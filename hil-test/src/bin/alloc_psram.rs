@@ -27,12 +27,19 @@ mod tests {
     use embedded_storage::*;
     use esp_alloc::{AnyMemory, ExternalMemory, InternalMemory};
     use esp_bootloader_esp_idf::partitions;
+    use esp_hal::peripherals::FLASH;
     use esp_storage::FlashStorage;
 
+    struct Context<'a> {
+        flash: FLASH<'a>,
+    }
+
     #[init]
-    fn init() {
+    fn init() -> Context<'static> {
         let p = esp_hal::init(esp_hal::Config::default());
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+
+        Context { flash: p.FLASH }
     }
 
     // alloc::vec::Vec tests
@@ -146,8 +153,8 @@ mod tests {
     }
 
     #[test]
-    fn test_with_accessing_flash_storage() {
-        let mut flash = FlashStorage::new();
+    fn test_with_accessing_flash_storage(ctx: Context<'static>) {
+        let mut flash = FlashStorage::new(ctx.flash);
 
         let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
         let pt = partitions::read_partition_table(&mut flash, &mut pt_mem).unwrap();

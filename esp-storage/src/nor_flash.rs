@@ -15,7 +15,7 @@ use crate::{
     buffer::{FlashSectorBuffer, uninit_slice, uninit_slice_mut},
 };
 
-impl FlashStorage {
+impl FlashStorage<'_> {
     #[inline(always)]
     fn is_word_aligned(bytes: &[u8]) -> bool {
         // TODO: Use is_aligned_to when stabilized (see `pointer_is_aligned`)
@@ -33,11 +33,11 @@ impl NorFlashError for FlashStorageError {
     }
 }
 
-impl ErrorType for FlashStorage {
+impl ErrorType for FlashStorage<'_> {
     type Error = FlashStorageError;
 }
 
-impl ReadNorFlash for FlashStorage {
+impl ReadNorFlash for FlashStorage<'_> {
     #[cfg(not(feature = "bytewise-read"))]
     const READ_SIZE: usize = Self::WORD_SIZE as _;
 
@@ -45,7 +45,8 @@ impl ReadNorFlash for FlashStorage {
     const READ_SIZE: usize = 1;
 
     fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
-        self.check_alignment::<{ Self::READ_SIZE as _ }>(offset, bytes.len())?;
+        const RS: u32 = FlashStorage::READ_SIZE as u32;
+        self.check_alignment::<{ RS }>(offset, bytes.len())?;
         self.check_bounds(offset, bytes.len())?;
 
         #[cfg(feature = "bytewise-read")]
@@ -135,12 +136,13 @@ impl ReadNorFlash for FlashStorage {
     }
 }
 
-impl NorFlash for FlashStorage {
+impl NorFlash for FlashStorage<'_> {
     const WRITE_SIZE: usize = Self::WORD_SIZE as _;
     const ERASE_SIZE: usize = Self::SECTOR_SIZE as _;
 
     fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
-        self.check_alignment::<{ Self::WORD_SIZE }>(offset, bytes.len())?;
+        const WS: u32 = FlashStorage::WORD_SIZE;
+        self.check_alignment::<{ WS }>(offset, bytes.len())?;
         self.check_bounds(offset, bytes.len())?;
 
         if Self::is_word_aligned(bytes) {
@@ -174,7 +176,8 @@ impl NorFlash for FlashStorage {
 
     fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
         let len = (to - from) as _;
-        self.check_alignment::<{ Self::SECTOR_SIZE }>(from, len)?;
+        const SZ: u32 = FlashStorage::SECTOR_SIZE;
+        self.check_alignment::<{ SZ }>(from, len)?;
         self.check_bounds(from, len)?;
 
         for sector in from / Self::SECTOR_SIZE..to / Self::SECTOR_SIZE {
@@ -185,7 +188,7 @@ impl NorFlash for FlashStorage {
     }
 }
 
-impl MultiwriteNorFlash for FlashStorage {}
+impl MultiwriteNorFlash for FlashStorage<'_> {}
 
 // Run the tests with `--test-threads=1` - the emulation is not multithread safe
 #[cfg(test)]

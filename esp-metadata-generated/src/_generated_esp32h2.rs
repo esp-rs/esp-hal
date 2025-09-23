@@ -614,10 +614,10 @@ macro_rules! for_each_peripheral {
         (unstable))); _for_each_inner!((DMA_CH1 <= virtual() (unstable)));
         _for_each_inner!((DMA_CH2 <= virtual() (unstable))); _for_each_inner!((ADC1 <=
         virtual() (unstable))); _for_each_inner!((BT <= virtual() (unstable)));
-        _for_each_inner!((SW_INTERRUPT <= virtual() (unstable)));
-        _for_each_inner!((MEM2MEM1 <= virtual() (unstable))); _for_each_inner!((MEM2MEM4
-        <= virtual() (unstable))); _for_each_inner!((MEM2MEM5 <= virtual() (unstable)));
-        _for_each_inner!((MEM2MEM10 <= virtual() (unstable)));
+        _for_each_inner!((FLASH <= virtual() (unstable))); _for_each_inner!((SW_INTERRUPT
+        <= virtual() (unstable))); _for_each_inner!((MEM2MEM1 <= virtual() (unstable)));
+        _for_each_inner!((MEM2MEM4 <= virtual() (unstable))); _for_each_inner!((MEM2MEM5
+        <= virtual() (unstable))); _for_each_inner!((MEM2MEM10 <= virtual() (unstable)));
         _for_each_inner!((MEM2MEM11 <= virtual() (unstable)));
         _for_each_inner!((MEM2MEM12 <= virtual() (unstable)));
         _for_each_inner!((MEM2MEM13 <= virtual() (unstable)));
@@ -669,12 +669,12 @@ macro_rules! for_each_peripheral {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (DMA_CH0 <= virtual() (unstable)), (DMA_CH1 <= virtual()
         (unstable)), (DMA_CH2 <= virtual() (unstable)), (ADC1 <= virtual() (unstable)),
-        (BT <= virtual() (unstable)), (SW_INTERRUPT <= virtual() (unstable)), (MEM2MEM1
-        <= virtual() (unstable)), (MEM2MEM4 <= virtual() (unstable)), (MEM2MEM5 <=
-        virtual() (unstable)), (MEM2MEM10 <= virtual() (unstable)), (MEM2MEM11 <=
-        virtual() (unstable)), (MEM2MEM12 <= virtual() (unstable)), (MEM2MEM13 <=
-        virtual() (unstable)), (MEM2MEM14 <= virtual() (unstable)), (MEM2MEM15 <=
-        virtual() (unstable))));
+        (BT <= virtual() (unstable)), (FLASH <= virtual() (unstable)), (SW_INTERRUPT <=
+        virtual() (unstable)), (MEM2MEM1 <= virtual() (unstable)), (MEM2MEM4 <= virtual()
+        (unstable)), (MEM2MEM5 <= virtual() (unstable)), (MEM2MEM10 <= virtual()
+        (unstable)), (MEM2MEM11 <= virtual() (unstable)), (MEM2MEM12 <= virtual()
+        (unstable)), (MEM2MEM13 <= virtual() (unstable)), (MEM2MEM14 <= virtual()
+        (unstable)), (MEM2MEM15 <= virtual() (unstable))));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.
