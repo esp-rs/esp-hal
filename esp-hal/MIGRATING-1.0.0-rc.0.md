@@ -185,6 +185,7 @@ Additionally, RMT transaction types
 - `SingleShotTxTransaction`
 - `ContinuousTxTransaction`
 - `RxTransaction`
+- futures returned by the async API
 are marked as `#[must_use]` to account for the fact that it is in general required to poll them to ensure progress.
 Additionally, they now implement `Drop` and stop the ongoing transfer as quickly as possible when dropped,
 ensuring that subsequent transactions start from a well-defined state.
