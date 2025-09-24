@@ -267,8 +267,12 @@ impl Drop for Controller<'_> {
 /// use esp_hal::timer::timg::TimerGroup;
 ///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
-/// esp_preempt::start(timg0.timer0);
-///
+#[cfg_attr(
+    riscv,
+    doc = " let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);"
+)]
+#[cfg_attr(riscv, doc = " esp_preempt::start(timg0.timer0, software_interrupt);")]
+#[cfg_attr(xtensa, doc = " esp_preempt::start(timg0.timer0);")]
 /// // You can now start esp-radio:
 /// let esp_radio_controller = esp_radio::init().unwrap();
 /// # }

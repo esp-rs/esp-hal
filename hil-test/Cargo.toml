@@ -198,11 +198,6 @@ name    = "twai"
 harness = false
 
 [[bin]]
-name              = "esp_radio_floats"
-harness           = false
-required-features = ["esp-radio", "esp-alloc"]
-
-[[bin]]
 name              = "esp_radio_ble_controller"
 harness           = false
 required-features = ["esp-radio", "esp-alloc"]
@@ -230,12 +225,12 @@ embedded-can       = "0.4.1"
 embedded-hal-async = "1.0.0"
 esp-alloc          = { path = "../esp-alloc", optional = true }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
-esp-hal            = { path = "../esp-hal" }
-esp-hal-embassy    = { path = "../esp-hal-embassy", optional = true }
-esp-preempt        = { path = "../esp-preempt", optional = true }
+esp-hal            = { path = "../esp-hal", features = ["defmt"] }
+esp-hal-embassy    = { path = "../esp-hal-embassy", features = ["defmt"], optional = true }
+esp-preempt        = { path = "../esp-preempt", features = ["defmt"], optional = true }
 esp-storage        = { path = "../esp-storage", optional = true }
 esp-sync           = { path = "../esp-sync" }
-esp-radio          = { path = "../esp-radio", optional = true }
+esp-radio          = { path = "../esp-radio", features = ["defmt"], optional = true }
 esp-radio-preempt-driver = { path = "../esp-radio-preempt-driver", optional = true }
 portable-atomic    = "1.11.0"
 static_cell        = { version = "2.1.0" }
@@ -245,7 +240,7 @@ crypto-bigint       = { version = "0.5.5", default-features = false }
 digest              = { version = "0.10.7", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
 # Add the `embedded-test/defmt` feature for more verbose testing
-embedded-test       = { version = "0.7.0-alpha.3", default-features = false, features = ["embassy", "external-executor", "semihosting"], git = "https://github.com/probe-rs/embedded-test", branch = "next" }
+embedded-test       = { version = "0.7.0-alpha.3", default-features = false, features = ["embassy", "external-executor", "semihosting", "defmt"], git = "https://github.com/probe-rs/embedded-test", branch = "next" }
 hex-literal         = "1.0.0"
 nb                  = "1.1.0"
 p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
@@ -260,7 +255,7 @@ esp-metadata-generated = { path = "../esp-metadata-generated", features = ["buil
 default = []
 unstable = ["esp-hal/unstable"]
 
-defmt = ["dep:defmt-rtt", "esp-hal/defmt", "embedded-test/defmt", "esp-radio?/defmt", "esp-hal-embassy?/defmt", "esp-preempt?/defmt"]
+defmt = ["dep:defmt-rtt"]
 esp-radio = ["dep:esp-radio", "dep:esp-preempt", "dep:esp-radio-preempt-driver"]
 
 # Device support (required!):
