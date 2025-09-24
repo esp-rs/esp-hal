@@ -2545,6 +2545,9 @@ pub mod asynch {
         ///
         /// Returns [crate::dma::DmaError::Late] if DMA descriptors are used up.
         pub async fn wait_for_available(&mut self) -> Result<(), Error> {
+            if self.is_done() {
+                return Err(Error::DmaError(crate::dma::DmaError::Late));
+            }
             DmaTxDoneChFuture::new(&mut self.i2s_tx.tx_channel).await?;
             Ok(())
         }
@@ -2557,6 +2560,9 @@ pub mod asynch {
         /// In particular, it waits for [crate::dma::DmaRxInterrupt::Done]
         /// which is trigger every time a descriptor in the list has been filled.
         pub async fn wait_for_available(&mut self) -> Result<(), Error> {
+            if self.is_done() {
+                return Err(Error::DmaError(crate::dma::DmaError::Late));
+            }
             DmaRxDoneChFuture::new(&mut self.i2s_rx.rx_channel).await?;
             Ok(())
         }
