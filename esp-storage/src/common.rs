@@ -1,7 +1,7 @@
 use core::mem::MaybeUninit;
 
 #[cfg(not(feature = "emulation"))]
-use esp_hal::peripherals::FLASH;
+pub use esp_hal::peripherals::FLASH as Flash;
 
 use crate::chip_specific;
 #[cfg(multi_core)]
@@ -43,6 +43,21 @@ pub fn check_rc(rc: i32) -> Result<(), FlashStorageError> {
     }
 }
 
+#[cfg(feature = "emulation")]
+#[derive(Debug)]
+pub struct Flash<'d> {
+    _phantom: core::marker::PhantomData<&'d ()>,
+}
+
+#[cfg(feature = "emulation")]
+impl<'d> Flash<'d> {
+    pub fn new() -> Self {
+        Flash {
+            _phantom: core::marker::PhantomData,
+        }
+    }
+}
+
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Flash storage abstraction.
@@ -51,10 +66,7 @@ pub struct FlashStorage<'d> {
     unlocked: bool,
     #[cfg(multi_core)]
     pub(crate) multi_core_strategy: MultiCoreStrategy,
-    #[cfg(not(feature = "emulation"))]
-    _flash: FLASH<'d>,
-    #[cfg(feature = "emulation")]
-    _phantom: core::marker::PhantomData<&'d ()>,
+    _flash: Flash<'d>,
 }
 
 impl<'d> FlashStorage<'d> {
@@ -68,8 +80,7 @@ impl<'d> FlashStorage<'d> {
     /// # Panics
     ///
     /// Panics if called more than once.
-    #[cfg(not(feature = "emulation"))]
-    pub fn new(flash: FLASH<'d>) -> Self {
+    pub fn new(flash: Flash<'d>) -> Self {
         #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
         const ADDR: u32 = 0x0000;
         #[cfg(any(feature = "esp32", feature = "esp32s2"))]
@@ -81,40 +92,6 @@ impl<'d> FlashStorage<'d> {
             #[cfg(multi_core)]
             multi_core_strategy: MultiCoreStrategy::Error,
             _flash: flash,
-        };
-
-        let mut buffer = crate::buffer::FlashWordBuffer::uninit();
-        storage.internal_read(ADDR, buffer.as_bytes_mut()).unwrap();
-
-        let buffer = unsafe { buffer.assume_init_bytes() };
-        let mb = match buffer[3] & 0xf0 {
-            0x00 => 1,
-            0x10 => 2,
-            0x20 => 4,
-            0x30 => 8,
-            0x40 => 16,
-            0x50 => 32,
-            _ => 0,
-        };
-        storage.capacity = mb * 1024 * 1024;
-
-        storage
-    }
-
-    #[allow(dead_code)]
-    #[cfg(feature = "emulation")]
-    pub(crate) fn new() -> Self {
-        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
-        const ADDR: u32 = 0x0000;
-        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-        const ADDR: u32 = 0x1000;
-
-        let mut storage = Self {
-            capacity: 0,
-            unlocked: false,
-            #[cfg(multi_core)]
-            multi_core_strategy: MultiCoreStrategy::Error,
-            _phantom: core::marker::PhantomData,
         };
 
         let mut buffer = crate::buffer::FlashWordBuffer::uninit();

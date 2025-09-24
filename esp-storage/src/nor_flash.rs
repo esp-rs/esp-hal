@@ -194,6 +194,7 @@ impl MultiwriteNorFlash for FlashStorage<'_> {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::Flash;
 
     const WORD_SIZE: u32 = 4;
     const SECTOR_SIZE: u32 = 4 << 10;
@@ -267,7 +268,7 @@ mod tests {
     #[test]
     #[cfg(not(feature = "bytewise-read"))]
     fn aligned_read() {
-        let mut flash = FlashStorage::new();
+        let mut flash = FlashStorage::new(Flash::new());
         flash.capacity = 4 * 4096;
         let src = TestBuffer::seq();
         let mut data = TestBuffer::default();
@@ -287,7 +288,7 @@ mod tests {
     #[test]
     #[cfg(not(feature = "bytewise-read"))]
     fn not_aligned_read_aligned_buffer() {
-        let mut flash = FlashStorage::new();
+        let mut flash = FlashStorage::new(Flash::new());
         flash.capacity = 4 * 4096;
         let mut data = TestBuffer::default();
 
@@ -299,7 +300,7 @@ mod tests {
     #[test]
     #[cfg(not(feature = "bytewise-read"))]
     fn aligned_read_not_aligned_buffer() {
-        let mut flash = FlashStorage::new();
+        let mut flash = FlashStorage::new(Flash::new());
         flash.capacity = 4 * 4096;
         let src = TestBuffer::seq();
         let mut data = TestBuffer::default();
@@ -321,7 +322,7 @@ mod tests {
     #[test]
     #[cfg(feature = "bytewise-read")]
     fn bytewise_read_aligned_buffer() {
-        let mut flash = FlashStorage::new();
+        let mut flash = FlashStorage::new(Flash::new());
 
         flash.capacity = 4 * 4096;
         let src = TestBuffer::seq();
@@ -342,7 +343,7 @@ mod tests {
     #[test]
     #[cfg(feature = "bytewise-read")]
     fn bytewise_read_not_aligned_buffer() {
-        let mut flash = FlashStorage::new();
+        let mut flash = FlashStorage::new(Flash::new());
 
         flash.capacity = 4 * 4096;
         let src = TestBuffer::seq();
@@ -364,7 +365,7 @@ mod tests {
 
     #[test]
     fn write_not_aligned_buffer() {
-        let mut flash = FlashStorage::new();
+        let mut flash = FlashStorage::new(Flash::new());
         flash.capacity = 4 * 4096;
         let mut read_data = TestBuffer::default();
         let write_data = TestBuffer::seq();
