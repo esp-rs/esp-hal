@@ -1,7 +1,10 @@
 use alloc::boxed::Box;
 use core::ptr::NonNull;
 
-use esp_hal::time::{Duration, Instant};
+use esp_hal::{
+    system::Cpu,
+    time::{Duration, Instant},
+};
 use esp_radio_preempt_driver::{
     register_semaphore_implementation,
     semaphore::{SemaphoreImplementation, SemaphoreKind, SemaphorePtr},
@@ -10,7 +13,7 @@ use esp_sync::NonReentrantMutex;
 
 use crate::{
     SCHEDULER,
-    task::{TaskExt, TaskPtr, current_task},
+    task::{TaskExt, TaskPtr},
     wait_queue::WaitQueue,
 };
 
@@ -47,30 +50,30 @@ impl SemaphoreInner {
                 original_priority,
                 ..
             } => {
-                let current = current_task();
-                if let Some(owner) = owner {
-                    if *owner == current && *recursive {
-                        *lock_counter += 1;
-                        true
-                    } else {
-                        // We can't lock the mutex. Make sure the mutex holder has a high enough
-                        // priority to avoid priority inversion.
-                        SCHEDULER.with(|scheduler| {
+                SCHEDULER.with(|scheduler| {
+                    let current_cpu = Cpu::current() as usize;
+                    let current = unwrap!(scheduler.per_cpu[current_cpu].current_task);
+                    if let Some(owner) = owner {
+                        if *owner == current && *recursive {
+                            *lock_counter += 1;
+                            true
+                        } else {
+                            // We can't lock the mutex. Make sure the mutex holder has a high enough
+                            // priority to avoid priority inversion.
                             let current_priority = current.priority(&mut scheduler.run_queue);
                             if owner.priority(&mut scheduler.run_queue) < current_priority {
                                 owner.set_priority(&mut scheduler.run_queue, current_priority);
                                 scheduler.resume_task(*owner);
                             }
                             false
-                        })
+                        }
+                    } else {
+                        *owner = Some(current);
+                        *lock_counter += 1;
+                        *original_priority = current.priority(&mut scheduler.run_queue);
+                        true
                     }
-                } else {
-                    *owner = Some(current);
-                    *lock_counter += 1;
-                    *original_priority =
-                        SCHEDULER.with(|scheduler| current.priority(&mut scheduler.run_queue));
-                    true
-                }
+                })
             }
         }
     }
@@ -90,23 +93,22 @@ impl SemaphoreInner {
                 lock_counter,
                 original_priority,
                 ..
-            } => {
-                let current = current_task();
+            } => SCHEDULER.with(|scheduler| {
+                let current_cpu = Cpu::current() as usize;
+                let current = unwrap!(scheduler.per_cpu[current_cpu].current_task);
 
                 if *owner == Some(current) && *lock_counter > 0 {
                     *lock_counter -= 1;
-                    if *lock_counter == 0 {
-                        if let Some(owner) = owner.take() {
-                            SCHEDULER.with(|scheduler| {
-                                owner.set_priority(&mut scheduler.run_queue, *original_priority);
-                            });
-                        }
+                    if *lock_counter == 0
+                        && let Some(owner) = owner.take()
+                    {
+                        owner.set_priority(&mut scheduler.run_queue, *original_priority);
                     }
                     true
                 } else {
                     false
                 }
-            }
+            }),
         }
     }
 
