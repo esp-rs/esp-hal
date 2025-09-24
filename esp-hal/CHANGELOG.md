@@ -70,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Introduced `Error::FrequencyUnset` in `ledc::timer::Error` (#4214)
 - `ESP_HAL_CONFIG_STACK_GUARD_OFFSET` is now considered stable (#4220)
 - `rmt::Channel` and `rmt::ChannelCreator` now carry a lifetime and can be reborrowed. (#4174)
+- RMT transactions are marked as `#[must_use]` and implement `Drop`. (#4174)
 
 ### Fixed
 
