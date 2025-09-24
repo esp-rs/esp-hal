@@ -1,17 +1,13 @@
+#[cfg(feature = "esp-radio")]
 use core::{ffi::c_void, ptr::NonNull};
 
 use allocator_api2::boxed::Box;
-use esp_hal::{
-    system::Cpu,
-    time::{Duration, Instant},
-};
-use esp_radio_preempt_driver::semaphore::{SemaphoreImplementation, SemaphoreKind, SemaphorePtr};
+use esp_hal::{system::Cpu, time::Instant};
 use esp_sync::NonReentrantMutex;
 
 use crate::{
     InternalMemory,
-    run_queue::{MaxPriority, RunQueue},
-    semaphore::Semaphore,
+    run_queue::RunQueue,
     task::{
         self,
         CpuContext,
@@ -93,6 +89,7 @@ impl CpuSchedulerState {
 
             main_task: Task {
                 cpu_context: CpuContext::new(),
+                #[cfg(feature = "esp-radio")]
                 thread_semaphore: None,
                 state: TaskState::Ready,
                 stack: core::ptr::slice_from_raw_parts_mut(core::ptr::null_mut(), 0),
@@ -201,6 +198,7 @@ impl SchedulerState {
         task::yield_task();
     }
 
+    #[cfg(feature = "esp-radio")]
     pub(crate) fn create_task(
         &mut self,
         name: &str,
@@ -365,6 +363,7 @@ impl SchedulerState {
         });
     }
 
+    #[cfg(feature = "esp-radio")]
     pub(crate) fn schedule_task_deletion(&mut self, task_to_delete: *mut Task) -> bool {
         let current_cpu = Cpu::current() as usize;
         let current_task = unwrap!(self.per_cpu[current_cpu].current_task);
@@ -408,7 +407,7 @@ impl SchedulerState {
                 let task = Box::from_raw_in(to_delete.as_ptr(), InternalMemory);
                 core::mem::drop(task);
             } else {
-                to_delete.as_mut().thread_semaphore = None;
+                core::ptr::drop_in_place(to_delete.as_mut());
             }
         }
     }
@@ -436,10 +435,12 @@ impl Scheduler {
         self.inner.with(cb)
     }
 
+    #[cfg(feature = "esp-radio")]
     pub(crate) fn current_task(&self) -> TaskPtr {
         task::current_task()
     }
 
+    #[cfg(feature = "esp-radio")]
     pub(crate) fn create_task(
         &self,
         name: &str,
@@ -466,102 +467,12 @@ impl Scheduler {
     }
 }
 
+#[cfg(feature = "esp-radio")]
 esp_radio_preempt_driver::scheduler_impl!(pub(crate) static SCHEDULER: Scheduler = Scheduler {
     inner: NonReentrantMutex::new(SchedulerState::new())
 });
 
-impl esp_radio_preempt_driver::Scheduler for Scheduler {
-    fn initialized(&self) -> bool {
-        self.with(|scheduler| {
-            if scheduler.time_driver.is_none() {
-                warn!("Trying to initialize esp-radio before starting esp-preempt");
-                return false;
-            }
-
-            let current_cpu = Cpu::current() as usize;
-            if !scheduler.per_cpu[current_cpu].initialized {
-                warn!(
-                    "Trying to initialize esp-radio on {:?} but esp-preempt is not running on this core",
-                    current_cpu
-                );
-                return false;
-            }
-
-            true
-        })
-    }
-
-    fn yield_task(&self) {
-        task::yield_task();
-    }
-
-    fn yield_task_from_isr(&self) {
-        task::yield_task();
-    }
-
-    fn max_task_priority(&self) -> u32 {
-        MaxPriority::MAX_PRIORITY as u32
-    }
-
-    fn task_create(
-        &self,
-        name: &str,
-        task: extern "C" fn(*mut c_void),
-        param: *mut c_void,
-        priority: u32,
-        pin_to_core: Option<u32>,
-        task_stack_size: usize,
-    ) -> *mut c_void {
-        self.create_task(
-            name,
-            task,
-            param,
-            task_stack_size,
-            priority.min(self.max_task_priority()),
-            pin_to_core.and_then(|core| match core {
-                0 => Some(Cpu::ProCpu),
-                #[cfg(multi_core)]
-                1 => Some(Cpu::AppCpu),
-                _ => {
-                    warn!("Invalid core number: {}", core);
-                    None
-                }
-            }),
-        )
-        .as_ptr()
-        .cast()
-    }
-
-    fn current_task(&self) -> *mut c_void {
-        self.current_task().as_ptr().cast()
-    }
-
-    fn schedule_task_deletion(&self, task_handle: *mut c_void) {
-        task::schedule_task_deletion(task_handle as *mut Task)
-    }
-
-    fn current_task_thread_semaphore(&self) -> SemaphorePtr {
-        task::with_current_task(|task| {
-            if task.thread_semaphore.is_none() {
-                task.thread_semaphore = Some(Semaphore::create(SemaphoreKind::Counting {
-                    max: 1,
-                    initial: 0,
-                }));
-            }
-
-            unwrap!(task.thread_semaphore)
-        })
-    }
-
-    fn usleep(&self, us: u32) {
-        SCHEDULER.sleep_until(Instant::now() + Duration::from_micros(us as u64));
-    }
-
-    fn now(&self) -> u64 {
-        // We're using a SingleShotTimer as the time driver, which lets us use the system timer's
-        // timestamps.
-        esp_hal::time::Instant::now()
-            .duration_since_epoch()
-            .as_micros()
-    }
-}
+#[cfg(not(feature = "esp-radio"))]
+pub(crate) static SCHEDULER: Scheduler = Scheduler {
+    inner: NonReentrantMutex::new(SchedulerState::new()),
+};

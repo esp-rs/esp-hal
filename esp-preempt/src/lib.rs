@@ -61,13 +61,13 @@ extern crate alloc;
 // MUST be the first module
 mod fmt;
 
-mod queue;
+#[cfg(feature = "esp-radio")]
+mod esp_radio;
 mod run_queue;
 mod scheduler;
-mod semaphore;
+pub mod semaphore;
 mod task;
 mod timer;
-mod timer_queue;
 mod wait_queue;
 
 use core::mem::MaybeUninit;
@@ -87,6 +87,7 @@ use esp_hal::{
     time::{Duration, Instant},
 };
 pub(crate) use scheduler::SCHEDULER;
+pub use task::CurrentThreadHandle;
 
 use crate::timer::TimeDriver;
 

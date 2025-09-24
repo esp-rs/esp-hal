@@ -1,13 +1,6 @@
-use alloc::boxed::Box;
-use core::ptr::NonNull;
-
 use esp_hal::{
     system::Cpu,
     time::{Duration, Instant},
-};
-use esp_radio_preempt_driver::{
-    register_semaphore_implementation,
-    semaphore::{SemaphoreImplementation, SemaphoreKind, SemaphorePtr},
 };
 use esp_sync::NonReentrantMutex;
 
@@ -143,28 +136,25 @@ pub struct Semaphore {
 }
 
 impl Semaphore {
-    pub fn new(kind: SemaphoreKind) -> Self {
-        let inner = match kind {
-            SemaphoreKind::Counting { initial, max } => SemaphoreInner::Counting {
+    pub fn new_counting(initial: u32, max: u32) -> Self {
+        Semaphore {
+            inner: NonReentrantMutex::new(SemaphoreInner::Counting {
                 current: initial,
                 max,
                 waiting: WaitQueue::new(),
-            },
-            SemaphoreKind::Mutex | SemaphoreKind::RecursiveMutex => SemaphoreInner::Mutex {
-                recursive: matches!(kind, SemaphoreKind::RecursiveMutex),
+            }),
+        }
+    }
+    pub fn new_mutex(recursive: bool) -> Self {
+        Semaphore {
+            inner: NonReentrantMutex::new(SemaphoreInner::Mutex {
+                recursive,
                 owner: None,
                 lock_counter: 0,
                 original_priority: 0,
                 waiting: WaitQueue::new(),
-            },
-        };
-        Semaphore {
-            inner: NonReentrantMutex::new(inner),
+            }),
         }
-    }
-
-    unsafe fn from_ptr<'a>(ptr: SemaphorePtr) -> &'a Self {
-        unsafe { ptr.cast::<Self>().as_ref() }
     }
 
     pub fn try_take(&self) -> bool {
@@ -220,49 +210,3 @@ impl Semaphore {
         })
     }
 }
-
-impl SemaphoreImplementation for Semaphore {
-    fn create(kind: SemaphoreKind) -> SemaphorePtr {
-        let sem = Box::new(Semaphore::new(kind));
-        NonNull::from(Box::leak(sem)).cast()
-    }
-
-    unsafe fn delete(semaphore: SemaphorePtr) {
-        let sem = unsafe { Box::from_raw(semaphore.cast::<Semaphore>().as_ptr()) };
-        core::mem::drop(sem);
-    }
-
-    unsafe fn take(semaphore: SemaphorePtr, timeout_us: Option<u32>) -> bool {
-        let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
-
-        semaphore.take(timeout_us)
-    }
-
-    unsafe fn give(semaphore: SemaphorePtr) -> bool {
-        let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
-
-        semaphore.give()
-    }
-
-    unsafe fn current_count(semaphore: SemaphorePtr) -> u32 {
-        let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
-
-        semaphore.current_count()
-    }
-
-    unsafe fn try_take(semaphore: SemaphorePtr) -> bool {
-        let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
-
-        semaphore.try_take()
-    }
-
-    unsafe fn try_give_from_isr(semaphore: SemaphorePtr, _hptw: Option<&mut bool>) -> bool {
-        unsafe { <Self as SemaphoreImplementation>::give(semaphore) }
-    }
-
-    unsafe fn try_take_from_isr(semaphore: SemaphorePtr, _hptw: Option<&mut bool>) -> bool {
-        unsafe { <Self as SemaphoreImplementation>::try_take(semaphore) }
-    }
-}
-
-register_semaphore_implementation!(Semaphore);
