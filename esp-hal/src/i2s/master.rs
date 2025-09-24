@@ -1706,6 +1706,10 @@ mod private {
             self.regs().conf().modify(|_, w| w.rx_start().clear_bit());
         }
 
+        fn tx_done(&self) -> bool {
+            self.regs().state().read().tx_idle().bit_is_set()
+        }
+
         fn wait_for_tx_done(&self) {
             while self.regs().state().read().tx_idle().bit_is_clear() {
                 // wait
@@ -1752,6 +1756,10 @@ mod private {
                 .modify(|_, w| unsafe { w.rx_eof_num().bits(eof_num as u32) });
 
             self.regs().conf().modify(|_, w| w.rx_start().set_bit());
+        }
+
+        fn rx_done(&self) -> bool {
+            self.regs().int_raw().read().in_suc_eof().bit_is_set()
         }
 
         fn wait_for_rx_done(&self) {
