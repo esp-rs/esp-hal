@@ -58,7 +58,7 @@ impl TimerQueueInner {
         } else {
             // create the timer task
             let task_ptr =
-                SCHEDULER.create_task("timer", timer_task, core::ptr::null_mut(), 8192, 2);
+                SCHEDULER.create_task("timer", timer_task, core::ptr::null_mut(), 8192, 2, None);
             self.task = Some(task_ptr);
             self.next_wakeup = due;
         }

@@ -9,9 +9,21 @@ Depending on your chosen OS, you may need to use other `esp_preempt` implementat
 
 Furthermore, `esp_radio::init` no longer requires `RNG` or a timer.
 
+On Xtensa devices (ESP32/S2/S3):
+
 ```diff
 -let esp_wifi_ctrl = esp_wifi::init(timg0.timer0, Rng::new()).unwrap();
 +esp_preempt::start(timg0.timer0);
++let esp_wifi_ctrl = esp_radio::init().unwrap();
+```
+
+On RISC-V devices (ESP32-C2/C3/C6/H2) you'll need to also pass `SoftwareInterrupt<0>` to `esp_preempt::start`:
+
+```diff
+-let esp_wifi_ctrl = esp_wifi::init(timg0.timer0, Rng::new()).unwrap();
++use esp_hal::interrupt::software::SoftwareInterruptControl;
++let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
++esp_preempt::start(timg0.timer0, software_interrupt.software_interrupt0);
 +let esp_wifi_ctrl = esp_radio::init().unwrap();
 ```
 

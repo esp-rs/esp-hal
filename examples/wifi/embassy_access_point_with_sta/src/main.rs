@@ -34,6 +34,8 @@ use embassy_net::{
 use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
+#[cfg(target_arch = "riscv32")]
+use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_radio::{
@@ -74,7 +76,13 @@ async fn main(spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_preempt::start(timg0.timer0);
+    #[cfg(target_arch = "riscv32")]
+    let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_preempt::start(
+        timg0.timer0,
+        #[cfg(target_arch = "riscv32")]
+        software_interrupt.software_interrupt0,
+    );
 
     let esp_radio_ctrl = &*mk_static!(Controller<'static>, esp_radio::init().unwrap());
 

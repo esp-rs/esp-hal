@@ -1,5 +1,6 @@
 use crate::task::{TaskExt, TaskPtr, TaskQueue, TaskReadyQueueElement, TaskState};
 
+#[derive(Clone, Copy)]
 pub(crate) struct MaxPriority {
     max: usize,
     mask: usize,
@@ -71,7 +72,39 @@ impl RunQueue {
         let current_prio = self.ready_priority.ready();
         debug!("pop - from level: {}", current_prio);
 
-        let popped = self.ready_tasks[current_prio].pop();
+        cfg_if::cfg_if! {
+            if #[cfg(multi_core)] {
+                use esp_hal::system::Cpu;
+
+                let other = match Cpu::current() {
+                    Cpu::AppCpu => Cpu::ProCpu,
+                    Cpu::ProCpu => Cpu::AppCpu,
+                };
+
+                // Look iteratively through priority levels - this will ensure we can find a task even if all high priority tasks are pinned to the other CPU.
+                let mut priority_level = self.ready_priority;
+
+                let mut current_prio = current_prio;
+                let mut popped;
+                loop {
+                    popped = self.ready_tasks[current_prio].pop_if(|t| t.pinned_to != Some(other));
+
+                    if popped.is_none() {
+                        priority_level.unmark(current_prio);
+                        if current_prio == 0 {
+                            break;
+                        }
+                        current_prio = priority_level.ready();
+                        continue;
+                    }
+
+                    break;
+                }
+
+            } else {
+                let popped = self.ready_tasks[current_prio].pop();
+            }
+        }
 
         if self.ready_tasks[current_prio].is_empty() {
             self.ready_priority.unmark(current_prio);

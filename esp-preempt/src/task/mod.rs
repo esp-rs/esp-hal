@@ -6,6 +6,7 @@ use core::{ffi::c_void, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 use allocator_api2::alloc::Allocator;
 pub(crate) use arch_specific::*;
+use esp_hal::system::Cpu;
 use esp_radio_preempt_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 
 use crate::{
@@ -182,6 +183,32 @@ impl<E: TaskListElement> TaskQueue<E> {
         popped
     }
 
+    #[cfg(multi_core)]
+    pub fn pop_if(&mut self, cond: impl Fn(&Task) -> bool) -> Option<TaskPtr> {
+        let mut head = self.head.take();
+        self.tail = None;
+
+        let mut popped = None;
+        while let Some(task) = head {
+            head = E::next(task);
+            E::set_next(task, None);
+            if cond(unsafe { task.as_ref() }) {
+                popped = Some(task);
+                break;
+            } else {
+                self.push(task);
+            }
+        }
+
+        while let Some(task) = head {
+            head = E::next(task);
+            E::set_next(task, None);
+            self.push(task);
+        }
+
+        popped
+    }
+
     pub fn remove(&mut self, task: TaskPtr) {
         let mut list = core::mem::take(self);
         while let Some(popped) = list.pop() {
@@ -203,6 +230,8 @@ pub(crate) struct Task {
     pub state: TaskState,
     pub stack: *mut [MaybeUninit<u32>],
     pub priority: usize,
+    #[cfg(multi_core)]
+    pub pinned_to: Option<Cpu>,
 
     pub wakeup_at: u64,
 
@@ -236,10 +265,11 @@ impl Task {
         param: *mut c_void,
         task_stack_size: usize,
         priority: usize,
+        pinned_to: Option<Cpu>,
     ) -> Self {
-        trace!(
-            "task_create {} {:?}({:?}) stack_size = {} priority = {}",
-            name, task_fn, param, task_stack_size, priority
+        debug!(
+            "task_create {} {:?}({:?}) stack_size = {} priority = {} pinned_to = {:?}",
+            name, task_fn, param, task_stack_size, priority, pinned_to
         );
 
         // Make sure the stack guard doesn't eat into the stack size.
@@ -274,6 +304,8 @@ impl Task {
             stack: stack_words,
             current_queue: None,
             priority,
+            #[cfg(multi_core)]
+            pinned_to,
 
             wakeup_at: 0,
 
@@ -308,57 +340,50 @@ impl Drop for Task {
     }
 }
 
-// This context will be filled out by the first context switch.
-// We allocate the main task statically, because there is always a main task. If deleted, we simply
-// don't deallocate this.
-pub(crate) static mut MAIN_TASK: Task = Task {
-    cpu_context: CpuContext::new(),
-    thread_semaphore: None,
-    state: TaskState::Ready,
-    stack: core::ptr::slice_from_raw_parts_mut(core::ptr::null_mut(), 0),
-    current_queue: None,
-    priority: 0,
-
-    wakeup_at: 0,
-
-    alloc_list_item: TaskListItem::None,
-    ready_queue_item: TaskListItem::None,
-    timer_queue_item: TaskListItem::None,
-    delete_list_item: TaskListItem::None,
-
-    heap_allocated: false,
-};
-
 pub(super) fn allocate_main_task(scheduler: &mut SchedulerState, stack: *mut [MaybeUninit<u32>]) {
-    let mut main_task_ptr = unwrap!(NonNull::new(&raw mut MAIN_TASK));
-    debug!("Main task created: {:?}", main_task_ptr);
+    let cpu = Cpu::current();
+    let current_cpu = cpu as usize;
 
     unsafe {
         stack
             .cast::<MaybeUninit<u32>>()
             .write(MaybeUninit::new(STACK_CANARY));
+    }
 
-        let main_task = main_task_ptr.as_mut();
-
-        // Reset main task properties. The rest should be cleared when the task is deleted.
-        main_task.priority = 0;
-        main_task.state = TaskState::Ready;
-        main_task.stack = stack;
+    // Reset main task properties. The rest should be cleared when the task is deleted.
+    scheduler.per_cpu[current_cpu].main_task.priority = 0;
+    scheduler.per_cpu[current_cpu].main_task.state = TaskState::Ready;
+    scheduler.per_cpu[current_cpu].main_task.stack = stack;
+    #[cfg(multi_core)]
+    {
+        scheduler.per_cpu[current_cpu].main_task.pinned_to = Some(cpu);
     }
 
     debug_assert!(
-        scheduler.current_task.is_none(),
+        !scheduler.per_cpu[current_cpu].initialized,
         "Tried to allocate main task multiple times"
     );
 
+    scheduler.per_cpu[current_cpu].initialized = true;
+
+    // This is slightly questionable as we don't ensure SchedulerState is pinned, but it's always
+    // part of a static object so taking the pointer is fine.
+    let main_task_ptr = NonNull::from(&scheduler.per_cpu[current_cpu].main_task);
+    debug!("Main task created: {:?}", main_task_ptr);
+
     // The main task is already running, no need to add it to the ready queue.
     scheduler.all_tasks.push(main_task_ptr);
-    scheduler.current_task = Some(main_task_ptr);
+    scheduler.per_cpu[current_cpu].current_task = Some(main_task_ptr);
     scheduler.run_queue.mark_task_ready(main_task_ptr);
 }
 
 pub(super) fn with_current_task<R>(mut cb: impl FnMut(&mut Task) -> R) -> R {
-    SCHEDULER.with(|state| cb(unsafe { unwrap!(state.current_task).as_mut() }))
+    SCHEDULER.with(|state| {
+        cb(unsafe {
+            let current_cpu = Cpu::current() as usize;
+            unwrap!(state.per_cpu[current_cpu].current_task).as_mut()
+        })
+    })
 }
 
 pub(super) fn current_task() -> TaskPtr {
@@ -367,16 +392,25 @@ pub(super) fn current_task() -> TaskPtr {
 
 pub(super) fn schedule_task_deletion(task: *mut Task) {
     trace!("schedule_task_deletion {:?}", task);
-    let deleting_current = SCHEDULER.with(|state| state.schedule_task_deletion(task));
-
-    // Tasks are deleted during context switches, so we need to yield if we are
-    // deleting the current task.
-    if deleting_current {
-        SCHEDULER.with(|scheduler| {
-            // We won't be re-scheduled.
-            scheduler.event.set_blocked();
+    SCHEDULER.with(|scheduler| {
+        if scheduler.schedule_task_deletion(task) {
+            // Deleting the current task - We won't be re-scheduled.
+            let current_cpu = Cpu::current() as usize;
+            scheduler.per_cpu[current_cpu].event.set_blocked();
             yield_task();
-        });
-        unreachable!();
+        }
+    });
+}
+
+#[inline]
+#[cfg(multi_core)]
+pub(crate) fn schedule_other_core() {
+    use esp_hal::interrupt::software::SoftwareInterrupt;
+    match Cpu::current() {
+        Cpu::ProCpu => unsafe { SoftwareInterrupt::<'static, 1>::steal() }.raise(),
+        Cpu::AppCpu => unsafe { SoftwareInterrupt::<'static, 0>::steal() }.raise(),
     }
+
+    // It takes a bit for the software interrupt to be serviced, but since it's happening on the
+    // other core, we don't need to wait.
 }

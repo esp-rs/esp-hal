@@ -12,6 +12,8 @@ use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 use esp_alloc as _;
 use esp_backtrace as _;
+#[cfg(target_arch = "riscv32")]
+use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::{clock::CpuClock, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_radio::{
@@ -40,7 +42,13 @@ async fn main(_spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_preempt::start(timg0.timer0);
+    #[cfg(target_arch = "riscv32")]
+    let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_preempt::start(
+        timg0.timer0,
+        #[cfg(target_arch = "riscv32")]
+        software_interrupt.software_interrupt0,
+    );
 
     let esp_radio_ctrl = &*mk_static!(Controller<'static>, esp_radio::init().unwrap());
 
