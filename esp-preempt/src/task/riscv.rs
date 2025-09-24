@@ -1,3 +1,4 @@
+#[cfg(feature = "esp-radio")]
 use core::ffi::c_void;
 
 use esp_hal::{interrupt::software::SoftwareInterrupt, riscv::register, system::Cpu};
@@ -117,6 +118,7 @@ pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext) {
     idle_context.pc = idle_hook as usize;
 }
 
+#[cfg(feature = "esp-radio")]
 pub(crate) fn new_task_context(
     task: extern "C" fn(*mut c_void),
     param: *mut c_void,

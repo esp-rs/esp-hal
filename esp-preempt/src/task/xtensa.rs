@@ -1,3 +1,4 @@
+#[cfg(feature = "esp-radio")]
 use core::ffi::c_void;
 
 #[cfg(multi_core)]
@@ -28,6 +29,7 @@ pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext) {
     idle_context.PS = current_ps;
 }
 
+#[cfg(feature = "esp-radio")]
 pub(crate) fn new_task_context(
     task_fn: extern "C" fn(*mut c_void),
     param: *mut c_void,
