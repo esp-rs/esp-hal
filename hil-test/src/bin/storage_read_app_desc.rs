@@ -18,11 +18,11 @@ mod tests {
 
     #[test]
     fn test_can_read_app_desc() {
-        let _ = esp_hal::init(esp_hal::Config::default());
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let mut bytes = [0u8; 256];
 
-        let mut flash = FlashStorage::new();
+        let mut flash = FlashStorage::new(peripherals.FLASH);
 
         // esp-idf 2nd stage bootloader would expect the app-descriptor at the start of
         // DROM it also expects DROM segment to the the first page of the

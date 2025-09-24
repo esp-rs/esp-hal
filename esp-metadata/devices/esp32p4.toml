@@ -2,7 +2,7 @@
 #
 # Empty [`device.driver`] tables imply `partial` support status.
 #
-# If you modify a driver support status, run `cargo xtask update-chip-support-table` to
+# If you modify a driver support status, run `cargo xtask update-metadata` to
 # update the table in the esp-hal README.
 
 [device]

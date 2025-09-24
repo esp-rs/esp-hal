@@ -2,7 +2,7 @@ use embedded_storage::{ReadStorage, Storage};
 
 use crate::{FlashStorage, FlashStorageError, buffer::FlashSectorBuffer};
 
-impl ReadStorage for FlashStorage {
+impl ReadStorage for FlashStorage<'_> {
     type Error = FlashStorageError;
 
     fn read(&mut self, offset: u32, mut bytes: &mut [u8]) -> Result<(), Self::Error> {
@@ -44,7 +44,7 @@ impl ReadStorage for FlashStorage {
     }
 }
 
-impl Storage for FlashStorage {
+impl Storage for FlashStorage<'_> {
     fn write(&mut self, offset: u32, mut bytes: &[u8]) -> Result<(), Self::Error> {
         self.check_bounds(offset, bytes.len())?;
 

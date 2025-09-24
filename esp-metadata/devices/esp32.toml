@@ -2,7 +2,7 @@
 #
 # Empty [`device.driver`] tables imply `partial` support status.
 #
-# If you modify a driver support status, run `cargo xtask update-chip-support-table` to
+# If you modify a driver support status, run `cargo xtask update-metadata` to
 # update the table in the esp-hal README.
 
 [device]
@@ -73,6 +73,7 @@ peripherals = [
     { name = "CPU_CTRL", virtual = true },
     { name = "DAC1", virtual = true },
     { name = "DAC2", virtual = true },
+    { name = "FLASH", virtual = true },
     { name = "PSRAM", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "TOUCH", virtual = true },

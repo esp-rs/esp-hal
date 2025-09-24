@@ -657,21 +657,22 @@ macro_rules! for_each_peripheral {
         (unstable))); _for_each_inner!((ADC1 <= virtual() (unstable)));
         _for_each_inner!((ADC2 <= virtual() (unstable))); _for_each_inner!((DAC1 <=
         virtual() (unstable))); _for_each_inner!((DAC2 <= virtual() (unstable)));
-        _for_each_inner!((PSRAM <= virtual() (unstable))); _for_each_inner!((SW_INTERRUPT
-        <= virtual() (unstable))); _for_each_inner!((ULP_RISCV_CORE <= virtual()
-        (unstable))); _for_each_inner!((all(GPIO0 <= virtual()), (GPIO1 <= virtual()),
-        (GPIO2 <= virtual()), (GPIO3 <= virtual()), (GPIO4 <= virtual()), (GPIO5 <=
-        virtual()), (GPIO6 <= virtual()), (GPIO7 <= virtual()), (GPIO8 <= virtual()),
-        (GPIO9 <= virtual()), (GPIO10 <= virtual()), (GPIO11 <= virtual()), (GPIO12 <=
-        virtual()), (GPIO13 <= virtual()), (GPIO14 <= virtual()), (GPIO15 <= virtual()),
-        (GPIO16 <= virtual()), (GPIO17 <= virtual()), (GPIO18 <= virtual()), (GPIO19 <=
-        virtual()), (GPIO20 <= virtual()), (GPIO21 <= virtual()), (GPIO26 <= virtual()),
-        (GPIO27 <= virtual()), (GPIO28 <= virtual()), (GPIO29 <= virtual()), (GPIO30 <=
-        virtual()), (GPIO31 <= virtual()), (GPIO32 <= virtual()), (GPIO33 <= virtual()),
-        (GPIO34 <= virtual()), (GPIO35 <= virtual()), (GPIO36 <= virtual()), (GPIO37 <=
-        virtual()), (GPIO38 <= virtual()), (GPIO39 <= virtual()), (GPIO40 <= virtual()),
-        (GPIO41 <= virtual()), (GPIO42 <= virtual()), (GPIO43 <= virtual()), (GPIO44 <=
-        virtual()), (GPIO45 <= virtual()), (GPIO46 <= virtual()), (AES <= AES(AES : {
+        _for_each_inner!((FLASH <= virtual() (unstable))); _for_each_inner!((PSRAM <=
+        virtual() (unstable))); _for_each_inner!((SW_INTERRUPT <= virtual() (unstable)));
+        _for_each_inner!((ULP_RISCV_CORE <= virtual() (unstable)));
+        _for_each_inner!((all(GPIO0 <= virtual()), (GPIO1 <= virtual()), (GPIO2 <=
+        virtual()), (GPIO3 <= virtual()), (GPIO4 <= virtual()), (GPIO5 <= virtual()),
+        (GPIO6 <= virtual()), (GPIO7 <= virtual()), (GPIO8 <= virtual()), (GPIO9 <=
+        virtual()), (GPIO10 <= virtual()), (GPIO11 <= virtual()), (GPIO12 <= virtual()),
+        (GPIO13 <= virtual()), (GPIO14 <= virtual()), (GPIO15 <= virtual()), (GPIO16 <=
+        virtual()), (GPIO17 <= virtual()), (GPIO18 <= virtual()), (GPIO19 <= virtual()),
+        (GPIO20 <= virtual()), (GPIO21 <= virtual()), (GPIO26 <= virtual()), (GPIO27 <=
+        virtual()), (GPIO28 <= virtual()), (GPIO29 <= virtual()), (GPIO30 <= virtual()),
+        (GPIO31 <= virtual()), (GPIO32 <= virtual()), (GPIO33 <= virtual()), (GPIO34 <=
+        virtual()), (GPIO35 <= virtual()), (GPIO36 <= virtual()), (GPIO37 <= virtual()),
+        (GPIO38 <= virtual()), (GPIO39 <= virtual()), (GPIO40 <= virtual()), (GPIO41 <=
+        virtual()), (GPIO42 <= virtual()), (GPIO43 <= virtual()), (GPIO44 <= virtual()),
+        (GPIO45 <= virtual()), (GPIO46 <= virtual()), (AES <= AES(AES : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (APB_SARADC <= APB_SARADC() (unstable)), (DEDICATED_GPIO <=
         DEDICATED_GPIO() (unstable)), (DS <= DS() (unstable)), (EFUSE <= EFUSE()
@@ -706,8 +707,9 @@ macro_rules! for_each_peripheral {
         (DMA_SPI3 <= SPI3() (unstable)), (DMA_I2S0 <= I2S0() (unstable)), (DMA_CRYPTO <=
         CRYPTO_DMA() (unstable)), (DMA_COPY <= COPY_DMA() (unstable)), (ADC1 <= virtual()
         (unstable)), (ADC2 <= virtual() (unstable)), (DAC1 <= virtual() (unstable)),
-        (DAC2 <= virtual() (unstable)), (PSRAM <= virtual() (unstable)), (SW_INTERRUPT <=
-        virtual() (unstable)), (ULP_RISCV_CORE <= virtual() (unstable))));
+        (DAC2 <= virtual() (unstable)), (FLASH <= virtual() (unstable)), (PSRAM <=
+        virtual() (unstable)), (SW_INTERRUPT <= virtual() (unstable)), (ULP_RISCV_CORE <=
+        virtual() (unstable))));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.
