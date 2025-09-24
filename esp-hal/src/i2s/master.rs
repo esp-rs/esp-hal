@@ -1153,9 +1153,8 @@ impl<'d, Dm: DriverMode, BUFFER: DmaTxBuffer> I2sTxDmaTransfer<'d, Dm, BUFFER> {
     }
 
     /// Checks if the DMA transfer is done.
-    #[cfg(not(any(esp32, esp32s2)))]
     pub fn is_done(&self) -> bool {
-        self.i2s_tx.i2s.interrupts().contains(I2sInterrupt::TxDone)
+        self.i2s_tx.i2s.tx_done()
     }
 
     /// Stops and restarts the DMA transfer.
@@ -1233,9 +1232,8 @@ impl<'d, Dm: DriverMode, BUFFER: DmaRxBuffer> I2sRxDmaTransfer<'d, Dm, BUFFER> {
     }
 
     /// Returns true if the transfer is done.
-    #[cfg(not(any(esp32, esp32s2)))]
     pub fn is_done(&self) -> bool {
-        self.i2s_rx.i2s.interrupts().contains(I2sInterrupt::RxDone)
+        self.i2s_rx.i2s.rx_done()
     }
 
     /// Stops and restarts the DMA transfer.
@@ -2118,6 +2116,10 @@ mod private {
             });
         }
 
+        fn tx_done(&self) -> bool {
+            self.regs().int_raw().read().tx_done().bit_is_set()
+        }
+
         fn tx_start(&self) {
             self.regs().tx_conf().modify(|_, w| w.tx_start().set_bit());
         }
@@ -2170,6 +2172,10 @@ mod private {
             self.regs()
                 .rx_conf()
                 .modify(|_, w| w.rx_start().clear_bit());
+        }
+
+        fn rx_done(&self) -> bool {
+            self.regs().int_raw().read().rx_done().bit_is_set()
         }
 
         fn wait_for_rx_done(&self) {
