@@ -210,10 +210,28 @@ pub static RESERVED_INTERRUPTS: &[u32] = PRIORITY_TO_INTERRUPT;
 
 /// Enable an interrupt by directly binding it to a available CPU interrupt
 ///
-/// Unless you are sure, you most likely want to use [`enable`] instead.
+/// ⚠️ This installs a *raw trap handler*, the `handler` user provides is written directly into the
+/// CPU interrupt vector table. That means:
+///
+/// - Provided handler will be used as an actual trap-handler
+/// - It is user's responsibility to:
+///   - Save and restore all registers they use (caller-saved).
+///   - Clear the interrupt source if necessary.
+///   - Return using the `mret` instruction.
+/// - The compiler will not insert a function prologue/epilogue for the user, that is why writing a
+///   normal Rust `fn` will almost always result in an error. Instead, the handler should be
+///   declared as `#[naked]` and implemented using the inline assembler.
+///
+/// Unless you are sure that you need such low-level control to achieve the lowest possible latency,
+/// you most likely want to use [`enable`] instead.
 ///
 /// Trying using a reserved interrupt from [`RESERVED_INTERRUPTS`] will return
 /// an error.
+///
+/// ## Example
+/// Visit the [interrupt] test to see a proper example of how to use direct vectoring.
+///
+/// [interrupt]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/src/bin/interrupt.rs
 pub fn enable_direct(
     interrupt: Interrupt,
     level: Priority,
@@ -241,7 +259,7 @@ pub fn enable_direct(
 
         let int_slot = base_addr.wrapping_add((cpu_interrupt as usize) * 4);
 
-        let instr = encode_jal_x0(handler as usize, int_slot as usize)?;
+        let instr = encode_jal_x0(handler as usize, int_slot)?;
 
         core::ptr::write_volatile(int_slot as *mut u32, instr);
         core::arch::asm!("fence.i");
