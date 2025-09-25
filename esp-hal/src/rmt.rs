@@ -715,13 +715,12 @@ for_each_rmt_channel!(
                 where
                     Dm: crate::DriverMode,
                 {
-                    fn configure_tx<'pin>(
+                    fn configure_tx(
                         self,
-                        pin: impl PeripheralOutput<'pin>,
+                        pin: impl PeripheralOutput<'ch>,
                         config: TxChannelConfig,
                     ) -> Result<Channel<'ch, Dm, Tx>, Error>
                     where
-                        'pin: 'ch,
                         Self: Sized,
                     {
                         unsafe { Channel::configure_tx(
@@ -749,13 +748,12 @@ for_each_rmt_channel!(
                 where
                     Dm: crate::DriverMode,
                 {
-                    fn configure_rx<'pin>(
+                    fn configure_rx(
                         self,
-                        pin: impl PeripheralInput<'pin>,
+                        pin: impl PeripheralInput<'ch>,
                         config: RxChannelConfig,
                     ) -> Result<Channel<'ch, Dm, Rx>, Error>
                     where
-                        'pin: 'ch,
                         Self: Sized,
                     {
                         unsafe { Channel::configure_rx(
@@ -1004,15 +1002,12 @@ impl<'ch, Dm> Channel<'ch, Dm, Tx>
 where
     Dm: crate::DriverMode,
 {
-    unsafe fn configure_tx<'pin>(
+    unsafe fn configure_tx(
         ch_idx: ChannelIndex,
-        pin: gpio::interconnect::OutputSignal<'pin>,
+        pin: gpio::interconnect::OutputSignal<'ch>,
         config: TxChannelConfig,
         _guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
-    ) -> Result<Self, Error>
-    where
-        'pin: 'ch,
-    {
+    ) -> Result<Self, Error> {
         let raw = unsafe { DynChannelAccess::conjure(ch_idx) };
 
         let memsize = MemSize::from_blocks(config.memsize);
@@ -1045,15 +1040,12 @@ impl<'ch, Dm> Channel<'ch, Dm, Rx>
 where
     Dm: crate::DriverMode,
 {
-    unsafe fn configure_rx<'pin>(
+    unsafe fn configure_rx(
         ch_idx: ChannelIndex,
-        pin: gpio::interconnect::InputSignal<'pin>,
+        pin: gpio::interconnect::InputSignal<'ch>,
         config: RxChannelConfig,
         _guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
-    ) -> Result<Self, Error>
-    where
-        'pin: 'ch,
-    {
+    ) -> Result<Self, Error> {
         let raw = unsafe { DynChannelAccess::conjure(ch_idx) };
 
         if config.idle_threshold > property!("rmt.max_idle_threshold") {
@@ -1133,13 +1125,12 @@ where
     Dm: crate::DriverMode,
 {
     /// Configure the TX channel
-    fn configure_tx<'pin>(
+    fn configure_tx(
         self,
-        pin: impl PeripheralOutput<'pin>,
+        pin: impl PeripheralOutput<'ch>,
         config: TxChannelConfig,
     ) -> Result<Channel<'ch, Dm, Tx>, Error>
     where
-        'pin: 'ch,
         Self: Sized;
 }
 
@@ -1149,13 +1140,12 @@ where
     Dm: crate::DriverMode,
 {
     /// Configure the RX channel
-    fn configure_rx<'pin>(
+    fn configure_rx(
         self,
-        pin: impl PeripheralInput<'pin>,
+        pin: impl PeripheralInput<'ch>,
         config: RxChannelConfig,
     ) -> Result<Channel<'ch, Dm, Rx>, Error>
     where
-        'pin: 'ch,
         Self: Sized;
 }
 
