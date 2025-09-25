@@ -199,7 +199,8 @@ impl<'a> PartitionTable<'a> {
             return Err(Error::Invalid);
         }
 
-        if binary.len() % RAW_ENTRY_LEN != 0 {
+        let (binary, rem) = binary.as_chunks::<RAW_ENTRY_LEN>();
+        if !rem.is_empty() {
             return Err(Error::Invalid);
         }
 
@@ -209,14 +210,6 @@ impl<'a> PartitionTable<'a> {
                 entries: 0,
             });
         }
-
-        // we checked binary before
-        let binary = unsafe {
-            core::slice::from_raw_parts(
-                binary.as_ptr() as *const [u8; RAW_ENTRY_LEN],
-                binary.len() / RAW_ENTRY_LEN,
-            )
-        };
 
         let mut raw_table = Self {
             binary,
