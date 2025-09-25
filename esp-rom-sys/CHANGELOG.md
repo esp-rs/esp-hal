@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- esp32: c2, c3, s2, s3: fixed "Defalut" typo in ld scripts
+- esp32: c2, c3, s2, s3: fixed "Defalut" typo in ld scripts (#4180)
 
 ### Removed
 
