@@ -72,7 +72,7 @@ unsafe extern "C" fn abort_wrapper() {
 /// Should only get called once.
 #[allow(clippy::missing_transmute_annotations)]
 pub unsafe fn init_syscall_table() {
-    unsafe {
+    let syscall_table = unsafe {
         (&mut *core::ptr::addr_of_mut!(S_STUB_TABLE)).write(chip_specific::syscall_stub_table {
             __getreent: Some(core::mem::transmute(not_implemented as usize)),
             _malloc_r: Some(core::mem::transmute(not_implemented as usize)),
@@ -115,13 +115,8 @@ pub unsafe fn init_syscall_table() {
             __assert_func: Some(super::__assert_func),
             __sinit: Some(core::mem::transmute(not_implemented as usize)),
             _cleanup_r: Some(core::mem::transmute(not_implemented as usize)),
-        });
-
-        S_STUB_TABLE.assume_init();
+        })
     };
-
-    let syscall_table =
-        core::ptr::addr_of!(S_STUB_TABLE) as *const chip_specific::syscall_stub_table;
 
     cfg_if::cfg_if! {
         if #[cfg(esp32)] {
