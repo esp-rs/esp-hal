@@ -87,7 +87,7 @@ async fn main(_spawner: Spawner) {
     let data =
         unsafe { core::slice::from_raw_parts(&SINE as *const _ as *const u8, SINE.len() * 2) };
 
-    let mut buffer = dma_loop_buffer!(64);
+    let mut buffer = dma_loop_buffer!(128);
     buffer.copy_from_slice(data);
 
     println!("Start");

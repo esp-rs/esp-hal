@@ -77,30 +77,6 @@ use crate::{
     system::Cpu,
 };
 
-trait Word: crate::private::Sealed {}
-
-macro_rules! impl_word {
-    ($w:ty) => {
-        impl $crate::private::Sealed for $w {}
-        impl Word for $w {}
-    };
-}
-
-impl_word!(u8);
-impl_word!(u16);
-impl_word!(u32);
-impl_word!(i8);
-impl_word!(i16);
-impl_word!(i32);
-
-impl<W, const S: usize> crate::private::Sealed for [W; S] where W: Word {}
-
-impl<W, const S: usize> crate::private::Sealed for &[W; S] where W: Word {}
-
-impl<W> crate::private::Sealed for &[W] where W: Word {}
-
-impl<W> crate::private::Sealed for &mut [W] where W: Word {}
-
 bitfield::bitfield! {
     /// DMA descriptor flags.
     #[derive(Clone, Copy, PartialEq, Eq)]

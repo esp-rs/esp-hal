@@ -57,12 +57,10 @@ async fn interrupt_driven_task(spi: esp_hal::spi::master::SpiDma<'static, Blocki
 #[cfg(not(any(esp32, esp32s2, esp32s3)))]
 #[embassy_executor::task]
 async fn interrupt_driven_task(i2s_tx: esp_hal::i2s::master::I2s<'static, Blocking>) {
-    use esp_hal::{dma::DmaTxStreamBuf, dma_buffers_chunk_size};
-    let (_, _, tx_buffer, tx_descriptors) = dma_buffers_chunk_size!(128, 128, 128 / 3);
+    use esp_hal::dma_tx_stream_buffer;
+    let mut buf = dma_tx_stream_buffer!(128, 128 / 3);
 
     let mut i2s_tx = i2s_tx.into_async().i2s_tx.build();
-    let mut buf = DmaTxStreamBuf::new(tx_descriptors, tx_buffer).unwrap();
-
     loop {
         let mut buffer: [u8; 8] = [0; 8];
 

@@ -76,10 +76,9 @@
 //! ```rust, no_run
 //! # {before_snippet}
 //! # use esp_hal::i2s::master::{I2s, Channels, DataFormat, Config};
-//! # use esp_hal::dma_buffers_chunk_size;
-//! # use esp_hal::dma::DmaRxStreamBuf;
+//! # use esp_hal::dma_rx_stream_buffer;
 //! # {dma_channel}
-//! let (mut rx_buffer, rx_descriptors, _, _) = dma_buffers_chunk_size!(4 * 4092, 0, 4092);
+//! let rx_buffer = dma_rx_stream_buffer!(4 * 4092);
 //!
 //! let i2s = I2s::new(
 //!     peripherals.I2S0,
@@ -97,10 +96,7 @@
 //!     .with_din(peripherals.GPIO5)
 //!     .build();
 //!
-//! let mut transfer = i2s_rx.read(
-//!     DmaRxStreamBuf::new(rx_descriptors, rx_buffer).unwrap(),
-//!     4092,
-//! )?;
+//! let mut transfer = i2s_rx.read(rx_buffer, 4092)?;
 //!
 //! loop {
 //!     let avail = transfer.available_bytes();
@@ -171,15 +167,6 @@ pub(crate) const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 6;
 pub(crate) const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = 9;
 
 pub(crate) const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_WIDTH) - 1;
-
-/// Data types that the I2S peripheral can work with.
-pub trait AcceptedWord: crate::private::Sealed {}
-impl AcceptedWord for u8 {}
-impl AcceptedWord for u16 {}
-impl AcceptedWord for u32 {}
-impl AcceptedWord for i8 {}
-impl AcceptedWord for i16 {}
-impl AcceptedWord for i32 {}
 
 /// I2S Error
 #[derive(Debug, Clone, Copy, PartialEq)]

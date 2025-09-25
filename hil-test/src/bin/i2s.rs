@@ -13,7 +13,7 @@
 use esp_hal::{
     Async,
     delay::Delay,
-    dma::{DmaDescriptor, DmaTxStreamBuf},
+    dma::DmaTxStreamBuf,
     gpio::{AnyPin, NoPin, Pin},
     i2s::master::{Channels, Config, DataFormat, I2s, I2sTx},
     peripherals::I2S0,
@@ -57,19 +57,16 @@ impl Iterator for SampleSource {
 }
 
 #[embassy_executor::task]
-async fn writer(
-    tx_buffer: &'static mut [u8],
-    tx_descriptors: &'static mut [DmaDescriptor],
-    i2s_tx: I2sTx<'static, Async>,
-) {
+async fn writer(mut tx_buffer: DmaTxStreamBuf, i2s_tx: I2sTx<'static, Async>) {
     let mut samples = SampleSource::new();
-    for b in tx_buffer.iter_mut() {
-        *b = samples.next().unwrap();
-    }
+    tx_buffer.push_with(|buf| {
+        for b in buf.iter_mut() {
+            *b = samples.next().unwrap();
+        }
+        buf.len()
+    });
 
-    let mut tx_transfer = i2s_tx
-        .write(DmaTxStreamBuf::new(tx_descriptors, tx_buffer).unwrap())
-        .unwrap();
+    let mut tx_transfer = i2s_tx.write(tx_buffer).unwrap();
 
     loop {
         while tx_transfer.available_bytes() == 0 {
@@ -102,7 +99,12 @@ fn enable_loopback() {
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
-    use esp_hal::{dma::DmaRxStreamBuf, dma_buffers_chunk_size};
+    use esp_hal::{
+        dma::DmaRxStreamBuf,
+        dma_buffers_chunk_size,
+        dma_rx_stream_buffer,
+        dma_tx_stream_buffer,
+    };
 
     use super::*;
 
@@ -140,8 +142,8 @@ mod tests {
         let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
 
         // We need more than 3 descriptors for continuous transfer to work
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
-            esp_hal::dma_buffers_chunk_size!(BUFFER_SIZE, BUFFER_SIZE, BUFFER_SIZE / 3);
+        let rx_buffer = dma_rx_stream_buffer!(BUFFER_SIZE, BUFFER_SIZE / 3);
+        let tx_buffer = dma_tx_stream_buffer!(BUFFER_SIZE, BUFFER_SIZE / 3);
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -172,13 +174,8 @@ mod tests {
 
         enable_loopback();
 
-        let mut rx_transfer = i2s_rx
-            .read(
-                DmaRxStreamBuf::new(rx_descriptors, rx_buffer).unwrap(),
-                BUFFER_SIZE,
-            )
-            .unwrap();
-        spawner.must_spawn(writer(tx_buffer, tx_descriptors, i2s_tx));
+        let mut rx_transfer = i2s_rx.read(rx_buffer, BUFFER_SIZE).unwrap();
+        spawner.must_spawn(writer(tx_buffer, i2s_tx));
 
         let mut sample_idx = 0;
         let mut samples = SampleSource::new();
