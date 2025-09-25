@@ -86,11 +86,24 @@ fn pulse_code_matches(left: PulseCode, right: PulseCode, tolerance: u16) -> bool
 // timeouts while printing. Note that probe-rs reading the buffer might still mess up
 // timing-sensitive tests! This doesn't apply to `check_data_eq` since it is used after the action,
 // but adding any additional logging to the driver is likely to cause sporadic issues.
-fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], idle_threshold: u16, tolerance: u16) {
+// FIXME: Add a variant that just check the data, and one that does additional verification for
+// regular loopback transactions!
+fn check_data_eq(
+    tx: &[PulseCode],
+    rx: &[PulseCode],
+    idle_threshold: u16,
+    tolerance: u16,
+    rx_res: Result<usize, Error>,
+    rx_memsize: usize,
+    rx_wrap: bool,
+) {
     let mut errors: usize = 0;
     let mut count: usize = 0;
 
-    for (_idx, (&code_tx, &code_rx)) in core::iter::zip(tx, rx).enumerate() {
+    // The last tx code might be a stop code, which won't be received; but we skip that below
+    let mut expected_rx_len = tx.len();
+
+    for (idx, (&code_tx, &code_rx)) in core::iter::zip(tx, rx).enumerate() {
         let mut done = false;
         let mut _msg = "";
         if code_tx.length1() == 0 {
@@ -129,7 +142,7 @@ fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], idle_threshold: u16, tolera
         if _msg.len() > 0 {
             defmt::error!(
                 "loopback @ idx {}: {:?} (tx) -> {:?} (rx): {}",
-                _idx,
+                idx,
                 code_tx,
                 code_rx,
                 _msg
@@ -137,22 +150,60 @@ fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], idle_threshold: u16, tolera
         } else {
             defmt::info!(
                 "loopback @ idx {}: {:?} (tx) -> {:?} (rx)",
-                _idx,
+                idx,
                 code_tx,
                 code_rx,
             );
         }
 
         if done {
+            expected_rx_len = idx + 1;
             break;
         }
     }
 
+    // Some device don't support wrapping rx, and will terminate rx when the buffer is full.
+    if !rx_wrap {
+        expected_rx_len = expected_rx_len.min(rx_memsize)
+    };
+
+    match rx_res {
+        Ok(rx_count) => {
+            assert_eq!(
+                // FIXME: This is now incorrect! At least for cont. tx
+                rx_count,
+                expected_rx_len,
+                "unexpected rx count (last: tx={:?}, rx={:?})",
+                tx[rx_count - 1],
+                rx[rx_count - 1],
+            );
+        }
+        Err(Error::InvalidDataLength) if !rx_wrap => {
+            assert!(tx.len() > rx_memsize);
+            return;
+        }
+        Err(e) => {
+            panic!("unexpected rx error {:?}", e);
+        }
+    }
+
+    // The driver shouldn't have touched the rx buffer beyond expected_rx_len, and
+    // we initialized the buffer to PulseCode::end_marker()
+    assert!(
+        rx[expected_rx_len..]
+            .iter()
+            .all(|c| *c == PulseCode::end_marker()),
+        "rx buffer unexpectedly overwritten beyond rx end"
+    );
+
+    // FIXME: Show first mismatch, not first code!
     assert!(
         errors == 0,
-        "rx/tx code mismatch at {}/{} indices",
+        "rx/tx code mismatch at {}/{} indices (First: tx={:?}, rx={:?})",
         errors,
-        count
+        count,
+        tx.first(),
+        rx.first(),
     );
 }
 
@@ -161,6 +212,9 @@ fn do_rmt_loopback_inner<const TX_LEN: usize>(
     rx_channel: Channel<Blocking, Rx>,
     abort: bool,
 ) {
+    let supports_rx_wrap = rx_channel.supports_wrap();
+    let rx_buffer_size = rx_channel.buffer_size();
+
     let tx_data: [_; TX_LEN] = generate_tx_data(true, true);
     let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
 
@@ -194,10 +248,21 @@ fn do_rmt_loopback_inner<const TX_LEN: usize>(
         }
 
         tx_transaction.wait().unwrap();
-        rx_transaction.wait().unwrap();
+        let rx_res = match rx_transaction.wait() {
+            Ok((rx_count, _channel)) => Ok(rx_count),
+            Err((err, _channel)) => Err(err),
+        };
 
-        check_data_eq(&tx_data, &rcv_data, 1000, 1);
-    }
+        check_data_eq(
+            &tx_data,
+            &rcv_data,
+            1000,
+            1,
+            rx_res,
+            rx_buffer_size,
+            supports_rx_wrap,
+        );
+    };
 }
 
 // Run a test where some data is sent from one channel and looped back to
@@ -243,9 +308,16 @@ async fn do_rmt_loopback_async_inner<const TX_LEN: usize>(
         let (rx_res, tx_res) = embassy_futures::join::join(rx_fut, tx_fut).await;
 
         tx_res.unwrap();
-        rx_res.unwrap();
 
-        check_data_eq(&tx_data, &rcv_data, 1000, 1);
+        check_data_eq(
+            &tx_data,
+            &rcv_data,
+            1000,
+            1,
+            rx_res,
+            rx_channel.buffer_size(),
+            rx_channel.supports_wrap(),
+        );
     }
 }
 
@@ -581,6 +653,9 @@ mod tests {
 
         let (_, rx_channel) = Context::setup_impl(rmt, rx_pin, NoPin, tx_config, rx_config);
 
+        let supports_rx_wrap = rx_channel.supports_wrap();
+        let rx_buffer_size = rx_channel.buffer_size();
+
         let mut rx_data = [PulseCode::default(); 6];
         let rx_transaction = rx_channel.receive(&mut rx_data).unwrap();
 
@@ -603,10 +678,20 @@ mod tests {
         delay.delay_millis(100);
         tx_pin.set_low();
 
-        rx_transaction.wait().unwrap();
+        let rx_res = rx_transaction.wait()
+            .map(|(x, _)| x)
+            .map_err(|(e, _)| e);
 
         // tolerance 25 cycles == 50us
-        check_data_eq(&expected, &rx_data, 0x3FFF, 25);
+        check_data_eq(
+            &expected,
+            &rx_data,
+            0x3FFF,
+            25,
+            rx_res,
+            rx_buffer_size,
+            supports_rx_wrap,
+        );
     }
 
     // Compile-only test to verify that reborrowing channel creators works.
@@ -788,15 +873,19 @@ mod tests {
             // rx/tx concurrently.
             while !tx_transaction.is_loopcount_interrupt_set() {}
 
-            if loopstop == LoopStop::Manual {
+            let rx_res = if loopstop == LoopStop::Manual {
                 tx_transaction.stop_next().unwrap();
-                rx_transaction.wait().unwrap();
+                rx_transaction.wait()
             } else {
                 // tx should stop automatically, so rx should also stop before we explicitly stop
                 // tx
-                rx_transaction.wait().unwrap();
+                let res = rx_transaction.wait();
                 tx_transaction.stop_next().unwrap();
-            }
+                res
+            };
+            let rx_res = rx_res
+                .map(|(x, _)| x)
+                .map_err(|(e, _)| e);
 
             // FIXME: Somehow verify that tx is really stopped!
 
@@ -816,7 +905,15 @@ mod tests {
                 .with_length2(1100)
                 .unwrap();
 
-            check_data_eq(&expected_data, &rx_data, 1000, 1);
+            check_data_eq(
+                &expected_data,
+                &rx_data,
+                1000,
+                1,
+                rx_res,
+                rx_channel.buffer_size(),
+                rx_channel.supports_wrap(),
+            );
         }
     }
 
