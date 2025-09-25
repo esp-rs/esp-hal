@@ -210,14 +210,32 @@ pub static RESERVED_INTERRUPTS: &[u32] = PRIORITY_TO_INTERRUPT;
 
 /// Enable an interrupt by directly binding it to a available CPU interrupt
 ///
-/// Unless you are sure, you most likely want to use [`enable`] instead.
+/// ⚠️ This installs a *raw trap handler*, the `handler` user provides is written directly into the
+/// CPU interrupt vector table. That means:
+///
+/// - Provided handler will be used as an actual trap-handler
+/// - It is user's responsibility to:
+///   - Save and restore all registers they use.
+///   - Clear the interrupt source if necessary.
+///   - Return using the `mret` instruction.
+/// - The handler should be declared as naked function. The compiler will not insert a function
+///   prologue/epilogue for the user, normal Rust `fn` will result in an error.
+///
+/// Unless you are sure that you need such low-level control to achieve the lowest possible latency,
+/// you most likely want to use [`enable`] instead.
 ///
 /// Trying using a reserved interrupt from [`RESERVED_INTERRUPTS`] will return
 /// an error.
+///
+/// ## Example
+/// Visit the [interrupt] test to see a proper example of how to use direct vectoring.
+///
+/// [interrupt]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/src/bin/interrupt.rs
 pub fn enable_direct(
     interrupt: Interrupt,
     level: Priority,
     cpu_interrupt: CpuInterrupt,
+    handler: unsafe extern "C" fn(),
 ) -> Result<(), Error> {
     if RESERVED_INTERRUPTS.contains(&(cpu_interrupt as _)) {
         return Err(Error::CpuInterruptReserved);
@@ -228,9 +246,51 @@ pub fn enable_direct(
     unsafe {
         map(Cpu::current(), interrupt, cpu_interrupt);
         set_priority(Cpu::current(), cpu_interrupt, level);
+
+        let mt = mtvec::read();
+
+        assert_eq!(
+            mt.trap_mode().into_usize(),
+            mtvec::TrapMode::Vectored.into_usize()
+        );
+
+        let base_addr = mt.address() as usize;
+
+        let int_slot = base_addr.wrapping_add((cpu_interrupt as usize) * 4);
+
+        let instr = encode_jal_x0(handler as usize, int_slot)?;
+
+        core::ptr::write_volatile(int_slot as *mut u32, instr);
+        core::arch::asm!("fence.i");
+
         enable_cpu_interrupt(cpu_interrupt);
     }
     Ok(())
+}
+
+// helper: returns correctly encoded RISC-V `jal` instruction
+fn encode_jal_x0(target: usize, pc: usize) -> Result<u32, Error> {
+    let offset = (target as isize) - (pc as isize);
+
+    const MIN: isize = -(1isize << 20);
+    const MAX: isize = (1isize << 20) - 1;
+
+    assert!(offset % 2 == 0 && (MIN..=MAX).contains(&offset));
+
+    let imm = offset as u32;
+    let imm20 = (imm >> 20) & 0x1;
+    let imm10_1 = (imm >> 1) & 0x3ff;
+    let imm11 = (imm >> 11) & 0x1;
+    let imm19_12 = (imm >> 12) & 0xff;
+
+    let instr = (imm20 << 31)
+        | (imm19_12 << 12)
+        | (imm11 << 20)
+        | (imm10_1 << 21)
+        // https://lhtin.github.io/01world/app/riscv-isa/?xlen=32&insn_name=jal
+        | 0b1101111u32;
+
+    Ok(instr)
 }
 
 /// Disable the given peripheral interrupt.
