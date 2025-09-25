@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Event handlers are now passed the event by reference (#4113)
 - Some build-time configuration options have been replaced by runtime options in `WifiConfig` (#4121)
 - Update bt-hci version with flash usage improvements (#4146)
+- `esp_radio::wifi::new` is now split into `esp_radio::wifi::interfaces()` and `esp_radio::wifi::WifiController::new`, the sta and ap interfaces don't implement the networking drivers anymore - instead use the adaptors located in `esp_radio::wifi::net` (#4167)
 
 ### Fixed
 
