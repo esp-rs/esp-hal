@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ShaBackend, Sha<N>Context`: Work-queue based SHA driver (#4013)
 - I2S: `i2s::master::Config` with support for more TDM mode standards (#3985)
 - ESP32: support outputting the main I2S clock signal (#4128)
+- RMT: Wrapping the hardware buffer is now supported for rx/tx and blocking/async channels (#4049)
+- RMT: add `Channel::buffer_size` and `Channel::supports_wrap` methods (#4049)
 
 ### Changed
 
@@ -63,6 +65,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RtcClock`, `RtcFastClock`, and `RtcSlowClock` moved to `clock` module (#4089)
 - Resolved enum variant naming violations in `RtcFastClock` and `RtcSlowClock` enums (#4089)
 - The `rmt::Channel::transmit_continuously` and `rmt::Channel::transmit_continuously_with_loopcount` methods have been merged (#4100)
+- `rmt::Channel` and `rmt::ChannelCreator` now carry a lifetime and can be reborrowed. (#4174)
+- RMT transactions and futures are marked as `#[must_use]` and implement `Drop`. (#4174)
+- RMT: `Channel::transmit_continuously` now takes an additional `LoopStop` argument. (#4174)
+- RMT: `LoopCount::Finite` and `ContinuousTxTransaction::is_tx_loopcount_interrupt_set` are only defined when the hardware supports it (all except ESP32). (#4174)
+- RMT: Receive operations read only received codes instead of the entire buffer and return the number of codes read (#4049)
+- RMT: Dropping async futures and blocking transactions always stops them and returns the channel to an idle state. Transactions are `#[must_use]` (#4049)
 
 ### Fixed
 
@@ -76,6 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32: Enable up to 4M of PSRAM (#3990)
 - I2C error recovery logic issues (#4000)
 - I2S: Fixed RX half-sample bits configuration bug causing microphone noise (#4109)
+- RMT: `Channel::transmit_continuously` also triggers the loopcount interrupt when only using a single repetition. (#4174)
 
 ### Removed
 
