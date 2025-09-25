@@ -3,13 +3,14 @@
 //! The second core runs a simple LED blinking task, that is controlled by a
 //! signal set by the task running on the other core.
 //!
+//! The interrupt executor works without the esp_preempt scheduler, so this example uses the esp-hal
+//! CpuControl API to start the second core.
+//!
 //! The following wiring is assumed:
 //! - LED => GPIO0
 
 #![no_std]
 #![no_main]
-
-use core::ptr::addr_of_mut;
 
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use embassy_time::{Duration, Ticker};
@@ -26,8 +27,6 @@ use esp_println::println;
 use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
-
-static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 
 /// Waits for a message that contains a duration, then flashes a led for that
 /// duration of time.
@@ -91,8 +90,11 @@ fn main() -> ! {
     let executor_core1 = InterruptExecutor::new(sw_int.software_interrupt1);
     let executor_core1 = EXECUTOR_CORE_1.init(executor_core1);
 
+    static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
+    let app_core_stack = APP_CORE_STACK.init(Stack::new());
+
     let _guard = cpu_control
-        .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {
+        .start_app_core(app_core_stack, move || {
             let spawner = executor_core1.start(Priority::Priority1);
 
             spawner.spawn(control_led(led, led_ctrl_signal)).ok();
