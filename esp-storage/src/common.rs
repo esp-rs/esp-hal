@@ -1,15 +1,11 @@
-use core::{
-    mem::MaybeUninit,
-    sync::atomic::Ordering::{Acquire, Release},
-};
+use core::mem::MaybeUninit;
 
-use portable_atomic::AtomicBool;
+#[cfg(not(feature = "emulation"))]
+pub use esp_hal::peripherals::FLASH as Flash;
 
 use crate::chip_specific;
 #[cfg(multi_core)]
 use crate::multi_core::MultiCoreStrategy;
-
-static IS_TAKEN: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
@@ -47,23 +43,33 @@ pub fn check_rc(rc: i32) -> Result<(), FlashStorageError> {
     }
 }
 
+#[cfg(feature = "emulation")]
+#[derive(Debug)]
+pub struct Flash<'d> {
+    _phantom: core::marker::PhantomData<&'d ()>,
+}
+
+#[cfg(feature = "emulation")]
+impl<'d> Flash<'d> {
+    pub fn new() -> Self {
+        Flash {
+            _phantom: core::marker::PhantomData,
+        }
+    }
+}
+
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Flash storage abstraction.
-pub struct FlashStorage {
+pub struct FlashStorage<'d> {
     pub(crate) capacity: usize,
     unlocked: bool,
     #[cfg(multi_core)]
     pub(crate) multi_core_strategy: MultiCoreStrategy,
+    _flash: Flash<'d>,
 }
 
-impl Default for FlashStorage {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl FlashStorage {
+impl<'d> FlashStorage<'d> {
     /// Flash word size in bytes.
     pub const WORD_SIZE: u32 = 4;
     /// Flash sector size in bytes.
@@ -74,11 +80,7 @@ impl FlashStorage {
     /// # Panics
     ///
     /// Panics if called more than once.
-    pub fn new() -> Self {
-        if IS_TAKEN.fetch_or(true, Acquire) {
-            panic!("FlashStorage::new() called more than once!");
-        }
-
+    pub fn new(flash: Flash<'d>) -> Self {
         #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
         const ADDR: u32 = 0x0000;
         #[cfg(any(feature = "esp32", feature = "esp32s2"))]
@@ -89,6 +91,7 @@ impl FlashStorage {
             unlocked: false,
             #[cfg(multi_core)]
             multi_core_strategy: MultiCoreStrategy::Error,
+            _flash: flash,
         };
 
         let mut buffer = crate::buffer::FlashWordBuffer::uninit();
@@ -186,41 +189,5 @@ impl FlashStorage {
         self.multi_core_strategy.post_write(unpark);
 
         Ok(())
-    }
-}
-
-impl Drop for FlashStorage {
-    fn drop(&mut self) {
-        IS_TAKEN.store(false, Release);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::FlashStorage;
-    #[test]
-    fn test_singleton_behavior() {
-        // First call should succeed
-        let flash1 = FlashStorage::new();
-        assert_eq!(flash1.capacity > 0, true); // or check some field
-
-        // Second call should panic
-        let result = std::panic::catch_unwind(|| {
-            FlashStorage::new();
-        });
-        assert!(result.is_err(), "expected panic on second init");
-
-        // Third call should also panic
-        let result = std::panic::catch_unwind(|| {
-            FlashStorage::new();
-        });
-        assert!(result.is_err(), "expected panic on third init");
-    }
-
-    #[test]
-    #[should_panic(expected = "FlashStorage::new() called more than once!")]
-    fn test_expect_panics() {
-        let _flash1 = FlashStorage::new(); // first call is fine
-        let _flash2 = FlashStorage::new(); // this panics
     }
 }

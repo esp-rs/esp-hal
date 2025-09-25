@@ -41,6 +41,7 @@ embedded-storage = "0.3.1"
 procmacros       = { version = "0.19.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 cfg-if           = "1.0.0"
 portable-atomic          = { version = "1.11.0", default-features = false }
+esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", default-features = false, optional = true}
 
 # Optional dependencies
 esp-sync         = { version = "0.0.0", path = "../esp-sync", optional = true }
@@ -75,18 +76,18 @@ defmt = ["dep:defmt"]
 #! One of the following features must be enabled to select the target chip:
 
 ##
-esp32c2   = ["esp-rom-sys/esp32c2", "esp-sync/esp32c2"]
+esp32c2   = ["esp-hal/esp32c2", "esp-hal/unstable", "esp-rom-sys/esp32c2", "esp-sync/esp32c2"]
 ##
-esp32c3   = ["esp-rom-sys/esp32c3", "esp-sync/esp32c3"]
+esp32c3   = ["esp-hal/esp32c3", "esp-hal/unstable", "esp-rom-sys/esp32c3", "esp-sync/esp32c3"]
 ##
-esp32c6   = ["esp-rom-sys/esp32c6", "esp-sync/esp32c6"]
+esp32c6   = ["esp-hal/esp32c6", "esp-hal/unstable", "esp-rom-sys/esp32c6", "esp-sync/esp32c6"]
 ##
-esp32h2   = ["esp-rom-sys/esp32h2", "esp-sync/esp32h2"]
+esp32h2   = ["esp-hal/esp32h2", "esp-hal/unstable", "esp-rom-sys/esp32h2", "esp-sync/esp32h2"]
 ##
-esp32     = ["esp-rom-sys/esp32", "esp-sync/esp32", "xtensa-lx"]
+esp32     = ["esp-hal/esp32", "esp-hal/unstable", "esp-rom-sys/esp32", "esp-sync/esp32", "xtensa-lx"]
 ##
-esp32s2   = ["esp-rom-sys/esp32s2", "esp-sync/esp32s2"]
+esp32s2   = ["esp-hal/esp32s2", "esp-hal/unstable", "esp-rom-sys/esp32s2", "esp-sync/esp32s2"]
 ##
-esp32s3   = ["esp-rom-sys/esp32s3", "esp-sync/esp32s3", "xtensa-lx"]
+esp32s3   = ["esp-hal/esp32s3", "esp-hal/unstable", "esp-rom-sys/esp32s3", "esp-sync/esp32s3", "xtensa-lx"]
 ## Used for testing on a host.
 emulation = []

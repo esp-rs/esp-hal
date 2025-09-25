@@ -52,7 +52,7 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut flash = FlashStorage::new();
+    let mut flash = FlashStorage::new(peripherals.FLASH);
 
     let mut buffer = [0u8; esp_bootloader_esp_idf::partitions::PARTITION_TABLE_MAX_LEN];
     let pt =

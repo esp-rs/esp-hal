@@ -17,9 +17,9 @@ esp_bootloader_esp_idf::esp_app_desc!();
 #[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-    let _ = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut flash = FlashStorage::new();
+    let mut flash = FlashStorage::new(peripherals.FLASH);
     println!("Flash size = {}", flash.capacity());
 
     let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];

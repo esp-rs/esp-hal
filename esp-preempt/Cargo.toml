@@ -15,6 +15,7 @@ doc-config = { features = ["esp-hal/unstable"] }
 check-configs = [
     { features = ["esp-hal/unstable"] },
     { features = ["esp-hal/unstable", "esp-alloc"] },
+    { features = ["esp-hal/unstable", "esp-radio"] },
 ]
 clippy-configs = [
     { features = ["esp-hal/unstable", "esp-alloc", "defmt"] },
@@ -40,7 +41,7 @@ document-features  = "0.2.11"
 esp-alloc = { version = "0.8.0", path = "../esp-alloc", optional = true }
 esp-config = { version = "0.5.0", path = "../esp-config" }
 esp-sync = { version = "0.0.0", path = "../esp-sync" }
-esp-radio-preempt-driver = { version = "0.0.1", path = "../esp-radio-preempt-driver" }
+esp-radio-preempt-driver = { version = "0.0.1", path = "../esp-radio-preempt-driver", optional = true }
 portable-atomic = { version = "1.11.0", default-features = false }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
@@ -55,7 +56,7 @@ esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated"
 esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", features = ["unstable"] }
 
 [features]
-default = ["esp-alloc"]
+default = ["esp-alloc", "esp-radio"]
 
 ## Enable the use of the `esp-alloc` crate for dynamic memory allocation.
 ##
@@ -63,6 +64,9 @@ default = ["esp-alloc"]
 ## - `pub extern "C" fn malloc_internal(size: usize) -> *mut u8`
 ## - `pub extern "C" fn free_internal(ptr: *mut u8)`
 esp-alloc = ["dep:esp-alloc"]
+
+## Enables esp-radio support.
+esp-radio = ["dep:esp-radio-preempt-driver"]
 
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:

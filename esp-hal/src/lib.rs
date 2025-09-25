@@ -699,5 +699,9 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(feature = "psram")]
     crate::psram::init_psram(config.psram);
 
+    unsafe {
+        esp_rom_sys::init_syscall_table();
+    }
+
     peripherals
 }

@@ -2,20 +2,21 @@
 #[cfg_attr(xtensa, path = "xtensa.rs")]
 pub(crate) mod arch_specific;
 
-use core::{ffi::c_void, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
+#[cfg(feature = "esp-radio")]
+use core::ffi::c_void;
+use core::{marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
+#[cfg(feature = "esp-radio")]
 use allocator_api2::alloc::Allocator;
 pub(crate) use arch_specific::*;
-use esp_hal::system::Cpu;
-use esp_radio_preempt_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
-
-use crate::{
-    InternalMemory,
-    SCHEDULER,
-    run_queue::RunQueue,
-    scheduler::SchedulerState,
-    wait_queue::WaitQueue,
+use esp_hal::{
+    system::Cpu,
+    time::{Duration, Instant},
 };
+
+#[cfg(feature = "esp-radio")]
+use crate::{InternalMemory, semaphore::Semaphore};
+use crate::{SCHEDULER, run_queue::RunQueue, scheduler::SchedulerState, wait_queue::WaitQueue};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -59,6 +60,7 @@ task_list_item!(TaskTimerQueueElement, timer_queue_item);
 /// Extension trait for common task operations. These should be inherent methods but we can't
 /// implement stuff for NonNull.
 pub(crate) trait TaskExt {
+    #[cfg(feature = "esp-radio")]
     fn resume(self);
     fn priority(self, _: &mut RunQueue) -> usize;
     fn set_priority(self, _: &mut RunQueue, new_pro: usize);
@@ -67,6 +69,7 @@ pub(crate) trait TaskExt {
 }
 
 impl TaskExt for TaskPtr {
+    #[cfg(feature = "esp-radio")]
     fn resume(self) {
         SCHEDULER.with(|scheduler| scheduler.resume_task(self))
     }
@@ -226,7 +229,8 @@ impl<E: TaskListElement> TaskQueue<E> {
 #[repr(C)]
 pub(crate) struct Task {
     pub cpu_context: CpuContext,
-    pub thread_semaphore: Option<SemaphorePtr>,
+    #[cfg(feature = "esp-radio")]
+    pub thread_semaphore: Option<Semaphore>,
     pub state: TaskState,
     pub stack: *mut [MaybeUninit<u32>],
     pub priority: usize,
@@ -259,6 +263,7 @@ const STACK_CANARY: u32 =
     const { esp_config::esp_config_int!(u32, "ESP_HAL_CONFIG_STACK_GUARD_VALUE") };
 
 impl Task {
+    #[cfg(feature = "esp-radio")]
     pub(crate) fn new(
         name: &str,
         task_fn: extern "C" fn(*mut c_void),
@@ -299,6 +304,7 @@ impl Task {
 
         Task {
             cpu_context: new_task_context(task_fn, param, stack_top),
+            #[cfg(feature = "esp-radio")]
             thread_semaphore: None,
             state: TaskState::Ready,
             stack: stack_words,
@@ -333,10 +339,9 @@ impl Task {
 impl Drop for Task {
     fn drop(&mut self) {
         debug!("Dropping task: {:?}", self as *mut Task);
-        if let Some(sem) = self.thread_semaphore {
-            let sem = unsafe { SemaphoreHandle::from_ptr(sem) };
-            core::mem::drop(sem)
-        }
+
+        #[cfg(feature = "esp-radio")]
+        let _ = self.thread_semaphore.take();
     }
 }
 
@@ -390,6 +395,33 @@ pub(super) fn current_task() -> TaskPtr {
     with_current_task(|task| NonNull::from(task))
 }
 
+/// A handle to the current thread.
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct CurrentThreadHandle {
+    _task: TaskPtr,
+}
+
+impl CurrentThreadHandle {
+    /// Retrieves a handle to the current task.
+    pub fn get() -> Self {
+        Self {
+            _task: current_task(),
+        }
+    }
+
+    /// Delays the current task for the specified duration.
+    pub fn delay(self, duration: Duration) {
+        self.delay_until(Instant::now() + duration);
+    }
+
+    /// Delays the current task until the specified deadline.
+    pub fn delay_until(self, deadline: Instant) {
+        SCHEDULER.sleep_until(deadline);
+    }
+}
+
+#[cfg(feature = "esp-radio")]
 pub(super) fn schedule_task_deletion(task: *mut Task) {
     trace!("schedule_task_deletion {:?}", task);
     SCHEDULER.with(|scheduler| {

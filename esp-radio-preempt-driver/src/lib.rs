@@ -120,7 +120,7 @@ macro_rules! scheduler_impl {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_current_task_thread_semaphore() -> SemaphorePtr {
+        fn esp_preempt_current_task_thread_semaphore() -> $crate::semaphore::SemaphorePtr {
             <$t as $crate::Scheduler>::current_task_thread_semaphore(&$driver)
         }
 

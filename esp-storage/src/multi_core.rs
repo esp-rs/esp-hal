@@ -38,10 +38,10 @@ pub(crate) enum MultiCoreStrategy {
     Ignore,
 }
 
-impl FlashStorage {
+impl<'d> FlashStorage<'d> {
     /// Enable auto parking of the second core before writing to flash
     /// The other core will be automatically un-parked when the write is complete
-    pub fn multicore_auto_park(mut self) -> FlashStorage {
+    pub fn multicore_auto_park(mut self) -> FlashStorage<'d> {
         self.multi_core_strategy = MultiCoreStrategy::AutoPark;
         self
     }
@@ -51,7 +51,7 @@ impl FlashStorage {
     /// # Safety
     /// Only enable this if you are sure that the second core is not fetching instructions from the
     /// flash during the write
-    pub unsafe fn multicore_ignore(mut self) -> FlashStorage {
+    pub unsafe fn multicore_ignore(mut self) -> FlashStorage<'d> {
         self.multi_core_strategy = MultiCoreStrategy::Ignore;
         self
     }

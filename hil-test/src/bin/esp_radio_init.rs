@@ -12,7 +12,7 @@ use core::ffi::c_void;
 use defmt::info;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 #[cfg(multi_core)]
-use esp_hal::system::{CpuControl, Stack};
+use esp_hal::system::{Cpu, CpuControl, Stack};
 #[cfg(xtensa)]
 use esp_hal::xtensa_lx::interrupt::free as interrupt_free;
 use esp_hal::{
@@ -25,13 +25,14 @@ use esp_hal::{
 #[cfg(riscv)]
 use esp_hal::{interrupt::software::SoftwareInterrupt, riscv::interrupt::free as interrupt_free};
 use esp_hal_embassy::InterruptExecutor;
+use esp_preempt::{CurrentThreadHandle, semaphore::Semaphore};
 use esp_radio::InitializationError;
 use esp_radio_preempt_driver::{
     self as preempt,
     semaphore::{SemaphoreHandle, SemaphoreKind},
 };
 use hil_test::mk_static;
-use portable_atomic::{AtomicUsize, Ordering};
+use portable_atomic::{AtomicBool, AtomicUsize, Ordering};
 use static_cell::StaticCell;
 
 #[allow(unused)] // compile test
@@ -193,7 +194,7 @@ mod tests {
 
         let now = Instant::now();
 
-        preempt::usleep(10_000);
+        CurrentThreadHandle::get().delay(Duration::from_millis(10));
 
         hil_test::assert!(now.elapsed() >= Duration::from_millis(10));
     }
@@ -278,12 +279,6 @@ mod tests {
 
     #[test]
     fn test_esp_preempt_priority_inheritance(p: Peripherals) {
-        use core::ffi::c_void;
-
-        use esp_radio_preempt_driver as preempt;
-        use portable_atomic::{AtomicBool, Ordering};
-        use preempt::semaphore::{SemaphoreHandle, SemaphoreKind};
-
         #[cfg(riscv)]
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);
@@ -312,15 +307,15 @@ mod tests {
         // The medium priority task will assert that the high priority task has finished.
 
         struct TestContext {
-            ready_semaphore: SemaphoreHandle,
-            mutex: SemaphoreHandle,
+            ready_semaphore: Semaphore,
+            mutex: Semaphore,
             high_priority_task_finished: AtomicBool,
         }
         let mut test_context = TestContext {
             // This semaphore signals the end of the test
-            ready_semaphore: SemaphoreHandle::new(SemaphoreKind::Counting { max: 1, initial: 0 }),
+            ready_semaphore: Semaphore::new_counting(0, 1),
             // We'll use this mutex to test priority inheritance
-            mutex: SemaphoreHandle::new(SemaphoreKind::Mutex),
+            mutex: Semaphore::new_mutex(false),
             high_priority_task_finished: AtomicBool::new(false),
         };
 
@@ -395,12 +390,6 @@ mod tests {
     #[test]
     #[cfg(multi_core)]
     fn test_esp_preempt_smp(p: Peripherals) {
-        use core::ffi::c_void;
-
-        use esp_hal::system::Cpu;
-        use esp_radio_preempt_driver as preempt;
-        use preempt::semaphore::{SemaphoreHandle, SemaphoreKind};
-
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
 
         let timg0 = TimerGroup::new(p.TIMG0);
@@ -409,12 +398,12 @@ mod tests {
         // increment a counter, if they are scheduled to run on their specific core.
 
         struct TestContext {
-            ready_semaphore: SemaphoreHandle,
+            ready_semaphore: Semaphore,
         }
         let test_context = TestContext {
             // This semaphore signals the end of the test. Each test case will give it once it is
             // done.
-            ready_semaphore: SemaphoreHandle::new(SemaphoreKind::Counting { max: 2, initial: 0 }),
+            ready_semaphore: Semaphore::new_counting(0, 2),
         };
 
         fn count_impl(context: &TestContext, core: Cpu) {
