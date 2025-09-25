@@ -229,15 +229,23 @@ impl SchedulerState {
     }
 
     fn delete_marked_tasks(&mut self) {
-        while let Some(to_delete) = self.to_delete.pop() {
-            trace!("delete_marked_tasks {:?}", to_delete);
-
+        let current_cpu = Cpu::current() as usize;
+        let mut to_delete = core::mem::take(&mut self.to_delete);
+        'outer: while let Some(task_ptr) = to_delete.pop() {
             for cpu in 0..Cpu::COUNT {
-                if Some(to_delete) == self.per_cpu[cpu].current_task {
-                    self.per_cpu[cpu].current_task = None;
+                if Some(task_ptr) == self.per_cpu[cpu].current_task {
+                    if cpu == current_cpu {
+                        self.per_cpu[cpu].current_task = None;
+                    } else {
+                        // We can't delete a task that is currently running on another CPU.
+                        self.to_delete.push(task_ptr);
+                        continue 'outer;
+                    }
                 }
             }
-            self.delete_task(to_delete);
+
+            trace!("delete_marked_tasks {:?}", task_ptr);
+            self.delete_task(task_ptr);
         }
     }
 
