@@ -267,3 +267,18 @@ All RTC clock enums/structs have been moved from `rtc_cntl` to the `clock` modul
 Imports will need to be updated accordingly.
 
 Additionally, enum variant naming violations have been resolved, so the `RtcFastClock` and `RtcSlowClock` prefixes will need to be removed from any variants from these enums.
+
+## Direct vectoring changes
+
+`enable_direct` now requires user to pass handler function to it. 
+
+```diff
+interrupt::enable_direct(
+    Interrupt::FROM_CPU_INTR0,
+    Priority::Priority3,
+    CpuInterrupt::Interrupt20,
++   interrupt_handler,
+)
+.unwrap();
+
+```
