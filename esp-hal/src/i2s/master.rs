@@ -998,8 +998,6 @@ where
         self.i2s.reset_tx();
 
         // Enable corresponding interrupts if needed
-        #[cfg(not(any(esp32, esp32s2)))]
-        self.i2s.listen(I2sInterrupt::TxDone);
 
         // configure DMA outlink
         unsafe {
@@ -1068,8 +1066,6 @@ where
         self.i2s.reset_rx();
 
         // Enable corresponding interrupts if needed
-        #[cfg(not(any(esp32, esp32s2)))]
-        self.i2s.listen(I2sInterrupt::RxDone);
 
         // configure DMA inlink
         unsafe {
