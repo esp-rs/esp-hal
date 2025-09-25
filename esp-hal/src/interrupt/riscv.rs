@@ -215,12 +215,11 @@ pub static RESERVED_INTERRUPTS: &[u32] = PRIORITY_TO_INTERRUPT;
 ///
 /// - Provided handler will be used as an actual trap-handler
 /// - It is user's responsibility to:
-///   - Save and restore all registers they use (caller-saved).
+///   - Save and restore all registers they use.
 ///   - Clear the interrupt source if necessary.
 ///   - Return using the `mret` instruction.
-/// - The compiler will not insert a function prologue/epilogue for the user, that is why writing a
-///   normal Rust `fn` will almost always result in an error. Instead, the handler should be
-///   declared as `#[naked]` and implemented using the inline assembler.
+/// - The handler should be declared as naked function. The compiler will not insert a function
+///   prologue/epilogue for the user, normal Rust `fn` will result in an error.
 ///
 /// Unless you are sure that you need such low-level control to achieve the lowest possible latency,
 /// you most likely want to use [`enable`] instead.
