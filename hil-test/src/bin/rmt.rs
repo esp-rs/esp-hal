@@ -1,4 +1,9 @@
 //! RMT Loopback Test
+//!
+//! When running this with defmt, consider increasing embedded_test's default_timeout below to
+//! avoid timeouts while printing. Note that probe-rs reading the buffer might still mess up
+//! timing-sensitive tests! This doesn't apply to `check_data_eq` since it is used after the
+//! action, but adding any additional logging to the driver is likely to cause sporadic issues.
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: embassy unstable
@@ -23,8 +28,10 @@ use esp_hal::{
     },
     peripherals::RMT,
     rmt::{
+        CHANNEL_RAM_SIZE,
         Channel,
         Error,
+        HAS_RX_WRAP,
         PulseCode,
         Rmt,
         Rx,
@@ -82,37 +89,45 @@ fn pulse_code_matches(left: PulseCode, right: PulseCode, tolerance: u16) -> bool
         && left.length2().abs_diff(right.length2()) <= tolerance
 }
 
-// When running this with defmt, consider increasing embedded_test's default_timeout below to avoid
-// timeouts while printing. Note that probe-rs reading the buffer might still mess up
-// timing-sensitive tests! This doesn't apply to `check_data_eq` since it is used after the action,
-// but adding any additional logging to the driver is likely to cause sporadic issues.
-fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], idle_threshold: u16, tolerance: u16) {
+// Compare tx and rx data from a loopback transmission
+//
+// This takes into account whether the device does not support wrapping rx such that truncated
+// output is expected.
+fn check_data_eq(
+    tx: &[PulseCode],
+    rx: &[PulseCode],
+    idle_threshold: u16,
+    tolerance: u16,
+    rx_res: Result<usize, Error>,
+    rx_memsize: u8,
+) {
     let mut errors: usize = 0;
     let mut count: usize = 0;
 
-    for (_idx, (&code_tx, &code_rx)) in core::iter::zip(tx, rx).enumerate() {
-        let mut done = false;
+    let rx_memsize_codes = rx_memsize as usize * CHANNEL_RAM_SIZE;
+
+    let mut expected_rx_len = tx.len();
+
+    // Iterate through pairs of sent/received `PulseCode`s
+    let mut rx_done = false;
+    for (idx, (&code_tx, &code_rx)) in core::iter::zip(tx, rx).enumerate() {
+        count += if rx_done { 0 } else { 1 };
+
         let mut _msg = "";
-        if code_tx.length1() == 0 {
-            // Sent an end marker
-            break;
-        } else if code_tx.length2() == 0 {
-            // Sent an end marker in the second PulseCode field
-            done = true;
-            if !pulse_code_matches(code_tx, code_rx.with_length2(0).unwrap(), tolerance) {
-                errors += 1;
-                _msg = "rx/tx code mismatch!";
-            }
+        if rx_done {
+            // The rx buffer should be zero-filled, we check that below.
         } else if code_tx.length1() > idle_threshold {
             // Should receive an end marker in the first PulseCode field
-            done = true;
-            if !code_rx.length1() == 0 && code_tx.level1() == code_rx.level1() {
+            rx_done = true;
+            expected_rx_len = expected_rx_len.min(idx + 1);
+            if !(code_rx.length1() == 0 && code_tx.level1() == code_rx.level1()) {
                 errors += 1;
                 _msg = "rx code not a stop code!";
             }
         } else if code_tx.length2() > idle_threshold {
             // Should receive an end marker in the second PulseCode field
-            done = true;
+            rx_done = true;
+            expected_rx_len = expected_rx_len.min(idx + 1);
             if !pulse_code_matches(code_tx.with_length2(0).unwrap(), code_rx, tolerance) {
                 errors += 1;
                 _msg = "rx code not a stop code!";
@@ -123,13 +138,11 @@ fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], idle_threshold: u16, tolera
             _msg = "rx/tx code mismatch!";
         };
 
-        count += 1;
-
         #[cfg(feature = "defmt")]
         if _msg.len() > 0 {
             defmt::error!(
                 "loopback @ idx {}: {:?} (tx) -> {:?} (rx): {}",
-                _idx,
+                idx,
                 code_tx,
                 code_rx,
                 _msg
@@ -137,16 +150,47 @@ fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], idle_threshold: u16, tolera
         } else {
             defmt::info!(
                 "loopback @ idx {}: {:?} (tx) -> {:?} (rx)",
-                _idx,
+                idx,
                 code_tx,
                 code_rx,
             );
         }
+    }
 
-        if done {
-            break;
+    // Some devices don't support wrapping rx, and will terminate rx when the buffer is full.
+    if !HAS_RX_WRAP {
+        expected_rx_len = expected_rx_len.min(rx_memsize_codes)
+    };
+
+    match rx_res {
+        Ok(rx_count) => {
+            assert_eq!(
+                rx_count,
+                expected_rx_len,
+                "unexpected rx count (last: tx={:?}, rx={:?})",
+                tx[rx_count - 1],
+                rx[rx_count - 1],
+            );
+        }
+        Err(Error::InvalidDataLength) if !HAS_RX_WRAP => {
+            // In this case, rx wasn't even started, so we can't compare the partially received
+            // data below!
+            assert!(tx.len() > rx_memsize_codes);
+            return;
+        }
+        Err(e) => {
+            panic!("unexpected rx error {:?}", e);
         }
     }
+
+    // The driver shouldn't have touched the rx buffer beyond expected_rx_len, and
+    // we initialized the buffer to PulseCode::end_marker()
+    assert!(
+        rx[expected_rx_len..]
+            .iter()
+            .all(|c| *c == PulseCode::end_marker()),
+        "rx buffer unexpectedly overwritten beyond rx end"
+    );
 
     assert!(
         errors == 0,
@@ -160,15 +204,18 @@ fn do_rmt_loopback_inner<const TX_LEN: usize>(
     tx_channel: Channel<Blocking, Tx>,
     rx_channel: Channel<Blocking, Rx>,
     abort: bool,
+    rx_memsize: u8,
 ) {
     let tx_data: [_; TX_LEN] = generate_tx_data(true, true);
     let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
 
-    // Start the transactions...
-    let mut rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
+    let rx_transaction = rx_channel.receive(&mut rcv_data);
     let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
 
     if abort {
+        // Start the transactions...
+        let mut rx_transaction = rx_transaction.unwrap();
+
         Delay::new().delay_millis(2);
 
         // ...poll them for a while, but then drop them...
@@ -184,19 +231,28 @@ fn do_rmt_loopback_inner<const TX_LEN: usize>(
         assert!(!rx_done);
         assert!(!tx_done);
     } else {
-        // ... poll them until completion.
-        loop {
-            let tx_done = tx_transaction.poll();
-            let rx_done = rx_transaction.poll();
-            if tx_done && rx_done {
-                break;
+        let run = move || match rx_transaction {
+            Ok(mut rx_transaction) => {
+                // ... poll them until completion.
+                loop {
+                    let tx_done = tx_transaction.poll();
+                    let rx_done = rx_transaction.poll();
+                    if tx_done && rx_done {
+                        break;
+                    }
+                }
+
+                tx_transaction.wait().unwrap();
+                match rx_transaction.wait() {
+                    Ok((rx_count, _channel)) => Ok(rx_count),
+                    Err((err, _channel)) => Err(err),
+                }
             }
-        }
+            Err(e) => Err(e),
+        };
+        let rx_res = run();
 
-        tx_transaction.wait().unwrap();
-        rx_transaction.wait().unwrap();
-
-        check_data_eq(&tx_data, &rcv_data, 1000, 1);
+        check_data_eq(&tx_data, &rcv_data, 1000, 1, rx_res, rx_memsize);
     }
 }
 
@@ -210,13 +266,14 @@ fn do_rmt_loopback<const TX_LEN: usize>(ctx: &mut Context, tx_memsize: u8, rx_me
 
     let (tx_channel, rx_channel) = ctx.setup_loopback(tx_config, rx_config);
 
-    do_rmt_loopback_inner::<TX_LEN>(tx_channel, rx_channel, false);
+    do_rmt_loopback_inner::<TX_LEN>(tx_channel, rx_channel, false, rx_memsize);
 }
 
 async fn do_rmt_loopback_async_inner<const TX_LEN: usize>(
     tx_channel: &mut Channel<'_, Async, Tx>,
     rx_channel: &mut Channel<'_, Async, Rx>,
     abort: bool,
+    rx_memsize: u8,
 ) {
     use embassy_time::Delay;
     use embedded_hal_async::delay::DelayNs;
@@ -243,9 +300,8 @@ async fn do_rmt_loopback_async_inner<const TX_LEN: usize>(
         let (rx_res, tx_res) = embassy_futures::join::join(rx_fut, tx_fut).await;
 
         tx_res.unwrap();
-        rx_res.unwrap();
 
-        check_data_eq(&tx_data, &rcv_data, 1000, 1);
+        check_data_eq(&tx_data, &rcv_data, 1000, 1, rx_res, rx_memsize);
     }
 }
 
@@ -263,7 +319,7 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(
 
     let (mut tx_channel, mut rx_channel) = ctx.setup_loopback_async(tx_config, rx_config);
 
-    do_rmt_loopback_async_inner::<TX_LEN>(&mut tx_channel, &mut rx_channel, false).await
+    do_rmt_loopback_async_inner::<TX_LEN>(&mut tx_channel, &mut rx_channel, false, rx_memsize).await
 }
 
 // Run a test that just sends some data, without trying to recive it.
@@ -500,7 +556,7 @@ mod tests {
                 .configure_rx(rx_pin, rx_config)
                 .unwrap();
 
-            do_rmt_loopback_inner::<20>(tx_channel, rx_channel, false);
+            do_rmt_loopback_inner::<20>(tx_channel, rx_channel, false, 1);
         }};
     }
 
@@ -584,12 +640,13 @@ mod tests {
         let mut rx_data = [PulseCode::default(); 6];
         let rx_transaction = rx_channel.receive(&mut rx_data).unwrap();
 
-        let mut expected: [_; 5] = core::array::from_fn(|i| {
+        let mut expected: [_; 6] = core::array::from_fn(|i| {
             let i = i as u16 + 1;
             // 1 cycle = 2us
             PulseCode::new(Level::High, 500 * i, Level::Low, 500 * i)
         });
-        *expected.last_mut().unwrap() = PulseCode::end_marker();
+        expected[4] = PulseCode::new(Level::High, 0x7FFF, Level::Low, 0);
+        expected[5] = PulseCode::end_marker();
 
         let delay = Delay::new();
         for i in 1..5 {
@@ -603,10 +660,10 @@ mod tests {
         delay.delay_millis(100);
         tx_pin.set_low();
 
-        rx_transaction.wait().unwrap();
+        let rx_res = rx_transaction.wait().map(|(x, _)| x).map_err(|(e, _)| e);
 
         // tolerance 25 cycles == 50us
-        check_data_eq(&expected, &rx_data, 0x3FFF, 25);
+        check_data_eq(&expected, &rx_data, 0x3FFF, 25, rx_res, 1);
     }
 
     // Compile-only test to verify that reborrowing channel creators works.
@@ -644,9 +701,9 @@ mod tests {
 
         let (mut tx_channel, mut rx_channel) = ctx.setup_loopback(tx_config, rx_config);
 
-        do_rmt_loopback_inner::<TX_LEN>(tx_channel.reborrow(), rx_channel.reborrow(), true);
+        do_rmt_loopback_inner::<TX_LEN>(tx_channel.reborrow(), rx_channel.reborrow(), true, 1);
 
-        do_rmt_loopback_inner::<TX_LEN>(tx_channel, rx_channel, false);
+        do_rmt_loopback_inner::<TX_LEN>(tx_channel, rx_channel, false, 1);
     }
 
     // Test that completed blocking transactions leave the hardware in a predictable state from
@@ -684,6 +741,7 @@ mod tests {
                         tx_channel.reborrow(),
                         rx_channel.reborrow(),
                         false,
+                        1,
                     );
                 }
             }
@@ -705,12 +763,12 @@ mod tests {
         let (mut tx_channel, mut rx_channel) = ctx.setup_loopback_async(tx_config, rx_config);
 
         // Start loopback once, but abort before completion...
-        do_rmt_loopback_async_inner::<TX_LEN>(&mut tx_channel, &mut rx_channel, true).await;
+        do_rmt_loopback_async_inner::<TX_LEN>(&mut tx_channel, &mut rx_channel, true, 1).await;
 
         // ...then start over and check that everything still works as expected (i.e. we
         // didn't leave the hardware in an unexpected state or lock up when
         // dropping the futures).
-        do_rmt_loopback_async_inner::<TX_LEN>(&mut tx_channel, &mut rx_channel, false).await;
+        do_rmt_loopback_async_inner::<TX_LEN>(&mut tx_channel, &mut rx_channel, false, 1).await;
     }
 
     // Test that completed async transactions leave the hardware in a predictable state from which
@@ -744,7 +802,7 @@ mod tests {
 
                 // Test that dropping & recreating Channel works
                 for _ in 0..3 {
-                    do_rmt_loopback_async_inner::<20>(&mut tx_channel, &mut rx_channel, false)
+                    do_rmt_loopback_async_inner::<20>(&mut tx_channel, &mut rx_channel, false, 1)
                         .await;
                 }
             }
@@ -790,15 +848,18 @@ mod tests {
             // rx/tx concurrently.
             while !tx_transaction.is_loopcount_interrupt_set() {}
 
-            if use_autostop {
+            let rx_res = if use_autostop {
                 // tx should stop automatically, so rx should also stop before we explicitly stop
                 // tx
-                rx_transaction.wait().unwrap();
+                let res = rx_transaction.wait();
                 tx_transaction.stop_next().unwrap();
+                res
             } else {
                 tx_transaction.stop_next().unwrap();
-                rx_transaction.wait().unwrap();
-            }
+                rx_transaction.wait()
+            };
+
+            let rx_res = rx_res.map(|(x, _)| x).map_err(|(e, _)| e);
 
             // FIXME: Somehow verify that tx is really stopped!
 
@@ -818,7 +879,7 @@ mod tests {
                 .with_length2(1100)
                 .unwrap();
 
-            check_data_eq(&expected_data, &rx_data, 1000, 1);
+            check_data_eq(&expected_data, &rx_data, 1000, 1, rx_res, 2);
         }
     }
 
