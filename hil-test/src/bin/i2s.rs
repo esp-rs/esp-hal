@@ -99,12 +99,7 @@ fn enable_loopback() {
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
-    use esp_hal::{
-        dma::DmaRxStreamBuf,
-        dma_buffers_chunk_size,
-        dma_rx_stream_buffer,
-        dma_tx_stream_buffer,
-    };
+    use esp_hal::{dma_rx_stream_buffer, dma_tx_stream_buffer};
 
     use super::*;
 
@@ -203,8 +198,8 @@ mod tests {
         // NOTE: 32000 bits of buffer maybe too large, but for some reason it fails with buffer
         // size 16000 as it seems DMA can be quick enough to run out of descriptors in that
         // case.
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
-            dma_buffers_chunk_size!(32000, 32000, 4000);
+        let rx_buffer = dma_rx_stream_buffer!(32000, 4000);
+        let mut tx_buffer = dma_tx_stream_buffer!(32000, 4000);
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -235,28 +230,24 @@ mod tests {
         enable_loopback();
 
         let mut samples = SampleSource::new();
-        for b in tx_buffer.iter_mut() {
-            *b = samples.next().unwrap();
-        }
+        tx_buffer.push_with(|buf| {
+            for b in buf.iter_mut() {
+                *b = samples.next().unwrap();
+            }
+            buf.len()
+        });
 
         let mut rcv = [0u8; 11000];
         let mut filler = [0x1u8; 12000];
 
-        let mut rx_transfer = i2s_rx
-            .read(
-                DmaRxStreamBuf::new(rx_descriptors, rx_buffer).unwrap(),
-                4000,
-            )
-            .unwrap();
+        let mut rx_transfer = i2s_rx.read(rx_buffer, 4000).unwrap();
         // trying to peek data before calling `available` should just do nothing
         assert_eq!(0, rx_transfer.peek().len());
 
         // no data available yet
         assert_eq!(0, rx_transfer.available_bytes());
 
-        let mut tx_transfer = i2s_tx
-            .write(DmaTxStreamBuf::new(tx_descriptors, tx_buffer).unwrap())
-            .unwrap();
+        let mut tx_transfer = i2s_tx.write(tx_buffer).unwrap();
 
         let mut iteration = 0;
         let mut sample_idx = 0;
