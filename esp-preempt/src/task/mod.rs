@@ -25,6 +25,7 @@ use crate::{SCHEDULER, run_queue::RunQueue, scheduler::SchedulerState, wait_queu
 pub(crate) enum TaskState {
     Ready,
     Sleeping,
+    Deleted,
 }
 
 pub(crate) type TaskPtr = NonNull<Task>;
@@ -459,9 +460,6 @@ pub(super) fn schedule_task_deletion(task: *mut Task) {
     trace!("schedule_task_deletion {:?}", task);
     SCHEDULER.with(|scheduler| {
         if scheduler.schedule_task_deletion(task) {
-            // Deleting the current task - We won't be re-scheduled.
-            let current_cpu = Cpu::current() as usize;
-            scheduler.per_cpu[current_cpu].event.set_blocked();
             yield_task();
         }
     });

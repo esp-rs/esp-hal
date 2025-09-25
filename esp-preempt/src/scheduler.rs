@@ -25,32 +25,6 @@ use crate::{
     timer::TimeDriver,
 };
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-// Due to how our interrupts work, we may have a timer event and a yield at the same time. Their
-// order of processing is an implementation detail in esp-hal. We need to be able to store multiple
-// events to not miss any.
-pub(crate) struct SchedulerEvent(usize);
-
-impl SchedulerEvent {
-    // If this is NOT set, the event is a cooperative yield of some sort (time slicing, self-yield).
-    const TASK_BLOCKED: usize = 1 << 0;
-
-    fn contains(self, bit: usize) -> bool {
-        self.0 & bit != 0
-    }
-    fn set(&mut self, bit: usize) {
-        self.0 |= bit;
-    }
-
-    pub(crate) fn set_blocked(&mut self) {
-        self.set(Self::TASK_BLOCKED)
-    }
-
-    pub(crate) fn is_cooperative_yield(self) -> bool {
-        !self.contains(Self::TASK_BLOCKED)
-    }
-}
-
 pub(crate) struct SchedulerState {
     /// A list of all allocated tasks
     pub(crate) all_tasks: TaskList<TaskAllocListElement>,
@@ -72,8 +46,6 @@ pub(crate) struct CpuSchedulerState {
     pub(crate) current_task: Option<TaskPtr>,
     idle_context: CpuContext,
 
-    pub(crate) event: SchedulerEvent,
-
     // This context will be filled out by the first context switch.
     // We allocate the main task statically, because there is always a main task. If deleted, we
     // simply don't deallocate this.
@@ -86,8 +58,6 @@ impl CpuSchedulerState {
             initialized: false,
             current_task: None,
             idle_context: CpuContext::new(),
-
-            event: SchedulerEvent(0),
 
             main_task: Task {
                 cpu_context: CpuContext::new(),
@@ -232,6 +202,7 @@ impl SchedulerState {
         let current_cpu = Cpu::current() as usize;
         let mut to_delete = core::mem::take(&mut self.to_delete);
         'outer: while let Some(task_ptr) = to_delete.pop() {
+            assert!(task_ptr.state() == TaskState::Deleted);
             for cpu in 0..Cpu::COUNT {
                 if Some(task_ptr) == self.per_cpu[cpu].current_task {
                     if cpu == current_cpu {
@@ -262,10 +233,8 @@ impl SchedulerState {
 
         self.delete_marked_tasks();
 
-        let event = core::mem::take(&mut self.per_cpu[current_cpu].event);
-
-        if event.is_cooperative_yield()
-            && let Some(current_task) = self.per_cpu[current_cpu].current_task
+        if let Some(current_task) = self.per_cpu[current_cpu].current_task
+            && current_task.state() == TaskState::Ready
         {
             // Current task is still ready, mark it as such.
             debug!("re-queueing current task: {:?}", current_task);
@@ -382,6 +351,7 @@ impl SchedulerState {
         let is_current = task_to_delete == current_task;
 
         self.to_delete.push(task_to_delete);
+        task_to_delete.set_state(TaskState::Deleted);
 
         is_current
     }
@@ -392,7 +362,6 @@ impl SchedulerState {
         let timer_queue = unwrap!(self.time_driver.as_mut());
         if timer_queue.schedule_wakeup(current_task, at) {
             // The task has been scheduled for wakeup.
-            self.per_cpu[current_cpu].event.set_blocked();
             task::yield_task();
             true
         } else {
