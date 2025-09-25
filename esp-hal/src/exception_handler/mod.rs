@@ -49,7 +49,7 @@ unsafe extern "C" fn ExceptionHandler(context: &TrapFrame) -> ! {
         };
 
         panic!(
-            "Exception '{}' mepc={:08x}, mtval={:08x}\n{:?}",
+            "Exception '{}' mepc=0x{:08x}, mtval=0x{:08x}\n{:?}",
             code, mepc, mtval, context
         );
     }
