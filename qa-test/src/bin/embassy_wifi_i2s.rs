@@ -217,9 +217,9 @@ async fn main(spawner: Spawner) {
     // Preempt scheduler (WiFi)
     #[cfg(target_arch = "riscv32")]
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    let timg1 = TimerGroup::new(peripherals.TIMG1);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_preempt::start(
-        timg1.timer0,
+        timg0.timer0,
         #[cfg(target_arch = "riscv32")]
         sw_int.software_interrupt0,
     );
@@ -244,8 +244,8 @@ async fn main(spawner: Spawner) {
 
     let i2s_rx = i2s
         .i2s_rx
-        .with_bclk(peripherals.GPIO7) // SCK
-        .with_ws(peripherals.GPIO6) // WS
+        .with_bclk(peripherals.GPIO2) // SCK
+        .with_ws(peripherals.GPIO4) // WS
         .with_din(peripherals.GPIO5) // SD
         .build(rx_descriptors);
 
