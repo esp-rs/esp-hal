@@ -13,7 +13,8 @@ use embassy_time::{Duration, Instant, Timer};
 use esp_alloc;
 use esp_backtrace as _;
 use esp_hal::{
-    dma_buffers,
+    dma::DmaRxStreamBuf,
+    dma_rx_stream_buffer,
     i2s::master::{Channels, Config as I2sConfig, DataFormat, I2s},
     rng::Rng,
     time::Rate,
@@ -43,6 +44,7 @@ const PASSWORD: &str = env!("PASSWORD");
 
 const SAMPLE_RATE: u32 = 16_000;
 const I2S_BUFFER_SIZE: usize = 4092 * 8; // DMA ring size
+const I2S_CHUNK_SIZE: usize = 4092;
 
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
@@ -126,19 +128,15 @@ async fn connection_manager(
 #[embassy_executor::task]
 async fn i2s_dma_drain(
     i2s_rx: esp_hal::i2s::master::I2sRx<'static, esp_hal::Async>,
-    buffer: &'static mut [u8],
+    buffer: DmaRxStreamBuf,
     connected_signal: &'static Signal<NoopRawMutex, bool>,
 ) {
-    // Temporary buffer for DMA pops
-    static I2S_DATA_BUFFER: StaticCell<[u8; 8192]> = StaticCell::new();
-    let i2s_data = I2S_DATA_BUFFER.init([0u8; 8192]);
-
-    // Create circular DMA transaction
+    // Create streaming DMA transaction
     println!(
-        "🎛️  Creating I2S DMA circular transaction with ring size: {} bytes",
-        buffer.len()
+        "🎛️  Creating I2S DMA transaction with streaming buffer of size: {} bytes",
+        I2S_BUFFER_SIZE
     );
-    let mut transaction = match i2s_rx.read_dma_circular_async(buffer) {
+    let mut transaction = match i2s_rx.read(buffer, I2S_CHUNK_SIZE) {
         Ok(t) => t,
         Err(e) => {
             println!("❌ Failed to start I2S DMA: {:?}", e);
@@ -153,10 +151,19 @@ async fn i2s_dma_drain(
     // Start continuous draining to prevent DmaError(Late)
     println!("🧹 Starting continuous buffer drain to keep DMA synchronized...");
     while !connected_signal.signaled() {
+        let available_bytes = match transaction.available_bytes() {
+            0 => transaction
+                .wait_for_available()
+                .await
+                .map(|_| transaction.available_bytes()),
+            b => Ok(b),
+        };
+
         // Check for available data and drain it
-        match transaction.pop(i2s_data).await {
+        match available_bytes {
             Ok(bytes) => {
                 total_drained += bytes;
+                transaction.consume(bytes);
             }
             Err(e) => {
                 if matches!(
@@ -187,9 +194,17 @@ async fn i2s_dma_drain(
         late_errors,
         start.elapsed().as_millis()
     );
-    match transaction.pop(i2s_data).await {
+    let available_bytes = match transaction.available_bytes() {
+        0 => transaction
+            .wait_for_available()
+            .await
+            .map(|_| transaction.available_bytes()),
+        b => Ok(b),
+    };
+    match available_bytes {
         Ok(bytes) => {
             println!("🧹 Final drained {} bytes total", bytes);
+            transaction.consume(bytes);
         }
         Err(e) => {
             if matches!(
@@ -246,7 +261,7 @@ async fn main(spawner: Spawner) {
     let dma_channel = peripherals.DMA_I2S0;
     #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
     let dma_channel = peripherals.DMA_CH0;
-    let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(I2S_BUFFER_SIZE, 0);
+    let rx_buffer = dma_rx_stream_buffer!(I2S_BUFFER_SIZE, I2S_CHUNK_SIZE);
 
     let i2s_cfg = I2sConfig::new_tdm_philips()
         .with_sample_rate(Rate::from_hz(SAMPLE_RATE))
@@ -262,7 +277,7 @@ async fn main(spawner: Spawner) {
         .with_bclk(peripherals.GPIO7) // SCK
         .with_ws(peripherals.GPIO6) // WS
         .with_din(peripherals.GPIO5) // SD
-        .build(rx_descriptors);
+        .build();
 
     // WiFi + network stack
     let esp_radio_ctrl = &*mk_static!(Controller<'static>, esp_radio::init().unwrap());
