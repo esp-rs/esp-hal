@@ -26,7 +26,7 @@ esp-radio = { path = "../../../esp-radio", features = [
 ] }
 heapless = "0.9.1"
 log = "0.4.27"
-trouble-host = { version = "0.3.0", features = [
+trouble-host = { version = "0.4.0", features = [
     "default-packet-pool-mtu-255",
     "derive",
     "scan",
