@@ -239,7 +239,7 @@ use crate::{
 mod reader;
 use reader::{ReaderState, RmtReader};
 mod writer;
-use writer::{RmtWriter, WriterState};
+use writer::{WriterContext, WriterState};
 
 /// A configuration error
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1441,7 +1441,7 @@ where
 
     channel: Channel<'ch, Blocking, Tx>,
 
-    writer: RmtWriter,
+    writer: WriterContext,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
     remaining_data: &'data [T],
@@ -1459,7 +1459,7 @@ where
         if status == Some(Event::Threshold) {
             raw.clear_tx_interrupts(Event::Threshold);
 
-            // `RmtWriter::write()` is safe to call even if `poll_internal` is called repeatedly
+            // `WriterContext::write()` is safe to call even if `poll_internal` is called repeatedly
             // after the data is exhausted since it returns immediately if already done.
             self.writer.write(&mut self.remaining_data, raw, false);
         }
@@ -1725,7 +1725,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
             Some(_) => return Err((Error::EndMarkerMissing, self)),
         }
 
-        let mut writer = RmtWriter::new();
+        let mut writer = WriterContext::new();
         writer.write(&mut data, raw, true);
 
         raw.clear_tx_interrupts(EnumSet::all());
@@ -1781,7 +1781,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         }
 
         if _guard.is_active() {
-            let mut writer = RmtWriter::new();
+            let mut writer = WriterContext::new();
             writer.write(&mut data, raw, true);
 
             raw.clear_tx_interrupts(EnumSet::all());
@@ -1933,7 +1933,7 @@ where
 {
     raw: DynChannelAccess<Tx>,
     _phantom: PhantomData<Channel<'a, Async, Tx>>,
-    writer: RmtWriter,
+    writer: WriterContext,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
     data: &'a [T],
@@ -1999,7 +1999,7 @@ impl Channel<'_, Async, Tx> {
         let raw = self.raw;
         let memsize = raw.memsize();
 
-        let mut writer = RmtWriter::new();
+        let mut writer = WriterContext::new();
 
         match data.last() {
             None => {

@@ -15,7 +15,7 @@ pub(super) enum WriterState {
 
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub(super) struct RmtWriter {
+pub(super) struct WriterContext {
     // The position in channel RAM to continue writing at; must be either
     // 0 or half the available RAM size if there's further data.
     // The position may be invalid if there's no data left.
@@ -24,7 +24,7 @@ pub(super) struct RmtWriter {
     pub state: WriterState,
 }
 
-impl RmtWriter {
+impl WriterContext {
     pub(super) fn new() -> Self {
         Self {
             offset: 0,
