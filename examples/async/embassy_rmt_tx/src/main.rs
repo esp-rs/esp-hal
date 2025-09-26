@@ -14,7 +14,7 @@ use esp_backtrace as _;
 use esp_hal::{
     gpio::Level,
     interrupt::software::SoftwareInterruptControl,
-    rmt::{PulseCode, Rmt, TxChannelConfig, TxChannelCreator},
+    rmt::{CopyEncoder, PulseCode, Rmt, TxChannelConfig, TxChannelCreator},
     time::Rate,
     timer::timg::TimerGroup,
 };
@@ -56,7 +56,8 @@ async fn main(_spawner: Spawner) {
 
     loop {
         println!("transmit");
-        channel.transmit(&data).await.unwrap();
+        let mut encoder = CopyEncoder::new(&data);
+        channel.transmit(&mut encoder).await.unwrap();
         println!("transmitted\n");
         Timer::after(Duration::from_millis(500)).await;
     }
