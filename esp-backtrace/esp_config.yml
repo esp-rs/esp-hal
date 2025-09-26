@@ -5,3 +5,17 @@ options:
   description: The maximum number of frames that will be printed in a backtrace.
   default:
     - value: 10
+
+- name: stack-dump-max-size
+  description: Max amount of stack to dump.
+  default:
+    - value: '"8K"'
+  constraints:
+    - type:
+        validator: enumeration
+        value:
+          - '4K'
+          - '8K'
+          - '16K'
+          - '32K'
+  active: 'chip == "esp32c2" || chip == "esp32c3" || chip == "esp32c6" || chip == "esp32h2"'
