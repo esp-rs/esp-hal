@@ -458,11 +458,11 @@ impl CurrentThreadHandle {
 #[cfg(feature = "esp-radio")]
 pub(super) fn schedule_task_deletion(task: *mut Task) {
     trace!("schedule_task_deletion {:?}", task);
-    SCHEDULER.with(|scheduler| {
-        if scheduler.schedule_task_deletion(task) {
+    if SCHEDULER.with(|scheduler| scheduler.schedule_task_deletion(task)) {
+        loop {
             yield_task();
         }
-    });
+    }
 }
 
 #[inline]
