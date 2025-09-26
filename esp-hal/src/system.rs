@@ -5,7 +5,7 @@ use esp_sync::NonReentrantMutex;
 #[cfg(esp32)]
 use crate::peripherals::DPORT;
 #[cfg(multi_core)]
-use crate::peripherals::LPWR as LP_TIMER;
+use crate::peripherals::LPWR;
 use crate::peripherals::SYSTEM;
 
 /// Peripherals which can be enabled via `PeripheralClockControl`.
@@ -1150,7 +1150,7 @@ impl Cpu {
     }
 
     #[cfg(multi_core)]
-    fn c0_c1_bits(&self) -> (u32, u32) {
+    fn c0_c1_bits(self) -> (u32, u32) {
         // Write 0x2 to options0 to stall a particular core
         // offset for app cpu: 0
         // offset for pro cpu: 2
@@ -1169,8 +1169,8 @@ impl Cpu {
     /// Park or un-park the core.
     #[inline(always)]
     #[cfg(multi_core)]
-    pub fn park_core(&self, park: bool) {
-        let rtc_cntl = LP_TIMER::regs();
+    pub fn park_core(self, park: bool) {
+        let rtc_cntl = LPWR::regs();
 
         let (c0_val, c1_val) = self.c0_c1_bits();
 
@@ -1197,28 +1197,22 @@ impl Cpu {
     #[inline(always)]
     #[cfg(multi_core)]
     pub fn is_running(&self) -> bool {
-        // If the core is the app cpu we need to check first if it was even enabled
-        if let Cpu::AppCpu = *self {
+        if *self == Cpu::AppCpu {
             cfg_if::cfg_if! {
                 if #[cfg(esp32s3)] {
                     let system = SYSTEM::regs();
-
                     let r = system.core_1_control_0().read();
-                if r.control_core_1_clkgate_en().bit_is_clear() || r.control_core_1_runstall().bit_is_set() {
-                    // If the core is not enabled (CLKGATE_EN=0) or stalled (RUNSTALL=1)
-                    return false;
-                }
+                    if r.control_core_1_clkgate_en().bit_is_clear()
+                        || r.control_core_1_runstall().bit_is_set()
+                    {
+                        return false;
+                    }
                 } else if #[cfg(esp32)] {
-                    // DPORT_APPCPU_CLKGATE_EN in APPCPU_CTRL_B bit 0 -> needs to be 1 to even be enabled
-                    // DPORT_APPCPU_RUNSTALL in APPCPU_CTRL_C bit 0 -> needs to be 0 to not stall
-
                     let dport = DPORT::regs();
                     if dport.appcpu_ctrl_b().read().appcpu_clkgate_en().bit_is_clear() {
-                     // If the core is not enabled we can take this shortcut
                         return false;
                     }
                     if dport.appcpu_ctrl_c().read().appcpu_runstall().bit_is_set() {
-                     // If the core is not enabled we can take this shortcut
                         return false;
                     }
                 }
@@ -1226,23 +1220,22 @@ impl Cpu {
         }
 
         let (c0_val, c1_val) = self.c0_c1_bits();
+        let rtc_cntl = LPWR::regs();
 
-        let rtc_cntl = LP_TIMER::regs();
         unsafe {
             rtc_cntl
                 .sw_cpu_stall()
-                .modify(|_, w| w.sw_stall_procpu_c1().bits(c1_val as u8))
-        };
-        unsafe {
+                .modify(|_, w| w.sw_stall_procpu_c1().bits(c1_val as u8));
             rtc_cntl
                 .options0()
-                .modify(|_, w| w.sw_stall_procpu_c0().bits(c0_val as u8))
+                .modify(|_, w| w.sw_stall_procpu_c0().bits(c0_val as u8));
         };
 
         let (c0, c1) = (
             rtc_cntl.options0().read().bits() & c0_val,
             rtc_cntl.sw_cpu_stall().read().bits() & c1_val,
         );
+
         !(c0 == c0_val && c1 == c1_val)
     }
 }
