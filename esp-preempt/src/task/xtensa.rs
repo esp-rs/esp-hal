@@ -47,10 +47,11 @@ pub(crate) fn new_task_context(
     }
 
     CpuContext {
-        PC: task_fn as usize as u32,
+        PC: super::task_wrapper as usize as u32,
         A0: 0,
         A1: stack_top,
-        A6: param as usize as u32,
+        A6: task_fn as usize as u32,
+        A7: param as usize as u32,
 
         // For windowed ABI set WOE and CALLINC (pretend task was 'call4'd)
         PS: 0x00040000 | ((1 & 3) << 16),
