@@ -46,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated radio related drivers to ESP-IDF 5.5.1 (#4113)
 - Event handlers are now passed the event by reference (#4113)
 - Some build-time configuration options have been replaced by runtime options in `WifiConfig` (#4121)
-- Update bt-hci version with flash usage improvements (#4146)
+- Update to bt-hci version with flash usage improvements (#4146, #4165)
 
 ### Fixed
 
