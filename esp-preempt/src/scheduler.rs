@@ -233,7 +233,8 @@ impl SchedulerState {
 
         self.delete_marked_tasks();
 
-        if let Some(current_task) = self.per_cpu[current_cpu].current_task
+        let current_task = self.per_cpu[current_cpu].current_task;
+        if let Some(current_task) = current_task
             && current_task.state() == TaskState::Ready
         {
             // Current task is still ready, mark it as such.
@@ -242,40 +243,37 @@ impl SchedulerState {
         }
 
         let next_task = self.run_queue.pop();
-        if next_task != self.per_cpu[current_cpu].current_task {
-            trace!(
-                "Switching task {:?} -> {:?}",
-                self.per_cpu[current_cpu].current_task, next_task
-            );
+        if next_task != current_task {
+            trace!("Switching task {:?} -> {:?}", current_task, next_task);
 
             // If the current task is deleted, we can skip saving its context. We signal this by
             // using a null pointer.
-            let current_context = if let Some(mut current) = self.per_cpu[current_cpu].current_task
-            {
+            let current_context = if let Some(current) = current_task {
                 // TODO: the SMP scheduler relies on at least the context saving to happen within
                 // the scheduler's critical section. We can't run the scheduler on the other core
                 // while it might try to restore a partially saved context.
-                let current_ref = unsafe { current.as_mut() };
+                #[cfg(multi_core)]
+                let current_ref = unsafe { current.as_ref() };
                 #[cfg(multi_core)]
                 if current_ref.pinned_to.is_none()
                     && current_ref.priority
                         >= self.per_cpu[1 - current_cpu]
                             .current_task
-                            .map(|t| unsafe { t.as_ref().priority })
+                            .map(|t| t.priority(&mut self.run_queue))
                             .unwrap_or(0)
                 {
                     task::schedule_other_core();
                 }
 
-                &raw mut current_ref.cpu_context
+                unsafe { &raw mut (*current.as_ptr()).cpu_context }
             } else {
                 core::ptr::null_mut()
             };
 
-            let next_context = if let Some(mut next) = next_task {
+            let next_context = if let Some(next) = next_task {
                 priority = Some(next.priority(&mut self.run_queue));
 
-                unsafe { &raw mut next.as_mut().cpu_context }
+                unsafe { &raw mut (*next.as_ptr()).cpu_context }
             } else {
                 // If there is no next task, set up and return to the idle hook.
                 // Reuse the stack frame of the main task. Note that this requires the main task to
