@@ -3,12 +3,17 @@ use esp_hal::{
     time::{Duration, Instant, Rate},
 };
 
+#[cfg(feature = "embassy")]
+use crate::TIMER_QUEUE;
 use crate::{
     SCHEDULER,
     TICK_RATE,
     TimeBase,
     task::{TaskExt, TaskPtr, TaskQueue, TaskState, TaskTimerQueueElement},
 };
+
+#[cfg(feature = "embassy")]
+pub(crate) mod embassy;
 
 const TIMESLICE_DURATION: Duration = Rate::from_hz(TICK_RATE).as_duration();
 
@@ -29,6 +34,23 @@ impl TimerQueue {
         Self {
             queue: TaskQueue::new(),
             next_wakeup: u64::MAX,
+        }
+    }
+
+    fn retain(&mut self, now: u64, mut on_task_ready: impl FnMut(TaskPtr)) {
+        let mut timer_queue = core::mem::take(self);
+
+        while let Some(mut task_ptr) = timer_queue.pop() {
+            let task = unsafe { task_ptr.as_mut() };
+
+            let wakeup_at = task.wakeup_at;
+            let ready = wakeup_at <= now;
+
+            if ready {
+                on_task_ready(task_ptr);
+            } else {
+                self.push(task_ptr, wakeup_at);
+            }
         }
     }
 
@@ -83,33 +105,20 @@ impl TimeDriver {
         }
     }
 
-    pub(crate) fn handle_alarm(&mut self, mut on_task_ready: impl FnMut(TaskPtr)) {
-        let mut timer_queue = core::mem::take(&mut self.timer_queue);
-
-        let now = Instant::now().duration_since_epoch().as_micros();
-
-        while let Some(mut task_ptr) = timer_queue.pop() {
-            let task = unsafe { task_ptr.as_mut() };
-
-            let wakeup_at = task.wakeup_at;
-            let ready = wakeup_at <= now;
-
-            if ready {
-                on_task_ready(task_ptr);
-            } else {
-                self.timer_queue.push(task_ptr, wakeup_at);
-            }
-        }
+    pub(crate) fn handle_alarm(&mut self, on_task_ready: impl FnMut(TaskPtr)) {
+        self.timer_queue.retain(crate::now(), on_task_ready);
     }
 
     pub(crate) fn arm_next_wakeup(&mut self, with_time_slice: bool) {
         let wakeup_at = self.timer_queue.next_wakeup;
 
-        if wakeup_at != u64::MAX {
-            let now = Instant::now().duration_since_epoch().as_micros();
-            let sleep_duration = wakeup_at.saturating_sub(now);
+        #[cfg(feature = "embassy")]
+        let wakeup_at = wakeup_at.min(TIMER_QUEUE.next_wakeup());
 
-            let timeout = if with_time_slice {
+        if wakeup_at != u64::MAX {
+            let sleep_duration = wakeup_at.saturating_sub(crate::now());
+
+            let mut timeout = if with_time_slice {
                 sleep_duration.min(TIMESLICE_DURATION.as_micros())
             } else {
                 // assume 52-bit underlying timer. it's not a big deal to sleep for a shorter time
@@ -117,7 +126,16 @@ impl TimeDriver {
             };
 
             trace!("Arming timer for {:?}", timeout);
-            unwrap!(self.timer.schedule(Duration::from_micros(timeout)));
+            loop {
+                match self.timer.schedule(Duration::from_micros(timeout)) {
+                    Ok(_) => break,
+                    Err(esp_hal::timer::Error::InvalidTimeout) if timeout != 0 => {
+                        timeout /= 2;
+                        continue;
+                    }
+                    Err(e) => panic!("Failed to schedule timer: {:?}", e),
+                }
+            }
         } else if with_time_slice {
             trace!("Arming timer for {:?}", TIMESLICE_DURATION);
             unwrap!(self.timer.schedule(TIMESLICE_DURATION));
@@ -164,7 +182,10 @@ impl TimeDriver {
 }
 
 #[esp_hal::ram]
-extern "C" fn timer_tick_handler(#[cfg(xtensa)] _context: &mut esp_hal::trapframe::TrapFrame) {
+extern "C" fn timer_tick_handler() {
+    #[cfg(feature = "embassy")]
+    TIMER_QUEUE.handle_alarm(crate::now());
+
     SCHEDULER.with(|scheduler| {
         let time_driver = unwrap!(scheduler.time_driver.as_mut());
 
@@ -184,8 +205,9 @@ extern "C" fn timer_tick_handler(#[cfg(xtensa)] _context: &mut esp_hal::trapfram
             scheduler.run_queue.mark_task_ready(ready_task);
         });
 
-        // The timer interrupt fires when a task is ready to run, or when a time slice tick expires.
-        // Trigger a context switch in both cases.
+        // The timer interrupt fires when a task is ready to run, an embassy timer expires or when a
+        // time slice tick expires. Trigger a context switch in all cases, which context switch will
+        // re-arm the timer.
 
         // `Scheduler::switch_task` must be called on a single interrupt priority level only.
         // To ensure this, we call yield_task to pend the software interrupt.
@@ -198,12 +220,8 @@ extern "C" fn timer_tick_handler(#[cfg(xtensa)] _context: &mut esp_hal::trapfram
         // ESP32: Because on ESP32 the software interrupt is triggered at priority 3 but
         // the timer interrupt is triggered at priority 1, we need to trigger the
         // software interrupt manually.
-        cfg_if::cfg_if! {
-            if #[cfg(any(riscv, esp32))] {
-                crate::task::yield_task();
-            } else {
-                scheduler.switch_task(_context)
-            }
-        }
+        //
+        // The rest of the lineup could switch tasks here, but it's not done to save some IRAM.
+        crate::task::yield_task();
     });
 }

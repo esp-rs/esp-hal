@@ -110,7 +110,7 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
     fn now(&self) -> u64 {
         // We're using a SingleShotTimer as the time driver, which lets us use the system timer's
         // timestamps.
-        Instant::now().duration_since_epoch().as_micros()
+        crate::now()
     }
 }
 

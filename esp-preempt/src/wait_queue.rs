@@ -7,20 +7,20 @@ use esp_hal::{
 
 use crate::{
     SCHEDULER,
-    task::{TaskPtr, TaskQueue, TaskReadyQueueElement},
+    task::{TaskList, TaskPtr, TaskReadyQueueElement},
 };
 
 pub(crate) struct WaitQueue {
     // A task is either blocked, or ready. Since it can't be both, we can reuse the ready queue
     // element. Note however, that a task can simultaneously be in the timer queue and a wait
     // queue!
-    pub(crate) waiting_tasks: TaskQueue<TaskReadyQueueElement>,
+    pub(crate) waiting_tasks: TaskList<TaskReadyQueueElement>,
 }
 
 impl WaitQueue {
     pub(crate) const fn new() -> Self {
         Self {
-            waiting_tasks: TaskQueue::new(),
+            waiting_tasks: TaskList::new(),
         }
     }
 

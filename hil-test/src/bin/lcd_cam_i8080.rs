@@ -10,7 +10,6 @@ use esp_hal::{
     Blocking,
     dma::DmaTxBuf,
     dma_buffers,
-    gpio::NoPin,
     lcd_cam::{
         BitOrder,
         LcdCam,

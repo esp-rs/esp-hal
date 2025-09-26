@@ -56,6 +56,7 @@ esp_preempt::start_second_core(
 #![no_std]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 
+#[cfg(feature = "alloc")]
 extern crate alloc;
 
 // MUST be the first module
@@ -70,8 +71,12 @@ mod task;
 mod timer;
 mod wait_queue;
 
+#[cfg(feature = "embassy")]
+pub mod embassy;
+
 use core::mem::MaybeUninit;
 
+#[cfg(feature = "alloc")]
 pub(crate) use esp_alloc::InternalMemory;
 #[cfg(any(multi_core, riscv))]
 use esp_hal::interrupt::software::SoftwareInterrupt;
@@ -86,6 +91,7 @@ use esp_hal::{
     system::{CpuControl, Stack},
     time::{Duration, Instant},
 };
+pub use macros::preempt_main as main;
 pub(crate) use scheduler::SCHEDULER;
 pub use task::CurrentThreadHandle;
 
@@ -94,7 +100,7 @@ use crate::timer::TimeDriver;
 type TimeBase = OneShotTimer<'static, Blocking>;
 
 // Polyfill the InternalMemory allocator
-#[cfg(not(feature = "esp-alloc"))]
+#[cfg(all(feature = "alloc", not(feature = "esp-alloc")))]
 mod esp_alloc {
     use core::{alloc::Layout, ptr::NonNull};
 
@@ -165,10 +171,6 @@ where
 /// - An `AnyTimer` instance
 ///
 /// For an example, see the [crate-level documentation][self].
-#[cfg_attr(
-    multi_core,
-    doc = " \nNote that `esp_radio::init()` must be called on the same core as `esp_preempt::start()`."
-)]
 pub fn start(timer: impl TimerSource, #[cfg(riscv)] int0: SoftwareInterrupt<'static, 0>) {
     trace!("Starting scheduler for the first core");
     assert_eq!(Cpu::current(), Cpu::ProCpu);
@@ -259,3 +261,12 @@ pub fn start_second_core<const STACK_SIZE: usize>(
 }
 
 const TICK_RATE: u32 = esp_config::esp_config_int!(u32, "ESP_PREEMPT_CONFIG_TICK_RATE_HZ");
+
+pub(crate) fn now() -> u64 {
+    esp_hal::time::Instant::now()
+        .duration_since_epoch()
+        .as_micros()
+}
+
+#[cfg(feature = "embassy")]
+embassy_time_driver::time_driver_impl!(static TIMER_QUEUE: crate::timer::embassy::TimerQueue = crate::timer::embassy::TimerQueue::new());

@@ -2305,6 +2305,7 @@ impl Driver<'_> {
     fn check_all_commands_done_blocking(&self, deadline: Option<Instant>) -> Result<(), Error> {
         // loop until commands are actually done
         while !self.all_commands_done(deadline)? {}
+        self.check_errors()?;
 
         Ok(())
     }
@@ -2315,6 +2316,7 @@ impl Driver<'_> {
         while !self.all_commands_done(deadline)? {
             embassy_futures::yield_now().await;
         }
+        self.check_errors()?;
 
         Ok(())
     }

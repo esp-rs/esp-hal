@@ -2,6 +2,7 @@
 use core::ffi::c_void;
 
 use esp_hal::{interrupt::software::SoftwareInterrupt, riscv::register, system::Cpu};
+use portable_atomic::Ordering;
 
 use crate::SCHEDULER;
 
@@ -145,13 +146,9 @@ pub(crate) fn new_task_context(
 /// which will save the current CPU state for the current task (excluding PC) and
 /// restoring the CPU state from the next task.
 pub fn task_switch(old_ctx: *mut CpuContext, new_ctx: *mut CpuContext) {
-    debug_assert!(
-        _NEXT_CTX_PTR
-            .load(portable_atomic::Ordering::SeqCst)
-            .is_null()
-    );
-    _CURRENT_CTX_PTR.store(old_ctx, portable_atomic::Ordering::SeqCst);
-    _NEXT_CTX_PTR.store(new_ctx, portable_atomic::Ordering::SeqCst);
+    debug_assert!(_NEXT_CTX_PTR.load(Ordering::SeqCst).is_null());
+    _CURRENT_CTX_PTR.store(old_ctx, Ordering::SeqCst);
+    _NEXT_CTX_PTR.store(new_ctx, Ordering::SeqCst);
 
     if !old_ctx.is_null() {
         unsafe {

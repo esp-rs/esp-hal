@@ -48,8 +48,6 @@ mod alert;
 mod blocking;
 mod builder;
 mod doc_replace;
-#[cfg(feature = "embassy")]
-mod embassy;
 mod interrupt;
 #[cfg(any(
     feature = "is-lp-core",
@@ -58,6 +56,7 @@ mod interrupt;
     feature = "has-ulp-core"
 ))]
 mod lp_core;
+mod preempt_main;
 mod ram;
 
 /// Sets which segment of RAM to use for a function or static and how it should
@@ -208,15 +207,14 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 /// Spawning a task:
 ///
 /// ``` rust
-/// #[main]
+/// #[esp_preempt::main]
 /// async fn main(_s: embassy_executor::Spawner) {
 ///     // Function body
 /// }
 /// ```
-#[cfg(feature = "embassy")]
 #[proc_macro_attribute]
-pub fn embassy_main(args: TokenStream, item: TokenStream) -> TokenStream {
-    embassy::main(args, item)
+pub fn preempt_main(args: TokenStream, item: TokenStream) -> TokenStream {
+    preempt_main::main(args, item)
 }
 
 /// Attribute to declare the entry point of the program

@@ -356,7 +356,7 @@ mod tests {
         let mut dep_graph = HashMap::new();
         dep_graph.insert(Package::EspHal, vec![Package::EspAlloc]);
         dep_graph.insert(
-            Package::EspHalEmbassy,
+            Package::EspPreempt,
             vec![Package::EspHal, Package::EspRadio],
         );
         dep_graph.insert(Package::EspRadio, vec![Package::EspHal]);
@@ -369,7 +369,7 @@ mod tests {
                 Package::EspAlloc,
                 Package::EspHal,
                 Package::EspRadio,
-                Package::EspHalEmbassy
+                Package::EspPreempt
             ]
         );
     }

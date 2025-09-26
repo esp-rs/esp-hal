@@ -28,7 +28,6 @@ rustflags = [
 
 [env]
 ESP_LOG = "info"
-ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE="multiple-integrated"
 SSID = "SSID"
 PASSWORD = "PASSWORD"
 STATIC_IP = "1.1.1.1 "
