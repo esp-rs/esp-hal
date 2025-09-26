@@ -50,10 +50,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .expect("Failed to read esp_config.yml for esp-backtrace");
     generate_config_from_yaml_definition(&cfg_yaml, true, true, Some(chip))?;
 
-    let target_arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
-
     println!("cargo::rustc-check-cfg=cfg(stack_dump)");
-    if target_arch == "riscv32"
+    if !chip.is_xtensa()
         && !std::env::var("CARGO_ENCODED_RUSTFLAGS")
             .unwrap_or_default()
             .contains("force-frame-pointers")
