@@ -36,6 +36,7 @@ use esp_hal::{
         CHANNEL_RAM_SIZE,
         Channel,
         ConfigError,
+        CopyEncoder,
         Error,
         HAS_RX_WRAP,
         PulseCode,
@@ -330,10 +331,11 @@ fn do_rmt_loopback_inner(
     rx_channel: Channel<Blocking, Rx>,
 ) {
     let tx_data = generate_tx_data(conf);
-    let mut rcv_data = vec![PulseCode::default(); conf.tx_len];
+    let mut rx_data = vec![PulseCode::default(); conf.tx_len];
 
-    let rx_transaction = rx_channel.receive(&mut rcv_data);
-    let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
+    let mut tx_enc = CopyEncoder::new(&tx_data);
+    let rx_transaction = rx_channel.receive(&mut rx_data);
+    let mut tx_transaction = tx_channel.transmit(&mut tx_enc).unwrap();
 
     if conf.abort {
         // Start the transactions...
@@ -375,7 +377,7 @@ fn do_rmt_loopback_inner(
         };
         let rx_res = run();
 
-        check_data_eq(conf, &tx_data, &rcv_data, rx_res);
+        check_data_eq(conf, &tx_data, &rx_data, rx_res);
     }
 }
 
@@ -399,8 +401,9 @@ async fn do_rmt_loopback_async_inner(
     let mut rcv_data = vec![PulseCode::default(); conf.tx_len];
 
     // Start the transactions...
+    let mut tx_enc = CopyEncoder::new(&tx_data);
     let rx_fut = rx_channel.receive(&mut rcv_data);
-    let tx_fut = tx_channel.transmit(&tx_data);
+    let tx_fut = tx_channel.transmit(&mut tx_enc);
 
     if conf.abort {
         Delay.delay_ms(2).await;
@@ -619,9 +622,10 @@ mod tests {
         let (tx_channel, _) = ctx.setup_loopback(&conf);
 
         let tx_data = generate_tx_data(&conf);
+        let mut tx_enc = CopyEncoder::new(&tx_data);
 
         assert!(matches!(
-            tx_channel.transmit(&tx_data),
+            tx_channel.transmit(&mut tx_enc),
             Err((Error::EndMarkerMissing, _))
         ));
     }
@@ -821,8 +825,9 @@ mod tests {
                 .unwrap();
 
             let tx_data = generate_tx_data(&conf);
+            let mut tx_enc = CopyEncoder::new(&tx_data);
 
-            ch0.transmit(&tx_data).await.unwrap();
+            ch0.transmit(&mut tx_enc).await.unwrap();
         }
     }
 
@@ -979,11 +984,13 @@ mod tests {
             if use_autostop {
                 loopmode = LoopMode::Finite(loopcount as u16);
             };
+
+            let mut tx_enc = CopyEncoder::new(&tx_data);
             rx_data.fill(PulseCode::default());
             let rx_transaction = rx_channel.reborrow().receive(&mut rx_data).unwrap();
             let tx_transaction = tx_channel
                 .reborrow()
-                .transmit_continuously(&tx_data, loopmode)
+                .transmit_continuously(&mut tx_enc, loopmode)
                 .unwrap();
 
             // All data is small enough to fit a single hardware buffer, so we don't need to poll
@@ -1063,12 +1070,13 @@ mod tests {
             PulseCode::new(Level::High, 10_000, Level::Low, 10_000),
             PulseCode::end_marker(),
         ];
+        let mut tx_enc = CopyEncoder::new(&tx_data);
 
         let start = Instant::now();
 
         let tx_transaction = tx_channel
             .reborrow()
-            .transmit_continuously(&tx_data, LoopMode::Finite(0))
+            .transmit_continuously(&mut tx_enc, LoopMode::Finite(0))
             .unwrap();
 
         while !tx_transaction.is_loopcount_interrupt_set() {}
