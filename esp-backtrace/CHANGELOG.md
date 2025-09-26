@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `exception-handler` now panics. (#3838)
 - Only halt cores in panics when `halt-cores` feature is enabled. (#4010)
 - It is no longer possible to select multiple halt method features (`halt-cores`, `custom-halt`, `semihosting`) (#4012)
+- RISC-V: If stack-frames are not enabled the panic-handler will now emit a stack dump (#4189)
 
 ### Fixed
 
