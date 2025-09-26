@@ -247,11 +247,6 @@ mod tests {
             }
 
             context.time_slice_observed.give();
-
-            // TODO: support one-shot tasks in esp-preempt
-            unsafe {
-                preempt::schedule_task_deletion(core::ptr::null_mut());
-            }
         }
 
         unsafe {
@@ -337,11 +332,6 @@ mod tests {
 
             info!("High: released mutex");
             context.mutex.give();
-
-            // TODO: support one-shot tasks in esp-preempt
-            unsafe {
-                preempt::schedule_task_deletion(core::ptr::null_mut());
-            }
         }
         extern "C" fn medium_priority_task(context: *mut c_void) {
             let context = unsafe { &*(context as *const TestContext) };
@@ -351,11 +341,6 @@ mod tests {
 
             info!("Medium: marking test finished");
             context.ready_semaphore.give();
-
-            // TODO: support one-shot tasks in esp-preempt
-            unsafe {
-                preempt::schedule_task_deletion(core::ptr::null_mut());
-            }
         }
 
         unsafe {
@@ -426,21 +411,11 @@ mod tests {
             let context = unsafe { &*(context as *const TestContext) };
 
             count_impl(context, Cpu::AppCpu);
-
-            // TODO: support one-shot tasks in esp-preempt
-            unsafe {
-                preempt::schedule_task_deletion(core::ptr::null_mut());
-            }
         }
         extern "C" fn count_on_pro_core(context: *mut c_void) {
             let context = unsafe { &*(context as *const TestContext) };
 
             count_impl(context, Cpu::ProCpu);
-
-            // TODO: support one-shot tasks in esp-preempt
-            unsafe {
-                preempt::schedule_task_deletion(core::ptr::null_mut());
-            }
         }
 
         esp_preempt::start(

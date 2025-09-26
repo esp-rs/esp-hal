@@ -128,8 +128,9 @@ pub(crate) fn new_task_context(
     let stack_top = stack_top - (stack_top % 16);
 
     CpuContext {
-        pc: task as usize,
-        a0: param as usize,
+        pc: super::task_wrapper as usize,
+        a0: task as usize,
+        a1: param as usize,
         sp: stack_top,
         ..Default::default()
     }

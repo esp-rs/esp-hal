@@ -262,6 +262,12 @@ pub(crate) struct Task {
 const STACK_CANARY: u32 =
     const { esp_config::esp_config_int!(u32, "ESP_HAL_CONFIG_STACK_GUARD_VALUE") };
 
+#[cfg(feature = "esp-radio")]
+extern "C" fn task_wrapper(task_fn: extern "C" fn(*mut c_void), param: *mut c_void) {
+    task_fn(param);
+    schedule_task_deletion(core::ptr::null_mut());
+}
+
 impl Task {
     #[cfg(feature = "esp-radio")]
     pub(crate) fn new(
