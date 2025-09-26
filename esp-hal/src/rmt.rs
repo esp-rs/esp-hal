@@ -239,7 +239,7 @@ use crate::{
 mod reader;
 use reader::{ReaderState, RmtReader};
 mod writer;
-use writer::{RmtWriter, WriterState};
+use writer::{WriterContext, WriterState};
 
 /// A configuration error
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1438,7 +1438,7 @@ pub struct TxTransaction<'ch, 'data> {
 
     channel: Channel<'ch, Blocking, Tx>,
 
-    writer: RmtWriter,
+    writer: WriterContext,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
     remaining_data: &'data [PulseCode],
@@ -1453,7 +1453,7 @@ impl<'ch> TxTransaction<'ch, '_> {
         if status == Some(Event::Threshold) {
             raw.clear_tx_interrupts(Event::Threshold);
 
-            // `RmtWriter::write()` is safe to call even if `poll_internal` is called repeatedly
+            // `WriterContext::write()` is safe to call even if `poll_internal` is called repeatedly
             // after the data is exhausted since it returns immediately if already done.
             self.writer.write(&mut self.remaining_data, raw, false);
         }
@@ -1702,7 +1702,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         let raw = self.raw;
         let memsize = raw.memsize();
 
-        let mut writer = RmtWriter::new();
+        let mut writer = WriterContext::new();
         writer.write(&mut data, raw, true);
 
         if let WriterState::Error(e) = writer.state() {
@@ -1746,7 +1746,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
             return Err((Error::InvalidArgument, self));
         }
 
-        let mut writer = RmtWriter::new();
+        let mut writer = WriterContext::new();
         writer.write(&mut data, raw, true);
 
         match writer.state() {
@@ -1899,7 +1899,7 @@ static RMT_LOCK: RawMutex = RawMutex::new();
 struct TxFuture<'a> {
     raw: DynChannelAccess<Tx>,
     _phantom: PhantomData<Channel<'a, Async, Tx>>,
-    writer: RmtWriter,
+    writer: WriterContext,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
     data: &'a [PulseCode],
@@ -1952,7 +1952,7 @@ impl Channel<'_, Async, Tx> {
         let raw = self.raw;
         let memsize = raw.memsize();
 
-        let mut writer = RmtWriter::new();
+        let mut writer = WriterContext::new();
         writer.write(&mut data, raw, true);
 
         let _guard = if writer.state().is_ok() {
