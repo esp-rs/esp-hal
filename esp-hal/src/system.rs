@@ -1196,7 +1196,7 @@ impl Cpu {
     /// Returns true if the core is running.
     #[inline(always)]
     #[cfg(multi_core)]
-    pub fn is_running(&self) -> bool {
+    pub fn is_running(self) -> bool {
         if *self == Cpu::AppCpu {
             cfg_if::cfg_if! {
                 if #[cfg(esp32s3)] {
