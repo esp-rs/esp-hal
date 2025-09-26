@@ -416,7 +416,7 @@ fn zb_mac_handler() {
     }
 
     if events & Event::AckRxDone != 0 {
-        info!("EventAckRxDone");
+        trace!("EventAckRxDone");
     }
 
     if events & Event::AckTxDone != 0 {
