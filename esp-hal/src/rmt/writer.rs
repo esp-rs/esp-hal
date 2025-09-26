@@ -25,6 +25,7 @@ pub(super) struct WriterContext {
 }
 
 impl WriterContext {
+    #[inline]
     pub(super) fn new() -> Self {
         Self {
             offset: 0,
