@@ -1,7 +1,7 @@
 //! RMT Loopback Test
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: unstable
+//% FEATURES: embassy unstable
 
 #![no_std]
 #![no_main]
@@ -36,6 +36,7 @@ use esp_hal::{
 #[allow(unused_imports)]
 use hil_test::{assert, assert_eq};
 
+// RMT channel clock = 500kHz
 cfg_if::cfg_if! {
     if #[cfg(esp32h2)] {
         const FREQ: Rate = Rate::from_mhz(32);
@@ -47,12 +48,12 @@ cfg_if::cfg_if! {
 }
 
 fn setup<'a, Dm: DriverMode>(
-    rmt: Rmt<'static, Dm>,
+    rmt: Rmt<'a, Dm>,
     rx: impl PeripheralInput<'a>,
     tx: impl PeripheralOutput<'a>,
     tx_config: TxChannelConfig,
     rx_config: RxChannelConfig,
-) -> (Channel<Dm, Tx>, Channel<Dm, Rx>) {
+) -> (Channel<'a, Dm, Tx>, Channel<'a, Dm, Rx>) {
     let tx_channel = rmt
         .channel0
         .configure_tx(tx, tx_config.with_clk_divider(DIV))
@@ -72,6 +73,7 @@ fn setup<'a, Dm: DriverMode>(
     (tx_channel, rx_channel)
 }
 
+// Pulses of H 100..300 L 50, i.e. 150..350 / 500kHz = 150..350 * 2us = 300..700us
 fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [PulseCode; TX_LEN] {
     let mut tx_data: [_; TX_LEN] = core::array::from_fn(|i| {
         PulseCode::new(Level::High, (100 + (i * 10) % 200) as u16, Level::Low, 50)
@@ -270,13 +272,6 @@ mod tests {
         do_rmt_loopback::<80>(2, 2);
     }
 
-    // FIXME: This test currently fails on esp32 with an rmt::Error::ReceiverError,
-    // which should imply a receiver overrun, which is unexpected (the buffer
-    // should hold 2 * 64 codes, which is sufficient).
-    // However, the problem already exists exists in the original code that added
-    // support for extended channel RAM, so we can't bisect to find a
-    // regression. Skip the test for now.
-    #[cfg(not(esp32))]
     #[test]
     fn rmt_loopback_tx_wrap() {
         // 80 codes require two RAM blocks; thus a tx channel with only 1 block requires
@@ -316,7 +311,7 @@ mod tests {
     fn rmt_single_shot_fails_without_end_marker() {
         let result = do_rmt_single_shot::<20>(1, false);
 
-        assert!(matches!(result, Err(Error::EndMarkerMissing)));
+        assert_eq!(result, Err(Error::EndMarkerMissing));
     }
 
     #[test]
@@ -493,5 +488,236 @@ mod tests {
 
         // tolerance 25 cycles == 50us
         check_data_eq(&expected, &rx_data, 6, 25);
+    }
+
+    // Compile-only test to verify that reborrowing channel creators works.
+    async fn _rmt_reborrow_channel_creator() {
+        let mut peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let mut rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ)
+            .unwrap()
+            .into_async();
+
+        for _ in 0..2 {
+            let mut ch0 = rmt
+                .channel0
+                .reborrow()
+                .configure_tx(NoPin, TxChannelConfig::default())
+                .unwrap();
+
+            let tx_data: [_; 10] = generate_tx_data(true);
+
+            ch0.transmit(&tx_data).await.unwrap();
+        }
+    }
+
+    // Test that dropping rx/tx transactions returns the hardware to a predictable state from which
+    // subsequent transactions are successful.
+    #[test]
+    fn rmt_loopback_after_drop_blocking() {
+        const TX_LEN: usize = 40;
+
+        let mut peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ).unwrap();
+
+        let (_, pin) = hil_test::common_test_pins!(peripherals);
+        let pin = Flex::new(pin);
+        let (rx_pin, tx_pin) = pin.split();
+
+        let tx_config = TxChannelConfig::default()
+            // If not enabling a defined idle_output level, the output might remain high after
+            // dropping the tx future, which will lead to an extra edge being received.
+            .with_idle_output(true);
+        let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
+
+        let (mut tx_channel, mut rx_channel) = setup(rmt, rx_pin, tx_pin, tx_config, rx_config);
+
+        let tx_data: [_; TX_LEN] = generate_tx_data(true);
+        let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
+
+        // Start the transactions...
+        let mut rx_transaction = rx_channel.reborrow().receive(&mut rcv_data).unwrap();
+        let mut tx_transaction = tx_channel.reborrow().transmit(&tx_data).unwrap();
+
+        Delay::new().delay_millis(2);
+
+        // ...poll them for a while, but then drop them...
+        // (`poll_once` takes the future by value and drops it before returning)
+        let rx_done = rx_transaction.poll();
+        let tx_done = tx_transaction.poll();
+
+        // The test should fail here when the the delay above is increased, e.g. to 100ms.
+        assert!(!rx_done);
+        assert!(!tx_done);
+
+        // Removing these lines should fail to compile!
+        core::mem::drop(rx_transaction);
+        core::mem::drop(tx_transaction);
+
+        rcv_data.fill(PulseCode::default());
+        let mut rx_transaction = rx_channel.reborrow().receive(&mut rcv_data).unwrap();
+        let mut tx_transaction = tx_channel.reborrow().transmit(&tx_data).unwrap();
+
+        loop {
+            let tx_done = tx_transaction.poll();
+            let rx_done = rx_transaction.poll();
+            if tx_done && rx_done {
+                break;
+            }
+        }
+
+        tx_transaction.wait().unwrap();
+        rx_transaction.wait().unwrap();
+
+        check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
+    }
+
+    // Test that completed blocking transactions leave the hardware in a predictable state from
+    // which subsequent transactions are successful.
+    #[test]
+    fn rmt_loopback_repeat_blocking() {
+        const TX_LEN: usize = 20;
+
+        let mut peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ).unwrap();
+
+        let (_, pin) = hil_test::common_test_pins!(peripherals);
+        let pin = Flex::new(pin);
+        let (rx_pin, tx_pin) = pin.split();
+
+        let tx_config = TxChannelConfig::default()
+            // If not enabling a defined idle_output level, the output might remain high after
+            // dropping the tx future, which will lead to an extra edge being received.
+            .with_idle_output(true);
+        let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
+
+        let (mut tx_channel, mut rx_channel) = setup(rmt, rx_pin, tx_pin, tx_config, rx_config);
+
+        let tx_data: [_; TX_LEN] = generate_tx_data(true);
+        let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
+
+        for _ in 0..3 {
+            rcv_data.fill(PulseCode::default());
+            let mut rx_transaction = rx_channel.reborrow().receive(&mut rcv_data).unwrap();
+            let mut tx_transaction = tx_channel.reborrow().transmit(&tx_data).unwrap();
+
+            loop {
+                let tx_done = tx_transaction.poll();
+                let rx_done = rx_transaction.poll();
+                if tx_done && rx_done {
+                    break;
+                }
+            }
+
+            tx_transaction.wait().unwrap();
+            rx_transaction.wait().unwrap();
+
+            check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
+        }
+    }
+
+    // Test that dropping rx/tx futures returns the hardware to a predictable state from which
+    // subsequent transactions are successful.
+    #[test]
+    async fn rmt_loopback_after_drop_async() {
+        use embassy_time::Delay;
+        use embedded_hal_async::delay::DelayNs;
+
+        const TX_LEN: usize = 40;
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        hil_test::init_embassy!(peripherals, 2);
+
+        let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
+
+        let (_, pin) = hil_test::common_test_pins!(peripherals);
+        let pin = Flex::new(pin);
+        let (rx_pin, tx_pin) = pin.split();
+
+        let tx_config = TxChannelConfig::default()
+            // If not enabling a defined idle_output level, the output might remain high after
+            // dropping the tx future, which will lead to an extra edge being received.
+            .with_idle_output(true);
+        let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
+
+        let (mut tx_channel, mut rx_channel) = setup(rmt, rx_pin, tx_pin, tx_config, rx_config);
+
+        let tx_data: [_; TX_LEN] = generate_tx_data(true);
+        let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
+
+        // Start the transactions...
+        let rx_fut = rx_channel.receive(&mut rcv_data);
+        let tx_fut = tx_channel.transmit(&tx_data);
+
+        Delay.delay_ms(2).await;
+
+        // ...poll them, but then drop them before completion...
+        // (`poll_once` takes the future by value and drops it before returning)
+        let rx_poll = embassy_futures::poll_once(rx_fut);
+        let tx_poll = embassy_futures::poll_once(tx_fut);
+
+        // The test should fail here when the the delay above is increased, e.g. to 100ms.
+        assert!(rx_poll.is_pending());
+        assert!(tx_poll.is_pending());
+
+        // ...then start over and check that everything still works as expected (i.e. we
+        // didn't leave the hardware in an unexpected state or lock up when
+        // dropping the futures).
+        rcv_data.fill(PulseCode::default());
+        let (rx_res, tx_res) = embassy_futures::join::join(
+            rx_channel.receive(&mut rcv_data),
+            tx_channel.transmit(&tx_data),
+        )
+        .await;
+
+        tx_res.unwrap();
+        rx_res.unwrap();
+
+        check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
+    }
+
+    // Test that completed async transactions leave the hardware in a predictable state from which
+    // subsequent transactions are successful.
+    #[test]
+    async fn rmt_loopback_repeat_async() {
+        const TX_LEN: usize = 40;
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        hil_test::init_embassy!(peripherals, 2);
+
+        let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
+
+        let (_, pin) = hil_test::common_test_pins!(peripherals);
+        let pin = Flex::new(pin);
+        let (rx_pin, tx_pin) = pin.split();
+
+        let tx_config = TxChannelConfig::default()
+            // If not enabling a defined idle_output level, the output might remain high after
+            // dropping the tx future, which will lead to an extra edge being received.
+            .with_idle_output(true);
+        let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
+
+        let (mut tx_channel, mut rx_channel) = setup(rmt, rx_pin, tx_pin, tx_config, rx_config);
+
+        let tx_data: [_; TX_LEN] = generate_tx_data(true);
+        let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
+
+        for _ in 0..3 {
+            rcv_data.fill(PulseCode::default());
+            let (rx_res, tx_res) = embassy_futures::join::join(
+                rx_channel.receive(&mut rcv_data),
+                tx_channel.transmit(&tx_data),
+            )
+            .await;
+
+            tx_res.unwrap();
+            rx_res.unwrap();
+
+            check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
+        }
     }
 }

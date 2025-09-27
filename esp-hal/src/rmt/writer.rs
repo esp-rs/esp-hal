@@ -1,8 +1,10 @@
-use super::{DynChannelAccess, PulseCode, Tx};
+use super::{DynChannelAccess, Error, PulseCode, Tx};
 
 #[derive(PartialEq)]
 pub(crate) enum WriterState {
     Active,
+
+    Error(Error),
 
     Done,
 }
