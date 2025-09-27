@@ -1,8 +1,14 @@
-use std::{path::Path, time::Instant};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    time::Instant,
+};
 
 use anyhow::{Context, Result, bail};
 use clap::{Args, Parser};
 use esp_metadata::{Chip, Config};
+use object::{Object, ObjectSymbol, read::archive::ArchiveFile};
+use rustc_demangle::try_demangle;
 use strum::IntoEnumIterator;
 use xtask::{
     Package,
@@ -45,6 +51,9 @@ enum Cli {
     UpdateMetadata(UpdateMetadataArgs),
     /// Run host-tests in the workspace with `cargo test`
     HostTests(HostTestsArgs),
+    /// Check global symbols in the compiled `.rlib` of the specified packages for the specified
+    /// chips.
+    CheckGlobalSymbols(CheckPackagesArgs),
 }
 
 #[derive(Debug, Args)]
@@ -209,6 +218,9 @@ fn main() -> Result<()> {
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
         Cli::UpdateMetadata(args) => update_metadata(&workspace, args.check),
         Cli::HostTests(args) => host_tests(&workspace, args),
+        Cli::CheckGlobalSymbols(args) => {
+            check_global_symbols(&workspace, &args.packages, &args.chips)
+        }
     }
 }
 
@@ -718,4 +730,160 @@ fn host_tests(workspace: &Path, args: HostTestsArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Find the most recently modified rlib for the specified package in the deps_dir.
+fn find_esp_hal_rlib(deps_dir: &Path, package: &Package) -> Result<PathBuf> {
+    println!("Looking for {} rlib in: {}", package, deps_dir.display());
+
+    let crate_name = package.to_string().replace('-', "_");
+    let prefix = format!("lib{}-", crate_name);
+
+    fs::read_dir(deps_dir)
+        .with_context(|| format!("Failed to read directory: {}", deps_dir.display()))?
+        .filter_map(|entry| {
+            let path = entry.ok()?.path();
+            let name = path.file_name()?.to_str()?;
+            if name.starts_with(&prefix) && name.ends_with(".rlib") {
+                path.metadata()
+                    .ok()
+                    .and_then(|m| m.modified().ok())
+                    .map(|t| (path, t))
+            } else {
+                None
+            }
+        })
+        .max_by_key(|(_, time)| *time)
+        .map(|(path, _)| path)
+        .ok_or_else(|| anyhow::anyhow!("No rlib found for {} in {}", package, deps_dir.display()))
+}
+
+/// Check global symbols in the compiled rlib of the specified packages for the
+/// specified chips. Reports any unmangled global symbols that may pollute the
+/// global namespace.
+fn check_global_symbols(workspace: &Path, packages: &[Package], chips: &[Chip]) -> Result<()> {
+    let mut total_problematic = 0;
+    let mut checked_packages = 0;
+
+    for package in packages {
+        for chip in chips {
+            let target = package.target_triple(chip)?;
+            let deps_dir = workspace.join("target").join(&target).join("debug/deps");
+
+            let rlib_path = match find_esp_hal_rlib(&deps_dir, package) {
+                Ok(path) => path,
+                Err(e) => {
+                    println!("⚠️  No rlib found for {} on {}: {}", package, chip, e);
+                    continue;
+                }
+            };
+
+            println!(
+                "🔍 Checking global symbols for {} on {}:\n   {}",
+                package,
+                chip,
+                rlib_path.display()
+            );
+
+            let data = std::fs::read(&rlib_path)?;
+            let archive = ArchiveFile::parse(data.as_slice())?;
+
+            let mut problematic_symbols = Vec::new();
+            let mut rust_symbol_count = 0;
+
+            for member in archive.members().flatten() {
+                if let Ok(obj) = object::File::parse(member.data(data.as_slice())?) {
+                    for symbol in obj.symbols().filter(|s| s.is_global() && s.is_definition()) {
+                        if let Ok(name) = symbol.name() {
+                            if is_allowed_global_symbol(name) {
+                                continue;
+                            }
+                            if try_demangle(name).is_ok() {
+                                rust_symbol_count += 1;
+                            } else {
+                                problematic_symbols.push((
+                                    name.to_string(),
+                                    format!("{:?}", symbol.kind()),
+                                    symbol.section_index().map(|i| i.0).unwrap_or(0),
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+
+            let total_symbols = rust_symbol_count + problematic_symbols.len();
+            println!(
+                "   📊 Found {total_symbols} global symbols\n   ✅ {rust_symbol_count} properly mangled Rust symbols"
+            );
+
+            if problematic_symbols.is_empty() {
+                println!("   ✅ All global symbols are properly mangled Rust symbols\n");
+            } else {
+                println!(
+                    "   ❌ Found {} potentially problematic global symbols (may pollute global namespace):",
+                    problematic_symbols.len()
+                );
+                for (symbol, kind, section) in &problematic_symbols {
+                    let symbol_type = match kind.as_str() {
+                        "Text" => "T",
+                        "Data" => "D",
+                        "Unknown" => "U",
+                        _ => &kind,
+                    };
+                    println!(
+                        "      {:>16} {} {}",
+                        format!("{:x}", section),
+                        symbol_type,
+                        symbol
+                    );
+                }
+                println!();
+
+                total_problematic += problematic_symbols.len();
+            }
+
+            checked_packages += 1;
+        }
+    }
+
+    println!(
+        "\n{}\n📋 Final Summary:\n   Checked {} package-chip combinations\n   Total problematic symbols found: {}",
+        "=".repeat(60),
+        checked_packages,
+        total_problematic
+    );
+
+    if total_problematic > 0 {
+        Err(anyhow::anyhow!(
+            "Found {total_problematic} unmangled global symbols across all packages/chips"
+        ))
+    } else {
+        println!("🎉 All packages passed namespace checks!");
+        Ok(())
+    }
+}
+
+/// Global symbols that are expected to be unmangled.
+fn is_allowed_global_symbol(name: &str) -> bool {
+    name.starts_with("__rustc_")
+        || name.starts_with("__rtti_")
+        || name.starts_with("__DWARF")
+        || name.starts_with("__debug_")
+        || name.starts_with("__eh_frame")
+        || name.starts_with("__stack_")
+        || name.starts_with("__heap_")
+        || name.starts_with("__data_")
+        || name.starts_with("__bss_")
+        || name.starts_with("__text_")
+        || matches!(
+            name,
+            "_start"
+                | "main"
+                | "__stack_size"
+                | "__heap_size"
+                | "__dso_handle"
+                | "__tdata_start"
+                | "__tbss_start"
+        )
 }
