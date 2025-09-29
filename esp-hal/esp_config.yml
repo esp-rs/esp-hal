@@ -95,7 +95,7 @@ options:
   active: 'feature("psram")'
 
 - name: stack-guard-offset
-  description: The stack guard variable will be placed this many bytes from the stack's end.
+  description: The stack guard variable will be placed this many bytes from the stack's end. Needs to be a multiple of 4.
   default:
     - value: 4096
   active: 'true'
@@ -105,6 +105,11 @@ options:
   default:
     - value: 3740121773
   display_hint: Hex
+
+- name: stack-guard-monitoring
+  description: Use a data watchpoint to check if the stack guard was overwritten.
+  default:
+    - value: true
 
 - name: impl-critical-section
   description: "Provide a `critical-section` implementation. Note that if disabled,
@@ -186,3 +191,7 @@ options:
           - '4'
           - '8'
   active: 'chip == "esp32s3"'
+
+# TODO somni doesn't yet support `%` and evalexpr doesn't support `&`
+#checks:
+#  - "ESP_HAL_CONFIG_STACK_GUARD_OFFSET & 3 == 0"

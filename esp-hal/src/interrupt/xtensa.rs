@@ -750,7 +750,6 @@ mod rt {
     unsafe extern "C" {
         fn level4_interrupt(save_frame: &mut Context);
         fn level5_interrupt(save_frame: &mut Context);
-        fn level6_interrupt(save_frame: &mut Context);
         fn level7_interrupt(save_frame: &mut Context);
     }
 
@@ -764,12 +763,6 @@ mod rt {
     #[unsafe(link_section = ".rwtext")]
     unsafe fn __level_5_interrupt(save_frame: &mut Context) {
         unsafe { level5_interrupt(save_frame) }
-    }
-
-    #[unsafe(no_mangle)]
-    #[unsafe(link_section = ".rwtext")]
-    unsafe fn __level_6_interrupt(save_frame: &mut Context) {
-        unsafe { level6_interrupt(save_frame) }
     }
 
     #[unsafe(no_mangle)]

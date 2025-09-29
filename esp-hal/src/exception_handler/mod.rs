@@ -15,6 +15,34 @@ unsafe extern "C" fn __user_exception(
     );
 }
 
+#[cfg(xtensa)]
+#[unsafe(no_mangle)]
+#[unsafe(link_section = ".rwtext")]
+unsafe extern "C" fn __level_6_interrupt(context: &TrapFrame) {
+    let mut dbgcause: u32;
+    unsafe {
+        core::arch::asm!(
+            "rsr.debugcause {0}",
+            out(reg) dbgcause, options(nostack)
+        );
+    }
+
+    if dbgcause & 4 != 0 && dbgcause & 0b1111_0000_0000 == 0 {
+        panic!(
+            "\n\nDetected a write to the stack guard value on {:?}\n{:?}",
+            crate::system::Cpu::current(),
+            context
+        );
+    } else {
+        panic!(
+            "\n\nBreakpoint on {:?}\n{:?}\nDebug cause: {}",
+            crate::system::Cpu::current(),
+            context,
+            dbgcause
+        );
+    }
+}
+
 #[cfg(riscv)]
 #[unsafe(no_mangle)]
 unsafe extern "C" fn ExceptionHandler(context: &TrapFrame) -> ! {
@@ -22,11 +50,22 @@ unsafe extern "C" fn ExceptionHandler(context: &TrapFrame) -> ! {
     let code = riscv::register::mcause::read().code();
     let mtval = riscv::register::mtval::read();
 
+    unsafe extern "C" {
+        static mut __stack_chk_guard: u32;
+    }
+
+    let guard_addr = core::ptr::addr_of_mut!(__stack_chk_guard) as *mut _ as usize;
+
     if code == 14 {
         panic!(
-            "Stack overflow detected at 0x{:x} called by 0x{:x}",
+            "Stack overflow detected at 0x{:x}, possibly called by 0x{:x}",
             mepc, context.ra
         );
+    } else if code == 3 && mtval == guard_addr {
+        panic!(
+            "Detected a write to the stack guard value at 0x{:x}, possibly called by 0x{:x}",
+            mepc, context.ra
+        )
     } else {
         let code = match code {
             0 => "Instruction address misaligned",
