@@ -287,8 +287,15 @@ impl Task {
             name, task_fn, param, task_stack_size, priority, pinned_to
         );
 
-        // Make sure the stack guard doesn't eat into the stack size.
-        let task_stack_size = task_stack_size + 4;
+        let extra_stack = if cfg!(debug_build) {
+            // This is a lot, but debug builds fail in different ways without.
+            6 * 1024
+        } else {
+            // Make sure the stack guard doesn't eat into the stack size.
+            4
+        };
+
+        let task_stack_size = task_stack_size + extra_stack;
 
         // Make sure stack size is also aligned to 16 bytes.
         let task_stack_size = (task_stack_size & !0xF) + 16;

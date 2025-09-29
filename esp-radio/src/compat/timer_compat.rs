@@ -38,7 +38,7 @@ pub(crate) fn compat_timer_disarm(ets_timer: *mut ets_timer) {
 }
 
 pub(crate) fn compat_timer_is_active(ets_timer: *mut ets_timer) -> bool {
-    trace!("timer disarm");
+    trace!("timer is_active");
     let ets_timer = unwrap!(unsafe { ets_timer.as_mut() }, "ets_timer is null");
 
     if let Some(timer) = TimerPtr::new(ets_timer.priv_.cast()) {
@@ -55,6 +55,7 @@ fn delete_timer(ets_timer: &mut ets_timer) {
         let timer = unsafe { TimerHandle::from_ptr(timer) };
 
         core::mem::drop(timer);
+        ets_timer.priv_ = core::ptr::null_mut();
     }
 }
 
