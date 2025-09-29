@@ -174,8 +174,6 @@ mod compat;
 mod radio;
 mod time;
 
-pub(crate) use unstable_module;
-
 #[cfg(feature = "wifi")]
 pub mod wifi;
 
