@@ -91,7 +91,7 @@ use esp_hal::{
     system::{CpuControl, Stack},
     time::{Duration, Instant},
 };
-pub use macros::preempt_main as main;
+pub use macros::rtos_main as main;
 pub(crate) use scheduler::SCHEDULER;
 pub use task::CurrentThreadHandle;
 

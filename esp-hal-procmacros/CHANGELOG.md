@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Replaced `embassy_main` with `preempt_main` (intended to be called as `esp_rtos::main`) (#4172)
+- Replaced `embassy_main` with `rtos_main` (intended to be called as `esp_rtos::main`) (#4172)
 
 ### Removed
 

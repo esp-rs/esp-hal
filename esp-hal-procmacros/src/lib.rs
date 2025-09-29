@@ -56,8 +56,8 @@ mod interrupt;
     feature = "has-ulp-core"
 ))]
 mod lp_core;
-mod preempt_main;
 mod ram;
+mod rtos_main;
 
 /// Sets which segment of RAM to use for a function or static and how it should
 /// be initialized.
@@ -192,7 +192,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
     lp_core::entry(args, input)
 }
 
-/// Creates a new `executor` instance and declares an application entry point
+/// Creates a new instance of `esp_rtos::embassy::Executor` and declares an application entry point
 /// spawning the corresponding function body as an async task.
 ///
 /// The following restrictions apply:
@@ -213,8 +213,8 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn preempt_main(args: TokenStream, item: TokenStream) -> TokenStream {
-    preempt_main::main(args, item)
+pub fn rtos_main(args: TokenStream, item: TokenStream) -> TokenStream {
+    rtos_main::main(args, item)
 }
 
 /// Attribute to declare the entry point of the program
