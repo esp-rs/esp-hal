@@ -768,7 +768,7 @@ mod rt {
     #[unsafe(no_mangle)]
     #[unsafe(link_section = ".rwtext")]
     unsafe fn __level_6_interrupt(save_frame: &mut Context) {
-        unsafe { crate::exception_handler::breakpoint_interrupt(save_frame) }
+        crate::exception_handler::breakpoint_interrupt(save_frame);
     }
 
     #[unsafe(no_mangle)]
