@@ -58,6 +58,8 @@ jobs:
               - 'esp-storage/**'
             esp-radio:
               - 'esp-radio/**'
+            esp-radio-rtos-driver:
+              - 'esp-radio-rtos-driver/**'
             esp-sync:
               - 'esp-sync/**'
             xtensa-lx:
@@ -176,6 +178,14 @@ jobs:
           changeLogPath: esp-radio/CHANGELOG.md
           skipLabels: "skip-changelog"
           missingUpdateErrorMessage: "Please add a changelog entry in the esp-radio/CHANGELOG.md file."
+
+      - name: Check that changelog updated (esp-radio-rtos-driver)
+        if: steps.changes.outputs.esp-radio-rtos-driver == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: esp-radio-rtos-driver/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-radio-rtos-driver/CHANGELOG.md file."
 
       - name: Check that changelog updated (esp-sync)
         if: steps.changes.outputs.esp-sync == 'true'
