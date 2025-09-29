@@ -16,8 +16,7 @@ unsafe extern "C" fn __user_exception(
 }
 
 #[cfg(xtensa)]
-#[unsafe(no_mangle)]
-unsafe extern "C" fn __level_6_interrupt(context: &TrapFrame) {
+pub(crate) fn breakpoint_interrupt(context: &TrapFrame) {
     let mut dbgcause: u32;
     unsafe {
         core::arch::asm!(
