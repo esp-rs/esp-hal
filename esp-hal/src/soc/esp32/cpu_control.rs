@@ -306,6 +306,9 @@ impl<'d> CpuControl<'d> {
         let entry = START_CORE1_FUNCTION.load(Ordering::Acquire);
         debug_assert!(!entry.is_null());
 
+        #[cfg(stack_guard_monitoring)]
+        crate::soc::enable_stack_guard_monitoring();
+
         unsafe {
             let entry = ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>());
             entry();
