@@ -79,7 +79,9 @@ esp_hal::interrupt::bind_interrupt(
 );
 ```
 
-## RMT PulseCode changes
+## RMT changes
+
+### RMT PulseCode changes
 
 `PulseCode` used to be an extension trait implemented on `u32`. It is now a
 newtype struct, wrapping `u32`.
@@ -113,7 +115,7 @@ let _ = tx_channel.transmit(&tx_data).wait().unwrap();
 let _ = rx_channel.transmit(&mut rx_data).wait().unwrap();
 ```
 
-## RMT Channel Changes
+### RMT Channel Changes
 
 `rmt::Channel` used to have a `Raw: RawChannelAccess` generic parameter,
 which could be either `ConstChannelAccess<Dir, const CHANNEL: u8>` or `DynChannelAccess<Dir>`.
@@ -149,7 +151,7 @@ API as well.
 +let rx_transaction: RxTransaction<'_, PulseCode> = rx.transmit(&data);
 ```
 
-## RMT method changes
+### RMT method changes
 
 The `rmt::Channel::transmit_continuously` and
 `rmt::Channel::transmit_continuously_with_loopcount` methods have been merged:
@@ -268,9 +270,9 @@ Imports will need to be updated accordingly.
 
 Additionally, enum variant naming violations have been resolved, so the `RtcFastClock` and `RtcSlowClock` prefixes will need to be removed from any variants from these enums.
 
-## Direct vectoring changes
+## RISC-V interrupt direct vectoring changes
 
-`enable_direct` now requires user to pass handler function to it. 
+`enable_direct` now requires user to pass handler function to it.
 
 ```diff
 interrupt::enable_direct(
@@ -280,5 +282,4 @@ interrupt::enable_direct(
 +   interrupt_handler,
 )
 .unwrap();
-
 ```
