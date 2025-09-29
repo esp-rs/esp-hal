@@ -676,7 +676,7 @@ pub struct RxChannelConfig {
     carrier_level: Level,
     /// Filter threshold in ticks
     filter_threshold: u8,
-    /// Idle threshold in ticks
+    /// Idle threshold in ticks, must not exceed [`MAX_RX_IDLE_THRESHOLD`]
     idle_threshold: u16,
     /// The amount of memory blocks allocted to this channel
     memsize: u8,
@@ -1111,7 +1111,7 @@ where
     ) -> Result<Self, Error> {
         let raw = unsafe { DynChannelAccess::conjure(ch_idx) };
 
-        if config.idle_threshold > property!("rmt.max_idle_threshold") {
+        if config.idle_threshold > MAX_RX_IDLE_THRESHOLD {
             return Err(Error::InvalidArgument);
         }
 
@@ -2406,6 +2406,11 @@ mod chip_specific {
         }
     }
 
+    // documented in re-export below
+    #[allow(missing_docs)]
+    pub const MAX_RX_IDLE_THRESHOLD: u16 =
+        max_from_register_spec!(u16, ch_rx_conf0, CH_RX_CONF0_SPEC, IDLE_THRES_W);
+
     impl DynChannelAccess<Rx> {
         #[inline]
         pub fn clear_rx_interrupts(&self) {
@@ -2833,6 +2838,11 @@ mod chip_specific {
         }
     }
 
+    // documented in re-export below
+    #[allow(missing_docs)]
+    pub const MAX_RX_IDLE_THRESHOLD: u16 =
+        max_from_register_spec!(u16, chconf0, CHCONF0_SPEC, IDLE_THRES_W);
+
     impl DynChannelAccess<Rx> {
         #[inline]
         pub fn clear_rx_interrupts(&self) {
@@ -2999,3 +3009,6 @@ mod chip_specific {
         }
     }
 }
+
+/// The largest valid value for [`RxChannelConfig::with_idle_threshold`].
+pub use chip_specific::MAX_RX_IDLE_THRESHOLD;
