@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
@@ -359,8 +359,7 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
         let chips = toml
             .features
             .keys()
-            .map(|chip| Chip::from_str(&chip, true).unwrap())
-            .collect::<BTreeSet<_>>();
+            .filter_map(|chip| Chip::from_str(&chip, true).ok());
 
         for chip in chips {
             examples.push(Metadata {
