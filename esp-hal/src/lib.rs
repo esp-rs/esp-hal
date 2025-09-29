@@ -306,7 +306,6 @@ macro_rules! unstable_driver {
     };
 }
 
-pub(crate) use unstable_driver;
 pub(crate) use unstable_module;
 
 unstable_module! {
