@@ -256,12 +256,12 @@ pub(crate) fn enable_stack_guard_monitoring() {
             }
 
             let guard_addr = core::ptr::addr_of_mut!(__stack_chk_guard) as *mut _ as u32;
-            assert!(guard_addr % 4 == 0);
+            assert!(guard_addr.is_multiple_of(4));
 
             let id = 0; // breakpoint 0
             let addr = (guard_addr & !0b11) | 0b01;
 
-            let tdata = (1 << 3) | (1 << 6) | (1 << 1) | (0 << 0); // 0 = load, 1 = store, 6 = m-mode, 3 = u-mode
+            let tdata = (1 << 3) | (1 << 6) | (1 << 1); // bits: 0 = load, 1 = store, 6 = m-mode, 3 = u-mode
             let tcontrol = 1 << 3; // M-mode trigger
             core::arch::asm!(
                 "
@@ -288,10 +288,10 @@ pub(crate) fn enable_stack_guard_monitoring() {
 
             let guard_addr = core::ptr::addr_of_mut!(__stack_chk_guard) as *mut _ as u32;
 
-            assert!(guard_addr % 4 == 0);
+            assert!(guard_addr.is_multiple_of(4));
             let addr = guard_addr & !0b11;
 
-            let dbreakc = 0b11 | (0 << 30) | (1 << 31); // only watch stores
+            let dbreakc = 0b11 | (1 << 31); // bit 31 = STORE
 
             core::arch::asm!(
             "
