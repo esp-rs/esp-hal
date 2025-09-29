@@ -283,3 +283,86 @@ interrupt::enable_direct(
 )
 .unwrap();
 ```
+
+## Async/embassy changes
+
+> This section affects `esp-hal-embassy` users. Ariel-OS users are not affected by these changes.
+
+The `esp-hal-embassy` has been discontinued. Embassy is continued to be supported as part of `esp-rtos`.
+
+### Configuration
+
+`esp-hal-embassy` configuration options have not been ported to `esp-rtos`. `esp-rtos` by default works with a single integrated timer queue.
+To keep using generic timer queues, use the configuration options provided by `embassy-time`. Multiple timer queues (i.e. the previous `multiple-integrated` option) are not supported.
+
+The `low-power-wait` configuration can be substituted with a custom idle hook. You can specify an idle hook by calling `esp_rtos::start_with_idle_hook`, with a function that just `loop`s.
+
+### Setup
+
+The previous `esp_hal_embassy::main` macro has been replaced by `esp_rtos::main`. The `esp_hal_embassy::init` function has been replaced by `esp_rtos::start`, with a different signature. This is the same function that needs to be called
+for `esp_radio`, too.
+
+`esp_rtos::start` has a different signature for the different CPU architectures. The function takes a single timer instead of a variable number of timers.
+
+On Xtensa devices (ESP32/S2/S3):
+
+```diff
+-#[esp_hal_embassy::main]
++#[esp_rtos::main]
+ async fn main(spawner: Spawner) {
+     // ... timer setup not shown here.
+-    esp_hal_embassy::init([timer0, timer1]);
++    esp_rtos::start(timer0);
+     // ...
+ }
+```
+
+On RISC-V devices (ESP32-C2/C3/C6/H2) you'll need to also pass `SoftwareInterrupt<0>` to `esp_rtos::start`:
+
+```diff
++use esp_hal::interrupt::software::SoftwareInterruptControl;
+
+-#[esp_hal_embassy::main]
++#[esp_rtos::main]
+ async fn main(spawner: Spawner) {
+     // ... timer setup not shown here.
+-    esp_hal_embassy::init([timer0, timer1]);
+
++    let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
++    esp_rtos::start(timer0, software_interrupt.software_interrupt0);
+     // ...
+ }
+```
+
+### Multi-core support
+
+`esp_rtos::embassy::Executor` expects to be run in an `esp_rtos` thread. This means it cannot be started on the second core, unless the second core is managed by `esp_rtos`:
+
+```rust
+use esp_hal::system::Stack;
+use esp_rtos::embassy::Executor;
+use static_cell::StaticCell;
+
+static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
+let app_core_stack = APP_CORE_STACK.init(Stack::new());
+
+// AFTER esp_rtos::start
+
+esp_rtos::start_second_core(
+    peripherals.CPU_CTRL,
+    sw_int.software_interrupt0,
+    sw_int.software_interrupt1,
+    app_core_stack,
+    move || {
+        static EXECUTOR: StaticCell<Executor> = StaticCell::new();
+        let executor = EXECUTOR.init(Executor::new());
+        executor.run(|spawner| {
+            // Spawn tasks from here.
+        });
+    },
+);
+```
+
+### Interrupt executor changes
+
+Interrupt executors are provided as `esp_rtos::embassy::InterruptExecutor` with no additional changes.
