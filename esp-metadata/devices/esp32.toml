@@ -598,7 +598,6 @@ has_per_channel_clock = true
 clock_sources.supported = [ "RefTick", "Apb" ]
 # Power-on value is RefTick!
 clock_sources.default = "Apb"
-max_idle_threshold = 0x7FFF
 
 [device.rsa]
 support_status = "partial"
