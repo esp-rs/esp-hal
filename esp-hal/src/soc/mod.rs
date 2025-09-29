@@ -278,7 +278,7 @@ pub(crate) fn enable_stack_guard_monitoring() {
     }
 }
 
-#[cfg(all(feature = "rt", xtensa, stack_guard_monitoring))]
+#[cfg(all(feature = "rt", xtensa))]
 pub(crate) fn enable_stack_guard_monitoring() {
     if !crate::debugger::debugger_connected() {
         unsafe {
@@ -295,8 +295,8 @@ pub(crate) fn enable_stack_guard_monitoring() {
 
             core::arch::asm!(
             "
-            wsr {addr}, 144
-            wsr {dbreakc}, 160
+            wsr {addr}, 144 // 144 = dbreaka0
+            wsr {dbreakc}, 160 // 160 = dbreakc0
             ",
                 addr = in(reg) addr,
                 dbreakc = in(reg) dbreakc,
