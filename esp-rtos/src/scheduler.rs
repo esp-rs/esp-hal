@@ -13,6 +13,7 @@ use crate::{
     task::{
         self,
         CpuContext,
+        IdleFn,
         Task,
         TaskAllocListElement,
         TaskDeleteListElement,
@@ -99,14 +100,14 @@ impl SchedulerState {
         }
     }
 
-    pub(crate) fn setup(&mut self, time_driver: TimeDriver) {
+    pub(crate) fn setup(&mut self, time_driver: TimeDriver, idle_hook: IdleFn) {
         assert!(
             self.time_driver.is_none(),
             "The scheduler has already been started"
         );
         self.time_driver = Some(time_driver);
         for cpu in 0..Cpu::COUNT {
-            task::set_idle_hook_entry(&mut self.per_cpu[cpu].idle_context);
+            task::set_idle_hook_entry(&mut self.per_cpu[cpu].idle_context, idle_hook);
         }
     }
 

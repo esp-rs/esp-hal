@@ -107,16 +107,16 @@ impl CpuContext {
     }
 }
 
-extern "C" fn idle_hook() -> ! {
+pub(crate) extern "C" fn idle_hook() -> ! {
     loop {
         unsafe { core::arch::asm!("wfi") };
     }
 }
 
-pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext) {
+pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext, hook_fn: super::IdleFn) {
     // Point idle context PC at the assembly that calls the idle hook. We need a new stack
     // frame for the idle task on the main stack.
-    idle_context.pc = idle_hook as usize;
+    idle_context.pc = hook_fn as usize;
 }
 
 #[cfg(feature = "esp-radio")]

@@ -95,7 +95,7 @@ pub use macros::rtos_main as main;
 pub(crate) use scheduler::SCHEDULER;
 pub use task::CurrentThreadHandle;
 
-use crate::timer::TimeDriver;
+use crate::{task::IdleFn, timer::TimeDriver};
 
 type TimeBase = OneShotTimer<'static, Blocking>;
 
@@ -161,7 +161,26 @@ where
 ///
 /// The current context will be converted into the main task, and will be pinned to the first core.
 ///
-/// # The `timer` argument
+/// This function is equivalent to [start_with_idle_hook], with the default idle hook. The default
+/// idle hook will wait for an interrupt.
+///
+/// For information about the other arguments, see [start_with_idle_hook].
+pub fn start(timer: impl TimerSource, #[cfg(riscv)] int0: SoftwareInterrupt<'static, 0>) {
+    start_with_idle_hook(
+        timer,
+        #[cfg(riscv)]
+        int0,
+        crate::task::idle_hook,
+    )
+}
+
+/// Starts the scheduler, with a custom idle hook.
+///
+/// The current context will be converted into the main task, and will be pinned to the first core.
+///
+/// The idle hook will be called when no tasks are ready to run. The idle hook's context is not
+/// preserved. If you need to execute a longer process to enter a low-power state, make sure to call
+/// the relevant code in a critical section.
 ///
 /// The `timer` argument is a timer source that is used by the scheduler to
 /// schedule internal tasks. The timer source can be any of the following:
@@ -169,14 +188,23 @@ where
 /// - A timg `Timer` instance
 /// - A systimer `Alarm` instance
 /// - An `AnyTimer` instance
-///
+#[doc = ""]
+#[cfg_attr(
+    riscv,
+    doc = "The `int0` argument must be `SoftwareInterrupt<0>` which will be used to trigger context switches."
+)]
+#[doc = ""]
 /// For an example, see the [crate-level documentation][self].
-pub fn start(timer: impl TimerSource, #[cfg(riscv)] int0: SoftwareInterrupt<'static, 0>) {
+pub fn start_with_idle_hook(
+    timer: impl TimerSource,
+    #[cfg(riscv)] int0: SoftwareInterrupt<'static, 0>,
+    idle_hook: IdleFn,
+) {
     trace!("Starting scheduler for the first core");
     assert_eq!(Cpu::current(), Cpu::ProCpu);
 
     SCHEDULER.with(move |scheduler| {
-        scheduler.setup(TimeDriver::new(timer.timer()));
+        scheduler.setup(TimeDriver::new(timer.timer()), idle_hook);
 
         // Allocate the default task. The stack bottom is set to the stack guard's address as the
         // rest of the stack is unusable anyway.

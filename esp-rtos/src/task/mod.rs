@@ -20,6 +20,8 @@ use crate::InternalMemory;
 use crate::semaphore::Semaphore;
 use crate::{SCHEDULER, run_queue::RunQueue, scheduler::SchedulerState, wait_queue::WaitQueue};
 
+pub type IdleFn = extern "C" fn() -> !;
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum TaskState {
