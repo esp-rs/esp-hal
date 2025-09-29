@@ -20,5 +20,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("cargo:rustc-env=ESP_HAL_CONFIG_STACK_GUARD_VALUE=3740121773");
     }
 
+    let debug_build = ["0", "1"];
+    println!("cargo:rustc-check-cfg=cfg(debug_build)");
+    if let Ok(level) = std::env::var("OPT_LEVEL")
+        && debug_build.iter().any(|&x| x == level)
+    {
+        println!("cargo:rustc-cfg=debug_build")
+    }
+
     Ok(())
 }
