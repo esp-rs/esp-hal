@@ -21,8 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - `Default` impl for `FlashStorage` (#4132)
-- `src/multi_core.rs` functionality has been moved into `esp-hal/src/system.rs` (#4188)
-
 
 ## [v0.8.0] - 2025-09-10
 

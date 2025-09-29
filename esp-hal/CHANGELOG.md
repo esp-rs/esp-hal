@@ -30,7 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ShaBackend, Sha<N>Context`: Work-queue based SHA driver (#4013)
 - I2S: `i2s::master::Config` with support for more TDM mode standards (#3985)
 - ESP32: support outputting the main I2S clock signal (#4128)
-- `esp-storage/src/multi_core.rs` functionality has been moved into `esp-hal/src/system.rs` (#4188)
+- `park_core()`, `is_running()` functions were moved from `esp-storage` (#4188)
+    - `Cpu::other()` is now marked as public
 
 ### Changed
 
