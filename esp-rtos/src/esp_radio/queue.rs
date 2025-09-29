@@ -2,7 +2,7 @@ use alloc::{boxed::Box, vec};
 use core::ptr::NonNull;
 
 use esp_hal::time::{Duration, Instant};
-use esp_radio_preempt_driver::{
+use esp_radio_rtos_driver::{
     queue::{QueueImplementation, QueuePtr},
     register_queue_implementation,
 };

@@ -1,4 +1,4 @@
-use esp_radio_preempt_driver::timer::TimerHandle;
+use esp_radio_rtos_driver::timer::TimerHandle;
 
 use crate::{
     binary::{c_types::c_void, include::ets_timer},

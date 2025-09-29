@@ -448,7 +448,7 @@ impl Scheduler {
 }
 
 #[cfg(feature = "esp-radio")]
-esp_radio_preempt_driver::scheduler_impl!(pub(crate) static SCHEDULER: Scheduler = Scheduler {
+esp_radio_rtos_driver::scheduler_impl!(pub(crate) static SCHEDULER: Scheduler = Scheduler {
     inner: NonReentrantMutex::new(SchedulerState::new())
 });
 

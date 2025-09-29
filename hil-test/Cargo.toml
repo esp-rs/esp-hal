@@ -230,7 +230,7 @@ esp-rtos        = { path = "../esp-rtos", features = ["defmt"], optional = true 
 esp-storage        = { path = "../esp-storage", optional = true }
 esp-sync           = { path = "../esp-sync" }
 esp-radio          = { path = "../esp-radio", features = ["defmt"], optional = true }
-esp-radio-preempt-driver = { path = "../esp-radio-preempt-driver", optional = true }
+esp-radio-rtos-driver = { path = "../esp-radio-rtos-driver", optional = true }
 portable-atomic    = "1.11.0"
 static_cell        = { version = "2.1.0" }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
@@ -255,7 +255,7 @@ default = []
 unstable = ["esp-hal/unstable"]
 
 defmt = ["dep:defmt-rtt"]
-esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-preempt-driver", "esp-rtos/alloc"]
+esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/alloc"]
 embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
 
 # Device support (required!):

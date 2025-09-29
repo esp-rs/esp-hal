@@ -63,7 +63,7 @@ unsafe extern "Rust" {
 /// `SemaphoreImplementation` trait:
 ///
 /// ```rust,no_run
-/// use esp_radio_preempt_driver::{
+/// use esp_radio_rtos_driver::{
 ///     register_semaphore_implementation,
 ///     semaphore::{SemaphoreImplementation, SemaphoreKind, SemaphorePtr},
 /// };

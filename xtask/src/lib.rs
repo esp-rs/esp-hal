@@ -62,7 +62,7 @@ pub enum Package {
     EspStorage,
     EspSync,
     EspRadio,
-    EspRadioPreemptDriver,
+    EspRadioRtosDriver,
     EspRtos,
     Examples,
     HilTest,

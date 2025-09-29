@@ -25,7 +25,7 @@ use esp_hal::{
 #[cfg(riscv)]
 use esp_hal::{interrupt::software::SoftwareInterrupt, riscv::interrupt::free as interrupt_free};
 use esp_radio::InitializationError;
-use esp_radio_preempt_driver::{
+use esp_radio_rtos_driver::{
     self as preempt,
     semaphore::{SemaphoreHandle, SemaphoreKind},
 };

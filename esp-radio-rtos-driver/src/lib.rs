@@ -149,7 +149,7 @@ macro_rules! scheduler_impl {
 /// ```rust,no_run
 /// struct MyScheduler {}
 ///
-/// impl esp_radio_preempt_driver::Scheduler for MyScheduler {
+/// impl esp_radio_rtos_driver::Scheduler for MyScheduler {
 ///
 ///     fn initialized(&self) -> bool {
 ///         unimplemented!()
@@ -200,7 +200,7 @@ macro_rules! scheduler_impl {
 ///     }
 /// }
 ///
-/// esp_radio_preempt_driver::scheduler_impl!(static SCHEDULER: MyScheduler = MyScheduler {});
+/// esp_radio_rtos_driver::scheduler_impl!(static SCHEDULER: MyScheduler = MyScheduler {});
 /// ```
 pub trait Scheduler: Send + Sync + 'static {
     /// This function is called by `esp_radio::init` to verify that the scheduler is properly set

@@ -15,7 +15,7 @@ exclude  = [
     "esp-phy",
     "esp-println",
     "esp-rtos",
-    "esp-radio-preempt-driver",
+    "esp-radio-rtos-driver",
     "esp-riscv-rt",
     "esp-radio",
     "esp-storage",

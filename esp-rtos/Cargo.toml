@@ -43,7 +43,7 @@ document-features  = "0.2.11"
 esp-alloc = { version = "0.8.0", path = "../esp-alloc", optional = true }
 esp-config = { version = "0.5.0", path = "../esp-config" }
 esp-sync = { version = "0.0.0", path = "../esp-sync" }
-esp-radio-preempt-driver = { version = "0.0.1", path = "../esp-radio-preempt-driver", optional = true }
+esp-radio-rtos-driver = { version = "0.0.1", path = "../esp-radio-rtos-driver", optional = true }
 macros = { version = "0.19.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 portable-atomic = { version = "1.11.0", default-features = false }
 
@@ -67,7 +67,7 @@ esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", features = ["unstable"]
 default = ["esp-alloc", "esp-radio"]
 
 ## Enable features that require heap allocation.
-alloc = ["dep:allocator-api2", "dep:esp-radio-preempt-driver"]
+alloc = ["dep:allocator-api2", "dep:esp-radio-rtos-driver"]
 
 ## Enable the use of the `esp-alloc` crate for dynamic memory allocation.
 ##
@@ -80,7 +80,7 @@ esp-alloc = ["alloc", "dep:esp-alloc"]
 embassy = ["dep:embassy-time-driver", "dep:embassy-executor", "dep:embassy-time-queue-utils"]
 
 ## Enables esp-radio support.
-esp-radio = ["alloc", "dep:esp-radio-preempt-driver"]
+esp-radio = ["alloc", "dep:esp-radio-rtos-driver"]
 
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:

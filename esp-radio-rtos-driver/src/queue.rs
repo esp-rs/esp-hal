@@ -56,7 +56,7 @@ unsafe extern "Rust" {
 /// `QueueImplementation` trait:
 ///
 /// ```rust,no_run
-/// use esp_radio_preempt_driver::{
+/// use esp_radio_rtos_driver::{
 ///     queue::{QueueImplementation, QueuePtr},
 ///     register_queue_implementation,
 /// };

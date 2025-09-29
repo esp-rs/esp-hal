@@ -131,7 +131,7 @@ use core::marker::PhantomData;
 
 pub use common_adapter::{phy_calibration_data, set_phy_calibration_data};
 use esp_hal::{self as hal};
-use esp_radio_preempt_driver as preempt;
+use esp_radio_rtos_driver as preempt;
 use esp_sync::RawMutex;
 #[cfg(esp32)]
 use hal::analog::adc::{release_adc2, try_claim_adc2};
@@ -235,7 +235,7 @@ impl Drop for Controller<'_> {
 /// Initialize for using Wi-Fi and or BLE.
 ///
 /// Wi-Fi and BLE require a preemptive scheduler to be present. Without one, the underlying firmware
-/// can't operate. The scheduler must implement the interfaces in the `esp-radio-preempt-driver`
+/// can't operate. The scheduler must implement the interfaces in the `esp-radio-rtos-driver`
 /// crate. If you are using an embedded RTOS like Ariel OS, it needs to provide an appropriate
 /// implementation.
 ///
