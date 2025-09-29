@@ -155,11 +155,13 @@ impl TimerHandle {
     ///
     /// - The callback and its data must be valid for the lifetime of the timer.
     /// - The callback and its data need to be able to be sent across threads.
+    #[inline]
     pub unsafe fn new(function: unsafe extern "C" fn(*mut c_void), data: *mut c_void) -> Self {
         Self(unsafe { esp_preempt_timer_create(function, data) })
     }
 
     /// Converts this object into a pointer without dropping it.
+    #[inline]
     pub fn leak(self) -> TimerPtr {
         let ptr = self.0;
         core::mem::forget(self);
@@ -172,6 +174,7 @@ impl TimerHandle {
     ///
     /// - The caller must only use pointers created using [`Self::leak`].
     /// - The caller must ensure the pointer is not shared.
+    #[inline]
     pub unsafe fn from_ptr(ptr: TimerPtr) -> Self {
         Self(ptr)
     }
@@ -183,6 +186,7 @@ impl TimerHandle {
     /// # Safety
     ///
     /// - The caller must only use pointers created using [`Self::leak`].
+    #[inline]
     pub unsafe fn ref_from_ptr(ptr: &TimerPtr) -> &Self {
         unsafe { core::mem::transmute(ptr) }
     }
@@ -191,22 +195,26 @@ impl TimerHandle {
     ///
     /// The timeout is specified in microsecond. If the timer is set to be periodic,
     /// the timer will be triggered with a constant frequency.
+    #[inline]
     pub fn arm(&self, timeout: u64, periodic: bool) {
         unsafe { esp_preempt_timer_arm(self.0, timeout, periodic) }
     }
 
     /// Checks if the timer is currently active.
+    #[inline]
     pub fn is_active(&self) -> bool {
         unsafe { esp_preempt_timer_is_active(self.0) }
     }
 
     /// Stops the timer.
+    #[inline]
     pub fn disarm(&self) {
         unsafe { esp_preempt_timer_disarm(self.0) }
     }
 }
 
 impl Drop for TimerHandle {
+    #[inline]
     fn drop(&mut self) {
         unsafe { esp_preempt_timer_delete(self.0) };
     }
