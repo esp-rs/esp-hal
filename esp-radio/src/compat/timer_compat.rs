@@ -55,6 +55,7 @@ fn delete_timer(ets_timer: &mut ets_timer) {
         let timer = unsafe { TimerHandle::from_ptr(timer) };
 
         core::mem::drop(timer);
+        ets_timer.priv_ = core::ptr::null_mut();
     }
 }
 
