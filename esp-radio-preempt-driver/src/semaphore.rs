@@ -295,12 +295,14 @@ impl SemaphoreHandle {
     ///
     /// - Use `SemaphoreKind::Counting` to create counting semaphores and non-recursive mutexes.
     /// - Use `SemaphoreKind::RecursiveMutex` to create recursive mutexes.
+    #[inline]
     pub fn new(kind: SemaphoreKind) -> Self {
         let ptr = unsafe { esp_preempt_semaphore_create(kind) };
         Self(ptr)
     }
 
     /// Converts this object into a pointer without dropping it.
+    #[inline]
     pub fn leak(self) -> SemaphorePtr {
         let ptr = self.0;
         core::mem::forget(self);
@@ -313,6 +315,7 @@ impl SemaphoreHandle {
     ///
     /// - The caller must only use pointers created using [`Self::leak`].
     /// - The caller must ensure the pointer is not shared.
+    #[inline]
     pub unsafe fn from_ptr(ptr: SemaphorePtr) -> Self {
         Self(ptr)
     }
@@ -324,6 +327,7 @@ impl SemaphoreHandle {
     /// # Safety
     ///
     /// - The caller must only use pointers created using [`Self::leak`].
+    #[inline]
     pub unsafe fn ref_from_ptr(ptr: &SemaphorePtr) -> &Self {
         unsafe { core::mem::transmute(ptr) }
     }
@@ -335,6 +339,7 @@ impl SemaphoreHandle {
     /// succeeds.
     ///
     /// This function returns `true` if the semaphore was taken, `false` if the timeout was reached.
+    #[inline]
     pub fn take(&self, timeout_us: Option<u32>) -> bool {
         unsafe { esp_preempt_semaphore_take(self.0, timeout_us) }
     }
@@ -343,6 +348,7 @@ impl SemaphoreHandle {
     ///
     /// This function returns `true` if the semaphore was given, `false` if the counter is at its
     /// maximum.
+    #[inline]
     pub fn give(&self) -> bool {
         unsafe { esp_preempt_semaphore_give(self.0) }
     }
@@ -352,11 +358,13 @@ impl SemaphoreHandle {
     /// If the counter is at its maximum, this function returns `false`.
     ///
     /// If the flag is `Some`, the implementation may set it to `true` to request a context switch.
+    #[inline]
     pub fn try_give_from_isr(&self, higher_prio_task_waken: Option<&mut bool>) -> bool {
         unsafe { esp_preempt_semaphore_try_give_from_isr(self.0, higher_prio_task_waken) }
     }
 
     /// Returns the current counter value.
+    #[inline]
     pub fn current_count(&self) -> u32 {
         unsafe { esp_preempt_semaphore_current_count(self.0) }
     }
@@ -364,6 +372,7 @@ impl SemaphoreHandle {
     /// Attempts to decrement the semaphore's counter.
     ///
     /// If the counter is zero, this function returns `false`.
+    #[inline]
     pub fn try_take(&self) -> bool {
         unsafe { esp_preempt_semaphore_try_take(self.0) }
     }
@@ -374,12 +383,14 @@ impl SemaphoreHandle {
     ///
     /// If a higher priority task is woken up by this operation, the `higher_prio_task_waken` flag
     /// is set to `true`.
+    #[inline]
     pub fn try_take_from_isr(&self, higher_prio_task_waken: Option<&mut bool>) -> bool {
         unsafe { esp_preempt_semaphore_try_take_from_isr(self.0, higher_prio_task_waken) }
     }
 }
 
 impl Drop for SemaphoreHandle {
+    #[inline]
     fn drop(&mut self) {
         unsafe { esp_preempt_semaphore_delete(self.0) };
     }

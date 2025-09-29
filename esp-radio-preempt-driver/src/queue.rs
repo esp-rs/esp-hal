@@ -315,12 +315,14 @@ macro_rules! register_queue_implementation {
 pub struct QueueHandle(QueuePtr);
 impl QueueHandle {
     /// Creates a new queue instance.
+    #[inline]
     pub fn new(capacity: usize, item_size: usize) -> Self {
         let ptr = unsafe { esp_preempt_queue_create(capacity, item_size) };
         Self(ptr)
     }
 
     /// Converts this object into a pointer without dropping it.
+    #[inline]
     pub fn leak(self) -> QueuePtr {
         let ptr = self.0;
         core::mem::forget(self);
@@ -333,6 +335,7 @@ impl QueueHandle {
     ///
     /// - The caller must only use pointers created using [`Self::leak`].
     /// - The caller must ensure the pointer is not shared.
+    #[inline]
     pub unsafe fn from_ptr(ptr: QueuePtr) -> Self {
         Self(ptr)
     }
@@ -344,6 +347,7 @@ impl QueueHandle {
     /// # Safety
     ///
     /// - The caller must only use pointers created using [`Self::leak`].
+    #[inline]
     pub unsafe fn ref_from_ptr(ptr: &QueuePtr) -> &Self {
         unsafe { core::mem::transmute(ptr) }
     }
@@ -359,6 +363,7 @@ impl QueueHandle {
     ///
     /// The caller must ensure that `item` can be dereferenced and points to an allocation of
     /// a size equal to the queue's item size.
+    #[inline]
     pub unsafe fn send_to_front(&self, item: *const u8, timeout_us: Option<u32>) -> bool {
         unsafe { esp_preempt_queue_send_to_front(self.0, item, timeout_us) }
     }
@@ -374,6 +379,7 @@ impl QueueHandle {
     ///
     /// The caller must ensure that `item` can be dereferenced and points to an allocation of
     /// a size equal to the queue's item size.
+    #[inline]
     pub unsafe fn send_to_back(&self, item: *const u8, timeout_us: Option<u32>) -> bool {
         unsafe { esp_preempt_queue_send_to_back(self.0, item, timeout_us) }
     }
@@ -389,6 +395,7 @@ impl QueueHandle {
     ///
     /// The caller must ensure that `item` can be dereferenced and points to an allocation of
     /// a size equal to the queue's item size.
+    #[inline]
     pub unsafe fn try_send_to_back_from_isr(
         &self,
         item: *const u8,
@@ -410,6 +417,7 @@ impl QueueHandle {
     ///
     /// The caller must ensure that `item` can be dereferenced and points to an allocation of
     /// a size equal to the queue's item size.
+    #[inline]
     pub unsafe fn receive(&self, item: *mut u8, timeout_us: Option<u32>) -> bool {
         unsafe { esp_preempt_queue_receive(self.0, item, timeout_us) }
     }
@@ -427,6 +435,7 @@ impl QueueHandle {
     ///
     /// The caller must ensure that `item` can be dereferenced and points to an allocation of
     /// a size equal to the queue's item size.
+    #[inline]
     pub unsafe fn try_receive_from_isr(
         &self,
         item: *mut u8,
@@ -441,17 +450,20 @@ impl QueueHandle {
     ///
     /// The caller must ensure that `item` can be dereferenced and points to an allocation of
     /// a size equal to the queue's item size.
+    #[inline]
     pub unsafe fn remove(&self, item: *const u8) {
         unsafe { esp_preempt_queue_remove(self.0, item) }
     }
 
     /// Returns the number of messages in the queue.
+    #[inline]
     pub fn messages_waiting(&self) -> usize {
         unsafe { esp_preempt_queue_messages_waiting(self.0) }
     }
 }
 
 impl Drop for QueueHandle {
+    #[inline]
     fn drop(&mut self) {
         unsafe { esp_preempt_queue_delete(self.0) };
     }
