@@ -22,8 +22,8 @@ use esp_hal::{
     system::{Cpu, Stack},
     timer::timg::TimerGroup,
 };
-use esp_rtos::embassy::Executor;
 use esp_println::println;
+use esp_rtos::embassy::Executor;
 use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
