@@ -57,6 +57,8 @@ async fn main(_spawner: Spawner) {
 
     let mut i = 0;
     loop {
+        println!("{}", esp_alloc::HEAP.stats());
+
         i += 1;
         println!(
             "==================================CONNECTION ATTEMPT=================================="
@@ -130,7 +132,6 @@ async fn main(_spawner: Spawner) {
         if err.is_err() {
             println!("Failed to connect to WiFi: {:?}", err);
             Timer::after(Duration::from_secs(2)).await;
-            continue;
         } else {
             println!("Connect OK");
         }
