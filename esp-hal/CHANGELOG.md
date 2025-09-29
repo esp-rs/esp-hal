@@ -88,6 +88,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-C3/S3: removed the UHCI1 peripheral singleton (#4007)
 - `i2s::master::Standard` has been removed (#3985)
 - `ledc::channel::PinConfig` has been removed and used `DriveMode` instead (#4214)
+- ESP32: removed integrated SPI-connected pins (6 to 11 both included) (#4202)
+- ESP32C2: removed pins 11 to 17 both included (#4202)
+- ESP32H2: removed pins 6 and 7 (#4202)
 
 ## [v1.0.0-rc.0] - 2025-07-16
 

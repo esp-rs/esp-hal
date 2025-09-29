@@ -115,13 +115,6 @@ pins = [
     { pin =  8 },
     { pin =  9 },
     { pin = 10 }, # Available without SiP flash
-    { pin = 11, functions = { 0 = "SPIHD"  } }, # Available without SiP flash
-    { pin = 12, functions = { 0 = "SPIHD"  } }, # Available without SiP flash
-    { pin = 13, functions = { 0 = "SPIWP"  } }, # Available without SiP flash
-    { pin = 14, functions = { 0 = "SPICS0" } }, # Available without SiP flash
-    { pin = 15, functions = { 0 = "SPICLK" } }, # Available without SiP flash
-    { pin = 16, functions = { 0 = "SPID"   } }, # Available without SiP flash
-    { pin = 17, functions = { 0 = "SPIQ"   } }, # Available without SiP flash
     { pin = 18 },
     { pin = 19, functions = { 0 = "U0RXD" } },
     { pin = 20, functions = { 0 = "U0TXD" } },
