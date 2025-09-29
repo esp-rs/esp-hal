@@ -442,7 +442,7 @@ impl EspHeapInner {
         used
     }
 
-    /// Return usage stats for the [Heap].
+    /// Return usage stats for the [EspHeap].
     ///
     /// Note:
     /// [HeapStats] directly implements [Display], so this function can be
@@ -603,7 +603,7 @@ impl EspHeap {
         self.inner.with(|heap| heap.used())
     }
 
-    /// Return usage stats for the [Heap].
+    /// Return usage stats for the [EspHeap].
     ///
     /// Note:
     /// [HeapStats] directly implements [Display], so this function can be
