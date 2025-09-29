@@ -24,8 +24,7 @@ use esp_hal::{
 };
 #[cfg(riscv)]
 use esp_hal::{interrupt::software::SoftwareInterrupt, riscv::interrupt::free as interrupt_free};
-use esp_hal_embassy::InterruptExecutor;
-use esp_preempt::{CurrentThreadHandle, semaphore::Semaphore};
+use esp_preempt::{CurrentThreadHandle, embassy::InterruptExecutor, semaphore::Semaphore};
 use esp_radio::InitializationError;
 use esp_radio_preempt_driver::{
     self as preempt,
@@ -77,7 +76,7 @@ fn run_float_calc(x: f32) -> f32 {
 #[cfg(multi_core)]
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 
-#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = esp_preempt::embassy::Executor::new())]
 mod tests {
     use super::*;
 
@@ -201,7 +200,7 @@ mod tests {
 
     #[test]
     #[timeout(2)]
-    fn test_esp_preempt_time_sliicng(p: Peripherals) {
+    fn test_esp_preempt_time_slicing(p: Peripherals) {
         #[cfg(riscv)]
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);

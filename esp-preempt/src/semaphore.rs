@@ -136,7 +136,7 @@ pub struct Semaphore {
 }
 
 impl Semaphore {
-    pub fn new_counting(initial: u32, max: u32) -> Self {
+    pub const fn new_counting(initial: u32, max: u32) -> Self {
         Semaphore {
             inner: NonReentrantMutex::new(SemaphoreInner::Counting {
                 current: initial,
@@ -145,7 +145,8 @@ impl Semaphore {
             }),
         }
     }
-    pub fn new_mutex(recursive: bool) -> Self {
+
+    pub const fn new_mutex(recursive: bool) -> Self {
         Semaphore {
             inner: NonReentrantMutex::new(SemaphoreInner::Mutex {
                 recursive,

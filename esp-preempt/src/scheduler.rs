@@ -1,12 +1,14 @@
 #[cfg(feature = "esp-radio")]
 use core::{ffi::c_void, ptr::NonNull};
 
+#[cfg(feature = "alloc")]
 use allocator_api2::boxed::Box;
 use esp_hal::{system::Cpu, time::Instant};
 use esp_sync::NonReentrantMutex;
 
+#[cfg(feature = "alloc")]
+use crate::InternalMemory;
 use crate::{
-    InternalMemory,
     run_queue::RunQueue,
     task::{
         self,
@@ -22,32 +24,6 @@ use crate::{
     },
     timer::TimeDriver,
 };
-
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-// Due to how our interrupts work, we may have a timer event and a yield at the same time. Their
-// order of processing is an implementation detail in esp-hal. We need to be able to store multiple
-// events to not miss any.
-pub(crate) struct SchedulerEvent(usize);
-
-impl SchedulerEvent {
-    // If this is NOT set, the event is a cooperative yield of some sort (time slicing, self-yield).
-    const TASK_BLOCKED: usize = 1 << 0;
-
-    fn contains(self, bit: usize) -> bool {
-        self.0 & bit != 0
-    }
-    fn set(&mut self, bit: usize) {
-        self.0 |= bit;
-    }
-
-    pub(crate) fn set_blocked(&mut self) {
-        self.set(Self::TASK_BLOCKED)
-    }
-
-    pub(crate) fn is_cooperative_yield(self) -> bool {
-        !self.contains(Self::TASK_BLOCKED)
-    }
-}
 
 pub(crate) struct SchedulerState {
     /// A list of all allocated tasks
@@ -70,8 +46,6 @@ pub(crate) struct CpuSchedulerState {
     pub(crate) current_task: Option<TaskPtr>,
     idle_context: CpuContext,
 
-    pub(crate) event: SchedulerEvent,
-
     // This context will be filled out by the first context switch.
     // We allocate the main task statically, because there is always a main task. If deleted, we
     // simply don't deallocate this.
@@ -84,8 +58,6 @@ impl CpuSchedulerState {
             initialized: false,
             current_task: None,
             idle_context: CpuContext::new(),
-
-            event: SchedulerEvent(0),
 
             main_task: Task {
                 cpu_context: CpuContext::new(),
@@ -105,6 +77,7 @@ impl CpuSchedulerState {
                 timer_queue_item: TaskListItem::None,
                 delete_list_item: TaskListItem::None,
 
+                #[cfg(feature = "alloc")]
                 heap_allocated: false,
             },
         }
@@ -226,15 +199,24 @@ impl SchedulerState {
     }
 
     fn delete_marked_tasks(&mut self) {
-        while let Some(to_delete) = self.to_delete.pop() {
-            trace!("delete_marked_tasks {:?}", to_delete);
-
+        let current_cpu = Cpu::current() as usize;
+        let mut to_delete = core::mem::take(&mut self.to_delete);
+        'outer: while let Some(task_ptr) = to_delete.pop() {
+            assert!(task_ptr.state() == TaskState::Deleted);
             for cpu in 0..Cpu::COUNT {
-                if Some(to_delete) == self.per_cpu[cpu].current_task {
-                    self.per_cpu[cpu].current_task = None;
+                if Some(task_ptr) == self.per_cpu[cpu].current_task {
+                    if cpu == current_cpu {
+                        self.per_cpu[cpu].current_task = None;
+                    } else {
+                        // We can't delete a task that is currently running on another CPU.
+                        self.to_delete.push(task_ptr);
+                        continue 'outer;
+                    }
                 }
             }
-            self.delete_task(to_delete);
+
+            trace!("delete_marked_tasks {:?}", task_ptr);
+            self.delete_task(task_ptr);
         }
     }
 
@@ -251,10 +233,9 @@ impl SchedulerState {
 
         self.delete_marked_tasks();
 
-        let event = core::mem::take(&mut self.per_cpu[current_cpu].event);
-
-        if event.is_cooperative_yield()
-            && let Some(current_task) = self.per_cpu[current_cpu].current_task
+        let current_task = self.per_cpu[current_cpu].current_task;
+        if let Some(current_task) = current_task
+            && current_task.state() == TaskState::Ready
         {
             // Current task is still ready, mark it as such.
             debug!("re-queueing current task: {:?}", current_task);
@@ -262,40 +243,37 @@ impl SchedulerState {
         }
 
         let next_task = self.run_queue.pop();
-        if next_task != self.per_cpu[current_cpu].current_task {
-            trace!(
-                "Switching task {:?} -> {:?}",
-                self.per_cpu[current_cpu].current_task, next_task
-            );
+        if next_task != current_task {
+            trace!("Switching task {:?} -> {:?}", current_task, next_task);
 
             // If the current task is deleted, we can skip saving its context. We signal this by
             // using a null pointer.
-            let current_context = if let Some(mut current) = self.per_cpu[current_cpu].current_task
-            {
+            let current_context = if let Some(current) = current_task {
                 // TODO: the SMP scheduler relies on at least the context saving to happen within
                 // the scheduler's critical section. We can't run the scheduler on the other core
                 // while it might try to restore a partially saved context.
-                let current_ref = unsafe { current.as_mut() };
+                #[cfg(multi_core)]
+                let current_ref = unsafe { current.as_ref() };
                 #[cfg(multi_core)]
                 if current_ref.pinned_to.is_none()
                     && current_ref.priority
                         >= self.per_cpu[1 - current_cpu]
                             .current_task
-                            .map(|t| unsafe { t.as_ref().priority })
+                            .map(|t| t.priority(&mut self.run_queue))
                             .unwrap_or(0)
                 {
                     task::schedule_other_core();
                 }
 
-                &raw mut current_ref.cpu_context
+                unsafe { &raw mut (*current.as_ptr()).cpu_context }
             } else {
                 core::ptr::null_mut()
             };
 
-            let next_context = if let Some(mut next) = next_task {
+            let next_context = if let Some(next) = next_task {
                 priority = Some(next.priority(&mut self.run_queue));
 
-                unsafe { &raw mut next.as_mut().cpu_context }
+                unsafe { &raw mut (*next.as_ptr()).cpu_context }
             } else {
                 // If there is no next task, set up and return to the idle hook.
                 // Reuse the stack frame of the main task. Note that this requires the main task to
@@ -371,6 +349,7 @@ impl SchedulerState {
         let is_current = task_to_delete == current_task;
 
         self.to_delete.push(task_to_delete);
+        task_to_delete.set_state(TaskState::Deleted);
 
         is_current
     }
@@ -381,7 +360,6 @@ impl SchedulerState {
         let timer_queue = unwrap!(self.time_driver.as_mut());
         if timer_queue.schedule_wakeup(current_task, at) {
             // The task has been scheduled for wakeup.
-            self.per_cpu[current_cpu].event.set_blocked();
             task::yield_task();
             true
         } else {
@@ -403,12 +381,14 @@ impl SchedulerState {
         self.remove_from_all_queues(to_delete);
 
         unsafe {
+            #[cfg(feature = "alloc")]
             if to_delete.as_ref().heap_allocated {
                 let task = Box::from_raw_in(to_delete.as_ptr(), InternalMemory);
                 core::mem::drop(task);
-            } else {
-                core::ptr::drop_in_place(to_delete.as_mut());
+                return;
             }
+
+            core::ptr::drop_in_place(to_delete.as_mut());
         }
     }
 

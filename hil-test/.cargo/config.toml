@@ -22,7 +22,6 @@ rustflags = [
 
 [env]
 DEFMT_LOG = "info,embedded_test=warn"
-ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE="multiple-integrated"
 
 [unstable]
 build-std = ["core", "alloc"]

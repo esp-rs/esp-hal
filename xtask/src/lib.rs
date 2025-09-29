@@ -51,7 +51,6 @@ pub enum Package {
     EspBootloaderEspIdf,
     EspConfig,
     EspHal,
-    EspHalEmbassy,
     EspHalProcmacros,
     EspRomSys,
     EspLpHal,
@@ -179,7 +178,6 @@ impl Package {
                 | EspLpHal
                 | EspRadio
                 | EspPhy
-                | EspHalEmbassy
                 | EspRomSys
                 | EspBootloaderEspIdf
                 | EspMetadataGenerated

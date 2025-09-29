@@ -7,7 +7,6 @@ use core::{
 
 use esp_hal::time::{Duration, Instant};
 use esp_radio_preempt_driver::{
-    Scheduler,
     register_timer_implementation,
     timer::{TimerImplementation, TimerPtr},
 };
@@ -136,7 +135,7 @@ impl TimerQueue {
                     return false;
                 }
 
-                if props.next_due > SCHEDULER.now() {
+                if props.next_due > crate::now() {
                     // Not our time yet.
                     debug!(
                         "Timer {:x} is not due yet",
@@ -240,7 +239,7 @@ impl Timer {
     }
 
     fn arm(&self, q: &mut TimerQueueInner, timeout: u64, periodic: bool) {
-        let next_due = crate::SCHEDULER.now() + timeout;
+        let next_due = crate::now() + timeout;
 
         let props = self.properties(q);
         props.is_active = true;

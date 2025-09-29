@@ -6,16 +6,18 @@ pub(crate) mod arch_specific;
 use core::ffi::c_void;
 use core::{marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
-#[cfg(feature = "esp-radio")]
-use allocator_api2::alloc::Allocator;
+#[cfg(feature = "alloc")]
+use allocator_api2::alloc::{Allocator, Layout};
 pub(crate) use arch_specific::*;
 use esp_hal::{
     system::Cpu,
     time::{Duration, Instant},
 };
 
+#[cfg(feature = "alloc")]
+use crate::InternalMemory;
 #[cfg(feature = "esp-radio")]
-use crate::{InternalMemory, semaphore::Semaphore};
+use crate::semaphore::Semaphore;
 use crate::{SCHEDULER, run_queue::RunQueue, scheduler::SchedulerState, wait_queue::WaitQueue};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -23,6 +25,7 @@ use crate::{SCHEDULER, run_queue::RunQueue, scheduler::SchedulerState, wait_queu
 pub(crate) enum TaskState {
     Ready,
     Sleeping,
+    Deleted,
 }
 
 pub(crate) type TaskPtr = NonNull<Task>;
@@ -256,6 +259,7 @@ pub(crate) struct Task {
     pub delete_list_item: TaskListItem,
 
     /// Whether the task was allocated on the heap.
+    #[cfg(feature = "alloc")]
     pub(crate) heap_allocated: bool,
 }
 
@@ -290,7 +294,7 @@ impl Task {
         let task_stack_size = (task_stack_size & !0xF) + 16;
 
         let layout = unwrap!(
-            allocator_api2::alloc::Layout::from_size_align(task_stack_size, 16).ok(),
+            Layout::from_size_align(task_stack_size, 16).ok(),
             "Cannot compute Layout for stack"
         );
 
@@ -326,6 +330,7 @@ impl Task {
             timer_queue_item: TaskListItem::None,
             delete_list_item: TaskListItem::None,
 
+            #[cfg(feature = "alloc")]
             heap_allocated: false,
         }
     }
@@ -348,6 +353,15 @@ impl Drop for Task {
 
         #[cfg(feature = "esp-radio")]
         let _ = self.thread_semaphore.take();
+
+        #[cfg(feature = "alloc")]
+        if self.heap_allocated {
+            let layout = unwrap!(
+                Layout::from_size_align(self.stack.len() * 4, 16).ok(),
+                "Cannot compute Layout for stack"
+            );
+            unsafe { InternalMemory.deallocate(unwrap!(NonNull::new(self.stack.cast())), layout) };
+        }
     }
 }
 
@@ -425,19 +439,30 @@ impl CurrentThreadHandle {
     pub fn delay_until(self, deadline: Instant) {
         SCHEDULER.sleep_until(deadline);
     }
+
+    /// Sets the priority of the current task.
+    pub fn set_priority(self, priority: usize) {
+        let priority = priority.min(crate::run_queue::MaxPriority::MAX_PRIORITY);
+        SCHEDULER.with(|state| {
+            let current_cpu = Cpu::current() as usize;
+            let current_task = unwrap!(state.per_cpu[current_cpu].current_task);
+            let old = current_task.priority(&mut state.run_queue);
+            current_task.set_priority(&mut state.run_queue, priority);
+            if old > priority {
+                crate::task::yield_task();
+            }
+        });
+    }
 }
 
 #[cfg(feature = "esp-radio")]
 pub(super) fn schedule_task_deletion(task: *mut Task) {
     trace!("schedule_task_deletion {:?}", task);
-    SCHEDULER.with(|scheduler| {
-        if scheduler.schedule_task_deletion(task) {
-            // Deleting the current task - We won't be re-scheduled.
-            let current_cpu = Cpu::current() as usize;
-            scheduler.per_cpu[current_cpu].event.set_blocked();
+    if SCHEDULER.with(|scheduler| scheduler.schedule_task_deletion(task)) {
+        loop {
             yield_task();
         }
-    });
+    }
 }
 
 #[inline]
