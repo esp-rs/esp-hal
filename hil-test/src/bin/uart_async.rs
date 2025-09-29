@@ -17,7 +17,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
     uart::{self, Uart, UartRx},
 };
-use esp_preempt::embassy::InterruptExecutor;
+use esp_rtos::embassy::InterruptExecutor;
 use hil_test::mk_static;
 
 struct Context {
@@ -69,7 +69,7 @@ mod tests {
         let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_int.software_interrupt0,

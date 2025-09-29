@@ -12,7 +12,7 @@ pub fn main(args: TokenStream, input: TokenStream) -> TokenStream {
     let f = parse_macro_input!(input as ItemFn);
 
     if f.sig.asyncness.is_some() {
-        return parse::Error::new(Span::call_site(), "If you want to use `async` please use `esp-preempt`'s `#[esp_preempt::main]` macro instead.")
+        return parse::Error::new(Span::call_site(), "If you want to use `async` please use `esp-rtos`'s `#[esp_rtos::main]` macro instead.")
             .to_compile_error()
             .into();
     }

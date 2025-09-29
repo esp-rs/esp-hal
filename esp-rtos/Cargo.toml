@@ -1,10 +1,10 @@
 [package]
-name          = "esp-preempt"
+name          = "esp-rtos"
 version       = "0.0.1"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "A task scheduler for Espressif devices"
-documentation = "https://docs.espressif.com/projects/rust/esp-preempt/latest/"
+documentation = "https://docs.espressif.com/projects/rust/esp-rtos/latest/"
 keywords      = ["esp32", "espressif", "no-std"]
 categories    = ["embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"

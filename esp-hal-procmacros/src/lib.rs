@@ -207,7 +207,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 /// Spawning a task:
 ///
 /// ``` rust
-/// #[esp_preempt::main]
+/// #[esp_rtos::main]
 /// async fn main(_s: embassy_executor::Spawner) {
 ///     // Function body
 /// }

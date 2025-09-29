@@ -14,7 +14,7 @@ exclude  = [
     "esp-metadata-generated",
     "esp-phy",
     "esp-println",
-    "esp-preempt",
+    "esp-rtos",
     "esp-radio-preempt-driver",
     "esp-riscv-rt",
     "esp-radio",

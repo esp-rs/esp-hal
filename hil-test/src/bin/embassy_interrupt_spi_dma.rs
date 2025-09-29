@@ -19,7 +19,7 @@ use esp_hal::{
     time::Rate,
     timer::timg::TimerGroup,
 };
-use esp_preempt::embassy::InterruptExecutor;
+use esp_rtos::embassy::InterruptExecutor;
 use hil_test::mk_static;
 use portable_atomic::AtomicBool;
 
@@ -82,7 +82,7 @@ mod test {
         let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_int.software_interrupt0,
@@ -231,7 +231,7 @@ mod test {
 
         let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_int.software_interrupt0,
@@ -254,7 +254,7 @@ mod test {
 
         let app_core_stack = mk_static!(Stack<8192>, Stack::new());
 
-        esp_preempt::start_second_core(
+        esp_rtos::start_second_core(
             peripherals.CPU_CTRL,
             #[cfg(xtensa)]
             sw_int.software_interrupt0,

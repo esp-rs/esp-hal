@@ -226,7 +226,7 @@ embedded-hal-async = "1.0.0"
 esp-alloc          = { path = "../esp-alloc", optional = true }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
 esp-hal            = { path = "../esp-hal", features = ["defmt"] }
-esp-preempt        = { path = "../esp-preempt", features = ["defmt"], optional = true }
+esp-rtos        = { path = "../esp-rtos", features = ["defmt"], optional = true }
 esp-storage        = { path = "../esp-storage", optional = true }
 esp-sync           = { path = "../esp-sync" }
 esp-radio          = { path = "../esp-radio", features = ["defmt"], optional = true }
@@ -255,8 +255,8 @@ default = []
 unstable = ["esp-hal/unstable"]
 
 defmt = ["dep:defmt-rtt"]
-esp-radio = ["dep:esp-radio", "dep:esp-preempt", "dep:esp-radio-preempt-driver", "esp-preempt/alloc"]
-embassy = ["dep:esp-preempt", "esp-preempt/embassy"]
+esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-preempt-driver", "esp-rtos/alloc"]
+embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
 
 # Device support (required!):
 esp32 = [
@@ -266,7 +266,7 @@ esp32 = [
     "esp-storage?/esp32",
     "esp-bootloader-esp-idf/esp32",
     "esp-metadata-generated/esp32",
-    "esp-preempt?/esp32",
+    "esp-rtos?/esp32",
 ]
 esp32c2 = [
     "esp-hal/esp32c2",
@@ -274,7 +274,7 @@ esp32c2 = [
     "esp-storage?/esp32c2",
     "esp-bootloader-esp-idf/esp32c2",
     "esp-metadata-generated/esp32c2",
-    "esp-preempt?/esp32c2"
+    "esp-rtos?/esp32c2"
 ]
 esp32c3 = [
     "esp-hal/esp32c3",
@@ -282,7 +282,7 @@ esp32c3 = [
     "esp-storage?/esp32c3",
     "esp-bootloader-esp-idf/esp32c3",
     "esp-metadata-generated/esp32c3",
-    "esp-preempt?/esp32c3",
+    "esp-rtos?/esp32c3",
 ]
 esp32c6 = [
     "esp-hal/esp32c6",
@@ -290,7 +290,7 @@ esp32c6 = [
     "esp-storage?/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
     "esp-metadata-generated/esp32c6",
-    "esp-preempt?/esp32c6",
+    "esp-rtos?/esp32c6",
 ]
 esp32h2 = [
     "esp-hal/esp32h2",
@@ -298,7 +298,7 @@ esp32h2 = [
     "esp-storage?/esp32h2",
     "esp-bootloader-esp-idf/esp32h2",
     "esp-metadata-generated/esp32h2",
-    "esp-preempt?/esp32h2",
+    "esp-rtos?/esp32h2",
 ]
 esp32s2 = [
     "embedded-test/xtensa-semihosting",
@@ -307,7 +307,7 @@ esp32s2 = [
     "esp-storage?/esp32s2",
     "esp-bootloader-esp-idf/esp32s2",
     "esp-metadata-generated/esp32s2",
-    "esp-preempt?/esp32s2"
+    "esp-rtos?/esp32s2"
 ]
 esp32s3 = [
     "embedded-test/xtensa-semihosting",
@@ -316,7 +316,7 @@ esp32s3 = [
     "esp-storage?/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
     "esp-metadata-generated/esp32s3",
-    "esp-preempt?/esp32s3",
+    "esp-rtos?/esp32s3",
 ]
 
 psram = ["esp-hal/psram", "esp-alloc"]

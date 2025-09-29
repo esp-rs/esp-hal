@@ -3,7 +3,7 @@
 //! The second core runs a simple LED blinking task, that is controlled by a
 //! signal set by the task running on the other core.
 //!
-//! The interrupt executor works without the esp_preempt scheduler, so this example uses the esp-hal
+//! The interrupt executor works without the esp_rtos scheduler, so this example uses the esp-hal
 //! CpuControl API to start the second core.
 //!
 //! The following wiring is assumed:
@@ -22,8 +22,8 @@ use esp_hal::{
     system::{Cpu, CpuControl, Stack},
     timer::timg::TimerGroup,
 };
-use esp_preempt::embassy::InterruptExecutor;
 use esp_println::println;
+use esp_rtos::embassy::InterruptExecutor;
 use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -73,7 +73,7 @@ fn main() -> ! {
 
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_preempt::start(
+    esp_rtos::start(
         timg0.timer0,
         #[cfg(target_arch = "riscv32")]
         sw_int.software_interrupt0,

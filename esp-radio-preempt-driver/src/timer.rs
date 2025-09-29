@@ -19,15 +19,15 @@ use core::{ffi::c_void, ptr::NonNull};
 pub type TimerPtr = NonNull<()>;
 
 unsafe extern "Rust" {
-    fn esp_preempt_timer_create(
+    fn esp_rtos_timer_create(
         function: unsafe extern "C" fn(*mut c_void),
         data: *mut c_void,
     ) -> TimerPtr;
-    fn esp_preempt_timer_delete(timer: TimerPtr);
+    fn esp_rtos_timer_delete(timer: TimerPtr);
 
-    fn esp_preempt_timer_arm(timer: TimerPtr, timeout: u64, periodic: bool);
-    fn esp_preempt_timer_is_active(timer: TimerPtr) -> bool;
-    fn esp_preempt_timer_disarm(timer: TimerPtr);
+    fn esp_rtos_timer_arm(timer: TimerPtr, timeout: u64, periodic: bool);
+    fn esp_rtos_timer_is_active(timer: TimerPtr) -> bool;
+    fn esp_rtos_timer_disarm(timer: TimerPtr);
 }
 
 /// A timer implementation.
@@ -110,7 +110,7 @@ macro_rules! register_timer_implementation {
     ($t: ty) => {
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_timer_create(
+        fn esp_rtos_timer_create(
             function: unsafe extern "C" fn(*mut ::core::ffi::c_void),
             data: *mut ::core::ffi::c_void,
         ) -> $crate::timer::TimerPtr {
@@ -119,25 +119,25 @@ macro_rules! register_timer_implementation {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_timer_delete(timer: $crate::timer::TimerPtr) {
+        fn esp_rtos_timer_delete(timer: $crate::timer::TimerPtr) {
             unsafe { <$t as $crate::timer::TimerImplementation>::delete(timer) }
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_timer_arm(timer: $crate::timer::TimerPtr, timeout: u64, periodic: bool) {
+        fn esp_rtos_timer_arm(timer: $crate::timer::TimerPtr, timeout: u64, periodic: bool) {
             unsafe { <$t as $crate::timer::TimerImplementation>::arm(timer, timeout, periodic) }
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_timer_is_active(timer: $crate::timer::TimerPtr) -> bool {
+        fn esp_rtos_timer_is_active(timer: $crate::timer::TimerPtr) -> bool {
             unsafe { <$t as $crate::timer::TimerImplementation>::is_active(timer) }
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_timer_disarm(timer: $crate::timer::TimerPtr) {
+        fn esp_rtos_timer_disarm(timer: $crate::timer::TimerPtr) {
             unsafe { <$t as $crate::timer::TimerImplementation>::disarm(timer) }
         }
     };
@@ -157,7 +157,7 @@ impl TimerHandle {
     /// - The callback and its data need to be able to be sent across threads.
     #[inline]
     pub unsafe fn new(function: unsafe extern "C" fn(*mut c_void), data: *mut c_void) -> Self {
-        Self(unsafe { esp_preempt_timer_create(function, data) })
+        Self(unsafe { esp_rtos_timer_create(function, data) })
     }
 
     /// Converts this object into a pointer without dropping it.
@@ -197,25 +197,25 @@ impl TimerHandle {
     /// the timer will be triggered with a constant frequency.
     #[inline]
     pub fn arm(&self, timeout: u64, periodic: bool) {
-        unsafe { esp_preempt_timer_arm(self.0, timeout, periodic) }
+        unsafe { esp_rtos_timer_arm(self.0, timeout, periodic) }
     }
 
     /// Checks if the timer is currently active.
     #[inline]
     pub fn is_active(&self) -> bool {
-        unsafe { esp_preempt_timer_is_active(self.0) }
+        unsafe { esp_rtos_timer_is_active(self.0) }
     }
 
     /// Stops the timer.
     #[inline]
     pub fn disarm(&self) {
-        unsafe { esp_preempt_timer_disarm(self.0) }
+        unsafe { esp_rtos_timer_disarm(self.0) }
     }
 }
 
 impl Drop for TimerHandle {
     #[inline]
     fn drop(&mut self) {
-        unsafe { esp_preempt_timer_delete(self.0) };
+        unsafe { esp_rtos_timer_delete(self.0) };
     }
 }

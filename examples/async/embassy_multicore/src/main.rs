@@ -3,7 +3,7 @@
 //! The second core runs a simple LED blinking task, that is controlled by a
 //! signal set by the task running on the other core.
 //!
-//! The thread-mode executor requires the esp_preempt scheduler to be enabled on the core where it
+//! The thread-mode executor requires the esp_rtos scheduler to be enabled on the core where it
 //! is running.
 //!
 //! The following wiring is assumed:
@@ -22,7 +22,7 @@ use esp_hal::{
     system::{Cpu, Stack},
     timer::timg::TimerGroup,
 };
-use esp_preempt::embassy::Executor;
+use esp_rtos::embassy::Executor;
 use esp_println::println;
 use static_cell::StaticCell;
 
@@ -47,7 +47,7 @@ async fn control_led(
     }
 }
 
-#[esp_preempt::main]
+#[esp_rtos::main]
 async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -57,7 +57,7 @@ async fn main(_spawner: Spawner) {
 
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_preempt::start(
+    esp_rtos::start(
         timg0.timer0,
         #[cfg(target_arch = "riscv32")]
         sw_int.software_interrupt0,
@@ -68,7 +68,7 @@ async fn main(_spawner: Spawner) {
 
     let led = Output::new(peripherals.GPIO0, Level::Low, OutputConfig::default());
 
-    esp_preempt::start_second_core(
+    esp_rtos::start_second_core(
         peripherals.CPU_CTRL,
         #[cfg(target_arch = "xtensa")]
         sw_int.software_interrupt0,

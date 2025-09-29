@@ -39,19 +39,19 @@ pub enum SemaphoreKind {
 }
 
 unsafe extern "Rust" {
-    fn esp_preempt_semaphore_create(kind: SemaphoreKind) -> SemaphorePtr;
-    fn esp_preempt_semaphore_delete(semaphore: SemaphorePtr);
+    fn esp_rtos_semaphore_create(kind: SemaphoreKind) -> SemaphorePtr;
+    fn esp_rtos_semaphore_delete(semaphore: SemaphorePtr);
 
-    fn esp_preempt_semaphore_take(semaphore: SemaphorePtr, timeout_us: Option<u32>) -> bool;
-    fn esp_preempt_semaphore_give(semaphore: SemaphorePtr) -> bool;
-    fn esp_preempt_semaphore_try_give_from_isr(
+    fn esp_rtos_semaphore_take(semaphore: SemaphorePtr, timeout_us: Option<u32>) -> bool;
+    fn esp_rtos_semaphore_give(semaphore: SemaphorePtr) -> bool;
+    fn esp_rtos_semaphore_try_give_from_isr(
         semaphore: SemaphorePtr,
         higher_prio_task_waken: Option<&mut bool>,
     ) -> bool;
-    fn esp_preempt_semaphore_current_count(semaphore: SemaphorePtr) -> u32;
+    fn esp_rtos_semaphore_current_count(semaphore: SemaphorePtr) -> u32;
 
-    fn esp_preempt_semaphore_try_take(semaphore: SemaphorePtr) -> bool;
-    fn esp_preempt_semaphore_try_take_from_isr(
+    fn esp_rtos_semaphore_try_take(semaphore: SemaphorePtr) -> bool;
+    fn esp_rtos_semaphore_try_take_from_isr(
         semaphore: SemaphorePtr,
         higher_prio_task_waken: Option<&mut bool>,
     ) -> bool;
@@ -212,7 +212,7 @@ macro_rules! register_semaphore_implementation {
     ($t: ty) => {
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_semaphore_create(
+        fn esp_rtos_semaphore_create(
             kind: $crate::semaphore::SemaphoreKind,
         ) -> $crate::semaphore::SemaphorePtr {
             <$t as $crate::semaphore::SemaphoreImplementation>::create(kind)
@@ -220,13 +220,13 @@ macro_rules! register_semaphore_implementation {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_semaphore_delete(semaphore: $crate::semaphore::SemaphorePtr) {
+        fn esp_rtos_semaphore_delete(semaphore: $crate::semaphore::SemaphorePtr) {
             unsafe { <$t as $crate::semaphore::SemaphoreImplementation>::delete(semaphore) }
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_semaphore_take(
+        fn esp_rtos_semaphore_take(
             semaphore: $crate::semaphore::SemaphorePtr,
             timeout_us: Option<u32>,
         ) -> bool {
@@ -237,13 +237,13 @@ macro_rules! register_semaphore_implementation {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_semaphore_give(semaphore: $crate::semaphore::SemaphorePtr) -> bool {
+        fn esp_rtos_semaphore_give(semaphore: $crate::semaphore::SemaphorePtr) -> bool {
             unsafe { <$t as $crate::semaphore::SemaphoreImplementation>::give(semaphore) }
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_semaphore_try_give_from_isr(
+        fn esp_rtos_semaphore_try_give_from_isr(
             semaphore: $crate::semaphore::SemaphorePtr,
             higher_prio_task_waken: Option<&mut bool>,
         ) -> bool {
@@ -257,19 +257,19 @@ macro_rules! register_semaphore_implementation {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_semaphore_current_count(semaphore: $crate::semaphore::SemaphorePtr) -> u32 {
+        fn esp_rtos_semaphore_current_count(semaphore: $crate::semaphore::SemaphorePtr) -> u32 {
             unsafe { <$t as $crate::semaphore::SemaphoreImplementation>::current_count(semaphore) }
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_semaphore_try_take(semaphore: $crate::semaphore::SemaphorePtr) -> bool {
+        fn esp_rtos_semaphore_try_take(semaphore: $crate::semaphore::SemaphorePtr) -> bool {
             unsafe { <$t as $crate::semaphore::SemaphoreImplementation>::try_take(semaphore) }
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_semaphore_try_take_from_isr(
+        fn esp_rtos_semaphore_try_take_from_isr(
             semaphore: $crate::semaphore::SemaphorePtr,
             higher_prio_task_waken: Option<&mut bool>,
         ) -> bool {
@@ -297,7 +297,7 @@ impl SemaphoreHandle {
     /// - Use `SemaphoreKind::RecursiveMutex` to create recursive mutexes.
     #[inline]
     pub fn new(kind: SemaphoreKind) -> Self {
-        let ptr = unsafe { esp_preempt_semaphore_create(kind) };
+        let ptr = unsafe { esp_rtos_semaphore_create(kind) };
         Self(ptr)
     }
 
@@ -341,7 +341,7 @@ impl SemaphoreHandle {
     /// This function returns `true` if the semaphore was taken, `false` if the timeout was reached.
     #[inline]
     pub fn take(&self, timeout_us: Option<u32>) -> bool {
-        unsafe { esp_preempt_semaphore_take(self.0, timeout_us) }
+        unsafe { esp_rtos_semaphore_take(self.0, timeout_us) }
     }
 
     /// Increments the semaphore's counter.
@@ -350,7 +350,7 @@ impl SemaphoreHandle {
     /// maximum.
     #[inline]
     pub fn give(&self) -> bool {
-        unsafe { esp_preempt_semaphore_give(self.0) }
+        unsafe { esp_rtos_semaphore_give(self.0) }
     }
 
     /// Attempts to increment the semaphore's counter from an ISR.
@@ -360,13 +360,13 @@ impl SemaphoreHandle {
     /// If the flag is `Some`, the implementation may set it to `true` to request a context switch.
     #[inline]
     pub fn try_give_from_isr(&self, higher_prio_task_waken: Option<&mut bool>) -> bool {
-        unsafe { esp_preempt_semaphore_try_give_from_isr(self.0, higher_prio_task_waken) }
+        unsafe { esp_rtos_semaphore_try_give_from_isr(self.0, higher_prio_task_waken) }
     }
 
     /// Returns the current counter value.
     #[inline]
     pub fn current_count(&self) -> u32 {
-        unsafe { esp_preempt_semaphore_current_count(self.0) }
+        unsafe { esp_rtos_semaphore_current_count(self.0) }
     }
 
     /// Attempts to decrement the semaphore's counter.
@@ -374,7 +374,7 @@ impl SemaphoreHandle {
     /// If the counter is zero, this function returns `false`.
     #[inline]
     pub fn try_take(&self) -> bool {
-        unsafe { esp_preempt_semaphore_try_take(self.0) }
+        unsafe { esp_rtos_semaphore_try_take(self.0) }
     }
 
     /// Attempts to decrement the semaphore's counter from an ISR.
@@ -385,13 +385,13 @@ impl SemaphoreHandle {
     /// is set to `true`.
     #[inline]
     pub fn try_take_from_isr(&self, higher_prio_task_waken: Option<&mut bool>) -> bool {
-        unsafe { esp_preempt_semaphore_try_take_from_isr(self.0, higher_prio_task_waken) }
+        unsafe { esp_rtos_semaphore_try_take_from_isr(self.0, higher_prio_task_waken) }
     }
 }
 
 impl Drop for SemaphoreHandle {
     #[inline]
     fn drop(&mut self) {
-        unsafe { esp_preempt_semaphore_delete(self.0) };
+        unsafe { esp_rtos_semaphore_delete(self.0) };
     }
 }

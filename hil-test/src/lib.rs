@@ -152,6 +152,6 @@ mod executor {
 }
 
 #[cfg(feature = "embassy")]
-pub use esp_preempt::embassy::Executor;
+pub use esp_rtos::embassy::Executor;
 #[cfg(not(feature = "embassy"))]
 pub use executor::Executor;
