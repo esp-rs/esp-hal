@@ -3,8 +3,6 @@
   _data_start = ABSOLUTE(.);
   . = ALIGN (4);
 
-  PROVIDE(__global_pointer$ = . + 0x800);
-
   #IF ESP_HAL_CONFIG_PLACE_SWITCH_TABLES_IN_RAM
     *(.rodata.*_esp_hal_internal_handler*)
     *(.rodata..Lswitch.table.*)
