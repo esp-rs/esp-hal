@@ -37,7 +37,7 @@ pub unsafe fn set_stack_watchpoint(addr: usize) {
         cfg_if::cfg_if! {
             if #[cfg(xtensa)] {
                 let addr = addr & !0b11;
-                let dbreakc = 0b11 | (1 << 31); // bit 31 = STORE
+                let dbreakc = 0b1111100 | (1 << 31); // bit 31 = STORE
 
                 unsafe {
                     core::arch::asm!(
