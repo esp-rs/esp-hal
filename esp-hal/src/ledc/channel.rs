@@ -75,29 +75,10 @@ pub enum Number {
 
 /// Channel configuration
 pub mod config {
-    use crate::ledc::{
-        channel::DriveMode,
-        timer::{TimerIFace, TimerSpeed},
+    use crate::{
+        gpio::DriveMode,
+        ledc::timer::{TimerIFace, TimerSpeed},
     };
-
-    #[derive(Debug, Clone, Copy, PartialEq)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    /// Pin configuration for the LEDC channel.
-    pub enum PinConfig {
-        /// Push-pull pin configuration.
-        PushPull,
-        /// Open-drain pin configuration.
-        OpenDrain,
-    }
-
-    impl Into<DriveMode> for PinConfig {
-        fn into(self) -> DriveMode {
-            match self {
-                PinConfig::PushPull => DriveMode::PushPull,
-                PinConfig::OpenDrain => DriveMode::OpenDrain,
-            }
-        }
-    }
 
     /// Channel configuration
     #[derive(Copy, Clone)]
@@ -107,7 +88,7 @@ pub mod config {
         /// The duty cycle percentage (0-100).
         pub duty_pct: u8,
         /// The pin configuration (PushPull or OpenDrain).
-        pub pin_config: PinConfig,
+        pub pin_config: DriveMode,
     }
 }
 
@@ -141,7 +122,7 @@ pub trait ChannelHW {
     fn configure_hw(&mut self) -> Result<(), Error>;
     /// Configure the hardware for the channel with a specific pin
     /// configuration.
-    fn configure_hw_with_pin_config(&mut self, cfg: config::PinConfig) -> Result<(), Error>;
+    fn configure_hw_with_pin_config(&mut self, cfg: config::DriveMode) -> Result<(), Error>;
 
     /// Set channel duty HW
     fn set_duty_hw(&self, duty: u32);
@@ -564,9 +545,9 @@ where
 {
     /// Configure Channel HW
     fn configure_hw(&mut self) -> Result<(), Error> {
-        self.configure_hw_with_pin_config(config::PinConfig::PushPull)
+        self.configure_hw_with_pin_config(DriveMode::PushPull)
     }
-    fn configure_hw_with_pin_config(&mut self, cfg: config::PinConfig) -> Result<(), Error> {
+    fn configure_hw_with_pin_config(&mut self, cfg: DriveMode) -> Result<(), Error> {
         if let Some(timer) = self.timer {
             if !timer.is_configured() {
                 return Err(Error::Timer);

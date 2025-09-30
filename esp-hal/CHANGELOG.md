@@ -63,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RtcClock`, `RtcFastClock`, and `RtcSlowClock` moved to `clock` module (#4089)
 - Resolved enum variant naming violations in `RtcFastClock` and `RtcSlowClock` enums (#4089)
 - The `rmt::Channel::transmit_continuously` and `rmt::Channel::transmit_continuously_with_loopcount` methods have been merged (#4100)
+- Introduced `Error::FrequencyUnset` in `ledc::timer::Error` (#4214)
 
 ### Fixed
 
@@ -86,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Xtal::Other` has been removed (#3983)
 - ESP32-C3/S3: removed the UHCI1 peripheral singleton (#4007)
 - `i2s::master::Standard` has been removed (#3985)
+- `ledc::channel::PinConfig` has been removed and used `DriveMode` instead (#4214)
 
 ## [v1.0.0-rc.0] - 2025-07-16
 
