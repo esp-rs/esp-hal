@@ -311,8 +311,8 @@ pub(crate) mod flags {
                     return true;
                 }
 
-                // We are here because we weren't able to take the semaphore previously. We've
-                // either timed out, or the semaphore is ready for taking. However,
+                // We are here because the required flags were not set previously. We've
+                // either timed out, or the flags are now set. However,
                 // any higher priority task can wake up and preempt us still. Let's
                 // just check for the timeout, and try the whole process again.
 
