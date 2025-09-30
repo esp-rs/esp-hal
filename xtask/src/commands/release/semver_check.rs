@@ -11,6 +11,7 @@ use crate::Package;
 pub enum SemverCheckCmd {
     GenerateBaseline,
     Check,
+    DownloadBaselines,
 }
 
 /// Arguments for performing semver checks on the public API of packages.
@@ -36,9 +37,9 @@ pub fn semver_checks(workspace: &Path, args: SemverCheckArgs) -> anyhow::Result<
         let _ = workspace;
         let _ = args;
 
-        return Err(anyhow::anyhow!(
+        Err(anyhow::anyhow!(
             "Feature `semver-checks` is not enabled. Use the `xcheck` alias",
-        ));
+        ))
     }
 
     #[cfg(feature = "semver-checks")]
@@ -49,6 +50,7 @@ pub fn semver_checks(workspace: &Path, args: SemverCheckArgs) -> anyhow::Result<
         SemverCheckCmd::Check => {
             checker::check_for_breaking_changes(&workspace, args.packages, args.chips)
         }
+        SemverCheckCmd::DownloadBaselines => checker::download_baselines(&workspace, args.packages),
     }
 }
 
@@ -173,6 +175,142 @@ pub mod checker {
             ))
         } else {
             Ok(())
+        }
+    }
+
+    #[derive(Debug)]
+    enum BaselineSource {
+        Artifact(String), // GitHub Actions artifact name
+    }
+
+    /// Download API baselines from GitHub Actions artifacts for the specified packages.
+    pub fn download_baselines(workspace: &Path, packages: Vec<Package>) -> anyhow::Result<()> {
+        use std::process::Command;
+
+        for package in packages {
+            if !package.is_semver_checked() {
+                log::info!("Skipping {package} - not semver checked");
+                continue;
+            }
+
+            log::info!("Downloading API baselines for {package}");
+
+            let package_name = package.to_string();
+            let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+            let baseline_dir = package_path.join("api-baseline");
+
+            // Remove existing baselines
+            if baseline_dir.exists() {
+                std::fs::remove_dir_all(&baseline_dir)?;
+            }
+
+            // Get the package version to determine which baseline to download
+            let version = crate::package_version(workspace, package)?;
+
+            // Try to download from GitHub Actions artifacts
+            // Note: Artifacts have a 90-day retention limit for public repositories
+            let baseline_sources = vec![
+                BaselineSource::Artifact(format!("api-baselines-{version}")),
+                BaselineSource::Artifact("api-baselines-latest".to_string()),
+            ];
+
+            let mut downloaded = false;
+            for baseline_source in baseline_sources {
+                match &baseline_source {
+                    BaselineSource::Artifact(artifact_name) => {
+                        log::info!(
+                            "Attempting to download from GitHub Actions artifact: {artifact_name}"
+                        );
+                        if try_download_from_artifact(&package_path, artifact_name)? {
+                            log::info!(
+                                "✅ Successfully downloaded baselines from artifact {artifact_name}"
+                            );
+                            downloaded = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if !downloaded {
+                return Err(anyhow::anyhow!(
+                    "Failed to download baselines for {package}. Tried sources: {baseline_sources:?}"
+                ));
+            }
+
+            // Verify that baselines were extracted correctly
+            if !baseline_dir.exists() {
+                return Err(anyhow::anyhow!(
+                    "Baseline directory not found after extraction: {}",
+                    baseline_dir.display()
+                ));
+            }
+
+            let baseline_files: Vec<_> = std::fs::read_dir(&baseline_dir)?
+                .filter_map(|entry| entry.ok())
+                .filter(|entry| {
+                    entry
+                        .path()
+                        .extension()
+                        .and_then(|ext| ext.to_str())
+                        .map(|ext| ext == "gz")
+                        .unwrap_or(false)
+                })
+                .collect();
+
+            if baseline_files.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "No baseline files found in extracted directory: {}",
+                    baseline_dir.display()
+                ));
+            }
+
+            log::info!(
+                "Found {} baseline files for {package}",
+                baseline_files.len(),
+                package
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Try to download baselines from a GitHub Actions artifact
+    fn try_download_from_artifact(
+        package_path: &PathBuf,
+        artifact_name: &str,
+    ) -> anyhow::Result<bool> {
+        use std::process::Command;
+
+        // GitHub CLI can download artifacts from recent workflow runs
+        // This requires the artifact to still be available (within retention period)
+        let output = Command::new("gh")
+            .args([
+                "run",
+                "download",
+                "--name",
+                artifact_name,
+                "--dir",
+                package_path.to_str().unwrap(),
+            ])
+            .output();
+
+        match output {
+            Ok(result) if result.status.success() => {
+                log::debug!("Successfully downloaded artifact {artifact_name}");
+                Ok(true)
+            }
+            Ok(result) => {
+                log::debug!(
+                    "Artifact {artifact_name} not available: {}",
+                    String::from_utf8_lossy(&result.stderr)
+                );
+                Ok(false)
+            }
+            Err(e) => {
+                log::debug!("Error downloading artifact {artifact_name}: {e}");
+                Ok(false)
+            }
         }
     }
 }

@@ -87,6 +87,7 @@ jobs:
         shell: bash
         # always invokes +esp internally
         run: |
+          cargo xtask semver-check download-baselines
           cargo xcheck semver-check --chips esp32 check
           cargo xcheck semver-check --chips esp32s2 check
           cargo xcheck semver-check --chips esp32s3 check
