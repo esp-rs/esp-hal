@@ -637,7 +637,7 @@ pub fn init(config: Config) -> Peripherals {
     crate::soc::pre_init();
 
     #[cfg(stack_guard_monitoring)]
-    crate::soc::enable_stack_guard_monitoring();
+    crate::soc::enable_main_stack_guard_monitoring();
 
     system::disable_peripherals();
 
