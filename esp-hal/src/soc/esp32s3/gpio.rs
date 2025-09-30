@@ -35,15 +35,14 @@ macro_rules! rtcio_analog {
                     $pin_num
                 }
 
-                /// Set the RTC properties of the pin. If `mux` is true then then pin is
+                /// Set the RTC properties of the pin. If `mux` is true then the pin is
                 /// routed to RTC, when false it is routed to IO_MUX.
                 fn rtc_set_config(&self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
                     enable_iomux_clk_gate();
 
-                    // We need `paste` to rewrite something in each function, so that rustc
-                    // doesn't trip over trying to substitute a partial expression as `$pin_reg`
+                    // Access the RTC_IO register for this pin
                     $crate::peripherals::[<RTC _IO>]::regs()
-                        .$pin_reg.modify(|_,w| unsafe {
+                        .$pin_reg.modify(|_, w| unsafe {
                             w.fun_ie().bit(input_enable);
                             w.mux_sel().bit(mux);
                             w.fun_sel().bits(func as u8)
@@ -85,9 +84,10 @@ macro_rules! rtcio_analog {
                         rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << self.rtc_number()) });
 
                         // disable open drain
-                        rtcio.pin(self.rtc_number() as usize).modify(|_,w| w.pad_driver().bit(false));
+                        rtcio.pin(self.rtc_number() as usize).modify(|_, w| w.pad_driver().bit(false));
 
-                        rtcio.$pin_reg.modify(|_,w| {
+                        // configure pin register
+                        rtcio.$pin_reg.modify(|_, w| {
                             w.fun_ie().clear_bit();
 
                             // Connect pin to analog / RTC module instead of standard GPIO
