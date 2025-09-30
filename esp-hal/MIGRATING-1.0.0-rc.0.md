@@ -365,3 +365,4 @@ esp_rtos::start_second_core(
 ### Interrupt executor changes
 
 Interrupt executors are provided as `esp_rtos::embassy::InterruptExecutor` with no additional changes.
+

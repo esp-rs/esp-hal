@@ -476,9 +476,12 @@ pub(super) fn allocate_main_task(scheduler: &mut SchedulerState, stack: *mut [Ma
     let current_cpu = cpu as usize;
 
     unsafe {
-        stack
-            .cast::<MaybeUninit<u32>>()
-            .write(MaybeUninit::new(STACK_CANARY));
+        // avoid touching the main stack's canary on the first core
+        if stack.cast::<MaybeUninit<u32>>().read().assume_init() != STACK_CANARY {
+            stack
+                .cast::<MaybeUninit<u32>>()
+                .write(MaybeUninit::new(STACK_CANARY));
+        }
     }
 
     // Reset main task properties. The rest should be cleared when the task is deleted.
