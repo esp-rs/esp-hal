@@ -4,6 +4,8 @@ use core::mem::MaybeUninit;
 pub use esp_hal::peripherals::FLASH as Flash;
 #[cfg(multi_core)]
 use esp_hal::system::Cpu;
+#[cfg(multi_core)]
+use esp_hal::system::is_running;
 
 use crate::chip_specific;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -239,7 +241,7 @@ impl MultiCoreStrategy {
         match self {
             MultiCoreStrategy::Error => {
                 for other_cpu in Cpu::other() {
-                    if other_cpu.is_running() {
+                    if is_running(other_cpu) {
                         return Err(FlashStorageError::OtherCoreRunning);
                     }
                 }
@@ -247,7 +249,7 @@ impl MultiCoreStrategy {
             }
             MultiCoreStrategy::AutoPark => {
                 for other_cpu in Cpu::other() {
-                    if other_cpu.is_running() {
+                    if is_running(other_cpu) {
                         other_cpu.park_core(true);
                         return Ok(true);
                     }

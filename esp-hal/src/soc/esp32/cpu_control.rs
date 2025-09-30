@@ -171,6 +171,51 @@ unsafe fn internal_park_core(core: Cpu, park: bool) {
     }
 }
 
+/// Returns `true` if the specified core is currently running (not stalled).
+#[instability::unstable]
+pub fn is_running(core: Cpu) -> bool {
+    if core == Cpu::AppCpu {
+        let dport = DPORT::regs();
+        // DPORT_APPCPU_CLKGATE_EN in APPCPU_CTRL_B bit 0 -> needs to be 1 to even be enabled
+        // DPORT_APPCPU_RUNSTALL in APPCPU_CTRL_C bit 0 -> needs to be 0 to not stall
+        if dport
+            .appcpu_ctrl_b()
+            .read()
+            .appcpu_clkgate_en()
+            .bit_is_clear()
+            || dport.appcpu_ctrl_c().read().appcpu_runstall().bit_is_set()
+        {
+            // If the core is not enabled or is stallled, we can take this shortcut
+            return false;
+        }
+    }
+
+    // sw_stall_appcpu_c1[5:0],  sw_stall_appcpu_c0[1:0]} == 0x86 will stall APP CPU
+    // sw_stall_procpu_c1[5:0],  reg_sw_stall_procpu_c0[1:0]} == 0x86 will stall PRO CPU
+    let is_stalled = match core {
+        Cpu::ProCpu => {
+            let c1 = LPWR::regs()
+                .sw_cpu_stall()
+                .read()
+                .sw_stall_procpu_c1()
+                .bits();
+            let c0 = LPWR::regs().options0().read().sw_stall_procpu_c0().bits();
+            (c1 << 2) | c0
+        }
+        Cpu::AppCpu => {
+            let c1 = LPWR::regs()
+                .sw_cpu_stall()
+                .read()
+                .sw_stall_appcpu_c1()
+                .bits();
+            let c0 = LPWR::regs().options0().read().sw_stall_appcpu_c0().bits();
+            (c1 << 2) | c0
+        }
+    };
+
+    is_stalled != 0x86
+}
+
 impl<'d> CpuControl<'d> {
     /// Creates a new instance of `CpuControl`.
     #[instability::unstable]

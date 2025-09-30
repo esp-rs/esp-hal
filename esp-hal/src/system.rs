@@ -1192,49 +1192,6 @@ impl Cpu {
             rtc_cntl.options0().write(|w| w.bits(c0_val))
         };
     }
-
-    /// Returns true if the core is running (clock enabled and not stalled).
-    #[inline(always)]
-    #[cfg(multi_core)]
-    pub fn is_running(self) -> bool {
-        // If the core is the app cpu we need to check first if it was even enabled
-        if self == Cpu::AppCpu {
-            cfg_if::cfg_if! {
-                if #[cfg(esp32s3)] {
-                    // CORE_1_RUNSTALL in bit 0 -> needs to be 0 to not stall
-                    // CORE_1_CLKGATE_EN in bit 1 -> needs to be 1 to even be enabled
-                    let system = SYSTEM::regs();
-                    let r = system.core_1_control_0().read();
-                    if r.control_core_1_clkgate_en().bit_is_clear()
-                        || r.control_core_1_runstall().bit_is_set()
-                    {
-                        // If the core is not enabled we can take this shortcut
-                        return false;
-                    }
-                } else if #[cfg(esp32)] {
-                    // DPORT_APPCPU_CLKGATE_EN in APPCPU_CTRL_B bit 0 -> needs to be 1 to even be enabled
-                    // DPORT_APPCPU_RUNSTALL in APPCPU_CTRL_C bit 0 -> needs to be 0 to not stall
-                    let dport = DPORT::regs();
-                    if dport.appcpu_ctrl_b().read().appcpu_clkgate_en().bit_is_clear()
-                        || dport.appcpu_ctrl_c().read().appcpu_runstall().bit_is_set()
-                    {
-                        // If the core is not enabled or is stallled, we can take this shortcut
-                        return false;
-                    }
-                }
-            }
-        }
-
-        let (c0_val, c1_val) = self.c0_c1_bits();
-        let rtc_cntl = LPWR::regs();
-
-        let (c0, c1) = (
-            rtc_cntl.options0().read().bits() & c0_val,
-            rtc_cntl.sw_cpu_stall().read().bits() & c1_val,
-        );
-
-        !(c0 == c0_val && c1 == c1_val)
-    }
 }
 
 /// Returns the raw value of the mhartid register.
