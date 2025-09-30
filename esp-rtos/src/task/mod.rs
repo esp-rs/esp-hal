@@ -65,7 +65,7 @@ task_list_item!(TaskTimerQueueElement, timer_queue_item);
 /// Extension trait for common task operations. These should be inherent methods but we can't
 /// implement stuff for NonNull.
 pub(crate) trait TaskExt {
-    #[cfg(feature = "esp-radio")]
+    #[cfg(any(feature = "esp-radio", feature = "embassy"))]
     fn resume(self);
     fn priority(self, _: &mut RunQueue) -> usize;
     fn set_priority(self, _: &mut RunQueue, new_pro: usize);
@@ -74,7 +74,7 @@ pub(crate) trait TaskExt {
 }
 
 impl TaskExt for TaskPtr {
-    #[cfg(feature = "esp-radio")]
+    #[cfg(any(feature = "esp-radio", feature = "embassy"))]
     fn resume(self) {
         SCHEDULER.with(|scheduler| scheduler.resume_task(self))
     }
@@ -228,6 +228,103 @@ impl<E: TaskListElement> TaskQueue<E> {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.head.is_none()
+    }
+}
+
+#[cfg(feature = "embassy")]
+pub(crate) mod flags {
+
+    use esp_hal::time::{Duration, Instant};
+    use esp_sync::NonReentrantMutex;
+
+    use crate::{
+        CurrentThreadHandle,
+        SCHEDULER,
+        task::{TaskExt, TaskPtr},
+    };
+
+    pub(crate) struct FlagsInner {
+        owner: Option<TaskPtr>,
+        flags: u32,
+    }
+    impl FlagsInner {
+        fn wait(&mut self, wait_flags: u32) -> bool {
+            if self.flags & wait_flags == wait_flags {
+                self.flags &= !wait_flags;
+                true
+            } else {
+                if self.owner.is_none() {
+                    self.owner = Some(CurrentThreadHandle::get().task);
+                }
+
+                false
+            }
+        }
+    }
+
+    pub(crate) struct ThreadFlags {
+        inner: NonReentrantMutex<FlagsInner>,
+    }
+
+    impl ThreadFlags {
+        pub(crate) const fn new() -> Self {
+            Self {
+                inner: NonReentrantMutex::new(FlagsInner {
+                    owner: None,
+                    flags: 0,
+                }),
+            }
+        }
+
+        pub(crate) fn set(&self, flag: u32) {
+            self.inner.with(|inner| {
+                inner.flags |= flag;
+                if let Some(owner) = inner.owner {
+                    owner.resume();
+                }
+            });
+        }
+
+        pub(crate) fn get(&self) -> u32 {
+            self.inner.with(|inner| inner.flags)
+        }
+
+        pub(crate) fn wait(&self, wait_flags: u32, timeout_us: Option<u32>) -> bool {
+            let deadline = timeout_us.map(|us| Instant::now() + Duration::from_micros(us as u64));
+            loop {
+                let success = self.inner.with(|inner| {
+                    if inner.wait(wait_flags) {
+                        true
+                    } else {
+                        let wake_at = if let Some(deadline) = deadline {
+                            deadline
+                        } else {
+                            Instant::EPOCH + Duration::MAX
+                        };
+                        SCHEDULER.sleep_until(wake_at);
+                        false
+                    }
+                });
+
+                if success {
+                    debug!("Flags - wait - success");
+                    return true;
+                }
+
+                // We are here because we weren't able to take the semaphore previously. We've
+                // either timed out, or the semaphore is ready for taking. However,
+                // any higher priority task can wake up and preempt us still. Let's
+                // just check for the timeout, and try the whole process again.
+
+                if let Some(deadline) = deadline
+                    && deadline < Instant::now()
+                {
+                    // We have a deadline and we've timed out.
+                    trace!("Flags - wait - timed out");
+                    return false;
+                }
+            }
+        }
     }
 }
 
@@ -428,14 +525,14 @@ pub(super) fn current_task() -> TaskPtr {
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CurrentThreadHandle {
-    _task: TaskPtr,
+    task: TaskPtr,
 }
 
 impl CurrentThreadHandle {
     /// Retrieves a handle to the current task.
     pub fn get() -> Self {
         Self {
-            _task: current_task(),
+            task: current_task(),
         }
     }
 
@@ -453,10 +550,8 @@ impl CurrentThreadHandle {
     pub fn set_priority(self, priority: usize) {
         let priority = priority.min(crate::run_queue::MaxPriority::MAX_PRIORITY);
         SCHEDULER.with(|state| {
-            let current_cpu = Cpu::current() as usize;
-            let current_task = unwrap!(state.per_cpu[current_cpu].current_task);
-            let old = current_task.priority(&mut state.run_queue);
-            current_task.set_priority(&mut state.run_queue, priority);
+            let old = self.task.priority(&mut state.run_queue);
+            self.task.set_priority(&mut state.run_queue, priority);
             if old > priority {
                 crate::task::yield_task();
             }

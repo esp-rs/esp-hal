@@ -6,7 +6,7 @@ use embassy_executor::{SendSpawner, Spawner, raw};
 use esp_hal::interrupt::{InterruptHandler, Priority, software::SoftwareInterrupt};
 use portable_atomic::AtomicPtr;
 
-use crate::semaphore::Semaphore;
+use crate::task::flags::ThreadFlags;
 
 #[unsafe(export_name = "__pender")]
 fn __pender(context: *mut ()) {
@@ -18,8 +18,8 @@ fn __pender(context: *mut ()) {
         _ => {
             // This forces us to keep the embassy timer queue separate, otherwise we'd need to
             // reentrantly lock SCHEDULER.
-            let semaphore = unwrap!(unsafe { context.cast::<Semaphore>().as_ref() });
-            semaphore.give();
+            let flags = unwrap!(unsafe { context.cast::<ThreadFlags>().as_ref() });
+            flags.set(1);
         }
     }
 }
@@ -40,8 +40,6 @@ pub trait Callbacks {
 ///
 /// This executor runs in an OS thread.
 pub struct Executor {
-    /// Signals that work is available.
-    semaphore: Semaphore,
     executor: UnsafeCell<MaybeUninit<raw::Executor>>,
 }
 
@@ -49,7 +47,6 @@ impl Executor {
     /// Create a new thread-mode executor.
     pub const fn new() -> Self {
         Self {
-            semaphore: Semaphore::new_counting(0, 1),
             executor: UnsafeCell::new(MaybeUninit::uninit()),
         }
     }
@@ -75,6 +72,7 @@ impl Executor {
     ///
     /// This function never returns.
     pub fn run(&'static mut self, init: impl FnOnce(Spawner)) -> ! {
+        let flags = ThreadFlags::new();
         struct NoHooks;
 
         impl Callbacks for NoHooks {
@@ -83,7 +81,7 @@ impl Executor {
             fn on_idle(&mut self) {}
         }
 
-        self.run_inner(init, NoHooks)
+        self.run_inner(init, &flags, NoHooks)
     }
 
     /// Run the executor with callbacks.
@@ -98,7 +96,8 @@ impl Executor {
         init: impl FnOnce(Spawner),
         callbacks: impl Callbacks,
     ) -> ! {
-        struct Hooks<'a, CB: Callbacks>(CB, &'a Semaphore);
+        let flags = ThreadFlags::new();
+        struct Hooks<'a, CB: Callbacks>(CB, &'a ThreadFlags);
 
         impl<CB: Callbacks> Callbacks for Hooks<'_, CB> {
             fn before_poll(&mut self) {
@@ -107,19 +106,24 @@ impl Executor {
 
             fn on_idle(&mut self) {
                 // Make sure we only call on_idle if the executor would otherwise go to sleep.
-                if self.1.current_count() == 0 {
+                if self.1.get() == 0 {
                     self.0.on_idle();
                 }
             }
         }
 
-        self.run_inner(init, Hooks(callbacks, &self.semaphore))
+        self.run_inner(init, &flags, Hooks(callbacks, &flags))
     }
 
-    fn run_inner(&'static self, init: impl FnOnce(Spawner), mut hooks: impl Callbacks) -> ! {
+    fn run_inner(
+        &'static self,
+        init: impl FnOnce(Spawner),
+        flags: &ThreadFlags,
+        mut hooks: impl Callbacks,
+    ) -> ! {
         let executor = unsafe {
             (&mut *self.executor.get()).write(raw::Executor::new(
-                (&raw const self.semaphore).cast::<()>().cast_mut(),
+                (flags as *const ThreadFlags).cast::<()>().cast_mut(),
             ))
         };
 
@@ -133,7 +137,7 @@ impl Executor {
             hooks.on_idle();
 
             // Wait for work to become available.
-            self.semaphore.take(None);
+            flags.wait(1, None);
         }
     }
 }
