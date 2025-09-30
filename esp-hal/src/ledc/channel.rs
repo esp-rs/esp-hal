@@ -554,7 +554,7 @@ where
             }
 
             self.output_pin
-                .apply_output_config(&OutputConfig::default().with_drive_mode(cfg.into()));
+                .apply_output_config(&OutputConfig::default().with_drive_mode(cfg));
             self.output_pin.set_output_enable(true);
 
             let timer_number = timer.number() as u8;
