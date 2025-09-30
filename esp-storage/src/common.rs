@@ -1,9 +1,13 @@
 use core::mem::MaybeUninit;
 
+#[cfg(multi_core)]
+use esp_hal::peripherals::CPU_CTRL;
 #[cfg(not(feature = "emulation"))]
 pub use esp_hal::peripherals::FLASH as Flash;
 #[cfg(multi_core)]
 use esp_hal::system::Cpu;
+#[cfg(multi_core)]
+use esp_hal::system::CpuControl;
 #[cfg(multi_core)]
 use esp_hal::system::is_running;
 
@@ -238,6 +242,7 @@ impl MultiCoreStrategy {
     /// * `True` if the other core needs to be un-parked by post_write
     /// * `False` otherwise
     pub(crate) fn pre_write(&self) -> Result<bool, FlashStorageError> {
+        let mut cpu_ctrl = CpuControl::new(unsafe { CPU_CTRL::steal() });
         match self {
             MultiCoreStrategy::Error => {
                 for other_cpu in Cpu::other() {
@@ -250,7 +255,7 @@ impl MultiCoreStrategy {
             MultiCoreStrategy::AutoPark => {
                 for other_cpu in Cpu::other() {
                     if is_running(other_cpu) {
-                        other_cpu.park_core(true);
+                        unsafe { cpu_ctrl.park_core(other_cpu) };
                         return Ok(true);
                     }
                 }
@@ -266,10 +271,11 @@ impl MultiCoreStrategy {
     /// * `True` if the other core needs to be un-parked by post_write
     /// * `False` otherwise
     pub(crate) fn post_write(&self, unpark: bool) {
+        let mut cpu_ctrl = CpuControl::new(unsafe { CPU_CTRL::steal() });
         if let MultiCoreStrategy::AutoPark = self {
             if unpark {
                 for other_cpu in Cpu::other() {
-                    other_cpu.park_core(false);
+                    cpu_ctrl.unpark_core(other_cpu);
                 }
             }
         }

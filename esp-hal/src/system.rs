@@ -2,10 +2,6 @@
 
 use esp_sync::NonReentrantMutex;
 
-#[cfg(esp32)]
-use crate::peripherals::DPORT;
-#[cfg(multi_core)]
-use crate::peripherals::LPWR;
 use crate::peripherals::SYSTEM;
 
 /// Peripherals which can be enabled via `PeripheralClockControl`.
@@ -1124,6 +1120,7 @@ impl Cpu {
 
     /// Returns an iterator over the "other" cores.
     #[inline(always)]
+    #[instability::unstable]
     pub fn other() -> impl Iterator<Item = Self> {
         cfg_if::cfg_if! {
             if #[cfg(multi_core)] {
@@ -1147,50 +1144,6 @@ impl Cpu {
                 [Cpu::ProCpu].into_iter()
             }
         }
-    }
-
-    #[cfg(multi_core)]
-    fn c0_c1_bits(self) -> (u32, u32) {
-        // Write 0x2 to options0 to stall a particular core
-        // offset for app cpu: 0
-        // offset for pro cpu: 2
-
-        // Write 0x21 to sw_cpu_stall to allow stalling of a particular core
-        // offset for app cpu: 20
-        // offset for pro cpu: 26
-
-        match self {
-            Cpu::ProCpu => (0x02 << 2, 0x21 << 26),
-            #[cfg(multi_core)]
-            Cpu::AppCpu => (0x02, (0x21 << 20) as u32),
-        }
-    }
-
-    /// Park or un-park the core.
-    #[inline(always)]
-    #[cfg(multi_core)]
-    pub fn park_core(self, park: bool) {
-        let rtc_cntl = LPWR::regs();
-
-        let (c0_val, c1_val) = self.c0_c1_bits();
-
-        // Decide actual values to write depending on `park`
-        let (c0_val, c1_val) = {
-            let mut c0 = rtc_cntl.options0().read().bits() & !c0_val;
-            let mut c1 = rtc_cntl.sw_cpu_stall().read().bits() & !c1_val;
-
-            if park {
-                c0 |= c0_val;
-                c1 |= c1_val;
-            }
-
-            (c0, c1)
-        };
-
-        unsafe {
-            rtc_cntl.sw_cpu_stall().write(|w| w.bits(c1_val));
-            rtc_cntl.options0().write(|w| w.bits(c0_val))
-        };
     }
 }
 
