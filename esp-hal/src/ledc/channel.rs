@@ -88,7 +88,7 @@ pub mod config {
         /// The duty cycle percentage (0-100).
         pub duty_pct: u8,
         /// The pin configuration (PushPull or OpenDrain).
-        pub pin_config: DriveMode,
+        pub drive_mode: DriveMode,
     }
 }
 
@@ -122,7 +122,7 @@ pub trait ChannelHW {
     fn configure_hw(&mut self) -> Result<(), Error>;
     /// Configure the hardware for the channel with a specific pin
     /// configuration.
-    fn configure_hw_with_pin_config(&mut self, cfg: config::DriveMode) -> Result<(), Error>;
+    fn configure_hw_with_drive_mode(&mut self, cfg: DriveMode) -> Result<(), Error>;
 
     /// Set channel duty HW
     fn set_duty_hw(&self, duty: u32);
@@ -171,7 +171,7 @@ where
         self.timer = Some(config.timer);
 
         self.set_duty(config.duty_pct)?;
-        self.configure_hw_with_pin_config(config.pin_config)?;
+        self.configure_hw_with_drive_mode(config.drive_mode)?;
 
         Ok(())
     }
@@ -545,9 +545,9 @@ where
 {
     /// Configure Channel HW
     fn configure_hw(&mut self) -> Result<(), Error> {
-        self.configure_hw_with_pin_config(DriveMode::PushPull)
+        self.configure_hw_with_drive_mode(DriveMode::PushPull)
     }
-    fn configure_hw_with_pin_config(&mut self, cfg: DriveMode) -> Result<(), Error> {
+    fn configure_hw_with_drive_mode(&mut self, cfg: DriveMode) -> Result<(), Error> {
         if let Some(timer) = self.timer {
             if !timer.is_configured() {
                 return Err(Error::Timer);
