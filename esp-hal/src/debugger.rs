@@ -28,7 +28,7 @@ pub fn debugger_connected() -> bool {
 ///
 /// Breakpoint 0 is used.
 ///
-/// # Safety:
+/// # Safety
 /// The address must be word aligned.
 pub unsafe fn set_stack_watchpoint(addr: usize) {
     assert!(addr.is_multiple_of(4));

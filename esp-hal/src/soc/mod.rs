@@ -247,7 +247,7 @@ fn setup_stack_guard() {
     }
 }
 
-#[cfg(feature = "rt")]
+#[cfg(all(feature = "rt", stack_guard_monitoring))]
 pub(crate) fn enable_main_stack_guard_monitoring() {
     unsafe {
         unsafe extern "C" {
