@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Updated `timestamp` example code for Rust edition 2024 (#4211)
 
 ### Fixed
 
