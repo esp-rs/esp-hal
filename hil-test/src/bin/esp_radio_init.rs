@@ -489,7 +489,6 @@ mod tests {
                 unsafe {
                     &mut APP_CORE_STACK
                 },
-                None,
                 || {
                     let result = super::run_float_calc(2.0);
                     assert_eq!(result, 4.0);
