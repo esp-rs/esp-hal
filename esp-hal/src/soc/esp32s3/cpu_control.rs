@@ -121,11 +121,8 @@ pub enum Error {
 /// let cpu1_fnctn = || {
 ///     cpu1_task(&delay, &counter);
 /// };
-/// let _guard = cpu_control.start_app_core(
-///     unsafe { &mut *addr_of_mut!(APP_CORE_STACK) },
-///     None,
-///     cpu1_fnctn,
-/// )?;
+/// let _guard =
+///     cpu_control.start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, cpu1_fnctn)?;
 ///
 /// loop {
 ///     delay.delay(Duration::from_secs(1));
