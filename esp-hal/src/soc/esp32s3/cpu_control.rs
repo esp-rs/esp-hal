@@ -245,7 +245,7 @@ impl<'d> CpuControl<'d> {
         let entry = START_CORE1_FUNCTION.load(Ordering::Acquire);
         debug_assert!(!entry.is_null());
 
-        #[cfg(stack_guard_monitoring)]
+        #[cfg(all(feature = "rt", stack_guard_monitoring))]
         crate::soc::enable_main_stack_guard_monitoring();
 
         unsafe {
