@@ -16,13 +16,14 @@ impl TimerQueueInner {
     }
 
     pub(crate) fn handle_alarm(&mut self, now: u64) {
-        let next = self.queue.next_expiration(now);
-        self.next_wakeup = next;
+        if now >= self.next_wakeup {
+            self.next_wakeup = self.queue.next_expiration(now);
+        }
     }
 
     fn schedule_wake(&mut self, at: u64, waker: &Waker) -> bool {
         if self.queue.schedule_wake(at, waker) {
-            self.next_wakeup = at;
+            self.next_wakeup = self.next_wakeup.min(at);
             true
         } else {
             false
