@@ -332,6 +332,10 @@ impl SchedulerState {
 
     pub(crate) fn switch_task(&mut self, #[cfg(xtensa)] trap_frame: &mut CpuContext) {
         self.run_scheduler(|current_context, next_context| {
+            trace!(
+                "Task switch: {:x} -> {:x}",
+                current_context as usize, next_context as usize
+            );
             task::task_switch(
                 current_context,
                 next_context,
