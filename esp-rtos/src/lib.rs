@@ -258,6 +258,7 @@ pub fn start_second_core<const STACK_SIZE: usize>(
     #[cfg(xtensa)] int0: SoftwareInterrupt<'static, 0>,
     int1: SoftwareInterrupt<'static, 1>,
     stack: &'static mut Stack<STACK_SIZE>,
+    stack_guard_offset: Option<usize>,
     func: impl FnOnce() + Send + 'static,
 ) {
     trace!("Starting scheduler for the second core");
@@ -278,7 +279,7 @@ pub fn start_second_core<const STACK_SIZE: usize>(
 
     let mut cpu_control = CpuControl::new(cpu_control);
     let guard = cpu_control
-        .start_app_core(stack, move || {
+        .start_app_core(stack, stack_guard_offset, move || {
             trace!("Second core running");
             task::setup_smp(int1);
             SCHEDULER.with(move |scheduler| {

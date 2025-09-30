@@ -77,6 +77,7 @@ impl<const SIZE: usize> Stack<SIZE> {
 // is copied to the core's stack.
 static START_CORE1_FUNCTION: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
 static APP_CORE_STACK_TOP: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
+static APP_CORE_STACK_GUARD: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
 
 /// Will park the APP (second) core when dropped
 #[must_use = "Dropping this guard will park the APP core"]
@@ -288,6 +289,13 @@ impl<'d> CpuControl<'d> {
         unsafe {
             xtensa_lx::set_vecbase(&raw const _init_start);
             xtensa_lx::set_stack_pointer(APP_CORE_STACK_TOP.load(Ordering::Acquire));
+
+            #[cfg(all(feature = "rt", stack_guard_monitoring))]
+            {
+                let stack_guard = APP_CORE_STACK_GUARD.load(Ordering::Acquire);
+                // setting 0 effectively disables the functionality
+                crate::debugger::set_stack_watchpoint(stack_guard as usize);
+            }
         }
 
         // Trampoline to run from the new stack.
@@ -305,9 +313,6 @@ impl<'d> CpuControl<'d> {
     {
         let entry = START_CORE1_FUNCTION.load(Ordering::Acquire);
         debug_assert!(!entry.is_null());
-
-        #[cfg(all(feature = "rt", stack_guard_monitoring))]
-        crate::soc::enable_main_stack_guard_monitoring();
 
         unsafe {
             let entry = ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>());
@@ -328,6 +333,7 @@ impl<'d> CpuControl<'d> {
     pub fn start_app_core<'a, const SIZE: usize, F>(
         &mut self,
         stack: &'static mut Stack<SIZE>,
+        stack_guard_offset: Option<usize>,
         entry: F,
     ) -> Result<AppCoreGuard<'a>, Error>
     where
@@ -365,6 +371,13 @@ impl<'d> CpuControl<'d> {
             let entry_fn = entry_dst.cast::<()>();
             START_CORE1_FUNCTION.store(entry_fn, Ordering::Release);
             APP_CORE_STACK_TOP.store(stack.top(), Ordering::Release);
+            let stack_guard = if let Some(stack_guard_offset) = stack_guard_offset {
+                assert!(stack_guard_offset.is_multiple_of(4));
+                stack_bottom.byte_add(stack_guard_offset)
+            } else {
+                core::ptr::null_mut()
+            };
+            APP_CORE_STACK_GUARD.store(stack_guard.cast(), Ordering::Release);
         }
 
         dport_control.appcpu_ctrl_d().write(|w| unsafe {
