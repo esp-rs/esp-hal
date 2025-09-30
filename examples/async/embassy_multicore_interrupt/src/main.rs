@@ -94,7 +94,7 @@ fn main() -> ! {
     let app_core_stack = APP_CORE_STACK.init(Stack::new());
 
     let _guard = cpu_control
-        .start_app_core(app_core_stack, move || {
+        .start_app_core(app_core_stack, Some(1024), move || {
             let spawner = executor_core1.start(Priority::Priority1);
 
             spawner.spawn(control_led(led, led_ctrl_signal)).ok();

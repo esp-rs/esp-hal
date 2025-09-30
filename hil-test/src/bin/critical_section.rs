@@ -205,7 +205,7 @@ mod tests {
         };
 
         let _guard = cpu_control
-            .start_app_core(app_core_stack, cpu1_fnctn)
+            .start_app_core(app_core_stack, None, cpu1_fnctn)
             .unwrap();
 
         START_COUNTING.store(true, Ordering::Relaxed);

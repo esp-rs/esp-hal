@@ -586,6 +586,7 @@ mod tests {
             sw_int.software_interrupt0,
             sw_int.software_interrupt1,
             app_core_stack,
+            None,
             move || {
                 let executor = mk_static!(Executor, Executor::new());
                 executor.run(|spawner| {

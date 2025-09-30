@@ -164,6 +164,7 @@ mod test {
             ctx.sw_int0,
             ctx.sw_int1,
             app_core_stack,
+            None,
             || {
                 let interrupt_executor =
                     mk_static!(InterruptExecutor<2>, InterruptExecutor::new(ctx.sw_int2));
@@ -193,6 +194,7 @@ mod test {
             ctx.sw_int0,
             ctx.sw_int1,
             app_core_stack,
+            None,
             || {
                 let executor = mk_static!(Executor, Executor::new());
                 executor.run(|spawner| {
