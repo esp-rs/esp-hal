@@ -366,15 +366,3 @@ esp_rtos::start_second_core(
 
 Interrupt executors are provided as `esp_rtos::embassy::InterruptExecutor` with no additional changes.
 
-
-## Changes for starting the second core / app core
-
-`start_app_core` takes an additional `Option` to enable stack monitoring - the passed argument is the offset from the bottom of the stack to define a safe-zone.
-
-```diff
-     let app_core_stack = APP_CORE_STACK.init(Stack::new());
-
-     let _guard = cpu_control
--        .start_app_core(app_core_stack, move || {
-+        .start_app_core(app_core_stack, Some(1024), move || {
-```
