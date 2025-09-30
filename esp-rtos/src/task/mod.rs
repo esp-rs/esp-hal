@@ -233,8 +233,6 @@ impl<E: TaskListElement> TaskQueue<E> {
 
 #[cfg(feature = "embassy")]
 pub(crate) mod flags {
-
-    use esp_hal::time::{Duration, Instant};
     use esp_sync::NonReentrantMutex;
 
     use crate::{
@@ -290,39 +288,21 @@ pub(crate) mod flags {
         }
 
         pub(crate) fn wait(&self, wait_flags: u32, timeout_us: Option<u32>) -> bool {
-            let deadline = timeout_us.map(|us| Instant::now() + Duration::from_micros(us as u64));
-            loop {
-                let success = self.inner.with(|inner| {
+            if crate::with_deadline(timeout_us, |deadline| {
+                self.inner.with(|inner| {
                     if inner.wait(wait_flags) {
                         true
                     } else {
-                        let wake_at = if let Some(deadline) = deadline {
-                            deadline
-                        } else {
-                            Instant::EPOCH + Duration::MAX
-                        };
-                        SCHEDULER.sleep_until(wake_at);
+                        SCHEDULER.sleep_until(deadline);
                         false
                     }
-                });
-
-                if success {
-                    debug!("Flags - wait - success");
-                    return true;
-                }
-
-                // We are here because the required flags were not set previously. We've
-                // either timed out, or the flags are now set. However,
-                // any higher priority task can wake up and preempt us still. Let's
-                // just check for the timeout, and try the whole process again.
-
-                if let Some(deadline) = deadline
-                    && deadline < Instant::now()
-                {
-                    // We have a deadline and we've timed out.
-                    trace!("Flags - wait - timed out");
-                    return false;
-                }
+                })
+            }) {
+                debug!("Flags - wait - success");
+                true
+            } else {
+                trace!("Flags - wait - timed out");
+                false
             }
         }
     }

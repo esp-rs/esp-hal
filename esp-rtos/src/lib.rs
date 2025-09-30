@@ -98,13 +98,13 @@ use esp_hal::interrupt::software::SoftwareInterrupt;
 use esp_hal::{
     Blocking,
     system::Cpu,
+    time::{Duration, Instant},
     timer::{AnyTimer, OneShotTimer},
 };
 #[cfg(multi_core)]
 use esp_hal::{
     peripherals::CPU_CTRL,
     system::{CpuControl, Stack},
-    time::{Duration, Instant},
 };
 #[cfg_attr(docsrs, doc(cfg(feature = "embassy")))]
 pub use macros::rtos_main as main;
@@ -336,10 +336,33 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
 const TICK_RATE: u32 = esp_config::esp_config_int!(u32, "ESP_RTOS_CONFIG_TICK_RATE_HZ");
 
 pub(crate) fn now() -> u64 {
-    esp_hal::time::Instant::now()
-        .duration_since_epoch()
-        .as_micros()
+    Instant::now().duration_since_epoch().as_micros()
 }
 
 #[cfg(feature = "embassy")]
 embassy_time_driver::time_driver_impl!(static TIMER_QUEUE: crate::timer::embassy::TimerQueue = crate::timer::embassy::TimerQueue::new());
+
+/// Waits for a condition to be met or a timeout to occur.
+///
+/// This function is meant to simplify implementation of blocking primitives. Upon failure the
+/// `attempt` function should enqueue the task in a wait queue and put the task to sleep.
+fn with_deadline(timeout_us: Option<u32>, attempt: impl Fn(Instant) -> bool) -> bool {
+    let deadline = timeout_us
+        .map(|us| Instant::now() + Duration::from_micros(us as u64))
+        .unwrap_or(Instant::EPOCH + Duration::MAX);
+
+    while !attempt(deadline) {
+        // We are here because the operation failed. We've either timed out, or the operation is
+        // ready to be attempted again. However, any higher priority task can wake up and
+        // preempt us still. Let's just check for the timeout, and try the whole process
+        // again.
+
+        if timeout_us.is_some() && deadline < Instant::now() {
+            // We have a deadline and we've timed out.
+            return false;
+        }
+        // We can block more, so let's attempt the operation again.
+    }
+
+    true
+}
