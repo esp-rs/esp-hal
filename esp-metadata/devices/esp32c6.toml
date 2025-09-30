@@ -191,13 +191,7 @@ pins = [
     { pin = 21, functions = { 0 = "SDIO_DATA1", 2 = "FSPICS5" } },
     { pin = 22, functions = { 0 = "SDIO_DATA2" } },
     { pin = 23, functions = { 0 = "SDIO_DATA3" } },
-    { pin = 24, functions = { 0 = "SPICS0" } },
-    { pin = 25, functions = { 0 = "SPIQ" } },
-    { pin = 26, functions = { 0 = "SPIWP" } },
     { pin = 27 },
-    { pin = 28, functions = { 0 = "SPIHD" } },
-    { pin = 29, functions = { 0 = "SPICLK" } },
-    { pin = 30, functions = { 0 = "SPID" } },
 ]
 input_signals = [
     { name = "EXT_ADC_START",       id = 0 },

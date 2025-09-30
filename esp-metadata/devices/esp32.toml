@@ -155,7 +155,7 @@ pins = [
     { pin = 17, functions = {                                3 = "HS1_DATA5", 4 = "U2TXD",    5 = "EMAC_CLK_180" }, analog = {}, rtc = {} },
     { pin = 18, functions = {                 1 = "VSPICLK", 3 = "HS1_DATA7"                                     }, analog = {}, rtc = {} },
     { pin = 19, functions = {                 1 = "VSPIQ",   3 = "U0CTS",                     5 = "EMAC_TXD0"    }, analog = {}, rtc = {} },
-    { pin = 20 }, # ESP32-PICO-V3 only
+    # { pin = 20 }, # ESP32-PICO-V3 only see https://github.com/esp-rs/esp-hal/pull/4202#discussion_r2390041983
     { pin = 21, functions = { 1 = "VSPIHD",              5 = "EMAC_TX_EN" } },
     { pin = 22, functions = { 1 = "VSPIWP", 3 = "U0RTS", 5 = "EMAC_TXD1"  } },
     { pin = 23, functions = { 1 = "VSPID",  3 = "HS1_STROBE"              } },
