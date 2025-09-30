@@ -232,6 +232,10 @@ impl<'d> CpuControl<'d> {
             #[cfg(all(feature = "rt", stack_guard_monitoring))]
             {
                 let stack_guard = APP_CORE_STACK_GUARD.load(Ordering::Acquire);
+                stack_guard.write_volatile(esp_config::esp_config_int!(
+                    u32,
+                    "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
+                ));
                 // setting 0 effectively disables the functionality
                 crate::debugger::set_stack_watchpoint(stack_guard as usize);
             }
