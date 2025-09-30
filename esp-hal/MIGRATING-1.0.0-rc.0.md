@@ -299,8 +299,7 @@ The `low-power-wait` configuration can be substituted with a custom idle hook. Y
 
 ### Setup
 
-The previous `esp_hal_embassy::main` macro has been replaced by `esp_rtos::main`. The `esp_hal_embassy::init` function has been replaced by `esp_rtos::start`, with a different signature. This is the same function that needs to be called
-for `esp_radio`, too.
+The previous `esp_hal_embassy::main` macro has been replaced by `esp_rtos::main`. The `esp_hal_embassy::init` function has been replaced by `esp_rtos::start`, with a different signature; this function should be used for `esp_radio` as well.
 
 `esp_rtos::start` has a different signature for the different CPU architectures. The function takes a single timer instead of a variable number of timers.
 
