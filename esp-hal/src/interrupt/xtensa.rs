@@ -772,7 +772,7 @@ mod rt {
     unsafe fn __level_6_interrupt(save_frame: &mut Context) {
         cfg_if::cfg_if! {
             if #[cfg(all(feature = "rt", feature = "exception-handler", stack_guard_monitoring))] {
-            crate::exception_handler::breakpoint_interrupt(save_frame);
+                crate::exception_handler::breakpoint_interrupt(save_frame);
             } else {
                 unsafe { level6_interrupt(save_frame) }
             }
