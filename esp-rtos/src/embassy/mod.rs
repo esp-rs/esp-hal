@@ -1,3 +1,5 @@
+//! OS-aware embassy executors.
+
 use core::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::Ordering};
 
 use embassy_executor::{SendSpawner, Spawner, raw};
@@ -34,6 +36,9 @@ pub trait Callbacks {
     fn on_idle(&mut self);
 }
 
+/// Thread-mode executor.
+///
+/// This executor runs in an OS thread.
 pub struct Executor {
     /// Signals that work is available.
     semaphore: Semaphore,
@@ -144,6 +149,9 @@ impl Default for Executor {
 /// This executor runs tasks in interrupt mode. The interrupt handler is set up
 /// to poll tasks, and when a task is woken the interrupt is pended from
 /// software.
+///
+/// Interrupt executors have potentially lower latency than thread-mode executors, but only a
+/// limited number can be created.
 pub struct InterruptExecutor<const SWI: u8> {
     executor: UnsafeCell<MaybeUninit<raw::Executor>>,
     interrupt: SoftwareInterrupt<'static, SWI>,
@@ -207,13 +215,11 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
     /// The executor keeps running in the background through the interrupt.
     ///
     /// This returns a [`SendSpawner`] you can use to spawn tasks on it. A
-    /// [`SendSpawner`] is returned instead of a
-    /// [`Spawner`](embassy_executor::Spawner) because the
+    /// [`SendSpawner`] is returned instead of a [`Spawner`] because the
     /// executor effectively runs in a different "thread" (the interrupt),
     /// so spawning tasks on it is effectively sending them.
     ///
-    /// To obtain a [`Spawner`](embassy_executor::Spawner) for this executor,
-    /// use [`Spawner::for_current_executor`](embassy_executor::Spawner::for_current_executor)
+    /// To obtain a [`Spawner`] for this executor, use [`Spawner::for_current_executor`]
     /// from a task running in it.
     pub fn start(&'static mut self, priority: Priority) -> SendSpawner {
         unsafe {

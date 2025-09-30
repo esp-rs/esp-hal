@@ -8,9 +8,3 @@ options:
     constraints:
       - type:
           validator: positive_integer
-
-  - name: stack-guard-value
-    description: The stack overflow guard value. This must be the same value as esp_hal's stack guard value.
-    default:
-      - value: 3740121773
-    display_hint: Hex

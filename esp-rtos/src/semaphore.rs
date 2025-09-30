@@ -1,3 +1,7 @@
+//! Semaphores and mutexes.
+//!
+//! This module provides the [`Semaphore`] type, which implements counting semaphores and mutexes.
+
 use esp_hal::{
     system::Cpu,
     time::{Duration, Instant},
@@ -131,11 +135,13 @@ impl SemaphoreInner {
     }
 }
 
+/// Semaphore and mutex primitives.
 pub struct Semaphore {
     inner: NonReentrantMutex<SemaphoreInner>,
 }
 
 impl Semaphore {
+    /// Create a new counting semaphore.
     pub const fn new_counting(initial: u32, max: u32) -> Self {
         Semaphore {
             inner: NonReentrantMutex::new(SemaphoreInner::Counting {
@@ -146,6 +152,9 @@ impl Semaphore {
         }
     }
 
+    /// Create a new mutex.
+    ///
+    /// If `recursive` is true, the mutex can be locked multiple times by the same task.
     pub const fn new_mutex(recursive: bool) -> Self {
         Semaphore {
             inner: NonReentrantMutex::new(SemaphoreInner::Mutex {
@@ -158,10 +167,19 @@ impl Semaphore {
         }
     }
 
+    /// Try to take the semaphore.
+    ///
+    /// This is a non-blocking operation.
     pub fn try_take(&self) -> bool {
         self.inner.with(|sem| sem.try_take())
     }
 
+    /// Take the semaphore.
+    ///
+    /// This is a blocking operation.
+    ///
+    /// If the semaphore is already taken, the task will be blocked until the semaphore is released.
+    /// Recursive mutexes can be locked multiple times by the mutex owner task.
     pub fn take(&self, timeout_us: Option<u32>) -> bool {
         let deadline = timeout_us.map(|us| Instant::now() + Duration::from_micros(us as u64));
         loop {
@@ -196,10 +214,12 @@ impl Semaphore {
         }
     }
 
+    /// Return the current count of the semaphore.
     pub fn current_count(&self) -> u32 {
         self.inner.with(|sem| sem.current_count())
     }
 
+    /// Unlock the semaphore.
     pub fn give(&self) -> bool {
         self.inner.with(|sem| {
             if sem.try_give() {
