@@ -4,7 +4,7 @@
 //! tailored to specific software platforms (such as ArielOS). Trying to use multiple scheduler
 //! crates in a firmware project will not build.
 //!
-//! If you want to use esp-radio without any OS, you can use the [`esp-preempt`]
+//! If you want to use esp-radio without any OS, you can use the [`esp-rtos`]
 //! crate as the task scheduler.
 //!
 //! ## Implementing a scheduler driver
@@ -17,7 +17,7 @@
 //! - Queues: [`queue::QueueImplementation`]
 //! - Timers (functions that are executed at a specific time): [`timer::TimerImplementation`]
 //!
-//! [`esp-preempt`]: https://crates.io/crates/esp-preempt
+//! [`esp-rtos`]: https://crates.io/crates/esp-rtos
 
 #![no_std]
 
@@ -33,12 +33,12 @@ extern crate alloc;
 use crate::semaphore::SemaphorePtr;
 
 unsafe extern "Rust" {
-    fn esp_preempt_initialized() -> bool;
-    fn esp_preempt_yield_task();
-    fn esp_preempt_yield_task_from_isr();
-    fn esp_preempt_current_task() -> *mut c_void;
-    fn esp_preempt_max_task_priority() -> u32;
-    fn esp_preempt_task_create(
+    fn esp_rtos_initialized() -> bool;
+    fn esp_rtos_yield_task();
+    fn esp_rtos_yield_task_from_isr();
+    fn esp_rtos_current_task() -> *mut c_void;
+    fn esp_rtos_max_task_priority() -> u32;
+    fn esp_rtos_task_create(
         name: &str,
         task: extern "C" fn(*mut c_void),
         param: *mut c_void,
@@ -46,11 +46,11 @@ unsafe extern "Rust" {
         pin_to_core: Option<u32>,
         task_stack_size: usize,
     ) -> *mut c_void;
-    fn esp_preempt_schedule_task_deletion(task_handle: *mut c_void);
-    fn esp_preempt_current_task_thread_semaphore() -> SemaphorePtr;
+    fn esp_rtos_schedule_task_deletion(task_handle: *mut c_void);
+    fn esp_rtos_current_task_thread_semaphore() -> SemaphorePtr;
 
-    fn esp_preempt_usleep(us: u32);
-    fn esp_preempt_now() -> u64;
+    fn esp_rtos_usleep(us: u32);
+    fn esp_rtos_now() -> u64;
 }
 
 /// Set the Scheduler implementation.
@@ -63,37 +63,37 @@ macro_rules! scheduler_impl {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_initialized() -> bool {
+        fn esp_rtos_initialized() -> bool {
             <$t as $crate::Scheduler>::initialized(&$driver)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_yield_task() {
+        fn esp_rtos_yield_task() {
             <$t as $crate::Scheduler>::yield_task(&$driver)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_yield_task_from_isr() {
+        fn esp_rtos_yield_task_from_isr() {
             <$t as $crate::Scheduler>::yield_task_from_isr(&$driver)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_current_task() -> *mut c_void {
+        fn esp_rtos_current_task() -> *mut c_void {
             <$t as $crate::Scheduler>::current_task(&$driver)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_max_task_priority() -> u32 {
+        fn esp_rtos_max_task_priority() -> u32 {
             <$t as $crate::Scheduler>::max_task_priority(&$driver)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_task_create(
+        fn esp_rtos_task_create(
             name: &str,
             task: extern "C" fn(*mut c_void),
             param: *mut c_void,
@@ -114,25 +114,25 @@ macro_rules! scheduler_impl {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_schedule_task_deletion(task_handle: *mut c_void) {
+        fn esp_rtos_schedule_task_deletion(task_handle: *mut c_void) {
             <$t as $crate::Scheduler>::schedule_task_deletion(&$driver, task_handle)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_current_task_thread_semaphore() -> $crate::semaphore::SemaphorePtr {
+        fn esp_rtos_current_task_thread_semaphore() -> $crate::semaphore::SemaphorePtr {
             <$t as $crate::Scheduler>::current_task_thread_semaphore(&$driver)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_usleep(us: u32) {
+        fn esp_rtos_usleep(us: u32) {
             <$t as $crate::Scheduler>::usleep(&$driver, us)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_now() -> u64 {
+        fn esp_rtos_now() -> u64 {
             <$t as $crate::Scheduler>::now(&$driver)
         }
     };
@@ -149,7 +149,7 @@ macro_rules! scheduler_impl {
 /// ```rust,no_run
 /// struct MyScheduler {}
 ///
-/// impl esp_radio_preempt_driver::Scheduler for MyScheduler {
+/// impl esp_radio_rtos_driver::Scheduler for MyScheduler {
 ///
 ///     fn initialized(&self) -> bool {
 ///         unimplemented!()
@@ -200,7 +200,7 @@ macro_rules! scheduler_impl {
 ///     }
 /// }
 ///
-/// esp_radio_preempt_driver::scheduler_impl!(static SCHEDULER: MyScheduler = MyScheduler {});
+/// esp_radio_rtos_driver::scheduler_impl!(static SCHEDULER: MyScheduler = MyScheduler {});
 /// ```
 pub trait Scheduler: Send + Sync + 'static {
     /// This function is called by `esp_radio::init` to verify that the scheduler is properly set
@@ -261,25 +261,25 @@ pub trait Scheduler: Send + Sync + 'static {
 /// Returns whether the task scheduler has been initialized.
 #[inline]
 pub fn initialized() -> bool {
-    unsafe { esp_preempt_initialized() }
+    unsafe { esp_rtos_initialized() }
 }
 
 /// Yields control to another task.
 #[inline]
 pub fn yield_task() {
-    unsafe { esp_preempt_yield_task() }
+    unsafe { esp_rtos_yield_task() }
 }
 
 /// Yields control to another task for an interrupt.
 #[inline]
 pub fn yield_task_from_isr() {
-    unsafe { esp_preempt_yield_task_from_isr() }
+    unsafe { esp_rtos_yield_task_from_isr() }
 }
 
 /// Returns a pointer to the current task.
 #[inline]
 pub fn current_task() -> *mut c_void {
-    unsafe { esp_preempt_current_task() }
+    unsafe { esp_rtos_current_task() }
 }
 
 /// Returns the maximum priority a task can have.
@@ -287,7 +287,7 @@ pub fn current_task() -> *mut c_void {
 /// This function assumes that a bigger number means higher priority.
 #[inline]
 pub fn max_task_priority() -> u32 {
-    unsafe { esp_preempt_max_task_priority() }
+    unsafe { esp_rtos_max_task_priority() }
 }
 
 /// Creates a new task with the given initial parameter and stack size.
@@ -305,7 +305,7 @@ pub unsafe fn task_create(
     pin_to_core: Option<u32>,
     task_stack_size: usize,
 ) -> *mut c_void {
-    unsafe { esp_preempt_task_create(name, task, param, priority, pin_to_core, task_stack_size) }
+    unsafe { esp_rtos_task_create(name, task, param, priority, pin_to_core, task_stack_size) }
 }
 
 /// Schedules the given task for deletion.
@@ -318,23 +318,23 @@ pub unsafe fn task_create(
 /// [`current_task`].
 #[inline]
 pub unsafe fn schedule_task_deletion(task_handle: *mut c_void) {
-    unsafe { esp_preempt_schedule_task_deletion(task_handle) }
+    unsafe { esp_rtos_schedule_task_deletion(task_handle) }
 }
 
 /// Returns a pointer to the current thread's semaphore.
 #[inline]
 pub fn current_task_thread_semaphore() -> SemaphorePtr {
-    unsafe { esp_preempt_current_task_thread_semaphore() }
+    unsafe { esp_rtos_current_task_thread_semaphore() }
 }
 
 /// Puts the current task to sleep for the specified number of microseconds.
 #[inline]
 pub fn usleep(us: u32) {
-    unsafe { esp_preempt_usleep(us) }
+    unsafe { esp_rtos_usleep(us) }
 }
 
 /// Returns the current timestamp, in microseconds.
 #[inline]
 pub fn now() -> u64 {
-    unsafe { esp_preempt_now() }
+    unsafe { esp_rtos_now() }
 }

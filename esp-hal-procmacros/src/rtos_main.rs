@@ -165,7 +165,7 @@ pub fn main_fn() -> TokenStream2 {
     quote! {
         #[#root::main]
         fn main() -> ! {
-            let mut executor = ::esp_preempt::embassy::Executor::new();
+            let mut executor = ::esp_rtos::embassy::Executor::new();
             let executor = unsafe { __make_static(&mut executor) };
             executor.run(|spawner| {
                 spawner.must_spawn(__embassy_main(spawner));

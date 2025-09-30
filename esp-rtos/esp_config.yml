@@ -1,4 +1,4 @@
-crate: esp-preempt
+crate: esp-rtos
 
 options:
   - name: tick_rate_hz

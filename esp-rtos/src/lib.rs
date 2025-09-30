@@ -17,19 +17,19 @@ let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT)
     xtensa,
     doc = "
 
-esp_preempt::start(timg0.timer0);"
+esp_rtos::start(timg0.timer0);"
 )]
 #![cfg_attr(
     riscv,
     doc = "
 
-esp_preempt::start(timg0.timer0, software_interrupt.software_interrupt0);"
+esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);"
 )]
 #![cfg_attr(
     all(xtensa, multi_core),
     doc = "
 // Optionally, start the scheduler on the second core
-esp_preempt::start_second_core(
+esp_rtos::start_second_core(
     software_interrupt.software_interrupt0,
     software_interrupt.software_interrupt1,
     || {}, // Second core's main function.
@@ -40,7 +40,7 @@ esp_preempt::start_second_core(
     all(riscv, multi_core),
     doc = "
 // Optionally, start the scheduler on the second core
-esp_preempt::start_second_core(
+esp_rtos::start_second_core(
     software_interrupt.software_interrupt1,
     || {}, // Second core's main function.
 );
@@ -91,7 +91,7 @@ use esp_hal::{
     system::{CpuControl, Stack},
     time::{Duration, Instant},
 };
-pub use macros::preempt_main as main;
+pub use macros::rtos_main as main;
 pub(crate) use scheduler::SCHEDULER;
 pub use task::CurrentThreadHandle;
 
@@ -128,7 +128,7 @@ mod esp_alloc {
     }
 }
 
-/// A trait to allow better UX for initializing esp-preempt.
+/// A trait to allow better UX for initializing esp-rtos.
 ///
 /// This trait is meant to be used only for the `init` function.
 pub trait TimerSource: private::Sealed + 'static {
@@ -260,7 +260,7 @@ pub fn start_second_core<const STACK_SIZE: usize>(
     core::mem::forget(guard);
 }
 
-const TICK_RATE: u32 = esp_config::esp_config_int!(u32, "ESP_PREEMPT_CONFIG_TICK_RATE_HZ");
+const TICK_RATE: u32 = esp_config::esp_config_int!(u32, "ESP_RTOS_CONFIG_TICK_RATE_HZ");
 
 pub(crate) fn now() -> u64 {
     esp_hal::time::Instant::now()

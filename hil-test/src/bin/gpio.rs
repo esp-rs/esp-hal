@@ -143,7 +143,7 @@ mod tests {
             );
             // Timers are unstable
             let timg0 = TimerGroup::new(peripherals.TIMG0);
-            esp_preempt::start(
+            esp_rtos::start(
                 timg0.timer0,
                 #[cfg(riscv)]
                 sw_int.software_interrupt0,
@@ -498,7 +498,7 @@ mod tests {
     #[cfg(feature = "unstable")]
     fn interrupt_executor_is_not_frozen(ctx: Context) {
         use esp_hal::interrupt::{Priority, software::SoftwareInterrupt};
-        use esp_preempt::embassy::InterruptExecutor;
+        use esp_rtos::embassy::InterruptExecutor;
         use static_cell::StaticCell;
 
         static INTERRUPT_EXECUTOR: StaticCell<InterruptExecutor<1>> = StaticCell::new();
@@ -565,7 +565,7 @@ mod tests {
             peripherals::{CPU_CTRL, SW_INTERRUPT},
             system::{Cpu, CpuControl, Stack},
         };
-        use esp_preempt::embassy::Executor;
+        use esp_rtos::embassy::Executor;
         use hil_test::mk_static;
 
         let sw_int = unsafe { SoftwareInterruptControl::new(SW_INTERRUPT::steal()) };
@@ -580,7 +580,7 @@ mod tests {
         const CORE1_STACK_SIZE: usize = 8192;
         let app_core_stack = mk_static!(Stack<CORE1_STACK_SIZE>, Stack::new());
 
-        esp_preempt::start_second_core(
+        esp_rtos::start_second_core(
             unsafe { CPU_CTRL::steal() },
             #[cfg(xtensa)]
             sw_int.software_interrupt0,

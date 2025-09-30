@@ -77,14 +77,14 @@ async fn task3() {
     }
 }
 
-#[esp_preempt::main]
+#[esp_rtos::main]
 async fn main(spawner: Spawner) {
     let config = esp_hal::Config::default().with_cpu_clock(CLOCK);
     let peripherals = esp_hal::init(config);
     #[cfg(target_arch = "riscv32")]
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
-    esp_preempt::start(
+    esp_rtos::start(
         systimer.alarm0,
         #[cfg(target_arch = "riscv32")]
         sw_int.software_interrupt0,

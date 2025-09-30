@@ -7,7 +7,7 @@ use esp_hal::{
     system::Cpu,
     time::{Duration, Instant},
 };
-use esp_radio_preempt_driver::{
+use esp_radio_rtos_driver::{
     register_semaphore_implementation,
     semaphore::{SemaphoreImplementation, SemaphoreKind, SemaphorePtr},
 };
@@ -23,18 +23,18 @@ use crate::{
 mod queue;
 mod timer_queue;
 
-impl esp_radio_preempt_driver::Scheduler for Scheduler {
+impl esp_radio_rtos_driver::Scheduler for Scheduler {
     fn initialized(&self) -> bool {
         self.with(|scheduler| {
             if scheduler.time_driver.is_none() {
-                warn!("Trying to initialize esp-radio before starting esp-preempt");
+                warn!("Trying to initialize esp-radio before starting esp-rtos");
                 return false;
             }
 
             let current_cpu = Cpu::current() as usize;
             if !scheduler.per_cpu[current_cpu].initialized {
                 warn!(
-                    "Trying to initialize esp-radio on {:?} but esp-preempt is not running on this core",
+                    "Trying to initialize esp-radio on {:?} but esp-rtos is not running on this core",
                     current_cpu
                 );
                 return false;

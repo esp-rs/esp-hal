@@ -22,32 +22,32 @@ use core::ptr::NonNull;
 pub type QueuePtr = NonNull<()>;
 
 unsafe extern "Rust" {
-    fn esp_preempt_queue_create(capacity: usize, item_size: usize) -> QueuePtr;
-    fn esp_preempt_queue_delete(queue: QueuePtr);
+    fn esp_rtos_queue_create(capacity: usize, item_size: usize) -> QueuePtr;
+    fn esp_rtos_queue_delete(queue: QueuePtr);
 
-    fn esp_preempt_queue_send_to_front(
+    fn esp_rtos_queue_send_to_front(
         queue: QueuePtr,
         item: *const u8,
         timeout_us: Option<u32>,
     ) -> bool;
-    fn esp_preempt_queue_send_to_back(
+    fn esp_rtos_queue_send_to_back(
         queue: QueuePtr,
         item: *const u8,
         timeout_us: Option<u32>,
     ) -> bool;
-    fn esp_preempt_queue_try_send_to_back_from_isr(
+    fn esp_rtos_queue_try_send_to_back_from_isr(
         queue: QueuePtr,
         item: *const u8,
         higher_prio_task_waken: Option<&mut bool>,
     ) -> bool;
-    fn esp_preempt_queue_receive(queue: QueuePtr, item: *mut u8, timeout_us: Option<u32>) -> bool;
-    fn esp_preempt_queue_try_receive_from_isr(
+    fn esp_rtos_queue_receive(queue: QueuePtr, item: *mut u8, timeout_us: Option<u32>) -> bool;
+    fn esp_rtos_queue_try_receive_from_isr(
         queue: QueuePtr,
         item: *mut u8,
         higher_prio_task_waken: Option<&mut bool>,
     ) -> bool;
-    fn esp_preempt_queue_remove(queue: QueuePtr, item: *const u8);
-    fn esp_preempt_queue_messages_waiting(queue: QueuePtr) -> usize;
+    fn esp_rtos_queue_remove(queue: QueuePtr, item: *const u8);
+    fn esp_rtos_queue_messages_waiting(queue: QueuePtr) -> usize;
 }
 
 /// A queue primitive.
@@ -56,7 +56,7 @@ unsafe extern "Rust" {
 /// `QueueImplementation` trait:
 ///
 /// ```rust,no_run
-/// use esp_radio_preempt_driver::{
+/// use esp_radio_rtos_driver::{
 ///     queue::{QueueImplementation, QueuePtr},
 ///     register_queue_implementation,
 /// };
@@ -218,19 +218,19 @@ macro_rules! register_queue_implementation {
     ($t: ty) => {
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_queue_create(capacity: usize, item_size: usize) -> $crate::queue::QueuePtr {
+        fn esp_rtos_queue_create(capacity: usize, item_size: usize) -> $crate::queue::QueuePtr {
             <$t as $crate::queue::QueueImplementation>::create(capacity, item_size)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_queue_delete(queue: $crate::queue::QueuePtr) {
+        fn esp_rtos_queue_delete(queue: $crate::queue::QueuePtr) {
             unsafe { <$t as $crate::queue::QueueImplementation>::delete(queue) }
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_queue_send_to_front(
+        fn esp_rtos_queue_send_to_front(
             queue: QueuePtr,
             item: *const u8,
             timeout_us: Option<u32>,
@@ -242,7 +242,7 @@ macro_rules! register_queue_implementation {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_queue_send_to_back(
+        fn esp_rtos_queue_send_to_back(
             queue: QueuePtr,
             item: *const u8,
             timeout_us: Option<u32>,
@@ -254,7 +254,7 @@ macro_rules! register_queue_implementation {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_queue_try_send_to_back_from_isr(
+        fn esp_rtos_queue_try_send_to_back_from_isr(
             queue: QueuePtr,
             item: *const u8,
             higher_prio_task_waken: Option<&mut bool>,
@@ -270,17 +270,13 @@ macro_rules! register_queue_implementation {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_queue_receive(
-            queue: QueuePtr,
-            item: *mut u8,
-            timeout_us: Option<u32>,
-        ) -> bool {
+        fn esp_rtos_queue_receive(queue: QueuePtr, item: *mut u8, timeout_us: Option<u32>) -> bool {
             unsafe { <$t as $crate::queue::QueueImplementation>::receive(queue, item, timeout_us) }
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_queue_try_receive_from_isr(
+        fn esp_rtos_queue_try_receive_from_isr(
             queue: QueuePtr,
             item: *mut u8,
             higher_prio_task_waken: Option<&mut bool>,
@@ -296,13 +292,13 @@ macro_rules! register_queue_implementation {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_queue_remove(queue: QueuePtr, item: *mut u8) {
+        fn esp_rtos_queue_remove(queue: QueuePtr, item: *mut u8) {
             unsafe { <$t as $crate::queue::QueueImplementation>::remove(queue, item) }
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_queue_messages_waiting(queue: QueuePtr) -> usize {
+        fn esp_rtos_queue_messages_waiting(queue: QueuePtr) -> usize {
             unsafe { <$t as $crate::queue::QueueImplementation>::messages_waiting(queue) }
         }
     };
@@ -317,7 +313,7 @@ impl QueueHandle {
     /// Creates a new queue instance.
     #[inline]
     pub fn new(capacity: usize, item_size: usize) -> Self {
-        let ptr = unsafe { esp_preempt_queue_create(capacity, item_size) };
+        let ptr = unsafe { esp_rtos_queue_create(capacity, item_size) };
         Self(ptr)
     }
 
@@ -365,7 +361,7 @@ impl QueueHandle {
     /// a size equal to the queue's item size.
     #[inline]
     pub unsafe fn send_to_front(&self, item: *const u8, timeout_us: Option<u32>) -> bool {
-        unsafe { esp_preempt_queue_send_to_front(self.0, item, timeout_us) }
+        unsafe { esp_rtos_queue_send_to_front(self.0, item, timeout_us) }
     }
 
     /// Enqueues an item.
@@ -381,7 +377,7 @@ impl QueueHandle {
     /// a size equal to the queue's item size.
     #[inline]
     pub unsafe fn send_to_back(&self, item: *const u8, timeout_us: Option<u32>) -> bool {
-        unsafe { esp_preempt_queue_send_to_back(self.0, item, timeout_us) }
+        unsafe { esp_rtos_queue_send_to_back(self.0, item, timeout_us) }
     }
 
     /// Attempts to enqueues an item.
@@ -402,7 +398,7 @@ impl QueueHandle {
         higher_priority_task_waken: Option<&mut bool>,
     ) -> bool {
         unsafe {
-            esp_preempt_queue_try_send_to_back_from_isr(self.0, item, higher_priority_task_waken)
+            esp_rtos_queue_try_send_to_back_from_isr(self.0, item, higher_priority_task_waken)
         }
     }
 
@@ -419,7 +415,7 @@ impl QueueHandle {
     /// a size equal to the queue's item size.
     #[inline]
     pub unsafe fn receive(&self, item: *mut u8, timeout_us: Option<u32>) -> bool {
-        unsafe { esp_preempt_queue_receive(self.0, item, timeout_us) }
+        unsafe { esp_rtos_queue_receive(self.0, item, timeout_us) }
     }
 
     /// Attempts to dequeue an item from the queue.
@@ -441,7 +437,7 @@ impl QueueHandle {
         item: *mut u8,
         higher_priority_task_waken: Option<&mut bool>,
     ) -> bool {
-        unsafe { esp_preempt_queue_try_receive_from_isr(self.0, item, higher_priority_task_waken) }
+        unsafe { esp_rtos_queue_try_receive_from_isr(self.0, item, higher_priority_task_waken) }
     }
 
     /// Removes an item from the queue.
@@ -452,19 +448,19 @@ impl QueueHandle {
     /// a size equal to the queue's item size.
     #[inline]
     pub unsafe fn remove(&self, item: *const u8) {
-        unsafe { esp_preempt_queue_remove(self.0, item) }
+        unsafe { esp_rtos_queue_remove(self.0, item) }
     }
 
     /// Returns the number of messages in the queue.
     #[inline]
     pub fn messages_waiting(&self) -> usize {
-        unsafe { esp_preempt_queue_messages_waiting(self.0) }
+        unsafe { esp_rtos_queue_messages_waiting(self.0) }
     }
 }
 
 impl Drop for QueueHandle {
     #[inline]
     fn drop(&mut self) {
-        unsafe { esp_preempt_queue_delete(self.0) };
+        unsafe { esp_rtos_queue_delete(self.0) };
     }
 }

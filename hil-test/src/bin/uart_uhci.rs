@@ -59,7 +59,7 @@ mod tests {
         let sw_int = SoftwareInterruptControl::new(ctx.peripherals.SW_INTERRUPT);
 
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_int.software_interrupt0,
@@ -123,7 +123,7 @@ mod tests {
         let sw_int = SoftwareInterruptControl::new(ctx.peripherals.SW_INTERRUPT);
 
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_int.software_interrupt0,
@@ -187,7 +187,7 @@ mod tests {
         let sw_int = SoftwareInterruptControl::new(ctx.peripherals.SW_INTERRUPT);
 
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_int.software_interrupt0,
@@ -253,7 +253,7 @@ mod tests {
         let sw_int = SoftwareInterruptControl::new(ctx.peripherals.SW_INTERRUPT);
 
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_int.software_interrupt0,

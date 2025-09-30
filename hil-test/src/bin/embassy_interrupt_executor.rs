@@ -20,7 +20,7 @@ use esp_hal::{
     peripherals::CPU_CTRL,
     system::{Cpu, CpuControl, Stack},
 };
-use esp_preempt::embassy::{Executor, InterruptExecutor};
+use esp_rtos::embassy::{Executor, InterruptExecutor};
 use hil_test::mk_static;
 
 #[embassy_executor::task]
@@ -79,7 +79,7 @@ struct Context {
 
 #[embedded_test::tests(default_timeout = 3)]
 mod test {
-    use esp_preempt::embassy::Callbacks;
+    use esp_rtos::embassy::Callbacks;
 
     use super::*;
 
@@ -89,7 +89,7 @@ mod test {
 
         let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_int.software_interrupt0,
@@ -158,7 +158,7 @@ mod test {
         let response = &*mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
         let signal = &*mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
-        esp_preempt::start_second_core(
+        esp_rtos::start_second_core(
             ctx.cpu_control,
             #[cfg(xtensa)]
             ctx.sw_int0,
@@ -187,7 +187,7 @@ mod test {
         let signal = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
         let response = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
-        esp_preempt::start_second_core(
+        esp_rtos::start_second_core(
             ctx.cpu_control,
             #[cfg(xtensa)]
             ctx.sw_int0,

@@ -24,19 +24,19 @@ use esp_hal::{
 };
 #[cfg(riscv)]
 use esp_hal::{interrupt::software::SoftwareInterrupt, riscv::interrupt::free as interrupt_free};
-use esp_preempt::{CurrentThreadHandle, embassy::InterruptExecutor, semaphore::Semaphore};
 use esp_radio::InitializationError;
-use esp_radio_preempt_driver::{
+use esp_radio_rtos_driver::{
     self as preempt,
     semaphore::{SemaphoreHandle, SemaphoreKind},
 };
+use esp_rtos::{CurrentThreadHandle, embassy::InterruptExecutor, semaphore::Semaphore};
 use hil_test::mk_static;
 use portable_atomic::{AtomicBool, AtomicUsize, Ordering};
 use static_cell::StaticCell;
 
 #[allow(unused)] // compile test
 fn baremetal_preempt_can_be_initialized_with_any_timer(timer: esp_hal::timer::AnyTimer<'static>) {
-    esp_preempt::start(
+    esp_rtos::start(
         timer,
         #[cfg(riscv)]
         unsafe {
@@ -51,7 +51,7 @@ async fn try_init(
     timer: TIMG0<'static>,
 ) {
     let timg0 = TimerGroup::new(timer);
-    esp_preempt::start(
+    esp_rtos::start(
         timg0.timer0,
         #[cfg(riscv)]
         unsafe {
@@ -76,7 +76,7 @@ fn run_float_calc(x: f32) -> f32 {
 #[cfg(multi_core)]
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 
-#[embedded_test::tests(default_timeout = 3, executor = esp_preempt::embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = esp_rtos::embassy::Executor::new())]
 mod tests {
     use super::*;
 
@@ -91,7 +91,7 @@ mod tests {
 
     #[test]
     fn test_init_fails_without_scheduler(_peripherals: Peripherals) {
-        // esp-preempt must be initialized before esp-radio.
+        // esp-rtos must be initialized before esp-radio.
         let init = esp_radio::init();
 
         assert!(matches!(
@@ -103,7 +103,7 @@ mod tests {
     #[test]
     fn test_init_fails_cs(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             unsafe {
@@ -119,7 +119,7 @@ mod tests {
     #[test]
     fn test_init_fails_interrupt_free(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             unsafe {
@@ -161,7 +161,7 @@ mod tests {
         #[cfg(riscv)]
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_ints.software_interrupt0,
@@ -181,11 +181,11 @@ mod tests {
     }
 
     #[test]
-    fn test_esp_preempt_sleep_wakes_up(p: Peripherals) {
+    fn test_esp_rtos_sleep_wakes_up(p: Peripherals) {
         #[cfg(riscv)]
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_ints.software_interrupt0,
@@ -200,11 +200,11 @@ mod tests {
 
     #[test]
     #[timeout(2)]
-    fn test_esp_preempt_time_slicing(p: Peripherals) {
+    fn test_esp_rtos_time_slicing(p: Peripherals) {
         #[cfg(riscv)]
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_ints.software_interrupt0,
@@ -272,11 +272,11 @@ mod tests {
     }
 
     #[test]
-    fn test_esp_preempt_priority_inheritance(p: Peripherals) {
+    fn test_esp_rtos_priority_inheritance(p: Peripherals) {
         #[cfg(riscv)]
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_ints.software_interrupt0,
@@ -373,7 +373,7 @@ mod tests {
 
     #[test]
     #[cfg(multi_core)]
-    fn test_esp_preempt_smp(p: Peripherals) {
+    fn test_esp_rtos_smp(p: Peripherals) {
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
 
         let timg0 = TimerGroup::new(p.TIMG0);
@@ -417,13 +417,13 @@ mod tests {
             count_impl(context, Cpu::ProCpu);
         }
 
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_ints.software_interrupt0,
         );
 
-        esp_preempt::start_second_core(
+        esp_rtos::start_second_core(
             p.CPU_CTRL,
             #[cfg(xtensa)]
             sw_ints.software_interrupt0,
@@ -515,14 +515,14 @@ mod tests {
         let timg0 = TimerGroup::new(p.TIMG0);
         #[cfg(riscv)]
         let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             software_interrupt,
         );
 
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_preempt::start_second_core::<8192>(
+        esp_rtos::start_second_core::<8192>(
             p.CPU_CTRL,
             sw_ints.software_interrupt0,
             sw_ints.software_interrupt1,

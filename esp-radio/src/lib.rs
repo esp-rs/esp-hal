@@ -68,7 +68,7 @@
         "\n\n",
         "BLE and Wi-Fi can also be run on the second core.",
         "\n\n",
-        "`esp_preempt::init` and `esp_radio::init` _must_ be called on the core on",
+        "`esp_rtos::init` and `esp_radio::init` _must_ be called on the core on",
         "which you intend to run the wireless code. This will correctly initialize",
         "the radio peripheral to run on that core, and ensure that interrupts are",
         "serviced by the correct core.",
@@ -131,7 +131,7 @@ use core::marker::PhantomData;
 
 pub use common_adapter::{phy_calibration_data, set_phy_calibration_data};
 use esp_hal::{self as hal};
-use esp_radio_preempt_driver as preempt;
+use esp_radio_rtos_driver as preempt;
 use esp_sync::RawMutex;
 #[cfg(esp32)]
 use hal::analog::adc::{release_adc2, try_claim_adc2};
@@ -235,11 +235,11 @@ impl Drop for Controller<'_> {
 /// Initialize for using Wi-Fi and or BLE.
 ///
 /// Wi-Fi and BLE require a preemptive scheduler to be present. Without one, the underlying firmware
-/// can't operate. The scheduler must implement the interfaces in the `esp-radio-preempt-driver`
+/// can't operate. The scheduler must implement the interfaces in the `esp-radio-rtos-driver`
 /// crate. If you are using an embedded RTOS like Ariel OS, it needs to provide an appropriate
 /// implementation.
 ///
-/// If you are not using an embedded RTOS, use the `esp-preempt` crate which provides the
+/// If you are not using an embedded RTOS, use the `esp-rtos` crate which provides the
 /// necessary functionality.
 ///
 /// Make sure to **not** call this function while interrupts are disabled.
@@ -257,7 +257,7 @@ impl Drop for Controller<'_> {
 /// ## Example
 ///
 /// For examples of the necessary setup, see your RTOS's documentation. If you are
-/// using the `esp-preempt` crate, you will need to initialize the scheduler before calling this
+/// using the `esp-rtos` crate, you will need to initialize the scheduler before calling this
 /// function:
 ///
 /// ```rust, no_run
@@ -269,8 +269,8 @@ impl Drop for Controller<'_> {
     riscv,
     doc = " let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);"
 )]
-#[cfg_attr(riscv, doc = " esp_preempt::start(timg0.timer0, software_interrupt);")]
-#[cfg_attr(xtensa, doc = " esp_preempt::start(timg0.timer0);")]
+#[cfg_attr(riscv, doc = " esp_rtos::start(timg0.timer0, software_interrupt);")]
+#[cfg_attr(xtensa, doc = " esp_rtos::start(timg0.timer0);")]
 /// // You can now start esp-radio:
 /// let esp_radio_controller = esp_radio::init().unwrap();
 /// # }

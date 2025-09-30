@@ -33,7 +33,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 static SIGNAL: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 
-#[esp_preempt::main]
+#[esp_rtos::main]
 async fn main(spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let p = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
@@ -52,7 +52,7 @@ async fn main(spawner: Spawner) {
     #[cfg(target_arch = "riscv32")]
     let sw_int = SoftwareInterruptControl::new(p.SW_INTERRUPT);
     let timg0 = TimerGroup::new(p.TIMG0);
-    esp_preempt::start(
+    esp_rtos::start(
         timg0.timer0,
         #[cfg(target_arch = "riscv32")]
         sw_int.software_interrupt0,

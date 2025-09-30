@@ -6,7 +6,7 @@ use core::{
 };
 
 use esp_hal::time::{Duration, Instant};
-use esp_radio_preempt_driver::{
+use esp_radio_rtos_driver::{
     register_timer_implementation,
     timer::{TimerImplementation, TimerPtr},
 };

@@ -62,8 +62,8 @@ pub enum Package {
     EspStorage,
     EspSync,
     EspRadio,
-    EspRadioPreemptDriver,
-    EspPreempt,
+    EspRadioRtosDriver,
+    EspRtos,
     Examples,
     HilTest,
     QaTest,
@@ -181,7 +181,7 @@ impl Package {
                 | EspRomSys
                 | EspBootloaderEspIdf
                 | EspMetadataGenerated
-                | EspPreempt
+                | EspRtos
         )
     }
 

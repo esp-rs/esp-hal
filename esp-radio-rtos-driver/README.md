@@ -1,12 +1,12 @@
-# esp-preempt
+# esp-radio-rtos-driver
 
-[![Crates.io](https://img.shields.io/crates/v/esp-preempt?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-preempt)
-[![docs.rs](https://img.shields.io/docsrs/esp-preempt?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.espressif.com/projects/rust/esp-preempt/latest/)
+[![Crates.io](https://img.shields.io/crates/v/esp-radio-rtos-driver?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-radio-rtos-driver)
+[![docs.rs](https://img.shields.io/docsrs/esp-radio-rtos-driver?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.espressif.com/projects/rust/esp-radio-rtos-driver/latest/)
 ![MSRV](https://img.shields.io/badge/MSRV-1.86.0-blue?labelColor=1C2C2E&style=flat-square)
-![Crates.io](https://img.shields.io/crates/l/esp-preempt?labelColor=1C2C2E&style=flat-square)
+![Crates.io](https://img.shields.io/crates/l/esp-radio-rtos-driver?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
-This crate implements [`esp-radio-preempt-driver`](https://crates.io/crates/esp-radio-preempt-driver) for firmwares using [esp-hal](https://crates.io/crates/esp-hal) without any additional software platform.
+This crate provides the interface to create task schedulers for [`esp-radio`](https://crates.io/crates/esp-radio).
 
 ## Minimum Supported Rust Version (MSRV)
 

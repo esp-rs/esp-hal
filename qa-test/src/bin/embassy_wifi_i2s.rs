@@ -204,27 +204,27 @@ async fn i2s_dma_drain(
     }
 }
 
-#[esp_preempt::main]
+#[esp_rtos::main]
 async fn main(spawner: Spawner) {
     // Enable logging from the ESP_LOG environment variable (set at build time)
-    // Example: ESP_LOG=warn,esp_preempt=trace,esp_radio=info
+    // Example: ESP_LOG=warn,esp_rtos=trace,esp_radio=info
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    // Provide a heap for components that allocate (esp-preempt/esp-radio, etc.)
+    // Provide a heap for components that allocate (esp-rtos/esp-radio, etc.)
     esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
 
     // Preempt scheduler (WiFi)
     #[cfg(target_arch = "riscv32")]
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_preempt::start(
+    esp_rtos::start(
         timg0.timer0,
         #[cfg(target_arch = "riscv32")]
         sw_int.software_interrupt0,
     );
 
-    esp_preempt::CurrentThreadHandle::get().set_priority(30);
+    esp_rtos::CurrentThreadHandle::get().set_priority(30);
 
     // I2S config (TDM Philips, 32-bit data per channel, stereo)
     #[cfg(any(feature = "esp32", feature = "esp32s2"))]

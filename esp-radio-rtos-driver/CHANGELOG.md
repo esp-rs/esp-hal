@@ -10,4 +10,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Initial release (#3855)
-- The `esp-hal-embassy` crate has been merged into `esp-preempt`. (#4172)

@@ -16,7 +16,7 @@ use esp_hal::{
     time,
     timer::{AnyTimer, OneShotTimer, PeriodicTimer, timg::TimerGroup},
 };
-use esp_preempt::embassy::InterruptExecutor;
+use esp_rtos::embassy::InterruptExecutor;
 use hil_test::mk_static;
 
 mod test_cases {
@@ -88,7 +88,7 @@ fn set_up_embassy_with_timg0(peripherals: Peripherals) {
     #[cfg(riscv)]
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_preempt::start(
+    esp_rtos::start(
         timg0.timer0,
         #[cfg(riscv)]
         sw_int.software_interrupt0,
@@ -100,7 +100,7 @@ fn set_up_embassy_with_systimer(peripherals: Peripherals) {
     #[cfg(riscv)]
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
-    esp_preempt::start(
+    esp_rtos::start(
         systimer.alarm0,
         #[cfg(riscv)]
         sw_int.software_interrupt0,
@@ -182,7 +182,7 @@ mod test {
     async fn test_interrupt_executor(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_int.software_interrupt0,
