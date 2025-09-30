@@ -24,6 +24,8 @@ const LEDC_TIMER_DIV_NUM_MAX: u64 = 0x3FFFF;
 pub enum Error {
     /// Invalid Divisor
     Divisor,
+    /// Frequency unset
+    FrequencyUnset,
 }
 
 #[cfg(esp32)]
@@ -241,8 +243,7 @@ where
         self.duty = Some(config.duty);
         self.clock_source = Some(config.clock_source);
 
-        // TODO: we should return some error here if `unwrap()` fails
-        let src_freq: u32 = self.freq().unwrap().as_hz();
+        let src_freq: u32 = self.freq().ok_or(Error::FrequencyUnset)?.as_hz();
         let precision = 1 << config.duty as u32;
         let frequency: u32 = config.frequency.as_hz();
         self.frequency = frequency;

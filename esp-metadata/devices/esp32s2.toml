@@ -166,13 +166,6 @@ pins = [
     { pin = 20, functions = { 2 = "U1CTS",   3 = "CLK_OUT1" },                 analog = { 0 = "USB_DP",     1 = "ADC2_CH9" }, rtc = { 0 = "RTC_GPIO20" } },
     { pin = 21,                                                                                                               rtc = { 0 = "RTC_GPIO21" } },
 
-    { pin = 26, functions = { 0 = "SPICS1" } },
-    { pin = 27, functions = { 0 = "SPIHD"  } },
-    { pin = 28, functions = { 0 = "SPIWP"  } },
-    { pin = 29, functions = { 0 = "SPICS0" } },
-    { pin = 30, functions = { 0 = "SPICLK" } },
-    { pin = 31, functions = { 0 = "SPIQ"   } },
-    { pin = 32, functions = { 0 = "SPID"   } },
     { pin = 33, functions = {              2 = "FSPIHD",   3 = "SUBSPIHD"              } },
     { pin = 34, functions = {              2 = "FSPICS0",  3 = "SUBSPICS0"             } },
     { pin = 35, functions = {              2 = "FSPID",    3 = "SUBSPID"               } },

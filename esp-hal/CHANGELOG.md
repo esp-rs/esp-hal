@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32: support outputting the main I2S clock signal (#4128)
 - ESP32 and S3 has `is_running()` function from `esp-storage (#4188)
 - `Cpu::other()` is now marked as public (#4188)
+- The ESP_HAL_CONFIG_STACK_GUARD_MONITORING (enabled by default) enables a data watchpoint on the stack guard value to protect the main stack (#4207)
+- `start_app_core_with_stack_guard_offset` (#4207)
 
 ### Changed
 
@@ -65,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RtcClock`, `RtcFastClock`, and `RtcSlowClock` moved to `clock` module (#4089)
 - Resolved enum variant naming violations in `RtcFastClock` and `RtcSlowClock` enums (#4089)
 - The `rmt::Channel::transmit_continuously` and `rmt::Channel::transmit_continuously_with_loopcount` methods have been merged (#4100)
+- Introduced `Error::FrequencyUnset` in `ledc::timer::Error` (#4214)
 
 ### Fixed
 
@@ -88,6 +91,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Xtal::Other` has been removed (#3983)
 - ESP32-C3/S3: removed the UHCI1 peripheral singleton (#4007)
 - `i2s::master::Standard` has been removed (#3985)
+- `ledc::channel::PinConfig` has been removed and used `DriveMode` instead (#4214)
+- ESP32: removed integrated SPI-connected pins (6 to 11 both included) (#4202)
+- ESP32H2: removed pins 6 and 7 (#4202)
+- ESP32C3 and ESP32C2: removed pins 11 to 17 both included (#4202)
+- ESP32C6: removed pins 24, 25, 26, 28, 29 and 30 (#4202)
+- ESP32S2 and ESP32S3: removed pins 26 to 32 both included (#4202)
 
 ## [v1.0.0-rc.0] - 2025-07-16
 

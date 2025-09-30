@@ -89,7 +89,7 @@
 //!     dma_channel,
 //! )?;
 //!
-//! let mut clock_pin = ClkOutPin::new(peripherals.GPIO6);
+//! let mut clock_pin = ClkOutPin::new(peripherals.GPIO8);
 //! let config = TxConfig::default()
 //!     .with_frequency(Rate::from_mhz(1))
 //!     .with_bit_order(BitPackOrder::Msb);

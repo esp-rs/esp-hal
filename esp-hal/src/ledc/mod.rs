@@ -32,6 +32,7 @@
 //! # use esp_hal::ledc::timer::{self, TimerIFace};
 //! # use esp_hal::ledc::LowSpeed;
 //! # use esp_hal::ledc::channel::{self, ChannelIFace};
+//! # use esp_hal::gpio::DriveMode;
 //! # let led = peripherals.GPIO0;
 //!
 //! let mut ledc = Ledc::new(peripherals.LEDC);
@@ -48,7 +49,7 @@
 //! channel0.configure(channel::config::Config {
 //!     timer: &lstimer0,
 //!     duty_pct: 10,
-//!     pin_config: channel::config::PinConfig::PushPull,
+//!     drive_mode: DriveMode::PushPull,
 //! })?;
 //!
 //! loop {

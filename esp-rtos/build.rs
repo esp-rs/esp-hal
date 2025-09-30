@@ -20,6 +20,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("cargo:rustc-env=ESP_HAL_CONFIG_STACK_GUARD_VALUE=3740121773");
     }
 
+    // Emit the default stack guard offset if not set by the user.
+    if std::env::var("ESP_HAL_CONFIG_STACK_GUARD_OFFSET").is_err() {
+        println!("cargo:rustc-env=ESP_HAL_CONFIG_STACK_GUARD_OFFSET=60");
+    }
+
     let debug_build = ["0", "1"];
     println!("cargo:rustc-check-cfg=cfg(debug_build)");
     if let Ok(level) = std::env::var("OPT_LEVEL")

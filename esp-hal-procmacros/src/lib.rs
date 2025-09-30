@@ -22,8 +22,9 @@
 //!    sections, such as SRAM or RTC RAM (slow or fast) with different initialization options. See
 //!    its documentation for details.
 //!
-//!  - [`embassy::main`](macro@embassy_main) - Creates a new `executor` instance and declares an
-//!    application entry point spawning the corresponding function body as an async task.
+//!  - [`esp_rtos::main`](macro@rtos_main) - Creates a new instance of `esp_rtos::embassy::Executor`
+//!    and declares an application entry point spawning the corresponding function body as an async
+//!    task.
 //!
 //! ## Examples
 //!
