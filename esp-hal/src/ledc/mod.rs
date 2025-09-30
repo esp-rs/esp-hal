@@ -49,7 +49,7 @@
 //! channel0.configure(channel::config::Config {
 //!     timer: &lstimer0,
 //!     duty_pct: 10,
-//!     drive_mode: DriveMode,
+//!     drive_mode: DriveMode::PushPull,
 //! })?;
 //!
 //! loop {
