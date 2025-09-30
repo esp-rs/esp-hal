@@ -76,6 +76,7 @@ pub enum Number {
 /// Channel configuration
 pub mod config {
     use crate::ledc::timer::{TimerIFace, TimerSpeed};
+    use crate::ledc::channel::DriveMode;
 
     #[derive(Debug, Clone, Copy, PartialEq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -85,6 +86,15 @@ pub mod config {
         PushPull,
         /// Open-drain pin configuration.
         OpenDrain,
+    }
+
+    impl Into<DriveMode> for PinConfig {
+        fn into(self) -> DriveMode {
+            match self {
+                PinConfig::PushPull => DriveMode::PushPull,
+                PinConfig::OpenDrain => DriveMode::OpenDrain,
+            }
+        }
     }
 
     /// Channel configuration
@@ -560,14 +570,8 @@ where
                 return Err(Error::Timer);
             }
 
-            // TODO this is unnecessary
-            let drive_mode = match cfg {
-                config::PinConfig::PushPull => DriveMode::PushPull,
-                config::PinConfig::OpenDrain => DriveMode::OpenDrain,
-            };
-
             self.output_pin
-                .apply_output_config(&OutputConfig::default().with_drive_mode(drive_mode));
+                .apply_output_config(&OutputConfig::default().with_drive_mode(cfg.into()));
             self.output_pin.set_output_enable(true);
 
             let timer_number = timer.number() as u8;
