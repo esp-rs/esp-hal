@@ -1,0 +1,77 @@
+name: API Baseline Management
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: "Branch to generate baseline from"
+        required: true
+        default: "main"
+        type: string
+      baseline_version:
+        description: "Baseline version (e.g., 1.0.0-beta.1)"
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  generate-baseline:
+    runs-on: macos-m1-self-hosted
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.source_branch }}
+
+      # Install the Rust toolchain for Xtensa devices:
+      - uses: esp-rs/xtensa-toolchain@v1.6
+        with:
+          version: 1.89.0.0
+
+      # Install the Rust stable toolchain for RISC-V devices:
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: stable
+          components: rust-src
+
+      - name: Generate API baselines
+        shell: bash
+        run: |
+          echo "Generating baselines from branch: ${{ github.event.inputs.source_branch }}"
+          cargo xtask semver-check generate-baseline
+
+      - name: Upload API baselines as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-baselines-${{ github.event.inputs.baseline_version }}
+          path: esp-hal/api-baseline/
+          retention-days: 90 # Maximum for public repos
+
+      - name: Create baseline summary
+        shell: bash
+        run: |
+          echo "✅ Successfully generated and uploaded API baselines"
+          echo "📦 Artifact name: api-baselines-${{ github.event.inputs.baseline_version }}"
+          echo "📅 Retention: 90 days (expires on $(date -d '+90 days' '+%Y-%m-%d'))"
+          echo "🌿 Source branch: ${{ github.event.inputs.source_branch }}"
+          echo "📝 Commit: ${{ github.sha }}"
+
+          echo "## Baseline Files Generated:" >> $GITHUB_STEP_SUMMARY
+          echo "| Chip | File Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-----------|" >> $GITHUB_STEP_SUMMARY
+
+          cd esp-hal/api-baseline
+          for file in *.json.gz; do
+              if [ -f "$file" ]; then
+                  chip=$(basename "$file" .json.gz)
+                  size=$(du -h "$file" | cut -f1)
+                  echo "| $chip | $size |" >> $GITHUB_STEP_SUMMARY
+              fi
+          done

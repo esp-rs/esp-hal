@@ -26,3 +26,6 @@ docs/
 
 # Ignore the generated release plan
 release_plan.jsonc
+
+# Ignore downloaded API baselines
+**/api-baseline/
