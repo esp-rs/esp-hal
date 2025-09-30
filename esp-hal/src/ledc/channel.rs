@@ -75,8 +75,10 @@ pub enum Number {
 
 /// Channel configuration
 pub mod config {
-    use crate::ledc::timer::{TimerIFace, TimerSpeed};
-    use crate::ledc::channel::DriveMode;
+    use crate::ledc::{
+        channel::DriveMode,
+        timer::{TimerIFace, TimerSpeed},
+    };
 
     #[derive(Debug, Clone, Copy, PartialEq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
