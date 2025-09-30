@@ -342,14 +342,18 @@ impl<'d> CpuControl<'d> {
         F: FnOnce(),
         F: Send + 'a,
     {
-        self.start_app_core_with_stack_guard_offset(
-            stack,
-            Some(esp_config::esp_config_int!(
-                usize,
-                "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"
-            )),
-            entry,
-        )
+        cfg_if::cfg_if! {
+            if #[cfg(all(stack_guard_monitoring))] {
+                let stack_guard_offset = Some(esp_config::esp_config_int!(
+                    usize,
+                    "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"
+                ));
+            } else {
+                let stack_guard_offset = None;
+            }
+        };
+
+        self.start_app_core_with_stack_guard_offset(stack, stack_guard_offset, entry)
     }
 
     /// Start the APP (second) core.
