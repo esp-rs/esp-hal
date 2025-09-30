@@ -75,17 +75,10 @@ pub enum Number {
 
 /// Channel configuration
 pub mod config {
-    use crate::ledc::timer::{TimerIFace, TimerSpeed};
-
-    #[derive(Debug, Clone, Copy, PartialEq)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    /// Pin configuration for the LEDC channel.
-    pub enum PinConfig {
-        /// Push-pull pin configuration.
-        PushPull,
-        /// Open-drain pin configuration.
-        OpenDrain,
-    }
+    use crate::{
+        gpio::DriveMode,
+        ledc::timer::{TimerIFace, TimerSpeed},
+    };
 
     /// Channel configuration
     #[derive(Copy, Clone)]
@@ -95,7 +88,7 @@ pub mod config {
         /// The duty cycle percentage (0-100).
         pub duty_pct: u8,
         /// The pin configuration (PushPull or OpenDrain).
-        pub pin_config: PinConfig,
+        pub drive_mode: DriveMode,
     }
 }
 
@@ -129,7 +122,7 @@ pub trait ChannelHW {
     fn configure_hw(&mut self) -> Result<(), Error>;
     /// Configure the hardware for the channel with a specific pin
     /// configuration.
-    fn configure_hw_with_pin_config(&mut self, cfg: config::PinConfig) -> Result<(), Error>;
+    fn configure_hw_with_drive_mode(&mut self, cfg: DriveMode) -> Result<(), Error>;
 
     /// Set channel duty HW
     fn set_duty_hw(&self, duty: u32);
@@ -178,7 +171,7 @@ where
         self.timer = Some(config.timer);
 
         self.set_duty(config.duty_pct)?;
-        self.configure_hw_with_pin_config(config.pin_config)?;
+        self.configure_hw_with_drive_mode(config.drive_mode)?;
 
         Ok(())
     }
@@ -552,22 +545,16 @@ where
 {
     /// Configure Channel HW
     fn configure_hw(&mut self) -> Result<(), Error> {
-        self.configure_hw_with_pin_config(config::PinConfig::PushPull)
+        self.configure_hw_with_drive_mode(DriveMode::PushPull)
     }
-    fn configure_hw_with_pin_config(&mut self, cfg: config::PinConfig) -> Result<(), Error> {
+    fn configure_hw_with_drive_mode(&mut self, cfg: DriveMode) -> Result<(), Error> {
         if let Some(timer) = self.timer {
             if !timer.is_configured() {
                 return Err(Error::Timer);
             }
 
-            // TODO this is unnecessary
-            let drive_mode = match cfg {
-                config::PinConfig::PushPull => DriveMode::PushPull,
-                config::PinConfig::OpenDrain => DriveMode::OpenDrain,
-            };
-
             self.output_pin
-                .apply_output_config(&OutputConfig::default().with_drive_mode(drive_mode));
+                .apply_output_config(&OutputConfig::default().with_drive_mode(cfg));
             self.output_pin.set_output_enable(true);
 
             let timer_number = timer.number() as u8;
