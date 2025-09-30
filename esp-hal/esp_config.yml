@@ -192,6 +192,5 @@ options:
           - '8'
   active: 'chip == "esp32s3"'
 
-# TODO somni doesn't yet support `%` and evalexpr doesn't support `&`
-#checks:
-#  - "ESP_HAL_CONFIG_STACK_GUARD_OFFSET & 3 == 0"
+checks:
+  - "ESP_HAL_CONFIG_STACK_GUARD_OFFSET % 4 == 0"
