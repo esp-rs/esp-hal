@@ -432,7 +432,6 @@ mod tests {
             unsafe {
                 &mut APP_CORE_STACK
             },
-            None,
             || {},
         );
 
@@ -532,7 +531,6 @@ mod tests {
             unsafe {
                 &mut APP_CORE_STACK
             },
-            None,
             || {
                 preempt::usleep(10);
 

@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - I2S: `i2s::master::Config` with support for more TDM mode standards (#3985)
 - ESP32: support outputting the main I2S clock signal (#4128)
 - The ESP_HAL_CONFIG_STACK_GUARD_MONITORING (enabled by default) enables a data watchpoint on the stack guard value to protect the main stack (#4207)
+- `start_app_core_with_stack_guard_offset` (#4207)
 
 ### Changed
 
@@ -64,7 +65,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RtcClock`, `RtcFastClock`, and `RtcSlowClock` moved to `clock` module (#4089)
 - Resolved enum variant naming violations in `RtcFastClock` and `RtcSlowClock` enums (#4089)
 - The `rmt::Channel::transmit_continuously` and `rmt::Channel::transmit_continuously_with_loopcount` methods have been merged (#4100)
-- `start_app_core` takes an additional `Option` to enable stack monitoring (#4207)
 
 ### Fixed
 

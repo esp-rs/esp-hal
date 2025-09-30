@@ -336,6 +336,32 @@ impl<'d> CpuControl<'d> {
     pub fn start_app_core<'a, const SIZE: usize, F>(
         &mut self,
         stack: &'static mut Stack<SIZE>,
+        entry: F,
+    ) -> Result<AppCoreGuard<'a>, Error>
+    where
+        F: FnOnce(),
+        F: Send + 'a,
+    {
+        self.start_app_core_with_stack_guard_offset(
+            stack,
+            Some(esp_config::esp_config_int!(
+                usize,
+                "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"
+            )),
+            entry,
+        )
+    }
+
+    /// Start the APP (second) core.
+    ///
+    /// The second core will start running the closure `entry`. Note that if the
+    /// closure exits, the core will be parked.
+    ///
+    /// Dropping the returned guard will park the core.
+    #[instability::unstable]
+    pub fn start_app_core_with_stack_guard_offset<'a, const SIZE: usize, F>(
+        &mut self,
+        stack: &'static mut Stack<SIZE>,
         stack_guard_offset: Option<usize>,
         entry: F,
     ) -> Result<AppCoreGuard<'a>, Error>
@@ -376,6 +402,7 @@ impl<'d> CpuControl<'d> {
             APP_CORE_STACK_TOP.store(stack.top(), Ordering::Release);
             let stack_guard = if let Some(stack_guard_offset) = stack_guard_offset {
                 assert!(stack_guard_offset.is_multiple_of(4));
+                assert!(stack_guard_offset <= stack.len() - 4);
                 stack_bottom.byte_add(stack_guard_offset)
             } else {
                 core::ptr::null_mut()

@@ -258,6 +258,34 @@ pub fn start_second_core<const STACK_SIZE: usize>(
     #[cfg(xtensa)] int0: SoftwareInterrupt<'static, 0>,
     int1: SoftwareInterrupt<'static, 1>,
     stack: &'static mut Stack<STACK_SIZE>,
+    func: impl FnOnce() + Send + 'static,
+) {
+    start_second_core_with_stack_guard_offset::<STACK_SIZE>(
+        cpu_control,
+        #[cfg(xtensa)]
+        int0,
+        int1,
+        stack,
+        Some(esp_config::esp_config_int!(
+            usize,
+            "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"
+        )),
+        func,
+    );
+}
+
+/// Starts the scheduler on the second CPU core.
+///
+/// Note that the scheduler must be started first, before starting the second core.
+///
+/// The supplied stack and function will be used as the main thread of the second core. The thread
+/// will be pinned to the second core.
+#[cfg(multi_core)]
+pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
+    cpu_control: CPU_CTRL,
+    #[cfg(xtensa)] int0: SoftwareInterrupt<'static, 0>,
+    int1: SoftwareInterrupt<'static, 1>,
+    stack: &'static mut Stack<STACK_SIZE>,
     stack_guard_offset: Option<usize>,
     func: impl FnOnce() + Send + 'static,
 ) {
@@ -279,7 +307,7 @@ pub fn start_second_core<const STACK_SIZE: usize>(
 
     let mut cpu_control = CpuControl::new(cpu_control);
     let guard = cpu_control
-        .start_app_core(stack, stack_guard_offset, move || {
+        .start_app_core_with_stack_guard_offset(stack, stack_guard_offset, move || {
             trace!("Second core running");
             task::setup_smp(int1);
             SCHEDULER.with(move |scheduler| {

@@ -74,7 +74,6 @@ async fn main(_spawner: Spawner) {
         sw_int.software_interrupt0,
         sw_int.software_interrupt1,
         app_core_stack,
-        Some(1024),
         move || {
             static EXECUTOR: StaticCell<Executor> = StaticCell::new();
             let executor = EXECUTOR.init(Executor::new());

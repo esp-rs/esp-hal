@@ -260,7 +260,6 @@ mod test {
             sw_int.software_interrupt0,
             sw_int.software_interrupt1,
             app_core_stack,
-            None,
             || {
                 use esp_hal::interrupt::Priority;
                 let software_interrupt = sw_int.software_interrupt2;
