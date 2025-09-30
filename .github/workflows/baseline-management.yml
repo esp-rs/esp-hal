@@ -8,18 +8,20 @@ on:
         required: true
         default: "main"
         type: string
-      baseline_version:
-        description: "Baseline version (e.g., 1.0.0-beta.1)"
-        required: true
+      target_repository:
+        description: "Target repository for baseline storage (owner/repo)"
+        required: false
+        default: ""
         type: string
 
 env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GITHUB_REPOSITORY: ${{ github.repository }}
 
 jobs:
   generate-baseline:
-    runs-on: macos-m1-self-hosted
+    runs-on: ubuntu-latest
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
 
@@ -29,6 +31,18 @@ jobs:
         with:
           ref: ${{ github.event.inputs.source_branch }}
 
+      - name: Set target repository
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.target_repository }}" ]; then
+            TARGET_REPO="${{ github.event.inputs.target_repository }}"
+            echo "Using custom target repository: $TARGET_REPO"
+          else
+            TARGET_REPO="${{ github.repository }}"
+            echo "Using current repository: $TARGET_REPO"
+          fi
+          echo "GITHUB_REPOSITORY=$TARGET_REPO" >> $GITHUB_ENV
+          echo "📦 Target repository for baselines: $TARGET_REPO"
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
         with:
@@ -45,12 +59,12 @@ jobs:
         shell: bash
         run: |
           echo "Generating baselines from branch: ${{ github.event.inputs.source_branch }}"
-          cargo xtask semver-check generate-baseline
+          cargo xcheck semver-check generate-baseline
 
       - name: Upload API baselines as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: api-baselines-${{ github.event.inputs.baseline_version }}
+          name: api-baselines
           path: esp-hal/api-baseline/
           retention-days: 90 # Maximum for public repos
 
@@ -58,12 +72,20 @@ jobs:
         shell: bash
         run: |
           echo "✅ Successfully generated and uploaded API baselines"
-          echo "📦 Artifact name: api-baselines-${{ github.event.inputs.baseline_version }}"
+          echo "📦 Artifact name: api-baselines"
           echo "📅 Retention: 90 days (expires on $(date -d '+90 days' '+%Y-%m-%d'))"
           echo "🌿 Source branch: ${{ github.event.inputs.source_branch }}"
           echo "📝 Commit: ${{ github.sha }}"
+          echo "🏠 Target repository: $GITHUB_REPOSITORY"
 
-          echo "## Baseline Files Generated:" >> $GITHUB_STEP_SUMMARY
+          echo "## 📋 Baseline Generation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target Repository**: \`$GITHUB_REPOSITORY\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source Branch**: \`${{ github.event.inputs.source_branch }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifact Name**: \`api-baselines\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Retention**: 90 days (expires $(date -d '+90 days' '+%Y-%m-%d'))" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔧 Baseline Files Generated" >> $GITHUB_STEP_SUMMARY
           echo "| Chip | File Size |" >> $GITHUB_STEP_SUMMARY
           echo "|------|-----------|" >> $GITHUB_STEP_SUMMARY
 

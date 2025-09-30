@@ -82,12 +82,11 @@ jobs:
           cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
-
       - name: Semver-Check
         shell: bash
         # always invokes +esp internally
         run: |
-          cargo xtask semver-check download-baselines
+          cargo xcheck semver-check download-baselines
           cargo xcheck semver-check --chips esp32 check
           cargo xcheck semver-check --chips esp32s2 check
           cargo xcheck semver-check --chips esp32s3 check

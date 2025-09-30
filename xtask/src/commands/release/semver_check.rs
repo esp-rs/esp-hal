@@ -184,15 +184,9 @@ pub mod checker {
     }
 
     /// Download API baselines from GitHub Actions artifacts for the specified packages.
+    /// Fails with helpful error message if baselines are not available.
     pub fn download_baselines(workspace: &Path, packages: Vec<Package>) -> anyhow::Result<()> {
-        use std::process::Command;
-
         for package in packages {
-            if !package.is_semver_checked() {
-                log::info!("Skipping {package} - not semver checked");
-                continue;
-            }
-
             log::info!("Downloading API baselines for {package}");
 
             let package_name = package.to_string();
@@ -204,15 +198,9 @@ pub mod checker {
                 std::fs::remove_dir_all(&baseline_dir)?;
             }
 
-            // Get the package version to determine which baseline to download
-            let version = crate::package_version(workspace, package)?;
-
             // Try to download from GitHub Actions artifacts
             // Note: Artifacts have a 90-day retention limit for public repositories
-            let baseline_sources = vec![
-                BaselineSource::Artifact(format!("api-baselines-{version}")),
-                BaselineSource::Artifact("api-baselines-latest".to_string()),
-            ];
+            let baseline_sources = vec![BaselineSource::Artifact("api-baselines".to_string())];
 
             let mut downloaded = false;
             for baseline_source in baseline_sources {
@@ -221,9 +209,11 @@ pub mod checker {
                         log::info!(
                             "Attempting to download from GitHub Actions artifact: {artifact_name}"
                         );
-                        if try_download_from_artifact(&package_path, artifact_name)? {
+                        let repo = std::env::var("GITHUB_REPOSITORY")
+                            .unwrap_or_else(|_| "esp-rs/esp-hal".to_string());
+                        if try_download_from_artifact(&package_path, artifact_name, &repo)? {
                             log::info!(
-                                "✅ Successfully downloaded baselines from artifact {artifact_name}"
+                                "Successfully downloaded baselines from artifact {artifact_name}"
                             );
                             downloaded = true;
                             break;
@@ -233,9 +223,7 @@ pub mod checker {
             }
 
             if !downloaded {
-                return Err(anyhow::anyhow!(
-                    "Failed to download baselines for {package}. Tried sources: {baseline_sources:?}"
-                ));
+                return Err(anyhow::anyhow!("No API baselines found for {package}!"));
             }
 
             // Verify that baselines were extracted correctly
@@ -267,8 +255,7 @@ pub mod checker {
 
             log::info!(
                 "Found {} baseline files for {package}",
-                baseline_files.len(),
-                package
+                baseline_files.len()
             );
         }
 
@@ -279,15 +266,85 @@ pub mod checker {
     fn try_download_from_artifact(
         package_path: &PathBuf,
         artifact_name: &str,
+        repo: &str,
     ) -> anyhow::Result<bool> {
         use std::process::Command;
 
+        // Check if GitHub CLI is available
+        let gh_check = Command::new("gh").arg("--version").output();
+        if gh_check.is_err() {
+            log::debug!("GitHub CLI (gh) not available, skipping artifact download");
+            return Ok(false);
+        }
+
+        // Check if we're in a GitHub Actions environment (or allow override for testing)
+        if std::env::var("GITHUB_ACTIONS").is_err() && std::env::var("GITHUB_REPOSITORY").is_err() {
+            log::debug!(
+                "Not in GitHub Actions environment and no GITHUB_REPOSITORY set, skipping artifact download"
+            );
+            return Ok(false);
+        }
+
         // GitHub CLI can download artifacts from recent workflow runs
-        // This requires the artifact to still be available (within retention period)
+        log::debug!("Attempting to download artifact: {artifact_name} from {repo}");
+
+        // First, find the most recent successful workflow run that has our artifact
+        let list_output = Command::new("gh")
+            .args([
+                "run",
+                "list",
+                "--repo",
+                repo,
+                "--status",
+                "success",
+                "--limit",
+                "10",
+                "--json",
+                "databaseId,workflowName,conclusion",
+            ])
+            .output();
+
+        let run_id = match list_output {
+            Ok(result) if result.status.success() => {
+                let runs_json = String::from_utf8_lossy(&result.stdout);
+                log::debug!("Available runs: {}", runs_json);
+
+                // Parse JSON to find a run with our artifact
+                // For now, try the most recent successful run
+                if let Ok(runs) = serde_json::from_str::<serde_json::Value>(&runs_json) {
+                    if let Some(runs_array) = runs.as_array() {
+                        if let Some(first_run) = runs_array.first() {
+                            if let Some(id) = first_run.get("databaseId").and_then(|v| v.as_u64()) {
+                                Some(id.to_string())
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+
+        let Some(run_id) = run_id else {
+            log::debug!("No successful workflow runs found");
+            return Ok(false);
+        };
+
+        log::debug!("Trying to download artifact from run ID: {run_id}");
         let output = Command::new("gh")
             .args([
                 "run",
                 "download",
+                &run_id,
+                "--repo",
+                repo,
                 "--name",
                 artifact_name,
                 "--dir",
@@ -298,12 +355,45 @@ pub mod checker {
         match output {
             Ok(result) if result.status.success() => {
                 log::debug!("Successfully downloaded artifact {artifact_name}");
+
+                // The artifact files are downloaded directly to the package directory
+                // We need to move them to the api-baseline subdirectory
+                let baseline_dir = package_path.join("api-baseline");
+                std::fs::create_dir_all(&baseline_dir)?;
+
+                // Move any .json.gz files from package_path to baseline_dir
+                if let Ok(entries) = std::fs::read_dir(package_path) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.extension().and_then(|s| s.to_str()) == Some("gz")
+                            && path
+                                .file_stem()
+                                .and_then(|s| s.to_str())
+                                .map(|s| s.ends_with(".json"))
+                                .unwrap_or(false)
+                        {
+                            let filename = path.file_name().unwrap();
+                            let dest = baseline_dir.join(filename);
+                            if let Err(e) = std::fs::rename(&path, &dest) {
+                                log::warn!(
+                                    "Failed to move {} to baseline directory: {}",
+                                    path.display(),
+                                    e
+                                );
+                            } else {
+                                log::debug!("Moved {} to {}", path.display(), dest.display());
+                            }
+                        }
+                    }
+                }
+
                 Ok(true)
             }
             Ok(result) => {
+                let stderr = String::from_utf8_lossy(&result.stderr);
+                let stdout = String::from_utf8_lossy(&result.stdout);
                 log::debug!(
-                    "Artifact {artifact_name} not available: {}",
-                    String::from_utf8_lossy(&result.stderr)
+                    "Artifact {artifact_name} not available. stdout: {stdout}, stderr: {stderr}"
                 );
                 Ok(false)
             }
