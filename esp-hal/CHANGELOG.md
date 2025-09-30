@@ -89,8 +89,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `i2s::master::Standard` has been removed (#3985)
 - `ledc::channel::PinConfig` has been removed and used `DriveMode` instead (#4214)
 - ESP32: removed integrated SPI-connected pins (6 to 11 both included) (#4202)
-- ESP32C2: removed pins 11 to 17 both included (#4202)
 - ESP32H2: removed pins 6 and 7 (#4202)
+- ESP32C3 and ESP32C2: removed pins 11 to 17 both included (#4202)
+- ESP32C6: removed pins 24, 25, 26, 28, 29 and 30 (#4202)
+- ESP32S2 and ESP32S3: removed pins 26 to 32 both included (#4202)
 
 ## [v1.0.0-rc.0] - 2025-07-16
 
