@@ -54,4 +54,10 @@ INCLUDE "metadata.x"
 INCLUDE "eh_frame.x"
 /* End of Shared sections */
 
-_dram_origin = ORIGIN( DRAM );
+#IF ESP_HAL_CONFIG_FLIP_LINK
+  _dram_data_start = ORIGIN( DRAM );
+#ELSE
+  _dram_data_start = ORIGIN( DRAM ) + SIZEOF(.trap) + SIZEOF(.rwtext);
+#ENDIF
+
+_rwtext_len = SIZEOF(.trap) + SIZEOF(.rwtext);

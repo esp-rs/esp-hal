@@ -14,10 +14,17 @@ SECTIONS {
     */
     . = . + LENGTH(RWDATA) -  (SIZEOF(.trap) + SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi) + SIZEOF(.data) + SIZEOF(.bss) + SIZEOF(.noinit) + SIZEOF(.data.wifi)) - 304;
 #ELSE
-    . = ORIGIN(RWDATA) + LENGTH(RWDATA);
+    /* minus some space for exception safe data */
+    . = ORIGIN(RWDATA) + LENGTH(RWDATA) - 32;
 #ENDIF
     . = ALIGN (4);
     _stack_start = ABSOLUTE(.);
     _stack_start_cpu0 = ABSOLUTE(.);
+  } > RWDATA
+
+  /* a very small section to place data which needs to stay healthy for exception handling */
+  .critical_data : ALIGN(4)
+  {
+    *(.critical_data .critical_data.*)
   } > RWDATA
 }
