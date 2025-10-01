@@ -624,28 +624,48 @@ mod tests {
             .with_idle_output(true);
         let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
 
-        let (mut tx_channel, mut rx_channel) = ctx.setup_loopback(tx_config, rx_config);
-
         let tx_data: [_; TX_LEN] = generate_tx_data(true);
         let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
 
+        // Test that dropping & recreating Rmt works
         for _ in 0..3 {
-            rcv_data.fill(PulseCode::default());
-            let mut rx_transaction = rx_channel.reborrow().receive(&mut rcv_data).unwrap();
-            let mut tx_transaction = tx_channel.reborrow().transmit(&tx_data).unwrap();
+            let mut rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap();
 
-            loop {
-                let tx_done = tx_transaction.poll();
-                let rx_done = rx_transaction.poll();
-                if tx_done && rx_done {
-                    break;
+            // Test that dropping & recreating ChannelCreator works
+            for _ in 0..3 {
+                let (rx, tx) = pins!(ctx);
+
+                let mut tx_channel = rmt
+                    .channel0
+                    .reborrow()
+                    .configure_tx(tx, tx_config.with_clk_divider(DIV))
+                    .unwrap();
+
+                let mut rx_channel = rx_channel_creator!(rmt)
+                    .reborrow()
+                    .configure_rx(rx, rx_config.with_clk_divider(DIV))
+                    .unwrap();
+
+                // Test that dropping & recreating Channel works
+                for _ in 0..3 {
+                    rcv_data.fill(PulseCode::default());
+                    let mut rx_transaction = rx_channel.reborrow().receive(&mut rcv_data).unwrap();
+                    let mut tx_transaction = tx_channel.reborrow().transmit(&tx_data).unwrap();
+
+                    loop {
+                        let tx_done = tx_transaction.poll();
+                        let rx_done = rx_transaction.poll();
+                        if tx_done && rx_done {
+                            break;
+                        }
+                    }
+
+                    tx_transaction.wait().unwrap();
+                    rx_transaction.wait().unwrap();
+
+                    check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
                 }
             }
-
-            tx_transaction.wait().unwrap();
-            rx_transaction.wait().unwrap();
-
-            check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
         }
     }
 
@@ -712,23 +732,43 @@ mod tests {
             .with_idle_output(true);
         let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
 
-        let (mut tx_channel, mut rx_channel) = ctx.setup_loopback_async(tx_config, rx_config);
-
         let tx_data: [_; TX_LEN] = generate_tx_data(true);
         let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
 
+        // Test that dropping & recreating Rmt works
         for _ in 0..3 {
-            rcv_data.fill(PulseCode::default());
-            let (rx_res, tx_res) = embassy_futures::join::join(
-                rx_channel.receive(&mut rcv_data),
-                tx_channel.transmit(&tx_data),
-            )
-            .await;
+            let mut rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap().into_async();
 
-            tx_res.unwrap();
-            rx_res.unwrap();
+            // Test that dropping & recreating ChannelCreator works
+            for _ in 0..3 {
+                let (rx, tx) = pins!(ctx);
 
-            check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
+                let mut tx_channel = rmt
+                    .channel0
+                    .reborrow()
+                    .configure_tx(tx, tx_config.with_clk_divider(DIV))
+                    .unwrap();
+
+                let mut rx_channel = rx_channel_creator!(rmt)
+                    .reborrow()
+                    .configure_rx(rx, rx_config.with_clk_divider(DIV))
+                    .unwrap();
+
+                // Test that dropping & recreating Channel works
+                for _ in 0..3 {
+                    rcv_data.fill(PulseCode::default());
+                    let (rx_res, tx_res) = embassy_futures::join::join(
+                        rx_channel.receive(&mut rcv_data),
+                        tx_channel.transmit(&tx_data),
+                    )
+                    .await;
+
+                    tx_res.unwrap();
+                    rx_res.unwrap();
+
+                    check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
+                }
+            }
         }
     }
 }
