@@ -131,25 +131,45 @@ fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], tx_len: usize, tolerance: u
 fn do_rmt_loopback_inner<const TX_LEN: usize>(
     tx_channel: Channel<Blocking, Tx>,
     rx_channel: Channel<Blocking, Rx>,
+    abort: bool,
 ) {
     let tx_data: [_; TX_LEN] = generate_tx_data(true);
     let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
 
+    // Start the transactions...
     let mut rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
     let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
 
-    loop {
-        let tx_done = tx_transaction.poll();
+    if abort {
+        Delay::new().delay_millis(2);
+
+        // ...poll them for a while, but then drop them...
+        // (`poll_once` takes the future by value and drops it before returning)
         let rx_done = rx_transaction.poll();
-        if tx_done && rx_done {
-            break;
+        let tx_done = tx_transaction.poll();
+
+        // Drop the transactions
+        core::mem::drop(rx_transaction);
+        core::mem::drop(tx_transaction);
+
+        // The test should fail here when the the delay above is increased, e.g. to 100ms.
+        assert!(!rx_done);
+        assert!(!tx_done);
+    } else {
+        // ... poll them until completion.
+        loop {
+            let tx_done = tx_transaction.poll();
+            let rx_done = rx_transaction.poll();
+            if tx_done && rx_done {
+                break;
+            }
         }
+
+        tx_transaction.wait().unwrap();
+        rx_transaction.wait().unwrap();
+
+        check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
     }
-
-    tx_transaction.wait().unwrap();
-    rx_transaction.wait().unwrap();
-
-    check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
 }
 
 // Run a test where some data is sent from one channel and looped back to
@@ -162,7 +182,43 @@ fn do_rmt_loopback<const TX_LEN: usize>(ctx: &mut Context, tx_memsize: u8, rx_me
 
     let (tx_channel, rx_channel) = ctx.setup_loopback(tx_config, rx_config);
 
-    do_rmt_loopback_inner::<TX_LEN>(tx_channel, rx_channel);
+    do_rmt_loopback_inner::<TX_LEN>(tx_channel, rx_channel, false);
+}
+
+async fn do_rmt_loopback_async_inner<const TX_LEN: usize>(
+    tx_channel: &mut Channel<'_, Async, Tx>,
+    rx_channel: &mut Channel<'_, Async, Rx>,
+    abort: bool,
+) {
+    use embassy_time::Delay;
+    use embedded_hal_async::delay::DelayNs;
+
+    let tx_data: [_; TX_LEN] = generate_tx_data(true);
+    let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
+
+    // Start the transactions...
+    let rx_fut = rx_channel.receive(&mut rcv_data);
+    let tx_fut = tx_channel.transmit(&tx_data);
+
+    if abort {
+        Delay.delay_ms(2).await;
+
+        // ...poll them, but then drop them before completion...
+        // (`poll_once` takes the future by value and drops it before returning)
+        let rx_poll = embassy_futures::poll_once(rx_fut);
+        let tx_poll = embassy_futures::poll_once(tx_fut);
+
+        // The test should fail here when the the delay above is increased, e.g. to 100ms.
+        assert!(rx_poll.is_pending());
+        assert!(tx_poll.is_pending());
+    } else {
+        let (rx_res, tx_res) = embassy_futures::join::join(rx_fut, tx_fut).await;
+
+        tx_res.unwrap();
+        rx_res.unwrap();
+
+        check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
+    }
 }
 
 // Run a test where some data is sent from one channel and looped back to
@@ -179,19 +235,7 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(
 
     let (mut tx_channel, mut rx_channel) = ctx.setup_loopback_async(tx_config, rx_config);
 
-    let tx_data: [_; TX_LEN] = generate_tx_data(true);
-    let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
-
-    let (rx_res, tx_res) = embassy_futures::join::join(
-        rx_channel.receive(&mut rcv_data),
-        tx_channel.transmit(&tx_data),
-    )
-    .await;
-
-    tx_res.unwrap();
-    rx_res.unwrap();
-
-    check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
+    do_rmt_loopback_async_inner::<TX_LEN>(&mut tx_channel, &mut rx_channel, false).await
 }
 
 // Run a test that just sends some data, without trying to recive it.
@@ -349,7 +393,7 @@ mod tests {
 
     #[test]
     fn rmt_single_shot_wrap(ctx: Context) {
-        // Single RAM block (48 or 64 codes), requires wrapping
+        // Single RAM block (48 or 64 codes), requires wrappin, falseg
         do_rmt_single_shot::<80>(ctx, 1, true).unwrap();
     }
 
@@ -428,7 +472,7 @@ mod tests {
                 .configure_rx(rx_pin, rx_config)
                 .unwrap();
 
-            do_rmt_loopback_inner::<20>(tx_channel, rx_channel);
+            do_rmt_loopback_inner::<20>(tx_channel, rx_channel, false);
         }};
     }
 
@@ -566,66 +610,26 @@ mod tests {
 
         let tx_config = TxChannelConfig::default()
             // If not enabling a defined idle_output level, the output might remain high after
-            // dropping the tx future, which will lead to an extra edge being received.
+            // dropping the tx transaction, which will lead to an extra edge being received.
             .with_idle_output(true);
         let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
 
         let (mut tx_channel, mut rx_channel) = ctx.setup_loopback(tx_config, rx_config);
 
-        let tx_data: [_; TX_LEN] = generate_tx_data(true);
-        let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
+        do_rmt_loopback_inner::<TX_LEN>(tx_channel.reborrow(), rx_channel.reborrow(), true);
 
-        // Start the transactions...
-        let mut rx_transaction = rx_channel.reborrow().receive(&mut rcv_data).unwrap();
-        let mut tx_transaction = tx_channel.reborrow().transmit(&tx_data).unwrap();
-
-        Delay::new().delay_millis(2);
-
-        // ...poll them for a while, but then drop them...
-        // (`poll_once` takes the future by value and drops it before returning)
-        let rx_done = rx_transaction.poll();
-        let tx_done = tx_transaction.poll();
-
-        // The test should fail here when the the delay above is increased, e.g. to 100ms.
-        assert!(!rx_done);
-        assert!(!tx_done);
-
-        // Removing these lines should fail to compile!
-        core::mem::drop(rx_transaction);
-        core::mem::drop(tx_transaction);
-
-        rcv_data.fill(PulseCode::default());
-        let mut rx_transaction = rx_channel.reborrow().receive(&mut rcv_data).unwrap();
-        let mut tx_transaction = tx_channel.reborrow().transmit(&tx_data).unwrap();
-
-        loop {
-            let tx_done = tx_transaction.poll();
-            let rx_done = rx_transaction.poll();
-            if tx_done && rx_done {
-                break;
-            }
-        }
-
-        tx_transaction.wait().unwrap();
-        rx_transaction.wait().unwrap();
-
-        check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
+        do_rmt_loopback_inner::<TX_LEN>(tx_channel, rx_channel, false);
     }
 
     // Test that completed blocking transactions leave the hardware in a predictable state from
     // which subsequent transactions are successful.
     #[test]
     fn rmt_loopback_repeat_blocking(mut ctx: Context) {
-        const TX_LEN: usize = 20;
-
         let tx_config = TxChannelConfig::default()
             // If not enabling a defined idle_output level, the output might remain high after
             // dropping the tx future, which will lead to an extra edge being received.
             .with_idle_output(true);
         let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
-
-        let tx_data: [_; TX_LEN] = generate_tx_data(true);
-        let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
 
         // Test that dropping & recreating Rmt works
         for _ in 0..3 {
@@ -648,22 +652,11 @@ mod tests {
 
                 // Test that dropping & recreating Channel works
                 for _ in 0..3 {
-                    rcv_data.fill(PulseCode::default());
-                    let mut rx_transaction = rx_channel.reborrow().receive(&mut rcv_data).unwrap();
-                    let mut tx_transaction = tx_channel.reborrow().transmit(&tx_data).unwrap();
-
-                    loop {
-                        let tx_done = tx_transaction.poll();
-                        let rx_done = rx_transaction.poll();
-                        if tx_done && rx_done {
-                            break;
-                        }
-                    }
-
-                    tx_transaction.wait().unwrap();
-                    rx_transaction.wait().unwrap();
-
-                    check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
+                    do_rmt_loopback_inner::<20>(
+                        tx_channel.reborrow(),
+                        rx_channel.reborrow(),
+                        false,
+                    );
                 }
             }
         }
@@ -673,9 +666,6 @@ mod tests {
     // subsequent transactions are successful.
     #[test]
     async fn rmt_loopback_after_drop_async(mut ctx: Context) {
-        use embassy_time::Delay;
-        use embedded_hal_async::delay::DelayNs;
-
         const TX_LEN: usize = 40;
 
         let tx_config = TxChannelConfig::default()
@@ -686,54 +676,24 @@ mod tests {
 
         let (mut tx_channel, mut rx_channel) = ctx.setup_loopback_async(tx_config, rx_config);
 
-        let tx_data: [_; TX_LEN] = generate_tx_data(true);
-        let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
-
-        // Start the transactions...
-        let rx_fut = rx_channel.receive(&mut rcv_data);
-        let tx_fut = tx_channel.transmit(&tx_data);
-
-        Delay.delay_ms(2).await;
-
-        // ...poll them, but then drop them before completion...
-        // (`poll_once` takes the future by value and drops it before returning)
-        let rx_poll = embassy_futures::poll_once(rx_fut);
-        let tx_poll = embassy_futures::poll_once(tx_fut);
-
-        // The test should fail here when the the delay above is increased, e.g. to 100ms.
-        assert!(rx_poll.is_pending());
-        assert!(tx_poll.is_pending());
+        // Start loopback once, but abort before completion...
+        do_rmt_loopback_async_inner::<TX_LEN>(&mut tx_channel, &mut rx_channel, true).await;
 
         // ...then start over and check that everything still works as expected (i.e. we
         // didn't leave the hardware in an unexpected state or lock up when
         // dropping the futures).
-        rcv_data.fill(PulseCode::default());
-        let (rx_res, tx_res) = embassy_futures::join::join(
-            rx_channel.receive(&mut rcv_data),
-            tx_channel.transmit(&tx_data),
-        )
-        .await;
-
-        tx_res.unwrap();
-        rx_res.unwrap();
-
-        check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
+        do_rmt_loopback_async_inner::<TX_LEN>(&mut tx_channel, &mut rx_channel, false).await;
     }
 
     // Test that completed async transactions leave the hardware in a predictable state from which
     // subsequent transactions are successful.
     #[test]
     async fn rmt_loopback_repeat_async(mut ctx: Context) {
-        const TX_LEN: usize = 40;
-
         let tx_config = TxChannelConfig::default()
             // If not enabling a defined idle_output level, the output might remain high after
             // dropping the tx future, which will lead to an extra edge being received.
             .with_idle_output(true);
         let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
-
-        let tx_data: [_; TX_LEN] = generate_tx_data(true);
-        let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
 
         // Test that dropping & recreating Rmt works
         for _ in 0..3 {
@@ -756,17 +716,8 @@ mod tests {
 
                 // Test that dropping & recreating Channel works
                 for _ in 0..3 {
-                    rcv_data.fill(PulseCode::default());
-                    let (rx_res, tx_res) = embassy_futures::join::join(
-                        rx_channel.receive(&mut rcv_data),
-                        tx_channel.transmit(&tx_data),
-                    )
-                    .await;
-
-                    tx_res.unwrap();
-                    rx_res.unwrap();
-
-                    check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
+                    do_rmt_loopback_async_inner::<20>(&mut tx_channel, &mut rx_channel, false)
+                        .await;
                 }
             }
         }
