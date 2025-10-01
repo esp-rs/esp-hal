@@ -1,5 +1,4 @@
 use std::{
-    fs,
     path::{Path, PathBuf},
     process::Command,
     time::Instant,
@@ -219,9 +218,7 @@ fn main() -> Result<()> {
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
         Cli::UpdateMetadata(args) => update_metadata(&workspace, args.check),
         Cli::HostTests(args) => host_tests(&workspace, args),
-        Cli::CheckGlobalSymbols(args) => {
-            check_global_symbols(&workspace, args.packages[0], &args.chips)
-        }
+        Cli::CheckGlobalSymbols(args) => check_global_symbols(&args.chips),
     }
 }
 
@@ -736,7 +733,7 @@ fn host_tests(workspace: &Path, args: HostTestsArgs) -> Result<()> {
 /// Build the given package for the given chip and return its `.rlib path` with `esp` toolchain.
 fn build_rlib(package: &str, chip: &str, target: &str) -> Result<PathBuf> {
     let workspace = std::env::current_dir().with_context(|| "Failed to get the current dir!")?;
-    let cmd = Command::new("cargo")
+    Command::new("cargo")
         .args(&[
             "+esp",
             "build",
@@ -745,7 +742,7 @@ fn build_rlib(package: &str, chip: &str, target: &str) -> Result<PathBuf> {
             chip,
             "--target",
             target,
-            "-Zbuild-std=core,alloc",
+            "-Zbuild-std=core",
         ])
         .current_dir(workspace.join(package.to_string()))
         .status()
@@ -767,14 +764,13 @@ fn build_rlib(package: &str, chip: &str, target: &str) -> Result<PathBuf> {
 /// Check global symbols in the compiled rlib of the specified packages for the
 /// specified chips. Reports any unmangled global symbols that may pollute the
 /// global namespace.
-fn check_global_symbols(workspace: &Path, package: Package, chips: &[Chip]) -> Result<()> {
+fn check_global_symbols(chips: &[Chip]) -> Result<()> {
     let mut total_problematic = 0;
 
     let package = Package::EspHal; // Only esp-hal for now
 
     for chip in chips {
         let target = package.target_triple(chip)?;
-        let deps_dir = workspace.join("target").join(&target).join("debug/deps");
 
         let rlib_path = match build_rlib(&package.to_string(), &chip.to_string(), &target) {
             Ok(path) => path,
@@ -821,7 +817,7 @@ fn check_global_symbols(workspace: &Path, package: Package, chips: &[Chip]) -> R
                 problematic_symbols.len(),
             );
 
-            for (name, kind, section) in &problematic_symbols {
+            for (name, kind, _) in &problematic_symbols {
                 println!("{:?} {}", kind, name);
             }
 
