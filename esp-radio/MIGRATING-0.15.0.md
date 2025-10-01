@@ -105,7 +105,7 @@ Same for `set_configuration()` to `set_config()`:
 + let res = controller.set_config(&ap_config);
 ```
 
-## BuilderLite pattern `AccessPointConfig` and `ClientConfig`
+### BuilderLite pattern `AccessPointConfig` and `ClientConfig`
 
 ```diff
 - let ap_config = Config::AccessPoint({
@@ -114,6 +114,18 @@ Same for `set_configuration()` to `set_config()`:
 -         config
 -     });
 + let ap_config = Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
+```
+
+### BLE
+
+The `BleController` can now be configured using `esp_radio::ble::Config`:
+
+```diff
+ let mut connector = BleConnector::new(
+     &init,
+     peripherals.BT,
++    Config::default().with_task_priority(10),
+ );
 ```
 
 ## WifiState

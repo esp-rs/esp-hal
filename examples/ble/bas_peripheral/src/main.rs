@@ -36,7 +36,7 @@ async fn main(_s: Spawner) {
     let radio = RADIO.init(esp_radio::init().unwrap());
 
     let bluetooth = peripherals.BT;
-    let connector = BleConnector::new(radio, bluetooth);
+    let connector = BleConnector::new(radio, bluetooth, Default::default());
     let controller: ExternalController<_, 20> = ExternalController::new(connector);
 
     ble_bas_peripheral_run(controller).await;
