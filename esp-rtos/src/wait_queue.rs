@@ -1,9 +1,6 @@
 use core::ptr::NonNull;
 
-use esp_hal::{
-    system::Cpu,
-    time::{Duration, Instant},
-};
+use esp_hal::{system::Cpu, time::Instant};
 
 use crate::{
     SCHEDULER,
@@ -33,22 +30,17 @@ impl WaitQueue {
         });
     }
 
-    pub(crate) fn wait_with_deadline(&mut self, deadline: Option<Instant>) {
+    pub(crate) fn wait_with_deadline(&mut self, deadline: Instant) {
         SCHEDULER.with(|scheduler| {
             let current_cpu = Cpu::current() as usize;
             let mut task = unwrap!(scheduler.per_cpu[current_cpu].current_task);
 
-            let wake_at = if let Some(deadline) = deadline {
-                deadline
-            } else {
-                Instant::EPOCH + Duration::MAX
-            };
-
-            if scheduler.sleep_until(wake_at) {
+            if scheduler.sleep_task_until(task, deadline) {
                 self.waiting_tasks.push(task);
                 unsafe {
                     task.as_mut().current_queue = Some(NonNull::from(self));
                 }
+                crate::task::yield_task();
             }
         });
     }

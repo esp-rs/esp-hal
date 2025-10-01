@@ -2,10 +2,7 @@
 //!
 //! This module provides the [`Semaphore`] type, which implements counting semaphores and mutexes.
 
-use esp_hal::{
-    system::Cpu,
-    time::{Duration, Instant},
-};
+use esp_hal::{system::Cpu, time::Instant};
 use esp_sync::NonReentrantMutex;
 
 use crate::{
@@ -118,7 +115,7 @@ impl SemaphoreInner {
         }
     }
 
-    fn wait_with_deadline(&mut self, deadline: Option<Instant>) {
+    fn wait_with_deadline(&mut self, deadline: Instant) {
         trace!("Semaphore wait_with_deadline - {:?}", deadline);
         match self {
             SemaphoreInner::Counting { waiting, .. } => waiting.wait_with_deadline(deadline),
@@ -181,9 +178,8 @@ impl Semaphore {
     /// If the semaphore is already taken, the task will be blocked until the semaphore is released.
     /// Recursive mutexes can be locked multiple times by the mutex owner task.
     pub fn take(&self, timeout_us: Option<u32>) -> bool {
-        let deadline = timeout_us.map(|us| Instant::now() + Duration::from_micros(us as u64));
-        loop {
-            let taken = self.inner.with(|sem| {
+        if crate::with_deadline(timeout_us, |deadline| {
+            self.inner.with(|sem| {
                 if sem.try_take() {
                     true
                 } else {
@@ -191,26 +187,13 @@ impl Semaphore {
                     sem.wait_with_deadline(deadline);
                     false
                 }
-            });
-
-            if taken {
-                debug!("Semaphore - take - success");
-                return true;
-            }
-
-            // We are here because we weren't able to take the semaphore previously. We've either
-            // timed out, or the semaphore is ready for taking. However, any higher priority task
-            // can wake up and preempt us still. Let's just check for the timeout, and
-            // try the whole process again.
-
-            if let Some(deadline) = deadline
-                && deadline < Instant::now()
-            {
-                // We have a deadline and we've timed out.
-                trace!("Semaphore - take - timed out");
-                return false;
-            }
-            // We can block more, so let's attempt to take the semaphore again.
+            })
+        }) {
+            debug!("Semaphore - take - success");
+            true
+        } else {
+            debug!("Semaphore - take - timed out");
+            false
         }
     }
 
