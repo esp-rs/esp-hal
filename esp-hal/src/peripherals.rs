@@ -188,9 +188,9 @@ for_each_peripheral! {
         }
 
         impl Peripherals {
-            /// Returns all the peripherals *once*
+            /// Returns all the peripherals *once*.
             #[inline]
-            #[cfg_attr(not(feature = "rt"), expect(dead_code))]
+            #[cfg(feature = "rt")]
             pub(crate) fn take() -> Self {
                 #[unsafe(no_mangle)]
                 static mut _ESP_HAL_DEVICE_PERIPHERALS: bool = false;
@@ -202,6 +202,13 @@ for_each_peripheral! {
                     _ESP_HAL_DEVICE_PERIPHERALS = true;
                     Self::steal()
                 })
+            }
+
+            /// Returns all the peripherals *once*.
+            #[inline]
+            #[cfg(not(feature = "rt"))]
+            pub(crate) fn take() -> Self {
+                crate::ESP_HAL_LOCK.lock(|| unsafe { Self::steal() })
             }
 
             /// Unsafely create an instance of this peripheral out of thin air.

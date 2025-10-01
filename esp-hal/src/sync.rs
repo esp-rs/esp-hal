@@ -93,6 +93,7 @@ unsafe impl embassy_sync::blocking_mutex::raw::RawMutex for RawPriorityLimitedMu
 mod critical_section {
     struct CriticalSection;
 
+    #[cfg(feature = "rt")]
     critical_section::set_impl!(CriticalSection);
 
     static CRITICAL_SECTION: esp_sync::RawMutex = esp_sync::RawMutex::new();
