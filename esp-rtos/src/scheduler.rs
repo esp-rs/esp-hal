@@ -66,6 +66,7 @@ impl CpuSchedulerState {
                 thread_semaphore: None,
                 state: TaskState::Ready,
                 stack: core::ptr::slice_from_raw_parts_mut(core::ptr::null_mut(), 0),
+                stack_guard: core::ptr::null_mut(),
                 current_queue: None,
                 priority: 0,
                 #[cfg(multi_core)]

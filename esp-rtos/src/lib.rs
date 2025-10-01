@@ -222,20 +222,23 @@ pub fn start_with_idle_hook(
     SCHEDULER.with(move |scheduler| {
         scheduler.setup(TimeDriver::new(timer.timer()), idle_hook);
 
-        // Allocate the default task. The stack bottom is set to the stack guard's address as the
-        // rest of the stack is unusable anyway.
+        // Allocate the default task.
 
         unsafe extern "C" {
             static _stack_start_cpu0: u32;
-            static __stack_chk_guard: u32;
+            static _stack_end_cpu0: u32;
         }
         let stack_top = &raw const _stack_start_cpu0;
-        let stack_bottom = (&raw const __stack_chk_guard).cast::<MaybeUninit<u32>>();
+        let stack_bottom = (&raw const _stack_end_cpu0).cast::<MaybeUninit<u32>>();
         let stack_slice = core::ptr::slice_from_raw_parts_mut(
             stack_bottom.cast_mut(),
             stack_top as usize - stack_bottom as usize,
         );
-        task::allocate_main_task(scheduler, stack_slice);
+        task::allocate_main_task(
+            scheduler,
+            stack_slice,
+            esp_config::esp_config_int!(usize, "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"),
+        );
 
         task::setup_multitasking(
             #[cfg(riscv)]
@@ -317,7 +320,14 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
                     scheduler.time_driver.is_some(),
                     "The scheduler must be started on the first core first."
                 );
-                task::allocate_main_task(scheduler, ptrs.stack);
+                task::allocate_main_task(
+                    scheduler,
+                    ptrs.stack,
+                    stack_guard_offset.unwrap_or(esp_config::esp_config_int!(
+                        usize,
+                        "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"
+                    )),
+                );
                 task::yield_task();
                 trace!("Second core scheduler initialized");
             });
