@@ -473,6 +473,12 @@ impl Task {
             self as *const Task
         );
     }
+
+    pub(crate) fn set_up_stack_watchpoint(&self) {
+        unsafe {
+            esp_hal::debugger::set_stack_watchpoint(self.stack_guard as usize);
+        }
+    }
 }
 
 impl Drop for Task {
@@ -520,6 +526,10 @@ pub(super) fn allocate_main_task(
     scheduler.per_cpu[current_cpu]
         .main_task
         .set_up_stack_guard(stack_guard_offset);
+
+    scheduler.per_cpu[current_cpu]
+        .main_task
+        .set_up_stack_watchpoint();
 
     // This is slightly questionable as we don't ensure SchedulerState is pinned, but it's always
     // part of a static object so taking the pointer is fine.
