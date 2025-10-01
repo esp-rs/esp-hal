@@ -22,7 +22,7 @@ use esp_hal::time::{Duration, Instant};
 use esp_hal::{
     clock::{ModemClockController, PhyClockGuard},
     rtc_cntl::{SocResetReason, reset_reason},
-    system::Cpu
+    system::Cpu,
 };
 use esp_sync::{NonReentrantMutex, RawMutex};
 use esp_wifi_sys::include::*;
