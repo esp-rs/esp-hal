@@ -263,6 +263,10 @@ pub(crate) fn enable_main_stack_guard_monitoring() {
 pub(crate) fn setup_trap_section_protection() {
     #[cfg(not(flip_link))]
     {
+        if crate::debugger::debugger_connected() {
+            return;
+        }
+
         unsafe extern "C" {
             static _rwtext_len: u32;
             static _trap_section_origin: u32;
