@@ -993,9 +993,9 @@ where
     // configured for. Conceptually, for 'ch, we keep the Rmt peripheral alive.
     _rmt: PhantomData<Rmt<'ch, Dm>>,
 
-    // Only the "outermost" Channel holds the GenericPeripheralGuard, which avoids constant inc/dec
-    // of the reference count on reborrow and drop.
-    _guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
+    // Only the "outermost" Channel/ChannelCreator holds the GenericPeripheralGuard, which avoids
+    // constant inc/dec of the reference count on reborrow and drop.
+    _guard: DropState,
 }
 
 impl<'ch, Dm> Channel<'ch, Dm, Tx>
@@ -1006,7 +1006,7 @@ where
         ch_idx: ChannelIndex,
         pin: gpio::interconnect::OutputSignal<'ch>,
         config: TxChannelConfig,
-        _guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
+        guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
     ) -> Result<Self, Error> {
         let raw = unsafe { DynChannelAccess::conjure(ch_idx) };
 
@@ -1028,6 +1028,11 @@ where
         raw.set_tx_idle_output(config.idle_output, config.idle_output_level);
         raw.set_memsize(memsize);
 
+        let _guard = match guard {
+            Some(g) => DropState::MemAndGuard(g),
+            None => DropState::MemoryOnly,
+        };
+
         Ok(Self {
             raw,
             _rmt: core::marker::PhantomData,
@@ -1044,7 +1049,7 @@ where
         ch_idx: ChannelIndex,
         pin: gpio::interconnect::InputSignal<'ch>,
         config: RxChannelConfig,
-        _guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
+        guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
     ) -> Result<Self, Error> {
         let raw = unsafe { DynChannelAccess::conjure(ch_idx) };
 
@@ -1071,12 +1076,24 @@ where
         raw.set_rx_idle_threshold(config.idle_threshold);
         raw.set_memsize(memsize);
 
+        let _guard = match guard {
+            Some(g) => DropState::MemAndGuard(g),
+            None => DropState::MemoryOnly,
+        };
+
         Ok(Self {
             raw,
             _rmt: core::marker::PhantomData,
             _guard,
         })
     }
+}
+
+#[derive(Debug)]
+enum DropState {
+    None,
+    MemoryOnly,
+    MemAndGuard(GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>),
 }
 
 impl<Dm, Dir> Channel<'_, Dm, Dir>
@@ -1089,7 +1106,8 @@ where
         Channel {
             raw: self.raw,
             _rmt: self._rmt,
-            _guard: None,
+            // Resources must only be released once the parent is dropped.
+            _guard: DropState::None,
         }
     }
 }
@@ -1100,7 +1118,7 @@ where
     Dir: Direction,
 {
     fn drop(&mut self) {
-        if self._guard.is_some() {
+        if !matches!(self._guard, DropState::None) {
             let memsize = self.raw.memsize();
 
             // This isn't really necessary, but be extra sure that this channel can't
