@@ -1,5 +1,7 @@
 use core::ptr::addr_of_mut;
 
+use procmacros::BuilderLite;
+
 use super::*;
 use crate::{
     binary::include::{
@@ -274,12 +276,29 @@ static BTDM_DRAM_AVAILABLE_REGION: [btdm_dram_available_region_t; 7] = [
     },
 ];
 
-pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
+/// Bluetooth controller configuration.
+#[derive(BuilderLite, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+pub struct Config {
+    /// The priority of the RTOS task.
+    task_priority: u8,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            // same priority as the wifi task, when using esp-rtos (I'm assuming it's MAX_PRIO - 2)
+            task_priority: 29,
+        }
+    }
+}
+
+pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
     // keep them aligned with BT_CONTROLLER_INIT_CONFIG_DEFAULT in ESP-IDF
     // ideally _some_ of these values should be configurable
     esp_bt_controller_config_t {
         controller_task_stack_size: 4096,
-        controller_task_prio: 110,
+        controller_task_prio: config.task_priority,
         hci_uart_no: 1,
         hci_uart_baudrate: 921600,
         scan_duplicate_mode: 0,
