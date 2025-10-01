@@ -653,6 +653,9 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(stack_guard_monitoring)]
     crate::soc::enable_main_stack_guard_monitoring();
 
+    #[cfg(riscv)]
+    crate::soc::setup_trap_section_protection();
+
     system::disable_peripherals();
 
     let mut peripherals = Peripherals::take();

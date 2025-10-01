@@ -56,7 +56,7 @@ pub unsafe fn set_stack_watchpoint(addr: usize) {
                 let addr = (addr & !0b11) | 0b01;
 
                 let id = 0; // breakpoint 0
-                let tdata = (1 << 3) | (1 << 6) | (1 << 1); // bits: 0 = load, 1 = store, 6 = m-mode, 3 = u-mode
+                let tdata = (1 << 3) | (1 << 6) | (1 << 1) | (1 << 7); // bits: 0 = load, 1 = store, 6 = m-mode, 10..7 = match (1 = NAPOT, 0 = exact)
                 let tcontrol = 1 << 3; // M-mode trigger
 
                 unsafe {

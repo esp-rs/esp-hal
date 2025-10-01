@@ -258,3 +258,46 @@ pub(crate) fn enable_main_stack_guard_monitoring() {
         crate::debugger::set_stack_watchpoint(guard_addr as usize);
     }
 }
+
+#[cfg(riscv)]
+pub(crate) fn setup_trap_section_protection() {
+    #[cfg(not(flip_link))]
+    {
+        unsafe extern "C" {
+            static _rwtext_len: u32;
+            static _trap_section_origin: u32;
+        }
+
+        let rwtext_len = core::ptr::addr_of!(_rwtext_len) as usize;
+
+        if rwtext_len < 2048 {
+            warn!("No trap vector protection available");
+        }
+
+        // protect MTVEC and trap handlers
+        // (plus some more bytes (2048) because of NAPOT)
+        // via watchpoint 1.
+        //
+        // Why not use PMP? On C2/C3 the bootloader locks all available PMP entries.
+        let addr = core::ptr::addr_of!(_trap_section_origin) as usize as u32;
+        let addr = (addr & !0b11111111111) | 0b01111111111;
+
+        let id: u32 = 1; // breakpoint 1
+        let tdata: u32 = (1 << 3) | (1 << 6) | (1 << 1) | (1 << 7); // bits: 0 = load, 1 = store, 6 = m-mode, 3 = u-mode
+        let tcontrol: u32 = 1 << 3; // M-mode trigger
+
+        unsafe {
+            core::arch::asm!(
+                "
+                csrw 0x7a0, {id} // tselect
+                csrrs {tcontrol}, 0x7a5, {tcontrol} // tcontrol
+                csrrs {tdata}, 0x7a1, {tdata} // tdata1
+                csrw 0x7a2, {addr} // tdata2
+                ", id = in(reg) id,
+                addr = in(reg) addr,
+                tdata = in(reg) tdata,
+                tcontrol = in(reg) tcontrol,
+            );
+        }
+    }
+}

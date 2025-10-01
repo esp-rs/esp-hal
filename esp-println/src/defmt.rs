@@ -9,10 +9,14 @@ use super::{LockToken, PrinterImpl};
 use crate::LOCK;
 
 /// Global logger lock.
+#[unsafe(link_section = ".critical_data")]
 #[cfg(feature = "critical-section")]
+#[unsafe(link_section = ".critical_data")]
 static mut TAKEN: bool = false;
 #[cfg(feature = "critical-section")]
+#[unsafe(link_section = ".critical_data")]
 static mut CS_RESTORE: RestoreState = RestoreState::invalid();
+#[unsafe(link_section = ".critical_data")]
 static mut ENCODER: defmt::Encoder = defmt::Encoder::new();
 
 #[defmt::global_logger]

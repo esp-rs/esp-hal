@@ -98,13 +98,15 @@ r#"
 .global _pre_default_start_trap
 _pre_default_start_trap:
     // move SP to some save place if it's pointing below the RAM
-    // otherwise we won't be able to do anything reasonable
+    // or into .trap / .rwtext.
+    //
+    // Otherwise we won't be able to do anything reasonable
     // (since we don't have a working stack)
     //
     // most probably we will just print something and halt in this case
     // we actually can't do anything else
     csrw mscratch, t0
-    la t0, _dram_origin
+    la t0, _dram_data_start
     bge sp, t0, 1f
 
     // use the reserved exception cause 14 to signal we detected a stack overflow
