@@ -1795,6 +1795,11 @@ mod asynch {
 
             if status.bus_off_st().bit_is_set() {
                 let _ = rx_queue.try_send(Err(EspTwaiError::BusOff));
+                // Abort transmissions and wake senders if we are in bus-off state.
+                if !status.tx_buf_st().bit_is_set() {
+                    register_block.cmd().write(|w| w.abort_tx().set_bit());
+                    async_state.tx_waker.wake();
+                }
             }
 
             if status.miss_st().bit_is_set() {
@@ -1809,19 +1814,10 @@ mod asynch {
             }
         }
 
-        if intr_status.bits() & 0b11111100 > 0 {
-            let err_capture = register_block.err_code_cap().read();
-            let status = register_block.status().read();
-
-            // Read error code direction (transmitting or receiving)
-            let ecc_direction = err_capture.ecc_direction().bit_is_set();
-
-            // If the error comes from Tx and Tx request is pending
-            if !ecc_direction && !status.tx_buf_st().bit_is_set() {
-                // Cancel a pending transmission request
-                register_block.cmd().write(|w| w.abort_tx().set_bit());
-            }
-
+        if intr_status.bits() & 0b10110100 > 0 {
+            // We might want to use the error code to gather statistics in the
+            // future.
+            let _ = register_block.err_code_cap().read();
             async_state.err_waker.wake();
         }
 
