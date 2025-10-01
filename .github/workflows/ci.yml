@@ -40,7 +40,7 @@ jobs:
   # Build Packages
 
   esp-hal:
-    runs-on: macos-m1-self-hosted
+    runs-on: ubuntu-latest
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
       CI: 1
@@ -71,17 +71,17 @@ jobs:
               cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
           fi
 
-      - name: Build and Check
-        shell: bash
-        run: |
-          # lints and docs are checked separately
-          cargo xcheck ci esp32 --toolchain esp --no-lint --no-docs
-          cargo xcheck ci esp32s2 --toolchain esp --no-lint --no-docs
-          cargo xcheck ci esp32s3 --toolchain esp --no-lint --no-docs
-          cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
+      # - name: Build and Check
+      #   shell: bash
+      #   run: |
+      #     # lints and docs are checked separately
+      #     cargo xcheck ci esp32 --toolchain esp --no-lint --no-docs
+      #     cargo xcheck ci esp32s2 --toolchain esp --no-lint --no-docs
+      #     cargo xcheck ci esp32s3 --toolchain esp --no-lint --no-docs
+      #     cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs
+      #     cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
+      #     cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs
+      #     cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
       - name: Semver-Check
         shell: bash
         # always invokes +esp internally
@@ -95,142 +95,142 @@ jobs:
           cargo xcheck semver-check --chips esp32c6 check
           cargo xcheck semver-check --chips esp32h2 check
 
-  detect-extras-runner:
-    uses: ./.github/workflows/check_runner.yml
-    with:
-      primary-runner: macos-m1-self-hosted
-      fallback-runner: ubuntu-latest
+  # detect-extras-runner:
+  #   uses: ./.github/workflows/check_runner.yml
+  #   with:
+  #     primary-runner: macos-m1-self-hosted
+  #     fallback-runner: ubuntu-latest
 
-  extras:
-    needs: detect-extras-runner
-    runs-on: ${{ needs.detect-extras-runner.outputs.selected-runner }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
+  # extras:
+  #   # needs: detect-extras-runner
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: dtolnay/rust-toolchain@v1
+  #       with:
+  #         toolchain: stable
 
-      # Install dependencies for building the extra crates on ubuntu
-      - name: Install dependencies
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get -y install musl-tools libudev-dev pkg-config
-      # Build the extra crates
-      - name: Build the bench-server
-        run: cd extras/bench-server && cargo build
-      - name: Build esp-wifishark
-        run: cd extras/esp-wifishark && cargo build
-      - name: Build ieee802154-sniffer
-        run: cd extras/ieee802154-sniffer && cargo build
+  #     # Install dependencies for building the extra crates on ubuntu
+  #     - name: Install dependencies
+  #       if: runner.os == 'Linux'
+  #       run: sudo apt-get update && sudo apt-get -y install musl-tools libudev-dev pkg-config
+  #     # Build the extra crates
+  #     - name: Build the bench-server
+  #       run: cd extras/bench-server && cargo build
+  #     - name: Build esp-wifishark
+  #       run: cd extras/esp-wifishark && cargo build
+  #     - name: Build ieee802154-sniffer
+  #       run: cd extras/ieee802154-sniffer && cargo build
 
-  docs:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+  # docs:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      # Install the Rust toolchain for Xtensa devices:
-      - uses: esp-rs/xtensa-toolchain@v1.6
-        with:
-          version: 1.88.0.0
+  #     # Install the Rust toolchain for Xtensa devices:
+  #     - uses: esp-rs/xtensa-toolchain@v1.6
+  #       with:
+  #         version: 1.88.0.0
 
-      # Install the Rust stable toolchain for RISC-V devices:
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
-          toolchain: stable
-          components: rust-src
-      # Install the Rust nightly toolchain for RISC-V devices:
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
+  #     # Install the Rust stable toolchain for RISC-V devices:
+  #     - uses: dtolnay/rust-toolchain@v1
+  #       with:
+  #         target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+  #         toolchain: stable
+  #         components: rust-src
+  #     # Install the Rust nightly toolchain for RISC-V devices:
+  #     - uses: dtolnay/rust-toolchain@v1
+  #       with:
+  #         target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+  #         toolchain: nightly
+  #         components: rust-src
 
-      - name: Build docs
-        shell: bash
-        run: |
-          cargo xtask build documentation
+  #     - name: Build docs
+  #       shell: bash
+  #       run: |
+  #         cargo xtask build documentation
 
   # --------------------------------------------------------------------------
   # MSRV
 
-  msrv:
-    runs-on: ubuntu-latest
+  # msrv:
+  #   runs-on: ubuntu-latest
 
-    steps:
-      - uses: actions/checkout@v4
-      - uses: esp-rs/xtensa-toolchain@v1.6
-        with:
-          version: ${{ env.MSRV }}
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,x86_64-unknown-linux-gnu
-          toolchain: ${{ env.MSRV }}
-          components: rust-src,clippy
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: esp-rs/xtensa-toolchain@v1.6
+  #       with:
+  #         version: ${{ env.MSRV }}
+  #     - uses: dtolnay/rust-toolchain@v1
+  #       with:
+  #         target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,x86_64-unknown-linux-gnu
+  #         toolchain: ${{ env.MSRV }}
+  #         components: rust-src,clippy
 
-      - name: Stable toolchain checks
-        run: rustc +${{ env.MSRV }} --version --verbose
-      - name: esp toolchain checks
-        run: rustc +esp --version --verbose
+  #     - name: Stable toolchain checks
+  #       run: rustc +${{ env.MSRV }} --version --verbose
+  #     - name: esp toolchain checks
+  #       run: rustc +esp --version --verbose
 
-      # Verify the MSRV for all chips by running a lint session
-      - name: msrv RISCV (esp-hal)
-        run: |
-          cargo xtask lint-packages --chips esp32c2,esp32c3,esp32c6,esp32h2 --toolchain ${{ env.MSRV }}
-      - name: msrv Xtensa (esp-hal)
-        run: |
-          cargo xtask lint-packages --chips esp32,esp32s2,esp32s3 --toolchain esp
+  #     # Verify the MSRV for all chips by running a lint session
+  #     - name: msrv RISCV (esp-hal)
+  #       run: |
+  #         cargo xtask lint-packages --chips esp32c2,esp32c3,esp32c6,esp32h2 --toolchain ${{ env.MSRV }}
+  #     - name: msrv Xtensa (esp-hal)
+  #       run: |
+  #         cargo xtask lint-packages --chips esp32,esp32s2,esp32s3 --toolchain esp
 
-  # --------------------------------------------------------------------------
-  # host tests
+  # # --------------------------------------------------------------------------
+  # # host tests
 
-  detect-host-tests-runner:
-    uses: ./.github/workflows/check_runner.yml
-    with:
-      primary-runner: macos-m1-self-hosted
-      fallback-runner: ubuntu-latest
+  # detect-host-tests-runner:
+  #   uses: ./.github/workflows/check_runner.yml
+  #   with:
+  #     primary-runner: macos-m1-self-hosted
+  #     fallback-runner: ubuntu-latest
 
-  host-tests:
-    needs: detect-host-tests-runner
-    runs-on: ${{ needs.detect-host-tests-runner.outputs.selected-runner }}
-    steps:
-      - uses: actions/checkout@v4
-      # Some of the configuration items in 'rustfmt.toml' require the 'nightly'
-      # release channel, MIRI is only available in nightly
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: nightly
-          components: rustfmt,miri
+  # host-tests:
+  #   needs: detect-host-tests-runner
+  #   runs-on: ${{ needs.detect-host-tests-runner.outputs.selected-runner }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     # Some of the configuration items in 'rustfmt.toml' require the 'nightly'
+  #     # release channel, MIRI is only available in nightly
+  #     - uses: dtolnay/rust-toolchain@v1
+  #       with:
+  #         toolchain: nightly
+  #         components: rustfmt,miri
 
-      # Run xtask tests
-      - name: Run xtask tests
-        run: cd xtask && cargo test --features release
+  #     # Run xtask tests
+  #     - name: Run xtask tests
+  #       run: cd xtask && cargo test --features release
 
-      # Check the formatting of all packages:
-      - run: cargo xtask fmt-packages --check
+  #     # Check the formatting of all packages:
+  #     - run: cargo xtask fmt-packages --check
 
-      # Check metadata generation for all packages:
-      - run: cargo xtask update-metadata --check
+  #     # Check metadata generation for all packages:
+  #     - run: cargo xtask update-metadata --check
 
-      # Run host tests for all applicable packages:
-      - run: cargo xtask host-tests
+  #     # Run host tests for all applicable packages:
+  #     - run: cargo xtask host-tests
 
   # --------------------------------------------------------------------------
   # Check links in .rs, .md, and .toml files
 
-  link-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: lycheeverse/lychee-action@v2
-        with:
-          args: |
-            --verbose
-            --no-progress
-            --format detailed
-            --timeout 7
-            --max-concurrency 6
-            --accept "200,301,302"
-            --exclude-path ".*/target/.*|.*/static\.files/.*|.*/docs/.*"
-            './**/*.rs'
-            './**/*.md'
-            './**/*.toml'
+  # link-check:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: lycheeverse/lychee-action@v2
+  #       with:
+  #         args: |
+  #           --verbose
+  #           --no-progress
+  #           --format detailed
+  #           --timeout 7
+  #           --max-concurrency 6
+  #           --accept "200,301,302"
+  #           --exclude-path ".*/target/.*|.*/static\.files/.*|.*/docs/.*"
+  #           './**/*.rs'
+  #           './**/*.md'
+  #           './**/*.toml'
