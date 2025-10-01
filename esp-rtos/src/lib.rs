@@ -227,6 +227,7 @@ pub fn start_with_idle_hook(
         unsafe extern "C" {
             static _stack_start_cpu0: u32;
             static _stack_end_cpu0: u32;
+            static __stack_chk_guard: u32;
         }
         let stack_top = &raw const _stack_start_cpu0;
         let stack_bottom = (&raw const _stack_end_cpu0).cast::<MaybeUninit<u32>>();
@@ -234,10 +235,14 @@ pub fn start_with_idle_hook(
             stack_bottom.cast_mut(),
             stack_top as usize - stack_bottom as usize,
         );
+
         task::allocate_main_task(
             scheduler,
             stack_slice,
             esp_config::esp_config_int!(usize, "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"),
+            // For compatibility with -Zstack-protector, we read and use the value of
+            // `__stack_chk_guard`.
+            unsafe { (&raw const __stack_chk_guard).read_volatile() },
         );
 
         task::setup_multitasking(
@@ -320,14 +325,21 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
                     scheduler.time_driver.is_some(),
                     "The scheduler must be started on the first core first."
                 );
-                task::allocate_main_task(
-                    scheduler,
-                    ptrs.stack,
-                    stack_guard_offset.unwrap_or(esp_config::esp_config_int!(
-                        usize,
-                        "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"
-                    )),
-                );
+
+                // esp-hal may be configured to use a watchpoint. To work around that, we read the
+                // memory at the stack guard, and we'll use whatever we find as the main task's
+                // stack guard value.
+                let stack_guard_offset = stack_guard_offset.unwrap_or(esp_config::esp_config_int!(
+                    usize,
+                    "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"
+                ));
+
+                let stack_bottom = ptrs.stack.cast::<u32>();
+                let stack_guard = unsafe { stack_bottom.byte_add(stack_guard_offset) };
+
+                task::allocate_main_task(scheduler, ptrs.stack, stack_guard_offset, unsafe {
+                    stack_guard.read()
+                });
                 task::yield_task();
                 trace!("Second core scheduler initialized");
             });
