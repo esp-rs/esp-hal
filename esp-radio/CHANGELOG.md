@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - lifetime to `Sniffer` (#4017)
 - `dtim_period` parameter for `PowerSaveMode` (#4040)
 - `WifiConfig`, `CountryInfo` and `OperatingClass` (#4121)
+- Configuration options for `BleController` (#4223)
 
 ### Changed
 
@@ -46,7 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated radio related drivers to ESP-IDF 5.5.1 (#4113)
 - Event handlers are now passed the event by reference (#4113)
 - Some build-time configuration options have been replaced by runtime options in `WifiConfig` (#4121)
-- Update bt-hci version with flash usage improvements (#4146)
+- Update to bt-hci version with flash usage improvements (#4146, #4165)
+- `scan_mode`, `(ap_)beacon_timeout`, `listen_interval` and `failure_retry_cnt` config options have been replaced by runtime options in `AccessPointConfig`, `ClientConfig` and `EapClientConfig` (#4224)
+- The `ieee802154_rx_queue_size` config option has been replaced by a runtime option in `esp_radio::ieee802154::Config` (#4224)
 
 ### Fixed
 

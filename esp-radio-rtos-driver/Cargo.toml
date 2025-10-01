@@ -1,0 +1,17 @@
+[package]
+name          = "esp-radio-rtos-driver"
+version       = "0.0.1"
+edition       = "2024"
+rust-version  = "1.86.0"
+description   = "Task scheduler interface for esp-radio"
+documentation = "https://docs.espressif.com/projects/rust/esp-radio-rtos-driver/latest/"
+keywords      = ["esp32", "espressif", "no-std"]
+categories    = ["embedded", "hardware-support", "no-std"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
+
+[package.metadata.espressif]
+check-configs = [{ features = [] }]
+clippy-configs = [{ features = [] }]
+
+[dependencies]

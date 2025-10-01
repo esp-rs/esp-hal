@@ -231,21 +231,27 @@ fn clean(workspace: &Path, args: CleanArgs) -> Result<()> {
     packages.sort();
 
     for package in packages {
-        log::info!("Cleaning package: {}", package);
         let path = workspace.join(package.to_string());
+        for dir in walkdir::WalkDir::new(path) {
+            if let Ok(dir) = dir
+                && let path = dir.path()
+                && path.join("Cargo.toml").exists()
+            {
+                log::info!("Cleaning folder: {}", path.display());
+                let cargo_args = CargoArgsBuilder::default()
+                    .subcommand("clean")
+                    .arg("--target-dir")
+                    .arg(path.join("target").display().to_string())
+                    .build();
 
-        let cargo_args = CargoArgsBuilder::default()
-            .subcommand("clean")
-            .arg("--target-dir")
-            .arg(path.join("target").display().to_string())
-            .build();
-
-        xtask::cargo::run(&cargo_args, &path).with_context(|| {
-            format!(
-                "Failed to run `cargo run` with {cargo_args:?} in {}",
-                path.display()
-            )
-        })?;
+                xtask::cargo::run(&cargo_args, &path).with_context(|| {
+                    format!(
+                        "Failed to run `cargo run` with {cargo_args:?} in {}",
+                        path.display()
+                    )
+                })?;
+            }
+        }
     }
 
     Ok(())
@@ -552,7 +558,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             build_documentation(
                 workspace,
                 BuildDocumentationArgs {
-                    packages: vec![Package::EspHal, Package::EspRadio, Package::EspHalEmbassy],
+                    packages: vec![Package::EspHal, Package::EspRadio, Package::EspRtos],
                     chips: vec![args.chip],
                     ..Default::default()
                 },

@@ -47,11 +47,11 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     #[cfg(target_arch = "riscv32")]
-    let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_preempt::start(
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(
         timg0.timer0,
         #[cfg(target_arch = "riscv32")]
-        software_interrupt.software_interrupt0,
+        sw_int.software_interrupt0,
     );
 
     // Set event handlers for wifi before init to avoid missing any.

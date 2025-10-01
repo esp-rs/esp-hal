@@ -1,0 +1,108 @@
+[package]
+name          = "esp-rtos"
+version       = "0.0.1"
+edition       = "2024"
+rust-version  = "1.86.0"
+description   = "A task scheduler for Espressif devices"
+documentation = "https://docs.espressif.com/projects/rust/esp-rtos/latest/"
+keywords      = ["esp32", "espressif", "no-std"]
+categories    = ["embedded", "hardware-support", "no-std"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
+
+[package.metadata.espressif]
+doc-config = { features = ["esp-hal/unstable", "embassy", "esp-radio"] }
+check-configs = [
+    { features = ["esp-hal/unstable"] },
+    { features = ["esp-hal/unstable", "esp-alloc"] },
+    { features = ["esp-hal/unstable", "esp-radio"] },
+    { features = ["esp-hal/unstable", "esp-radio", "embassy"] },
+    { features = ["esp-hal/unstable", "esp-alloc", "embassy"] },
+]
+clippy-configs = [
+    { features = ["esp-hal/unstable", "esp-alloc", "defmt", "esp-radio", "embassy"] },
+]
+
+[package.metadata.docs.rs]
+default-target = "riscv32imac-unknown-none-elf"
+features       = ["esp32c6", "embassy", "esp-radio"]
+
+[lib]
+bench = false
+
+[dependencies]
+esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", features = [
+    "requires-unstable",
+] }
+
+cfg-if = "1"
+
+# Unstable dependencies that are not (strictly) part of the public API
+allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"], optional = true }
+document-features  = "0.2.11"
+esp-alloc = { version = "0.8.0", path = "../esp-alloc", optional = true }
+esp-config = { version = "0.5.0", path = "../esp-config" }
+esp-sync = { version = "0.0.0", path = "../esp-sync" }
+esp-radio-rtos-driver = { version = "0.0.1", path = "../esp-radio-rtos-driver", optional = true }
+macros = { version = "0.19.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+portable-atomic = { version = "1.11.0", default-features = false }
+
+# Optional dependencies that enable ecosystem support.
+embassy-time-driver = { version = "0.2.1", features = [ "tick-hz-1_000_000" ], optional = true }
+embassy-executor = { version = "0.9.0", optional = true }
+embassy-time-queue-utils = { version = "0.3.0", optional = true }
+
+# Logging interfaces, they are mutually exclusive so they need to be behind separate features.
+defmt            = { version = "1.0", optional = true }
+log-04           = { package = "log", version = "0.4.27", optional = true }
+
+[build-dependencies]
+esp-config             = { version = "0.5.0", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
+
+[dev-dependencies]
+esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", features = ["unstable"] }
+
+[features]
+default = ["esp-alloc", "esp-radio"]
+
+## Enable features that require heap allocation.
+alloc = ["dep:allocator-api2", "dep:esp-radio-rtos-driver"]
+
+## Enable the use of the `esp-alloc` crate for dynamic memory allocation.
+##
+## If you opt-out, you need to provide implementations for the following functions:
+## - `pub extern "C" fn malloc_internal(size: usize) -> *mut u8`
+## - `pub extern "C" fn free_internal(ptr: *mut u8)`
+esp-alloc = ["alloc", "dep:esp-alloc"]
+
+## Enable embassy integration (time driver and executors).
+embassy = ["dep:embassy-time-driver", "dep:embassy-executor", "dep:embassy-time-queue-utils"]
+
+## Enables esp-radio support.
+esp-radio = ["alloc", "dep:esp-radio-rtos-driver"]
+
+#! ### Chip selection
+#! One of the following features must be enabled to select the target chip:
+
+##
+esp32 = ["esp-hal/esp32", "esp-metadata-generated/esp32"]
+##
+esp32c2 = ["esp-hal/esp32c2", "esp-metadata-generated/esp32c2"]
+##
+esp32c3 = ["esp-hal/esp32c3", "esp-metadata-generated/esp32c3"]
+##
+esp32c6 = ["esp-hal/esp32c6", "esp-metadata-generated/esp32c6"]
+##
+esp32h2 = ["esp-hal/esp32h2", "esp-metadata-generated/esp32h2"]
+##
+esp32s2 = ["esp-hal/esp32s2", "esp-metadata-generated/esp32s2"]
+##
+esp32s3 = ["esp-hal/esp32s3", "esp-metadata-generated/esp32s3"]
+
+#! ### Logging Feature Flags
+## Enable logging output using version 0.4 of the `log` crate.
+log-04 = ["dep:log-04", "esp-hal/log-04"]
+
+## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
+defmt = ["dep:defmt", "esp-hal/defmt"]

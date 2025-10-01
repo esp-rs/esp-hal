@@ -6,6 +6,8 @@
 #![no_std]
 #![no_main]
 
+#[cfg(riscv)]
+use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::{
     Async,
     uart::{self, UartRx, UartTx},
@@ -38,8 +40,14 @@ mod tests {
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
+        #[cfg(riscv)]
+        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_hal_embassy::init(timg0.timer0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_int.software_interrupt0,
+        );
 
         let tx = UartTx::new(peripherals.UART0, uart::Config::default())
             .unwrap()

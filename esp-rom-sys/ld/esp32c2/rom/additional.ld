@@ -23,3 +23,5 @@ PROVIDE ( atoi = __atoi );
 PROVIDE ( mktime = __mktime );
 
 PROVIDE( abs = 0x40000558 );
+
+syscall_table_ptr = 0x3fcdffd8;

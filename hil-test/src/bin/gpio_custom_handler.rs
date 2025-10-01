@@ -33,7 +33,7 @@ use esp_hal::{
     interrupt::{Priority, software::SoftwareInterruptControl},
     timer::timg::TimerGroup,
 };
-use esp_hal_embassy::InterruptExecutor;
+use esp_rtos::embassy::InterruptExecutor;
 use hil_test::mk_static;
 use portable_atomic::{AtomicUsize, Ordering};
 
@@ -106,7 +106,6 @@ async fn sense_pin(gpio: AnyPin<'static>, done: &'static Signal<CriticalSectionR
 
 #[embedded_test::tests(executor = hil_test::Executor::new(), default_timeout = 3)]
 mod tests {
-
     use super::*;
 
     #[test]
@@ -115,8 +114,14 @@ mod tests {
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
+        #[cfg(riscv)]
+        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_hal_embassy::init(timg0.timer0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_int.software_interrupt0,
+        );
 
         let counter = drive_pins(gpio1, gpio2).await;
 
@@ -132,9 +137,14 @@ mod tests {
         io.set_interrupt_handler(interrupt_handler);
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
-
+        #[cfg(riscv)]
+        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_hal_embassy::init(timg0.timer0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_int.software_interrupt0,
+        );
 
         let counter = drive_pins(gpio1, gpio2).await;
 
@@ -154,13 +164,17 @@ mod tests {
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
+        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_hal_embassy::init(timg0.timer0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_int.software_interrupt0,
+        );
 
-        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let interrupt_executor = mk_static!(
             InterruptExecutor<1>,
-            InterruptExecutor::new(sw_ints.software_interrupt1)
+            InterruptExecutor::new(sw_int.software_interrupt1)
         );
         // Run the executor at interrupt priority 1, which is the same as the default
         // interrupt priority of the GPIO interrupt handler.

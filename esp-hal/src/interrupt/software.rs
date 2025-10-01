@@ -156,14 +156,6 @@ impl<const NUM: u8> InterruptConfigurable for SoftwareInterrupt<'_, NUM> {
 /// This struct contains several instances of software interrupts that can be
 /// used for signaling between different parts of a program or system. Each
 /// interrupt is identified by an index (0 to 3).
-#[cfg_attr(
-    multi_core,
-    doc = r#"
-
-Please note: Software interrupt 3 is reserved
-for inter-processor communication when using
-`esp-hal-embassy`."#
-)]
 #[non_exhaustive]
 pub struct SoftwareInterruptControl<'d> {
     /// Software interrupt 0.
@@ -172,9 +164,7 @@ pub struct SoftwareInterruptControl<'d> {
     pub software_interrupt1: SoftwareInterrupt<'d, 1>,
     /// Software interrupt 2.
     pub software_interrupt2: SoftwareInterrupt<'d, 2>,
-    #[cfg(not(all(feature = "__esp_hal_embassy", multi_core)))]
-    /// Software interrupt 3. Not available when using `esp-hal-embassy`,
-    /// on multi-core systems.
+    /// Software interrupt 3.
     pub software_interrupt3: SoftwareInterrupt<'d, 3>,
 }
 
@@ -191,7 +181,6 @@ impl<'d> SoftwareInterruptControl<'d> {
             software_interrupt2: SoftwareInterrupt {
                 _lifetime: PhantomData,
             },
-            #[cfg(not(all(feature = "__esp_hal_embassy", multi_core)))]
             software_interrupt3: SoftwareInterrupt {
                 _lifetime: PhantomData,
             },

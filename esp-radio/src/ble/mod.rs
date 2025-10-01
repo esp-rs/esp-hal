@@ -11,6 +11,7 @@ pub(crate) mod npl;
 use alloc::{boxed::Box, collections::vec_deque::VecDeque, vec::Vec};
 use core::mem::MaybeUninit;
 
+pub use ble::ble_os_adapter_chip_specific::Config;
 pub(crate) use ble::{ble_deinit, ble_init, send_hci};
 use esp_sync::NonReentrantMutex;
 

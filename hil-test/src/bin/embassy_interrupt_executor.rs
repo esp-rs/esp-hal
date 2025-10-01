@@ -3,24 +3,24 @@
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: unstable embassy
-//% ENV(single_integrated):   ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE = single-integrated
-//% ENV(multiple_integrated): ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE = multiple-integrated
-//% ENV(generic_queue):       ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE = generic
-//% ENV(generic_queue):       ESP_HAL_EMBASSY_CONFIG_GENERIC_QUEUE_SIZE = 16
-//% ENV(default_with_waiti):  ESP_HAL_EMBASSY_CONFIG_LOW_POWER_WAIT = true
-//% ENV(default_no_waiti):    ESP_HAL_EMBASSY_CONFIG_LOW_POWER_WAIT = false
 
 #![no_std]
 #![no_main]
 
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
-use esp_hal::interrupt::{
-    Priority,
-    software::{SoftwareInterrupt, SoftwareInterruptControl},
+use esp_hal::{
+    interrupt::{
+        Priority,
+        software::{SoftwareInterrupt, SoftwareInterruptControl},
+    },
+    timer::timg::TimerGroup,
 };
 #[cfg(multi_core)]
-use esp_hal::system::{AppCoreGuard, CpuControl, Stack};
-use esp_hal_embassy::{Executor, InterruptExecutor};
+use esp_hal::{
+    peripherals::CPU_CTRL,
+    system::{Cpu, CpuControl, Stack},
+};
+use esp_rtos::embassy::{Executor, InterruptExecutor};
 use hil_test::mk_static;
 
 #[embassy_executor::task]
@@ -53,7 +53,6 @@ async fn tester_task(
 async fn tester_task_multi_core(
     signal: &'static Signal<CriticalSectionRawMutex, ()>,
     response: &'static Signal<CriticalSectionRawMutex, ()>,
-    core_guard: AppCoreGuard<'static>,
 ) {
     response.wait().await;
     for _ in 0..3 {
@@ -61,19 +60,26 @@ async fn tester_task_multi_core(
         response.wait().await;
     }
 
-    core::mem::drop(core_guard);
+    unsafe {
+        // Park the second core, we don't need it anymore
+        CpuControl::new(CPU_CTRL::steal()).park_core(Cpu::AppCpu);
+    }
     embedded_test::export::check_outcome(());
 }
 
 struct Context {
-    interrupt: SoftwareInterrupt<'static, 1>,
+    #[cfg(xtensa)]
+    sw_int0: SoftwareInterrupt<'static, 0>,
     #[cfg(multi_core)]
-    cpu_control: CpuControl<'static>,
+    sw_int1: SoftwareInterrupt<'static, 1>,
+    sw_int2: SoftwareInterrupt<'static, 2>,
+    #[cfg(multi_core)]
+    cpu_control: CPU_CTRL<'static>,
 }
 
 #[embedded_test::tests(default_timeout = 3)]
 mod test {
-    use esp_hal_embassy::Callbacks;
+    use esp_rtos::embassy::Callbacks;
 
     use super::*;
 
@@ -81,20 +87,29 @@ mod test {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        hil_test::init_embassy!(peripherals, 2);
+        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_int.software_interrupt0,
+        );
 
-        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         Context {
-            interrupt: sw_ints.software_interrupt1,
+            #[cfg(xtensa)]
+            sw_int0: sw_int.software_interrupt0,
             #[cfg(multi_core)]
-            cpu_control: CpuControl::new(peripherals.CPU_CTRL),
+            sw_int1: sw_int.software_interrupt1,
+            sw_int2: sw_int.software_interrupt2,
+            #[cfg(multi_core)]
+            cpu_control: peripherals.CPU_CTRL,
         }
     }
 
     #[test]
     fn run_test_with_callbacks_api(ctx: Context) {
         let interrupt_executor =
-            mk_static!(InterruptExecutor<1>, InterruptExecutor::new(ctx.interrupt));
+            mk_static!(InterruptExecutor<2>, InterruptExecutor::new(ctx.sw_int2));
         let signal = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
         let response = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
@@ -123,7 +138,7 @@ mod test {
     #[test]
     fn run_interrupt_executor_test(ctx: Context) {
         let interrupt_executor =
-            mk_static!(InterruptExecutor<1>, InterruptExecutor::new(ctx.interrupt));
+            mk_static!(InterruptExecutor<2>, InterruptExecutor::new(ctx.sw_int2));
         let signal = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
         let response = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
@@ -131,7 +146,6 @@ mod test {
         spawner.must_spawn(responder_task(signal, response));
 
         let thread_executor = mk_static!(Executor, Executor::new());
-
         thread_executor.run(|spawner| {
             spawner.must_spawn(tester_task(signal, response));
         })
@@ -139,59 +153,57 @@ mod test {
 
     #[test]
     #[cfg(multi_core)]
-    fn run_interrupt_executor_test_on_core_1(mut ctx: Context) {
+    fn run_interrupt_executor_test_on_core_1(ctx: Context) {
         let app_core_stack = mk_static!(Stack<8192>, Stack::new());
         let response = &*mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
         let signal = &*mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
-        let cpu1_fnctn = {
-            move || {
+        esp_rtos::start_second_core(
+            ctx.cpu_control,
+            #[cfg(xtensa)]
+            ctx.sw_int0,
+            ctx.sw_int1,
+            app_core_stack,
+            || {
                 let interrupt_executor =
-                    mk_static!(InterruptExecutor<1>, InterruptExecutor::new(ctx.interrupt));
+                    mk_static!(InterruptExecutor<2>, InterruptExecutor::new(ctx.sw_int2));
 
                 let spawner = interrupt_executor.start(Priority::Priority3);
 
                 spawner.spawn(responder_task(signal, response)).unwrap();
-
-                loop {}
-            }
-        };
-
-        let guard = ctx
-            .cpu_control
-            .start_app_core(app_core_stack, cpu1_fnctn)
-            .unwrap();
+            },
+        );
 
         let thread_executor = mk_static!(Executor, Executor::new());
-
         thread_executor.run(|spawner| {
-            spawner.must_spawn(tester_task_multi_core(signal, response, guard));
+            spawner.must_spawn(tester_task_multi_core(signal, response));
         })
     }
 
     #[test]
     #[cfg(multi_core)]
-    fn run_thread_executor_test_on_core_1(mut ctx: Context) {
+    fn run_thread_executor_test_on_core_1(ctx: Context) {
         let app_core_stack = mk_static!(Stack<8192>, Stack::new());
         let signal = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
         let response = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
-        let cpu1_fnctn = || {
-            let executor = mk_static!(Executor, Executor::new());
-            executor.run(|spawner| {
-                spawner.spawn(responder_task(signal, response)).ok();
-            });
-        };
-
-        let guard = ctx
-            .cpu_control
-            .start_app_core(app_core_stack, cpu1_fnctn)
-            .unwrap();
+        esp_rtos::start_second_core(
+            ctx.cpu_control,
+            #[cfg(xtensa)]
+            ctx.sw_int0,
+            ctx.sw_int1,
+            app_core_stack,
+            || {
+                let executor = mk_static!(Executor, Executor::new());
+                executor.run(|spawner| {
+                    spawner.spawn(responder_task(signal, response)).ok();
+                });
+            },
+        );
 
         let thread_executor = mk_static!(Executor, Executor::new());
-
         thread_executor.run(|spawner| {
-            spawner.must_spawn(tester_task_multi_core(signal, response, guard));
+            spawner.must_spawn(tester_task_multi_core(signal, response));
         })
     }
 }

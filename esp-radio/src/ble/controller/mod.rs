@@ -2,7 +2,7 @@ use embedded_io::{Error, ErrorType, Read, Write};
 use esp_phy::PhyInitGuard;
 
 use super::{read_hci, read_next, send_hci};
-use crate::Controller;
+use crate::{Controller, ble::Config};
 
 /// A blocking HCI connector
 #[instability::unstable]
@@ -21,9 +21,10 @@ impl<'d> BleConnector<'d> {
     pub fn new(
         _init: &'d Controller<'d>,
         device: crate::hal::peripherals::BT<'d>,
+        config: Config,
     ) -> BleConnector<'d> {
         Self {
-            _phy_init_guard: crate::ble::ble_init(),
+            _phy_init_guard: crate::ble::ble_init(&config),
             _device: device,
         }
     }
@@ -180,23 +181,7 @@ pub(crate) mod asynch {
         match ControllerToHostPacket::from_hci_bytes_complete(data) {
             Ok(p) => Ok(Some(p)),
             Err(e) => {
-                if e == bt_hci::FromHciBytesError::InvalidSize {
-                    use bt_hci::{PacketKind, event::EventPacketHeader};
-
-                    // Some controllers emit a suprious command complete event at startup.
-                    let (kind, data) =
-                        PacketKind::from_hci_bytes(data).map_err(|_| BleConnectorError::Unknown)?;
-                    if kind == PacketKind::Event {
-                        let (header, _) = EventPacketHeader::from_hci_bytes(data)
-                            .map_err(|_| BleConnectorError::Unknown)?;
-                        const COMMAND_COMPLETE: u8 = 0x0E;
-                        if header.code == COMMAND_COMPLETE && header.params_len < 4 {
-                            return Ok(None);
-                        }
-                    }
-                }
                 warn!("[hci] error parsing packet: {:?}", e);
-
                 Err(BleConnectorError::Unknown)
             }
         }

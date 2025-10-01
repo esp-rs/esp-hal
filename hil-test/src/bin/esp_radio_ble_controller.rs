@@ -28,7 +28,7 @@ fn _esp_radio_can_be_reinited() {
     let p = esp_hal::init(esp_hal::Config::default());
 
     let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
-    esp_preempt::start(
+    esp_rtos::start(
         timg0.timer0,
         #[cfg(riscv)]
         unsafe {
@@ -65,7 +65,7 @@ mod tests {
     #[test]
     fn test_controller_comms(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             unsafe {
@@ -74,7 +74,7 @@ mod tests {
         );
         let init = esp_radio::init().unwrap();
 
-        let mut connector = BleConnector::new(&init, peripherals.BT);
+        let mut connector = BleConnector::new(&init, peripherals.BT, Default::default());
 
         // send reset cmd
         pub const fn opcode(ogf: u8, ocf: u16) -> [u8; 2] {
@@ -121,7 +121,7 @@ mod tests {
     #[test]
     fn test_dropping_controller_during_reset(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             unsafe {
@@ -130,7 +130,7 @@ mod tests {
         );
         let init = esp_radio::init().unwrap();
 
-        let mut connector = BleConnector::new(&init, peripherals.BT);
+        let mut connector = BleConnector::new(&init, peripherals.BT, Default::default());
 
         // send reset cmd
         pub const fn opcode(ogf: u8, ocf: u16) -> [u8; 2] {

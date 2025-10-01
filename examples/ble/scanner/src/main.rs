@@ -22,35 +22,27 @@ use trouble_host::prelude::*;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(_s: Spawner) {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
+
     esp_alloc::heap_allocator!(size: 72 * 1024);
-    let timg0 = TimerGroup::new(peripherals.TIMG0);
+
     #[cfg(target_arch = "riscv32")]
-    let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_preempt::start(
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_rtos::start(
         timg0.timer0,
         #[cfg(target_arch = "riscv32")]
-        software_interrupt.software_interrupt0,
+        sw_int.software_interrupt0,
     );
 
     static RADIO: StaticCell<esp_radio::Controller<'static>> = StaticCell::new();
     let radio = RADIO.init(esp_radio::init().unwrap());
 
-    #[cfg(not(feature = "esp32"))]
-    {
-        let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER);
-        esp_hal_embassy::init(systimer.alarm0);
-    }
-    #[cfg(feature = "esp32")]
-    {
-        esp_hal_embassy::init(timg0.timer1);
-    }
-
     let bluetooth = peripherals.BT;
-    let connector = BleConnector::new(radio, bluetooth);
+    let connector = BleConnector::new(radio, bluetooth, Default::default());
     let controller: ExternalController<_, 20> = ExternalController::new(connector);
 
     ble_scanner_run(controller).await;

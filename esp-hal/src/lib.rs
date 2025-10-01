@@ -306,7 +306,6 @@ macro_rules! unstable_driver {
     };
 }
 
-pub(crate) use unstable_driver;
 pub(crate) use unstable_module;
 
 unstable_module! {
@@ -637,6 +636,9 @@ pub struct Config {
 pub fn init(config: Config) -> Peripherals {
     crate::soc::pre_init();
 
+    #[cfg(stack_guard_monitoring)]
+    crate::soc::enable_main_stack_guard_monitoring();
+
     system::disable_peripherals();
 
     let mut peripherals = Peripherals::take();
@@ -698,6 +700,10 @@ pub fn init(config: Config) -> Peripherals {
 
     #[cfg(feature = "psram")]
     crate::psram::init_psram(config.psram);
+
+    unsafe {
+        esp_rom_sys::init_syscall_table();
+    }
 
     peripherals
 }

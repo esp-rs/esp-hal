@@ -12,7 +12,7 @@ use core::ffi::c_void;
 use defmt::info;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 #[cfg(multi_core)]
-use esp_hal::system::{CpuControl, Stack};
+use esp_hal::system::{Cpu, CpuControl, Stack};
 #[cfg(xtensa)]
 use esp_hal::xtensa_lx::interrupt::free as interrupt_free;
 use esp_hal::{
@@ -24,19 +24,19 @@ use esp_hal::{
 };
 #[cfg(riscv)]
 use esp_hal::{interrupt::software::SoftwareInterrupt, riscv::interrupt::free as interrupt_free};
-use esp_hal_embassy::InterruptExecutor;
 use esp_radio::InitializationError;
-use esp_radio_preempt_driver::{
+use esp_radio_rtos_driver::{
     self as preempt,
     semaphore::{SemaphoreHandle, SemaphoreKind},
 };
+use esp_rtos::{CurrentThreadHandle, embassy::InterruptExecutor, semaphore::Semaphore};
 use hil_test::mk_static;
-use portable_atomic::{AtomicUsize, Ordering};
+use portable_atomic::{AtomicBool, AtomicUsize, Ordering};
 use static_cell::StaticCell;
 
 #[allow(unused)] // compile test
 fn baremetal_preempt_can_be_initialized_with_any_timer(timer: esp_hal::timer::AnyTimer<'static>) {
-    esp_preempt::start(
+    esp_rtos::start(
         timer,
         #[cfg(riscv)]
         unsafe {
@@ -51,7 +51,7 @@ async fn try_init(
     timer: TIMG0<'static>,
 ) {
     let timg0 = TimerGroup::new(timer);
-    esp_preempt::start(
+    esp_rtos::start(
         timg0.timer0,
         #[cfg(riscv)]
         unsafe {
@@ -76,7 +76,7 @@ fn run_float_calc(x: f32) -> f32 {
 #[cfg(multi_core)]
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 
-#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 3, executor = esp_rtos::embassy::Executor::new())]
 mod tests {
     use super::*;
 
@@ -91,7 +91,7 @@ mod tests {
 
     #[test]
     fn test_init_fails_without_scheduler(_peripherals: Peripherals) {
-        // esp-preempt must be initialized before esp-radio.
+        // esp-rtos must be initialized before esp-radio.
         let init = esp_radio::init();
 
         assert!(matches!(
@@ -103,7 +103,7 @@ mod tests {
     #[test]
     fn test_init_fails_cs(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             unsafe {
@@ -119,7 +119,7 @@ mod tests {
     #[test]
     fn test_init_fails_interrupt_free(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             unsafe {
@@ -161,7 +161,7 @@ mod tests {
         #[cfg(riscv)]
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_ints.software_interrupt0,
@@ -181,11 +181,11 @@ mod tests {
     }
 
     #[test]
-    fn test_esp_preempt_sleep_wakes_up(p: Peripherals) {
+    fn test_esp_rtos_sleep_wakes_up(p: Peripherals) {
         #[cfg(riscv)]
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_ints.software_interrupt0,
@@ -193,18 +193,18 @@ mod tests {
 
         let now = Instant::now();
 
-        preempt::usleep(10_000);
+        CurrentThreadHandle::get().delay(Duration::from_millis(10));
 
         hil_test::assert!(now.elapsed() >= Duration::from_millis(10));
     }
 
     #[test]
     #[timeout(2)]
-    fn test_esp_preempt_time_sliicng(p: Peripherals) {
+    fn test_esp_rtos_time_slicing(p: Peripherals) {
         #[cfg(riscv)]
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_ints.software_interrupt0,
@@ -246,11 +246,6 @@ mod tests {
             }
 
             context.time_slice_observed.give();
-
-            // TODO: support one-shot tasks in esp-preempt
-            unsafe {
-                preempt::schedule_task_deletion(core::ptr::null_mut());
-            }
         }
 
         unsafe {
@@ -277,17 +272,11 @@ mod tests {
     }
 
     #[test]
-    fn test_esp_preempt_priority_inheritance(p: Peripherals) {
-        use core::ffi::c_void;
-
-        use esp_radio_preempt_driver as preempt;
-        use portable_atomic::{AtomicBool, Ordering};
-        use preempt::semaphore::{SemaphoreHandle, SemaphoreKind};
-
+    fn test_esp_rtos_priority_inheritance(p: Peripherals) {
         #[cfg(riscv)]
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_ints.software_interrupt0,
@@ -312,15 +301,15 @@ mod tests {
         // The medium priority task will assert that the high priority task has finished.
 
         struct TestContext {
-            ready_semaphore: SemaphoreHandle,
-            mutex: SemaphoreHandle,
+            ready_semaphore: Semaphore,
+            mutex: Semaphore,
             high_priority_task_finished: AtomicBool,
         }
         let mut test_context = TestContext {
             // This semaphore signals the end of the test
-            ready_semaphore: SemaphoreHandle::new(SemaphoreKind::Counting { max: 1, initial: 0 }),
+            ready_semaphore: Semaphore::new_counting(0, 1),
             // We'll use this mutex to test priority inheritance
-            mutex: SemaphoreHandle::new(SemaphoreKind::Mutex),
+            mutex: Semaphore::new_mutex(false),
             high_priority_task_finished: AtomicBool::new(false),
         };
 
@@ -342,11 +331,6 @@ mod tests {
 
             info!("High: released mutex");
             context.mutex.give();
-
-            // TODO: support one-shot tasks in esp-preempt
-            unsafe {
-                preempt::schedule_task_deletion(core::ptr::null_mut());
-            }
         }
         extern "C" fn medium_priority_task(context: *mut c_void) {
             let context = unsafe { &*(context as *const TestContext) };
@@ -356,11 +340,6 @@ mod tests {
 
             info!("Medium: marking test finished");
             context.ready_semaphore.give();
-
-            // TODO: support one-shot tasks in esp-preempt
-            unsafe {
-                preempt::schedule_task_deletion(core::ptr::null_mut());
-            }
         }
 
         unsafe {
@@ -394,13 +373,7 @@ mod tests {
 
     #[test]
     #[cfg(multi_core)]
-    fn test_esp_preempt_smp(p: Peripherals) {
-        use core::ffi::c_void;
-
-        use esp_hal::system::Cpu;
-        use esp_radio_preempt_driver as preempt;
-        use preempt::semaphore::{SemaphoreHandle, SemaphoreKind};
-
+    fn test_esp_rtos_smp(p: Peripherals) {
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
 
         let timg0 = TimerGroup::new(p.TIMG0);
@@ -409,12 +382,12 @@ mod tests {
         // increment a counter, if they are scheduled to run on their specific core.
 
         struct TestContext {
-            ready_semaphore: SemaphoreHandle,
+            ready_semaphore: Semaphore,
         }
         let test_context = TestContext {
             // This semaphore signals the end of the test. Each test case will give it once it is
             // done.
-            ready_semaphore: SemaphoreHandle::new(SemaphoreKind::Counting { max: 2, initial: 0 }),
+            ready_semaphore: Semaphore::new_counting(0, 2),
         };
 
         fn count_impl(context: &TestContext, core: Cpu) {
@@ -437,30 +410,20 @@ mod tests {
             let context = unsafe { &*(context as *const TestContext) };
 
             count_impl(context, Cpu::AppCpu);
-
-            // TODO: support one-shot tasks in esp-preempt
-            unsafe {
-                preempt::schedule_task_deletion(core::ptr::null_mut());
-            }
         }
         extern "C" fn count_on_pro_core(context: *mut c_void) {
             let context = unsafe { &*(context as *const TestContext) };
 
             count_impl(context, Cpu::ProCpu);
-
-            // TODO: support one-shot tasks in esp-preempt
-            unsafe {
-                preempt::schedule_task_deletion(core::ptr::null_mut());
-            }
         }
 
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             sw_ints.software_interrupt0,
         );
 
-        esp_preempt::start_second_core(
+        esp_rtos::start_second_core(
             p.CPU_CTRL,
             #[cfg(xtensa)]
             sw_ints.software_interrupt0,
@@ -552,14 +515,14 @@ mod tests {
         let timg0 = TimerGroup::new(p.TIMG0);
         #[cfg(riscv)]
         let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-        esp_preempt::start(
+        esp_rtos::start(
             timg0.timer0,
             #[cfg(riscv)]
             software_interrupt,
         );
 
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_preempt::start_second_core::<8192>(
+        esp_rtos::start_second_core::<8192>(
             p.CPU_CTRL,
             sw_ints.software_interrupt0,
             sw_ints.software_interrupt1,

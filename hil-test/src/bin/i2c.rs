@@ -25,8 +25,9 @@ use esp_hal::{
         software::{SoftwareInterrupt, SoftwareInterruptControl},
     },
     time,
+    timer::timg::TimerGroup,
 };
-use esp_hal_embassy::InterruptExecutor;
+use esp_rtos::embassy::InterruptExecutor;
 use hil_test::mk_static;
 
 struct Context {
@@ -65,10 +66,14 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        hil_test::init_embassy!(peripherals, 2);
+        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_int.software_interrupt0,
+        );
         let (sda, scl) = hil_test::i2c_pins!(peripherals);
-
-        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
         // Create a new peripheral object with the described wiring and standard
         // I2C clock speed:
@@ -79,7 +84,7 @@ mod tests {
 
         Context {
             i2c,
-            interrupt: sw_ints.software_interrupt1,
+            interrupt: sw_int.software_interrupt1,
         }
     }
 

@@ -1,16 +1,20 @@
-//! ## Feature Flags
-#![doc = document_features::document_features!()]
-#![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
-//! This is a lightweight crate for obtaining backtraces during panics, exceptions, and hard faults
-//! on Espressif devices. It provides optional panic and exception handlers and supports a range of
-//! output options, all configurable through feature flags.
+//! This is a lightweight crate for obtaining backtraces on Espressif devices.
+//!
+//! It provides an optional panic handler and supports a range of output options, all configurable
+//! through feature flags.
+#![cfg_attr(target_arch = "riscv32", doc = "\n")]
 #![cfg_attr(
     target_arch = "riscv32",
-    doc = "Please note that you **need** to force frame pointers (i.e. `\"-C\", \"force-frame-pointers\",` in your `.cargo/config.toml`)"
+    doc = "\nPlease note that you **need** to force frame pointers (i.e. `\"-C\", \"force-frame-pointers\",` in your `.cargo/config.toml`).\n"
 )]
+#![cfg_attr(
+    target_arch = "riscv32",
+    doc = "Otherwise the panic handler will emit a stack dump which needs tooling to decode it.\n\n"
+)]
+#![cfg_attr(target_arch = "riscv32", doc = "\n")]
 //! You can get an array of backtrace addresses (limited to 10 entries by default) via
-//! `arch::backtrace()` if you want to create a backtrace yourself (i.e. not using the panic or
-//! exception handler).
+//! `arch::backtrace()` if you want to create a backtrace yourself (i.e. not using the panic
+//! handler).
 //!
 //! ## Features
 #![doc = document_features::document_features!()]
@@ -23,6 +27,7 @@
 #![doc = ""]
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_backtrace_config_table.md"))]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+#![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
 #![no_std]
 
 #[macro_use]
@@ -74,6 +79,9 @@ macro_rules! println {
     };
 }
 
+#[cfg(all(feature = "panic-handler", feature = "defmt", stack_dump))]
+pub(crate) use println;
+
 #[cfg(all(feature = "panic-handler", feature = "println"))]
 macro_rules! println {
     ($($arg:tt)*) => {
@@ -91,7 +99,7 @@ fn set_color_code(_code: &str) {
 
 #[cfg_attr(target_arch = "riscv32", path = "riscv.rs")]
 #[cfg_attr(target_arch = "xtensa", path = "xtensa.rs")]
-pub mod arch;
+pub(crate) mod arch;
 
 #[cfg(feature = "panic-handler")]
 #[panic_handler]
@@ -105,19 +113,26 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     println!("{}", info);
     set_color_code(RESET);
 
-    println!("");
-    println!("Backtrace:");
-    println!("");
+    cfg_if::cfg_if! {
+        if #[cfg(not(stack_dump))]
+        {
+            println!("");
+            println!("Backtrace:");
+            println!("");
 
-    let backtrace = Backtrace::capture();
-    #[cfg(target_arch = "riscv32")]
-    if backtrace.frames().is_empty() {
-        println!(
-            "No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)"
-        );
-    }
-    for frame in backtrace.frames() {
-        println!("0x{:x}", frame.program_counter());
+            let backtrace = Backtrace::capture();
+            #[cfg(target_arch = "riscv32")]
+            if backtrace.frames().is_empty() {
+                println!(
+                    "No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)"
+                );
+            }
+            for frame in backtrace.frames() {
+                println!("0x{:x}", frame.program_counter());
+            }
+        } else {
+            arch::dump_stack();
+        }
     }
 
     abort()

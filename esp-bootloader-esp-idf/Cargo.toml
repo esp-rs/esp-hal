@@ -2,7 +2,7 @@
 name = "esp-bootloader-esp-idf"
 version = "0.2.0"
 edition = "2024"
-rust-version = "1.86.0"
+rust-version = "1.88.0"
 description = "Functionality related to the esp-idf bootloader"
 documentation = "https://docs.espressif.com/projects/rust/esp-bootloader-esp-idf/latest/"
 keywords = ["esp32", "espressif", "no-std"]

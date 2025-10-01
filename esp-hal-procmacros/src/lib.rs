@@ -22,8 +22,9 @@
 //!    sections, such as SRAM or RTC RAM (slow or fast) with different initialization options. See
 //!    its documentation for details.
 //!
-//!  - [`embassy::main`](macro@embassy_main) - Creates a new `executor` instance and declares an
-//!    application entry point spawning the corresponding function body as an async task.
+//!  - [`esp_rtos::main`](macro@rtos_main) - Creates a new instance of `esp_rtos::embassy::Executor`
+//!    and declares an application entry point spawning the corresponding function body as an async
+//!    task.
 //!
 //! ## Examples
 //!
@@ -48,8 +49,6 @@ mod alert;
 mod blocking;
 mod builder;
 mod doc_replace;
-#[cfg(feature = "embassy")]
-mod embassy;
 mod interrupt;
 #[cfg(any(
     feature = "is-lp-core",
@@ -59,6 +58,7 @@ mod interrupt;
 ))]
 mod lp_core;
 mod ram;
+mod rtos_main;
 
 /// Sets which segment of RAM to use for a function or static and how it should
 /// be initialized.
@@ -193,7 +193,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
     lp_core::entry(args, input)
 }
 
-/// Creates a new `executor` instance and declares an application entry point
+/// Creates a new instance of `esp_rtos::embassy::Executor` and declares an application entry point
 /// spawning the corresponding function body as an async task.
 ///
 /// The following restrictions apply:
@@ -208,15 +208,14 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 /// Spawning a task:
 ///
 /// ``` rust
-/// #[main]
+/// #[esp_rtos::main]
 /// async fn main(_s: embassy_executor::Spawner) {
 ///     // Function body
 /// }
 /// ```
-#[cfg(feature = "embassy")]
 #[proc_macro_attribute]
-pub fn embassy_main(args: TokenStream, item: TokenStream) -> TokenStream {
-    embassy::main(args, item)
+pub fn rtos_main(args: TokenStream, item: TokenStream) -> TokenStream {
+    rtos_main::main(args, item)
 }
 
 /// Attribute to declare the entry point of the program

@@ -6,10 +6,13 @@
 #![no_std]
 #![no_main]
 
+#[cfg(riscv)]
+use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::{
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     peripherals::Peripherals,
+    timer::timg::TimerGroup,
     uart::{self, Uart, uhci::Uhci},
 };
 
@@ -52,6 +55,16 @@ mod tests {
 
     #[test]
     fn test_send_receive(ctx: Context) {
+        #[cfg(riscv)]
+        let sw_int = SoftwareInterruptControl::new(ctx.peripherals.SW_INTERRUPT);
+
+        let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_int.software_interrupt0,
+        );
+
         let (rx, tx) = hil_test::common_test_pins!(ctx.peripherals);
         let uart = Uart::new(ctx.peripherals.UART0, uart::Config::default())
             .unwrap()
@@ -106,6 +119,16 @@ mod tests {
 
     #[test]
     fn test_long_strings(ctx: Context) {
+        #[cfg(riscv)]
+        let sw_int = SoftwareInterruptControl::new(ctx.peripherals.SW_INTERRUPT);
+
+        let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_int.software_interrupt0,
+        );
+
         let (rx, tx) = hil_test::common_test_pins!(ctx.peripherals);
         let uart = Uart::new(ctx.peripherals.UART0, uart::Config::default())
             .unwrap()
@@ -160,6 +183,16 @@ mod tests {
 
     #[test]
     async fn test_send_receive_async(ctx: Context) {
+        #[cfg(riscv)]
+        let sw_int = SoftwareInterruptControl::new(ctx.peripherals.SW_INTERRUPT);
+
+        let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_int.software_interrupt0,
+        );
+
         let (rx, tx) = hil_test::common_test_pins!(ctx.peripherals);
         let uart = Uart::new(ctx.peripherals.UART0, uart::Config::default())
             .unwrap()
@@ -216,6 +249,16 @@ mod tests {
 
     #[test]
     async fn test_long_strings_async(ctx: Context) {
+        #[cfg(riscv)]
+        let sw_int = SoftwareInterruptControl::new(ctx.peripherals.SW_INTERRUPT);
+
+        let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_int.software_interrupt0,
+        );
+
         let (rx, tx) = hil_test::common_test_pins!(ctx.peripherals);
         let uart = Uart::new(ctx.peripherals.UART0, uart::Config::default())
             .unwrap()

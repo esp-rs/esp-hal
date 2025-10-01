@@ -14,9 +14,10 @@ use esp_hal::{
         Priority,
         software::{SoftwareInterrupt, SoftwareInterruptControl},
     },
+    timer::timg::TimerGroup,
     uart::{self, Uart, UartRx},
 };
-use esp_hal_embassy::InterruptExecutor;
+use esp_rtos::embassy::InterruptExecutor;
 use hil_test::mk_static;
 
 struct Context {
@@ -65,9 +66,17 @@ mod tests {
             .with_rx(rx)
             .into_async();
 
-        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_int.software_interrupt0,
+        );
+
         Context {
-            interrupt: sw_ints.software_interrupt1,
+            interrupt: sw_int.software_interrupt1,
             uart,
         }
     }

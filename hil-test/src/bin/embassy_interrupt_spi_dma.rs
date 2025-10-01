@@ -2,10 +2,6 @@
 
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c3 esp32c6 esp32h2
 //% FEATURES: unstable embassy
-//% ENV(single_integrated):   ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE = single-integrated
-//% ENV(multiple_integrated): ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE = multiple-integrated
-//% ENV(generic_queue):       ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE = generic
-//% ENV(generic_queue):       ESP_HAL_EMBASSY_CONFIG_GENERIC_QUEUE_SIZE = 16
 
 #![no_std]
 #![no_main]
@@ -21,9 +17,9 @@ use esp_hal::{
         master::{Config, Spi},
     },
     time::Rate,
-    timer::AnyTimer,
+    timer::timg::TimerGroup,
 };
-use esp_hal_embassy::InterruptExecutor;
+use esp_rtos::embassy::InterruptExecutor;
 use hil_test::mk_static;
 use portable_atomic::AtomicBool;
 
@@ -83,24 +79,14 @@ mod test {
     #[test]
     async fn dma_does_not_lock_up_when_used_in_different_executors() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
-        cfg_if::cfg_if! {
-            if #[cfg(systimer)] {
-                use esp_hal::timer::systimer::SystemTimer;
-                let systimer = SystemTimer::new(peripherals.SYSTIMER);
-                esp_hal_embassy::init([
-                    AnyTimer::from(systimer.alarm0),
-                    AnyTimer::from(systimer.alarm1),
-                ]);
-            } else {
-                use esp_hal::timer::timg::TimerGroup;
-                let timg0 = TimerGroup::new(peripherals.TIMG0);
-                esp_hal_embassy::init([
-                    AnyTimer::from(timg0.timer0),
-                    AnyTimer::from(timg0.timer1),
-                ]);
-            }
-        }
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_int.software_interrupt0,
+        );
 
         cfg_if::cfg_if! {
             if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
@@ -152,11 +138,9 @@ mod test {
         )
         .unwrap();
 
-        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-
         let interrupt_executor = mk_static!(
             InterruptExecutor<1>,
-            InterruptExecutor::new(sw_ints.software_interrupt1)
+            InterruptExecutor::new(sw_int.software_interrupt1)
         );
 
         let spawner = interrupt_executor.start(Priority::Priority3);
@@ -193,7 +177,10 @@ mod test {
     #[test]
     async fn dma_does_not_lock_up_on_core_1() {
         use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
-        use esp_hal::peripherals::SPI2;
+        use esp_hal::{
+            peripherals::{CPU_CTRL, SPI2},
+            system::{Cpu, CpuControl, Stack},
+        };
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
@@ -242,23 +229,13 @@ mod test {
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        cfg_if::cfg_if! {
-            if #[cfg(systimer)] {
-                use esp_hal::timer::systimer::SystemTimer;
-                let systimer = SystemTimer::new(peripherals.SYSTIMER);
-                esp_hal_embassy::init([
-                    AnyTimer::from(systimer.alarm0),
-                    AnyTimer::from(systimer.alarm1),
-                ]);
-            } else {
-                use esp_hal::timer::timg::TimerGroup;
-                let timg0 = TimerGroup::new(peripherals.TIMG0);
-                esp_hal_embassy::init([
-                    AnyTimer::from(timg0.timer0),
-                    AnyTimer::from(timg0.timer1),
-                ]);
-            }
-        }
+        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_int.software_interrupt0,
+        );
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
@@ -275,14 +252,17 @@ mod test {
             dma_channel,
         };
 
-        let cpu1_fnctn = {
-            move || {
+        let app_core_stack = mk_static!(Stack<8192>, Stack::new());
+
+        esp_rtos::start_second_core(
+            peripherals.CPU_CTRL,
+            #[cfg(xtensa)]
+            sw_int.software_interrupt0,
+            sw_int.software_interrupt1,
+            app_core_stack,
+            || {
                 use esp_hal::interrupt::Priority;
-                use esp_hal_embassy::InterruptExecutor;
-                let sw_ints = esp_hal::interrupt::software::SoftwareInterruptControl::new(
-                    peripherals.SW_INTERRUPT,
-                );
-                let software_interrupt = sw_ints.software_interrupt2;
+                let software_interrupt = sw_int.software_interrupt2;
                 let hp_executor = mk_static!(
                     InterruptExecutor<2>,
                     InterruptExecutor::new(software_interrupt)
@@ -293,22 +273,8 @@ mod test {
                 high_pri_spawner
                     .spawn(run_spi(spi_peripherals, transfer_finished))
                     .ok();
-
-                // This loop is necessary to avoid parking the core after creating the interrupt
-                // executor.
-                loop {}
-            }
-        };
-
-        use esp_hal::system::{CpuControl, Stack};
-        const DISPLAY_STACK_SIZE: usize = 8192;
-        let app_core_stack = mk_static!(Stack<DISPLAY_STACK_SIZE>, Stack::new());
-        let cpu_control = CpuControl::new(peripherals.CPU_CTRL);
-        let mut _cpu_control = cpu_control;
-
-        let _guard = _cpu_control
-            .start_app_core(app_core_stack, cpu1_fnctn)
-            .unwrap();
+            },
+        );
 
         // Wait for a few SPI transfers to happen
         for _ in 0..5 {
@@ -318,5 +284,10 @@ mod test {
         // make sure the other peripheral didn't get stuck
         STOP_INTERRUPT_TASK.store(true, portable_atomic::Ordering::Relaxed);
         while INTERRUPT_TASK_WORKING.load(portable_atomic::Ordering::Relaxed) {}
+
+        unsafe {
+            // Park the second core, we don't need it anymore
+            CpuControl::new(CPU_CTRL::steal()).park_core(Cpu::AppCpu);
+        }
     }
 }

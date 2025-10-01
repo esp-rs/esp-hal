@@ -2,10 +2,10 @@
 
 ## Initialization
 
-The `builtin-scheduler` feature has been removed. The functionality has been moved to `esp_preempt`.
-`esp_preempt` needs to be initialized before calling `esp_radio::init`. Failure to do so will result in an error.
+The `builtin-scheduler` feature has been removed. The functionality has been moved to `esp_rtos`.
+`esp_rtos` needs to be initialized before calling `esp_radio::init`. Failure to do so will result in an error.
 
-Depending on your chosen OS, you may need to use other `esp_preempt` implementations.
+Depending on your chosen OS, you may need to use other `esp_rtos` implementations.
 
 Furthermore, `esp_radio::init` no longer requires `RNG` or a timer.
 
@@ -13,17 +13,17 @@ On Xtensa devices (ESP32/S2/S3):
 
 ```diff
 -let esp_wifi_ctrl = esp_wifi::init(timg0.timer0, Rng::new()).unwrap();
-+esp_preempt::start(timg0.timer0);
++esp_rtos::start(timg0.timer0);
 +let esp_wifi_ctrl = esp_radio::init().unwrap();
 ```
 
-On RISC-V devices (ESP32-C2/C3/C6/H2) you'll need to also pass `SoftwareInterrupt<0>` to `esp_preempt::start`:
+On RISC-V devices (ESP32-C2/C3/C6/H2) you'll need to also pass `SoftwareInterrupt<0>` to `esp_rtos::start`:
 
 ```diff
 -let esp_wifi_ctrl = esp_wifi::init(timg0.timer0, Rng::new()).unwrap();
 +use esp_hal::interrupt::software::SoftwareInterruptControl;
 +let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-+esp_preempt::start(timg0.timer0, software_interrupt.software_interrupt0);
++esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
 +let esp_wifi_ctrl = esp_radio::init().unwrap();
 ```
 
@@ -105,7 +105,7 @@ Same for `set_configuration()` to `set_config()`:
 + let res = controller.set_config(&ap_config);
 ```
 
-## BuilderLite pattern `AccessPointConfig` and `ClientConfig`
+### BuilderLite pattern `AccessPointConfig` and `ClientConfig`
 
 ```diff
 - let ap_config = Config::AccessPoint({
@@ -114,6 +114,18 @@ Same for `set_configuration()` to `set_config()`:
 -         config
 -     });
 + let ap_config = Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
+```
+
+### BLE
+
+The `BleController` can now be configured using `esp_radio::ble::Config`:
+
+```diff
+ let mut connector = BleConnector::new(
+     &init,
+     peripherals.BT,
++    Config::default().with_task_priority(10),
+ );
 ```
 
 ## WifiState

@@ -12,7 +12,7 @@ options:
                RAM consumption."
   default:
     - value: true
-  stability: !Stable '1.0.0-beta.0'
+  stability: !Stable '1.0.0'
 
 - name: place-anon-in-ram
   description: "Places anonymous symbols into RAM - resulting in better performance
@@ -20,7 +20,7 @@ options:
                `place-switch-tables-in-ram`."
   default:
     - value: false
-  stability: !Stable '1.0.0-beta.0'
+  stability: !Stable '1.0.0'
 
 - name: place-rmt-driver-in-ram
   description: Places the RMT driver in RAM for better performance
@@ -95,16 +95,22 @@ options:
   active: 'feature("psram")'
 
 - name: stack-guard-offset
-  description: The stack guard variable will be placed this many bytes from the stack's end.
+  description: The stack guard variable will be placed this many bytes from the stack's end. Needs to be a multiple of 4.
   default:
-    - value: 4096
+    - value: 60
   active: 'true'
+  stability: !Stable '1.0.0'
 
 - name: stack-guard-value
   description: The value to be written to the stack guard variable.
   default:
     - value: 3740121773
   display_hint: Hex
+
+- name: stack-guard-monitoring
+  description: Use a data watchpoint to check if the stack guard was overwritten.
+  default:
+    - value: true
 
 - name: impl-critical-section
   description: "Provide a `critical-section` implementation. Note that if disabled,
@@ -186,3 +192,6 @@ options:
           - '4'
           - '8'
   active: 'chip == "esp32s3"'
+
+checks:
+  - "ESP_HAL_CONFIG_STACK_GUARD_OFFSET % 4 == 0"

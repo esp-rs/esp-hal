@@ -13,9 +13,7 @@ esp-backtrace = { path = "../../../esp-backtrace", features = [
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
 esp-println = { path = "../../../esp-println", features = ["log-04"] }
-esp-preempt = { path = "../../../esp-preempt", features = [
-    "log-04",
-] }
+esp-rtos = { path = "../../../esp-rtos", features = ["log-04"] }
 esp-radio = { path = "../../../esp-radio", features = [
     "log-04",
     "sniffer",
@@ -29,42 +27,42 @@ esp32 = [
     "esp-backtrace/esp32",
     "esp-bootloader-esp-idf/esp32",
     "esp-hal/esp32",
-    "esp-preempt/esp32",
+    "esp-rtos/esp32",
     "esp-radio/esp32",
 ]
 esp32c2 = [
     "esp-backtrace/esp32c2",
     "esp-bootloader-esp-idf/esp32c2",
     "esp-hal/esp32c2",
-    "esp-preempt/esp32c2",
+    "esp-rtos/esp32c2",
     "esp-radio/esp32c2",
 ]
 esp32c3 = [
     "esp-backtrace/esp32c3",
     "esp-bootloader-esp-idf/esp32c3",
     "esp-hal/esp32c3",
-    "esp-preempt/esp32c3",
+    "esp-rtos/esp32c3",
     "esp-radio/esp32c3",
 ]
 esp32c6 = [
     "esp-backtrace/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
     "esp-hal/esp32c6",
-    "esp-preempt/esp32c6",
+    "esp-rtos/esp32c6",
     "esp-radio/esp32c6",
 ]
 esp32s2 = [
     "esp-backtrace/esp32s2",
     "esp-bootloader-esp-idf/esp32s2",
     "esp-hal/esp32s2",
-    "esp-preempt/esp32s2",
+    "esp-rtos/esp32s2",
     "esp-radio/esp32s2",
 ]
 esp32s3 = [
     "esp-backtrace/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
     "esp-hal/esp32s3",
-    "esp-preempt/esp32s3",
+    "esp-rtos/esp32s3",
     "esp-radio/esp32s3",
 ]
 

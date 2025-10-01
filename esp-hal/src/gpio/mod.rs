@@ -434,7 +434,7 @@ pub trait Pin: Sealed {
     ///     }
     /// }
     ///
-    /// let pins: [AnyPin; 2] = [peripherals.GPIO5.degrade(), peripherals.GPIO6.degrade()];
+    /// let pins: [AnyPin; 2] = [peripherals.GPIO5.degrade(), peripherals.GPIO4.degrade()];
     ///
     /// let mut delay = Delay::new();
     /// toggle_pins(pins, &mut delay);

@@ -1001,7 +1001,18 @@ pub(crate) mod utils {
 
             fn configure_gpio(gpio: u8, field: Field, bits: u8) {
                 unsafe {
-                    let ptr = crate::gpio::io_mux_reg(gpio);
+                    // pins 6-11 should not be exposed to the user, so we access them directly to
+                    // configure the gpios for PSRAM
+                    let ptr = match gpio {
+                        6 => crate::peripherals::IO_MUX::regs().gpio6(),
+                        7 => crate::peripherals::IO_MUX::regs().gpio7(),
+                        8 => crate::peripherals::IO_MUX::regs().gpio8(),
+                        9 => crate::peripherals::IO_MUX::regs().gpio9(),
+                        10 => crate::peripherals::IO_MUX::regs().gpio10(),
+                        11 => crate::peripherals::IO_MUX::regs().gpio11(),
+                        _ => crate::gpio::io_mux_reg(gpio),
+                    };
+
                     ptr.modify(|_, w| apply_to_field!(w, field, bits));
                 }
             }

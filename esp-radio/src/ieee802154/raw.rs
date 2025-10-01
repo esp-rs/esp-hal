@@ -29,19 +29,18 @@ use super::{
 
 const PHY_ENABLE_VERSION_PRINT: u8 = 1;
 
-const RX_QUEUE_SIZE: usize =
-    esp_config::esp_config_int!(usize, "ESP_RADIO_CONFIG_IEEE802154_RX_QUEUE_SIZE");
-
 static mut RX_BUFFER: [u8; FRAME_SIZE] = [0u8; FRAME_SIZE];
 
 struct IeeeState {
     state: Ieee802154State,
     rx_queue: Queue<RawReceived>,
+    rx_queue_size: usize,
 }
 
 static STATE: NonReentrantMutex<IeeeState> = NonReentrantMutex::new(IeeeState {
     state: Ieee802154State::Idle,
     rx_queue: Queue::new(),
+    rx_queue_size: 10,
 });
 
 unsafe extern "C" {
@@ -184,6 +183,12 @@ pub fn tx_init(frame: *const u8) {
         // set rx pointer for ack frame
         set_next_rx_buffer();
     }
+}
+
+pub(crate) fn set_queue_size(rx_queue_size: usize) {
+    STATE.with(|state| {
+        state.rx_queue_size = rx_queue_size;
+    });
 }
 
 pub fn ieee802154_transmit(frame: *const u8, cca: bool) -> i32 {
@@ -385,7 +390,7 @@ fn zb_mac_handler() {
             );
             let mut state_for_notify = Ieee802154State::Idle;
             STATE.with(|state| {
-                if state.rx_queue.len() <= RX_QUEUE_SIZE {
+                if state.rx_queue.len() <= state.rx_queue_size {
                     let item = RawReceived {
                         data: RX_BUFFER,
                         channel: freq_to_channel(freq()),
@@ -416,7 +421,7 @@ fn zb_mac_handler() {
     }
 
     if events & Event::AckRxDone != 0 {
-        info!("EventAckRxDone");
+        trace!("EventAckRxDone");
     }
 
     if events & Event::AckTxDone != 0 {

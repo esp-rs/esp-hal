@@ -137,9 +137,17 @@ mod tests {
 
         #[cfg(feature = "unstable")]
         {
+            #[cfg(riscv)]
+            let sw_int = esp_hal::interrupt::software::SoftwareInterruptControl::new(
+                peripherals.SW_INTERRUPT,
+            );
             // Timers are unstable
             let timg0 = TimerGroup::new(peripherals.TIMG0);
-            esp_hal_embassy::init(timg0.timer0);
+            esp_rtos::start(
+                timg0.timer0,
+                #[cfg(riscv)]
+                sw_int.software_interrupt0,
+            );
         }
 
         Context {
@@ -490,7 +498,7 @@ mod tests {
     #[cfg(feature = "unstable")]
     fn interrupt_executor_is_not_frozen(ctx: Context) {
         use esp_hal::interrupt::{Priority, software::SoftwareInterrupt};
-        use esp_hal_embassy::InterruptExecutor;
+        use esp_rtos::embassy::InterruptExecutor;
         use static_cell::StaticCell;
 
         static INTERRUPT_EXECUTOR: StaticCell<InterruptExecutor<1>> = StaticCell::new();
@@ -553,11 +561,14 @@ mod tests {
         // exact number of edge transitions.
 
         use esp_hal::{
-            peripherals::CPU_CTRL,
-            system::{CpuControl, Stack},
+            interrupt::software::SoftwareInterruptControl,
+            peripherals::{CPU_CTRL, SW_INTERRUPT},
+            system::{Cpu, CpuControl, Stack},
         };
-        use esp_hal_embassy::Executor;
+        use esp_rtos::embassy::Executor;
         use hil_test::mk_static;
+
+        let sw_int = unsafe { SoftwareInterruptControl::new(SW_INTERRUPT::steal()) };
 
         let mut out_pin = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
         let in_pin = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
@@ -566,19 +577,22 @@ mod tests {
         let input_pin_listening = &*mk_static!(Signal<CriticalSectionRawMutex, u32>, Signal::new());
 
         // No need to thread this through `Context` for one test case
-        let cpu_ctrl = unsafe { CPU_CTRL::steal() };
         const CORE1_STACK_SIZE: usize = 8192;
         let app_core_stack = mk_static!(Stack<CORE1_STACK_SIZE>, Stack::new());
-        let _second_core = CpuControl::new(cpu_ctrl)
-            .start_app_core(app_core_stack, {
-                move || {
-                    let executor = mk_static!(Executor, Executor::new());
-                    executor.run(|spawner| {
-                        spawner.must_spawn(edge_counter_task(in_pin, input_pin_listening));
-                    });
-                }
-            })
-            .unwrap();
+
+        esp_rtos::start_second_core(
+            unsafe { CPU_CTRL::steal() },
+            #[cfg(xtensa)]
+            sw_int.software_interrupt0,
+            sw_int.software_interrupt1,
+            app_core_stack,
+            move || {
+                let executor = mk_static!(Executor, Executor::new());
+                executor.run(|spawner| {
+                    spawner.must_spawn(edge_counter_task(in_pin, input_pin_listening));
+                });
+            },
+        );
 
         // Now drive the OutputPin and assert that the other core saw exactly as many
         // edges as we generated here.
@@ -591,5 +605,10 @@ mod tests {
         let edge_counter = input_pin_listening.wait().await;
 
         assert_eq!(edge_counter, EDGE_COUNT);
+
+        unsafe {
+            // Park the second core, we don't need it anymore
+            CpuControl::new(CPU_CTRL::steal()).park_core(Cpu::AppCpu);
+        }
     }
 }

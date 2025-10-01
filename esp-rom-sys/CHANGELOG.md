@@ -9,12 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Initialize the syscall table (#4177)
 
 ### Changed
 
+- Updated linker scripts (#4113)
 
 ### Fixed
 
+- esp32: c2, c3, s2, s3: fixed "Defalut" typo in ld scripts (#4180)
 
 ### Removed
 

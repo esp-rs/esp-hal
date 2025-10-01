@@ -79,7 +79,7 @@ critical-section = ["dep:esp-sync"]
 ## When using [`esp_hal`], you can define this function as follows:
 ##
 ## ```rust
-## #[no_mangle]
+## #[unsafe(no_mangle)]
 ## pub extern "Rust" fn _esp_println_timestamp() -> u64 {
 ##     esp_hal::time::Instant::now()
 ##         .duration_since_epoch()

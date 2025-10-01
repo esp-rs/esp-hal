@@ -13,6 +13,8 @@ use core::{
 
 use embassy_executor::{Spawner, raw::TaskStorage};
 use esp_backtrace as _;
+#[cfg(target_arch = "riscv32")]
+use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::{
     clock::{Clock, CpuClock},
     handler,
@@ -75,12 +77,18 @@ async fn task3() {
     }
 }
 
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(spawner: Spawner) {
     let config = esp_hal::Config::default().with_cpu_clock(CLOCK);
     let peripherals = esp_hal::init(config);
+    #[cfg(target_arch = "riscv32")]
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
-    esp_hal_embassy::init(systimer.alarm0);
+    esp_rtos::start(
+        systimer.alarm0,
+        #[cfg(target_arch = "riscv32")]
+        sw_int.software_interrupt0,
+    );
     println!("Embassy initialized!");
 
     spawner.spawn(TASK1.spawn(|| Task1 {})).unwrap();

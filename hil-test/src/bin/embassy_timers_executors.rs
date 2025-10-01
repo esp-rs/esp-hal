@@ -9,33 +9,17 @@
 use embassy_futures::select::select;
 use embassy_time::{Duration, Ticker, Timer};
 #[cfg(not(feature = "esp32"))]
+use esp_hal::timer::systimer::SystemTimer;
 use esp_hal::{
-    interrupt::Priority,
-    interrupt::software::SoftwareInterruptControl,
-    timer::systimer::SystemTimer,
-};
-use esp_hal::{
+    interrupt::{Priority, software::SoftwareInterruptControl},
     peripherals::Peripherals,
     time,
     timer::{AnyTimer, OneShotTimer, PeriodicTimer, timg::TimerGroup},
 };
-#[cfg(not(feature = "esp32"))]
-use esp_hal_embassy::InterruptExecutor;
-#[cfg(not(feature = "esp32"))]
+use esp_rtos::embassy::InterruptExecutor;
 use hil_test::mk_static;
 
-// List of the functions that are ACTUALLY TESTS but are called in the invokers
-mod test_helpers {
-    use super::*;
-
-    #[embassy_executor::task]
-    pub async fn e_task30ms() {
-        Timer::after_millis(30).await;
-    }
-}
-
 mod test_cases {
-
     use super::*;
 
     pub async fn run_test_one_shot_async() {
@@ -101,23 +85,32 @@ mod test_cases {
 }
 
 fn set_up_embassy_with_timg0(peripherals: Peripherals) {
+    #[cfg(riscv)]
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_hal_embassy::init(timg0.timer0);
+    esp_rtos::start(
+        timg0.timer0,
+        #[cfg(riscv)]
+        sw_int.software_interrupt0,
+    );
 }
 
 #[cfg(not(feature = "esp32"))]
 fn set_up_embassy_with_systimer(peripherals: Peripherals) {
+    #[cfg(riscv)]
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
-    esp_hal_embassy::init(systimer.alarm0);
+    esp_rtos::start(
+        systimer.alarm0,
+        #[cfg(riscv)]
+        sw_int.software_interrupt0,
+    );
 }
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod test {
-
     use super::*;
     use crate::test_cases::*;
-    #[cfg(not(feature = "esp32"))]
-    use crate::test_helpers::*;
 
     #[init]
     fn init() -> Peripherals {
@@ -186,25 +179,26 @@ mod test {
 
     /// Test that the ticker works in tasks ran by the interrupt executors.
     #[test]
-    #[cfg(not(feature = "esp32"))]
     async fn test_interrupt_executor(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        let timer0: AnyTimer = timg0.timer0.into();
-
-        let systimer = SystemTimer::new(peripherals.SYSTIMER);
-        let alarm0: AnyTimer = systimer.alarm0.into();
-
-        esp_hal_embassy::init([timer0, alarm0]);
-
-        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_int.software_interrupt0,
+        );
 
         let executor = mk_static!(
             InterruptExecutor<2>,
-            InterruptExecutor::new(sw_ints.software_interrupt2)
+            InterruptExecutor::new(sw_int.software_interrupt2)
         );
 
         #[embassy_executor::task]
-        #[cfg(not(feature = "esp32"))]
+        async fn e_task30ms() {
+            Timer::after_millis(30).await;
+        }
+
+        #[embassy_executor::task]
         async fn test_interrupt_executor_invoker() {
             let outcome = async {
                 let mut ticker = Ticker::every(Duration::from_millis(30));

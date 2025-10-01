@@ -42,16 +42,19 @@ macro_rules! before_snippet {
 }
 
 pub mod rom;
+mod syscall;
+
+pub use syscall::init_syscall_table;
 
 /// This is needed by `libesp_rom.a` (if used)
 /// Other crates (i.e. esp-radio) also rely on this being defined somewhere
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __assert_func(
     file: *const core::ffi::c_char,
-    line: u32,
+    line: i32,
     func: *const core::ffi::c_char,
     expr: *const core::ffi::c_char,
-) {
+) -> ! {
     unsafe {
         panic!(
             "__assert_func in {}:{} ({}): {}",
