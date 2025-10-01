@@ -68,6 +68,8 @@ impl CpuSchedulerState {
                 stack: core::ptr::slice_from_raw_parts_mut(core::ptr::null_mut(), 0),
                 #[cfg(any(hw_task_overflow_detection, sw_task_overflow_detection))]
                 stack_guard: core::ptr::null_mut(),
+                #[cfg(sw_task_overflow_detection)]
+                stack_guard_value: 0,
                 current_queue: None,
                 priority: 0,
                 #[cfg(multi_core)]

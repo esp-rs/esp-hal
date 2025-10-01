@@ -315,8 +315,12 @@ pub(crate) struct Task {
     pub thread_semaphore: Option<Semaphore>,
     pub state: TaskState,
     pub stack: *mut [MaybeUninit<u32>],
+
     #[cfg(any(hw_task_overflow_detection, sw_task_overflow_detection))]
     pub stack_guard: *mut u32,
+    #[cfg(sw_task_overflow_detection)]
+    pub(crate) stack_guard_value: u32,
+
     pub priority: usize,
     #[cfg(multi_core)]
     pub pinned_to: Option<Cpu>,
@@ -343,10 +347,6 @@ pub(crate) struct Task {
     #[cfg(feature = "alloc")]
     pub(crate) heap_allocated: bool,
 }
-
-#[cfg(sw_task_overflow_detection)]
-const STACK_CANARY: u32 =
-    const { esp_config::esp_config_int!(u32, "ESP_HAL_CONFIG_STACK_GUARD_VALUE") };
 
 #[cfg(feature = "esp-radio")]
 extern "C" fn task_wrapper(task_fn: extern "C" fn(*mut c_void), param: *mut c_void) {
@@ -414,6 +414,8 @@ impl Task {
             stack: stack_words,
             #[cfg(any(hw_task_overflow_detection, sw_task_overflow_detection))]
             stack_guard: stack_words.cast(),
+            #[cfg(sw_task_overflow_detection)]
+            stack_guard_value: 0,
             current_queue: None,
             priority,
             #[cfg(multi_core)]
@@ -430,21 +432,22 @@ impl Task {
             heap_allocated: false,
         };
 
-        task.set_up_stack_guard(stack_guard_offset);
+        task.set_up_stack_guard(stack_guard_offset, 0xDEED_BAAD);
 
         task
     }
 
-    fn set_up_stack_guard(&mut self, offset: usize) {
+    fn set_up_stack_guard(&mut self, offset: usize, _value: u32) {
         let stack_bottom = self.stack.cast::<MaybeUninit<u32>>();
         let stack_guard = unsafe { stack_bottom.byte_add(offset) };
 
         #[cfg(sw_task_overflow_detection)]
         unsafe {
             // avoid touching the main stack's canary on the first core
-            if stack_guard.read().assume_init() != STACK_CANARY {
-                stack_guard.write(MaybeUninit::new(STACK_CANARY));
+            if stack_guard.read().assume_init() != _value {
+                stack_guard.write(MaybeUninit::new(_value));
             }
+            self.stack_guard_value = _value;
         }
 
         #[cfg(any(hw_task_overflow_detection, sw_task_overflow_detection))]
@@ -459,7 +462,7 @@ impl Task {
             // This cast is safe to do from MaybeUninit<u32> because this is the word we've written
             // during initialization.
             unsafe { self.stack_guard.read() },
-            STACK_CANARY,
+            self.stack_guard_value,
             "Stack overflow detected in {:?}",
             self as *const Task
         );
@@ -495,6 +498,7 @@ pub(super) fn allocate_main_task(
     scheduler: &mut SchedulerState,
     stack: *mut [MaybeUninit<u32>],
     stack_guard_offset: usize,
+    stack_guard_value: u32,
 ) {
     let cpu = Cpu::current();
     let current_cpu = cpu as usize;
@@ -517,7 +521,7 @@ pub(super) fn allocate_main_task(
 
     scheduler.per_cpu[current_cpu]
         .main_task
-        .set_up_stack_guard(stack_guard_offset);
+        .set_up_stack_guard(stack_guard_offset, stack_guard_value);
 
     scheduler.per_cpu[current_cpu]
         .main_task
