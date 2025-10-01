@@ -335,6 +335,7 @@ pub(crate) struct Task {
     pub thread_semaphore: Option<Semaphore>,
     pub state: TaskState,
     pub stack: *mut [MaybeUninit<u32>],
+    #[cfg(any(hw_task_overflow_detection, sw_task_overflow_detection))]
     pub stack_guard: *mut u32,
     pub priority: usize,
     #[cfg(multi_core)]
@@ -363,6 +364,7 @@ pub(crate) struct Task {
     pub(crate) heap_allocated: bool,
 }
 
+#[cfg(sw_task_overflow_detection)]
 const STACK_CANARY: u32 =
     const { esp_config::esp_config_int!(u32, "ESP_HAL_CONFIG_STACK_GUARD_VALUE") };
 
@@ -388,8 +390,11 @@ impl Task {
         );
 
         // Make sure the stack guard doesn't eat into the stack size.
-        let extra_stack =
-            4 + esp_config::esp_config_int!(usize, "ESP_HAL_CONFIG_STACK_GUARD_OFFSET");
+        let extra_stack = if cfg!(any(hw_task_overflow_detection, sw_task_overflow_detection)) {
+            4 + esp_config::esp_config_int!(usize, "ESP_HAL_CONFIG_STACK_GUARD_OFFSET")
+        } else {
+            0
+        };
 
         #[cfg(debug_build)]
         // This is a lot, but debug builds fail in different ways without.
@@ -427,6 +432,7 @@ impl Task {
             thread_semaphore: None,
             state: TaskState::Ready,
             stack: stack_words,
+            #[cfg(any(hw_task_overflow_detection, sw_task_overflow_detection))]
             stack_guard: stack_words.cast(),
             current_queue: None,
             priority,
@@ -453,6 +459,7 @@ impl Task {
         let stack_bottom = self.stack.cast::<MaybeUninit<u32>>();
         let stack_guard = unsafe { stack_bottom.byte_add(offset) };
 
+        #[cfg(sw_task_overflow_detection)]
         unsafe {
             // avoid touching the main stack's canary on the first core
             if stack_guard.read().assume_init() != STACK_CANARY {
@@ -460,10 +467,14 @@ impl Task {
             }
         }
 
-        self.stack_guard = stack_guard.cast();
+        #[cfg(any(hw_task_overflow_detection, sw_task_overflow_detection))]
+        {
+            self.stack_guard = stack_guard.cast();
+        }
     }
 
     pub(crate) fn ensure_no_stack_overflow(&self) {
+        #[cfg(sw_task_overflow_detection)]
         assert_eq!(
             // This cast is safe to do from MaybeUninit<u32> because this is the word we've written
             // during initialization.
@@ -475,6 +486,7 @@ impl Task {
     }
 
     pub(crate) fn set_up_stack_watchpoint(&self) {
+        #[cfg(hw_task_overflow_detection)]
         unsafe {
             esp_hal::debugger::set_stack_watchpoint(self.stack_guard as usize);
         }
