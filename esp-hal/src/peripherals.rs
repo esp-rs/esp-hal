@@ -204,13 +204,6 @@ for_each_peripheral! {
                 })
             }
 
-            /// Returns all the peripherals *once*.
-            #[inline]
-            #[cfg(not(feature = "rt"))]
-            pub(crate) fn take() -> Self {
-                crate::ESP_HAL_LOCK.lock(|| unsafe { Self::steal() })
-            }
-
             /// Unsafely create an instance of this peripheral out of thin air.
             ///
             /// # Safety

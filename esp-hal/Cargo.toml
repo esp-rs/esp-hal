@@ -48,7 +48,7 @@ test  = false
 bitflags                 = "2.9.0"
 bytemuck                 = "1.22.0"
 cfg-if                   = "1.0.0"
-critical-section         = { version = "1.2.0", features = ["restore-state-u32"] }
+critical-section         = { version = "1.2.0", features = ["restore-state-u32"], optional = true }
 embedded-hal             = "1.0.0"
 embedded-hal-async       = "1.0.0"
 enumset                  = "1.1.6"
@@ -224,6 +224,7 @@ rt = [
     "esp32h2?/rt",
     "esp32s2?/rt",
     "esp32s3?/rt",
+    "critical-section",
 ]
 
 ## Enable a simple exception handler turning exceptions into panics.
