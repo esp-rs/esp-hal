@@ -8,3 +8,13 @@ options:
     constraints:
       - type:
           validator: positive_integer
+
+  - name: sw-task-overflow-detection
+    description: 'Enable software-based stack overflow detection. The stack guard value and offset is based on esp-hal configuration.'
+    default:
+      - value: false
+
+  - name: hw-task-overflow-detection
+    description: 'Enable hardware-based stack overflow detection. The stack watermark is based on the esp-hal stack-guard-offset configuration.'
+    default:
+      - value: true

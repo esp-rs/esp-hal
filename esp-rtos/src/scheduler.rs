@@ -66,6 +66,8 @@ impl CpuSchedulerState {
                 thread_semaphore: None,
                 state: TaskState::Ready,
                 stack: core::ptr::slice_from_raw_parts_mut(core::ptr::null_mut(), 0),
+                #[cfg(any(hw_task_overflow_detection, sw_task_overflow_detection))]
+                stack_guard: core::ptr::null_mut(),
                 current_queue: None,
                 priority: 0,
                 #[cfg(multi_core)]
@@ -274,6 +276,8 @@ impl SchedulerState {
             let next_context = if let Some(next) = next_task {
                 priority = Some(next.priority(&mut self.run_queue));
 
+                unsafe { next.as_ref().set_up_stack_watchpoint() };
+
                 unsafe { &raw mut (*next.as_ptr()).cpu_context }
             } else {
                 // If there is no next task, set up and return to the idle hook.
@@ -284,6 +288,9 @@ impl SchedulerState {
                 let idle_sp = if current_context.is_null()
                     || current_context == &raw mut self.per_cpu[current_cpu].main_task.cpu_context
                 {
+                    // We're using the current task's stack, for which the watchpoint is already set
+                    // up.
+
                     let current_sp;
                     cfg_if::cfg_if! {
                         if #[cfg(xtensa)] {
@@ -294,6 +301,11 @@ impl SchedulerState {
                     }
                     current_sp
                 } else {
+                    // We're using the main task's stack.
+                    self.per_cpu[current_cpu]
+                        .main_task
+                        .set_up_stack_watchpoint();
+
                     cfg_if::cfg_if! {
                         if #[cfg(xtensa)] {
                             self.per_cpu[current_cpu].main_task.cpu_context.A1
