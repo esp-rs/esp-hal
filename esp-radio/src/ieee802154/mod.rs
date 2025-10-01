@@ -84,6 +84,7 @@ pub struct Config {
     pub pan_id: Option<u16>,
     pub short_addr: Option<u16>,
     pub ext_addr: Option<u64>,
+    pub rx_queue_size: usize,
 }
 
 impl Default for Config {
@@ -102,6 +103,7 @@ impl Default for Config {
             pan_id: None,
             short_addr: None,
             ext_addr: None,
+            rx_queue_size: 10,
         }
     }
 }
@@ -157,6 +159,8 @@ impl<'a> Ieee802154<'a> {
 
             set_extended_address(0, address);
         }
+
+        raw::set_queue_size(cfg.rx_queue_size);
     }
 
     /// Start receiving frames

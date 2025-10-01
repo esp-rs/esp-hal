@@ -48,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Event handlers are now passed the event by reference (#4113)
 - Some build-time configuration options have been replaced by runtime options in `WifiConfig` (#4121)
 - Update to bt-hci version with flash usage improvements (#4146, #4165)
+- `scan_mode`, `(ap_)beacon_timeout`, `listen_interval` and `failure_retry_cnt` config options have been replaced by runtime options in `AccessPointConfig`, `ClientConfig` and `EapClientConfig` (#4224)
+- The `ieee802154_rx_queue_size` config option has been replaced by a runtime option in `esp_radio::ieee802154::Config` (#4224)
 
 ### Fixed
 
