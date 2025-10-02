@@ -8,6 +8,8 @@
 //% CARGO-CONFIG: target.'cfg(target_arch = "xtensa")'.rustflags = [ "-Z", "stack-protector=all" ]
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: esp-alloc
+//% ENV: ESP_HAL_CONFIG_STACK_GUARD_MONITORING=false
+//% ENV: ESP_HAL_CONFIG_STACK_GUARD_OFFSET=4096
 
 #![no_std]
 #![no_main]

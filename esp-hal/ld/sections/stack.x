@@ -17,10 +17,13 @@ SECTIONS {
     /*
       minus some space for exception safe data placed "above" the stack
 
-      ideally we could calculate the size needed but the "INSERT AFTER trick" and using SIZEOF just doesn't work
-      so this is a best effort guess for now
+      Ideally we could calculate the size needed but the "INSERT AFTER trick" and using SIZEOF just doesn't work
+      so this is a best effort guess for now.
+
+      This could be smaller but for unknown reasons the `stack_protector` test on ESP32-S3 makes probe-rs going into an infinite loop.
+      (the correct panic is shown and then nothing anymore)
     */
-    . = ORIGIN(RWDATA) + LENGTH(RWDATA) - 32;
+    . = ORIGIN(RWDATA) + LENGTH(RWDATA) - 48;
 #ENDIF
     . = ALIGN (4);
     _stack_start = ABSOLUTE(.);
