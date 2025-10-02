@@ -60,6 +60,9 @@ pub unsafe fn set_stack_watchpoint(addr: usize) {
 }
 
 #[cfg(riscv)]
+pub(crate) static DEBUGGER_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
+
+#[cfg(riscv)]
 const NAPOT_MATCH: u8 = 1;
 
 #[cfg(riscv)]
@@ -126,23 +129,50 @@ bitfield::bitfield! {
 
 }
 
+#[cfg(riscv)]
+pub(crate) struct WatchPoint {
+    tdata1: u32,
+    tdata2: u32,
+}
+
 /// Clear the watchpoint
 #[cfg(riscv)]
-pub(crate) unsafe fn clear_watchpoint(id: u8) {
+pub(crate) unsafe fn clear_watchpoint(id: u8) -> WatchPoint {
     assert!(id < 4);
 
     // tdata1 is a WARL(write any read legal) register. We can just write 0 to it.
-    let tdata = 0;
+    let mut tdata1 = 0;
+    let mut tdata2 = 0;
 
-    unsafe {
+    DEBUGGER_LOCK.lock(|| unsafe {
         core::arch::asm!(
             "
             csrw 0x7a0, {id} // tselect
-            csrw 0x7a1, {tdata} // tdata1
+            csrrw {tdata1}, 0x7a1, {tdata2} // tdata1
+            csrr {tdata2}, 0x7a2 // tdata2
             ", id = in(reg) id,
-            tdata = in(reg) tdata,
+            tdata1 = inout(reg) tdata1,
+            tdata2 = out(reg) tdata2,
         );
-    }
+    });
+
+    WatchPoint { tdata1, tdata2 }
+}
+
+/// Clear the watchpoint
+#[cfg(riscv)]
+pub(crate) unsafe fn restore_watchpoint(id: u8, watchpoint: WatchPoint) {
+    DEBUGGER_LOCK.lock(|| unsafe {
+        core::arch::asm!(
+            "
+            csrw 0x7a0, {id} // tselect
+            csrw 0x7a1, {tdata1} // tdata1
+            csrw 0x7a2, {tdata2} // tdata2
+            ", id = in(reg) id,
+            tdata1 = in(reg) watchpoint.tdata1,
+            tdata2 = in(reg) watchpoint.tdata2,
+        );
+    });
 }
 
 /// Clear the watchpoint
@@ -151,7 +181,7 @@ pub(crate) unsafe fn watchpoint_hit(id: u8) -> bool {
     assert!(id < 4);
     let mut tdata = Tdata1::default();
 
-    unsafe {
+    DEBUGGER_LOCK.lock(|| unsafe {
         core::arch::asm!(
             "
             csrw 0x7a0, {id} // tselect
@@ -159,7 +189,7 @@ pub(crate) unsafe fn watchpoint_hit(id: u8) -> bool {
             ", id = in(reg) id,
             tdata = out(reg) tdata.0,
         );
-    }
+    });
 
     tdata.hit()
 }
@@ -193,7 +223,7 @@ pub(crate) unsafe fn set_watchpoint(id: u8, addr: usize, len: usize) {
     tcontrol.set_mte(true);
     let tcontrol: u32 = tcontrol.0;
 
-    unsafe {
+    DEBUGGER_LOCK.lock(|| unsafe {
         core::arch::asm!(
             "
             csrw 0x7a0, {id} // tselect
@@ -205,5 +235,5 @@ pub(crate) unsafe fn set_watchpoint(id: u8, addr: usize, len: usize) {
             tdata = in(reg) tdata,
             tcontrol = in(reg) tcontrol,
         );
-    }
+    });
 }
