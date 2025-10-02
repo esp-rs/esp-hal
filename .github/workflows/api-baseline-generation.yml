@@ -92,7 +92,7 @@ jobs:
 
           # Extract PR number from commit message if it follows conventional format
           PR_NUMBER=""
-          if echo "$COMMIT_MSG" | grep -q "Merge pull request #"; then
+          if echo "$COMMIT_MSG" | grep -q "#"; then
             PR_NUMBER=$(echo "$COMMIT_MSG" | grep -o "#[0-9]*" | grep -o "[0-9]*")
           fi
 
