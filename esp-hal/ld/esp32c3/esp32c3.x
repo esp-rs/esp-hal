@@ -60,5 +60,3 @@ INCLUDE "eh_frame.x"
 #ELSE
   _dram_data_start = ORIGIN( DRAM ) + SIZEOF(.trap) + SIZEOF(.rwtext);
 #ENDIF
-
-_rwtext_len = SIZEOF(.trap) + SIZEOF(.rwtext);

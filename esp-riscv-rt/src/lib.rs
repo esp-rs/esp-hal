@@ -97,7 +97,7 @@ r#"
 .extern _pre_default_start_trap_ret
 .global _pre_default_start_trap
 _pre_default_start_trap:
-    // move SP to some save place if it's pointing below the RAM
+    // move SP to some safe place if it's pointing below the RAM
     // or into .trap / .rwtext.
     //
     // Otherwise we won't be able to do anything reasonable

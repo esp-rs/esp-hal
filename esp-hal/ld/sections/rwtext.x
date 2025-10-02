@@ -28,4 +28,6 @@
   *( .wifiextrairam.* )
   *( .coexiram.* )
   . = ALIGN(4);
+
+  _rwtext_len = . - ORIGIN(RWTEXT);
 } > RWTEXT

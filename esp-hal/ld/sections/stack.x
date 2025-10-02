@@ -14,7 +14,12 @@ SECTIONS {
     */
     . = . + LENGTH(RWDATA) -  (SIZEOF(.trap) + SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi) + SIZEOF(.data) + SIZEOF(.bss) + SIZEOF(.noinit) + SIZEOF(.data.wifi)) - 304;
 #ELSE
-    /* minus some space for exception safe data */
+    /*
+      minus some space for exception safe data placed "above" the stack
+
+      ideally we could calculate the size needed but the "INSERT AFTER trick" and using SIZEOF just doesn't work
+      so this is a best effort guess for now
+    */
     . = ORIGIN(RWDATA) + LENGTH(RWDATA) - 32;
 #ENDIF
     . = ALIGN (4);

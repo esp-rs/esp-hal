@@ -274,34 +274,24 @@ pub(crate) fn setup_trap_section_protection() {
 
         let rwtext_len = core::ptr::addr_of!(_rwtext_len) as usize;
 
-        if rwtext_len < 2048 {
+        // protect as much as possible via NAPOT
+        let len = 1 << (usize::BITS - rwtext_len.leading_zeros() - 1) as usize;
+        if len == 0 {
             warn!("No trap vector protection available");
+            return;
         }
 
         // protect MTVEC and trap handlers
-        // (plus some more bytes (2048) because of NAPOT)
+        // (probably plus some more bytes because of NAPOT)
         // via watchpoint 1.
         //
         // Why not use PMP? On C2/C3 the bootloader locks all available PMP entries.
-        let addr = core::ptr::addr_of!(_trap_section_origin) as usize as u32;
-        let addr = (addr & !0b11111111111) | 0b01111111111;
-
-        let id: u32 = 1; // breakpoint 1
-        let tdata: u32 = (1 << 3) | (1 << 6) | (1 << 1) | (1 << 7); // bits: 0 = load, 1 = store, 6 = m-mode, 3 = u-mode
-        let tcontrol: u32 = 1 << 3; // M-mode trigger
+        // And additionally we write to MTVEC for direct-vectoring and we write
+        // to __EXTERNAL_INTERRUPTS when setting an interrupt handler.
+        let addr = core::ptr::addr_of!(_trap_section_origin) as usize;
 
         unsafe {
-            core::arch::asm!(
-                "
-                csrw 0x7a0, {id} // tselect
-                csrrs {tcontrol}, 0x7a5, {tcontrol} // tcontrol
-                csrrs {tdata}, 0x7a1, {tdata} // tdata1
-                csrw 0x7a2, {addr} // tdata2
-                ", id = in(reg) id,
-                addr = in(reg) addr,
-                tdata = in(reg) tdata,
-                tcontrol = in(reg) tcontrol,
-            );
+            crate::debugger::set_watchpoint(1, addr, len);
         }
     }
 }
