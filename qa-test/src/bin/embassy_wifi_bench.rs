@@ -27,7 +27,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 #[cfg(target_arch = "riscv32")]
 use esp_hal::interrupt::software::SoftwareInterruptControl;
-use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{clock::CpuClock, ram, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_radio::{
     Controller,
@@ -69,7 +69,7 @@ async fn main(spawner: Spawner) -> ! {
 
     esp_alloc::heap_allocator!(size: 32 * 1024);
     // add some more RAM
-    esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
 
     let server_address: Ipv4Addr = HOST_IP.parse().expect("Invalid HOST_IP address");
 
