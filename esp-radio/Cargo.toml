@@ -40,7 +40,7 @@ bench = false
 test  = false
 
 [dependencies]
-esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
+esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", default-features = false, features = ["requires-unstable", "unstable"] }
 cfg-if = "1.0.0"
 portable-atomic = { version = "1.11.0", default-features = false }
 enumset = { version = "1.1.6", default-features = false, optional = true }

@@ -47,17 +47,21 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
     // ideally _some_ of these values should be configurable
     esp_bt_controller_config_t {
         config_version: 0x20250310,
-        ble_ll_resolv_list_size: 4,
-        ble_hci_evt_hi_buf_count: 30,
-        ble_hci_evt_lo_buf_count: 8,
-        ble_ll_sync_list_cnt: 5,
-        ble_ll_sync_cnt: 0,
-        ble_ll_rsp_dup_list_count: 20,
-        ble_ll_adv_dup_list_count: 20,
-        ble_ll_tx_pwr_dbm: 9,
+        ble_ll_resolv_list_size: CONFIG_BT_LE_LL_RESOLV_LIST_SIZE as _,
+        ble_hci_evt_hi_buf_count: CONFIG_BT_LE_HCI_EVT_HI_BUF_COUNT as _,
+        ble_hci_evt_lo_buf_count: CONFIG_BT_LE_HCI_EVT_LO_BUF_COUNT as _,
+        ble_ll_sync_list_cnt: CONFIG_BT_LE_MAX_PERIODIC_ADVERTISER_LIST as _,
+        ble_ll_sync_cnt: CONFIG_BT_LE_MAX_PERIODIC_SYNCS as _,
+        ble_ll_rsp_dup_list_count: CONFIG_BT_LE_LL_DUP_SCAN_LIST_COUNT as _,
+        ble_ll_adv_dup_list_count: CONFIG_BT_LE_LL_DUP_SCAN_LIST_COUNT as _,
+        ble_ll_tx_pwr_dbm: CONFIG_BT_LE_DFT_TX_POWER_LEVEL_DBM_EFF as _,
         rtc_freq,
-        ble_ll_sca: 60,
-        ble_ll_scan_phy_number: 1,
+        ble_ll_sca: CONFIG_BT_LE_LL_SCA as _,
+        ble_ll_scan_phy_number: if CONFIG_BT_LE_LL_CFG_FEAT_LE_CODED_PHY != 0 {
+            2
+        } else {
+            1
+        },
         ble_ll_conn_def_auth_pyld_tmo: 3000,
         ble_ll_jitter_usecs: 16,
         ble_ll_sched_max_adv_pdu_usecs: 376,
@@ -66,13 +70,13 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_scan_rsp_data_max_len: 31,
         ble_ll_cfg_num_hci_cmd_pkts: 1,
         ble_ll_ctrl_proc_timeout_ms: 40000,
-        nimble_max_connections: 2,
-        ble_whitelist_size: 12,
-        ble_acl_buf_size: 255,
-        ble_acl_buf_count: 24,
-        ble_hci_evt_buf_size: 70,
-        ble_multi_adv_instances: 1,
-        ble_ext_adv_max_size: 31,
+        nimble_max_connections: CONFIG_BT_LE_MAX_CONNECTIONS as _,
+        ble_whitelist_size: CONFIG_BT_LE_WHITELIST_SIZE as _,
+        ble_acl_buf_size: CONFIG_BT_LE_ACL_BUF_SIZE as _,
+        ble_acl_buf_count: CONFIG_BT_LE_ACL_BUF_COUNT as _,
+        ble_hci_evt_buf_size: CONFIG_BT_LE_HCI_EVT_BUF_SIZE as _,
+        ble_multi_adv_instances: CONFIG_BT_LE_MAX_EXT_ADV_INSTANCES as _,
+        ble_ext_adv_max_size: CONFIG_BT_LE_EXT_ADV_MAX_SIZE as _,
         controller_task_stack_size: config.task_stack_size,
         controller_task_prio: config.task_priority,
         controller_run_cpu: 0,
@@ -85,10 +89,10 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_hci_uart_stop_bits: 0,
         ble_hci_uart_flow_ctrl: 0,
         ble_hci_uart_uart_parity: 0,
-        enable_tx_cca: 0,
-        cca_rssi_thresh: (256 - 50) as u8,
-        sleep_en: 0,
-        coex_phy_coded_tx_rx_time_limit: 0,
+        enable_tx_cca: 0,                  // DEFAULT_BT_LE_TX_CCA_ENABLED unset
+        cca_rssi_thresh: (256 - 50) as u8, // CONFIG_BT_LE_CCA_RSSI_THRESH unset
+        sleep_en: 0,                       // CONFIG_BT_LE_SLEEP_ENABLE unset
+        coex_phy_coded_tx_rx_time_limit: CONFIG_BT_LE_COEX_PHY_CODED_TX_RX_TLIM_EFF as _,
         dis_scan_backoff: 0,
         ble_scan_classify_filter_enable: 0,
         cca_drop_mode: 0,  //???
@@ -96,13 +100,13 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         main_xtal_freq,
         version_num: Efuse::minor_chip_version(),
         ignore_wl_for_direct_adv: 0,
-        csa2_select: 0,
-        ble_aa_check: 0,
+        csa2_select: CONFIG_BT_LE_50_FEATURE_SUPPORT as _,
+        ble_aa_check: 0, // CONFIG_BT_LE_CTRL_CHECK_CONNECT_IND_ACCESS_ADDRESS is unset
         ble_llcp_disc_flag: 0, /* (BT_CTRL_BLE_LLCP_CONN_UPDATE |
-                                * BT_CTRL_BLE_LLCP_CHAN_MAP_UPDATE |
-                                * BT_CTRL_BLE_LLCP_PHY_UPDATE */
-        scan_backoff_upperlimitmax: 256,
-        vhci_enabled: 0,
+                          * BT_CTRL_BLE_LLCP_CHAN_MAP_UPDATE |
+                          * BT_CTRL_BLE_LLCP_PHY_UPDATE */
+        scan_backoff_upperlimitmax: CONFIG_BT_CTRL_SCAN_BACKOFF_UPPERLIMITMAX as _,
+        vhci_enabled: CONFIG_BT_LE_HCI_INTERFACE_USE_RAM as _,
         config_magic: 0x5A5AA5A5,
     }
 }
