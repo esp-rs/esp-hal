@@ -288,7 +288,7 @@ pub mod checker {
         // GitHub CLI can download artifacts from recent workflow runs
         log::debug!("Attempting to download artifact: {artifact_name} from {repo}");
 
-        // First, find the most recent successful workflow run that has our artifact
+        // Get list of recent successful workflow runs
         let list_output = Command::new("gh")
             .args([
                 "run",
@@ -298,109 +298,125 @@ pub mod checker {
                 "--status",
                 "success",
                 "--limit",
-                "10",
+                "20", // Increased limit to check more runs
                 "--json",
                 "databaseId,workflowName,conclusion",
             ])
             .output();
 
-        let run_id = match list_output {
+        let runs = match list_output {
             Ok(result) if result.status.success() => {
                 let runs_json = String::from_utf8_lossy(&result.stdout);
                 log::debug!("Available runs: {}", runs_json);
 
-                // Parse JSON to find a run with our artifact
-                // For now, try the most recent successful run
                 if let Ok(runs) = serde_json::from_str::<serde_json::Value>(&runs_json) {
                     if let Some(runs_array) = runs.as_array() {
-                        if let Some(first_run) = runs_array.first() {
-                            if let Some(id) = first_run.get("databaseId").and_then(|v| v.as_u64()) {
-                                Some(id.to_string())
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        }
+                        runs_array.clone()
                     } else {
-                        None
+                        vec![]
                     }
                 } else {
-                    None
+                    vec![]
                 }
             }
-            _ => None,
+            _ => vec![],
         };
 
-        let Some(run_id) = run_id else {
+        if runs.is_empty() {
             log::debug!("No successful workflow runs found");
             return Ok(false);
-        };
+        }
 
-        log::debug!("Trying to download artifact from run ID: {run_id}");
-        let output = Command::new("gh")
-            .args([
-                "run",
-                "download",
-                &run_id,
-                "--repo",
-                repo,
-                "--name",
-                artifact_name,
-                "--dir",
-                package_path.to_str().unwrap(),
-            ])
-            .output();
+        // Try each run until we find one with the artifact
+        for run in runs {
+            let run_id = match run.get("databaseId").and_then(|v| v.as_u64()) {
+                Some(id) => id.to_string(),
+                None => continue,
+            };
 
-        match output {
-            Ok(result) if result.status.success() => {
-                log::debug!("Successfully downloaded artifact {artifact_name}");
+            let workflow_name = run
+                .get("workflowName")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
 
-                // The artifact files are downloaded directly to the package directory
-                // We need to move them to the api-baseline subdirectory
-                let baseline_dir = package_path.join("api-baseline");
-                std::fs::create_dir_all(&baseline_dir)?;
+            log::debug!(
+                "Trying to download artifact from run ID: {} (workflow: {})",
+                run_id,
+                workflow_name
+            );
 
-                // Move any .json.gz files from package_path to baseline_dir
-                if let Ok(entries) = std::fs::read_dir(package_path) {
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        if path.extension().and_then(|s| s.to_str()) == Some("gz")
-                            && path
-                                .file_stem()
-                                .and_then(|s| s.to_str())
-                                .map(|s| s.ends_with(".json"))
-                                .unwrap_or(false)
-                        {
-                            let filename = path.file_name().unwrap();
-                            let dest = baseline_dir.join(filename);
-                            if let Err(e) = std::fs::rename(&path, &dest) {
-                                log::warn!(
-                                    "Failed to move {} to baseline directory: {}",
-                                    path.display(),
-                                    e
-                                );
-                            } else {
-                                log::debug!("Moved {} to {}", path.display(), dest.display());
+            let output = Command::new("gh")
+                .args([
+                    "run",
+                    "download",
+                    &run_id,
+                    "--repo",
+                    repo,
+                    "--name",
+                    artifact_name,
+                    "--dir",
+                    package_path.to_str().unwrap(),
+                ])
+                .output();
+
+            match output {
+                Ok(result) if result.status.success() => {
+                    log::debug!(
+                        "Successfully downloaded artifact {artifact_name} from run {}",
+                        run_id
+                    );
+
+                    // The artifact files are downloaded directly to the package directory
+                    // We need to move them to the api-baseline subdirectory
+                    let baseline_dir = package_path.join("api-baseline");
+                    std::fs::create_dir_all(&baseline_dir)?;
+
+                    // Move any .json.gz files from package_path to baseline_dir
+                    if let Ok(entries) = std::fs::read_dir(package_path) {
+                        for entry in entries.flatten() {
+                            let path = entry.path();
+                            if path.extension().and_then(|s| s.to_str()) == Some("gz")
+                                && path
+                                    .file_stem()
+                                    .and_then(|s| s.to_str())
+                                    .map(|s| s.ends_with(".json"))
+                                    .unwrap_or(false)
+                            {
+                                let filename = path.file_name().unwrap();
+                                let dest = baseline_dir.join(filename);
+                                if let Err(e) = std::fs::rename(&path, &dest) {
+                                    log::warn!(
+                                        "Failed to move {} to baseline directory: {}",
+                                        path.display(),
+                                        e
+                                    );
+                                } else {
+                                    log::debug!("Moved {} to {}", path.display(), dest.display());
+                                }
                             }
                         }
                     }
-                }
 
-                Ok(true)
-            }
-            Ok(result) => {
-                let stderr = String::from_utf8_lossy(&result.stderr);
-                let stdout = String::from_utf8_lossy(&result.stdout);
-                log::debug!(
-                    "Artifact {artifact_name} not available. stdout: {stdout}, stderr: {stderr}"
-                );
-                Ok(false)
-            }
-            Err(e) => {
-                log::debug!("Error downloading artifact {artifact_name}: {e}");
-                Ok(false)
+                    return Ok(true);
+                }
+                Ok(result) => {
+                    let stderr = String::from_utf8_lossy(&result.stderr);
+                    let stdout = String::from_utf8_lossy(&result.stdout);
+                    log::debug!(
+                        "Artifact {artifact_name} not available in run {} (workflow: {}). stdout: {stdout}, stderr: {stderr}",
+                        run_id,
+                        workflow_name
+                    );
+                    // Continue to next run
+                }
+                Err(e) => {
+                    log::debug!("Error running gh command for run {}: {}", run_id, e);
+                    // Continue to next run
+                }
             }
         }
+
+        log::debug!("No runs found with artifact {}", artifact_name);
+        Ok(false)
     }
 }

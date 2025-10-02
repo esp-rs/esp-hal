@@ -1,4 +1,4 @@
-name: API Baseline Management
+name: API Baseline Generation
 
 on:
   push:
@@ -148,17 +148,17 @@ jobs:
 
           # Create appropriate summary based on trigger reason
           if [ "${{ steps.check-generation.outputs.trigger_reason }}" = "breaking_change" ]; then
-            echo "##Breaking Change Baseline Regeneration" >> $GITHUB_STEP_SUMMARY
+            echo "## Breaking Change Baseline Regeneration" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "This API baseline regeneration was automatically triggered due to a breaking change in the merged PR." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ steps.check-generation.outputs.trigger_reason }}" = "manual_force" ]; then
-            echo "##Manual Baseline Regeneration (Forced)" >> $GITHUB_STEP_SUMMARY
+            echo "## Manual Baseline Regeneration (Forced)" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "This API baseline regeneration was manually triggered with force regeneration enabled." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ steps.check-generation.outputs.trigger_reason }}" = "manual" ]; then
-            echo "##Manual Baseline Generation" >> $GITHUB_STEP_SUMMARY
+            echo "## Manual Baseline Generation" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "This API baseline generation was manually triggered." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
