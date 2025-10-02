@@ -793,20 +793,29 @@ for_each_rmt_channel!(
                 where
                     Dm: crate::DriverMode,
                 {
-                    fn configure_tx(
+                    fn configure_tx<P>(
                         self,
-                        pin: impl PeripheralOutput<'ch>,
+                        pin: P,
                         config: TxChannelConfig,
-                    ) -> Result<Channel<'ch, Dm, Tx>, Error>
+                    ) -> Result<Channel<'ch, Dm, Tx>, (Error, Self, P)>
                     where
                         Self: Sized,
+                        P: PeripheralOutput<'ch>,
                     {
-                        unsafe { Channel::configure_tx(
-                            ChannelIndex::[<Ch $idx>],
+                        let raw = unsafe { DynChannelAccess::conjure(ChannelIndex::[<Ch $idx>]) };
+
+                        let memsize = MemSize::from_blocks(config.memsize);
+                        if let Err(e) = reserve_channel(raw.channel(), RmtState::Tx, memsize) {
+                            return Err((e, self, pin));
+                        };
+
+                        Ok(unsafe { Channel::configure_tx(
+                            raw,
+                            memsize,
                             pin.into(),
                             config,
                             self._guard,
-                        ) }
+                        ) })
                     }
                 }
             )+
@@ -826,20 +835,34 @@ for_each_rmt_channel!(
                 where
                     Dm: crate::DriverMode,
                 {
-                    fn configure_rx(
+                    fn configure_rx<P>(
                         self,
-                        pin: impl PeripheralInput<'ch>,
+                        pin: P,
                         config: RxChannelConfig,
-                    ) -> Result<Channel<'ch, Dm, Rx>, Error>
+                    ) -> Result<Channel<'ch, Dm, Rx>, (Error, Self, P)>
                     where
                         Self: Sized,
+                        P: PeripheralInput<'ch>,
                     {
-                        unsafe { Channel::configure_rx(
-                            ChannelIndex::[<Ch $idx>],
+                        let raw = unsafe { DynChannelAccess::conjure(ChannelIndex::[<Ch $idx>]) };
+
+                        #[cfg_attr(any(esp32, esp32s2), allow(clippy::absurd_extreme_comparisons))]
+                        if config.idle_threshold > MAX_RX_IDLE_THRESHOLD {
+                            return Err((Error::InvalidArgument, self, pin));
+                        }
+
+                        let memsize = MemSize::from_blocks(config.memsize);
+                        if let Err(e) = reserve_channel(raw.channel(), RmtState::Rx, memsize) {
+                            return Err((e, self, pin));
+                        };
+
+                        Ok(unsafe { Channel::configure_rx(
+                            raw,
+                            memsize,
                             pin.into(),
                             config,
                             self._guard,
-                        ) }
+                        ) })
                     }
                 }
             )+
@@ -910,6 +933,7 @@ impl crate::interrupt::InterruptConfigurable for Rmt<'_, Blocking> {
 // If this is not possible (because a preceding channel is using the RAM, or
 // because subsequent channels are in use so that we can't reserve the RAM),
 // restore all state and return with an error.
+#[inline(never)]
 fn reserve_channel(channel: u8, state: RmtState, memsize: MemSize) -> Result<(), Error> {
     if memsize.blocks() == 0 || memsize.blocks() > NUM_CHANNELS as u8 - channel {
         return Err(Error::InvalidMemsize);
@@ -1080,17 +1104,14 @@ impl<'ch, Dm> Channel<'ch, Dm, Tx>
 where
     Dm: crate::DriverMode,
 {
+    #[inline(never)]
     unsafe fn configure_tx(
-        ch_idx: ChannelIndex,
+        raw: DynChannelAccess<Tx>,
+        memsize: MemSize,
         pin: gpio::interconnect::OutputSignal<'ch>,
         config: TxChannelConfig,
         guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
-    ) -> Result<Self, Error> {
-        let raw = unsafe { DynChannelAccess::conjure(ch_idx) };
-
-        let memsize = MemSize::from_blocks(config.memsize);
-        reserve_channel(raw.channel(), RmtState::Tx, memsize)?;
-
+    ) -> Self {
         pin.apply_output_config(&OutputConfig::default());
         pin.set_output_enable(true);
 
@@ -1111,11 +1132,11 @@ where
             None => DropState::MemoryOnly,
         };
 
-        Ok(Self {
+        Self {
             raw,
             _rmt: core::marker::PhantomData,
             _guard,
-        })
+        }
     }
 }
 
@@ -1123,22 +1144,14 @@ impl<'ch, Dm> Channel<'ch, Dm, Rx>
 where
     Dm: crate::DriverMode,
 {
+    #[inline(never)]
     unsafe fn configure_rx(
-        ch_idx: ChannelIndex,
+        raw: DynChannelAccess<Rx>,
+        memsize: MemSize,
         pin: gpio::interconnect::InputSignal<'ch>,
         config: RxChannelConfig,
         guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
-    ) -> Result<Self, Error> {
-        let raw = unsafe { DynChannelAccess::conjure(ch_idx) };
-
-        #[cfg_attr(any(esp32, esp32s2), allow(clippy::absurd_extreme_comparisons))]
-        if config.idle_threshold > MAX_RX_IDLE_THRESHOLD {
-            return Err(Error::InvalidArgument);
-        }
-
-        let memsize = MemSize::from_blocks(config.memsize);
-        reserve_channel(raw.channel(), RmtState::Rx, memsize)?;
-
+    ) -> Self {
         pin.apply_input_config(&InputConfig::default());
         pin.set_input_enable(true);
 
@@ -1160,11 +1173,11 @@ where
             None => DropState::MemoryOnly,
         };
 
-        Ok(Self {
+        Self {
             raw,
             _rmt: core::marker::PhantomData,
             _guard,
-        })
+        }
     }
 }
 
@@ -1222,13 +1235,14 @@ where
     Dm: crate::DriverMode,
 {
     /// Configure the TX channel
-    fn configure_tx(
+    fn configure_tx<P>(
         self,
-        pin: impl PeripheralOutput<'ch>,
+        pin: P,
         config: TxChannelConfig,
-    ) -> Result<Channel<'ch, Dm, Tx>, Error>
+    ) -> Result<Channel<'ch, Dm, Tx>, (Error, Self, P)>
     where
-        Self: Sized;
+        Self: Sized,
+        P: PeripheralOutput<'ch>;
 }
 
 /// Creates a RX channel
@@ -1237,13 +1251,14 @@ where
     Dm: crate::DriverMode,
 {
     /// Configure the RX channel
-    fn configure_rx(
+    fn configure_rx<P>(
         self,
-        pin: impl PeripheralInput<'ch>,
+        pin: P,
         config: RxChannelConfig,
-    ) -> Result<Channel<'ch, Dm, Rx>, Error>
+    ) -> Result<Channel<'ch, Dm, Rx>, (Error, Self, P)>
     where
-        Self: Sized;
+        Self: Sized,
+        P: PeripheralInput<'ch>;
 }
 
 /// An in-progress transaction for a single shot TX transaction.
