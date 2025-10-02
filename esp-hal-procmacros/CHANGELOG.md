@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added support for lifetimes and generics to `BuilderLite` derive macro (#3963)
+- Added `ram(reclaimed)` as an alias for `link_section = ".dram2_uninit"` (#4245)
 
 ### Changed
 

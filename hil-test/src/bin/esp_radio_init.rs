@@ -19,6 +19,7 @@ use esp_hal::{
     clock::CpuClock,
     interrupt::{Priority, software::SoftwareInterruptControl},
     peripherals::{Peripherals, TIMG0},
+    ram,
     time::{Duration, Instant},
     timer::timg::TimerGroup,
 };
@@ -82,7 +83,7 @@ mod tests {
 
     #[init]
     fn init() -> Peripherals {
-        esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
+        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
         esp_alloc::heap_allocator!(size: 36 * 1024);
 
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
