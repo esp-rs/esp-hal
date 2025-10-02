@@ -11,7 +11,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 #[cfg(target_arch = "riscv32")]
 use esp_hal::interrupt::software::SoftwareInterruptControl;
-use esp_hal::{clock::CpuClock, delay::Delay, main, time::Duration, timer::timg::TimerGroup};
+use esp_hal::{clock::CpuClock, delay::Delay, main, ram, time::Duration, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_radio::wifi;
 use ieee80211::{
@@ -35,7 +35,7 @@ fn main() -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
     esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let delay = Delay::new();
