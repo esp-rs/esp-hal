@@ -5,7 +5,7 @@ options:
   - name: wifi_max_burst_size
     description: See [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_burst_size)
     default:
-      - value: 1
+      - value: 3
 
   - name: wifi_mtu
     description: "MTU, see [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_transmission_unit)"
@@ -15,88 +15,7 @@ options:
       - type:
           validator: positive_integer
 
-  # TODO Should be part of ClientConfig
-  - name: listen_interval
-    description: 'Interval for station to listen to beacon from AP.
-                 The unit of listen interval is one beacon interval.
-                 For example, if beacon interval is 100 ms and listen interval is 3,
-                 the interval for station to listen to beacon is 300 ms'
-    default:
-      - value: 3
-
-  # TODO Should be part of ClientConfig
-  - name: beacon_timeout
-    description: 'For Station, If the station does not receive a beacon frame
-                 from the connected SoftAP during the  inactive time, disconnect from SoftAP.
-                 Default 6s. Range 6-30'
-    default:
-      - value: 6
-    constraints:
-      - type:
-          validator: integer_in_range
-          value:
-            start: 6
-            end: 31
-
-  # TODO Should be part of ApConfig
-  - name: ap_beacon_timeout
-    description: "For SoftAP, If the SoftAP doesn't receive any data from the connected STA
-                 during inactive time, the SoftAP will force deauth the STA. Default is 300s"
-    default:
-      - value: 300
-
-  # TODO Should be part of ClientConfig
-  - name: failure_retry_cnt
-    description: "Number of connection retries station will do before moving to next AP.
-                scan_method should be set as WIFI_ALL_CHANNEL_SCAN to use this config.
-                Note: Enabling this may cause connection time to increase incase best AP
-                doesn't behave properly. Defaults to 1"
-    default:
-      - value: 1
-    constraints:
-      - type:
-          validator: positive_integer
-
-  # TODO: this is a scan API argument
-  - name: scan_method
-    description: "0 = WIFI_FAST_SCAN, 1 = WIFI_ALL_CHANNEL_SCAN, defaults to 0"
-    default:
-      - value: 0
-    constraints:
-      - type:
-          validator: integer_in_range
-          value:
-            start: 0
-            end: 2
-
   - name: dump_packets
     description: "Dump packets via an info log statement"
     default:
       - value: false
-
-  # TODO: Should these be esp_radio::init config options?
-  - name: phy_enable_usb
-    description: "Keeps USB running when using WiFi.
-                 This allows debugging and log messages via USB Serial JTAG.
-                 Turn off for best WiFi performance."
-    default:
-      - value: true
-
-  - name: phy_skip_calibration_after_deep_sleep
-    description: "Use PHY_RF_CAL_NONE after deep sleep."
-    default:
-      - value: false
-
-  - name: phy_full_calibration
-    description: "Use PHY_RF_CAL_FULL instead of PHY_RF_CAL_PARTIAL."
-    default:
-      - value: true
-
-  # TODO: This could be a config option for Ieee802154::new
-  - name: ieee802154_rx_queue_size
-    description: Size of the RX queue in frames
-    default:
-      - value: 10
-    constraints:
-      - type:
-          validator: positive_integer

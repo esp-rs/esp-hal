@@ -23,7 +23,7 @@ rocket       = { version = "0.5.1", optional = true }
 semver       = { version = "1.0.23", features = ["serde"] }
 serde        = { version = "1.0.215", default-features = false, features = ["derive"] }
 serde_json   = "1.0.70"
-somni-expr   = { version = "0.1.0" }
+somni-expr   = { version = "0.2.0" }
 strum        = { version = "0.27.1", features = ["derive"] }
 syn          = { version = "2", default-features = false, features = ["full", "parsing"] }
 toml_edit    = { version = "0.22.22", features = ["serde"] }

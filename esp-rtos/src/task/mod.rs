@@ -20,6 +20,8 @@ use crate::InternalMemory;
 use crate::semaphore::Semaphore;
 use crate::{SCHEDULER, run_queue::RunQueue, scheduler::SchedulerState, wait_queue::WaitQueue};
 
+pub type IdleFn = extern "C" fn() -> !;
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum TaskState {
@@ -63,7 +65,7 @@ task_list_item!(TaskTimerQueueElement, timer_queue_item);
 /// Extension trait for common task operations. These should be inherent methods but we can't
 /// implement stuff for NonNull.
 pub(crate) trait TaskExt {
-    #[cfg(feature = "esp-radio")]
+    #[cfg(any(feature = "esp-radio", feature = "embassy"))]
     fn resume(self);
     fn priority(self, _: &mut RunQueue) -> usize;
     fn set_priority(self, _: &mut RunQueue, new_pro: usize);
@@ -72,7 +74,7 @@ pub(crate) trait TaskExt {
 }
 
 impl TaskExt for TaskPtr {
-    #[cfg(feature = "esp-radio")]
+    #[cfg(any(feature = "esp-radio", feature = "embassy"))]
     fn resume(self) {
         SCHEDULER.with(|scheduler| scheduler.resume_task(self))
     }
@@ -229,6 +231,83 @@ impl<E: TaskListElement> TaskQueue<E> {
     }
 }
 
+#[cfg(feature = "embassy")]
+pub(crate) mod flags {
+    use esp_sync::NonReentrantMutex;
+
+    use crate::{
+        CurrentThreadHandle,
+        SCHEDULER,
+        task::{TaskExt, TaskPtr},
+    };
+
+    pub(crate) struct FlagsInner {
+        owner: Option<TaskPtr>,
+        flags: u32,
+    }
+    impl FlagsInner {
+        fn wait(&mut self, wait_flags: u32) -> bool {
+            if self.flags & wait_flags == wait_flags {
+                self.flags &= !wait_flags;
+                true
+            } else {
+                if self.owner.is_none() {
+                    self.owner = Some(CurrentThreadHandle::get().task);
+                }
+
+                false
+            }
+        }
+    }
+
+    pub(crate) struct ThreadFlags {
+        inner: NonReentrantMutex<FlagsInner>,
+    }
+
+    impl ThreadFlags {
+        pub(crate) const fn new() -> Self {
+            Self {
+                inner: NonReentrantMutex::new(FlagsInner {
+                    owner: None,
+                    flags: 0,
+                }),
+            }
+        }
+
+        pub(crate) fn set(&self, flag: u32) {
+            self.inner.with(|inner| {
+                inner.flags |= flag;
+                if let Some(owner) = inner.owner {
+                    owner.resume();
+                }
+            });
+        }
+
+        pub(crate) fn get(&self) -> u32 {
+            self.inner.with(|inner| inner.flags)
+        }
+
+        pub(crate) fn wait(&self, wait_flags: u32, timeout_us: Option<u32>) -> bool {
+            if crate::with_deadline(timeout_us, |deadline| {
+                self.inner.with(|inner| {
+                    if inner.wait(wait_flags) {
+                        true
+                    } else {
+                        SCHEDULER.sleep_until(deadline);
+                        false
+                    }
+                })
+            }) {
+                debug!("Flags - wait - success");
+                true
+            } else {
+                trace!("Flags - wait - timed out");
+                false
+            }
+        }
+    }
+}
+
 #[repr(C)]
 pub(crate) struct Task {
     pub cpu_context: CpuContext,
@@ -236,6 +315,12 @@ pub(crate) struct Task {
     pub thread_semaphore: Option<Semaphore>,
     pub state: TaskState,
     pub stack: *mut [MaybeUninit<u32>],
+
+    #[cfg(any(hw_task_overflow_detection, sw_task_overflow_detection))]
+    pub stack_guard: *mut u32,
+    #[cfg(sw_task_overflow_detection)]
+    pub(crate) stack_guard_value: u32,
+
     pub priority: usize,
     #[cfg(multi_core)]
     pub pinned_to: Option<Cpu>,
@@ -263,9 +348,6 @@ pub(crate) struct Task {
     pub(crate) heap_allocated: bool,
 }
 
-const STACK_CANARY: u32 =
-    const { esp_config::esp_config_int!(u32, "ESP_HAL_CONFIG_STACK_GUARD_VALUE") };
-
 #[cfg(feature = "esp-radio")]
 extern "C" fn task_wrapper(task_fn: extern "C" fn(*mut c_void), param: *mut c_void) {
     task_fn(param);
@@ -287,13 +369,16 @@ impl Task {
             name, task_fn, param, task_stack_size, priority, pinned_to
         );
 
-        let extra_stack = if cfg!(debug_build) {
-            // This is a lot, but debug builds fail in different ways without.
-            6 * 1024
+        // Make sure the stack guard doesn't eat into the stack size.
+        let extra_stack = if cfg!(any(hw_task_overflow_detection, sw_task_overflow_detection)) {
+            4 + esp_config::esp_config_int!(usize, "ESP_HAL_CONFIG_STACK_GUARD_OFFSET")
         } else {
-            // Make sure the stack guard doesn't eat into the stack size.
-            4
+            0
         };
+
+        #[cfg(debug_build)]
+        // This is a lot, but debug builds fail in different ways without.
+        let extra_stack = extra_stack.max(6 * 1024);
 
         let task_stack_size = task_stack_size + extra_stack;
 
@@ -314,17 +399,23 @@ impl Task {
 
         let stack_bottom = stack.cast::<MaybeUninit<u32>>();
         let stack_len_bytes = layout.size();
-        unsafe { stack_bottom.write(MaybeUninit::new(STACK_CANARY)) };
+
+        let stack_guard_offset =
+            esp_config::esp_config_int!(usize, "ESP_HAL_CONFIG_STACK_GUARD_OFFSET");
 
         let stack_words = core::ptr::slice_from_raw_parts_mut(stack_bottom, stack_len_bytes / 4);
         let stack_top = unsafe { stack_bottom.add(stack_words.len()).cast() };
 
-        Task {
+        let mut task = Task {
             cpu_context: new_task_context(task_fn, param, stack_top),
             #[cfg(feature = "esp-radio")]
             thread_semaphore: None,
             state: TaskState::Ready,
             stack: stack_words,
+            #[cfg(any(hw_task_overflow_detection, sw_task_overflow_detection))]
+            stack_guard: stack_words.cast(),
+            #[cfg(sw_task_overflow_detection)]
+            stack_guard_value: 0,
             current_queue: None,
             priority,
             #[cfg(multi_core)]
@@ -339,18 +430,49 @@ impl Task {
 
             #[cfg(feature = "alloc")]
             heap_allocated: false,
+        };
+
+        task.set_up_stack_guard(stack_guard_offset, 0xDEED_BAAD);
+
+        task
+    }
+
+    fn set_up_stack_guard(&mut self, offset: usize, _value: u32) {
+        let stack_bottom = self.stack.cast::<MaybeUninit<u32>>();
+        let stack_guard = unsafe { stack_bottom.byte_add(offset) };
+
+        #[cfg(sw_task_overflow_detection)]
+        unsafe {
+            // avoid touching the main stack's canary on the first core
+            if stack_guard.read().assume_init() != _value {
+                stack_guard.write(MaybeUninit::new(_value));
+            }
+            self.stack_guard_value = _value;
+        }
+
+        #[cfg(any(hw_task_overflow_detection, sw_task_overflow_detection))]
+        {
+            self.stack_guard = stack_guard.cast();
         }
     }
 
     pub(crate) fn ensure_no_stack_overflow(&self) {
+        #[cfg(sw_task_overflow_detection)]
         assert_eq!(
             // This cast is safe to do from MaybeUninit<u32> because this is the word we've written
             // during initialization.
-            unsafe { self.stack.cast::<u32>().read() },
-            STACK_CANARY,
+            unsafe { self.stack_guard.read() },
+            self.stack_guard_value,
             "Stack overflow detected in {:?}",
             self as *const Task
         );
+    }
+
+    pub(crate) fn set_up_stack_watchpoint(&self) {
+        #[cfg(hw_task_overflow_detection)]
+        unsafe {
+            esp_hal::debugger::set_stack_watchpoint(self.stack_guard as usize);
+        }
     }
 }
 
@@ -372,15 +494,21 @@ impl Drop for Task {
     }
 }
 
-pub(super) fn allocate_main_task(scheduler: &mut SchedulerState, stack: *mut [MaybeUninit<u32>]) {
+pub(super) fn allocate_main_task(
+    scheduler: &mut SchedulerState,
+    stack: *mut [MaybeUninit<u32>],
+    stack_guard_offset: usize,
+    stack_guard_value: u32,
+) {
     let cpu = Cpu::current();
     let current_cpu = cpu as usize;
 
-    unsafe {
-        stack
-            .cast::<MaybeUninit<u32>>()
-            .write(MaybeUninit::new(STACK_CANARY));
-    }
+    debug_assert!(
+        !scheduler.per_cpu[current_cpu].initialized,
+        "Tried to allocate main task multiple times"
+    );
+
+    scheduler.per_cpu[current_cpu].initialized = true;
 
     // Reset main task properties. The rest should be cleared when the task is deleted.
     scheduler.per_cpu[current_cpu].main_task.priority = 0;
@@ -391,12 +519,13 @@ pub(super) fn allocate_main_task(scheduler: &mut SchedulerState, stack: *mut [Ma
         scheduler.per_cpu[current_cpu].main_task.pinned_to = Some(cpu);
     }
 
-    debug_assert!(
-        !scheduler.per_cpu[current_cpu].initialized,
-        "Tried to allocate main task multiple times"
-    );
+    scheduler.per_cpu[current_cpu]
+        .main_task
+        .set_up_stack_guard(stack_guard_offset, stack_guard_value);
 
-    scheduler.per_cpu[current_cpu].initialized = true;
+    scheduler.per_cpu[current_cpu]
+        .main_task
+        .set_up_stack_watchpoint();
 
     // This is slightly questionable as we don't ensure SchedulerState is pinned, but it's always
     // part of a static object so taking the pointer is fine.
@@ -426,14 +555,14 @@ pub(super) fn current_task() -> TaskPtr {
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CurrentThreadHandle {
-    _task: TaskPtr,
+    task: TaskPtr,
 }
 
 impl CurrentThreadHandle {
     /// Retrieves a handle to the current task.
     pub fn get() -> Self {
         Self {
-            _task: current_task(),
+            task: current_task(),
         }
     }
 
@@ -451,10 +580,8 @@ impl CurrentThreadHandle {
     pub fn set_priority(self, priority: usize) {
         let priority = priority.min(crate::run_queue::MaxPriority::MAX_PRIORITY);
         SCHEDULER.with(|state| {
-            let current_cpu = Cpu::current() as usize;
-            let current_task = unwrap!(state.per_cpu[current_cpu].current_task);
-            let old = current_task.priority(&mut state.run_queue);
-            current_task.set_priority(&mut state.run_queue, priority);
+            let old = self.task.priority(&mut state.run_queue);
+            self.task.set_priority(&mut state.run_queue, priority);
             if old > priority {
                 crate::task::yield_task();
             }

@@ -74,7 +74,7 @@ mod tests {
         );
         let init = esp_radio::init().unwrap();
 
-        let mut connector = BleConnector::new(&init, peripherals.BT);
+        let mut connector = BleConnector::new(&init, peripherals.BT, Default::default());
 
         // send reset cmd
         pub const fn opcode(ogf: u8, ocf: u16) -> [u8; 2] {
@@ -130,7 +130,7 @@ mod tests {
         );
         let init = esp_radio::init().unwrap();
 
-        let mut connector = BleConnector::new(&init, peripherals.BT);
+        let mut connector = BleConnector::new(&init, peripherals.BT, Default::default());
 
         // send reset cmd
         pub const fn opcode(ogf: u8, ocf: u16) -> [u8; 2] {

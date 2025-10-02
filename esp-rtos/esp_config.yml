@@ -9,8 +9,12 @@ options:
       - type:
           validator: positive_integer
 
-  - name: stack-guard-value
-    description: The stack overflow guard value. This must be the same value as esp_hal's stack guard value.
+  - name: sw-task-overflow-detection
+    description: 'Enable software-based stack overflow detection. The stack guard value and offset is based on esp-hal configuration.'
     default:
-      - value: 3740121773
-    display_hint: Hex
+      - value: false
+
+  - name: hw-task-overflow-detection
+    description: 'Enable hardware-based stack overflow detection. The stack watermark is based on the esp-hal stack-guard-offset configuration.'
+    default:
+      - value: true

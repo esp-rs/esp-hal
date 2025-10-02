@@ -13,6 +13,7 @@ use crate::{
     task::{
         self,
         CpuContext,
+        IdleFn,
         Task,
         TaskAllocListElement,
         TaskDeleteListElement,
@@ -65,6 +66,10 @@ impl CpuSchedulerState {
                 thread_semaphore: None,
                 state: TaskState::Ready,
                 stack: core::ptr::slice_from_raw_parts_mut(core::ptr::null_mut(), 0),
+                #[cfg(any(hw_task_overflow_detection, sw_task_overflow_detection))]
+                stack_guard: core::ptr::null_mut(),
+                #[cfg(sw_task_overflow_detection)]
+                stack_guard_value: 0,
                 current_queue: None,
                 priority: 0,
                 #[cfg(multi_core)]
@@ -99,14 +104,14 @@ impl SchedulerState {
         }
     }
 
-    pub(crate) fn setup(&mut self, time_driver: TimeDriver) {
+    pub(crate) fn setup(&mut self, time_driver: TimeDriver, idle_hook: IdleFn) {
         assert!(
             self.time_driver.is_none(),
             "The scheduler has already been started"
         );
         self.time_driver = Some(time_driver);
         for cpu in 0..Cpu::COUNT {
-            task::set_idle_hook_entry(&mut self.per_cpu[cpu].idle_context);
+            task::set_idle_hook_entry(&mut self.per_cpu[cpu].idle_context, idle_hook);
         }
     }
 
@@ -273,6 +278,8 @@ impl SchedulerState {
             let next_context = if let Some(next) = next_task {
                 priority = Some(next.priority(&mut self.run_queue));
 
+                unsafe { next.as_ref().set_up_stack_watchpoint() };
+
                 unsafe { &raw mut (*next.as_ptr()).cpu_context }
             } else {
                 // If there is no next task, set up and return to the idle hook.
@@ -283,6 +290,9 @@ impl SchedulerState {
                 let idle_sp = if current_context.is_null()
                     || current_context == &raw mut self.per_cpu[current_cpu].main_task.cpu_context
                 {
+                    // We're using the current task's stack, for which the watchpoint is already set
+                    // up.
+
                     let current_sp;
                     cfg_if::cfg_if! {
                         if #[cfg(xtensa)] {
@@ -293,6 +303,11 @@ impl SchedulerState {
                     }
                     current_sp
                 } else {
+                    // We're using the main task's stack.
+                    self.per_cpu[current_cpu]
+                        .main_task
+                        .set_up_stack_watchpoint();
+
                     cfg_if::cfg_if! {
                         if #[cfg(xtensa)] {
                             self.per_cpu[current_cpu].main_task.cpu_context.A1
@@ -358,18 +373,9 @@ impl SchedulerState {
         is_current
     }
 
-    pub(crate) fn sleep_until(&mut self, at: Instant) -> bool {
-        let current_cpu = Cpu::current() as usize;
-        let current_task = unwrap!(self.per_cpu[current_cpu].current_task, "No current task");
+    pub(crate) fn sleep_task_until(&mut self, task: TaskPtr, at: Instant) -> bool {
         let timer_queue = unwrap!(self.time_driver.as_mut());
-        if timer_queue.schedule_wakeup(current_task, at) {
-            // The task has been scheduled for wakeup.
-            task::yield_task();
-            true
-        } else {
-            // The task refuses to sleep.
-            false
-        }
+        timer_queue.schedule_wakeup(task, at)
     }
 
     pub(crate) fn resume_task(&mut self, task: TaskPtr) {
@@ -447,7 +453,19 @@ impl Scheduler {
     }
 
     pub(crate) fn sleep_until(&self, wake_at: Instant) -> bool {
-        self.with(|scheduler| scheduler.sleep_until(wake_at))
+        self.with(|scheduler| {
+            let current_cpu = Cpu::current() as usize;
+            let current_task = unwrap!(
+                scheduler.per_cpu[current_cpu].current_task,
+                "No current task"
+            );
+            if scheduler.sleep_task_until(current_task, wake_at) {
+                task::yield_task();
+                true
+            } else {
+                false
+            }
+        })
     }
 }
 

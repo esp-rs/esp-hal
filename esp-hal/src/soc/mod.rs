@@ -246,3 +246,15 @@ fn setup_stack_guard() {
         ));
     }
 }
+
+#[cfg(all(feature = "rt", stack_guard_monitoring))]
+pub(crate) fn enable_main_stack_guard_monitoring() {
+    unsafe {
+        unsafe extern "C" {
+            static mut __stack_chk_guard: u32;
+        }
+
+        let guard_addr = core::ptr::addr_of_mut!(__stack_chk_guard) as *mut _ as u32;
+        crate::debugger::set_stack_watchpoint(guard_addr as usize);
+    }
+}

@@ -1,14 +1,18 @@
 #[cfg(feature = "esp-radio")]
 use core::ffi::c_void;
+use core::sync::atomic::Ordering;
 
 #[cfg(multi_core)]
 use esp_hal::interrupt::software::SoftwareInterrupt;
 pub(crate) use esp_hal::trapframe::TrapFrame as CpuContext;
 use esp_hal::{xtensa_lx, xtensa_lx_rt};
+use portable_atomic::AtomicPtr;
 
-use crate::SCHEDULER;
+use crate::{SCHEDULER, task::IdleFn};
 
-extern "C" fn idle_hook() -> ! {
+static IDLE_HOOK: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
+
+pub(crate) extern "C" fn idle_hook() -> ! {
     loop {
         unsafe { core::arch::asm!("waiti 0") };
     }
@@ -16,10 +20,18 @@ extern "C" fn idle_hook() -> ! {
 
 #[unsafe(naked)]
 extern "C" fn idle_entry() -> ! {
-    core::arch::naked_asm!("call4 {idle_hook}", idle_hook = sym idle_hook);
+    core::arch::naked_asm!("
+        .literal idle_hook_fn, {idle_hook_fn}
+
+        l32r   a2, idle_hook_fn
+        l32i.n a2, a2, 0
+        callx4 a2
+    ", idle_hook_fn = sym IDLE_HOOK);
 }
 
-pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext) {
+pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext, hook_fn: IdleFn) {
+    IDLE_HOOK.store(hook_fn as *mut (), Ordering::Relaxed);
+
     // Point idle context PC at the assembly that calls the idle hook. We need a new stack
     // frame for the idle task on the main stack.
     idle_context.PC = idle_entry as usize as u32;

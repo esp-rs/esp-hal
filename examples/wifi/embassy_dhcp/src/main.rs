@@ -5,8 +5,6 @@
 //!
 //! This gets an ip address via DHCP then performs an HTTP get request to some
 //! "random" server
-//!
-//! Because of the huge task-arena size configured this won't work on ESP32-S2
 
 #![no_std]
 #![no_main]

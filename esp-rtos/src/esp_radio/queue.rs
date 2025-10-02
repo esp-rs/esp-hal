@@ -1,7 +1,6 @@
 use alloc::{boxed::Box, vec};
 use core::ptr::NonNull;
 
-use esp_hal::time::{Duration, Instant};
 use esp_radio_rtos_driver::{
     queue::{QueueImplementation, QueuePtr},
     register_queue_implementation,
@@ -131,10 +130,8 @@ impl Queue {
     }
 
     unsafe fn send_to_back(&self, item: *const u8, timeout_us: Option<u32>) -> bool {
-        let deadline = timeout_us.map(|us| Instant::now() + Duration::from_micros(us as u64));
-
-        loop {
-            let enqueued = self.inner.with(|queue| {
+        if crate::with_deadline(timeout_us, |deadline| {
+            self.inner.with(|queue| {
                 if unsafe { queue.try_enqueue(item) } {
                     trace!("Queue - notify with item");
                     queue.waiting_for_item.notify();
@@ -145,25 +142,13 @@ impl Queue {
                     queue.waiting_for_space.wait_with_deadline(deadline);
                     false
                 }
-            });
-
-            if enqueued {
-                return true;
-            }
-
-            // We are here because the queue was full. Now we've either timed out, or an item has
-            // been removed from the queue. However, any higher priority task can wake up
-            // and preempt us still. Let's just check for the timeout, and try the whole process
-            // again.
-
-            if let Some(deadline) = deadline
-                && deadline < Instant::now()
-            {
-                debug!("Queue - send to back - timed out");
-                // We have a deadline and we've timed out.
-                return false;
-            }
-            // We can block more, so let's attempt to enqueue again.
+            })
+        }) {
+            debug!("Queue - send to back - success");
+            true
+        } else {
+            debug!("Queue - send to back - timed out");
+            false
         }
     }
 
@@ -179,11 +164,8 @@ impl Queue {
     }
 
     unsafe fn receive(&self, item: *mut u8, timeout_us: Option<u32>) -> bool {
-        let deadline = timeout_us.map(|us| Instant::now() + Duration::from_micros(us as u64));
-
-        loop {
-            // Attempt to dequeue an item from the queue
-            let dequeued = self.inner.with(|queue| {
+        if crate::with_deadline(timeout_us, |deadline| {
+            self.inner.with(|queue| {
                 if unsafe { queue.try_dequeue(item) } {
                     trace!("Queue - notify with space");
                     queue.waiting_for_space.notify();
@@ -194,25 +176,13 @@ impl Queue {
                     queue.waiting_for_item.wait_with_deadline(deadline);
                     false
                 }
-            });
-
-            if dequeued {
-                return true;
-            }
-
-            // We are here because we weren't able to dequeue from the queue previously. We've
-            // either timed out, or the queue has an item. However, any higher priority
-            // task can wake up and preempt us still. Let's just check for the timeout,
-            // and try the whole process again.
-
-            if let Some(deadline) = deadline
-                && deadline < Instant::now()
-            {
-                // We have a deadline and we've timed out.
-                debug!("Queue - timed out waiting for item");
-                return false;
-            }
-            // We can block more, so let's attempt to dequeue again.
+            })
+        }) {
+            debug!("Queue - dequeued item");
+            true
+        } else {
+            debug!("Queue - timed out waiting for item");
+            false
         }
     }
 

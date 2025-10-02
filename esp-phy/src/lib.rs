@@ -17,9 +17,13 @@
 // MUST be the first module
 mod fmt;
 
-use esp_hal::clock::{ModemClockController, PhyClockGuard};
 #[cfg(esp32)]
 use esp_hal::time::{Duration, Instant};
+use esp_hal::{
+    clock::{ModemClockController, PhyClockGuard},
+    rtc_cntl::{SocResetReason, reset_reason},
+    system::Cpu,
+};
 use esp_sync::{NonReentrantMutex, RawMutex};
 use esp_wifi_sys::include::*;
 
@@ -138,17 +142,14 @@ impl PhyState {
             // If the SOC just woke up from deep sleep and
             // `phy_skip_calibration_after_deep_sleep` is enabled, no calibration will be
             // performed.
-            cfg_if::cfg_if! {
-                if #[cfg(phy_skip_calibration_after_deep_sleep)] {
-                    use esp_hal::{rtc_cntl::SocResetReason, system::reset_reason};
-                    if reset_reason() == Some(SocResetReason::CoreDeepSleep) {
-                        esp_phy_calibration_mode_t_PHY_RF_CAL_NONE
-                    } else {
-                        esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL
-                    }
-                } else {
-                    esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL
-                }
+            if cfg!(phy_skip_calibration_after_deep_sleep)
+                && reset_reason(Cpu::current()) == Some(SocResetReason::CoreDeepSleep)
+            {
+                esp_phy_calibration_mode_t_PHY_RF_CAL_NONE
+            } else if cfg!(phy_full_calibration) {
+                esp_phy_calibration_mode_t_PHY_RF_CAL_FULL
+            } else {
+                esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL
             }
         } else {
             esp_phy_calibration_mode_t_PHY_RF_CAL_FULL

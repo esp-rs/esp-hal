@@ -77,6 +77,7 @@ impl<const SIZE: usize> Stack<SIZE> {
 // is copied to the core's stack.
 static START_CORE1_FUNCTION: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
 static APP_CORE_STACK_TOP: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
+static APP_CORE_STACK_GUARD: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
 
 /// Will park the APP (second) core when dropped
 #[must_use = "Dropping this guard will park the APP core"]
@@ -169,6 +170,51 @@ unsafe fn internal_park_core(core: Cpu, park: bool) {
                 .modify(|_, w| unsafe { w.sw_stall_appcpu_c0().bits(c0_value) });
         }
     }
+}
+
+/// Returns `true` if the specified core is currently running (not stalled).
+#[instability::unstable]
+pub fn is_running(core: Cpu) -> bool {
+    if core == Cpu::AppCpu {
+        let dport = DPORT::regs();
+        // DPORT_APPCPU_CLKGATE_EN in APPCPU_CTRL_B bit 0 -> needs to be 1 to even be enabled
+        // DPORT_APPCPU_RUNSTALL in APPCPU_CTRL_C bit 0 -> needs to be 0 to not stall
+        if dport
+            .appcpu_ctrl_b()
+            .read()
+            .appcpu_clkgate_en()
+            .bit_is_clear()
+            || dport.appcpu_ctrl_c().read().appcpu_runstall().bit_is_set()
+        {
+            // If the core is not enabled or is stallled, we can take this shortcut
+            return false;
+        }
+    }
+
+    // sw_stall_appcpu_c1[5:0],  sw_stall_appcpu_c0[1:0]} == 0x86 will stall APP CPU
+    // sw_stall_procpu_c1[5:0],  reg_sw_stall_procpu_c0[1:0]} == 0x86 will stall PRO CPU
+    let is_stalled = match core {
+        Cpu::ProCpu => {
+            let c1 = LPWR::regs()
+                .sw_cpu_stall()
+                .read()
+                .sw_stall_procpu_c1()
+                .bits();
+            let c0 = LPWR::regs().options0().read().sw_stall_procpu_c0().bits();
+            (c1 << 2) | c0
+        }
+        Cpu::AppCpu => {
+            let c1 = LPWR::regs()
+                .sw_cpu_stall()
+                .read()
+                .sw_stall_appcpu_c1()
+                .bits();
+            let c0 = LPWR::regs().options0().read().sw_stall_appcpu_c0().bits();
+            (c1 << 2) | c0
+        }
+    };
+
+    is_stalled != 0x86
 }
 
 impl<'d> CpuControl<'d> {
@@ -288,6 +334,17 @@ impl<'d> CpuControl<'d> {
         unsafe {
             xtensa_lx::set_vecbase(&raw const _init_start);
             xtensa_lx::set_stack_pointer(APP_CORE_STACK_TOP.load(Ordering::Acquire));
+
+            #[cfg(all(feature = "rt", stack_guard_monitoring))]
+            {
+                let stack_guard = APP_CORE_STACK_GUARD.load(Ordering::Acquire);
+                stack_guard.write_volatile(esp_config::esp_config_int!(
+                    u32,
+                    "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
+                ));
+                // setting 0 effectively disables the functionality
+                crate::debugger::set_stack_watchpoint(stack_guard as usize);
+            }
         }
 
         // Trampoline to run from the new stack.
@@ -331,6 +388,37 @@ impl<'d> CpuControl<'d> {
         F: FnOnce(),
         F: Send + 'a,
     {
+        cfg_if::cfg_if! {
+            if #[cfg(all(stack_guard_monitoring))] {
+                let stack_guard_offset = Some(esp_config::esp_config_int!(
+                    usize,
+                    "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"
+                ));
+            } else {
+                let stack_guard_offset = None;
+            }
+        };
+
+        self.start_app_core_with_stack_guard_offset(stack, stack_guard_offset, entry)
+    }
+
+    /// Start the APP (second) core.
+    ///
+    /// The second core will start running the closure `entry`. Note that if the
+    /// closure exits, the core will be parked.
+    ///
+    /// Dropping the returned guard will park the core.
+    #[instability::unstable]
+    pub fn start_app_core_with_stack_guard_offset<'a, const SIZE: usize, F>(
+        &mut self,
+        stack: &'static mut Stack<SIZE>,
+        stack_guard_offset: Option<usize>,
+        entry: F,
+    ) -> Result<AppCoreGuard<'a>, Error>
+    where
+        F: FnOnce(),
+        F: Send + 'a,
+    {
         let dport_control = DPORT::regs();
 
         if !xtensa_lx::is_debugger_attached()
@@ -362,6 +450,14 @@ impl<'d> CpuControl<'d> {
             let entry_fn = entry_dst.cast::<()>();
             START_CORE1_FUNCTION.store(entry_fn, Ordering::Release);
             APP_CORE_STACK_TOP.store(stack.top(), Ordering::Release);
+            let stack_guard = if let Some(stack_guard_offset) = stack_guard_offset {
+                assert!(stack_guard_offset.is_multiple_of(4));
+                assert!(stack_guard_offset <= stack.len() - 4);
+                stack_bottom.byte_add(stack_guard_offset)
+            } else {
+                core::ptr::null_mut()
+            };
+            APP_CORE_STACK_GUARD.store(stack_guard.cast(), Ordering::Release);
         }
 
         dport_control.appcpu_ctrl_d().write(|w| unsafe {
