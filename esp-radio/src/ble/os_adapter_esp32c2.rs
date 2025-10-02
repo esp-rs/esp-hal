@@ -23,6 +23,9 @@ pub(crate) static mut ISR_INTERRUPT_7: (*mut c_void, *mut c_void) =
 pub struct Config {
     /// The priority of the RTOS task.
     task_priority: u8,
+
+    /// The stack size of the RTOS task.
+    task_stack_size: u16,
 }
 
 impl Default for Config {
@@ -30,6 +33,7 @@ impl Default for Config {
         Self {
             // same priority as the wifi task, when using esp-rtos (I'm assuming it's MAX_PRIO - 2)
             task_priority: 29,
+            task_stack_size: CONFIG_BT_LE_CONTROLLER_TASK_STACK_SIZE as _,
         }
     }
 }
@@ -69,7 +73,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_hci_evt_buf_size: 70,
         ble_multi_adv_instances: 1,
         ble_ext_adv_max_size: 31,
-        controller_task_stack_size: 4096,
+        controller_task_stack_size: config.task_stack_size,
         controller_task_prio: config.task_priority,
         controller_run_cpu: 0,
         enable_qa_test: 0,
