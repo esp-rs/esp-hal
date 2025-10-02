@@ -6,7 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- Set `ble_ll_sync_cnt` to 0 on C6, C2 and H2 as in esp-idf Kconfig default (#4241)
 
 ### Added
 
@@ -52,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scan_mode`, `(ap_)beacon_timeout`, `listen_interval` and `failure_retry_cnt` config options have been replaced by runtime options in `AccessPointConfig`, `ClientConfig` and `EapClientConfig` (#4224)
 - The `ieee802154_rx_queue_size` config option has been replaced by a runtime option in `esp_radio::ieee802154::Config` (#4224)
 - The default value of `wifi_max_burst_size` has been changed to 3 (#4231)
+- Set `ble_ll_sync_cnt` to 0 on C6, C2 and H2 as in esp-idf Kconfig default (#4241)
 
 ### Fixed
 
