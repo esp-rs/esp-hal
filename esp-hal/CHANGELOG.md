@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Cpu::other()` is now marked as public (#4188)
 - The ESP_HAL_CONFIG_STACK_GUARD_MONITORING (enabled by default) enables a data watchpoint on the stack guard value to protect the main stack (#4207)
 - `start_app_core_with_stack_guard_offset` (#4207)
+- The `rmt::PulseCode::MAX_LEN` constant was added. (#4246)
 - `rmt::Error` now implements `core::error::Error` (#4247)
 - `ram(reclaimed)` as an alias for `link_section = ".dram2_uninit"` (#4245)
 
@@ -71,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `rmt::Channel::transmit_continuously` and `rmt::Channel::transmit_continuously_with_loopcount` methods have been merged (#4100)
 - Introduced `Error::FrequencyUnset` in `ledc::timer::Error` (#4214)
 - `ESP_HAL_CONFIG_STACK_GUARD_OFFSET` is now considered stable (#4220)
+- The behavior of `rmt::PulseCode` constructors (`new`, `new_clamped`, `try_new`) has been reworked to be more convenient and clear. (#4246)
 
 ### Fixed
 
