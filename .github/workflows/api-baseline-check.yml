@@ -1,0 +1,51 @@
+name: API Baseline Check
+
+on:
+    pull_request:
+        types: [opened, synchronize, reopened, labeled, unlabeled]
+
+env:
+    CARGO_TERM_COLOR: always
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+# Cancel any currently running workflows from the same PR, branch, or
+# tag when a new workflow is triggered.
+#
+# https://stackoverflow.com/a/66336834
+concurrency:
+    cancel-in-progress: true
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+
+jobs:
+    baseline-check:
+        runs-on: ubuntu-latest
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'breaking-change') }}
+        env:
+            CARGO_TARGET_DIR: ${{ github.workspace }}/target
+
+        steps:
+            - uses: actions/checkout@v4
+
+            # Install the Rust toolchain for Xtensa devices:
+            - uses: esp-rs/xtensa-toolchain@v1.6
+              with:
+                  version: 1.89.0.0
+
+            # Install the Rust stable toolchain for RISC-V devices:
+            - uses: dtolnay/rust-toolchain@v1
+              with:
+                  target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+                  toolchain: stable
+                  components: rust-src
+
+            - name: Semver-Check
+              shell: bash
+              run: |
+                  cargo xcheck semver-check download-baselines
+                  cargo xcheck semver-check --chips esp32 check
+                  cargo xcheck semver-check --chips esp32s2 check
+                  cargo xcheck semver-check --chips esp32s3 check
+                  cargo xcheck semver-check --chips esp32c2 check
+                  cargo xcheck semver-check --chips esp32c3 check
+                  cargo xcheck semver-check --chips esp32c6 check
+                  cargo xcheck semver-check --chips esp32h2 check
