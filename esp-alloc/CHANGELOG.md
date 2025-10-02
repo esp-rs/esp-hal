@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Make stats structs fields public (#3828)
 - The default heap allocator is now TLSF, implemented by the `rlsf` crate (#3950)
+- Fixed documentation to use `ram(reclaimed)` instead of a no longer valid linker_section syntax. (#4245)
 
 ### Fixed
 

@@ -42,7 +42,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_hci_evt_hi_buf_count: 30,
         ble_hci_evt_lo_buf_count: 8,
         ble_ll_sync_list_cnt: 5,
-        ble_ll_sync_cnt: 20,
+        ble_ll_sync_cnt: 0,
         ble_ll_rsp_dup_list_count: 20,
         ble_ll_adv_dup_list_count: 20,
         ble_ll_tx_pwr_dbm: 9,

@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The ESP_HAL_CONFIG_STACK_GUARD_MONITORING (enabled by default) enables a data watchpoint on the stack guard value to protect the main stack (#4207)
 - `start_app_core_with_stack_guard_offset` (#4207)
 - The `rmt::PulseCode::MAX_LEN` constant was added. (#4246)
+- `rmt::Error` now implements `core::error::Error` (#4247)
+- `ram(reclaimed)` as an alias for `link_section = ".dram2_uninit"` (#4245)
 
 ### Changed
 
@@ -86,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - I2S: Fixed RX half-sample bits configuration bug causing microphone noise (#4109)
 - RISC-V: Direct interrupt vectoring (#4171)
 - TWAI: Fixed unnecessary transmission abortions (#4227)
+- ADC: Fixed integer overflow in curve calibration polynomial evaluation (#4240)
 
 ### Removed
 

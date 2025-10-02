@@ -258,6 +258,28 @@ pub enum Error {
     MemoryBlockNotAvailable,
 }
 
+impl core::error::Error for Error {}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Error::UnreachableTargetFrequency => {
+                write!(f, "The desired frequency is impossible to reach")
+            }
+            Error::Overflow => write!(f, "The amount of pulses exceeds the size of the FIFO"),
+            Error::InvalidArgument => write!(f, "An argument is invalid"),
+            Error::TransmissionError => write!(f, "An error occurred during transmission"),
+            Error::EndMarkerMissing => write!(f, "No transmission end marker found"),
+            Error::InvalidMemsize => write!(f, "Memsize is not correct,"),
+            Error::InvalidDataLength => write!(f, "The data length is invalid"),
+            Error::ReceiverError => write!(f, "Receiver error most likely RMT memory overflow"),
+            Error::MemoryBlockNotAvailable => {
+                write!(f, "Memory block is not available for channel")
+            }
+        }
+    }
+}
+
 /// Convenience newtype to work with pulse codes.
 ///
 /// A [`PulseCode`] is represented as `u32`, with fields laid out as follows:

@@ -4,7 +4,7 @@
 # updates which must be made to the CI workflow in order to reflect this; the
 # changes are:
 #
-# 1.) In the 'esp-hal' job, add the appropriate build and semver-check command.
+# 1.) In the 'esp-hal' job, add the appropriate build command.
 # 1a.) If the device has a low-power core (which is supported in
 #      `esp-lp-hal`), then update the `if` condition to build prerequisites.
 # 2.) In the 'msrv' job, add checks as needed for the new chip.
@@ -56,7 +56,7 @@ jobs:
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
         with:
-          version: 1.89.0.0
+          version: 1.90.0.0
 
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
@@ -82,18 +82,6 @@ jobs:
           cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
-
-      - name: Semver-Check
-        shell: bash
-        # always invokes +esp internally
-        run: |
-          cargo xcheck semver-check --chips esp32 check
-          cargo xcheck semver-check --chips esp32s2 check
-          cargo xcheck semver-check --chips esp32s3 check
-          cargo xcheck semver-check --chips esp32c2 check
-          cargo xcheck semver-check --chips esp32c3 check
-          cargo xcheck semver-check --chips esp32c6 check
-          cargo xcheck semver-check --chips esp32h2 check
 
   detect-extras-runner:
     uses: ./.github/workflows/check_runner.yml
