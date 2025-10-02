@@ -59,72 +59,114 @@ pub unsafe fn set_stack_watchpoint(addr: usize) {
     }
 }
 
-// Set a watchpoint
+#[cfg(riscv)]
+const NAPOT_MATCH: u8 = 1;
+
+#[cfg(riscv)]
+bitfield::bitfield! {
+    /// Only match type (0x2) triggers are supported.
+    #[derive(Clone, Copy, Default)]
+    pub(crate) struct Tdata1(u32);
+
+    /// Set this for configuring the selected trigger to fire right before a load operation with matching
+    /// data address is executed by the CPU.
+    pub bool, load, set_load: 0;
+
+    /// Set this for configuring the selected trigger to fire right before a store operation with matching
+    /// data address is executed by the CPU.
+    pub bool, store, set_store: 1;
+
+    /// Set this for configuring the selected trigger to fire right before an instruction with matching
+    /// virtual address is executed by the CPU.
+    pub bool, execute, set_execute: 2;
+
+    /// Set this for enabling selected trigger to operate in user mode.
+    pub bool, u, set_u: 3;
+
+    /// Set this for enabling selected trigger to operate in machine mode.
+    pub bool, m, set_m: 6;
+
+    /// Configures the selected trigger to perform one of the available matching operations on a
+    /// data/instruction address. Valid options are:
+    /// 0x0: exact byte match, i.e. address corresponding to one of the bytes in an access must match
+    /// the value of maddress exactly.
+    /// 0x1: NAPOT match, i.e. at least one of the bytes of an access must lie in the NAPOT region
+    /// specified in maddress.
+    /// Note: Writing a larger value will clip it to the largest possible value 0x1.
+    pub u8, _match, set_match: 10, 7;
+
+    /// Configures the selected trigger to perform one of the available actions when firing. Valid
+    /// options are:
+    /// 0x0: cause breakpoint exception.
+    /// 0x1: enter debug mode (only valid when dmode = 1)
+    /// Note: Writing an invalid value will set this to the default value 0x0.
+    pub u8, action, set_action: 15, 12;
+
+    /// This is found to be 1 if the selected trigger had fired previously. This bit is to be cleared manually.
+    pub bool, hit, set_hit: 20;
+
+    /// 0: Both Debug and M mode can write the tdata1 and tdata2 registers at the selected tselect.
+    /// 1: Only Debug Mode can write the tdata1 and tdata2 registers at the selected tselect. Writes from
+    /// other modes are ignored.
+    /// Note: Only writable from debug mode.
+    pub bool, dmode, set_dmode: 27;
+}
+
+#[cfg(riscv)]
+bitfield::bitfield! {
+    /// Only match type (0x2) triggers are supported.
+    #[derive(Clone, Copy, Default)]
+    pub(crate) struct Tcontrol(u32);
+
+    /// Current M mode trigger enable bit
+    pub bool, mte, set_mte: 3;
+
+    /// Previous M mode trigger enable bit
+    pub bool, mpte, set_mpte: 7;
+
+}
+
+/// Clear the watchpoint
+#[cfg(all(riscv, feature = "rt"))]
+pub(crate) unsafe fn clear_watchpoint(id: u8) {
+    assert!(id < 4);
+
+    // tdata1 is a WARL(write any read legal) register. We can just write 0 to it.
+    let tdata = 0;
+
+    unsafe {
+        core::arch::asm!(
+            "
+            csrw 0x7a0, {id} // tselect
+            csrw 0x7a1, {tdata} // tdata1
+            ", id = in(reg) id,
+            tdata = in(reg) tdata,
+        );
+    }
+}
+
+/// Clear the watchpoint
+#[cfg(all(riscv, feature = "exception-handler"))]
+pub(crate) unsafe fn watchpoint_hit(id: u8) -> bool {
+    assert!(id < 4);
+    let mut tdata = Tdata1::default();
+
+    unsafe {
+        core::arch::asm!(
+            "
+            csrw 0x7a0, {id} // tselect
+            csrr {tdata}, 0x7a1 // tdata1
+            ", id = in(reg) id,
+            tdata = out(reg) tdata.0,
+        );
+    }
+
+    tdata.hit()
+}
+
+/// Set watchpoint and enable triggers.
 #[cfg(riscv)]
 pub(crate) unsafe fn set_watchpoint(id: u8, addr: usize, len: usize) {
-    const NAPOT_MATCH: u8 = 1;
-
-    bitfield::bitfield! {
-        /// Only match type (0x2) triggers are supported.
-        #[derive(Clone, Copy, Default)]
-        pub struct Tdata1(u32);
-
-        /// Set this for configuring the selected trigger to fire right before a load operation with matching
-        /// data address is executed by the CPU.
-        pub bool, load, set_load: 0;
-
-        /// Set this for configuring the selected trigger to fire right before a store operation with matching
-        /// data address is executed by the CPU.
-        pub bool, store, set_store: 1;
-
-        /// Set this for configuring the selected trigger to fire right before an instruction with matching
-        /// virtual address is executed by the CPU.
-        pub bool, execute, set_execute: 2;
-
-        /// Set this for enabling selected trigger to operate in user mode.
-        pub bool, u, set_u: 3;
-
-        /// Set this for enabling selected trigger to operate in machine mode.
-        pub bool, m, set_m: 6;
-
-        /// Configures the selected trigger to perform one of the available matching operations on a
-        /// data/instruction address. Valid options are:
-        /// 0x0: exact byte match, i.e. address corresponding to one of the bytes in an access must match
-        /// the value of maddress exactly.
-        /// 0x1: NAPOT match, i.e. at least one of the bytes of an access must lie in the NAPOT region
-        /// specified in maddress.
-        /// Note: Writing a larger value will clip it to the largest possible value 0x1.
-        pub u8, _match, set_match: 10, 7;
-
-        /// Configures the selected trigger to perform one of the available actions when firing. Valid
-        /// options are:
-        /// 0x0: cause breakpoint exception.
-        /// 0x1: enter debug mode (only valid when dmode = 1)
-        /// Note: Writing an invalid value will set this to the default value 0x0.
-        pub u8, action, set_action: 15, 12;
-
-        /// This is found to be 1 if the selected trigger had fired previously. This bit is to be cleared manually.
-        pub bool, hit, set_hit: 20;
-
-        /// 0: Both Debug and M mode can write the tdata1 and tdata2 registers at the selected tselect.
-        /// 1: Only Debug Mode can write the tdata1 and tdata2 registers at the selected tselect. Writes from
-        /// other modes are ignored.
-        /// Note: Only writable from debug mode.
-        pub bool, dmode, set_dmode: 27;
-    }
-
-    bitfield::bitfield! {
-        /// Only match type (0x2) triggers are supported.
-        #[derive(Clone, Copy, Default)]
-        pub struct Tcontrol(u32);
-
-        /// Current M mode trigger enable bit
-        pub bool, mte, set_mte: 3;
-
-        /// Previous M mode trigger enable bit
-        pub bool, mpte, set_mpte: 7;
-
-    }
     assert!(id < 4);
     assert!(len.is_power_of_two());
     assert!(addr.is_multiple_of(len));
@@ -155,8 +197,8 @@ pub(crate) unsafe fn set_watchpoint(id: u8, addr: usize, len: usize) {
         core::arch::asm!(
             "
             csrw 0x7a0, {id} // tselect
-            csrrs {tcontrol}, 0x7a5, {tcontrol} // tcontrol
-            csrrs {tdata}, 0x7a1, {tdata} // tdata1
+            csrw 0x7a5, {tcontrol} // tcontrol
+            csrw 0x7a1, {tdata} // tdata1
             csrw 0x7a2, {addr} // tdata2
             ", id = in(reg) id,
             addr = in(reg) addr,
