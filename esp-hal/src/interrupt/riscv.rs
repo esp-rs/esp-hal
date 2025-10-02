@@ -204,8 +204,6 @@ impl TryFrom<u8> for Priority {
     }
 }
 
-static LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
-
 /// The interrupts reserved by the HAL
 #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
 pub static RESERVED_INTERRUPTS: &[u32] = PRIORITY_TO_INTERRUPT;
@@ -265,10 +263,10 @@ pub fn enable_direct(
         if crate::debugger::debugger_connected() {
             core::ptr::write_volatile(int_slot as *mut u32, instr);
         } else {
-            LOCK.lock(|| {
-                crate::debugger::clear_watchpoint(1);
+            crate::debugger::DEBUGGER_LOCK.lock(|| {
+                let wp = crate::debugger::clear_watchpoint(1);
                 core::ptr::write_volatile(int_slot as *mut u32, instr);
-                crate::soc::setup_trap_section_protection();
+                crate::debugger::restore_watchpoint(1, wp);
             });
         }
 
@@ -467,10 +465,10 @@ mod vectored {
             if crate::debugger::debugger_connected() {
                 ptr.write_volatile(handler.raw_value());
             } else {
-                LOCK.lock(|| {
-                    crate::debugger::clear_watchpoint(1);
+                crate::debugger::DEBUGGER_LOCK.lock(|| {
+                    let wp = crate::debugger::clear_watchpoint(1);
                     ptr.write_volatile(handler.raw_value());
-                    crate::soc::setup_trap_section_protection();
+                    crate::debugger::restore_watchpoint(1, wp);
                 });
             }
         }
