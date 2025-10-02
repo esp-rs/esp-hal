@@ -9,12 +9,9 @@
 //! Ensure you have set the IP of your local machine in the `HOST_IP` env
 //! variable. E.g `HOST_IP="192.168.0.24"` and also set SSID and PASSWORD env
 //! variable before running this example.
-//!
-//! Because of the huge task-arena size configured this won't work on ESP32-S2
-//! and ESP32-C2
 
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable
-//% CHIPS: esp32 esp32c3 esp32c6 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32s2 esp32s3
 
 #![allow(static_mut_refs)]
 #![no_std]
@@ -61,7 +58,6 @@ const DOWNLOAD_PORT: u16 = 4321;
 const UPLOAD_PORT: u16 = 4322;
 const UPLOAD_DOWNLOAD_PORT: u16 = 4323;
 
-// static buffers to not need a huge task-arena
 static mut RX_BUFFER: [u8; RX_BUFFER_SIZE] = [0; RX_BUFFER_SIZE];
 static mut TX_BUFFER: [u8; TX_BUFFER_SIZE] = [0; TX_BUFFER_SIZE];
 
