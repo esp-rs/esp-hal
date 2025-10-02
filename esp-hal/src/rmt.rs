@@ -295,10 +295,25 @@ impl PulseCode {
 
     /// Create a new instance.
     ///
+    /// Panics if `length1` or `length2` exceed the maximum representable range.
+    #[inline]
+    pub const fn new(level1: Level, length1: u16, level2: Level, length2: u16) -> Self {
+        if length1 > Self::MAX_LEN || length2 > Self::MAX_LEN {
+            // defmt::panic! fails const eval
+            core::panic!("PulseCode length out of range");
+        };
+
+        // SAFETY:
+        // - We just checked that length1 and length2 are in range
+        unsafe { Self::new_unchecked(level1, length1, level2, length2) }
+    }
+
+    /// Create a new instance.
+    ///
     /// If `length1` or `length2` exceed the maximum representable range, they
     /// will be clamped to `Self::MAX_LEN`.
     #[inline]
-    pub const fn new(level1: Level, length1: u16, level2: Level, length2: u16) -> Self {
+    pub const fn new_clamped(level1: Level, length1: u16, level2: Level, length2: u16) -> Self {
         // Can't use lengthX.min(Self::MAX_LEN) since it is not const
         let length1 = if length1 > Self::MAX_LEN {
             Self::MAX_LEN
@@ -316,18 +331,21 @@ impl PulseCode {
         unsafe { Self::new_unchecked(level1, length1, level2, length2) }
     }
 
-    /// Create a new instance.
+    /// Create a new instance, attempting to convert lengths to `u16` first.
+    ///
+    /// This is slightly more convenient when passing in longer integers (e.g. `u32`) resulting from
+    /// a preceding calculation.
     ///
     /// If `length1` or `length2` fail to convert to `u16` or exceed the maximum representable
     /// range, this will return `None`.
     #[inline]
-    pub const fn try_new(
+    pub fn try_new(
         level1: Level,
         length1: impl TryInto<u16>,
         level2: Level,
         length2: impl TryInto<u16>,
     ) -> Option<Self> {
-        let (Some(length1), Some(length2)) = (length1.try_into(), length2.try_into()) else {
+        let (Ok(length1), Ok(length2)) = (length1.try_into(), length2.try_into()) else {
             return None;
         };
         if length1 > Self::MAX_LEN || length2 >= Self::MAX_LEN {
@@ -335,7 +353,7 @@ impl PulseCode {
         }
 
         // SAFETY:
-        // - We just checked that length1 and length2 have their MSB cleared.
+        // - We just checked that length1 and length2 are in range
         Some(unsafe { Self::new_unchecked(level1, length1, level2, length2) })
     }
 

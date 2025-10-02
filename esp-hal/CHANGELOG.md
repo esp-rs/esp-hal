@@ -70,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `rmt::Channel::transmit_continuously` and `rmt::Channel::transmit_continuously_with_loopcount` methods have been merged (#4100)
 - Introduced `Error::FrequencyUnset` in `ledc::timer::Error` (#4214)
 - `ESP_HAL_CONFIG_STACK_GUARD_OFFSET` is now considered stable (#4220)
+- The behavior of `rmt::PulseCode` constructors (`new`, `new_clamped`, `try_new`) has been reworked to be more convenient and clear. (#XXXX)
 
 ### Fixed
 
