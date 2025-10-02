@@ -5,7 +5,7 @@ options:
   - name: wifi_max_burst_size
     description: See [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_burst_size)
     default:
-      - value: 1
+      - value: 3
 
   - name: wifi_mtu
     description: "MTU, see [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_transmission_unit)"
