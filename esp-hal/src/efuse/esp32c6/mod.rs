@@ -105,14 +105,6 @@ impl super::Efuse {
     pub fn minor_chip_version() -> u8 {
         Self::read_field_le(WAFER_VERSION_MINOR)
     }
-
-    /// Returns the hardware revision
-    ///
-    /// The chip version is calculated using the following
-    /// formula: MAJOR * 100 + MINOR. (if the result is 1, then version is v0.1)
-    pub fn chip_revision() -> u16 {
-        Self::major_chip_version() as u16 * 100 + Self::minor_chip_version() as u16
-    }
 }
 
 #[derive(Debug, Clone, Copy, strum::FromRepr)]
