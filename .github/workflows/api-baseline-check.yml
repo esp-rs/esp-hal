@@ -26,17 +26,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install the Rust toolchain for Xtensa devices:
-      - uses: esp-rs/xtensa-toolchain@v1.6
-        with:
-          version: 1.89.0.0
-
-      # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
-          components: rust-src
 
       - name: Semver-Check
         shell: bash
