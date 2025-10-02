@@ -70,10 +70,22 @@ unsafe extern "C" fn ExceptionHandler(context: &TrapFrame) -> ! {
                 mepc, context.ra
             )
         } else {
-            panic!(
-                "Breakpoint exception at 0x{:08x}, mtval=0x{:08x}\n{:?}",
-                mepc, mtval, context
-            );
+            if unsafe { crate::debugger::watchpoint_hit(1) } {
+                panic!(
+                    "Detected a write to the trap/rwtext segment at 0x{:x}, possibly called by 0x{:x}",
+                    mepc, context.ra
+                );
+            } else if unsafe { crate::debugger::watchpoint_hit(0) } {
+                panic!(
+                    "Detected a write to a stack guard value at 0x{:x}, possibly called by 0x{:x}",
+                    mepc, context.ra
+                );
+            } else {
+                panic!(
+                    "Breakpoint exception at 0x{:08x}, mtval=0x{:08x}\n{:?}",
+                    mepc, mtval, context
+                );
+            }
         }
     }
 
