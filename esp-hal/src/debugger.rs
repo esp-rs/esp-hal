@@ -127,7 +127,7 @@ bitfield::bitfield! {
 }
 
 /// Clear the watchpoint
-#[cfg(all(riscv, feature = "unstable"))]
+#[cfg(riscv)]
 pub(crate) unsafe fn clear_watchpoint(id: u8) {
     assert!(id < 4);
 

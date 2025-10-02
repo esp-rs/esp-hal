@@ -9,7 +9,6 @@ use super::{LockToken, PrinterImpl};
 use crate::LOCK;
 
 /// Global logger lock.
-#[unsafe(link_section = ".critical_data")]
 #[cfg(feature = "critical-section")]
 #[unsafe(link_section = ".critical_data")]
 static mut TAKEN: bool = false;
