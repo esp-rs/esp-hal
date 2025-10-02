@@ -290,15 +290,26 @@ const LEVEL1_MASK: u32 = 1 << LEVEL1_SHIFT;
 const LEVEL2_MASK: u32 = 1 << LEVEL2_SHIFT;
 
 impl PulseCode {
+    /// Maximum value for the `length1` and `length2` fields.
+    pub const MAX_LEN: u16 = 0x7FFF;
+
     /// Create a new instance.
     ///
     /// If `length1` or `length2` exceed the maximum representable range, they
-    /// will be clamped to `0x7FFF`.
+    /// will be clamped to `Self::MAX_LEN`.
     #[inline]
     pub const fn new(level1: Level, length1: u16, level2: Level, length2: u16) -> Self {
-        // Can't use lengthX.min(0x7FFF) since it is not const
-        let length1 = if length1 >= 0x8000 { 0x7FFF } else { length1 };
-        let length2 = if length2 >= 0x8000 { 0x7FFF } else { length2 };
+        // Can't use lengthX.min(Self::MAX_LEN) since it is not const
+        let length1 = if length1 > Self::MAX_LEN {
+            Self::MAX_LEN
+        } else {
+            length1
+        };
+        let length2 = if length2 > Self::MAX_LEN {
+            Self::MAX_LEN
+        } else {
+            length2
+        };
 
         // SAFETY:
         // - We just clamped length1 and length2 to the required intervals
@@ -307,11 +318,19 @@ impl PulseCode {
 
     /// Create a new instance.
     ///
-    /// If `length1` or `length2` exceed the maximum representable range, this
-    /// will return `None`.
+    /// If `length1` or `length2` fail to convert to `u16` or exceed the maximum representable
+    /// range, this will return `None`.
     #[inline]
-    pub const fn try_new(level1: Level, length1: u16, level2: Level, length2: u16) -> Option<Self> {
-        if length1 >= 0x8000 || length2 >= 0x8000 {
+    pub const fn try_new(
+        level1: Level,
+        length1: impl TryInto<u16>,
+        level2: Level,
+        length2: impl TryInto<u16>,
+    ) -> Option<Self> {
+        let (Some(length1), Some(length2)) = (length1.try_into(), length2.try_into()) else {
+            return None;
+        };
+        if length1 > Self::MAX_LEN || length2 >= Self::MAX_LEN {
             return None;
         }
 
@@ -408,7 +427,7 @@ impl PulseCode {
     /// Returns `None` if `length` exceeds the representable range.
     #[inline]
     pub const fn with_length1(mut self, length: u16) -> Option<Self> {
-        if length >= 0x8000 {
+        if length > Self::MAX_LEN {
             return None;
         }
 
@@ -422,7 +441,7 @@ impl PulseCode {
     /// Returns `None` if `length` exceeds the representable range.
     #[inline]
     pub const fn with_length2(mut self, length: u16) -> Option<Self> {
-        if length >= 0x8000 {
+        if length > Self::MAX_LEN {
             return None;
         }
 
