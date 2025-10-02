@@ -84,6 +84,7 @@ jobs:
       #     cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
       - name: Semver-Check
         shell: bash
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'breaking-change') }}
         # always invokes +esp internally
         run: |
           cargo xcheck semver-check download-baselines
