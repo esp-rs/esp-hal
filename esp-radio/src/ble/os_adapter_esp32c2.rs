@@ -5,6 +5,7 @@ use crate::{
     binary::include::esp_bt_controller_config_t,
     hal::{
         clock::{Clock, RtcClock},
+        efuse::Efuse,
         interrupt,
         peripherals::{BT, Interrupt},
     },
@@ -89,7 +90,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         cca_drop_mode: 0,  //???
         cca_low_tx_pwr: 0, //???
         main_xtal_freq,
-        version_num: 0, // chips revision: EFUSE.blk0_rdata5.rd_wafer_version_minor
+        version_num: Efuse::minor_chip_version(),
         ignore_wl_for_direct_adv: 0,
         csa2_select: 0,
         ble_aa_check: 0,
