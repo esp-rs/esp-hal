@@ -397,6 +397,9 @@ pub struct Config {
     /// Enable / disable uncoded phy / coded phy hardware re-correction.
     hw_recorrect_en: bool,
 
+    /// BLE Clear Channel Assessment (CCA) mode.
+    cca_mode: CcaMode,
+
     /// Absolute value of hardware-triggered CCA threshold.
     ///
     /// The CCA threshold is always negative.
@@ -406,9 +409,6 @@ pub struct Config {
     ///
     /// Range: 20 dBm - 100 dBm
     cca_threshold: u8,
-
-    /// BLE CCA mode.
-    cca_mode: CcaMode,
 
     /// Enable / disable auxiliary packets when the extended ADV data length is zero.
     data_length_zero_aux: bool,
