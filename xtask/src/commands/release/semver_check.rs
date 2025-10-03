@@ -200,7 +200,7 @@ pub mod checker {
 
             // Try to download from GitHub Actions artifacts
             // Note: Artifacts have a 90-day retention limit for public repositories
-            let baseline_sources = vec![BaselineSource::Artifact("api-baselines".to_string())];
+            let baseline_sources = vec![BaselineSource::Artifact("api-baselines-esp-hal".to_string())];
 
             let mut downloaded = false;
             for baseline_source in baseline_sources {
