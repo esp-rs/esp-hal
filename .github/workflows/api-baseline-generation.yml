@@ -99,11 +99,11 @@ jobs:
           if [ -n "$PR_NUMBER" ]; then
             echo "Found PR number: $PR_NUMBER"
 
-            # Check if the PR had the breaking-change label
+            # Check if the PR had the breaking-change-esp-hal label
             LABELS=$(gh pr view $PR_NUMBER --json labels --jq '.labels[].name' 2>/dev/null || echo "")
             echo "PR labels: $LABELS"
 
-            if echo "$LABELS" | grep -q "breaking-change"; then
+            if echo "$LABELS" | grep -q "breaking-change-esp-hal"; then
               echo "Breaking change detected in PR #$PR_NUMBER"
               echo "should_generate=true" >> $GITHUB_OUTPUT
               echo "trigger_reason=breaking_change" >> $GITHUB_OUTPUT

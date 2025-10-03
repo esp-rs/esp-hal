@@ -19,7 +19,7 @@ concurrency:
 jobs:
     baseline-check:
         runs-on: ubuntu-latest
-        if: ${{ !contains(github.event.pull_request.labels.*.name, 'breaking-change') }}
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'breaking-change-esp-hal') }}
         env:
             CARGO_TARGET_DIR: ${{ github.workspace }}/target
 
