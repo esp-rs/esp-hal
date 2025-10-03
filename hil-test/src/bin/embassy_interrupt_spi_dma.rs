@@ -53,15 +53,20 @@ async fn interrupt_driven_task(spi: esp_hal::spi::master::SpiDma<'static, Blocki
 #[cfg(not(any(esp32, esp32s2, esp32s3)))]
 #[embassy_executor::task]
 async fn interrupt_driven_task(i2s_tx: esp_hal::i2s::master::I2s<'static, Blocking>) {
-    let (_, _, _, tx_descriptors) = dma_buffers!(128);
+    use esp_hal::dma_tx_stream_buffer;
+    let mut buf = dma_tx_stream_buffer!(128, 128 / 3);
 
-    let mut i2s_tx = i2s_tx.into_async().i2s_tx.build(tx_descriptors);
-
+    let mut i2s_tx = i2s_tx.into_async().i2s_tx.build();
     loop {
         let mut buffer: [u8; 8] = [0; 8];
 
         INTERRUPT_TASK_WORKING.store(true, portable_atomic::Ordering::Relaxed);
-        i2s_tx.write_dma_async(&mut buffer).await.unwrap();
+        let mut transfer = i2s_tx.write(buf).unwrap();
+        while transfer.available_bytes() == 0 {
+            transfer.wait_for_available().await.unwrap();
+        }
+        transfer.push(&mut buffer);
+        (i2s_tx, buf) = transfer.stop();
         INTERRUPT_TASK_WORKING.store(false, portable_atomic::Ordering::Relaxed);
 
         if STOP_INTERRUPT_TASK.load(portable_atomic::Ordering::Relaxed) {
