@@ -121,10 +121,6 @@ name    = "storage_read_app_desc"
 harness = false
 
 [[bin]]
-name    = "stack_protector"
-harness = false
-
-[[bin]]
 name    = "parl_io"
 harness = false
 
