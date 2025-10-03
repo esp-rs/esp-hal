@@ -56,7 +56,7 @@ extern "C" fn WIFI_PWR() {
 #[unsafe(no_mangle)]
 extern "C" fn RWBT() {
     unsafe {
-        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION5;
+        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_5;
 
         trace!("interrupt RWBT {:?} {:?}", fnc, arg);
 
@@ -73,7 +73,7 @@ extern "C" fn RWBT() {
 #[unsafe(no_mangle)]
 extern "C" fn RWBLE() {
     unsafe {
-        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION8;
+        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_8;
 
         trace!("interrupt RWBLE {:?} {:?}", fnc, arg);
 
@@ -90,7 +90,7 @@ extern "C" fn RWBLE() {
 #[unsafe(no_mangle)]
 extern "C" fn BT_BB() {
     unsafe {
-        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION5;
+        let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_5;
 
         trace!("interrupt BT_BB {:?} {:?}", fnc, arg);
 
