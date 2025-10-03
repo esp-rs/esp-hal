@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - lifetime to `Sniffer` (#4017)
 - `dtim_period` parameter for `PowerSaveMode` (#4040)
 - `WifiConfig`, `CountryInfo` and `OperatingClass` (#4121)
-- Configuration options for `BleController` (#4223)
+- Configuration options for `BleController` (#4223, #4254)
 
 ### Changed
 

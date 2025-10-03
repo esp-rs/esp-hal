@@ -1,6 +1,8 @@
 use procmacros::BuilderLite;
 
 use super::*;
+#[cfg(multi_core)]
+use crate::hal::system::Cpu;
 use crate::{
     common_adapter::*,
     hal::{interrupt, peripherals::Interrupt},
@@ -288,6 +290,12 @@ unsafe extern "C" {
 pub struct Config {
     /// The priority of the RTOS task.
     task_priority: u8,
+
+    /// The stack size of the RTOS task.
+    task_stack_size: u16,
+
+    #[cfg(multi_core)]
+    task_cpu: Cpu,
 }
 
 impl Default for Config {
@@ -295,6 +303,9 @@ impl Default for Config {
         Self {
             // same priority as the wifi task, when using esp-rtos (I'm assuming it's MAX_PRIO - 2)
             task_priority: 29,
+            task_stack_size: 8192, // 4096?
+            #[cfg(multi_core)]
+            task_cpu: Cpu::ProCpu,
         }
     }
 }
@@ -304,8 +315,11 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
     // ideally _some_ of these values should be configurable
     esp_bt_controller_config_t {
         version: 0x02505080,
-        controller_task_stack_size: 8192,
+        controller_task_stack_size: config.task_stack_size,
         controller_task_prio: config.task_priority,
+        #[cfg(multi_core)]
+        controller_task_run_cpu: config.task_cpu as u8,
+        #[cfg(single_core)]
         controller_task_run_cpu: 0,
         bluetooth_mode: 1,
         ble_max_act: 10,
@@ -338,14 +352,14 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         cca_thresh: 20,
         dup_list_refresh_period: 0,
         scan_backoff_upperlimitmax: 0,
-        ble_50_feat_supp: true, // BT_CTRL_50_FEATURE_SUPPORT
+        ble_50_feat_supp: BT_CTRL_50_FEATURE_SUPPORT != 0,
         ble_cca_mode: 0,
         ble_chan_ass_en: 0,
         ble_data_lenth_zero_aux: 0,
         ble_ping_en: 0,
-        ble_llcp_disc_flag: 0b111, /* (BT_CTRL_BLE_LLCP_CONN_UPDATE |
-                                    * BT_CTRL_BLE_LLCP_CHAN_MAP_UPDATE |
-                                    * BT_CTRL_BLE_LLCP_PHY_UPDATE) */
+        ble_llcp_disc_flag: BT_CTRL_BLE_LLCP_CONN_UPDATE as u8
+            | BT_CTRL_BLE_LLCP_CHAN_MAP_UPDATE as u8
+            | BT_CTRL_BLE_LLCP_PHY_UPDATE as u8,
         run_in_flash: false,
         dtm_en: true,
         enc_en: true,
