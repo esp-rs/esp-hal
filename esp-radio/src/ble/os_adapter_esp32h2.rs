@@ -58,7 +58,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
     // keep them aligned with BT_CONTROLLER_INIT_CONFIG_DEFAULT in ESP-IDF
     // ideally _some_ of these values should be configurable
     esp_bt_controller_config_t {
-        config_version: 0x20250606,
+        config_version: CONFIG_VERSION,
         ble_ll_resolv_list_size: 4,
         ble_hci_evt_hi_buf_count: 30,
         ble_hci_evt_lo_buf_count: 8,
@@ -88,7 +88,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         controller_task_stack_size: config.task_stack_size,
         controller_task_prio: config.task_priority,
         controller_run_cpu: 0,
-        qa_test_mode: config.qa_test_mode as u8,
+        enable_qa_test: config.qa_test_mode as u8,
         enable_bqb_test: 0,
         enable_tx_cca: 0,
         cca_rssi_thresh: (256 - 50) as u8,
@@ -120,7 +120,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ch39_txpwr: 9,
         adv_rsv_cnt: 1,
         conn_rsv_cnt: 2,
-        config_magic: 0x5A5AA5A5,
+        config_magic: CONFIG_MAGIC,
     }
 }
 

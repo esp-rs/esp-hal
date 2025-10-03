@@ -63,7 +63,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
     // keep them aligned with BT_CONTROLLER_INIT_CONFIG_DEFAULT in ESP-IDF
     // ideally _some_ of these values should be configurable
     esp_bt_controller_config_t {
-        config_version: 0x20250310,
+        config_version: CONFIG_VERSION,
         ble_ll_resolv_list_size: CONFIG_BT_LE_LL_RESOLV_LIST_SIZE as _,
         ble_hci_evt_hi_buf_count: CONFIG_BT_LE_HCI_EVT_HI_BUF_COUNT as _,
         ble_hci_evt_lo_buf_count: CONFIG_BT_LE_HCI_EVT_LO_BUF_COUNT as _,
@@ -124,7 +124,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
                           * BT_CTRL_BLE_LLCP_PHY_UPDATE */
         scan_backoff_upperlimitmax: CONFIG_BT_CTRL_SCAN_BACKOFF_UPPERLIMITMAX as _,
         vhci_enabled: CONFIG_BT_LE_HCI_INTERFACE_USE_RAM as _,
-        config_magic: 0x5A5AA5A5,
+        config_magic: CONFIG_MAGIC,
     }
 }
 
