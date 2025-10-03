@@ -199,6 +199,7 @@
 use core::{
     default::Default,
     marker::PhantomData,
+    mem::ManuallyDrop,
     num::NonZeroU16,
     pin::Pin,
     task::{Context, Poll},
@@ -228,9 +229,9 @@ use crate::{
 };
 
 mod reader;
-use reader::RmtReader;
+use reader::{ReaderState, RmtReader};
 mod writer;
-use writer::RmtWriter;
+use writer::{RmtWriter, WriterState};
 
 /// Errors
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -590,7 +591,7 @@ pub struct Rx;
 /// A trait implemented by the `Rx` and `Tx` marker structs.
 ///
 /// For internal use by the driver.
-pub trait Direction: Copy + Clone + core::fmt::Debug + crate::private::Sealed {
+pub trait Direction: Copy + Clone + core::fmt::Debug + crate::private::Sealed + Unpin {
     #[doc(hidden)]
     const IS_TX: bool;
 }
@@ -704,23 +705,23 @@ for_each_rmt_channel!(
     (all $(($num:literal)),+) => {
         paste::paste! {
             /// RMT Instance
-            pub struct Rmt<'d, Dm>
+            pub struct Rmt<'rmt, Dm>
             where
                 Dm: crate::DriverMode,
             {
-                pub(super) peripheral: RMT<'d>,
+                pub(super) peripheral: RMT<'rmt>,
                 $(
                     #[doc = concat!("RMT Channel ", $num)]
-                    pub [<channel $num>]: ChannelCreator<Dm, $num>,
+                    pub [<channel $num>]: ChannelCreator<'rmt, Dm, $num>,
                 )+
                 _mode: PhantomData<Dm>,
             }
 
-            impl<'d, Dm> Rmt<'d, Dm>
+            impl<'rmt, Dm> Rmt<'rmt, Dm>
             where
                 Dm: crate::DriverMode,
             {
-                fn create(peripheral: RMT<'d>) -> Self {
+                fn create(peripheral: RMT<'rmt>) -> Self {
                     Self {
                         peripheral,
                         $(
@@ -769,19 +770,24 @@ for_each_rmt_channel!(
             ];
 
             $(
-                impl<'d, Dm> TxChannelCreator<'d, Dm> for ChannelCreator<Dm, $num>
+                impl<'ch, Dm> TxChannelCreator<'ch, Dm> for ChannelCreator<'ch, Dm, $num>
                 where
                     Dm: crate::DriverMode,
                 {
                     fn configure_tx(
                         self,
-                        pin: impl PeripheralOutput<'d>,
+                        pin: impl PeripheralOutput<'ch>,
                         config: TxChannelConfig,
-                    ) -> Result<Channel<Dm, Tx>, Error>
+                    ) -> Result<Channel<'ch, Dm, Tx>, Error>
                     where
                         Self: Sized,
                     {
-                        unsafe { Channel::configure_tx(ChannelIndex::[<Ch $idx>], pin.into(), config) }
+                        unsafe { Channel::configure_tx(
+                            ChannelIndex::[<Ch $idx>],
+                            pin.into(),
+                            config,
+                            self._guard,
+                        ) }
                     }
                 }
             )+
@@ -797,19 +803,24 @@ for_each_rmt_channel!(
             ];
 
             $(
-                impl<'d, Dm> RxChannelCreator<'d, Dm> for ChannelCreator<Dm, $num>
+                impl<'ch, Dm> RxChannelCreator<'ch, Dm> for ChannelCreator<'ch, Dm, $num>
                 where
                     Dm: crate::DriverMode,
                 {
                     fn configure_rx(
                         self,
-                        pin: impl PeripheralInput<'d>,
+                        pin: impl PeripheralInput<'ch>,
                         config: RxChannelConfig,
-                    ) -> Result<Channel<Dm, Rx>, Error>
+                    ) -> Result<Channel<'ch, Dm, Rx>, Error>
                     where
                         Self: Sized,
                     {
-                        unsafe { Channel::configure_rx(ChannelIndex::[<Ch $idx>], pin.into(), config) }
+                        unsafe { Channel::configure_rx(
+                            ChannelIndex::[<Ch $idx>],
+                            pin.into(),
+                            config,
+                            self._guard,
+                        ) }
                     }
                 }
             )+
@@ -844,16 +855,16 @@ impl ChannelIndex {
     }
 }
 
-impl<'d> Rmt<'d, Blocking> {
+impl<'rmt> Rmt<'rmt, Blocking> {
     /// Create a new RMT instance
-    pub fn new(peripheral: RMT<'d>, frequency: Rate) -> Result<Self, Error> {
+    pub fn new(peripheral: RMT<'rmt>, frequency: Rate) -> Result<Self, Error> {
         let this = Rmt::create(peripheral);
         self::chip_specific::configure_clock(ClockSource::default(), frequency)?;
         Ok(this)
     }
 
     /// Reconfigures the driver for asynchronous operation.
-    pub fn into_async(mut self) -> Rmt<'d, Async> {
+    pub fn into_async(mut self) -> Rmt<'rmt, Async> {
         self.set_interrupt_handler(async_interrupt_handler);
         Rmt::create(self.peripheral)
     }
@@ -1030,28 +1041,33 @@ use state::RmtState;
 /// RMT Channel
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct Channel<Dm, Dir>
+pub struct Channel<'ch, Dm, Dir>
 where
     Dm: crate::DriverMode,
     Dir: Direction,
 {
     raw: DynChannelAccess<Dir>,
-    _mode: PhantomData<Dm>,
-    _guard: GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>,
+
+    // Holds the lifetime for which have unique access to both the channel and the pin its
+    // configured for. Conceptually, for 'ch, we keep the Rmt peripheral alive.
+    _rmt: PhantomData<Rmt<'ch, Dm>>,
+
+    // Only the "outermost" Channel/ChannelCreator holds the GenericPeripheralGuard, which avoids
+    // constant inc/dec of the reference count on reborrow and drop.
+    _guard: DropState,
 }
 
-impl<Dm> Channel<Dm, Tx>
+impl<'ch, Dm> Channel<'ch, Dm, Tx>
 where
     Dm: crate::DriverMode,
 {
-    unsafe fn configure_tx<'d>(
+    unsafe fn configure_tx(
         ch_idx: ChannelIndex,
-        pin: gpio::interconnect::OutputSignal<'d>,
+        pin: gpio::interconnect::OutputSignal<'ch>,
         config: TxChannelConfig,
+        guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
     ) -> Result<Self, Error> {
         let raw = unsafe { DynChannelAccess::conjure(ch_idx) };
-
-        let _guard = GenericPeripheralGuard::new();
 
         let memsize = MemSize::from_blocks(config.memsize);
         reserve_channel(raw.channel(), RmtState::Tx, memsize)?;
@@ -1071,26 +1087,30 @@ where
         raw.set_tx_idle_output(config.idle_output, config.idle_output_level);
         raw.set_memsize(memsize);
 
+        let _guard = match guard {
+            Some(g) => DropState::MemAndGuard(g),
+            None => DropState::MemoryOnly,
+        };
+
         Ok(Self {
             raw,
-            _mode: core::marker::PhantomData,
+            _rmt: core::marker::PhantomData,
             _guard,
         })
     }
 }
 
-impl<Dm> Channel<Dm, Rx>
+impl<'ch, Dm> Channel<'ch, Dm, Rx>
 where
     Dm: crate::DriverMode,
 {
-    unsafe fn configure_rx<'d>(
+    unsafe fn configure_rx(
         ch_idx: ChannelIndex,
-        pin: gpio::interconnect::InputSignal<'d>,
+        pin: gpio::interconnect::InputSignal<'ch>,
         config: RxChannelConfig,
+        guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
     ) -> Result<Self, Error> {
         let raw = unsafe { DynChannelAccess::conjure(ch_idx) };
-
-        let _guard = GenericPeripheralGuard::new();
 
         if config.idle_threshold > property!("rmt.max_idle_threshold") {
             return Err(Error::InvalidArgument);
@@ -1115,63 +1135,93 @@ where
         raw.set_rx_idle_threshold(config.idle_threshold);
         raw.set_memsize(memsize);
 
+        let _guard = match guard {
+            Some(g) => DropState::MemAndGuard(g),
+            None => DropState::MemoryOnly,
+        };
+
         Ok(Self {
             raw,
-            _mode: core::marker::PhantomData,
+            _rmt: core::marker::PhantomData,
             _guard,
         })
     }
 }
 
-impl<Dm, Dir> Drop for Channel<Dm, Dir>
+#[derive(Debug)]
+enum DropState {
+    None,
+    MemoryOnly,
+    MemAndGuard(GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>),
+}
+
+impl<Dm, Dir> Channel<'_, Dm, Dir>
+where
+    Dm: crate::DriverMode,
+    Dir: Direction,
+{
+    /// Reborrow this channel for a shorter lifetime `'a`.
+    pub fn reborrow<'a>(&'a mut self) -> Channel<'a, Dm, Dir> {
+        Channel {
+            raw: self.raw,
+            _rmt: self._rmt,
+            // Resources must only be released once the parent is dropped.
+            _guard: DropState::None,
+        }
+    }
+}
+
+impl<Dm, Dir> Drop for Channel<'_, Dm, Dir>
 where
     Dm: crate::DriverMode,
     Dir: Direction,
 {
     fn drop(&mut self) {
-        let memsize = self.raw.memsize();
+        if !matches!(self._guard, DropState::None) {
+            let memsize = self.raw.memsize();
 
-        // This isn't really necessary, but be extra sure that this channel can't
-        // interfere with others.
-        self.raw.set_memsize(MemSize::from_blocks(0));
+            // This isn't really necessary, but be extra sure that this channel can't
+            // interfere with others.
+            self.raw.set_memsize(MemSize::from_blocks(0));
 
-        // Existence of this `Channel` struct implies exclusive access to these hardware
-        // channels, thus simply store the new state.
-        RmtState::store_range_rev(
-            RmtState::Unconfigured,
-            self.raw.channel(),
-            self.raw.channel() + memsize.blocks(),
-            Ordering::Release,
-        );
+            // Existence of this `Channel` struct implies exclusive access to these hardware
+            // channels, thus simply store the new state.
+            RmtState::store_range_rev(
+                RmtState::Unconfigured,
+                self.raw.channel(),
+                self.raw.channel() + memsize.blocks(),
+                Ordering::Release,
+            );
+        }
     }
 }
 
 /// Creates a TX channel
-pub trait TxChannelCreator<'d, Dm>
+pub trait TxChannelCreator<'ch, Dm>
 where
     Dm: crate::DriverMode,
 {
     /// Configure the TX channel
     fn configure_tx(
         self,
-        pin: impl PeripheralOutput<'d>,
+        pin: impl PeripheralOutput<'ch>,
         config: TxChannelConfig,
-    ) -> Result<Channel<Dm, Tx>, Error>
+    ) -> Result<Channel<'ch, Dm, Tx>, Error>
     where
         Self: Sized;
 }
 
 /// Creates a RX channel
-pub trait RxChannelCreator<'d, Dm>
+pub trait RxChannelCreator<'ch, Dm>
 where
     Dm: crate::DriverMode,
 {
     /// Configure the RX channel
     fn configure_rx(
         self,
-        pin: impl PeripheralInput<'d>,
+        pin: impl PeripheralInput<'ch>,
         config: RxChannelConfig,
-    ) -> Result<Channel<Dm, Rx>, Error>
+    ) -> Result<Channel<'ch, Dm, Rx>, Error>
     where
         Self: Sized;
 }
@@ -1181,19 +1231,20 @@ where
 /// If the data size exceeds the size of the internal buffer, `.poll()` or
 /// `.wait()` needs to be called before the entire buffer has been sent to avoid
 /// underruns.
-pub struct SingleShotTxTransaction<'a, T>
+#[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
+pub struct SingleShotTxTransaction<'ch, 'data, T>
 where
     T: Into<PulseCode> + Copy,
 {
-    channel: Channel<Blocking, Tx>,
+    channel: Channel<'ch, Blocking, Tx>,
 
     writer: RmtWriter,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    remaining_data: &'a [T],
+    remaining_data: &'data [T],
 }
 
-impl<T> SingleShotTxTransaction<'_, T>
+impl<'ch, T> SingleShotTxTransaction<'ch, '_, T>
 where
     T: Into<PulseCode> + Copy,
 {
@@ -1228,42 +1279,84 @@ where
 
     /// Wait for the transaction to complete
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub fn wait(mut self) -> Result<Channel<Blocking, Tx>, (Error, Channel<Blocking, Tx>)> {
+    pub fn wait(
+        mut self,
+    ) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
+        let raw = self.channel.raw;
+
         // Not sure that all the error cases below can happen. However, it's best to
         // handle them to be sure that we don't lock up here in case they can happen.
-        loop {
+        let result = loop {
             match self.poll_internal() {
-                Some(Event::Error) => break Err((Error::TransmissionError, self.channel)),
+                Some(Event::Error) => break Err(Error::TransmissionError),
                 Some(Event::End) => {
                     if !self.remaining_data.is_empty() {
                         // Unexpectedly done, even though we have data left: For example, this could
                         // happen if there is a stop code inside the data and not just at the end.
-                        break Err((Error::TransmissionError, self.channel));
+                        break Err(Error::TransmissionError);
                     } else {
-                        break Ok(self.channel);
+                        break Ok(());
                     }
                 }
                 _ => continue,
             }
+        };
+
+        // Disable Drop handler since the transaction is stopped already.
+        let this = ManuallyDrop::new(self);
+        // Rust has no safe API to take values out of ManuallyDrop,
+        // cf. https://github.com/rust-lang/rfcs/pull/3466
+        // This is safe since we own `this`, and don't access it below.
+        let channel = unsafe { core::ptr::read(&this.channel) };
+
+        raw.clear_tx_interrupts();
+
+        match result {
+            Ok(()) => Ok(channel),
+            Err(err) => Err((err, channel)),
         }
     }
 }
 
-/// An in-progress continuous TX transaction
-pub struct ContinuousTxTransaction {
-    channel: Channel<Blocking, Tx>,
+impl<T> Drop for SingleShotTxTransaction<'_, '_, T>
+where
+    T: Into<PulseCode> + Copy,
+{
+    fn drop(&mut self) {
+        let raw = self.channel.raw;
+
+        if !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {
+            let immediate = raw.stop_tx();
+            raw.update();
+
+            // Block until the channel is safe to use again.
+            if !immediate {
+                while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+            }
+        }
+
+        raw.clear_tx_interrupts();
+    }
 }
 
-impl ContinuousTxTransaction {
+/// An in-progress continuous TX transaction
+#[must_use = "transactions will be aborted when dropped"]
+pub struct ContinuousTxTransaction<'ch> {
+    channel: Channel<'ch, Blocking, Tx>,
+}
+
+impl<'ch> ContinuousTxTransaction<'ch> {
     /// Stop transaction when the current iteration ends.
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub fn stop_next(self) -> Result<Channel<Blocking, Tx>, (Error, Channel<Blocking, Tx>)> {
+    pub fn stop_next(
+        self,
+    ) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
         self.stop_impl(false)
     }
 
     /// Stop transaction as soon as possible.
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub fn stop(self) -> Result<Channel<Blocking, Tx>, (Error, Channel<Blocking, Tx>)> {
+    pub fn stop(self) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
         self.stop_impl(true)
     }
 
@@ -1271,23 +1364,37 @@ impl ContinuousTxTransaction {
     fn stop_impl(
         self,
         immediate: bool,
-    ) -> Result<Channel<Blocking, Tx>, (Error, Channel<Blocking, Tx>)> {
+    ) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
         let raw = self.channel.raw;
 
         raw.set_tx_continuous(false);
         let immediate = if immediate { raw.stop_tx() } else { false };
         raw.update();
 
-        if immediate {
-            return Ok(self.channel);
-        }
-
-        loop {
-            match raw.get_tx_status() {
-                Some(Event::Error) => break Err((Error::TransmissionError, self.channel)),
-                Some(Event::End) => break Ok(self.channel),
-                _ => continue,
+        let result = if immediate {
+            Ok(())
+        } else {
+            loop {
+                match raw.get_tx_status() {
+                    Some(Event::Error) => break Err(Error::TransmissionError),
+                    Some(Event::End) => break Ok(()),
+                    _ => continue,
+                }
             }
+        };
+
+        // Disable Drop handler since the transaction is stopped already.
+        let this = ManuallyDrop::new(self);
+        // Rust has no safe API to take values out of ManuallyDrop,
+        // cf. https://github.com/rust-lang/rfcs/pull/3466
+        // This is safe since we own `this`, and don't access it below.
+        let channel = unsafe { core::ptr::read(&this.channel) };
+
+        raw.clear_tx_interrupts();
+
+        match result {
+            Ok(()) => Ok(channel),
+            Err(err) => Err((err, channel)),
         }
     }
 
@@ -1297,20 +1404,66 @@ impl ContinuousTxTransaction {
     }
 }
 
+impl<'ch> Drop for ContinuousTxTransaction<'ch> {
+    fn drop(&mut self) {
+        let raw = self.channel.raw;
+
+        if !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {
+            let immediate = raw.stop_tx();
+            raw.update();
+
+            // Block until the channel is safe to use again.
+            if !immediate {
+                while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+            }
+        }
+
+        raw.clear_tx_interrupts();
+    }
+}
+
 /// RMT Channel Creator
-pub struct ChannelCreator<Dm, const CHANNEL: u8>
+pub struct ChannelCreator<'ch, Dm, const CHANNEL: u8>
 where
     Dm: crate::DriverMode,
 {
-    _mode: PhantomData<Dm>,
-    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
+    // Conceptually, this retains a reference to the main driver struct, even when the
+    // `ChannelCreator` is taken out of it and the `Rmt` dropped. This prevents re-inititalizing
+    // the `Rmt` and obtaining a duplicate `ChannelCreator`.
+    _rmt: PhantomData<Rmt<'ch, Dm>>,
+
+    // We need to keep the peripheral clocked since the following sequence of events is possible:
+    //
+    // ```
+    // let cc = {
+    //     let rmt = Rmt::new(peripheral, freq);  // 1
+    //     rmt.channel0  // 2
+    // };  // 3 (drop other ChannelCreators and Rmt.peripheral)
+    // let ch0 = cc.configure_tx(pin, config).unwrap();  // 4 (create Channel._guard)
+    // ch0.transmit(...);  // 5
+    // ```
+    //
+    // If there was no _guard in ChannelCreator, the peripheral would be disabled in step 3, and
+    // re-enabled in step 4, losing the clock configuration that was set in step 1.
+    _guard: Option<GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>>,
 }
 
-impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
-    fn conjure() -> ChannelCreator<Dm, CHANNEL> {
-        ChannelCreator {
-            _mode: PhantomData,
-            _guard: GenericPeripheralGuard::new(),
+impl<Dm, const CHANNEL: u8> ChannelCreator<'_, Dm, CHANNEL>
+where
+    Dm: crate::DriverMode,
+{
+    fn conjure() -> Self {
+        Self {
+            _rmt: PhantomData,
+            _guard: Some(GenericPeripheralGuard::new()),
+        }
+    }
+
+    /// Reborrow this channel creator for a shorter lifetime `'a`.
+    pub fn reborrow<'a>(&'a mut self) -> ChannelCreator<'a, Dm, CHANNEL> {
+        Self {
+            _rmt: PhantomData,
+            _guard: None,
         }
     }
 
@@ -1321,10 +1474,10 @@ impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
     /// Circumvents HAL ownership and safety guarantees and allows creating
     /// multiple handles to the same peripheral structure.
     #[inline]
-    pub unsafe fn steal() -> ChannelCreator<Dm, CHANNEL> {
-        ChannelCreator {
-            _mode: PhantomData,
-            _guard: GenericPeripheralGuard::new(),
+    pub unsafe fn steal() -> Self {
+        Self {
+            _rmt: PhantomData,
+            _guard: Some(GenericPeripheralGuard::new()),
         }
     }
 }
@@ -1348,13 +1501,16 @@ const _: () = if core::mem::size_of::<LoopCount>() != 2 {
 };
 
 /// Channel in TX mode
-impl Channel<Blocking, Tx> {
+impl<'ch> Channel<'ch, Blocking, Tx> {
     /// Start transmitting the given pulse code sequence.
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit<T>(self, mut data: &[T]) -> Result<SingleShotTxTransaction<'_, T>, Error>
+    pub fn transmit<'data, T>(
+        self,
+        mut data: &'data [T],
+    ) -> Result<SingleShotTxTransaction<'ch, 'data, T>, Error>
     where
         T: Into<PulseCode> + Copy,
     {
@@ -1392,7 +1548,7 @@ impl Channel<Blocking, Tx> {
         self,
         mut data: &[T],
         loopcount: LoopCount,
-    ) -> Result<ContinuousTxTransaction, Error>
+    ) -> Result<ContinuousTxTransaction<'ch>, Error>
     where
         T: Into<PulseCode> + Copy,
     {
@@ -1415,18 +1571,19 @@ impl Channel<Blocking, Tx> {
 }
 
 /// RX transaction instance
-pub struct RxTransaction<'a, T>
+#[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
+pub struct RxTransaction<'ch, 'data, T>
 where
     T: From<PulseCode>,
 {
-    channel: Channel<Blocking, Rx>,
+    channel: Channel<'ch, Blocking, Rx>,
 
     reader: RmtReader,
 
-    data: &'a mut [T],
+    data: &'data mut [T],
 }
 
-impl<T> RxTransaction<'_, T>
+impl<'ch, T> RxTransaction<'ch, '_, T>
 where
     T: From<PulseCode>,
 {
@@ -1439,7 +1596,8 @@ where
         if status == Some(Event::End) {
             // Do not clear the interrupt flags here: Subsequent calls of wait() must
             // be able to observe them if this is currently called via poll()
-            raw.stop_rx();
+            // FIXME: rx should be stopped here, attempt removing this
+            raw.stop_rx(false);
             raw.update();
 
             // `RmtReader::read()` is safe to call even if `poll_internal` is called repeatedly
@@ -1464,31 +1622,60 @@ where
 
     /// Wait for the transaction to complete
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub fn wait(mut self) -> Result<Channel<Blocking, Rx>, (Error, Channel<Blocking, Rx>)> {
+    pub fn wait(
+        mut self,
+    ) -> Result<Channel<'ch, Blocking, Rx>, (Error, Channel<'ch, Blocking, Rx>)> {
         let raw = self.channel.raw;
 
         let result = loop {
             match self.poll_internal() {
-                Some(Event::Error) => break Err((Error::ReceiverError, self.channel)),
-                Some(Event::End) => break Ok(self.channel),
+                Some(Event::Error) => break Err(Error::ReceiverError),
+                Some(Event::End) => break Ok(()),
                 _ => continue,
             }
         };
 
+        // Disable Drop handler since the transaction is stopped already.
+        let this = ManuallyDrop::new(self);
+        // Rust has no safe API to take values out of ManuallyDrop,
+        // cf. https://github.com/rust-lang/rfcs/pull/3466
+        // This is safe since we own `this`, and don't access it below.
+        let channel = unsafe { core::ptr::read(&this.channel) };
+
         raw.clear_rx_interrupts();
 
-        result
+        match result {
+            Ok(()) => Ok(channel),
+            Err(err) => Err((err, channel)),
+        }
+    }
+}
+
+impl<T> Drop for RxTransaction<'_, '_, T>
+where
+    T: From<PulseCode>,
+{
+    fn drop(&mut self) {
+        let raw = self.channel.raw;
+
+        raw.stop_rx(true);
+        raw.update();
+
+        raw.clear_rx_interrupts();
     }
 }
 
 /// Channel is RX mode
-impl Channel<Blocking, Rx> {
+impl<'ch> Channel<'ch, Blocking, Rx> {
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
     /// The length of the received data cannot exceed the allocated RMT RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn receive<T>(self, data: &mut [T]) -> Result<RxTransaction<'_, T>, Error>
+    pub fn receive<'data, T>(
+        self,
+        data: &'data mut [T],
+    ) -> Result<RxTransaction<'ch, 'data, T>, Error>
     where
         Self: Sized,
         T: From<PulseCode>,
@@ -1513,19 +1700,29 @@ impl Channel<Blocking, Rx> {
 }
 
 static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_CHANNELS];
+
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtTxFuture {
+struct RmtTxFuture<'a> {
     raw: DynChannelAccess<Tx>,
+    _phantom: PhantomData<Channel<'a, Async, Tx>>,
+    writer: RmtWriter,
 }
 
-impl core::future::Future for RmtTxFuture {
+impl core::future::Future for RmtTxFuture<'_> {
     type Output = Result<(), Error>;
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        WAKER[self.raw.channel() as usize].register(ctx.waker());
+        let this = self.get_mut();
+        let raw = this.raw;
 
-        match self.raw.get_tx_status() {
+        if let WriterState::Error(err) = this.writer.state {
+            return Poll::Ready(Err(err));
+        }
+
+        WAKER[raw.channel() as usize].register(ctx.waker());
+
+        match raw.get_tx_status() {
             Some(Event::Error) => Poll::Ready(Err(Error::TransmissionError)),
             Some(Event::End) => Poll::Ready(Ok(())),
             _ => Poll::Pending,
@@ -1533,13 +1730,31 @@ impl core::future::Future for RmtTxFuture {
     }
 }
 
+impl Drop for RmtTxFuture<'_> {
+    fn drop(&mut self) {
+        let raw = self.raw;
+
+        if !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {
+            let immediate = raw.stop_tx();
+            raw.update();
+
+            // Block until the channel is safe to use again.
+            if !immediate {
+                while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+            }
+        }
+
+        raw.clear_tx_interrupts();
+    }
+}
+
 /// TX channel in async mode
-impl Channel<Async, Tx> {
+impl Channel<'_, Async, Tx> {
     /// Start transmitting the given pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub async fn transmit<T>(&mut self, mut data: &[T]) -> Result<(), Error>
+    pub fn transmit<T>(&mut self, mut data: &[T]) -> impl Future<Output = Result<(), Error>>
     where
         Self: Sized,
         T: Into<PulseCode> + Copy,
@@ -1547,82 +1762,122 @@ impl Channel<Async, Tx> {
         let raw = self.raw;
         let memsize = raw.memsize();
 
+        let mut writer = RmtWriter::new();
+
         match data.last() {
-            None => return Err(Error::InvalidArgument),
+            None => {
+                writer.state = WriterState::Error(Error::InvalidArgument);
+            }
             Some(&code) if code.into().is_end_marker() => (),
-            Some(_) => return Err(Error::EndMarkerMissing),
+            Some(_) => {
+                writer.state = WriterState::Error(Error::EndMarkerMissing);
+            }
         }
 
         if data.len() > memsize.codes() {
-            return Err(Error::InvalidDataLength);
+            writer.state = WriterState::Error(Error::InvalidDataLength);
         }
 
-        let mut writer = RmtWriter::new();
-        writer.write(&mut data, raw, true);
+        if !matches!(writer.state, WriterState::Error(_)) {
+            writer.write(&mut data, raw, true);
 
-        raw.clear_tx_interrupts();
-        raw.listen_tx_interrupt(Event::End | Event::Error);
-        raw.start_send(None, memsize);
+            raw.clear_tx_interrupts();
+            raw.listen_tx_interrupt(Event::End | Event::Error);
+            raw.start_send(None, memsize);
+        }
 
-        (RmtTxFuture { raw }).await
+        RmtTxFuture {
+            raw,
+            _phantom: PhantomData,
+            writer,
+        }
     }
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtRxFuture {
+struct RmtRxFuture<'a, T>
+where
+    T: From<PulseCode> + Unpin,
+{
     raw: DynChannelAccess<Rx>,
+    _phantom: PhantomData<Channel<'a, Async, Rx>>,
+    reader: RmtReader,
+    data: &'a mut [T],
 }
 
-impl core::future::Future for RmtRxFuture {
+impl<T> core::future::Future for RmtRxFuture<'_, T>
+where
+    T: From<PulseCode> + Unpin,
+{
     type Output = Result<(), Error>;
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        WAKER[self.raw.channel() as usize].register(ctx.waker());
+        let this = self.get_mut();
+        let raw = this.raw;
 
-        match self.raw.get_rx_status() {
+        if let ReaderState::Error(err) = this.reader.state {
+            return Poll::Ready(Err(err));
+        }
+
+        WAKER[raw.channel() as usize].register(ctx.waker());
+
+        match raw.get_rx_status() {
             Some(Event::Error) => Poll::Ready(Err(Error::ReceiverError)),
-            Some(Event::End) => Poll::Ready(Ok(())),
+            Some(Event::End) => {
+                this.reader.read(&mut this.data, raw, true);
+
+                Poll::Ready(Ok(()))
+            }
             _ => Poll::Pending,
         }
     }
 }
 
+impl<T> Drop for RmtRxFuture<'_, T>
+where
+    T: From<PulseCode> + Unpin,
+{
+    fn drop(&mut self) {
+        let raw = self.raw;
+
+        raw.stop_rx(true);
+        raw.update();
+
+        raw.clear_rx_interrupts();
+    }
+}
+
 /// RX channel in async mode
-impl Channel<Async, Rx> {
+impl Channel<'_, Async, Rx> {
     /// Start receiving a pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub async fn receive<T>(&mut self, mut data: &mut [T]) -> Result<(), Error>
+    pub fn receive<T>(&mut self, data: &mut [T]) -> impl Future<Output = Result<(), Error>>
     where
         Self: Sized,
-        T: From<PulseCode>,
+        T: From<PulseCode> + Unpin,
     {
         let raw = self.raw;
         let memsize = raw.memsize();
 
-        if data.len() > memsize.codes() {
-            return Err(Error::InvalidDataLength);
-        }
-
         let mut reader = RmtReader::new();
 
-        raw.clear_rx_interrupts();
-        raw.listen_rx_interrupt(Event::End | Event::Error);
-        raw.start_receive();
-
-        let result = (RmtRxFuture { raw }).await;
-
-        if result.is_ok() {
-            raw.stop_rx();
+        if data.len() > memsize.codes() {
+            reader.state = ReaderState::Error(Error::InvalidDataLength);
+        } else {
             raw.clear_rx_interrupts();
-            raw.update();
-
-            reader.read(&mut data, raw, true);
+            raw.listen_rx_interrupt(Event::End | Event::Error);
+            raw.start_receive();
         }
 
-        result
+        RmtRxFuture {
+            raw,
+            reader,
+            data,
+            _phantom: PhantomData,
+        }
     }
 }
 
@@ -2155,8 +2410,12 @@ mod chip_specific {
             }
         }
 
+        // This is immediate and does not update state flags; do not poll on get_rx_status()
+        // afterwards!
+        //
+        // Requires an update() call
         #[inline]
-        pub fn stop_rx(&self) {
+        pub fn stop_rx(&self, _force: bool) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
             rmt.ch_rx_conf1(ch_idx).modify(|_, w| w.rx_en().clear_bit());
@@ -2549,10 +2808,72 @@ mod chip_specific {
         }
 
         #[inline]
-        pub fn stop_rx(&self) {
+        pub fn stop_rx(&self, force: bool) {
             let rmt = crate::peripherals::RMT::regs();
-            rmt.chconf1(self.ch_idx as usize)
-                .modify(|_, w| w.rx_en().clear_bit());
+
+            // There's no direct hardware support on these chips for stopping the receiver once it
+            // started: It will only stop when it runs into an error or when it detects that the
+            // data ended (buffer end or idle threshold). Depending on the current channel
+            // settings, this might take a looong time.
+            //
+            // However, we do need to reliably stop the receiver on `Channel` drop to avoid
+            // subsequent transactions receiving some initial garbage.
+            //
+            // This code attempts to work around this limitation by
+            //
+            // 1) setting the mem_owner to an invalid value. This doesn't seem to trigger an error
+            //    immediately, so presumably the error only occurs when a new pulse code would be
+            //    written.
+            // 2) lowering the idle treshold and change other settings to make exceeding the
+            //    threshold more likely (lower clock divider, enable and set an input filter that is
+            //    longer than the idle threshold). The latter should have the same effect as
+            //    reconnecting the pin to a constant level, but that tricky to do since we'd also
+            //    need restore it afterwards.
+            //
+            // On its own, 2) should be sufficient and quickly result in an `End` condition. If
+            // this is overlooking anything and a new code does happen to be received, 1) should
+            // ensure that an `Error` condition occurs and in any case, we never block here for
+            // long.
+            if force {
+                let (old_idle_thres, old_div) =
+                    rmt.chconf0(self.ch_idx as usize).from_modify(|r, w| {
+                        let old = (r.idle_thres().bits(), r.div_cnt().bits());
+                        unsafe {
+                            w.idle_thres().bits(1);
+                            w.div_cnt().bits(1);
+                        }
+                        old
+                    });
+
+                let (old_filter_en, old_filter_thres) =
+                    rmt.chconf1(self.ch_idx as usize).from_modify(|r, w| {
+                        let old = (r.rx_filter_en().bit(), r.rx_filter_thres().bits());
+                        w.rx_en().clear_bit();
+                        w.rx_filter_en().bit(true);
+                        unsafe { w.rx_filter_thres().bits(0xFF) };
+                        w.mem_owner().clear_bit();
+                        old
+                    });
+
+                while !matches!(self.get_rx_status(), Some(Event::Error | Event::End)) {}
+
+                // Restore settings
+
+                rmt.chconf0(self.ch_idx as usize).modify(|_, w| unsafe {
+                    w.idle_thres().bits(old_idle_thres);
+                    w.div_cnt().bits(old_div)
+                });
+
+                rmt.chconf1(self.ch_idx as usize).modify(|_, w| {
+                    w.rx_filter_en().bit(old_filter_en);
+                    unsafe { w.rx_filter_thres().bits(old_filter_thres) };
+                    w.mem_owner().set_bit()
+                });
+            } else {
+                // Only disable, don't abort.
+                rmt.chconf1(self.ch_idx as usize)
+                    .modify(|_, w| w.rx_en().clear_bit());
+            }
         }
 
         pub fn set_rx_filter_threshold(&self, value: u8) {
