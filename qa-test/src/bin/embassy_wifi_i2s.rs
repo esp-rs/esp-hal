@@ -17,6 +17,7 @@ use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::{
     dma_buffers,
     i2s::master::{Channels, Config as I2sConfig, DataFormat, I2s},
+    ram,
     rng::Rng,
     time::Rate,
     timer::timg::TimerGroup,
@@ -212,7 +213,7 @@ async fn main(spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     // Provide a heap for components that allocate (esp-rtos/esp-radio, etc.)
-    esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
 
     // Preempt scheduler (WiFi)
     #[cfg(target_arch = "riscv32")]

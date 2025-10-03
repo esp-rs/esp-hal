@@ -104,9 +104,6 @@ symbols = [
     "rom_crc_le",
     "rom_crc_be",
     "rom_md5_bsd",
-
-    # Which bluetooth implementation
-    "npl",
 ]
 
 memory = [{ name = "dram", start = 0x4080_0000, end = 0x4085_0000 }]
@@ -460,5 +457,9 @@ apb_cycle_wait_num = 16 # TODO
 
 ## Radio
 [device.bt]
+support_status = "partial"
+controller = "npl"
+
 [device.ieee802154]
+
 [device.phy]

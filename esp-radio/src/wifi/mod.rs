@@ -22,18 +22,6 @@ use esp_hal::{asynch::AtomicWaker, system::Cpu};
 use esp_sync::NonReentrantMutex;
 #[cfg(all(any(feature = "sniffer", feature = "esp-now"), feature = "unstable"))]
 use esp_wifi_sys::include::wifi_pkt_rx_ctrl_t;
-use esp_wifi_sys::include::{
-    WIFI_INIT_CONFIG_MAGIC,
-    WIFI_PROTOCOL_11AX,
-    WIFI_PROTOCOL_11B,
-    WIFI_PROTOCOL_11G,
-    WIFI_PROTOCOL_11N,
-    WIFI_PROTOCOL_LR,
-    esp_wifi_connect_internal,
-    esp_wifi_disconnect_internal,
-    wifi_init_config_t,
-    wifi_scan_channel_bitmap_t,
-};
 #[cfg(feature = "wifi-eap")]
 use esp_wifi_sys::include::{
     esp_eap_client_clear_ca_cert,
@@ -63,6 +51,21 @@ use esp_wifi_sys::include::{
     esp_wifi_set_promiscuous_rx_cb,
     wifi_promiscuous_pkt_t,
     wifi_promiscuous_pkt_type_t,
+};
+use esp_wifi_sys::{
+    c_types::c_uint,
+    include::{
+        WIFI_INIT_CONFIG_MAGIC,
+        WIFI_PROTOCOL_11AX,
+        WIFI_PROTOCOL_11B,
+        WIFI_PROTOCOL_11G,
+        WIFI_PROTOCOL_11N,
+        WIFI_PROTOCOL_LR,
+        esp_wifi_connect_internal,
+        esp_wifi_disconnect_internal,
+        wifi_init_config_t,
+        wifi_scan_channel_bitmap_t,
+    },
 };
 use num_derive::FromPrimitive;
 #[doc(hidden)]
@@ -350,6 +353,10 @@ pub struct AccessPointConfig {
     max_connections: u16,
     /// Dtim period of the access point (Range: 1 ~ 10).
     dtim_period: u8,
+
+    /// Time to force deauth the STA if the SoftAP doesn't receive any data.
+    #[builder_lite(unstable)]
+    beacon_timeout: u16,
 }
 
 impl AccessPointConfig {
@@ -382,6 +389,7 @@ impl Default for AccessPointConfig {
             password: String::new(),
             max_connections: 255,
             dtim_period: 2,
+            beacon_timeout: 300,
         }
     }
 }
@@ -397,6 +405,8 @@ impl core::fmt::Debug for AccessPointConfig {
             .field("auth_method", &self.auth_method)
             .field("password", &"**REDACTED**")
             .field("max_connections", &self.max_connections)
+            .field("dtim_period", &self.dtim_period)
+            .field("beacon_timeout", &self.beacon_timeout)
             .finish()
     }
 }
@@ -415,6 +425,8 @@ impl defmt::Format for AccessPointConfig {
             auth_method: {}, \
             password: **REDACTED**, \
             max_connections: {}, \
+            dtim_period: {}, \
+            beacon_timeout: {} \
             }}",
             self.ssid.as_str(),
             self.ssid_hidden,
@@ -422,9 +434,24 @@ impl defmt::Format for AccessPointConfig {
             self.secondary_channel,
             self.protocols,
             self.auth_method,
-            self.max_connections
+            self.max_connections,
+            self.dtim_period,
+            self.beacon_timeout
         );
     }
+}
+
+/// Wi-Fi scan method.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[repr(u8)]
+#[instability::unstable]
+pub enum ScanMethod {
+    /// Fast scan.
+    Fast,
+
+    /// Scan all channels.
+    AllChannels,
 }
 
 /// Client configuration for a Wi-Fi connection.
@@ -450,6 +477,33 @@ pub struct ClientConfig {
 
     /// The set of protocols supported by the access point.
     protocols: EnumSet<Protocol>,
+
+    /// Interval for station to listen to beacon from AP.
+    ///
+    /// The unit of listen interval is one beacon interval.
+    /// For example, if beacon interval is 100 ms and listen interval is 3,
+    /// the interval for station to listen to beacon is 300 ms
+    #[builder_lite(unstable)]
+    listen_interval: u16,
+
+    /// Time to disconnect from AP if no data is received.
+    ///
+    /// Must be between 6 and 31.
+    #[builder_lite(unstable)]
+    beacon_timeout: u16,
+
+    /// Number of connection retries station will do before moving to next AP.
+    ///
+    /// `scan_method` should be set as [`ScanMethod::AllChannels`] to use this config.
+    ///
+    /// Note: Enabling this may cause connection time to increase in case the best AP
+    /// doesn't behave properly.
+    #[builder_lite(unstable)]
+    failure_retry_cnt: u8,
+
+    /// Scan method.
+    #[builder_lite(unstable)]
+    scan_method: ScanMethod,
 }
 
 impl ClientConfig {
@@ -459,6 +513,10 @@ impl ClientConfig {
         }
 
         if self.password.len() > 64 {
+            return Err(WifiError::InvalidArguments);
+        }
+
+        if !(6..=31).contains(&self.beacon_timeout) {
             return Err(WifiError::InvalidArguments);
         }
 
@@ -475,6 +533,10 @@ impl Default for ClientConfig {
             password: String::new(),
             channel: None,
             protocols: (Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
+            listen_interval: 3,
+            beacon_timeout: 6,
+            failure_retry_cnt: 1,
+            scan_method: ScanMethod::Fast,
         }
     }
 }
@@ -488,6 +550,10 @@ impl core::fmt::Debug for ClientConfig {
             .field("password", &"**REDACTED**")
             .field("channel", &self.channel)
             .field("protocols", &self.protocols)
+            .field("listen_interval", &self.listen_interval)
+            .field("beacon_timeout", &self.beacon_timeout)
+            .field("failure_retry_cnt", &self.failure_retry_cnt)
+            .field("scan_method", &self.scan_method)
             .finish()
     }
 }
@@ -504,12 +570,20 @@ impl defmt::Format for ClientConfig {
             password: **REDACTED**, \
             channel: {:?}, \
             protocols: {}, \
+            listen_interval: {}, \
+            beacon_timeout: {}, \
+            failure_retry_cnt: {}, \
+            scan_method: {} \
             }}",
             self.ssid.as_str(),
             self.bssid,
             self.auth_method,
             self.channel,
-            self.protocols
+            self.protocols,
+            self.listen_interval,
+            self.beacon_timeout,
+            self.failure_retry_cnt,
+            self.scan_method
         )
     }
 }
@@ -640,6 +714,33 @@ pub struct EapClientConfig {
 
     /// The set of protocols supported by the access point.
     protocols: EnumSet<Protocol>,
+
+    /// Interval for station to listen to beacon from AP.
+    ///
+    /// The unit of listen interval is one beacon interval.
+    /// For example, if beacon interval is 100 ms and listen interval is 3,
+    /// the interval for station to listen to beacon is 300 ms
+    #[builder_lite(unstable)]
+    listen_interval: u16,
+
+    /// Time to disconnect from AP if no data is received.
+    ///
+    /// Must be between 6 and 31.
+    #[builder_lite(unstable)]
+    beacon_timeout: u16,
+
+    /// Number of connection retries station will do before moving to next AP.
+    ///
+    /// `scan_method` should be set as [`ScanMethod::AllChannels`] to use this config.
+    ///
+    /// Note: Enabling this may cause connection time to increase in case the best AP
+    /// doesn't behave properly.
+    #[builder_lite(unstable)]
+    failure_retry_cnt: u8,
+
+    /// Scan method.
+    #[builder_lite(unstable)]
+    scan_method: ScanMethod,
 }
 
 #[cfg(feature = "wifi-eap")]
@@ -662,6 +763,10 @@ impl EapClientConfig {
         }
 
         if self.new_password.as_ref().unwrap_or(&String::new()).len() > 64 {
+            return Err(WifiError::InvalidArguments);
+        }
+
+        if !(6..=31).contains(&self.beacon_timeout) {
             return Err(WifiError::InvalidArguments);
         }
 
@@ -688,6 +793,10 @@ impl Debug for EapClientConfig {
             .field("certificate_and_key set", &"**REDACTED**")
             .field("ttls_phase2_method", &self.ttls_phase2_method)
             .field("protocols", &self.protocols)
+            .field("listen_interval", &self.listen_interval)
+            .field("beacon_timeout", &self.beacon_timeout)
+            .field("failure_retry_cnt", &self.failure_retry_cnt)
+            .field("scan_method", &self.scan_method)
             .finish()
     }
 }
@@ -714,6 +823,10 @@ impl defmt::Format for EapClientConfig {
             certificate_and_key: **REDACTED**, \
             ttls_phase2_method: {:?}, \
             protocols: {}, \
+            listen_interval: {}, \
+            beacon_timeout: {}, \
+            failure_retry_cnt: {}, \
+            scan_method: {},
             }}",
             self.ssid.as_str(),
             self.bssid,
@@ -726,7 +839,11 @@ impl defmt::Format for EapClientConfig {
             self.pac_file,
             self.ca_cert,
             self.ttls_phase2_method,
-            self.protocols
+            self.protocols,
+            self.listen_interval,
+            self.beacon_timeout,
+            self.failure_retry_cnt,
+            self.scan_method
         )
     }
 }
@@ -750,6 +867,10 @@ impl Default for EapClientConfig {
             certificate_and_key: None,
             ttls_phase2_method: None,
             protocols: (Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
+            listen_interval: 3,
+            beacon_timeout: 6,
+            failure_retry_cnt: 1,
+            scan_method: ScanMethod::Fast,
         }
     }
 }
@@ -1538,30 +1659,6 @@ unsafe extern "C" fn esp_wifi_tx_done_cb(
     embassy::TRANSMIT_WAKER.wake();
 }
 
-pub(crate) fn wifi_start() -> Result<(), WifiError> {
-    unsafe {
-        esp_wifi_result!(esp_wifi_start())?;
-
-        let mode = WifiMode::current()?;
-
-        // This is not an if-else because in AP-STA mode, both are true
-        if mode.is_ap() {
-            esp_wifi_result!(include::esp_wifi_set_inactive_time(
-                wifi_interface_t_WIFI_IF_AP,
-                esp_config_int!(u16, "ESP_RADIO_CONFIG_AP_BEACON_TIMEOUT")
-            ))?;
-        }
-        if mode.is_sta() {
-            esp_wifi_result!(include::esp_wifi_set_inactive_time(
-                wifi_interface_t_WIFI_IF_STA,
-                esp_config_int!(u16, "ESP_RADIO_CONFIG_BEACON_TIMEOUT")
-            ))?;
-        };
-    }
-
-    Ok(())
-}
-
 /// Configuration for active or passive scan.
 ///
 /// # Comparison of active and passive scan
@@ -2325,228 +2422,6 @@ pub(crate) fn esp_wifi_send_data(interface: wifi_interface_t, data: &mut [u8]) {
     }
 }
 
-fn apply_ap_config(config: &AccessPointConfig) -> Result<(), WifiError> {
-    let mut cfg = wifi_config_t {
-        ap: wifi_ap_config_t {
-            ssid: [0; 32],
-            password: [0; 64],
-            ssid_len: 0,
-            channel: config.channel,
-            authmode: config.auth_method.to_raw(),
-            ssid_hidden: if config.ssid_hidden { 1 } else { 0 },
-            max_connection: config.max_connections as u8,
-            beacon_interval: 100,
-            pairwise_cipher: wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP,
-            ftm_responder: false,
-            pmf_cfg: wifi_pmf_config_t {
-                capable: true,
-                required: false,
-            },
-            sae_pwe_h2e: 0,
-            csa_count: 3,
-            dtim_period: config.dtim_period,
-            transition_disable: 0,
-            sae_ext: 0,
-            bss_max_idle_cfg: include::wifi_bss_max_idle_config_t {
-                period: 0,
-                protected_keep_alive: false,
-            },
-            gtk_rekey_interval: 0,
-        },
-    };
-
-    if config.auth_method == AuthMethod::None && !config.password.is_empty() {
-        return Err(WifiError::InternalError(InternalWifiError::InvalidArg));
-    }
-
-    unsafe {
-        cfg.ap.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
-        cfg.ap.ssid_len = config.ssid.len() as u8;
-        cfg.ap.password[0..(config.password.len())].copy_from_slice(config.password.as_bytes());
-
-        esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_AP, &mut cfg))
-    }
-}
-
-fn apply_sta_config(config: &ClientConfig) -> Result<(), WifiError> {
-    let mut cfg = wifi_config_t {
-        sta: wifi_sta_config_t {
-            ssid: [0; 32],
-            password: [0; 64],
-            scan_method: esp_config_int!(u32, "ESP_RADIO_CONFIG_SCAN_METHOD"),
-            bssid_set: config.bssid.is_some(),
-            bssid: config.bssid.unwrap_or_default(),
-            channel: config.channel.unwrap_or(0),
-            listen_interval: esp_config_int!(u16, "ESP_RADIO_CONFIG_LISTEN_INTERVAL"),
-            sort_method: wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
-            threshold: wifi_scan_threshold_t {
-                rssi: -99,
-                authmode: config.auth_method.to_raw(),
-                rssi_5g_adjustment: 0,
-            },
-            pmf_cfg: wifi_pmf_config_t {
-                capable: true,
-                required: false,
-            },
-            sae_pwe_h2e: 3,
-            _bitfield_align_1: [0; 0],
-            _bitfield_1: __BindgenBitfieldUnit::new([0; 4]),
-            failure_retry_cnt: esp_config_int!(u8, "ESP_RADIO_CONFIG_FAILURE_RETRY_CNT"),
-            _bitfield_align_2: [0; 0],
-            _bitfield_2: __BindgenBitfieldUnit::new([0; 4]),
-            sae_pk_mode: 0, // ??
-            sae_h2e_identifier: [0; 32],
-        },
-    };
-
-    if config.auth_method == AuthMethod::None && !config.password.is_empty() {
-        return Err(WifiError::InternalError(InternalWifiError::InvalidArg));
-    }
-
-    unsafe {
-        cfg.sta.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
-        cfg.sta.password[0..(config.password.len())].copy_from_slice(config.password.as_bytes());
-
-        esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_STA, &mut cfg))
-    }
-}
-
-#[cfg(feature = "wifi-eap")]
-fn apply_sta_eap_config(config: &EapClientConfig) -> Result<(), WifiError> {
-    let mut cfg = wifi_config_t {
-        sta: wifi_sta_config_t {
-            ssid: [0; 32],
-            password: [0; 64],
-            scan_method: esp_config_int!(u32, "ESP_RADIO_CONFIG_SCAN_METHOD"),
-            bssid_set: config.bssid.is_some(),
-            bssid: config.bssid.unwrap_or_default(),
-            channel: config.channel.unwrap_or(0),
-            listen_interval: esp_config_int!(u16, "ESP_RADIO_CONFIG_LISTEN_INTERVAL"),
-            sort_method: wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
-            threshold: wifi_scan_threshold_t {
-                rssi: -99,
-                authmode: config.auth_method.to_raw(),
-                rssi_5g_adjustment: 0,
-            },
-            pmf_cfg: wifi_pmf_config_t {
-                capable: true,
-                required: false,
-            },
-            sae_pwe_h2e: 3,
-            _bitfield_align_1: [0; 0],
-            _bitfield_1: __BindgenBitfieldUnit::new([0; 4]),
-            failure_retry_cnt: esp_config_int!(u8, "ESP_RADIO_CONFIG_FAILURE_RETRY_CNT"),
-            _bitfield_align_2: [0; 0],
-            _bitfield_2: __BindgenBitfieldUnit::new([0; 4]),
-            sae_pk_mode: 0, // ??
-            sae_h2e_identifier: [0; 32],
-        },
-    };
-
-    unsafe {
-        cfg.sta.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
-        esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_STA, &mut cfg))?;
-
-        if let Some(identity) = &config.identity {
-            esp_wifi_result!(esp_eap_client_set_identity(
-                identity.as_str().as_ptr(),
-                identity.len() as i32
-            ))?;
-        } else {
-            esp_eap_client_clear_identity();
-        }
-
-        if let Some(username) = &config.username {
-            esp_wifi_result!(esp_eap_client_set_username(
-                username.as_str().as_ptr(),
-                username.len() as i32
-            ))?;
-        } else {
-            esp_eap_client_clear_username();
-        }
-
-        if let Some(password) = &config.password {
-            esp_wifi_result!(esp_eap_client_set_password(
-                password.as_str().as_ptr(),
-                password.len() as i32
-            ))?;
-        } else {
-            esp_eap_client_clear_password();
-        }
-
-        if let Some(new_password) = &config.new_password {
-            esp_wifi_result!(esp_eap_client_set_new_password(
-                new_password.as_str().as_ptr(),
-                new_password.len() as i32
-            ))?;
-        } else {
-            esp_eap_client_clear_new_password();
-        }
-
-        if let Some(pac_file) = &config.pac_file {
-            esp_wifi_result!(esp_eap_client_set_pac_file(
-                pac_file.as_ptr(),
-                pac_file.len() as i32
-            ))?;
-        }
-
-        if let Some(phase2_method) = &config.ttls_phase2_method {
-            esp_wifi_result!(esp_eap_client_set_ttls_phase2_method(
-                phase2_method.to_raw()
-            ))?;
-        }
-
-        if let Some(ca_cert) = config.ca_cert {
-            esp_wifi_result!(esp_eap_client_set_ca_cert(
-                ca_cert.as_ptr(),
-                ca_cert.len() as i32
-            ))?;
-        } else {
-            esp_eap_client_clear_ca_cert();
-        }
-
-        if let Some((cert, key, password)) = config.certificate_and_key {
-            let (pwd, pwd_len) = if let Some(pwd) = password {
-                (pwd.as_ptr(), pwd.len() as i32)
-            } else {
-                (core::ptr::null(), 0)
-            };
-
-            esp_wifi_result!(esp_eap_client_set_certificate_and_key(
-                cert.as_ptr(),
-                cert.len() as i32,
-                key.as_ptr(),
-                key.len() as i32,
-                pwd,
-                pwd_len,
-            ))?;
-        } else {
-            esp_eap_client_clear_certificate_and_key();
-        }
-
-        if let Some(cfg) = &config.eap_fast_config {
-            let params = esp_eap_fast_config {
-                fast_provisioning: cfg.fast_provisioning as i32,
-                fast_max_pac_list_len: cfg.fast_max_pac_list_len as i32,
-                fast_pac_format_binary: cfg.fast_pac_format_binary,
-            };
-            esp_wifi_result!(esp_eap_client_set_fast_params(params))?;
-        }
-
-        esp_wifi_result!(esp_eap_client_set_disable_time_check(!&config.time_check))?;
-
-        // esp_eap_client_set_suiteb_192bit_certification unsupported because we build
-        // without MBEDTLS
-
-        // esp_eap_client_use_default_cert_bundle unsupported because we build without
-        // MBEDTLS
-
-        esp_wifi_result!(esp_wifi_sta_enterprise_enable())?;
-
-        Ok(())
-    }
-}
-
 fn dump_packet_info(_buffer: &mut [u8]) {
     #[cfg(dump_packets)]
     {
@@ -2670,7 +2545,7 @@ pub enum PowerSaveMode {
     /// period.
     Minimum,
     /// Maximum power save mode. In this mode, interval to receive beacons is determined by the
-    /// `ESP_RADIO_CONFIG_LISTEN_INTERVAL` config option.
+    /// `listen_interval` config option.
     Maximum,
 }
 
@@ -3022,6 +2897,8 @@ pub fn new<'d>(
     // function will cause panic because WifiController::drop tries to disable the TRNG.
     let mut controller = WifiController {
         _phantom: Default::default(),
+        beacon_timeout: 6,
+        ap_beacon_timeout: 100,
     };
 
     controller.set_power_saving(config.power_save_mode)?;
@@ -3049,6 +2926,9 @@ pub fn new<'d>(
 #[non_exhaustive]
 pub struct WifiController<'d> {
     _phantom: PhantomData<&'d ()>,
+    // Things we have to remember due to how esp-wifi works:
+    beacon_timeout: u16,
+    ap_beacon_timeout: u16,
 }
 
 impl Drop for WifiController<'_> {
@@ -3176,7 +3056,27 @@ impl WifiController<'_> {
 
     /// Starts the Wi-Fi controller.
     pub fn start(&mut self) -> Result<(), WifiError> {
-        crate::wifi::wifi_start()
+        unsafe {
+            esp_wifi_result!(esp_wifi_start())?;
+
+            let mode = WifiMode::current()?;
+
+            // This is not an if-else because in AP-STA mode, both are true
+            if mode.is_ap() {
+                esp_wifi_result!(include::esp_wifi_set_inactive_time(
+                    wifi_interface_t_WIFI_IF_AP,
+                    self.ap_beacon_timeout
+                ))?;
+            }
+            if mode.is_sta() {
+                esp_wifi_result!(include::esp_wifi_set_inactive_time(
+                    wifi_interface_t_WIFI_IF_STA,
+                    self.beacon_timeout
+                ))?;
+            }
+        }
+
+        Ok(())
     }
 
     /// Stops the Wi-Fi controller.
@@ -3256,22 +3156,22 @@ impl WifiController<'_> {
         match conf {
             Config::None => Ok(()),
             Config::Client(config) => {
-                apply_sta_config(config)?;
+                self.apply_sta_config(config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)
             }
             Config::AccessPoint(config) => {
-                apply_ap_config(config)?;
+                self.apply_ap_config(config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_AP, &config.protocols)
             }
             Config::ApSta(sta_config, ap_config) => {
-                apply_ap_config(ap_config)?;
+                self.apply_ap_config(ap_config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_AP, &ap_config.protocols)?;
-                apply_sta_config(sta_config)?;
+                self.apply_sta_config(sta_config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &sta_config.protocols)
             }
             #[cfg(feature = "wifi-eap")]
             Config::EapClient(config) => {
-                apply_sta_eap_config(config)?;
+                self.apply_sta_eap_config(config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)
             }
         }
@@ -3374,7 +3274,7 @@ impl WifiController<'_> {
 
         Self::clear_events(events);
 
-        wifi_start()?;
+        self.start()?;
 
         self.wait_for_all_events(events, false).await;
 
@@ -3474,6 +3374,235 @@ impl WifiController<'_> {
         while !events.is_empty() {
             let fired = MultiWifiEventFuture::new(events).await;
             events -= fired;
+        }
+    }
+
+    fn apply_ap_config(&mut self, config: &AccessPointConfig) -> Result<(), WifiError> {
+        self.ap_beacon_timeout = config.beacon_timeout;
+
+        let mut cfg = wifi_config_t {
+            ap: wifi_ap_config_t {
+                ssid: [0; 32],
+                password: [0; 64],
+                ssid_len: 0,
+                channel: config.channel,
+                authmode: config.auth_method.to_raw(),
+                ssid_hidden: if config.ssid_hidden { 1 } else { 0 },
+                max_connection: config.max_connections as u8,
+                beacon_interval: 100,
+                pairwise_cipher: wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP,
+                ftm_responder: false,
+                pmf_cfg: wifi_pmf_config_t {
+                    capable: true,
+                    required: false,
+                },
+                sae_pwe_h2e: 0,
+                csa_count: 3,
+                dtim_period: config.dtim_period,
+                transition_disable: 0,
+                sae_ext: 0,
+                bss_max_idle_cfg: include::wifi_bss_max_idle_config_t {
+                    period: 0,
+                    protected_keep_alive: false,
+                },
+                gtk_rekey_interval: 0,
+            },
+        };
+
+        if config.auth_method == AuthMethod::None && !config.password.is_empty() {
+            return Err(WifiError::InternalError(InternalWifiError::InvalidArg));
+        }
+
+        unsafe {
+            cfg.ap.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
+            cfg.ap.ssid_len = config.ssid.len() as u8;
+            cfg.ap.password[0..(config.password.len())].copy_from_slice(config.password.as_bytes());
+
+            esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_AP, &mut cfg))
+        }
+    }
+
+    fn apply_sta_config(&mut self, config: &ClientConfig) -> Result<(), WifiError> {
+        self.beacon_timeout = config.beacon_timeout;
+
+        let mut cfg = wifi_config_t {
+            sta: wifi_sta_config_t {
+                ssid: [0; 32],
+                password: [0; 64],
+                scan_method: config.scan_method as c_uint,
+                bssid_set: config.bssid.is_some(),
+                bssid: config.bssid.unwrap_or_default(),
+                channel: config.channel.unwrap_or(0),
+                listen_interval: config.listen_interval,
+                sort_method: wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
+                threshold: wifi_scan_threshold_t {
+                    rssi: -99,
+                    authmode: config.auth_method.to_raw(),
+                    rssi_5g_adjustment: 0,
+                },
+                pmf_cfg: wifi_pmf_config_t {
+                    capable: true,
+                    required: false,
+                },
+                sae_pwe_h2e: 3,
+                _bitfield_align_1: [0; 0],
+                _bitfield_1: __BindgenBitfieldUnit::new([0; 4]),
+                failure_retry_cnt: config.failure_retry_cnt,
+                _bitfield_align_2: [0; 0],
+                _bitfield_2: __BindgenBitfieldUnit::new([0; 4]),
+                sae_pk_mode: 0, // ??
+                sae_h2e_identifier: [0; 32],
+            },
+        };
+
+        if config.auth_method == AuthMethod::None && !config.password.is_empty() {
+            return Err(WifiError::InternalError(InternalWifiError::InvalidArg));
+        }
+
+        unsafe {
+            cfg.sta.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
+            cfg.sta.password[0..(config.password.len())]
+                .copy_from_slice(config.password.as_bytes());
+
+            esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_STA, &mut cfg))
+        }
+    }
+
+    #[cfg(feature = "wifi-eap")]
+    fn apply_sta_eap_config(&mut self, config: &EapClientConfig) -> Result<(), WifiError> {
+        self.beacon_timeout = config.beacon_timeout;
+
+        let mut cfg = wifi_config_t {
+            sta: wifi_sta_config_t {
+                ssid: [0; 32],
+                password: [0; 64],
+                scan_method: config.scan_method as c_uint,
+                bssid_set: config.bssid.is_some(),
+                bssid: config.bssid.unwrap_or_default(),
+                channel: config.channel.unwrap_or(0),
+                listen_interval: config.listen_interval,
+                sort_method: wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
+                threshold: wifi_scan_threshold_t {
+                    rssi: -99,
+                    authmode: config.auth_method.to_raw(),
+                    rssi_5g_adjustment: 0,
+                },
+                pmf_cfg: wifi_pmf_config_t {
+                    capable: true,
+                    required: false,
+                },
+                sae_pwe_h2e: 3,
+                _bitfield_align_1: [0; 0],
+                _bitfield_1: __BindgenBitfieldUnit::new([0; 4]),
+                failure_retry_cnt: config.failure_retry_cnt,
+                _bitfield_align_2: [0; 0],
+                _bitfield_2: __BindgenBitfieldUnit::new([0; 4]),
+                sae_pk_mode: 0, // ??
+                sae_h2e_identifier: [0; 32],
+            },
+        };
+
+        unsafe {
+            cfg.sta.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
+            esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_STA, &mut cfg))?;
+
+            if let Some(identity) = &config.identity {
+                esp_wifi_result!(esp_eap_client_set_identity(
+                    identity.as_str().as_ptr(),
+                    identity.len() as i32
+                ))?;
+            } else {
+                esp_eap_client_clear_identity();
+            }
+
+            if let Some(username) = &config.username {
+                esp_wifi_result!(esp_eap_client_set_username(
+                    username.as_str().as_ptr(),
+                    username.len() as i32
+                ))?;
+            } else {
+                esp_eap_client_clear_username();
+            }
+
+            if let Some(password) = &config.password {
+                esp_wifi_result!(esp_eap_client_set_password(
+                    password.as_str().as_ptr(),
+                    password.len() as i32
+                ))?;
+            } else {
+                esp_eap_client_clear_password();
+            }
+
+            if let Some(new_password) = &config.new_password {
+                esp_wifi_result!(esp_eap_client_set_new_password(
+                    new_password.as_str().as_ptr(),
+                    new_password.len() as i32
+                ))?;
+            } else {
+                esp_eap_client_clear_new_password();
+            }
+
+            if let Some(pac_file) = &config.pac_file {
+                esp_wifi_result!(esp_eap_client_set_pac_file(
+                    pac_file.as_ptr(),
+                    pac_file.len() as i32
+                ))?;
+            }
+
+            if let Some(phase2_method) = &config.ttls_phase2_method {
+                esp_wifi_result!(esp_eap_client_set_ttls_phase2_method(
+                    phase2_method.to_raw()
+                ))?;
+            }
+
+            if let Some(ca_cert) = config.ca_cert {
+                esp_wifi_result!(esp_eap_client_set_ca_cert(
+                    ca_cert.as_ptr(),
+                    ca_cert.len() as i32
+                ))?;
+            } else {
+                esp_eap_client_clear_ca_cert();
+            }
+
+            if let Some((cert, key, password)) = config.certificate_and_key {
+                let (pwd, pwd_len) = if let Some(pwd) = password {
+                    (pwd.as_ptr(), pwd.len() as i32)
+                } else {
+                    (core::ptr::null(), 0)
+                };
+
+                esp_wifi_result!(esp_eap_client_set_certificate_and_key(
+                    cert.as_ptr(),
+                    cert.len() as i32,
+                    key.as_ptr(),
+                    key.len() as i32,
+                    pwd,
+                    pwd_len,
+                ))?;
+            } else {
+                esp_eap_client_clear_certificate_and_key();
+            }
+
+            if let Some(cfg) = &config.eap_fast_config {
+                let params = esp_eap_fast_config {
+                    fast_provisioning: cfg.fast_provisioning as i32,
+                    fast_max_pac_list_len: cfg.fast_max_pac_list_len as i32,
+                    fast_pac_format_binary: cfg.fast_pac_format_binary,
+                };
+                esp_wifi_result!(esp_eap_client_set_fast_params(params))?;
+            }
+
+            esp_wifi_result!(esp_eap_client_set_disable_time_check(!&config.time_check))?;
+
+            // esp_eap_client_set_suiteb_192bit_certification unsupported because we build
+            // without MBEDTLS
+
+            // esp_eap_client_use_default_cert_bundle unsupported because we build without
+            // MBEDTLS
+
+            esp_wifi_result!(esp_wifi_sta_enterprise_enable())?;
+
+            Ok(())
         }
     }
 }

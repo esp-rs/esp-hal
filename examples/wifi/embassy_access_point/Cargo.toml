@@ -5,7 +5,6 @@ edition = "2024"
 publish = false
 
 [dependencies]
-cfg-if = "1.0.0"
 edge-dhcp = "0.5.0"
 edge-nal = "0.5.0"
 edge-nal-embassy = "0.6.0"

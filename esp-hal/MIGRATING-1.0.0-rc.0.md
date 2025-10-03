@@ -84,7 +84,7 @@ esp_hal::interrupt::bind_interrupt(
 ### RMT PulseCode changes
 
 `PulseCode` used to be an extension trait implemented on `u32`. It is now a
-newtype struct, wrapping `u32`.
+newtype struct, wrapping `u32` and providing mostly `const` methods.
 RMT transmit and receive methods accept `impl Into<PulseCode>` and
 `impl From<PulseCode>`, respectively, and implementations for
 `PulseCode: From<u32>` and `u32: From<PulseCode>` are provided.
@@ -114,6 +114,15 @@ let _ = tx_channel.transmit(&tx_data).wait().unwrap();
 
 let _ = rx_channel.transmit(&mut rx_data).wait().unwrap();
 ```
+
+`PulseCode` constructors have also been reworked, now providing
+
+1. `PulseCode::new()` which panics for out-of-range signal lengths,
+2. `PulseCode::new_clamped()` which saturates the signal lengths if out of range,
+3. `PulseCode::try_new()` which returns `None` if any signal length is out of range.
+
+The old behaviour of truncating the passed in `u16` to 15 bits is not available
+anymore; which method is the best replacement will depend on the use case.
 
 ### RMT Channel Changes
 

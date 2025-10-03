@@ -6,7 +6,7 @@ use esp_sync::RawMutex;
 use esp_wifi_sys::c_types::*;
 use portable_atomic::{AtomicBool, Ordering};
 
-use super::ReceivedPacket;
+use super::{Config, ReceivedPacket};
 use crate::{
     binary::include::*,
     ble::{
@@ -18,8 +18,8 @@ use crate::{
     hal::ram,
 };
 
-#[cfg_attr(esp32c3, path = "os_adapter_esp32c3.rs")]
-#[cfg_attr(esp32s3, path = "os_adapter_esp32s3.rs")]
+#[cfg_attr(esp32c3, path = "os_adapter_esp32c3_s3.rs")]
+#[cfg_attr(esp32s3, path = "os_adapter_esp32c3_s3.rs")]
 #[cfg_attr(esp32, path = "os_adapter_esp32.rs")]
 pub(crate) mod ble_os_adapter_chip_specific;
 
@@ -302,7 +302,7 @@ unsafe extern "C" fn custom_queue_create(
     todo!();
 }
 
-pub(crate) fn ble_init() -> PhyInitGuard<'static> {
+pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
     let phy_init_guard;
     unsafe {
         (*addr_of_mut!(HCI_OUT_COLLECTOR)).write(HciOutCollector::new());
@@ -321,7 +321,7 @@ pub(crate) fn ble_init() -> PhyInitGuard<'static> {
         // esp32_bt_controller_init
         ble_os_adapter_chip_specific::btdm_controller_mem_init();
 
-        let mut cfg = ble_os_adapter_chip_specific::create_ble_config();
+        let mut cfg = ble_os_adapter_chip_specific::create_ble_config(config);
 
         let res = btdm_osi_funcs_register(addr_of!(G_OSI_FUNCS));
         assert!(res == 0, "btdm_osi_funcs_register returned {}", res);

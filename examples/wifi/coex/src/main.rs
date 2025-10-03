@@ -33,6 +33,7 @@ use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::{
     clock::CpuClock,
     main,
+    ram,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
@@ -61,12 +62,12 @@ fn main() -> ! {
     // COEX needs more RAM - add some more
     #[cfg(feature = "esp32")]
     {
-        esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 96 * 1024);
+        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 96 * 1024);
         esp_alloc::heap_allocator!(size: 24 * 1024);
     }
     #[cfg(not(feature = "esp32"))]
     {
-        esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
+        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
         esp_alloc::heap_allocator!(size: 64 * 1024);
     }
 
@@ -85,7 +86,7 @@ fn main() -> ! {
 
     // initializing Bluetooth first results in a more stable WiFi connection on
     // ESP32
-    let connector = BleConnector::new(&esp_radio_ctrl, peripherals.BT);
+    let connector = BleConnector::new(&esp_radio_ctrl, peripherals.BT, Default::default());
     let hci = HciConnector::new(connector, now);
     let mut ble = Ble::new(&hci);
 

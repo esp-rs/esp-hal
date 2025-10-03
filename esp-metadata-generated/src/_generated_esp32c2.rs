@@ -198,6 +198,9 @@ macro_rules! property {
     ("wifi.has_wifi6") => {
         false
     };
+    ("bt.controller") => {
+        "npl"
+    };
     ("phy.combo_module") => {
         true
     };

@@ -328,7 +328,8 @@ impl core::ops::Sub for Instant {
 
     #[inline]
     fn sub(self, rhs: Self) -> Self::Output {
-        Duration(self.0 - rhs.0)
+        // Avoid "Sub failed! Other > self" panics
+        Duration::from_micros(self.0.ticks().wrapping_sub(rhs.0.ticks()))
     }
 }
 

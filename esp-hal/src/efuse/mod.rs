@@ -229,6 +229,14 @@ impl Efuse {
             Self::read_base_mac_address()
         }
     }
+
+    /// Returns the hardware revision
+    ///
+    /// The chip version is calculated using the following
+    /// formula: MAJOR * 100 + MINOR. (if the result is 1, then version is v0.1)
+    pub fn chip_revision() -> u16 {
+        Self::major_chip_version() as u16 * 100 + Self::minor_chip_version() as u16
+    }
 }
 
 // Indicates the state of setting the mac address

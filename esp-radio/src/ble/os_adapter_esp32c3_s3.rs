@@ -1,6 +1,7 @@
+use procmacros::BuilderLite;
+
 use super::*;
 use crate::{
-    binary::include::esp_bt_controller_config_t,
     common_adapter::*,
     hal::{interrupt, peripherals::Interrupt},
 };
@@ -171,7 +172,7 @@ extern "C" fn coex_schm_register_btdm_callback(_callback: *const ()) -> i32 {
     #[cfg(coex)]
     unsafe {
         // COEX_SCHM_CALLBACK_TYPE_BT
-        coex_schm_register_callback(1, _callback as *mut c_void)
+        coex_schm_register_callback(1, _callback as *mut esp_wifi_sys::c_types::c_void)
     }
 
     #[cfg(not(coex))]
@@ -281,13 +282,30 @@ unsafe extern "C" {
     fn btdm_controller_rom_data_init() -> i32;
 }
 
-pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
+/// Bluetooth controller configuration.
+#[derive(BuilderLite, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+pub struct Config {
+    /// The priority of the RTOS task.
+    task_priority: u8,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            // same priority as the wifi task, when using esp-rtos (I'm assuming it's MAX_PRIO - 2)
+            task_priority: 29,
+        }
+    }
+}
+
+pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
     // keep them aligned with BT_CONTROLLER_INIT_CONFIG_DEFAULT in ESP-IDF
     // ideally _some_ of these values should be configurable
     esp_bt_controller_config_t {
         version: 0x02505080,
         controller_task_stack_size: 8192,
-        controller_task_prio: 200,
+        controller_task_prio: config.task_priority,
         controller_task_run_cpu: 0,
         bluetooth_mode: 1,
         ble_max_act: 10,
@@ -310,7 +328,11 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
         normal_adv_size: 20,
         mesh_adv_size: 0,
         coex_phy_coded_tx_rx_time_limit: 0,
-        hw_target_code: 0x02010000, // BLE_HW_TARGET_CODE_ESP32S3_CHIP_ECO0
+        hw_target_code: if cfg!(esp32c3) {
+            0x01010000
+        } else {
+            0x02010000
+        },
         slave_ce_len_min: 5,
         hw_recorrect_en: 1 << 0,
         cca_thresh: 20,
@@ -322,8 +344,8 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
         ble_data_lenth_zero_aux: 0,
         ble_ping_en: 0,
         ble_llcp_disc_flag: 0b111, /* (BT_CTRL_BLE_LLCP_CONN_UPDATE |
-                                    * BT_CTRL_BLE_LLCP_CHAN_MAP_UPDATE
-                                    * |BT_CTRL_BLE_LLCP_PHY_UPDATE) */
+                                    * BT_CTRL_BLE_LLCP_CHAN_MAP_UPDATE |
+                                    * BT_CTRL_BLE_LLCP_PHY_UPDATE) */
         run_in_flash: false,
         dtm_en: true,
         enc_en: true,
@@ -340,22 +362,13 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
 
 pub(crate) unsafe extern "C" fn interrupt_on(intr_num: i32) -> i32 {
     trace!("interrupt_on {}", intr_num);
-    unwrap!(interrupt::enable(
-        Interrupt::try_from(intr_num as u16).unwrap(),
-        interrupt::Priority::Priority1,
-    ));
 
+    // NO-OP
     0
 }
 
-pub(crate) unsafe extern "C" fn interrupt_off(intr_num: i32) -> i32 {
-    trace!("interrupt_off {}", intr_num);
-    interrupt::disable(
-        crate::hal::system::Cpu::ProCpu,
-        Interrupt::try_from(intr_num as u16).unwrap(),
-    );
-
-    0
+pub(crate) unsafe extern "C" fn interrupt_off(_intr_num: i32) -> i32 {
+    todo!();
 }
 
 pub(crate) fn btdm_controller_mem_init() {
@@ -410,16 +423,21 @@ pub(crate) unsafe extern "C" fn interrupt_handler_set(
         match interrupt_no {
             5 => {
                 ISR_INTERRUPT_5 = (func as *mut c_void, arg as *mut c_void);
+                #[cfg(esp32c3)]
+                unwrap!(interrupt::enable(
+                    Interrupt::RWBT,
+                    interrupt::Priority::Priority1
+                ));
                 unwrap!(interrupt::enable(
                     Interrupt::BT_BB,
-                    interrupt::Priority::Priority1,
+                    interrupt::Priority::Priority1
                 ));
             }
             8 => {
                 ISR_INTERRUPT_8 = (func as *mut c_void, arg as *mut c_void);
                 unwrap!(interrupt::enable(
                     Interrupt::RWBLE,
-                    interrupt::Priority::Priority1,
+                    interrupt::Priority::Priority1
                 ));
             }
             _ => panic!("Unsupported interrupt number {}", interrupt_no),

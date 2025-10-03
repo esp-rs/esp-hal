@@ -86,7 +86,7 @@ jobs:
       - uses: esp-rs/xtensa-toolchain@v1.6
         with:
           default: true
-          version: 1.89.0.0
+          version: 1.90.0.0
 
       # xtensa-toolchain installs rustup and a basic toolchain, but doesn't install rust-src
       - name: rust-src
