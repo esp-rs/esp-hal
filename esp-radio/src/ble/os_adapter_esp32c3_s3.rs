@@ -285,9 +285,54 @@ unsafe extern "C" {
     fn btdm_controller_rom_data_init() -> i32;
 }
 
+#[derive(Default, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[cfg_attr(feature = "defmt", defmt::Format)]
+pub enum Antenna {
+    /// Use Antenna 0
+    #[default]
+    Antenna0 = 0,
+    /// Use Antenna 1
+    Antenna1 = 1,
+}
+
+#[derive(Default, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[cfg_attr(feature = "defmt", defmt::Format)]
+pub enum TxPower {
+    /// -15 dBm
+    N15 = esp_power_level_t_ESP_PWR_LVL_N15,
+    /// -12 dBm
+    N12 = esp_power_level_t_ESP_PWR_LVL_N12,
+    /// -9 dBm
+    N9  = esp_power_level_t_ESP_PWR_LVL_N9,
+    /// -6 dBm
+    N6  = esp_power_level_t_ESP_PWR_LVL_N6,
+    /// -3 dBm
+    N3  = esp_power_level_t_ESP_PWR_LVL_N3,
+    /// 0 dBm
+    N0  = esp_power_level_t_ESP_PWR_LVL_N0,
+    /// 3 dBm
+    P3  = esp_power_level_t_ESP_PWR_LVL_P3,
+    /// 6 dBm
+    P6  = esp_power_level_t_ESP_PWR_LVL_P6,
+    /// 9 dBm
+    #[default]
+    P9  = esp_power_level_t_ESP_PWR_LVL_P9,
+    /// 12 dBm
+    P12 = esp_power_level_t_ESP_PWR_LVL_P12,
+    /// 15 dBm
+    P15 = esp_power_level_t_ESP_PWR_LVL_P15,
+    /// 18 dBm
+    P18 = esp_power_level_t_ESP_PWR_LVL_P18,
+    /// 20 dBm
+    P20 = esp_power_level_t_ESP_PWR_LVL_P20,
+}
+
 /// Bluetooth controller configuration.
 #[derive(BuilderLite, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[cfg_attr(feature = "defmt", defmt::Format)]
 pub struct Config {
     /// The priority of the RTOS task.
     task_priority: u8,
@@ -320,6 +365,15 @@ pub struct Config {
 
     /// Enable BLE ping procedure.
     ping: bool,
+
+    /// Default TX antenna.
+    default_tx_antenna: Antenna,
+
+    /// Default RX antenna.
+    default_rx_antenna: Antenna,
+
+    /// Default TX power.
+    default_tx_power: TxPower,
 }
 
 impl Default for Config {
@@ -336,6 +390,9 @@ impl Default for Config {
             verify_access_address: true,
             channel_assessment: false,
             ping: false,
+            default_tx_antenna: Antenna::default(),
+            default_rx_antenna: Antenna::default(),
+            default_tx_power: TxPower::default(),
         }
     }
 }
@@ -374,9 +431,9 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         coex_use_hooks: false,
         hci_tl_type: 1,
         hci_tl_funcs: core::ptr::null_mut(),
-        txant_dft: 0,
-        rxant_dft: 0,
-        txpwr_dft: 9,
+        txant_dft: config.default_tx_antenna as u8,
+        rxant_dft: config.default_rx_antenna as u8,
+        txpwr_dft: config.default_tx_power as u8,
         cfg_mask: 1,
 
         // Bluetooth mesh options, currently not supported
