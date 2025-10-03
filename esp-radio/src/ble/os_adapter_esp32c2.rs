@@ -30,6 +30,9 @@ pub struct Config {
 
     /// The maximum number of simultaneous connections.
     max_connections: u8,
+
+    /// Enable QA test mode.
+    qa_test_mode: bool,
 }
 
 impl Default for Config {
@@ -39,6 +42,7 @@ impl Default for Config {
             task_priority: 29,
             task_stack_size: CONFIG_BT_LE_CONTROLLER_TASK_STACK_SIZE as _,
             max_connections: CONFIG_BT_LE_MAX_CONNECTIONS as _,
+            qa_test_mode: false,
         }
     }
 }
@@ -92,7 +96,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         controller_task_stack_size: config.task_stack_size,
         controller_task_prio: config.task_priority,
         controller_run_cpu: 0,
-        enable_qa_test: 0,
+        qa_test_mode: config.qa_test_mode as u8,
         enable_bqb_test: 0,
         enable_uart_hci: 0,
         ble_hci_uart_port: 0,

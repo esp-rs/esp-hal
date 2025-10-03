@@ -295,8 +295,12 @@ pub struct Config {
     /// The stack size of the RTOS task.
     task_stack_size: u16,
 
+    /// The CPU core on which the BLE controller task should run.
     #[cfg(multi_core)]
     task_cpu: Cpu,
+
+    /// Enable QA test mode.
+    qa_test_mode: bool,
 }
 
 impl Default for Config {
@@ -307,6 +311,7 @@ impl Default for Config {
             task_stack_size: 8192, // 4096?
             #[cfg(multi_core)]
             task_cpu: Cpu::ProCpu,
+            qa_test_mode: false,
         }
     }
 }
@@ -370,7 +375,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         run_in_flash: false,
         dtm_en: true,
         enc_en: true,
-        qa_test: false,
+        qa_test: config.qa_test_mode as u8,
         connect_en: true,
         scan_en: true,
         ble_aa_check: true,
