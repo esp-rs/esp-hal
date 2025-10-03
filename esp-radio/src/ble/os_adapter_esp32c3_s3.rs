@@ -341,7 +341,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         #[cfg(single_core)]
         controller_task_run_cpu: 0,
 
-        bluetooth_mode: 1, // BLE
+        bluetooth_mode: esp_bt_mode_t_ESP_BT_MODE_BLE as _,
 
         ble_max_act: 10,
         sleep_mode: 0,
@@ -360,11 +360,11 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         cfg_mask: 1,
 
         // Bluetooth mesh options, currently not supported
-        scan_duplicate_mode: 0,
+        scan_duplicate_mode: 0, // normal mode
         scan_duplicate_type: 0,
+        mesh_adv_size: 0,
 
         normal_adv_size: config.normal_adv_size,
-        mesh_adv_size: 0,
         coex_phy_coded_tx_rx_time_limit: 0,
         hw_target_code: if cfg!(esp32c3) {
             0x01010000
@@ -387,7 +387,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         run_in_flash: false,
         dtm_en: true,
         enc_en: true,
-        qa_test: config.qa_test_mode as u8,
+        qa_test: config.qa_test_mode,
         connect_en: true,
         scan_en: true,
         ble_aa_check: true,

@@ -330,14 +330,14 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         hci_uart_no: 1,
         hci_uart_baudrate: 921600,
         // Bluetooth mesh options, currently not supported
-        scan_duplicate_mode: 0,
+        scan_duplicate_mode: 0, // normal mode
         scan_duplicate_type: 0,
+        mesh_adv_size: 0,
 
         normal_adv_size: config.normal_adv_size,
-        mesh_adv_size: 0,
-        send_adv_reserved_size: 1000,
-        controller_debug_flag: 0,
-        mode: 0x01, // BLE
+        send_adv_reserved_size: SCAN_SEND_ADV_RESERVED_SIZE as _,
+        controller_debug_flag: BTDM_CTRL_CONTROLLER_DEBUG_FLAG as _,
+        mode: esp_bt_mode_t_ESP_BT_MODE_BLE as _,
         ble_max_conn: config.max_connections,
         bt_max_acl_conn: 0,
         bt_sco_datapath: 0,
