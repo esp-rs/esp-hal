@@ -2,7 +2,10 @@ use embedded_io::{Error, ErrorType, Read, Write};
 use esp_phy::PhyInitGuard;
 
 use super::{read_hci, read_next, send_hci};
-use crate::{Controller, ble::Config};
+use crate::{
+    Controller,
+    ble::{Config, InvalidConfigError},
+};
 
 /// A blocking HCI connector
 #[instability::unstable]
@@ -22,11 +25,12 @@ impl<'d> BleConnector<'d> {
         _init: &'d Controller<'d>,
         device: crate::hal::peripherals::BT<'d>,
         config: Config,
-    ) -> BleConnector<'d> {
-        Self {
+    ) -> Result<BleConnector<'d>, InvalidConfigError> {
+        config.validate()?;
+        Ok(Self {
             _phy_init_guard: crate::ble::ble_init(&config),
             _device: device,
-        }
+        })
     }
 
     /// Read the next HCI packet from the BLE controller.

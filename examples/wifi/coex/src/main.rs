@@ -86,7 +86,7 @@ fn main() -> ! {
 
     // initializing Bluetooth first results in a more stable WiFi connection on
     // ESP32
-    let connector = BleConnector::new(&esp_radio_ctrl, peripherals.BT, Default::default());
+    let connector = BleConnector::new(&esp_radio_ctrl, peripherals.BT, Default::default()).unwrap();
     let hci = HciConnector::new(connector, now);
     let mut ble = Ble::new(&hci);
 
