@@ -285,93 +285,127 @@ pub mod checker {
             return Ok(false);
         }
 
-        // GitHub CLI can download artifacts from recent workflow runs
+        // Query repository artifacts via GitHub API and download the one matching `artifact_name`
         log::debug!("Attempting to download artifact: {artifact_name} from {repo}");
 
-        // Get list of recent successful workflow runs
+        // List artifacts for the repository, filtered by name
         let list_output = Command::new("gh")
             .args([
-                "run",
-                "list",
-                "--repo",
-                repo,
-                "--status",
-                "success",
-                "--limit",
-                "20", // Increased limit to check more runs
-                "--json",
-                "databaseId,workflowName,conclusion",
+                "api",
+                "-H",
+                "Accept: application/vnd.github+json",
+                "-H",
+                "X-GitHub-Api-Version: 2022-11-28",
+                &format!(
+                    "/repos/{}/actions/artifacts?name={}",
+                    repo, artifact_name
+                ),
             ])
             .output();
 
-        let runs = match list_output {
+        let artifacts: Vec<serde_json::Value> = match list_output {
             Ok(result) if result.status.success() => {
-                let runs_json = String::from_utf8_lossy(&result.stdout);
-                log::debug!("Available runs: {}", runs_json);
-
-                if let Ok(runs) = serde_json::from_str::<serde_json::Value>(&runs_json) {
-                    if let Some(runs_array) = runs.as_array() {
-                        runs_array.clone()
-                    } else {
-                        vec![]
+                let body = String::from_utf8_lossy(&result.stdout);
+                log::debug!("Artifacts list response: {}", body);
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
+                    match json.get("artifacts").and_then(|a| a.as_array()) {
+                        Some(arr) => arr.clone(),
+                        None => vec![],
                     }
                 } else {
                     vec![]
                 }
             }
-            _ => vec![],
+            Ok(result) => {
+                let stderr = String::from_utf8_lossy(&result.stderr);
+                log::debug!("Failed to list artifacts. stderr: {}", stderr);
+                vec![]
+            }
+            Err(e) => {
+                log::debug!("Error invoking gh api to list artifacts: {}", e);
+                vec![]
+            }
         };
 
-        if runs.is_empty() {
-            log::debug!("No successful workflow runs found");
+        if artifacts.is_empty() {
+            log::debug!("No artifacts found for name {}", artifact_name);
             return Ok(false);
         }
 
-        // Try each run until we find one with the artifact
-        for run in runs {
-            let run_id = match run.get("databaseId").and_then(|v| v.as_u64()) {
+        // Try each matching artifact until download and extraction succeeds
+        for artifact in artifacts {
+            let name_matches = artifact
+                .get("name")
+                .and_then(|v| v.as_str())
+                .map(|n| n == artifact_name)
+                .unwrap_or(false);
+            if !name_matches {
+                continue;
+            }
+
+            let expired = artifact
+                .get("expired")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            if expired {
+                log::debug!("Skipping expired artifact: {}", artifact_name);
+                continue;
+            }
+
+            let id = match artifact.get("id").and_then(|v| v.as_u64()) {
                 Some(id) => id.to_string(),
                 None => continue,
             };
 
-            let workflow_name = run
-                .get("workflowName")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown");
+            log::debug!("Downloading artifact id {} (name: {})", id, artifact_name);
 
-            log::debug!(
-                "Trying to download artifact from run ID: {} (workflow: {})",
-                run_id,
-                workflow_name
-            );
-
-            let output = Command::new("gh")
+            // Download the artifact ZIP (API returns a redirect to the ZIP)
+            let download = Command::new("gh")
                 .args([
-                    "run",
-                    "download",
-                    &run_id,
-                    "--repo",
-                    repo,
-                    "--name",
-                    artifact_name,
-                    "--dir",
-                    package_path.to_str().unwrap(),
+                    "api",
+                    "-H",
+                    "Accept: application/vnd.github+json",
+                    "-H",
+                    "X-GitHub-Api-Version: 2022-11-28",
+                    &format!("/repos/{}/actions/artifacts/{}/zip", repo, id),
                 ])
                 .output();
 
-            match output {
-                Ok(result) if result.status.success() => {
-                    log::debug!(
-                        "Successfully downloaded artifact {artifact_name} from run {}",
-                        run_id
-                    );
+            let Ok(result) = download else {
+                log::debug!("Error invoking gh api to download artifact id {}", id);
+                continue;
+            };
 
-                    // The artifact files are downloaded directly to the package directory
-                    // We need to move them to the api-baseline subdirectory
+            if !result.status.success() {
+                let stderr = String::from_utf8_lossy(&result.stderr);
+                log::debug!(
+                    "Failed to download artifact id {} (name: {}). stderr: {}",
+                    id, artifact_name, stderr
+                );
+                continue;
+            }
+
+            // Write ZIP to a temporary file
+            let zip_path = package_path.join("artifact.zip");
+            if let Err(e) = std::fs::write(&zip_path, &result.stdout) {
+                log::debug!("Failed to write artifact ZIP to {}: {}", zip_path.display(), e);
+                continue;
+            }
+
+            // Extract ZIP into the package directory
+            let unzip = Command::new("unzip")
+                .args(["-o", zip_path.to_str().unwrap(), "-d", package_path.to_str().unwrap()])
+                .output();
+
+            match unzip {
+                Ok(unzip_result) if unzip_result.status.success() => {
+                    // Cleanup ZIP file
+                    let _ = std::fs::remove_file(&zip_path);
+
+                    // Move extracted baseline files into `api-baseline` directory
                     let baseline_dir = package_path.join("api-baseline");
                     std::fs::create_dir_all(&baseline_dir)?;
 
-                    // Move any .json.gz files from package_path to baseline_dir
                     if let Ok(entries) = std::fs::read_dir(package_path) {
                         for entry in entries.flatten() {
                             let path = entry.path();
@@ -399,24 +433,19 @@ pub mod checker {
 
                     return Ok(true);
                 }
-                Ok(result) => {
-                    let stderr = String::from_utf8_lossy(&result.stderr);
-                    let stdout = String::from_utf8_lossy(&result.stdout);
-                    log::debug!(
-                        "Artifact {artifact_name} not available in run {} (workflow: {}). stdout: {stdout}, stderr: {stderr}",
-                        run_id,
-                        workflow_name
-                    );
-                    // Continue to next run
+                Ok(unzip_result) => {
+                    let stderr = String::from_utf8_lossy(&unzip_result.stderr);
+                    log::debug!("Failed to unzip artifact ZIP: {}", stderr);
+                    let _ = std::fs::remove_file(&zip_path);
                 }
                 Err(e) => {
-                    log::debug!("Error running gh command for run {}: {}", run_id, e);
-                    // Continue to next run
+                    log::debug!("Error invoking unzip: {}", e);
+                    let _ = std::fs::remove_file(&zip_path);
                 }
             }
         }
 
-        log::debug!("No runs found with artifact {}", artifact_name);
+        log::debug!("No downloadable artifacts found for {}", artifact_name);
         Ok(false)
     }
 }
