@@ -288,7 +288,7 @@ unsafe extern "C" {
 /// Antenna Selection
 #[derive(Default, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[cfg_attr(feature = "defmt", defmt::Format)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Antenna {
     /// Use Antenna 0
     #[default]
@@ -300,41 +300,80 @@ pub enum Antenna {
 /// Transmission Power Level
 #[derive(Default, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[cfg_attr(feature = "defmt", defmt::Format)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum TxPower {
     /// -15 dBm
-    N15 = esp_power_level_t_ESP_PWR_LVL_N15,
+    N15,
     /// -12 dBm
-    N12 = esp_power_level_t_ESP_PWR_LVL_N12,
+    N12,
     /// -9 dBm
-    N9  = esp_power_level_t_ESP_PWR_LVL_N9,
+    N9,
     /// -6 dBm
-    N6  = esp_power_level_t_ESP_PWR_LVL_N6,
+    N6,
     /// -3 dBm
-    N3  = esp_power_level_t_ESP_PWR_LVL_N3,
+    N3,
     /// 0 dBm
-    N0  = esp_power_level_t_ESP_PWR_LVL_N0,
+    N0,
     /// 3 dBm
-    P3  = esp_power_level_t_ESP_PWR_LVL_P3,
+    P3,
     /// 6 dBm
-    P6  = esp_power_level_t_ESP_PWR_LVL_P6,
+    P6,
     /// 9 dBm
     #[default]
-    P9  = esp_power_level_t_ESP_PWR_LVL_P9,
+    P9,
     /// 12 dBm
-    P12 = esp_power_level_t_ESP_PWR_LVL_P12,
+    P12,
     /// 15 dBm
-    P15 = esp_power_level_t_ESP_PWR_LVL_P15,
+    P15,
     /// 18 dBm
-    P18 = esp_power_level_t_ESP_PWR_LVL_P18,
+    P18,
     /// 20 dBm
-    P20 = esp_power_level_t_ESP_PWR_LVL_P20,
+    P20,
+}
+
+#[allow(dead_code)]
+impl TxPower {
+    fn idx(self) -> esp_power_level_t {
+        match self {
+            Self::N15 => esp_power_level_t_ESP_PWR_LVL_N15,
+            Self::N12 => esp_power_level_t_ESP_PWR_LVL_N12,
+            Self::N9 => esp_power_level_t_ESP_PWR_LVL_N9,
+            Self::N6 => esp_power_level_t_ESP_PWR_LVL_N6,
+            Self::N3 => esp_power_level_t_ESP_PWR_LVL_N3,
+            Self::N0 => esp_power_level_t_ESP_PWR_LVL_N0,
+            Self::P3 => esp_power_level_t_ESP_PWR_LVL_P3,
+            Self::P6 => esp_power_level_t_ESP_PWR_LVL_P6,
+            Self::P9 => esp_power_level_t_ESP_PWR_LVL_P9,
+            Self::P12 => esp_power_level_t_ESP_PWR_LVL_P12,
+            Self::P15 => esp_power_level_t_ESP_PWR_LVL_P15,
+            Self::P18 => esp_power_level_t_ESP_PWR_LVL_P18,
+            Self::P20 => esp_power_level_t_ESP_PWR_LVL_P20,
+        }
+    }
+
+    fn dbm(self) -> i8 {
+        match self {
+            Self::N15 => -15,
+            Self::N12 => -12,
+            Self::N9 => -9,
+            Self::N6 => -6,
+            Self::N3 => -3,
+            Self::N0 => 0,
+            Self::P3 => 3,
+            Self::P6 => 6,
+            Self::P9 => 9,
+            Self::P12 => 12,
+            Self::P15 => 15,
+            Self::P18 => 18,
+            Self::P20 => 20,
+        }
+    }
 }
 
 /// BLE CCA mode.
 #[derive(Default, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[cfg_attr(feature = "defmt", defmt::Format)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum CcaMode {
     /// Disabled
     #[default]
@@ -348,7 +387,7 @@ pub enum CcaMode {
 /// Bluetooth controller configuration.
 #[derive(BuilderLite, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[cfg_attr(feature = "defmt", defmt::Format)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
     /// The priority of the RTOS task.
     task_priority: u8,
@@ -518,7 +557,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         mesh_adv_size: 0,
 
         normal_adv_size: config.normal_adv_size,
-        coex_phy_coded_tx_rx_time_limit: if cfg(feature = "coex") {
+        coex_phy_coded_tx_rx_time_limit: if cfg!(feature = "coex") {
             config.limit_time_for_coded_phy_connection as u8
         } else {
             0

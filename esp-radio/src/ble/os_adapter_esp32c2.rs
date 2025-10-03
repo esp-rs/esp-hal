@@ -21,47 +21,92 @@ pub(crate) static mut ISR_INTERRUPT_7: (*mut c_void, *mut c_void) =
 /// Transmission Power Level
 #[derive(Default, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[cfg_attr(feature = "defmt", defmt::Format)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum TxPower {
     /// -24 dBm
-    N24 = esp_power_level_t_ESP_PWR_LVL_N24,
+    N24,
     /// -21 dBm
-    N21 = esp_power_level_t_ESP_PWR_LVL_N21,
+    N21,
     /// -18 dBm
-    N18 = esp_power_level_t_ESP_PWR_LVL_N18,
+    N18,
     /// -15 dBm
-    N15 = esp_power_level_t_ESP_PWR_LVL_N15,
+    N15,
     /// -12 dBm
-    N12 = esp_power_level_t_ESP_PWR_LVL_N12,
+    N12,
     /// -9 dBm
-    N9  = esp_power_level_t_ESP_PWR_LVL_N9,
+    N9,
     /// -6 dBm
-    N6  = esp_power_level_t_ESP_PWR_LVL_N6,
+    N6,
     /// -3 dBm
-    N3  = esp_power_level_t_ESP_PWR_LVL_N3,
+    N3,
     /// 0 dBm
-    N0  = esp_power_level_t_ESP_PWR_LVL_N0,
+    N0,
     /// 3 dBm
-    P3  = esp_power_level_t_ESP_PWR_LVL_P3,
+    P3,
     /// 6 dBm
-    P6  = esp_power_level_t_ESP_PWR_LVL_P6,
+    P6,
     /// 9 dBm
     #[default]
-    P9  = esp_power_level_t_ESP_PWR_LVL_P9,
+    P9,
     /// 12 dBm
-    P12 = esp_power_level_t_ESP_PWR_LVL_P12,
+    P12,
     /// 15 dBm
-    P15 = esp_power_level_t_ESP_PWR_LVL_P15,
+    P15,
     /// 18 dBm
-    P18 = esp_power_level_t_ESP_PWR_LVL_P18,
+    P18,
     /// 20 dBm
-    P20 = esp_power_level_t_ESP_PWR_LVL_P20,
+    P20,
+}
+
+#[allow(dead_code)]
+impl TxPower {
+    fn idx(self) -> esp_power_level_t {
+        match self {
+            Self::N24 => esp_power_level_t_ESP_PWR_LVL_N24,
+            Self::N21 => esp_power_level_t_ESP_PWR_LVL_N21,
+            Self::N18 => esp_power_level_t_ESP_PWR_LVL_N18,
+            Self::N15 => esp_power_level_t_ESP_PWR_LVL_N15,
+            Self::N12 => esp_power_level_t_ESP_PWR_LVL_N12,
+            Self::N9 => esp_power_level_t_ESP_PWR_LVL_N9,
+            Self::N6 => esp_power_level_t_ESP_PWR_LVL_N6,
+            Self::N3 => esp_power_level_t_ESP_PWR_LVL_N3,
+            Self::N0 => esp_power_level_t_ESP_PWR_LVL_N0,
+            Self::P3 => esp_power_level_t_ESP_PWR_LVL_P3,
+            Self::P6 => esp_power_level_t_ESP_PWR_LVL_P6,
+            Self::P9 => esp_power_level_t_ESP_PWR_LVL_P9,
+            Self::P12 => esp_power_level_t_ESP_PWR_LVL_P12,
+            Self::P15 => esp_power_level_t_ESP_PWR_LVL_P15,
+            Self::P18 => esp_power_level_t_ESP_PWR_LVL_P18,
+            Self::P20 => esp_power_level_t_ESP_PWR_LVL_P20,
+        }
+    }
+
+    fn dbm(self) -> i8 {
+        match self {
+            Self::N24 => -24,
+            Self::N21 => -21,
+            Self::N18 => -18,
+            Self::N15 => -15,
+            Self::N12 => -12,
+            Self::N9 => -9,
+            Self::N6 => -6,
+            Self::N3 => -3,
+            Self::N0 => 0,
+            Self::P3 => 3,
+            Self::P6 => 6,
+            Self::P9 => 9,
+            Self::P12 => 12,
+            Self::P15 => 15,
+            Self::P18 => 18,
+            Self::P20 => 20,
+        }
+    }
 }
 
 /// Bluetooth controller configuration.
 #[derive(BuilderLite, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[cfg_attr(feature = "defmt", defmt::Format)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
     /// The priority of the RTOS task.
     task_priority: u8,
@@ -70,7 +115,7 @@ pub struct Config {
     task_stack_size: u16,
 
     /// The maximum number of simultaneous connections.
-    max_connections: u8,
+    max_connections: u16,
 
     /// Enable QA test mode.
     qa_test_mode: bool,
@@ -231,9 +276,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_ll_sync_cnt: config.ll_sync_cnt,
         ble_ll_rsp_dup_list_count: config.ll_rsp_dup_list_count,
         ble_ll_adv_dup_list_count: config.ll_adv_dup_list_count,
-        // FIXME: esp-idf passes the raw dBm value as signed through this field. I'll assume the C3
-        // approach of passing the esp_power_level_t discriminants is the correct way.
-        ble_ll_tx_pwr_dbm: config.default_tx_power as u8,
+        ble_ll_tx_pwr_dbm: config.default_tx_power.dbm() as u8,
         rtc_freq,
         ble_ll_sca: CONFIG_BT_LE_LL_SCA as _,
         ble_ll_scan_phy_number: if CONFIG_BT_LE_LL_CFG_FEAT_LE_CODED_PHY != 0 {
@@ -269,7 +312,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_hci_uart_flow_ctrl: 0,
         ble_hci_uart_uart_parity: 0,
         enable_tx_cca: config.cca as u8,
-        cca_rssi_thresh: (256 - config.cca_threshold) as u8,
+        cca_rssi_thresh: (256 - config.cca_threshold as u32) as u8,
         sleep_en: 0, // CONFIG_BT_LE_SLEEP_ENABLE unset
         coex_phy_coded_tx_rx_time_limit: CONFIG_BT_LE_COEX_PHY_CODED_TX_RX_TLIM_EFF as _,
         dis_scan_backoff: config.dis_scan_backoff as u8,
@@ -280,7 +323,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         version_num: Efuse::minor_chip_version(),
         ignore_wl_for_direct_adv: 0,
         csa2_select: CONFIG_BT_LE_50_FEATURE_SUPPORT as _,
-        ble_aa_check: config.verify_access_address,
+        ble_aa_check: config.verify_access_address as u8,
         ble_llcp_disc_flag: config.disconnect_llcp_conn_update as u8
             | ((config.disconnect_llcp_chan_map_update as u8) << 1)
             | ((config.disconnect_llcp_phy_update as u8) << 2),
