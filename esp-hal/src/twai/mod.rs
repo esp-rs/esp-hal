@@ -1764,11 +1764,6 @@ mod asynch {
                     return Poll::Ready(Err(EspTwaiError::BusOff));
                 }
 
-                // Check if the packet in the receive buffer is valid or overrun.
-                if status.miss_st().bit_is_set() {
-                    return Poll::Ready(Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun)));
-                }
-
                 Poll::Pending
             })
             .await
