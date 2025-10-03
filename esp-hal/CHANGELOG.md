@@ -89,6 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - I2S: Fixed RX half-sample bits configuration bug causing microphone noise (#4109)
 - RISC-V: Direct interrupt vectoring (#4171)
 - TWAI: Fixed unnecessary transmission abortions (#4227)
+- TWAI: Fixed receive_async returning corrupt frames (#4243)
 - TWAI: Fixed receive_async erroneously returning RX FIFO overrun errors (#4244)
 - Subtracting Instant values with large difference no longer panics (#4249)
 - ADC: Fixed integer overflow in curve calibration polynomial evaluation (#4240)

@@ -1799,13 +1799,14 @@ mod asynch {
 
             if status.miss_st().bit_is_set() {
                 let _ = rx_queue.try_send(Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun)));
-            }
-
-            match read_frame(register_block) {
-                Ok(frame) => {
-                    let _ = rx_queue.try_send(Ok(frame));
+                release_receive_fifo(register_block);
+            } else {
+                match read_frame(register_block) {
+                    Ok(frame) => {
+                        let _ = rx_queue.try_send(Ok(frame));
+                    }
+                    Err(e) => warn!("Error reading frame: {:?}", e),
                 }
-                Err(e) => warn!("Error reading frame: {:?}", e),
             }
         }
 
