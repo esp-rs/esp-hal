@@ -18,8 +18,8 @@ use crate::{
     hal::ram,
 };
 
-#[cfg_attr(esp32c3, path = "os_adapter_esp32c3.rs")]
-#[cfg_attr(esp32s3, path = "os_adapter_esp32s3.rs")]
+#[cfg_attr(esp32c3, path = "os_adapter_esp32c3_s3.rs")]
+#[cfg_attr(esp32s3, path = "os_adapter_esp32c3_s3.rs")]
 #[cfg_attr(esp32, path = "os_adapter_esp32.rs")]
 pub(crate) mod ble_os_adapter_chip_specific;
 

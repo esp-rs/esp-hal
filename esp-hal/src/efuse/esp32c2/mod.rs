@@ -107,6 +107,16 @@ impl super::Efuse {
 
         Some(code11)
     }
+
+    /// Returns the major hardware revision
+    pub fn major_chip_version() -> u8 {
+        Self::read_field_le(WAFER_VERSION_MAJOR)
+    }
+
+    /// Returns the minor hardware revision
+    pub fn minor_chip_version() -> u8 {
+        Self::read_field_le(WAFER_VERSION_MINOR)
+    }
 }
 
 #[derive(Debug, Clone, Copy, strum::FromRepr)]

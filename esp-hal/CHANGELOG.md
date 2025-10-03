@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Cpu::other()` is now marked as public (#4188)
 - The ESP_HAL_CONFIG_STACK_GUARD_MONITORING (enabled by default) enables a data watchpoint on the stack guard value to protect the main stack (#4207)
 - `start_app_core_with_stack_guard_offset` (#4207)
+- Chip version Efuse accessors for ESP32, ESP32-C2, ESP32-C3 (#4248)
 - The `rmt::PulseCode::MAX_LEN` constant was added. (#4246)
 - `rmt::Error` now implements `core::error::Error` (#4247)
 - `ram(reclaimed)` as an alias for `link_section = ".dram2_uninit"` (#4245)
@@ -89,6 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RISC-V: Direct interrupt vectoring (#4171)
 - TWAI: Fixed unnecessary transmission abortions (#4227)
 - TWAI: Fixed receive_async returning corrupt frames (#4243)
+- TWAI: Fixed receive_async erroneously returning RX FIFO overrun errors (#4244)
 - Subtracting Instant values with large difference no longer panics (#4249)
 - ADC: Fixed integer overflow in curve calibration polynomial evaluation (#4240)
 
