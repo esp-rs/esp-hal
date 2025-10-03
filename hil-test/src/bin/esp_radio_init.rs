@@ -396,10 +396,12 @@ mod tests {
             loop {
                 if Cpu::current() == core {
                     counter += 1;
+                    // Let's also test that the delay works on both cores.
+                    CurrentThreadHandle::get().delay(Duration::from_micros(100));
                 } else {
                     preempt::yield_task();
                 }
-                if counter == 1000 {
+                if counter == 10 {
                     context.ready_semaphore.give();
                     break;
                 }
