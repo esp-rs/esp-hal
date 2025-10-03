@@ -319,6 +319,12 @@ pub struct Config {
 
     /// Enable BLE ping procedure.
     ping: bool,
+
+    /// Disconnect when Instant Passed (0x28) occurs during ACL connection update.
+    disconnect_llcp_conn_update: bool,
+
+    /// Disconnect when Instant Passed (0x28) occurs during ACL channel map update.
+    disconnect_llcp_chan_map_update: bool,
 }
 
 impl Default for Config {
@@ -335,6 +341,8 @@ impl Default for Config {
             verify_access_address: false,
             channel_assessment: false,
             ping: false,
+            disconnect_llcp_conn_update: false,
+            disconnect_llcp_chan_map_update: false,
         }
     }
 }
@@ -383,11 +391,12 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_scan_backoff: config.ble_scan_backoff,
         pcm_fsyncshp: 0,
         enc_key_sz_min: config.enc_key_sz_min,
-        ble_llcp_disc_flag: 0,
+        ble_llcp_disc_flag: config.disconnect_llcp_conn_update as u8
+            | ((config.disconnect_llcp_chan_map_update as u8) << 1),
         ble_aa_check: config.verify_access_address,
         ble_chan_ass_en: config.channel_assessment as u8,
         ble_ping_en: config.ping as u8,
-        magic: 0x20250318,
+        magic: ESP_BT_CONTROLLER_CONFIG_MAGIC_VAL,
     }
 }
 

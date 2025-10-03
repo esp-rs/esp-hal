@@ -285,6 +285,7 @@ unsafe extern "C" {
     fn btdm_controller_rom_data_init() -> i32;
 }
 
+/// Antenna Selection
 #[derive(Default, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[cfg_attr(feature = "defmt", defmt::Format)]
@@ -296,6 +297,7 @@ pub enum Antenna {
     Antenna1 = 1,
 }
 
+/// Transmission Power Level
 #[derive(Default, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[cfg_attr(feature = "defmt", defmt::Format)]
@@ -327,6 +329,20 @@ pub enum TxPower {
     P18 = esp_power_level_t_ESP_PWR_LVL_P18,
     /// 20 dBm
     P20 = esp_power_level_t_ESP_PWR_LVL_P20,
+}
+
+/// BLE CCA mode.
+#[derive(Default, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[cfg_attr(feature = "defmt", defmt::Format)]
+pub enum CcaMode {
+    /// Disabled
+    #[default]
+    Disabled          = 0,
+    /// Hardware Triggered
+    HardwareTriggered = 1,
+    /// Software Triggered (experimental)
+    SoftwareTriggered = 2,
 }
 
 /// Bluetooth controller configuration.
@@ -374,6 +390,52 @@ pub struct Config {
 
     /// Default TX power.
     default_tx_power: TxPower,
+
+    /// Coexistence: limit on MAX Tx/Rx time for coded-PHY connection.
+    limit_time_for_coded_phy_connection: bool,
+
+    /// Enable / disable uncoded phy / coded phy hardware re-correction.
+    hw_recorrect_en: bool,
+
+    /// Absolute value of hardware-triggered CCA threshold.
+    ///
+    /// The CCA threshold is always negative.
+    ///
+    /// If the channel assessment result exceeds the CCA threshold (e.g. -75 dBm), indicating
+    /// the channel is busy, the hardware will not transmit packets on that channel.
+    ///
+    /// Range: 20 dBm - 100 dBm
+    cca_threshold: u8,
+
+    /// BLE CCA mode.
+    cca_mode: CcaMode,
+
+    /// Enable / disable auxiliary packets when the extended ADV data length is zero.
+    data_length_zero_aux: bool,
+
+    /// Enable / disable DTM.
+    dtm: bool,
+
+    /// Enable / disable encryption.
+    encryption: bool,
+
+    /// Enable / disable connection.
+    connection: bool,
+
+    /// Enable / disable scanning.
+    scan: bool,
+
+    /// Enable / disable ADV.
+    adv: bool,
+
+    /// Disconnect when Instant Passed (0x28) occurs during ACL connection update.
+    disconnect_llcp_conn_update: bool,
+
+    /// Disconnect when Instant Passed (0x28) occurs during ACL channel map update.
+    disconnect_llcp_chan_map_update: bool,
+
+    /// Disconnect when Instant Passed (0x28) occurs during ACL PHY update.
+    disconnect_llcp_phy_update: bool,
 }
 
 impl Default for Config {
@@ -393,6 +455,19 @@ impl Default for Config {
             default_tx_antenna: Antenna::default(),
             default_rx_antenna: Antenna::default(),
             default_tx_power: TxPower::default(),
+            limit_time_for_coded_phy_connection: false,
+            hw_recorrect_en: AGC_RECORRECT_EN != 0,
+            cca_threshold: 75, // CONFIG_BT_CTRL_HW_CCA_VAL is 0 which is not valid
+            cca_mode: CcaMode::default(),
+            data_length_zero_aux: false,
+            dtm: true,
+            encryption: true,
+            connection: true,
+            scan: true,
+            adv: true,
+            disconnect_llcp_conn_update: false,
+            disconnect_llcp_chan_map_update: false,
+            disconnect_llcp_phy_update: false,
         }
     }
 }
@@ -401,6 +476,7 @@ impl Config {
     pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
         crate::ble::validate_range!(self, normal_adv_size, 10, 1000);
         crate::ble::validate_range!(self, scan_duplicate_refresh_period, 0, 100);
+        crate::ble::validate_range!(self, cca_threshold, 20, 100);
 
         Ok(())
     }
@@ -434,7 +510,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         txant_dft: config.default_tx_antenna as u8,
         rxant_dft: config.default_rx_antenna as u8,
         txpwr_dft: config.default_tx_power as u8,
-        cfg_mask: 1,
+        cfg_mask: CFG_MASK,
 
         // Bluetooth mesh options, currently not supported
         scan_duplicate_mode: 0, // normal mode
@@ -442,36 +518,41 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         mesh_adv_size: 0,
 
         normal_adv_size: config.normal_adv_size,
-        coex_phy_coded_tx_rx_time_limit: 0,
+        coex_phy_coded_tx_rx_time_limit: if cfg(feature = "coex") {
+            config.limit_time_for_coded_phy_connection as u8
+        } else {
+            0
+        },
         hw_target_code: if cfg!(esp32c3) {
             0x01010000
         } else {
             0x02010000
         },
-        slave_ce_len_min: 5,
-        hw_recorrect_en: 1 << 0,
-        cca_thresh: 20,
+        // esp-idf: "Please do not modify this value"
+        slave_ce_len_min: SLAVE_CE_LEN_MIN_DEFAULT as _,
+        hw_recorrect_en: config.hw_recorrect_en as u8,
+        cca_thresh: config.cca_threshold,
         dup_list_refresh_period: config.scan_duplicate_refresh_period,
         scan_backoff_upperlimitmax: 0,
         ble_50_feat_supp: BT_CTRL_50_FEATURE_SUPPORT != 0,
-        ble_cca_mode: 0,
+        ble_cca_mode: config.cca_mode as u8,
         ble_chan_ass_en: config.channel_assessment as u8,
-        ble_data_lenth_zero_aux: 0,
+        ble_data_lenth_zero_aux: config.data_length_zero_aux as u8,
         ble_ping_en: config.ping as u8,
-        ble_llcp_disc_flag: BT_CTRL_BLE_LLCP_CONN_UPDATE as u8
-            | BT_CTRL_BLE_LLCP_CHAN_MAP_UPDATE as u8
-            | BT_CTRL_BLE_LLCP_PHY_UPDATE as u8,
+        ble_llcp_disc_flag: config.disconnect_llcp_conn_update as u8
+            | ((config.disconnect_llcp_chan_map_update as u8) << 1)
+            | ((config.disconnect_llcp_phy_update as u8) << 2),
         run_in_flash: false,
-        dtm_en: true,
-        enc_en: true,
+        dtm_en: config.dtm,
+        enc_en: config.encryption,
         qa_test: config.qa_test_mode,
-        connect_en: true,
-        scan_en: true,
+        connect_en: config.connection,
+        scan_en: config.scan,
         ble_aa_check: config.verify_access_address,
         ble_log_mode_en: if cfg!(feature = "sys-logs") { 4095 } else { 0 },
         ble_log_level: if cfg!(feature = "sys-logs") { 5 } else { 0 },
-        adv_en: true,
-        magic: 0x5a5aa5a5,
+        adv_en: config.adv,
+        magic: ESP_BT_CTRL_CONFIG_MAGIC_VAL,
     }
 }
 
