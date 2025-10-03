@@ -288,7 +288,14 @@ pub struct Config {
     task_stack_size: u16,
 
     /// The maximum number of simultaneous connections.
+    ///
+    /// Range: 1 - 9
     max_connections: u8,
+
+    /// Maximum number of devices in scan duplicate filtering list.
+    ///
+    /// Range: 10 - 1000
+    normal_adv_size: u16,
 }
 
 impl Default for Config {
@@ -298,6 +305,7 @@ impl Default for Config {
             task_priority: 29,
             task_stack_size: 4096,
             max_connections: CONFIG_BTDM_CTRL_BLE_MAX_CONN_EFF as _,
+            normal_adv_size: CONFIG_BTDM_SCAN_DUPL_CACHE_SIZE as _,
         }
     }
 }
@@ -305,6 +313,7 @@ impl Default for Config {
 impl Config {
     pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
         crate::ble::validate_range!(self, max_connections, 1, 9);
+        crate::ble::validate_range!(self, normal_adv_size, 10, 1000);
 
         Ok(())
     }
@@ -316,11 +325,15 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
     esp_bt_controller_config_t {
         controller_task_stack_size: config.task_stack_size,
         controller_task_prio: config.task_priority,
+
+        // We're using VHCI but esp-idf has these defaults:
         hci_uart_no: 1,
         hci_uart_baudrate: 921600,
+        // Bluetooth mesh options, currently not supported
         scan_duplicate_mode: 0,
         scan_duplicate_type: 0,
-        normal_adv_size: 200,
+
+        normal_adv_size: config.normal_adv_size,
         mesh_adv_size: 0,
         send_adv_reserved_size: 1000,
         controller_debug_flag: 0,

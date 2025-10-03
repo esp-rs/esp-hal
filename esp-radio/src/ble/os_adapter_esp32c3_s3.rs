@@ -301,6 +301,11 @@ pub struct Config {
 
     /// Enable QA test mode.
     qa_test_mode: bool,
+
+    /// Maximum number of devices in scan duplicate filtering list.
+    ///
+    /// Range: 10 - 1000
+    normal_adv_size: u16,
 }
 
 impl Default for Config {
@@ -312,12 +317,14 @@ impl Default for Config {
             #[cfg(multi_core)]
             task_cpu: Cpu::ProCpu,
             qa_test_mode: false,
+            normal_adv_size: 100,
         }
     }
 }
 
 impl Config {
     pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
+        crate::ble::validate_range!(self, normal_adv_size, 10, 1000);
         Ok(())
     }
 }
@@ -333,7 +340,9 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         controller_task_run_cpu: config.task_cpu as u8,
         #[cfg(single_core)]
         controller_task_run_cpu: 0,
-        bluetooth_mode: 1,
+
+        bluetooth_mode: 1, // BLE
+
         ble_max_act: 10,
         sleep_mode: 0,
         sleep_clock: 0,
@@ -349,9 +358,12 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         rxant_dft: 0,
         txpwr_dft: 9,
         cfg_mask: 1,
+
+        // Bluetooth mesh options, currently not supported
         scan_duplicate_mode: 0,
         scan_duplicate_type: 0,
-        normal_adv_size: 20,
+
+        normal_adv_size: config.normal_adv_size,
         mesh_adv_size: 0,
         coex_phy_coded_tx_rx_time_limit: 0,
         hw_target_code: if cfg!(esp32c3) {

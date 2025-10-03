@@ -172,7 +172,6 @@ fn dump_packet_info(_buffer: &[u8]) {
     info!("@HCIFRAME {:?}", _buffer);
 }
 
-#[allow(unused_macros)] // not yet used for every chip
 macro_rules! validate_range {
     ($this:ident, $field:ident, $min:literal, $max:literal) => {
         if !($min..=$max).contains(&$this.$field) {
@@ -187,5 +186,4 @@ macro_rules! validate_range {
         }
     };
 }
-#[allow(unused_imports)] // not yet used for every chip
 pub(crate) use validate_range;
