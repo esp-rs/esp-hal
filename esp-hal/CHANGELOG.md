@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `rmt::PulseCode::MAX_LEN` constant was added. (#4246)
 - `rmt::Error` now implements `core::error::Error` (#4247)
 - `ram(reclaimed)` as an alias for `link_section = ".dram2_uninit"` (#4245)
+- RMT: Wrapping the hardware buffer is now supported for rx/tx and blocking/async channels (#4049)
+- RMT: add `Channel::buffer_size` and `Channel::supports_wrap` methods (#4049)
 
 ### Changed
 
@@ -76,6 +78,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `rmt::Channel` and `rmt::ChannelCreator` now carry a lifetime and can be reborrowed. (#4174)
 - RMT transactions and futures are marked as `#[must_use]` and implement `Drop`. (#4174)
 - The behavior of `rmt::PulseCode` constructors (`new`, `new_clamped`, `try_new`) has been reworked to be more convenient and clear. (#4246)
+- RMT: `Channel::transmit_continuously` now takes an additional `LoopStop` argument. (#4174)
+- RMT: `LoopCount::Finite` and `ContinuousTxTransaction::is_tx_loopcount_interrupt_set` are only defined when the hardware supports it (all except ESP32). (#4174)
+- RMT: Receive operations read only received codes instead of the entire buffer and return the number of codes read (#4049)
+- RMT: Dropping async futures and blocking transactions always stops them and returns the channel to an idle state. Transactions are `#[must_use]` (#4049)
 
 ### Fixed
 
@@ -95,6 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TWAI: Fixed receive_async erroneously returning RX FIFO overrun errors (#4244)
 - Subtracting Instant values with large difference no longer panics (#4249)
 - ADC: Fixed integer overflow in curve calibration polynomial evaluation (#4240)
+- RMT: `Channel::transmit_continuously` also triggers the loopcount interrupt when only using a single repetition. (#4174)
 
 ### Removed
 
