@@ -296,6 +296,28 @@ pub struct Config {
     ///
     /// Range: 10 - 1000
     normal_adv_size: u16,
+
+    /// Scan duplicate filtering list refresh period in seconds.
+    ///
+    /// Range: 0 - 100 seconds
+    scan_duplicate_refresh_period: u16,
+
+    /// Enable BLE scan backoff.
+    ble_scan_backoff: bool,
+
+    /// Minimum encryption key size.
+    ///
+    /// Range: 7 - 16
+    enc_key_sz_min: u8,
+
+    /// Enable verification of the Access Address within the `CONNECT_IND` PDU.
+    verify_access_address: bool,
+
+    /// Enable BLE channel assessment.
+    channel_assessment: bool,
+
+    /// Enable BLE ping procedure.
+    ping: bool,
 }
 
 impl Default for Config {
@@ -306,6 +328,12 @@ impl Default for Config {
             task_stack_size: 4096,
             max_connections: CONFIG_BTDM_CTRL_BLE_MAX_CONN_EFF as _,
             normal_adv_size: CONFIG_BTDM_SCAN_DUPL_CACHE_SIZE as _,
+            scan_duplicate_refresh_period: SCAN_DUPL_CACHE_REFRESH_PERIOD as _,
+            ble_scan_backoff: false,
+            enc_key_sz_min: 7,
+            verify_access_address: false,
+            channel_assessment: false,
+            ping: false,
         }
     }
 }
@@ -314,6 +342,8 @@ impl Config {
     pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
         crate::ble::validate_range!(self, max_connections, 1, 9);
         crate::ble::validate_range!(self, normal_adv_size, 10, 1000);
+        crate::ble::validate_range!(self, scan_duplicate_refresh_period, 0, 100);
+        crate::ble::validate_range!(self, enc_key_sz_min, 7, 16);
 
         Ok(())
     }
@@ -348,14 +378,14 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         pcm_role: 0,
         pcm_polar: 0,
         hli: false,
-        dup_list_refresh_period: 0,
-        ble_scan_backoff: false,
+        dup_list_refresh_period: config.scan_duplicate_refresh_period,
+        ble_scan_backoff: config.ble_scan_backoff,
         pcm_fsyncshp: 0,
-        enc_key_sz_min: 7,
+        enc_key_sz_min: config.enc_key_sz_min,
         ble_llcp_disc_flag: 0,
-        ble_aa_check: false,
-        ble_chan_ass_en: 0,
-        ble_ping_en: 0,
+        ble_aa_check: config.verify_access_address,
+        ble_chan_ass_en: config.channel_assessment as u8,
+        ble_ping_en: config.ping as u8,
         magic: 0x20250318,
     }
 }

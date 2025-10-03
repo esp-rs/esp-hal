@@ -306,6 +306,20 @@ pub struct Config {
     ///
     /// Range: 10 - 1000
     normal_adv_size: u16,
+
+    /// Scan duplicate filtering list refresh period in seconds.
+    ///
+    /// Range: 0 - 100 seconds
+    scan_duplicate_refresh_period: u16,
+
+    /// Enables verification of the Access Address within the `CONNECT_IND` PDU.
+    verify_access_address: bool,
+
+    /// Enable BLE channel assessment.
+    channel_assessment: bool,
+
+    /// Enable BLE ping procedure.
+    ping: bool,
 }
 
 impl Default for Config {
@@ -318,6 +332,10 @@ impl Default for Config {
             task_cpu: Cpu::ProCpu,
             qa_test_mode: false,
             normal_adv_size: 100,
+            scan_duplicate_refresh_period: 0,
+            verify_access_address: true,
+            channel_assessment: false,
+            ping: false,
         }
     }
 }
@@ -325,6 +343,8 @@ impl Default for Config {
 impl Config {
     pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
         crate::ble::validate_range!(self, normal_adv_size, 10, 1000);
+        crate::ble::validate_range!(self, scan_duplicate_refresh_period, 0, 100);
+
         Ok(())
     }
 }
@@ -374,13 +394,13 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         slave_ce_len_min: 5,
         hw_recorrect_en: 1 << 0,
         cca_thresh: 20,
-        dup_list_refresh_period: 0,
+        dup_list_refresh_period: config.scan_duplicate_refresh_period,
         scan_backoff_upperlimitmax: 0,
         ble_50_feat_supp: BT_CTRL_50_FEATURE_SUPPORT != 0,
         ble_cca_mode: 0,
-        ble_chan_ass_en: 0,
+        ble_chan_ass_en: config.channel_assessment as u8,
         ble_data_lenth_zero_aux: 0,
-        ble_ping_en: 0,
+        ble_ping_en: config.ping as u8,
         ble_llcp_disc_flag: BT_CTRL_BLE_LLCP_CONN_UPDATE as u8
             | BT_CTRL_BLE_LLCP_CHAN_MAP_UPDATE as u8
             | BT_CTRL_BLE_LLCP_PHY_UPDATE as u8,
@@ -390,7 +410,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         qa_test: config.qa_test_mode,
         connect_en: true,
         scan_en: true,
-        ble_aa_check: true,
+        ble_aa_check: config.verify_access_address,
         ble_log_mode_en: if cfg!(feature = "sys-logs") { 4095 } else { 0 },
         ble_log_level: if cfg!(feature = "sys-logs") { 5 } else { 0 },
         adv_en: true,
