@@ -52,6 +52,14 @@ mod tests {
         assert_eq!(now.duration_since_epoch(), Duration::ZERO);
     }
 
+    #[test]
+    fn large_instant_difference_does_not_panic() {
+        assert_eq!(
+            (Instant::EPOCH + Duration::MAX).duration_since_epoch(),
+            Duration::MAX
+        );
+    }
+
     #[cfg(systimer)]
     #[test]
     fn test_current_time_construct_systimer(ctx: Context) {
