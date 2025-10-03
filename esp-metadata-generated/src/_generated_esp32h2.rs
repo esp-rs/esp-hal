@@ -264,6 +264,9 @@ macro_rules! property {
     ("uart.ram_size", str) => {
         stringify!(128)
     };
+    ("bt.controller") => {
+        "npl"
+    };
     ("phy.combo_module") => {
         false
     };
