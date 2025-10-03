@@ -183,10 +183,13 @@ impl TimeDriver {
 
 #[esp_hal::ram]
 extern "C" fn timer_tick_handler() {
-    #[cfg(feature = "embassy")]
-    TIMER_QUEUE.handle_alarm(crate::now());
+    SCHEDULER.with_shared(|scheduler| {
+        #[cfg(feature = "embassy")]
+        TIMER_QUEUE.handle_alarm(crate::now());
 
-    SCHEDULER.with(|scheduler| {
+        let mut scheduler = unwrap!(scheduler.try_borrow_mut());
+        let scheduler = &mut *scheduler;
+
         let time_driver = unwrap!(scheduler.time_driver.as_mut());
 
         time_driver.timer.clear_interrupt();
@@ -202,12 +205,16 @@ extern "C" fn timer_tick_handler() {
 
             debug!("Task {:?} is ready", ready_task);
 
+            // TODO: we can yield here for each task. That will ensure a task switch is scheduled
+            // only the relevant core(s).
             scheduler.run_queue.mark_task_ready(ready_task);
         });
 
         // The timer interrupt fires when a task is ready to run, an embassy timer expires or when a
         // time slice tick expires. Trigger a context switch in all cases, which context switch will
         // re-arm the timer.
+        // TODO: if we track which core needs time slicing, we won't need to unconditionally yield
+        // on both cores.
 
         // `Scheduler::switch_task` must be called on a single interrupt priority level only.
         // To ensure this, we call yield_task to pend the software interrupt.
@@ -223,5 +230,7 @@ extern "C" fn timer_tick_handler() {
         //
         // The rest of the lineup could switch tasks here, but it's not done to save some IRAM.
         crate::task::yield_task();
+        #[cfg(multi_core)]
+        crate::task::schedule_other_core();
     });
 }

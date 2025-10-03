@@ -1,10 +1,12 @@
+use core::cell::RefCell;
 #[cfg(feature = "esp-radio")]
 use core::{ffi::c_void, ptr::NonNull};
 
 #[cfg(feature = "alloc")]
 use allocator_api2::boxed::Box;
+use embassy_sync::blocking_mutex::Mutex;
 use esp_hal::{system::Cpu, time::Instant};
-use esp_sync::NonReentrantMutex;
+use esp_sync::RawMutex;
 
 #[cfg(feature = "alloc")]
 use crate::InternalMemory;
@@ -341,6 +343,18 @@ impl SchedulerState {
         let arm_next_timeslice_tick = priority
             .map(|p| !self.run_queue.is_level_empty(p))
             .unwrap_or(false);
+
+        #[cfg(multi_core)]
+        let arm_next_timeslice_tick = if arm_next_timeslice_tick {
+            true
+        } else {
+            self.per_cpu[1 - current_cpu]
+                .current_task
+                .map(|task| task.priority(&mut self.run_queue))
+                .map(|p| !self.run_queue.is_level_empty(p))
+                .unwrap_or(false)
+        };
+
         let time_driver = unwrap!(self.time_driver.as_mut());
         time_driver.arm_next_wakeup(arm_next_timeslice_tick);
     }
@@ -417,12 +431,16 @@ impl SchedulerState {
 }
 
 pub(crate) struct Scheduler {
-    inner: NonReentrantMutex<SchedulerState>,
+    inner: Mutex<RawMutex, RefCell<SchedulerState>>,
 }
 
 impl Scheduler {
     pub(crate) fn with<R>(&self, cb: impl FnOnce(&mut SchedulerState) -> R) -> R {
-        self.inner.with(cb)
+        self.with_shared(|shared| cb(&mut *unwrap!(shared.try_borrow_mut())))
+    }
+
+    pub(crate) fn with_shared<R>(&self, cb: impl FnOnce(&RefCell<SchedulerState>) -> R) -> R {
+        self.inner.lock(|shared| cb(shared))
     }
 
     #[cfg(feature = "esp-radio")]
@@ -471,10 +489,10 @@ impl Scheduler {
 
 #[cfg(feature = "esp-radio")]
 esp_radio_rtos_driver::scheduler_impl!(pub(crate) static SCHEDULER: Scheduler = Scheduler {
-    inner: NonReentrantMutex::new(SchedulerState::new())
+    inner: Mutex::new(RefCell::new(SchedulerState::new()))
 });
 
 #[cfg(not(feature = "esp-radio"))]
 pub(crate) static SCHEDULER: Scheduler = Scheduler {
-    inner: NonReentrantMutex::new(SchedulerState::new()),
+    inner: Mutex::new(RefCell::new(SchedulerState::new())),
 };
