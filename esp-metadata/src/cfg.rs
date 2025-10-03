@@ -14,6 +14,7 @@ pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
 pub(crate) use rmt::*;
 pub(crate) use sha::*;
+pub(crate) use soc::*;
 pub(crate) use spi_master::*;
 pub(crate) use spi_slave::*;
 pub(crate) use uart::*;
@@ -23,7 +24,7 @@ pub(crate) trait GenericProperty {
         None
     }
 
-    fn for_each_macro(&self) -> Option<proc_macro2::TokenStream> {
+    fn macros(&self) -> Option<proc_macro2::TokenStream> {
         None
     }
 
@@ -293,6 +294,8 @@ driver_configs![
             #[serde(default)]
             rc_slow_clock: Option<u32>,
             xtal_options: Vec<u32>,
+            #[serde(default)]
+            peripheral_clocks: PeripheralClocks,
         }
     },
 
@@ -594,6 +597,8 @@ driver_configs![
         name: "UART",
         properties: {
             ram_size: u32,
+            #[serde(default)]
+            peripheral_controls_mem_clk: bool,
         }
     },
     LpUartProperties {

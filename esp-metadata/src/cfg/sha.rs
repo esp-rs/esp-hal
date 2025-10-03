@@ -28,7 +28,7 @@ pub struct ShaAlgoMap {
 }
 
 impl super::GenericProperty for ShaAlgoMap {
-    fn for_each_macro(&self) -> Option<proc_macro2::TokenStream> {
+    fn macros(&self) -> Option<proc_macro2::TokenStream> {
         let modes = [
             ("SHA-1", self.sha1),
             ("SHA-224", self.sha224),

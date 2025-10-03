@@ -1736,7 +1736,7 @@ cfg_if::cfg_if! {
     if #[cfg(pdma)] {
         type PeripheralGuard = Option<system::PeripheralGuard>;
     } else {
-        type PeripheralGuard = system::GenericPeripheralGuard<{ system::Peripheral::Gdma as u8}>;
+        type PeripheralGuard = system::GenericPeripheralGuard<{ system::Peripheral::Dma as u8}>;
     }
 }
 

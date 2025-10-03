@@ -21,7 +21,7 @@ pub struct AesKeyLength {
 }
 
 impl GenericProperty for AesKeyLength {
-    fn for_each_macro(&self) -> Option<proc_macro2::TokenStream> {
+    fn macros(&self) -> Option<proc_macro2::TokenStream> {
         let bits = self
             .options
             .iter()
