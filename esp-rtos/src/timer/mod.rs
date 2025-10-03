@@ -183,15 +183,13 @@ impl TimeDriver {
 
 #[esp_hal::ram]
 extern "C" fn timer_tick_handler() {
-    // Must not be inside a scheduler lock, because waking a thread-mode executor requires locking
-    // the scheduler, which is non-reentrant.
-    #[cfg(feature = "embassy")]
-    TIMER_QUEUE.handle_alarm(crate::now());
+    SCHEDULER.with_shared(|scheduler| {
+        #[cfg(feature = "embassy")]
+        TIMER_QUEUE.handle_alarm(crate::now());
 
-    // Race condition? Other core can delay an async task here. It will re-arm the timer, but will
-    // that alarm not be processed in this round of the interrupt handler.
+        let mut scheduler = unwrap!(scheduler.try_borrow_mut());
+        let scheduler = &mut *scheduler;
 
-    SCHEDULER.with(|scheduler| {
         let time_driver = unwrap!(scheduler.time_driver.as_mut());
 
         time_driver.timer.clear_interrupt();
