@@ -188,9 +188,9 @@ for_each_peripheral! {
         }
 
         impl Peripherals {
-            /// Returns all the peripherals *once*
+            /// Returns all the peripherals *once*.
             #[inline]
-            #[cfg_attr(not(feature = "rt"), expect(dead_code))]
+            #[cfg(feature = "rt")]
             pub(crate) fn take() -> Self {
                 #[unsafe(no_mangle)]
                 static mut _ESP_HAL_DEVICE_PERIPHERALS: bool = false;

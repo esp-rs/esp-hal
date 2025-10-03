@@ -63,7 +63,7 @@ jobs:
       - name: Install xtensa toolchain
         uses: esp-rs/xtensa-toolchain@v1.6
         with:
-          version: 1.89.0.0
+          version: 1.90.0.0
 
       - name: Check if baseline generation is needed
         id: check-generation

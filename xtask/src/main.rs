@@ -1,8 +1,14 @@
-use std::{path::Path, time::Instant};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+    time::Instant,
+};
 
 use anyhow::{Context, Result, bail};
 use clap::{Args, Parser};
 use esp_metadata::{Chip, Config};
+use object::{Object, ObjectSymbol, SymbolKind, read::archive::ArchiveFile};
+use rustc_demangle::try_demangle;
 use strum::IntoEnumIterator;
 use xtask::{
     Package,
@@ -45,6 +51,9 @@ enum Cli {
     UpdateMetadata(UpdateMetadataArgs),
     /// Run host-tests in the workspace with `cargo test`
     HostTests(HostTestsArgs),
+    /// Check global symbols in the compiled `.rlib` of the specified packages for the specified
+    /// chips.
+    CheckGlobalSymbols(CheckPackagesArgs),
 }
 
 #[derive(Debug, Args)]
@@ -209,6 +218,7 @@ fn main() -> Result<()> {
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
         Cli::UpdateMetadata(args) => update_metadata(&workspace, args.check),
         Cli::HostTests(args) => host_tests(&workspace, args),
+        Cli::CheckGlobalSymbols(args) => check_global_symbols(&args.chips),
     }
 }
 
@@ -718,4 +728,108 @@ fn host_tests(workspace: &Path, args: HostTestsArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Build the given package for the given chip and return its `.rlib path` with `esp` toolchain.
+fn build_rlib(package: &str, chip: &str, target: &str) -> Result<PathBuf> {
+    let workspace = std::env::current_dir().with_context(|| "Failed to get the current dir!")?;
+    Command::new("cargo")
+        .args(&[
+            "+esp",
+            "build",
+            "--no-default-features",
+            "--features",
+            chip,
+            "--target",
+            target,
+            "-Zbuild-std=core",
+        ])
+        .current_dir(workspace.join(package.to_string()))
+        .status()
+        .context("Failed to run cargo build")?;
+
+    let lib_name = format!("lib{}.rlib", package.replace('-', "_"));
+    let rlib_path = Path::new("target")
+        .join(target)
+        .join("debug")
+        .join(&lib_name);
+
+    if !rlib_path.exists() {
+        anyhow::bail!("Expected rlib not found: {}", rlib_path.display());
+    }
+
+    Ok(rlib_path)
+}
+
+/// Check global symbols in the compiled rlib of the specified packages for the
+/// specified chips. Reports any unmangled global symbols that may pollute the
+/// global namespace.
+fn check_global_symbols(chips: &[Chip]) -> Result<()> {
+    let mut total_problematic = 0;
+
+    let package = Package::EspHal; // Only esp-hal for now
+
+    for chip in chips {
+        let target = package.target_triple(chip)?;
+
+        let rlib_path = match build_rlib(&package.to_string(), &chip.to_string(), &target) {
+            Ok(path) => path,
+            Err(e) => {
+                println!(
+                    "Failed to build/find rlib for {} on {}: {}",
+                    package, chip, e
+                );
+                continue;
+            }
+        };
+
+        log::info!("Checking global symbols for {} on {}:\n", package, chip);
+
+        let data = std::fs::read(&rlib_path)
+            .with_context(|| format!("Failed to read {}!", rlib_path.display()))?;
+        let archive = ArchiveFile::parse(data.as_slice())
+            .with_context(|| format!("Failed to create archive!"))?;
+
+        let mut problematic_symbols: Vec<(String, SymbolKind, usize)> = Vec::new();
+
+        for member in archive.members().flatten() {
+            let obj = object::File::parse(
+                member
+                    .data(data.as_slice())
+                    .with_context(|| "Failed to parse archive!")?,
+            )?;
+
+            for symbol in obj.symbols().filter(|s| s.is_global() && s.is_definition()) {
+                if let Ok(name) = symbol.name() {
+                    if try_demangle(name).is_err() {
+                        let section = symbol.section_index().map(|i| i.0).unwrap_or(0);
+                        problematic_symbols.push((name.to_string(), symbol.kind(), section));
+                    }
+                }
+            }
+        }
+
+        if problematic_symbols.is_empty() {
+            println!("All global symbols are properly mangled Rust symbols\n");
+        } else {
+            println!(
+                "Found {} potentially problematic global symbols:",
+                problematic_symbols.len(),
+            );
+
+            for (name, kind, _) in &problematic_symbols {
+                println!("{:?} {}", kind, name);
+            }
+
+            total_problematic += problematic_symbols.len();
+        }
+    }
+
+    if total_problematic > 0 {
+        Err(anyhow::anyhow!(
+            "Found {total_problematic} unmangled global symbols across all packages/chips"
+        ))
+    } else {
+        Ok(())
+    }
 }
