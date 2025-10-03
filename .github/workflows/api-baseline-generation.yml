@@ -99,11 +99,11 @@ jobs:
           if [ -n "$PR_NUMBER" ]; then
             echo "Found PR number: $PR_NUMBER"
 
-            # Check if the PR had the breaking-change label
+            # Check if the PR had the breaking-change-esp-hal label
             LABELS=$(gh pr view $PR_NUMBER --json labels --jq '.labels[].name' 2>/dev/null || echo "")
             echo "PR labels: $LABELS"
 
-            if echo "$LABELS" | grep -q "breaking-change"; then
+            if echo "$LABELS" | grep -q "breaking-change-esp-hal"; then
               echo "Breaking change detected in PR #$PR_NUMBER"
               echo "should_generate=true" >> $GITHUB_OUTPUT
               echo "trigger_reason=breaking_change" >> $GITHUB_OUTPUT
@@ -131,7 +131,7 @@ jobs:
         if: steps.check-generation.outputs.should_generate == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: api-baselines
+          name: api-baselines-esp-hal
           path: esp-hal/api-baseline/
           retention-days: 90 # Maximum for public repos
 
@@ -140,7 +140,7 @@ jobs:
         shell: bash
         run: |
           echo "Successfully generated and uploaded API baselines"
-          echo "Artifact name: api-baselines"
+          echo "Artifact name: api-baselines-esp-hal"
           echo "Retention: 90 days (expires on $(date -d '+90 days' '+%Y-%m-%d'))"
           echo "Source branch: ${{ github.event.inputs.source_branch || 'main' }}"
           echo "Commit: ${{ github.sha }}"
@@ -169,7 +169,7 @@ jobs:
 
           echo "- **Target Repository**: \`$GITHUB_REPOSITORY\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Source Branch**: \`${{ github.event.inputs.source_branch || 'main' }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Artifact Name**: \`api-baselines\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifact Name**: \`api-baselines-esp-hal\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Retention**: 90 days (expires $(date -d '+90 days' '+%Y-%m-%d'))" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Baseline Files Generated" >> $GITHUB_STEP_SUMMARY
