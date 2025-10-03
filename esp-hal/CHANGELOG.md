@@ -76,8 +76,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `rmt::Channel` and `rmt::ChannelCreator` now carry a lifetime and can be reborrowed. (#4174)
 - RMT transactions and futures are marked as `#[must_use]` and implement `Drop`. (#4174)
 - The behavior of `rmt::PulseCode` constructors (`new`, `new_clamped`, `try_new`) has been reworked to be more convenient and clear. (#4246)
-- RMT: `Channel::transmit_continuously` now takes an additional `LoopStop` argument. (#4174)
-- RMT: `LoopCount::Finite` and `ContinuousTxTransaction::is_tx_loopcount_interrupt_set` are only defined when the hardware supports it (all except ESP32). (#4174)
+- RMT: `Channel::transmit_continuously` now takes an additional `LoopStop` argument. (#4260)
+- RMT: `LoopCount::Finite` and `ContinuousTxTransaction::is_tx_loopcount_interrupt_set` are only defined when the hardware supports it (all except ESP32). (#4260)
 
 ### Fixed
 
@@ -97,7 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TWAI: Fixed receive_async erroneously returning RX FIFO overrun errors (#4244)
 - Subtracting Instant values with large difference no longer panics (#4249)
 - ADC: Fixed integer overflow in curve calibration polynomial evaluation (#4240)
-- RMT: `Channel::transmit_continuously` also triggers the loopcount interrupt when only using a single repetition. (#4174)
+- RMT: `Channel::transmit_continuously` also triggers the loopcount interrupt when only using a single repetition. (#4260)
 
 ### Removed
 
