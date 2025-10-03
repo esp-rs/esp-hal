@@ -12,6 +12,7 @@ use crate::{
         esp_bt_mode_t_ESP_BT_MODE_CLASSIC_BT,
         esp_bt_mode_t_ESP_BT_MODE_IDLE,
     },
+    ble::InvalidConfigError,
     common_adapter::*,
     hal::{interrupt, peripherals::Interrupt},
 };
@@ -285,6 +286,9 @@ pub struct Config {
 
     /// The stack size of the RTOS task.
     task_stack_size: u16,
+
+    /// The maximum number of simultaneous connections.
+    max_connections: u8,
 }
 
 impl Default for Config {
@@ -293,7 +297,16 @@ impl Default for Config {
             // same priority as the wifi task, when using esp-rtos (I'm assuming it's MAX_PRIO - 2)
             task_priority: 29,
             task_stack_size: 4096,
+            max_connections: CONFIG_BTDM_CTRL_BLE_MAX_CONN_EFF as _,
         }
+    }
+}
+
+impl Config {
+    pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
+        crate::ble::validate_range!(self, max_connections, 1, 9);
+
+        Ok(())
     }
 }
 
@@ -312,7 +325,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         send_adv_reserved_size: 1000,
         controller_debug_flag: 0,
         mode: 0x01, // BLE
-        ble_max_conn: 3,
+        ble_max_conn: config.max_connections,
         bt_max_acl_conn: 0,
         bt_sco_datapath: 0,
         auto_latency: false,

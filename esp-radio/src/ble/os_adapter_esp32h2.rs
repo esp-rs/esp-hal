@@ -3,6 +3,7 @@ use procmacros::BuilderLite;
 use super::*;
 use crate::{
     binary::include::esp_bt_controller_config_t,
+    ble::InvalidConfigError,
     hal::{
         clock::ModemClockController,
         interrupt,
@@ -25,6 +26,9 @@ pub struct Config {
 
     /// The stack size of the RTOS task.
     task_stack_size: u16,
+
+    /// The maximum number of simultaneous connections.
+    max_connections: u8,
 }
 
 impl Default for Config {
@@ -33,7 +37,15 @@ impl Default for Config {
             // same priority as the wifi task, when using esp-rtos (I'm assuming it's MAX_PRIO - 2)
             task_priority: 29,
             task_stack_size: CONFIG_BT_LE_CONTROLLER_TASK_STACK_SIZE as _,
+            max_connections: CONFIG_BT_LE_MAX_CONNECTIONS as _,
         }
+    }
+}
+
+impl Config {
+    pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
+        crate::ble::validate_range!(self, max_connections, 1, 35);
+        Ok(())
     }
 }
 
@@ -61,7 +73,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_scan_rsp_data_max_len: 31,
         ble_ll_cfg_num_hci_cmd_pkts: 1,
         ble_ll_ctrl_proc_timeout_ms: 40000,
-        nimble_max_connections: 2,
+        nimble_max_connections: config.max_connections,
         ble_whitelist_size: 12,
         ble_acl_buf_size: 255,
         ble_acl_buf_count: 24,

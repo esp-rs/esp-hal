@@ -4,6 +4,7 @@ use super::*;
 #[cfg(multi_core)]
 use crate::hal::system::Cpu;
 use crate::{
+    ble::InvalidConfigError,
     common_adapter::*,
     hal::{interrupt, peripherals::Interrupt},
 };
@@ -307,6 +308,12 @@ impl Default for Config {
             #[cfg(multi_core)]
             task_cpu: Cpu::ProCpu,
         }
+    }
+}
+
+impl Config {
+    pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
+        Ok(())
     }
 }
 
