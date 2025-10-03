@@ -341,6 +341,18 @@ impl SchedulerState {
         let arm_next_timeslice_tick = priority
             .map(|p| !self.run_queue.is_level_empty(p))
             .unwrap_or(false);
+
+        #[cfg(multi_core)]
+        let arm_next_timeslice_tick = if arm_next_timeslice_tick {
+            true
+        } else {
+            self.per_cpu[1 - current_cpu]
+                .current_task
+                .map(|task| task.priority(&mut self.run_queue))
+                .map(|p| !self.run_queue.is_level_empty(p))
+                .unwrap_or(false)
+        };
+
         let time_driver = unwrap!(self.time_driver.as_mut());
         time_driver.arm_next_wakeup(arm_next_timeslice_tick);
     }
