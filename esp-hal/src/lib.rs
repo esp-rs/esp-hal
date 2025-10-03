@@ -546,6 +546,14 @@ pub use private::Internal;
 #[instability::unstable]
 pub unsafe trait Persistable: Sized {}
 
+/// Marker trait for types that can be safely used in `#[ram(reclaimed)]`.
+///
+/// # Safety
+///
+/// - The type must be some form of `MaybeUninit<T>`
+#[instability::unstable]
+pub unsafe trait Uninit: Sized {}
+
 macro_rules! impl_persistable {
     ($($t:ty),+) => {$(
         unsafe impl Persistable for $t {}
@@ -562,6 +570,9 @@ impl_persistable!(atomic AtomicU8, AtomicI8, AtomicU16, AtomicI16, AtomicU32, At
 
 unsafe impl<T: Persistable, const N: usize> Persistable for [T; N] {}
 
+unsafe impl<T> Uninit for core::mem::MaybeUninit<T> {}
+unsafe impl<T, const N: usize> Uninit for [core::mem::MaybeUninit<T>; N] {}
+
 #[doc(hidden)]
 pub mod __macro_implementation {
     //! Private implementation details of esp-hal-procmacros.
@@ -571,6 +582,9 @@ pub mod __macro_implementation {
 
     #[instability::unstable]
     pub const fn assert_is_persistable<T: super::Persistable>() {}
+
+    #[instability::unstable]
+    pub const fn assert_is_uninit<T: super::Uninit>() {}
 
     #[cfg(feature = "rt")]
     #[cfg(riscv)]

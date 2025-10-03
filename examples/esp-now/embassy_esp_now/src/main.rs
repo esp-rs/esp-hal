@@ -1,8 +1,6 @@
 //! Embassy ESP-NOW Example
 //!
 //! Broadcasts, receives and sends messages via esp-now in an async way
-//!
-//! Because of the huge task-arena size configured this won't work on ESP32-S2
 
 #![no_std]
 #![no_main]

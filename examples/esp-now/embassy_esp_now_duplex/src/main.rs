@@ -2,8 +2,6 @@
 //!
 //! Asynchronously broadcasts, receives and sends messages via esp-now in
 //! multiple embassy tasks
-//!
-//! Because of the huge task-arena size configured this won't work on ESP32-S2
 
 #![no_std]
 #![no_main]

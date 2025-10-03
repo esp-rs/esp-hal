@@ -21,6 +21,7 @@ use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::{
     clock::CpuClock,
     main,
+    ram,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
@@ -43,7 +44,7 @@ fn main() -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
     esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);

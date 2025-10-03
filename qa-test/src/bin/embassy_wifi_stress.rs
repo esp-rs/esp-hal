@@ -20,6 +20,7 @@ use esp_hal::{
     Config as EspConfig,
     clock::CpuClock,
     init as initialize_esp_hal,
+    ram,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -36,7 +37,7 @@ async fn main(_spawner: Spawner) {
     let mut peripherals = initialize_esp_hal(EspConfig::default().with_cpu_clock(CpuClock::max()));
 
     esp_alloc::heap_allocator!(size: 32 * 1024);
-    esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
 
     #[cfg(target_arch = "riscv32")]
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);

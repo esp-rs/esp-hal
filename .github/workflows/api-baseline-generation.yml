@@ -1,0 +1,194 @@
+name: API Baseline Generation
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: "Branch to generate baseline from"
+        required: true
+        default: "main"
+        type: string
+      target_repository:
+        description: "Target repository for baseline storage (owner/repo)"
+        required: false
+        default: ""
+        type: string
+      force_regeneration:
+        description: "Force baseline regeneration even without breaking change"
+        required: false
+        default: false
+        type: boolean
+
+env:
+  CARGO_TERM_COLOR: always
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GITHUB_REPOSITORY: ${{ github.repository }}
+
+jobs:
+  manage-baselines:
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.source_branch || 'main' }}
+          fetch-depth: 10
+
+      - name: Set target repository
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.target_repository }}" ]; then
+            TARGET_REPO="${{ github.event.inputs.target_repository }}"
+            echo "Using custom target repository: $TARGET_REPO"
+          else
+            TARGET_REPO="${{ github.repository }}"
+            echo "Using current repository: $TARGET_REPO"
+          fi
+          echo "GITHUB_REPOSITORY=$TARGET_REPO" >> $GITHUB_ENV
+          echo "📦 Target repository for baselines: $TARGET_REPO"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rust-src
+
+      - name: Install xtensa toolchain
+        uses: esp-rs/xtensa-toolchain@v1.6
+        with:
+          version: 1.89.0.0
+
+      - name: Check if baseline generation is needed
+        id: check-generation
+        shell: bash
+        run: |
+          # Always generate for manual dispatch
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ github.event.inputs.force_regeneration }}" = "true" ]; then
+              echo "Manual baseline regeneration requested (force_regeneration=true)"
+              echo "should_generate=true" >> $GITHUB_OUTPUT
+              echo "trigger_reason=manual_force" >> $GITHUB_OUTPUT
+            else
+              echo "Manual baseline generation requested"
+              echo "should_generate=true" >> $GITHUB_OUTPUT
+              echo "trigger_reason=manual" >> $GITHUB_OUTPUT
+            fi
+            exit 0
+          fi
+
+          # For push events, check for breaking changes
+          echo "Checking for breaking change in merged PR..."
+
+          # Get the commit message of the last commit
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Last commit message: $COMMIT_MSG"
+
+          # Extract PR number from commit message if it follows conventional format
+          PR_NUMBER=""
+          if echo "$COMMIT_MSG" | grep -q "#"; then
+            PR_NUMBER=$(echo "$COMMIT_MSG" | grep -o "#[0-9]*" | grep -o "[0-9]*")
+          fi
+
+          if [ -n "$PR_NUMBER" ]; then
+            echo "Found PR number: $PR_NUMBER"
+
+            # Check if the PR had the breaking-change label
+            LABELS=$(gh pr view $PR_NUMBER --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+            echo "PR labels: $LABELS"
+
+            if echo "$LABELS" | grep -q "breaking-change"; then
+              echo "Breaking change detected in PR #$PR_NUMBER"
+              echo "should_generate=true" >> $GITHUB_OUTPUT
+              echo "trigger_reason=breaking_change" >> $GITHUB_OUTPUT
+            else
+              echo "No breaking change label found in PR #$PR_NUMBER"
+              echo "should_generate=false" >> $GITHUB_OUTPUT
+              echo "trigger_reason=none" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "No PR number found in commit message"
+            echo "should_generate=false" >> $GITHUB_OUTPUT
+            echo "trigger_reason=none" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate API baselines
+        if: steps.check-generation.outputs.should_generate == 'true'
+        shell: bash
+        run: |
+          echo "Starting API baseline generation..."
+          echo "Trigger reason: ${{ steps.check-generation.outputs.trigger_reason }}"
+          cargo xcheck semver-check generate-baseline
+          echo "API baseline generation completed"
+
+      - name: Upload API baselines as artifact
+        if: steps.check-generation.outputs.should_generate == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-baselines
+          path: esp-hal/api-baseline/
+          retention-days: 90 # Maximum for public repos
+
+      - name: Create baseline summary
+        if: steps.check-generation.outputs.should_generate == 'true'
+        shell: bash
+        run: |
+          echo "Successfully generated and uploaded API baselines"
+          echo "Artifact name: api-baselines"
+          echo "Retention: 90 days (expires on $(date -d '+90 days' '+%Y-%m-%d'))"
+          echo "Source branch: ${{ github.event.inputs.source_branch || 'main' }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Target repository: $GITHUB_REPOSITORY"
+
+          # Create appropriate summary based on trigger reason
+          if [ "${{ steps.check-generation.outputs.trigger_reason }}" = "breaking_change" ]; then
+            echo "## Breaking Change Baseline Regeneration" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "This API baseline regeneration was automatically triggered due to a breaking change in the merged PR." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.check-generation.outputs.trigger_reason }}" = "manual_force" ]; then
+            echo "## Manual Baseline Regeneration (Forced)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "This API baseline regeneration was manually triggered with force regeneration enabled." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.check-generation.outputs.trigger_reason }}" = "manual" ]; then
+            echo "## Manual Baseline Generation" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "This API baseline generation was manually triggered." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## Baseline Generation Summary" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "- **Target Repository**: \`$GITHUB_REPOSITORY\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source Branch**: \`${{ github.event.inputs.source_branch || 'main' }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifact Name**: \`api-baselines\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Retention**: 90 days (expires $(date -d '+90 days' '+%Y-%m-%d'))" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Baseline Files Generated" >> $GITHUB_STEP_SUMMARY
+          echo "| Chip | File Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-----------|" >> $GITHUB_STEP_SUMMARY
+
+          cd esp-hal/api-baseline
+          for file in *.json.gz; do
+              if [ -f "$file" ]; then
+                  chip=$(basename "$file" .json.gz)
+                  size=$(du -h "$file" | cut -f1)
+                  echo "| $chip | $size |" >> $GITHUB_STEP_SUMMARY
+              fi
+          done
+
+      - name: Create no-action summary
+        if: steps.check-generation.outputs.should_generate == 'false'
+        shell: bash
+        run: |
+          echo "## No Baseline Generation Needed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "No breaking change detected in the merged PR. API baselines will not be regenerated." >> $GITHUB_STEP_SUMMARY

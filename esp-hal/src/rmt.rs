@@ -258,6 +258,28 @@ pub enum Error {
     MemoryBlockNotAvailable,
 }
 
+impl core::error::Error for Error {}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Error::UnreachableTargetFrequency => {
+                write!(f, "The desired frequency is impossible to reach")
+            }
+            Error::Overflow => write!(f, "The amount of pulses exceeds the size of the FIFO"),
+            Error::InvalidArgument => write!(f, "An argument is invalid"),
+            Error::TransmissionError => write!(f, "An error occurred during transmission"),
+            Error::EndMarkerMissing => write!(f, "No transmission end marker found"),
+            Error::InvalidMemsize => write!(f, "Memsize is not correct,"),
+            Error::InvalidDataLength => write!(f, "The data length is invalid"),
+            Error::ReceiverError => write!(f, "Receiver error most likely RMT memory overflow"),
+            Error::MemoryBlockNotAvailable => {
+                write!(f, "Memory block is not available for channel")
+            }
+        }
+    }
+}
+
 /// Convenience newtype to work with pulse codes.
 ///
 /// A [`PulseCode`] is represented as `u32`, with fields laid out as follows:
@@ -290,33 +312,70 @@ const LEVEL1_MASK: u32 = 1 << LEVEL1_SHIFT;
 const LEVEL2_MASK: u32 = 1 << LEVEL2_SHIFT;
 
 impl PulseCode {
+    /// Maximum value for the `length1` and `length2` fields.
+    pub const MAX_LEN: u16 = 0x7FFF;
+
+    /// Create a new instance.
+    ///
+    /// Panics if `length1` or `length2` exceed the maximum representable range.
+    #[inline]
+    pub const fn new(level1: Level, length1: u16, level2: Level, length2: u16) -> Self {
+        if length1 > Self::MAX_LEN || length2 > Self::MAX_LEN {
+            // defmt::panic! fails const eval
+            core::panic!("PulseCode length out of range");
+        };
+
+        // SAFETY:
+        // - We just checked that length1 and length2 are in range
+        unsafe { Self::new_unchecked(level1, length1, level2, length2) }
+    }
+
     /// Create a new instance.
     ///
     /// If `length1` or `length2` exceed the maximum representable range, they
-    /// will be clamped to `0x7FFF`.
+    /// will be clamped to `Self::MAX_LEN`.
     #[inline]
-    pub const fn new(level1: Level, length1: u16, level2: Level, length2: u16) -> Self {
-        // Can't use lengthX.min(0x7FFF) since it is not const
-        let length1 = if length1 >= 0x8000 { 0x7FFF } else { length1 };
-        let length2 = if length2 >= 0x8000 { 0x7FFF } else { length2 };
+    pub const fn new_clamped(level1: Level, length1: u16, level2: Level, length2: u16) -> Self {
+        // Can't use lengthX.min(Self::MAX_LEN) since it is not const
+        let length1 = if length1 > Self::MAX_LEN {
+            Self::MAX_LEN
+        } else {
+            length1
+        };
+        let length2 = if length2 > Self::MAX_LEN {
+            Self::MAX_LEN
+        } else {
+            length2
+        };
 
         // SAFETY:
         // - We just clamped length1 and length2 to the required intervals
         unsafe { Self::new_unchecked(level1, length1, level2, length2) }
     }
 
-    /// Create a new instance.
+    /// Create a new instance, attempting to convert lengths to `u16` first.
     ///
-    /// If `length1` or `length2` exceed the maximum representable range, this
-    /// will return `None`.
+    /// This is slightly more convenient when passing in longer integers (e.g. `u32`) resulting from
+    /// a preceding calculation.
+    ///
+    /// If `length1` or `length2` fail to convert to `u16` or exceed the maximum representable
+    /// range, this will return `None`.
     #[inline]
-    pub const fn try_new(level1: Level, length1: u16, level2: Level, length2: u16) -> Option<Self> {
-        if length1 >= 0x8000 || length2 >= 0x8000 {
+    pub fn try_new(
+        level1: Level,
+        length1: impl TryInto<u16>,
+        level2: Level,
+        length2: impl TryInto<u16>,
+    ) -> Option<Self> {
+        let (Ok(length1), Ok(length2)) = (length1.try_into(), length2.try_into()) else {
+            return None;
+        };
+        if length1 > Self::MAX_LEN || length2 >= Self::MAX_LEN {
             return None;
         }
 
         // SAFETY:
-        // - We just checked that length1 and length2 have their MSB cleared.
+        // - We just checked that length1 and length2 are in range
         Some(unsafe { Self::new_unchecked(level1, length1, level2, length2) })
     }
 
@@ -408,7 +467,7 @@ impl PulseCode {
     /// Returns `None` if `length` exceeds the representable range.
     #[inline]
     pub const fn with_length1(mut self, length: u16) -> Option<Self> {
-        if length >= 0x8000 {
+        if length > Self::MAX_LEN {
             return None;
         }
 
@@ -422,7 +481,7 @@ impl PulseCode {
     /// Returns `None` if `length` exceeds the representable range.
     #[inline]
     pub const fn with_length2(mut self, length: u16) -> Option<Self> {
-        if length >= 0x8000 {
+        if length > Self::MAX_LEN {
             return None;
         }
 
