@@ -83,9 +83,6 @@ symbols = [
     "pm_support_bt_wakeup",
     "uart_support_wakeup_int",
     "gpio_support_deepsleep_wakeup",
-
-    # Which bluetooth implementation
-    "btdm",
 ]
 
 memory = [{ name = "dram", start = 0x3FC8_0000, end = 0x3FCE_0000 }]
@@ -375,7 +372,11 @@ apb_cycle_wait_num = 16 # TODO
 
 ## Radio
 [device.wifi]
+
 [device.bt]
+support_status = "partial"
+controller = "btdm"
+
 [device.phy]
 combo_module = true
 backed_up_digital_register_count = 21

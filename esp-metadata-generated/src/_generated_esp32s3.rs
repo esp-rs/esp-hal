@@ -261,6 +261,9 @@ macro_rules! property {
     ("wifi.has_wifi6") => {
         false
     };
+    ("bt.controller") => {
+        "btdm"
+    };
     ("phy.combo_module") => {
         true
     };

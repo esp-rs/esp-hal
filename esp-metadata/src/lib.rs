@@ -410,6 +410,7 @@ impl Config {
                         let mut syms = match value {
                             Value::Boolean(true) => Some(vec![name.to_string()]),
                             Value::NumberList(_) => None,
+                            Value::String(value) => Some(vec![format!("{name}=\"{value}\"")]),
                             Value::Generic(v) => v.cfgs(),
                             Value::StringList(values) => Some(
                                 values
@@ -497,6 +498,9 @@ impl Config {
                         }
                     }
                     Value::Boolean(value) => quote! {
+                        (#name) => { #value };
+                    },
+                    Value::String(value) => quote! {
                         (#name) => { #value };
                     },
                     Value::NumberList(numbers) => {

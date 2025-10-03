@@ -125,9 +125,6 @@ symbols = [
     "gpio_support_deepsleep_wakeup",
     "uart_support_wakeup_int",
     "pm_support_ext1_wakeup",
-
-    # Which bluetooth implementation
-    "npl",
 ]
 
 memory = [{ name = "dram", start = 0x4080_0000, end = 0x4088_0000 }]
@@ -513,10 +510,6 @@ ram_size = 32
 [device.ds]
 support_status = "not_supported"
 
-[device.wifi]
-support_status = "partial"
-has_wifi6 = true
-
 [device.rng]
 support_status = "partial"
 apb_cycle_wait_num = 16 # TODO
@@ -547,7 +540,15 @@ apb_cycle_wait_num = 16 # TODO
 [device.ulp_riscv]
 
 ## Radio
+[device.wifi]
+support_status = "partial"
+has_wifi6 = true
+
 [device.bt]
+support_status = "partial"
+controller = "npl"
+
 [device.ieee802154]
+
 [device.phy]
 combo_module = true
