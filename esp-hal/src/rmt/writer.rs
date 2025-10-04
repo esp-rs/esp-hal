@@ -1,3 +1,6 @@
+#[cfg(place_rmt_driver_in_ram)]
+use procmacros::ram;
+
 use super::{DynChannelAccess, Error, PulseCode, Tx};
 
 #[derive(PartialEq)]
