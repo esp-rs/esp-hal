@@ -1339,6 +1339,7 @@ where
 #[must_use = "transactions will be aborted when dropped"]
 pub struct ContinuousTxTransaction<'ch> {
     channel: Channel<'ch, Blocking, Tx>,
+    is_running: bool,
 }
 
 impl<'ch> ContinuousTxTransaction<'ch> {
@@ -1365,26 +1366,30 @@ impl<'ch> ContinuousTxTransaction<'ch> {
     ) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
         let raw = self.channel.raw;
 
-        // If rmt_has_tx_loop_auto_stop and the engine is stopped already, this is not necesary.
-        // However, explicitly stopping unconditionally makes the logic here much simpler and
-        // shouldn't create much overhead.
-        raw.set_tx_continuous(false);
-        let needs_wait = if immediate { !raw.stop_tx() } else { true };
-        raw.update();
-
         let mut result = Ok(());
-        if needs_wait {
-            loop {
-                match raw.get_tx_status() {
-                    Some(Event::Error) => {
-                        result = Err(Error::TransmissionError);
-                        break;
+        if self.is_running {
+            // If rmt_has_tx_loop_auto_stop and the engine is stopped already, this is not
+            // necessary. However, explicitly stopping unconditionally makes the logic
+            // here much simpler and shouldn't create much overhead.
+            raw.set_tx_continuous(false);
+            let needs_wait = if immediate { !raw.stop_tx() } else { true };
+            raw.update();
+
+            if needs_wait {
+                loop {
+                    match raw.get_tx_status() {
+                        Some(Event::Error) => {
+                            result = Err(Error::TransmissionError);
+                            break;
+                        }
+                        Some(Event::End) => break,
+                        Some(Event::LoopCount) if cfg!(rmt_has_tx_loop_auto_stop) => break,
+                        _ => continue,
                     }
-                    Some(Event::End) => break,
-                    Some(Event::LoopCount) if cfg!(rmt_has_tx_loop_auto_stop) => break,
-                    _ => continue,
                 }
             }
+
+            raw.clear_tx_interrupts();
         }
 
         // Disable Drop handler since the transaction is stopped already.
@@ -1394,8 +1399,6 @@ impl<'ch> ContinuousTxTransaction<'ch> {
         // This is safe since we own `this`, and don't access it below.
         let channel = unsafe { core::ptr::read(&this.channel) };
 
-        raw.clear_tx_interrupts();
-
         match result {
             Ok(()) => Ok(channel),
             Err(err) => Err((err, channel)),
@@ -1404,11 +1407,11 @@ impl<'ch> ContinuousTxTransaction<'ch> {
 
     /// Check if the `loopcount` interrupt bit is set.
     ///
-    /// Whether this implies that the transmission has stopped depends on the [`LoopStop`] value
+    /// Whether this implies that the transmission has stopped depends on the [`LoopMode`] value
     /// provided when starting it.
     #[cfg(rmt_has_tx_loop_count)]
     pub fn is_loopcount_interrupt_set(&self) -> bool {
-        self.channel.raw.is_tx_loopcount_interrupt_set()
+        !self.is_running || self.channel.raw.is_tx_loopcount_interrupt_set()
     }
 }
 
@@ -1416,7 +1419,7 @@ impl<'ch> Drop for ContinuousTxTransaction<'ch> {
     fn drop(&mut self) {
         let raw = self.channel.raw;
 
-        if !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {
+        if self.is_running && !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {
             let immediate = raw.stop_tx();
             raw.update();
 
@@ -1490,54 +1493,41 @@ where
     }
 }
 
-/// Loopcount for continuous transmission
+/// Loop mode for continuous transmission
+///
+/// Depending on hardware support, automatic stopping of the transmission upon reaching a
+/// specified loop count may not be available.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum LoopCount {
+pub enum LoopMode {
     /// Repeat until explicitly stopped.
     Infinite,
 
     // FIXME: Does continuous tx trigger the End interrupt on each repetition such that it could
     // be used to emulate the LoopCount interrupt on devices that lack it?
-    /// Repeat the given number of times.
+    /// Repeat until explicitly stopped, and assert the loop count interrupt upon completing the
+    /// given number of iterations.
     #[cfg(rmt_has_tx_loop_count)]
-    Finite(core::num::NonZeroU16),
+    InfiniteWithInterrupt(u16),
+
+    /// Repeat for the given number of iterations, and also set the loop count interrupt flag upon
+    /// completion. If the iteration count is 0, the transaction will complete immediately without
+    /// starting the transmitter.
+    #[cfg(rmt_has_tx_loop_auto_stop)]
+    Finite(u16),
 }
 
-impl LoopCount {
-    // Get value to write to hardware (should compile to a no-op)
-    #[allow(dead_code)]
-    fn get(self) -> u16 {
+impl LoopMode {
+    #[allow(unused)]
+    fn get_count(self) -> u16 {
         match self {
+            Self::Infinite => 0,
             #[cfg(rmt_has_tx_loop_count)]
-            LoopCount::Finite(repeats) => repeats.get(),
-            LoopCount::Infinite => 0,
+            Self::InfiniteWithInterrupt(count) => count,
+            #[cfg(rmt_has_tx_loop_auto_stop)]
+            Self::Finite(count) => count,
         }
     }
-}
-
-// LoopCount::Infinite should be represented as 0u16, which corresponds to the value that needs to
-// be written to the tx_lim register.
-#[cfg(rmt_has_tx_loop_count)]
-const _: () = if core::mem::size_of::<LoopCount>() != 2 {
-    // This must not be defmt::panic!, which doesn't work in const context.
-    core::panic!("Niche optimization unexpectedly not working!");
-};
-
-/// Stopping behavior for continuous transmission.
-///
-/// Depending on hardware support, automatic stopping of the transmission upon reaching the
-/// specified loop count may not be available.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum LoopStop {
-    /// Continue loop transmission even after the desired loop count has been reached and only stop
-    /// when manually requested.
-    Manual = 0,
-
-    #[cfg(rmt_has_tx_loop_auto_stop)]
-    /// Stop loop transmission immediately once the desired loop count is reached.
-    Auto   = 1,
 }
 
 /// Channel in TX mode
@@ -1588,8 +1578,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
     pub fn transmit_continuously<T>(
         self,
         mut data: &[T],
-        loopcount: LoopCount,
-        loopstop: LoopStop,
+        mode: LoopMode,
     ) -> Result<ContinuousTxTransaction<'ch>, Error>
     where
         T: Into<PulseCode> + Copy,
@@ -1605,12 +1594,27 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
             return Err(Error::Overflow);
         }
 
-        let mut writer = RmtWriter::new();
-        writer.write(&mut data, raw, true);
+        // We need a separate flag to track whether we actually started the transmitter: The
+        // ContinuousTxTransaction looks at the interrupt status to determine this (and would lock
+        // up if it's not running, and will never set them), but unfortunately, it is not possible
+        // (according to the TRM) to manually set the raw interrupt flags here, e.g. do something
+        // like `raw.set_tx_status(Event::End, Event::LoopCount)`.
+        #[cfg(rmt_has_tx_loop_auto_stop)]
+        let is_running = mode != LoopMode::Finite(0);
+        #[cfg(not(rmt_has_tx_loop_auto_stop))]
+        let is_running = true;
 
-        self.raw.start_send(Some((loopcount, loopstop)), memsize);
+        if is_running {
+            let mut writer = RmtWriter::new();
+            writer.write(&mut data, raw, true);
 
-        Ok(ContinuousTxTransaction { channel: self })
+            raw.start_send(Some(mode), memsize);
+        }
+
+        Ok(ContinuousTxTransaction {
+            channel: self,
+            is_running,
+        })
     }
 }
 
@@ -1967,13 +1971,13 @@ impl DynChannelAccess<Tx> {
     // call sites, and passing it as argument avoids a volatile read that the compiler wouldn't be
     // able to deduplicate.
     #[inline]
-    fn start_send(&self, loop_params: Option<(LoopCount, LoopStop)>, memsize: MemSize) {
+    fn start_send(&self, loopmode: Option<LoopMode>, memsize: MemSize) {
         self.clear_tx_interrupts();
         self.set_tx_threshold((memsize.codes() / 2) as u8);
-        self.set_tx_continuous(loop_params.is_some());
+        self.set_tx_continuous(loopmode.is_some());
         #[cfg(rmt_has_tx_loop_count)]
-        self.set_generate_repeat_interrupt(loop_params);
-        self.set_tx_wrap_mode(loop_params.is_none());
+        self.set_generate_repeat_interrupt(loopmode);
+        self.set_tx_wrap_mode(loopmode.is_none());
         self.update();
         self.start_tx();
         self.update();
@@ -2082,8 +2086,7 @@ mod chip_specific {
         Error,
         Event,
         Level,
-        LoopCount,
-        LoopStop,
+        LoopMode,
         MemSize,
         Rx,
         Tx,
@@ -2229,19 +2232,18 @@ mod chip_specific {
 
     impl DynChannelAccess<Tx> {
         #[inline]
-        pub fn set_generate_repeat_interrupt(&self, loop_params: Option<(LoopCount, LoopStop)>) {
+        pub fn set_generate_repeat_interrupt(&self, mode: Option<LoopMode>) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            if let Some((loopcount, _loopstop)) = loop_params {
+            if let Some(mode) = mode {
                 rmt.ch_tx_lim(ch_idx).modify(|_, w| unsafe {
                     w.loop_count_reset().set_bit();
-                    w.tx_loop_cnt_en()
-                        .bit(matches!(loopcount, LoopCount::Finite(_)));
-                    w.tx_loop_num().bits(loopcount.get());
+                    w.tx_loop_cnt_en().bit(!matches!(mode, LoopMode::Infinite));
+                    w.tx_loop_num().bits(mode.get_count());
 
                     #[cfg(rmt_has_tx_loop_auto_stop)]
-                    w.loop_stop_en().bit(_loopstop == LoopStop::Auto);
+                    w.loop_stop_en().bit(matches!(mode, LoopMode::Finite(_)));
 
                     w
                 });
@@ -2623,19 +2625,16 @@ mod chip_specific {
     impl DynChannelAccess<Tx> {
         #[cfg(rmt_has_tx_loop_count)]
         #[inline]
-        pub fn set_generate_repeat_interrupt(
-            &self,
-            loop_params: Option<(super::LoopCount, super::LoopStop)>,
-        ) {
+        pub fn set_generate_repeat_interrupt(&self, mode: Option<super::LoopMode>) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            if let Some((loopcount, _loopstop)) = loop_params {
+            if let Some(mode) = mode {
                 rmt.ch_tx_lim(ch_idx).modify(|_, w| unsafe {
                     w.loop_count_reset().set_bit();
                     w.tx_loop_cnt_en()
-                        .bit(matches!(loopcount, super::LoopCount::Finite(_)));
-                    w.tx_loop_num().bits(loopcount.get())
+                        .bit(!matches!(mode, super::LoopMode::Infinite));
+                    w.tx_loop_num().bits(mode.get_count())
                 });
 
                 // FIXME: Is this required?

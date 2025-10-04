@@ -752,8 +752,8 @@ mod tests {
     }
 
     #[cfg(not(esp32))]
-    fn rmt_loopback_continuous_tx_impl(mut ctx: Context, loopstop: esp_hal::rmt::LoopStop) {
-        use esp_hal::rmt::{LoopCount, LoopStop};
+    fn rmt_loopback_continuous_tx_impl(mut ctx: Context, use_autostop: bool) {
+        use esp_hal::rmt::LoopMode;
 
         const TX_COUNT: usize = 10;
         const MAX_LOOP_COUNT: usize = 3;
@@ -773,37 +773,39 @@ mod tests {
         let mut expected_data: [PulseCode; MAX_RX_LEN] = [Default::default(); MAX_RX_LEN];
 
         for loopcount in 1..MAX_LOOP_COUNT {
+            #[allow(unused_mut)]
+            let mut loopmode = LoopMode::InfiniteWithInterrupt(loopcount as u16);
+            #[cfg(any(esp32c6, esp32h2, esp32s3))]
+            if use_autostop {
+                loopmode = LoopMode::Finite(loopcount as u16);
+            };
             rx_data.fill(PulseCode::default());
             let rx_transaction = rx_channel.reborrow().receive(&mut rx_data).unwrap();
             let tx_transaction = tx_channel
                 .reborrow()
-                .transmit_continuously(
-                    &tx_data,
-                    LoopCount::Finite((loopcount as u16).try_into().unwrap()),
-                    loopstop,
-                )
+                .transmit_continuously(&tx_data, loopmode)
                 .unwrap();
 
             // All data is small enough to fit a single hardware buffer, so we don't need to poll
             // rx/tx concurrently.
             while !tx_transaction.is_loopcount_interrupt_set() {}
 
-            if loopstop == LoopStop::Manual {
-                tx_transaction.stop_next().unwrap();
-                rx_transaction.wait().unwrap();
-            } else {
+            if use_autostop {
                 // tx should stop automatically, so rx should also stop before we explicitly stop
                 // tx
                 rx_transaction.wait().unwrap();
                 tx_transaction.stop_next().unwrap();
+            } else {
+                tx_transaction.stop_next().unwrap();
+                rx_transaction.wait().unwrap();
             }
 
             // FIXME: Somehow verify that tx is really stopped!
 
-            let rx_loopcount = if loopstop == LoopStop::Manual {
-                loopcount + 1
-            } else {
+            let rx_loopcount = if use_autostop {
                 loopcount
+            } else {
+                loopcount + 1
             };
             expected_data.fill(PulseCode::default());
             for i in 0..rx_loopcount {
@@ -825,7 +827,7 @@ mod tests {
     #[cfg(not(esp32))]
     #[test]
     fn rmt_loopback_continuous_tx_manual_stop(ctx: Context) {
-        rmt_loopback_continuous_tx_impl(ctx, esp_hal::rmt::LoopStop::Manual);
+        rmt_loopback_continuous_tx_impl(ctx, false);
     }
 
     // Test that continuous tx with a finite loopcount works as expected when using automatic
@@ -833,6 +835,39 @@ mod tests {
     #[cfg(any(esp32c6, esp32h2, esp32s3))]
     #[test]
     fn rmt_loopback_continuous_tx_auto_stop(ctx: Context) {
-        rmt_loopback_continuous_tx_impl(ctx, esp_hal::rmt::LoopStop::Auto);
+        rmt_loopback_continuous_tx_impl(ctx, true);
+    }
+
+    // Test that using loopcount 0 doesn't hang, but returns success immediately.
+    #[cfg(any(esp32c6, esp32h2, esp32s3))]
+    #[test]
+    fn rmt_continuous_tx_zero_loopcount(mut ctx: Context) {
+        use esp_hal::{rmt::LoopMode, time::Instant};
+
+        let tx_config = TxChannelConfig::default()
+            .with_idle_output(true)
+            .with_idle_output_level(Level::Low);
+
+        let (mut tx_channel, _) = ctx.setup_loopback(tx_config, RxChannelConfig::default());
+
+        let tx_data: [_; 10] = generate_tx_data(false, true);
+
+        let start = Instant::now();
+
+        let tx_transaction = tx_channel
+            .reborrow()
+            .transmit_continuously(&tx_data, LoopMode::Finite(0))
+            .unwrap();
+
+        while !tx_transaction.is_loopcount_interrupt_set() {}
+
+        tx_transaction.stop_next().unwrap();
+
+        // overall, this should complete in less time than sending a single code from `tx_data`
+        // would take (see above, the codes are several 100us in length)
+        assert!(
+            start.elapsed().as_micros() < 100,
+            "tx with loopcount 0 did not complete immediately"
+        );
     }
 }
