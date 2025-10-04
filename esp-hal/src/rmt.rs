@@ -3073,6 +3073,11 @@ mod chip_specific {
             // ensure that an `Error` condition occurs and in any case, we never block here for
             // long.
             if force {
+                if !rmt.chconf1(self.ch_idx as usize).read().rx_en().bit() {
+                    // Don't lock up trying to stop rx when we didn't start in the first place
+                    return;
+                }
+
                 let (old_idle_thres, old_div) =
                     rmt.chconf0(self.ch_idx as usize).from_modify(|r, w| {
                         let old = (r.idle_thres().bits(), r.div_cnt().bits());
