@@ -2076,6 +2076,22 @@ for_each_rmt_clock_source!(
     };
 );
 
+// Obtain maximum value for a register field from the PAC's register spec.
+macro_rules! max_from_register_spec {
+    ($typ:ty, $reg:ident, $spec:ident, $w:ident) => {{
+        use crate::soc::pac::rmt::$reg as reg;
+        type Spec = reg::$spec;
+        const WIDTH: u8 = reg::$w::<Spec>::WIDTH;
+
+        const _: () = if WIDTH as u32 > <$typ>::BITS {
+            core::panic!("Unexpectedly large register WIDTH");
+        };
+
+        // Fits into $ty according to the assertion above
+        ((1u32 << WIDTH) - 1) as $typ
+    }};
+}
+
 #[cfg(not(any(esp32, esp32s2)))]
 mod chip_specific {
     use enumset::EnumSet;
