@@ -175,7 +175,7 @@ The `rmt::Channel::transmit_continuously` and
 +let tx_trans1 = tx_channel1.transmit_continuously(&data, LoopCount::Finite(count));
 ```
 
-## RMT lifetime changes
+### RMT lifetime changes
 
 The RMT driver didn't use to properly tie together lifetimes of its types and
 therefore didn't statically prevent all kinds of concurrent and conflicting
@@ -198,6 +198,22 @@ Additionally, RMT transaction types
 are marked as `#[must_use]` to account for the fact that it is in general required to poll them to ensure progress.
 Additionally, they now implement `Drop` and stop the ongoing transfer as quickly as possible when dropped,
 ensuring that subsequent transactions start from a well-defined state.
+
+### RMT continuous transmit changes
+
+The behavior of `Channel::transmit_continuously` has been clarified to account
+for the varying hardware support between devices: It now takes an additional
+`LoopStop` argument.
+
+```diff
+- let transaction = channel.transmit_continuously(&data, LoopCount::Finite(count))?;
++ let transaction = channel.transmit_continuously(&data, LoopCount::Finite(count), LoopStop::Manual)?;
+```
+
+Additionally, some enum variants and methods are only defined when the hardware supports them:
+
+- `LoopCount::Finite` and `ContinuousTxTransaction::is_tx_loopcount_interrupt_set` (all except ESP32),
+- `LoopStop::Auto` (ESP32-C6, ESP32-H2, ESP32-S3).
 
 ## DMA changes
 
