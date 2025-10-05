@@ -1495,8 +1495,8 @@ where
 
 /// Loop mode for continuous transmission
 ///
-/// Depending on hardware support, automatic stopping of the transmission upon reaching a
-/// specified loop count may not be available.
+/// Depending on hardware support, the `loopcount` interrupt and automatic stopping of the
+/// transmission upon reaching a specified loop count may not be available.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum LoopMode {
@@ -1569,11 +1569,14 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
     ///
     /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
     /// ongoing transmission and get back the channel for further use.
+    ///
+    /// The `mode` argument determines whether transmission will continue until explicitly stopped
+    /// or for a fixed number of iterations; see [`LoopMode`] for more details.
     #[cfg_attr(
         rmt_has_tx_loop_count,
-        doc = "When setting a finite `loopcount`, [`ContinuousTxTransaction::is_loopcount_interrupt_set`] can be used to check if the loop count is reached. The `loopstop` argument determines whether transmission will automatically stop upon reaching the finite `loopcount`."
+        doc = "When using a loop `mode` other than [`LoopMode::Infinite`], [`ContinuousTxTransaction::is_loopcount_interrupt_set`] can be used to check if the loop count is reached."
     )]
-    /// The length of sequence cannot exceed the size of the allocated RMT RAM.
+    /// The length of `data` cannot exceed the size of the allocated RMT RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn transmit_continuously<T>(
         self,
