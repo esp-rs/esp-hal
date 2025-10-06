@@ -259,7 +259,7 @@ pub(crate) fn enable_main_stack_guard_monitoring() {
     }
 }
 
-#[cfg(riscv)]
+#[cfg(all(riscv, write_vec_table_monitoring))]
 pub(crate) fn setup_trap_section_protection() {
     #[cfg(not(flip_link))]
     {
