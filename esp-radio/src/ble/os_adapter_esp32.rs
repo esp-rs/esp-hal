@@ -12,6 +12,7 @@ use crate::{
         esp_bt_mode_t_ESP_BT_MODE_CLASSIC_BT,
         esp_bt_mode_t_ESP_BT_MODE_IDLE,
     },
+    ble::InvalidConfigError,
     common_adapter::*,
     hal::{interrupt, peripherals::Interrupt},
 };
@@ -279,12 +280,51 @@ static BTDM_DRAM_AVAILABLE_REGION: [btdm_dram_available_region_t; 7] = [
 /// Bluetooth controller configuration.
 #[derive(BuilderLite, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
     /// The priority of the RTOS task.
     task_priority: u8,
 
     /// The stack size of the RTOS task.
     task_stack_size: u16,
+
+    /// The maximum number of simultaneous connections.
+    ///
+    /// Range: 1 - 9
+    max_connections: u8,
+
+    /// Maximum number of devices in scan duplicate filtering list.
+    ///
+    /// Range: 10 - 1000
+    scan_duplicate_list_count: u16,
+
+    /// Scan duplicate filtering list refresh period in seconds.
+    ///
+    /// Range: 0 - 1000 seconds
+    scan_duplicate_refresh_period: u16,
+
+    /// Enable BLE scan backoff.
+    ble_scan_backoff: bool,
+
+    /// Minimum encryption key size.
+    ///
+    /// Range: 7 - 16
+    enc_key_sz_min: u8,
+
+    /// Enable verification of the Access Address within the `CONNECT_IND` PDU.
+    verify_access_address: bool,
+
+    /// Enable BLE channel assessment.
+    channel_assessment: bool,
+
+    /// Enable BLE ping procedure.
+    ping: bool,
+
+    /// Disconnect when Instant Passed (0x28) occurs during ACL connection update.
+    disconnect_llcp_conn_update: bool,
+
+    /// Disconnect when Instant Passed (0x28) occurs during ACL channel map update.
+    disconnect_llcp_chan_map_update: bool,
 }
 
 impl Default for Config {
@@ -293,7 +333,28 @@ impl Default for Config {
             // same priority as the wifi task, when using esp-rtos (I'm assuming it's MAX_PRIO - 2)
             task_priority: 29,
             task_stack_size: 4096,
+            max_connections: CONFIG_BTDM_CTRL_BLE_MAX_CONN_EFF as _,
+            scan_duplicate_list_count: CONFIG_BTDM_SCAN_DUPL_CACHE_SIZE as _,
+            scan_duplicate_refresh_period: SCAN_DUPL_CACHE_REFRESH_PERIOD as _,
+            ble_scan_backoff: false,
+            enc_key_sz_min: 7,
+            verify_access_address: false,
+            channel_assessment: false,
+            ping: false,
+            disconnect_llcp_conn_update: false,
+            disconnect_llcp_chan_map_update: false,
         }
+    }
+}
+
+impl Config {
+    pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
+        crate::ble::validate_range!(self, max_connections, 1, 9);
+        crate::ble::validate_range!(self, scan_duplicate_list_count, 10, 1000);
+        crate::ble::validate_range!(self, scan_duplicate_refresh_period, 0, 1000);
+        crate::ble::validate_range!(self, enc_key_sz_min, 7, 16);
+
+        Ok(())
     }
 }
 
@@ -303,16 +364,20 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
     esp_bt_controller_config_t {
         controller_task_stack_size: config.task_stack_size,
         controller_task_prio: config.task_priority,
+
+        // We're using VHCI but esp-idf has these defaults:
         hci_uart_no: 1,
         hci_uart_baudrate: 921600,
-        scan_duplicate_mode: 0,
+        // Bluetooth mesh options, currently not supported
+        scan_duplicate_mode: 0, // normal mode
         scan_duplicate_type: 0,
-        normal_adv_size: 200,
         mesh_adv_size: 0,
-        send_adv_reserved_size: 1000,
-        controller_debug_flag: 0,
-        mode: 0x01, // BLE
-        ble_max_conn: 3,
+
+        normal_adv_size: config.scan_duplicate_list_count,
+        send_adv_reserved_size: SCAN_SEND_ADV_RESERVED_SIZE as _,
+        controller_debug_flag: BTDM_CTRL_CONTROLLER_DEBUG_FLAG as _,
+        mode: esp_bt_mode_t_ESP_BT_MODE_BLE as _,
+        ble_max_conn: config.max_connections,
         bt_max_acl_conn: 0,
         bt_sco_datapath: 0,
         auto_latency: false,
@@ -322,15 +387,16 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         pcm_role: 0,
         pcm_polar: 0,
         hli: false,
-        dup_list_refresh_period: 0,
-        ble_scan_backoff: false,
+        dup_list_refresh_period: config.scan_duplicate_refresh_period,
+        ble_scan_backoff: config.ble_scan_backoff,
         pcm_fsyncshp: 0,
-        enc_key_sz_min: 7,
-        ble_llcp_disc_flag: 0,
-        ble_aa_check: false,
-        ble_chan_ass_en: 0,
-        ble_ping_en: 0,
-        magic: 0x20250318,
+        enc_key_sz_min: config.enc_key_sz_min,
+        ble_llcp_disc_flag: config.disconnect_llcp_conn_update as u8
+            | ((config.disconnect_llcp_chan_map_update as u8) << 1),
+        ble_aa_check: config.verify_access_address,
+        ble_chan_ass_en: config.channel_assessment as u8,
+        ble_ping_en: config.ping as u8,
+        magic: ESP_BT_CONTROLLER_CONFIG_MAGIC_VAL,
     }
 }
 
