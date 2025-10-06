@@ -418,6 +418,12 @@ pub struct Config {
     scan_duplicate_refresh_period: u16,
 
     /// Enables verification of the Access Address within the `CONNECT_IND` PDU.
+    ///
+    /// Enabling this option will add stricter verification of the Access Address in the
+    /// `CONNECT_IND` PDU. This improves security by ensuring that only connection requests with
+    /// valid Access Addresses are accepted. If disabled, only basic checks are applied,
+    /// improving compatibility.
+    // TODO: this needs additional setup
     verify_access_address: bool,
 
     /// Enable BLE channel assessment.

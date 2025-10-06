@@ -148,6 +148,11 @@ pub struct Config {
     ll_adv_dup_list_count: u16,
 
     /// Enables verification of the Access Address within the `CONNECT_IND` PDU.
+    ///
+    /// Enabling this option will add stricter verification of the Access Address in the
+    /// `CONNECT_IND` PDU. This improves security by ensuring that only connection requests with
+    /// valid Access Addresses are accepted. If disabled, only basic checks are applied,
+    /// improving compatibility.
     verify_access_address: bool,
 
     /// Enable BLE channel assessment.
@@ -174,7 +179,7 @@ pub struct Config {
     /// Buffer size for HCI event data
     hci_evt_buf_size: u16,
 
-    /// Number of advertising instances
+    /// Maximum number of extended advertising instances.
     multi_adv_instances: u16,
 
     /// Maximum size of extended advertising data
@@ -185,9 +190,11 @@ pub struct Config {
     /// Disable scan backoff
     dis_scan_backoff: bool,
 
-    /// Maximum scan backoff time
+    /// The value of upperlimitmax during scan backoff procedure
     ///
-    /// The value of upperlimitmax is 2^n, The maximum value is 256
+    /// The value of upperlimitmax needs to be a power of 2.
+    ///
+    /// Range: 1 - 256
     scan_backoff_max: u16,
 
     /// Enable BLE Clear Channel Assessment (CCA).
@@ -256,6 +263,13 @@ impl Default for Config {
 impl Config {
     pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
         crate::ble::validate_range!(self, max_connections, 1, 35);
+        crate::ble::validate_range!(self, ll_rsp_dup_list_count, 1, 100);
+        crate::ble::validate_range!(self, ll_adv_dup_list_count, 1, 100);
+        crate::ble::validate_range!(self, whitelist_size, 1, 31);
+        crate::ble::validate_range!(self, multi_adv_instances, 0, 4);
+        crate::ble::validate_range!(self, ext_adv_max_size, 0, 1650);
+        crate::ble::validate_range!(self, scan_backoff_max, 1, 256);
+        crate::ble::validate_range!(self, cca_threshold, 20, 100);
         Ok(())
     }
 }
