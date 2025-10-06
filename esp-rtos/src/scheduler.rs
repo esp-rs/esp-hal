@@ -495,10 +495,7 @@ impl Scheduler {
     pub(crate) fn sleep_until(&self, wake_at: Instant) -> bool {
         self.with(|scheduler| {
             let current_cpu = Cpu::current() as usize;
-            let current_task = unwrap!(
-                scheduler.per_cpu[current_cpu].current_task,
-                "No current task"
-            );
+            let current_task = unwrap!(scheduler.per_cpu[current_cpu].current_task);
             if scheduler.sleep_task_until(current_task, wake_at) {
                 task::yield_task();
                 true

@@ -1,8 +1,6 @@
 #![macro_use]
 #![allow(unused_macros)]
 
-use core::fmt::{Debug, Display, LowerHex};
-
 #[collapse_debuginfo(yes)]
 macro_rules! assert {
     ($($x:tt)*) => {
@@ -231,23 +229,43 @@ macro_rules! unwrap {
     };
 }
 
+#[cold]
+#[inline(never)]
+#[cfg(not(feature = "defmt"))]
+pub(crate) fn __unwrap_failed(arg: &str, e: impl ::core::fmt::Debug) -> ! {
+    ::core::panic!("unwrap of `{}` failed: {:?}", arg, e);
+}
+
+#[cold]
+#[inline(never)]
+#[cfg(not(feature = "defmt"))]
+pub(crate) fn __unwrap_failed_with_message(
+    arg: &str,
+    e: impl core::fmt::Debug,
+    msg: impl core::fmt::Display,
+) -> ! {
+    ::core::panic!("unwrap of `{}` failed: {}: {:?}", arg, msg, e);
+}
+
 #[cfg(not(feature = "defmt"))]
 #[collapse_debuginfo(yes)]
 macro_rules! unwrap {
     ($arg:expr) => {
         match $crate::fmt::Try::into_result($arg) {
             ::core::result::Result::Ok(t) => t,
-            ::core::result::Result::Err(e) => {
-                ::core::panic!("unwrap of `{}` failed: {:?}", ::core::stringify!($arg), e);
-            }
+            ::core::result::Result::Err(e) => { $crate::fmt::__unwrap_failed(::core::stringify!($arg), e) }
+        }
+    };
+    ($arg:expr, $msg:expr) => {
+        match $crate::fmt::Try::into_result($arg) {
+            ::core::result::Result::Ok(t) => t,
+            ::core::result::Result::Err(e) => { $crate::fmt::__unwrap_failed_with_message(::core::stringify!($arg), e, $msg) }
         }
     };
     ($arg:expr, $($msg:expr),+ $(,)? ) => {
         match $crate::fmt::Try::into_result($arg) {
             ::core::result::Result::Ok(t) => t,
-            ::core::result::Result::Err(e) => {
-                ::core::panic!("unwrap of `{}` failed: {}: {:?}", ::core::stringify!($arg), ::core::format_args!($($msg,)*), e);
-            }
+            ::core::result::Result::Err(e) => { $crate::fmt::__unwrap_failed_with_message(::core::stringify!($arg), e, ::core::format_args!($($msg,)*)) }
         }
     }
 }
@@ -279,34 +297,5 @@ impl<T, E> Try for Result<T, E> {
     #[inline]
     fn into_result(self) -> Self {
         self
-    }
-}
-
-/// A way to `{:x?}` format a byte slice which is compatible with `defmt`
-#[allow(unused)]
-pub(crate) struct Bytes<'a>(pub &'a [u8]);
-
-impl Debug for Bytes<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:#02x?}", self.0)
-    }
-}
-
-impl Display for Bytes<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:#02x?}", self.0)
-    }
-}
-
-impl LowerHex for Bytes<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:#02x?}", self.0)
-    }
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for Bytes<'_> {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(fmt, "{:02x}", self.0)
     }
 }
