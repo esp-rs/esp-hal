@@ -296,7 +296,7 @@ pub struct Config {
     /// Maximum number of devices in scan duplicate filtering list.
     ///
     /// Range: 10 - 1000
-    normal_adv_size: u16,
+    scan_duplicate_list_count: u16,
 
     /// Scan duplicate filtering list refresh period in seconds.
     ///
@@ -334,7 +334,7 @@ impl Default for Config {
             task_priority: 29,
             task_stack_size: 4096,
             max_connections: CONFIG_BTDM_CTRL_BLE_MAX_CONN_EFF as _,
-            normal_adv_size: CONFIG_BTDM_SCAN_DUPL_CACHE_SIZE as _,
+            scan_duplicate_list_count: CONFIG_BTDM_SCAN_DUPL_CACHE_SIZE as _,
             scan_duplicate_refresh_period: SCAN_DUPL_CACHE_REFRESH_PERIOD as _,
             ble_scan_backoff: false,
             enc_key_sz_min: 7,
@@ -350,7 +350,7 @@ impl Default for Config {
 impl Config {
     pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
         crate::ble::validate_range!(self, max_connections, 1, 9);
-        crate::ble::validate_range!(self, normal_adv_size, 10, 1000);
+        crate::ble::validate_range!(self, scan_duplicate_list_count, 10, 1000);
         crate::ble::validate_range!(self, scan_duplicate_refresh_period, 0, 1000);
         crate::ble::validate_range!(self, enc_key_sz_min, 7, 16);
 
@@ -373,7 +373,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         scan_duplicate_type: 0,
         mesh_adv_size: 0,
 
-        normal_adv_size: config.normal_adv_size,
+        normal_adv_size: config.scan_duplicate_list_count,
         send_adv_reserved_size: SCAN_SEND_ADV_RESERVED_SIZE as _,
         controller_debug_flag: BTDM_CTRL_CONTROLLER_DEBUG_FLAG as _,
         mode: esp_bt_mode_t_ESP_BT_MODE_BLE as _,

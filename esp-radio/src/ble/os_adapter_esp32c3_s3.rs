@@ -410,7 +410,7 @@ pub struct Config {
     /// Maximum number of devices in scan duplicate filtering list.
     ///
     /// Range: 10 - 1000
-    normal_adv_size: u16,
+    scan_duplicate_list_count: u16,
 
     /// Scan duplicate filtering list refresh period in seconds.
     ///
@@ -492,7 +492,7 @@ impl Default for Config {
             task_cpu: Cpu::ProCpu,
             max_connections: 6,
             qa_test_mode: false,
-            normal_adv_size: 100,
+            scan_duplicate_list_count: 100,
             scan_duplicate_refresh_period: 0,
             verify_access_address: true,
             channel_assessment: false,
@@ -520,7 +520,7 @@ impl Default for Config {
 impl Config {
     pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
         crate::ble::validate_range!(self, max_connections, 1, 10);
-        crate::ble::validate_range!(self, normal_adv_size, 10, 1000);
+        crate::ble::validate_range!(self, scan_duplicate_list_count, 10, 1000);
         crate::ble::validate_range!(self, scan_duplicate_refresh_period, 0, 1000);
         crate::ble::validate_range!(self, cca_threshold, 20, 100);
 
@@ -563,7 +563,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         scan_duplicate_type: 0,
         mesh_adv_size: 0,
 
-        normal_adv_size: config.normal_adv_size,
+        normal_adv_size: config.scan_duplicate_list_count,
         coex_phy_coded_tx_rx_time_limit: if cfg!(feature = "coex") {
             config.limit_time_for_coded_phy_connection as u8
         } else {
