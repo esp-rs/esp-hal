@@ -103,6 +103,8 @@ pub struct Config {
     task_stack_size: u16,
 
     /// The maximum number of simultaneous connections.
+    ///
+    /// Range: 1 - 70
     max_connections: u16,
 
     /// Enable QA test mode.
