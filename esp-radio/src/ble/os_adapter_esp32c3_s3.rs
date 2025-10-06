@@ -414,7 +414,7 @@ pub struct Config {
 
     /// Scan duplicate filtering list refresh period in seconds.
     ///
-    /// Range: 0 - 100 seconds
+    /// Range: 0 - 1000 seconds
     scan_duplicate_refresh_period: u16,
 
     /// Enables verification of the Access Address within the `CONNECT_IND` PDU.
@@ -521,7 +521,7 @@ impl Config {
     pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
         crate::ble::validate_range!(self, max_connections, 1, 10);
         crate::ble::validate_range!(self, normal_adv_size, 10, 1000);
-        crate::ble::validate_range!(self, scan_duplicate_refresh_period, 0, 100);
+        crate::ble::validate_range!(self, scan_duplicate_refresh_period, 0, 1000);
         crate::ble::validate_range!(self, cca_threshold, 20, 100);
 
         Ok(())

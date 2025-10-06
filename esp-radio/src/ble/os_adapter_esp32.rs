@@ -300,7 +300,7 @@ pub struct Config {
 
     /// Scan duplicate filtering list refresh period in seconds.
     ///
-    /// Range: 0 - 100 seconds
+    /// Range: 0 - 1000 seconds
     scan_duplicate_refresh_period: u16,
 
     /// Enable BLE scan backoff.
@@ -351,7 +351,7 @@ impl Config {
     pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
         crate::ble::validate_range!(self, max_connections, 1, 9);
         crate::ble::validate_range!(self, normal_adv_size, 10, 1000);
-        crate::ble::validate_range!(self, scan_duplicate_refresh_period, 0, 100);
+        crate::ble::validate_range!(self, scan_duplicate_refresh_period, 0, 1000);
         crate::ble::validate_range!(self, enc_key_sz_min, 7, 16);
 
         Ok(())
