@@ -36,6 +36,8 @@ esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", features = [
 ] }
 
 cfg-if = "1"
+paste = { version = "1", optional = true }
+rtos-trace = { version = "0.2.0", optional = true }
 
 # Unstable dependencies that are not (strictly) part of the public API
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"], optional = true }
@@ -80,8 +82,11 @@ esp-alloc = ["alloc", "dep:esp-alloc"]
 ## Enable embassy integration (time driver and executors).
 embassy = ["dep:embassy-time-driver", "dep:embassy-executor", "dep:embassy-time-queue-utils"]
 
-## Enables esp-radio support.
+## Enable esp-radio support.
 esp-radio = ["alloc", "dep:esp-radio-rtos-driver"]
+
+## Enable rtos-trace support.
+rtos-trace = ["dep:rtos-trace"]
 
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:

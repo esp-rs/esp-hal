@@ -115,6 +115,26 @@ use crate::{task::IdleFn, timer::TimeDriver};
 
 type TimeBase = OneShotTimer<'static, Blocking>;
 
+/// Trace events, emitted via `marker_begin` and `marker_end`
+#[cfg(feature = "rtos-trace")]
+pub enum TraceEvents {
+    /// The scheduler function is running.
+    RunSchedule,
+
+    /// A task has yielded.
+    YieldTask,
+
+    /// The timer tick handler is running.
+    TimerTickHandler,
+
+    /// Process timer queue.
+    ProcessTimerQueue,
+
+    /// Process embassy timer queue.
+    #[cfg(feature = "embassy")]
+    ProcessEmbassyTimerQueue,
+}
+
 // Polyfill the InternalMemory allocator
 #[cfg(all(feature = "alloc", not(feature = "esp-alloc")))]
 mod esp_alloc {
@@ -216,6 +236,22 @@ pub fn start_with_idle_hook(
     #[cfg(riscv)] int0: SoftwareInterrupt<'static, 0>,
     idle_hook: IdleFn,
 ) {
+    #[cfg(feature = "rtos-trace")]
+    {
+        rtos_trace::trace::name_marker(TraceEvents::YieldTask as u32, "yield task");
+        rtos_trace::trace::name_marker(TraceEvents::RunSchedule as u32, "run scheduler");
+        rtos_trace::trace::name_marker(TraceEvents::TimerTickHandler as u32, "timer tick handler");
+        rtos_trace::trace::name_marker(
+            TraceEvents::ProcessTimerQueue as u32,
+            "process timer queue",
+        );
+        rtos_trace::trace::name_marker(
+            TraceEvents::ProcessEmbassyTimerQueue as u32,
+            "process embassy timer queue",
+        );
+        rtos_trace::trace::start();
+    }
+
     trace!("Starting scheduler for the first core");
     assert_eq!(Cpu::current(), Cpu::ProCpu);
 

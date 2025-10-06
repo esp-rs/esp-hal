@@ -56,6 +56,9 @@ impl RunQueue {
         self.ready_tasks[priority].remove(ready_task);
         self.ready_tasks[priority].push(ready_task);
 
+        #[cfg(feature = "rtos-trace")]
+        rtos_trace::trace::task_ready_begin(ready_task.rtos_trace_id());
+
         self.ready_priority.mark_ready(priority);
         if priority > current_prio || current_prio == 0 {
             debug!(
