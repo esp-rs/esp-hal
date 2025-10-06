@@ -2,6 +2,8 @@ use core::task::Waker;
 
 use esp_sync::NonReentrantMutex;
 
+use crate::SCHEDULER;
+
 pub(super) struct TimerQueueInner {
     queue: embassy_time_queue_utils::Queue,
     pub next_wakeup: u64,
@@ -62,8 +64,13 @@ impl embassy_time_driver::Driver for TimerQueue {
     #[inline]
     fn schedule_wake(&self, at: u64, waker: &Waker) {
         if self.inner.with(|inner| inner.schedule_wake(at, waker)) {
-            // Next wakeup time became shorter, yield to re-arm the timer.
-            crate::task::yield_task();
+            // Next wakeup time became shorter, re-arm the timer.
+            // FIXME: avoid two separate critical sections.
+            // FIXME: this likely interferes with time slicing - we just keep pushing the time slice
+            // out on the other core, if active.
+            SCHEDULER.with(|s| {
+                unwrap!(s.time_driver.as_mut()).arm_next_wakeup();
+            });
         }
     }
 }

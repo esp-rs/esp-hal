@@ -4,6 +4,7 @@ use super::*;
 #[cfg(multi_core)]
 use crate::hal::system::Cpu;
 use crate::{
+    ble::InvalidConfigError,
     common_adapter::*,
     hal::{interrupt, peripherals::Interrupt},
 };
@@ -284,9 +285,109 @@ unsafe extern "C" {
     fn btdm_controller_rom_data_init() -> i32;
 }
 
+/// Antenna Selection
+#[derive(Default, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum Antenna {
+    /// Use Antenna 0
+    #[default]
+    Antenna0 = 0,
+    /// Use Antenna 1
+    Antenna1 = 1,
+}
+
+/// Transmission Power Level
+#[derive(Default, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum TxPower {
+    /// -15 dBm
+    N15,
+    /// -12 dBm
+    N12,
+    /// -9 dBm
+    N9,
+    /// -6 dBm
+    N6,
+    /// -3 dBm
+    N3,
+    /// 0 dBm
+    N0,
+    /// 3 dBm
+    P3,
+    /// 6 dBm
+    P6,
+    /// 9 dBm
+    #[default]
+    P9,
+    /// 12 dBm
+    P12,
+    /// 15 dBm
+    P15,
+    /// 18 dBm
+    P18,
+    /// 20 dBm
+    P20,
+}
+
+#[allow(dead_code)]
+impl TxPower {
+    fn idx(self) -> esp_power_level_t {
+        match self {
+            Self::N15 => esp_power_level_t_ESP_PWR_LVL_N15,
+            Self::N12 => esp_power_level_t_ESP_PWR_LVL_N12,
+            Self::N9 => esp_power_level_t_ESP_PWR_LVL_N9,
+            Self::N6 => esp_power_level_t_ESP_PWR_LVL_N6,
+            Self::N3 => esp_power_level_t_ESP_PWR_LVL_N3,
+            Self::N0 => esp_power_level_t_ESP_PWR_LVL_N0,
+            Self::P3 => esp_power_level_t_ESP_PWR_LVL_P3,
+            Self::P6 => esp_power_level_t_ESP_PWR_LVL_P6,
+            Self::P9 => esp_power_level_t_ESP_PWR_LVL_P9,
+            Self::P12 => esp_power_level_t_ESP_PWR_LVL_P12,
+            Self::P15 => esp_power_level_t_ESP_PWR_LVL_P15,
+            Self::P18 => esp_power_level_t_ESP_PWR_LVL_P18,
+            Self::P20 => esp_power_level_t_ESP_PWR_LVL_P20,
+        }
+    }
+
+    fn dbm(self) -> i8 {
+        match self {
+            Self::N15 => -15,
+            Self::N12 => -12,
+            Self::N9 => -9,
+            Self::N6 => -6,
+            Self::N3 => -3,
+            Self::N0 => 0,
+            Self::P3 => 3,
+            Self::P6 => 6,
+            Self::P9 => 9,
+            Self::P12 => 12,
+            Self::P15 => 15,
+            Self::P18 => 18,
+            Self::P20 => 20,
+        }
+    }
+}
+
+/// BLE CCA mode.
+#[derive(Default, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum CcaMode {
+    /// Disabled
+    #[default]
+    Disabled          = 0,
+    /// Hardware Triggered
+    HardwareTriggered = 1,
+    /// Software Triggered (experimental)
+    SoftwareTriggered = 2,
+}
+
 /// Bluetooth controller configuration.
 #[derive(BuilderLite, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
     /// The priority of the RTOS task.
     task_priority: u8,
@@ -294,8 +395,97 @@ pub struct Config {
     /// The stack size of the RTOS task.
     task_stack_size: u16,
 
+    /// The CPU core on which the BLE controller task should run.
     #[cfg(multi_core)]
     task_cpu: Cpu,
+
+    /// The maximum number of simultaneous connections.
+    ///
+    /// Range: 1 - 10
+    max_connections: u8,
+
+    /// Enable QA test mode.
+    qa_test_mode: bool,
+
+    /// Maximum number of devices in scan duplicate filtering list.
+    ///
+    /// Range: 10 - 1000
+    scan_duplicate_list_count: u16,
+
+    /// Scan duplicate filtering list refresh period in seconds.
+    ///
+    /// Range: 0 - 1000 seconds
+    scan_duplicate_refresh_period: u16,
+
+    /// Enables verification of the Access Address within the `CONNECT_IND` PDU.
+    ///
+    /// Enabling this option will add stricter verification of the Access Address in the
+    /// `CONNECT_IND` PDU. This improves security by ensuring that only connection requests with
+    /// valid Access Addresses are accepted. If disabled, only basic checks are applied,
+    /// improving compatibility.
+    // TODO: this needs additional setup
+    verify_access_address: bool,
+
+    /// Enable BLE channel assessment.
+    channel_assessment: bool,
+
+    /// Enable BLE ping procedure.
+    ping: bool,
+
+    /// Default TX antenna.
+    default_tx_antenna: Antenna,
+
+    /// Default RX antenna.
+    default_rx_antenna: Antenna,
+
+    /// Default TX power.
+    default_tx_power: TxPower,
+
+    /// Coexistence: limit on MAX Tx/Rx time for coded-PHY connection.
+    limit_time_for_coded_phy_connection: bool,
+
+    /// Enable / disable uncoded phy / coded phy hardware re-correction.
+    hw_recorrect_en: bool,
+
+    /// BLE Clear Channel Assessment (CCA) mode.
+    cca_mode: CcaMode,
+
+    /// Absolute value of hardware-triggered CCA threshold.
+    ///
+    /// The CCA threshold is always negative.
+    ///
+    /// If the channel assessment result exceeds the CCA threshold (e.g. -75 dBm), indicating
+    /// the channel is busy, the hardware will not transmit packets on that channel.
+    ///
+    /// Range: 20 dBm - 100 dBm
+    cca_threshold: u8,
+
+    /// Enable / disable auxiliary packets when the extended ADV data length is zero.
+    data_length_zero_aux: bool,
+
+    /// Enable / disable DTM.
+    dtm: bool,
+
+    /// Enable / disable encryption.
+    encryption: bool,
+
+    /// Enable / disable connection.
+    connection: bool,
+
+    /// Enable / disable scanning.
+    scan: bool,
+
+    /// Enable / disable ADV.
+    adv: bool,
+
+    /// Disconnect when Instant Passed (0x28) occurs during ACL connection update.
+    disconnect_llcp_conn_update: bool,
+
+    /// Disconnect when Instant Passed (0x28) occurs during ACL channel map update.
+    disconnect_llcp_chan_map_update: bool,
+
+    /// Disconnect when Instant Passed (0x28) occurs during ACL PHY update.
+    disconnect_llcp_phy_update: bool,
 }
 
 impl Default for Config {
@@ -306,7 +496,41 @@ impl Default for Config {
             task_stack_size: 8192, // 4096?
             #[cfg(multi_core)]
             task_cpu: Cpu::ProCpu,
+            max_connections: 6,
+            qa_test_mode: false,
+            scan_duplicate_list_count: 100,
+            scan_duplicate_refresh_period: 0,
+            verify_access_address: true,
+            channel_assessment: false,
+            ping: false,
+            default_tx_antenna: Antenna::default(),
+            default_rx_antenna: Antenna::default(),
+            default_tx_power: TxPower::default(),
+            limit_time_for_coded_phy_connection: false,
+            hw_recorrect_en: AGC_RECORRECT_EN != 0,
+            cca_threshold: 75, // CONFIG_BT_CTRL_HW_CCA_VAL is 0 which is not valid
+            cca_mode: CcaMode::default(),
+            data_length_zero_aux: false,
+            dtm: true,
+            encryption: true,
+            connection: true,
+            scan: true,
+            adv: true,
+            disconnect_llcp_conn_update: false,
+            disconnect_llcp_chan_map_update: false,
+            disconnect_llcp_phy_update: false,
         }
+    }
+}
+
+impl Config {
+    pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
+        crate::ble::validate_range!(self, max_connections, 1, 10);
+        crate::ble::validate_range!(self, scan_duplicate_list_count, 10, 1000);
+        crate::ble::validate_range!(self, scan_duplicate_refresh_period, 0, 1000);
+        crate::ble::validate_range!(self, cca_threshold, 20, 100);
+
+        Ok(())
     }
 }
 
@@ -321,8 +545,10 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         controller_task_run_cpu: config.task_cpu as u8,
         #[cfg(single_core)]
         controller_task_run_cpu: 0,
-        bluetooth_mode: 1,
-        ble_max_act: 10,
+
+        bluetooth_mode: esp_bt_mode_t_ESP_BT_MODE_BLE as _,
+
+        ble_max_act: config.max_connections,
         sleep_mode: 0,
         sleep_clock: 0,
         ble_st_acl_tx_buf_nb: 0,
@@ -333,44 +559,52 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         coex_use_hooks: false,
         hci_tl_type: 1,
         hci_tl_funcs: core::ptr::null_mut(),
-        txant_dft: 0,
-        rxant_dft: 0,
-        txpwr_dft: 9,
-        cfg_mask: 1,
-        scan_duplicate_mode: 0,
+        txant_dft: config.default_tx_antenna as u8,
+        rxant_dft: config.default_rx_antenna as u8,
+        txpwr_dft: config.default_tx_power as u8,
+        cfg_mask: CFG_MASK,
+
+        // Bluetooth mesh options, currently not supported
+        scan_duplicate_mode: 0, // normal mode
         scan_duplicate_type: 0,
-        normal_adv_size: 20,
         mesh_adv_size: 0,
-        coex_phy_coded_tx_rx_time_limit: 0,
+
+        normal_adv_size: config.scan_duplicate_list_count,
+        coex_phy_coded_tx_rx_time_limit: if cfg!(feature = "coex") {
+            config.limit_time_for_coded_phy_connection as u8
+        } else {
+            0
+        },
         hw_target_code: if cfg!(esp32c3) {
             0x01010000
         } else {
             0x02010000
         },
-        slave_ce_len_min: 5,
-        hw_recorrect_en: 1 << 0,
-        cca_thresh: 20,
-        dup_list_refresh_period: 0,
+        // esp-idf: "Please do not modify this value"
+        slave_ce_len_min: SLAVE_CE_LEN_MIN_DEFAULT as _,
+        hw_recorrect_en: config.hw_recorrect_en as u8,
+        cca_thresh: config.cca_threshold,
+        dup_list_refresh_period: config.scan_duplicate_refresh_period,
         scan_backoff_upperlimitmax: 0,
         ble_50_feat_supp: BT_CTRL_50_FEATURE_SUPPORT != 0,
-        ble_cca_mode: 0,
-        ble_chan_ass_en: 0,
-        ble_data_lenth_zero_aux: 0,
-        ble_ping_en: 0,
-        ble_llcp_disc_flag: BT_CTRL_BLE_LLCP_CONN_UPDATE as u8
-            | BT_CTRL_BLE_LLCP_CHAN_MAP_UPDATE as u8
-            | BT_CTRL_BLE_LLCP_PHY_UPDATE as u8,
+        ble_cca_mode: config.cca_mode as u8,
+        ble_chan_ass_en: config.channel_assessment as u8,
+        ble_data_lenth_zero_aux: config.data_length_zero_aux as u8,
+        ble_ping_en: config.ping as u8,
+        ble_llcp_disc_flag: config.disconnect_llcp_conn_update as u8
+            | ((config.disconnect_llcp_chan_map_update as u8) << 1)
+            | ((config.disconnect_llcp_phy_update as u8) << 2),
         run_in_flash: false,
-        dtm_en: true,
-        enc_en: true,
-        qa_test: false,
-        connect_en: true,
-        scan_en: true,
-        ble_aa_check: true,
+        dtm_en: config.dtm,
+        enc_en: config.encryption,
+        qa_test: config.qa_test_mode,
+        connect_en: config.connection,
+        scan_en: config.scan,
+        ble_aa_check: config.verify_access_address,
         ble_log_mode_en: if cfg!(feature = "sys-logs") { 4095 } else { 0 },
         ble_log_level: if cfg!(feature = "sys-logs") { 5 } else { 0 },
-        adv_en: true,
-        magic: 0x5a5aa5a5,
+        adv_en: config.adv,
+        magic: ESP_BT_CTRL_CONFIG_MAGIC_VAL,
     }
 }
 

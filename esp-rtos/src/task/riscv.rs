@@ -5,6 +5,8 @@ use esp_hal::{interrupt::software::SoftwareInterrupt, riscv::register, system::C
 use portable_atomic::Ordering;
 
 use crate::SCHEDULER;
+#[cfg(feature = "rtos-trace")]
+use crate::TraceEvents;
 
 unsafe extern "C" {
     fn sys_switch();
@@ -319,6 +321,12 @@ extern "C" fn swint_handler() {
 
 #[inline]
 pub(crate) fn yield_task() {
+    #[cfg(feature = "rtos-trace")]
+    {
+        rtos_trace::trace::marker_begin(TraceEvents::YieldTask as u32);
+        rtos_trace::trace::marker_end(TraceEvents::YieldTask as u32);
+    }
+
     match Cpu::current() {
         Cpu::ProCpu => unsafe { SoftwareInterrupt::<'static, 0>::steal() }.raise(),
         #[cfg(multi_core)]
