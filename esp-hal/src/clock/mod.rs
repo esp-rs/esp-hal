@@ -1373,8 +1373,12 @@ fn increase_phy_clock_ref_count_internal() {
         if phy_clock_ref_count == 0 {
             clocks_ll::enable_phy(true);
         }
+        let new_phy_clock_ref_count = unwrap!(
+            phy_clock_ref_count.checked_add(1),
+            "PHY clock ref count overflowed."
+        );
 
-        phy_clock_ref_counter.set(phy_clock_ref_count + 1);
+        phy_clock_ref_counter.set(new_phy_clock_ref_count);
     })
 }
 
@@ -1389,6 +1393,7 @@ fn decrease_phy_clock_ref_count_internal() {
         if new_phy_clock_ref_count == 0 {
             clocks_ll::enable_phy(false);
         }
+
         phy_clock_ref_counter.set(new_phy_clock_ref_count);
     })
 }
