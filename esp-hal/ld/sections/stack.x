@@ -14,25 +14,10 @@ SECTIONS {
     */
     . = . + LENGTH(RWDATA) -  (SIZEOF(.trap) + SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi) + SIZEOF(.data) + SIZEOF(.bss) + SIZEOF(.noinit) + SIZEOF(.data.wifi)) - 304;
 #ELSE
-    /*
-      minus some space for exception safe data placed "above" the stack
-
-      Ideally we could calculate the size needed but the "INSERT AFTER trick" and using SIZEOF just doesn't work
-      so this is a best effort guess for now.
-
-      This could be smaller but for unknown reasons the `stack_protector` test on ESP32-S3 makes probe-rs going into an infinite loop.
-      (the correct panic is shown and then nothing anymore)
-    */
-    . = ORIGIN(RWDATA) + LENGTH(RWDATA) - 48;
+    . = ORIGIN(RWDATA) + LENGTH(RWDATA);
 #ENDIF
     . = ALIGN (4);
     _stack_start = ABSOLUTE(.);
     _stack_start_cpu0 = ABSOLUTE(.);
-  } > RWDATA
-
-  /* a very small section to place data which needs to stay healthy for exception handling */
-  .critical_data : ALIGN(4)
-  {
-    *(.critical_data .critical_data.*)
   } > RWDATA
 }

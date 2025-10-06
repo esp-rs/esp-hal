@@ -246,7 +246,6 @@ mod serial_jtag_printer {
 
     /// A previous wait has timed out. We use this flag to avoid blocking
     /// forever if there is no host attached.
-    #[unsafe(link_section = ".critical_data")]
     static TIMED_OUT: AtomicBool = AtomicBool::new(false);
 
     fn fifo_flush() {
@@ -508,7 +507,6 @@ impl LockToken<'_> {
     }
 }
 
-#[unsafe(link_section = ".critical_data")]
 #[cfg(feature = "critical-section")]
 static LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 

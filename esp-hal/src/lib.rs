@@ -719,7 +719,7 @@ pub fn init(config: Config) -> Peripherals {
         esp_rom_sys::init_syscall_table();
     }
 
-    #[cfg(riscv)]
+    #[cfg(all(riscv, write_vec_table_monitoring))]
     crate::soc::setup_trap_section_protection();
 
     peripherals
