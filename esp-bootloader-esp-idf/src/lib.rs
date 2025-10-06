@@ -374,6 +374,7 @@ macro_rules! esp_app_desc {
     ) => {
         #[unsafe(export_name = "esp_app_desc")]
         #[unsafe(link_section = ".rodata_desc.appdesc")]
+        /// Application metadata descriptor.
         pub static ESP_APP_DESC: $crate::EspAppDesc = $crate::EspAppDesc::new_internal(
             $version,
             $project_name,
