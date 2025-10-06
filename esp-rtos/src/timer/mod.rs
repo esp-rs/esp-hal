@@ -5,6 +5,8 @@ use esp_hal::{
 
 #[cfg(feature = "embassy")]
 use crate::TIMER_QUEUE;
+#[cfg(feature = "rtos-trace")]
+use crate::TraceEvents;
 use crate::{
     SCHEDULER,
     TICK_RATE,
@@ -20,6 +22,7 @@ const TIMESLICE_DURATION: Duration = Rate::from_hz(TICK_RATE).as_duration();
 pub(crate) struct TimerQueue {
     queue: TaskQueue<TaskTimerQueueElement>,
     next_wakeup: u64,
+    pub(crate) time_slice_active: bool,
 }
 
 impl Default for TimerQueue {
@@ -34,6 +37,7 @@ impl TimerQueue {
         Self {
             queue: TaskQueue::new(),
             next_wakeup: u64::MAX,
+            time_slice_active: false,
         }
     }
 
@@ -70,6 +74,26 @@ impl TimerQueue {
         // We can allow waking up sooner than necessary, so this function doesn't need to
         // re-calculate the next wakeup time.
         self.queue.remove(task);
+    }
+
+    fn next_sleep_duration(&self) -> u64 {
+        let wakeup_at = self.next_wakeup;
+
+        #[cfg(feature = "embassy")]
+        let wakeup_at = wakeup_at.min(TIMER_QUEUE.next_wakeup());
+
+        let max_sleep_duration = if self.time_slice_active {
+            TIMESLICE_DURATION.as_micros()
+        } else {
+            u64::MAX
+        };
+
+        if wakeup_at == u64::MAX {
+            max_sleep_duration
+        } else {
+            let sleep_duration = wakeup_at.saturating_sub(crate::now());
+            sleep_duration.min(max_sleep_duration)
+        }
     }
 }
 
@@ -109,21 +133,12 @@ impl TimeDriver {
         self.timer_queue.retain(crate::now(), on_task_ready);
     }
 
-    pub(crate) fn arm_next_wakeup(&mut self, with_time_slice: bool) {
-        let wakeup_at = self.timer_queue.next_wakeup;
+    pub(crate) fn arm_next_wakeup(&mut self) {
+        let sleep_duration = self.timer_queue.next_sleep_duration();
 
-        #[cfg(feature = "embassy")]
-        let wakeup_at = wakeup_at.min(TIMER_QUEUE.next_wakeup());
-
-        if wakeup_at != u64::MAX {
-            let sleep_duration = wakeup_at.saturating_sub(crate::now());
-
-            let mut timeout = if with_time_slice {
-                sleep_duration.min(TIMESLICE_DURATION.as_micros())
-            } else {
-                // assume 52-bit underlying timer. it's not a big deal to sleep for a shorter time
-                sleep_duration & ((1 << 52) - 1)
-            };
+        if sleep_duration != u64::MAX {
+            // assume 52-bit underlying timer. it's not a big deal to sleep for a shorter time
+            let mut timeout = sleep_duration & ((1 << 52) - 1);
 
             trace!("Arming timer for {:?}", timeout);
             loop {
@@ -136,9 +151,6 @@ impl TimeDriver {
                     Err(e) => panic!("Failed to schedule timer: {:?}", e),
                 }
             }
-        } else if with_time_slice {
-            trace!("Arming timer for {:?}", TIMESLICE_DURATION);
-            unwrap!(self.timer.schedule(TIMESLICE_DURATION));
         } else {
             trace!("Stopping timer");
             self.timer.stop();
@@ -183,9 +195,20 @@ impl TimeDriver {
 
 #[esp_hal::ram]
 extern "C" fn timer_tick_handler() {
+    #[cfg(feature = "rtos-trace")]
+    rtos_trace::trace::marker_begin(TraceEvents::TimerTickHandler as u32);
+
     SCHEDULER.with_shared(|scheduler| {
         #[cfg(feature = "embassy")]
-        TIMER_QUEUE.handle_alarm(crate::now());
+        {
+            #[cfg(feature = "rtos-trace")]
+            rtos_trace::trace::marker_begin(TraceEvents::ProcessEmbassyTimerQueue as u32);
+
+            TIMER_QUEUE.handle_alarm(crate::now());
+
+            #[cfg(feature = "rtos-trace")]
+            rtos_trace::trace::marker_end(TraceEvents::ProcessEmbassyTimerQueue as u32);
+        }
 
         let mut scheduler = unwrap!(scheduler.try_borrow_mut());
         let scheduler = &mut *scheduler;
@@ -193,6 +216,9 @@ extern "C" fn timer_tick_handler() {
         let time_driver = unwrap!(scheduler.time_driver.as_mut());
 
         time_driver.timer.clear_interrupt();
+
+        #[cfg(feature = "rtos-trace")]
+        rtos_trace::trace::marker_begin(TraceEvents::ProcessTimerQueue as u32);
 
         // Process timer queue. This will wake up ready tasks, and set a new alarm.
         time_driver.handle_alarm(|ready_task| {
@@ -209,6 +235,9 @@ extern "C" fn timer_tick_handler() {
             // only the relevant core(s).
             scheduler.run_queue.mark_task_ready(ready_task);
         });
+
+        #[cfg(feature = "rtos-trace")]
+        rtos_trace::trace::marker_end(TraceEvents::ProcessTimerQueue as u32);
 
         // The timer interrupt fires when a task is ready to run, an embassy timer expires or when a
         // time slice tick expires. Trigger a context switch in all cases, which context switch will
@@ -233,4 +262,7 @@ extern "C" fn timer_tick_handler() {
         #[cfg(multi_core)]
         crate::task::schedule_other_core();
     });
+
+    #[cfg(feature = "rtos-trace")]
+    rtos_trace::trace::marker_end(TraceEvents::TimerTickHandler as u32);
 }

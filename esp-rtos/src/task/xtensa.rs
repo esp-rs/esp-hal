@@ -8,6 +8,8 @@ pub(crate) use esp_hal::trapframe::TrapFrame as CpuContext;
 use esp_hal::{xtensa_lx, xtensa_lx_rt};
 use portable_atomic::AtomicPtr;
 
+#[cfg(feature = "rtos-trace")]
+use crate::TraceEvents;
 use crate::{SCHEDULER, task::IdleFn};
 
 static IDLE_HOOK: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
@@ -111,6 +113,12 @@ fn task_switch_interrupt(context: &mut CpuContext) {
 
 #[inline]
 pub(crate) fn yield_task() {
+    #[cfg(feature = "rtos-trace")]
+    {
+        rtos_trace::trace::marker_begin(TraceEvents::YieldTask as u32);
+        rtos_trace::trace::marker_end(TraceEvents::YieldTask as u32);
+    }
+
     unsafe { xtensa_lx::interrupt::set(SW_INTERRUPT) };
 }
 
@@ -118,7 +126,6 @@ pub(crate) fn yield_task() {
 #[esp_hal::handler]
 fn cross_core_yield_handler() {
     use esp_hal::system::Cpu;
-
     match Cpu::current() {
         Cpu::ProCpu => unsafe { SoftwareInterrupt::<'static, 0>::steal() }.reset(),
         Cpu::AppCpu => unsafe { SoftwareInterrupt::<'static, 1>::steal() }.reset(),

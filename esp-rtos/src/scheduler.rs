@@ -10,6 +10,8 @@ use esp_sync::RawMutex;
 
 #[cfg(feature = "alloc")]
 use crate::InternalMemory;
+#[cfg(feature = "rtos-trace")]
+use crate::TraceEvents;
 use crate::{
     run_queue::RunQueue,
     task::{
@@ -195,6 +197,9 @@ impl SchedulerState {
         task.heap_allocated = true;
         let task_ptr = NonNull::from(Box::leak(task));
 
+        #[cfg(feature = "rtos-trace")]
+        rtos_trace::trace::task_new(task_ptr.rtos_trace_id());
+
         self.all_tasks.push(task_ptr);
         if self.run_queue.mark_task_ready(task_ptr) {
             self.trigger_schedule(task_ptr);
@@ -228,7 +233,11 @@ impl SchedulerState {
     }
 
     fn run_scheduler(&mut self, task_switch: impl FnOnce(*mut CpuContext, *mut CpuContext)) {
-        let current_cpu = Cpu::current() as usize;
+        #[cfg(feature = "rtos-trace")]
+        rtos_trace::trace::marker_begin(TraceEvents::RunSchedule as u32);
+
+        let cpu = Cpu::current();
+        let current_cpu = cpu as usize;
 
         let mut priority = if let Some(current_task) = self.per_cpu[current_cpu].current_task {
             let current_task = unsafe { current_task.as_ref() };
@@ -256,6 +265,9 @@ impl SchedulerState {
             // If the current task is deleted, we can skip saving its context. We signal this by
             // using a null pointer.
             let current_context = if let Some(current) = current_task {
+                #[cfg(feature = "rtos-trace")]
+                rtos_trace::trace::task_exec_end(); // FIXME: rtos-trace should take the task ID for multi-core
+
                 // TODO: the SMP scheduler relies on at least the context saving to happen within
                 // the scheduler's critical section. We can't run the scheduler on the other core
                 // while it might try to restore a partially saved context.
@@ -279,6 +291,9 @@ impl SchedulerState {
 
             let next_context = if let Some(next) = next_task {
                 priority = Some(next.priority(&mut self.run_queue));
+
+                #[cfg(feature = "rtos-trace")]
+                rtos_trace::trace::task_exec_begin(next.rtos_trace_id());
 
                 unsafe { next.as_ref().set_up_stack_watchpoint() };
 
@@ -327,6 +342,9 @@ impl SchedulerState {
                     }
                 }
 
+                #[cfg(feature = "rtos-trace")]
+                rtos_trace::trace::system_idle();
+
                 &raw mut self.per_cpu[current_cpu].idle_context
             };
 
@@ -356,7 +374,11 @@ impl SchedulerState {
         };
 
         let time_driver = unwrap!(self.time_driver.as_mut());
-        time_driver.arm_next_wakeup(arm_next_timeslice_tick);
+        time_driver.timer_queue.time_slice_active = arm_next_timeslice_tick;
+        time_driver.arm_next_wakeup();
+
+        #[cfg(feature = "rtos-trace")]
+        rtos_trace::trace::marker_end(TraceEvents::RunSchedule as u32);
     }
 
     pub(crate) fn switch_task(&mut self, #[cfg(xtensa)] trap_frame: &mut CpuContext) {
@@ -496,3 +518,24 @@ esp_radio_rtos_driver::scheduler_impl!(pub(crate) static SCHEDULER: Scheduler = 
 pub(crate) static SCHEDULER: Scheduler = Scheduler {
     inner: Mutex::new(RefCell::new(SchedulerState::new())),
 };
+
+#[cfg(feature = "rtos-trace")]
+impl rtos_trace::RtosTraceOSCallbacks for Scheduler {
+    fn task_list() {
+        SCHEDULER.with(|s| {
+            for task in s.all_tasks.iter() {
+                rtos_trace::trace::task_send_info(
+                    task.rtos_trace_id(),
+                    task.rtos_trace_info(&mut s.run_queue),
+                );
+            }
+        })
+    }
+
+    fn time() -> u64 {
+        crate::now()
+    }
+}
+
+#[cfg(feature = "rtos-trace")]
+rtos_trace::global_os_callbacks!(Scheduler);

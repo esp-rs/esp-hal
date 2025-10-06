@@ -13,6 +13,8 @@ use esp_hal::{
     system::Cpu,
     time::{Duration, Instant},
 };
+#[cfg(feature = "rtos-trace")]
+use rtos_trace::TaskInfo;
 
 #[cfg(feature = "alloc")]
 use crate::InternalMemory;
@@ -65,6 +67,11 @@ task_list_item!(TaskTimerQueueElement, timer_queue_item);
 /// Extension trait for common task operations. These should be inherent methods but we can't
 /// implement stuff for NonNull.
 pub(crate) trait TaskExt {
+    #[cfg(feature = "rtos-trace")]
+    fn rtos_trace_id(self) -> u32;
+    #[cfg(feature = "rtos-trace")]
+    fn rtos_trace_info(self, run_queue: &mut RunQueue) -> TaskInfo;
+
     #[cfg(any(feature = "esp-radio", feature = "embassy"))]
     fn resume(self);
     fn priority(self, _: &mut RunQueue) -> usize;
@@ -74,6 +81,21 @@ pub(crate) trait TaskExt {
 }
 
 impl TaskExt for TaskPtr {
+    #[cfg(feature = "rtos-trace")]
+    fn rtos_trace_id(self) -> u32 {
+        self.addr().get() as u32
+    }
+
+    #[cfg(feature = "rtos-trace")]
+    fn rtos_trace_info(self, run_queue: &mut RunQueue) -> TaskInfo {
+        TaskInfo {
+            name: "<todo>",
+            priority: self.priority(run_queue) as u32,
+            stack_base: unsafe { self.as_ref().stack.addr() },
+            stack_size: unsafe { self.as_ref().stack.len() },
+        }
+    }
+
     #[cfg(any(feature = "esp-radio", feature = "embassy"))]
     fn resume(self) {
         SCHEDULER.with(|scheduler| scheduler.resume_task(self))
@@ -94,6 +116,14 @@ impl TaskExt for TaskPtr {
 
     fn set_state(mut self, state: TaskState) {
         trace!("Task {:?} state changed to {:?}", self, state);
+
+        #[cfg(feature = "rtos-trace")]
+        match state {
+            TaskState::Ready => rtos_trace::trace::task_ready_begin(self.rtos_trace_id()),
+            TaskState::Sleeping => rtos_trace::trace::task_ready_end(self.rtos_trace_id()),
+            TaskState::Deleted => rtos_trace::trace::task_terminate(self.rtos_trace_id()),
+        }
+
         unsafe { self.as_mut().state = state };
     }
 }
@@ -142,6 +172,16 @@ impl<E: TaskListElement> TaskList<E> {
                 self.push(popped);
             }
         }
+    }
+
+    #[cfg(feature = "rtos-trace")]
+    pub fn iter(&self) -> impl Iterator<Item = TaskPtr> {
+        let mut current = self.head;
+        core::iter::from_fn(move || {
+            let task = current?;
+            current = E::next(task);
+            Some(task)
+        })
     }
 }
 
@@ -531,6 +571,9 @@ pub(super) fn allocate_main_task(
     // part of a static object so taking the pointer is fine.
     let main_task_ptr = NonNull::from(&scheduler.per_cpu[current_cpu].main_task);
     debug!("Main task created: {:?}", main_task_ptr);
+
+    #[cfg(feature = "rtos-trace")]
+    rtos_trace::trace::task_new(main_task_ptr.rtos_trace_id());
 
     // The main task is already running, no need to add it to the ready queue.
     scheduler.all_tasks.push(main_task_ptr);
