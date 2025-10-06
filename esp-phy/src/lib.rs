@@ -261,12 +261,12 @@ impl PhyState {
 /// Global PHY initialization state
 static PHY_STATE: NonReentrantMutex<PhyState> = NonReentrantMutex::new(PhyState::new());
 
-#[derive(Debug)]
 /// Prevents the PHY from being deinitialized.
 ///
 /// As long as at least one [PhyInitGuard] exists, the PHY will remain initialized. To release this
 /// guard, you can either let it go out of scope, or use [PhyInitGuard::release] to explicitly
 /// release it.
+#[derive(Debug)]
 pub struct PhyInitGuard<'d> {
     _phy_clock_guard: PhyClockGuard<'d>,
 }
