@@ -83,17 +83,15 @@ The `scan_with_config_sync_max`, `scan_with_config_sync_max`, `scan_n`, and `sca
 +let (controller, ifaces) = esp_radio::wifi::new(&ctrl, p.WIFI, config).unwrap();
 ```
 
-The `Configuration`, `WifiConfig`,  `ClientConfiguration`, `AccessPointConfiguration`, and `EapClientConfiguration` enums have been renamed to `ModeConfig`, `Config`, `ClientConfig`, `AccessPointConfig`, and `EapClientConfig`:
+The `Configuration`, `ClientConfiguration`, `AccessPointConfiguration`, and `EapClientConfiguration` enums have been renamed to `ModeConfig`, `ClientConfig`, `AccessPointConfig`, and `EapClientConfig`:
 
 ```diff
 use esp_radio::wifi::{
 -    AccessPointConfiguration,
--    WifiConfig,
 -    ClientConfiguration,
 -    Configuration,
 -    EapClientConfiguration,
 +    AccessPointConfig,
-+    Config,
 +    ClientConfig,
 +    ModeConfig,
 +    EapClientConfig
