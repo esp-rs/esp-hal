@@ -1111,6 +1111,7 @@ where
     ) -> Result<Self, Error> {
         let raw = unsafe { DynChannelAccess::conjure(ch_idx) };
 
+        #[cfg_attr(any(esp32, esp32s2), allow(clippy::absurd_extreme_comparisons))]
         if config.idle_threshold > MAX_RX_IDLE_THRESHOLD {
             return Err(Error::InvalidArgument);
         }
