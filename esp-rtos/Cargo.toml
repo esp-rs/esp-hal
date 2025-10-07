@@ -67,7 +67,13 @@ esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated"
 esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", features = ["unstable"] }
 
 [features]
-default = ["esp-alloc", "esp-radio"]
+default = []
+
+## Enable embassy integration (time driver and executors).
+embassy = ["dep:embassy-time-driver", "dep:embassy-executor", "dep:embassy-time-queue-utils"]
+
+## Enable esp-radio support.
+esp-radio = ["alloc", "dep:esp-radio-rtos-driver"]
 
 ## Enable features that require heap allocation.
 alloc = ["dep:allocator-api2", "dep:esp-radio-rtos-driver"]
@@ -78,12 +84,6 @@ alloc = ["dep:allocator-api2", "dep:esp-radio-rtos-driver"]
 ## - `pub extern "C" fn malloc_internal(size: usize) -> *mut u8`
 ## - `pub extern "C" fn free_internal(ptr: *mut u8)`
 esp-alloc = ["alloc", "dep:esp-alloc"]
-
-## Enable embassy integration (time driver and executors).
-embassy = ["dep:embassy-time-driver", "dep:embassy-executor", "dep:embassy-time-queue-utils"]
-
-## Enable esp-radio support.
-esp-radio = ["alloc", "dep:esp-radio-rtos-driver"]
 
 ## Enable rtos-trace support.
 rtos-trace = ["dep:rtos-trace"]
