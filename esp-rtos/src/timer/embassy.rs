@@ -18,9 +18,16 @@ impl TimerQueueInner {
     }
 
     pub(crate) fn handle_alarm(&mut self, now: u64) {
-        if now >= self.next_wakeup {
-            self.next_wakeup = self.queue.next_expiration(now);
+        if now < self.next_wakeup {
+            trace!(
+                "Not processing embassy timer queue. Now: {}, expected next wakeup: {}",
+                now, self.next_wakeup
+            );
+            return;
         }
+        trace!("Processing embassy timer queue at {}", now);
+
+        self.next_wakeup = self.queue.next_expiration(now);
     }
 
     fn schedule_wake(&mut self, at: u64, waker: &Waker) -> bool {
@@ -69,7 +76,7 @@ impl embassy_time_driver::Driver for TimerQueue {
             // FIXME: this likely interferes with time slicing - we just keep pushing the time slice
             // out on the other core, if active.
             SCHEDULER.with(|s| {
-                unwrap!(s.time_driver.as_mut()).arm_next_wakeup();
+                unwrap!(s.time_driver.as_mut()).arm_next_wakeup(crate::now());
             });
         }
     }
