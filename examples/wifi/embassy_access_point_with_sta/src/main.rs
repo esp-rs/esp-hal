@@ -43,7 +43,7 @@ use esp_radio::{
     wifi::{
         AccessPointConfig,
         ClientConfig,
-        Config,
+        ModeConfig,
         WifiApState,
         WifiController,
         WifiDevice,
@@ -116,7 +116,7 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    let client_config = Config::ApSta(
+    let client_config = ModeConfig::ApSta(
         ClientConfig::default()
             .with_ssid(SSID.into())
             .with_password(PASSWORD.into()),
