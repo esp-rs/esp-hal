@@ -1946,14 +1946,14 @@ where
 
         WAKER[raw.channel() as usize].register(ctx.waker());
 
-        match raw.get_rx_status() {
+        let result = match raw.get_rx_status() {
             // Read all available data also on error
             Some(ev @ (Event::End | Event::Error)) => {
                 this.reader.read(&mut this.data, raw, true);
 
                 match ev {
-                    Event::Error => Poll::Ready(Err(Error::ReceiverError)),
-                    _ => Poll::Ready(Ok(this.reader.total)),
+                    Event::Error => Err(Error::ReceiverError),
+                    _ => Ok(this.reader.total),
                 }
             }
             #[cfg(rmt_has_rx_wrap)]
@@ -1966,10 +1966,12 @@ where
                     raw.listen_rx_interrupt(Event::Threshold);
                 }
 
-                Poll::Pending
+                return Poll::Pending;
             }
-            _ => Poll::Pending,
-        }
+            _ => return Poll::Pending,
+        };
+
+        Poll::Ready(result)
     }
 }
 
