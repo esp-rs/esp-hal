@@ -109,7 +109,7 @@ async fn main(_spawner: Spawner) {
         println!("Best AP found: {:?}", best_one);
         println!("Connecting to WiFi SSID: {}", SSID);
 
-        let client_config = ModeConfig(
+        let client_config = ModeConfig::Client(
             ClientConfig::default()
                 .with_ssid(best_one.ssid.clone())
                 .with_bssid(best_one.bssid)
