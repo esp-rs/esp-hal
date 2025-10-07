@@ -43,7 +43,7 @@ esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated"
 
 [features]
 #! ### Logging Feature Flags
-## Enable logging output using version 0.4 of the `log` crate.
+## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
 defmt = ["dep:defmt"]
 
 ## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
