@@ -425,20 +425,16 @@ impl Task {
         // Make sure stack size is also aligned to 16 bytes.
         let task_stack_size = (task_stack_size & !0xF) + 16;
 
-        let layout = unwrap!(
-            Layout::from_size_align(task_stack_size, 16).ok(),
-            "Cannot compute Layout for stack"
-        );
-
         let stack = unwrap!(
-            InternalMemory.allocate(layout).ok(),
-            "Failed to allocate stack of {} bytes",
-            layout.size()
+            Layout::from_size_align(task_stack_size, 16)
+                .ok()
+                .and_then(|layout| InternalMemory.allocate(layout).ok()),
+            "Failed to allocate stack",
         )
         .as_ptr();
 
         let stack_bottom = stack.cast::<MaybeUninit<u32>>();
-        let stack_len_bytes = layout.size();
+        let stack_len_bytes = stack.len();
 
         let stack_guard_offset =
             esp_config::esp_config_int!(usize, "ESP_HAL_CONFIG_STACK_GUARD_OFFSET");
