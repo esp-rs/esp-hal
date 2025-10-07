@@ -48,7 +48,10 @@ impl<const SIZE: usize> Stack<SIZE> {
     /// Construct a stack of length SIZE, uninitialized
     #[instability::unstable]
     pub const fn new() -> Stack<SIZE> {
-        ::core::assert!(SIZE % 16 == 0); // Make sure stack top is aligned, too.
+        const {
+            // Make sure stack top is aligned, too.
+            ::core::assert!(SIZE.is_multiple_of(16));
+        }
 
         Stack {
             mem: MaybeUninit::uninit(),

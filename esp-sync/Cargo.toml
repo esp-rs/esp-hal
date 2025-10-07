@@ -30,10 +30,10 @@ defmt  = { version = "1.0.1", optional = true }
 log-04 = { package = "log", version = "0.4", optional = true }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
-riscv            = { version = "0.15.0" }
+riscv            = { version = "0.15" }
 
 [target.'cfg(target_arch = "xtensa")'.dependencies]
-xtensa-lx        = { version = "0.12.0", path = "../xtensa-lx" }
+xtensa-lx        = { version = "0.12", path = "../xtensa-lx" }
 
 [build-dependencies]
 esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }

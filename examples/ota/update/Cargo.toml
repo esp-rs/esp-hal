@@ -5,7 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
-cfg-if = "1.0.0"
+cfg-if = "1"
 embedded-storage = "0.3.1"
 esp-backtrace = { path = "../../../esp-backtrace", features = [
     "panic-handler",

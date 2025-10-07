@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `rmt::Error` now implements `core::error::Error` (#4247)
 - `ram(reclaimed)` as an alias for `link_section = ".dram2_uninit"` (#4245)
 - `rmt::MAX_TX_LOOPCOUNT` and `rmt::MAX_RX_IDLE_THRESHOLD` constants have been added (#4276)
+- Added support for `embedded-io 0.7` (#4280)
 
 ### Changed
 
