@@ -93,6 +93,9 @@ timestamp = []
 #! ### Output interfaces
 #! You must enable exactly 1 of the below features to enable to intended
 #! communication method.
+#!
+#! > Note: some boards, such as Waveshare's ESP32-C6-DEV-KIT-N8, come with a USB hub.
+#! This can confuse the `auto` feature. If you experience no log output, try selecting an output interface instead of relying on `auto`.
 
 ## Automatically select the best output interface for the target.
 auto        = ["dep:portable-atomic"]
