@@ -46,7 +46,7 @@ esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated"
 ## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
 defmt = ["dep:defmt"]
 
-## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
+## Enable logging output using version 0.4 of the `log` crate.
 log-04 = ["dep:log-04"]
 
 #! ### Chip selection
