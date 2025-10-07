@@ -83,7 +83,7 @@ The `scan_with_config_sync_max`, `scan_with_config_sync_max`, `scan_n`, and `sca
 +let (controller, ifaces) = esp_radio::wifi::new(&ctrl, p.WIFI, config).unwrap();
 ```
 
-The `Configuration`, `ClientConfiguration`, `AccessPointConfiguration`, and `EapClientConfiguration` enums have been renamed to `Config`, `ClientConfig`, `AccessPointConfig`, and `EapClientConfig`:
+The `Configuration`, `ClientConfiguration`, `AccessPointConfiguration`, and `EapClientConfiguration` enums have been renamed to `ModeConfig`, `ClientConfig`, `AccessPointConfig`, and `EapClientConfig`:
 
 ```diff
 use esp_radio::wifi::{
@@ -93,7 +93,7 @@ use esp_radio::wifi::{
 -    EapClientConfiguration,
 +    AccessPointConfig,
 +    ClientConfig,
-+    Config,
++    ModeConfig,
 +    EapClientConfig
 }
 ```
@@ -113,7 +113,7 @@ Same for `set_configuration()` to `set_config()`:
 -         config.ssid = "esp-radio".into();
 -         config
 -     });
-+ let ap_config = Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
++ let ap_config = ModeConfig::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
 ```
 
 ### BLE
@@ -146,7 +146,7 @@ The `BleController` can now be configured using `esp_radio::ble::Config`:
 -            .with_password("password".into()),
 -        AccessPointConfig::default().with_ssid("esp-radio".into()),
 -    );
-+    let client_config = Config::ApSta(
++    let client_config = ModeConfig::ApSta(
 +        ClientConfig::default()
 +            .with_ssid("ssid".into())
 +            .with_password("password".into()),

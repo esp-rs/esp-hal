@@ -23,7 +23,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_radio::wifi::{ClientConfig, Config, ScanConfig};
+use esp_radio::wifi::{ClientConfig, ModeConfig, ScanConfig};
 use smoltcp::iface::{SocketSet, SocketStorage};
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -70,7 +70,7 @@ fn main() -> ! {
     let now = || time::Instant::now().duration_since_epoch().as_millis();
     let mut stack = Stack::new(iface, device, socket_set, now, rng.random());
 
-    let client_config = Config::Client(
+    let client_config = ModeConfig::Client(
         ClientConfig::default()
             .with_ssid(SSID.into())
             .with_password(PASSWORD.into()),
