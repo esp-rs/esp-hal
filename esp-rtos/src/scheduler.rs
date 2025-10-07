@@ -119,67 +119,6 @@ impl SchedulerState {
         }
     }
 
-    #[cfg(multi_core)]
-    fn trigger_schedule(&mut self, task: TaskPtr) {
-        // Assuming 2 cores.
-        // Assuming current core's scheduler is always initialized.
-        let current = Cpu::current() as usize;
-        let other = 1 - current;
-
-        // We're running both schedulers, try to figure out where to schedule the context switch.
-        let task_ref = unsafe { task.as_ref() };
-
-        let ready_task_prio = task_ref.priority;
-
-        let target_cpu = if let Some(pinned_to) = task_ref.pinned_to {
-            // Task is pinned, we have no choice (in CPU cores - we have the choice to not trigger a
-            // context switch)
-            pinned_to as usize
-        } else {
-            // Task is not pinned, pick the core that runs the lower priority task.
-            let current_prio = self.per_cpu[current]
-                .current_task
-                .map(|task| task.priority(&mut self.run_queue))
-                .unwrap_or(0);
-            let other_prio = self.per_cpu[other]
-                .current_task
-                .map(|task| task.priority(&mut self.run_queue));
-
-            if let Some(other_prio) = other_prio {
-                if current_prio >= other_prio {
-                    other
-                } else {
-                    current
-                }
-            } else {
-                other
-            }
-        };
-
-        if !self.per_cpu[target_cpu].initialized {
-            return;
-        }
-
-        let target_cpu_prio = self.per_cpu[target_cpu]
-            .current_task
-            .map(|task| task.priority(&mut self.run_queue))
-            .unwrap_or(0);
-
-        if target_cpu_prio <= ready_task_prio {
-            if target_cpu == current {
-                task::yield_task();
-            } else {
-                task::schedule_other_core();
-            }
-        }
-    }
-
-    #[cfg(not(multi_core))]
-    fn trigger_schedule(&mut self, _task: TaskPtr) {
-        // Single-core system, there's nothing to decide, just yield.
-        task::yield_task();
-    }
-
     #[cfg(feature = "esp-radio")]
     pub(crate) fn create_task(
         &mut self,
@@ -202,7 +141,7 @@ impl SchedulerState {
 
         self.all_tasks.push(task_ptr);
         if self.run_queue.mark_task_ready(task_ptr) {
-            self.trigger_schedule(task_ptr);
+            Scheduler::trigger_schedule(&mut self.per_cpu, &mut self.run_queue, task_ptr);
         }
 
         debug!("Task '{}' created: {:?}", name, task_ptr);
@@ -289,9 +228,9 @@ impl SchedulerState {
                 core::ptr::null_mut()
             };
 
+            let new_core_priority = next_task.map_or(0, |t| t.priority(&mut self.run_queue));
             let next_context = if let Some(next) = next_task {
-                priority = Some(next.priority(&mut self.run_queue));
-
+                priority = Some(new_core_priority);
                 #[cfg(feature = "rtos-trace")]
                 rtos_trace::trace::task_exec_begin(next.rtos_trace_id());
 
@@ -299,6 +238,7 @@ impl SchedulerState {
 
                 unsafe { &raw mut (*next.as_ptr()).cpu_context }
             } else {
+                priority = None;
                 // If there is no next task, set up and return to the idle hook.
                 // Reuse the stack frame of the main task. Note that this requires the main task to
                 // be pinned to the current CPU. If we're switching out the main task, however, we
@@ -352,9 +292,10 @@ impl SchedulerState {
 
             // If we went to idle, this will be None and we won't mess up the main task's stack.
             self.per_cpu[current_cpu].current_task = next_task;
+
+            self.run_queue.update_core_prio(cpu, new_core_priority);
         }
 
-        // TODO maybe we don't need to do this every time?
         // The current task is not in the run queue. If the run queue on the current priority
         // level is empty, the current task is the only one running at its priority
         // level. In this case, we don't need time slicing.
@@ -362,20 +303,10 @@ impl SchedulerState {
             .map(|p| !self.run_queue.is_level_empty(p))
             .unwrap_or(false);
 
-        #[cfg(multi_core)]
-        let arm_next_timeslice_tick = if arm_next_timeslice_tick {
-            true
-        } else {
-            self.per_cpu[1 - current_cpu]
-                .current_task
-                .map(|task| task.priority(&mut self.run_queue))
-                .map(|p| !self.run_queue.is_level_empty(p))
-                .unwrap_or(false)
-        };
-
         let time_driver = unwrap!(self.time_driver.as_mut());
-        time_driver.timer_queue.time_slice_active = arm_next_timeslice_tick;
-        time_driver.arm_next_wakeup();
+        let now = crate::now();
+        time_driver.set_time_slice(cpu, now, arm_next_timeslice_tick);
+        time_driver.arm_next_wakeup(now);
 
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::marker_end(TraceEvents::RunSchedule as u32);
@@ -419,7 +350,7 @@ impl SchedulerState {
         timer_queue.timer_queue.remove(task);
 
         if self.run_queue.mark_task_ready(task) {
-            self.trigger_schedule(task);
+            Scheduler::trigger_schedule(&mut self.per_cpu, &mut self.run_queue, task);
         }
     }
 
@@ -463,6 +394,75 @@ impl Scheduler {
 
     pub(crate) fn with_shared<R>(&self, cb: impl FnOnce(&RefCell<SchedulerState>) -> R) -> R {
         self.inner.lock(|shared| cb(shared))
+    }
+
+    #[cfg(multi_core)]
+    pub(crate) fn trigger_schedule(
+        state: &mut [CpuSchedulerState],
+        run_queue: &mut RunQueue,
+        task: TaskPtr,
+    ) {
+        // Assuming 2 cores.
+        // Assuming current core's scheduler is always initialized.
+        let current = Cpu::current() as usize;
+        let other = 1 - current;
+
+        // We're running both schedulers, try to figure out where to schedule the context switch.
+        let task_ref = unsafe { task.as_ref() };
+
+        let ready_task_prio = task_ref.priority;
+
+        let target_cpu = if let Some(pinned_to) = task_ref.pinned_to {
+            // Task is pinned, we have no choice (in CPU cores - we have the choice to not trigger a
+            // context switch)
+            pinned_to as usize
+        } else {
+            // Task is not pinned, pick the core that runs the lower priority task.
+            let current_prio = state[current]
+                .current_task
+                .map(|task| task.priority(run_queue))
+                .unwrap_or(0);
+            let other_prio = state[other]
+                .current_task
+                .map(|task| task.priority(run_queue));
+
+            if let Some(other_prio) = other_prio {
+                if current_prio >= other_prio {
+                    other
+                } else {
+                    current
+                }
+            } else {
+                other
+            }
+        };
+
+        if !state[target_cpu].initialized {
+            return;
+        }
+
+        let target_cpu_prio = state[target_cpu]
+            .current_task
+            .map(|task| task.priority(run_queue))
+            .unwrap_or(0);
+
+        if target_cpu_prio <= ready_task_prio {
+            if target_cpu == current {
+                task::yield_task();
+            } else {
+                task::schedule_other_core();
+            }
+        }
+    }
+
+    #[cfg(not(multi_core))]
+    pub(crate) fn trigger_schedule(
+        _state: &mut [CpuSchedulerState],
+        _run_queue: &mut RunQueue,
+        _task: TaskPtr,
+    ) {
+        // Single-core system, there's nothing to decide, just yield.
+        task::yield_task();
     }
 
     #[cfg(feature = "esp-radio")]
