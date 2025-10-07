@@ -77,14 +77,6 @@ name    = "lcd_cam"
 harness = false
 
 [[bin]]
-name    = "lcd_cam_i8080"
-harness = false
-
-[[bin]]
-name    = "lcd_cam_i8080_async"
-harness = false
-
-[[bin]]
 name    = "misc_simple"
 harness = false
 
