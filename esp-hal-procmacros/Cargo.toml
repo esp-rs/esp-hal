@@ -25,7 +25,6 @@ proc-macro = true
 
 [dependencies]
 document-features = "0.2"
-litrs             = "0.5"
 object            = { version = "0.37", default-features = false, features = ["read_core", "elf"], optional = true }
 proc-macro-crate  = "3.4"
 proc-macro2       = "1.0"
