@@ -104,7 +104,7 @@ default = ["esp-alloc"]
 ## - `pub extern "C" fn get_free_internal_heap_size() -> usize;`
 esp-alloc = ["dep:esp-alloc"]
 
-## Logs the WiFi logs from the driver at log level info (needs a nightly-compiler)
+## Logs the Wi-Fi logs from the driver at log level info (needs a nightly-compiler)
 sys-logs = ["esp-wifi-sys/sys-logs"]
 
 #! ### Chip selection
