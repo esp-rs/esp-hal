@@ -35,13 +35,54 @@ mod esp_alloc {
 
     unsafe impl Allocator for InternalMemory {
         fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
-            let raw_ptr = unsafe { super::malloc_internal(layout.size()) };
-            let ptr = NonNull::new(raw_ptr).ok_or(AllocError)?;
+            // We assume malloc returns a 4-byte aligned pointer. We can skip aligning types
+            // that are already aligned to 4 bytes or less.
+            let ptr = if layout.align() <= 4 {
+                unsafe { super::malloc_internal(layout.size()) }
+            } else {
+                // We allocate extra memory so that we can store the number of prefix bytes in the
+                // bytes before the actual allocation. We will then use this to
+                // restore the pointer to the original allocation.
+
+                // If we can get away with 0 padding bytes, let's do that. In this case, we need
+                // space for the prefix length only.
+                // We assume malloc returns a 4-byte aligned pointer. This means any higher
+                // alignment requirements can be satisfied by at most align - 4
+                // bytes of shift, and we can use the remaining 4 bytes for the prefix length.
+                let extra = layout.align().max(4);
+
+                let allocation = unsafe { super::malloc_internal(layout.size() + extra) };
+
+                // reserve at least 4 bytes for the prefix
+                let ptr = allocation.wrapping_add(4);
+
+                let align_offset = ptr.align_offset(layout.align());
+
+                let data_ptr = ptr.wrapping_add(align_offset);
+                let prefix_ptr = data_ptr.wrapping_sub(4);
+
+                // Store the amount of padding bytes used for alignment.
+                unsafe { prefix_ptr.cast::<usize>().write(align_offset) };
+
+                data_ptr
+            };
+
+            let ptr = NonNull::new(ptr).ok_or(AllocError)?;
             Ok(NonNull::slice_from_raw_parts(ptr, layout.size()))
         }
 
-        unsafe fn deallocate(&self, ptr: NonNull<u8>, _layout: Layout) {
-            unsafe { super::free_internal(ptr.as_ptr()) };
+        unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+            // We assume malloc returns a 4-byte aligned pointer. In that case we don't have to
+            // align, so we don't have a prefix.
+            if layout.align() <= 4 {
+                unsafe { super::free_internal(ptr.as_ptr()) };
+            } else {
+                // Retrieve the amount of padding bytes used for alignment.
+                let prefix_ptr = ptr.as_ptr().wrapping_sub(4);
+                let prefix_bytes = unsafe { prefix_ptr.cast::<usize>().read() };
+
+                unsafe { super::free_internal(prefix_ptr.wrapping_sub(prefix_bytes)) };
+            }
         }
     }
 }

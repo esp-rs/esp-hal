@@ -85,6 +85,8 @@ alloc = ["dep:allocator-api2", "dep:esp-radio-rtos-driver"]
 ## this feature, you need to provide implementations for the following functions:
 ## - `pub extern "C" fn malloc_internal(size: usize) -> *mut u8`
 ## - `pub extern "C" fn free_internal(ptr: *mut u8)`
+## 
+## Note that the untyped nature of the allocator functions means that esp-alloc is likely the more memory efficient option.
 esp-alloc = ["alloc", "dep:esp-alloc"]
 
 ## Enable [`rtos-trace`](https://crates.io/crates/rtos-trace) support.
