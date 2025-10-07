@@ -175,6 +175,18 @@ The `rmt::Channel::transmit_continuously` and
 +let tx_trans1 = tx_channel1.transmit_continuously(&data, LoopCount::Finite(count));
 ```
 
+The receiver methods `rmt::Channel::<'_, Blocking>::receive` and
+`rmt::Channel::<'_, Async>::receive` now return the actual amount of data read,
+which may be shorter than the buffer size if the idle threshold was exceeded:
+
+```diff
+-let channel = channel.receive(&mut buffer)?.wait().unwrap();
++let (_count, channel) = channel.receive(&mut buffer)?.wait().unwrap();
+
+-let () = async_channel.receive(&mut buffer).await.unwrap();
++let _count = async_channel.receive(&mut buffer).await.unwrap();
+```
+
 ### RMT lifetime changes
 
 The RMT driver didn't use to properly tie together lifetimes of its types and
