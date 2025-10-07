@@ -17,9 +17,6 @@ clippy-configs = [] # don't waste time on this
 
 [dependencies]
 
-[build-dependencies]
-esp-metadata = { version = "0.8.0", path = "../esp-metadata" } # TODO: remove
-
 [features]
 build-script = []
 _device-selected = []

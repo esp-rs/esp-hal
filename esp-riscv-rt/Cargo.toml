@@ -27,8 +27,8 @@ bench = false
 test  = false
 
 [dependencies]
-document-features = "0.2.11"
-defmt             = {version = "1.0.1", optional = true}
+document-features = "0.2"
+defmt             = { version = "1.0.1", optional = true }
 riscv             = "0.15.0"
 # We use the `single-hart` feature since starting up harts != 0 is handled by the HAL, not the runtime.
 riscv-rt          = {version = "0.16.0", features = ["pre-init", "no-exceptions", "no-interrupts", "single-hart", "v-trap", "pre-default-start-trap"]}

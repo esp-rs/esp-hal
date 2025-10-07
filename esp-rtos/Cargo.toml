@@ -41,14 +41,14 @@ rtos-trace = { version = "0.2.0", optional = true }
 
 # Unstable dependencies that are not (strictly) part of the public API
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"], optional = true }
-document-features  = "0.2.11"
+document-features  = "0.2"
 embassy-sync = "0.7"
 esp-alloc = { version = "0.8.0", path = "../esp-alloc", optional = true }
 esp-config = { version = "0.5.0", path = "../esp-config" }
 esp-sync = { version = "0.0.0", path = "../esp-sync" }
 esp-radio-rtos-driver = { version = "0.0.1", path = "../esp-radio-rtos-driver", optional = true }
 macros = { version = "0.19.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
-portable-atomic = { version = "1.11.0", default-features = false }
+portable-atomic = { version = "1.11", default-features = false }
 
 # Optional dependencies that enable ecosystem support.
 embassy-time-driver = { version = "0.2.1", features = [ "tick-hz-1_000_000" ], optional = true }
@@ -57,7 +57,7 @@ embassy-time-queue-utils = { version = "0.3.0", optional = true }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
 defmt            = { version = "1.0", optional = true }
-log-04           = { package = "log", version = "0.4.27", optional = true }
+log-04           = { package = "log", version = "0.4", optional = true }
 
 [build-dependencies]
 esp-config             = { version = "0.5.0", path = "../esp-config", features = ["build"] }

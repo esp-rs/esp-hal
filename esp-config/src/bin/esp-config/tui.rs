@@ -1,12 +1,16 @@
 use std::{collections::HashMap, error::Error, io};
 
-use crossterm::{
-    ExecutableCommand,
-    event::{self, Event, KeyCode, KeyEventKind},
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
-};
 use esp_config::{DisplayHint, Stability, Validator, Value};
-use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
+use ratatui::{
+    crossterm::{
+        ExecutableCommand,
+        event::{self, Event, KeyCode, KeyEventKind},
+        terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+    },
+    prelude::*,
+    style::palette::tailwind,
+    widgets::*,
+};
 use tui_textarea::{CursorMove, TextArea};
 
 use crate::CrateConfig;

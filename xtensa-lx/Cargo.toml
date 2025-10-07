@@ -18,6 +18,6 @@ bench = false
 test  = false
 
 [dependencies]
-critical-section  = "1.2.0"
+critical-section = "1"
 
 [features]
