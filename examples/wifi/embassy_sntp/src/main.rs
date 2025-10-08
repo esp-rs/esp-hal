@@ -28,7 +28,15 @@ use esp_hal::{clock::CpuClock, rng::Rng, rtc_cntl::Rtc, timer::timg::TimerGroup}
 use esp_println::println;
 use esp_radio::{
     Controller,
-    wifi::{ClientConfig, Config, ScanConfig, WifiController, WifiDevice, WifiEvent, WifiStaState},
+    wifi::{
+        ClientConfig,
+        ModeConfig,
+        ScanConfig,
+        WifiController,
+        WifiDevice,
+        WifiEvent,
+        WifiStaState,
+    },
 };
 use log::{error, info};
 use sntpc::{NtpContext, NtpTimestampGenerator, get_time};
@@ -213,7 +221,7 @@ async fn connection(mut controller: WifiController<'static>) {
             Timer::after(Duration::from_millis(5000)).await
         }
         if !matches!(controller.is_started(), Ok(true)) {
-            let client_config = Config::Client(
+            let client_config = ModeConfig::Client(
                 ClientConfig::default()
                     .with_ssid(SSID.into())
                     .with_password(PASSWORD.into()),

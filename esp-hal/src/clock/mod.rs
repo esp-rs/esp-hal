@@ -299,6 +299,7 @@ impl Clock for ApbClock {
 /// RTC FAST_CLK frequency values
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum RtcFastClock {
     /// Main XTAL, divided by 4
     #[cfg(not(any(esp32c6, esp32h2)))]
@@ -329,6 +330,7 @@ impl Clock for RtcFastClock {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
+#[instability::unstable]
 pub enum RtcSlowClock {
     /// Internal slow RC oscillator
     RcSlow   = 0,
@@ -342,6 +344,7 @@ pub enum RtcSlowClock {
 #[cfg(any(esp32c6, esp32h2))]
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
+#[instability::unstable]
 pub enum RtcSlowClock {
     /// Select RC_SLOW_CLK as RTC_SLOW_CLK source
     RcSlow   = 0,
@@ -369,6 +372,7 @@ impl Clock for RtcSlowClock {
 }
 
 /// RTC Clocks.
+#[instability::unstable]
 pub struct RtcClock;
 
 /// RTC Watchdog Timer driver.
@@ -1043,6 +1047,7 @@ impl RtcClock {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 #[doc(hidden)]
+#[instability::unstable]
 pub struct Clocks {
     /// CPU clock frequency
     pub cpu_clock: Rate,

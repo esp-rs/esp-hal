@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32: support outputting the main I2S clock signal (#4128)
 - ESP32 and S3 has `is_running()` function from `esp-storage (#4188)
 - `Cpu::other()` is now marked as public (#4188)
-- The ESP_HAL_CONFIG_STACK_GUARD_MONITORING (enabled by default) enables a data watchpoint on the stack guard value to protect the main stack (#4207)
+- The ESP_HAL_CONFIG_STACK_GUARD_MONITORING (enabled by default) enables a data watchpoint on the stack guard value to protect the main stack (#4207, #4289)
 - `start_app_core_with_stack_guard_offset` (#4207)
 - Chip version Efuse accessors for ESP32, ESP32-C2, ESP32-C3 (#4248)
 - The `rmt::PulseCode::MAX_LEN` constant was added. (#4246)
@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added support for `embedded-io 0.7` (#4280)
 - RMT: Wrapping the hardware buffer is now supported for rx/tx and blocking/async channels (#4049)
 - `rmt::CHANNEL_RAM_SIZE` and `rmt::HAS_RX_WRAP` constants have been added (#4049)
+- A new option `ESP_HAL_CONFIG_WRITE_VEC_TABLE_MONITORING` (disabled by default) to check that no unintentional writes to a very vital memory area are made. (Only RISC-V)  (#4225)
 
 ### Changed
 
@@ -84,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: `LoopCount::Finite` and `ContinuousTxTransaction::is_tx_loopcount_interrupt_set` are only defined when the hardware supports it (all except ESP32). (#4260)
 - RMT: `Channel::transmit_continuously` now verifies that loop counts don't exceed the hardware limit (#4276)
 - RMT: Receive operations read only received codes instead of the entire buffer and return the number of codes read (#4049)
+- `esp_hal::clock::{RtcFastClock, RtcSlowClock, RtcClock}` and `esp_hal::gpio::Event` have been marked unstable (#4293)
 
 ### Fixed
 

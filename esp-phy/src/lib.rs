@@ -12,6 +12,9 @@
 //! previously persisted calibration data.
 //! ## Config Options
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_phy_config_table.md"))]
+//! ## Feature Flags
+#![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 
 // MUST be the first module

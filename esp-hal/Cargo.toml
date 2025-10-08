@@ -142,78 +142,11 @@ __usb_otg = [
     "esp-synopsys-usb-otg/fs",
 ]
 
-# Chip Support Feature Flags
-# Target the ESP32.
-esp32   = [
-    "dep:esp32",
-    "procmacros/rtc-slow",
-    "esp-rom-sys/esp32",
-    "esp-sync/esp32",
-    "esp-metadata-generated/esp32",
-    "dep:sha1",
-    "dep:sha2"
-]
-# Target the ESP32-C2.
-esp32c2 = [
-    "dep:esp32c2",
-    "esp-riscv-rt/no-mie-mip",
-    "portable-atomic/unsafe-assume-single-core",
-    "esp-rom-sys/esp32c2",
-    "esp-sync/esp32c2",
-    "esp-metadata-generated/esp32c2",
-]
-# Target the ESP32-C3.
-esp32c3 = [
-    "dep:esp32c3",
-    "esp-riscv-rt/no-mie-mip",
-    "esp-riscv-rt/rtc-ram",
-    "portable-atomic/unsafe-assume-single-core",
-    "esp-rom-sys/esp32c3",
-    "esp-sync/esp32c3",
-    "esp-metadata-generated/esp32c3",
-]
-# Target the ESP32-C6.
-esp32c6 = [
-    "dep:esp32c6",
-    "esp-riscv-rt/rtc-ram",
-    "procmacros/has-lp-core",
-    "esp-rom-sys/esp32c6",
-    "esp-sync/esp32c6",
-    "esp-metadata-generated/esp32c6",
-]
-# Target the ESP32-H2.
-esp32h2 = [
-    "dep:esp32h2",
-    "esp-riscv-rt/rtc-ram",
-    "esp-rom-sys/esp32h2",
-    "esp-sync/esp32h2",
-    "esp-metadata-generated/esp32h2",
-]
-# Target the ESP32-S2.
-esp32s2 = [
-    "dep:esp32s2",
-    "portable-atomic/unsafe-assume-single-core",
-    "procmacros/has-ulp-core",
-    "procmacros/rtc-slow",
-    "__usb_otg",
-    "esp-rom-sys/esp32s2",
-    "esp-sync/esp32s2",
-    "esp-metadata-generated/esp32s2",
-]
-# Target the ESP32-S3.
-esp32s3 = [
-    "dep:esp32s3",
-    "procmacros/has-ulp-core",
-    "procmacros/rtc-slow",
-    "__usb_otg",
-    "esp-rom-sys/esp32s3",
-    "esp-sync/esp32s3",
-    "esp-metadata-generated/esp32s3",
-]
+#! ### Runtime support
+#! These features are meant to be enabled by firmware projects. If you are writing a library that
+#! depends on `esp-hal`, you should *not* enable these features under any circumstance.
 
-## Runtime support
-##
-## If you are depending on `esp-hal` as a library, you should *not* enable the `rt` feature under any circumstance.
+## Enable code necessary to run the firmware.
 rt = [
     "dep:xtensa-lx-rt",
     "dep:esp-riscv-rt",
@@ -228,9 +161,78 @@ rt = [
 ]
 
 ## Enable a simple exception handler turning exceptions into panics.
-##
-## If you are depending on `esp-hal` as a library, you should *not* enable the `exception-handler` feature under any circumstance.
 exception-handler = []
+
+#! ### Chip selection
+#! One of the following features must be enabled to select the target chip:
+
+##
+esp32   = [
+    "dep:esp32",
+    "procmacros/rtc-slow",
+    "esp-rom-sys/esp32",
+    "esp-sync/esp32",
+    "esp-metadata-generated/esp32",
+    "dep:sha1",
+    "dep:sha2"
+]
+##
+esp32c2 = [
+    "dep:esp32c2",
+    "esp-riscv-rt/no-mie-mip",
+    "portable-atomic/unsafe-assume-single-core",
+    "esp-rom-sys/esp32c2",
+    "esp-sync/esp32c2",
+    "esp-metadata-generated/esp32c2",
+]
+##
+esp32c3 = [
+    "dep:esp32c3",
+    "esp-riscv-rt/no-mie-mip",
+    "esp-riscv-rt/rtc-ram",
+    "portable-atomic/unsafe-assume-single-core",
+    "esp-rom-sys/esp32c3",
+    "esp-sync/esp32c3",
+    "esp-metadata-generated/esp32c3",
+]
+##
+esp32c6 = [
+    "dep:esp32c6",
+    "esp-riscv-rt/rtc-ram",
+    "procmacros/has-lp-core",
+    "esp-rom-sys/esp32c6",
+    "esp-sync/esp32c6",
+    "esp-metadata-generated/esp32c6",
+]
+##
+esp32h2 = [
+    "dep:esp32h2",
+    "esp-riscv-rt/rtc-ram",
+    "esp-rom-sys/esp32h2",
+    "esp-sync/esp32h2",
+    "esp-metadata-generated/esp32h2",
+]
+##
+esp32s2 = [
+    "dep:esp32s2",
+    "portable-atomic/unsafe-assume-single-core",
+    "procmacros/has-ulp-core",
+    "procmacros/rtc-slow",
+    "__usb_otg",
+    "esp-rom-sys/esp32s2",
+    "esp-sync/esp32s2",
+    "esp-metadata-generated/esp32s2",
+]
+##
+esp32s3 = [
+    "dep:esp32s3",
+    "procmacros/has-ulp-core",
+    "procmacros/rtc-slow",
+    "__usb_otg",
+    "esp-rom-sys/esp32s3",
+    "esp-sync/esp32s3",
+    "esp-metadata-generated/esp32s3",
+]
 
 #! ### Logging Feature Flags
 ## Enable logging output using version 0.4 of the `log` crate.

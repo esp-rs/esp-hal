@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update bt-hci version to add additional HCI commands (#3920)
 - A number of enums/structs have been marked as `#[non_exhaustive]` (#3981, #4017)
   - `AuthMethod`, `Protocol`, `AccessPointInfo`, `AccessPointConfiguration`, `ClientConfiguration`, `Capability`, `Configuration`, `WifiEvent`, `InternalWifiError`, `ScanTypeConfig`, `WifiState`, and `WifiMode`
-- The `Configuration`, `ClientConfiguration`, `AccessPointConfiguration`, and `EapClientConfiguration` enums have been renamed to `Config`, `ClientConfig`, `AccessPointConfig`, and `EapClientConfig` (#3994)
+- The `Configuration`, `ClientConfiguration`, `AccessPointConfiguration`, and `EapClientConfiguration` enums have been renamed to `ModeConfig`, `ClientConfig`, `AccessPointConfig`, and `EapClientConfig` (#3994, #4278)
   - Error types implements `core::error:Error`
 - Use `esp-phy` internally for PHY initialization (#3892)
 - `ap_state()` and `sta_state()` marked as stable (#4017)
@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `ieee802154_rx_queue_size` config option has been replaced by a runtime option in `esp_radio::ieee802154::Config` (#4224)
 - The default value of `wifi_max_burst_size` has been changed to 3 (#4231)
 - Set `ble_ll_sync_cnt` to 0 on C6, C2 and H2 as in esp-idf Kconfig default (#4241)
+- `esp_radio::wifi::WifiController::scan_with_config_sync` has been renamed to `scan_with_config` (#4294)
 
 ### Fixed
 

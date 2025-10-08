@@ -112,6 +112,17 @@ options:
   default:
     - value: true
 
+- name: write-vec-table-monitoring
+  description: Use a data watchpoint to check that the vector table was not unintentionally overwritten.
+  default:
+    - value: false
+  active: 'chip == "esp32c2" || chip == "esp32c3" || chip == "esp32c6" || chip == "esp32h2"'
+
+- name: stack-guard-monitoring-with-debugger-connected
+  description: Enable the stack guard also with a debugger connected. Also applies to `write-vec-table-monitoring`.
+  default:
+    - value: true
+
 - name: impl-critical-section
   description: "Provide a `critical-section` implementation. Note that if disabled,
                you will need to provide a `critical-section` implementation which is

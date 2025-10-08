@@ -37,10 +37,6 @@ name    = "dma_mem2mem"
 harness = false
 
 [[bin]]
-name    = "ecc"
-harness = false
-
-[[bin]]
 name    = "flip_link"
 harness = false
 
@@ -74,14 +70,6 @@ harness = false
 
 [[bin]]
 name    = "lcd_cam"
-harness = false
-
-[[bin]]
-name    = "lcd_cam_i8080"
-harness = false
-
-[[bin]]
-name    = "lcd_cam_i8080_async"
 harness = false
 
 [[bin]]
@@ -142,11 +130,7 @@ harness = false
 required-features = ["embassy"]
 
 [[bin]]
-name    = "rsa"
-harness = false
-
-[[bin]]
-name    = "sha"
+name    = "ecc_rsa_sha"
 harness = false
 
 [[bin]]
@@ -252,7 +236,7 @@ default = []
 unstable = ["esp-hal/unstable"]
 
 defmt = ["dep:defmt-rtt"]
-esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/alloc"]
+esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/esp-radio"]
 embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
 
 # Device support (required!):

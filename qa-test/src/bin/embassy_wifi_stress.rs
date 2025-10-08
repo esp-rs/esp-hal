@@ -24,7 +24,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{ClientConfig, ScanConfig, WifiConfig, WifiMode};
+use esp_radio::wifi::{ClientConfig, Config, ModeConfig, ScanConfig, WifiMode};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -52,7 +52,7 @@ async fn main(_spawner: Spawner) {
     let (mut controller, _interfaces) = esp_radio::wifi::new(
         esp_wifi_ctrl,
         peripherals.WIFI.reborrow(),
-        WifiConfig::default(),
+        Config::default(),
     )
     .unwrap();
 
@@ -109,7 +109,7 @@ async fn main(_spawner: Spawner) {
         println!("Best AP found: {:?}", best_one);
         println!("Connecting to WiFi SSID: {}", SSID);
 
-        let client_config = esp_radio::wifi::Config::Client(
+        let client_config = ModeConfig::Client(
             ClientConfig::default()
                 .with_ssid(best_one.ssid.clone())
                 .with_bssid(best_one.bssid)
