@@ -2706,6 +2706,7 @@ impl Info {
                 match interrupt {
                     UartInterrupt::AtCmd => w.at_cmd_char_det().bit(enable),
                     UartInterrupt::TxDone => w.tx_done().bit(enable),
+                    UartInterrupt::RxBreakDetected => w.brk_det().bit(enable),
                     UartInterrupt::RxFifoFull => w.rxfifo_full().bit(enable),
                     UartInterrupt::RxTimeout => w.rxfifo_tout().bit(enable),
                 };
@@ -2726,6 +2727,9 @@ impl Info {
         if ints.tx_done().bit_is_set() {
             res.insert(UartInterrupt::TxDone);
         }
+        if ints.brk_det().bit_is_set() {
+            res.insert(UartInterrupt::RxBreakDetected);
+        }
         if ints.rxfifo_full().bit_is_set() {
             res.insert(UartInterrupt::RxFifoFull);
         }
@@ -2744,6 +2748,7 @@ impl Info {
                 match interrupt {
                     UartInterrupt::AtCmd => w.at_cmd_char_det().clear_bit_by_one(),
                     UartInterrupt::TxDone => w.tx_done().clear_bit_by_one(),
+                    UartInterrupt::RxBreakDetected => w.brk_det().clear_bit_by_one(),
                     UartInterrupt::RxFifoFull => w.rxfifo_full().clear_bit_by_one(),
                     UartInterrupt::RxTimeout => w.rxfifo_tout().clear_bit_by_one(),
                 };
@@ -2807,6 +2812,7 @@ impl Info {
             for event in events {
                 match event {
                     RxEvent::FifoFull => w.rxfifo_full().bit(enable),
+                    RxEvent::BreakDetected => w.brk_det().bit(enable),
                     RxEvent::CmdCharDetected => w.at_cmd_char_det().bit(enable),
 
                     RxEvent::FifoOvf => w.rxfifo_ovf().bit(enable),
@@ -2826,6 +2832,9 @@ impl Info {
 
         if pending_interrupts.rxfifo_full().bit_is_set() {
             active_events |= RxEvent::FifoFull;
+        }
+        if pending_interrupts.brk_det().bit_is_set() {
+            active_events |= RxEvent::BreakDetected;
         }
         if pending_interrupts.at_cmd_char_det().bit_is_set() {
             active_events |= RxEvent::CmdCharDetected;
@@ -2855,6 +2864,7 @@ impl Info {
             for event in events {
                 match event {
                     RxEvent::FifoFull => w.rxfifo_full().clear_bit_by_one(),
+                    RxEvent::BreakDetected => w.brk_det().clear_bit_by_one(),
                     RxEvent::CmdCharDetected => w.at_cmd_char_det().clear_bit_by_one(),
 
                     RxEvent::FifoOvf => w.rxfifo_ovf().clear_bit_by_one(),
