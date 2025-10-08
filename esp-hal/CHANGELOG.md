@@ -81,6 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: `Channel::transmit_continuously` now takes an additional `LoopStop` argument. (#4260)
 - RMT: `LoopCount::Finite` and `ContinuousTxTransaction::is_tx_loopcount_interrupt_set` are only defined when the hardware supports it (all except ESP32). (#4260)
 - RMT: `Channel::transmit_continuously` now verifies that loop counts don't exceed the hardware limit (#4276)
+- `esp_hal::clock::{RtcFastClock, RtcSlowClock, RtcClock}` and `esp_hal::gpio::Event` have been marked unstable (#4293)
 
 ### Fixed
 

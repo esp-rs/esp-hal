@@ -141,6 +141,7 @@ impl Drop for PinGuard {
 /// Event used to trigger interrupts.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum Event {
     /// Interrupts trigger on rising pin edge.
     RisingEdge  = 1,
