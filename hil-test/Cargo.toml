@@ -37,10 +37,6 @@ name    = "dma_mem2mem"
 harness = false
 
 [[bin]]
-name    = "ecc"
-harness = false
-
-[[bin]]
 name    = "flip_link"
 harness = false
 
@@ -134,11 +130,7 @@ harness = false
 required-features = ["embassy"]
 
 [[bin]]
-name    = "rsa"
-harness = false
-
-[[bin]]
-name    = "sha"
+name    = "ecc_rsa_sha"
 harness = false
 
 [[bin]]
