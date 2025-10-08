@@ -1592,7 +1592,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
     pub fn transmit<'data, T>(
         self,
         mut data: &'data [T],
-    ) -> Result<TxTransaction<'ch, 'data, T>, Error>
+    ) -> Result<TxTransaction<'ch, 'data, T>, (Error, Self)>
     where
         T: Into<PulseCode> + Copy,
     {
@@ -1600,9 +1600,9 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         let memsize = raw.memsize();
 
         match data.last() {
-            None => return Err(Error::InvalidArgument),
+            None => return Err((Error::InvalidArgument, self)),
             Some(&code) if code.into().is_end_marker() => (),
-            Some(_) => return Err(Error::EndMarkerMissing),
+            Some(_) => return Err((Error::EndMarkerMissing, self)),
         }
 
         let mut writer = RmtWriter::new();
@@ -1635,7 +1635,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         self,
         mut data: &[T],
         mode: LoopMode,
-    ) -> Result<ContinuousTxTransaction<'ch>, Error>
+    ) -> Result<ContinuousTxTransaction<'ch>, (Error, Self)>
     where
         T: Into<PulseCode> + Copy,
     {
@@ -1644,13 +1644,13 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
 
         #[cfg(rmt_has_tx_loop_count)]
         if mode.get_count() > MAX_TX_LOOPCOUNT {
-            return Err(Error::InvalidArgument);
+            return Err((Error::InvalidArgument, self));
         }
 
         if data.is_empty() {
-            return Err(Error::InvalidArgument);
+            return Err((Error::InvalidArgument, self));
         } else if data.len() > memsize.codes() {
-            return Err(Error::Overflow);
+            return Err((Error::Overflow, self));
         }
 
         // We need a separate flag to track whether we actually started the transmitter: The
@@ -1796,7 +1796,7 @@ impl<'ch> Channel<'ch, Blocking, Rx> {
     pub fn receive<'data, T>(
         self,
         data: &'data mut [T],
-    ) -> Result<RxTransaction<'ch, 'data, T>, Error>
+    ) -> Result<RxTransaction<'ch, 'data, T>, (Error, Self)>
     where
         Self: Sized,
         T: From<PulseCode>,
@@ -1805,7 +1805,7 @@ impl<'ch> Channel<'ch, Blocking, Rx> {
         let memsize = raw.memsize();
 
         if !property!("rmt.has_rx_wrap") && data.len() > memsize.codes() {
-            return Err(Error::InvalidDataLength);
+            return Err((Error::InvalidDataLength, self));
         }
 
         let reader = RmtReader::new();
