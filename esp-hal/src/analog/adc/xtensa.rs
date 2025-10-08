@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 pub use self::calibration::*;
 use super::{AdcCalScheme, AdcCalSource, AdcChannel, AdcConfig, AdcPin, Attenuation};
 #[cfg(esp32s3)]
-use crate::efuse::Efuse;
+use crate::efuse::{AdcCalibUnit, Efuse};
 use crate::{
     peripherals::{APB_SARADC, SENS},
     soc::regi2c,
@@ -55,6 +55,7 @@ where
         // Connect calibration source
         ADCI::connect_cal(source, true);
 
+        ADCI::calibration_init();
         ADCI::set_init_code(0);
 
         for _ in 0..ADCI::ADC_CAL_CNT_MAX {
@@ -104,6 +105,9 @@ pub trait RegisterAccess {
 
     /// Read sample data
     fn read_data() -> u16;
+
+    /// Set up ADC hardware for calibration
+    fn calibration_init();
 
     /// Set calibration parameter to ADC hardware
     fn set_init_code(data: u16);
@@ -172,6 +176,13 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
             .read()
             .meas1_data_sar()
             .bits()
+    }
+
+    #[cfg(any(esp32s2, esp32s3))]
+    fn calibration_init() {
+        // https://github.com/espressif/esp-idf/blob/800f141f94c0f880c162de476512e183df671307/components/hal/esp32s3/include/hal/adc_ll.h#L833
+        // https://github.com/espressif/esp-idf/blob/800f141f94c0f880c162de476512e183df671307/components/hal/esp32s2/include/hal/adc_ll.h#L1145
+        regi2c::ADC_SAR1_DREF.write_field(4);
     }
 
     fn set_init_code(data: u16) {
@@ -275,6 +286,11 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
             .read()
             .meas2_data_sar()
             .bits()
+    }
+
+    #[cfg(any(esp32s2, esp32s3))]
+    fn calibration_init() {
+        regi2c::ADC_SAR2_DREF.write_field(4);
     }
 
     fn set_init_code(data: u16) {
@@ -478,6 +494,7 @@ where
         // Set ADC unit calibration according used scheme for pin
         let init_code = pin.cal_scheme.adc_cal();
         if self.last_init_code != init_code {
+            ADCI::calibration_init();
             ADCI::set_init_code(init_code);
             self.last_init_code = init_code;
         }
@@ -492,29 +509,29 @@ where
 #[cfg(esp32s3)]
 impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_init_code(1, atten)
+        Efuse::rtc_calib_init_code(AdcCalibUnit::ADC1, atten)
     }
 
     fn cal_mv(atten: Attenuation) -> u16 {
-        Efuse::rtc_calib_cal_mv(1, atten)
+        Efuse::rtc_calib_cal_mv(AdcCalibUnit::ADC1, atten)
     }
 
     fn cal_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_cal_code(1, atten)
+        Efuse::rtc_calib_cal_code(AdcCalibUnit::ADC1, atten)
     }
 }
 
 #[cfg(esp32s3)]
 impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_init_code(2, atten)
+        Efuse::rtc_calib_init_code(AdcCalibUnit::ADC2, atten)
     }
 
     fn cal_mv(atten: Attenuation) -> u16 {
-        Efuse::rtc_calib_cal_mv(2, atten)
+        Efuse::rtc_calib_cal_mv(AdcCalibUnit::ADC2, atten)
     }
 
     fn cal_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_cal_code(2, atten)
+        Efuse::rtc_calib_cal_code(AdcCalibUnit::ADC2, atten)
     }
 }

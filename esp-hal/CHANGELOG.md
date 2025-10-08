@@ -105,6 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TWAI: Fixed receive_async erroneously returning RX FIFO overrun errors (#4244)
 - Subtracting Instant values with large difference no longer panics (#4249)
 - ADC: Fixed integer overflow in curve calibration polynomial evaluation (#4240)
+- ADC: Fixed bug where ADC1 would use ADC2 efuse calibration data (#4286)
 - RMT: `Channel::transmit_continuously` also triggers the loopcount interrupt when only using a single repetition. (#4260)
 - I2C: Fix position of SDA sampling point (#4268)
 
