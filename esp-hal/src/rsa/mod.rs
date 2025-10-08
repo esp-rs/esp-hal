@@ -12,13 +12,6 @@
 //!
 //! The RSA accelerator also supports operands of different lengths, which
 //! provides more flexibility during the computation.
-//!
-//! ## Examples
-//!
-//! ### Modular Exponentiation, Modular Multiplication, and Multiplication
-//! Visit the [RSA test suite] for an example of using the peripheral.
-//!
-//! [RSA test suite]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/src/bin/rsa.rs
 
 use core::{marker::PhantomData, ptr::NonNull, task::Poll};
 
