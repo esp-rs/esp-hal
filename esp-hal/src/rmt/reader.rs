@@ -18,6 +18,8 @@ pub(crate) struct RmtReader {
     // The position may be invalid if there's no data left.
     offset: u16,
 
+    pub total: usize,
+
     pub state: ReaderState,
 }
 
@@ -25,6 +27,7 @@ impl RmtReader {
     pub(crate) fn new() -> Self {
         Self {
             offset: 0,
+            total: 0,
             state: ReaderState::Active,
         }
     }
@@ -44,10 +47,38 @@ impl RmtReader {
 
         let ram_start = raw.channel_ram_start();
         let memsize = raw.memsize().codes();
+        let offset = self.offset as usize;
 
-        let max_count = if final_ { memsize } else { memsize / 2 };
+        let max_count = if final_ {
+            let hw_offset = raw.hw_offset();
+
+            // self.offset -> next code we would read
+            // hw_offset -> next code the hardware would write
+            // => If both are the same, we're done, max_count = 0
+            let max_count = (if offset <= hw_offset { 0 } else { memsize }) + hw_offset - offset;
+
+            debug_assert!(
+                max_count == 0 && self.total == 0
+                    // We always enable wrapping if it is available. If it's unavailable, rx might
+                    // stop when the buffer is full, without an end marker present!
+                    // (Checking for two value of hw_offset here, because it's not documented what
+                    // happens with the pointer in that case.)
+                    || !property!("rmt.has_rx_wrap") && (hw_offset == 0 || hw_offset == memsize)
+                    || unsafe {
+                        raw.channel_ram_start()
+                            .add(hw_offset.checked_sub(1).unwrap_or(memsize - 1))
+                            .read_volatile()
+                    }
+                    .is_end_marker()
+            );
+
+            max_count
+        } else {
+            memsize / 2
+        };
+
         let count = data.len().min(max_count);
-        let mut count0 = count.min(memsize - self.offset as usize);
+        let mut count0 = count.min(memsize - offset);
         let mut count1 = count - count0;
 
         // Read in up to 2 chunks to allow wrapping around the buffer end. This is more efficient
@@ -83,6 +114,7 @@ impl RmtReader {
         // where we stopped reading, but the new offset will not be used again since further calls
         // will immediately return due to `self.state != Active`.
         self.offset = (memsize / 2) as u16 - self.offset;
+        self.total += count;
         data.split_off_mut(..count).unwrap();
 
         if count < max_count {
