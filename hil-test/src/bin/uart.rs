@@ -241,4 +241,13 @@ mod tests {
 
         assert_eq!(buf, bytes);
     }
+
+    #[test]
+    fn test_break_detection(ctx: Context) {
+        let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
+        let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
+
+        tx.send_break(1);
+        rx.wait_for_break();
+    }
 }
