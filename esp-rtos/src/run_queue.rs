@@ -12,7 +12,10 @@ pub(crate) struct MaxPriority {
 }
 
 impl MaxPriority {
-    pub const MAX_PRIORITY: usize = 31;
+    pub const MAX_PRIORITY: usize = const {
+        ::core::assert!((P::MAX as usize) < 32);
+        P::MAX as usize
+    };
 
     const fn new() -> Self {
         Self { max: 0, mask: 0 }
@@ -31,6 +34,100 @@ impl MaxPriority {
     fn ready(&self) -> usize {
         // Priority 0 must always be ready
         self.max
+    }
+}
+
+// Annoying but safe way to ensure indexing by priority has no bounds check panics.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(usize)]
+enum P {
+    P0,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+    P6,
+    P7,
+    P8,
+    P9,
+    P10,
+    P11,
+    P12,
+    P13,
+    P14,
+    P15,
+    P16,
+    P17,
+    P18,
+    P19,
+    P20,
+    P21,
+    P22,
+    P23,
+    P24,
+    P25,
+    P26,
+    P27,
+    P28,
+    P29,
+    P30,
+    P31,
+}
+
+impl P {
+    const MAX: Self = Self::P31;
+
+    const fn from_usize(p: usize) -> Self {
+        match p {
+            0 => Self::P0,
+            1 => Self::P1,
+            2 => Self::P2,
+            3 => Self::P3,
+            4 => Self::P4,
+            5 => Self::P5,
+            6 => Self::P6,
+            7 => Self::P7,
+            8 => Self::P8,
+            9 => Self::P9,
+            10 => Self::P10,
+            11 => Self::P11,
+            12 => Self::P12,
+            13 => Self::P13,
+            14 => Self::P14,
+            15 => Self::P15,
+            16 => Self::P16,
+            17 => Self::P17,
+            18 => Self::P18,
+            19 => Self::P19,
+            20 => Self::P20,
+            21 => Self::P21,
+            22 => Self::P22,
+            23 => Self::P23,
+            24 => Self::P24,
+            25 => Self::P25,
+            26 => Self::P26,
+            27 => Self::P27,
+            28 => Self::P28,
+            29 => Self::P29,
+            30 => Self::P30,
+            _ => Self::P31,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Priority(P);
+
+impl Priority {
+    pub const ZERO: Self = Self(P::P0);
+
+    pub const fn new(p: usize) -> Self {
+        Self(P::from_usize(p))
+    }
+
+    pub fn get(self) -> usize {
+        self.0 as usize
     }
 }
 
@@ -61,7 +158,7 @@ impl RunQueue {
         _state: &[CpuSchedulerState; Cpu::COUNT],
         mut ready_task: TaskPtr,
     ) -> RunSchedulerOn {
-        let priority = ready_task.priority(self);
+        let priority = ready_task.priority(self).get();
 
         ready_task.set_state(TaskState::Ready);
         if let Some(mut containing_queue) = unsafe { ready_task.as_mut().current_queue.take() } {
@@ -193,12 +290,12 @@ impl RunQueue {
         popped
     }
 
-    pub(crate) fn is_level_empty(&self, level: usize) -> bool {
-        self.ready_tasks[level].is_empty()
+    pub(crate) fn is_level_empty(&self, level: Priority) -> bool {
+        self.ready_tasks[level.get()].is_empty()
     }
 
     pub(crate) fn remove(&mut self, to_delete: TaskPtr) {
-        let priority = to_delete.priority(self);
+        let priority = to_delete.priority(self).get();
         self.ready_tasks[priority].remove(to_delete);
 
         if self.ready_tasks[priority].is_empty() {

@@ -13,7 +13,7 @@ use crate::InternalMemory;
 #[cfg(feature = "rtos-trace")]
 use crate::TraceEvents;
 use crate::{
-    run_queue::{RunQueue, RunSchedulerOn},
+    run_queue::{Priority, RunQueue, RunSchedulerOn},
     task::{
         self,
         CpuContext,
@@ -75,7 +75,7 @@ impl CpuSchedulerState {
                 #[cfg(sw_task_overflow_detection)]
                 stack_guard_value: 0,
                 current_queue: None,
-                priority: 0,
+                priority: Priority::ZERO,
                 #[cfg(multi_core)]
                 pinned_to: None,
 
@@ -92,10 +92,10 @@ impl CpuSchedulerState {
         }
     }
 
-    pub fn current_priority(&self) -> usize {
+    pub fn current_priority(&self) -> Priority {
         self.current_task
             .map(|task| unsafe { (*task.as_ptr()).priority })
-            .unwrap_or(0)
+            .unwrap_or(Priority::ZERO)
     }
 }
 
@@ -230,11 +230,7 @@ impl SchedulerState {
                 let current_ref = unsafe { current.as_ref() };
                 #[cfg(multi_core)]
                 if current_ref.pinned_to.is_none()
-                    && current_ref.priority
-                        >= self.per_cpu[1 - current_cpu]
-                            .current_task
-                            .map(|t| t.priority(&mut self.run_queue))
-                            .unwrap_or(0)
+                    && current_ref.priority >= self.per_cpu[1 - current_cpu].current_priority()
                 {
                     task::schedule_other_core();
                 }
@@ -244,7 +240,8 @@ impl SchedulerState {
                 core::ptr::null_mut()
             };
 
-            let new_core_priority = next_task.map_or(0, |t| t.priority(&mut self.run_queue));
+            let new_core_priority =
+                next_task.map_or(Priority::ZERO, |t| t.priority(&mut self.run_queue));
             let next_context = if let Some(next) = next_task {
                 priority = Some(new_core_priority);
                 #[cfg(feature = "rtos-trace")]

@@ -20,7 +20,12 @@ use rtos_trace::TaskInfo;
 use crate::InternalMemory;
 #[cfg(feature = "esp-radio")]
 use crate::semaphore::Semaphore;
-use crate::{SCHEDULER, run_queue::RunQueue, scheduler::SchedulerState, wait_queue::WaitQueue};
+use crate::{
+    SCHEDULER,
+    run_queue::{Priority, RunQueue},
+    scheduler::SchedulerState,
+    wait_queue::WaitQueue,
+};
 
 pub type IdleFn = extern "C" fn() -> !;
 
@@ -74,8 +79,8 @@ pub(crate) trait TaskExt {
 
     #[cfg(any(feature = "esp-radio", feature = "embassy"))]
     fn resume(self);
-    fn priority(self, _: &mut RunQueue) -> usize;
-    fn set_priority(self, _: &mut RunQueue, new_pro: usize);
+    fn priority(self, _: &mut RunQueue) -> Priority;
+    fn set_priority(self, _: &mut RunQueue, new_pro: Priority);
     fn state(self) -> TaskState;
     fn set_state(self, state: TaskState);
 }
@@ -90,7 +95,7 @@ impl TaskExt for TaskPtr {
     fn rtos_trace_info(self, run_queue: &mut RunQueue) -> TaskInfo {
         TaskInfo {
             name: "<todo>",
-            priority: self.priority(run_queue) as u32,
+            priority: self.priority(run_queue).get() as u32,
             stack_base: unsafe { self.as_ref().stack.addr() },
             stack_size: unsafe { self.as_ref().stack.len() },
         }
@@ -101,11 +106,11 @@ impl TaskExt for TaskPtr {
         SCHEDULER.with(|scheduler| scheduler.resume_task(self))
     }
 
-    fn priority(self, _: &mut RunQueue) -> usize {
+    fn priority(self, _: &mut RunQueue) -> Priority {
         unsafe { self.as_ref().priority }
     }
 
-    fn set_priority(mut self, run_queue: &mut RunQueue, new_priority: usize) {
+    fn set_priority(mut self, run_queue: &mut RunQueue, new_priority: Priority) {
         run_queue.remove(self);
         unsafe { self.as_mut().priority = new_priority };
     }
@@ -361,7 +366,7 @@ pub(crate) struct Task {
     #[cfg(sw_task_overflow_detection)]
     pub(crate) stack_guard_value: u32,
 
-    pub priority: usize,
+    pub priority: Priority,
     #[cfg(multi_core)]
     pub pinned_to: Option<Cpu>,
 
@@ -453,7 +458,7 @@ impl Task {
             #[cfg(sw_task_overflow_detection)]
             stack_guard_value: 0,
             current_queue: None,
-            priority,
+            priority: Priority::new(priority),
             #[cfg(multi_core)]
             pinned_to,
 
@@ -547,7 +552,7 @@ pub(super) fn allocate_main_task(
     scheduler.per_cpu[current_cpu].initialized = true;
 
     // Reset main task properties. The rest should be cleared when the task is deleted.
-    scheduler.per_cpu[current_cpu].main_task.priority = 0;
+    scheduler.per_cpu[current_cpu].main_task.priority = Priority::ZERO;
     scheduler.per_cpu[current_cpu].main_task.state = TaskState::Ready;
     scheduler.per_cpu[current_cpu].main_task.stack = stack;
     #[cfg(multi_core)]
@@ -619,10 +624,13 @@ impl CurrentThreadHandle {
 
     /// Sets the priority of the current task.
     pub fn set_priority(self, priority: usize) {
-        let priority = priority.min(crate::run_queue::MaxPriority::MAX_PRIORITY);
+        let priority = Priority::new(priority);
         SCHEDULER.with(|state| {
             let old = self.task.priority(&mut state.run_queue);
             self.task.set_priority(&mut state.run_queue, priority);
+
+            // If we're dropping in priority, trigger a context switch in case another task can be
+            // scheduled or time slicing needs to be started.
             if old > priority {
                 crate::task::yield_task();
             }

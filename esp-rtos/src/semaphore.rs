@@ -7,6 +7,7 @@ use esp_sync::NonReentrantMutex;
 
 use crate::{
     SCHEDULER,
+    run_queue::Priority,
     task::{TaskExt, TaskPtr},
     wait_queue::WaitQueue,
 };
@@ -20,7 +21,7 @@ enum SemaphoreInner {
     Mutex {
         recursive: bool,
         owner: Option<TaskPtr>,
-        original_priority: usize,
+        original_priority: Priority,
         lock_counter: u32,
         waiting: WaitQueue,
     },
@@ -158,7 +159,7 @@ impl Semaphore {
                 recursive,
                 owner: None,
                 lock_counter: 0,
-                original_priority: 0,
+                original_priority: Priority::new(0),
                 waiting: WaitQueue::new(),
             }),
         }
