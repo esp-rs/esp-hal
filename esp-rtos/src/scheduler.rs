@@ -149,8 +149,8 @@ impl SchedulerState {
         task_ptr
     }
 
-    fn delete_marked_tasks(&mut self) {
-        let current_cpu = Cpu::current() as usize;
+    fn delete_marked_tasks(&mut self, cpu: Cpu) {
+        let current_cpu = cpu as usize;
         let mut to_delete = core::mem::take(&mut self.to_delete);
         'outer: while let Some(task_ptr) = to_delete.pop() {
             assert!(task_ptr.state() == TaskState::Deleted);
@@ -186,7 +186,7 @@ impl SchedulerState {
             None
         };
 
-        self.delete_marked_tasks();
+        self.delete_marked_tasks(cpu);
 
         let current_task = self.per_cpu[current_cpu].current_task;
         if let Some(current_task) = current_task

@@ -67,17 +67,7 @@ esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated"
 esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", features = ["unstable"] }
 
 [features]
-default = ["esp-alloc", "esp-radio"]
-
-## Enable features that require heap allocation.
-alloc = ["dep:allocator-api2", "dep:esp-radio-rtos-driver"]
-
-## Enable the use of the `esp-alloc` crate for dynamic memory allocation.
-##
-## If you opt-out, you need to provide implementations for the following functions:
-## - `pub extern "C" fn malloc_internal(size: usize) -> *mut u8`
-## - `pub extern "C" fn free_internal(ptr: *mut u8)`
-esp-alloc = ["alloc", "dep:esp-alloc"]
+default = []
 
 ## Enable embassy integration (time driver and executors).
 embassy = ["dep:embassy-time-driver", "dep:embassy-executor", "dep:embassy-time-queue-utils"]
@@ -85,7 +75,21 @@ embassy = ["dep:embassy-time-driver", "dep:embassy-executor", "dep:embassy-time-
 ## Enable esp-radio support.
 esp-radio = ["alloc", "dep:esp-radio-rtos-driver"]
 
-## Enable rtos-trace support.
+# Not documented because we don't currently expose anything that requires alloc, but isn't related to esp-radio.
+# TODO: make this public once we actually have alloc-based APIs.
+alloc = ["dep:allocator-api2", "dep:esp-radio-rtos-driver"]
+
+## Enable the use of the `esp-alloc` crate for dynamic memory allocation.
+##
+## Memory allocation is required by `esp-radio`. If you choose to not enable
+## this feature, you need to provide implementations for the following functions:
+## - `pub extern "C" fn malloc_internal(size: usize) -> *mut u8`
+## - `pub extern "C" fn free_internal(ptr: *mut u8)`
+## 
+## Note that the untyped nature of the allocator functions means that esp-alloc is likely the more memory efficient option.
+esp-alloc = ["alloc", "dep:esp-alloc"]
+
+## Enable [`rtos-trace`](https://crates.io/crates/rtos-trace) support.
 rtos-trace = ["dep:rtos-trace"]
 
 #! ### Chip selection

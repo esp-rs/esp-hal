@@ -13,7 +13,7 @@ esp-backtrace = { path = "../../../esp-backtrace", features = [
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
 esp-println = { path = "../../../esp-println", features = ["log-04"] }
-esp-rtos = { path = "../../../esp-rtos", features = ["log-04"] }
+esp-rtos = { path = "../../../esp-rtos", features = ["esp-radio", "log-04"] }
 esp-radio = { path = "../../../esp-radio", features = [
     "esp-now",
     "log-04",

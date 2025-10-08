@@ -15,7 +15,7 @@ esp-backtrace = { path = "../../../esp-backtrace", features = [
 ] }
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["defmt", "unstable"] }
-esp-rtos = { path = "../../../esp-rtos", default-features = false, features = ["embassy", "defmt"] }
+esp-rtos = { path = "../../../esp-rtos", features = ["embassy", "defmt"] }
 esp-println = { path = "../../../esp-println", features = ["defmt-espflash"] }
 
 [features]

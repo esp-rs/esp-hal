@@ -28,6 +28,7 @@ pub trait RawLock {
 pub struct SingleCoreInterruptLock;
 
 impl RawLock for SingleCoreInterruptLock {
+    #[inline]
     unsafe fn enter(&self) -> RestoreState {
         cfg_if::cfg_if! {
             if #[cfg(riscv)] {
@@ -49,6 +50,7 @@ impl RawLock for SingleCoreInterruptLock {
         unsafe { RestoreState::new(token) }
     }
 
+    #[inline]
     unsafe fn exit(&self, token: RestoreState) {
         // Ensure no preceeding memory accesses are reordered to after interrupts are
         // enabled.

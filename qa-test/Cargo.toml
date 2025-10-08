@@ -50,6 +50,7 @@ esp-radio = [
     "dep:blocking-network-stack",
     "dep:esp-radio",
     "dep:smoltcp",
+    "esp-rtos/esp-radio",
 ]
 
 esp32 = [
