@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32: support outputting the main I2S clock signal (#4128)
 - ESP32 and S3 has `is_running()` function from `esp-storage (#4188)
 - `Cpu::other()` is now marked as public (#4188)
-- The ESP_HAL_CONFIG_STACK_GUARD_MONITORING (enabled by default) enables a data watchpoint on the stack guard value to protect the main stack (#4207)
+- The ESP_HAL_CONFIG_STACK_GUARD_MONITORING (enabled by default) enables a data watchpoint on the stack guard value to protect the main stack (#4207, #4289)
 - `start_app_core_with_stack_guard_offset` (#4207)
 - Chip version Efuse accessors for ESP32, ESP32-C2, ESP32-C3 (#4248)
 - The `rmt::PulseCode::MAX_LEN` constant was added. (#4246)

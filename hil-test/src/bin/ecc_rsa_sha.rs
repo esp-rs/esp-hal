@@ -1,56 +1,56 @@
-//! ECC Test
+//! ECC, RSA and SHA Tests
 
-//% CHIPS: esp32c2 esp32c6 esp32h2
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: unstable
 
 #![no_std]
 #![no_main]
 
-use core::ops::Mul;
-
-use crypto_bigint::{
-    Encoding,
-    U192,
-    U256,
-    modular::runtime_mod::{DynResidue, DynResidueParams},
-};
-use elliptic_curve::sec1::ToEncodedPoint;
-#[cfg(feature = "esp32h2")]
-use esp_hal::ecc::WorkMode;
-use esp_hal::{
-    Blocking,
-    clock::CpuClock,
-    ecc::{Ecc, EllipticCurve, Error},
-    rng::{Rng, TrngSource},
-};
-use hex_literal::hex;
 use hil_test as _;
 
-struct TestParams<'a> {
-    prime_fields: &'a [&'a [u8]],
-    nb_loop_mul: usize,
-    #[cfg(feature = "esp32c2")]
-    nb_loop_inv: usize,
-}
-
-const TEST_PARAMS_VECTOR: TestParams = TestParams {
-    prime_fields: &[
-        &hex!("fffffffffffffffffffffffffffffffeffffffffffffffff"),
-        &hex!("ffffffff00000001000000000000000000000000ffffffffffffffffffffffff"),
-    ],
-    nb_loop_mul: 10,
-    #[cfg(feature = "esp32c2")]
-    nb_loop_inv: 20,
-};
-
-struct Context<'a> {
-    ecc: Ecc<'a, Blocking>,
-    _rng_source: TrngSource<'a>,
-}
-
+#[cfg(any(esp32c2, esp32c6, esp32h2))]
 #[embedded_test::tests(default_timeout = 10)]
-mod tests {
-    use super::*;
+mod ecc_tests {
+    use core::ops::Mul;
+
+    use crypto_bigint::{
+        Encoding,
+        U192,
+        U256,
+        modular::runtime_mod::{DynResidue, DynResidueParams},
+    };
+    use elliptic_curve::sec1::ToEncodedPoint;
+    #[cfg(feature = "esp32h2")]
+    use esp_hal::ecc::WorkMode;
+    use esp_hal::{
+        Blocking,
+        clock::CpuClock,
+        ecc::{Ecc, EllipticCurve, Error},
+        rng::{Rng, TrngSource},
+    };
+    use hex_literal::hex;
+
+    struct TestParams<'a> {
+        prime_fields: &'a [&'a [u8]],
+        nb_loop_mul: usize,
+        #[cfg(feature = "esp32c2")]
+        nb_loop_inv: usize,
+    }
+
+    const TEST_PARAMS_VECTOR: TestParams = TestParams {
+        prime_fields: &[
+            &hex!("fffffffffffffffffffffffffffffffeffffffffffffffff"),
+            &hex!("ffffffff00000001000000000000000000000000ffffffffffffffffffffffff"),
+        ],
+        nb_loop_mul: 10,
+        #[cfg(feature = "esp32c2")]
+        nb_loop_inv: 20,
+    };
+
+    struct Context<'a> {
+        ecc: Ecc<'a, Blocking>,
+        _rng_source: TrngSource<'a>,
+    }
 
     #[init]
     fn init() -> Context<'static> {
@@ -226,7 +226,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ecc_afine_point_verification_multiplication(mut ctx: Context<'static>) {
+    fn test_ecc_affine_point_verification_multiplication(mut ctx: Context<'static>) {
         let rng = Rng::new();
         for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
             let t1 = &mut [0_u8; 96];
@@ -554,7 +554,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ecc_afine_point_verification_jacobian_multiplication(mut ctx: Context<'static>) {
+    fn test_ecc_affine_point_verification_jacobian_multiplication(mut ctx: Context<'static>) {
         let rng = Rng::new();
         for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
             let t1 = &mut [0_u8; 96];
@@ -1053,5 +1053,735 @@ mod tests {
             )
             .unwrap();
         assert_eq!(y_192, ECC_192_INV_MUL_RES);
+    }
+}
+
+#[cfg(not(esp32c2))]
+#[embedded_test::tests(default_timeout = 5, executor = hil_test::Executor::new())]
+mod rsa_tests {
+    use crypto_bigint::{U512, U1024, Uint};
+    use esp_hal::{
+        Blocking,
+        rsa::{
+            Rsa,
+            RsaBackend,
+            RsaContext,
+            RsaModularExponentiation,
+            RsaModularMultiplication,
+            RsaMultiplication,
+            operand_sizes::*,
+        },
+    };
+
+    const BIGNUM_1: U512 = Uint::from_be_hex(
+        "c7f61058f96db3bd87dbab08ab03b4f7f2f864eac249144adea6a65f97803b719d8ca980b7b3c0389c1c7c6\
+    7dc353c5e0ec11f5fc8ce7f6073796cc8f73fa878",
+    );
+    const BIGNUM_2: U512 = Uint::from_be_hex(
+        "1763db3344e97be15d04de4868badb12a38046bb793f7630d87cf100aa1c759afac15a01f3c4c83ec2d2f66\
+    6bd22f71c3c1f075ec0e2cb0cb29994d091b73f51",
+    );
+    const BIGNUM_3: U512 = Uint::from_be_hex(
+        "6b6bb3d2b6cbeb45a769eaa0384e611e1b89b0c9b45a045aca1c5fd6e8785b38df7118cf5dd45b9b63d293b\
+    67aeafa9ba25feb8712f188cb139b7d9b9af1c361",
+    );
+
+    const EXPECTED_EXPONENTIATION_OUTPUT: [u32; U512::LIMBS] = [
+        1601059419, 3994655875, 2600857657, 1530060852, 64828275, 4221878473, 2751381085,
+        1938128086, 625895085, 2087010412, 2133352910, 101578249, 3798099415, 3357588690,
+        2065243474, 330914193,
+    ];
+    const EXPECTED_MODULAR_MULT_OUTPUT: [u32; U512::LIMBS] = [
+        1868256644, 833470784, 4187374062, 2684021027, 191862388, 1279046003, 1929899870,
+        4209598061, 3830489207, 1317083344, 2666864448, 3701382766, 3232598924, 2904609522,
+        747558855, 479377985,
+    ];
+    const EXPECTED_MULT_OUTPUT: [u32; U1024::LIMBS] = [
+        1264702968, 3552243420, 2602501218, 498422249, 2431753435, 2307424767, 349202767,
+        2269697177, 1525551459, 3623276361, 3146383138, 191420847, 4252021895, 9176459, 301757643,
+        4220806186, 434407318, 3722444851, 1850128766, 928651940, 107896699, 563405838, 1834067613,
+        1289630401, 3145128058, 3300293535, 3077505758, 1926648662, 1264151247, 3626086486,
+        3701894076, 306518743,
+    ];
+
+    struct Context<'a> {
+        rsa: Rsa<'a, Blocking>,
+    }
+
+    const fn compute_r(modulus: &U512) -> U512 {
+        let mut d = [0_u32; U512::LIMBS * 2 + 1];
+        d[d.len() - 1] = 1;
+        let d = Uint::from_words(d);
+        d.const_rem(&modulus.resize()).0.resize()
+    }
+
+    const fn compute_mprime(modulus: &U512) -> u32 {
+        let m_inv = modulus.inv_mod2k(32).to_words()[0];
+        (-1 * m_inv as i64 & (u32::MAX as i64)) as u32
+    }
+
+    #[init]
+    fn init() -> Context<'static> {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        #[allow(unused_mut)]
+        let mut rsa = Rsa::new(peripherals.RSA);
+
+        #[cfg(not(esp32))]
+        {
+            rsa.disable_constant_time(true);
+            rsa.search_acceleration(true);
+        }
+
+        Context { rsa }
+    }
+
+    #[test]
+    fn test_modular_exponentiation(mut ctx: Context<'static>) {
+        let mut outbuf = [0_u32; U512::LIMBS];
+        let mut mod_exp = RsaModularExponentiation::<Op512, _>::new(
+            &mut ctx.rsa,
+            BIGNUM_2.as_words(),
+            BIGNUM_3.as_words(),
+            compute_mprime(&BIGNUM_3),
+        );
+        let r = compute_r(&BIGNUM_3);
+        mod_exp.start_exponentiation(BIGNUM_1.as_words(), r.as_words());
+        mod_exp.read_results(&mut outbuf);
+        hil_test::assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
+    }
+
+    #[test]
+    async fn modular_async_exponentiation(ctx: Context<'static>) {
+        let mut rsa = ctx.rsa.into_async();
+
+        let mut outbuf = [0_u32; U512::LIMBS];
+        let mut mod_exp = RsaModularExponentiation::<Op512, _>::new(
+            &mut rsa,
+            BIGNUM_2.as_words(),
+            BIGNUM_3.as_words(),
+            compute_mprime(&BIGNUM_3),
+        );
+        let r = compute_r(&BIGNUM_3);
+        mod_exp
+            .exponentiation(BIGNUM_1.as_words(), r.as_words(), &mut outbuf)
+            .await;
+        hil_test::assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
+    }
+
+    #[test]
+    fn test_modular_multiplication(mut ctx: Context<'static>) {
+        let mut outbuf = [0_u32; U512::LIMBS];
+        let r = compute_r(&BIGNUM_3);
+        let mut mod_multi = RsaModularMultiplication::<Op512, _>::new(
+            &mut ctx.rsa,
+            BIGNUM_1.as_words(),
+            BIGNUM_3.as_words(),
+            r.as_words(),
+            compute_mprime(&BIGNUM_3),
+        );
+        mod_multi.start_modular_multiplication(BIGNUM_2.as_words());
+        mod_multi.read_results(&mut outbuf);
+        hil_test::assert_eq!(EXPECTED_MODULAR_MULT_OUTPUT, outbuf);
+    }
+
+    #[test]
+    async fn test_async_modular_multiplication(ctx: Context<'static>) {
+        let mut rsa = ctx.rsa.into_async();
+
+        let mut outbuf = [0_u32; U512::LIMBS];
+        let r = compute_r(&BIGNUM_3);
+        let mut mod_multi = RsaModularMultiplication::<Op512, _>::new(
+            &mut rsa,
+            BIGNUM_1.as_words(),
+            BIGNUM_3.as_words(),
+            r.as_words(),
+            compute_mprime(&BIGNUM_3),
+        );
+        mod_multi
+            .modular_multiplication(BIGNUM_2.as_words(), &mut outbuf)
+            .await;
+        hil_test::assert_eq!(EXPECTED_MODULAR_MULT_OUTPUT, outbuf);
+    }
+
+    #[test]
+    fn test_multiplication(mut ctx: Context<'static>) {
+        let mut outbuf = [0_u32; U1024::LIMBS];
+
+        let operand_a = BIGNUM_1.as_words();
+        let operand_b = BIGNUM_2.as_words();
+
+        let mut rsamulti = RsaMultiplication::<Op512, _>::new(&mut ctx.rsa, operand_a);
+        rsamulti.start_multiplication(operand_b);
+        rsamulti.read_results(&mut outbuf);
+
+        hil_test::assert_eq!(EXPECTED_MULT_OUTPUT, outbuf)
+    }
+
+    #[test]
+    async fn test_async_multiplication(ctx: Context<'static>) {
+        let mut outbuf = [0_u32; U1024::LIMBS];
+
+        let mut rsa = ctx.rsa.into_async();
+
+        let operand_a = BIGNUM_1.as_words();
+        let operand_b = BIGNUM_2.as_words();
+
+        let mut rsamulti = RsaMultiplication::<Op512, _>::new(&mut rsa, operand_a);
+        rsamulti.multiplication(operand_b, &mut outbuf).await;
+
+        hil_test::assert_eq!(EXPECTED_MULT_OUTPUT, outbuf);
+    }
+
+    #[test]
+    async fn test_rsa_work_queue() {
+        // FIXME
+        let mut backend = RsaBackend::new(unsafe { esp_hal::peripherals::RSA::steal() });
+        let _rsa = backend.start();
+
+        let mut rsa = RsaContext::new();
+
+        // Output buffers
+        let mut multi_outbuf = [0_u32; U1024::LIMBS];
+        let mut outbuf = [0_u32; U512::LIMBS];
+
+        // Software-derived values
+        let r = compute_r(&BIGNUM_3);
+        let mprime = compute_mprime(&BIGNUM_3);
+
+        defmt::info!("Multiply");
+
+        let mut handle =
+            rsa.multiply::<Op512>(BIGNUM_1.as_words(), BIGNUM_2.as_words(), &mut multi_outbuf);
+        handle.wait().await;
+        core::mem::drop(handle);
+
+        hil_test::assert_eq!(EXPECTED_MULT_OUTPUT, multi_outbuf);
+
+        defmt::info!("Modular multiply");
+
+        let mut handle = rsa.modular_multiply::<Op512>(
+            BIGNUM_1.as_words(),
+            BIGNUM_2.as_words(),
+            BIGNUM_3.as_words(),
+            r.as_words(),
+            mprime,
+            &mut outbuf,
+        );
+        handle.wait().await;
+        core::mem::drop(handle);
+
+        hil_test::assert_eq!(EXPECTED_MODULAR_MULT_OUTPUT, outbuf);
+
+        defmt::info!("Modular exponentiate");
+
+        let mut handle = rsa.modular_exponentiate::<Op512>(
+            BIGNUM_1.as_words(),
+            BIGNUM_2.as_words(),
+            BIGNUM_3.as_words(),
+            r.as_words(),
+            mprime,
+            &mut outbuf,
+        );
+        handle.wait().await;
+        core::mem::drop(handle);
+
+        hil_test::assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
+    }
+}
+
+#[embedded_test::tests(default_timeout = 6)]
+mod sha_tests {
+    use digest::{Digest, Update};
+    #[cfg(not(esp32))]
+    use esp_hal::sha::Sha224;
+    #[cfg(any(esp32, esp32s2, esp32s3))]
+    use esp_hal::sha::{Sha384, Sha512};
+    #[cfg(any(esp32s2, esp32s3))]
+    use esp_hal::sha::{Sha512_224, Sha512_256};
+    use esp_hal::{
+        clock::CpuClock,
+        rng::{Rng, TrngSource},
+        sha::{Sha, Sha1, Sha256, ShaAlgorithm, ShaBackend, ShaDigest},
+    };
+    use nb::block;
+
+    const SOURCE_DATA: &[u8] = &[b'a'; 258];
+
+    pub struct Context {
+        _rng_source: TrngSource<'static>,
+        sha: Sha<'static>,
+    }
+
+    #[track_caller]
+    fn assert_sw_hash<D: Digest>(algo: &str, input: &[u8], expected_output: &[u8]) {
+        let mut hasher = D::new();
+        hasher.update(input);
+        let soft_result = hasher.finalize();
+
+        hil_test::assert_eq!(
+            expected_output,
+            &soft_result[..],
+            "Output mismatch with {}",
+            algo
+        );
+    }
+
+    fn hash_sha<S: ShaAlgorithm>(sha: &mut Sha<'static>, mut input: &[u8], output: &mut [u8]) {
+        let mut digest = sha.start::<S>();
+        while !input.is_empty() {
+            input = block!(digest.update(input)).unwrap();
+        }
+        block!(digest.finish(output)).unwrap();
+    }
+
+    fn hash_digest<'a, S: ShaAlgorithm>(
+        sha: &'a mut Sha<'static>,
+        input: &[u8],
+        output: &mut [u8],
+    ) {
+        let mut hasher = ShaDigest::<S, _>::new(sha);
+        Update::update(&mut hasher, input);
+        output.copy_from_slice(&digest::FixedOutput::finalize_fixed(hasher));
+    }
+
+    /// A simple test using the Sha trait. This will compare the result with a
+    /// software implementation.
+    #[track_caller]
+    fn assert_sha<S: ShaAlgorithm, const N: usize>(sha: &mut Sha<'static>, input: &[u8]) {
+        let mut output = [0u8; N];
+        hash_sha::<S>(sha, input, &mut output);
+
+        // Compare against Software result.
+        match N {
+            20 => assert_sw_hash::<sha1::Sha1>("SHA-1", input, &output),
+            28 => assert_sw_hash::<sha2::Sha224>("SHA-224", input, &output),
+            32 => assert_sw_hash::<sha2::Sha256>("SHA-256", input, &output),
+            48 => assert_sw_hash::<sha2::Sha384>("SHA-384", input, &output),
+            64 => assert_sw_hash::<sha2::Sha512>("SHA-512", input, &output),
+            _ => unreachable!(),
+        }
+    }
+
+    /// A simple test using the Digest trait. This will compare the result with a
+    /// software implementation.
+    #[track_caller]
+    fn assert_digest<'a, S: ShaAlgorithm, const N: usize>(sha: &'a mut Sha<'static>, input: &[u8]) {
+        let mut output = [0u8; N];
+        hash_digest::<S>(sha, input, &mut output);
+
+        // Compare against Software result.
+        match N {
+            20 => assert_sw_hash::<sha1::Sha1>("SHA-1", input, &output),
+            28 => assert_sw_hash::<sha2::Sha224>("SHA-224", input, &output),
+            32 => assert_sw_hash::<sha2::Sha256>("SHA-256", input, &output),
+            48 => assert_sw_hash::<sha2::Sha384>("SHA-384", input, &output),
+            64 => assert_sw_hash::<sha2::Sha512>("SHA-512", input, &output),
+            _ => unreachable!(),
+        }
+    }
+
+    #[allow(unused_mut)]
+    fn with_random_data(
+        mut f: impl FnMut(
+            (&[u8], &mut [u8]),
+            (&[u8], &mut [u8]),
+            (&[u8], &mut [u8]),
+            (&[u8], &mut [u8]),
+            (&[u8], &mut [u8]),
+        ),
+    ) {
+        const BUFFER_LEN: usize = 256;
+
+        let mut sha1_random = [0u8; BUFFER_LEN];
+        let mut sha224_random = [0u8; BUFFER_LEN];
+        let mut sha256_random = [0u8; BUFFER_LEN];
+        let mut sha384_random = [0u8; BUFFER_LEN];
+        let mut sha512_random = [0u8; BUFFER_LEN];
+
+        let rng = Rng::new();
+
+        // Fill source data with random data
+        rng.read(&mut sha1_random);
+        #[cfg(not(esp32))]
+        rng.read(&mut sha224_random);
+        rng.read(&mut sha256_random);
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        rng.read(&mut sha384_random);
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        rng.read(&mut sha512_random);
+
+        for size in [1, 64, 128, 256] {
+            let mut sha1_output = [0u8; 20];
+            let mut sha224_output = [0u8; 28];
+            let mut sha256_output = [0u8; 32];
+            let mut sha384_output = [0u8; 48];
+            let mut sha512_output = [0u8; 64];
+            f(
+                (&sha1_random[..size], &mut sha1_output[..]),
+                (&sha224_random[..size], &mut sha224_output[..]),
+                (&sha256_random[..size], &mut sha256_output[..]),
+                (&sha384_random[..size], &mut sha384_output[..]),
+                (&sha512_random[..size], &mut sha512_output[..]),
+            );
+
+            // Calculate software result to compare against
+            assert_sw_hash::<sha1::Sha1>("SHA-1", &sha1_random[..size], &sha1_output);
+
+            #[cfg(not(esp32))]
+            assert_sw_hash::<sha2::Sha224>("SHA-224", &sha224_random[..size], &sha224_output);
+
+            assert_sw_hash::<sha2::Sha256>("SHA-256", &sha256_random[..size], &sha256_output);
+
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            assert_sw_hash::<sha2::Sha384>("SHA-384", &sha384_random[..size], &sha384_output);
+
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            assert_sw_hash::<sha2::Sha512>("SHA-512", &sha512_random[..size], &sha512_output);
+        }
+    }
+
+    #[init]
+    fn init() -> Context {
+        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        let peripherals = esp_hal::init(config);
+
+        Context {
+            _rng_source: TrngSource::new(peripherals.RNG, peripherals.ADC1),
+            sha: Sha::new(peripherals.SHA),
+        }
+    }
+
+    #[test]
+    #[cfg(any(esp32s2, esp32s3))]
+    fn test_sha_512_224(mut ctx: Context) {
+        let expected_output = [
+            0x19, 0xf2, 0xb3, 0x88, 0x22, 0x86, 0x94, 0x38, 0xee, 0x24, 0xc1, 0xc3, 0xb0, 0xb1,
+            0x21, 0x6a, 0xf4, 0x81, 0x14, 0x8f, 0x4, 0x34, 0xfd, 0xd7, 0x54, 0x3, 0x2b, 0x88,
+        ];
+        let mut output = [0u8; 28];
+        hash_sha::<Sha512_224>(&mut ctx.sha, SOURCE_DATA, &mut output);
+        assert_eq!(output, expected_output);
+
+        let mut output = [0u8; 28];
+        hash_digest::<Sha512_224>(&mut ctx.sha, SOURCE_DATA, &mut output);
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    #[cfg(any(esp32s2, esp32s3))]
+    fn test_sha_512_256(mut ctx: Context) {
+        let expected_output = [
+            0xb7, 0x49, 0x4e, 0xe1, 0xdb, 0xcd, 0xe5, 0x47, 0x5a, 0x61, 0x25, 0xac, 0x27, 0xc2,
+            0x1b, 0x53, 0xcd, 0x6b, 0x16, 0x33, 0xb4, 0x94, 0xac, 0xa4, 0x2a, 0xe6, 0x99, 0x2f,
+            0xe7, 0xd, 0x83, 0x19,
+        ];
+        let mut output = [0u8; 32];
+        hash_sha::<Sha512_256>(&mut ctx.sha, SOURCE_DATA, &mut output);
+        assert_eq!(output, expected_output);
+
+        let mut output = [0u8; 32];
+        hash_digest::<Sha512_256>(&mut ctx.sha, SOURCE_DATA, &mut output);
+        assert_eq!(output, expected_output);
+    }
+
+    /// A test that runs a hashing on a digest of every size between 1 and 200
+    /// inclusively.
+    #[test]
+    #[timeout(15)]
+    fn test_digest_of_size_1_to_200(mut ctx: Context) {
+        for i in 1..=200 {
+            assert_sha::<Sha1, 20>(&mut ctx.sha, &SOURCE_DATA[..i]);
+            assert_digest::<Sha1, 20>(&mut ctx.sha, &SOURCE_DATA[..i]);
+
+            #[cfg(not(esp32))]
+            {
+                assert_sha::<Sha224, 28>(&mut ctx.sha, &SOURCE_DATA[..i]);
+                assert_digest::<Sha224, 28>(&mut ctx.sha, &SOURCE_DATA[..i]);
+            }
+
+            assert_sha::<Sha256, 32>(&mut ctx.sha, &SOURCE_DATA[..i]);
+            assert_digest::<Sha256, 32>(&mut ctx.sha, &SOURCE_DATA[..i]);
+
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            {
+                assert_sha::<Sha384, 48>(&mut ctx.sha, &SOURCE_DATA[..i]);
+                assert_digest::<Sha384, 48>(&mut ctx.sha, &SOURCE_DATA[..i]);
+
+                assert_sha::<Sha512, 64>(&mut ctx.sha, &SOURCE_DATA[..i]);
+                assert_digest::<Sha512, 64>(&mut ctx.sha, &SOURCE_DATA[..i]);
+            }
+        }
+    }
+
+    #[cfg(not(esp32))]
+    /// A rolling test that loops between hasher for every step to test
+    /// interleaving. This specifically test the Sha trait implementation
+    #[test]
+    fn test_sha_rolling(mut ctx: Context) {
+        #[allow(unused)]
+        with_random_data(|sha1_p, sha224_p, sha256_p, sha384_p, sha512_p| {
+            let mut sha1_remaining = sha1_p.0;
+            let mut sha224_remaining = sha224_p.0;
+            let mut sha256_remaining = sha256_p.0;
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            let mut sha384_remaining = sha384_p.0;
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            let mut sha512_remaining = sha512_p.0;
+
+            let mut sha1 = esp_hal::sha::Context::<esp_hal::sha::Sha1>::new();
+            let mut sha224 = esp_hal::sha::Context::<esp_hal::sha::Sha224>::new();
+            let mut sha256 = esp_hal::sha::Context::<esp_hal::sha::Sha256>::new();
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            let mut sha384 = esp_hal::sha::Context::<esp_hal::sha::Sha384>::new();
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            let mut sha512 = esp_hal::sha::Context::<esp_hal::sha::Sha512>::new();
+
+            loop {
+                let mut all_done = true;
+                if !sha1_remaining.is_empty() {
+                    let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha1);
+                    sha1_remaining = block!(digest.update(sha1_remaining)).unwrap();
+                    block!(digest.save(&mut sha1));
+                    all_done = false;
+                }
+                if !sha224_remaining.is_empty() {
+                    let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha224);
+                    sha224_remaining = block!(digest.update(sha224_remaining)).unwrap();
+                    block!(digest.save(&mut sha224));
+                    all_done = false;
+                }
+
+                if !sha256_remaining.is_empty() {
+                    let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha256);
+                    sha256_remaining = block!(digest.update(sha256_remaining)).unwrap();
+                    block!(digest.save(&mut sha256));
+                    all_done = false;
+                }
+
+                #[cfg(any(esp32, esp32s2, esp32s3))]
+                {
+                    if !sha384_remaining.is_empty() {
+                        let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha384);
+                        sha384_remaining = block!(digest.update(sha384_remaining)).unwrap();
+                        block!(digest.save(&mut sha384));
+                        all_done = false;
+                    }
+
+                    if !sha512_remaining.is_empty() {
+                        let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha512);
+                        sha512_remaining = block!(digest.update(sha512_remaining)).unwrap();
+                        block!(digest.save(&mut sha512));
+                        all_done = false;
+                    }
+                }
+
+                if all_done {
+                    break;
+                }
+            }
+
+            let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha1);
+            block!(digest.finish(sha1_p.1)).unwrap();
+            let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha224);
+            block!(digest.finish(sha224_p.1)).unwrap();
+            let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha256);
+            block!(digest.finish(sha256_p.1)).unwrap();
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            {
+                let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha384);
+                block!(digest.finish(sha384_p.1)).unwrap();
+                let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha512);
+                block!(digest.finish(sha512_p.1)).unwrap();
+            }
+        });
+    }
+
+    /// A rolling test that loops between hasher for every step to test
+    /// interleaving. This specifically test the Digest trait implementation
+    #[test]
+    fn test_for_digest_rolling(mut ctx: Context) {
+        #[allow(unused)]
+        with_random_data(|sha1_p, sha224_p, sha256_p, sha384_p, sha512_p| {
+            // The Digest::update will consume the entirety of remaining. We don't need to
+            // loop until remaining is fully consumed.
+
+            let mut sha1 = ctx.sha.start::<esp_hal::sha::Sha1>();
+            Update::update(&mut sha1, sha1_p.0);
+            let sha1_output = digest::FixedOutput::finalize_fixed(sha1);
+            sha1_p.1.copy_from_slice(&sha1_output);
+
+            #[cfg(not(esp32))]
+            {
+                let mut sha224 = ctx.sha.start::<esp_hal::sha::Sha224>();
+                Update::update(&mut sha224, sha224_p.0);
+                let sha224_output = digest::FixedOutput::finalize_fixed(sha224);
+                sha224_p.1.copy_from_slice(&sha224_output);
+            }
+
+            let mut sha256 = ctx.sha.start::<esp_hal::sha::Sha256>();
+            Update::update(&mut sha256, sha256_p.0);
+            let sha256_output = digest::FixedOutput::finalize_fixed(sha256);
+            sha256_p.1.copy_from_slice(&sha256_output);
+
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            {
+                let mut sha384 = ctx.sha.start::<esp_hal::sha::Sha384>();
+                Update::update(&mut sha384, sha384_p.0);
+                let sha384_output = digest::FixedOutput::finalize_fixed(sha384);
+                sha384_p.1.copy_from_slice(&sha384_output);
+
+                let mut sha512 = ctx.sha.start::<esp_hal::sha::Sha512>();
+                Update::update(&mut sha512, sha512_p.0);
+                let sha512_output = digest::FixedOutput::finalize_fixed(sha512);
+                sha512_p.1.copy_from_slice(&sha512_output);
+            }
+        });
+    }
+
+    /// Calling finalize repeatedly will first return the result of the first hashing operation,
+    /// then return result for hashing 0 bytes.
+    #[test]
+    fn test_repeated_finalize_is_empty_hash(_ctx: Context) {
+        let mut sha_backend = ShaBackend::new(unsafe { esp_hal::peripherals::SHA::steal() });
+        let _sha_driver = sha_backend.start();
+
+        let mut sha1 = esp_hal::sha::Sha1Context::new();
+        let sha1 = &mut sha1; // Trick to not pick Digest methods erroneously
+
+        let mut empty_result = [0; 20];
+        let mut hash_result = [0; 20];
+        let mut repeated_result = [0; 20];
+
+        sha1.finalize(&mut empty_result).wait_blocking();
+
+        sha1.update(&SOURCE_DATA).wait_blocking();
+        sha1.finalize(&mut hash_result).wait_blocking();
+
+        sha1.finalize(&mut repeated_result).wait_blocking();
+
+        assert_sw_hash::<sha1::Sha1>("SHA-1", &SOURCE_DATA, &hash_result);
+        assert_sw_hash::<sha1::Sha1>("SHA-1", &[], &empty_result);
+        hil_test::assert_eq!(empty_result, repeated_result);
+    }
+
+    /// A rolling test that loops between hasher for every step to test
+    /// interleaving. This specifically tests the SHA backend implementation
+    #[test]
+    fn test_for_digest_rolling_context(_ctx: Context) {
+        let mut sha_backend = ShaBackend::new(unsafe { esp_hal::peripherals::SHA::steal() });
+        let _sha_driver = sha_backend.start();
+
+        #[allow(unused)]
+        with_random_data(|sha1_p, sha224_p, sha256_p, sha384_p, sha512_p| {
+            {
+                let mut sha1 = esp_hal::sha::Sha1Context::new();
+                sha1.update(sha1_p.0).wait_blocking();
+                sha1.finalize_into_slice(sha1_p.1).unwrap().wait_blocking();
+            }
+
+            #[cfg(not(esp32))]
+            {
+                let mut sha224 = esp_hal::sha::Sha224Context::new();
+                sha224.update(sha224_p.0).wait_blocking();
+                sha224
+                    .finalize_into_slice(sha224_p.1)
+                    .unwrap()
+                    .wait_blocking();
+            }
+
+            {
+                let mut sha256 = esp_hal::sha::Sha256Context::new();
+                sha256.update(sha256_p.0).wait_blocking();
+                sha256
+                    .finalize_into_slice(sha256_p.1)
+                    .unwrap()
+                    .wait_blocking();
+            }
+
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            {
+                let mut sha384 = esp_hal::sha::Sha384Context::new();
+                sha384.update(sha384_p.0).wait_blocking();
+                sha384
+                    .finalize_into_slice(sha384_p.1)
+                    .unwrap()
+                    .wait_blocking();
+            }
+
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            {
+                let mut sha512 = esp_hal::sha::Sha512Context::new();
+                sha512.update(sha512_p.0).wait_blocking();
+                sha512
+                    .finalize_into_slice(sha512_p.1)
+                    .unwrap()
+                    .wait_blocking();
+            }
+        });
+    }
+
+    /// A rolling test that loops between hasher for every step to test
+    /// interleaving. This specifically tests the SHA backend implementation
+    #[test]
+    fn test_for_digest_rolling_context_interleaved(_ctx: Context) {
+        let mut sha_backend = ShaBackend::new(unsafe { esp_hal::peripherals::SHA::steal() });
+        let _sha_driver = sha_backend.start();
+
+        let mut sha1 = esp_hal::sha::Sha1Context::new();
+
+        #[cfg(not(esp32))]
+        let mut sha224 = esp_hal::sha::Sha224Context::new();
+
+        let mut sha256 = esp_hal::sha::Sha256Context::new();
+
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        let mut sha384 = esp_hal::sha::Sha384Context::new();
+
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        let mut sha512 = esp_hal::sha::Sha512Context::new();
+
+        #[allow(unused)]
+        with_random_data(|sha1_p, sha224_p, sha256_p, sha384_p, sha512_p| {
+            {
+                sha1.update(sha1_p.0).wait_blocking();
+                sha1.finalize_into_slice(sha1_p.1).unwrap().wait_blocking();
+            }
+
+            #[cfg(not(esp32))]
+            {
+                sha224.update(sha224_p.0).wait_blocking();
+                sha224
+                    .finalize_into_slice(sha224_p.1)
+                    .unwrap()
+                    .wait_blocking();
+            }
+
+            {
+                sha256.update(sha256_p.0).wait_blocking();
+                sha256
+                    .finalize_into_slice(sha256_p.1)
+                    .unwrap()
+                    .wait_blocking();
+            }
+
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            {
+                sha384.update(sha384_p.0).wait_blocking();
+                sha384
+                    .finalize_into_slice(sha384_p.1)
+                    .unwrap()
+                    .wait_blocking();
+            }
+
+            #[cfg(any(esp32, esp32s2, esp32s3))]
+            {
+                sha512.update(sha512_p.0).wait_blocking();
+                sha512
+                    .finalize_into_slice(sha512_p.1)
+                    .unwrap()
+                    .wait_blocking();
+            }
+        });
     }
 }

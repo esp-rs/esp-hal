@@ -24,7 +24,8 @@ pub fn debugger_connected() -> bool {
 }
 
 /// Set a word-sized data breakpoint at the given address.
-/// No breakpoint will be set if a debugger is currently attached.
+/// No breakpoint will be set when a debugger is currently attached if
+/// the `stack_guard_monitoring_with_debugger_connected` option is false.
 ///
 /// Breakpoint 0 is used.
 ///
@@ -33,7 +34,9 @@ pub fn debugger_connected() -> bool {
 pub unsafe fn set_stack_watchpoint(addr: usize) {
     assert!(addr.is_multiple_of(4));
 
-    if !crate::debugger::debugger_connected() {
+    if cfg!(stack_guard_monitoring_with_debugger_connected)
+        || !crate::debugger::debugger_connected()
+    {
         cfg_if::cfg_if! {
             if #[cfg(xtensa)] {
                 let addr = addr & !0b11;
