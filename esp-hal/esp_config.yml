@@ -70,12 +70,6 @@ options:
     - value: true
   active: 'chip == "esp32"'
 
-- name: flip-link
-  description: Move the stack to start of RAM to get zero-cost stack overflow protection.
-  default:
-    - value: false
-  active: 'chip == "esp32c6" || chip == "esp32h2"'
-
 - name: psram-mode
   description: SPIRAM chip mode
   default:
