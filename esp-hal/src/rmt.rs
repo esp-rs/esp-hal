@@ -711,7 +711,7 @@ for_each_rmt_channel!(
             where
                 Dm: crate::DriverMode,
             {
-                pub(super) peripheral: RMT<'rmt>,
+                peripheral: RMT<'rmt>,
                 $(
                     #[doc = concat!("RMT Channel ", $num)]
                     pub [<channel $num>]: ChannelCreator<'rmt, Dm, $num>,
@@ -728,6 +728,21 @@ for_each_rmt_channel!(
                         peripheral,
                         $(
                             [<channel $num>]: ChannelCreator::conjure(),
+                        )+
+                        _mode: PhantomData,
+                    }
+                }
+            }
+
+            impl<'rmt> Rmt<'rmt, Blocking> {
+                /// Reconfigures the driver for asynchronous operation.
+                pub fn into_async(mut self) -> Rmt<'rmt, Async> {
+                    self.set_interrupt_handler(chip_specific::async_interrupt_handler);
+
+                    Rmt {
+                        peripheral: self.peripheral,
+                        $(
+                            [<channel $num>]: unsafe { self.[<channel $num>].into_async() },
                         )+
                         _mode: PhantomData,
                     }
@@ -863,12 +878,6 @@ impl<'rmt> Rmt<'rmt, Blocking> {
         let this = Rmt::create(peripheral);
         self::chip_specific::configure_clock(ClockSource::default(), frequency)?;
         Ok(this)
-    }
-
-    /// Reconfigures the driver for asynchronous operation.
-    pub fn into_async(mut self) -> Rmt<'rmt, Async> {
-        self.set_interrupt_handler(chip_specific::async_interrupt_handler);
-        Rmt::create(self.peripheral)
     }
 
     /// Registers an interrupt handler for the RMT peripheral.
@@ -1469,7 +1478,7 @@ where
     _guard: Option<GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>>,
 }
 
-impl<Dm, const CHANNEL: u8> ChannelCreator<'_, Dm, CHANNEL>
+impl<'ch, Dm, const CHANNEL: u8> ChannelCreator<'ch, Dm, CHANNEL>
 where
     Dm: crate::DriverMode,
 {
@@ -1477,6 +1486,13 @@ where
         Self {
             _rmt: PhantomData,
             _guard: Some(GenericPeripheralGuard::new()),
+        }
+    }
+
+    unsafe fn into_async(self) -> ChannelCreator<'ch, Async, CHANNEL> {
+        ChannelCreator {
+            _rmt: PhantomData,
+            _guard: self._guard,
         }
     }
 
