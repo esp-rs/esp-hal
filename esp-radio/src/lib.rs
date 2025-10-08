@@ -27,7 +27,7 @@
 //! You will also need a dynamic memory allocator, and a preemptive task scheduler in your
 //! application. For the dynamic allocator, we recommend using `esp-alloc`. For the task scheduler,
 //! the simplest option that is supported by us is `esp-rtos`, but you may use Ariel
-//! OS or other operation systems as well.
+//! OS or other operating systems as well.
 //!
 //! ```toml
 //! [dependencies.esp-radio]
