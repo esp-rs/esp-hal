@@ -973,7 +973,7 @@ impl<'d> UartRx<'d, Blocking> {
     }
 
     /// Waits for a break condition to be detected.
-    /// 
+    ///
     /// This is a blocking function that will continuously check for a break condition.
     /// After detection, the break interrupt flag is automatically cleared.
     #[instability::unstable]
@@ -981,30 +981,34 @@ impl<'d> UartRx<'d, Blocking> {
         while !self.regs().int_raw().read().brk_det().bit_is_set() {
             // wait
         }
-        self.regs().int_clr().write(|w| w.brk_det().clear_bit_by_one());
+        self.regs()
+            .int_clr()
+            .write(|w| w.brk_det().clear_bit_by_one());
     }
 
     /// Waits for a break condition to be detected with a timeout.
-    /// 
+    ///
     /// This is a blocking function that will check for a break condition up to
     /// the specified timeout. Returns `true` if a break was detected, `false` if
     /// the timeout elapsed. After successful detection, the break interrupt flag
     /// is automatically cleared.
-    /// 
+    ///
     /// ## Arguments
     /// * `timeout_us` - Timeout in microseconds
     #[instability::unstable]
     pub fn wait_for_break_with_timeout(&mut self, timeout_us: u32) -> bool {
         let start = crate::time::Instant::now();
         let timeout_duration = crate::time::Duration::from_micros(timeout_us as u64);
-        
+
         while !self.regs().int_raw().read().brk_det().bit_is_set() {
             if crate::time::Instant::now() - start >= timeout_duration {
                 return false;
             }
         }
-        
-        self.regs().int_clr().write(|w| w.brk_det().clear_bit_by_one());
+
+        self.regs()
+            .int_clr()
+            .write(|w| w.brk_det().clear_bit_by_one());
         true
     }
 
@@ -1163,7 +1167,7 @@ impl<'d> UartRx<'d, Async> {
     }
 
     /// Waits for a break condition to be detected asynchronously.
-    /// 
+    ///
     /// This is an async function that will await until a break condition is
     /// detected on the RX line. After detection, the break interrupt flag is
     /// automatically cleared.
@@ -1174,7 +1178,9 @@ impl<'d> UartRx<'d, Async> {
     #[instability::unstable]
     pub async fn wait_for_break_async(&mut self) {
         UartRxFuture::new(self.uart.reborrow(), RxEvent::BreakDetected).await;
-        self.regs().int_clr().write(|w| w.brk_det().clear_bit_by_one());
+        self.regs()
+            .int_clr()
+            .write(|w| w.brk_det().clear_bit_by_one());
     }
 }
 
@@ -1468,7 +1474,7 @@ impl<'d> Uart<'d, Blocking> {
     }
 
     /// Waits for a break condition to be detected.
-    /// 
+    ///
     /// This is a blocking function that will continuously check for a break condition.
     /// After detection, the break interrupt flag is automatically cleared.
     #[instability::unstable]
@@ -1477,12 +1483,12 @@ impl<'d> Uart<'d, Blocking> {
     }
 
     /// Waits for a break condition to be detected with a timeout.
-    /// 
+    ///
     /// This is a blocking function that will check for a break condition up to
     /// the specified timeout. Returns `true` if a break was detected, `false` if
     /// the timeout elapsed. After successful detection, the break interrupt flag
     /// is automatically cleared.
-    /// 
+    ///
     /// ## Arguments
     /// * `timeout_us` - Timeout in microseconds
     #[instability::unstable]
@@ -1630,7 +1636,7 @@ impl<'d> Uart<'d, Async> {
     }
 
     /// Waits for a break condition to be detected asynchronously.
-    /// 
+    ///
     /// This is an async function that will await until a break condition is
     /// detected on the RX line. After detection, the break interrupt flag is
     /// automatically cleared.
