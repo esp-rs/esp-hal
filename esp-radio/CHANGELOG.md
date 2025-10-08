@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `dtim_period` parameter for `PowerSaveMode` (#4040)
 - `WifiConfig`, `CountryInfo` and `OperatingClass` (#4121)
 - Configuration options for `BleController` (#4223, #4254, #4259)
+- BLE controller: Added support for `embedded-io 0.7` (#4280)
 
 ### Changed
 
@@ -33,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update bt-hci version to add additional HCI commands (#3920)
 - A number of enums/structs have been marked as `#[non_exhaustive]` (#3981, #4017)
   - `AuthMethod`, `Protocol`, `AccessPointInfo`, `AccessPointConfiguration`, `ClientConfiguration`, `Capability`, `Configuration`, `WifiEvent`, `InternalWifiError`, `ScanTypeConfig`, `WifiState`, and `WifiMode`
-- The `Configuration`, `ClientConfiguration`, `AccessPointConfiguration`, and `EapClientConfiguration` enums have been renamed to `Config`, `ClientConfig`, `AccessPointConfig`, and `EapClientConfig` (#3994)
+- The `Configuration`, `ClientConfiguration`, `AccessPointConfiguration`, and `EapClientConfiguration` enums have been renamed to `ModeConfig`, `ClientConfig`, `AccessPointConfig`, and `EapClientConfig` (#3994, #4278)
   - Error types implements `core::error:Error`
 - Use `esp-phy` internally for PHY initialization (#3892)
 - `ap_state()` and `sta_state()` marked as stable (#4017)

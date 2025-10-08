@@ -24,14 +24,13 @@ features = ["has-ulp-core", "interrupt", "ram", "is-ulp-core"]
 proc-macro = true
 
 [dependencies]
-document-features = "0.2.11"
-litrs             = "0.4.1"
-object            = { version = "0.36.7", default-features = false, features = ["read_core", "elf"], optional = true }
-proc-macro-crate  = "3.3.0"
-proc-macro2       = "1.0.95"
-quote             = "1.0.40"
-syn               = { version = "2.0.100", features = ["extra-traits", "full"] }
-termcolor         = "1.4.1"
+document-features = "0.2"
+object            = { version = "0.37", default-features = false, features = ["read_core", "elf"], optional = true }
+proc-macro-crate  = "3.4"
+proc-macro2       = "1.0"
+quote             = "1.0"
+syn               = { version = "2.0", features = ["extra-traits", "full"] }
+termcolor         = "1.4"
 
 [features]
 ## Indicates the target device has RTC slow memory available.

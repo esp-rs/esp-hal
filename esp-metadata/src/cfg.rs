@@ -499,7 +499,6 @@ driver_configs![
             #[serde(default)]
             has_per_channel_clock: bool,
             clock_sources: RmtClockSourcesConfig,
-            max_idle_threshold: u32,
         }
     },
     RngProperties {

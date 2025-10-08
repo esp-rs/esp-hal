@@ -30,7 +30,7 @@ use esp_hal::{
 use esp_println::{print, println};
 use esp_radio::wifi::{
     AccessPointConfig,
-    Config,
+    ModeConfig,
     event::{self, EventExt},
 };
 use smoltcp::iface::{SocketSet, SocketStorage};
@@ -88,7 +88,8 @@ fn main() -> ! {
     let socket_set = SocketSet::new(&mut socket_set_entries[..]);
     let mut stack = Stack::new(iface, device, socket_set, now, rng.random());
 
-    let ap_config = Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
+    let ap_config =
+        ModeConfig::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
     let res = controller.set_config(&ap_config);
     println!("wifi_set_configuration returned {:?}", res);
 

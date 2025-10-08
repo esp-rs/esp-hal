@@ -12,6 +12,7 @@ use syn::{
     punctuated::Punctuated,
 };
 
+/// Parsed arguments for the `main` macro.
 pub struct Args {
     pub(crate) meta: Vec<Meta>,
 }
@@ -25,6 +26,7 @@ impl Parse for Args {
     }
 }
 
+/// Procedural macro entry point for the async `main` function.
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     let args = syn::parse_macro_input!(args as Args);
     let f = syn::parse_macro_input!(item as syn::ItemFn);
@@ -32,6 +34,7 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     run(&args.meta, f, main_fn()).unwrap_or_else(|x| x).into()
 }
 
+/// Expands and validates the async `main` function into a task entry point.
 pub fn run(
     _args: &[Meta],
     f: syn::ItemFn,
@@ -156,6 +159,7 @@ impl Drop for Ctxt {
     }
 }
 
+/// Generates the `main` function that initializes and runs the async executor.
 pub fn main_fn() -> TokenStream2 {
     let root = match proc_macro_crate::crate_name("esp-hal") {
         Ok(proc_macro_crate::FoundCrate::Name(ref name)) => quote::format_ident!("{name}"),

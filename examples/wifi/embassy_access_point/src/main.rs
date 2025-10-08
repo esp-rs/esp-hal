@@ -34,7 +34,7 @@ use esp_hal::{clock::CpuClock, ram, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_radio::{
     Controller,
-    wifi::{AccessPointConfig, Config, WifiApState, WifiController, WifiDevice, WifiEvent},
+    wifi::{AccessPointConfig, ModeConfig, WifiApState, WifiController, WifiDevice, WifiEvent},
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -249,7 +249,7 @@ async fn connection(mut controller: WifiController<'static>) {
         }
         if !matches!(controller.is_started(), Ok(true)) {
             let client_config =
-                Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
+                ModeConfig::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
             controller.set_config(&client_config).unwrap();
             println!("Starting wifi");
             controller.start_async().await.unwrap();

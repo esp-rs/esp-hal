@@ -158,6 +158,8 @@ impl rtos_trace::RtosTrace for Hooks {
 
     fn name_marker(_id: u32, _name: &'static str) {}
     fn marker(_id: u32) {}
+
+    #[esp_hal::ram]
     fn marker_begin(id: u32) {
         match id {
             v if v == esp_rtos::TraceEvents::RunSchedule as u32 => Self::pin_high(),
@@ -168,6 +170,8 @@ impl rtos_trace::RtosTrace for Hooks {
             _ => {}
         }
     }
+
+    #[esp_hal::ram]
     fn marker_end(id: u32) {
         match id {
             v if v == esp_rtos::TraceEvents::RunSchedule as u32 => Self::pin_low(),

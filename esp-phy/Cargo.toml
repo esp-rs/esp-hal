@@ -26,12 +26,13 @@ features       = ["esp32c6"]
 bench = false
 
 [dependencies]
+cfg-if = "1"
+
+document-features = "0.2"
 esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
 esp-wifi-sys = "0.8.1"
 esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated" }
 esp-sync = { version = "0.0.0", path = "../esp-sync" }
-
-cfg-if = "1.0.1"
 
 defmt = { version = "1.0.1", optional = true }
 log-04 = { version = "0.4.27", package = "log", optional = true }
@@ -41,47 +42,53 @@ esp-config   = { version = "0.5.0", path = "../esp-config", features = ["build"]
 esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
+#! ### Logging Feature Flags
+## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
 defmt = ["dep:defmt"]
+
+## Enable logging output using version 0.4 of the `log` crate.
 log-04 = ["dep:log-04"]
 
-# Chip Support Feature Flags
-# Target the ESP32-C2.
+#! ### Chip selection
+#! One of the following features must be enabled to select the target chip:
+
+##
 esp32c2 = [
   "esp-hal/esp32c2",
   "esp-wifi-sys/esp32c2",
   "esp-metadata-generated/esp32c2",
 ]
-# Target the ESP32-C3.
+##
 esp32c3 = [
   "esp-hal/esp32c3",
   "esp-wifi-sys/esp32c3",
   "esp-metadata-generated/esp32c3",
 ]
-# Target the ESP32-C6.
+##
 esp32c6 = [
   "esp-hal/esp32c6",
   "esp-wifi-sys/esp32c6",
   "esp-metadata-generated/esp32c6",
 ]
-# Target the ESP32-H2.
+##
 esp32h2 = [
   "esp-hal/esp32h2",
   "esp-wifi-sys/esp32h2",
   "esp-metadata-generated/esp32h2",
 ]
-# Target the ESP32.
+##
 esp32 = [
   "esp-hal/esp32",
   "esp-wifi-sys/esp32",
   "esp-metadata-generated/esp32",
 ]
-# Target the ESP32-S2.
+##
 esp32s2 = [
   "esp-hal/esp32s2",
   "esp-wifi-sys/esp32s2",
   "esp-metadata-generated/esp32s2",
 ]
-# Target the ESP32-S3.
+##
 esp32s3 = [
   "esp-hal/esp32s3",
   "esp-wifi-sys/esp32s3",

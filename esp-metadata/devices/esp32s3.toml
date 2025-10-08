@@ -600,7 +600,6 @@ has_rx_demodulation = true
 has_dma = true
 clock_sources.supported = [ "None", "Apb", "RcFast", "Xtal" ]
 clock_sources.default = "Apb"
-max_idle_threshold = 0x3FFF
 
 [device.rsa]
 support_status = "partial"

@@ -205,12 +205,11 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 pub fn load_lp_code(input: TokenStream) -> TokenStream {
     use std::{fs, path::Path};
 
-    use litrs::StringLit;
     use object::{File, Object, ObjectSection, ObjectSymbol, Section, SectionKind};
     use parse::Error;
     use proc_macro::Span;
     use proc_macro_crate::{FoundCrate, crate_name};
-    use syn::{Ident, parse};
+    use syn::{Ident, LitStr, parse};
 
     let hal_crate = if cfg!(any(feature = "is-lp-core", feature = "is-ulp-core")) {
         crate_name("esp-lp-hal")
@@ -225,31 +224,14 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
         quote!(crate)
     };
 
-    let first_token = match input.into_iter().next() {
-        Some(token) => token,
-        None => {
-            return Error::new(
-                Span::call_site().into(),
-                "You need to give the path to an ELF file",
-            )
-            .to_compile_error()
-            .into();
-        }
+    let lit: LitStr = match syn::parse(input) {
+        Ok(lit) => lit,
+        Err(e) => return e.into_compile_error().into(),
     };
-    let arg = match StringLit::try_from(&first_token) {
-        Ok(arg) => arg,
-        Err(_) => {
-            return Error::new(
-                Span::call_site().into(),
-                "You need to give the path to an ELF file",
-            )
-            .to_compile_error()
-            .into();
-        }
-    };
-    let elf_file = arg.value();
 
-    if !Path::new(elf_file).exists() {
+    let elf_file = lit.value();
+
+    if !Path::new(&elf_file).exists() {
         return Error::new(Span::call_site().into(), "File not found")
             .to_compile_error()
             .into();

@@ -676,7 +676,7 @@ pub struct RxChannelConfig {
     carrier_level: Level,
     /// Filter threshold in ticks
     filter_threshold: u8,
-    /// Idle threshold in ticks
+    /// Idle threshold in ticks, must not exceed [`MAX_RX_IDLE_THRESHOLD`]
     idle_threshold: u16,
     /// The amount of memory blocks allocted to this channel
     memsize: u8,
@@ -1111,7 +1111,8 @@ where
     ) -> Result<Self, Error> {
         let raw = unsafe { DynChannelAccess::conjure(ch_idx) };
 
-        if config.idle_threshold > property!("rmt.max_idle_threshold") {
+        #[cfg_attr(any(esp32, esp32s2), allow(clippy::absurd_extreme_comparisons))]
+        if config.idle_threshold > MAX_RX_IDLE_THRESHOLD {
             return Err(Error::InvalidArgument);
         }
 
@@ -1507,12 +1508,18 @@ pub enum LoopMode {
     // be used to emulate the LoopCount interrupt on devices that lack it?
     /// Repeat until explicitly stopped, and assert the loop count interrupt upon completing the
     /// given number of iterations.
+    ///
+    /// Loop counts larger than [`MAX_TX_LOOPCOUNT`] will result in an error.
     #[cfg(rmt_has_tx_loop_count)]
     InfiniteWithInterrupt(u16),
 
     /// Repeat for the given number of iterations, and also set the loop count interrupt flag upon
-    /// completion. If the iteration count is 0, the transaction will complete immediately without
+    /// completion.
+    ///
+    /// If the iteration count is 0, the transaction will complete immediately without
     /// starting the transmitter.
+    ///
+    /// Loop counts larger than [`MAX_TX_LOOPCOUNT`] will result in an error.
     #[cfg(rmt_has_tx_loop_auto_stop)]
     Finite(u16),
 }
@@ -1589,7 +1596,10 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         let raw = self.raw;
         let memsize = raw.memsize();
 
-        // FIXME: Validate maximum loopcount!
+        #[cfg(rmt_has_tx_loop_count)]
+        if mode.get_count() > MAX_TX_LOOPCOUNT {
+            return Err(Error::InvalidArgument);
+        }
 
         if data.is_empty() {
             return Err(Error::InvalidArgument);
@@ -2076,6 +2086,22 @@ for_each_rmt_clock_source!(
     };
 );
 
+// Obtain maximum value for a register field from the PAC's register spec.
+macro_rules! max_from_register_spec {
+    ($typ:ty, $reg:ident, $spec:ident, $w:ident) => {{
+        use crate::soc::pac::rmt::$reg as reg;
+        type Spec = reg::$spec;
+        const WIDTH: u8 = reg::$w::<Spec>::WIDTH;
+
+        const _: () = if WIDTH as u32 > <$typ>::BITS {
+            core::panic!("Unexpectedly large register WIDTH");
+        };
+
+        // Fits into $ty according to the assertion above
+        ((1u32 << WIDTH) - 1) as $typ
+    }};
+}
+
 #[cfg(not(any(esp32, esp32s2)))]
 mod chip_specific {
     use enumset::EnumSet;
@@ -2233,6 +2259,11 @@ mod chip_specific {
         }
     }
 
+    // documented in re-export below
+    #[allow(missing_docs)]
+    pub const MAX_TX_LOOPCOUNT: u16 =
+        max_from_register_spec!(u16, ch_tx_lim, CH_TX_LIM_SPEC, TX_LOOP_NUM_W);
+
     impl DynChannelAccess<Tx> {
         #[inline]
         pub fn set_generate_repeat_interrupt(&self, mode: Option<LoopMode>) {
@@ -2389,6 +2420,11 @@ mod chip_specific {
             });
         }
     }
+
+    // documented in re-export below
+    #[allow(missing_docs)]
+    pub const MAX_RX_IDLE_THRESHOLD: u16 =
+        max_from_register_spec!(u16, ch_rx_conf0, CH_RX_CONF0_SPEC, IDLE_THRES_W);
 
     impl DynChannelAccess<Rx> {
         #[inline]
@@ -2625,6 +2661,12 @@ mod chip_specific {
         }
     }
 
+    // documented in re-export below
+    #[allow(missing_docs)]
+    #[cfg(rmt_has_tx_loop_count)]
+    pub const MAX_TX_LOOPCOUNT: u16 =
+        max_from_register_spec!(u16, ch_tx_lim, CH_TX_LIM_SPEC, TX_LOOP_NUM_W);
+
     impl DynChannelAccess<Tx> {
         #[cfg(rmt_has_tx_loop_count)]
         #[inline]
@@ -2817,6 +2859,11 @@ mod chip_specific {
         }
     }
 
+    // documented in re-export below
+    #[allow(missing_docs)]
+    pub const MAX_RX_IDLE_THRESHOLD: u16 =
+        max_from_register_spec!(u16, chconf0, CHCONF0_SPEC, IDLE_THRES_W);
+
     impl DynChannelAccess<Rx> {
         #[inline]
         pub fn clear_rx_interrupts(&self) {
@@ -2983,3 +3030,9 @@ mod chip_specific {
         }
     }
 }
+
+/// The largest valid value for [`RxChannelConfig::with_idle_threshold`].
+pub use chip_specific::MAX_RX_IDLE_THRESHOLD;
+/// The largest valid value for loopcounts in [`LoopMode`].
+#[cfg(rmt_has_tx_loop_count)]
+pub use chip_specific::MAX_TX_LOOPCOUNT;

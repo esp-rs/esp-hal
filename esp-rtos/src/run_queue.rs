@@ -1,3 +1,5 @@
+use esp_hal::system::Cpu;
+
 use crate::task::{TaskExt, TaskPtr, TaskQueue, TaskReadyQueueElement, TaskState};
 
 #[derive(Clone, Copy)]
@@ -33,6 +35,11 @@ pub(crate) struct RunQueue {
     pub(crate) ready_priority: MaxPriority,
 
     pub(crate) ready_tasks: [TaskQueue<TaskReadyQueueElement>; MaxPriority::MAX_PRIORITY + 1],
+
+    /// Tracks the priority of the running task on each core. Used to determine when a task switch
+    /// is needed.
+    #[cfg(multi_core)]
+    current_prios: [usize; Cpu::COUNT],
 }
 
 impl RunQueue {
@@ -40,12 +47,20 @@ impl RunQueue {
         Self {
             ready_priority: MaxPriority::new(),
             ready_tasks: [const { TaskQueue::new() }; MaxPriority::MAX_PRIORITY + 1],
+            #[cfg(multi_core)]
+            current_prios: [0; Cpu::COUNT],
+        }
+    }
+
+    pub(crate) fn update_core_prio(&mut self, _cpu: Cpu, _new_minimum_prio: usize) {
+        #[cfg(multi_core)]
+        {
+            self.current_prios[_cpu as usize] = _new_minimum_prio;
         }
     }
 
     pub(crate) fn mark_task_ready(&mut self, mut ready_task: TaskPtr) -> bool {
         let priority = ready_task.priority(self);
-        let current_prio = self.ready_priority.ready();
 
         ready_task.set_state(TaskState::Ready);
         if let Some(mut containing_queue) = unsafe { ready_task.as_mut().current_queue.take() } {
@@ -59,8 +74,17 @@ impl RunQueue {
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::task_ready_begin(ready_task.rtos_trace_id());
 
+        cfg_if::cfg_if! {
+            if #[cfg(multi_core)] {
+                let current_minimum_prio = self.current_prios.iter().copied().min().unwrap();
+            } else {
+                let current_minimum_prio = self.ready_priority.ready();
+            }
+        }
+
         self.ready_priority.mark_ready(priority);
-        if priority > current_prio || current_prio == 0 {
+
+        if priority > current_minimum_prio || current_minimum_prio == 0 {
             debug!(
                 "mark_task_ready - New prio level: {}",
                 self.ready_priority.ready()

@@ -37,13 +37,7 @@ esp-rom-sys      = { version = "0.1.1", path = "../esp-rom-sys", optional = true
 defmt  = { version = "1.0.1", optional = true }
 
 # Unstable dependencies that are not (strictly) part of the public API
-document-features = "0.2.11"
-
-[target.'cfg(target_arch = "riscv32")'.dependencies]
-riscv            = { version = "0.14.0", optional = true}
-
-[target.'cfg(target_arch = "xtensa")'.dependencies]
-xtensa-lx        = { version = "0.12.0", path = "../xtensa-lx", optional = true }
+document-features = "0.2"
 
 [build-dependencies]
 esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
@@ -72,10 +66,10 @@ esp32c6   = ["esp-hal/esp32c6", "esp-hal/unstable", "esp-rom-sys/esp32c6", "esp-
 ##
 esp32h2   = ["esp-hal/esp32h2", "esp-hal/unstable", "esp-rom-sys/esp32h2", "esp-sync/esp32h2"]
 ##
-esp32     = ["esp-hal/esp32", "esp-hal/unstable", "esp-rom-sys/esp32", "esp-sync/esp32", "xtensa-lx"]
+esp32     = ["esp-hal/esp32", "esp-hal/unstable", "esp-rom-sys/esp32", "esp-sync/esp32"]
 ##
 esp32s2   = ["esp-hal/esp32s2", "esp-hal/unstable", "esp-rom-sys/esp32s2", "esp-sync/esp32s2"]
 ##
-esp32s3   = ["esp-hal/esp32s3", "esp-hal/unstable", "esp-rom-sys/esp32s3", "esp-sync/esp32s3", "xtensa-lx"]
+esp32s3   = ["esp-hal/esp32s3", "esp-hal/unstable", "esp-rom-sys/esp32s3", "esp-sync/esp32s3"]
 ## Used for testing on a host.
 emulation = []

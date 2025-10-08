@@ -27,7 +27,7 @@ use esp_radio::{
     Controller,
     wifi::{
         ClientConfig,
-        Config as WifiConfig,
+        ModeConfig,
         WifiController,
         WifiDevice,
         WifiEvent,
@@ -69,7 +69,7 @@ async fn connection_manager(
     println!("📡 Starting WiFi connection manager");
 
     if !matches!(controller.is_started(), Ok(true)) {
-        let client_config = WifiConfig::Client(
+        let client_config = ModeConfig::Client(
             ClientConfig::default()
                 .with_ssid(SSID.into())
                 .with_password(PASSWORD.into()),

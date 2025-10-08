@@ -27,7 +27,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_radio::wifi::{ClientConfig, Config, ScanConfig};
+use esp_radio::wifi::{ClientConfig, ModeConfig, ScanConfig};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::{DhcpOption, IpAddress},
@@ -82,7 +82,7 @@ fn main() -> ! {
         .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
         .unwrap();
 
-    let client_config = Config::Client(
+    let client_config = ModeConfig::Client(
         ClientConfig::default()
             .with_ssid(SSID.into())
             .with_password(PASSWORD.into()),

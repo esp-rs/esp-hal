@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `rmt::PulseCode::MAX_LEN` constant was added. (#4246)
 - `rmt::Error` now implements `core::error::Error` (#4247)
 - `ram(reclaimed)` as an alias for `link_section = ".dram2_uninit"` (#4245)
+- `rmt::MAX_TX_LOOPCOUNT` and `rmt::MAX_RX_IDLE_THRESHOLD` constants have been added (#4276)
+- Added support for `embedded-io 0.7` (#4280)
 
 ### Changed
 
@@ -79,6 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The behavior of `rmt::PulseCode` constructors (`new`, `new_clamped`, `try_new`) has been reworked to be more convenient and clear. (#4246)
 - RMT: `Channel::transmit_continuously` now takes an additional `LoopStop` argument. (#4260)
 - RMT: `LoopCount::Finite` and `ContinuousTxTransaction::is_tx_loopcount_interrupt_set` are only defined when the hardware supports it (all except ESP32). (#4260)
+- RMT: `Channel::transmit_continuously` now verifies that loop counts don't exceed the hardware limit (#4276)
 
 ### Fixed
 

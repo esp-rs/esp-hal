@@ -40,20 +40,18 @@ bench = false
 test  = false
 
 [dependencies]
+cfg-if  = "1"
 esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
-cfg-if = "1.0.0"
-portable-atomic = { version = "1.11.0", default-features = false }
-enumset = { version = "1.1.6", default-features = false, optional = true }
+portable-atomic = { version = "1.11", default-features = false }
+enumset = { version = "1.1", default-features = false, optional = true }
 
 # ⚠️ Unstable dependencies
-embedded-io = { version = "0.6.1", default-features = false }
-embedded-io-async = "0.6.1"
 esp-radio-rtos-driver = { version = "0.0.1", path = "../esp-radio-rtos-driver" }
 instability = "0.3.9"
 
 # Unstable dependencies that are not (strictly) part of the public API
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
-document-features  = "0.2.11"
+document-features  = "0.2"
 esp-alloc = { version = "0.8.0", path = "../esp-alloc", optional = true }
 esp-config = { version = "0.5.0", path = "../esp-config" }
 esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated" }
@@ -70,6 +68,10 @@ ieee802154 = { version = "0.6.1", optional = true }
 heapless = "0.9"
 
 # Optional dependencies enabling ecosystem features
+embedded-io-06 = { package = "embedded-io", version = "0.6", default-features = false, optional = true }
+embedded-io-async-06 = { package = "embedded-io-async", version = "0.6", default-features = false, optional = true }
+embedded-io-07 = { package = "embedded-io", version = "0.7", default-features = false, optional = true }
+embedded-io-async-07 = { package = "embedded-io-async", version = "0.7", default-features = false, optional = true }
 serde = { version = "1.0.218", default-features = false, features = ["derive"], optional = true }
 smoltcp = { version = "0.12.0", default-features = false, features = [
   "medium-ethernet",
@@ -89,60 +91,6 @@ esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated"
 [features]
 default = ["esp-alloc"]
 
-# Chip Support Feature Flags
-# Target the ESP32-C2.
-esp32c2 = [
-  "esp-hal/esp32c2",
-  "esp-phy/esp32c2",
-  "esp-wifi-sys/esp32c2",
-  "esp-metadata-generated/esp32c2",
-]
-# Target the ESP32-C3.
-esp32c3 = [
-  "esp-hal/esp32c3",
-  "esp-phy/esp32c3",
-  "esp-wifi-sys/esp32c3",
-  "esp-metadata-generated/esp32c3",
-]
-# Target the ESP32-C6.
-esp32c6 = [
-  "esp-hal/esp32c6",
-  "esp-phy/esp32c6",
-  "esp-wifi-sys/esp32c6",
-  "esp-metadata-generated/esp32c6",
-]
-# Target the ESP32-H2.
-esp32h2 = [
-  "esp-hal/esp32h2",
-  "esp-phy/esp32h2",
-  "esp-wifi-sys/esp32h2",
-  "esp-metadata-generated/esp32h2",
-]
-# Target the ESP32.
-esp32 = [
-  "esp-hal/esp32",
-  "esp-phy/esp32",
-  "esp-wifi-sys/esp32",
-  "esp-metadata-generated/esp32",
-  "xtensa-lx-rt/float-save-restore",
-]
-# Target the ESP32-S2.
-esp32s2 = [
-  "esp-hal/esp32s2",
-  "esp-phy/esp32s2",
-  "esp-wifi-sys/esp32s2",
-  "esp-metadata-generated/esp32s2",
-  "xtensa-lx-rt/float-save-restore",
-]
-# Target the ESP32-S3.
-esp32s3 = [
-  "esp-hal/esp32s3",
-  "esp-phy/esp32s3",
-  "esp-wifi-sys/esp32s3",
-  "esp-metadata-generated/esp32s3",
-  "xtensa-lx-rt/float-save-restore",
-]
-
 ## Use `esp-alloc` with the `compat` feature for dynamic allocations.
 ##
 ## If you opt-out, you need to provide implementations for the following functions:
@@ -156,21 +104,77 @@ esp32s3 = [
 ## - `pub extern "C" fn get_free_internal_heap_size() -> usize;`
 esp-alloc = ["dep:esp-alloc"]
 
-## Logs the WiFi logs from the driver at log level info (needs a nightly-compiler)
+## Logs the Wi-Fi logs from the driver at log level info (needs a nightly-compiler)
 sys-logs = ["esp-wifi-sys/sys-logs"]
+
+#! ### Chip selection
+#! One of the following features must be enabled to select the target chip:
+
+##
+esp32 = [
+  "esp-hal/esp32",
+  "esp-phy/esp32",
+  "esp-wifi-sys/esp32",
+  "esp-metadata-generated/esp32",
+  "xtensa-lx-rt/float-save-restore",
+]
+##
+esp32c2 = [
+  "esp-hal/esp32c2",
+  "esp-phy/esp32c2",
+  "esp-wifi-sys/esp32c2",
+  "esp-metadata-generated/esp32c2",
+]
+##
+esp32c3 = [
+  "esp-hal/esp32c3",
+  "esp-phy/esp32c3",
+  "esp-wifi-sys/esp32c3",
+  "esp-metadata-generated/esp32c3",
+]
+##
+esp32c6 = [
+  "esp-hal/esp32c6",
+  "esp-phy/esp32c6",
+  "esp-wifi-sys/esp32c6",
+  "esp-metadata-generated/esp32c6",
+]
+##
+esp32h2 = [
+  "esp-hal/esp32h2",
+  "esp-phy/esp32h2",
+  "esp-wifi-sys/esp32h2",
+  "esp-metadata-generated/esp32h2",
+]
+##
+esp32s2 = [
+  "esp-hal/esp32s2",
+  "esp-phy/esp32s2",
+  "esp-wifi-sys/esp32s2",
+  "esp-metadata-generated/esp32s2",
+  "xtensa-lx-rt/float-save-restore",
+]
+##
+esp32s3 = [
+  "esp-hal/esp32s3",
+  "esp-phy/esp32s3",
+  "esp-wifi-sys/esp32s3",
+  "esp-metadata-generated/esp32s3",
+  "xtensa-lx-rt/float-save-restore",
+]
 
 #! ### Wireless Feature Flags
 
-## Enable WiFi support
+## Enable Wi-Fi support
 wifi = ["dep:enumset", "dep:embassy-net-driver"]
 
-## Enable WiFi Enterprise Authentication Protocol (EAP) support
+## Enable Wi-Fi Enterprise Authentication Protocol (EAP) support
 wifi-eap = ["wifi"]
 
-## Enable esp-now support
+## Enable ESP-NOW support
 esp-now = ["wifi"]
 
-## Enable sniffer mode support
+## Enable sniffer mode support for Wi-Fi
 sniffer = ["wifi"]
 
 ## Enable BLE support
@@ -180,10 +184,10 @@ ble = ["esp-hal/__bluetooth", "dep:bt-hci"]
 ## See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/kconfig-reference.html#config-esp-coex-sw-coexist-enable) for details
 coex = []
 
-## Enable WiFi channel state information. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv4N18wifi_init_config_t10csi_enableE),
+## Enable Wi-Fi channel state information. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv4N18wifi_init_config_t10csi_enableE),
 csi = []
 
-## Use IEEE 802.15.4.
+## Enable IEEE 802.15.4.
 ## Cannot be used together with Wi-Fi.
 ieee802154 = ["dep:byte", "dep:ieee802154"]
 
@@ -205,7 +209,12 @@ defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-w
 #! ### Unstable APIs
 #! Unstable APIs are drivers and features that are not yet ready for general use.
 #! They may be incomplete, have bugs, or be subject to change without notice.
-unstable = []
+unstable = [
+  "dep:embedded-io-06",
+  "dep:embedded-io-async-06",
+  "dep:embedded-io-07",
+  "dep:embedded-io-async-07",
+]
 
 ## Libraries that depend on `esp-radio` should enable this feature to indicate their use of unstable APIs.
 ## However, they must **not** enable the `unstable` feature themselves.

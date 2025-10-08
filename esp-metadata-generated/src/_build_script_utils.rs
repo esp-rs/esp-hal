@@ -292,7 +292,6 @@ impl Chip {
                     "rmt_has_per_channel_clock",
                     "rmt_supports_reftick_clock",
                     "rmt_supports_apb_clock",
-                    "rmt_max_idle_threshold=\"32767\"",
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"512\"",
                     "rsa_memory_size_bytes=\"512\"",
@@ -455,7 +454,6 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_has_per_channel_clock",
                     "cargo:rustc-cfg=rmt_supports_reftick_clock",
                     "cargo:rustc-cfg=rmt_supports_apb_clock",
-                    "cargo:rustc-cfg=rmt_max_idle_threshold=\"32767\"",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"512\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
@@ -861,7 +859,6 @@ impl Chip {
                     "rmt_supports_apb_clock",
                     "rmt_supports_rcfast_clock",
                     "rmt_supports_xtal_clock",
-                    "rmt_max_idle_threshold=\"16383\"",
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"384\"",
@@ -1024,7 +1021,6 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_supports_apb_clock",
                     "cargo:rustc-cfg=rmt_supports_rcfast_clock",
                     "cargo:rustc-cfg=rmt_supports_xtal_clock",
-                    "cargo:rustc-cfg=rmt_max_idle_threshold=\"16383\"",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
@@ -1247,7 +1243,6 @@ impl Chip {
                     "rmt_supports_pll80mhz_clock",
                     "rmt_supports_rcfast_clock",
                     "rmt_supports_xtal_clock",
-                    "rmt_max_idle_threshold=\"16383\"",
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"384\"",
@@ -1466,7 +1461,6 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_supports_pll80mhz_clock",
                     "cargo:rustc-cfg=rmt_supports_rcfast_clock",
                     "cargo:rustc-cfg=rmt_supports_xtal_clock",
-                    "cargo:rustc-cfg=rmt_max_idle_threshold=\"16383\"",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
@@ -1663,7 +1657,6 @@ impl Chip {
                     "rmt_has_rx_demodulation",
                     "rmt_supports_xtal_clock",
                     "rmt_supports_rcfast_clock",
-                    "rmt_max_idle_threshold=\"16383\"",
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"384\"",
@@ -1853,7 +1846,6 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_has_rx_demodulation",
                     "cargo:rustc-cfg=rmt_supports_xtal_clock",
                     "cargo:rustc-cfg=rmt_supports_rcfast_clock",
-                    "cargo:rustc-cfg=rmt_max_idle_threshold=\"16383\"",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
@@ -2038,7 +2030,6 @@ impl Chip {
                     "rmt_has_per_channel_clock",
                     "rmt_supports_reftick_clock",
                     "rmt_supports_apb_clock",
-                    "rmt_max_idle_threshold=\"32767\"",
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"512\"",
@@ -2217,7 +2208,6 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_has_per_channel_clock",
                     "cargo:rustc-cfg=rmt_supports_reftick_clock",
                     "cargo:rustc-cfg=rmt_supports_apb_clock",
-                    "cargo:rustc-cfg=rmt_max_idle_threshold=\"32767\"",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
@@ -2418,7 +2408,6 @@ impl Chip {
                     "rmt_supports_apb_clock",
                     "rmt_supports_rcfast_clock",
                     "rmt_supports_xtal_clock",
-                    "rmt_max_idle_threshold=\"16383\"",
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"512\"",
@@ -2619,7 +2608,6 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_supports_apb_clock",
                     "cargo:rustc-cfg=rmt_supports_rcfast_clock",
                     "cargo:rustc-cfg=rmt_supports_xtal_clock",
-                    "cargo:rustc-cfg=rmt_max_idle_threshold=\"16383\"",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
@@ -2979,7 +2967,6 @@ pub fn emit_check_cfg_directives() {
         "cargo:rustc-check-cfg=cfg(rmt_ram_start, values(\"1073047552\",\"1610703872\",\"1610638336\",\"1610642432\",\"1061250048\",\"1610704896\"))"
     );
     println!("cargo:rustc-check-cfg=cfg(rmt_channel_ram_size, values(\"64\",\"48\"))");
-    println!("cargo:rustc-check-cfg=cfg(rmt_max_idle_threshold, values(\"32767\",\"16383\"))");
     println!("cargo:rustc-check-cfg=cfg(rng_apb_cycle_wait_num, values(\"16\"))");
     println!("cargo:rustc-check-cfg=cfg(rsa_size_increment, values(\"512\",\"32\"))");
     println!("cargo:rustc-check-cfg=cfg(rsa_memory_size_bytes, values(\"512\",\"384\"))");

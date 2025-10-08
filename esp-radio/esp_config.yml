@@ -1,11 +1,13 @@
 crate: esp-radio
 
 options:
-  # TODO these could also be runtime configurable
   - name: wifi_max_burst_size
     description: See [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_burst_size)
     default:
       - value: 3
+    constraints:
+      - type:
+          validator: non_negative_integer
 
   - name: wifi_mtu
     description: "MTU, see [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_transmission_unit)"
