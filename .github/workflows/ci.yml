@@ -219,7 +219,6 @@ jobs:
             --max-concurrency 6
             --accept "200,301,302"
             --exclude-path ".*/target/.*|.*/static\.files/.*|.*/docs/.*"
-            --remap "https://github.com/${{ github.repository }}/(?:blob|tree)/[^/]+/(.+) $GITHUB_WORKSPACE/\$1"
-            ./**/*.rs
+            --remap "https://github.com/${{ github.repository }}/(?:blob|tree)/[^/]+/(.+) file://$GITHUB_WORKSPACE/\$1"            ./**/*.rs
             ./**/*.md
             ./**/*.toml
