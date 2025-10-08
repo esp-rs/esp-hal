@@ -4,11 +4,13 @@ use core::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::Ordering};
 
 use embassy_executor::{SendSpawner, Spawner, raw};
 use esp_hal::interrupt::{InterruptHandler, Priority, software::SoftwareInterrupt};
+use macros::ram;
 use portable_atomic::AtomicPtr;
 
 use crate::task::flags::ThreadFlags;
 
 #[unsafe(export_name = "__pender")]
+#[ram]
 fn __pender(context: *mut ()) {
     match context as usize {
         0 => unsafe { SoftwareInterrupt::<0>::steal().raise() },

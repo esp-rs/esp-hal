@@ -115,6 +115,7 @@ mod multi_core {
     // value.
     const UNUSED_THREAD_ID_VALUE: usize = 0x100;
 
+    #[inline]
     fn thread_id() -> usize {
         // This method must never return UNUSED_THREAD_ID_VALUE
         cfg_if::cfg_if! {
@@ -134,16 +135,19 @@ mod multi_core {
     }
 
     impl LockedState {
+        #[inline]
         pub const fn new() -> Self {
             Self {
                 owner: AtomicUsize::new(UNUSED_THREAD_ID_VALUE),
             }
         }
 
+        #[inline]
         fn is_owned_by(&self, thread: usize) -> bool {
             self.owner.load(Ordering::Relaxed) == thread
         }
 
+        #[inline]
         pub fn lock(&self, lock: &impl crate::RawLock) -> crate::RestoreState {
             // We acquire the lock inside an interrupt-free context to prevent a subtle
             // race condition:
@@ -192,6 +196,7 @@ mod multi_core {
         ///
         /// This function must only be called if the lock was acquired by the
         /// current thread.
+        #[inline]
         pub unsafe fn unlock(&self) {
             #[cfg(debug_assertions)]
             if !self.is_owned_by(thread_id()) {
