@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ram(reclaimed)` as an alias for `link_section = ".dram2_uninit"` (#4245)
 - `rmt::MAX_TX_LOOPCOUNT` and `rmt::MAX_RX_IDLE_THRESHOLD` constants have been added (#4276)
 - Added support for `embedded-io 0.7` (#4280)
+- A new option `ESP_HAL_CONFIG_WRITE_VEC_TABLE_MONITORING` (disabled by default) to check that no unintentional writes to a very vital memory area are made. (Only RISC-V)  (#4225)
 
 ### Changed
 
