@@ -419,7 +419,9 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
         .unwrap();
 
     // Spin until the second core scheduler is initialized
-    while SCHEDULER.with(|s| !s.per_cpu[1].initialized) {}
+    while SCHEDULER.with(|s| !s.per_cpu[1].initialized) {
+        esp_hal::rom::ets_delay_us(1);
+    }
 
     core::mem::forget(guard);
 }
