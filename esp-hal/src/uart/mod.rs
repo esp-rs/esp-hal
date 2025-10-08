@@ -977,7 +977,7 @@ impl<'d> UartRx<'d, Blocking> {
     /// This is a blocking function that will continuously check for a break condition.
     #[instability::unstable]
     pub fn wait_for_break(&mut self) {
-        while !self.uart.info().brk_det().bit_is_set() {
+        while !self.regs().int_raw().read().brk_det().bit_is_set() {
             // wait
         }
     }
