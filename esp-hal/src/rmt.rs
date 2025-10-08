@@ -2081,7 +2081,7 @@ impl DynChannelAccess<Tx> {
         self.set_tx_threshold((memsize.codes() / 2) as u8);
         self.set_tx_continuous(loopmode.is_some());
         #[cfg(rmt_has_tx_loop_count)]
-        self.set_generate_repeat_interrupt(loopmode);
+        self.set_loopmode(loopmode);
         self.set_tx_wrap_mode(loopmode.is_none());
         self.update();
         self.start_tx();
@@ -2379,7 +2379,7 @@ mod chip_specific {
 
     impl DynChannelAccess<Tx> {
         #[inline(always)]
-        pub fn set_generate_repeat_interrupt(self, mode: Option<LoopMode>) {
+        pub fn set_loopmode(self, mode: Option<LoopMode>) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2849,7 +2849,7 @@ mod chip_specific {
     impl DynChannelAccess<Tx> {
         #[cfg(rmt_has_tx_loop_count)]
         #[inline(always)]
-        pub fn set_generate_repeat_interrupt(self, mode: Option<super::LoopMode>) {
+        pub fn set_loopmode(self, mode: Option<super::LoopMode>) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
