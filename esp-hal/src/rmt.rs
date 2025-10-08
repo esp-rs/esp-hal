@@ -1252,6 +1252,7 @@ where
 /// `.wait()` needs to be called before the entire buffer has been sent to avoid
 /// underruns.
 #[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
+#[derive(Debug)]
 pub struct TxTransaction<'ch, 'data, T>
 where
     T: Into<PulseCode> + Copy,
@@ -1358,6 +1359,7 @@ where
 
 /// An in-progress continuous TX transaction
 #[must_use = "transactions will be aborted when dropped"]
+#[derive(Debug)]
 pub struct ContinuousTxTransaction<'ch> {
     channel: Channel<'ch, Blocking, Tx>,
     is_running: bool,
@@ -1455,6 +1457,7 @@ impl<'ch> Drop for ContinuousTxTransaction<'ch> {
 }
 
 /// RMT Channel Creator
+#[derive(Debug)]
 pub struct ChannelCreator<'ch, Dm, const CHANNEL: u8>
 where
     Dm: crate::DriverMode,
@@ -1662,6 +1665,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
 
 /// RX transaction instance
 #[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
+#[derive(Debug)]
 pub struct RxTransaction<'ch, 'data, T>
 where
     T: From<PulseCode>,

@@ -3,7 +3,7 @@ use procmacros::ram;
 
 use super::{DynChannelAccess, Error, PulseCode, Tx};
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub(crate) enum WriterState {
     Active,
 
@@ -12,6 +12,7 @@ pub(crate) enum WriterState {
     Done,
 }
 
+#[derive(Debug)]
 pub(crate) struct RmtWriter {
     // The position in channel RAM to continue writing at; must be either
     // 0 or half the available RAM size if there's further data.
