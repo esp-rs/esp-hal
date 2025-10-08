@@ -215,6 +215,7 @@ impl RunQueue {
 
             // Written like this because `state.iter()` leaves an unnecessary panic in the code.
             let mut target = (0, state[0].current_priority());
+            #[allow(clippy::needless_range_loop)]
             for i in 1..Cpu::COUNT {
                 if state[i].current_priority() < target.1 {
                     target = (i, state[i].current_priority());
