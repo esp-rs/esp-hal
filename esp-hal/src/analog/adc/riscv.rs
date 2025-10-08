@@ -21,7 +21,7 @@ use procmacros::handler;
 pub use self::calibration::*;
 use super::{AdcCalSource, AdcConfig, Attenuation};
 #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
-use crate::efuse::Efuse;
+use crate::efuse::{AdcCalibUnit, Efuse};
 use crate::{
     Async,
     Blocking,
@@ -424,30 +424,30 @@ impl<ADCI> InterruptConfigurable for Adc<'_, ADCI, Blocking> {
 #[cfg(adc_adc1)]
 impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_init_code(1, atten)
+        Efuse::rtc_calib_init_code(AdcCalibUnit::ADC1, atten)
     }
 
     fn cal_mv(atten: Attenuation) -> u16 {
-        Efuse::rtc_calib_cal_mv(1, atten)
+        Efuse::rtc_calib_cal_mv(AdcCalibUnit::ADC1, atten)
     }
 
     fn cal_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_cal_code(1, atten)
+        Efuse::rtc_calib_cal_code(AdcCalibUnit::ADC1, atten)
     }
 }
 
 #[cfg(adc_adc2)]
 impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_init_code(2, atten)
+        Efuse::rtc_calib_init_code(AdcCalibUnit::ADC2, atten)
     }
 
     fn cal_mv(atten: Attenuation) -> u16 {
-        Efuse::rtc_calib_cal_mv(2, atten)
+        Efuse::rtc_calib_cal_mv(AdcCalibUnit::ADC2, atten)
     }
 
     fn cal_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_cal_code(2, atten)
+        Efuse::rtc_calib_cal_code(AdcCalibUnit::ADC2, atten)
     }
 }
 

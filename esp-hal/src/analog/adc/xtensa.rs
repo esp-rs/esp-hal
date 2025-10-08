@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 pub use self::calibration::*;
 use super::{AdcCalScheme, AdcCalSource, AdcChannel, AdcConfig, AdcPin, Attenuation};
 #[cfg(esp32s3)]
-use crate::efuse::Efuse;
+use crate::efuse::{AdcCalibUnit, Efuse};
 use crate::{
     peripherals::{APB_SARADC, SENS},
     soc::regi2c,
@@ -492,29 +492,29 @@ where
 #[cfg(esp32s3)]
 impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_init_code(1, atten)
+        Efuse::rtc_calib_init_code(AdcCalibUnit::ADC1, atten)
     }
 
     fn cal_mv(atten: Attenuation) -> u16 {
-        Efuse::rtc_calib_cal_mv(1, atten)
+        Efuse::rtc_calib_cal_mv(AdcCalibUnit::ADC1, atten)
     }
 
     fn cal_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_cal_code(1, atten)
+        Efuse::rtc_calib_cal_code(AdcCalibUnit::ADC1, atten)
     }
 }
 
 #[cfg(esp32s3)]
 impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_init_code(2, atten)
+        Efuse::rtc_calib_init_code(AdcCalibUnit::ADC2, atten)
     }
 
     fn cal_mv(atten: Attenuation) -> u16 {
-        Efuse::rtc_calib_cal_mv(2, atten)
+        Efuse::rtc_calib_cal_mv(AdcCalibUnit::ADC2, atten)
     }
 
     fn cal_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_cal_code(2, atten)
+        Efuse::rtc_calib_cal_code(AdcCalibUnit::ADC2, atten)
     }
 }
