@@ -471,6 +471,7 @@ where
                 guard: tx_guard,
                 rts_pin,
                 tx_pin,
+                baudrate: config.baudrate,
             },
         };
         serial.init(config)?;
@@ -507,6 +508,7 @@ pub struct UartTx<'d, Dm: DriverMode> {
     guard: PeripheralGuard,
     rts_pin: PinGuard,
     tx_pin: PinGuard,
+    baudrate: u32,
 }
 
 /// UART (Receive)
@@ -606,6 +608,7 @@ where
     type ConfigError = ConfigError;
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.baudrate = config.baudrate;
         self.apply_config(config)
     }
 }
@@ -649,6 +652,7 @@ impl<'d> UartTx<'d, Blocking> {
             guard: self.guard,
             rts_pin: self.rts_pin,
             tx_pin: self.tx_pin,
+            baudrate: self.baudrate,
         }
     }
 }
@@ -671,6 +675,7 @@ impl<'d> UartTx<'d, Async> {
             guard: self.guard,
             rts_pin: self.rts_pin,
             tx_pin: self.tx_pin,
+            baudrate: self.baudrate,
         }
     }
 
@@ -842,6 +847,35 @@ where
         // fast and slow baud rates.
         crate::rom::ets_delay_us(10);
         while !self.is_tx_idle() {}
+    }
+
+    /// Sends a break signal for a specified duration in bit time, i.e. the time
+    /// it takes to transfer one bit at the current baud rate. The delay during
+    /// the break is just is busy-waiting.
+    pub fn send_break(&mut self, bits: u32) {
+        // Read the current TX inversion state
+        let original_txd_inv = self.uart.info().regs().conf0().read().txd_inv().bit();
+
+        // Invert the TX line (toggle the current state)
+        self.uart
+            .info()
+            .regs()
+            .conf0()
+            .modify(|_, w| w.txd_inv().bit(!original_txd_inv));
+
+        // Calculate total delay in microseconds: (bits * 1_000_000) / baudrate_bps
+        // Use u64 to avoid overflow, then convert back to u32
+        let total_delay_us = (bits as u64 * 1_000_000) / self.baudrate as u64;
+        let delay_us = (total_delay_us as u32).max(1);
+
+        crate::rom::ets_delay_us(delay_us);
+
+        // Restore the original TX inversion state
+        self.uart
+            .info()
+            .regs()
+            .conf0()
+            .modify(|_, w| w.txd_inv().bit(original_txd_inv));
     }
 
     /// Checks if the TX line is idle for this UART instance.
@@ -1522,6 +1556,11 @@ pub enum UartInterrupt {
     /// The transmitter has finished sending out all data from the FIFO.
     TxDone,
 
+    /// Break condition has been detected.
+    /// Triggered when the receiver detects a NULL character (i.e. logic 0 for
+    /// one NULL character transmission) after stop bits.
+    RxBreakDetected,
+
     /// The receiver has received more data than what
     /// [`RxConfig::fifo_full_threshold`] specifies.
     RxFifoFull,
@@ -1677,6 +1716,12 @@ where
     /// ```
     pub fn flush(&mut self) -> Result<(), TxError> {
         self.tx.flush()
+    }
+
+    /// Sends a break signal for a specified duration
+    #[instability::unstable]
+    pub fn send_break(&mut self, bits: u32) {
+        self.tx.send_break(bits)
     }
 
     /// Returns whether the UART buffer has data.
@@ -2150,6 +2195,7 @@ pub(crate) enum RxEvent {
     GlitchDetected,
     FrameError,
     ParityError,
+    BreakDetected,
 }
 
 fn rx_event_check_for_error(events: EnumSet<RxEvent>) -> Result<(), RxError> {
@@ -2159,7 +2205,10 @@ fn rx_event_check_for_error(events: EnumSet<RxEvent>) -> Result<(), RxError> {
             RxEvent::GlitchDetected => return Err(RxError::GlitchOccurred),
             RxEvent::FrameError => return Err(RxError::FrameFormatViolated),
             RxEvent::ParityError => return Err(RxError::ParityMismatch),
-            RxEvent::FifoFull | RxEvent::CmdCharDetected | RxEvent::FifoTout => continue,
+            RxEvent::FifoFull
+            | RxEvent::CmdCharDetected
+            | RxEvent::FifoTout
+            | RxEvent::BreakDetected => continue,
         }
     }
 

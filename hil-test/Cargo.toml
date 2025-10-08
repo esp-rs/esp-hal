@@ -159,6 +159,11 @@ harness           = false
 required-features = ["embassy"]
 
 [[bin]]
+name              = "uart_brk_det"
+harness           = false
+required-features = ["embassy"]
+
+[[bin]]
 name              = "uart_uhci"
 harness           = false
 required-features = ["embassy"]
