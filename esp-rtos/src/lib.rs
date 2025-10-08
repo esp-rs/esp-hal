@@ -388,6 +388,9 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
         })
         .unwrap();
 
+    // Spin until the second core scheduler is initialized
+    while SCHEDULER.with(|s| !s.per_cpu[1].initialized) {}
+
     core::mem::forget(guard);
 }
 

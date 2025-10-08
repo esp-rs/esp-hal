@@ -574,7 +574,9 @@ pub(super) fn allocate_main_task(
     // The main task is already running, no need to add it to the ready queue.
     scheduler.all_tasks.push(main_task_ptr);
     scheduler.per_cpu[current_cpu].current_task = Some(main_task_ptr);
-    scheduler.run_queue.mark_task_ready(main_task_ptr);
+    scheduler
+        .run_queue
+        .mark_task_ready(&scheduler.per_cpu, main_task_ptr);
 }
 
 pub(super) fn with_current_task<R>(mut cb: impl FnMut(&mut Task) -> R) -> R {
