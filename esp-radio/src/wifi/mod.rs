@@ -3055,6 +3055,9 @@ impl WifiController<'_> {
     }
 
     /// Starts the Wi-Fi controller.
+    ///
+    /// This method is not blocking. To check if the controller has started, use the
+    /// [`Self::is_started`] method.
     pub fn start(&mut self) -> Result<(), WifiError> {
         unsafe {
             esp_wifi_result!(esp_wifi_start())?;
@@ -3080,14 +3083,21 @@ impl WifiController<'_> {
     }
 
     /// Stops the Wi-Fi controller.
+    ///
+    /// This method is not blocking. Use the [`Self::is_started`] method to see if the controller is
+    /// still running.
     pub fn stop(&mut self) -> Result<(), WifiError> {
         self.stop_impl()
     }
 
     /// Connect Wi-Fi station to the AP.
     ///
-    /// - If station is connected , call [Self::disconnect] to disconnect.
-    /// - Scanning will not be effective until connection between device and the AP is established.
+    /// This method is not blocking. Use the [`Self::is_connected`] method to see if the station is
+    /// connected.
+    ///
+    /// - If station is connected, call [`Self::disconnect`] to disconnect.
+    /// - Calling [`Self::scan`] will not be effective until connection between device and the AP is
+    ///   established.
     /// - If device is scanning and connecting at the same time, it will abort scanning and return a
     ///   warning message and error
     pub fn connect(&mut self) -> Result<(), WifiError> {
@@ -3095,6 +3105,9 @@ impl WifiController<'_> {
     }
 
     /// Disconnect Wi-Fi station from the AP.
+    ///
+    /// This method is not blocking. Use the [`Self::is_connected`] method to see if the station is
+    /// still connected.
     pub fn disconnect(&mut self) -> Result<(), WifiError> {
         self.disconnect_impl()
     }
@@ -3260,7 +3273,9 @@ impl WifiController<'_> {
         Ok(result)
     }
 
-    /// Async version of [`WifiController`]'s `start` method
+    /// Async version of [`Self::start`].
+    ///
+    /// This function will wait for the Wi-Fi controller to start before returning.
     pub async fn start_async(&mut self) -> Result<(), WifiError> {
         let mut events = enumset::enum_set! {};
 
@@ -3282,6 +3297,8 @@ impl WifiController<'_> {
     }
 
     /// Async version of [`Self::stop`].
+    ///
+    /// This function will wait for the Wi-Fi controller to stop before returning.
     pub async fn stop_async(&mut self) -> Result<(), WifiError> {
         let mut events = enumset::enum_set! {};
 
@@ -3306,6 +3323,8 @@ impl WifiController<'_> {
     }
 
     /// Async version of [`Self::connect`].
+    ///
+    /// This function will wait for the connection to be established before returning.
     pub async fn connect_async(&mut self) -> Result<(), WifiError> {
         Self::clear_events(WifiEvent::StaConnected | WifiEvent::StaDisconnected);
 
@@ -3322,6 +3341,8 @@ impl WifiController<'_> {
     }
 
     /// Async version of [`Self::disconnect`].
+    ///
+    /// This function will wait for the connection to be closed before returning.
     pub async fn disconnect_async(&mut self) -> Result<(), WifiError> {
         // If not connected, this will do nothing.
         // It will also wait forever for a `StaDisconnected` event that will never come.
