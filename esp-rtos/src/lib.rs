@@ -95,11 +95,15 @@ use core::mem::MaybeUninit;
 pub(crate) use esp_alloc::InternalMemory;
 #[cfg(any(multi_core, riscv))]
 use esp_hal::interrupt::software::SoftwareInterrupt;
+#[cfg(systimer)]
+use esp_hal::timer::systimer::Alarm;
+#[cfg(timergroup)]
+use esp_hal::timer::timg::Timer;
 use esp_hal::{
     Blocking,
     system::Cpu,
     time::{Duration, Instant},
-    timer::{AnyTimer, OneShotTimer},
+    timer::{AnyTimer, OneShotTimer, any::Degrade},
 };
 #[cfg(multi_core)]
 use esp_hal::{
@@ -164,9 +168,9 @@ mod esp_alloc {
     }
 }
 
-/// A trait to allow better UX for initializing esp-rtos.
+/// Timers that can be used as time drivers.
 ///
-/// This trait is meant to be used only for the `init` function.
+/// This trait is meant to be used only for the [`start`] function.
 pub trait TimerSource: private::Sealed + 'static {
     /// Returns the timer source.
     fn timer(self) -> TimeBase;
@@ -179,17 +183,33 @@ mod private {
 impl private::Sealed for TimeBase {}
 impl private::Sealed for AnyTimer<'static> {}
 #[cfg(timergroup)]
-impl private::Sealed for esp_hal::timer::timg::Timer<'static> {}
+impl private::Sealed for Timer<'static> {}
 #[cfg(systimer)]
-impl private::Sealed for esp_hal::timer::systimer::Alarm<'static> {}
+impl private::Sealed for Alarm<'static> {}
 
-impl<T> TimerSource for T
-where
-    T: esp_hal::timer::any::Degrade + private::Sealed + 'static,
-{
+impl TimerSource for TimeBase {
     fn timer(self) -> TimeBase {
-        let any_timer: AnyTimer<'static> = self.degrade();
-        TimeBase::new(any_timer)
+        self
+    }
+}
+
+impl TimerSource for AnyTimer<'static> {
+    fn timer(self) -> TimeBase {
+        TimeBase::new(self)
+    }
+}
+
+#[cfg(timergroup)]
+impl TimerSource for Timer<'static> {
+    fn timer(self) -> TimeBase {
+        TimeBase::new(self.degrade())
+    }
+}
+
+#[cfg(systimer)]
+impl TimerSource for Alarm<'static> {
+    fn timer(self) -> TimeBase {
+        TimeBase::new(self.degrade())
     }
 }
 
@@ -197,10 +217,10 @@ where
 ///
 /// The current context will be converted into the main task, and will be pinned to the first core.
 ///
-/// This function is equivalent to [start_with_idle_hook], with the default idle hook. The default
+/// This function is equivalent to [`start_with_idle_hook`], with the default idle hook. The default
 /// idle hook will wait for an interrupt.
 ///
-/// For information about the other arguments, see [start_with_idle_hook].
+/// For information about the arguments, see [`start_with_idle_hook`].
 pub fn start(timer: impl TimerSource, #[cfg(riscv)] int0: SoftwareInterrupt<'static, 0>) {
     start_with_idle_hook(
         timer,
@@ -224,6 +244,7 @@ pub fn start(timer: impl TimerSource, #[cfg(riscv)] int0: SoftwareInterrupt<'sta
 /// - A timg `Timer` instance
 /// - A systimer `Alarm` instance
 /// - An `AnyTimer` instance
+/// - A `OneShotTimer` instance
 #[doc = ""]
 #[cfg_attr(
     riscv,

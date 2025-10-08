@@ -92,6 +92,7 @@ impl CpuSchedulerState {
         }
     }
 
+    #[cfg(multi_core)]
     pub fn current_priority(&self) -> Priority {
         self.current_task
             .map(|task| unsafe { (*task.as_ptr()).priority })
