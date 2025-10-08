@@ -71,9 +71,6 @@ impl RunQueue {
         self.ready_tasks[priority].remove(ready_task);
         self.ready_tasks[priority].push(ready_task);
 
-        #[cfg(feature = "rtos-trace")]
-        rtos_trace::trace::task_ready_begin(ready_task.rtos_trace_id());
-
         cfg_if::cfg_if! {
             if #[cfg(multi_core)] {
                 let current_minimum_prio = self.current_prios.iter().copied().min().unwrap();
