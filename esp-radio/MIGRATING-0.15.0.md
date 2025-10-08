@@ -65,7 +65,7 @@ Provide these symbols:
 
 ## Scanning Functions
 
-The `scan_with_config_sync_max`, `scan_with_config_sync_max`, `scan_n`, and `scan_n_async` functions have been removed. You can instead use the `scan_with_config_async` or `scan_with_config_sync` funtions while specifying a `max` value in `ScanConfig`.
+The `scan_with_config_sync_max`, `scan_with_config_sync_max`, `scan_n`, and `scan_n_async` functions have been removed. You can instead use the `scan_with_config_async` or `scan_with_config` functions while specifying a `max` value in `ScanConfig`.
 
 ## Configuration
 

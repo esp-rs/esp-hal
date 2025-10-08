@@ -3022,7 +3022,7 @@ impl WifiController<'_> {
     }
 
     /// A blocking wifi network scan with caller-provided scanning options.
-    pub fn scan_with_config_sync(
+    pub fn scan_with_config(
         &mut self,
         config: ScanConfig<'_>,
     ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
@@ -3096,10 +3096,10 @@ impl WifiController<'_> {
     /// connected.
     ///
     /// - If station is connected, call [`Self::disconnect`] to disconnect.
-    /// - Calling [`Self::scan`] will not be effective until connection between device and the AP is
-    ///   established.
+    /// - Calling [`Self::scan_with_config`] or [`Self::scan_with_config_async`] will not be
+    ///   effective until connection between device and the AP is established.
     /// - If device is scanning and connecting at the same time, it will abort scanning and return a
-    ///   warning message and error
+    ///   warning message and error.
     pub fn connect(&mut self) -> Result<(), WifiError> {
         self.connect_impl()
     }
@@ -3117,12 +3117,12 @@ impl WifiController<'_> {
     ///
     /// <div class="warning">
     ///
-    /// - This API should be called after station connected to AP.
     /// - Use this API only in STA or AP-STA mode.
+    /// - This API should be called after the station has connected to an access point.
     /// </div>
     ///
     /// # Errors
-    /// This function returns [WifiError::Unsupported] if the STA side isn't
+    /// This function returns [`WifiError::Unsupported`] if the STA side isn't
     /// running. For example, when configured for AP only.
     pub fn rssi(&self) -> Result<i32, WifiError> {
         if self.mode()?.is_sta() {
@@ -3146,9 +3146,9 @@ impl WifiController<'_> {
     /// Set the configuration.
     ///
     /// This will set the mode accordingly.
-    /// You need to use Wifi::connect() for connecting to an AP.
+    /// You need to use [`Self::connect`] for connecting to an AP.
     ///
-    /// Passing [ModeConfig::None] will disable both, AP and STA mode.
+    /// Passing [`ModeConfig::None`] will disable both, AP and STA mode.
     ///
     /// If you don't intend to use Wi-Fi anymore at all consider tearing down
     /// Wi-Fi completely.
@@ -3200,7 +3200,7 @@ impl WifiController<'_> {
 
     /// Set the Wi-Fi mode.
     ///
-    /// This will override the mode inferred by [Self::set_config].
+    /// This will override the mode inferred by [`Self::set_config`].
     pub fn set_mode(&mut self, mode: WifiMode) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode.into()) })?;
         Ok(())
@@ -3222,8 +3222,8 @@ impl WifiController<'_> {
 
     /// Checks if the Wi-Fi controller has started. Returns true if STA and/or AP are started.
     ///
-    /// This function should be called after the `start` method to verify if the
-    /// Wi-Fi has started successfully.
+    /// This function should be called after the [`Self::start`] method to verify if the
+    /// Wi-Fi controller has started successfully.
     pub fn is_started(&self) -> Result<bool, WifiError> {
         if matches!(
             crate::wifi::sta_state(),
@@ -3239,7 +3239,7 @@ impl WifiController<'_> {
 
     /// Checks if the Wi-Fi controller is connected to an AP.
     ///
-    /// This function should be called after the `connect` method to verify if
+    /// This function should be called after the [`Self::connect`] method to verify if
     /// the connection was successful.
     pub fn is_connected(&self) -> Result<bool, WifiError> {
         match crate::wifi::sta_state() {
