@@ -55,6 +55,7 @@ where
         // Connect calibration source
         ADCI::connect_cal(source, true);
 
+        ADCI::calibration_init();
         ADCI::set_init_code(0);
 
         for _ in 0..ADCI::ADC_CAL_CNT_MAX {
@@ -104,6 +105,9 @@ pub trait RegisterAccess {
 
     /// Read sample data
     fn read_data() -> u16;
+
+    /// Set up ADC hardware for calibration
+    fn calibration_init();
 
     /// Set calibration parameter to ADC hardware
     fn set_init_code(data: u16);
@@ -172,6 +176,13 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
             .read()
             .meas1_data_sar()
             .bits()
+    }
+
+    #[cfg(any(esp32s2, esp32s3))]
+    fn calibration_init() {
+        // https://github.com/espressif/esp-idf/blob/800f141f94c0f880c162de476512e183df671307/components/hal/esp32s3/include/hal/adc_ll.h#L833
+        // https://github.com/espressif/esp-idf/blob/800f141f94c0f880c162de476512e183df671307/components/hal/esp32s2/include/hal/adc_ll.h#L1145
+        regi2c::ADC_SAR1_DREF.write_field(4);
     }
 
     fn set_init_code(data: u16) {
@@ -275,6 +286,11 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
             .read()
             .meas2_data_sar()
             .bits()
+    }
+
+    #[cfg(any(esp32s2, esp32s3))]
+    fn calibration_init() {
+        regi2c::ADC_SAR2_DREF.write_field(4);
     }
 
     fn set_init_code(data: u16) {
@@ -478,6 +494,7 @@ where
         // Set ADC unit calibration according used scheme for pin
         let init_code = pin.cal_scheme.adc_cal();
         if self.last_init_code != init_code {
+            ADCI::calibration_init();
             ADCI::set_init_code(init_code);
             self.last_init_code = init_code;
         }
