@@ -975,11 +975,37 @@ impl<'d> UartRx<'d, Blocking> {
     /// Waits for a break condition to be detected.
     /// 
     /// This is a blocking function that will continuously check for a break condition.
+    /// After detection, the break interrupt flag is automatically cleared.
     #[instability::unstable]
     pub fn wait_for_break(&mut self) {
         while !self.regs().int_raw().read().brk_det().bit_is_set() {
             // wait
         }
+        self.regs().int_clr().write(|w| w.brk_det().clear_bit_by_one());
+    }
+
+    /// Waits for a break condition to be detected with a timeout.
+    /// 
+    /// This is a blocking function that will check for a break condition up to
+    /// the specified timeout. Returns `true` if a break was detected, `false` if
+    /// the timeout elapsed. After successful detection, the break interrupt flag
+    /// is automatically cleared.
+    /// 
+    /// ## Arguments
+    /// * `timeout_us` - Timeout in microseconds
+    #[instability::unstable]
+    pub fn wait_for_break_with_timeout(&mut self, timeout_us: u32) -> bool {
+        let start = crate::time::Instant::now();
+        let timeout_duration = crate::time::Duration::from_micros(timeout_us as u64);
+        
+        while !self.regs().int_raw().read().brk_det().bit_is_set() {
+            if crate::time::Instant::now() - start >= timeout_duration {
+                return false;
+            }
+        }
+        
+        self.regs().int_clr().write(|w| w.brk_det().clear_bit_by_one());
+        true
     }
 
     /// Reconfigures the driver to operate in [`Async`] mode.
@@ -1134,6 +1160,21 @@ impl<'d> UartRx<'d, Async> {
         }
 
         Ok(())
+    }
+
+    /// Waits for a break condition to be detected asynchronously.
+    /// 
+    /// This is an async function that will await until a break condition is
+    /// detected on the RX line. After detection, the break interrupt flag is
+    /// automatically cleared.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is cancellation safe.
+    #[instability::unstable]
+    pub async fn wait_for_break_async(&mut self) {
+        UartRxFuture::new(self.uart.reborrow(), RxEvent::BreakDetected).await;
+        self.regs().int_clr().write(|w| w.brk_det().clear_bit_by_one());
     }
 }
 
@@ -1425,6 +1466,29 @@ impl<'d> Uart<'d, Blocking> {
     pub fn clear_interrupts(&mut self, interrupts: EnumSet<UartInterrupt>) {
         self.tx.uart.info().clear_interrupts(interrupts)
     }
+
+    /// Waits for a break condition to be detected.
+    /// 
+    /// This is a blocking function that will continuously check for a break condition.
+    /// After detection, the break interrupt flag is automatically cleared.
+    #[instability::unstable]
+    pub fn wait_for_break(&mut self) {
+        self.rx.wait_for_break()
+    }
+
+    /// Waits for a break condition to be detected with a timeout.
+    /// 
+    /// This is a blocking function that will check for a break condition up to
+    /// the specified timeout. Returns `true` if a break was detected, `false` if
+    /// the timeout elapsed. After successful detection, the break interrupt flag
+    /// is automatically cleared.
+    /// 
+    /// ## Arguments
+    /// * `timeout_us` - Timeout in microseconds
+    #[instability::unstable]
+    pub fn wait_for_break_with_timeout(&mut self, timeout_us: u32) -> bool {
+        self.rx.wait_for_break_with_timeout(timeout_us)
+    }
 }
 
 impl<'d> Uart<'d, Async> {
@@ -1563,6 +1627,20 @@ impl<'d> Uart<'d, Async> {
     #[instability::unstable]
     pub async fn read_exact_async(&mut self, buf: &mut [u8]) -> Result<(), RxError> {
         self.rx.read_exact_async(buf).await
+    }
+
+    /// Waits for a break condition to be detected asynchronously.
+    /// 
+    /// This is an async function that will await until a break condition is
+    /// detected on the RX line. After detection, the break interrupt flag is
+    /// automatically cleared.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is cancellation safe.
+    #[instability::unstable]
+    pub async fn wait_for_break_async(&mut self) {
+        self.rx.wait_for_break_async().await
     }
 }
 
