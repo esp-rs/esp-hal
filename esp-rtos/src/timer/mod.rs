@@ -12,8 +12,8 @@ use crate::{
     SCHEDULER,
     TICK_RATE,
     TimeBase,
-    scheduler::Scheduler,
-    task::{TaskExt, TaskPtr, TaskQueue, TaskState, TaskTimerQueueElement},
+    run_queue::RunSchedulerOn,
+    task::{self, TaskExt, TaskPtr, TaskQueue, TaskState, TaskTimerQueueElement},
 };
 
 #[cfg(feature = "embassy")]
@@ -263,12 +263,14 @@ extern "C" fn timer_tick_handler() {
 
             debug!("Task {:?} is ready", ready_task);
 
-            if scheduler.run_queue.mark_task_ready(ready_task) {
-                Scheduler::trigger_schedule(
-                    &mut scheduler.per_cpu,
-                    &mut scheduler.run_queue,
-                    ready_task,
-                );
+            match scheduler
+                .run_queue
+                .mark_task_ready(&scheduler.per_cpu, ready_task)
+            {
+                RunSchedulerOn::DontRun => {}
+                RunSchedulerOn::CurrentCore => task::yield_task(),
+                #[cfg(multi_core)]
+                RunSchedulerOn::OtherCore => task::schedule_other_core(),
             }
         });
 
