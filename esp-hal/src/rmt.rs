@@ -1805,7 +1805,7 @@ impl<'ch> Channel<'ch, Blocking, Rx> {
 static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_CHANNELS];
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtTxFuture<'a, T>
+struct TxFuture<'a, T>
 where
     T: Into<PulseCode> + Copy,
 {
@@ -1817,7 +1817,7 @@ where
     data: &'a [T],
 }
 
-impl<T> core::future::Future for RmtTxFuture<'_, T>
+impl<T> core::future::Future for TxFuture<'_, T>
 where
     T: Into<PulseCode> + Copy,
 {
@@ -1862,7 +1862,7 @@ where
     }
 }
 
-impl<T> Drop for RmtTxFuture<'_, T>
+impl<T> Drop for TxFuture<'_, T>
 where
     T: Into<PulseCode> + Copy,
 {
@@ -1927,7 +1927,7 @@ impl Channel<'_, Async, Tx> {
             raw.start_send(None, memsize);
         }
 
-        RmtTxFuture {
+        TxFuture {
             raw,
             _phantom: PhantomData,
             writer,
@@ -1937,7 +1937,7 @@ impl Channel<'_, Async, Tx> {
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtRxFuture<'a, T>
+struct RxFuture<'a, T>
 where
     T: From<PulseCode> + Unpin,
 {
@@ -1947,7 +1947,7 @@ where
     data: &'a mut [T],
 }
 
-impl<T> core::future::Future for RmtRxFuture<'_, T>
+impl<T> core::future::Future for RxFuture<'_, T>
 where
     T: From<PulseCode> + Unpin,
 {
@@ -1993,7 +1993,7 @@ where
     }
 }
 
-impl<T> Drop for RmtRxFuture<'_, T>
+impl<T> Drop for RxFuture<'_, T>
 where
     T: From<PulseCode> + Unpin,
 {
@@ -2031,7 +2031,7 @@ impl Channel<'_, Async, Rx> {
             raw.start_receive(true, memsize);
         }
 
-        RmtRxFuture {
+        RxFuture {
             raw,
             reader,
             data,
@@ -2276,14 +2276,14 @@ mod chip_specific {
                 raw_tx.unlisten_tx_interrupt(EnumSet::all());
                 raw_tx.channel()
             } else if st.ch_tx_thr_event(ch_idx).bit() {
-                // RmtTxFuture will enable the interrupt again if required.
+                // TxFuture will enable the interrupt again if required.
                 raw_tx.unlisten_tx_interrupt(Event::Threshold);
                 raw_tx.channel()
             } else if st.ch_rx_end(ch_idx).bit() || st.ch_rx_err(ch_idx).bit() {
                 raw_rx.unlisten_rx_interrupt(EnumSet::all());
                 raw_rx.channel()
             } else if st.ch_rx_thr_event(ch_idx).bit() {
-                // RmtRxFuture will enable the interrupt again if required.
+                // RxFuture will enable the interrupt again if required.
                 raw_rx.unlisten_rx_interrupt(Event::Threshold);
                 raw_rx.channel()
             } else {
