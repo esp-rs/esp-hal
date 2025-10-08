@@ -1252,7 +1252,7 @@ where
 /// `.wait()` needs to be called before the entire buffer has been sent to avoid
 /// underruns.
 #[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
-pub struct SingleShotTxTransaction<'ch, 'data, T>
+pub struct TxTransaction<'ch, 'data, T>
 where
     T: Into<PulseCode> + Copy,
 {
@@ -1264,7 +1264,7 @@ where
     remaining_data: &'data [T],
 }
 
-impl<'ch, T> SingleShotTxTransaction<'ch, '_, T>
+impl<'ch, T> TxTransaction<'ch, '_, T>
 where
     T: Into<PulseCode> + Copy,
 {
@@ -1335,7 +1335,7 @@ where
     }
 }
 
-impl<T> Drop for SingleShotTxTransaction<'_, '_, T>
+impl<T> Drop for TxTransaction<'_, '_, T>
 where
     T: Into<PulseCode> + Copy,
 {
@@ -1365,7 +1365,7 @@ pub struct ContinuousTxTransaction<'ch> {
 
 impl<'ch> ContinuousTxTransaction<'ch> {
     // FIXME: This interface isn't great, since one cannot use the waiting time until tx is stopped
-    // for other things! Implement a poll-like interface similar to SingleShotTxTransaction!
+    // for other things! Implement a poll-like interface similar to TxTransaction!
     /// Stop transaction when the current iteration ends.
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
     pub fn stop_next(
@@ -1567,14 +1567,14 @@ impl LoopMode {
 /// Channel in TX mode
 impl<'ch> Channel<'ch, Blocking, Tx> {
     /// Start transmitting the given pulse code sequence.
-    /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
+    /// This returns a [`TxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn transmit<'data, T>(
         self,
         mut data: &'data [T],
-    ) -> Result<SingleShotTxTransaction<'ch, 'data, T>, Error>
+    ) -> Result<TxTransaction<'ch, 'data, T>, Error>
     where
         T: Into<PulseCode> + Copy,
     {
@@ -1593,7 +1593,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         raw.clear_tx_interrupts();
         raw.start_send(None, memsize);
 
-        Ok(SingleShotTxTransaction {
+        Ok(TxTransaction {
             channel: self,
             writer,
             remaining_data: data,
