@@ -860,9 +860,11 @@ where
         while !self.is_tx_idle() {}
     }
 
-    /// Sends a break signal for a specified duration in bit time, i.e. the time
-    /// it takes to transfer one bit at the current baud rate. The delay during
-    /// the break is just is busy-waiting.
+    /// Sends a break signal for a specified duration in bit time.
+    ///
+    /// Duration is in bits, the time it takes to transfer one bit at the
+    /// current baud rate. The delay during the break is just is busy-waiting.
+    #[instability::unstable]
     pub fn send_break(&mut self, bits: u32) {
         // Read the current TX inversion state
         let original_txd_inv = self.uart.info().regs().conf0().read().txd_inv().bit();
