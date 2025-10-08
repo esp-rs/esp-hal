@@ -972,6 +972,16 @@ impl<'d> UartRx<'d, Blocking> {
         Ok(uart_rx)
     }
 
+    /// Waits for a break condition to be detected.
+    /// 
+    /// This is a blocking function that will continuously check for a break condition.
+    #[instability::unstable]
+    pub fn wait_for_break(&mut self) {
+        while !self.uart.info().brk_det().bit_is_set() {
+            // wait
+        }
+    }
+
     /// Reconfigures the driver to operate in [`Async`] mode.
     #[instability::unstable]
     pub fn into_async(self) -> UartRx<'d, Async> {
