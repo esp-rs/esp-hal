@@ -37,10 +37,6 @@ name    = "dma_mem2mem"
 harness = false
 
 [[bin]]
-name    = "flip_link"
-harness = false
-
-[[bin]]
 name    = "gpio"
 harness = false
 
