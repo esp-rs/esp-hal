@@ -777,10 +777,12 @@ for_each_rmt_channel!(
                 )+
             }
 
-            #[allow(clippy::no_effect)]
-            const CHANNEL_INDEX_COUNT: u8 = const { 0 $( + {$idx; 1} )+ };
+            impl ChannelIndex {
+                #[allow(clippy::no_effect)]
+                const MAX: u8 = const { 0 $( + {$idx; 1} )+ };
+            }
 
-            const OUTPUT_SIGNALS: [gpio::OutputSignal; CHANNEL_INDEX_COUNT as usize] = [
+            const OUTPUT_SIGNALS: [gpio::OutputSignal; ChannelIndex::MAX as usize] = [
                 $(
                     gpio::OutputSignal::[<RMT_SIG_ $idx>],
                 )+
@@ -813,7 +815,7 @@ for_each_rmt_channel!(
 
     (rx $(($num:literal, $idx:literal)),+) => {
         paste::paste! {
-            const INPUT_SIGNALS: [gpio::InputSignal; CHANNEL_INDEX_COUNT as usize] = [
+            const INPUT_SIGNALS: [gpio::InputSignal; ChannelIndex::MAX as usize] = [
                 $(
                     gpio::InputSignal::[<RMT_SIG_ $idx>],
                 )+
@@ -852,7 +854,7 @@ impl Iterator for ChannelIndexIter {
 
     fn next(&mut self) -> Option<Self::Item> {
         let ch_idx = self.0;
-        if ch_idx < CHANNEL_INDEX_COUNT {
+        if ch_idx < ChannelIndex::MAX {
             self.0 = ch_idx + 1;
             Some(unsafe { ChannelIndex::from_u8_unchecked(ch_idx) })
         } else {
@@ -867,7 +869,7 @@ impl ChannelIndex {
     }
 
     unsafe fn from_u8_unchecked(ch_idx: u8) -> Self {
-        debug_assert!(ch_idx < CHANNEL_INDEX_COUNT);
+        debug_assert!(ch_idx < ChannelIndex::MAX);
         unsafe { core::mem::transmute(ch_idx) }
     }
 }
@@ -2197,7 +2199,6 @@ mod chip_specific {
     use enumset::EnumSet;
 
     use super::{
-        CHANNEL_INDEX_COUNT,
         ChannelIndex,
         ClockSource,
         Direction,
@@ -2300,7 +2301,7 @@ mod chip_specific {
             if Dir::IS_TX {
                 self.ch_idx as u8
             } else {
-                self.ch_idx as u8 + CHANNEL_INDEX_COUNT
+                self.ch_idx as u8 + ChannelIndex::MAX
             }
         }
 
