@@ -112,6 +112,11 @@ options:
   default:
     - value: true
 
+- name: stack-guard-monitoring-with-debugger-connected
+  description: Enable the stack guard also with a debugger connected.
+  default:
+    - value: true
+
 - name: impl-critical-section
   description: "Provide a `critical-section` implementation. Note that if disabled,
                you will need to provide a `critical-section` implementation which is
