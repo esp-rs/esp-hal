@@ -3,9 +3,6 @@
 //! The following wiring is assumed:
 //! - RX => GPIO16
 
-//% CHIPS: esp32
-//% FEATURES: esp-hal/unstable
-
 #![no_std]
 #![no_main]
 
