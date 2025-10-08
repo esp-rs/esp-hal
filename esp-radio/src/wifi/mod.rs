@@ -3260,7 +3260,7 @@ impl WifiController<'_> {
         Ok(result)
     }
 
-    /// Async version of [`crate::wifi::WifiController`]'s `start` method
+    /// Async version of [`WifiController`]'s `start` method
     pub async fn start_async(&mut self) -> Result<(), WifiError> {
         let mut events = enumset::enum_set! {};
 
@@ -3281,7 +3281,7 @@ impl WifiController<'_> {
         Ok(())
     }
 
-    /// Async version of [`crate::wifi::WifiController`]'s `stop` method
+    /// Async version of [`Self::stop`].
     pub async fn stop_async(&mut self) -> Result<(), WifiError> {
         let mut events = enumset::enum_set! {};
 
@@ -3295,7 +3295,7 @@ impl WifiController<'_> {
 
         Self::clear_events(events);
 
-        crate::wifi::WifiController::stop_impl(self)?;
+        self.stop_impl()?;
 
         self.wait_for_all_events(events, false).await;
 
@@ -3305,11 +3305,11 @@ impl WifiController<'_> {
         Ok(())
     }
 
-    /// Async version of [`crate::wifi::WifiController`]'s `connect` method
+    /// Async version of [`Self::connect`].
     pub async fn connect_async(&mut self) -> Result<(), WifiError> {
         Self::clear_events(WifiEvent::StaConnected | WifiEvent::StaDisconnected);
 
-        let err = crate::wifi::WifiController::connect_impl(self).err();
+        let err = self.connect_impl().err();
 
         if MultiWifiEventFuture::new(WifiEvent::StaConnected | WifiEvent::StaDisconnected)
             .await
@@ -3321,8 +3321,7 @@ impl WifiController<'_> {
         }
     }
 
-    /// Async version of [`crate::wifi::WifiController`]'s `Disconnect`
-    /// method
+    /// Async version of [`Self::disconnect`].
     pub async fn disconnect_async(&mut self) -> Result<(), WifiError> {
         // If not connected, this will do nothing.
         // It will also wait forever for a `StaDisconnected` event that will never come.
@@ -3332,7 +3331,7 @@ impl WifiController<'_> {
         }
 
         Self::clear_events(WifiEvent::StaDisconnected);
-        crate::wifi::WifiController::disconnect_impl(self)?;
+        self.disconnect_impl()?;
         WifiEventFuture::new(WifiEvent::StaDisconnected).await;
 
         Ok(())
