@@ -2240,20 +2240,19 @@ mod chip_specific {
         #[cfg(soc_has_pcr)]
         {
             use crate::peripherals::PCR;
+
             PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
+                cfg_if::cfg_if!(
+                    if #[cfg(esp32c6)] {
+                        w.sclk_sel().bits(source.bits())
+                    } else {
+                        w.sclk_sel().bit(source.bit())
+                    }
+                );
                 w.sclk_div_num().bits(div);
                 w.sclk_div_a().bits(0);
                 w.sclk_div_b().bits(0)
             });
-
-            #[cfg(esp32c6)]
-            PCR::regs()
-                .rmt_sclk_conf()
-                .modify(|_, w| unsafe { w.sclk_sel().bits(source.bits()) });
-            #[cfg(not(esp32c6))]
-            PCR::regs()
-                .rmt_sclk_conf()
-                .modify(|_, w| w.sclk_sel().bit(source.bit()));
 
             RMT::regs()
                 .sys_conf()
