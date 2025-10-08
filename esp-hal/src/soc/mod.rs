@@ -263,7 +263,9 @@ pub(crate) fn enable_main_stack_guard_monitoring() {
 pub(crate) fn setup_trap_section_protection() {
     #[cfg(not(flip_link))]
     {
-        if crate::debugger::debugger_connected() {
+        if !cfg!(stack_guard_monitoring_with_debugger_connected)
+            && crate::debugger::debugger_connected()
+        {
             return;
         }
 
