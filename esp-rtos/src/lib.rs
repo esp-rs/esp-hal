@@ -317,6 +317,10 @@ pub fn start_with_idle_hook(
 ///
 /// The supplied stack and function will be used as the main thread of the second core. The thread
 /// will be pinned to the second core.
+///
+/// You can return from the second core's main thread function. This will cause the scheduler to
+/// enter the idle state, but the second core will continue to run interrupt handlers and other
+/// tasks.
 #[cfg(multi_core)]
 pub fn start_second_core<const STACK_SIZE: usize>(
     cpu_control: CPU_CTRL,
@@ -331,10 +335,7 @@ pub fn start_second_core<const STACK_SIZE: usize>(
         int0,
         int1,
         stack,
-        Some(esp_config::esp_config_int!(
-            usize,
-            "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"
-        )),
+        None,
         func,
     );
 }
@@ -345,6 +346,14 @@ pub fn start_second_core<const STACK_SIZE: usize>(
 ///
 /// The supplied stack and function will be used as the main thread of the second core. The thread
 /// will be pinned to the second core.
+///
+/// The stack guard offset is used to reserve a portion of the stack for the stack guard, for safety
+/// purposes. Passing `None` will result in the default value configured by the
+/// `ESP_HAL_CONFIG_STACK_GUARD_OFFSET` esp-hal configuration.
+///
+/// You can return from the second core's main thread function. This will cause the scheduler to
+/// enter the idle state, but the second core will continue to run interrupt handlers and other
+/// tasks.
 #[cfg(multi_core)]
 pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
     cpu_control: CPU_CTRL,
@@ -370,9 +379,14 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
         ),
     };
 
+    let stack_guard_offset = stack_guard_offset.unwrap_or(esp_config::esp_config_int!(
+        usize,
+        "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"
+    ));
+
     let mut cpu_control = CpuControl::new(cpu_control);
     let guard = cpu_control
-        .start_app_core_with_stack_guard_offset(stack, stack_guard_offset, move || {
+        .start_app_core_with_stack_guard_offset(stack, Some(stack_guard_offset), move || {
             trace!("Second core running");
             task::setup_smp(int1);
             SCHEDULER.with(move |scheduler| {
@@ -385,12 +399,7 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
 
                 // esp-hal may be configured to use a watchpoint. To work around that, we read the
                 // memory at the stack guard, and we'll use whatever we find as the main task's
-                // stack guard value.
-                let stack_guard_offset = stack_guard_offset.unwrap_or(esp_config::esp_config_int!(
-                    usize,
-                    "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"
-                ));
-
+                // stack guard value, instead of writing our own stack guard value.
                 let stack_bottom = ptrs.stack.cast::<u32>();
                 let stack_guard = unsafe { stack_bottom.byte_add(stack_guard_offset) };
 
