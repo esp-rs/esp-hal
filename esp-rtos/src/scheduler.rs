@@ -365,6 +365,8 @@ impl SchedulerState {
     }
 
     fn delete_task(&mut self, mut to_delete: TaskPtr) {
+        unsafe { to_delete.as_ref().ensure_no_stack_overflow() };
+
         self.remove_from_all_queues(to_delete);
 
         unsafe {
