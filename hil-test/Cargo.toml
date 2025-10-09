@@ -98,14 +98,6 @@ name    = "parl_io"
 harness = false
 
 [[bin]]
-name    = "parl_io_tx"
-harness = false
-
-[[bin]]
-name    = "parl_io_tx_async"
-harness = false
-
-[[bin]]
 name    = "pcnt"
 harness = false
 
@@ -120,24 +112,6 @@ harness = false
 
 [[bin]]
 name    = "uart"
-harness = false
-
-[[bin]]
-name              = "uart_async"
-harness           = false
-required-features = ["embassy"]
-
-[[bin]]
-name              = "uart_uhci"
-harness           = false
-required-features = ["embassy"]
-
-[[bin]]
-name    = "uart_regression"
-harness = false
-
-[[bin]]
-name    = "uart_tx_rx_async"
 harness = false
 
 [[bin]]
