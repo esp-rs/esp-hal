@@ -2288,6 +2288,7 @@ mod chip_specific {
     }
 
     #[crate::handler]
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub(super) fn async_interrupt_handler() {
         let st = RMT::regs().int_st().read();
 
@@ -2787,6 +2788,7 @@ mod chip_specific {
     }
 
     #[crate::handler]
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub(super) fn async_interrupt_handler() {
         let st = RMT::regs().int_st().read();
 
