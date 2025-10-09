@@ -63,6 +63,10 @@ esp_rtos::start_second_core(
 //! Note that, to create async tasks, you will need the `task` macro from the `embassy-executor` crate. Do
 //! NOT enable any of the `arch-*` features on `embassy-executor`.
 //!
+//! ## Additional configuration
+#![doc = ""]
+#![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_rtos_config_table.md"))]
+#![doc = ""]
 //! ## Feature Flags
 #![doc = document_features::document_features!()]
 #![no_std]
