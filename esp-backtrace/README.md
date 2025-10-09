@@ -15,35 +15,6 @@ you want to create a backtrace yourself (i.e. not using the panic or exception h
 
 When using the panic and/or exception handler make sure to include `use esp_backtrace as _;`.
 
-## Features
-
-| Feature              | Description                                                                                                        |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| esp32                | Target ESP32                                                                                                       |
-| esp32c2              | Target ESP32-C2                                                                                                    |
-| esp32c3              | Target ESP32-C3                                                                                                    |
-| esp32c6              | Target ESP32-C6                                                                                                    |
-| esp32h2              | Target ESP32-H2                                                                                                    |
-| esp32p4              | Target ESP32-P4                                                                                                    |
-| esp32s2              | Target ESP32-S2                                                                                                    |
-| esp32s3              | Target ESP32-S3                                                                                                    |
-| panic-handler        | Include a panic handler, will add `esp-println` as a dependency                                                    |
-| exception-handler    | Include an exception handler, will add `esp-println` as a dependency                                               |
-| println              | Use `esp-println` to print messages                                                                                |
-| defmt                | Use `defmt` logging to print messages\* (check [example](https://github.com/playfulFence/backtrace-defmt-example)) |
-| colors               | Print messages in red\*                                                                                            |
-| halt-cores           | Halt both CPUs on ESP32 / ESP32-S3 instead of doing a `loop {}` in case of a panic or exception                    |
-| semihosting          | Call `semihosting::process::abort()` on panic.                                                                     |
-| custom-halt          | Invoke the extern function `custom_halt()` instead of doing a `loop {}` in case of a panic or exception            |
-| custom-pre-backtrace | Invoke the extern function `custom_pre_backtrace()` before handling a panic or exception                           |
-
-\* _only used for panic and exception handlers_
-
-### `defmt` Feature
-
-Please note that `defmt` does _not_ provide MSRV guarantees with releases, and as such we are not able to make any MSRV guarantees when this feature is enabled. For more information refer to the MSRV section of `defmt`'s README:
-https://github.com/knurling-rs/defmt?tab=readme-ov-file#msrv
-
 ## Minimum Supported Rust Version (MSRV)
 
 This crate is guaranteed to compile when using the latest stable Rust version at the time of the crate's release. It _might_ compile with older versions, but that may change in any new release, including patches.
