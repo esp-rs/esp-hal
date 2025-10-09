@@ -1290,7 +1290,7 @@ where
 
         let status = raw.get_tx_status();
         if status == Some(Event::Threshold) {
-            raw.reset_tx_threshold_set();
+            raw.clear_tx_interrupts(Event::Threshold);
 
             // `RmtWriter::write()` is safe to call even if `poll_internal` is called repeatedly
             // after the data is exhausted since it returns immediately if already done.
@@ -1342,7 +1342,7 @@ where
         // This is safe since we own `this`, and don't access it below.
         let channel = unsafe { core::ptr::read(&this.channel) };
 
-        raw.clear_tx_interrupts();
+        raw.clear_tx_interrupts(EnumSet::all());
 
         match result {
             Ok(()) => Ok(channel),
@@ -1368,7 +1368,7 @@ where
             }
         }
 
-        raw.clear_tx_interrupts();
+        raw.clear_tx_interrupts(EnumSet::all());
     }
 }
 
@@ -1427,7 +1427,7 @@ impl<'ch> ContinuousTxTransaction<'ch> {
                 }
             }
 
-            raw.clear_tx_interrupts();
+            raw.clear_tx_interrupts(EnumSet::all());
         }
 
         // Disable Drop handler since the transaction is stopped already.
@@ -1467,7 +1467,7 @@ impl<'ch> Drop for ContinuousTxTransaction<'ch> {
             }
         }
 
-        raw.clear_tx_interrupts();
+        raw.clear_tx_interrupts(EnumSet::all());
     }
 }
 
@@ -1608,7 +1608,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         let mut writer = RmtWriter::new();
         writer.write(&mut data, raw, true);
 
-        raw.clear_tx_interrupts();
+        raw.clear_tx_interrupts(EnumSet::all());
         raw.start_send(None, memsize);
 
         Ok(TxTransaction {
@@ -1667,7 +1667,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
             let mut writer = RmtWriter::new();
             writer.write(&mut data, raw, true);
 
-            raw.clear_tx_interrupts();
+            raw.clear_tx_interrupts(EnumSet::all());
             raw.start_send(Some(mode), memsize);
         }
 
@@ -1717,7 +1717,7 @@ where
             }
             #[cfg(rmt_has_rx_wrap)]
             Some(Event::Threshold) => {
-                raw.reset_rx_threshold_set();
+                raw.clear_rx_interrupts(Event::Threshold);
 
                 if self.reader.state == ReaderState::Active {
                     self.reader.read(&mut self.data, raw, false);
@@ -1762,7 +1762,7 @@ where
         // This is safe since we own `this`, and don't access it below.
         let channel = unsafe { core::ptr::read(&this.channel) };
 
-        raw.clear_rx_interrupts();
+        raw.clear_rx_interrupts(EnumSet::all());
 
         match result {
             Ok(total) => Ok((total, channel)),
@@ -1781,7 +1781,7 @@ where
         raw.stop_rx(true);
         raw.update();
 
-        raw.clear_rx_interrupts();
+        raw.clear_rx_interrupts(EnumSet::all());
     }
 }
 
@@ -1810,7 +1810,7 @@ impl<'ch> Channel<'ch, Blocking, Rx> {
 
         let reader = RmtReader::new();
 
-        raw.clear_rx_interrupts();
+        raw.clear_rx_interrupts(EnumSet::all());
         raw.start_receive(true, memsize);
 
         Ok(RxTransaction {
@@ -1864,7 +1864,7 @@ where
                 }
             }
             Some(Event::Threshold) => {
-                raw.reset_tx_threshold_set();
+                raw.clear_tx_interrupts(Event::Threshold);
 
                 this.writer.write(&mut this.data, raw, false);
 
@@ -1898,7 +1898,7 @@ where
             }
         }
 
-        raw.clear_tx_interrupts();
+        raw.clear_tx_interrupts(EnumSet::all());
     }
 }
 
@@ -1937,7 +1937,7 @@ impl Channel<'_, Async, Tx> {
                 WriterState::Done => false,
             };
 
-            raw.clear_tx_interrupts();
+            raw.clear_tx_interrupts(EnumSet::all());
             let mut events = Event::End | Event::Error;
             if wrap {
                 events |= Event::Threshold;
@@ -1995,7 +1995,7 @@ where
             }
             #[cfg(rmt_has_rx_wrap)]
             Some(Event::Threshold) => {
-                raw.reset_rx_threshold_set();
+                raw.clear_rx_interrupts(Event::Threshold);
 
                 this.reader.read(&mut this.data, raw, false);
 
@@ -2022,7 +2022,7 @@ where
         raw.stop_rx(true);
         raw.update();
 
-        raw.clear_rx_interrupts();
+        raw.clear_rx_interrupts(EnumSet::all());
     }
 }
 
@@ -2045,7 +2045,7 @@ impl Channel<'_, Async, Rx> {
         if !property!("rmt.has_rx_wrap") && data.len() > memsize.codes() {
             reader.state = ReaderState::Error(Error::InvalidDataLength);
         } else {
-            raw.clear_rx_interrupts();
+            raw.clear_rx_interrupts(EnumSet::all());
             raw.listen_rx_interrupt(Event::End | Event::Error | Event::Threshold);
             raw.start_receive(true, memsize);
         }
@@ -2421,16 +2421,26 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn clear_tx_interrupts(self) {
+        pub fn clear_tx_interrupts(self, events: impl Into<EnumSet<Event>>) {
             let rmt = crate::peripherals::RMT::regs();
+            let events = events.into();
 
             rmt.int_clr().write(|w| {
                 let ch_idx = self.ch_idx as u8;
 
-                w.ch_tx_end(ch_idx).set_bit();
-                w.ch_tx_err(ch_idx).set_bit();
-                w.ch_tx_loop(ch_idx).set_bit();
-                w.ch_tx_thr_event(ch_idx).set_bit()
+                if events.contains(Event::End) {
+                    w.ch_tx_end(ch_idx).set_bit();
+                }
+                if events.contains(Event::Error) {
+                    w.ch_tx_err(ch_idx).set_bit();
+                }
+                if events.contains(Event::LoopCount) {
+                    w.ch_tx_loop(ch_idx).set_bit();
+                }
+                if events.contains(Event::Threshold) {
+                    w.ch_tx_thr_event(ch_idx).set_bit();
+                }
+                w
             });
         }
 
@@ -2510,17 +2520,6 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn reset_tx_threshold_set(self) {
-            let rmt = crate::peripherals::RMT::regs();
-
-            rmt.int_clr().write(|w| {
-                let ch_idx = self.ch_idx as u8;
-
-                w.ch_tx_thr_event(ch_idx).set_bit()
-            });
-        }
-
-        #[inline(always)]
         pub fn set_tx_threshold(self, threshold: u8) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
@@ -2589,15 +2588,23 @@ mod chip_specific {
 
     impl DynChannelAccess<Rx> {
         #[inline(always)]
-        pub fn clear_rx_interrupts(self) {
+        pub fn clear_rx_interrupts(self, events: impl Into<EnumSet<Event>>) {
             let rmt = crate::peripherals::RMT::regs();
+            let events = events.into();
 
             rmt.int_clr().write(|w| {
                 let ch_idx = self.ch_idx as u8;
 
-                w.ch_rx_end(ch_idx).set_bit();
-                w.ch_rx_err(ch_idx).set_bit();
-                w.ch_rx_thr_event(ch_idx).set_bit()
+                if events.contains(Event::End) {
+                    w.ch_rx_end(ch_idx).set_bit();
+                }
+                if events.contains(Event::Error) {
+                    w.ch_rx_err(ch_idx).set_bit();
+                }
+                if events.contains(Event::Threshold) {
+                    w.ch_rx_thr_event(ch_idx).set_bit();
+                }
+                w
             });
         }
 
@@ -2662,17 +2669,6 @@ mod chip_specific {
             } else {
                 None
             }
-        }
-
-        #[inline(always)]
-        pub fn reset_rx_threshold_set(self) {
-            let rmt = crate::peripherals::RMT::regs();
-
-            rmt.int_clr().write(|w| {
-                let ch_idx = self.ch_idx as u8;
-
-                w.ch_rx_thr_event(ch_idx).set_bit()
-            });
         }
 
         #[inline(always)]
@@ -2888,17 +2884,27 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn clear_tx_interrupts(self) {
+        pub fn clear_tx_interrupts(self, events: impl Into<EnumSet<Event>>) {
             let rmt = crate::peripherals::RMT::regs();
+            let events = events.into();
 
             rmt.int_clr().write(|w| {
                 let ch = self.ch_idx as u8;
 
-                w.ch_err(ch).set_bit();
-                w.ch_tx_end(ch).set_bit();
+                if events.contains(Event::End) {
+                    w.ch_tx_end(ch).set_bit();
+                }
+                if events.contains(Event::Error) {
+                    w.ch_err(ch).set_bit();
+                }
                 #[cfg(rmt_has_tx_loop_count)]
-                w.ch_tx_loop(ch).set_bit();
-                w.ch_tx_thr_event(ch).set_bit()
+                if events.contains(Event::LoopCount) {
+                    w.ch_tx_loop(ch).set_bit();
+                }
+                if events.contains(Event::Threshold) {
+                    w.ch_tx_thr_event(ch).set_bit();
+                }
+                w
             });
         }
 
@@ -2985,17 +2991,6 @@ mod chip_specific {
             }
 
             None
-        }
-
-        #[inline(always)]
-        pub fn reset_tx_threshold_set(self) {
-            let rmt = crate::peripherals::RMT::regs();
-
-            rmt.int_clr().write(|w| {
-                let ch = self.ch_idx as u8;
-
-                w.ch_tx_thr_event(ch).set_bit()
-            });
         }
 
         #[inline(always)]
@@ -3088,14 +3083,20 @@ mod chip_specific {
 
     impl DynChannelAccess<Rx> {
         #[inline(always)]
-        pub fn clear_rx_interrupts(self) {
+        pub fn clear_rx_interrupts(self, events: impl Into<EnumSet<Event>>) {
             let rmt = crate::peripherals::RMT::regs();
+            let events = events.into();
 
             rmt.int_clr().write(|w| {
                 let ch = self.ch_idx as u8;
 
-                w.ch_rx_end(ch).set_bit();
-                w.ch_err(ch).set_bit()
+                if events.contains(Event::End) {
+                    w.ch_rx_end(ch).set_bit();
+                }
+                if events.contains(Event::Error) {
+                    w.ch_err(ch).set_bit();
+                }
+                w
             });
         }
 
