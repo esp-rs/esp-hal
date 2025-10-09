@@ -46,8 +46,7 @@ impl SemaphoreInner {
                 ..
             } => {
                 SCHEDULER.with(|scheduler| {
-                    let current_cpu = Cpu::current() as usize;
-                    let current = unwrap!(scheduler.per_cpu[current_cpu].current_task);
+                    let current = scheduler.current_task(Cpu::current());
                     if let Some(owner) = owner {
                         if *owner == current && *recursive {
                             *lock_counter += 1;

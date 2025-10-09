@@ -117,6 +117,13 @@ impl SchedulerState {
         }
     }
 
+    pub(crate) fn current_task(&self, cpu: Cpu) -> TaskPtr {
+        unwrap!(
+            self.per_cpu[cpu as usize].current_task,
+            "The scheduler is not running on the current CPU. Make sure you start the scheduler before calling OS functions."
+        )
+    }
+
     pub(crate) fn setup(&mut self, time_driver: TimeDriver, idle_hook: IdleFn) {
         assert!(
             self.time_driver.is_none(),
@@ -437,8 +444,7 @@ impl Scheduler {
 
     pub(crate) fn sleep_until(&self, wake_at: Instant) -> bool {
         self.with(|scheduler| {
-            let current_cpu = Cpu::current() as usize;
-            let current_task = unwrap!(scheduler.per_cpu[current_cpu].current_task);
+            let current_task = scheduler.current_task(Cpu::current());
             if scheduler.sleep_task_until(current_task, wake_at) {
                 task::yield_task();
                 true

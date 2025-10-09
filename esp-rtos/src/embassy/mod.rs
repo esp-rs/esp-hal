@@ -4,6 +4,8 @@ use core::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::Ordering};
 
 use embassy_executor::{SendSpawner, Spawner, raw};
 use esp_hal::interrupt::{InterruptHandler, Priority, software::SoftwareInterrupt};
+#[cfg(multi_core)]
+use esp_hal::system::Cpu;
 use macros::ram;
 use portable_atomic::AtomicPtr;
 
@@ -40,7 +42,16 @@ pub trait Callbacks {
 
 /// Thread-mode executor.
 ///
-/// This executor runs in an OS thread.
+/// This executor runs in an OS thread, meaning the scheduler needs to be started before using any
+/// async operations.
+#[cfg_attr(
+    multi_core,
+    doc = r"
+
+If you want to start the executor on the second core, you will need to start the second core using [`crate::start_second_core`].
+If you are looking for a way to run code on the second core without the scheduler, use the [`InterruptExecutor`].
+"
+)]
 pub struct Executor {
     executor: UnsafeCell<MaybeUninit<raw::Executor>>,
 }
@@ -128,6 +139,14 @@ impl Executor {
                 (flags as *const ThreadFlags).cast::<()>().cast_mut(),
             ))
         };
+
+        #[cfg(multi_core)]
+        if Cpu::current() != Cpu::ProCpu
+            && crate::SCHEDULER
+                .with(|scheduler| !scheduler.per_cpu[Cpu::current() as usize].initialized)
+        {
+            panic!("Executor cannot be started: the scheduler is not running on the current CPU.");
+        }
 
         init(executor.spawner());
 
