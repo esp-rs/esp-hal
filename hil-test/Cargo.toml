@@ -73,10 +73,6 @@ name    = "misc_simple"
 harness = false
 
 [[bin]]
-name    = "qspi"
-harness = false
-
-[[bin]]
 name    = "rng"
 harness = false
 
@@ -85,19 +81,12 @@ name    = "spi_full_duplex"
 harness = false
 
 [[bin]]
-name    = "spi_half_duplex_read"
+name    = "spi_half_duplex_slave_qspi"
 harness = false
 
-[[bin]]
-name    = "spi_half_duplex_write"
-harness = false
 
 [[bin]]
 name    = "spi_half_duplex_write_psram"
-harness = false
-
-[[bin]]
-name    = "spi_slave"
 harness = false
 
 [[bin]]
