@@ -95,11 +95,15 @@ use core::mem::MaybeUninit;
 pub(crate) use esp_alloc::InternalMemory;
 #[cfg(any(multi_core, riscv))]
 use esp_hal::interrupt::software::SoftwareInterrupt;
+#[cfg(systimer)]
+use esp_hal::timer::systimer::Alarm;
+#[cfg(timergroup)]
+use esp_hal::timer::timg::Timer;
 use esp_hal::{
     Blocking,
     system::Cpu,
     time::{Duration, Instant},
-    timer::{AnyTimer, OneShotTimer},
+    timer::{AnyTimer, OneShotTimer, any::Degrade},
 };
 #[cfg(multi_core)]
 use esp_hal::{
@@ -153,20 +157,61 @@ mod esp_alloc {
 
     unsafe impl Allocator for InternalMemory {
         fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
-            let raw_ptr = unsafe { malloc_internal(layout.size()) };
-            let ptr = NonNull::new(raw_ptr).ok_or(AllocError)?;
+            // We assume malloc returns a 4-byte aligned pointer. We can skip aligning types
+            // that are already aligned to 4 bytes or less.
+            let ptr = if layout.align() <= 4 {
+                unsafe { malloc_internal(layout.size()) }
+            } else {
+                // We allocate extra memory so that we can store the number of prefix bytes in the
+                // bytes before the actual allocation. We will then use this to
+                // restore the pointer to the original allocation.
+
+                // If we can get away with 0 padding bytes, let's do that. In this case, we need
+                // space for the prefix length only.
+                // We assume malloc returns a 4-byte aligned pointer. This means any higher
+                // alignment requirements can be satisfied by at most align - 4
+                // bytes of shift, and we can use the remaining 4 bytes for the prefix length.
+                let extra = layout.align().max(4);
+
+                let allocation = unsafe { malloc_internal(layout.size() + extra) };
+
+                // reserve at least 4 bytes for the prefix
+                let ptr = allocation.wrapping_add(4);
+
+                let align_offset = ptr.align_offset(layout.align());
+
+                let data_ptr = ptr.wrapping_add(align_offset);
+                let prefix_ptr = data_ptr.wrapping_sub(4);
+
+                // Store the amount of padding bytes used for alignment.
+                unsafe { prefix_ptr.cast::<usize>().write(align_offset) };
+
+                data_ptr
+            };
+
+            let ptr = NonNull::new(ptr).ok_or(AllocError)?;
             Ok(NonNull::slice_from_raw_parts(ptr, layout.size()))
         }
 
-        unsafe fn deallocate(&self, ptr: NonNull<u8>, _layout: Layout) {
-            unsafe { free_internal(ptr.as_ptr()) };
+        unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+            // We assume malloc returns a 4-byte aligned pointer. In that case we don't have to
+            // align, so we don't have a prefix.
+            if layout.align() <= 4 {
+                unsafe { free_internal(ptr.as_ptr()) };
+            } else {
+                // Retrieve the amount of padding bytes used for alignment.
+                let prefix_ptr = ptr.as_ptr().wrapping_sub(4);
+                let prefix_bytes = unsafe { prefix_ptr.cast::<usize>().read() };
+
+                unsafe { free_internal(prefix_ptr.wrapping_sub(prefix_bytes)) };
+            }
         }
     }
 }
 
-/// A trait to allow better UX for initializing esp-rtos.
+/// Timers that can be used as time drivers.
 ///
-/// This trait is meant to be used only for the `init` function.
+/// This trait is meant to be used only for the [`start`] function.
 pub trait TimerSource: private::Sealed + 'static {
     /// Returns the timer source.
     fn timer(self) -> TimeBase;
@@ -179,17 +224,33 @@ mod private {
 impl private::Sealed for TimeBase {}
 impl private::Sealed for AnyTimer<'static> {}
 #[cfg(timergroup)]
-impl private::Sealed for esp_hal::timer::timg::Timer<'static> {}
+impl private::Sealed for Timer<'static> {}
 #[cfg(systimer)]
-impl private::Sealed for esp_hal::timer::systimer::Alarm<'static> {}
+impl private::Sealed for Alarm<'static> {}
 
-impl<T> TimerSource for T
-where
-    T: esp_hal::timer::any::Degrade + private::Sealed + 'static,
-{
+impl TimerSource for TimeBase {
     fn timer(self) -> TimeBase {
-        let any_timer: AnyTimer<'static> = self.degrade();
-        TimeBase::new(any_timer)
+        self
+    }
+}
+
+impl TimerSource for AnyTimer<'static> {
+    fn timer(self) -> TimeBase {
+        TimeBase::new(self)
+    }
+}
+
+#[cfg(timergroup)]
+impl TimerSource for Timer<'static> {
+    fn timer(self) -> TimeBase {
+        TimeBase::new(self.degrade())
+    }
+}
+
+#[cfg(systimer)]
+impl TimerSource for Alarm<'static> {
+    fn timer(self) -> TimeBase {
+        TimeBase::new(self.degrade())
     }
 }
 
@@ -197,10 +258,10 @@ where
 ///
 /// The current context will be converted into the main task, and will be pinned to the first core.
 ///
-/// This function is equivalent to [start_with_idle_hook], with the default idle hook. The default
+/// This function is equivalent to [`start_with_idle_hook`], with the default idle hook. The default
 /// idle hook will wait for an interrupt.
 ///
-/// For information about the other arguments, see [start_with_idle_hook].
+/// For information about the arguments, see [`start_with_idle_hook`].
 pub fn start(timer: impl TimerSource, #[cfg(riscv)] int0: SoftwareInterrupt<'static, 0>) {
     start_with_idle_hook(
         timer,
@@ -224,6 +285,7 @@ pub fn start(timer: impl TimerSource, #[cfg(riscv)] int0: SoftwareInterrupt<'sta
 /// - A timg `Timer` instance
 /// - A systimer `Alarm` instance
 /// - An `AnyTimer` instance
+/// - A `OneShotTimer` instance
 #[doc = ""]
 #[cfg_attr(
     riscv,
@@ -296,6 +358,10 @@ pub fn start_with_idle_hook(
 ///
 /// The supplied stack and function will be used as the main thread of the second core. The thread
 /// will be pinned to the second core.
+///
+/// You can return from the second core's main thread function. This will cause the scheduler to
+/// enter the idle state, but the second core will continue to run interrupt handlers and other
+/// tasks.
 #[cfg(multi_core)]
 pub fn start_second_core<const STACK_SIZE: usize>(
     cpu_control: CPU_CTRL,
@@ -310,10 +376,7 @@ pub fn start_second_core<const STACK_SIZE: usize>(
         int0,
         int1,
         stack,
-        Some(esp_config::esp_config_int!(
-            usize,
-            "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"
-        )),
+        None,
         func,
     );
 }
@@ -324,6 +387,14 @@ pub fn start_second_core<const STACK_SIZE: usize>(
 ///
 /// The supplied stack and function will be used as the main thread of the second core. The thread
 /// will be pinned to the second core.
+///
+/// The stack guard offset is used to reserve a portion of the stack for the stack guard, for safety
+/// purposes. Passing `None` will result in the default value configured by the
+/// `ESP_HAL_CONFIG_STACK_GUARD_OFFSET` esp-hal configuration.
+///
+/// You can return from the second core's main thread function. This will cause the scheduler to
+/// enter the idle state, but the second core will continue to run interrupt handlers and other
+/// tasks.
 #[cfg(multi_core)]
 pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
     cpu_control: CPU_CTRL,
@@ -349,9 +420,14 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
         ),
     };
 
+    let stack_guard_offset = stack_guard_offset.unwrap_or(esp_config::esp_config_int!(
+        usize,
+        "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"
+    ));
+
     let mut cpu_control = CpuControl::new(cpu_control);
     let guard = cpu_control
-        .start_app_core_with_stack_guard_offset(stack, stack_guard_offset, move || {
+        .start_app_core_with_stack_guard_offset(stack, Some(stack_guard_offset), move || {
             trace!("Second core running");
             task::setup_smp(int1);
             SCHEDULER.with(move |scheduler| {
@@ -364,12 +440,7 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
 
                 // esp-hal may be configured to use a watchpoint. To work around that, we read the
                 // memory at the stack guard, and we'll use whatever we find as the main task's
-                // stack guard value.
-                let stack_guard_offset = stack_guard_offset.unwrap_or(esp_config::esp_config_int!(
-                    usize,
-                    "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"
-                ));
-
+                // stack guard value, instead of writing our own stack guard value.
                 let stack_bottom = ptrs.stack.cast::<u32>();
                 let stack_guard = unsafe { stack_bottom.byte_add(stack_guard_offset) };
 
@@ -387,6 +458,11 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
             }
         })
         .unwrap();
+
+    // Spin until the second core scheduler is initialized
+    while SCHEDULER.with(|s| !s.per_cpu[1].initialized) {
+        esp_hal::rom::ets_delay_us(1);
+    }
 
     core::mem::forget(guard);
 }

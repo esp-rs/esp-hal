@@ -24,10 +24,19 @@
 //!
 //! Ensure that the right features are enabled for your chip. See [Examples](https://github.com/esp-rs/esp-hal/tree/main/examples#examples) for more examples.
 //!
+//! You will also need a dynamic memory allocator, and a preemptive task scheduler in your
+//! application. For the dynamic allocator, we recommend using `esp-alloc`. For the task scheduler,
+//! the simplest option that is supported by us is `esp-rtos`, but you may use Ariel
+//! OS or other operating systems as well.
+//!
 //! ```toml
 //! [dependencies.esp-radio]
 //! # A supported chip needs to be specified, as well as specific use-case features
-#![doc = concat!(r#"features = [""#, chip!(), r#"", "wifi", "esp-now"]"#)]
+#![doc = concat!(r#"features = [""#, chip!(), r#"", "wifi", "esp-now", "esp-alloc"]"#)]
+//! [dependencies.esp-rtos]
+#![doc = concat!(r#"features = [""#, chip!(), r#"", "esp-radio", "esp-alloc"]"#)]
+//! [dependencies.esp-alloc]
+#![doc = concat!(r#"features = [""#, chip!(), r#""]"#)]
 //! ```
 //! 
 //! ### Optimization Level
@@ -57,7 +66,7 @@
 //! Please note that the configuration keys are usually named slightly different and not all configuration keys apply.
 #![cfg_attr(
     feature = "wifi",
-    doc = "By default the power-saving mode is [PowerSaveMode::None](crate::wifi::PowerSaveMode::None) and `ESP_PHY_PHY_ENABLE_USB` is enabled by default."
+    doc = "By default the power-saving mode is [`PowerSaveMode::None`](crate::wifi::PowerSaveMode::None) and `ESP_PHY_CONFIG_PHY_ENABLE_USB` is enabled by default."
 )]
 //! In addition pay attention to these configuration keys:
 //! - `ESP_RADIO_RX_QUEUE_SIZE`
@@ -70,18 +79,16 @@
         "\n\n",
         "BLE and Wi-Fi can also be run on the second core.",
         "\n\n",
-        "`esp_rtos::init` and `esp_radio::init` _must_ be called on the core on",
-        "which you intend to run the wireless code. This will correctly initialize",
-        "the radio peripheral to run on that core, and ensure that interrupts are",
-        "serviced by the correct core.",
+        "`esp_radio::init` is recommended to be called on the first core. The tasks ",
+        "created by `esp-radio` are pinned to the first core.",
         "\n\n",
-        "It's also important to allocate adequate stack for the second core; in many",
-        "cases 8kB is not enough, and 16kB or more may be required depending on your",
-        "use case. Failing to allocate adequate stack may result in strange behaviour,",
+        "It's also important to allocate adequate stack for the second core; in many ",
+        "cases 8kB is not enough, and 16kB or more may be required depending on your ",
+        "use case. Failing to allocate adequate stack may result in strange behaviour, ",
         "such as your application silently failing at some point during execution."
     )
 )]
-//! # Features flags
+//! ## Feature flags
 //!
 //! Note that not all features are available on every MCU. For example, `ble`
 //! (and thus, `coex`) is not available on ESP32-S2.

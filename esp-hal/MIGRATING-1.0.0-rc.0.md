@@ -175,11 +175,23 @@ The `rmt::Channel::transmit_continuously` and
 +let tx_trans1 = tx_channel1.transmit_continuously(&data, LoopCount::Finite(count));
 ```
 
+The receiver methods `rmt::Channel::<'_, Blocking>::receive` and
+`rmt::Channel::<'_, Async>::receive` now return the actual amount of data read,
+which may be shorter than the buffer size if the idle threshold was exceeded:
+
+```diff
+-let channel = channel.receive(&mut buffer)?.wait().unwrap();
++let (_count, channel) = channel.receive(&mut buffer)?.wait().unwrap();
+
+-let () = async_channel.receive(&mut buffer).await.unwrap();
++let _count = async_channel.receive(&mut buffer).await.unwrap();
+```
+
 ### RMT lifetime changes
 
 The RMT driver didn't use to properly tie together lifetimes of its types and
 therefore didn't statically prevent all kinds of concurrent and conflicting
-channel re-use. 
+channel re-use.
 `rmt::Channel` and `rmt::ChannelCreator` now carry a lifetime and can be reborrowed:
 
 ```diff
@@ -339,6 +351,13 @@ interrupt::enable_direct(
 
 The `esp-hal-embassy` has been discontinued. Embassy is continued to be supported as part of `esp-rtos`.
 
+To import `esp_rtos` for `embassy` support, add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+esp-rtos = { version = "0.1.0", features = ["your_chip", "embassy"] }
+```
+
 ### Configuration
 
 `esp-hal-embassy` configuration options have not been ported to `esp-rtos`. `esp-rtos` by default works with a single integrated timer queue.
@@ -414,4 +433,3 @@ esp_rtos::start_second_core(
 ### Interrupt executor changes
 
 Interrupt executors are provided as `esp_rtos::embassy::InterruptExecutor` with no additional changes.
-

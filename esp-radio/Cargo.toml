@@ -102,6 +102,8 @@ default = ["esp-alloc"]
 ## - `pub extern "C" fn calloc_internal(number: u32, size: usize) -> *mut u8`
 ## - `pub extern "C" fn realloc(ptr: *mut u8, new_size: usize) -> *mut u8`
 ## - `pub extern "C" fn get_free_internal_heap_size() -> usize;`
+## 
+## Note that the untyped nature of the allocator functions means that esp-alloc is likely the more memory efficient option.
 esp-alloc = ["dep:esp-alloc"]
 
 ## Logs the Wi-Fi logs from the driver at log level info (needs a nightly-compiler)

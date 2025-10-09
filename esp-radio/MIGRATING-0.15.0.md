@@ -5,6 +5,13 @@
 The `builtin-scheduler` feature has been removed. The functionality has been moved to `esp_rtos`.
 `esp_rtos` needs to be initialized before calling `esp_radio::init`. Failure to do so will result in an error.
 
+To import `esp_rtos` for `esp_radio`, add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+esp-rtos = { version = "0.1.0", features = ["your_chip", "esp-radio", "esp-alloc"] } # esp-alloc is optional, but recommended
+```
+
 Depending on your chosen OS, you may need to use other `esp_rtos` implementations.
 
 Furthermore, `esp_radio::init` no longer requires `RNG` or a timer.
@@ -65,7 +72,7 @@ Provide these symbols:
 
 ## Scanning Functions
 
-The `scan_with_config_sync_max`, `scan_with_config_sync_max`, `scan_n`, and `scan_n_async` functions have been removed. You can instead use the `scan_with_config_async` or `scan_with_config_sync` funtions while specifying a `max` value in `ScanConfig`.
+The `scan_with_config_sync_max`, `scan_with_config_sync_max`, `scan_n`, and `scan_n_async` functions have been removed. You can instead use the `scan_with_config_async` or `scan_with_config` functions while specifying a `max` value in `ScanConfig`.
 
 ## Configuration
 

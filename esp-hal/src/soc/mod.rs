@@ -258,3 +258,39 @@ pub(crate) fn enable_main_stack_guard_monitoring() {
         crate::debugger::set_stack_watchpoint(guard_addr as usize);
     }
 }
+
+#[cfg(all(riscv, write_vec_table_monitoring))]
+pub(crate) fn setup_trap_section_protection() {
+    if !cfg!(stack_guard_monitoring_with_debugger_connected)
+        && crate::debugger::debugger_connected()
+    {
+        return;
+    }
+
+    unsafe extern "C" {
+        static _rwtext_len: u32;
+        static _trap_section_origin: u32;
+    }
+
+    let rwtext_len = core::ptr::addr_of!(_rwtext_len) as usize;
+
+    // protect as much as possible via NAPOT
+    let len = 1 << (usize::BITS - rwtext_len.leading_zeros() - 1) as usize;
+    if len == 0 {
+        warn!("No trap vector protection available");
+        return;
+    }
+
+    // protect MTVEC and trap handlers
+    // (probably plus some more bytes because of NAPOT)
+    // via watchpoint 1.
+    //
+    // Why not use PMP? On C2/C3 the bootloader locks all available PMP entries.
+    // And additionally we write to MTVEC for direct-vectoring and we write
+    // to __EXTERNAL_INTERRUPTS when setting an interrupt handler.
+    let addr = core::ptr::addr_of!(_trap_section_origin) as usize;
+
+    unsafe {
+        crate::debugger::set_watchpoint(1, addr, len);
+    }
+}

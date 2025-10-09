@@ -10,11 +10,6 @@ SECTIONS {
   INCLUDE "rwdata.x"
   /* End of Shared sections */
 }
-#IF ESP_HAL_CONFIG_FLIP_LINK
-/* INSERT BEFORE does not seem to work for the .stack section. Instead, we place every RAM
-  section after .stack if `flip_link` is enabled. */
-INSERT AFTER .stack;
-#ENDIF
 
 SECTIONS {
   /**
@@ -39,4 +34,4 @@ INCLUDE "metadata.x"
 INCLUDE "eh_frame.x"
 /* End of Shared sections #2 */
 
-_dram_origin = ORIGIN( RAM );
+_dram_data_start = ORIGIN( RAM ) + SIZEOF(.trap) + SIZEOF(.rwtext);

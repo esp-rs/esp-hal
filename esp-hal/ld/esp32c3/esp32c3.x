@@ -55,4 +55,4 @@ INCLUDE "metadata.x"
 INCLUDE "eh_frame.x"
 /* End of Shared sections */
 
-_dram_origin = ORIGIN( DRAM );
+_dram_data_start = ORIGIN( DRAM ) + SIZEOF(.trap) + SIZEOF(.rwtext);

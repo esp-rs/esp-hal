@@ -37,10 +37,6 @@ name    = "dma_mem2mem"
 harness = false
 
 [[bin]]
-name    = "flip_link"
-harness = false
-
-[[bin]]
 name    = "gpio"
 harness = false
 
@@ -236,7 +232,7 @@ default = []
 unstable = ["esp-hal/unstable"]
 
 defmt = ["dep:defmt-rtt"]
-esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/alloc"]
+esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/esp-radio"]
 embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
 
 # Device support (required!):

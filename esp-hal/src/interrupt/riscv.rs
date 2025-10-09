@@ -260,7 +260,16 @@ pub fn enable_direct(
 
         let instr = encode_jal_x0(handler as usize, int_slot)?;
 
-        core::ptr::write_volatile(int_slot as *mut u32, instr);
+        if crate::debugger::debugger_connected() {
+            core::ptr::write_volatile(int_slot as *mut u32, instr);
+        } else {
+            crate::debugger::DEBUGGER_LOCK.lock(|| {
+                let wp = crate::debugger::clear_watchpoint(1);
+                core::ptr::write_volatile(int_slot as *mut u32, instr);
+                crate::debugger::restore_watchpoint(1, wp);
+            });
+        }
+
         core::arch::asm!("fence.i");
 
         enable_cpu_interrupt(cpu_interrupt);
@@ -452,7 +461,16 @@ mod vectored {
         unsafe {
             let ptr =
                 &pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as *const _ as *mut usize;
-            ptr.write_volatile(handler.raw_value());
+
+            if crate::debugger::debugger_connected() {
+                ptr.write_volatile(handler.raw_value());
+            } else {
+                crate::debugger::DEBUGGER_LOCK.lock(|| {
+                    let wp = crate::debugger::clear_watchpoint(1);
+                    ptr.write_volatile(handler.raw_value());
+                    crate::debugger::restore_watchpoint(1, wp);
+                });
+            }
         }
     }
 

@@ -3,6 +3,12 @@ use crate::{analog::adc::Attenuation, peripherals::EFUSE};
 mod fields;
 pub use fields::*;
 
+/// Selects which ADC we are interested in the efuse calibration data for
+pub enum AdcCalibUnit {
+    /// Select efuse calibration data for ADC1
+    ADC1,
+}
+
 impl super::Efuse {
     /// Get status of SPI boot encryption.
     pub fn flash_encryption() -> bool {
@@ -39,7 +45,7 @@ impl super::Efuse {
     /// Get ADC initial code for specified attenuation from efuse
     ///
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c2/esp_efuse_rtc_calib.c#L27>
-    pub fn rtc_calib_init_code(_unit: u8, atten: Attenuation) -> Option<u16> {
+    pub fn rtc_calib_init_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
         let version = Self::rtc_calib_version();
 
         if version != 1 {
@@ -68,7 +74,7 @@ impl super::Efuse {
     /// Get ADC reference point voltage for specified attenuation in millivolts
     ///
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c2/esp_efuse_rtc_calib.c#L65>
-    pub fn rtc_calib_cal_mv(_unit: u8, atten: Attenuation) -> u16 {
+    pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> u16 {
         match atten {
             Attenuation::_0dB => 400,
             Attenuation::_11dB => 1370,
@@ -78,7 +84,7 @@ impl super::Efuse {
     /// Get ADC reference point digital code for specified attenuation
     ///
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c2/esp_efuse_rtc_calib.c#L65>
-    pub fn rtc_calib_cal_code(_unit: u8, atten: Attenuation) -> Option<u16> {
+    pub fn rtc_calib_cal_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
         let version = Self::rtc_calib_version();
 
         if version != 1 {
