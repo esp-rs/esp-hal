@@ -168,20 +168,18 @@ impl SchedulerState {
         task_ptr
     }
 
+    #[cold]
+    #[inline(never)]
     fn delete_marked_tasks(&mut self, cpu: Cpu) {
         let current_cpu = cpu as usize;
         let mut to_delete = core::mem::take(&mut self.to_delete);
         'outer: while let Some(task_ptr) = to_delete.pop() {
             assert!(task_ptr.state() == TaskState::Deleted);
             for cpu in 0..Cpu::COUNT {
-                if Some(task_ptr) == self.per_cpu[cpu].current_task {
-                    if cpu == current_cpu {
-                        self.per_cpu[cpu].current_task = None;
-                    } else {
-                        // We can't delete a task that is currently running on another CPU.
-                        self.to_delete.push(task_ptr);
-                        continue 'outer;
-                    }
+                if cpu != current_cpu && Some(task_ptr) == self.per_cpu[cpu].current_task {
+                    // We can't delete a task that is currently running on another CPU.
+                    self.to_delete.push(task_ptr);
+                    continue 'outer;
                 }
             }
 
@@ -197,25 +195,22 @@ impl SchedulerState {
         let cpu = Cpu::current();
         let current_cpu = cpu as usize;
 
-        let mut priority = if let Some(current_task) = self.per_cpu[current_cpu].current_task {
-            let current_task = unsafe { current_task.as_ref() };
-            current_task.ensure_no_stack_overflow();
-            Some(current_task.priority)
-        } else {
-            None
-        };
-
-        self.delete_marked_tasks(cpu);
-
-        let current_task = self.per_cpu[current_cpu].current_task;
-        if let Some(current_task) = current_task
-            && current_task.state() == TaskState::Ready
-        {
-            // Current task is still ready, mark it as such.
-            debug!("re-queueing current task: {:?}", current_task);
-            self.run_queue.mark_task_ready(&self.per_cpu, current_task);
+        if !self.to_delete.is_empty() {
+            self.delete_marked_tasks(cpu);
         }
 
+        let current_task = self.per_cpu[current_cpu].current_task;
+        if let Some(current_task) = current_task {
+            unsafe { current_task.as_ref().ensure_no_stack_overflow() };
+
+            if current_task.state() == TaskState::Ready {
+                // Current task is still ready, mark it as such.
+                debug!("re-queueing current task: {:?}", current_task);
+                self.run_queue.mark_task_ready(&self.per_cpu, current_task);
+            }
+        };
+
+        let mut arm_next_timeslice_tick = false;
         let next_task = self.run_queue.pop();
         if next_task != current_task {
             trace!("Switching task {:?} -> {:?}", current_task, next_task);
@@ -243,18 +238,19 @@ impl SchedulerState {
                 core::ptr::null_mut()
             };
 
-            let new_core_priority =
-                next_task.map_or(Priority::ZERO, |t| t.priority(&mut self.run_queue));
             let next_context = if let Some(next) = next_task {
-                priority = Some(new_core_priority);
                 #[cfg(feature = "rtos-trace")]
                 rtos_trace::trace::task_exec_begin(next.rtos_trace_id());
 
                 unsafe { next.as_ref().set_up_stack_watchpoint() };
 
+                // If there are more tasks at this priority level, we need to schedule a timeslice
+                // tick.
+                let new_core_priority = next.priority(&mut self.run_queue);
+                arm_next_timeslice_tick = !self.run_queue.is_level_empty(new_core_priority);
+
                 unsafe { &raw mut (*next.as_ptr()).cpu_context }
             } else {
-                priority = None;
                 // If there is no next task, set up and return to the idle hook.
                 // Reuse the stack frame of the main task. Note that this requires the main task to
                 // be pinned to the current CPU. If we're switching out the main task, however, we
@@ -310,13 +306,6 @@ impl SchedulerState {
             self.per_cpu[current_cpu].current_task = next_task;
         }
 
-        // The current task is not in the run queue. If the run queue on the current priority
-        // level is empty, the current task is the only one running at its priority
-        // level. In this case, we don't need time slicing.
-        let arm_next_timeslice_tick = priority
-            .map(|p| !self.run_queue.is_level_empty(p))
-            .unwrap_or(false);
-
         let time_driver = unwrap!(self.time_driver.as_mut());
         let now = crate::now();
         time_driver.set_time_slice(cpu, now, arm_next_timeslice_tick);
@@ -350,6 +339,10 @@ impl SchedulerState {
 
         self.to_delete.push(task_to_delete);
         task_to_delete.set_state(TaskState::Deleted);
+
+        if is_current {
+            self.per_cpu[current_cpu].current_task = None;
+        }
 
         is_current
     }
