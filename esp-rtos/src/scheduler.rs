@@ -80,6 +80,8 @@ impl CpuSchedulerState {
                 pinned_to: None,
 
                 wakeup_at: 0,
+                run_queued: false,
+                timer_queued: false,
 
                 alloc_list_item: TaskListItem::None,
                 ready_queue_item: TaskListItem::None,

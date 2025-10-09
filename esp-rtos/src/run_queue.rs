@@ -172,7 +172,6 @@ impl RunQueue {
                 containing_queue.as_mut().remove(ready_task);
             }
         }
-        self.ready_tasks[priority_n].remove(ready_task);
         self.ready_tasks[priority_n].push(ready_task);
 
         cfg_if::cfg_if! {
