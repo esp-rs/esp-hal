@@ -99,12 +99,7 @@ name    = "twai"
 harness = false
 
 [[bin]]
-name              = "esp_radio_ble_controller"
-harness           = false
-required-features = ["esp-radio", "esp-alloc"]
-
-[[bin]]
-name              = "esp_radio_init"
+name              = "esp_radio"
 harness           = false
 required-features = ["esp-radio", "esp-alloc"]
 
