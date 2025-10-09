@@ -1,18 +1,19 @@
 use core::task::Waker;
 
+use embassy_time_queue_utils::Queue;
 use esp_sync::NonReentrantMutex;
 
 use crate::SCHEDULER;
 
 pub(super) struct TimerQueueInner {
-    queue: embassy_time_queue_utils::Queue,
+    queue: Queue,
     pub next_wakeup: u64,
 }
 
 impl TimerQueueInner {
     const fn new() -> Self {
         Self {
-            queue: embassy_time_queue_utils::Queue::new(),
+            queue: Queue::new(),
             next_wakeup: u64::MAX,
         }
     }
@@ -70,13 +71,13 @@ impl embassy_time_driver::Driver for TimerQueue {
 
     #[inline]
     fn schedule_wake(&self, at: u64, waker: &Waker) {
+        // Note that we don't put the thread to sleep here, as other embassy tasks may be
+        // ready. The thread will go to sleep when it can.
         if self.inner.with(|inner| inner.schedule_wake(at, waker)) {
             // Next wakeup time became shorter, re-arm the timer.
             // FIXME: avoid two separate critical sections.
-            // FIXME: this likely interferes with time slicing - we just keep pushing the time slice
-            // out on the other core, if active.
-            SCHEDULER.with(|s| {
-                unwrap!(s.time_driver.as_mut()).arm_next_wakeup(crate::now());
+            SCHEDULER.with(|scheduler| {
+                unwrap!(scheduler.time_driver.as_mut()).arm_next_wakeup(crate::now());
             });
         }
     }

@@ -143,11 +143,6 @@ mod multi_core {
         }
 
         #[inline]
-        fn is_owned_by(&self, thread: usize) -> bool {
-            self.owner.load(Ordering::Relaxed) == thread
-        }
-
-        #[inline]
         pub fn lock(&self, lock: &impl crate::RawLock) -> crate::RestoreState {
             // We acquire the lock inside an interrupt-free context to prevent a subtle
             // race condition:
@@ -199,7 +194,7 @@ mod multi_core {
         #[inline]
         pub unsafe fn unlock(&self) {
             #[cfg(debug_assertions)]
-            if !self.is_owned_by(thread_id()) {
+            if self.owner.load(Ordering::Relaxed) != thread_id() {
                 panic_attempt_unlock_not_owned();
             }
             self.owner.store(UNUSED_THREAD_ID_VALUE, Ordering::Release);
