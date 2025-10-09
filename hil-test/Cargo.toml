@@ -37,10 +37,6 @@ name    = "i2s"
 harness = false
 
 [[bin]]
-name    = "i2s_parallel"
-harness = false
-
-[[bin]]
 name    = "lcd_cam"
 harness = false
 
