@@ -66,9 +66,22 @@ impl RawLock for SingleCoreInterruptLock {
                     }
                 }
             } else if #[cfg(xtensa)] {
-                // Reserved bits in the PS register, these must be written as 0.
-                const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
-                debug_assert!(token & RESERVED_MASK == 0);
+                #[cfg(debug_assertions)]
+                {
+                    // Reserved bits in the PS register, these must be written as 0.
+                    const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
+                    if token & RESERVED_MASK != 0 {
+                        // We could do this transformation in fmt.rs automatically, but experiments
+                        // show this is only worth it in terms of binary size for code inlined into many places.
+                        #[cold]
+                        #[inline(never)]
+                        fn __assert_failed() {
+                            panic!("Reserved bits in PS register must be written as 0");
+                        }
+
+                        __assert_failed();
+                    }
+                }
                 unsafe {
                     core::arch::asm!(
                         "wsr.ps {0}",
