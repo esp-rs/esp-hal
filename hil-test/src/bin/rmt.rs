@@ -248,7 +248,7 @@ fn do_rmt_loopback_inner<const TX_LEN: usize>(
                     Err((err, _channel)) => Err(err),
                 }
             }
-            Err(e) => Err(e),
+            Err((e, _)) => Err(e),
         };
         let rx_res = run();
 
@@ -337,7 +337,11 @@ fn do_rmt_single_shot<const TX_LEN: usize>(
 
     let tx_data: [_; TX_LEN] = generate_tx_data(write_end_marker, write_end_marker);
 
-    tx_channel.transmit(&tx_data)?.wait().map_err(|(e, _)| e)?;
+    tx_channel
+        .transmit(&tx_data)
+        .map_err(|(e, _)| e)?
+        .wait()
+        .map_err(|(e, _)| e)?;
 
     Ok(())
 }
@@ -380,10 +384,12 @@ impl Context {
         let tx_channel = rmt
             .channel0
             .configure_tx(tx, tx_config.with_clk_divider(DIV))
+            .map_err(|(e, _, _)| e)
             .unwrap();
 
         let rx_channel = rx_channel_creator!(rmt)
             .configure_rx(rx, rx_config.with_clk_divider(DIV))
+            .map_err(|(e, _, _)| e)
             .unwrap();
 
         (tx_channel, rx_channel)
@@ -509,12 +515,13 @@ mod tests {
         let _ch0 = rmt
             .channel0
             .configure_tx(NoPin, TxChannelConfig::default().with_memsize(2))
+            .map_err(|(e, _, _)| e)
             .unwrap();
 
         // Configuring channel 1 should fail, since channel 0 already uses its memory.
         let ch1 = rmt.channel1.configure_tx(NoPin, TxChannelConfig::default());
 
-        assert!(matches!(ch1, Err(Error::MemoryBlockNotAvailable)));
+        assert!(matches!(ch1, Err((Error::MemoryBlockNotAvailable, _, _))));
     }
 
     #[test]
@@ -524,6 +531,7 @@ mod tests {
         let ch0 = rmt
             .channel0
             .configure_tx(NoPin, TxChannelConfig::default().with_memsize(2))
+            .map_err(|(e, _, _)| e)
             .unwrap();
 
         // After dropping channel 0, the memory that it reserved should become available
@@ -531,6 +539,7 @@ mod tests {
         core::mem::drop(ch0);
         rmt.channel1
             .configure_tx(NoPin, TxChannelConfig::default())
+            .map_err(|(e, _, _)| e)
             .unwrap();
     }
 
@@ -550,12 +559,14 @@ mod tests {
                 .$tx_channel
                 .reborrow()
                 .configure_tx(tx_pin, tx_config)
+                .map_err(|(e, _, _)| e)
                 .unwrap();
 
             let rx_channel = rmt
                 .$rx_channel
                 .reborrow()
                 .configure_rx(rx_pin, rx_config)
+                .map_err(|(e, _, _)| e)
                 .unwrap();
 
             do_rmt_loopback_inner::<20>(tx_channel, rx_channel, false, 1);
@@ -681,6 +692,7 @@ mod tests {
                 .channel0
                 .reborrow()
                 .configure_tx(NoPin, TxChannelConfig::default())
+                .map_err(|(e, _, _)| e)
                 .unwrap();
 
             let tx_data: [_; 10] = generate_tx_data(true, true);
@@ -730,11 +742,13 @@ mod tests {
                     .channel0
                     .reborrow()
                     .configure_tx(tx, tx_config.with_clk_divider(DIV))
+                    .map_err(|(e, _, _)| e)
                     .unwrap();
 
                 let mut rx_channel = rx_channel_creator!(rmt)
                     .reborrow()
                     .configure_rx(rx, rx_config.with_clk_divider(DIV))
+                    .map_err(|(e, _, _)| e)
                     .unwrap();
 
                 // Test that dropping & recreating Channel works
@@ -795,11 +809,13 @@ mod tests {
                     .channel0
                     .reborrow()
                     .configure_tx(tx, tx_config.with_clk_divider(DIV))
+                    .map_err(|(e, _, _)| e)
                     .unwrap();
 
                 let mut rx_channel = rx_channel_creator!(rmt)
                     .reborrow()
                     .configure_rx(rx, rx_config.with_clk_divider(DIV))
+                    .map_err(|(e, _, _)| e)
                     .unwrap();
 
                 // Test that dropping & recreating Channel works
