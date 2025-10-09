@@ -224,6 +224,10 @@ impl<E: TaskListElement> TaskList<E> {
             Some(task)
         })
     }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.head.is_none()
+    }
 }
 
 /// A singly linked queue of tasks.
