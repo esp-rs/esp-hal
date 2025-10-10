@@ -58,13 +58,17 @@ cfg_if::cfg_if! {
     }
 }
 
-// Pulses of H 100..300 L 50, i.e. 150..350 / 500kHz = 150..350 * 2us = 300..700us
+// Pulses of H 100..330 L 50, i.e. 100..330 / 500kHz = 100..330 * 2us = 200..660us
+//
+// Note that there's no small common multiple of `CHANNEL_RAM_SIZE` (either 48 or 64) and the
+// period 23, so we don't repeatedly write the same data to the same location in the hardware
+// buffer in loopback tests with buffer wrapping. If we did, that might hide bugs.
 fn generate_tx_data<const TX_LEN: usize>(
     write_stop_code: bool,
     write_end_marker: bool,
 ) -> [PulseCode; TX_LEN] {
     let mut tx_data: [_; TX_LEN] = core::array::from_fn(|i| {
-        PulseCode::new(Level::High, (100 + (i * 10) % 200) as u16, Level::Low, 50)
+        PulseCode::new(Level::High, (100 + 10 * (i % 23)) as u16, Level::Low, 50)
     });
 
     let mut pos = TX_LEN - 1;
