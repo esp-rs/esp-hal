@@ -841,25 +841,39 @@ mod rt {
         let prio = INTERRUPT_TO_PRIORITY[cpu_intr as usize];
         let configured_interrupts = vectored::configured_interrupts(core, status, prio);
 
+        // Change the current runlevel so that interrupt handlers can access the correct runlevel.
+        let level = unsafe { change_current_runlevel(prio) };
+
+        // When nesting is possible, we run the nestable interrupts first. This ensures that we
+        // don't violate assumptions made by non-nestable handlers.
+
+        if prio != Priority::max() {
+            for interrupt_nr in configured_interrupts.iterator() {
+                let handler =
+                    unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler } as usize;
+                let nested = (handler & 1) == 0;
+                if nested {
+                    let handler: fn() =
+                        unsafe { core::mem::transmute::<usize, fn()>(handler & !1) };
+
+                    unsafe { riscv::interrupt::nested(handler) };
+                }
+            }
+        }
+
+        // Now we can run the non-nestable interrupt handlers.
+
         for interrupt_nr in configured_interrupts.iterator() {
             let handler =
                 unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler } as usize;
             let not_nested = (handler & 1) == 1;
-            let handler = handler & !1;
+            if not_nested || prio == Priority::max() {
+                let handler: fn() = unsafe { core::mem::transmute::<usize, fn()>(handler & !1) };
 
-            let handler: fn() = unsafe { core::mem::transmute::<usize, fn()>(handler) };
-
-            if not_nested || prio == Priority::Priority15 {
                 handler();
-            } else {
-                let elevated = prio as u8;
-                unsafe {
-                    let level =
-                        change_current_runlevel(unwrap!(Priority::try_from(elevated as u32)));
-                    riscv::interrupt::nested(handler);
-                    change_current_runlevel(level);
-                }
             }
         }
+
+        unsafe { change_current_runlevel(level) };
     }
 }
