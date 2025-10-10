@@ -41,10 +41,6 @@ name    = "gpio"
 harness = false
 
 [[bin]]
-name    = "gpio_custom_handler"
-harness = false
-
-[[bin]]
 name    = "interrupt"
 harness = false
 
