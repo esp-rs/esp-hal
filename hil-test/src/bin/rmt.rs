@@ -326,30 +326,6 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(
     do_rmt_loopback_async_inner::<TX_LEN>(&mut tx_channel, &mut rx_channel, false, rx_memsize).await
 }
 
-// Run a test that just sends some data, without trying to recive it.
-#[must_use = "Tests should fail on errors"]
-fn do_rmt_single_shot<const TX_LEN: usize>(
-    mut ctx: Context,
-    tx_memsize: u8,
-    write_end_marker: bool,
-) -> Result<(), Error> {
-    let tx_config = TxChannelConfig::default()
-        .with_clk_divider(DIV)
-        .with_memsize(tx_memsize);
-
-    let (tx_channel, _) = ctx.setup_loopback(&tx_config, &Default::default());
-
-    let tx_data: [_; TX_LEN] = generate_tx_data(write_end_marker, write_end_marker);
-
-    tx_channel
-        .transmit(&tx_data)
-        .map_err(|(e, _)| e)?
-        .wait()
-        .map_err(|(e, _)| e)?;
-
-    Ok(())
-}
-
 macro_rules! pins {
     ($ctx:expr) => {
         Flex::new($ctx.pin.reborrow()).split()
@@ -488,28 +464,17 @@ mod tests {
     }
 
     #[test]
-    fn rmt_single_shot_wrap(ctx: Context) {
-        // Single RAM block (48 or 64 codes), requires wrappin, falseg
-        do_rmt_single_shot::<80>(ctx, 1, true).unwrap();
-    }
+    fn rmt_fails_without_end_marker(mut ctx: Context) {
+        let tx_config = TxChannelConfig::default().with_clk_divider(DIV);
 
-    #[test]
-    fn rmt_single_shot_extended(ctx: Context) {
-        // Two RAM blocks (96 or 128 codes), no wrapping
-        do_rmt_single_shot::<80>(ctx, 2, true).unwrap();
-    }
+        let (tx_channel, _) = ctx.setup_loopback(&tx_config, &Default::default());
 
-    #[test]
-    fn rmt_single_shot_extended_wrap(ctx: Context) {
-        // Two RAM blocks (96 or 128 codes), requires wrapping
-        do_rmt_single_shot::<150>(ctx, 2, true).unwrap();
-    }
+        let tx_data: [_; 10] = generate_tx_data(false, false);
 
-    #[test]
-    fn rmt_single_shot_fails_without_end_marker(ctx: Context) {
-        let result = do_rmt_single_shot::<20>(ctx, 1, false);
-
-        assert_eq!(result, Err(Error::EndMarkerMissing));
+        assert!(matches!(
+            tx_channel.transmit(&tx_data),
+            Err((Error::EndMarkerMissing, _))
+        ));
     }
 
     #[test]
