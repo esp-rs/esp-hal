@@ -2456,18 +2456,12 @@ mod chip_specific {
                 |w| {
                     let ch_idx = self.ch_idx as u8;
 
-                    if events.contains(Event::End) {
-                        w.ch_tx_end(ch_idx).set_bit();
-                    }
-                    if events.contains(Event::Error) {
-                        w.ch_tx_err(ch_idx).set_bit();
-                    }
-                    if events.contains(Event::LoopCount) {
-                        w.ch_tx_loop(ch_idx).set_bit();
-                    }
-                    if events.contains(Event::Threshold) {
-                        w.ch_tx_thr_event(ch_idx).set_bit();
-                    }
+                    w.ch_tx_end(ch_idx).bit(events.contains(Event::End));
+                    w.ch_tx_err(ch_idx).bit(events.contains(Event::Error));
+                    w.ch_tx_loop(ch_idx).bit(events.contains(Event::LoopCount));
+                    w.ch_tx_thr_event(ch_idx)
+                        .bit(events.contains(Event::Threshold));
+
                     w
                 },
             );
@@ -2648,15 +2642,10 @@ mod chip_specific {
                 |w| {
                     let ch_idx = self.ch_idx as u8;
 
-                    if events.contains(Event::End) {
-                        w.ch_rx_end(ch_idx).set_bit();
-                    }
-                    if events.contains(Event::Error) {
-                        w.ch_rx_err(ch_idx).set_bit();
-                    }
-                    if events.contains(Event::Threshold) {
-                        w.ch_rx_thr_event(ch_idx).set_bit();
-                    }
+                    w.ch_rx_end(ch_idx).bit(events.contains(Event::End));
+                    w.ch_rx_err(ch_idx).bit(events.contains(Event::Error));
+                    w.ch_rx_thr_event(ch_idx)
+                        .bit(events.contains(Event::Threshold));
                     w
                 },
             );
@@ -2992,19 +2981,12 @@ mod chip_specific {
                 |w| {
                     let ch = self.ch_idx as u8;
 
-                    if events.contains(Event::End) {
-                        w.ch_tx_end(ch).set_bit();
-                    }
-                    if events.contains(Event::Error) {
-                        w.ch_err(ch).set_bit();
-                    }
+                    w.ch_tx_end(ch).bit(events.contains(Event::End));
+                    w.ch_err(ch).bit(events.contains(Event::Error));
                     #[cfg(rmt_has_tx_loop_count)]
-                    if events.contains(Event::LoopCount) {
-                        w.ch_tx_loop(ch).set_bit();
-                    }
-                    if events.contains(Event::Threshold) {
-                        w.ch_tx_thr_event(ch).set_bit();
-                    }
+                    w.ch_tx_loop(ch).bit(events.contains(Event::LoopCount));
+                    w.ch_tx_thr_event(ch).bit(events.contains(Event::Threshold));
+
                     w
                 },
             );
@@ -3219,12 +3201,9 @@ mod chip_specific {
                 |w| {
                     let ch = self.ch_idx as u8;
 
-                    if events.contains(Event::End) {
-                        w.ch_rx_end(ch).set_bit();
-                    }
-                    if events.contains(Event::Error) {
-                        w.ch_err(ch).set_bit();
-                    }
+                    w.ch_rx_end(ch).bit(events.contains(Event::End));
+                    w.ch_err(ch).bit(events.contains(Event::Error));
+
                     w
                 },
             );
