@@ -1,126 +1,128 @@
-//! GPIO Test
+//! GPIO basic and interrupt handler tests
+//!
+//! This test checks that during HAL initialization we do not overwrite custom
+//! GPIO interrupt handlers. We also check that binding a custom interrupt
+//! handler explicitly overwrites the handler set by the user, as well as the
+//! async API works for user handlers automatically.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES(unstable): unstable embassy
+//% FEATURES: unstable embassy
 //% FEATURES(stable):
 
 #![no_std]
 #![no_main]
 
-use esp_hal::gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pin, Pull};
-use hil_test as _;
-
-cfg_if::cfg_if! {
-    if #[cfg(feature = "unstable")] {
-        use core::cell::RefCell;
-        use critical_section::Mutex;
-        use embassy_time::{Duration, Timer};
-        use esp_hal::{
-            // OutputOpenDrain is here because will be unused otherwise
-            delay::Delay,
-            gpio::{DriveMode, Event, Flex, Io},
-            handler,
-            timer::timg::TimerGroup,
-        };
-        use portable_atomic::{AtomicUsize, Ordering};
-
-        static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
-        static INPUT_PIN: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
-    }
-}
-
-cfg_if::cfg_if! {
-    if #[cfg(all(multi_core, feature = "unstable"))] {
-        use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
-    }
-}
-
-struct Context {
-    test_gpio1: AnyPin<'static>,
-    test_gpio2: AnyPin<'static>,
-    #[cfg(feature = "unstable")]
-    delay: Delay,
-    #[cfg(feature = "unstable")]
-    io: Io<'static>,
-}
-
-#[cfg_attr(feature = "unstable", handler)]
-#[cfg(feature = "unstable")]
-pub fn interrupt_handler() {
-    critical_section::with(|cs| {
-        *COUNTER.borrow_ref_mut(cs) += 1;
-        INPUT_PIN
-            .borrow_ref_mut(cs)
-            .as_mut()
-            .map(|pin| pin.clear_interrupt());
-    });
-}
-
-#[cfg_attr(feature = "unstable", handler)]
-#[cfg(feature = "unstable")]
-pub fn interrupt_handler_unlisten() {
-    critical_section::with(|cs| {
-        INPUT_PIN
-            .borrow_ref_mut(cs)
-            .as_mut()
-            .map(|pin| pin.unlisten());
-        *COUNTER.borrow_ref_mut(cs) += 1;
-    });
-}
-
-// Compile-time test to check that GPIOs can be passed by reference.
-fn _gpios_can_be_reused() {
-    let p = esp_hal::init(esp_hal::Config::default());
-
-    let mut gpio1 = p.GPIO1;
-
-    {
-        let _driver = Input::new(
-            gpio1.reborrow(),
-            InputConfig::default().with_pull(Pull::Down),
-        );
-    }
-
-    {
-        let _driver = esp_hal::spi::master::Spi::new(p.SPI2, Default::default())
-            .unwrap()
-            .with_mosi(gpio1.reborrow());
-    }
-
-    {
-        let _driver = Input::new(
-            gpio1.reborrow(),
-            InputConfig::default().with_pull(Pull::Down),
-        );
-    }
-}
-
-#[cfg(all(multi_core, feature = "unstable"))]
-#[embassy_executor::task]
-async fn edge_counter_task(
-    mut in_pin: Input<'static>,
-    signal: &'static Signal<CriticalSectionRawMutex, u32>,
-) {
-    let mut edge_count = 0;
-    loop {
-        // This join will:
-        // - first set up the pin to listen
-        // - then poll the pin future once (which will return Pending)
-        // - then signal that the pin is listening, which enables the other core to toggle the
-        //   matching OutputPin
-        // - then will wait for the pin future to resolve.
-        embassy_futures::join::join(in_pin.wait_for_any_edge(), async {
-            signal.signal(edge_count);
-        })
-        .await;
-
-        edge_count += 1;
-    }
-}
-
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
-    use super::*;
+    use esp_hal::gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pin, Pull};
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "unstable")] {
+            use core::cell::RefCell;
+            use critical_section::Mutex;
+            use embassy_time::{Duration, Timer};
+            use esp_hal::{
+                // OutputOpenDrain is here because will be unused otherwise
+                delay::Delay,
+                gpio::{DriveMode, Event, Flex, Io},
+                handler,
+                timer::timg::TimerGroup,
+            };
+            use portable_atomic::{AtomicUsize, Ordering};
+
+            static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
+            static INPUT_PIN: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
+        }
+    }
+
+    cfg_if::cfg_if! {
+        if #[cfg(all(multi_core, feature = "unstable"))] {
+            use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
+        }
+    }
+
+    struct Context {
+        test_gpio1: AnyPin<'static>,
+        test_gpio2: AnyPin<'static>,
+        #[cfg(feature = "unstable")]
+        delay: Delay,
+        #[cfg(feature = "unstable")]
+        io: Io<'static>,
+    }
+
+    #[cfg_attr(feature = "unstable", handler)]
+    #[cfg(feature = "unstable")]
+    pub fn interrupt_handler() {
+        critical_section::with(|cs| {
+            *COUNTER.borrow_ref_mut(cs) += 1;
+            INPUT_PIN
+                .borrow_ref_mut(cs)
+                .as_mut()
+                .map(|pin| pin.clear_interrupt());
+        });
+    }
+
+    #[cfg_attr(feature = "unstable", handler)]
+    #[cfg(feature = "unstable")]
+    pub fn interrupt_handler_unlisten() {
+        critical_section::with(|cs| {
+            INPUT_PIN
+                .borrow_ref_mut(cs)
+                .as_mut()
+                .map(|pin| pin.unlisten());
+            *COUNTER.borrow_ref_mut(cs) += 1;
+        });
+    }
+
+    // Compile-time test to check that GPIOs can be passed by reference.
+    fn _gpios_can_be_reused() {
+        let p = esp_hal::init(esp_hal::Config::default());
+
+        let mut gpio1 = p.GPIO1;
+
+        {
+            let _driver = Input::new(
+                gpio1.reborrow(),
+                InputConfig::default().with_pull(Pull::Down),
+            );
+        }
+
+        {
+            let _driver = esp_hal::spi::master::Spi::new(p.SPI2, Default::default())
+                .unwrap()
+                .with_mosi(gpio1.reborrow());
+        }
+
+        {
+            let _driver = Input::new(
+                gpio1.reborrow(),
+                InputConfig::default().with_pull(Pull::Down),
+            );
+        }
+    }
+
+    #[cfg(all(multi_core, feature = "unstable"))]
+    #[embassy_executor::task]
+    async fn edge_counter_task(
+        mut in_pin: Input<'static>,
+        signal: &'static Signal<CriticalSectionRawMutex, u32>,
+    ) {
+        let mut edge_count = 0;
+        loop {
+            // This join will:
+            // - first set up the pin to listen
+            // - then poll the pin future once (which will return Pending)
+            // - then signal that the pin is listening, which enables the other core to toggle the
+            //   matching OutputPin
+            // - then will wait for the pin future to resolve.
+            embassy_futures::join::join(in_pin.wait_for_any_edge(), async {
+                signal.signal(edge_count);
+            })
+            .await;
+
+            edge_count += 1;
+        }
+    }
 
     #[init]
     fn init() -> Context {
@@ -610,5 +612,182 @@ mod tests {
             // Park the second core, we don't need it anymore
             CpuControl::new(CPU_CTRL::steal()).park_core(Cpu::AppCpu);
         }
+    }
+}
+
+#[embedded_test::tests(executor = hil_test::Executor::new(), default_timeout = 3)]
+#[cfg(feature = "unstable")]
+mod handler_tests {
+    use embassy_executor::task;
+    use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
+    use embassy_time::{Duration, Timer};
+    use esp_hal::{
+        gpio::{
+            AnyPin,
+            Flex,
+            Input,
+            InputConfig,
+            InputPin,
+            Io,
+            Level,
+            Output,
+            OutputConfig,
+            OutputPin,
+            Pin,
+            Pull,
+        },
+        handler,
+        interrupt::{Priority, software::SoftwareInterruptControl},
+        timer::timg::TimerGroup,
+    };
+    use esp_rtos::embassy::InterruptExecutor;
+    use hil_test::mk_static;
+    use portable_atomic::{AtomicUsize, Ordering};
+
+    #[unsafe(no_mangle)]
+    unsafe extern "C" fn GPIO() {
+        // Prevents binding the default handler, but we need to clear the GPIO
+        // interrupts by hand.
+        let peripherals = unsafe { esp_hal::peripherals::Peripherals::steal() };
+
+        let (gpio1, _) = hil_test::common_test_pins!(peripherals);
+
+        // Using flex will reinitialize the pin, but it's okay here since we access an
+        // Input.
+        let mut gpio1 = Flex::new(gpio1);
+
+        gpio1.unlisten();
+    }
+
+    #[handler]
+    pub fn interrupt_handler() {
+        // Do nothing
+    }
+
+    async fn drive_pins(gpio1: impl InputPin, gpio2: impl OutputPin) -> usize {
+        let counter = AtomicUsize::new(0);
+        let mut test_gpio1 = Input::new(gpio1, InputConfig::default().with_pull(Pull::Down));
+        let mut test_gpio2 = Output::new(gpio2, Level::Low, OutputConfig::default());
+        embassy_futures::select::select(
+            async {
+                loop {
+                    test_gpio1.wait_for_rising_edge().await;
+                    counter.fetch_add(1, Ordering::SeqCst);
+                }
+            },
+            async {
+                for _ in 0..5 {
+                    test_gpio2.set_high();
+                    Timer::after(Duration::from_millis(25)).await;
+                    test_gpio2.set_low();
+                    Timer::after(Duration::from_millis(25)).await;
+                }
+            },
+        )
+        .await;
+
+        counter.load(Ordering::SeqCst)
+    }
+
+    #[task]
+    async fn drive_pin(gpio: AnyPin<'static>) {
+        let mut test_gpio = Output::new(gpio, Level::Low, OutputConfig::default());
+        for _ in 0..5 {
+            test_gpio.set_high();
+            Timer::after(Duration::from_millis(25)).await;
+            test_gpio.set_low();
+            Timer::after(Duration::from_millis(25)).await;
+        }
+    }
+
+    #[task]
+    async fn sense_pin(gpio: AnyPin<'static>, done: &'static Signal<CriticalSectionRawMutex, ()>) {
+        let mut test_gpio = Input::new(gpio, InputConfig::default().with_pull(Pull::Down));
+        test_gpio.wait_for_rising_edge().await;
+        test_gpio.wait_for_rising_edge().await;
+        test_gpio.wait_for_rising_edge().await;
+        test_gpio.wait_for_rising_edge().await;
+        test_gpio.wait_for_rising_edge().await;
+        done.signal(());
+    }
+
+    #[test]
+    async fn default_handler_does_not_run_because_gpio_is_defined() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
+
+        #[cfg(riscv)]
+        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_int.software_interrupt0,
+        );
+
+        let counter = drive_pins(gpio1, gpio2).await;
+
+        // GPIO is bound to something else, so we don't expect the async API to work.
+        assert_eq!(counter, 0);
+    }
+
+    #[test]
+    async fn default_handler_runs_because_handler_is_set() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let mut io = Io::new(peripherals.IO_MUX);
+        io.set_interrupt_handler(interrupt_handler);
+
+        let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
+        #[cfg(riscv)]
+        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_int.software_interrupt0,
+        );
+
+        let counter = drive_pins(gpio1, gpio2).await;
+
+        // We expect the async API to keep working even if a user handler is set.
+        assert_eq!(counter, 5);
+    }
+
+    #[test]
+    async fn task_that_runs_at_handlers_priority_is_not_locked_up() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        // Register an interrupt handler. Since we are not dealing with raw interrupts
+        // here, it's okay to do nothing. Handling async GPIO events will
+        // disable the corresponding interrupts.
+        let mut io = Io::new(peripherals.IO_MUX);
+        io.set_interrupt_handler(interrupt_handler);
+
+        let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
+
+        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_int.software_interrupt0,
+        );
+
+        let interrupt_executor = mk_static!(
+            InterruptExecutor<1>,
+            InterruptExecutor::new(sw_int.software_interrupt1)
+        );
+        // Run the executor at interrupt priority 1, which is the same as the default
+        // interrupt priority of the GPIO interrupt handler.
+        let interrupt_spawner = interrupt_executor.start(Priority::Priority1);
+
+        let done = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
+
+        interrupt_spawner.must_spawn(sense_pin(gpio1.degrade(), done));
+        interrupt_spawner.must_spawn(drive_pin(gpio2.degrade()));
+
+        done.wait().await;
     }
 }
