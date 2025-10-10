@@ -1742,7 +1742,7 @@ mod private {
         }
 
         fn rx_done(&self) -> bool {
-            self.regs().int_raw().read().in_suc_eof().bit_is_set()
+            self.regs().int_raw().read().in_dscr_empty().bit_is_set()
         }
 
         fn wait_for_rx_done(&self) {
