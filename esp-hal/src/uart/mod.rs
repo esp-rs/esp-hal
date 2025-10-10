@@ -482,6 +482,7 @@ where
                 guard: tx_guard,
                 rts_pin,
                 tx_pin,
+                baudrate: config.baudrate,
             },
         };
         serial.init(config)?;
@@ -518,6 +519,7 @@ pub struct UartTx<'d, Dm: DriverMode> {
     guard: PeripheralGuard,
     rts_pin: PinGuard,
     tx_pin: PinGuard,
+    baudrate: u32,
 }
 
 /// UART (Receive)
@@ -617,6 +619,7 @@ where
     type ConfigError = ConfigError;
 
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.baudrate = config.baudrate;
         self.apply_config(config)
     }
 }
@@ -660,6 +663,7 @@ impl<'d> UartTx<'d, Blocking> {
             guard: self.guard,
             rts_pin: self.rts_pin,
             tx_pin: self.tx_pin,
+            baudrate: self.baudrate,
         }
     }
 }
@@ -682,6 +686,7 @@ impl<'d> UartTx<'d, Async> {
             guard: self.guard,
             rts_pin: self.rts_pin,
             tx_pin: self.tx_pin,
+            baudrate: self.baudrate,
         }
     }
 
@@ -855,6 +860,37 @@ where
         while !self.is_tx_idle() {}
     }
 
+    /// Sends a break signal for a specified duration in bit time.
+    ///
+    /// Duration is in bits, the time it takes to transfer one bit at the
+    /// current baud rate. The delay during the break is just is busy-waiting.
+    #[instability::unstable]
+    pub fn send_break(&mut self, bits: u32) {
+        // Read the current TX inversion state
+        let original_txd_inv = self.uart.info().regs().conf0().read().txd_inv().bit();
+
+        // Invert the TX line (toggle the current state)
+        self.uart
+            .info()
+            .regs()
+            .conf0()
+            .modify(|_, w| w.txd_inv().bit(!original_txd_inv));
+
+        // Calculate total delay in microseconds: (bits * 1_000_000) / baudrate_bps
+        // Use u64 to avoid overflow, then convert back to u32
+        let total_delay_us = (bits as u64 * 1_000_000) / self.baudrate as u64;
+        let delay_us = (total_delay_us as u32).max(1);
+
+        crate::rom::ets_delay_us(delay_us);
+
+        // Restore the original TX inversion state
+        self.uart
+            .info()
+            .regs()
+            .conf0()
+            .modify(|_, w| w.txd_inv().bit(original_txd_inv));
+    }
+
     /// Checks if the TX line is idle for this UART instance.
     ///
     /// Returns `true` if the transmit line is idle, meaning no data is
@@ -934,6 +970,46 @@ impl<'d> UartRx<'d, Blocking> {
         let (uart_rx, _) = UartBuilder::new(uart).init(config)?.split();
 
         Ok(uart_rx)
+    }
+
+    /// Waits for a break condition to be detected.
+    ///
+    /// This is a blocking function that will continuously check for a break condition.
+    /// After detection, the break interrupt flag is automatically cleared.
+    #[instability::unstable]
+    pub fn wait_for_break(&mut self) {
+        while !self.regs().int_raw().read().brk_det().bit_is_set() {
+            // wait
+        }
+        self.regs()
+            .int_clr()
+            .write(|w| w.brk_det().clear_bit_by_one());
+    }
+
+    /// Waits for a break condition to be detected with a timeout.
+    ///
+    /// This is a blocking function that will check for a break condition up to
+    /// the specified timeout. Returns `true` if a break was detected, `false` if
+    /// the timeout elapsed. After successful detection, the break interrupt flag
+    /// is automatically cleared.
+    ///
+    /// ## Arguments
+    /// * `timeout_us` - Timeout in microseconds
+    #[instability::unstable]
+    pub fn wait_for_break_with_timeout(&mut self, timeout_us: u32) -> bool {
+        let start = crate::time::Instant::now();
+        let timeout_duration = crate::time::Duration::from_micros(timeout_us as u64);
+
+        while !self.regs().int_raw().read().brk_det().bit_is_set() {
+            if crate::time::Instant::now() - start >= timeout_duration {
+                return false;
+            }
+        }
+
+        self.regs()
+            .int_clr()
+            .write(|w| w.brk_det().clear_bit_by_one());
+        true
     }
 
     /// Reconfigures the driver to operate in [`Async`] mode.
@@ -1088,6 +1164,23 @@ impl<'d> UartRx<'d, Async> {
         }
 
         Ok(())
+    }
+
+    /// Waits for a break condition to be detected asynchronously.
+    ///
+    /// This is an async function that will await until a break condition is
+    /// detected on the RX line. After detection, the break interrupt flag is
+    /// automatically cleared.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is cancellation safe.
+    #[instability::unstable]
+    pub async fn wait_for_break_async(&mut self) {
+        UartRxFuture::new(self.uart.reborrow(), RxEvent::BreakDetected).await;
+        self.regs()
+            .int_clr()
+            .write(|w| w.brk_det().clear_bit_by_one());
     }
 }
 
@@ -1379,6 +1472,29 @@ impl<'d> Uart<'d, Blocking> {
     pub fn clear_interrupts(&mut self, interrupts: EnumSet<UartInterrupt>) {
         self.tx.uart.info().clear_interrupts(interrupts)
     }
+
+    /// Waits for a break condition to be detected.
+    ///
+    /// This is a blocking function that will continuously check for a break condition.
+    /// After detection, the break interrupt flag is automatically cleared.
+    #[instability::unstable]
+    pub fn wait_for_break(&mut self) {
+        self.rx.wait_for_break()
+    }
+
+    /// Waits for a break condition to be detected with a timeout.
+    ///
+    /// This is a blocking function that will check for a break condition up to
+    /// the specified timeout. Returns `true` if a break was detected, `false` if
+    /// the timeout elapsed. After successful detection, the break interrupt flag
+    /// is automatically cleared.
+    ///
+    /// ## Arguments
+    /// * `timeout_us` - Timeout in microseconds
+    #[instability::unstable]
+    pub fn wait_for_break_with_timeout(&mut self, timeout_us: u32) -> bool {
+        self.rx.wait_for_break_with_timeout(timeout_us)
+    }
 }
 
 impl<'d> Uart<'d, Async> {
@@ -1518,6 +1634,20 @@ impl<'d> Uart<'d, Async> {
     pub async fn read_exact_async(&mut self, buf: &mut [u8]) -> Result<(), RxError> {
         self.rx.read_exact_async(buf).await
     }
+
+    /// Waits for a break condition to be detected asynchronously.
+    ///
+    /// This is an async function that will await until a break condition is
+    /// detected on the RX line. After detection, the break interrupt flag is
+    /// automatically cleared.
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is cancellation safe.
+    #[instability::unstable]
+    pub async fn wait_for_break_async(&mut self) {
+        self.rx.wait_for_break_async().await
+    }
 }
 
 /// List of exposed UART events.
@@ -1532,6 +1662,11 @@ pub enum UartInterrupt {
 
     /// The transmitter has finished sending out all data from the FIFO.
     TxDone,
+
+    /// Break condition has been detected.
+    /// Triggered when the receiver detects a NULL character (i.e. logic 0 for
+    /// one NULL character transmission) after stop bits.
+    RxBreakDetected,
 
     /// The receiver has received more data than what
     /// [`RxConfig::fifo_full_threshold`] specifies.
@@ -1688,6 +1823,12 @@ where
     /// ```
     pub fn flush(&mut self) -> Result<(), TxError> {
         self.tx.flush()
+    }
+
+    /// Sends a break signal for a specified duration
+    #[instability::unstable]
+    pub fn send_break(&mut self, bits: u32) {
+        self.tx.send_break(bits)
     }
 
     /// Returns whether the UART buffer has data.
@@ -2271,6 +2412,7 @@ pub(crate) enum RxEvent {
     GlitchDetected,
     FrameError,
     ParityError,
+    BreakDetected,
 }
 
 fn rx_event_check_for_error(events: EnumSet<RxEvent>) -> Result<(), RxError> {
@@ -2280,7 +2422,10 @@ fn rx_event_check_for_error(events: EnumSet<RxEvent>) -> Result<(), RxError> {
             RxEvent::GlitchDetected => return Err(RxError::GlitchOccurred),
             RxEvent::FrameError => return Err(RxError::FrameFormatViolated),
             RxEvent::ParityError => return Err(RxError::ParityMismatch),
-            RxEvent::FifoFull | RxEvent::CmdCharDetected | RxEvent::FifoTout => continue,
+            RxEvent::FifoFull
+            | RxEvent::CmdCharDetected
+            | RxEvent::FifoTout
+            | RxEvent::BreakDetected => continue,
         }
     }
 
@@ -2838,6 +2983,7 @@ impl Info {
                 match interrupt {
                     UartInterrupt::AtCmd => w.at_cmd_char_det().bit(enable),
                     UartInterrupt::TxDone => w.tx_done().bit(enable),
+                    UartInterrupt::RxBreakDetected => w.brk_det().bit(enable),
                     UartInterrupt::RxFifoFull => w.rxfifo_full().bit(enable),
                     UartInterrupt::RxTimeout => w.rxfifo_tout().bit(enable),
                 };
@@ -2858,6 +3004,9 @@ impl Info {
         if ints.tx_done().bit_is_set() {
             res.insert(UartInterrupt::TxDone);
         }
+        if ints.brk_det().bit_is_set() {
+            res.insert(UartInterrupt::RxBreakDetected);
+        }
         if ints.rxfifo_full().bit_is_set() {
             res.insert(UartInterrupt::RxFifoFull);
         }
@@ -2876,6 +3025,7 @@ impl Info {
                 match interrupt {
                     UartInterrupt::AtCmd => w.at_cmd_char_det().clear_bit_by_one(),
                     UartInterrupt::TxDone => w.tx_done().clear_bit_by_one(),
+                    UartInterrupt::RxBreakDetected => w.brk_det().clear_bit_by_one(),
                     UartInterrupt::RxFifoFull => w.rxfifo_full().clear_bit_by_one(),
                     UartInterrupt::RxTimeout => w.rxfifo_tout().clear_bit_by_one(),
                 };
@@ -2939,6 +3089,7 @@ impl Info {
             for event in events {
                 match event {
                     RxEvent::FifoFull => w.rxfifo_full().bit(enable),
+                    RxEvent::BreakDetected => w.brk_det().bit(enable),
                     RxEvent::CmdCharDetected => w.at_cmd_char_det().bit(enable),
 
                     RxEvent::FifoOvf => w.rxfifo_ovf().bit(enable),
@@ -2958,6 +3109,9 @@ impl Info {
 
         if pending_interrupts.rxfifo_full().bit_is_set() {
             active_events |= RxEvent::FifoFull;
+        }
+        if pending_interrupts.brk_det().bit_is_set() {
+            active_events |= RxEvent::BreakDetected;
         }
         if pending_interrupts.at_cmd_char_det().bit_is_set() {
             active_events |= RxEvent::CmdCharDetected;
@@ -2987,6 +3141,7 @@ impl Info {
             for event in events {
                 match event {
                     RxEvent::FifoFull => w.rxfifo_full().clear_bit_by_one(),
+                    RxEvent::BreakDetected => w.brk_det().clear_bit_by_one(),
                     RxEvent::CmdCharDetected => w.at_cmd_char_det().clear_bit_by_one(),
 
                     RxEvent::FifoOvf => w.rxfifo_ovf().clear_bit_by_one(),
