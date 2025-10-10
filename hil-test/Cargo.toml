@@ -25,6 +25,10 @@ name    = "gpio_custom_handler"
 harness = false
 
 [[bin]]
+name    = "misc_drivers"
+harness = false
+
+[[bin]]
 name    = "interrupt"
 harness = false
 
@@ -42,10 +46,6 @@ harness = false
 
 [[bin]]
 name    = "misc_non_drivers"
-harness = false
-
-[[bin]]
-name    = "rng"
 harness = false
 
 [[bin]]
@@ -69,10 +69,6 @@ name    = "parl_io"
 harness = false
 
 [[bin]]
-name    = "pcnt"
-harness = false
-
-[[bin]]
 name    = "rmt"
 harness = false
 required-features = ["embassy"]
@@ -89,14 +85,6 @@ harness = false
 name              = "embassy_timers_executors"
 harness           = false
 required-features = ["embassy"]
-
-[[bin]]
-name    = "systimer"
-harness = false
-
-[[bin]]
-name    = "twai"
-harness = false
 
 [[bin]]
 name              = "esp_radio"
