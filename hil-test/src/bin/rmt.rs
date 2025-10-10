@@ -6,11 +6,14 @@
 //! action, but adding any additional logging to the driver is likely to cause sporadic issues.
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embassy unstable
+//% FEATURES: embassy esp-alloc unstable
 
 #![no_std]
 #![no_main]
 
+extern crate alloc;
+
+use allocator_api2::{vec, vec::Vec};
 use esp_hal::{
     Async,
     Blocking,
@@ -27,6 +30,7 @@ use esp_hal::{
         interconnect::{PeripheralInput, PeripheralOutput},
     },
     peripherals::RMT,
+    ram,
     rmt::{
         CHANNEL_RAM_SIZE,
         Channel,
@@ -63,15 +67,17 @@ cfg_if::cfg_if! {
 // Note that there's no small common multiple of `CHANNEL_RAM_SIZE` (either 48 or 64) and the
 // period 23, so we don't repeatedly write the same data to the same location in the hardware
 // buffer in loopback tests with buffer wrapping. If we did, that might hide bugs.
-fn generate_tx_data<const TX_LEN: usize>(
+fn generate_tx_data(
+    tx_len: usize,
     write_stop_code: bool,
     write_end_marker: bool,
-) -> [PulseCode; TX_LEN] {
-    let mut tx_data: [_; TX_LEN] = core::array::from_fn(|i| {
-        PulseCode::new(Level::High, (100 + 10 * (i % 23)) as u16, Level::Low, 50)
-    });
+) -> Vec<PulseCode> {
+    let mut tx_data: Vec<_> = (0..)
+        .take(tx_len)
+        .map(|i| PulseCode::new(Level::High, (100 + 10 * (i % 23)) as u16, Level::Low, 50))
+        .collect();
 
-    let mut pos = TX_LEN - 1;
+    let mut pos = tx_len - 1;
     if write_end_marker {
         tx_data[pos] = PulseCode::end_marker();
         pos -= 1;
@@ -204,14 +210,15 @@ fn check_data_eq(
     );
 }
 
-fn do_rmt_loopback_inner<const TX_LEN: usize>(
+fn do_rmt_loopback_inner(
+    tx_len: usize,
     tx_channel: Channel<Blocking, Tx>,
     rx_channel: Channel<Blocking, Rx>,
     abort: bool,
     rx_memsize: u8,
 ) {
-    let tx_data: [_; TX_LEN] = generate_tx_data(true, true);
-    let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
+    let tx_data = generate_tx_data(tx_len, true, true);
+    let mut rcv_data = vec![PulseCode::default(); tx_len];
 
     let rx_transaction = rx_channel.receive(&mut rcv_data);
     let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
@@ -262,7 +269,7 @@ fn do_rmt_loopback_inner<const TX_LEN: usize>(
 
 // Run a test where some data is sent from one channel and looped back to
 // another one for receive, and verify that the data matches.
-fn do_rmt_loopback<const TX_LEN: usize>(ctx: &mut Context, tx_memsize: u8, rx_memsize: u8) {
+fn do_rmt_loopback(tx_len: usize, ctx: &mut Context, tx_memsize: u8, rx_memsize: u8) {
     let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
     let rx_config = RxChannelConfig::default()
         .with_idle_threshold(1000)
@@ -270,10 +277,11 @@ fn do_rmt_loopback<const TX_LEN: usize>(ctx: &mut Context, tx_memsize: u8, rx_me
 
     let (tx_channel, rx_channel) = ctx.setup_loopback(&tx_config, &rx_config);
 
-    do_rmt_loopback_inner::<TX_LEN>(tx_channel, rx_channel, false, rx_memsize);
+    do_rmt_loopback_inner(tx_len, tx_channel, rx_channel, false, rx_memsize);
 }
 
-async fn do_rmt_loopback_async_inner<const TX_LEN: usize>(
+async fn do_rmt_loopback_async_inner(
+    tx_len: usize,
     tx_channel: &mut Channel<'_, Async, Tx>,
     rx_channel: &mut Channel<'_, Async, Rx>,
     abort: bool,
@@ -282,8 +290,8 @@ async fn do_rmt_loopback_async_inner<const TX_LEN: usize>(
     use embassy_time::Delay;
     use embedded_hal_async::delay::DelayNs;
 
-    let tx_data: [_; TX_LEN] = generate_tx_data(true, true);
-    let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
+    let tx_data = generate_tx_data(tx_len, true, true);
+    let mut rcv_data = vec![PulseCode::default(); tx_len];
 
     // Start the transactions...
     let rx_fut = rx_channel.receive(&mut rcv_data);
@@ -311,11 +319,7 @@ async fn do_rmt_loopback_async_inner<const TX_LEN: usize>(
 
 // Run a test where some data is sent from one channel and looped back to
 // another one for receive, and verify that the data matches.
-async fn do_rmt_loopback_async<const TX_LEN: usize>(
-    ctx: &mut Context,
-    tx_memsize: u8,
-    rx_memsize: u8,
-) {
+async fn do_rmt_loopback_async(tx_len: usize, ctx: &mut Context, tx_memsize: u8, rx_memsize: u8) {
     let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
     let rx_config = RxChannelConfig::default()
         .with_idle_threshold(1000)
@@ -323,7 +327,7 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(
 
     let (mut tx_channel, mut rx_channel) = ctx.setup_loopback_async(&tx_config, &rx_config);
 
-    do_rmt_loopback_async_inner::<TX_LEN>(&mut tx_channel, &mut rx_channel, false, rx_memsize).await
+    do_rmt_loopback_async_inner(tx_len, &mut tx_channel, &mut rx_channel, false, rx_memsize).await
 }
 
 macro_rules! pins {
@@ -407,6 +411,8 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
+        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+
         let software_interrupt =
             esp_hal::interrupt::software::SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
@@ -425,42 +431,42 @@ mod tests {
     #[test]
     fn rmt_loopback_simple(mut ctx: Context) {
         // 20 codes fit a single RAM block
-        do_rmt_loopback::<20>(&mut ctx, 1, 1);
+        do_rmt_loopback(20, &mut ctx, 1, 1);
     }
 
     #[test]
     async fn rmt_loopback_simple_async(mut ctx: Context) {
         // 20 codes fit a single RAM block
-        do_rmt_loopback_async::<20>(&mut ctx, 1, 1).await;
+        do_rmt_loopback_async(20, &mut ctx, 1, 1).await;
     }
     #[test]
     fn rmt_loopback_extended_ram(mut ctx: Context) {
         // 80 codes require two RAM blocks
-        do_rmt_loopback::<80>(&mut ctx, 2, 2);
+        do_rmt_loopback(80, &mut ctx, 2, 2);
     }
 
     #[test]
     fn rmt_loopback_tx_wrap(mut ctx: Context) {
         // 80 codes require two RAM blocks; thus a tx channel with only 1 block requires
         // wrapping.
-        do_rmt_loopback::<80>(&mut ctx, 1, 2);
+        do_rmt_loopback(80, &mut ctx, 1, 2);
     }
 
     #[test]
     async fn rmt_loopback_tx_wrap_async(mut ctx: Context) {
-        do_rmt_loopback_async::<80>(&mut ctx, 1, 2).await;
+        do_rmt_loopback_async(80, &mut ctx, 1, 2).await;
     }
 
     #[test]
     fn rmt_loopback_rx_wrap(mut ctx: Context) {
         // 80 codes require two RAM blocks; thus an rx channel with only 1 block requires
         // wrapping.
-        do_rmt_loopback::<80>(&mut ctx, 2, 1);
+        do_rmt_loopback(80, &mut ctx, 2, 1);
     }
 
     #[test]
     async fn rmt_loopback_rx_wrap_async(mut ctx: Context) {
-        do_rmt_loopback_async::<80>(&mut ctx, 2, 1).await;
+        do_rmt_loopback_async(80, &mut ctx, 2, 1).await;
     }
 
     #[test]
@@ -469,7 +475,7 @@ mod tests {
 
         let (tx_channel, _) = ctx.setup_loopback(&tx_config, &Default::default());
 
-        let tx_data: [_; 10] = generate_tx_data(false, false);
+        let tx_data = generate_tx_data(10, false, false);
 
         assert!(matches!(
             tx_channel.transmit(&tx_data),
@@ -564,7 +570,7 @@ mod tests {
                 .unwrap()
                 .with_pin(rx_pin);
 
-            do_rmt_loopback_inner::<20>(tx_channel, rx_channel, false, 1);
+            do_rmt_loopback_inner(20, tx_channel, rx_channel, false, 1);
         }};
     }
 
@@ -689,7 +695,7 @@ mod tests {
                 .configure_tx(&TxChannelConfig::default())
                 .unwrap();
 
-            let tx_data: [_; 10] = generate_tx_data(true, true);
+            let tx_data = generate_tx_data(10, true, true);
 
             ch0.transmit(&tx_data).await.unwrap();
         }
@@ -709,9 +715,15 @@ mod tests {
 
         let (mut tx_channel, mut rx_channel) = ctx.setup_loopback(&tx_config, &rx_config);
 
-        do_rmt_loopback_inner::<TX_LEN>(tx_channel.reborrow(), rx_channel.reborrow(), true, 1);
+        do_rmt_loopback_inner(
+            TX_LEN,
+            tx_channel.reborrow(),
+            rx_channel.reborrow(),
+            true,
+            1,
+        );
 
-        do_rmt_loopback_inner::<TX_LEN>(tx_channel, rx_channel, false, 1);
+        do_rmt_loopback_inner(TX_LEN, tx_channel, rx_channel, false, 1);
     }
 
     // Test that completed blocking transactions leave the hardware in a predictable state from
@@ -747,7 +759,8 @@ mod tests {
 
                 // Test that dropping & recreating Channel works
                 for _ in 0..3 {
-                    do_rmt_loopback_inner::<20>(
+                    do_rmt_loopback_inner(
+                        20,
                         tx_channel.reborrow(),
                         rx_channel.reborrow(),
                         false,
@@ -773,12 +786,12 @@ mod tests {
         let (mut tx_channel, mut rx_channel) = ctx.setup_loopback_async(&tx_config, &rx_config);
 
         // Start loopback once, but abort before completion...
-        do_rmt_loopback_async_inner::<TX_LEN>(&mut tx_channel, &mut rx_channel, true, 1).await;
+        do_rmt_loopback_async_inner(TX_LEN, &mut tx_channel, &mut rx_channel, true, 1).await;
 
         // ...then start over and check that everything still works as expected (i.e. we
         // didn't leave the hardware in an unexpected state or lock up when
         // dropping the futures).
-        do_rmt_loopback_async_inner::<TX_LEN>(&mut tx_channel, &mut rx_channel, false, 1).await;
+        do_rmt_loopback_async_inner(TX_LEN, &mut tx_channel, &mut rx_channel, false, 1).await;
     }
 
     // Test that completed async transactions leave the hardware in a predictable state from which
@@ -814,7 +827,7 @@ mod tests {
 
                 // Test that dropping & recreating Channel works
                 for _ in 0..3 {
-                    do_rmt_loopback_async_inner::<20>(&mut tx_channel, &mut rx_channel, false, 1)
+                    do_rmt_loopback_async_inner(20, &mut tx_channel, &mut rx_channel, false, 1)
                         .await;
                 }
             }
@@ -838,9 +851,9 @@ mod tests {
 
         let (mut tx_channel, mut rx_channel) = ctx.setup_loopback(&tx_config, &rx_config);
 
-        let tx_data: [_; TX_COUNT + 1] = generate_tx_data(false, true);
-        let mut rx_data: [PulseCode; MAX_RX_LEN] = [Default::default(); MAX_RX_LEN];
-        let mut expected_data: [PulseCode; MAX_RX_LEN] = [Default::default(); MAX_RX_LEN];
+        let tx_data = generate_tx_data(TX_COUNT + 1, false, true);
+        let mut rx_data = vec![PulseCode::default(); MAX_RX_LEN];
+        let mut expected_data = vec![PulseCode::default(); MAX_RX_LEN];
 
         for loopcount in 1..MAX_LOOP_COUNT {
             #[allow(unused_mut)]

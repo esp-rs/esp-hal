@@ -69,7 +69,7 @@ harness           = false
 [[bin]]
 name              = "rmt"
 harness           = false
-required-features = ["embassy"]
+required-features = ["embassy", "esp-alloc"]
 
 [[bin]]
 name              = "spi_full_duplex"
