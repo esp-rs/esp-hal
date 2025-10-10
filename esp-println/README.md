@@ -11,7 +11,7 @@ logging capabilities for Espressif devices.
 
 - Supports all Espressif ESP32 family devices.
 - Supports different communication methods:
-  - UART (Default)
+  - UART
   - JTAG-Serial (Only available in ESP32-C3, ESP32-C6, ESP32-H2, ESP32-S3)
   - No-op: Turns printing into a no-op
 - Supports [`defmt`] backend
