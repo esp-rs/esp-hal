@@ -1429,6 +1429,231 @@ impl DmaRxStreamBufView {
     }
 }
 
+/// DMA Streaming Transmit Buffer.
+///
+/// This is symmetric implementation to [DmaRxStreamBuf], used for continuously
+/// streaming data to a peripheral's FIFO.
+///
+/// The list starts out like so `A(full) -> B(full) -> C(full) -> D(full) -> NULL`.
+///
+/// As the DMA writes to FIFO, the list progresses like so:
+/// - `A(full)  -> B(full)  -> C(full)  -> D(full) -> NULL`
+/// - `A(empty) -> B(full)  -> C(full)  -> D(full) -> NULL`
+/// - `A(empty) -> B(empty) -> C(full)  -> D(full) -> NULL`
+/// - `A(empty) -> B(empty) -> C(empty) -> D(full) -> NULL`
+///
+/// As you call [DmaTxStreamBufView::push] the list (approximately) progresses like so:
+/// - `A(empty) -> B(empty) -> C(empty) -> D(full) -> NULL`
+/// - `B(empty) -> C(empty) -> D(full)  -> A(full) -> NULL`
+/// - `C(empty) -> D(full)  -> A(full)  -> B(full) -> NULL`
+/// - `D(full)  -> A(full)  -> B(full)  -> C(full) -> NULL`
+///
+/// If all the descriptors run out, the [DmaTxInterrupt::TotalEof] interrupt will fire and DMA
+/// will stop writing, at which point it is up to you to resume/restart the transfer.
+pub struct DmaTxStreamBuf {
+    descriptors: &'static mut [DmaDescriptor],
+    buffer: &'static mut [u8],
+    burst: BurstConfig,
+    pre_filled: Option<usize>,
+}
+
+impl DmaTxStreamBuf {
+    /// Creates a new [DmaTxStreamBuf] evenly distributing the buffer between
+    /// the provided descriptors.
+    pub fn new(
+        descriptors: &'static mut [DmaDescriptor],
+        buffer: &'static mut [u8],
+    ) -> Result<Self, DmaBufError> {
+        match () {
+            _ if !is_slice_in_dram(descriptors) => Err(DmaBufError::UnsupportedMemoryRegion)?,
+            _ if !is_slice_in_dram(buffer) => Err(DmaBufError::UnsupportedMemoryRegion)?,
+            _ if descriptors.is_empty() => Err(DmaBufError::InsufficientDescriptors)?,
+            _ => (),
+        };
+
+        // Evenly distribute the buffer between the descriptors.
+        let chunk_size = Some(buffer.len() / descriptors.len())
+            .filter(|x| *x <= 4095)
+            .ok_or(DmaBufError::InsufficientDescriptors)?;
+
+        let mut chunks = buffer.chunks_exact_mut(chunk_size);
+        for (desc, chunk) in descriptors.iter_mut().zip(chunks.by_ref()) {
+            desc.buffer = chunk.as_mut_ptr();
+            desc.set_size(chunk.len());
+        }
+        let remainder = chunks.into_remainder();
+
+        if !remainder.is_empty() {
+            // Append any excess to the last descriptor.
+            let last_descriptor = descriptors.last_mut().unwrap();
+            let size = last_descriptor.size() + remainder.len();
+            if size > 4095 {
+                Err(DmaBufError::InsufficientDescriptors)?;
+            }
+            last_descriptor.set_size(size);
+        }
+
+        Ok(Self {
+            descriptors,
+            buffer,
+            burst: Default::default(),
+            pre_filled: None,
+        })
+    }
+
+    /// Consume the buf, returning the descriptors and buffer.
+    pub fn split(self) -> (&'static mut [DmaDescriptor], &'static mut [u8]) {
+        (self.descriptors, self.buffer)
+    }
+
+    /// Push the buffer with the given data before DMA transfer starts.
+    ///
+    /// Otherwise the streaming buffer will transfer garbage data to
+    /// DMA so that CPU has enough time to fill the buffer after transfer starts.
+    pub fn push(&mut self, data: &[u8]) -> usize {
+        self.push_with(|buf| {
+            let len = buf.len().min(data.len());
+            buf[..len].copy_from_slice(&data[..len]);
+            len
+        })
+    }
+
+    /// Push the buffer with the given data before DMA transfer starts.
+    ///
+    /// Returns the number of bytes filled.
+    pub fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> usize {
+        let start = self.pre_filled.unwrap_or(0);
+        let bytes_pushed = f(&mut self.buffer[start..]);
+        self.pre_filled = Some(start + bytes_pushed);
+        bytes_pushed
+    }
+}
+
+unsafe impl DmaTxBuffer for DmaTxStreamBuf {
+    type View = DmaTxStreamBufView;
+    type Final = Self;
+
+    fn prepare(&mut self) -> Preparation {
+        // Link up all the descriptors (but not in a circle).
+        let mut next = null_mut();
+        for desc in self.descriptors.iter_mut().rev() {
+            desc.next = next;
+            next = desc;
+
+            desc.set_suc_eof(false);
+        }
+        Preparation {
+            start: self.descriptors.as_mut_ptr(),
+            direction: TransferDirection::Out,
+            #[cfg(psram_dma)]
+            accesses_psram: false,
+            burst_transfer: self.burst,
+
+            // Whilst we give ownership of the descriptors the DMA, the correctness of this buffer
+            // implementation doesn't rely on the DMA checking for descriptor ownership.
+            // No descriptor is added back to the end of the stream before it's ready for the DMA
+            // to consume it.
+            check_owner: None,
+            auto_write_back: true,
+        }
+    }
+
+    fn into_view(self) -> Self::View {
+        // If the buffer is not pre-filled, treat it as fully filled
+        let pre_filled = self.pre_filled.unwrap_or(self.buffer.len());
+        let mut view = DmaTxStreamBufView {
+            buf: self,
+            descriptor_idx: 0,
+            descriptor_offset: 0,
+        };
+        view.advance(pre_filled);
+        view
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view.buf
+    }
+}
+
+/// A view into a [DmaRxStreamBuf]
+pub struct DmaTxStreamBufView {
+    buf: DmaTxStreamBuf,
+    descriptor_idx: usize,
+    descriptor_offset: usize,
+}
+
+impl DmaTxStreamBufView {
+    /// Returns the number of bytes available for writing.
+    pub fn available_bytes(&self) -> usize {
+        let (tail, head) = self.buf.descriptors.split_at(self.descriptor_idx);
+        head.iter()
+            .chain(tail)
+            .take_while(|d| d.owner() == Owner::Cpu)
+            .map(|d| d.size())
+            .sum::<usize>()
+            - self.descriptor_offset
+    }
+
+    /// Pushes a buffer into the stream buffer.
+    /// Returns the number of bytes pushed.
+    pub fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> usize {
+        let chunk_size = self.buf.descriptors[0].size();
+        let dma_start = self.descriptor_idx * chunk_size + self.descriptor_offset;
+        let dma_end = (dma_start + self.available_bytes()).min(self.buf.buffer.len());
+        let bytes_pushed = f(&mut self.buf.buffer[dma_start..dma_end]);
+
+        self.advance(bytes_pushed);
+        bytes_pushed
+    }
+
+    /// Advances the first `n` bytes from the available data
+    pub fn advance(&mut self, bytes_pushed: usize) {
+        let mut bytes_filled = 0;
+        for d in (self.descriptor_idx..self.buf.descriptors.len()).chain(core::iter::once(0)) {
+            let desc = &mut self.buf.descriptors[d];
+            let bytes_in_d = desc.size() - self.descriptor_offset;
+            // There is at least one byte left in `desc`.
+            if bytes_in_d + bytes_filled > bytes_pushed {
+                self.descriptor_idx = d;
+                self.descriptor_offset = self.descriptor_offset + bytes_pushed - bytes_filled;
+                break;
+            }
+            bytes_filled += bytes_in_d;
+            self.descriptor_offset = 0;
+
+            // Put the current descriptor at the end of the list
+            desc.set_owner(Owner::Dma);
+            desc.set_length(desc.size());
+            desc.set_suc_eof(true);
+            let p = d.checked_sub(1).unwrap_or(self.buf.descriptors.len() - 1);
+            if p != d {
+                let [prev, desc] = self.buf.descriptors.get_disjoint_mut([p, d]).unwrap();
+                desc.next = null_mut();
+                prev.next = desc;
+                prev.set_suc_eof(false);
+            }
+        }
+    }
+
+    /// Pushes a buffer into the stream buffer.
+    /// Returns the number of bytes pushed.
+    pub fn push(&mut self, data: &[u8]) -> usize {
+        let total_len = data.len();
+        let mut remaining = data;
+
+        while self.available_bytes() >= remaining.len() && !remaining.is_empty() {
+            let written = self.push_with(|buffer| {
+                let len = usize::min(buffer.len(), remaining.len());
+                buffer[..len].copy_from_slice(&remaining[..len]);
+                len
+            });
+            remaining = &remaining[written..];
+        }
+
+        total_len - remaining.len()
+    }
+}
+
 static mut EMPTY: [DmaDescriptor; 1] = [DmaDescriptor::EMPTY];
 
 /// An empty buffer that can be used when you don't need to transfer any data.

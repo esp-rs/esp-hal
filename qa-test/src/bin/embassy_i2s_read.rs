@@ -21,7 +21,7 @@ use esp_backtrace as _;
 #[cfg(target_arch = "riscv32")]
 use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::{
-    dma_buffers,
+    dma_rx_stream_buffer,
     i2s::master::{Channels, Config, DataFormat, I2s},
     time::Rate,
     timer::timg::TimerGroup,
@@ -51,8 +51,6 @@ async fn main(_spawner: Spawner) {
         }
     }
 
-    let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(4092 * 4, 0);
-
     let i2s = I2s::new(
         peripherals.I2S0,
         dma_channel,
@@ -70,18 +68,20 @@ async fn main(_spawner: Spawner) {
         .with_bclk(peripherals.GPIO2)
         .with_ws(peripherals.GPIO4)
         .with_din(peripherals.GPIO5)
-        .build(rx_descriptors);
+        .build();
 
-    let buffer = rx_buffer;
     println!("Start");
 
     let mut data = [0u8; 5000];
-    let mut transaction = i2s_rx.read_dma_circular_async(buffer).unwrap();
+    let mut transaction = i2s_rx
+        .read(dma_rx_stream_buffer!(4092 * 4, 4092), 4092)
+        .unwrap();
     loop {
-        let avail = transaction.available().await.unwrap();
+        transaction.wait_for_available().await.unwrap();
+        let avail = transaction.available_bytes();
         println!("available {}", avail);
 
-        let count = transaction.pop(&mut data).await.unwrap();
+        let count = transaction.pop(&mut data);
 
         #[cfg(not(feature = "esp32s2"))]
         println!(

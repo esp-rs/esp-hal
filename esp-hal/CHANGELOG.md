@@ -138,6 +138,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnyPin::downcast`/`AnyPeripheral::downcast` to allow retrieving the original GPIO/peripheral type (#3783, #3784)
 - Add `ESP_HAL_CONFIG_PLACE_RMT_DRIVER_IN_RAM` configuration option to pin the RMT driver in RAM (#3778)
 - The `rt` feature (#3706)
+- Added `DmaTxStreamBuf` (#3639)
 
 ### Changed
 
@@ -157,6 +158,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adjusted ESP32-S2 deep-sleep to hibernate for the Ext1WakeupSource (#3785)
 - Libraries depending on esp-hal should now disable default features, so that only the final binary crate enables the `rt` feature (#3706)
 - Changed `interrupt::RESERVED_INTERRUPTS` from `&[usize]` to `&[u32]` (#3798)
+- Migrate the I2S driver to a move based API (#3639)
 
 ### Fixed
 
