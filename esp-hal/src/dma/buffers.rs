@@ -1607,7 +1607,7 @@ impl DmaTxStreamBufView {
     }
 
     /// Advances the first `n` bytes from the available data
-    fn advance(&mut self, bytes_pushed: usize) {
+    pub fn advance(&mut self, bytes_pushed: usize) {
         let mut bytes_filled = 0;
         for d in (self.descriptor_idx..self.buf.descriptors.len()).chain(core::iter::once(0)) {
             let desc = &mut self.buf.descriptors[d];
@@ -1638,20 +1638,19 @@ impl DmaTxStreamBufView {
     /// Pushes a buffer into the stream buffer.
     /// Returns the number of bytes pushed.
     pub fn push(&mut self, data: &[u8]) -> usize {
-        let mut remaining = data.len();
-        let mut offset = 0;
+        let total_len = data.len();
+        let mut remaining = data;
 
-        while self.available_bytes() >= remaining && remaining > 0 {
+        while self.available_bytes() >= remaining.len() && remaining.len() > 0 {
             let written = self.push_with(|buffer| {
-                let len = usize::min(buffer.len(), data.len() - offset);
-                buffer[..len].copy_from_slice(&data[offset..][..len]);
+                let len = usize::min(buffer.len(), remaining.len());
+                buffer[..len].copy_from_slice(&remaining[..len]);
                 len
             });
-            offset += written;
-            remaining -= written;
+            remaining = &remaining[written..];
         }
 
-        offset
+        total_len - remaining.len()
     }
 }
 
