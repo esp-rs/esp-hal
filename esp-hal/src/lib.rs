@@ -546,7 +546,7 @@ pub use private::Internal;
 #[instability::unstable]
 pub unsafe trait Persistable: Sized {}
 
-/// Marker trait for types that can be safely used in `#[ram(unstable(reclaimed))]`.
+/// Marker trait for types that can be safely used in `#[ram(reclaimed)]`.
 ///
 /// # Safety
 ///

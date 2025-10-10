@@ -28,7 +28,14 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
                 for meta in nested_args {
                     match meta {
                         syn::Meta::Path(path) => {
-                            let ident = path.get_ident().expect("expected identifier");
+                            let Some(ident) = path.get_ident() else {
+                                return syn::Error::new(
+                                    path.span(),
+                                    "Expected identifier inside `unstable(...)`",
+                                )
+                                .into_compile_error()
+                                .into();
+                            };
                             let arg = match ident {
                                 i if i == "rtc_fast" => &mut rtc_fast,
                                 i if i == "rtc_slow" => &mut rtc_slow,
@@ -68,7 +75,11 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
             }
 
             syn::Meta::Path(path) => {
-                let ident = path.get_ident().expect("expected identifier");
+                let Some(ident) = path.get_ident() else {
+                    return syn::Error::new(path.span(), "Expected identifier")
+                        .into_compile_error()
+                        .into();
+                };
                 let arg = match ident {
                     i if i == "reclaimed" => &mut dram2_uninit,
                     _ => {
