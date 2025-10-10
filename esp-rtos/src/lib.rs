@@ -114,6 +114,7 @@ use esp_hal::{
     peripherals::CPU_CTRL,
     system::{CpuControl, Stack},
 };
+#[cfg(feature = "embassy")]
 #[cfg_attr(docsrs, doc(cfg(feature = "embassy")))]
 pub use macros::rtos_main as main;
 pub(crate) use scheduler::SCHEDULER;
