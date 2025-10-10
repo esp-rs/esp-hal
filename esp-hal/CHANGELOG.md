@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: Wrapping the hardware buffer is now supported for rx/tx and blocking/async channels (#4049)
 - `rmt::CHANNEL_RAM_SIZE` and `rmt::HAS_RX_WRAP` constants have been added (#4049)
 - A new option `ESP_HAL_CONFIG_WRITE_VEC_TABLE_MONITORING` (disabled by default) to check that no unintentional writes to a very vital memory area are made. (Only RISC-V)  (#4225)
+- All public RMT types now derive `Debug`. (#4302)
 
 ### Changed
 
@@ -87,6 +88,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: Receive operations read only received codes instead of the entire buffer and return the number of codes read (#4049)
 - `esp_hal::clock::{RtcFastClock, RtcSlowClock, RtcClock}` and `esp_hal::gpio::Event` have been marked unstable (#4293)
 - All `ram` proc macro options except `#[ram(reclaimed)]` are considered `unstable` (#4309)
+- `rmt::SingleShotTxTransaction` has been renamed to `rmt::TxTransaction`. (#4302)
+- `rmt::ChannelCreator::configure_tx` and `rmt::ChannelCreator::configure_rx` now take the configuration by reference (#4302)
 
 ### Fixed
 
@@ -109,6 +112,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ADC: Fixed bug where ADC1 would use ADC2 efuse calibration data (#4286)
 - RMT: `Channel::transmit_continuously` also triggers the loopcount interrupt when only using a single repetition. (#4260)
 - I2C: Fix position of SDA sampling point (#4268)
+- RMT: All blocking methods now return the channel on failure (#4302)
+- RMT: the place_rmt_driver_in_ram option now also places the async interrupt handler in RAM (#4302)
 
 ### Removed
 
