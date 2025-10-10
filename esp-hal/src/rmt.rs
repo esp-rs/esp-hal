@@ -2051,12 +2051,12 @@ enum Event {
 
 impl<Dir: Direction> DynChannelAccess<Dir> {
     #[inline]
-    fn channel_ram_start_offset(&self) -> usize {
+    fn channel_ram_start_offset(self) -> usize {
         usize::from(self.channel()) * property!("rmt.channel_ram_size")
     }
 
     #[inline]
-    fn channel_ram_start(&self) -> *mut PulseCode {
+    fn channel_ram_start(self) -> *mut PulseCode {
         unsafe {
             (property!("rmt.ram_start") as *mut PulseCode).add(self.channel_ram_start_offset())
         }
@@ -2065,7 +2065,7 @@ impl<Dir: Direction> DynChannelAccess<Dir> {
 
 impl DynChannelAccess<Tx> {
     #[inline(always)]
-    fn output_signal(&self) -> gpio::OutputSignal {
+    fn output_signal(self) -> gpio::OutputSignal {
         OUTPUT_SIGNALS[self.ch_idx as usize]
     }
 
@@ -2073,7 +2073,7 @@ impl DynChannelAccess<Tx> {
     // call sites, and passing it as argument avoids a volatile read that the compiler wouldn't be
     // able to deduplicate.
     #[inline(always)]
-    fn start_send(&self, loopmode: Option<LoopMode>, memsize: MemSize) {
+    fn start_send(self, loopmode: Option<LoopMode>, memsize: MemSize) {
         self.set_tx_threshold((memsize.codes() / 2) as u8);
         self.set_tx_continuous(loopmode.is_some());
         #[cfg(rmt_has_tx_loop_count)]
@@ -2085,24 +2085,24 @@ impl DynChannelAccess<Tx> {
     }
 
     #[inline(always)]
-    fn listen_tx_interrupt(&self, event: impl Into<EnumSet<Event>>) {
+    fn listen_tx_interrupt(self, event: impl Into<EnumSet<Event>>) {
         self.set_tx_interrupt(event.into(), true);
     }
 
     #[inline(always)]
-    fn unlisten_tx_interrupt(&self, event: impl Into<EnumSet<Event>>) {
+    fn unlisten_tx_interrupt(self, event: impl Into<EnumSet<Event>>) {
         self.set_tx_interrupt(event.into(), false);
     }
 }
 
 impl DynChannelAccess<Rx> {
     #[inline(always)]
-    fn input_signal(&self) -> gpio::InputSignal {
+    fn input_signal(self) -> gpio::InputSignal {
         INPUT_SIGNALS[self.ch_idx as usize]
     }
 
     #[inline(always)]
-    fn start_receive(&self, _wrap: bool, _memsize: MemSize) {
+    fn start_receive(self, _wrap: bool, _memsize: MemSize) {
         #[cfg(rmt_has_rx_wrap)]
         {
             self.set_rx_threshold((_memsize.codes() / 2) as u16);
@@ -2115,12 +2115,12 @@ impl DynChannelAccess<Rx> {
     }
 
     #[inline(always)]
-    fn listen_rx_interrupt(&self, event: impl Into<EnumSet<Event>>) {
+    fn listen_rx_interrupt(self, event: impl Into<EnumSet<Event>>) {
         self.set_rx_interrupt(event.into(), true);
     }
 
     #[inline(always)]
-    fn unlisten_rx_interrupt(&self, event: impl Into<EnumSet<Event>>) {
+    fn unlisten_rx_interrupt(self, event: impl Into<EnumSet<Event>>) {
         self.set_rx_interrupt(event.into(), false);
     }
 }
@@ -2302,7 +2302,7 @@ mod chip_specific {
 
     impl<Dir: Direction> DynChannelAccess<Dir> {
         #[inline(always)]
-        pub fn channel(&self) -> u8 {
+        pub fn channel(self) -> u8 {
             if Dir::IS_TX {
                 self.ch_idx as u8
             } else {
@@ -2311,7 +2311,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn update(&self) {
+        pub fn update(self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2325,7 +2325,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_divider(&self, divider: u8) {
+        pub fn set_divider(self, divider: u8) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2339,7 +2339,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn memsize(&self) -> MemSize {
+        pub fn memsize(self) -> MemSize {
             let rmt = RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2353,7 +2353,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_memsize(&self, value: MemSize) {
+        pub fn set_memsize(self, value: MemSize) {
             let blocks = value.blocks();
             let rmt = RMT::regs();
             let ch_idx = self.ch_idx as usize;
@@ -2375,7 +2375,7 @@ mod chip_specific {
 
     impl DynChannelAccess<Tx> {
         #[inline(always)]
-        pub fn set_generate_repeat_interrupt(&self, mode: Option<LoopMode>) {
+        pub fn set_generate_repeat_interrupt(self, mode: Option<LoopMode>) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2401,7 +2401,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn clear_tx_interrupts(&self) {
+        pub fn clear_tx_interrupts(self) {
             let rmt = crate::peripherals::RMT::regs();
 
             rmt.int_clr().write(|w| {
@@ -2415,7 +2415,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_tx_continuous(&self, continuous: bool) {
+        pub fn set_tx_continuous(self, continuous: bool) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2424,7 +2424,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_tx_wrap_mode(&self, wrap: bool) {
+        pub fn set_tx_wrap_mode(self, wrap: bool) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2433,7 +2433,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_tx_carrier(&self, carrier: bool, high: u16, low: u16, level: Level) {
+        pub fn set_tx_carrier(self, carrier: bool, high: u16, low: u16, level: Level) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2448,7 +2448,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_tx_idle_output(&self, enable: bool, level: Level) {
+        pub fn set_tx_idle_output(self, enable: bool, level: Level) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2457,7 +2457,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn start_tx(&self) {
+        pub fn start_tx(self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2471,7 +2471,7 @@ mod chip_specific {
         // Return the first flag that is set of, in order of decreasing priority,
         // Event::Error, Event::End, Event::LoopCount, Event::Threshold
         #[inline(always)]
-        pub fn get_tx_status(&self) -> Option<Event> {
+        pub fn get_tx_status(self) -> Option<Event> {
             let rmt = crate::peripherals::RMT::regs();
             let reg = rmt.int_raw().read();
             let ch_idx = self.ch_idx as u8;
@@ -2490,7 +2490,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn reset_tx_threshold_set(&self) {
+        pub fn reset_tx_threshold_set(self) {
             let rmt = crate::peripherals::RMT::regs();
 
             rmt.int_clr().write(|w| {
@@ -2501,7 +2501,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_tx_threshold(&self, threshold: u8) {
+        pub fn set_tx_threshold(self, threshold: u8) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2510,7 +2510,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn is_tx_loopcount_interrupt_set(&self) -> bool {
+        pub fn is_tx_loopcount_interrupt_set(self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as u8;
 
@@ -2523,7 +2523,7 @@ mod chip_specific {
         //
         // Requires an update() call
         #[inline(always)]
-        pub fn stop_tx(&self) -> bool {
+        pub fn stop_tx(self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2532,7 +2532,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_tx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
+        pub fn set_tx_interrupt(self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
 
             rmt.int_ena().modify(|_, w| {
@@ -2553,7 +2553,7 @@ mod chip_specific {
 
         #[allow(unused)]
         #[inline(always)]
-        pub fn hw_offset(&self) -> usize {
+        pub fn hw_offset(self) -> usize {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2569,7 +2569,7 @@ mod chip_specific {
 
     impl DynChannelAccess<Rx> {
         #[inline(always)]
-        pub fn clear_rx_interrupts(&self) {
+        pub fn clear_rx_interrupts(self) {
             let rmt = crate::peripherals::RMT::regs();
 
             rmt.int_clr().write(|w| {
@@ -2582,7 +2582,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_rx_wrap_mode(&self, wrap: bool) {
+        pub fn set_rx_wrap_mode(self, wrap: bool) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2591,7 +2591,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_rx_carrier(&self, carrier: bool, high: u16, low: u16, level: Level) {
+        pub fn set_rx_carrier(self, carrier: bool, high: u16, low: u16, level: Level) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2609,7 +2609,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn start_rx(&self) {
+        pub fn start_rx(self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as u8;
 
@@ -2628,7 +2628,7 @@ mod chip_specific {
         // Return the first flag that is set of, in order of decreasing priority,
         // Event::Error, Event::End, Event::Threshold
         #[inline(always)]
-        pub fn get_rx_status(&self) -> Option<Event> {
+        pub fn get_rx_status(self) -> Option<Event> {
             let rmt = crate::peripherals::RMT::regs();
             let reg = rmt.int_raw().read();
             let ch_idx = self.ch_idx as u8;
@@ -2645,7 +2645,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn reset_rx_threshold_set(&self) {
+        pub fn reset_rx_threshold_set(self) {
             let rmt = crate::peripherals::RMT::regs();
 
             rmt.int_clr().write(|w| {
@@ -2656,7 +2656,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_rx_threshold(&self, threshold: u16) {
+        pub fn set_rx_threshold(self, threshold: u16) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2669,7 +2669,7 @@ mod chip_specific {
         //
         // Requires an update() call
         #[inline(always)]
-        pub fn stop_rx(&self, _force: bool) {
+        pub fn stop_rx(self, _force: bool) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2677,7 +2677,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_rx_filter_threshold(&self, value: u8) {
+        pub fn set_rx_filter_threshold(self, value: u8) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2688,7 +2688,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_rx_idle_threshold(&self, value: u16) {
+        pub fn set_rx_idle_threshold(self, value: u16) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2697,7 +2697,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_rx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
+        pub fn set_rx_interrupt(self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
 
             rmt.int_ena().modify(|_, w| {
@@ -2717,7 +2717,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn hw_offset(&self) -> usize {
+        pub fn hw_offset(self) -> usize {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -2799,17 +2799,17 @@ mod chip_specific {
 
     impl<Dir: Direction> DynChannelAccess<Dir> {
         #[inline(always)]
-        pub fn channel(&self) -> u8 {
+        pub fn channel(self) -> u8 {
             self.ch_idx as u8
         }
 
         #[inline(always)]
-        pub fn update(&self) {
+        pub fn update(self) {
             // no-op
         }
 
         #[inline(always)]
-        pub fn set_divider(&self, divider: u8) {
+        pub fn set_divider(self, divider: u8) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
@@ -2818,7 +2818,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn memsize(&self) -> MemSize {
+        pub fn memsize(self) -> MemSize {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
@@ -2827,7 +2827,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_memsize(&self, value: MemSize) {
+        pub fn set_memsize(self, value: MemSize) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
@@ -2845,7 +2845,7 @@ mod chip_specific {
     impl DynChannelAccess<Tx> {
         #[cfg(rmt_has_tx_loop_count)]
         #[inline(always)]
-        pub fn set_generate_repeat_interrupt(&self, mode: Option<super::LoopMode>) {
+        pub fn set_generate_repeat_interrupt(self, mode: Option<super::LoopMode>) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
@@ -2867,7 +2867,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn clear_tx_interrupts(&self) {
+        pub fn clear_tx_interrupts(self) {
             let rmt = crate::peripherals::RMT::regs();
 
             rmt.int_clr().write(|w| {
@@ -2882,7 +2882,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_tx_continuous(&self, continuous: bool) {
+        pub fn set_tx_continuous(self, continuous: bool) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
@@ -2891,7 +2891,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_tx_wrap_mode(&self, wrap: bool) {
+        pub fn set_tx_wrap_mode(self, wrap: bool) {
             let rmt = crate::peripherals::RMT::regs();
 
             // this is "okay", because we use all TX channels always in wrap mode
@@ -2899,7 +2899,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_tx_carrier(&self, carrier: bool, high: u16, low: u16, level: Level) {
+        pub fn set_tx_carrier(self, carrier: bool, high: u16, low: u16, level: Level) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
@@ -2915,7 +2915,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_tx_idle_output(&self, enable: bool, level: Level) {
+        pub fn set_tx_idle_output(self, enable: bool, level: Level) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
@@ -2924,7 +2924,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn start_tx(&self) {
+        pub fn start_tx(self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as u8;
 
@@ -2944,7 +2944,7 @@ mod chip_specific {
         // Return the first flag that is set of, in order of decreasing priority,
         // Event::Error, Event::End, Event::LoopCount, Event::Threshold
         #[inline(always)]
-        pub fn get_tx_status(&self) -> Option<Event> {
+        pub fn get_tx_status(self) -> Option<Event> {
             let rmt = crate::peripherals::RMT::regs();
             let reg = rmt.int_raw().read();
             let ch = self.ch_idx as u8;
@@ -2967,7 +2967,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn reset_tx_threshold_set(&self) {
+        pub fn reset_tx_threshold_set(self) {
             let rmt = crate::peripherals::RMT::regs();
 
             rmt.int_clr().write(|w| {
@@ -2978,7 +2978,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_tx_threshold(&self, threshold: u8) {
+        pub fn set_tx_threshold(self, threshold: u8) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
@@ -2988,7 +2988,7 @@ mod chip_specific {
 
         #[cfg(rmt_has_tx_loop_count)]
         #[inline(always)]
-        pub fn is_tx_loopcount_interrupt_set(&self) -> bool {
+        pub fn is_tx_loopcount_interrupt_set(self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as u8;
 
@@ -3000,7 +3000,7 @@ mod chip_specific {
         #[cfg(not(rmt_has_tx_loop_count))]
         #[allow(unused)]
         #[inline(always)]
-        pub fn is_tx_loopcount_interrupt_set(&self) -> bool {
+        pub fn is_tx_loopcount_interrupt_set(self) -> bool {
             false
         }
 
@@ -3009,7 +3009,7 @@ mod chip_specific {
         // depends on this.
         #[cfg(rmt_has_tx_immediate_stop)]
         #[inline(always)]
-        pub fn stop_tx(&self) -> bool {
+        pub fn stop_tx(self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
@@ -3019,7 +3019,7 @@ mod chip_specific {
 
         #[cfg(not(rmt_has_tx_immediate_stop))]
         #[inline(always)]
-        pub fn stop_tx(&self) -> bool {
+        pub fn stop_tx(self) -> bool {
             let ptr = self.channel_ram_start();
             for idx in 0..self.memsize().codes() {
                 unsafe {
@@ -3030,7 +3030,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_tx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
+        pub fn set_tx_interrupt(self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
 
             rmt.int_ena().modify(|_, w| {
@@ -3051,7 +3051,7 @@ mod chip_specific {
 
         #[allow(unused)]
         #[inline(always)]
-        pub fn hw_offset(&self) -> usize {
+        pub fn hw_offset(self) -> usize {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
@@ -3067,7 +3067,7 @@ mod chip_specific {
 
     impl DynChannelAccess<Rx> {
         #[inline(always)]
-        pub fn clear_rx_interrupts(&self) {
+        pub fn clear_rx_interrupts(self) {
             let rmt = crate::peripherals::RMT::regs();
 
             rmt.int_clr().write(|w| {
@@ -3079,7 +3079,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_rx_carrier(&self, carrier: bool, high: u16, low: u16, level: Level) {
+        pub fn set_rx_carrier(self, carrier: bool, high: u16, low: u16, level: Level) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
@@ -3095,7 +3095,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn start_rx(&self) {
+        pub fn start_rx(self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as u8;
 
@@ -3115,7 +3115,7 @@ mod chip_specific {
         // Return the first flag that is set of, in order of decreasing priority,
         // Event::Error, Event::End, Event::Threshold
         #[inline(always)]
-        pub fn get_rx_status(&self) -> Option<Event> {
+        pub fn get_rx_status(self) -> Option<Event> {
             let rmt = crate::peripherals::RMT::regs();
             let reg = rmt.int_raw().read();
             let ch = self.ch_idx as u8;
@@ -3130,7 +3130,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn stop_rx(&self, force: bool) {
+        pub fn stop_rx(self, force: bool) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
@@ -3202,7 +3202,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_rx_filter_threshold(&self, value: u8) {
+        pub fn set_rx_filter_threshold(self, value: u8) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
@@ -3213,7 +3213,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_rx_idle_threshold(&self, value: u16) {
+        pub fn set_rx_idle_threshold(self, value: u16) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
@@ -3222,7 +3222,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn set_rx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
+        pub fn set_rx_interrupt(self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
 
             rmt.int_ena().modify(|_, w| {
@@ -3239,7 +3239,7 @@ mod chip_specific {
         }
 
         #[inline(always)]
-        pub fn hw_offset(&self) -> usize {
+        pub fn hw_offset(self) -> usize {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
