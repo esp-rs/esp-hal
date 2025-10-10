@@ -184,6 +184,12 @@ impl I2cAddress {
 
         Ok(())
     }
+
+    fn bytes(self) -> usize {
+        match self {
+            I2cAddress::SevenBit(_) => 1,
+        }
+    }
 }
 
 impl From<u8> for I2cAddress {
@@ -1976,12 +1982,14 @@ impl Driver<'_> {
     /// - `bytes` is the data two be sent.
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
+    /// - `stop` indicates whether the operation will end with a STOP condition.
     /// - `cmd_iterator` is an iterator over the command registers.
     fn setup_write<'a, I>(
         &self,
         addr: I2cAddress,
         bytes: &[u8],
         start: bool,
+        stop: bool,
         cmd_iterator: &mut I,
     ) -> Result<(), Error>
     where
@@ -2005,60 +2013,32 @@ impl Driver<'_> {
         let write_len = if start { bytes.len() + 1 } else { bytes.len() };
         // don't issue write if there is no data to write
         if write_len > 0 {
-            if cfg!(any(esp32, esp32s2)) {
-                // try to place END at the same index
-                if write_len < 2 {
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Write {
-                            ack_exp: Ack::Ack,
-                            ack_check_en: true,
-                            length: write_len as u8,
-                        },
-                    )?;
-                } else if start {
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Write {
-                            ack_exp: Ack::Ack,
-                            ack_check_en: true,
-                            length: (write_len as u8) - 1,
-                        },
-                    )?;
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Write {
-                            ack_exp: Ack::Ack,
-                            ack_check_en: true,
-                            length: 1,
-                        },
-                    )?;
-                } else {
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Write {
-                            ack_exp: Ack::Ack,
-                            ack_check_en: true,
-                            length: (write_len as u8) - 2,
-                        },
-                    )?;
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Write {
-                            ack_exp: Ack::Ack,
-                            ack_check_en: true,
-                            length: 1,
-                        },
-                    )?;
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Write {
-                            ack_exp: Ack::Ack,
-                            ack_check_en: true,
-                            length: 1,
-                        },
-                    )?;
-                }
+            // ESP32 can't alter the position of END, so we need to split the chunk always into
+            // 3-command sequences. Chunking makes sure not to place a 1-byte
+            // command at the end, which would cause an arithmetic underflow.
+            // The sequences we can generate are:
+            // - START-WRITE-STOP
+            // - START-WRITE-END-WRITE-STOP
+            // - START-WRITE-END-(WRITE-WRITE-END)*-WRITE-STOP sequence.
+            if cfg!(esp32) && !(start || stop) {
+                // Chunks that do not have a START or STOP command need to be split into multiple
+                // commands.
+                add_cmd(
+                    cmd_iterator,
+                    Command::Write {
+                        ack_exp: Ack::Ack,
+                        ack_check_en: true,
+                        length: (write_len as u8) - 1,
+                    },
+                )?;
+                add_cmd(
+                    cmd_iterator,
+                    Command::Write {
+                        ack_exp: Ack::Ack,
+                        ack_check_en: true,
+                        length: 1,
+                    },
+                )?;
             } else {
                 add_cmd(
                     cmd_iterator,
@@ -2091,6 +2071,7 @@ impl Driver<'_> {
     /// - `buffer` is the buffer to store the read data.
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
+    /// - `stop` indicates whether the operation will end with a STOP condition.
     /// - `will_continue` indicates whether there is another read operation following this one and
     ///   we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
@@ -2099,6 +2080,7 @@ impl Driver<'_> {
         addr: I2cAddress,
         buffer: &mut [u8],
         start: bool,
+        stop: bool,
         will_continue: bool,
         cmd_iterator: &mut I,
     ) -> Result<(), Error>
@@ -2119,7 +2101,7 @@ impl Driver<'_> {
 
         if start {
             add_cmd(cmd_iterator, Command::Start)?;
-            // WRITE command
+            // WRITE 7-bit address
             add_cmd(
                 cmd_iterator,
                 Command::Write {
@@ -2131,60 +2113,32 @@ impl Driver<'_> {
         }
 
         if initial_len > 0 {
-            if cfg!(any(esp32, esp32s2)) {
-                // try to place END at the same index
-                if initial_len < 2 || start {
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Read {
-                            ack_value: Ack::Ack,
-                            length: initial_len as u8,
-                        },
-                    )?;
-                } else if !will_continue {
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Read {
-                            ack_value: Ack::Ack,
-                            length: (initial_len as u8) - 1,
-                        },
-                    )?;
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Read {
-                            ack_value: Ack::Ack,
-                            length: 1,
-                        },
-                    )?;
-                } else {
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Read {
-                            ack_value: Ack::Ack,
-                            length: (initial_len as u8) - 2,
-                        },
-                    )?;
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Read {
-                            ack_value: Ack::Ack,
-                            length: 1,
-                        },
-                    )?;
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Read {
-                            ack_value: Ack::Ack,
-                            length: 1,
-                        },
-                    )?;
+            let extra_commands = if cfg!(esp32) {
+                match (start, will_continue) {
+                    // No chunking (START-WRITE-READ-STOP) or first chunk (START-WRITE-READ-END)
+                    (true, _) => 0,
+                    // Middle chunk - (READ-READ-READ-END)
+                    (false, true) => 2,
+                    // Last chunk - (READ-READ-STOP-END)
+                    (false, false) => 1 - stop as u8,
                 }
             } else {
+                0
+            };
+
+            add_cmd(
+                cmd_iterator,
+                Command::Read {
+                    ack_value: Ack::Ack,
+                    length: initial_len as u8 - extra_commands,
+                },
+            )?;
+            for _ in 0..extra_commands {
                 add_cmd(
                     cmd_iterator,
                     Command::Read {
                         ack_value: Ack::Ack,
-                        length: initial_len as u8,
+                        length: 1,
                     },
                 )?;
             }
@@ -2437,24 +2391,28 @@ impl Driver<'_> {
     fn start_write_operation(
         &self,
         address: I2cAddress,
-        bytes: &[u8],
+        buffer: &[u8],
         start: bool,
         stop: bool,
         deadline: Deadline,
     ) -> Result<Option<Instant>, Error> {
         let cmd_iterator = &mut self.regs().comd_iter();
 
-        self.setup_write(address, bytes, start, cmd_iterator)?;
+        self.setup_write(address, buffer, start, stop, cmd_iterator)?;
 
         if stop {
             add_cmd(cmd_iterator, Command::Stop)?;
-        } else {
+        }
+        if !(start && stop) {
+            // Multi-chunk write, terminate with END. ESP32 TRM suggests a write should work with
+            // only a STOP at the end, but STOP does not seem to generate a TX_COMPLETE interrupt
+            // without END.
             add_cmd(cmd_iterator, Command::End)?;
         }
-        self.start_transmission();
-        let deadline = deadline.start(bytes.len() + start as usize);
 
-        Ok(deadline)
+        self.start_transmission();
+
+        Ok(deadline.start(buffer.len() + address.bytes()))
     }
 
     /// Executes an I2C read operation.
@@ -2482,17 +2440,19 @@ impl Driver<'_> {
 
         let cmd_iterator = &mut self.regs().comd_iter();
 
-        self.setup_read(address, buffer, start, will_continue, cmd_iterator)?;
+        self.setup_read(address, buffer, start, stop, will_continue, cmd_iterator)?;
 
         if stop {
             add_cmd(cmd_iterator, Command::Stop)?;
-        } else {
+        }
+        if !(start && stop) {
+            // Multi-chunk read, terminate with END. On ESP32, assume same limitation as writes.
             add_cmd(cmd_iterator, Command::End)?;
         }
-        self.start_transmission();
-        let deadline = deadline.start(buffer.len() + start as usize);
 
-        Ok(deadline)
+        self.start_transmission();
+
+        Ok(deadline.start(buffer.len() + address.bytes()))
     }
 
     /// Executes an I2C write operation.
