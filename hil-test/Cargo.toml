@@ -120,16 +120,6 @@ harness           = false
 required-features = ["embassy"]
 
 [[bin]]
-name              = "embassy_interrupt_executor"
-harness           = false
-required-features = ["embassy"]
-
-[[bin]]
-name    = "embassy_interrupt_spi_dma"
-harness = false
-required-features = ["embassy"]
-
-[[bin]]
 name    = "systimer"
 harness = false
 
