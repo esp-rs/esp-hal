@@ -47,7 +47,7 @@ async fn main(_spawner: Spawner) {
         .channel0
         .configure_tx(
             peripherals.GPIO4,
-            TxChannelConfig::default().with_clk_divider(255),
+            &TxChannelConfig::default().with_clk_divider(255),
         )
         .unwrap();
 
