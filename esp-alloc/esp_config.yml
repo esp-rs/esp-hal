@@ -5,7 +5,7 @@ options:
     description: "The heap algorithm to use. TLSF offers higher performance
       and bounded allocation time, but uses more memory."
     default:
-      - value: '"TLSF"'
+      - value: '"LLFF"'
     constraints:
       - type:
           validator: enumeration
