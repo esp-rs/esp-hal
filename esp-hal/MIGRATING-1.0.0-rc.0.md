@@ -433,3 +433,23 @@ esp_rtos::start_second_core(
 ### Interrupt executor changes
 
 Interrupt executors are provided as `esp_rtos::embassy::InterruptExecutor` with no additional changes.
+
+
+### `ram` procmacro changes
+
+All `ram` proc macro options except `#[ram(reclaimed)]` are considered `unstable` and should be used in a following way:
+
+```diff
+- #[ram(rtc_fast)]
++ #[ram(unstable(rtc_fast))]
+static mut SOME_INITED_DATA: [u8; 2] = [0xaa, 0xbb];
+
+- #[ram(rtc_fast, persistent)]
++ #[ram(unstable(rtc_fast, persistent))]
+static mut SOME_PERSISTENT_DATA: [u8; 2] = [0; 2];
+
+- #[ram(rtc_fast, zeroed)]
++ #[ram(unstable(rtc_fast, zeroed))]
+static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
+
+```

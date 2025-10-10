@@ -82,20 +82,20 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
                 };
 
                 if *arg {
-                    return syn::Error::new(ident.span(), format!("Argument `{ident}` is already set"))
-                        .into_compile_error()
-                        .into();
+                    return syn::Error::new(
+                        ident.span(),
+                        format!("Argument `{ident}` is already set"),
+                    )
+                    .into_compile_error()
+                    .into();
                 }
                 *arg = true;
             }
 
             _ => {
-                return syn::Error::new(
-                    attr_arg.span(),
-                    "Unsupported attribute syntax for `ram`",
-                )
-                .into_compile_error()
-                .into();
+                return syn::Error::new(attr_arg.span(), "Unsupported attribute syntax for `ram`")
+                    .into_compile_error()
+                    .into();
             }
         }
     }

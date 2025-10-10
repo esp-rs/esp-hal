@@ -101,10 +101,10 @@ mod rtos_main;
 /// #[ram(unstable(rtc_fast))]
 /// static mut SOME_INITED_DATA: [u8; 2] = [0xaa, 0xbb];
 ///
-/// #[ram(unstable(rtc_fast), unstable(persistent))]
+/// #[ram(unstable(rtc_fast, persistent))]
 /// static mut SOME_PERSISTENT_DATA: [u8; 2] = [0; 2];
 ///
-/// #[ram(unstable(rtc_fast), unstable(zeroed))]
+/// #[ram(unstable(rtc_fast, zeroed))]
 /// static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 /// ```
 ///
