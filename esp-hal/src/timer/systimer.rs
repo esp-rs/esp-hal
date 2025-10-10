@@ -104,9 +104,9 @@ impl<'d> SystemTimer<'d> {
         etm::enable_etm();
 
         Self {
-            alarm0: Alarm::new(0),
-            alarm1: Alarm::new(1),
-            alarm2: Alarm::new(2),
+            alarm0: Alarm::new(Comparator::Comparator0),
+            alarm1: Alarm::new(Comparator::Comparator1),
+            alarm2: Alarm::new(Comparator::Comparator2),
         }
     }
 
@@ -263,17 +263,25 @@ impl Unit {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+enum Comparator {
+    Comparator0,
+    Comparator1,
+    Comparator2,
+}
+
 /// An alarm unit
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Alarm<'d> {
-    comp: u8,
+    comp: Comparator,
     unit: Unit,
     _lifetime: PhantomData<&'d mut ()>,
 }
 
 impl Alarm<'_> {
-    const fn new(comp: u8) -> Self {
+    const fn new(comp: Comparator) -> Self {
         Alarm {
             comp,
             unit: Unit::Unit0,
@@ -310,7 +318,7 @@ impl Alarm<'_> {
     /// Returns the comparator's number.
     #[inline]
     fn channel(&self) -> u8 {
-        self.comp
+        self.comp as u8
     }
 
     /// Enables/disables the comparator. If enabled, this means
@@ -639,30 +647,30 @@ mod asynch {
     }
 
     #[inline]
-    fn handle_alarm(alarm: u8) {
+    fn handle_alarm(comp: Comparator) {
         Alarm {
-            comp: alarm,
+            comp,
             unit: Unit::Unit0,
             _lifetime: PhantomData,
         }
         .enable_interrupt(false);
 
-        WAKERS[alarm as usize].wake();
+        WAKERS[comp as usize].wake();
     }
 
     #[handler]
     pub(crate) fn target0_handler() {
-        handle_alarm(0);
+        handle_alarm(Comparator::Comparator0);
     }
 
     #[handler]
     pub(crate) fn target1_handler() {
-        handle_alarm(1);
+        handle_alarm(Comparator::Comparator1);
     }
 
     #[handler]
     pub(crate) fn target2_handler() {
-        handle_alarm(2);
+        handle_alarm(Comparator::Comparator2);
     }
 }
 

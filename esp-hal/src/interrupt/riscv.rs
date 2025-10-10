@@ -260,7 +260,16 @@ pub fn enable_direct(
 
         let instr = encode_jal_x0(handler as usize, int_slot)?;
 
-        core::ptr::write_volatile(int_slot as *mut u32, instr);
+        if crate::debugger::debugger_connected() {
+            core::ptr::write_volatile(int_slot as *mut u32, instr);
+        } else {
+            crate::debugger::DEBUGGER_LOCK.lock(|| {
+                let wp = crate::debugger::clear_watchpoint(1);
+                core::ptr::write_volatile(int_slot as *mut u32, instr);
+                crate::debugger::restore_watchpoint(1, wp);
+            });
+        }
+
         core::arch::asm!("fence.i");
 
         enable_cpu_interrupt(cpu_interrupt);
@@ -452,7 +461,16 @@ mod vectored {
         unsafe {
             let ptr =
                 &pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as *const _ as *mut usize;
-            ptr.write_volatile(handler.raw_value());
+
+            if crate::debugger::debugger_connected() {
+                ptr.write_volatile(handler.raw_value());
+            } else {
+                crate::debugger::DEBUGGER_LOCK.lock(|| {
+                    let wp = crate::debugger::clear_watchpoint(1);
+                    ptr.write_volatile(handler.raw_value());
+                    crate::debugger::restore_watchpoint(1, wp);
+                });
+            }
         }
     }
 
@@ -823,25 +841,39 @@ mod rt {
         let prio = INTERRUPT_TO_PRIORITY[cpu_intr as usize];
         let configured_interrupts = vectored::configured_interrupts(core, status, prio);
 
+        // Change the current runlevel so that interrupt handlers can access the correct runlevel.
+        let level = unsafe { change_current_runlevel(prio) };
+
+        // When nesting is possible, we run the nestable interrupts first. This ensures that we
+        // don't violate assumptions made by non-nestable handlers.
+
+        if prio != Priority::max() {
+            for interrupt_nr in configured_interrupts.iterator() {
+                let handler =
+                    unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler } as usize;
+                let nested = (handler & 1) == 0;
+                if nested {
+                    let handler: fn() =
+                        unsafe { core::mem::transmute::<usize, fn()>(handler & !1) };
+
+                    unsafe { riscv::interrupt::nested(handler) };
+                }
+            }
+        }
+
+        // Now we can run the non-nestable interrupt handlers.
+
         for interrupt_nr in configured_interrupts.iterator() {
             let handler =
                 unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler } as usize;
             let not_nested = (handler & 1) == 1;
-            let handler = handler & !1;
+            if not_nested || prio == Priority::max() {
+                let handler: fn() = unsafe { core::mem::transmute::<usize, fn()>(handler & !1) };
 
-            let handler: fn() = unsafe { core::mem::transmute::<usize, fn()>(handler) };
-
-            if not_nested || prio == Priority::Priority15 {
                 handler();
-            } else {
-                let elevated = prio as u8;
-                unsafe {
-                    let level =
-                        change_current_runlevel(unwrap!(Priority::try_from(elevated as u32)));
-                    riscv::interrupt::nested(handler);
-                    change_current_runlevel(level);
-                }
             }
         }
+
+        unsafe { change_current_runlevel(level) };
     }
 }

@@ -9,9 +9,6 @@ mod chip_specific;
 mod buffer;
 mod common;
 
-#[cfg(multi_core)]
-mod multi_core;
-
 pub use common::{FlashStorage, FlashStorageError};
 
 pub mod ll;

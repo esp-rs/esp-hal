@@ -76,6 +76,26 @@ impl super::Efuse {
     pub fn flash_encryption() -> bool {
         (Self::read_field_le::<u8>(FLASH_CRYPT_CNT).count_ones() % 2) != 0
     }
+
+    /// Returns the major hardware revision
+    pub fn major_chip_version() -> u8 {
+        let eco_bit0 = Self::read_field_le::<u32>(CHIP_VER_REV1);
+        let eco_bit1 = Self::read_field_le::<u32>(CHIP_VER_REV2);
+        let eco_bit2 =
+            (crate::peripherals::APB_CTRL::regs().date().read().bits() & 0x80000000) >> 31;
+
+        match (eco_bit2 << 2) | (eco_bit1 << 1) | eco_bit0 {
+            1 => 1,
+            3 => 2,
+            7 => 3,
+            _ => 0,
+        }
+    }
+
+    /// Returns the minor hardware revision
+    pub fn minor_chip_version() -> u8 {
+        Self::read_field_le(WAFER_VERSION_MINOR)
+    }
 }
 
 #[derive(Debug, Clone, Copy, strum::FromRepr)]

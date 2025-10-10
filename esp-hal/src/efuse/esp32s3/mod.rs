@@ -3,6 +3,14 @@ use crate::{analog::adc::Attenuation, peripherals::EFUSE};
 mod fields;
 pub use fields::*;
 
+/// Selects which ADC we are interested in the efuse calibration data for
+pub enum AdcCalibUnit {
+    /// Select efuse calibration data for ADC1
+    ADC1,
+    /// Select efuse calibration data for ADC2
+    ADC2,
+}
+
 impl super::Efuse {
     /// Get status of SPI boot encryption.
     pub fn flash_encryption() -> bool {
@@ -40,42 +48,44 @@ impl super::Efuse {
     /// Get ADC initial code for specified attenuation from efuse
     ///
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L28>
-    pub fn rtc_calib_init_code(unit: u8, atten: Attenuation) -> Option<u16> {
+    pub fn rtc_calib_init_code(unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
         let version = Self::rtc_calib_version();
 
         if version != 1 {
             return None;
         }
 
-        let adc_icode_diff: [u16; 4] = if unit == 0 {
-            [
+        let adc_icode_diff: [u16; 4] = match unit {
+            AdcCalibUnit::ADC1 => [
                 Self::read_field_le(ADC1_INIT_CODE_ATTEN0),
                 Self::read_field_le(ADC1_INIT_CODE_ATTEN1),
                 Self::read_field_le(ADC1_INIT_CODE_ATTEN2),
                 Self::read_field_le(ADC1_INIT_CODE_ATTEN3),
-            ]
-        } else {
-            [
+            ],
+            AdcCalibUnit::ADC2 => [
                 Self::read_field_le(ADC2_INIT_CODE_ATTEN0),
                 Self::read_field_le(ADC2_INIT_CODE_ATTEN1),
                 Self::read_field_le(ADC2_INIT_CODE_ATTEN2),
                 Self::read_field_le(ADC2_INIT_CODE_ATTEN3),
-            ]
+            ],
         };
 
         // Version 1 logic for calculating ADC ICode based on EFUSE burnt value
 
         let mut adc_icode = [0; 4];
-        if unit == 0 {
-            adc_icode[0] = adc_icode_diff[0] + 1850;
-            adc_icode[1] = adc_icode_diff[1] + adc_icode[0] + 90;
-            adc_icode[2] = adc_icode_diff[2] + adc_icode[1];
-            adc_icode[3] = adc_icode_diff[3] + adc_icode[2] + 70;
-        } else {
-            adc_icode[0] = adc_icode_diff[0] + 2020;
-            adc_icode[1] = adc_icode_diff[1] + adc_icode[0];
-            adc_icode[2] = adc_icode_diff[2] + adc_icode[1];
-            adc_icode[3] = adc_icode_diff[3] + adc_icode[2];
+        match unit {
+            AdcCalibUnit::ADC1 => {
+                adc_icode[0] = adc_icode_diff[0] + 1850;
+                adc_icode[1] = adc_icode_diff[1] + adc_icode[0] + 90;
+                adc_icode[2] = adc_icode_diff[2] + adc_icode[1];
+                adc_icode[3] = adc_icode_diff[3] + adc_icode[2] + 70;
+            }
+            AdcCalibUnit::ADC2 => {
+                adc_icode[0] = adc_icode_diff[0] + 2020;
+                adc_icode[1] = adc_icode_diff[1] + adc_icode[0];
+                adc_icode[2] = adc_icode_diff[2] + adc_icode[1];
+                adc_icode[3] = adc_icode_diff[3] + adc_icode[2];
+            }
         }
 
         Some(
@@ -91,14 +101,14 @@ impl super::Efuse {
     /// Get ADC reference point voltage for specified attenuation in millivolts
     ///
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L63>
-    pub fn rtc_calib_cal_mv(_unit: u8, _atten: Attenuation) -> u16 {
+    pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, _atten: Attenuation) -> u16 {
         850
     }
 
     /// Get ADC reference point digital code for specified attenuation
     ///
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L63>
-    pub fn rtc_calib_cal_code(unit: u8, atten: Attenuation) -> Option<u16> {
+    pub fn rtc_calib_cal_code(unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
         let version = Self::rtc_calib_version();
 
         if version != 1 {
@@ -134,10 +144,9 @@ impl super::Efuse {
             Attenuation::_11dB => 3,
         };
 
-        Some(if unit == 0 {
-            adc1_vol[atten]
-        } else {
-            adc2_vol[atten]
+        Some(match unit {
+            AdcCalibUnit::ADC1 => adc1_vol[atten],
+            AdcCalibUnit::ADC2 => adc2_vol[atten],
         })
     }
 
@@ -150,14 +159,6 @@ impl super::Efuse {
     pub fn minor_chip_version() -> u8 {
         Self::read_field_le::<u8>(WAFER_VERSION_MINOR_HI) << 3
             | Self::read_field_le::<u8>(WAFER_VERSION_MINOR_LO)
-    }
-
-    /// Returns the hardware revision
-    ///
-    /// The chip version is calculated using the following
-    /// formula: MAJOR * 100 + MINOR. (if the result is 1, then version is v0.1)
-    pub fn chip_revision() -> u16 {
-        Self::major_chip_version() as u16 * 100 + Self::minor_chip_version() as u16
     }
 }
 

@@ -104,9 +104,6 @@ symbols = [
     "rom_crc_le",
     "rom_crc_be",
     "rom_md5_bsd",
-
-    # Which bluetooth implementation
-    "npl",
 ]
 
 memory = [{ name = "dram", start = 0x4080_0000, end = 0x4085_0000 }]
@@ -152,8 +149,6 @@ pins = [
     { pin =  3, functions = { 0 = "MTDI", 2 = "FSPIHD"  }, analog = { 1 = "ADC1_CH2" } },
     { pin =  4, functions = { 0 = "MTCK", 2 = "FSPICLK" }, analog = { 1 = "ADC1_CH3" } },
     { pin =  5, functions = { 0 = "MTDO", 2 = "FSPID"   }, analog = { 1 = "ADC1_CH4" } },
-    { pin =  6 },
-    { pin =  7 },
     { pin =  8 },
     { pin =  9 },
     { pin = 10, analog = { 0 = "ZCD0" } },
@@ -391,7 +386,6 @@ has_rx_demodulation = true
 clock_sources.supported = ["Xtal", "RcFast" ]
 # Power-on value is RcFast!
 clock_sources.default = "Xtal"
-max_idle_threshold = 0x3FFF
 
 [device.rsa]
 support_status = "partial"
@@ -462,5 +456,9 @@ apb_cycle_wait_num = 16 # TODO
 
 ## Radio
 [device.bt]
+support_status = "partial"
+controller = "npl"
+
 [device.ieee802154]
+
 [device.phy]

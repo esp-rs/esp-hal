@@ -25,8 +25,8 @@ bench = false
 test  = false
 
 [dependencies]
-cfg-if              = "1.0.1"
-document-features   = "0.2.11"
+cfg-if              = "1"
+document-features   = "0.2"
 
 [build-dependencies]
 esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }

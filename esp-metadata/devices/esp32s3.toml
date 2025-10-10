@@ -108,9 +108,6 @@ symbols = [
     "uart_support_wakeup_int",
     "ulp_supported",
     "riscv_coproc_supported",
-
-    # Which bluetooth implementation
-    "btdm",
 ]
 
 memory = [{ name = "dram", start = 0x3FC8_8000, end = 0x3FD0_0000 }]
@@ -172,13 +169,6 @@ pins = [
     { pin = 20, functions = { 2 = "U1CTS",   3 = "CLK_OUT1" },                 analog = { 0 = "USB_DP",     1 = "ADC2_CH9"  }, rtc = { 0 = "RTC_GPIO20" } },
     { pin = 21,                                                                                                                rtc = { 0 = "RTC_GPIO21" } },
 
-    { pin = 26, functions = { 0 = "SPICS1" } },
-    { pin = 27, functions = { 0 = "SPIHD"  } },
-    { pin = 28, functions = { 0 = "SPIWP"  } },
-    { pin = 29, functions = { 0 = "SPICS0" } },
-    { pin = 30, functions = { 0 = "SPICLK" } },
-    { pin = 31, functions = { 0 = "SPIQ"   } },
-    { pin = 32, functions = { 0 = "SPID"   } },
     { pin = 33, functions = { 2 = "FSPIHD",   3 = "SUBSPIHD",  4 = "SPIIO4" } },
     { pin = 34, functions = { 2 = "FSPICS0",  3 = "SUBSPICS0", 4 = "SPIIO5" } },
     { pin = 35, functions = { 2 = "FSPID",    3 = "SUBSPID",   4 = "SPIIO6" } },
@@ -610,7 +600,6 @@ has_rx_demodulation = true
 has_dma = true
 clock_sources.supported = [ "None", "Apb", "RcFast", "Xtal" ]
 clock_sources.default = "Apb"
-max_idle_threshold = 0x3FFF
 
 [device.rsa]
 support_status = "partial"
@@ -692,7 +681,11 @@ apb_cycle_wait_num = 16 # TODO
 
 ## Radio
 [device.wifi]
+
 [device.bt]
+support_status = "partial"
+controller = "btdm"
+
 [device.phy]
 combo_module = true
 backed_up_digital_register_count = 21

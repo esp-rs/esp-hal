@@ -330,15 +330,15 @@ macro_rules! metadata {
 ///     Resources<'d> {
 ///         display: DisplayResources<'d> {
 ///             spi:  SPI2,
-///             sda:  GPIO6,
-///             sclk: GPIO7,
-///             cs:   GPIO8,
-///             dc:   GPIO9,
+///             sda:  GPIO5,
+///             sclk: GPIO4,
+///             cs:   GPIO3,
+///             dc:   GPIO2,
 ///         },
 ///         axl: AccelerometerResources<'d> {
 ///             i2c: I2C0,
-///             sda: GPIO12,
-///             scl: GPIO13,
+///             sda: GPIO0,
+///             scl: GPIO1,
 ///         },
 ///     }
 /// }

@@ -37,14 +37,6 @@ name    = "dma_mem2mem"
 harness = false
 
 [[bin]]
-name    = "ecc"
-harness = false
-
-[[bin]]
-name    = "flip_link"
-harness = false
-
-[[bin]]
 name    = "gpio"
 harness = false
 
@@ -77,19 +69,7 @@ name    = "lcd_cam"
 harness = false
 
 [[bin]]
-name    = "lcd_cam_i8080"
-harness = false
-
-[[bin]]
-name    = "lcd_cam_i8080_async"
-harness = false
-
-[[bin]]
 name    = "misc_simple"
-harness = false
-
-[[bin]]
-name    = "qspi"
 harness = false
 
 [[bin]]
@@ -101,19 +81,12 @@ name    = "spi_full_duplex"
 harness = false
 
 [[bin]]
-name    = "spi_half_duplex_read"
+name    = "spi_half_duplex_slave_qspi"
 harness = false
 
-[[bin]]
-name    = "spi_half_duplex_write"
-harness = false
 
 [[bin]]
 name    = "spi_half_duplex_write_psram"
-harness = false
-
-[[bin]]
-name    = "spi_slave"
 harness = false
 
 [[bin]]
@@ -121,19 +94,7 @@ name    = "storage_read_app_desc"
 harness = false
 
 [[bin]]
-name    = "stack_protector"
-harness = false
-
-[[bin]]
 name    = "parl_io"
-harness = false
-
-[[bin]]
-name    = "parl_io_tx"
-harness = false
-
-[[bin]]
-name    = "parl_io_tx_async"
 harness = false
 
 [[bin]]
@@ -143,35 +104,14 @@ harness = false
 [[bin]]
 name    = "rmt"
 harness = false
+required-features = ["embassy"]
 
 [[bin]]
-name    = "rsa"
-harness = false
-
-[[bin]]
-name    = "sha"
+name    = "ecc_rsa_sha"
 harness = false
 
 [[bin]]
 name    = "uart"
-harness = false
-
-[[bin]]
-name              = "uart_async"
-harness           = false
-required-features = ["embassy"]
-
-[[bin]]
-name              = "uart_uhci"
-harness           = false
-required-features = ["embassy"]
-
-[[bin]]
-name    = "uart_regression"
-harness = false
-
-[[bin]]
-name    = "uart_tx_rx_async"
 harness = false
 
 [[bin]]
@@ -209,30 +149,29 @@ required-features = ["esp-radio", "esp-alloc"]
 
 [dependencies]
 allocator-api2    = { version = "0.3.0", default-features = false, features = ["alloc"] }
-cfg-if             = "1.0.0"
-critical-section   = "1.1.3"
+cfg-if             = "1"
+critical-section   = "1"
 defmt              = "1.0.1"
 defmt-rtt          = { version = "1.0.0", optional = true }
 embassy-executor   = { version = "0.9.0", default-features = false }
 embassy-futures    = "0.1"
 embedded-storage   = "0.3.1"
-embassy-sync       = "0.6.0"
+embassy-sync       = "0.7.2"
 embassy-time       = "0.5.0"
 embedded-hal       = "1.0.0"
-embedded-io        = "0.6.1"
-embedded-io-async  = "0.6.1"
+embedded-io        = "0.7.1"
+embedded-io-async  = "0.7.0"
 embedded-can       = "0.4.1"
 embedded-hal-async = "1.0.0"
 esp-alloc          = { path = "../esp-alloc", optional = true }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
 esp-hal            = { path = "../esp-hal", features = ["defmt"] }
-esp-hal-embassy    = { path = "../esp-hal-embassy", features = ["defmt"], optional = true }
-esp-preempt        = { path = "../esp-preempt", features = ["defmt"], optional = true }
+esp-rtos           = { path = "../esp-rtos", features = ["defmt"], optional = true }
 esp-storage        = { path = "../esp-storage", optional = true }
 esp-sync           = { path = "../esp-sync" }
 esp-radio          = { path = "../esp-radio", features = ["defmt"], optional = true }
-esp-radio-preempt-driver = { path = "../esp-radio-preempt-driver", optional = true }
-portable-atomic    = "1.11.0"
+esp-radio-rtos-driver = { path = "../esp-radio-rtos-driver", optional = true }
+portable-atomic    = "1.11"
 static_cell        = { version = "2.1.0" }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
 
@@ -256,79 +195,70 @@ default = []
 unstable = ["esp-hal/unstable"]
 
 defmt = ["dep:defmt-rtt"]
-esp-radio = ["dep:esp-radio", "dep:esp-preempt", "dep:esp-radio-preempt-driver"]
+esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/esp-radio"]
+embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
 
 # Device support (required!):
 esp32 = [
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32",
-    "esp-hal-embassy?/esp32",
     "esp-radio?/esp32",
     "esp-storage?/esp32",
     "esp-bootloader-esp-idf/esp32",
     "esp-metadata-generated/esp32",
-    "esp-preempt?/esp32",
+    "esp-rtos?/esp32",
 ]
 esp32c2 = [
     "esp-hal/esp32c2",
-    "esp-hal-embassy?/esp32c2",
     "esp-radio?/esp32c2",
     "esp-storage?/esp32c2",
     "esp-bootloader-esp-idf/esp32c2",
     "esp-metadata-generated/esp32c2",
-    "esp-preempt?/esp32c2"
+    "esp-rtos?/esp32c2"
 ]
 esp32c3 = [
     "esp-hal/esp32c3",
-    "esp-hal-embassy?/esp32c3",
     "esp-radio?/esp32c3",
     "esp-storage?/esp32c3",
     "esp-bootloader-esp-idf/esp32c3",
     "esp-metadata-generated/esp32c3",
-    "esp-preempt?/esp32c3",
+    "esp-rtos?/esp32c3",
 ]
 esp32c6 = [
     "esp-hal/esp32c6",
-    "esp-hal-embassy?/esp32c6",
     "esp-radio?/esp32c6",
     "esp-storage?/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
     "esp-metadata-generated/esp32c6",
-    "esp-preempt?/esp32c6",
+    "esp-rtos?/esp32c6",
 ]
 esp32h2 = [
     "esp-hal/esp32h2",
-    "esp-hal-embassy?/esp32h2",
     "esp-radio?/esp32h2",
     "esp-storage?/esp32h2",
     "esp-bootloader-esp-idf/esp32h2",
     "esp-metadata-generated/esp32h2",
-    "esp-preempt?/esp32h2",
+    "esp-rtos?/esp32h2",
 ]
 esp32s2 = [
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32s2",
-    "esp-hal-embassy?/esp32s2",
     "esp-radio?/esp32s2",
     "esp-storage?/esp32s2",
     "esp-bootloader-esp-idf/esp32s2",
     "esp-metadata-generated/esp32s2",
-    "esp-preempt?/esp32s2"
+    "esp-rtos?/esp32s2"
 ]
 esp32s3 = [
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32s3",
-    "esp-hal-embassy?/esp32s3",
     "esp-radio?/esp32s3",
     "esp-storage?/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
     "esp-metadata-generated/esp32s3",
-    "esp-preempt?/esp32s3",
+    "esp-rtos?/esp32s3",
 ]
-# Async & Embassy:
-embassy = [
-    "dep:esp-hal-embassy",
-]
+
 psram = ["esp-hal/psram", "esp-alloc"]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html#test

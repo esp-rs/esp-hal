@@ -216,7 +216,6 @@ impl Chip {
                     "pm_support_ext1_wakeup",
                     "pm_support_touch_sensor_wakeup",
                     "ulp_supported",
-                    "btdm",
                     "soc",
                     "adc",
                     "aes",
@@ -293,12 +292,12 @@ impl Chip {
                     "rmt_has_per_channel_clock",
                     "rmt_supports_reftick_clock",
                     "rmt_supports_apb_clock",
-                    "rmt_max_idle_threshold=\"32767\"",
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"512\"",
                     "rsa_memory_size_bytes=\"512\"",
                     "timergroup_timg_has_timer1",
                     "uart_ram_size=\"128\"",
+                    "bt_controller=\"btdm\"",
                     "phy_combo_module",
                     "has_dram_region",
                 ],
@@ -379,7 +378,6 @@ impl Chip {
                     "cargo:rustc-cfg=pm_support_ext1_wakeup",
                     "cargo:rustc-cfg=pm_support_touch_sensor_wakeup",
                     "cargo:rustc-cfg=ulp_supported",
-                    "cargo:rustc-cfg=btdm",
                     "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=aes",
@@ -456,12 +454,12 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_has_per_channel_clock",
                     "cargo:rustc-cfg=rmt_supports_reftick_clock",
                     "cargo:rustc-cfg=rmt_supports_apb_clock",
-                    "cargo:rustc-cfg=rmt_max_idle_threshold=\"32767\"",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"512\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
                     "cargo:rustc-cfg=timergroup_timg_has_timer1",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
+                    "cargo:rustc-cfg=bt_controller=\"btdm\"",
                     "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=has_dram_region",
                 ],
@@ -525,7 +523,6 @@ impl Chip {
                     "pm_support_bt_wakeup",
                     "uart_support_wakeup_int",
                     "gpio_support_deepsleep_wakeup",
-                    "npl",
                     "soc",
                     "adc",
                     "assist_debug",
@@ -587,6 +584,7 @@ impl Chip {
                     "timergroup_default_wdt_clock_source=\"0\"",
                     "timergroup_default_wdt_clock_source_is_set",
                     "uart_ram_size=\"128\"",
+                    "bt_controller=\"npl\"",
                     "phy_combo_module",
                     "has_dram_region",
                 ],
@@ -646,7 +644,6 @@ impl Chip {
                     "cargo:rustc-cfg=pm_support_bt_wakeup",
                     "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=gpio_support_deepsleep_wakeup",
-                    "cargo:rustc-cfg=npl",
                     "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=assist_debug",
@@ -708,6 +705,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_default_wdt_clock_source=\"0\"",
                     "cargo:rustc-cfg=timergroup_default_wdt_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
+                    "cargo:rustc-cfg=bt_controller=\"npl\"",
                     "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=has_dram_region",
                 ],
@@ -779,7 +777,6 @@ impl Chip {
                     "pm_support_bt_wakeup",
                     "uart_support_wakeup_int",
                     "gpio_support_deepsleep_wakeup",
-                    "btdm",
                     "soc",
                     "adc",
                     "aes",
@@ -862,7 +859,6 @@ impl Chip {
                     "rmt_supports_apb_clock",
                     "rmt_supports_rcfast_clock",
                     "rmt_supports_xtal_clock",
-                    "rmt_max_idle_threshold=\"16383\"",
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"384\"",
@@ -873,6 +869,7 @@ impl Chip {
                     "timergroup_default_wdt_clock_source=\"0\"",
                     "timergroup_default_wdt_clock_source_is_set",
                     "uart_ram_size=\"128\"",
+                    "bt_controller=\"btdm\"",
                     "phy_combo_module",
                     "phy_backed_up_digital_register_count=\"21\"",
                     "phy_backed_up_digital_register_count_is_set",
@@ -942,7 +939,6 @@ impl Chip {
                     "cargo:rustc-cfg=pm_support_bt_wakeup",
                     "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=gpio_support_deepsleep_wakeup",
-                    "cargo:rustc-cfg=btdm",
                     "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=aes",
@@ -1025,7 +1021,6 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_supports_apb_clock",
                     "cargo:rustc-cfg=rmt_supports_rcfast_clock",
                     "cargo:rustc-cfg=rmt_supports_xtal_clock",
-                    "cargo:rustc-cfg=rmt_max_idle_threshold=\"16383\"",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
@@ -1036,6 +1031,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_default_wdt_clock_source=\"0\"",
                     "cargo:rustc-cfg=timergroup_default_wdt_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
+                    "cargo:rustc-cfg=bt_controller=\"btdm\"",
                     "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count=\"21\"",
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count_is_set",
@@ -1151,7 +1147,6 @@ impl Chip {
                     "gpio_support_deepsleep_wakeup",
                     "uart_support_wakeup_int",
                     "pm_support_ext1_wakeup",
-                    "npl",
                     "soc",
                     "adc",
                     "aes",
@@ -1248,7 +1243,6 @@ impl Chip {
                     "rmt_supports_pll80mhz_clock",
                     "rmt_supports_rcfast_clock",
                     "rmt_supports_xtal_clock",
-                    "rmt_max_idle_threshold=\"16383\"",
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"384\"",
@@ -1261,6 +1255,7 @@ impl Chip {
                     "uart_ram_size=\"128\"",
                     "lp_uart_ram_size=\"32\"",
                     "wifi_has_wifi6",
+                    "bt_controller=\"npl\"",
                     "phy_combo_module",
                     "has_dram_region",
                 ],
@@ -1370,7 +1365,6 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_support_deepsleep_wakeup",
                     "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=pm_support_ext1_wakeup",
-                    "cargo:rustc-cfg=npl",
                     "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=aes",
@@ -1467,7 +1461,6 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_supports_pll80mhz_clock",
                     "cargo:rustc-cfg=rmt_supports_rcfast_clock",
                     "cargo:rustc-cfg=rmt_supports_xtal_clock",
-                    "cargo:rustc-cfg=rmt_max_idle_threshold=\"16383\"",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
@@ -1480,6 +1473,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
                     "cargo:rustc-cfg=wifi_has_wifi6",
+                    "cargo:rustc-cfg=bt_controller=\"npl\"",
                     "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=has_dram_region",
                 ],
@@ -1574,7 +1568,6 @@ impl Chip {
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
-                    "npl",
                     "soc",
                     "adc",
                     "aes",
@@ -1664,7 +1657,6 @@ impl Chip {
                     "rmt_has_rx_demodulation",
                     "rmt_supports_xtal_clock",
                     "rmt_supports_rcfast_clock",
-                    "rmt_max_idle_threshold=\"16383\"",
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"384\"",
@@ -1675,6 +1667,7 @@ impl Chip {
                     "timergroup_default_wdt_clock_source=\"2\"",
                     "timergroup_default_wdt_clock_source_is_set",
                     "uart_ram_size=\"128\"",
+                    "bt_controller=\"npl\"",
                     "has_dram_region",
                 ],
                 cfgs: &[
@@ -1764,7 +1757,6 @@ impl Chip {
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
-                    "cargo:rustc-cfg=npl",
                     "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=aes",
@@ -1854,7 +1846,6 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_has_rx_demodulation",
                     "cargo:rustc-cfg=rmt_supports_xtal_clock",
                     "cargo:rustc-cfg=rmt_supports_rcfast_clock",
-                    "cargo:rustc-cfg=rmt_max_idle_threshold=\"16383\"",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
@@ -1865,6 +1856,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_default_wdt_clock_source=\"2\"",
                     "cargo:rustc-cfg=timergroup_default_wdt_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
+                    "cargo:rustc-cfg=bt_controller=\"npl\"",
                     "cargo:rustc-cfg=has_dram_region",
                 ],
             },
@@ -2038,7 +2030,6 @@ impl Chip {
                     "rmt_has_per_channel_clock",
                     "rmt_supports_reftick_clock",
                     "rmt_supports_apb_clock",
-                    "rmt_max_idle_threshold=\"32767\"",
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"512\"",
@@ -2217,7 +2208,6 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_has_per_channel_clock",
                     "cargo:rustc-cfg=rmt_supports_reftick_clock",
                     "cargo:rustc-cfg=rmt_supports_apb_clock",
-                    "cargo:rustc-cfg=rmt_max_idle_threshold=\"32767\"",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
@@ -2322,7 +2312,6 @@ impl Chip {
                     "uart_support_wakeup_int",
                     "ulp_supported",
                     "riscv_coproc_supported",
-                    "btdm",
                     "soc",
                     "adc",
                     "aes",
@@ -2419,7 +2408,6 @@ impl Chip {
                     "rmt_supports_apb_clock",
                     "rmt_supports_rcfast_clock",
                     "rmt_supports_xtal_clock",
-                    "rmt_max_idle_threshold=\"16383\"",
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"512\"",
@@ -2429,6 +2417,7 @@ impl Chip {
                     "timergroup_default_clock_source=\"0\"",
                     "timergroup_default_clock_source_is_set",
                     "uart_ram_size=\"128\"",
+                    "bt_controller=\"btdm\"",
                     "phy_combo_module",
                     "phy_backed_up_digital_register_count=\"21\"",
                     "phy_backed_up_digital_register_count_is_set",
@@ -2523,7 +2512,6 @@ impl Chip {
                     "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=ulp_supported",
                     "cargo:rustc-cfg=riscv_coproc_supported",
-                    "cargo:rustc-cfg=btdm",
                     "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=aes",
@@ -2620,7 +2608,6 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_supports_apb_clock",
                     "cargo:rustc-cfg=rmt_supports_rcfast_clock",
                     "cargo:rustc-cfg=rmt_supports_xtal_clock",
-                    "cargo:rustc-cfg=rmt_max_idle_threshold=\"16383\"",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
@@ -2630,6 +2617,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_default_clock_source=\"0\"",
                     "cargo:rustc-cfg=timergroup_default_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
+                    "cargo:rustc-cfg=bt_controller=\"btdm\"",
                     "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count=\"21\"",
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count_is_set",
@@ -2733,7 +2721,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(pm_support_ext1_wakeup)");
     println!("cargo:rustc-check-cfg=cfg(pm_support_touch_sensor_wakeup)");
     println!("cargo:rustc-check-cfg=cfg(ulp_supported)");
-    println!("cargo:rustc-check-cfg=cfg(btdm)");
     println!("cargo:rustc-check-cfg=cfg(soc)");
     println!("cargo:rustc-check-cfg=cfg(adc)");
     println!("cargo:rustc-check-cfg=cfg(aes)");
@@ -2823,7 +2810,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(pm_support_bt_wakeup)");
     println!("cargo:rustc-check-cfg=cfg(uart_support_wakeup_int)");
     println!("cargo:rustc-check-cfg=cfg(gpio_support_deepsleep_wakeup)");
-    println!("cargo:rustc-check-cfg=cfg(npl)");
     println!("cargo:rustc-check-cfg=cfg(assist_debug)");
     println!("cargo:rustc-check-cfg=cfg(ecc)");
     println!("cargo:rustc-check-cfg=cfg(systimer)");
@@ -2981,11 +2967,11 @@ pub fn emit_check_cfg_directives() {
         "cargo:rustc-check-cfg=cfg(rmt_ram_start, values(\"1073047552\",\"1610703872\",\"1610638336\",\"1610642432\",\"1061250048\",\"1610704896\"))"
     );
     println!("cargo:rustc-check-cfg=cfg(rmt_channel_ram_size, values(\"64\",\"48\"))");
-    println!("cargo:rustc-check-cfg=cfg(rmt_max_idle_threshold, values(\"32767\",\"16383\"))");
     println!("cargo:rustc-check-cfg=cfg(rng_apb_cycle_wait_num, values(\"16\"))");
     println!("cargo:rustc-check-cfg=cfg(rsa_size_increment, values(\"512\",\"32\"))");
     println!("cargo:rustc-check-cfg=cfg(rsa_memory_size_bytes, values(\"512\",\"384\"))");
     println!("cargo:rustc-check-cfg=cfg(uart_ram_size, values(\"128\"))");
+    println!("cargo:rustc-check-cfg=cfg(bt_controller, values(\"btdm\",\"npl\"))");
     println!(
         "cargo:rustc-check-cfg=cfg(timergroup_default_clock_source, values(\"0\",\"1\",\"2\"))"
     );

@@ -1051,7 +1051,7 @@ pub(crate) struct BleNplCountInfoT {
     mutex_count: u16,
 }
 
-pub(crate) fn ble_init() -> PhyInitGuard<'static> {
+pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
     let phy_init_guard;
     unsafe {
         (*addr_of_mut!(HCI_OUT_COLLECTOR)).write(HciOutCollector::new());
@@ -1070,26 +1070,7 @@ pub(crate) fn ble_init() -> PhyInitGuard<'static> {
 
         self::ble_os_adapter_chip_specific::ble_rtc_clk_init();
 
-        #[cfg(esp32c2)]
-        let mut cfg = ble_os_adapter_chip_specific::BLE_CONFIG;
-
-        #[cfg(not(esp32c2))]
-        let cfg = ble_os_adapter_chip_specific::BLE_CONFIG;
-
-        #[cfg(esp32c2)]
-        {
-            use esp_hal::clock::Clock;
-
-            let xtal = crate::hal::clock::RtcClock::xtal_freq();
-            let mhz = xtal.mhz() as u8;
-
-            cfg.main_xtal_freq = mhz;
-
-            if mhz == 26 {
-                cfg.rtc_freq = 40000;
-                cfg.main_xtal_freq = 26;
-            }
-        }
+        let cfg = ble_os_adapter_chip_specific::create_ble_config(config);
 
         let res = esp_register_ext_funcs(&G_OSI_FUNCS as *const ExtFuncsT);
         assert!(res == 0, "esp_register_ext_funcs returned {}", res);
@@ -1396,7 +1377,7 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
         r_ble_hci_trans_buf_free(cmd);
     }
 
-    crate::ble::controller::asynch::hci_read_data_available();
+    crate::ble::controller::hci_read_data_available();
 
     0
 }
@@ -1425,7 +1406,7 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
         r_os_mbuf_free_chain(om as *mut _);
     }
 
-    crate::ble::controller::asynch::hci_read_data_available();
+    crate::ble::controller::hci_read_data_available();
 
     0
 }

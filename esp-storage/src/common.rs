@@ -1,12 +1,17 @@
 use core::mem::MaybeUninit;
 
+#[cfg(multi_core)]
+use esp_hal::peripherals::CPU_CTRL;
 #[cfg(not(feature = "emulation"))]
 pub use esp_hal::peripherals::FLASH as Flash;
+#[cfg(multi_core)]
+use esp_hal::system::Cpu;
+#[cfg(multi_core)]
+use esp_hal::system::CpuControl;
+#[cfg(multi_core)]
+use esp_hal::system::is_running;
 
 use crate::chip_specific;
-#[cfg(multi_core)]
-use crate::multi_core::MultiCoreStrategy;
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -189,5 +194,90 @@ impl<'d> FlashStorage<'d> {
         self.multi_core_strategy.post_write(unpark);
 
         Ok(())
+    }
+}
+
+/// Strategy to use on a multi core system where writing to the flash needs exclusive access from
+/// one core.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg(multi_core)]
+pub(crate) enum MultiCoreStrategy {
+    /// Flash writes simply fail if the second core is active while attempting a write (default
+    /// behavior).
+    Error,
+    /// Auto park the other core before writing. Un-park it when writing is complete.
+    AutoPark,
+    /// Ignore that the other core is active.
+    /// This is useful if the second core is known to not fetch instructions from the flash for the
+    /// duration of the write. This is unsafe to use.
+    Ignore,
+}
+
+#[cfg(multi_core)]
+impl<'d> FlashStorage<'d> {
+    /// Enable auto parking of the second core before writing to flash.
+    /// The other core will be automatically un-parked when the write is complete.
+    pub fn multicore_auto_park(mut self) -> FlashStorage<'d> {
+        self.multi_core_strategy = MultiCoreStrategy::AutoPark;
+        self
+    }
+
+    /// Do not check if the second core is active before writing to flash.
+    ///
+    /// # Safety
+    /// Only enable this if you are sure that the second core is not fetching instructions from the
+    /// flash during the write.
+    pub unsafe fn multicore_ignore(mut self) -> FlashStorage<'d> {
+        self.multi_core_strategy = MultiCoreStrategy::Ignore;
+        self
+    }
+}
+
+#[cfg(multi_core)]
+impl MultiCoreStrategy {
+    /// Perform checks/Prepare for a flash write according to the current strategy.
+    ///
+    /// # Returns
+    /// * `True` if the other core needs to be un-parked by post_write
+    /// * `False` otherwise
+    pub(crate) fn pre_write(&self) -> Result<bool, FlashStorageError> {
+        let mut cpu_ctrl = CpuControl::new(unsafe { CPU_CTRL::steal() });
+        match self {
+            MultiCoreStrategy::Error => {
+                for other_cpu in Cpu::other() {
+                    if is_running(other_cpu) {
+                        return Err(FlashStorageError::OtherCoreRunning);
+                    }
+                }
+                Ok(false)
+            }
+            MultiCoreStrategy::AutoPark => {
+                for other_cpu in Cpu::other() {
+                    if is_running(other_cpu) {
+                        unsafe { cpu_ctrl.park_core(other_cpu) };
+                        return Ok(true);
+                    }
+                }
+                Ok(false)
+            }
+            MultiCoreStrategy::Ignore => Ok(false),
+        }
+    }
+
+    /// Perform post-write actions.
+    ///
+    /// # Returns
+    /// * `True` if the other core needs to be un-parked by post_write
+    /// * `False` otherwise
+    pub(crate) fn post_write(&self, unpark: bool) {
+        let mut cpu_ctrl = CpuControl::new(unsafe { CPU_CTRL::steal() });
+        if let MultiCoreStrategy::AutoPark = self {
+            if unpark {
+                for other_cpu in Cpu::other() {
+                    cpu_ctrl.unpark_core(other_cpu);
+                }
+            }
+        }
     }
 }

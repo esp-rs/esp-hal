@@ -79,10 +79,12 @@ esp_hal::interrupt::bind_interrupt(
 );
 ```
 
-## RMT PulseCode changes
+## RMT changes
+
+### RMT PulseCode changes
 
 `PulseCode` used to be an extension trait implemented on `u32`. It is now a
-newtype struct, wrapping `u32`.
+newtype struct, wrapping `u32` and providing mostly `const` methods.
 RMT transmit and receive methods accept `impl Into<PulseCode>` and
 `impl From<PulseCode>`, respectively, and implementations for
 `PulseCode: From<u32>` and `u32: From<PulseCode>` are provided.
@@ -113,7 +115,16 @@ let _ = tx_channel.transmit(&tx_data).wait().unwrap();
 let _ = rx_channel.transmit(&mut rx_data).wait().unwrap();
 ```
 
-## RMT Channel Changes
+`PulseCode` constructors have also been reworked, now providing
+
+1. `PulseCode::new()` which panics for out-of-range signal lengths,
+2. `PulseCode::new_clamped()` which saturates the signal lengths if out of range,
+3. `PulseCode::try_new()` which returns `None` if any signal length is out of range.
+
+The old behaviour of truncating the passed in `u16` to 15 bits is not available
+anymore; which method is the best replacement will depend on the use case.
+
+### RMT Channel Changes
 
 `rmt::Channel` used to have a `Raw: RawChannelAccess` generic parameter,
 which could be either `ConstChannelAccess<Dir, const CHANNEL: u8>` or `DynChannelAccess<Dir>`.
@@ -149,7 +160,7 @@ API as well.
 +let rx_transaction: RxTransaction<'_, PulseCode> = rx.transmit(&data);
 ```
 
-## RMT method changes
+### RMT method changes
 
 The `rmt::Channel::transmit_continuously` and
 `rmt::Channel::transmit_continuously_with_loopcount` methods have been merged:
@@ -163,6 +174,58 @@ The `rmt::Channel::transmit_continuously` and
 +let count = NonZeroU16::new(count).unwrap();
 +let tx_trans1 = tx_channel1.transmit_continuously(&data, LoopCount::Finite(count));
 ```
+
+The receiver methods `rmt::Channel::<'_, Blocking>::receive` and
+`rmt::Channel::<'_, Async>::receive` now return the actual amount of data read,
+which may be shorter than the buffer size if the idle threshold was exceeded:
+
+```diff
+-let channel = channel.receive(&mut buffer)?.wait().unwrap();
++let (_count, channel) = channel.receive(&mut buffer)?.wait().unwrap();
+
+-let () = async_channel.receive(&mut buffer).await.unwrap();
++let _count = async_channel.receive(&mut buffer).await.unwrap();
+```
+
+### RMT lifetime changes
+
+The RMT driver didn't use to properly tie together lifetimes of its types and
+therefore didn't statically prevent all kinds of concurrent and conflicting
+channel re-use.
+`rmt::Channel` and `rmt::ChannelCreator` now carry a lifetime and can be reborrowed:
+
+```diff
+  let rmt: Rmt<Blocking> = Rmt::new(peripherals.RMT, freq)?;
+- let cc: ChannelCreator<Blocking, 0> = rmt.channel0;
+- let ch: Channel<Blocking, Tx> = rmt.channel0.configure_tx(pin, config)?;
++ let cc: ChannelCreator<'static, Blocking, 0> = rmt.channel0;
++ let ch: Channel<'static, Blocking, Tx> = rmt.channel0.configure_tx(pin, config)?;
+```
+
+Additionally, RMT transaction types
+- `SingleShotTxTransaction`
+- `ContinuousTxTransaction`
+- `RxTransaction`
+- futures returned by the async API
+are marked as `#[must_use]` to account for the fact that it is in general required to poll them to ensure progress.
+Additionally, they now implement `Drop` and stop the ongoing transfer as quickly as possible when dropped,
+ensuring that subsequent transactions start from a well-defined state.
+
+### RMT continuous transmit changes
+
+The behavior of `Channel::transmit_continuously` has been clarified to account
+for the varying hardware support between devices: It now takes an additional
+`LoopStop` argument.
+
+```diff
+- let transaction = channel.transmit_continuously(&data, LoopCount::Finite(count))?;
++ let transaction = channel.transmit_continuously(&data, LoopCount::Finite(count), LoopStop::Manual)?;
+```
+
+Additionally, some enum variants and methods are only defined when the hardware supports them:
+
+- `LoopCount::Finite` and `ContinuousTxTransaction::is_tx_loopcount_interrupt_set` (all except ESP32),
+- `LoopStop::Auto` (ESP32-C6, ESP32-H2, ESP32-S3).
 
 ## DMA changes
 
@@ -268,9 +331,9 @@ Imports will need to be updated accordingly.
 
 Additionally, enum variant naming violations have been resolved, so the `RtcFastClock` and `RtcSlowClock` prefixes will need to be removed from any variants from these enums.
 
-## Direct vectoring changes
+## RISC-V interrupt direct vectoring changes
 
-`enable_direct` now requires user to pass handler function to it. 
+`enable_direct` now requires user to pass handler function to it.
 
 ```diff
 interrupt::enable_direct(
@@ -280,5 +343,93 @@ interrupt::enable_direct(
 +   interrupt_handler,
 )
 .unwrap();
-
 ```
+
+## Async/embassy changes
+
+> This section affects `esp-hal-embassy` users. Ariel-OS users are not affected by these changes.
+
+The `esp-hal-embassy` has been discontinued. Embassy is continued to be supported as part of `esp-rtos`.
+
+To import `esp_rtos` for `embassy` support, add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+esp-rtos = { version = "0.1.0", features = ["your_chip", "embassy"] }
+```
+
+### Configuration
+
+`esp-hal-embassy` configuration options have not been ported to `esp-rtos`. `esp-rtos` by default works with a single integrated timer queue.
+To keep using generic timer queues, use the configuration options provided by `embassy-time`. Multiple timer queues (i.e. the previous `multiple-integrated` option) are not supported.
+
+The `low-power-wait` configuration can be substituted with a custom idle hook. You can specify an idle hook by calling `esp_rtos::start_with_idle_hook`, with a function that just `loop`s.
+
+### Setup
+
+The previous `esp_hal_embassy::main` macro has been replaced by `esp_rtos::main`. The `esp_hal_embassy::init` function has been replaced by `esp_rtos::start`, with a different signature; this function should be used for `esp_radio` as well.
+
+`esp_rtos::start` has a different signature for the different CPU architectures. The function takes a single timer instead of a variable number of timers.
+
+On Xtensa devices (ESP32/S2/S3):
+
+```diff
+-#[esp_hal_embassy::main]
++#[esp_rtos::main]
+ async fn main(spawner: Spawner) {
+     // ... timer setup not shown here.
+-    esp_hal_embassy::init([timer0, timer1]);
++    esp_rtos::start(timer0);
+     // ...
+ }
+```
+
+On RISC-V devices (ESP32-C2/C3/C6/H2) you'll need to also pass `SoftwareInterrupt<0>` to `esp_rtos::start`:
+
+```diff
++use esp_hal::interrupt::software::SoftwareInterruptControl;
+
+-#[esp_hal_embassy::main]
++#[esp_rtos::main]
+ async fn main(spawner: Spawner) {
+     // ... timer setup not shown here.
+-    esp_hal_embassy::init([timer0, timer1]);
+
++    let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
++    esp_rtos::start(timer0, software_interrupt.software_interrupt0);
+     // ...
+ }
+```
+
+### Multi-core support
+
+`esp_rtos::embassy::Executor` expects to be run in an `esp_rtos` thread. This means it cannot be started on the second core, unless the second core is managed by `esp_rtos`:
+
+```rust
+use esp_hal::system::Stack;
+use esp_rtos::embassy::Executor;
+use static_cell::StaticCell;
+
+static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
+let app_core_stack = APP_CORE_STACK.init(Stack::new());
+
+// AFTER esp_rtos::start
+
+esp_rtos::start_second_core(
+    peripherals.CPU_CTRL,
+    sw_int.software_interrupt0,
+    sw_int.software_interrupt1,
+    app_core_stack,
+    move || {
+        static EXECUTOR: StaticCell<Executor> = StaticCell::new();
+        let executor = EXECUTOR.init(Executor::new());
+        executor.run(|spawner| {
+            // Spawn tasks from here.
+        });
+    },
+);
+```
+
+### Interrupt executor changes
+
+Interrupt executors are provided as `esp_rtos::embassy::InterruptExecutor` with no additional changes.

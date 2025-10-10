@@ -2462,7 +2462,7 @@ mod private {
 
                         if mb.abs_diff(ma) < min {
                             denominator = a as u32;
-                            numerator = b as u32;
+                            numerator = (b / 10000) as u32;
                             min = mb.abs_diff(ma);
                         }
                     }

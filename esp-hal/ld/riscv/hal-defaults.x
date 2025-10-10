@@ -5,6 +5,7 @@ We don't use the linker scripts defined in riscv-rt (since we have special needs
 */
 
 PROVIDE(_stext = ORIGIN(ROTEXT));
+PROVIDE(__global_pointer$ = ALIGN(_data_start, 4) + 0x800);
 
 /* Default abort entry point. If no abort symbol is provided, then abort maps to _default_abort. */
 EXTERN(_default_abort);

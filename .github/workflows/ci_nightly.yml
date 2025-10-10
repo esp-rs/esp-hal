@@ -50,24 +50,41 @@ jobs:
         shell: bash
         run: cargo xtask ci ${{ matrix.device }} --toolchain nightly
 
-      - if: failure()
-        name: Create or Update GitHub Issue
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          sudo apt-get install gh -y
-          ISSUE_NAME=$(gh issue list --state open --search "Nightly CI Failure in:title" --json number --jq '.[0].number')
-
-          if [[ -z "$ISSUE_NAME" ]];
-          then
-            gh issue create \
-              --title "Nightly CI Failure" \
-              --body "Nightly CI Workflow Failed! [View the failed job](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})." \
-              --label "ci-nightly"
-          fi
-
       # Check for unused dependencies through esp-hal packages
       - name: Install and run cargo machete
         run: |
           cargo install cargo-machete
           cargo machete
+
+  check-global-symbols:
+    name: Check Global Symbols in esp-hal
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+       # Install the Rust toolchain for Xtensa devices:
+      - uses: esp-rs/xtensa-toolchain@v1.6
+        with:
+          version: 1.90.0.0
+
+      # Check all chips at once only for esp-hal
+      - name: Run check-global-symbols
+        run: cargo xtask check-global-symbols
+
+  create-issue:
+    name: Create GitHub Issue if any job failed
+    runs-on: ubuntu-latest
+    needs: [esp-hal-nightly, check-global-symbols]
+    if: ${{ failure() }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get install gh -y
+          ISSUE_NAME=$(gh issue list --state open --search "Nightly CI Failure in:title" --json number --jq '.[0].number')
+          if [[ -z "$ISSUE_NAME" ]];
+          then
+            gh issue create \
+              --title "Nightly CI Failure" \
+              --body "One or more jobs failed! [View the failed workflow](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})." \
+              --label "ci-nightly"
+              --assignee JurajSadel

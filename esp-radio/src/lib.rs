@@ -2,6 +2,8 @@
     all(docsrs, not(not_really_docsrs)),
     doc = "<div style='padding:30px;background:#810;color:#fff;text-align:center;'><p>You might want to <a href='https://docs.espressif.com/projects/rust/'>browse the <code>esp-radio</code> documentation on the esp-rs website</a> instead.</p><p>The documentation here on <a href='https://docs.rs'>docs.rs</a> is built for a single chip only (ESP32-C3, in particular), while on the esp-rs website you can select your exact chip from the list of supported devices. Available peripherals and their APIs might change depending on the chip.</p></div>\n\n<br/>\n\n"
 )]
+//! # Wireless support for Espressif ESP32 devices.
+//!
 //! This documentation is built for the
 #![cfg_attr(esp32, doc = "**ESP32**")]
 #![cfg_attr(esp32s2, doc = "**ESP32-S2**")]
@@ -22,10 +24,19 @@
 //!
 //! Ensure that the right features are enabled for your chip. See [Examples](https://github.com/esp-rs/esp-hal/tree/main/examples#examples) for more examples.
 //!
+//! You will also need a dynamic memory allocator, and a preemptive task scheduler in your
+//! application. For the dynamic allocator, we recommend using `esp-alloc`. For the task scheduler,
+//! the simplest option that is supported by us is `esp-rtos`, but you may use Ariel
+//! OS or other operating systems as well.
+//!
 //! ```toml
 //! [dependencies.esp-radio]
 //! # A supported chip needs to be specified, as well as specific use-case features
-#![doc = concat!(r#"features = [""#, chip!(), r#"", "wifi", "esp-now"]"#)]
+#![doc = concat!(r#"features = [""#, chip!(), r#"", "wifi", "esp-now", "esp-alloc"]"#)]
+//! [dependencies.esp-rtos]
+#![doc = concat!(r#"features = [""#, chip!(), r#"", "esp-radio", "esp-alloc"]"#)]
+//! [dependencies.esp-alloc]
+#![doc = concat!(r#"features = [""#, chip!(), r#""]"#)]
 //! ```
 //! 
 //! ### Optimization Level
@@ -55,7 +66,7 @@
 //! Please note that the configuration keys are usually named slightly different and not all configuration keys apply.
 #![cfg_attr(
     feature = "wifi",
-    doc = "By default the power-saving mode is [PowerSaveMode::None](crate::wifi::PowerSaveMode::None) and `ESP_PHY_PHY_ENABLE_USB` is enabled by default."
+    doc = "By default the power-saving mode is [`PowerSaveMode::None`](crate::wifi::PowerSaveMode::None) and `ESP_PHY_CONFIG_PHY_ENABLE_USB` is enabled by default."
 )]
 //! In addition pay attention to these configuration keys:
 //! - `ESP_RADIO_RX_QUEUE_SIZE`
@@ -68,18 +79,16 @@
         "\n\n",
         "BLE and Wi-Fi can also be run on the second core.",
         "\n\n",
-        "`esp_preempt::init` and `esp_radio::init` _must_ be called on the core on",
-        "which you intend to run the wireless code. This will correctly initialize",
-        "the radio peripheral to run on that core, and ensure that interrupts are",
-        "serviced by the correct core.",
+        "`esp_radio::init` is recommended to be called on the first core. The tasks ",
+        "created by `esp-radio` are pinned to the first core.",
         "\n\n",
-        "It's also important to allocate adequate stack for the second core; in many",
-        "cases 8kB is not enough, and 16kB or more may be required depending on your",
-        "use case. Failing to allocate adequate stack may result in strange behaviour,",
+        "It's also important to allocate adequate stack for the second core; in many ",
+        "cases 8kB is not enough, and 16kB or more may be required depending on your ",
+        "use case. Failing to allocate adequate stack may result in strange behaviour, ",
         "such as your application silently failing at some point during execution."
     )
 )]
-//! # Features flags
+//! ## Feature flags
 //!
 //! Note that not all features are available on every MCU. For example, `ble`
 //! (and thus, `coex`) is not available on ESP32-S2.
@@ -131,7 +140,7 @@ use core::marker::PhantomData;
 
 pub use common_adapter::{phy_calibration_data, set_phy_calibration_data};
 use esp_hal::{self as hal};
-use esp_radio_preempt_driver as preempt;
+use esp_radio_rtos_driver as preempt;
 use esp_sync::RawMutex;
 #[cfg(esp32)]
 use hal::analog::adc::{release_adc2, try_claim_adc2};
@@ -173,8 +182,6 @@ mod compat;
 
 mod radio;
 mod time;
-
-pub(crate) use unstable_module;
 
 #[cfg(feature = "wifi")]
 pub mod wifi;
@@ -237,11 +244,11 @@ impl Drop for Controller<'_> {
 /// Initialize for using Wi-Fi and or BLE.
 ///
 /// Wi-Fi and BLE require a preemptive scheduler to be present. Without one, the underlying firmware
-/// can't operate. The scheduler must implement the interfaces in the `esp-radio-preempt-driver`
+/// can't operate. The scheduler must implement the interfaces in the `esp-radio-rtos-driver`
 /// crate. If you are using an embedded RTOS like Ariel OS, it needs to provide an appropriate
 /// implementation.
 ///
-/// If you are not using an embedded RTOS, use the `esp-preempt` crate which provides the
+/// If you are not using an embedded RTOS, use the `esp-rtos` crate which provides the
 /// necessary functionality.
 ///
 /// Make sure to **not** call this function while interrupts are disabled.
@@ -259,7 +266,7 @@ impl Drop for Controller<'_> {
 /// ## Example
 ///
 /// For examples of the necessary setup, see your RTOS's documentation. If you are
-/// using the `esp-preempt` crate, you will need to initialize the scheduler before calling this
+/// using the `esp-rtos` crate, you will need to initialize the scheduler before calling this
 /// function:
 ///
 /// ```rust, no_run
@@ -271,8 +278,8 @@ impl Drop for Controller<'_> {
     riscv,
     doc = " let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);"
 )]
-#[cfg_attr(riscv, doc = " esp_preempt::start(timg0.timer0, software_interrupt);")]
-#[cfg_attr(xtensa, doc = " esp_preempt::start(timg0.timer0);")]
+#[cfg_attr(riscv, doc = " esp_rtos::start(timg0.timer0, software_interrupt);")]
+#[cfg_attr(xtensa, doc = " esp_rtos::start(timg0.timer0);")]
 /// // You can now start esp-radio:
 /// let esp_radio_controller = esp_radio::init().unwrap();
 /// # }

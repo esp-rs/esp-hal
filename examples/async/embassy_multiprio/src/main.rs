@@ -9,7 +9,7 @@
 //!  - A high priority task that prints something every second. The example demonstrates that this
 //!    task will continue to run even while the low priority blocking task is running.
 
-// The thread-executor is created by the `#[esp_hal_embassy::main]` macro and is used to spawn
+// The thread-executor is created by the `#[esp_rtos::main]` macro and is used to spawn
 // `low_prio_async` and `low_prio_blocking`. The interrupt-executor is created in `main` and is used
 // to spawn `high_prio`.
 
@@ -21,10 +21,10 @@ use embassy_time::{Duration, Instant, Ticker, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     interrupt::{Priority, software::SoftwareInterruptControl},
-    timer::{AnyTimer, timg::TimerGroup},
+    timer::timg::TimerGroup,
 };
-use esp_hal_embassy::InterruptExecutor;
 use esp_println::println;
+use esp_rtos::embassy::InterruptExecutor;
 use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -66,33 +66,23 @@ async fn low_prio_async() {
     }
 }
 
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(low_prio_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     println!("Init!");
 
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let timer0: AnyTimer = timg0.timer0.into();
-
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32c2")] {
-            use esp_hal::timer::systimer::SystemTimer;
-            let systimer = SystemTimer::new(peripherals.SYSTIMER);
-            let timer1: AnyTimer = systimer.alarm0.into();
-        } else {
-            let timg1 = TimerGroup::new(peripherals.TIMG1);
-            let timer1: AnyTimer = timg1.timer0.into();
-        }
-    }
-
-    esp_hal_embassy::init([timer0, timer1]);
+    esp_rtos::start(
+        timg0.timer0,
+        #[cfg(target_arch = "riscv32")]
+        sw_int.software_interrupt0,
+    );
 
     static EXECUTOR: StaticCell<InterruptExecutor<2>> = StaticCell::new();
-    let executor = InterruptExecutor::new(sw_ints.software_interrupt2);
+    let executor = InterruptExecutor::new(sw_int.software_interrupt2);
     let executor = EXECUTOR.init(executor);
 
     let spawner = executor.start(Priority::Priority3);

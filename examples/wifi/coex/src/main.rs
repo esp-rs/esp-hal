@@ -33,6 +33,7 @@ use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::{
     clock::CpuClock,
     main,
+    ram,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
@@ -40,7 +41,7 @@ use esp_hal::{
 use esp_println::{print, println};
 use esp_radio::{
     ble::controller::BleConnector,
-    wifi::{ClientConfig, Config},
+    wifi::{ClientConfig, ModeConfig},
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
@@ -61,22 +62,22 @@ fn main() -> ! {
     // COEX needs more RAM - add some more
     #[cfg(feature = "esp32")]
     {
-        esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 96 * 1024);
+        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 96 * 1024);
         esp_alloc::heap_allocator!(size: 24 * 1024);
     }
     #[cfg(not(feature = "esp32"))]
     {
-        esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
+        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
         esp_alloc::heap_allocator!(size: 64 * 1024);
     }
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     #[cfg(target_arch = "riscv32")]
-    let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_preempt::start(
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(
         timg0.timer0,
         #[cfg(target_arch = "riscv32")]
-        software_interrupt.software_interrupt0,
+        sw_int.software_interrupt0,
     );
 
     let esp_radio_ctrl = esp_radio::init().unwrap();
@@ -85,7 +86,7 @@ fn main() -> ! {
 
     // initializing Bluetooth first results in a more stable WiFi connection on
     // ESP32
-    let connector = BleConnector::new(&esp_radio_ctrl, peripherals.BT);
+    let connector = BleConnector::new(&esp_radio_ctrl, peripherals.BT, Default::default()).unwrap();
     let hci = HciConnector::new(connector, now);
     let mut ble = Ble::new(&hci);
 
@@ -129,7 +130,7 @@ fn main() -> ! {
     let rng = Rng::new();
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
-    let client_config = Config::Client(
+    let client_config = ModeConfig::Client(
         ClientConfig::default()
             .with_ssid(SSID.into())
             .with_password(PASSWORD.into()),

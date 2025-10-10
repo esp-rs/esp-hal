@@ -12,22 +12,23 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use embassy_time::{Duration, Instant, Timer};
 use esp_alloc;
 use esp_backtrace as _;
+#[cfg(target_arch = "riscv32")]
+use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::{
     dma::DmaRxStreamBuf,
     dma_rx_stream_buffer,
     i2s::master::{Channels, Config as I2sConfig, DataFormat, I2s},
+    ram,
     rng::Rng,
     time::Rate,
     timer::timg::TimerGroup,
 };
-#[cfg(any(feature = "esp32", feature = "esp32s3"))]
-use esp_hal::{interrupt::software::SoftwareInterruptControl, system::Stack};
 use esp_println::println;
 use esp_radio::{
     Controller,
     wifi::{
         ClientConfig,
-        Config as WifiConfig,
+        ModeConfig,
         WifiController,
         WifiDevice,
         WifiEvent,
@@ -70,7 +71,7 @@ async fn connection_manager(
     println!("📡 Starting WiFi connection manager");
 
     if !matches!(controller.is_started(), Ok(true)) {
-        let client_config = WifiConfig::Client(
+        let client_config = ModeConfig::Client(
             ClientConfig::default()
                 .with_ssid(SSID.into())
                 .with_password(PASSWORD.into()),
@@ -219,42 +220,27 @@ async fn i2s_dma_drain(
     }
 }
 
-#[cfg(any(feature = "esp32", feature = "esp32s3"))]
-static mut SECOND_CORE_STACK: Stack<4096> = Stack::new();
-
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(spawner: Spawner) {
     // Enable logging from the ESP_LOG environment variable (set at build time)
-    // Example: ESP_LOG=warn,esp_preempt=trace,esp_radio=info
+    // Example: ESP_LOG=warn,esp_rtos=trace,esp_radio=info
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    // Embassy time source
-    let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_hal_embassy::init(timg0.timer0);
-
-    // Provide a heap for components that allocate (esp-preempt/esp-radio, etc.)
-    esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
-
-    #[cfg(any(feature = "esp32", feature = "esp32s3"))]
-    #[allow(static_mut_refs)]
-    let stack = unsafe { &mut SECOND_CORE_STACK };
+    // Provide a heap for components that allocate (esp-rtos/esp-radio, etc.)
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
 
     // Preempt scheduler (WiFi)
-    let timg1 = TimerGroup::new(peripherals.TIMG1);
-    esp_preempt::start(timg1.timer0);
-
-    #[cfg(any(feature = "esp32", feature = "esp32s3"))]
-    let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    #[cfg(any(feature = "esp32", feature = "esp32s3"))]
-    esp_preempt::start_second_core(
-        peripherals.CPU_CTRL,
-        sw_ints.software_interrupt0,
-        sw_ints.software_interrupt1,
-        #[allow(static_mut_refs)]
-        stack,
-        || {},
+    #[cfg(target_arch = "riscv32")]
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_rtos::start(
+        timg0.timer0,
+        #[cfg(target_arch = "riscv32")]
+        sw_int.software_interrupt0,
     );
+
+    esp_rtos::CurrentThreadHandle::get().set_priority(30);
 
     // I2S config (TDM Philips, 32-bit data per channel, stereo)
     #[cfg(any(feature = "esp32", feature = "esp32s2"))]
@@ -274,8 +260,8 @@ async fn main(spawner: Spawner) {
 
     let i2s_rx = i2s
         .i2s_rx
-        .with_bclk(peripherals.GPIO7) // SCK
-        .with_ws(peripherals.GPIO6) // WS
+        .with_bclk(peripherals.GPIO2) // SCK
+        .with_ws(peripherals.GPIO4) // WS
         .with_din(peripherals.GPIO5) // SD
         .build();
 

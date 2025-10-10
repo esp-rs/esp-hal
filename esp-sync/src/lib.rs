@@ -115,6 +115,7 @@ mod multi_core {
     // value.
     const UNUSED_THREAD_ID_VALUE: usize = 0x100;
 
+    #[inline]
     fn thread_id() -> usize {
         // This method must never return UNUSED_THREAD_ID_VALUE
         cfg_if::cfg_if! {
@@ -134,16 +135,14 @@ mod multi_core {
     }
 
     impl LockedState {
+        #[inline]
         pub const fn new() -> Self {
             Self {
                 owner: AtomicUsize::new(UNUSED_THREAD_ID_VALUE),
             }
         }
 
-        fn is_owned_by(&self, thread: usize) -> bool {
-            self.owner.load(Ordering::Relaxed) == thread
-        }
-
+        #[inline]
         pub fn lock(&self, lock: &impl crate::RawLock) -> crate::RestoreState {
             // We acquire the lock inside an interrupt-free context to prevent a subtle
             // race condition:
@@ -192,13 +191,21 @@ mod multi_core {
         ///
         /// This function must only be called if the lock was acquired by the
         /// current thread.
+        #[inline]
         pub unsafe fn unlock(&self) {
-            debug_assert!(
-                self.is_owned_by(thread_id()),
-                "tried to unlock a mutex locked on a different thread"
-            );
+            #[cfg(debug_assertions)]
+            if self.owner.load(Ordering::Relaxed) != thread_id() {
+                panic_attempt_unlock_not_owned();
+            }
             self.owner.store(UNUSED_THREAD_ID_VALUE, Ordering::Release);
         }
+    }
+
+    #[cfg(debug_assertions)]
+    #[inline(never)]
+    #[cold]
+    fn panic_attempt_unlock_not_owned() -> ! {
+        panic!("tried to unlock a mutex locked on a different thread");
     }
 }
 
@@ -245,8 +252,8 @@ impl<L: RawLock> GenericRawMutex<L> {
     /// - The caller must ensure to release the locks in the reverse order they were acquired.
     /// - Each release call must be paired with an acquire call.
     unsafe fn release(&self, token: RestoreState) {
-        unsafe {
-            if !token.is_reentry() {
+        if !token.is_reentry() {
+            unsafe {
                 self.inner.unlock();
 
                 self.lock.exit(token)
@@ -390,7 +397,9 @@ struct LockGuard<'a, L: RawLock> {
 impl<'a, L: RawLock> LockGuard<'a, L> {
     fn new_non_reentrant(lock: &'a GenericRawMutex<L>) -> Self {
         let this = Self::new_reentrant(lock);
-        assert!(!this.token.is_reentry(), "lock is not reentrant");
+        if this.token.is_reentry() {
+            panic_lock_not_reentrant();
+        }
         this
     }
 
@@ -410,4 +419,10 @@ impl<L: RawLock> Drop for LockGuard<'_, L> {
     fn drop(&mut self) {
         unsafe { self.lock.release(self.token) };
     }
+}
+
+#[inline(never)]
+#[cold]
+fn panic_lock_not_reentrant() -> ! {
+    panic!("lock is not reentrant");
 }

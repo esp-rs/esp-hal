@@ -3,13 +3,14 @@
 //! The second core runs a simple LED blinking task, that is controlled by a
 //! signal set by the task running on the other core.
 //!
+//! The thread-mode executor requires the esp_rtos scheduler to be enabled on the core where it
+//! is running.
+//!
 //! The following wiring is assumed:
 //! - LED => GPIO0
 
 #![no_std]
 #![no_main]
-
-use core::ptr::addr_of_mut;
 
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
@@ -17,16 +18,15 @@ use embassy_time::{Duration, Ticker};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Level, Output, OutputConfig},
-    system::{Cpu, CpuControl, Stack},
-    timer::{AnyTimer, timg::TimerGroup},
+    interrupt::software::SoftwareInterruptControl,
+    system::{Cpu, Stack},
+    timer::timg::TimerGroup,
 };
-use esp_hal_embassy::Executor;
 use esp_println::println;
+use esp_rtos::embassy::Executor;
 use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
-
-static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 
 /// Waits for a message that contains a duration, then flashes a led for that
 /// duration of time.
@@ -47,32 +47,41 @@ async fn control_led(
     }
 }
 
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let timer0: AnyTimer = timg0.timer0.into();
-    let timer1: AnyTimer = timg0.timer1.into();
-    esp_hal_embassy::init([timer0, timer1]);
+    static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
+    let app_core_stack = APP_CORE_STACK.init(Stack::new());
 
-    let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_rtos::start(
+        timg0.timer0,
+        #[cfg(target_arch = "riscv32")]
+        sw_int.software_interrupt0,
+    );
 
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
 
     let led = Output::new(peripherals.GPIO0, Level::Low, OutputConfig::default());
 
-    let _guard = cpu_control
-        .start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, move || {
+    esp_rtos::start_second_core(
+        peripherals.CPU_CTRL,
+        #[cfg(target_arch = "xtensa")]
+        sw_int.software_interrupt0,
+        sw_int.software_interrupt1,
+        app_core_stack,
+        move || {
             static EXECUTOR: StaticCell<Executor> = StaticCell::new();
             let executor = EXECUTOR.init(Executor::new());
             executor.run(|spawner| {
                 spawner.spawn(control_led(led, led_ctrl_signal)).ok();
             });
-        })
-        .unwrap();
+        },
+    );
 
     // Sends periodic messages to control_led, enabling or disabling it.
     println!(

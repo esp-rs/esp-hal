@@ -141,6 +141,7 @@ impl Drop for PinGuard {
 /// Event used to trigger interrupts.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum Event {
     /// Interrupts trigger on rising pin edge.
     RisingEdge  = 1,
@@ -434,7 +435,7 @@ pub trait Pin: Sealed {
     ///     }
     /// }
     ///
-    /// let pins: [AnyPin; 2] = [peripherals.GPIO5.degrade(), peripherals.GPIO6.degrade()];
+    /// let pins: [AnyPin; 2] = [peripherals.GPIO5.degrade(), peripherals.GPIO4.degrade()];
     ///
     /// let mut delay = Delay::new();
     /// toggle_pins(pins, &mut delay);

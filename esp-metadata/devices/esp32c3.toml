@@ -83,9 +83,6 @@ symbols = [
     "pm_support_bt_wakeup",
     "uart_support_wakeup_int",
     "gpio_support_deepsleep_wakeup",
-
-    # Which bluetooth implementation
-    "btdm",
 ]
 
 memory = [{ name = "dram", start = 0x3FC8_0000, end = 0x3FCE_0000 }]
@@ -136,13 +133,6 @@ pins = [
     { pin =  8 },
     { pin =  9 },
     { pin = 10, functions = { 2 = "FSPICS0" } },
-    { pin = 11 },
-    { pin = 12, functions = { 0 = "SPIHD" } },
-    { pin = 13, functions = { 0 = "SPIWP" } },
-    { pin = 14, functions = { 0 = "SPICS0" } },
-    { pin = 15, functions = { 0 = "SPICLK" } },
-    { pin = 16, functions = { 0 = "SPID" } },
-    { pin = 17, functions = { 0 = "SPIQ" } },
     { pin = 18,                          analog = { 0 = "USB_DM" } },
     { pin = 19,                          analog = { 0 = "USB_DP" } },
     { pin = 20, functions = { 0 = "U0RXD" } },
@@ -316,7 +306,6 @@ has_rx_wrap = true
 has_rx_demodulation = true
 clock_sources.supported = [ "None", "Apb", "RcFast", "Xtal" ]
 clock_sources.default = "Apb"
-max_idle_threshold = 0x3FFF
 
 [device.rsa]
 support_status = "partial"
@@ -382,7 +371,11 @@ apb_cycle_wait_num = 16 # TODO
 
 ## Radio
 [device.wifi]
+
 [device.bt]
+support_status = "partial"
+controller = "btdm"
+
 [device.phy]
 combo_module = true
 backed_up_digital_register_count = 21

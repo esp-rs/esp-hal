@@ -24,12 +24,13 @@ use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::{
     clock::CpuClock,
     main,
+    ram,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_radio::wifi::{AccessPointConfig, ClientConfig, Config};
+use esp_radio::wifi::{AccessPointConfig, ClientConfig, ModeConfig};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::IpAddress,
@@ -46,16 +47,16 @@ fn main() -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
     esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     #[cfg(target_arch = "riscv32")]
-    let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_preempt::start(
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(
         timg0.timer0,
         #[cfg(target_arch = "riscv32")]
-        software_interrupt.software_interrupt0,
+        sw_int.software_interrupt0,
     );
 
     let esp_radio_ctrl = esp_radio::init().unwrap();
@@ -80,7 +81,7 @@ fn main() -> ! {
     sta_socket_set.add(smoltcp::socket::dhcpv4::Socket::new());
     let sta_stack = Stack::new(sta_interface, sta_device, sta_socket_set, now, rng.random());
 
-    let client_config = Config::ApSta(
+    let client_config = ModeConfig::ApSta(
         ClientConfig::default()
             .with_ssid(SSID.into())
             .with_password(PASSWORD.into()),

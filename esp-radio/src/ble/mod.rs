@@ -2,21 +2,28 @@
 //!
 //! The usage of BLE is currently incompatible with the usage of IEEE 802.15.4.
 
-#[cfg(any(esp32, esp32c3, esp32s3))]
+#[cfg(bt_controller = "btdm")]
 pub(crate) mod btdm;
 
-#[cfg(any(esp32c2, esp32c6, esp32h2))]
+#[cfg(bt_controller = "npl")]
 pub(crate) mod npl;
 
 use alloc::{boxed::Box, collections::vec_deque::VecDeque, vec::Vec};
 use core::mem::MaybeUninit;
 
+pub use ble::ble_os_adapter_chip_specific::Config;
 pub(crate) use ble::{ble_deinit, ble_init, send_hci};
 use esp_sync::NonReentrantMutex;
 
-#[cfg(btdm)]
+/// An error that is returned when the configuration is invalid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct InvalidConfigError;
+
+#[cfg(bt_controller = "btdm")]
 use self::btdm as ble;
-#[cfg(npl)]
+#[cfg(bt_controller = "npl")]
 use self::npl as ble;
 
 unstable_module! {
@@ -164,3 +171,19 @@ fn dump_packet_info(_buffer: &[u8]) {
     #[cfg(dump_packets)]
     info!("@HCIFRAME {:?}", _buffer);
 }
+
+macro_rules! validate_range {
+    ($this:ident, $field:ident, $min:literal, $max:literal) => {
+        if !($min..=$max).contains(&$this.$field) {
+            error!(
+                "{} must be between {} and {}, current value is {}",
+                stringify!($field),
+                $min,
+                $max,
+                $this.$field
+            );
+            return Err(InvalidConfigError);
+        }
+    };
+}
+pub(crate) use validate_range;

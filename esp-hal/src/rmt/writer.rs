@@ -1,8 +1,13 @@
-use super::{DynChannelAccess, PulseCode, Tx};
+#[cfg(place_rmt_driver_in_ram)]
+use procmacros::ram;
+
+use super::{DynChannelAccess, Error, PulseCode, Tx};
 
 #[derive(PartialEq)]
 pub(crate) enum WriterState {
     Active,
+
+    Error(Error),
 
     Done,
 }

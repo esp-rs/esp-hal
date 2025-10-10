@@ -22,6 +22,7 @@ use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::{
     clock::CpuClock,
     main,
+    ram,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
@@ -29,7 +30,7 @@ use esp_hal::{
 use esp_println::{print, println};
 use esp_radio::wifi::{
     AccessPointConfig,
-    Config,
+    ModeConfig,
     event::{self, EventExt},
 };
 use smoltcp::iface::{SocketSet, SocketStorage};
@@ -42,16 +43,16 @@ fn main() -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
     esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     #[cfg(target_arch = "riscv32")]
-    let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_preempt::start(
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(
         timg0.timer0,
         #[cfg(target_arch = "riscv32")]
-        software_interrupt.software_interrupt0,
+        sw_int.software_interrupt0,
     );
 
     // Set event handlers for wifi before init to avoid missing any.
@@ -87,7 +88,8 @@ fn main() -> ! {
     let socket_set = SocketSet::new(&mut socket_set_entries[..]);
     let mut stack = Stack::new(iface, device, socket_set, now, rng.random());
 
-    let ap_config = Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
+    let ap_config =
+        ModeConfig::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
     let res = controller.set_config(&ap_config);
     println!("wifi_set_configuration returned {:?}", res);
 

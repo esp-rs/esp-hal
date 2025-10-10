@@ -5,8 +5,6 @@
 //!
 //! This gets an ip address via DHCP then performs an HTTP get request to some
 //! "random" server
-//!
-//! Because of the huge task-arena size configured this won't work on ESP32-S2
 
 #![no_std]
 #![no_main]
@@ -20,11 +18,19 @@ use esp_alloc as _;
 use esp_backtrace as _;
 #[cfg(target_arch = "riscv32")]
 use esp_hal::interrupt::software::SoftwareInterruptControl;
-use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{clock::CpuClock, ram, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_radio::{
     Controller,
-    wifi::{ClientConfig, Config, ScanConfig, WifiController, WifiDevice, WifiEvent, WifiStaState},
+    wifi::{
+        ClientConfig,
+        ModeConfig,
+        ScanConfig,
+        WifiController,
+        WifiDevice,
+        WifiEvent,
+        WifiStaState,
+    },
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -42,22 +48,22 @@ macro_rules! mk_static {
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
     esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     #[cfg(target_arch = "riscv32")]
-    let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_preempt::start(
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(
         timg0.timer0,
         #[cfg(target_arch = "riscv32")]
-        software_interrupt.software_interrupt0,
+        sw_int.software_interrupt0,
     );
 
     let esp_radio_ctrl = &*mk_static!(Controller<'static>, esp_radio::init().unwrap());
@@ -66,17 +72,6 @@ async fn main(spawner: Spawner) -> ! {
         esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI, Default::default()).unwrap();
 
     let wifi_interface = interfaces.sta;
-
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32")] {
-            let timg1 = TimerGroup::new(peripherals.TIMG1);
-            esp_hal_embassy::init(timg1.timer0);
-        } else {
-            use esp_hal::timer::systimer::SystemTimer;
-            let systimer = SystemTimer::new(peripherals.SYSTIMER);
-            esp_hal_embassy::init(systimer.alarm0);
-        }
-    }
 
     let config = embassy_net::Config::dhcpv4(Default::default());
 
@@ -169,7 +164,7 @@ async fn connection(mut controller: WifiController<'static>) {
             _ => {}
         }
         if !matches!(controller.is_started(), Ok(true)) {
-            let client_config = Config::Client(
+            let client_config = ModeConfig::Client(
                 ClientConfig::default()
                     .with_ssid(SSID.into())
                     .with_password(PASSWORD.into()),

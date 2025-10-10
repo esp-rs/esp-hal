@@ -3,6 +3,12 @@ use crate::{analog::adc::Attenuation, peripherals::EFUSE};
 mod fields;
 pub use fields::*;
 
+/// Selects which ADC we are interested in the efuse calibration data for
+pub enum AdcCalibUnit {
+    /// Select efuse calibration data for ADC1
+    ADC1,
+}
+
 impl super::Efuse {
     /// Get status of SPI boot encryption.
     pub fn flash_encryption() -> bool {
@@ -38,7 +44,7 @@ impl super::Efuse {
     /// Get ADC initial code for specified attenuation from efuse
     ///
     /// See: <https://github.com/espressif/esp-idf/blob/be06a6f/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L33>
-    pub fn rtc_calib_init_code(_unit: u8, atten: Attenuation) -> Option<u16> {
+    pub fn rtc_calib_init_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
         let version = Self::rtc_calib_version();
 
         if version > 4 {
@@ -59,7 +65,7 @@ impl super::Efuse {
     /// Get ADC reference point voltage for specified attenuation in millivolts
     ///
     /// See: <https://github.com/espressif/esp-idf/blob/be06a6f/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L91>
-    pub fn rtc_calib_cal_mv(_unit: u8, atten: Attenuation) -> u16 {
+    pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> u16 {
         const INPUT_VOUT_MV: [[u16; 4]; 1] = [
             [750, 1000, 1500, 2800], // Calibration V1 coefficients
         ];
@@ -83,7 +89,7 @@ impl super::Efuse {
     /// Returns the call code
     ///
     /// See: <https://github.com/espressif/esp-idf/blob/17a2461297076481858b7f76482676a521cc727a/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L91>
-    pub fn rtc_calib_cal_code(_unit: u8, atten: Attenuation) -> Option<u16> {
+    pub fn rtc_calib_cal_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
         let cal_code: u16 = Self::read_field_le(match atten {
             Attenuation::_0dB => ADC1_HI_DOUT_ATTEN0,
             Attenuation::_2p5dB => ADC1_HI_DOUT_ATTEN1,
@@ -106,14 +112,6 @@ impl super::Efuse {
     /// Returns the minor hardware revision
     pub fn minor_chip_version() -> u8 {
         Self::read_field_le(WAFER_VERSION_MINOR)
-    }
-
-    /// Returns the hardware revision
-    ///
-    /// The chip version is calculated using the following
-    /// formula: MAJOR * 100 + MINOR. (if the result is 1, then version is v0.1)
-    pub fn chip_revision() -> u16 {
-        Self::major_chip_version() as u16 * 100 + Self::minor_chip_version() as u16
     }
 }
 

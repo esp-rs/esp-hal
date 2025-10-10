@@ -425,6 +425,16 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
     fs::write(&path, html).context("Failed to write index.html")?;
     log::info!("Created {}", path.display());
 
+    // Render the 404 template:
+    let html = render_template(
+        &resources_path,
+        "404.html.jinja",
+        minijinja::context! { metadata => meta },
+    )?;
+    let path = docs_path.join("404.html");
+    fs::write(&path, html).context("Failed to write 404.html")?;
+    log::info!("Created {}", path.display());
+
     Ok(())
 }
 

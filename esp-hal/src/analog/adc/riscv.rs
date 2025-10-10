@@ -21,7 +21,7 @@ use procmacros::handler;
 pub use self::calibration::*;
 use super::{AdcCalSource, AdcConfig, Attenuation};
 #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
-use crate::efuse::Efuse;
+use crate::efuse::{AdcCalibUnit, Efuse};
 use crate::{
     Async,
     Blocking,
@@ -88,6 +88,7 @@ where
         // Connect calibration source
         ADCI::connect_cal(source, true);
 
+        ADCI::calibration_init();
         for _ in 0..ADC_CAL_CNT_MAX {
             ADCI::set_init_code(0);
 
@@ -132,6 +133,9 @@ pub trait RegisterAccess {
     /// Reset flags
     fn reset();
 
+    /// Set up ADC hardware for calibration
+    fn calibration_init();
+
     /// Set calibration parameter to ADC hardware
     fn set_init_code(data: u16);
 }
@@ -175,6 +179,16 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
         APB_SARADC::regs()
             .onetime_sample()
             .modify(|_, w| w.onetime_start().clear_bit());
+    }
+
+    // Currently #[cfg] covers all supported RISC-V devices,
+    // but, for example, esp32p4 uses the value 4 instead of 1,
+    // so it is not standard across all RISC-V devices.
+    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
+    fn calibration_init() {
+        // e.g.
+        // https://github.com/espressif/esp-idf/blob/800f141f94c0f880c162de476512e183df671307/components/hal/esp32c3/include/hal/adc_ll.h#L702
+        regi2c::ADC_SAR1_DREF.write_field(1);
     }
 
     fn set_init_code(data: u16) {
@@ -247,6 +261,11 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
         APB_SARADC::regs()
             .onetime_sample()
             .modify(|_, w| w.onetime_start().clear_bit());
+    }
+
+    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
+    fn calibration_init() {
+        regi2c::ADC_SAR2_DREF.write_field(1);
     }
 
     fn set_init_code(data: u16) {
@@ -360,6 +379,7 @@ where
             self.active_channel = Some(pin.pin.adc_channel());
 
             // Set ADC unit calibration according used scheme for pin
+            ADCI::calibration_init();
             ADCI::set_init_code(pin.cal_scheme.adc_cal());
 
             let channel = self.active_channel.unwrap();
@@ -424,30 +444,30 @@ impl<ADCI> InterruptConfigurable for Adc<'_, ADCI, Blocking> {
 #[cfg(adc_adc1)]
 impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_init_code(1, atten)
+        Efuse::rtc_calib_init_code(AdcCalibUnit::ADC1, atten)
     }
 
     fn cal_mv(atten: Attenuation) -> u16 {
-        Efuse::rtc_calib_cal_mv(1, atten)
+        Efuse::rtc_calib_cal_mv(AdcCalibUnit::ADC1, atten)
     }
 
     fn cal_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_cal_code(1, atten)
+        Efuse::rtc_calib_cal_code(AdcCalibUnit::ADC1, atten)
     }
 }
 
 #[cfg(adc_adc2)]
 impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_init_code(2, atten)
+        Efuse::rtc_calib_init_code(AdcCalibUnit::ADC2, atten)
     }
 
     fn cal_mv(atten: Attenuation) -> u16 {
-        Efuse::rtc_calib_cal_mv(2, atten)
+        Efuse::rtc_calib_cal_mv(AdcCalibUnit::ADC2, atten)
     }
 
     fn cal_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_cal_code(2, atten)
+        Efuse::rtc_calib_cal_code(AdcCalibUnit::ADC2, atten)
     }
 }
 
@@ -489,6 +509,7 @@ where
         }
 
         // Set ADC unit calibration according used scheme for pin
+        ADCI::calibration_init();
         ADCI::set_init_code(pin.cal_scheme.adc_cal());
 
         let attenuation = self.attenuations[channel as usize].unwrap() as u8;

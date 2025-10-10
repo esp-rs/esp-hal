@@ -1,4 +1,4 @@
-use esp_radio_preempt_driver::semaphore::SemaphoreKind;
+use esp_radio_rtos_driver::semaphore::SemaphoreKind;
 use esp_wifi_sys::c_types::c_void;
 
 use crate::{

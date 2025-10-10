@@ -11,7 +11,7 @@ use crate::{
         include::esp_event_base_t,
     },
     compat::{common::*, semaphore::*},
-    hal::{self, clock::ModemClockController, ram},
+    hal::{self, ram},
     time::blob_ticks_to_micros,
 };
 
@@ -325,18 +325,24 @@ type ModemClockControllerPeripheral = esp_hal::peripherals::WIFI<'static>;
 #[cfg(esp32h2)]
 type ModemClockControllerPeripheral = esp_hal::peripherals::BT<'static>;
 
+// Clock control is no-op because the wifi blobs don't symmetrically enable/disable the clock,
+// causing an eventual overflow. Currently we are holding onto a guard ourselves while Wi-Fi/BT is
+// active, so the blobs should not be able to disable the clock anyway.
+//
+// This might have some low-power issues, but we're not there yet anyway.
 #[allow(unused)]
 pub(crate) unsafe fn phy_enable_clock() {
     // Stealing the peripheral is safe here, as they must have been passed into the relevant
     // initialization functions for the Wi-Fi or BLE controller, if this code gets executed.
-    let clock_guard = unsafe { ModemClockControllerPeripheral::steal() }.enable_phy_clock();
-    core::mem::forget(clock_guard);
+    // let clock_guard = unsafe { ModemClockControllerPeripheral::steal() }.enable_phy_clock();
+    // core::mem::forget(clock_guard);
 }
 
 #[allow(unused)]
 pub(crate) unsafe fn phy_disable_clock() {
-    unsafe { ModemClockControllerPeripheral::steal() }.decrease_phy_clock_ref_count();
+    // unsafe { ModemClockControllerPeripheral::steal() }.decrease_phy_clock_ref_count();
 }
+
 pub(crate) fn enable_wifi_power_domain() {
     #[cfg(not(any(soc_has_pmu, esp32c2)))]
     {
@@ -363,7 +369,7 @@ pub(crate) fn enable_wifi_power_domain() {
             }
             const WIFIBB_RST: u32 = 1 << 0; // Wi-Fi baseband
             const FE_RST: u32 = 1 << 1; // RF Frontend RST
-            const WIFIMAC_RST: u32 = 1 << 2; // Wi-Fi MAC 
+            const WIFIMAC_RST: u32 = 1 << 2; // Wi-Fi MAC
 
             const BTBB_RST: u32 = 1 << 3; // Bluetooth Baseband
             const BTMAC_RST: u32 = 1 << 4; // deprecated

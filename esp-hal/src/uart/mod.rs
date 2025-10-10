@@ -37,9 +37,9 @@
 //! with this driver.
 //!
 //! [embedded-hal]: embedded_hal
-//! [embedded-io]: embedded_io
+//! [embedded-io]: embedded_io_07
 //! [embedded-hal-async]: embedded_hal_async
-//! [embedded-io-async]: embedded_io_async
+//! [embedded-io-async]: embedded_io_async_07
 
 /// UHCI wrapper around UART
 // TODO add support for PDMA and multiple UHCI for 32/S2 support
@@ -49,8 +49,6 @@ pub mod uhci;
 
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
-#[cfg(feature = "unstable")]
-use embedded_io::ReadExactError;
 use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
 
@@ -122,9 +120,16 @@ impl core::fmt::Display for RxError {
 }
 
 #[instability::unstable]
-impl embedded_io::Error for RxError {
-    fn kind(&self) -> embedded_io::ErrorKind {
-        embedded_io::ErrorKind::Other
+impl embedded_io_06::Error for RxError {
+    fn kind(&self) -> embedded_io_06::ErrorKind {
+        embedded_io_06::ErrorKind::Other
+    }
+}
+
+#[instability::unstable]
+impl embedded_io_07::Error for RxError {
+    fn kind(&self) -> embedded_io_07::ErrorKind {
+        embedded_io_07::ErrorKind::Other
     }
 }
 
@@ -143,9 +148,15 @@ impl core::fmt::Display for TxError {
 impl core::error::Error for TxError {}
 
 #[instability::unstable]
-impl embedded_io::Error for TxError {
-    fn kind(&self) -> embedded_io::ErrorKind {
-        embedded_io::ErrorKind::Other
+impl embedded_io_06::Error for TxError {
+    fn kind(&self) -> embedded_io_06::ErrorKind {
+        embedded_io_06::ErrorKind::Other
+    }
+}
+#[instability::unstable]
+impl embedded_io_07::Error for TxError {
+    fn kind(&self) -> embedded_io_07::ErrorKind {
+        embedded_io_07::ErrorKind::Other
     }
 }
 
@@ -2012,9 +2023,16 @@ impl core::fmt::Display for IoError {
 }
 
 #[instability::unstable]
-impl embedded_io::Error for IoError {
-    fn kind(&self) -> embedded_io::ErrorKind {
-        embedded_io::ErrorKind::Other
+impl embedded_io_06::Error for IoError {
+    fn kind(&self) -> embedded_io_06::ErrorKind {
+        embedded_io_06::ErrorKind::Other
+    }
+}
+
+#[instability::unstable]
+impl embedded_io_07::Error for IoError {
+    fn kind(&self) -> embedded_io_07::ErrorKind {
+        embedded_io_07::ErrorKind::Other
     }
 }
 
@@ -2033,22 +2051,22 @@ impl From<TxError> for IoError {
 }
 
 #[instability::unstable]
-impl<Dm: DriverMode> embedded_io::ErrorType for Uart<'_, Dm> {
+impl<Dm: DriverMode> embedded_io_06::ErrorType for Uart<'_, Dm> {
     type Error = IoError;
 }
 
 #[instability::unstable]
-impl<Dm: DriverMode> embedded_io::ErrorType for UartTx<'_, Dm> {
+impl<Dm: DriverMode> embedded_io_06::ErrorType for UartTx<'_, Dm> {
     type Error = TxError;
 }
 
 #[instability::unstable]
-impl<Dm: DriverMode> embedded_io::ErrorType for UartRx<'_, Dm> {
+impl<Dm: DriverMode> embedded_io_06::ErrorType for UartRx<'_, Dm> {
     type Error = RxError;
 }
 
 #[instability::unstable]
-impl<Dm> embedded_io::Read for Uart<'_, Dm>
+impl<Dm> embedded_io_06::Read for Uart<'_, Dm>
 where
     Dm: DriverMode,
 {
@@ -2058,7 +2076,7 @@ where
 }
 
 #[instability::unstable]
-impl<Dm> embedded_io::Read for UartRx<'_, Dm>
+impl<Dm> embedded_io_06::Read for UartRx<'_, Dm>
 where
     Dm: DriverMode,
 {
@@ -2068,7 +2086,7 @@ where
 }
 
 #[instability::unstable]
-impl<Dm> embedded_io::ReadReady for Uart<'_, Dm>
+impl<Dm> embedded_io_06::ReadReady for Uart<'_, Dm>
 where
     Dm: DriverMode,
 {
@@ -2078,7 +2096,7 @@ where
 }
 
 #[instability::unstable]
-impl<Dm> embedded_io::ReadReady for UartRx<'_, Dm>
+impl<Dm> embedded_io_06::ReadReady for UartRx<'_, Dm>
 where
     Dm: DriverMode,
 {
@@ -2088,7 +2106,7 @@ where
 }
 
 #[instability::unstable]
-impl<Dm> embedded_io::Write for Uart<'_, Dm>
+impl<Dm> embedded_io_06::Write for Uart<'_, Dm>
 where
     Dm: DriverMode,
 {
@@ -2102,7 +2120,7 @@ where
 }
 
 #[instability::unstable]
-impl<Dm> embedded_io::Write for UartTx<'_, Dm>
+impl<Dm> embedded_io_06::Write for UartTx<'_, Dm>
 where
     Dm: DriverMode,
 {
@@ -2116,7 +2134,7 @@ where
 }
 
 #[instability::unstable]
-impl<Dm> embedded_io::WriteReady for UartTx<'_, Dm>
+impl<Dm> embedded_io_06::WriteReady for UartTx<'_, Dm>
 where
     Dm: DriverMode,
 {
@@ -2126,7 +2144,110 @@ where
 }
 
 #[instability::unstable]
-impl<Dm> embedded_io::WriteReady for Uart<'_, Dm>
+impl<Dm> embedded_io_06::WriteReady for Uart<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn write_ready(&mut self) -> Result<bool, Self::Error> {
+        Ok(self.tx.write_ready())
+    }
+}
+
+#[instability::unstable]
+impl<Dm: DriverMode> embedded_io_07::ErrorType for Uart<'_, Dm> {
+    type Error = IoError;
+}
+
+#[instability::unstable]
+impl<Dm: DriverMode> embedded_io_07::ErrorType for UartTx<'_, Dm> {
+    type Error = TxError;
+}
+
+#[instability::unstable]
+impl<Dm: DriverMode> embedded_io_07::ErrorType for UartRx<'_, Dm> {
+    type Error = RxError;
+}
+
+#[instability::unstable]
+impl<Dm> embedded_io_07::Read for Uart<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+        self.rx.read(buf).map_err(IoError::Rx)
+    }
+}
+
+#[instability::unstable]
+impl<Dm> embedded_io_07::Read for UartRx<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+        self.read(buf)
+    }
+}
+
+#[instability::unstable]
+impl<Dm> embedded_io_07::ReadReady for Uart<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn read_ready(&mut self) -> Result<bool, Self::Error> {
+        Ok(self.rx.read_ready())
+    }
+}
+
+#[instability::unstable]
+impl<Dm> embedded_io_07::ReadReady for UartRx<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn read_ready(&mut self) -> Result<bool, Self::Error> {
+        Ok(self.read_ready())
+    }
+}
+
+#[instability::unstable]
+impl<Dm> embedded_io_07::Write for Uart<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        self.tx.write(buf).map_err(IoError::Tx)
+    }
+
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        self.tx.flush().map_err(IoError::Tx)
+    }
+}
+
+#[instability::unstable]
+impl<Dm> embedded_io_07::Write for UartTx<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        self.write(buf)
+    }
+
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        self.flush()
+    }
+}
+
+#[instability::unstable]
+impl<Dm> embedded_io_07::WriteReady for UartTx<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn write_ready(&mut self) -> Result<bool, Self::Error> {
+        Ok(self.write_ready())
+    }
+}
+
+#[instability::unstable]
+impl<Dm> embedded_io_07::WriteReady for Uart<'_, Dm>
 where
     Dm: DriverMode,
 {
@@ -2272,33 +2393,39 @@ impl Drop for UartTxFuture {
 }
 
 #[instability::unstable]
-impl embedded_io_async::Read for Uart<'_, Async> {
+impl embedded_io_async_06::Read for Uart<'_, Async> {
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         self.read_async(buf).await.map_err(IoError::Rx)
     }
 
-    async fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), ReadExactError<Self::Error>> {
+    async fn read_exact(
+        &mut self,
+        buf: &mut [u8],
+    ) -> Result<(), embedded_io_06::ReadExactError<Self::Error>> {
         self.read_exact_async(buf)
             .await
-            .map_err(|e| ReadExactError::Other(IoError::Rx(e)))
+            .map_err(|e| embedded_io_06::ReadExactError::Other(IoError::Rx(e)))
     }
 }
 
 #[instability::unstable]
-impl embedded_io_async::Read for UartRx<'_, Async> {
+impl embedded_io_async_06::Read for UartRx<'_, Async> {
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         self.read_async(buf).await
     }
 
-    async fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), ReadExactError<Self::Error>> {
+    async fn read_exact(
+        &mut self,
+        buf: &mut [u8],
+    ) -> Result<(), embedded_io_06::ReadExactError<Self::Error>> {
         self.read_exact_async(buf)
             .await
-            .map_err(ReadExactError::Other)
+            .map_err(embedded_io_06::ReadExactError::Other)
     }
 }
 
 #[instability::unstable]
-impl embedded_io_async::Write for Uart<'_, Async> {
+impl embedded_io_async_06::Write for Uart<'_, Async> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         self.write_async(buf).await.map_err(IoError::Tx)
     }
@@ -2309,7 +2436,61 @@ impl embedded_io_async::Write for Uart<'_, Async> {
 }
 
 #[instability::unstable]
-impl embedded_io_async::Write for UartTx<'_, Async> {
+impl embedded_io_async_06::Write for UartTx<'_, Async> {
+    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        self.write_async(buf).await
+    }
+
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        self.flush_async().await
+    }
+}
+
+#[instability::unstable]
+impl embedded_io_async_07::Read for Uart<'_, Async> {
+    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+        self.read_async(buf).await.map_err(IoError::Rx)
+    }
+
+    async fn read_exact(
+        &mut self,
+        buf: &mut [u8],
+    ) -> Result<(), embedded_io_07::ReadExactError<Self::Error>> {
+        self.read_exact_async(buf)
+            .await
+            .map_err(|e| embedded_io_07::ReadExactError::Other(IoError::Rx(e)))
+    }
+}
+
+#[instability::unstable]
+impl embedded_io_async_07::Read for UartRx<'_, Async> {
+    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+        self.read_async(buf).await
+    }
+
+    async fn read_exact(
+        &mut self,
+        buf: &mut [u8],
+    ) -> Result<(), embedded_io_07::ReadExactError<Self::Error>> {
+        self.read_exact_async(buf)
+            .await
+            .map_err(embedded_io_07::ReadExactError::Other)
+    }
+}
+
+#[instability::unstable]
+impl embedded_io_async_07::Write for Uart<'_, Async> {
+    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        self.write_async(buf).await.map_err(IoError::Tx)
+    }
+
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        self.flush_async().await.map_err(IoError::Tx)
+    }
+}
+
+#[instability::unstable]
+impl embedded_io_async_07::Write for UartTx<'_, Async> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         self.write_async(buf).await
     }

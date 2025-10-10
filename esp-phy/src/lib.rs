@@ -12,14 +12,21 @@
 //! previously persisted calibration data.
 //! ## Config Options
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_phy_config_table.md"))]
+//! ## Feature Flags
+#![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 
 // MUST be the first module
 mod fmt;
 
-use esp_hal::clock::{ModemClockController, PhyClockGuard};
 #[cfg(esp32)]
 use esp_hal::time::{Duration, Instant};
+use esp_hal::{
+    clock::{ModemClockController, PhyClockGuard},
+    rtc_cntl::{SocResetReason, reset_reason},
+    system::Cpu,
+};
 use esp_sync::{NonReentrantMutex, RawMutex};
 use esp_wifi_sys::include::*;
 
@@ -138,17 +145,14 @@ impl PhyState {
             // If the SOC just woke up from deep sleep and
             // `phy_skip_calibration_after_deep_sleep` is enabled, no calibration will be
             // performed.
-            cfg_if::cfg_if! {
-                if #[cfg(phy_skip_calibration_after_deep_sleep)] {
-                    use esp_hal::{rtc_cntl::SocResetReason, system::reset_reason};
-                    if reset_reason() == Some(SocResetReason::CoreDeepSleep) {
-                        esp_phy_calibration_mode_t_PHY_RF_CAL_NONE
-                    } else {
-                        esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL
-                    }
-                } else {
-                    esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL
-                }
+            if cfg!(phy_skip_calibration_after_deep_sleep)
+                && reset_reason(Cpu::current()) == Some(SocResetReason::CoreDeepSleep)
+            {
+                esp_phy_calibration_mode_t_PHY_RF_CAL_NONE
+            } else if cfg!(phy_full_calibration) {
+                esp_phy_calibration_mode_t_PHY_RF_CAL_FULL
+            } else {
+                esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL
             }
         } else {
             esp_phy_calibration_mode_t_PHY_RF_CAL_FULL
@@ -260,12 +264,12 @@ impl PhyState {
 /// Global PHY initialization state
 static PHY_STATE: NonReentrantMutex<PhyState> = NonReentrantMutex::new(PhyState::new());
 
-#[derive(Debug)]
 /// Prevents the PHY from being deinitialized.
 ///
 /// As long as at least one [PhyInitGuard] exists, the PHY will remain initialized. To release this
 /// guard, you can either let it go out of scope, or use [PhyInitGuard::release] to explicitly
 /// release it.
+#[derive(Debug)]
 pub struct PhyInitGuard<'d> {
     _phy_clock_guard: PhyClockGuard<'d>,
 }

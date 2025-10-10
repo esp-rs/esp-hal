@@ -28,12 +28,13 @@ use esp_hal::{
     clock::CpuClock,
     delay::Delay,
     main,
+    ram,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{ClientConfig, Config, ScanConfig};
+use esp_radio::wifi::{ClientConfig, ModeConfig, ScanConfig};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::{DhcpOption, IpAddress},
@@ -59,17 +60,19 @@ fn main() -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(size: 72 * 1024);
+    esp_alloc::heap_allocator!(size: 32 * 1024);
+    // add some more RAM
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
 
     let server_address: Ipv4Addr = HOST_IP.parse().expect("Invalid HOST_IP address");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     #[cfg(target_arch = "riscv32")]
-    let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_preempt::start(
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(
         timg0.timer0,
         #[cfg(target_arch = "riscv32")]
-        software_interrupt.software_interrupt0,
+        sw_int.software_interrupt0,
     );
 
     let esp_radio_ctrl = esp_radio::init().unwrap();
@@ -98,7 +101,7 @@ fn main() -> ! {
     let now = || time::Instant::now().duration_since_epoch().as_millis();
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
-    let client_config = Config::Client(
+    let client_config = ModeConfig::Client(
         ClientConfig::default()
             .with_ssid(SSID.into())
             .with_password(PASSWORD.into()),
@@ -111,7 +114,7 @@ fn main() -> ! {
 
     println!("Start Wifi Scan");
     let scan_config = ScanConfig::default().with_max(10);
-    let res = controller.scan_with_config_sync(scan_config).unwrap();
+    let res = controller.scan_with_config(scan_config).unwrap();
     for ap in res {
         println!("{:?}", ap);
     }
