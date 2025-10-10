@@ -33,7 +33,7 @@ use core::marker::PhantomData;
 
 use super::{InputPin, OutputPin, RtcPin};
 use crate::{
-    gpio::RtcFunction,
+    gpio::{Pin, RtcFunction, RtcPinWithResistors},
     peripherals::{GPIO, RTC_IO},
 };
 
@@ -73,64 +73,57 @@ impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
     }
 }
 
-/// A GPIO input pin configured for low power operation
-pub struct LowPowerInput<'d, const PIN: u8> {
-    phantom: PhantomData<&'d mut ()>,
-}
-
-impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
-    /// Create a new input pin for use by the low-power core
-    pub fn new<P>(pin: P) -> Self
-    where
-        P: InputPin + RtcPin + 'd,
-    {
-        pin.rtc_set_config(true, true, RtcFunction::Rtc);
-
-        let this = Self {
-            phantom: PhantomData,
-        };
-        this.input_enable(true);
-        this.pullup_enable(false);
-        this.pulldown_enable(false);
-
-        this
-    }
-
-    fn input_enable(&self, enable: bool) {
-        RTC_IO::regs()
-            .touch_pad(PIN as usize)
-            .modify(|_, w| w.fun_ie().bit(enable));
-    }
-
-    /// Sets pull-up enable for the pin
-    pub fn pullup_enable(&self, enable: bool) {
-        RTC_IO::regs()
-            .touch_pad(PIN as usize)
-            .modify(|_, w| w.rue().bit(enable));
-    }
-
-    /// Sets pull-down enable for the pin
-    pub fn pulldown_enable(&self, enable: bool) {
-        RTC_IO::regs()
-            .touch_pad(PIN as usize)
-            .modify(|_, w| w.rde().bit(enable));
-    }
-}
-
-/// A GPIO open-drain output pin configured for low power operation
-pub struct LowPowerOutputOpenDrain<'d, const PIN: u8> {
+/// A GPIO input pin configured for low power operation.
+pub struct LowPowerInput<'d, P> {
+    pin: P,
     phantom: PhantomData<&'d ()>,
 }
 
-impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
-    /// Create a new output pin for use by the low-power core
-    pub fn new<P>(pin: P) -> Self
-    where
-        P: InputPin + OutputPin + RtcPin + 'd,
-    {
+impl<'d, P> LowPowerInput<'d, P>
+where
+    P: InputPin + RtcPinWithResistors + 'd,
+{
+    /// Create a new input pin for use by the low-power core.
+    pub fn new(pin: P) -> Self {
         pin.rtc_set_config(true, true, RtcFunction::Rtc);
 
-        let this = Self {
+        pin.rtcio_pullup(false);
+        pin.rtcio_pulldown(false);
+
+        Self {
+            pin,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Sets pull-up enable for the pin.
+    pub fn pullup_enable(&mut self, enable: bool) {
+        self.pin.rtcio_pullup(enable);
+    }
+
+    /// Sets pull-down enable for the pin.
+    pub fn pulldown_enable(&mut self, enable: bool) {
+        self.pin.rtcio_pulldown(enable);
+    }
+}
+
+/// A GPIO open-drain output pin configured for low power operation.
+pub struct LowPowerOutputOpenDrain<'d, P> {
+    pin: P,
+    phantom: PhantomData<&'d ()>,
+}
+
+impl<'d, P> LowPowerOutputOpenDrain<'d, P>
+where
+    P: InputPin + OutputPin + RtcPinWithResistors + Pin + 'd,
+{
+    /// Create a new output pin for use by the low-power core.
+    pub fn new(pin: P) -> Self {
+        // We can now call trait methods directly on the pin.
+        pin.rtc_set_config(true, true, RtcFunction::Rtc);
+
+        let mut this = Self {
+            pin,
             phantom: PhantomData,
         };
 
@@ -143,43 +136,39 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
         this
     }
 
-    fn output_enable(&self, enable: bool) {
+    fn output_enable(&mut self, enable: bool) {
         let rtc_io = RTC_IO::regs();
+        let rtc_pin = self.pin.rtc_number();
 
         if enable {
             rtc_io
                 .rtc_gpio_enable_w1ts()
-                .write(|w| unsafe { w.rtc_gpio_enable_w1ts().bits(1 << PIN) });
+                .write(|w| unsafe { w.rtc_gpio_enable_w1ts().bits(1 << rtc_pin) });
         } else {
             rtc_io
                 .enable_w1tc()
-                .write(|w| unsafe { w.enable_w1tc().bits(1 << PIN) });
+                .write(|w| unsafe { w.enable_w1tc().bits(1 << rtc_pin) });
         }
     }
 
-    fn input_enable(&self, enable: bool) {
-        RTC_IO::regs()
-            .touch_pad(PIN as usize)
-            .modify(|_, w| w.fun_ie().bit(enable));
+    fn input_enable(&mut self, enable: bool) {
+        self.pin.rtc_set_config(enable, true, RtcFunction::Rtc);
     }
 
     /// Sets pull-up enable for the pin
-    pub fn pullup_enable(&self, enable: bool) {
-        RTC_IO::regs()
-            .touch_pad(PIN as usize)
-            .modify(|_, w| w.rue().bit(enable));
+    pub fn pullup_enable(&mut self, enable: bool) {
+        self.pin.rtcio_pullup(enable);
     }
 
     /// Sets pull-down enable for the pin
-    pub fn pulldown_enable(&self, enable: bool) {
-        RTC_IO::regs()
-            .touch_pad(PIN as usize)
-            .modify(|_, w| w.rde().bit(enable));
+    pub fn pulldown_enable(&mut self, enable: bool) {
+        self.pin.rtcio_pulldown(enable);
     }
 
-    fn set_open_drain_output(&self, enable: bool) {
+    fn set_open_drain_output(&mut self, enable: bool) {
+        let pin_number = self.pin.number();
         GPIO::regs()
-            .pin(PIN as usize)
+            .pin(pin_number as usize)
             .modify(|_, w| w.pad_driver().bit(enable));
     }
 }
