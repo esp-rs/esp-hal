@@ -1641,7 +1641,7 @@ impl DmaTxStreamBufView {
         let total_len = data.len();
         let mut remaining = data;
 
-        while self.available_bytes() >= remaining.len() && remaining.len() > 0 {
+        while self.available_bytes() >= remaining.len() && !remaining.is_empty() {
             let written = self.push_with(|buffer| {
                 let len = usize::min(buffer.len(), remaining.len());
                 buffer[..len].copy_from_slice(&remaining[..len]);
