@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- All `ram` proc macro options except `reclaimed` are considered `unstable` (#4309)
+
 ### Fixed
 
 - Replaced `embassy_main` with `rtos_main` (intended to be called as `esp_rtos::main`) (#4172)

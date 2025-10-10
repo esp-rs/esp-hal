@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
-use syn::{Item, Token, parse, parse::Parser, punctuated::Punctuated};
+use syn::{Item, Token, parse, parse::Parser, punctuated::Punctuated, spanned::Spanned};
 
 pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     let attr_args = match Punctuated::<syn::Meta, Token![,]>::parse_terminated.parse2(args.into()) {
@@ -15,30 +15,99 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut zeroed = false;
 
     for attr_arg in &attr_args {
-        if let syn::Meta::Path(path) = attr_arg {
-            let ident = match path.require_ident() {
-                Ok(i) => i,
-                Err(e) => return e.into_compile_error().into(),
-            };
-            let arg = match ident {
-                i if i == "rtc_fast" => &mut rtc_fast,
-                i if i == "rtc_slow" => &mut rtc_slow,
-                i if i == "reclaimed" => &mut dram2_uninit,
-                i if i == "persistent" => &mut persistent,
-                i if i == "zeroed" => &mut zeroed,
-                i => {
-                    return syn::Error::new(i.span(), format!("Unknown argument `{i}`"))
+        match attr_arg {
+            syn::Meta::List(list) if list.path.is_ident("unstable") => {
+                let nested = &list.tokens;
+                let nested_args = match Punctuated::<syn::Meta, Token![,]>::parse_terminated
+                    .parse2(nested.clone())
+                {
+                    Ok(v) => v,
+                    Err(e) => return e.to_compile_error().into(),
+                };
+
+                for meta in nested_args {
+                    match meta {
+                        syn::Meta::Path(path) => {
+                            let Some(ident) = path.get_ident() else {
+                                return syn::Error::new(
+                                    path.span(),
+                                    "Expected identifier inside `unstable(...)`",
+                                )
+                                .into_compile_error()
+                                .into();
+                            };
+                            let arg = match ident {
+                                i if i == "rtc_fast" => &mut rtc_fast,
+                                i if i == "rtc_slow" => &mut rtc_slow,
+                                i if i == "persistent" => &mut persistent,
+                                i if i == "zeroed" => &mut zeroed,
+                                i => {
+                                    return syn::Error::new(
+                                        i.span(),
+                                        format!("Unknown unstable argument `{i}`"),
+                                    )
+                                    .into_compile_error()
+                                    .into();
+                                }
+                            };
+
+                            if *arg {
+                                return syn::Error::new(
+                                    ident.span(),
+                                    format!("Argument `{ident}` is already set"),
+                                )
+                                .into_compile_error()
+                                .into();
+                            }
+
+                            *arg = true;
+                        }
+                        _ => {
+                            return syn::Error::new(
+                                list.span(),
+                                "Expected identifiers inside `unstable(...)`",
+                            )
+                            .into_compile_error()
+                            .into();
+                        }
+                    }
+                }
+            }
+
+            syn::Meta::Path(path) => {
+                let Some(ident) = path.get_ident() else {
+                    return syn::Error::new(path.span(), "Expected identifier")
                         .into_compile_error()
                         .into();
-                }
-            };
+                };
+                let arg = match ident {
+                    i if i == "reclaimed" => &mut dram2_uninit,
+                    _ => {
+                        return syn::Error::new(
+                            ident.span(),
+                            format!("`{ident}` must be wrapped in `unstable(...)`"),
+                        )
+                        .into_compile_error()
+                        .into();
+                    }
+                };
 
-            if *arg {
-                return syn::Error::new(ident.span(), format!("Argument `{ident}` is already set"))
+                if *arg {
+                    return syn::Error::new(
+                        ident.span(),
+                        format!("Argument `{ident}` is already set"),
+                    )
+                    .into_compile_error()
+                    .into();
+                }
+                *arg = true;
+            }
+
+            _ => {
+                return syn::Error::new(attr_arg.span(), "Unsupported attribute syntax for `ram`")
                     .into_compile_error()
                     .into();
             }
-            *arg = true;
         }
     }
 
