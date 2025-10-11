@@ -431,42 +431,40 @@ mod tests {
     #[test]
     fn rmt_loopback_simple(mut ctx: Context) {
         // 20 codes fit a single RAM block
-        do_rmt_loopback(20, &mut ctx, 1, 1);
+        do_rmt_loopback(CHANNEL_RAM_SIZE / 2, &mut ctx, 1, 1);
     }
 
     #[test]
     async fn rmt_loopback_simple_async(mut ctx: Context) {
         // 20 codes fit a single RAM block
-        do_rmt_loopback_async(20, &mut ctx, 1, 1).await;
+        do_rmt_loopback_async(CHANNEL_RAM_SIZE / 2, &mut ctx, 1, 1).await;
     }
     #[test]
     fn rmt_loopback_extended_ram(mut ctx: Context) {
-        // 80 codes require two RAM blocks
-        do_rmt_loopback(80, &mut ctx, 2, 2);
+        // require two RAM blocks
+        do_rmt_loopback(CHANNEL_RAM_SIZE * 3 / 2, &mut ctx, 2, 2);
     }
 
     #[test]
     fn rmt_loopback_tx_wrap(mut ctx: Context) {
-        // 80 codes require two RAM blocks; thus a tx channel with only 1 block requires
-        // wrapping.
-        do_rmt_loopback(80, &mut ctx, 1, 2);
+        // require two RAM blocks; thus a tx channel with only 1 block requires wrapping.
+        do_rmt_loopback(CHANNEL_RAM_SIZE * 3 / 2, &mut ctx, 1, 2);
     }
 
     #[test]
     async fn rmt_loopback_tx_wrap_async(mut ctx: Context) {
-        do_rmt_loopback_async(80, &mut ctx, 1, 2).await;
+        do_rmt_loopback_async(CHANNEL_RAM_SIZE * 3 / 2, &mut ctx, 1, 2).await;
     }
 
     #[test]
     fn rmt_loopback_rx_wrap(mut ctx: Context) {
-        // 80 codes require two RAM blocks; thus an rx channel with only 1 block requires
-        // wrapping.
-        do_rmt_loopback(80, &mut ctx, 2, 1);
+        // require two RAM blocks; thus an rx channel with only 1 block requires wrapping.
+        do_rmt_loopback(CHANNEL_RAM_SIZE * 3 / 2, &mut ctx, 2, 1);
     }
 
     #[test]
     async fn rmt_loopback_rx_wrap_async(mut ctx: Context) {
-        do_rmt_loopback_async(80, &mut ctx, 2, 1).await;
+        do_rmt_loopback_async(CHANNEL_RAM_SIZE * 3 / 2, &mut ctx, 2, 1).await;
     }
 
     #[test]
@@ -475,7 +473,7 @@ mod tests {
 
         let (tx_channel, _) = ctx.setup_loopback(&tx_config, &Default::default());
 
-        let tx_data = generate_tx_data(10, false, false);
+        let tx_data = generate_tx_data(CHANNEL_RAM_SIZE / 2, false, false);
 
         assert!(matches!(
             tx_channel.transmit(&tx_data),
@@ -570,7 +568,7 @@ mod tests {
                 .unwrap()
                 .with_pin(rx_pin);
 
-            do_rmt_loopback_inner(20, tx_channel, rx_channel, false, 1);
+            do_rmt_loopback_inner(CHANNEL_RAM_SIZE / 2, tx_channel, rx_channel, false, 1);
         }};
     }
 
@@ -695,7 +693,7 @@ mod tests {
                 .configure_tx(&TxChannelConfig::default())
                 .unwrap();
 
-            let tx_data = generate_tx_data(10, true, true);
+            let tx_data = generate_tx_data(CHANNEL_RAM_SIZE / 2, true, true);
 
             ch0.transmit(&tx_data).await.unwrap();
         }
@@ -705,7 +703,7 @@ mod tests {
     // subsequent transactions are successful.
     #[test]
     fn rmt_loopback_after_drop_blocking(mut ctx: Context) {
-        const TX_LEN: usize = 40;
+        const TX_LEN: usize = CHANNEL_RAM_SIZE / 2;
 
         let tx_config = TxChannelConfig::default()
             // If not enabling a defined idle_output level, the output might remain high after
@@ -760,7 +758,7 @@ mod tests {
                 // Test that dropping & recreating Channel works
                 for _ in 0..3 {
                     do_rmt_loopback_inner(
-                        20,
+                        CHANNEL_RAM_SIZE / 2,
                         tx_channel.reborrow(),
                         rx_channel.reborrow(),
                         false,
@@ -775,7 +773,7 @@ mod tests {
     // subsequent transactions are successful.
     #[test]
     async fn rmt_loopback_after_drop_async(mut ctx: Context) {
-        const TX_LEN: usize = 40;
+        const TX_LEN: usize = CHANNEL_RAM_SIZE / 2;
 
         let tx_config = TxChannelConfig::default()
             // If not enabling a defined idle_output level, the output might remain high after
