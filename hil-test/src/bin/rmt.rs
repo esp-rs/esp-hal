@@ -63,6 +63,12 @@ cfg_if::cfg_if! {
     }
 }
 
+enum EndMarkerConfig {
+    None,
+    Field1,
+    Field2,
+}
+
 struct LoopbackConfig {
     tx_len: usize,
     idle_threshold: u16,
@@ -70,7 +76,7 @@ struct LoopbackConfig {
     tx_memsize: u8,
     rx_memsize: u8,
     write_stop_code: bool,
-    write_end_marker: bool,
+    end_marker: EndMarkerConfig,
     tolerance: u16,
     abort: bool,
     length1_base: u16,
@@ -87,7 +93,7 @@ impl Default for LoopbackConfig {
             tx_memsize: 1,
             rx_memsize: 1,
             write_stop_code: true,
-            write_end_marker: true,
+            end_marker: EndMarkerConfig::Field1,
             tolerance: 1,
             abort: false,
             length1_base: 100,
@@ -134,9 +140,16 @@ fn generate_tx_data(conf: &LoopbackConfig) -> Vec<PulseCode> {
         .collect();
 
     let mut pos = conf.tx_len - 1;
-    if conf.write_end_marker {
-        tx_data[pos] = PulseCode::end_marker();
-        pos -= 1;
+    match conf.end_marker {
+        EndMarkerConfig::None => (),
+        EndMarkerConfig::Field1 => {
+            tx_data[pos] = PulseCode::end_marker();
+            pos -= 1;
+        }
+        EndMarkerConfig::Field2 => {
+            tx_data[pos] = tx_data[pos].with_length2(0).unwrap();
+            pos -= 1;
+        }
     }
     if conf.write_stop_code {
         tx_data[pos] = PulseCode::new(
@@ -584,7 +597,7 @@ mod tests {
     #[test]
     fn rmt_fails_without_end_marker(mut ctx: Context) {
         let conf = LoopbackConfig {
-            write_end_marker: false,
+            end_marker: EndMarkerConfig::None,
             ..Default::default()
         };
 
@@ -933,7 +946,6 @@ mod tests {
         let mut conf = LoopbackConfig {
             tx_len: TX_COUNT + 1,
             write_stop_code: false,
-            write_end_marker: true,
             idle_output: true,
             rx_memsize: 2,
             ..Default::default()
@@ -1024,7 +1036,6 @@ mod tests {
         let conf = LoopbackConfig {
             idle_output: true,
             write_stop_code: false,
-            write_end_marker: true,
             ..Default::default()
         };
 
