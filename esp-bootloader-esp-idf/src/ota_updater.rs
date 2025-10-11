@@ -144,6 +144,18 @@ where
         self.with_ota(|mut ota| ota.set_current_app_partition(next_slot))
     }
 
+    /// Returns a [FlashRegion] for the partition which would be selected by
+    /// [Self::activate_next_partition].
+    pub fn next_partition(&mut self) -> Result<FlashRegion<'_, F>, Error> {
+        let next_slot = self.next_ota_part()?;
+
+        Ok(self
+            .pt
+            .find_partition(crate::partitions::PartitionType::App(next_slot))?
+            .ok_or(Error::Invalid)?
+            .as_embedded_storage(self.flash))
+    }
+
     /// Executes the given closure with the partition which would be selected by
     /// [Self::activate_next_partition].
     ///
