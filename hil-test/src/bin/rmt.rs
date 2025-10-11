@@ -26,6 +26,7 @@ use esp_hal::{
         Level,
         NoPin,
         OutputConfig,
+        Pin,
         Pull,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
@@ -72,6 +73,9 @@ struct LoopbackConfig {
     write_end_marker: bool,
     tolerance: u16,
     abort: bool,
+    length1_base: u16,
+    length1_step: u16,
+    length2: u16,
 }
 
 impl Default for LoopbackConfig {
@@ -86,6 +90,9 @@ impl Default for LoopbackConfig {
             write_end_marker: true,
             tolerance: 1,
             abort: false,
+            length1_base: 100,
+            length1_step: 10,
+            length2: 50,
         }
     }
 }
@@ -116,7 +123,14 @@ impl LoopbackConfig {
 fn generate_tx_data(conf: &LoopbackConfig) -> Vec<PulseCode> {
     let mut tx_data: Vec<_> = (0..)
         .take(conf.tx_len)
-        .map(|i| PulseCode::new(Level::High, (100 + 10 * (i % 23)) as u16, Level::Low, 50))
+        .map(|i| {
+            PulseCode::new(
+                Level::High,
+                conf.length1_base + conf.length1_step * (i % 23),
+                Level::Low,
+                conf.length2,
+            )
+        })
         .collect();
 
     let mut pos = conf.tx_len - 1;
@@ -125,7 +139,12 @@ fn generate_tx_data(conf: &LoopbackConfig) -> Vec<PulseCode> {
         pos -= 1;
     }
     if conf.write_stop_code {
-        tx_data[pos] = PulseCode::new(Level::High, 3000, Level::Low, 500);
+        tx_data[pos] = PulseCode::new(
+            Level::High,
+            2 * conf.idle_threshold,
+            Level::Low,
+            conf.length2,
+        );
     }
 
     tx_data
@@ -247,6 +266,48 @@ fn check_data_eq(
         errors,
         count
     );
+}
+
+struct BitbangTransmitter {
+    pin: Flex<'static>,
+}
+
+impl BitbangTransmitter {
+    fn new(pin: impl Pin + 'static) -> Self {
+        let mut pin = Flex::new(pin);
+        pin.set_input_enable(true);
+        pin.set_output_enable(true);
+        pin.apply_input_config(&InputConfig::default().with_pull(Pull::None));
+        pin.apply_output_config(&OutputConfig::default());
+
+        pin.set_low();
+
+        Self { pin }
+    }
+
+    fn rx_pin(&mut self) -> impl PeripheralInput<'static> {
+        self.pin.peripheral_input()
+    }
+
+    fn transmit(&mut self, tx_data: &[PulseCode]) {
+        let cycles_per_us = DIV as u32 / FREQ.as_mhz();
+
+        let delay = Delay::new();
+
+        for code in tx_data {
+            if code.length1() == 0 {
+                break;
+            }
+            self.pin.set_level(code.level1());
+            delay.delay_micros(code.length1() as u32 * cycles_per_us);
+
+            if code.length2() == 0 {
+                break;
+            }
+            self.pin.set_level(code.level2());
+            delay.delay_micros(code.length2() as u32 * cycles_per_us);
+        }
+    }
 }
 
 fn do_rmt_loopback_inner(
@@ -686,54 +747,32 @@ mod tests {
     // This test is almost guaranteed to fail when using defmt!
     #[test]
     fn rmt_clock_rate(ctx: Context) {
-        let rmt = Rmt::new(ctx.rmt, FREQ).unwrap();
-
-        let mut pin = Flex::new(ctx.pin);
-        pin.set_input_enable(true);
-        pin.set_output_enable(true);
-        pin.apply_input_config(&InputConfig::default().with_pull(Pull::None));
-        pin.apply_output_config(&OutputConfig::default());
-        let rx_pin = pin.peripheral_input();
-        let mut tx_pin = pin;
-
-        tx_pin.set_low();
-
+        // Increase pulse lengths and tolerance to deal with the imprecision of Delay
         let conf = LoopbackConfig {
+            tx_len: 6,
             // idle threshold 16383 cycles = ~33ms
             idle_threshold: 0x3FFF,
+            // tolerance 25 cycles == 50us
             tolerance: 25,
+            length1_base: 500,
+            length1_step: 500,
+            length2: 500,
             ..Default::default()
         };
 
-        let (_, rx_channel) = Context::setup_impl(rmt, rx_pin, NoPin, &conf);
+        let rmt = Rmt::new(ctx.rmt, FREQ).unwrap();
 
+        let mut bitbang_tx = BitbangTransmitter::new(ctx.pin);
+        let (_, rx_channel) = Context::setup_impl(rmt, bitbang_tx.rx_pin(), NoPin, &conf);
+
+        let tx_data = generate_tx_data(&conf);
         let mut rx_data = [PulseCode::default(); 6];
+
         let rx_transaction = rx_channel.receive(&mut rx_data).unwrap();
-
-        let mut expected: [_; 6] = core::array::from_fn(|i| {
-            let i = i as u16 + 1;
-            // 1 cycle = 2us
-            PulseCode::new(Level::High, 500 * i, Level::Low, 500 * i)
-        });
-        expected[4] = PulseCode::new(Level::High, 0x7FFF, Level::Low, 0);
-        expected[5] = PulseCode::end_marker();
-
-        let delay = Delay::new();
-        for i in 1..5 {
-            tx_pin.set_high();
-            delay.delay_millis(i);
-            tx_pin.set_low();
-            delay.delay_millis(i);
-        }
-
-        tx_pin.set_high();
-        delay.delay_millis(100);
-        tx_pin.set_low();
-
+        bitbang_tx.transmit(&tx_data);
         let rx_res = rx_transaction.wait().map(|(x, _)| x).map_err(|(e, _)| e);
 
-        // tolerance 25 cycles == 50us
-        check_data_eq(&conf, &expected, &rx_data, rx_res);
+        check_data_eq(&conf, &tx_data, &rx_data, rx_res);
     }
 
     // Compile-only test to verify that reborrowing channel creators works.
