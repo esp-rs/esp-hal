@@ -537,6 +537,17 @@ mod tests {
         let conf = LoopbackConfig::default();
         do_rmt_loopback_async(&mut ctx, &conf).await;
     }
+
+    #[test]
+    fn rmt_loopback_end_marker_field2(mut ctx: Context) {
+        // 20 codes fit a single RAM block
+        let conf = LoopbackConfig {
+            end_marker: EndMarkerConfig::Field2,
+            ..Default::default()
+        };
+        do_rmt_loopback(&mut ctx, &conf);
+    }
+
     #[test]
     fn rmt_loopback_extended_ram(mut ctx: Context) {
         let conf = LoopbackConfig {
