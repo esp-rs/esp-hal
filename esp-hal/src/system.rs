@@ -590,19 +590,19 @@ impl PeripheralClockControl {
                     .twai0_conf()
                     .modify(|_, w| w.twai0_clk_en().bit(enable));
 
-                if enable {
-                    // use Xtal clk-src
-                    system.twai0_func_clk_conf().modify(|_, w| {
-                        w.twai0_func_clk_en().set_bit();
-                        w.twai0_func_clk_sel().variant(false)
-                    });
-                }
+                system
+                    .twai0_func_clk_conf()
+                    .modify(|_, w| w.twai0_func_clk_en().bit(enable));
             }
             #[cfg(soc_has_twai1)]
             Peripheral::Twai1 => {
                 system
                     .twai1_conf()
                     .modify(|_, w| w.twai1_clk_en().bit(enable));
+
+                system
+                    .twai1_func_clk_conf()
+                    .modify(|_, w| w.twai1_func_clk_en().bit(enable));
             }
             #[cfg(soc_has_aes)]
             Peripheral::Aes => {
