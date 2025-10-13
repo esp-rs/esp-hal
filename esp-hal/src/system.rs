@@ -453,14 +453,10 @@ impl PeripheralClockControl {
             }
             #[cfg(soc_has_timg0)]
             Peripheral::Timg0 => {
-                #[cfg(any(esp32c3, esp32s2, esp32s3))]
-                perip_clk_en0.modify(|_, w| w.timers_clk_en().bit(enable));
                 perip_clk_en0.modify(|_, w| w.timergroup_clk_en().bit(enable));
             }
             #[cfg(soc_has_timg1)]
             Peripheral::Timg1 => {
-                #[cfg(any(esp32c3, esp32s2, esp32s3))]
-                perip_clk_en0.modify(|_, w| w.timers_clk_en().bit(enable));
                 perip_clk_en0.modify(|_, w| w.timergroup1_clk_en().bit(enable));
             }
             #[cfg(soc_has_sha)]
