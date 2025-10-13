@@ -487,16 +487,9 @@ impl PeripheralClockControl {
             Peripheral::Uart2 => {
                 perip_clk_en0.modify(|_, w| w.uart2_clk_en().bit(enable));
             }
-            #[cfg(all(rsa, esp32))]
+            #[cfg(rsa)]
             Peripheral::Rsa => {
                 perip_clk_en1.modify(|_, w| w.crypto_rsa_clk_en().bit(enable));
-            }
-            #[cfg(all(rsa, any(esp32c3, esp32s2, esp32s3)))]
-            Peripheral::Rsa => {
-                perip_clk_en1.modify(|_, w| w.crypto_rsa_clk_en().bit(enable));
-                system
-                    .rsa_pd_ctrl()
-                    .modify(|_, w| w.rsa_mem_pd().bit(!enable));
             }
             #[cfg(soc_has_hmac)]
             Peripheral::Hmac => {
@@ -647,9 +640,6 @@ impl PeripheralClockControl {
             #[cfg(soc_has_rsa)]
             Peripheral::Rsa => {
                 system.rsa_conf().modify(|_, w| w.rsa_clk_en().bit(enable));
-                system
-                    .rsa_pd_ctrl()
-                    .modify(|_, w| w.rsa_mem_pd().clear_bit());
             }
             #[cfg(soc_has_parl_io)]
             Peripheral::ParlIo => {

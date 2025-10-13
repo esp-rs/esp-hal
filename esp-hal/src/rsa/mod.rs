@@ -35,6 +35,8 @@ use crate::{
 pub struct Rsa<'d, Dm: DriverMode> {
     rsa: RSA<'d>,
     phantom: PhantomData<Dm>,
+    #[cfg(not(esp32))]
+    _memory_guard: RsaMemoryPowerGuard,
     _guard: GenericPeripheralGuard<{ PeripheralEnable::Rsa as u8 }>,
 }
 
@@ -48,6 +50,28 @@ pub struct Rsa<'d, Dm: DriverMode> {
 /// bits, or 16 words.
 const WORDS_PER_INCREMENT: u32 = property!("rsa.size_increment") / 32;
 
+#[cfg(not(esp32))]
+struct RsaMemoryPowerGuard;
+
+#[cfg(not(esp32))]
+impl RsaMemoryPowerGuard {
+    fn new() -> Self {
+        crate::peripherals::SYSTEM::regs()
+            .rsa_pd_ctrl()
+            .modify(|_, w| w.rsa_mem_pd().clear_bit());
+        Self
+    }
+}
+
+#[cfg(not(esp32))]
+impl Drop for RsaMemoryPowerGuard {
+    fn drop(&mut self) {
+        crate::peripherals::SYSTEM::regs()
+            .rsa_pd_ctrl()
+            .modify(|_, w| w.rsa_mem_pd().set_bit());
+    }
+}
+
 impl<'d> Rsa<'d, Blocking> {
     /// Create a new instance in [Blocking] mode.
     ///
@@ -58,6 +82,8 @@ impl<'d> Rsa<'d, Blocking> {
         let this = Self {
             rsa,
             phantom: PhantomData,
+            #[cfg(not(esp32))]
+            _memory_guard: RsaMemoryPowerGuard::new(),
             _guard: guard,
         };
 
@@ -74,6 +100,7 @@ impl<'d> Rsa<'d, Blocking> {
         Rsa {
             rsa: self.rsa,
             phantom: PhantomData,
+            _memory_guard: self._memory_guard,
             _guard: self._guard,
         }
     }
@@ -118,6 +145,7 @@ impl<'d> Rsa<'d, Async> {
         Rsa {
             rsa: self.rsa,
             phantom: PhantomData,
+            _memory_guard: self._memory_guard,
             _guard: self._guard,
         }
     }
@@ -860,6 +888,8 @@ impl<'d> RsaBackend<'d> {
                 let driver = Rsa {
                     rsa: unsafe { self.peri.clone_unchecked() },
                     phantom: PhantomData,
+                    #[cfg(not(esp32))]
+                    _memory_guard: RsaMemoryPowerGuard::new(),
                     _guard: GenericPeripheralGuard::new(),
                 };
                 self.state = RsaBackendState::Initializing(driver);
