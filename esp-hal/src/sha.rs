@@ -88,6 +88,8 @@
 //! # {after_snippet}
 //! ```
 
+#![allow(deprecated, reason = "generic_array 0.14 has been deprecated")]
+
 use core::{borrow::Borrow, convert::Infallible, marker::PhantomData, mem::size_of, ptr::NonNull};
 
 /// Re-export digest for convenience
