@@ -9,12 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.16.0] - 2025-10-13
+
+### Added
+
 - `AccessPointInfo::country` to access the Country Code from the Wi-Fi scan results (#3837)
 - `unstable` feature to opt into `ble`, `esp-now`, `csi`, `sniffer`, `esp-ieee802154` and `smoltcp` APIs (#3865)
 - Added unstable `wifi-eap` feature (#3924)
 - Optional `max` field in `ScanConfig` to allow limiting the number of returned results (#3963)
 - `set_phy_calibration_data` and `phy_calibration_data` (#4001)
-- common traits for `Protocol`, `Country`,  (#4017)
+- common traits for `Protocol`, `Country`, (#4017)
 - `BuilderLite` pattern to `AccessPointConfig`, `ClientConfig`, and `EapClientConfig` (#4017, #4115)
 - lifetime to `Sniffer` (#4017)
 - `dtim_period` parameter for `PowerSaveMode` (#4040)
@@ -328,4 +342,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.14.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.13.0...esp-wifi-v0.14.0
 [v0.14.1]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.14.0...esp-wifi-v0.14.1
 [v0.15.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.14.1...esp-wifi-v0.15.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.15.0...HEAD
+[v0.16.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.15.0...esp-radio-v0.16.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.16.0...HEAD

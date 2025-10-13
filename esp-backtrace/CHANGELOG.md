@@ -12,13 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.18.0] - 2025-10-13
+
+### Changed
+
 - `exception-handler` now panics. (#3838)
 - Only halt cores in panics when `halt-cores` feature is enabled. (#4010)
 - It is no longer possible to select multiple halt method features (`halt-cores`, `custom-halt`, `semihosting`) (#4012)
 - RISC-V: If stack-frames are not enabled the panic-handler will now emit a stack dump (#4189)
-
-### Fixed
-
 
 ### Removed
 
@@ -100,4 +108,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.15.1]: https://github.com/esp-rs/esp-hal/releases/tag/esp-backtrace-v0.15.1
 [v0.16.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.15.1...esp-backtrace-v0.16.0
 [v0.17.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.16.0...esp-backtrace-v0.17.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.17.0...HEAD
+[v0.18.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.17.0...esp-backtrace-v0.18.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.18.0...HEAD

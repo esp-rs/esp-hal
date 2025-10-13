@@ -1,6 +1,6 @@
 [package]
 name          = "esp-storage"
-version       = "0.7.0"
+version       = "0.8.0"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "Implementation of embedded-storage traits to access unencrypted ESP32 flash"
@@ -28,19 +28,19 @@ bench = false
 
 [dependencies]
 embedded-storage = "0.3.1"
-procmacros       = { version = "0.19.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
-esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", default-features = false, optional = true}
+procmacros       = { version = "0.20.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+esp-hal = { version = "1.0.0-rc.1", path = "../esp-hal", default-features = false, optional = true}
 
 # Optional dependencies
-esp-sync         = { version = "0.0.0", path = "../esp-sync", optional = true }
-esp-rom-sys      = { version = "0.1.1", path = "../esp-rom-sys", optional = true }
+esp-sync         = { version = "0.1.0", path = "../esp-sync", optional = true }
+esp-rom-sys      = { version = "0.1.2", path = "../esp-rom-sys", optional = true }
 defmt  = { version = "1.0.1", optional = true }
 
 # Unstable dependencies that are not (strictly) part of the public API
 document-features = "0.2"
 
 [build-dependencies]
-esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 default = ["critical-section"]

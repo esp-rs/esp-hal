@@ -1,6 +1,6 @@
 [package]
 name          = "esp-println"
-version       = "0.15.0"
+version       = "0.16.0"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "Provides `print!` and `println!` implementations various Espressif devices"
@@ -39,7 +39,7 @@ test  = false
 document-features = "0.2"
 
 # Unstable dependencies that are not (strictly) part of the public API
-esp-sync = { version = "0.0.0", path = "../esp-sync", optional = true }
+esp-sync = { version = "0.1.0", path = "../esp-sync", optional = true }
 
 # Optional dependencies
 portable-atomic  = { version = "1.11", optional = true, default-features = false }
@@ -49,7 +49,7 @@ defmt  = { version = "1.0.1", optional = true }
 log-04 = { package = "log", version = "0.4", optional = true }
 
 [build-dependencies]
-esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated", features = ["build-script"] }
 log-04 = { package = "log", version = "0.4" }
 
 [features]
