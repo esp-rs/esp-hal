@@ -260,7 +260,7 @@ pub use procmacros::blocking_main as main;
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use procmacros::handler;
 #[cfg(any(lp_core, ulp_riscv_core))]
-#[cfg(feature = "unstable")]
+#[instability::unstable]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub use procmacros::load_lp_code;
 pub use procmacros::ram;
