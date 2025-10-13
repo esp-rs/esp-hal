@@ -98,13 +98,13 @@ mod rtos_main;
 /// # Examples
 ///
 /// ```rust, no_run
-/// #[ram(rtc_fast)]
+/// #[ram(unstable(rtc_fast))]
 /// static mut SOME_INITED_DATA: [u8; 2] = [0xaa, 0xbb];
 ///
-/// #[ram(rtc_fast, persistent)]
+/// #[ram(unstable(rtc_fast, persistent))]
 /// static mut SOME_PERSISTENT_DATA: [u8; 2] = [0; 2];
 ///
-/// #[ram(rtc_fast, zeroed)]
+/// #[ram(unstable(rtc_fast, zeroed))]
 /// static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 /// ```
 ///

@@ -1,6 +1,6 @@
 [package]
 name = "esp-bootloader-esp-idf"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.88.0"
 description = "Functionality related to the esp-idf bootloader"
@@ -32,8 +32,8 @@ test  = true
 cfg-if = "1"
 defmt = { version = "1.0.1", optional = true }
 document-features = "0.2"
-esp-config = { version = "0.5.0", path = "../esp-config" }
-esp-rom-sys = { version = "0.1.1", path = "../esp-rom-sys", optional = true }
+esp-config = { version = "0.6.0", path = "../esp-config" }
+esp-rom-sys = { version = "0.1.2", path = "../esp-rom-sys", optional = true }
 embedded-storage = "0.3.1"
 log-04 = { package = "log", version = "0.4", optional = true }
 strum = { version = "0.27", default-features = false, features = ["derive"] }
@@ -43,7 +43,7 @@ md-5 = { version = "0.10.6", default-features = false, optional = true }
 
 [build-dependencies]
 jiff       = { version = "0.2.13", default-features = false, features = ["std"] }
-esp-config = { version = "0.5.0", path = "../esp-config", features = ["build"] }
+esp-config = { version = "0.6.0", path = "../esp-config", features = ["build"] }
 
 [features]
 default = ["validation"]

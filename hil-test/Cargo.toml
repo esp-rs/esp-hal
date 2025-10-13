@@ -17,26 +17,6 @@ harness = false
 required-features = ["psram"]
 
 [[bin]]
-name    = "clock_monitor"
-harness = false
-
-[[bin]]
-name    = "critical_section"
-harness = false
-
-[[bin]]
-name    = "delay_async"
-harness = false
-
-[[bin]]
-name    = "dma_macros"
-harness = false
-
-[[bin]]
-name    = "dma_mem2mem"
-harness = false
-
-[[bin]]
 name    = "gpio"
 harness = false
 
@@ -53,10 +33,6 @@ name    = "i2c"
 harness = false
 
 [[bin]]
-name    = "init"
-harness = false
-
-[[bin]]
 name    = "i2s"
 harness = false
 
@@ -69,11 +45,7 @@ name    = "lcd_cam"
 harness = false
 
 [[bin]]
-name    = "misc_simple"
-harness = false
-
-[[bin]]
-name    = "qspi"
+name    = "misc_non_drivers"
 harness = false
 
 [[bin]]
@@ -85,19 +57,12 @@ name    = "spi_full_duplex"
 harness = false
 
 [[bin]]
-name    = "spi_half_duplex_read"
+name    = "spi_half_duplex_slave_qspi"
 harness = false
 
-[[bin]]
-name    = "spi_half_duplex_write"
-harness = false
 
 [[bin]]
 name    = "spi_half_duplex_write_psram"
-harness = false
-
-[[bin]]
-name    = "spi_slave"
 harness = false
 
 [[bin]]
@@ -106,14 +71,6 @@ harness = false
 
 [[bin]]
 name    = "parl_io"
-harness = false
-
-[[bin]]
-name    = "parl_io_tx"
-harness = false
-
-[[bin]]
-name    = "parl_io_tx_async"
 harness = false
 
 [[bin]]
@@ -134,36 +91,8 @@ name    = "uart"
 harness = false
 
 [[bin]]
-name              = "uart_async"
-harness           = false
-required-features = ["embassy"]
-
-[[bin]]
-name              = "uart_uhci"
-harness           = false
-required-features = ["embassy"]
-
-[[bin]]
-name    = "uart_regression"
-harness = false
-
-[[bin]]
-name    = "uart_tx_rx_async"
-harness = false
-
-[[bin]]
 name              = "embassy_timers_executors"
 harness           = false
-required-features = ["embassy"]
-
-[[bin]]
-name              = "embassy_interrupt_executor"
-harness           = false
-required-features = ["embassy"]
-
-[[bin]]
-name    = "embassy_interrupt_spi_dma"
-harness = false
 required-features = ["embassy"]
 
 [[bin]]

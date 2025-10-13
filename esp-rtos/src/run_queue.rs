@@ -7,7 +7,8 @@ use crate::{
 
 #[derive(Clone, Copy)]
 pub(crate) struct MaxPriority {
-    max: usize,
+    // Using Priority here tells the compiler about the maximum value, removing bounds checks.
+    max: Priority,
     mask: usize,
 }
 
@@ -18,22 +19,26 @@ impl MaxPriority {
     };
 
     const fn new() -> Self {
-        Self { max: 0, mask: 0 }
+        Self {
+            max: Priority::ZERO,
+            mask: 0,
+        }
     }
 
-    fn mark_ready(&mut self, level: usize) {
-        self.max = self.max.max(level);
-        self.mask |= 1 << level;
+    fn mark_ready(&mut self, level: Priority) {
+        self.max = if level > self.max { level } else { self.max };
+        self.mask |= 1 << level.get();
     }
 
     fn unmark(&mut self, level: usize) {
         self.mask &= !(1 << level);
-        self.max = Self::MAX_PRIORITY.saturating_sub(self.mask.leading_zeros() as usize);
+        self.max =
+            Priority::new(Self::MAX_PRIORITY.saturating_sub(self.mask.leading_zeros() as usize));
     }
 
     fn ready(&self) -> usize {
         // Priority 0 must always be ready
-        self.max
+        self.max.get()
     }
 }
 
@@ -158,7 +163,8 @@ impl RunQueue {
         _state: &[CpuSchedulerState; Cpu::COUNT],
         mut ready_task: TaskPtr,
     ) -> RunSchedulerOn {
-        let priority = ready_task.priority(self).get();
+        let priority = ready_task.priority(self);
+        let priority_n = priority.get();
 
         ready_task.set_state(TaskState::Ready);
         if let Some(mut containing_queue) = unsafe { ready_task.as_mut().current_queue.take() } {
@@ -166,18 +172,17 @@ impl RunQueue {
                 containing_queue.as_mut().remove(ready_task);
             }
         }
-        self.ready_tasks[priority].remove(ready_task);
-        self.ready_tasks[priority].push(ready_task);
+        self.ready_tasks[priority_n].push(ready_task);
 
         cfg_if::cfg_if! {
             if #[cfg(multi_core)] {
                 let run_on = if _state[1].initialized {
                     self.select_scheduler_trigger_multi_core(_state, ready_task)
                 } else {
-                    self.select_scheduler_trigger_single_core(priority)
+                    self.select_scheduler_trigger_single_core(priority_n)
                 };
             } else {
-                let run_on = self.select_scheduler_trigger_single_core(priority);
+                let run_on = self.select_scheduler_trigger_single_core(priority_n);
             }
         }
 

@@ -23,16 +23,6 @@ cfg_if::cfg_if! {
     }
 }
 
-/// The sampling/readout resolution of the ADC.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
-pub enum Resolution {
-    /// 12-bit resolution
-    #[default]
-    Resolution12Bit,
-}
-
 impl<ADCI> AdcConfig<ADCI>
 where
     ADCI: RegisterAccess,
@@ -362,12 +352,10 @@ where
         ADCI::clear_dig_force();
         ADCI::set_start_force();
         ADCI::set_en_pad_force();
-        sensors
-            .sar_hall_ctrl()
-            .modify(|_, w| w.xpd_hall_force().set_bit());
-        sensors
-            .sar_hall_ctrl()
-            .modify(|_, w| w.hall_phase_force().set_bit());
+        sensors.sar_hall_ctrl().modify(|_, w| {
+            w.xpd_hall_force().set_bit();
+            w.hall_phase_force().set_bit()
+        });
 
         // Set power to SW power on
         #[cfg(esp32s2)]
@@ -380,33 +368,24 @@ where
             .sar_peri_clk_gate_conf()
             .modify(|_, w| w.saradc_clk_en().set_bit());
 
-        sensors
-            .sar_power_xpd_sar()
-            .modify(|_, w| w.sarclk_en().set_bit());
-
-        sensors
-            .sar_power_xpd_sar()
-            .modify(|_, w| unsafe { w.force_xpd_sar().bits(0b11) });
+        sensors.sar_power_xpd_sar().modify(|_, w| unsafe {
+            w.sarclk_en().set_bit();
+            w.force_xpd_sar().bits(0b11)
+        });
 
         // disable AMP
         sensors
             .sar_meas1_ctrl1()
             .modify(|_, w| unsafe { w.force_xpd_amp().bits(0b11) });
-        sensors
-            .sar_amp_ctrl3()
-            .modify(|_, w| unsafe { w.amp_rst_fb_fsm().bits(0) });
-        sensors
-            .sar_amp_ctrl3()
-            .modify(|_, w| unsafe { w.amp_short_ref_fsm().bits(0) });
-        sensors
-            .sar_amp_ctrl3()
-            .modify(|_, w| unsafe { w.amp_short_ref_gnd_fsm().bits(0) });
-        sensors
-            .sar_amp_ctrl1()
-            .modify(|_, w| unsafe { w.sar_amp_wait1().bits(1) });
-        sensors
-            .sar_amp_ctrl1()
-            .modify(|_, w| unsafe { w.sar_amp_wait2().bits(1) });
+        sensors.sar_amp_ctrl3().modify(|_, w| unsafe {
+            w.amp_rst_fb_fsm().bits(0);
+            w.amp_short_ref_fsm().bits(0);
+            w.amp_short_ref_gnd_fsm().bits(0)
+        });
+        sensors.sar_amp_ctrl1().modify(|_, w| unsafe {
+            w.sar_amp_wait1().bits(1);
+            w.sar_amp_wait2().bits(1)
+        });
         sensors
             .sar_amp_ctrl2()
             .modify(|_, w| unsafe { w.sar_amp_wait3().bits(1) });

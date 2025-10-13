@@ -9,12 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.16.0] - 2025-10-13
+
+### Added
+
 - `AccessPointInfo::country` to access the Country Code from the Wi-Fi scan results (#3837)
 - `unstable` feature to opt into `ble`, `esp-now`, `csi`, `sniffer`, `esp-ieee802154` and `smoltcp` APIs (#3865)
 - Added unstable `wifi-eap` feature (#3924)
 - Optional `max` field in `ScanConfig` to allow limiting the number of returned results (#3963)
 - `set_phy_calibration_data` and `phy_calibration_data` (#4001)
-- common traits for `Protocol`, `Country`,  (#4017)
+- common traits for `Protocol`, `Country`, (#4017)
 - `BuilderLite` pattern to `AccessPointConfig`, `ClientConfig`, and `EapClientConfig` (#4017, #4115)
 - lifetime to `Sniffer` (#4017)
 - `dtim_period` parameter for `PowerSaveMode` (#4040)
@@ -32,10 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp-ieee802154` package has been folded into `esp-radio`, it's now alloc. (#3861, #3890)
 - `ble`, `esp-now`, `csi`, `sniffer`, `esp-ieee802154` and `smoltcp` features and APIs marked as unstable (#3865)
 - Update bt-hci version to add additional HCI commands (#3920)
-- A number of enums/structs have been marked as `#[non_exhaustive]` (#3981, #4017)
-  - `AuthMethod`, `Protocol`, `AccessPointInfo`, `AccessPointConfiguration`, `ClientConfiguration`, `Capability`, `Configuration`, `WifiEvent`, `InternalWifiError`, `ScanTypeConfig`, `WifiState`, and `WifiMode`
+- `AuthMethod`, `Protocol`, `AccessPointInfo`, `AccessPointConfiguration`, `ClientConfiguration`, `Capability`, `Configuration`, `WifiEvent`, `InternalWifiError`, `ScanTypeConfig`, `WifiState`, and `WifiMode` have been marked as `#[non_exhaustive]` (#3981, #4017)
 - The `Configuration`, `ClientConfiguration`, `AccessPointConfiguration`, and `EapClientConfiguration` enums have been renamed to `ModeConfig`, `ClientConfig`, `AccessPointConfig`, and `EapClientConfig` (#3994, #4278)
-  - Error types implements `core::error:Error`
+- Error types implements `core::error:Error` (#3994, #4278)
 - Use `esp-phy` internally for PHY initialization (#3892)
 - `ap_state()` and `sta_state()` marked as stable (#4017)
 - `wifi_state()` marked as unstable (#4017)
@@ -329,4 +342,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.14.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.13.0...esp-wifi-v0.14.0
 [v0.14.1]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.14.0...esp-wifi-v0.14.1
 [v0.15.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.14.1...esp-wifi-v0.15.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.15.0...HEAD
+[v0.16.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.15.0...esp-radio-v0.16.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.16.0...HEAD

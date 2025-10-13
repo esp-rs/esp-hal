@@ -273,20 +273,12 @@ pub mod checker {
         // Check if GitHub CLI is available
         let gh_check = Command::new("gh").arg("--version").output();
         if gh_check.is_err() {
-            log::debug!("GitHub CLI (gh) not available, skipping artifact download");
-            return Ok(false);
-        }
-
-        // Check if we're in a GitHub Actions environment (or allow override for testing)
-        if std::env::var("GITHUB_ACTIONS").is_err() && std::env::var("GITHUB_REPOSITORY").is_err() {
-            log::debug!(
-                "Not in GitHub Actions environment and no GITHUB_REPOSITORY set, skipping artifact download"
-            );
+            log::error!("GitHub CLI (gh) not available, skipping artifact download");
             return Ok(false);
         }
 
         // Query repository artifacts via GitHub API and download the one matching `artifact_name`
-        log::debug!("Attempting to download artifact: {artifact_name} from {repo}");
+        log::info!("Attempting to download artifact: {artifact_name} from {repo}");
 
         // List artifacts for the repository, filtered by name
         let list_output = Command::new("gh")

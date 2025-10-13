@@ -1,6 +1,6 @@
 [package]
 name          = "esp-radio-rtos-driver"
-version       = "0.0.1"
+version       = "0.1.0"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "Task scheduler interface for esp-radio"

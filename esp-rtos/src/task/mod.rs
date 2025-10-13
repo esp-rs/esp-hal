@@ -42,12 +42,24 @@ pub(crate) type TaskListItem = Option<TaskPtr>;
 
 /// An abstraction that allows the task to contain multiple different queue pointers.
 pub(crate) trait TaskListElement: Default {
+    /// Returns the pointer to the next element in the list.
     fn next(task: TaskPtr) -> Option<TaskPtr>;
+
+    /// Sets the pointer to the next element in the list.
     fn set_next(task: TaskPtr, next: Option<TaskPtr>);
+
+    /// Returns whether the task is in the list. If this function returns `None`, we don't know.
+    fn is_in_queue(_task: TaskPtr) -> Option<bool> {
+        // By default we don't store this information, so we return "Don't know".
+        None
+    }
+
+    /// Marks whether the task is in the list.
+    fn mark_in_queue(_task: TaskPtr, _in_queue: bool) {}
 }
 
 macro_rules! task_list_item {
-    ($struct:ident, $field:ident) => {
+    ($struct:ident, $field:ident $(, $in_queue_field:ident)?) => {
         #[derive(Default)]
         pub(crate) struct $struct;
         impl TaskListElement for $struct {
@@ -60,14 +72,27 @@ macro_rules! task_list_item {
                     task.as_mut().$field = next;
                 }
             }
+
+            $(
+                fn is_in_queue(task: TaskPtr) -> Option<bool> {
+                    Some(unsafe { task.as_ref().$in_queue_field })
+                }
+
+                fn mark_in_queue(mut task: TaskPtr, in_queue: bool) {
+                    unsafe {
+                        task.as_mut().$in_queue_field = in_queue;
+                    }
+                }
+            )?
         }
     };
 }
 
+task_list_item!(TaskReadyQueueElement, ready_queue_item, run_queued);
+task_list_item!(TaskTimerQueueElement, timer_queue_item, timer_queued);
+// These aren't perf critical, no need to waste memory on caching list status:
 task_list_item!(TaskAllocListElement, alloc_list_item);
-task_list_item!(TaskReadyQueueElement, ready_queue_item);
 task_list_item!(TaskDeleteListElement, delete_list_item);
-task_list_item!(TaskTimerQueueElement, timer_queue_item);
 
 /// Extension trait for common task operations. These should be inherent methods but we can't
 /// implement stuff for NonNull.
@@ -153,6 +178,11 @@ impl<E: TaskListElement> TaskList<E> {
     }
 
     pub fn push(&mut self, task: TaskPtr) {
+        if E::is_in_queue(task) == Some(true) {
+            return;
+        }
+        E::mark_in_queue(task, true);
+
         debug_assert!(E::next(task).is_none());
         E::set_next(task, self.head);
         self.head = Some(task);
@@ -164,12 +194,18 @@ impl<E: TaskListElement> TaskList<E> {
         if let Some(task) = popped {
             self.head = E::next(task);
             E::set_next(task, None);
+            E::mark_in_queue(task, false);
         }
 
         popped
     }
 
     pub fn remove(&mut self, task: TaskPtr) {
+        if E::is_in_queue(task) == Some(false) {
+            return;
+        }
+        E::mark_in_queue(task, false);
+
         // TODO: maybe this (and TaskQueue::remove) may prove too expensive.
         let mut list = core::mem::take(self);
         while let Some(popped) = list.pop() {
@@ -187,6 +223,10 @@ impl<E: TaskListElement> TaskList<E> {
             current = E::next(task);
             Some(task)
         })
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.head.is_none()
     }
 }
 
@@ -213,6 +253,11 @@ impl<E: TaskListElement> TaskQueue<E> {
     }
 
     pub fn push(&mut self, task: TaskPtr) {
+        if E::is_in_queue(task) == Some(true) {
+            return;
+        }
+        E::mark_in_queue(task, true);
+
         debug_assert!(E::next(task).is_none());
         if let Some(tail) = self.tail {
             E::set_next(tail, Some(task));
@@ -231,6 +276,7 @@ impl<E: TaskListElement> TaskQueue<E> {
             if self.head.is_none() {
                 self.tail = None;
             }
+            E::mark_in_queue(task, false);
         }
 
         popped
@@ -238,34 +284,31 @@ impl<E: TaskListElement> TaskQueue<E> {
 
     #[cfg(multi_core)]
     pub fn pop_if(&mut self, cond: impl Fn(&Task) -> bool) -> Option<TaskPtr> {
-        let mut head = self.head.take();
-        self.tail = None;
-
         let mut popped = None;
-        while let Some(task) = head {
-            head = E::next(task);
-            E::set_next(task, None);
-            if cond(unsafe { task.as_ref() }) {
+
+        let mut list = core::mem::take(self);
+        while let Some(task) = list.pop() {
+            if popped.is_none() && cond(unsafe { task.as_ref() }) {
+                E::mark_in_queue(task, false);
                 popped = Some(task);
-                break;
             } else {
                 self.push(task);
             }
-        }
-
-        while let Some(task) = head {
-            head = E::next(task);
-            E::set_next(task, None);
-            self.push(task);
         }
 
         popped
     }
 
     pub fn remove(&mut self, task: TaskPtr) {
+        if E::is_in_queue(task) == Some(false) {
+            return;
+        }
+
         let mut list = core::mem::take(self);
         while let Some(popped) = list.pop() {
-            if popped != task {
+            if popped == task {
+                E::mark_in_queue(task, false);
+            } else {
                 self.push(popped);
             }
         }
@@ -372,6 +415,11 @@ pub(crate) struct Task {
 
     pub wakeup_at: u64,
 
+    /// Whether the task is currently queued in the run queue.
+    pub run_queued: bool,
+    /// Whether the task is currently queued in the timer queue.
+    pub timer_queued: bool,
+
     /// The current wait queue this task is in.
     pub(crate) current_queue: Option<NonNull<WaitQueue>>,
 
@@ -463,6 +511,8 @@ impl Task {
             pinned_to,
 
             wakeup_at: 0,
+            timer_queued: false,
+            run_queued: false,
 
             alloc_list_item: TaskListItem::None,
             ready_queue_item: TaskListItem::None,
@@ -555,6 +605,8 @@ pub(super) fn allocate_main_task(
     scheduler.per_cpu[current_cpu].main_task.priority = Priority::ZERO;
     scheduler.per_cpu[current_cpu].main_task.state = TaskState::Ready;
     scheduler.per_cpu[current_cpu].main_task.stack = stack;
+    scheduler.per_cpu[current_cpu].main_task.run_queued = false;
+    scheduler.per_cpu[current_cpu].main_task.timer_queued = false;
     #[cfg(multi_core)]
     {
         scheduler.per_cpu[current_cpu].main_task.pinned_to = Some(cpu);

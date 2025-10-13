@@ -32,9 +32,7 @@ impl WaitQueue {
 
     pub(crate) fn wait_with_deadline(&mut self, deadline: Instant) {
         SCHEDULER.with(|scheduler| {
-            let current_cpu = Cpu::current() as usize;
-            let mut task = unwrap!(scheduler.per_cpu[current_cpu].current_task);
-
+            let mut task = scheduler.current_task(Cpu::current());
             if scheduler.sleep_task_until(task, deadline) {
                 self.waiting_tasks.push(task);
                 unsafe {

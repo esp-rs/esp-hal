@@ -274,14 +274,14 @@ where
         Self {
             _timer_group: PhantomData,
             timer0: Timer {
-                timer: 0,
+                timer: TimerId::Timer0,
                 tg: T::id(),
                 register_block: T::register_block(),
                 _lifetime: PhantomData,
             },
             #[cfg(timergroup_timg_has_timer1)]
             timer1: Timer {
-                timer: 1,
+                timer: TimerId::Timer1,
                 tg: T::id(),
                 register_block: T::register_block(),
                 _lifetime: PhantomData,
@@ -380,8 +380,16 @@ impl super::Timer for Timer<'_> {
 pub struct Timer<'d> {
     register_block: *const RegisterBlock,
     _lifetime: PhantomData<&'d mut ()>,
-    timer: u8,
+    timer: TimerId,
     tg: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+enum TimerId {
+    Timer0,
+    #[cfg(timergroup_timg_has_timer1)]
+    Timer1,
 }
 
 impl Sealed for Timer<'_> {}
@@ -444,7 +452,7 @@ impl Timer<'_> {
     }
 
     fn timer_number(&self) -> u8 {
-        self.timer
+        self.timer as u8
     }
 
     fn t(&self) -> &crate::pac::timg0::T {
@@ -517,7 +525,7 @@ impl Timer<'_> {
     fn clear_interrupt(&self) {
         self.register_block()
             .int_clr()
-            .write(|w| w.t(self.timer).clear_bit_by_one());
+            .write(|w| w.t(self.timer as _).clear_bit_by_one());
         let periodic = self.t().config().read().autoreload().bit_is_set();
         self.set_alarm_active(periodic);
     }
@@ -567,7 +575,7 @@ impl Timer<'_> {
         self.register_block()
             .int_raw()
             .read()
-            .t(self.timer)
+            .t(self.timer as _)
             .bit_is_set()
     }
 
@@ -577,8 +585,7 @@ impl Timer<'_> {
                 // On ESP32 and S2, the `int_ena` register is ineffective - interrupts fire even
                 // without int_ena enabling them. We use level interrupts so that we have a status
                 // bit available.
-                self.register_block()
-                    .t(self.timer as usize)
+                self.t()
                     .config()
                     .modify(|_, w| w.level_int_en().bit(state));
             } else if #[cfg(timergroup_timg_has_timer1)] {
@@ -868,7 +875,7 @@ mod asynch {
         handle_irq(Timer {
             register_block: TIMG0::regs(),
             _lifetime: PhantomData,
-            timer: 0,
+            timer: TimerId::Timer0,
             tg: 0,
         });
     }
@@ -879,7 +886,7 @@ mod asynch {
         handle_irq(Timer {
             register_block: TIMG1::regs(),
             _lifetime: PhantomData,
-            timer: 0,
+            timer: TimerId::Timer0,
             tg: 1,
         });
     }
@@ -890,7 +897,7 @@ mod asynch {
         handle_irq(Timer {
             register_block: TIMG0::regs(),
             _lifetime: PhantomData,
-            timer: 1,
+            timer: TimerId::Timer1,
             tg: 0,
         });
     }
@@ -901,7 +908,7 @@ mod asynch {
         handle_irq(Timer {
             register_block: TIMG1::regs(),
             _lifetime: PhantomData,
-            timer: 1,
+            timer: TimerId::Timer1,
             tg: 1,
         });
     }

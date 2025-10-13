@@ -27,6 +27,10 @@ pub trait RawLock {
 /// A lock that disables interrupts.
 pub struct SingleCoreInterruptLock;
 
+// Reserved bits in the PS register, these must be written as 0.
+#[cfg(all(xtensa, debug_assertions))]
+const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
+
 impl RawLock for SingleCoreInterruptLock {
     #[inline]
     unsafe fn enter(&self) -> RestoreState {
@@ -38,6 +42,8 @@ impl RawLock for SingleCoreInterruptLock {
             } else if #[cfg(xtensa)] {
                 let token: u32;
                 unsafe { core::arch::asm!("rsil {0}, 5", out(reg) token); }
+                #[cfg(debug_assertions)]
+                let token = token & !RESERVED_MASK;
             } else {
                 compile_error!("Unsupported architecture")
             }
@@ -66,9 +72,19 @@ impl RawLock for SingleCoreInterruptLock {
                     }
                 }
             } else if #[cfg(xtensa)] {
-                // Reserved bits in the PS register, these must be written as 0.
-                const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
-                debug_assert!(token & RESERVED_MASK == 0);
+                #[cfg(debug_assertions)]
+                if token & RESERVED_MASK != 0 {
+                    // We could do this transformation in fmt.rs automatically, but experiments
+                    // show this is only worth it in terms of binary size for code inlined into many places.
+                    #[cold]
+                    #[inline(never)]
+                    fn __assert_failed() {
+                        panic!("Reserved bits in PS register must be written as 0");
+                    }
+
+                    __assert_failed();
+                }
+
                 unsafe {
                     core::arch::asm!(
                         "wsr.ps {0}",

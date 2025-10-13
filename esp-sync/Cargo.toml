@@ -1,6 +1,6 @@
 [package]
 name          = "esp-sync"
-version       = "0.0.0"
+version       = "0.1.0"
 edition       = "2024"
 rust-version  = "1.88.0"
 description   = "Synchronization primitives for Espressif devices"
@@ -21,7 +21,7 @@ clippy-configs = [{ features = ["defmt"] }]
 [dependencies]
 cfg-if = "1"
 document-features = "0.2"
-esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated" }
+esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated" }
 embassy-sync-06 = { package = "embassy-sync", version = "0.6" }
 embassy-sync-07 = { package = "embassy-sync", version = "0.7" }
 
@@ -33,10 +33,10 @@ log-04 = { package = "log", version = "0.4", optional = true }
 riscv            = { version = "0.15" }
 
 [target.'cfg(target_arch = "xtensa")'.dependencies]
-xtensa-lx        = { version = "0.12", path = "../xtensa-lx" }
+xtensa-lx        = { version = "0.13.0", path = "../xtensa-lx" }
 
 [build-dependencies]
-esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 #! ### Chip Support Feature Flags
