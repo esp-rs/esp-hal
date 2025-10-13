@@ -6,6 +6,7 @@ use clap::Args;
 use esp_metadata::Chip;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
+use toml_edit::{Item, Value};
 
 use crate::{
     Package,
@@ -124,20 +125,30 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
             let amount = if package.is_semver_checked() {
                 min_package_update(workspace, package, &all_chips)?
             } else {
-                ReleaseType::Minor
-            };
+                let forever_unstable = if let Some(metadata) =
+                    package_tomls[&package].espressif_metadata()
+                    && let Some(Item::Value(forever_unstable)) = metadata.get("forever_unstable")
+                {
+                    // Special case: some packages are perma-unstable, meaning they won't ever have
+                    // a stable release. For these packages, we always use a
+                    // patch release.
+                    if let Value::Boolean(forever_unstable) = forever_unstable {
+                        *forever_unstable.value()
+                    } else {
+                        log::warn!(
+                            "Invalid value for 'forever_unstable' in metadata - must be a boolean"
+                        );
+                        true
+                    }
+                } else {
+                    false
+                };
 
-            // Special case: some packages are perma-unstable, meaning they won't ever have a stable
-            // release. For these packages, we always use a patch release.
-            let amount = match package {
-                Package::EspRomSys if amount != ReleaseType::Patch => {
-                    log::debug!(
-                        "Bump '{:?}' is not acceptable for package esp-rom-sys - using 'Patch'",
-                        amount
-                    );
+                if forever_unstable {
                     ReleaseType::Patch
+                } else {
+                    ReleaseType::Minor
                 }
-                _ => amount,
             };
 
             log::debug!("{} needs {:?} version bump", package, amount);
