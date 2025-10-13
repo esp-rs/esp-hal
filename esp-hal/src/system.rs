@@ -352,8 +352,6 @@ pub(crate) struct PeripheralClockControl;
 #[cfg(not(any(esp32c6, esp32h2)))]
 impl PeripheralClockControl {
     unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
-        debug!("Enable {:?} {}", peripheral, enable);
-
         let system = SYSTEM::regs();
 
         #[cfg(esp32)]
@@ -535,7 +533,6 @@ impl PeripheralClockControl {
 #[cfg(any(esp32c6, esp32h2))]
 impl PeripheralClockControl {
     unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
-        debug!("Enable {:?} {}", peripheral, enable);
         let system = SYSTEM::regs();
 
         match peripheral {
@@ -1101,6 +1098,7 @@ impl PeripheralClockControl {
             unsafe { Self::reset_racey(peripheral) };
         }
 
+        debug!("Enable {:?} {}", peripheral, enable);
         unsafe { Self::enable_internal_racey(peripheral, enable) };
 
         true
