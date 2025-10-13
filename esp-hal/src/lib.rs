@@ -262,7 +262,10 @@ pub use procmacros::load_lp_code;
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[instability::unstable]
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub use procmacros::{handler, ram};
+pub use procmacros::handler;
+
+pub use procmacros::ram;
+
 
 #[cfg(all(feature = "rt", feature = "exception-handler"))]
 mod exception_handler;
