@@ -19,6 +19,7 @@ use crate::{
     },
     interrupt::InterruptHandler,
     peripherals::Interrupt,
+    system::Peripheral,
 };
 
 pub(super) type I2sRegisterBlock = crate::pac::i2s0::RegisterBlock;
@@ -52,6 +53,9 @@ impl crate::private::Sealed for AnyI2sDmaTxChannel<'_> {}
 impl DmaTxChannel for AnyI2sDmaTxChannel<'_> {}
 
 impl RegisterAccess for AnyI2sDmaTxChannel<'_> {
+    fn peripheral_clock(&self) -> Option<Peripheral> {
+        None
+    }
     fn reset(&self) {
         self.regs().lc_conf().modify(|_, w| w.out_rst().set_bit());
         self.regs().lc_conf().modify(|_, w| w.out_rst().clear_bit());
@@ -237,6 +241,9 @@ impl InterruptAccess<DmaTxInterrupt> for AnyI2sDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for AnyI2sDmaRxChannel<'_> {
+    fn peripheral_clock(&self) -> Option<Peripheral> {
+        None
+    }
     fn reset(&self) {
         self.regs().lc_conf().modify(|_, w| w.in_rst().set_bit());
         self.regs().lc_conf().modify(|_, w| w.in_rst().clear_bit());

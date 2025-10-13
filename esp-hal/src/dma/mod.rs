@@ -66,6 +66,8 @@ pub use self::gdma::*;
 pub use self::m2m::*;
 #[cfg(pdma)]
 pub use self::pdma::*;
+#[cfg(pdma)]
+use crate::system::Peripheral;
 use crate::{
     Async,
     Blocking,
@@ -73,8 +75,7 @@ use crate::{
     interrupt::InterruptHandler,
     peripherals::Interrupt,
     soc::{is_slice_in_dram, is_valid_memory_address, is_valid_ram_address},
-    system,
-    system::Cpu,
+    system::{self, Cpu},
 };
 
 trait Word: crate::private::Sealed {}
@@ -1733,15 +1734,25 @@ where
 // `GenericPeripheralGuard`.
 cfg_if::cfg_if! {
     if #[cfg(pdma)] {
-        type PeripheralGuard = system::GenericPeripheralGuard<{ system::Peripheral::Dma as u8}>;
+        type PeripheralGuard = Option<system::PeripheralGuard>;
     } else {
         type PeripheralGuard = system::GenericPeripheralGuard<{ system::Peripheral::Gdma as u8}>;
     }
 }
 
 fn create_guard(_ch: &impl RegisterAccess) -> PeripheralGuard {
-    // NOTE(p4): this function will read the channel's DMA peripheral from `_ch`
-    system::GenericPeripheralGuard::new_with(init_dma_racey)
+    cfg_if::cfg_if! {
+        if #[cfg(pdma)] {
+            if let Some(peri_clock) = _ch.peripheral_clock() {
+                Some(system::PeripheralGuard::new_with(peri_clock, init_dma_racey))
+            } else {
+                None
+            }
+        } else {
+            // NOTE(p4): this function will read the channel's DMA peripheral from `_ch`
+            system::GenericPeripheralGuard::new_with(init_dma_racey)
+        }
+    }
 }
 
 // DMA receive channel
@@ -2275,6 +2286,9 @@ where
 
 #[doc(hidden)]
 pub trait RegisterAccess: crate::private::Sealed {
+    #[cfg(pdma)]
+    fn peripheral_clock(&self) -> Option<Peripheral>;
+
     /// Reset the state machine of the channel and FIFO pointer.
     fn reset(&self);
 

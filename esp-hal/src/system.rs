@@ -49,9 +49,21 @@ pub enum Peripheral {
     /// General DMA (GDMA) peripheral.
     #[cfg(gdma)]
     Gdma,
-    /// Peripheral DMA (PDMA) peripheral.
-    #[cfg(pdma)]
-    Dma,
+    /// SPI_DMA peripheral.
+    #[cfg(esp32)]
+    SpiDma,
+    /// SPI2_DMA peripheral.
+    #[cfg(esp32s2)]
+    Spi2Dma,
+    /// SPI3_DMA peripheral.
+    #[cfg(esp32s2)]
+    Spi3Dma,
+    /// CRYPTO_DMA peripheral.
+    #[cfg(esp32s2)]
+    CryptoDma,
+    /// COPY_DMA peripheral.
+    #[cfg(esp32s2)]
+    CopyDma,
     /// I2S0 peripheral (Inter-IC Sound).
     #[cfg(soc_has_i2s0)]
     I2s0,
@@ -162,8 +174,16 @@ impl Peripheral {
         Self::ApbSarAdc,
         #[cfg(gdma)]
         Self::Gdma,
-        #[cfg(pdma)]
-        Self::Dma,
+        #[cfg(esp32)]
+        Self::SpiDma,
+        #[cfg(esp32s2)]
+        Self::Spi2Dma,
+        #[cfg(esp32s2)]
+        Self::Spi3Dma,
+        #[cfg(esp32s2)]
+        Self::CryptoDma,
+        #[cfg(esp32s2)]
+        Self::CopyDma,
         #[cfg(soc_has_i2s0)]
         Self::I2s0,
         #[cfg(soc_has_i2s1)]
@@ -389,16 +409,30 @@ impl PeripheralClockControl {
             Peripheral::Gdma => {
                 perip_clk_en1.modify(|_, w| w.dma_clk_en().bit(enable));
             }
+
             #[cfg(esp32)]
-            Peripheral::Dma => {
+            Peripheral::SpiDma => {
                 perip_clk_en0.modify(|_, w| w.spi_dma_clk_en().bit(enable));
             }
             #[cfg(esp32s2)]
-            Peripheral::Dma => {
+            Peripheral::Spi2Dma => {
                 perip_clk_en0.modify(|_, w| w.spi2_dma_clk_en().bit(enable));
+            }
+            #[cfg(esp32s2)]
+            Peripheral::Spi3Dma => {
                 perip_clk_en0.modify(|_, w| w.spi3_dma_clk_en().bit(enable));
+            }
+            #[cfg(esp32s2)]
+            Peripheral::CryptoDma => {
                 perip_clk_en1.modify(|_, w| w.crypto_dma_clk_en().bit(enable));
             }
+            #[cfg(esp32s2)]
+            Peripheral::CopyDma => {
+                let copy_config = crate::peripherals::DMA_COPY::regs().conf();
+
+                copy_config.modify(|_, w| w.clk_en().bit(enable));
+            }
+
             #[cfg(soc_has_i2s0)]
             Peripheral::I2s0 => {
                 perip_clk_en0.modify(|_, w| w.i2s0_clk_en().bit(enable));
@@ -731,16 +765,35 @@ unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
         Peripheral::Gdma => {
             perip_rst_en1.modify(|_, w| w.dma_rst().bit(reset));
         }
+
         #[cfg(esp32)]
-        Peripheral::Dma => {
+        Peripheral::SpiDma => {
             perip_rst_en0.modify(|_, w| w.spi_dma_rst().bit(reset));
         }
         #[cfg(esp32s2)]
-        Peripheral::Dma => {
+        Peripheral::Spi2Dma => {
             perip_rst_en0.modify(|_, w| w.spi2_dma_rst().bit(reset));
+        }
+        #[cfg(esp32s2)]
+        Peripheral::Spi3Dma => {
             perip_rst_en0.modify(|_, w| w.spi3_dma_rst().bit(reset));
+        }
+        #[cfg(esp32s2)]
+        Peripheral::CryptoDma => {
             perip_rst_en1.modify(|_, w| w.crypto_dma_rst().bit(reset));
         }
+        #[cfg(esp32s2)]
+        Peripheral::CopyDma => {
+            let copy_config = crate::peripherals::DMA_COPY::regs().conf();
+
+            copy_config.modify(|_, w| {
+                w.in_rst().bit(reset);
+                w.out_rst().bit(reset);
+                w.cmdfifo_rst().bit(reset);
+                w.fifo_rst().bit(reset)
+            });
+        }
+
         #[cfg(soc_has_i2s0)]
         Peripheral::I2s0 => {
             perip_rst_en0.modify(|_, w| w.i2s0_rst().bit(reset));

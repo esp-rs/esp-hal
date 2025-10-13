@@ -23,6 +23,7 @@ use crate::{
     },
     interrupt::{InterruptHandler, Priority},
     peripherals::{DMA_COPY, Interrupt},
+    system::Peripheral,
 };
 
 pub(super) type CopyRegisterBlock = crate::pac::copy_dma::RegisterBlock;
@@ -56,6 +57,9 @@ impl crate::private::Sealed for CopyDmaTxChannel<'_> {}
 impl DmaTxChannel for CopyDmaTxChannel<'_> {}
 
 impl RegisterAccess for CopyDmaTxChannel<'_> {
+    fn peripheral_clock(&self) -> Option<Peripheral> {
+        Some(Peripheral::CopyDma)
+    }
     fn reset(&self) {
         self.regs().conf().modify(|_, w| w.out_rst().set_bit());
         self.regs().conf().modify(|_, w| w.out_rst().clear_bit());
@@ -225,6 +229,9 @@ impl InterruptAccess<DmaTxInterrupt> for CopyDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for CopyDmaRxChannel<'_> {
+    fn peripheral_clock(&self) -> Option<Peripheral> {
+        Some(Peripheral::CopyDma)
+    }
     fn reset(&self) {
         self.regs().conf().modify(|_, w| w.in_rst().set_bit());
         self.regs().conf().modify(|_, w| w.in_rst().clear_bit());
