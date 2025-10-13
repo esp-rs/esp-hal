@@ -685,10 +685,9 @@ impl PeripheralClockControl {
             }
             #[cfg(soc_has_tsens)]
             Peripheral::Tsens => {
-                system.tsens_clk_conf().modify(|_, w| {
-                    w.tsens_clk_en().bit(enable);
-                    w.tsens_clk_sel().bit(enable)
-                });
+                system
+                    .tsens_clk_conf()
+                    .modify(|_, w| w.tsens_clk_en().bit(enable));
             }
             #[cfg(soc_has_uhci0)]
             Peripheral::Uhci0 => {
@@ -809,14 +808,10 @@ unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
         }
         #[cfg(soc_has_timg0)]
         Peripheral::Timg0 => {
-            #[cfg(any(esp32c3, esp32s2, esp32s3))]
-            perip_rst_en0.modify(|_, w| w.timers_rst().bit(reset));
             perip_rst_en0.modify(|_, w| w.timergroup_rst().bit(reset));
         }
         #[cfg(soc_has_timg1)]
         Peripheral::Timg1 => {
-            #[cfg(any(esp32c3, esp32s2, esp32s3))]
-            perip_rst_en0.modify(|_, w| w.timers_rst().bit(reset));
             perip_rst_en0.modify(|_, w| w.timergroup1_rst().bit(reset));
         }
         #[cfg(soc_has_sha)]
@@ -957,11 +952,15 @@ unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
         }
         #[cfg(soc_has_timg0)]
         Peripheral::Timg0 => {
-            // no reset?
+            system
+                .timergroup0_conf()
+                .modify(|_, w| w.tg0_rst_en().bit(reset));
         }
         #[cfg(soc_has_timg1)]
         Peripheral::Timg1 => {
-            // no reset?
+            system
+                .timergroup1_conf()
+                .modify(|_, w| w.tg1_rst_en().bit(reset));
         }
         #[cfg(soc_has_sha)]
         Peripheral::Sha => {
