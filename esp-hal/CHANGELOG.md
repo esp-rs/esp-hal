@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: Wrapping the hardware buffer is now supported for rx/tx and blocking/async channels (#4049)
 - `rmt::CHANNEL_RAM_SIZE` and `rmt::HAS_RX_WRAP` constants have been added (#4049)
 - A new option `ESP_HAL_CONFIG_WRITE_VEC_TABLE_MONITORING` (disabled by default) to check that no unintentional writes to a very vital memory area are made. (Only RISC-V)  (#4225)
+- ESP32-C2: Added `Attenuation::_2p5dB` and `Attenuation::_6dB` options (#4324)
 
 ### Changed
 
@@ -87,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: Receive operations read only received codes instead of the entire buffer and return the number of codes read (#4049)
 - `esp_hal::clock::{RtcFastClock, RtcSlowClock, RtcClock}` and `esp_hal::gpio::Event` have been marked unstable (#4293)
 - All `ram` proc macro options except `#[ram(reclaimed)]` are considered `unstable` (#4309)
+- ESP32: Stripped prefix from `esp_hal::adc::Resolution` variants (`ResolutionXBit -> _XBit`) (#4324)
 
 ### Fixed
 
@@ -124,6 +126,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32C3 and ESP32C2: removed pins 11 to 17 both included (#4202)
 - ESP32C6: removed pins 24, 25, 26, 28, 29 and 30 (#4202)
 - ESP32S2 and ESP32S3: removed pins 26 to 32 both included (#4202)
+- `adc::Resolution` has been removed from chips other than ESP32 (#4324)
 
 ## [v1.0.0-rc.0] - 2025-07-16
 

@@ -41,24 +41,22 @@ pub fn release_adc2(_: private::Internal) {
 /// The sampling/readout resolution of the ADC.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
+#[allow(clippy::enum_variant_names, reason = "unit of measurement")]
 pub enum Resolution {
     /// 9-bit resolution
-    Resolution9Bit  = 0b00,
+    _9Bit,
     /// 10-bit resolution
-    Resolution10Bit = 0b01,
+    _10Bit,
     /// 11-bit resolution
-    Resolution11Bit = 0b10,
+    _11Bit,
     /// 12-bit resolution
     #[default]
-    Resolution12Bit = 0b11,
+    _12Bit,
 }
 
 #[doc(hidden)]
 pub trait RegisterAccess {
-    fn set_bit_width(resolution: u8);
-
-    fn set_sample_bit(resolution: u8);
+    fn set_resolution(resolution: u8);
 
     fn set_attenuation(channel: usize, attenuation: u8);
 
@@ -82,13 +80,10 @@ pub trait RegisterAccess {
 }
 
 impl RegisterAccess for ADC1<'_> {
-    fn set_bit_width(resolution: u8) {
+    fn set_resolution(resolution: u8) {
         SENS::regs()
             .sar_start_force()
             .modify(|_, w| unsafe { w.sar1_bit_width().bits(resolution) });
-    }
-
-    fn set_sample_bit(resolution: u8) {
         SENS::regs()
             .sar_read_ctrl()
             .modify(|_, w| unsafe { w.sar1_sample_bit().bits(resolution) });
@@ -161,13 +156,10 @@ impl RegisterAccess for ADC1<'_> {
 }
 
 impl RegisterAccess for ADC2<'_> {
-    fn set_bit_width(resolution: u8) {
+    fn set_resolution(resolution: u8) {
         SENS::regs()
             .sar_start_force()
             .modify(|_, w| unsafe { w.sar2_bit_width().bits(resolution) });
-    }
-
-    fn set_sample_bit(resolution: u8) {
         SENS::regs()
             .sar_read_ctrl2()
             .modify(|_, w| unsafe { w.sar2_sample_bit().bits(resolution) });
@@ -268,10 +260,7 @@ where
         let sensors = SENS::regs();
 
         // Set reading and sampling resolution
-        let resolution: u8 = config.resolution as u8;
-
-        ADCI::set_bit_width(resolution);
-        ADCI::set_sample_bit(resolution);
+        ADCI::set_resolution(config.resolution as u8);
 
         // Set attenuation for pins
         let attenuations = config.attenuations;
@@ -286,37 +275,26 @@ where
         ADCI::clear_dig_force();
         ADCI::set_start_force();
         ADCI::set_en_pad_force();
-        sensors
-            .sar_touch_ctrl1()
-            .modify(|_, w| w.xpd_hall_force().set_bit());
-        sensors
-            .sar_touch_ctrl1()
-            .modify(|_, w| w.hall_phase_force().set_bit());
+        sensors.sar_touch_ctrl1().modify(|_, w| {
+            w.xpd_hall_force().set_bit();
+            w.hall_phase_force().set_bit()
+        });
 
-        // Set power to SW power on
-        sensors
-            .sar_meas_wait2()
-            .modify(|_, w| unsafe { w.force_xpd_sar().bits(0b11) });
-
-        // disable AMP
-        sensors
-            .sar_meas_wait2()
-            .modify(|_, w| unsafe { w.force_xpd_amp().bits(0b10) });
-        sensors
-            .sar_meas_ctrl()
-            .modify(|_, w| unsafe { w.amp_rst_fb_fsm().bits(0) });
-        sensors
-            .sar_meas_ctrl()
-            .modify(|_, w| unsafe { w.amp_short_ref_fsm().bits(0) });
-        sensors
-            .sar_meas_ctrl()
-            .modify(|_, w| unsafe { w.amp_short_ref_gnd_fsm().bits(0) });
-        sensors
-            .sar_meas_wait1()
-            .modify(|_, w| unsafe { w.sar_amp_wait1().bits(1) });
-        sensors
-            .sar_meas_wait1()
-            .modify(|_, w| unsafe { w.sar_amp_wait2().bits(1) });
+        sensors.sar_meas_wait2().modify(|_, w| unsafe {
+            // Set power to SW power on
+            w.force_xpd_sar().bits(0b11);
+            // disable AMP
+            w.force_xpd_amp().bits(0b10)
+        });
+        sensors.sar_meas_ctrl().modify(|_, w| unsafe {
+            w.amp_rst_fb_fsm().bits(0);
+            w.amp_short_ref_fsm().bits(0);
+            w.amp_short_ref_gnd_fsm().bits(0)
+        });
+        sensors.sar_meas_wait1().modify(|_, w| unsafe {
+            w.sar_amp_wait1().bits(1);
+            w.sar_amp_wait2().bits(1)
+        });
         sensors
             .sar_meas_wait2()
             .modify(|_, w| unsafe { w.sar_amp_wait3().bits(1) });

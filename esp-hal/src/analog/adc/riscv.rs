@@ -57,16 +57,6 @@ cfg_if::cfg_if! {
     }
 }
 
-/// The sampling/readout resolution of the ADC.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
-pub enum Resolution {
-    /// 12-bit resolution
-    #[default]
-    Resolution12Bit,
-}
-
 impl<ADCI> AdcConfig<ADCI>
 where
     ADCI: RegisterAccess,

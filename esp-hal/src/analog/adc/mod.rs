@@ -109,7 +109,7 @@ pub struct AdcPin<PIN, ADCI, CS = ()> {
 /// Configuration for the ADC.
 #[cfg(feature = "unstable")]
 pub struct AdcConfig<ADCI> {
-    #[cfg_attr(not(esp32), expect(unused))]
+    #[cfg(esp32)]
     resolution: Resolution,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     _phantom: PhantomData<ADCI>,
@@ -168,6 +168,7 @@ impl<ADCI> AdcConfig<ADCI> {
 impl<ADCI> Default for AdcConfig<ADCI> {
     fn default() -> Self {
         Self {
+            #[cfg(esp32)]
             resolution: Resolution::default(),
             attenuations: [None; NUM_ATTENS],
             _phantom: PhantomData,
