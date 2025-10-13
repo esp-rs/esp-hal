@@ -86,7 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: `LoopCount::Finite` and `ContinuousTxTransaction::is_tx_loopcount_interrupt_set` are only defined when the hardware supports it (all except ESP32). (#4260)
 - RMT: `Channel::transmit_continuously` now verifies that loop counts don't exceed the hardware limit (#4276)
 - RMT: Receive operations read only received codes instead of the entire buffer and return the number of codes read (#4049)
-- `esp_hal::clock::{RtcFastClock, RtcSlowClock, RtcClock}` and `esp_hal::gpio::Event` have been marked unstable (#4293)
+- `esp_hal::clock::{RtcFastClock, RtcSlowClock, RtcClock}`, `esp_hal::gpio::Input::wait_for` and `esp_hal::gpio::Event` have been marked unstable (#4293, #4326)
 - All `ram` proc macro options except `#[ram(reclaimed)]` are considered `unstable` (#4309)
 - ESP32: Stripped prefix from `esp_hal::adc::Resolution` variants (`ResolutionXBit -> _XBit`) (#4324)
 
