@@ -67,24 +67,22 @@ mod implementation;
 #[cfg(feature = "unstable")]
 pub use self::implementation::*;
 
-/// The attenuation of the ADC pin.
+/// The approximate attenuation of the ADC pin.
 ///
 /// The effective measurement range for a given attenuation is dependent on the
 /// device being targeted. Please refer to "ADC Characteristics" section of your
 /// device's datasheet for more information.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
+#[allow(clippy::enum_variant_names, reason = "unit of measurement")]
 pub enum Attenuation {
-    /// 0dB attenuation
+    /// About 0dB attenuation.
     _0dB   = 0b00,
-    /// 2.5dB attenuation
-    #[cfg(not(esp32c2))]
+    /// About 2.5dB attenuation.
     _2p5dB = 0b01,
-    /// 6dB attenuation
-    #[cfg(not(esp32c2))]
+    /// About 6dB attenuation.
     _6dB   = 0b10,
-    /// 11dB attenuation
+    /// About 11dB attenuation.
     _11dB  = 0b11,
 }
 
