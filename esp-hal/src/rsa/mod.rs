@@ -100,6 +100,7 @@ impl<'d> Rsa<'d, Blocking> {
         Rsa {
             rsa: self.rsa,
             phantom: PhantomData,
+            #[cfg(not(esp32))]
             _memory_guard: self._memory_guard,
             _guard: self._guard,
         }
@@ -145,6 +146,7 @@ impl<'d> Rsa<'d, Async> {
         Rsa {
             rsa: self.rsa,
             phantom: PhantomData,
+            #[cfg(not(esp32))]
             _memory_guard: self._memory_guard,
             _guard: self._guard,
         }

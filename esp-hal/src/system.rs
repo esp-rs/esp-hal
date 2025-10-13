@@ -557,10 +557,6 @@ impl PeripheralClockControl {
             Peripheral::Mcpwm0 => {
                 system.pwm_conf().modify(|_, w| w.pwm_clk_en().bit(enable));
             }
-            #[cfg(soc_has_mcpwm1)]
-            Peripheral::Mcpwm1 => {
-                system.pwm_conf.modify(|_, w| w.pwm_clk_en().bit(enable));
-            }
             #[cfg(soc_has_apb_saradc)]
             Peripheral::ApbSarAdc => {
                 system
