@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-* This crate no longer uses the `links` field in its `Cargo.toml` (#3697)
+- This crate no longer uses the `links` field in its `Cargo.toml` (#3697)
 
 ## [v0.11.0] - 2025-06-03
 
