@@ -143,7 +143,7 @@ peripheral_clocks = { templates = [
     #{ name = "Adc2Arb" },
     { name = "Systimer", keep_enabled = true },
     { name = "ApbSarAdc", template_params = { peripheral = "apb_saradc" } },
-    #{ name = "UartMem" },
+    { name = "UartMem" },
     { name = "Usb" },
     { name = "I2s1" },
     { name = "Mcpwm1", template_params = { peripheral = "pwm1" } },

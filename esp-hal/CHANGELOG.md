@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `work_queue` is no longer public (#4357)
+- UART memory is now powered down when the driver is no longer in use. (#4354)
 
 ### Fixed
 
