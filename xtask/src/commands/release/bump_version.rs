@@ -11,7 +11,14 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use toml_edit::{Item, TableLike, Value};
 
-use crate::{Package, Version, cargo::CargoToml, changelog::Changelog, commands::PLACEHOLDER};
+use crate::{
+    Package,
+    Version,
+    cargo::CargoToml,
+    changelog::Changelog,
+    commands::PLACEHOLDER,
+    find_packages,
+};
 
 /// How to bump the version of a package.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -196,20 +203,38 @@ fn bump_crate_version(
     }
 
     let package_name = bumped_package.package.to_string();
-    for pkg in Package::iter() {
-        let mut dependent = CargoToml::new(&bumped_package.workspace, pkg)
-            .with_context(|| format!("Could not load Cargo.toml of {pkg}"))?;
 
+    let examples = find_packages(&bumped_package.workspace.join("examples"))?
+        .into_iter()
+        .map(|p| p.join("Cargo.toml"));
+
+    let tomls = Package::iter()
+        .filter(|&p| p != Package::Examples)
+        .map(|p| {
+            CargoToml::new(&bumped_package.workspace, p)
+                .with_context(|| format!("Could not load Cargo.toml of {p}"))
+        })
+        // special case, examples are stand alone projects so we must add these in a special way
+        .chain(examples.into_iter().map(|p| {
+            let content = fs::read_to_string(&p)
+                .with_context(|| format!("Could not read {}", p.display()))?;
+            CargoToml::from_str(&bumped_package.workspace, Package::Examples, &content)
+                .with_context(|| format!("Could not parse Cargo.toml"))
+        }));
+
+    for dependent in tomls {
+        let mut dependent = dependent?;
         if dependent.change_version_of_dependency(&package_name, &version) {
             if dry_run {
                 log::info!(
                     "  Dry run: would update {} in {}: ({prev_version} -> {version})",
                     package_name,
-                    pkg,
+                    dependent.package(),
                 );
             } else {
                 log::info!(
-                    "  Bumping {package_name} version for package {pkg}: ({prev_version} -> {version})"
+                    "  Bumping {package_name} version for package {}: ({prev_version} -> {version})",
+                    dependent.package()
                 );
                 dependent.save()?;
             }
