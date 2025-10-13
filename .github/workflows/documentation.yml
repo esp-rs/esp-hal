@@ -29,6 +29,9 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release-pr')) }}
+    # required for this step, as stdout is captured by `hal-xtask release tag-releases`
+    env:
+      RUST_LOG: off
     steps:
       - uses: dtolnay/rust-toolchain@v1
         with:
