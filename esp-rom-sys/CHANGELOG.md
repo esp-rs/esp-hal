@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.1.2] - 2025-10-13
+
+### Added
+
 - Initialize the syscall table (#4177)
 
 ### Changed
@@ -19,13 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - esp32: c2, c3, s2, s3: fixed "Defalut" typo in ld scripts (#4180)
 
-### Removed
-
-
 ## [v0.1.1] - 2025-07-16
 
 ## [v0.1.0] - 2025-07-01
 
 [v0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-rom-sys-v0.1.0
 [v0.1.1]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.0...esp-rom-sys-v0.1.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.1...HEAD
+[v0.1.2]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.1...esp-rom-sys-v0.1.2
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.2...HEAD

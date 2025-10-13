@@ -1,6 +1,6 @@
 [package]
 name = "esp-radio"
-version = "0.15.0"
+version = "0.16.0"
 edition = "2024"
 rust-version  = "1.88.0"
 description = "A WiFi, Bluetooth and ESP-NOW driver for use with Espressif chips and bare-metal Rust"
@@ -41,28 +41,28 @@ test  = false
 
 [dependencies]
 cfg-if  = "1"
-esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
+esp-hal = { version = "1.0.0-rc.1", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
 portable-atomic = { version = "1.11", default-features = false }
 enumset = { version = "1.1", default-features = false, optional = true }
 
 # ⚠️ Unstable dependencies
-esp-radio-rtos-driver = { version = "0.0.1", path = "../esp-radio-rtos-driver" }
+esp-radio-rtos-driver = { version = "0.1.0", path = "../esp-radio-rtos-driver" }
 instability = "0.3.9"
 
 # Unstable dependencies that are not (strictly) part of the public API
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
 document-features  = "0.2"
-esp-alloc = { version = "0.8.0", path = "../esp-alloc", optional = true }
-esp-config = { version = "0.5.0", path = "../esp-config" }
-esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated" }
-esp-sync = { version = "0.0.0", path = "../esp-sync" }
-esp-phy = { version = "0.0.1", path = "../esp-phy/" }
+esp-alloc = { version = "0.9.0", path = "../esp-alloc", optional = true }
+esp-config = { version = "0.6.0", path = "../esp-config" }
+esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated" }
+esp-sync = { version = "0.1.0", path = "../esp-sync" }
+esp-phy = { version = "0.1.0", path = "../esp-phy/" }
 esp-wifi-sys = { version = "0.8.1" }
 num-derive = "0.4.2"
 num-traits = { version = "0.2.19", default-features = false }
 portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
-procmacros = { version = "0.19.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
-xtensa-lx-rt = { version = "0.20.0", path = "../xtensa-lx-rt", optional = true }
+procmacros = { version = "0.20.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+xtensa-lx-rt = { version = "0.21.0", path = "../xtensa-lx-rt", optional = true }
 byte = { version = "0.2.7", optional = true }
 ieee802154 = { version = "0.6.1", optional = true }
 heapless = "0.9"
@@ -85,8 +85,8 @@ defmt = { version = "1.0.1", optional = true }
 log-04 = { package = "log", version = "0.4.27", optional = true }
 
 [build-dependencies]
-esp-config = { version = "0.5.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-config = { version = "0.6.0", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 default = ["esp-alloc"]

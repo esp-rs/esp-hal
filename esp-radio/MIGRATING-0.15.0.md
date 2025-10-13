@@ -1,4 +1,4 @@
-# Migration Guide from 0.15.0 to {{currentVersion}}
+# Migration Guide from 0.15.0 to 0.16.0
 
 ## Initialization
 
@@ -40,7 +40,7 @@ On RISC-V devices (ESP32-C2/C3/C6/H2) you'll need to also pass `SoftwareInterrup
 
 ```diff
 - esp-wifi = "0.15.0"
-+ esp-radio = "{{currentVersion}}"
++ esp-radio = "0.16.0"
 ```
 
 ## `EspWifi` prefix has been removed

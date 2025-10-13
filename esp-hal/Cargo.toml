@@ -1,6 +1,6 @@
 [package]
 name          = "esp-hal"
-version       = "1.0.0-rc.0"
+version       = "1.0.0-rc.1"
 edition       = "2024"
 rust-version  = "1.88.0"
 description   = "Bare-metal HAL for Espressif devices"
@@ -55,7 +55,7 @@ enumset                  = "1.1"
 paste                    = "1.0.15"
 portable-atomic          = { version = "1.11", default-features = false }
 
-esp-rom-sys              = { version = "0.1.1", path = "../esp-rom-sys" }
+esp-rom-sys              = { version = "0.1.2", path = "../esp-rom-sys" }
 
 # Unstable dependencies that are not (strictly) part of the public API
 bitfield                 = "0.19"
@@ -67,10 +67,10 @@ fugit                    = "0.3.7"
 instability              = "0.3.9"
 strum                    = { version = "0.27.1", default-features = false, features = ["derive"] }
 
-esp-config               = { version = "0.5.0", path = "../esp-config" }
-esp-metadata-generated   = { version = "0.1.0", path = "../esp-metadata-generated" }
-esp-sync                 = { version = "0.0.0", path = "../esp-sync" }
-procmacros               = { version = "0.19.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+esp-config               = { version = "0.6.0", path = "../esp-config" }
+esp-metadata-generated   = { version = "0.2.0", path = "../esp-metadata-generated" }
+esp-sync                 = { version = "0.1.0", path = "../esp-sync" }
+procmacros               = { version = "0.20.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 
 # Dependencies that are optional because they are used by unstable drivers.
 # They are needed when using the `unstable` feature.
@@ -114,15 +114,15 @@ esp32s3 = { version = "0.34", features = ["critical-section", "rt"], optional = 
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.15.0" }
-esp-riscv-rt     = { version = "0.12.0", path = "../esp-riscv-rt", optional = true }
+esp-riscv-rt     = { version = "0.13.0", path = "../esp-riscv-rt", optional = true }
 
 [target.'cfg(target_arch = "xtensa")'.dependencies]
-xtensa-lx        = { version = "0.12.0", path = "../xtensa-lx" }
-xtensa-lx-rt     = { version = "0.20.0", path = "../xtensa-lx-rt", optional = true }
+xtensa-lx        = { version = "0.13.0", path = "../xtensa-lx" }
+xtensa-lx-rt     = { version = "0.21.0", path = "../xtensa-lx-rt", optional = true }
 
 [build-dependencies]
-esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
-esp-config   = { version = "0.5.0", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-config   = { version = "0.6.0", path = "../esp-config", features = ["build"] }
 
 [dev-dependencies]
 crypto-bigint = { version = "0.5.5", default-features = false }
