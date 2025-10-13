@@ -60,6 +60,7 @@ impl RegisterAccess for CopyDmaTxChannel<'_> {
     fn peripheral_clock(&self) -> Option<Peripheral> {
         Some(Peripheral::CopyDma)
     }
+
     fn reset(&self) {
         self.regs().conf().modify(|_, w| w.out_rst().set_bit());
         self.regs().conf().modify(|_, w| w.out_rst().clear_bit());
@@ -232,6 +233,7 @@ impl RegisterAccess for CopyDmaRxChannel<'_> {
     fn peripheral_clock(&self) -> Option<Peripheral> {
         Some(Peripheral::CopyDma)
     }
+
     fn reset(&self) {
         self.regs().conf().modify(|_, w| w.in_rst().set_bit());
         self.regs().conf().modify(|_, w| w.in_rst().clear_bit());

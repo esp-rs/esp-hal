@@ -60,6 +60,7 @@ impl RegisterAccess for CryptoDmaTxChannel<'_> {
     fn peripheral_clock(&self) -> Option<Peripheral> {
         Some(Peripheral::CryptoDma)
     }
+
     fn reset(&self) {
         self.regs().conf().modify(|_, w| {
             w.out_rst().set_bit();
@@ -258,6 +259,7 @@ impl RegisterAccess for CryptoDmaRxChannel<'_> {
     fn peripheral_clock(&self) -> Option<Peripheral> {
         Some(Peripheral::CryptoDma)
     }
+
     fn reset(&self) {
         self.regs().conf().modify(|_, w| {
             w.in_rst().set_bit();

@@ -1743,11 +1743,7 @@ cfg_if::cfg_if! {
 fn create_guard(_ch: &impl RegisterAccess) -> PeripheralGuard {
     cfg_if::cfg_if! {
         if #[cfg(pdma)] {
-            if let Some(peri_clock) = _ch.peripheral_clock() {
-                Some(system::PeripheralGuard::new_with(peri_clock, init_dma_racey))
-            } else {
-                None
-            }
+            _ch.peripheral_clock().map(|peri_clock| system::PeripheralGuard::new_with(peri_clock, init_dma_racey))
         } else {
             // NOTE(p4): this function will read the channel's DMA peripheral from `_ch`
             system::GenericPeripheralGuard::new_with(init_dma_racey)

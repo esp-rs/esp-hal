@@ -56,6 +56,7 @@ impl RegisterAccess for AnyI2sDmaTxChannel<'_> {
     fn peripheral_clock(&self) -> Option<Peripheral> {
         None
     }
+
     fn reset(&self) {
         self.regs().lc_conf().modify(|_, w| w.out_rst().set_bit());
         self.regs().lc_conf().modify(|_, w| w.out_rst().clear_bit());
@@ -244,6 +245,7 @@ impl RegisterAccess for AnyI2sDmaRxChannel<'_> {
     fn peripheral_clock(&self) -> Option<Peripheral> {
         None
     }
+
     fn reset(&self) {
         self.regs().lc_conf().modify(|_, w| w.in_rst().set_bit());
         self.regs().lc_conf().modify(|_, w| w.in_rst().clear_bit());

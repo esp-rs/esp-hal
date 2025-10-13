@@ -65,6 +65,7 @@ impl RegisterAccess for AnySpiDmaTxChannel<'_> {
             }
         }
     }
+
     fn reset(&self) {
         self.regs().dma_conf().modify(|_, w| w.out_rst().set_bit());
         self.regs()
@@ -263,6 +264,7 @@ impl RegisterAccess for AnySpiDmaRxChannel<'_> {
             }
         }
     }
+
     fn reset(&self) {
         self.regs().dma_conf().modify(|_, w| w.in_rst().set_bit());
         self.regs().dma_conf().modify(|_, w| w.in_rst().clear_bit());
