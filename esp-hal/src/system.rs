@@ -607,11 +607,17 @@ impl PeripheralClockControl {
             #[cfg(soc_has_timg0)]
             Peripheral::Timg0 => {
                 system
+                    .timergroup0_conf()
+                    .modify(|_, w| w.tg0_clk_en().bit(enable));
+                system
                     .timergroup0_timer_clk_conf()
                     .modify(|_, w| w.tg0_timer_clk_en().bit(enable));
             }
             #[cfg(soc_has_timg1)]
             Peripheral::Timg1 => {
+                system
+                    .timergroup1_conf()
+                    .modify(|_, w| w.tg1_clk_en().bit(enable));
                 system
                     .timergroup1_timer_clk_conf()
                     .modify(|_, w| w.tg1_timer_clk_en().bit(enable));
