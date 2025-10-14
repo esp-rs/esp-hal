@@ -355,6 +355,7 @@ fn next_operation() {
     notify_state(previous_operation)
 }
 
+// FIXME: we shouldn't need this - we need to re-align the original driver with our port
 pub(crate) fn ensure_receive_enabled() {
     // shouldn't be necessary but avoids a problem with rx stopping
     // unexpectedly when used together with BLE
