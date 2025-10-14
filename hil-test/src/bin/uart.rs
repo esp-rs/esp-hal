@@ -261,7 +261,7 @@ mod tests {
         let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
 
         for _ in 0..3 {
-            tx.send_break(50);
+            tx.send_break(100);
             assert!(rx.wait_for_break_with_timeout(1_000_000));
         }
     }
