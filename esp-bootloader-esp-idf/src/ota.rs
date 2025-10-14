@@ -433,7 +433,7 @@ mod tests {
         };
 
         let mut mock_region = FlashRegion {
-            raw: &mock_entry,
+            raw: mock_entry,
             flash: &mut mock_flash,
         };
 
@@ -483,7 +483,7 @@ mod tests {
         mock_flash.data[0x1000..][..0x20].copy_from_slice(SLOT_INITIAL);
 
         let mut mock_region = FlashRegion {
-            raw: &mock_entry,
+            raw: mock_entry,
             flash: &mut mock_flash,
         };
 
@@ -523,7 +523,7 @@ mod tests {
         mock_flash.data[0x1000..][..0x20].copy_from_slice(SLOT_COUNT_2_NEW);
 
         let mut mock_region = FlashRegion {
-            raw: &mock_entry,
+            raw: mock_entry,
             flash: &mut mock_flash,
         };
 
@@ -561,7 +561,7 @@ mod tests {
         };
 
         let mut mock_region = FlashRegion {
-            raw: &mock_entry,
+            raw: mock_entry,
             flash: &mut mock_flash,
         };
 
@@ -627,7 +627,7 @@ mod tests {
         };
 
         let mut mock_region = FlashRegion {
-            raw: &mock_entry,
+            raw: mock_entry,
             flash: &mut mock_flash,
         };
 
@@ -712,7 +712,7 @@ mod tests {
         };
 
         let mut mock_region = FlashRegion {
-            raw: &mock_entry,
+            raw: mock_entry,
             flash: &mut mock_flash,
         };
 
