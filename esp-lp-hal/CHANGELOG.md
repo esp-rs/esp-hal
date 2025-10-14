@@ -15,10 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed size of LP_UART's RAM block (#3812)
 
 ### Removed
 
+
+## [v0.3.0] - 2025-10-13
+
+### Fixed
+
+- Fixed size of LP_UART's RAM block (#3812)
 
 ## [v0.2.0] - 2025-06-03
 
@@ -55,4 +60,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GPIO Input/Output types have been converted to unit structs (#1754)
 
 [v0.2.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-lp-hal-v0.2.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-lp-hal-v0.2.0...HEAD
+[v0.3.0]: https://github.com/esp-rs/esp-hal/compare/esp-lp-hal-v0.2.0...esp-lp-hal-v0.3.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-lp-hal-v0.3.0...HEAD

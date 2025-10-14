@@ -1,6 +1,6 @@
 [package]
 name          = "esp-lp-hal"
-version       = "0.2.0"
+version       = "0.3.0"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "HAL for low-power RISC-V coprocessors found in ESP32 devices"
@@ -45,15 +45,15 @@ esp32c6-lp        = { version = "0.3.0", features = ["critical-section"], option
 esp32s2-ulp       = { version = "0.3.0", features = ["critical-section"], optional = true }
 esp32s3-ulp       = { version = "0.3.0", features = ["critical-section"], optional = true }
 nb                = { version = "1.1.0",  optional = true }
-procmacros        = { version = "0.19.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+procmacros        = { version = "0.20.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 riscv             = { version = "0.15", features = ["critical-section-single-hart"] }
-esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated" }
+esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated" }
 
 [dev-dependencies]
 panic-halt = "0.2.0"
 
 [build-dependencies]
-esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 default = ["embedded-hal"]

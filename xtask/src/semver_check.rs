@@ -8,7 +8,7 @@ use anyhow::{Context, Error};
 use cargo_semver_checks::{Check, GlobalConfig, ReleaseType, Rustdoc};
 use esp_metadata::Chip;
 
-use crate::{Package, cargo::CargoArgsBuilder};
+use crate::{Package, cargo::CargoArgsBuilder, commands::checker::download_baselines};
 
 /// Return the minimum required bump for the next release.
 /// Even if nothing changed this will be [ReleaseType::Patch]
@@ -31,6 +31,9 @@ pub fn minimum_update(
 
     let baseline_path_gz =
         PathBuf::from(&package_path).join(format!("api-baseline/{}.json.gz", file_name));
+    if !baseline_path_gz.exists() {
+        download_baselines(&package_path, vec![package])?;
+    }
     let baseline_path =
         temp_file::TempFile::new().with_context(|| format!("Failed to create a TempFile!"))?;
     let buffer = Vec::new();

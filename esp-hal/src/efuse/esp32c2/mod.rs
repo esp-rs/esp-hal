@@ -78,6 +78,7 @@ impl super::Efuse {
         match atten {
             Attenuation::_0dB => 400,
             Attenuation::_11dB => 1370,
+            _ => panic!("Unsupported attenuation"),
         }
     }
 

@@ -12,14 +12,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.16.0] - 2025-10-13
+
+### Changed
+
 - Updated `timestamp` example code for Rust edition 2024 (#4211)
 
 ### Fixed
 
 - `critical-section` now wraps the entirety of the `print!` macros (#4162)
-
-### Removed
-
 
 ## [v0.15.0] - 2025-07-16
 
@@ -110,4 +118,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.13.1]: https://github.com/esp-rs/esp-hal/releases/tag/esp-println-v0.13.1
 [v0.14.0]: https://github.com/esp-rs/esp-hal/compare/esp-println-v0.13.1...esp-println-v0.14.0
 [v0.15.0]: https://github.com/esp-rs/esp-hal/compare/esp-println-v0.14.0...esp-println-v0.15.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-println-v0.15.0...HEAD
+[v0.16.0]: https://github.com/esp-rs/esp-hal/compare/esp-println-v0.15.0...esp-println-v0.16.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-println-v0.16.0...HEAD
