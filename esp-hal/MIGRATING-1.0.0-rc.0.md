@@ -304,19 +304,20 @@ let peripherals = esp_hal::init(
 ## I2S Changes
 
 I2S configuration is now done using `i2s::master::Config`. Sample rate and data format, previously passed
-to the constructor, have to be assigned to `Config` instead.
+to the constructor, have to be assigned to `Config` instead. The constructor is also fallible now:
 
 ```diff
-  let i2s = I2s::new(
-      peripherals.I2S0,
--     Standard::Philips,
--     DataFormat::Data16Channel16,
--     Rate::from_hz(44100),
-      dma_channel,
-+     Config::new_tdm_philips()
-+         .with_data_format(DataFormat::Data16Channel16)
-+         .with_sample_rate(Rate::from_hz(44100)),
-  );
+ let i2s = I2s::new(
+     peripherals.I2S0,
+-    Standard::Philips,
+-    DataFormat::Data16Channel16,
+-    Rate::from_hz(44100),
+     dma_channel,
++    Config::new_tdm_philips()
++        .with_data_format(DataFormat::Data16Channel16)
++        .with_sample_rate(Rate::from_hz(44100)),
+-);
++).unwrap();
 ```
 
 ## RTC Clocks
