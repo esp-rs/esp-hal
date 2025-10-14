@@ -389,6 +389,7 @@ impl SchedulerState {
         }
     }
 
+    #[cfg(feature = "esp-radio")]
     fn remove_from_all_queues(&mut self, mut task: TaskPtr) {
         self.all_tasks.remove(task);
         unwrap!(self.time_driver.as_mut()).timer_queue.remove(task);
