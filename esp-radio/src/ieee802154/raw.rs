@@ -355,6 +355,16 @@ fn next_operation() {
     notify_state(previous_operation)
 }
 
+pub(crate) fn ensure_receive_enabled() {
+    // shouldn't be necessary but avoids a problem with rx stopping
+    // unexpectedly when used together with BLE
+    STATE.with(|state| {
+        if state.state == Ieee802154State::Receive {
+            set_cmd(Command::RxStart);
+        }
+    });
+}
+
 #[handler(priority = Priority::Priority1)]
 fn zb_mac_handler() {
     trace!("ZB_MAC interrupt");
