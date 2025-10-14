@@ -373,6 +373,55 @@ mod tests {
     }
 
     #[test]
+    fn test_esp_rtos_task_deletion_does_not_crash(p: Peripherals) {
+        #[cfg(riscv)]
+        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_ints.software_interrupt0,
+        );
+
+        // Spawn tasks
+        extern "C" fn high_priority_task(context: *mut c_void) {
+            info!("High: spawning medium priority task");
+
+            let context = unsafe { &*(context as *const TestContext) };
+
+            context.mutex.take(None);
+            info!("High: mutex obtained, exiting");
+        }
+
+        struct TestContext {
+            mutex: Semaphore,
+        }
+        let mut test_context = TestContext {
+            mutex: Semaphore::new_mutex(false),
+        };
+
+        test_context.mutex.take(None);
+        info!("Low: mutex obtained");
+
+        let handle = unsafe {
+            info!("Low: spawning high priority task");
+            preempt::task_create(
+                "high_priority_task",
+                high_priority_task,
+                (&raw mut test_context).cast::<c_void>(),
+                3,
+                None,
+                4096,
+            )
+        };
+
+        unsafe { preempt::schedule_task_deletion(handle) };
+        test_context.mutex.give();
+
+        info!("Low: exiting");
+    }
+
+    #[test]
     #[cfg(multi_core)]
     fn test_esp_rtos_smp(p: Peripherals) {
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);

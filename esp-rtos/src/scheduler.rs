@@ -344,8 +344,11 @@ impl SchedulerState {
         let task_to_delete = NonNull::new(task_to_delete).unwrap_or(current_task);
         let is_current = task_to_delete == current_task;
 
-        self.to_delete.push(task_to_delete);
-        task_to_delete.set_state(TaskState::Deleted);
+        self.remove_from_all_queues(task_to_delete);
+        if task_to_delete.state() != TaskState::Deleted {
+            self.to_delete.push(task_to_delete);
+            task_to_delete.set_state(TaskState::Deleted);
+        }
 
         if is_current {
             self.per_cpu[current_cpu].current_task = None;
@@ -374,8 +377,6 @@ impl SchedulerState {
     fn delete_task(&mut self, mut to_delete: TaskPtr) {
         unsafe { to_delete.as_ref().ensure_no_stack_overflow() };
 
-        self.remove_from_all_queues(to_delete);
-
         unsafe {
             #[cfg(feature = "alloc")]
             if to_delete.as_ref().heap_allocated {
@@ -393,9 +394,7 @@ impl SchedulerState {
         unwrap!(self.time_driver.as_mut()).timer_queue.remove(task);
 
         if let Some(mut containing_queue) = unsafe { task.as_mut().current_queue.take() } {
-            unsafe {
-                containing_queue.as_mut().remove(task);
-            }
+            unsafe { containing_queue.as_mut().remove(task) };
         } else {
             self.run_queue.remove(task);
         }
