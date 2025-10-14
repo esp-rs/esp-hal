@@ -15,10 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed a bug causing a crash when deleting a task (#4338)
 
 ### Removed
 
+
+## [v0.1.1] - 2025-10-14
+
+### Fixed
+
+- Fixed a bug causing a crash when deleting a task (#4338)
 
 ## [v0.1.0] - 2025-10-13
 
@@ -28,4 +33,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `esp-hal-embassy` crate has been merged into `esp-rtos`. (#4172)
 
 [v0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-rtos-v0.1.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-rtos-v0.1.0...HEAD
+[v0.1.1]: https://github.com/esp-rs/esp-hal/compare/esp-rtos-v0.1.0...esp-rtos-v0.1.1
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-rtos-v0.1.1...HEAD

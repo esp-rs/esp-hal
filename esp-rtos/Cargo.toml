@@ -1,6 +1,6 @@
 [package]
 name          = "esp-rtos"
-version       = "0.1.0"
+version       = "0.1.1"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "A task scheduler for Espressif devices"
