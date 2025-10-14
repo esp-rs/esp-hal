@@ -6,7 +6,7 @@
 ![Crates.io](https://img.shields.io/crates/l/esp-rtos?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
-This crate implements [`esp-radio-rtos-driver`](https://crates.io/crates/esp-radio-rtos-driver) for firmwares using [esp-hal](https://crates.io/crates/esp-hal) without any additional software platform.
+An RTOS (Real-Time Operating System) implementation for esp-hal. This crate provides the runtime necessary to run `async` code on top of esp-hal, and implements the necessary capabilities (threads, queues, etc.) required by esp-radio.
 
 ## Minimum Supported Rust Version (MSRV)
 

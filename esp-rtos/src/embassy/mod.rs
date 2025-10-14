@@ -43,7 +43,8 @@ pub trait Callbacks {
 /// Thread-mode executor.
 ///
 /// This executor runs in an OS thread, meaning the scheduler needs to be started before using any
-/// async operations.
+/// async operations. If you wish to write async code without the scheduler running, consider
+/// using the [`InterruptExecutor`].
 #[cfg_attr(
     multi_core,
     doc = r"
