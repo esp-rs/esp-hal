@@ -85,6 +85,7 @@ xtal_options = [26, 40]
 
 memory_map = { ranges = [
     { name = "dram", start = 0x3FCA_0000, end = 0x3FCE_0000 },
+    { name = "dram2_uninit", start = 0x3FCC_E800, end = 0x3FCD_EB70 },
 ] }
 
 peripheral_clocks = { templates = [

@@ -726,6 +726,15 @@ macro_rules! memory_range {
     ("DRAM") => {
         1082130432..1082654720
     };
+    (size as str, "DRAM") => {
+        "524288"
+    };
+    ("DRAM2_UNINIT") => {
+        1082582544..1082648080
+    };
+    (size as str, "DRAM2_UNINIT") => {
+        "65536"
+    };
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
