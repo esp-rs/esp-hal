@@ -22,7 +22,7 @@ pub(crate) struct RmtChannelConfig(
 ///
 /// The macro generates code for each [device.rmt.channels[X]] entry.
 impl GenericProperty for RmtChannelConfig {
-    fn for_each_macro(&self) -> Option<TokenStream> {
+    fn macros(&self) -> Option<TokenStream> {
         let channel_cfgs = self
             .0
             .iter()
@@ -111,7 +111,7 @@ impl GenericProperty for RmtClockSourcesConfig {
         Some(cfgs)
     }
 
-    fn for_each_macro(&self) -> Option<TokenStream> {
+    fn macros(&self) -> Option<TokenStream> {
         let clock_sources = self
             .supported
             .iter()

@@ -483,7 +483,7 @@ impl Config {
         let cores = number(self.device.cores);
         let trm = &self.device.trm;
 
-        let mut for_each_macros = vec![];
+        let mut macros = vec![];
 
         let peripheral_properties =
             self.device
@@ -505,15 +505,15 @@ impl Config {
                     },
                     Value::NumberList(numbers) => {
                         let numbers = numbers.into_iter().map(number).collect::<Vec<_>>();
-                        for_each_macros.push(generate_for_each_macro(
+                        macros.push(generate_for_each_macro(
                             &name.replace(".", "_"),
                             &[("all", &numbers)],
                         ));
                         quote! {}
                     }
                     Value::Generic(v) => {
-                        if let Some(for_each) = v.for_each_macro() {
-                            for_each_macros.push(for_each);
+                        if let Some(for_each) = v.macros() {
+                            macros.push(for_each);
                         }
                         v.property_macro_branches()
                     }
@@ -557,7 +557,7 @@ impl Config {
                 #(#region_branches)*
             }
 
-            #(#for_each_macros)*
+            #(#macros)*
         });
 
         tokens

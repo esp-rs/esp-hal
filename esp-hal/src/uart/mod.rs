@@ -464,8 +464,8 @@ where
     }
 
     fn init(self, config: Config) -> Result<Uart<'d, Dm>, ConfigError> {
-        let rx_guard = PeripheralGuard::new(self.uart.parts().0.peripheral);
-        let tx_guard = PeripheralGuard::new(self.uart.parts().0.peripheral);
+        let rx_guard = PeripheralGuard::new(self.uart.info().peripheral);
+        let tx_guard = PeripheralGuard::new(self.uart.info().peripheral);
 
         let rts_pin = PinGuard::new_unconnected(self.uart.info().rts_signal);
         let tx_pin = PinGuard::new_unconnected(self.uart.info().tx_signal);
