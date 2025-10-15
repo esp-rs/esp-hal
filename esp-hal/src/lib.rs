@@ -228,11 +228,9 @@ pub use xtensa_lx_rt::{self, xtensa_lx};
 
 #[cfg(lp_core)]
 #[instability::unstable]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use self::soc::lp_core;
 #[cfg(ulp_riscv_core)]
 #[instability::unstable]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use self::soc::ulp_core;
 
 #[cfg(any(soc_has_dport, soc_has_hp_sys, soc_has_pcr, soc_has_system))]
@@ -334,8 +332,9 @@ unstable_module! {
     #[cfg(psram)] // DMA needs some things from here
     pub mod psram;
     pub mod efuse;
-    pub mod work_queue;
 }
+
+mod work_queue;
 
 unstable_driver! {
     #[cfg(soc_has_aes)]
