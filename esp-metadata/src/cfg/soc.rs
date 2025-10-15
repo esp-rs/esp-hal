@@ -47,10 +47,17 @@ impl super::GenericProperty for MemoryMap {
             let name = region.name.to_uppercase();
             let start = number(region.range.start as usize);
             let end = number(region.range.end as usize);
+            let size = format!(
+                "{}",
+                region.range.end as usize - region.range.start as usize
+            );
 
             quote! {
                 ( #name ) => {
                     #start .. #end
+                };
+                ( size as str, #name ) => {
+                    #size
                 };
             }
         });
