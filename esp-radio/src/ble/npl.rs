@@ -1038,7 +1038,7 @@ unsafe extern "C" fn ble_npl_get_current_task_id() -> *const c_void {
 }
 
 unsafe extern "C" fn ble_npl_os_started() -> bool {
-    todo!();
+    true
 }
 
 #[repr(C)]
@@ -1185,9 +1185,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             assert!(res == 0, "adv_stack_initEnv returned {}", res);
 
             let res = extAdv_stack_initEnv();
-            if res != 0 {
-                panic!("extAdv_stack_initEnv returned {}", res);
-            }
+            assert!(res == 0, "extAdv_stack_initEnv returned {}", res);
 
             let res = sync_stack_initEnv();
             assert!(res == 0, "sync_stack_initEnv returned {}", res);
@@ -1225,10 +1223,6 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         #[cfg(not(esp32c2))]
         let res = r_ble_controller_enable(1); // 1 = BLE
         assert!(res == 0, "ble_controller_enable returned {}", res);
-
-        // this is to avoid (ASSERT r_ble_hci_ram_hs_cmd_tx:34 0 0)
-        // we wait a bit to make sure the ble task initialized everything
-        crate::preempt::usleep(10_000);
     }
 
     // At some point the "High-speed ADC" entropy source became available.
@@ -1253,18 +1247,12 @@ pub(crate) fn ble_deinit() {
     }
 
     unsafe {
-        // Prevent ASSERT r_ble_ll_reset:1069 ... ...
-        // TODO: the cause of the issue is that the BLE controller can be dropped while the driver
-        // is in the process of handling a HCI command.
-        crate::preempt::usleep(10_000);
         // HCI deinit
         npl::r_ble_hci_trans_cfg_hs(None, core::ptr::null(), None, core::ptr::null());
 
         #[cfg(not(esp32c2))]
-        npl::r_ble_controller_disable();
-
-        #[cfg(not(esp32c2))]
         {
+            npl::r_ble_controller_disable();
             conn_stack_deinitEnv();
             sync_stack_deinitEnv();
             extAdv_stack_deinitEnv();
@@ -1278,9 +1266,7 @@ pub(crate) fn ble_deinit() {
         #[cfg(esp32c2)]
         let res = npl::ble_controller_deinit();
 
-        if res != 0 {
-            panic!("ble_controller_deinit returned {}", res);
-        }
+        assert!(res == 0, "ble_controller_deinit returned {}", res);
 
         npl::esp_unregister_npl_funcs();
 

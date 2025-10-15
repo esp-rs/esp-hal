@@ -122,7 +122,7 @@ unsafe extern "C" fn interrupt_disable() {
 
 #[ram]
 unsafe extern "C" fn task_yield() {
-    todo!();
+    crate::preempt::yield_task();
 }
 
 unsafe extern "C" fn task_yield_from_isr() {
