@@ -16,6 +16,7 @@
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
+#![deny(missing_docs)]
 
 // MUST be the first module
 mod fmt;
@@ -290,6 +291,11 @@ impl Drop for PhyInitGuard<'_> {
 
 /// Common functionality for controlling PHY initialization.
 pub trait PhyController<'d>: private::Sealed + ModemClockController<'d> {
+    /// Enable the PHY.
+    ///
+    /// If no other [PhyInitGuard] is currently alive, this will also initialize the PHY, which
+    /// will involve a full RF calibration, unless you loaded previously backed up calibration
+    /// data with [set_phy_calibration_data].
     fn enable_phy(&self) -> PhyInitGuard<'d> {
         // In esp-idf, this is done after calculating the MAC time delta, but it shouldn't make
         // much of a difference.
