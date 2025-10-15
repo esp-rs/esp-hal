@@ -104,19 +104,18 @@ fn main() -> ! {
         if boot_button.is_low() && !done {
             done = true;
 
-            ota.with_next_partition(|mut next_app_partition, part_type| {
-                println!("Flashing image to {:?}", part_type);
+            let (mut next_app_partition, part_type) = ota.next_partition().unwrap();
 
-                // write to the app partition
-                for (sector, chunk) in OTA_IMAGE.chunks(4096).enumerate() {
-                    println!("Writing sector {sector}...");
+            println!("Flashing image to {:?}", part_type);
 
-                    next_app_partition
-                        .write((sector * 4096) as u32, chunk)
-                        .unwrap();
-                }
-            })
-            .ok();
+            // write to the app partition
+            for (sector, chunk) in OTA_IMAGE.chunks(4096).enumerate() {
+                println!("Writing sector {sector}...");
+
+                next_app_partition
+                    .write((sector * 4096) as u32, chunk)
+                    .unwrap();
+            }
 
             println!("Changing OTA slot and setting the state to NEW");
 

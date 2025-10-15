@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `OtaUpdater::next_partition` (#4339)
 
 ### Changed
 
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- `OtaUpdater::with_next_partition` (#4339)
 
 ## [v0.3.0] - 2025-10-13
 
