@@ -1,6 +1,8 @@
 use std::{collections::HashMap, str::FromStr};
 
+use anyhow::{Context, Result};
 use convert_case::{Boundary, Case, Casing, pattern};
+use proc_macro2::TokenStream;
 
 use crate::cfg::Value;
 
@@ -24,15 +26,16 @@ impl super::SocProperties {
     }
 }
 
-/// A named template. Can contain `{{placeholder}}s` that will be substituted with actual values.
+/// A named template. Can contain `{{placeholder}}` placeholders that will be substituted with
+/// actual values.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct Template {
     /// The name of the template. Other templates can substitute this template's value by using the
     /// `{{name}}` placeholder.
     pub name: String,
 
-    /// The value of the template. Can contain `{{placeholder}}s` that will be substituted with
-    /// actual values.
+    /// The value of the template. Can contain `{{placeholder}}` placeholders that will be
+    /// substituted with actual values.
     pub value: String,
 }
 
@@ -68,71 +71,7 @@ pub struct PeripheralClocks {
 }
 
 impl PeripheralClocks {
-    fn substitute_into(
-        &self,
-        template_name: &str,
-        periph: &PeripheralClock,
-    ) -> proc_macro2::TokenStream {
-        fn placeholder(name: &str) -> String {
-            // format! would work but it needs an insane syntax to escape the curly braces.
-            let mut output = String::with_capacity(name.len() + 4);
-            output.push_str("{{");
-            output.push_str(name);
-            output.push_str("}}");
-            output
-        }
-
-        let mut substitutions = HashMap::new();
-        for template in &self.templates {
-            substitutions.insert(placeholder(&template.name), template.value.clone());
-        }
-        substitutions.insert(
-            placeholder("peripheral"),
-            periph
-                .name
-                .from_case(Case::Custom {
-                    boundaries: &[Boundary::LOWER_UPPER, Boundary::DIGIT_UPPER],
-                    pattern: pattern::capital,
-                    delim: "",
-                })
-                .to_case(Case::Snake),
-        );
-        // Peripheral-specific keys overwrite template defaults
-        for (key, value) in periph.template_params.iter() {
-            substitutions.insert(placeholder(key), value.clone());
-        }
-
-        let template_name = placeholder(template_name);
-        let mut template = substitutions[&template_name].clone();
-
-        // Replace while there are substitutions left
-        loop {
-            let mut found = false;
-            for (key, value) in substitutions.iter() {
-                if template.contains(key) {
-                    template = template.replace(key, value);
-                    found = true;
-                }
-            }
-            if !found {
-                break;
-            }
-        }
-
-        proc_macro2::TokenStream::from_str(&template).unwrap()
-    }
-
-    fn clk_en(&self, periph: &PeripheralClock) -> proc_macro2::TokenStream {
-        self.substitute_into("clk_en_template", periph)
-    }
-
-    fn rst(&self, periph: &PeripheralClock) -> proc_macro2::TokenStream {
-        self.substitute_into("rst_template", periph)
-    }
-}
-
-impl super::GenericProperty for PeripheralClocks {
-    fn macros(&self) -> Option<proc_macro2::TokenStream> {
+    fn generate_macro(&self) -> Result<TokenStream> {
         let mut clocks = self.peripheral_clocks.clone();
         clocks.sort_by(|a, b| a.name.cmp(&b.name));
 
@@ -159,28 +98,34 @@ impl super::GenericProperty for PeripheralClocks {
                 .then_some(quote::format_ident!("{}", clock.name))
         });
 
-        let clk_en_arms = clocks.iter().map(|clock| {
-            let clock_name = quote::format_ident!("{}", clock.name);
-            let clock_en = self.clk_en(clock);
+        let clk_en_arms = clocks
+            .iter()
+            .map(|clock| {
+                let clock_name = quote::format_ident!("{}", clock.name);
+                let clock_en = self.clk_en(clock)?;
 
-            quote::quote! {
-                Peripheral::#clock_name => {
-                    #clock_en
-                }
-            }
-        });
-        let rst_arms = clocks.iter().map(|clock| {
-            let clock_name = quote::format_ident!("{}", clock.name);
-            let rst = self.rst(clock);
+                Ok(quote::quote! {
+                    Peripheral::#clock_name => {
+                        #clock_en
+                    }
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let rst_arms = clocks
+            .iter()
+            .map(|clock| {
+                let clock_name = quote::format_ident!("{}", clock.name);
+                let rst = self.rst(clock)?;
 
-            quote::quote! {
-                Peripheral::#clock_name => {
-                    #rst
-                }
-            }
-        });
+                Ok(quote::quote! {
+                    Peripheral::#clock_name => {
+                        #rst
+                    }
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
 
-        Some(quote::quote! {
+        Ok(quote::quote! {
             /// Implement the `Peripheral` enum and enable/disable/reset functions.
             ///
             /// This macro is intended to be placed in `esp_hal::system`.
@@ -229,5 +174,84 @@ impl super::GenericProperty for PeripheralClocks {
                 }
             }
         })
+    }
+
+    fn substitute_into(
+        &self,
+        template_name: &str,
+        periph: &PeripheralClock,
+    ) -> Result<TokenStream> {
+        fn placeholder(name: &str) -> String {
+            // format! would work but it needs an insane syntax to escape the curly braces.
+            let mut output = String::with_capacity(name.len() + 4);
+            output.push_str("{{");
+            output.push_str(name);
+            output.push_str("}}");
+            output
+        }
+
+        let mut substitutions = HashMap::new();
+        for template in &self.templates {
+            substitutions.insert(placeholder(&template.name), template.value.clone());
+        }
+        substitutions.insert(
+            placeholder("peripheral"),
+            periph
+                .name
+                .from_case(Case::Custom {
+                    boundaries: &[Boundary::LOWER_UPPER, Boundary::DIGIT_UPPER],
+                    pattern: pattern::capital,
+                    delim: "",
+                })
+                .to_case(Case::Snake),
+        );
+        // Peripheral-specific keys overwrite template defaults
+        for (key, value) in periph.template_params.iter() {
+            substitutions.insert(placeholder(key), value.clone());
+        }
+
+        let template_key = placeholder(template_name);
+        let mut template = substitutions[&template_key].clone();
+
+        // Replace while there are substitutions left
+        loop {
+            let mut found = false;
+            for (key, value) in substitutions.iter() {
+                if template.contains(key) {
+                    template = template.replace(key, value);
+                    found = true;
+                }
+            }
+            if !found {
+                break;
+            }
+        }
+
+        match proc_macro2::TokenStream::from_str(&template) {
+            Ok(tokens) => Ok(tokens),
+            Err(err) => anyhow::bail!("Failed to inflate {template_name}: {err}"),
+        }
+    }
+
+    fn clk_en(&self, periph: &PeripheralClock) -> Result<TokenStream> {
+        self.substitute_into("clk_en_template", periph)
+            .with_context(|| format!("Failed to generate clock enable code for {}", periph.name))
+    }
+
+    fn rst(&self, periph: &PeripheralClock) -> Result<TokenStream> {
+        self.substitute_into("rst_template", periph)
+            .with_context(|| format!("Failed to generate reset code for {}", periph.name))
+    }
+}
+
+impl super::GenericProperty for PeripheralClocks {
+    fn macros(&self) -> Option<TokenStream> {
+        match self.generate_macro() {
+            Ok(tokens) => Some(tokens),
+            Err(err) => panic!(
+                "{:?}",
+                err.context("Failed to generate peripheral clock control macro")
+            ),
+        }
     }
 }

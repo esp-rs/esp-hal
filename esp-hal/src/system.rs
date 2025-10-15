@@ -94,6 +94,7 @@ impl<const P: u8> GenericPeripheralGuard<P> {
         Self {}
     }
 
+    #[cfg_attr(not(feature = "unstable"), allow(unused))]
     pub(crate) fn new() -> Self {
         Self::new_with(|| {})
     }
