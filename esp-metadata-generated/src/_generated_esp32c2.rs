@@ -208,14 +208,6 @@ macro_rules! property {
         true
     };
 }
-/// Macro to get the address range of the given memory region.
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! memory_range {
-    ("DRAM") => {
-        1070202880..1070465024
-    };
-}
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_soc_xtal_options {
@@ -422,6 +414,14 @@ macro_rules! implement_peripheral_clocks {
                 }
             }
         }
+    };
+}
+/// Macro to get the address range of the given memory region.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! memory_range {
+    ("DRAM") => {
+        1070202880..1070465024
     };
 }
 #[macro_export]
