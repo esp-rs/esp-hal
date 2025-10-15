@@ -467,8 +467,20 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
         .unwrap();
 
     // Spin until the second core scheduler is initialized
-    while SCHEDULER.with(|s| !s.per_cpu[1].initialized) {
+    let start = Instant::now();
+
+    while start.elapsed() < Duration::from_secs(1) {
+        if SCHEDULER.with(|s| s.per_cpu[1].initialized) {
+            break;
+        }
         esp_hal::rom::ets_delay_us(1);
+    }
+
+    if !SCHEDULER.with(|s| s.per_cpu[1].initialized) {
+        panic!(
+            "Second core scheduler failed to initialize. \
+            This can happen if its main function overflowed the stack."
+        );
     }
 
     core::mem::forget(guard);

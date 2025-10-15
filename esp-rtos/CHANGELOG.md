@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `start_second_core` will now panic if the scheduler does not start on the second core. (#4353)
 
 ### Fixed
 
