@@ -552,7 +552,7 @@ pub unsafe trait Persistable: Sized {}
 /// # Safety
 ///
 /// - The type must be some form of `MaybeUninit<T>`
-#[instability::unstable]
+#[doc(hidden)]
 pub unsafe trait Uninit: Sized {}
 
 macro_rules! impl_persistable {
@@ -584,7 +584,6 @@ pub mod __macro_implementation {
     #[instability::unstable]
     pub const fn assert_is_persistable<T: super::Persistable>() {}
 
-    #[instability::unstable]
     pub const fn assert_is_uninit<T: super::Uninit>() {}
 
     #[cfg(feature = "rt")]
