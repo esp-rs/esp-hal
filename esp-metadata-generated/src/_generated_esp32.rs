@@ -249,6 +249,9 @@ macro_rules! property {
     ("uart.ram_size", str) => {
         stringify!(128)
     };
+    ("uart.peripheral_controls_mem_clk") => {
+        false
+    };
     ("wifi.has_wifi6") => {
         false
     };
@@ -274,6 +277,334 @@ macro_rules! for_each_soc_xtal_options {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
         _for_each_inner!((26)); _for_each_inner!((40)); _for_each_inner!((all(26),
         (40)));
+    };
+}
+/// Implement the `Peripheral` enum and enable/disable/reset functions.
+///
+/// This macro is intended to be placed in `esp_hal::system`.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! implement_peripheral_clocks {
+    () => {
+        #[doc(hidden)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[repr(u8)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum Peripheral {
+            #[doc = "AES peripheral clock signal"]
+            Aes,
+            #[doc = "I2C_EXT0 peripheral clock signal"]
+            I2cExt0,
+            #[doc = "I2C_EXT1 peripheral clock signal"]
+            I2cExt1,
+            #[doc = "I2S0 peripheral clock signal"]
+            I2s0,
+            #[doc = "I2S1 peripheral clock signal"]
+            I2s1,
+            #[doc = "LEDC peripheral clock signal"]
+            Ledc,
+            #[doc = "MCPWM0 peripheral clock signal"]
+            Mcpwm0,
+            #[doc = "MCPWM1 peripheral clock signal"]
+            Mcpwm1,
+            #[doc = "PCNT peripheral clock signal"]
+            Pcnt,
+            #[doc = "RMT peripheral clock signal"]
+            Rmt,
+            #[doc = "RSA peripheral clock signal"]
+            Rsa,
+            #[doc = "SHA peripheral clock signal"]
+            Sha,
+            #[doc = "SPI2 peripheral clock signal"]
+            Spi2,
+            #[doc = "SPI3 peripheral clock signal"]
+            Spi3,
+            #[doc = "SPI_DMA peripheral clock signal"]
+            SpiDma,
+            #[doc = "TIMG0 peripheral clock signal"]
+            Timg0,
+            #[doc = "TIMG1 peripheral clock signal"]
+            Timg1,
+            #[doc = "TWAI0 peripheral clock signal"]
+            Twai0,
+            #[doc = "UART0 peripheral clock signal"]
+            Uart0,
+            #[doc = "UART1 peripheral clock signal"]
+            Uart1,
+            #[doc = "UART2 peripheral clock signal"]
+            Uart2,
+            #[doc = "UHCI0 peripheral clock signal"]
+            Uhci0,
+            #[doc = "UHCI1 peripheral clock signal"]
+            Uhci1,
+        }
+        impl Peripheral {
+            const KEEP_ENABLED: &[Peripheral] = &[Self::Timg0, Self::Uart0];
+            const COUNT: usize = Self::ALL.len();
+            const ALL: &[Self] = &[
+                Self::Aes,
+                Self::I2cExt0,
+                Self::I2cExt1,
+                Self::I2s0,
+                Self::I2s1,
+                Self::Ledc,
+                Self::Mcpwm0,
+                Self::Mcpwm1,
+                Self::Pcnt,
+                Self::Rmt,
+                Self::Rsa,
+                Self::Sha,
+                Self::Spi2,
+                Self::Spi3,
+                Self::SpiDma,
+                Self::Timg0,
+                Self::Timg1,
+                Self::Twai0,
+                Self::Uart0,
+                Self::Uart1,
+                Self::Uart2,
+                Self::Uhci0,
+                Self::Uhci1,
+            ];
+        }
+        unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
+            match peripheral {
+                Peripheral::Aes => {
+                    crate::peripherals::SYSTEM::regs()
+                        .peri_clk_en()
+                        .modify(|_, w| w.crypto_aes_clk_en().bit(enable));
+                }
+                Peripheral::I2cExt0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.i2c_ext0_clk_en().bit(enable));
+                }
+                Peripheral::I2cExt1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.i2c_ext1_clk_en().bit(enable));
+                }
+                Peripheral::I2s0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.i2s0_clk_en().bit(enable));
+                }
+                Peripheral::I2s1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.i2s1_clk_en().bit(enable));
+                }
+                Peripheral::Ledc => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.ledc_clk_en().bit(enable));
+                }
+                Peripheral::Mcpwm0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.pwm0_clk_en().bit(enable));
+                }
+                Peripheral::Mcpwm1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.pwm1_clk_en().bit(enable));
+                }
+                Peripheral::Pcnt => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.pcnt_clk_en().bit(enable));
+                }
+                Peripheral::Rmt => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.rmt_clk_en().bit(enable));
+                }
+                Peripheral::Rsa => {
+                    crate::peripherals::SYSTEM::regs()
+                        .peri_clk_en()
+                        .modify(|_, w| w.crypto_rsa_clk_en().bit(enable));
+                }
+                Peripheral::Sha => {
+                    crate::peripherals::SYSTEM::regs()
+                        .peri_clk_en()
+                        .modify(|_, w| w.crypto_sha_clk_en().bit(enable));
+                }
+                Peripheral::Spi2 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.spi2_clk_en().bit(enable));
+                }
+                Peripheral::Spi3 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.spi3_clk_en().bit(enable));
+                }
+                Peripheral::SpiDma => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.spi_dma_clk_en().bit(enable));
+                }
+                Peripheral::Timg0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.timergroup_clk_en().bit(enable));
+                }
+                Peripheral::Timg1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.timergroup1_clk_en().bit(enable));
+                }
+                Peripheral::Twai0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.twai_clk_en().bit(enable));
+                }
+                Peripheral::Uart0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.uart_clk_en().bit(enable));
+                }
+                Peripheral::Uart1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.uart1_clk_en().bit(enable));
+                }
+                Peripheral::Uart2 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.uart2_clk_en().bit(enable));
+                }
+                Peripheral::Uhci0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.uhci0_clk_en().bit(enable));
+                }
+                Peripheral::Uhci1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en()
+                        .modify(|_, w| w.uhci1_clk_en().bit(enable));
+                }
+            }
+        }
+        unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
+            match peripheral {
+                Peripheral::Aes => {
+                    crate::peripherals::SYSTEM::regs()
+                        .peri_rst_en()
+                        .modify(|_, w| w.crypto_aes_rst().bit(reset));
+                }
+                Peripheral::I2cExt0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.i2c_ext0_rst().bit(reset));
+                }
+                Peripheral::I2cExt1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.i2c_ext1_rst().bit(reset));
+                }
+                Peripheral::I2s0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.i2s0_rst().bit(reset));
+                }
+                Peripheral::I2s1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.i2s1_rst().bit(reset));
+                }
+                Peripheral::Ledc => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.ledc_rst().bit(reset));
+                }
+                Peripheral::Mcpwm0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.pwm0_rst().bit(reset));
+                }
+                Peripheral::Mcpwm1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.pwm1_rst().bit(reset));
+                }
+                Peripheral::Pcnt => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.pcnt_rst().bit(reset));
+                }
+                Peripheral::Rmt => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.rmt_rst().bit(reset));
+                }
+                Peripheral::Rsa => {
+                    crate::peripherals::SYSTEM::regs()
+                        .peri_rst_en()
+                        .modify(|_, w| w.crypto_rsa_rst().bit(reset));
+                }
+                Peripheral::Sha => {
+                    crate::peripherals::SYSTEM::regs()
+                        .peri_rst_en()
+                        .modify(|_, w| w.crypto_sha_rst().bit(reset));
+                }
+                Peripheral::Spi2 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.spi2_rst().bit(reset));
+                }
+                Peripheral::Spi3 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.spi3_rst().bit(reset));
+                }
+                Peripheral::SpiDma => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.spi_dma_rst().bit(reset));
+                }
+                Peripheral::Timg0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.timergroup_rst().bit(reset));
+                }
+                Peripheral::Timg1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.timergroup1_rst().bit(reset));
+                }
+                Peripheral::Twai0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.twai_rst().bit(reset));
+                }
+                Peripheral::Uart0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.uart_rst().bit(reset));
+                }
+                Peripheral::Uart1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.uart1_rst().bit(reset));
+                }
+                Peripheral::Uart2 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.uart2_rst().bit(reset));
+                }
+                Peripheral::Uhci0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.uhci0_rst().bit(reset));
+                }
+                Peripheral::Uhci1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en()
+                        .modify(|_, w| w.uhci1_rst().bit(reset));
+                }
+            }
+        }
     };
 }
 #[macro_export]
