@@ -341,7 +341,7 @@ macro_rules! implement_peripheral_clocks {
             Uhci1,
         }
         impl Peripheral {
-            const KEEP_ENABLED: &[Peripheral] = &[Self::Timg0, Self::Uart0];
+            const KEEP_ENABLED: &[Peripheral] = &[Self::Timg0, Self::Uart0, Self::UartMem];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::Aes,

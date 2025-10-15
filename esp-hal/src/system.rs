@@ -6,7 +6,7 @@ use esp_sync::NonReentrantMutex;
 implement_peripheral_clocks!();
 
 impl Peripheral {
-    pub fn try_from(value: u8) -> Option<Peripheral> {
+    pub const fn try_from(value: u8) -> Option<Peripheral> {
         if value >= Peripheral::COUNT as u8 {
             return None;
         }
@@ -37,11 +37,14 @@ static PERIPHERAL_REF_COUNT: NonReentrantMutex<RefCounts> =
 pub(crate) fn disable_peripherals() {
     // Take the critical section up front to avoid taking it multiple times.
     PERIPHERAL_REF_COUNT.with(|refcounts| {
+        for p in Peripheral::KEEP_ENABLED {
+            refcounts.counts[*p as usize] += 1;
+        }
         for p in Peripheral::ALL {
-            if Peripheral::KEEP_ENABLED.contains(p) {
-                continue;
+            let ref_count = refcounts.counts[*p as usize];
+            if ref_count == 0 {
+                PeripheralClockControl::enable_forced_with_counts(*p, false, true, refcounts);
             }
-            PeripheralClockControl::enable_forced_with_counts(*p, false, true, refcounts);
         }
     })
 }
@@ -54,7 +57,7 @@ pub(crate) struct PeripheralGuard {
 
 impl PeripheralGuard {
     pub(crate) fn new_with(p: Peripheral, init: fn()) -> Self {
-        if !Peripheral::KEEP_ENABLED.contains(&p) && PeripheralClockControl::enable(p) {
+        if PeripheralClockControl::enable(p) {
             PeripheralClockControl::reset(p);
             init();
         }
@@ -69,9 +72,7 @@ impl PeripheralGuard {
 
 impl Drop for PeripheralGuard {
     fn drop(&mut self) {
-        if !Peripheral::KEEP_ENABLED.contains(&self.peripheral) {
-            PeripheralClockControl::disable(self.peripheral);
-        }
+        PeripheralClockControl::disable(self.peripheral);
     }
 }
 
@@ -81,15 +82,14 @@ pub(crate) struct GenericPeripheralGuard<const P: u8> {}
 
 impl<const P: u8> GenericPeripheralGuard<P> {
     pub(crate) fn new_with(init: fn()) -> Self {
-        let peripheral = unwrap!(Peripheral::try_from(P));
-        if !Peripheral::KEEP_ENABLED.contains(&peripheral) {
-            PERIPHERAL_REF_COUNT.with(|ref_counts| {
-                if PeripheralClockControl::enable_with_counts(peripheral, ref_counts) {
-                    unsafe { PeripheralClockControl::reset_racey(peripheral) };
-                    init();
-                }
-            });
-        }
+        let peripheral = const { Peripheral::try_from(P).unwrap() };
+
+        PERIPHERAL_REF_COUNT.with(|ref_counts| {
+            if PeripheralClockControl::enable_with_counts(peripheral, ref_counts) {
+                unsafe { PeripheralClockControl::reset_racey(peripheral) };
+                init();
+            }
+        });
 
         Self {}
     }
@@ -112,10 +112,8 @@ impl<const P: u8> Clone for GenericPeripheralGuard<P> {
 
 impl<const P: u8> Drop for GenericPeripheralGuard<P> {
     fn drop(&mut self) {
-        let peripheral = unwrap!(Peripheral::try_from(P));
-        if !Peripheral::KEEP_ENABLED.contains(&peripheral) {
-            PeripheralClockControl::disable(peripheral);
-        }
+        let peripheral = const { Peripheral::try_from(P).unwrap() };
+        PeripheralClockControl::disable(peripheral);
     }
 }
 

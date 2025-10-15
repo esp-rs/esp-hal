@@ -104,7 +104,7 @@ peripheral_clocks = { templates = [
     #{ name = "Adc2Arb" },
     { name = "Systimer", keep_enabled = true },
     { name = "ApbSarAdc", template_params = { peripheral = "apb_saradc" } },
-    { name = "UartMem" },
+    { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
     { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true }, # used for clock calibration
     { name = "Ledc" },
     { name = "I2cExt0" },

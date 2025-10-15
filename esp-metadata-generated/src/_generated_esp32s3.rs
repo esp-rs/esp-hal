@@ -365,8 +365,13 @@ macro_rules! implement_peripheral_clocks {
             UsbDevice,
         }
         impl Peripheral {
-            const KEEP_ENABLED: &[Peripheral] =
-                &[Self::Systimer, Self::Timg0, Self::Uart0, Self::UsbDevice];
+            const KEEP_ENABLED: &[Peripheral] = &[
+                Self::Systimer,
+                Self::Timg0,
+                Self::Uart0,
+                Self::UartMem,
+                Self::UsbDevice,
+            ];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::Aes,
