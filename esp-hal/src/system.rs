@@ -49,9 +49,21 @@ pub enum Peripheral {
     /// General DMA (GDMA) peripheral.
     #[cfg(gdma)]
     Gdma,
-    /// Peripheral DMA (PDMA) peripheral.
-    #[cfg(pdma)]
-    Dma,
+    /// SPI_DMA peripheral.
+    #[cfg(esp32)]
+    SpiDma,
+    /// SPI2_DMA peripheral.
+    #[cfg(esp32s2)]
+    Spi2Dma,
+    /// SPI3_DMA peripheral.
+    #[cfg(esp32s2)]
+    Spi3Dma,
+    /// CRYPTO_DMA peripheral.
+    #[cfg(esp32s2)]
+    CryptoDma,
+    /// COPY_DMA peripheral.
+    #[cfg(esp32s2)]
+    CopyDma,
     /// I2S0 peripheral (Inter-IC Sound).
     #[cfg(soc_has_i2s0)]
     I2s0,
@@ -162,8 +174,16 @@ impl Peripheral {
         Self::ApbSarAdc,
         #[cfg(gdma)]
         Self::Gdma,
-        #[cfg(pdma)]
-        Self::Dma,
+        #[cfg(esp32)]
+        Self::SpiDma,
+        #[cfg(esp32s2)]
+        Self::Spi2Dma,
+        #[cfg(esp32s2)]
+        Self::Spi3Dma,
+        #[cfg(esp32s2)]
+        Self::CryptoDma,
+        #[cfg(esp32s2)]
+        Self::CopyDma,
         #[cfg(soc_has_i2s0)]
         Self::I2s0,
         #[cfg(soc_has_i2s1)]
@@ -302,6 +322,7 @@ impl<const P: u8> GenericPeripheralGuard<P> {
         Self {}
     }
 
+    #[cfg_attr(not(feature = "unstable"), allow(unused))]
     pub(crate) fn new() -> Self {
         Self::new_with(|| {})
     }
@@ -332,8 +353,6 @@ pub(crate) struct PeripheralClockControl;
 #[cfg(not(any(esp32c6, esp32h2)))]
 impl PeripheralClockControl {
     unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
-        debug!("Enable {:?} {}", peripheral, enable);
-
         let system = SYSTEM::regs();
 
         #[cfg(esp32)]
@@ -389,16 +408,30 @@ impl PeripheralClockControl {
             Peripheral::Gdma => {
                 perip_clk_en1.modify(|_, w| w.dma_clk_en().bit(enable));
             }
+
             #[cfg(esp32)]
-            Peripheral::Dma => {
+            Peripheral::SpiDma => {
                 perip_clk_en0.modify(|_, w| w.spi_dma_clk_en().bit(enable));
             }
             #[cfg(esp32s2)]
-            Peripheral::Dma => {
+            Peripheral::Spi2Dma => {
                 perip_clk_en0.modify(|_, w| w.spi2_dma_clk_en().bit(enable));
+            }
+            #[cfg(esp32s2)]
+            Peripheral::Spi3Dma => {
                 perip_clk_en0.modify(|_, w| w.spi3_dma_clk_en().bit(enable));
+            }
+            #[cfg(esp32s2)]
+            Peripheral::CryptoDma => {
                 perip_clk_en1.modify(|_, w| w.crypto_dma_clk_en().bit(enable));
             }
+            #[cfg(esp32s2)]
+            Peripheral::CopyDma => {
+                let copy_config = crate::peripherals::DMA_COPY::regs().conf();
+
+                copy_config.modify(|_, w| w.clk_en().bit(enable));
+            }
+
             #[cfg(soc_has_i2s0)]
             Peripheral::I2s0 => {
                 perip_clk_en0.modify(|_, w| w.i2s0_clk_en().bit(enable));
@@ -421,14 +454,10 @@ impl PeripheralClockControl {
             }
             #[cfg(soc_has_timg0)]
             Peripheral::Timg0 => {
-                #[cfg(any(esp32c3, esp32s2, esp32s3))]
-                perip_clk_en0.modify(|_, w| w.timers_clk_en().bit(enable));
                 perip_clk_en0.modify(|_, w| w.timergroup_clk_en().bit(enable));
             }
             #[cfg(soc_has_timg1)]
             Peripheral::Timg1 => {
-                #[cfg(any(esp32c3, esp32s2, esp32s3))]
-                perip_clk_en0.modify(|_, w| w.timers_clk_en().bit(enable));
                 perip_clk_en0.modify(|_, w| w.timergroup1_clk_en().bit(enable));
             }
             #[cfg(soc_has_sha)]
@@ -459,16 +488,9 @@ impl PeripheralClockControl {
             Peripheral::Uart2 => {
                 perip_clk_en0.modify(|_, w| w.uart2_clk_en().bit(enable));
             }
-            #[cfg(all(rsa, esp32))]
+            #[cfg(rsa)]
             Peripheral::Rsa => {
                 perip_clk_en1.modify(|_, w| w.crypto_rsa_clk_en().bit(enable));
-            }
-            #[cfg(all(rsa, any(esp32c3, esp32s2, esp32s3)))]
-            Peripheral::Rsa => {
-                perip_clk_en1.modify(|_, w| w.crypto_rsa_clk_en().bit(enable));
-                system
-                    .rsa_pd_ctrl()
-                    .modify(|_, w| w.rsa_mem_pd().bit(!enable));
             }
             #[cfg(soc_has_hmac)]
             Peripheral::Hmac => {
@@ -501,7 +523,6 @@ impl PeripheralClockControl {
 #[cfg(any(esp32c6, esp32h2))]
 impl PeripheralClockControl {
     unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
-        debug!("Enable {:?} {}", peripheral, enable);
         let system = SYSTEM::regs();
 
         match peripheral {
@@ -537,10 +558,6 @@ impl PeripheralClockControl {
             Peripheral::Mcpwm0 => {
                 system.pwm_conf().modify(|_, w| w.pwm_clk_en().bit(enable));
             }
-            #[cfg(soc_has_mcpwm1)]
-            Peripheral::Mcpwm1 => {
-                system.pwm_conf.modify(|_, w| w.pwm_clk_en().bit(enable));
-            }
             #[cfg(soc_has_apb_saradc)]
             Peripheral::ApbSarAdc => {
                 system
@@ -563,19 +580,19 @@ impl PeripheralClockControl {
                     .twai0_conf()
                     .modify(|_, w| w.twai0_clk_en().bit(enable));
 
-                if enable {
-                    // use Xtal clk-src
-                    system.twai0_func_clk_conf().modify(|_, w| {
-                        w.twai0_func_clk_en().set_bit();
-                        w.twai0_func_clk_sel().variant(false)
-                    });
-                }
+                system
+                    .twai0_func_clk_conf()
+                    .modify(|_, w| w.twai0_func_clk_en().bit(enable));
             }
             #[cfg(soc_has_twai1)]
             Peripheral::Twai1 => {
                 system
                     .twai1_conf()
                     .modify(|_, w| w.twai1_clk_en().bit(enable));
+
+                system
+                    .twai1_func_clk_conf()
+                    .modify(|_, w| w.twai1_func_clk_en().bit(enable));
             }
             #[cfg(soc_has_aes)]
             Peripheral::Aes => {
@@ -590,11 +607,17 @@ impl PeripheralClockControl {
             #[cfg(soc_has_timg0)]
             Peripheral::Timg0 => {
                 system
+                    .timergroup0_conf()
+                    .modify(|_, w| w.tg0_clk_en().bit(enable));
+                system
                     .timergroup0_timer_clk_conf()
                     .modify(|_, w| w.tg0_timer_clk_en().bit(enable));
             }
             #[cfg(soc_has_timg1)]
             Peripheral::Timg1 => {
+                system
+                    .timergroup1_conf()
+                    .modify(|_, w| w.tg1_clk_en().bit(enable));
                 system
                     .timergroup1_timer_clk_conf()
                     .modify(|_, w| w.tg1_timer_clk_en().bit(enable));
@@ -620,9 +643,6 @@ impl PeripheralClockControl {
             #[cfg(soc_has_rsa)]
             Peripheral::Rsa => {
                 system.rsa_conf().modify(|_, w| w.rsa_clk_en().bit(enable));
-                system
-                    .rsa_pd_ctrl()
-                    .modify(|_, w| w.rsa_mem_pd().clear_bit());
             }
             #[cfg(soc_has_parl_io)]
             Peripheral::ParlIo => {
@@ -658,10 +678,9 @@ impl PeripheralClockControl {
             }
             #[cfg(soc_has_tsens)]
             Peripheral::Tsens => {
-                system.tsens_clk_conf().modify(|_, w| {
-                    w.tsens_clk_en().bit(enable);
-                    w.tsens_clk_sel().bit(enable)
-                });
+                system
+                    .tsens_clk_conf()
+                    .modify(|_, w| w.tsens_clk_en().bit(enable));
             }
             #[cfg(soc_has_uhci0)]
             Peripheral::Uhci0 => {
@@ -731,16 +750,35 @@ unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
         Peripheral::Gdma => {
             perip_rst_en1.modify(|_, w| w.dma_rst().bit(reset));
         }
+
         #[cfg(esp32)]
-        Peripheral::Dma => {
+        Peripheral::SpiDma => {
             perip_rst_en0.modify(|_, w| w.spi_dma_rst().bit(reset));
         }
         #[cfg(esp32s2)]
-        Peripheral::Dma => {
+        Peripheral::Spi2Dma => {
             perip_rst_en0.modify(|_, w| w.spi2_dma_rst().bit(reset));
+        }
+        #[cfg(esp32s2)]
+        Peripheral::Spi3Dma => {
             perip_rst_en0.modify(|_, w| w.spi3_dma_rst().bit(reset));
+        }
+        #[cfg(esp32s2)]
+        Peripheral::CryptoDma => {
             perip_rst_en1.modify(|_, w| w.crypto_dma_rst().bit(reset));
         }
+        #[cfg(esp32s2)]
+        Peripheral::CopyDma => {
+            let copy_config = crate::peripherals::DMA_COPY::regs().conf();
+
+            copy_config.modify(|_, w| {
+                w.in_rst().bit(reset);
+                w.out_rst().bit(reset);
+                w.cmdfifo_rst().bit(reset);
+                w.fifo_rst().bit(reset)
+            });
+        }
+
         #[cfg(soc_has_i2s0)]
         Peripheral::I2s0 => {
             perip_rst_en0.modify(|_, w| w.i2s0_rst().bit(reset));
@@ -763,14 +801,10 @@ unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
         }
         #[cfg(soc_has_timg0)]
         Peripheral::Timg0 => {
-            #[cfg(any(esp32c3, esp32s2, esp32s3))]
-            perip_rst_en0.modify(|_, w| w.timers_rst().bit(reset));
             perip_rst_en0.modify(|_, w| w.timergroup_rst().bit(reset));
         }
         #[cfg(soc_has_timg1)]
         Peripheral::Timg1 => {
-            #[cfg(any(esp32c3, esp32s2, esp32s3))]
-            perip_rst_en0.modify(|_, w| w.timers_rst().bit(reset));
             perip_rst_en0.modify(|_, w| w.timergroup1_rst().bit(reset));
         }
         #[cfg(soc_has_sha)]
@@ -911,11 +945,15 @@ unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
         }
         #[cfg(soc_has_timg0)]
         Peripheral::Timg0 => {
-            // no reset?
+            system
+                .timergroup0_conf()
+                .modify(|_, w| w.tg0_rst_en().bit(reset));
         }
         #[cfg(soc_has_timg1)]
         Peripheral::Timg1 => {
-            // no reset?
+            system
+                .timergroup1_conf()
+                .modify(|_, w| w.tg1_rst_en().bit(reset));
         }
         #[cfg(soc_has_sha)]
         Peripheral::Sha => {
@@ -1048,6 +1086,7 @@ impl PeripheralClockControl {
             unsafe { Self::reset_racey(peripheral) };
         }
 
+        debug!("Enable {:?} {}", peripheral, enable);
         unsafe { Self::enable_internal_racey(peripheral, enable) };
 
         true
