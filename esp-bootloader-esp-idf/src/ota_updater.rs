@@ -137,42 +137,22 @@ where
     ///
     /// After calling this other functions referencing the current partition will use the newly
     /// activated partition.
-    ///
-    /// Passing [AppPartitionSubType::Factory] will reset the OTA-data
     pub fn activate_next_partition(&mut self) -> Result<(), Error> {
         let next_slot = self.next_ota_part()?;
         self.with_ota(|mut ota| ota.set_current_app_partition(next_slot))
     }
 
-    /// Returns a [FlashRegion] for the partition which would be selected by
-    /// [Self::activate_next_partition].
-    pub fn next_partition(&mut self) -> Result<FlashRegion<'_, F>, Error> {
+    /// Returns a [FlashRegion] along with the [AppPartitionSubType] for the
+    /// partition which would be selected by [Self::activate_next_partition].
+    pub fn next_partition(&mut self) -> Result<(FlashRegion<'_, F>, AppPartitionSubType), Error> {
         let next_slot = self.next_ota_part()?;
 
-        Ok(self
+        let flash_region = self
             .pt
             .find_partition(crate::partitions::PartitionType::App(next_slot))?
             .ok_or(Error::Invalid)?
-            .as_embedded_storage(self.flash))
-    }
+            .as_embedded_storage(self.flash);
 
-    /// Executes the given closure with the partition which would be selected by
-    /// [Self::activate_next_partition].
-    ///
-    /// [FlashRegion] and the [AppPartitionSubType] is passed into the closure.
-    pub fn with_next_partition<R>(
-        &mut self,
-        f: impl FnOnce(FlashRegion<'_, F>, AppPartitionSubType) -> R,
-    ) -> Result<R, Error> {
-        let next_slot = self.next_ota_part()?;
-
-        if let Some(flash_region) = self
-            .pt
-            .find_partition(crate::partitions::PartitionType::App(next_slot))?
-        {
-            Ok(f(flash_region.as_embedded_storage(self.flash), next_slot))
-        } else {
-            Err(Error::Invalid)
-        }
+        Ok((flash_region, next_slot))
     }
 }
