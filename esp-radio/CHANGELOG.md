@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Avoid 802.15.4 rx stopping when BLE is used at the same time (#4348)
 
 ### Removed
 
