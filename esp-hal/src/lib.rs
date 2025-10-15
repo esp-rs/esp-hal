@@ -207,65 +207,6 @@ mod fmt;
 #[macro_use]
 extern crate esp_metadata_generated;
 
-use core::marker::PhantomData;
-
-pub use esp_metadata_generated::chip;
-use esp_rom_sys as _;
-
-metadata!("build_info", CHIP_NAME, chip!());
-
-#[cfg(all(riscv, feature = "rt"))]
-#[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
-#[cfg_attr(not(feature = "unstable"), doc(hidden))]
-pub use esp_riscv_rt::{self, riscv};
-use esp_sync::RawMutex;
-pub(crate) use peripherals::pac;
-#[cfg(xtensa)]
-#[cfg(all(xtensa, feature = "rt"))]
-#[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
-#[cfg_attr(not(feature = "unstable"), doc(hidden))]
-pub use xtensa_lx_rt::{self, xtensa_lx};
-
-#[cfg(lp_core)]
-#[instability::unstable]
-pub use self::soc::lp_core;
-#[cfg(ulp_riscv_core)]
-#[instability::unstable]
-pub use self::soc::ulp_core;
-
-#[cfg(any(soc_has_dport, soc_has_hp_sys, soc_has_pcr, soc_has_system))]
-pub mod clock;
-#[cfg(soc_has_gpio)]
-pub mod gpio;
-#[cfg(any(soc_has_i2c0, soc_has_i2c1))]
-pub mod i2c;
-pub mod peripherals;
-#[cfg(all(feature = "unstable", any(soc_has_hmac, soc_has_sha)))]
-mod reg_access;
-#[cfg(any(soc_has_spi0, soc_has_spi1, soc_has_spi2, soc_has_spi3))]
-pub mod spi;
-pub mod system;
-pub mod time;
-#[cfg(any(soc_has_uart0, soc_has_uart1, soc_has_uart2))]
-pub mod uart;
-
-mod macros;
-
-#[cfg(feature = "rt")]
-pub use procmacros::blocking_main as main;
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-#[instability::unstable]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub use procmacros::handler;
-#[cfg(any(lp_core, ulp_riscv_core))]
-#[instability::unstable]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-pub use procmacros::load_lp_code;
-pub use procmacros::ram;
-
-#[cfg(all(feature = "rt", feature = "exception-handler"))]
-mod exception_handler;
-
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 #[doc(hidden)]
 macro_rules! unstable_module {
@@ -288,6 +229,28 @@ macro_rules! unstable_module {
     };
 }
 
+// we can't use instability because it mucks up the short description in rustdoc
+#[doc(hidden)]
+macro_rules! unstable_reexport {
+    ($(
+        $(#[$meta:meta])*
+        pub use $path:path;
+    )*) => {
+        $(
+            $(#[$meta])*
+            #[cfg(feature = "unstable")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+            pub use $path;
+
+            $(#[$meta])*
+            #[cfg(not(feature = "unstable"))]
+            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+            #[allow(unused)]
+            pub(crate) use $path;
+        )*
+    };
+}
+
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 // we don't want unstable drivers to be compiled even, unless enabled
 #[doc(hidden)]
@@ -305,7 +268,63 @@ macro_rules! unstable_driver {
     };
 }
 
+use core::marker::PhantomData;
+
+pub use esp_metadata_generated::chip;
+use esp_rom_sys as _;
 pub(crate) use unstable_module;
+
+metadata!("build_info", CHIP_NAME, chip!());
+
+#[cfg(all(riscv, feature = "rt"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
+#[cfg_attr(not(feature = "unstable"), doc(hidden))]
+pub use esp_riscv_rt::{self, riscv};
+use esp_sync::RawMutex;
+pub(crate) use peripherals::pac;
+#[cfg(xtensa)]
+#[cfg(all(xtensa, feature = "rt"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
+#[cfg_attr(not(feature = "unstable"), doc(hidden))]
+pub use xtensa_lx_rt::{self, xtensa_lx};
+
+#[cfg(any(soc_has_dport, soc_has_hp_sys, soc_has_pcr, soc_has_system))]
+pub mod clock;
+#[cfg(soc_has_gpio)]
+pub mod gpio;
+#[cfg(any(soc_has_i2c0, soc_has_i2c1))]
+pub mod i2c;
+pub mod peripherals;
+#[cfg(all(feature = "unstable", any(soc_has_hmac, soc_has_sha)))]
+mod reg_access;
+#[cfg(any(soc_has_spi0, soc_has_spi1, soc_has_spi2, soc_has_spi3))]
+pub mod spi;
+pub mod system;
+pub mod time;
+#[cfg(any(soc_has_uart0, soc_has_uart1, soc_has_uart2))]
+pub mod uart;
+
+mod macros;
+
+#[cfg(feature = "rt")]
+pub use procmacros::blocking_main as main;
+pub use procmacros::ram;
+
+unstable_reexport! {
+    pub use procmacros::handler;
+
+    #[cfg(any(lp_core, ulp_riscv_core))]
+    pub use procmacros::load_lp_code;
+
+    #[cfg(lp_core)]
+    pub use self::soc::lp_core;
+
+    #[cfg(ulp_riscv_core)]
+    pub use self::soc::ulp_core;
+}
+
+#[cfg(all(feature = "rt", feature = "exception-handler"))]
+mod exception_handler;
 
 unstable_module! {
     pub mod asynch;

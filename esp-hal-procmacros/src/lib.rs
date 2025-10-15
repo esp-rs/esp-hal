@@ -63,8 +63,6 @@ mod rtos_main;
 /// Sets which segment of RAM to use for a function or static and how it should
 /// be initialized.
 ///
-/// Requires the `ram` feature.
-///
 /// # Options
 ///
 /// - `rtc_fast`: Use RTC fast RAM.
@@ -73,6 +71,7 @@ mod rtos_main;
 ///   below](#persistent) for details.
 /// - `zeroed`: Initialize the memory of the `static` to zero. The initializer expression will be
 ///   discarded. Types used must implement [`bytemuck::Zeroable`].
+/// - `reclaimed`: Memory reclaimed from the esp-idf bootloader.
 ///
 /// Using both `rtc_fast` and `rtc_slow` or `persistent` and `zeroed` together
 /// is an error.
@@ -108,7 +107,7 @@ mod rtos_main;
 /// static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 /// ```
 ///
-/// See the `ram` example in the esp-hal repository for a full usage example.
+/// See the `ram` example in the qa-test folder of the esp-hal repository for a full usage example.
 ///
 /// [`bytemuck::AnyBitPattern`]: https://docs.rs/bytemuck/1.9.0/bytemuck/trait.AnyBitPattern.html
 /// [`bytemuck::Zeroable`]: https://docs.rs/bytemuck/1.9.0/bytemuck/trait.Zeroable.html
