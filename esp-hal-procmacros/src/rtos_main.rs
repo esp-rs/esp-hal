@@ -4,6 +4,7 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{ToTokens, quote};
 use syn::{
+    Attribute,
     Meta,
     ReturnType,
     Token,
@@ -75,24 +76,42 @@ pub fn run(
         ctxt.error_spanned_by(&f.sig, "main function must have 1 argument: the spawner.");
     }
 
+    let fattrs = f.attrs;
+    let lint_attrs: Vec<Attribute> = fattrs
+        .clone()
+        .into_iter()
+        .filter(|item| {
+            item.path().is_ident("deny")
+                || item.path().is_ident("allow")
+                || item.path().is_ident("warn")
+        })
+        .collect();
+
     ctxt.check()?;
 
     let f_body = f.block;
     let out = &f.sig.output;
 
     let result = quote! {
-        #[doc(hidden)]
-        #[::embassy_executor::task()]
-        async fn __embassy_main(#fargs) #out {
-            #f_body
-        }
+        #(#lint_attrs)*
+        pub(crate) mod __main {
+            use super::*;
 
-        #[doc(hidden)]
-        unsafe fn __make_static<T>(t: &mut T) -> &'static mut T {
-            ::core::mem::transmute(t)
-        }
+            #[doc(hidden)]
+            #(#fattrs)*
+            #[::embassy_executor::task()]
+            async fn __embassy_main(#fargs) #out {
+                #f_body
+            }
 
-        #main
+            #[doc(hidden)]
+            unsafe fn __make_static<T>(t: &mut T) -> &'static mut T {
+                ::core::mem::transmute(t)
+            }
+
+            #(#fattrs)*
+            #main
+        }
     };
 
     Ok(result)
