@@ -9,6 +9,8 @@
 //% CHIPS: esp32s3
 //% FEATURES: unstable esp-storage
 
+// TODO: Make esp32 work
+
 #![no_std]
 #![no_main]
 
