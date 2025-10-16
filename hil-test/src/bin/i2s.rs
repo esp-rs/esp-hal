@@ -1,102 +1,100 @@
-//! I2S Loopback Test
+//! I2S Loopback and I2S parallel interface tests
 //!
 //! This test uses I2S TX to transmit known data to I2S RX (forced to slave mode
 //! with loopback mode enabled).
 
-//% CHIPS: esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: unstable
 // FIXME: re-enable on ESP32 when it no longer fails spuriously
 
 #![no_std]
 #![no_main]
 
-use esp_hal::{
-    Async,
-    delay::Delay,
-    dma_buffers,
-    gpio::{AnyPin, NoPin, Pin},
-    i2s::master::{Channels, Config, DataFormat, I2s, I2sTx},
-    peripherals::I2S0,
-    time::Rate,
-};
-use hil_test as _;
-
-cfg_if::cfg_if! {
-    if #[cfg(any(esp32, esp32s2))] {
-        type DmaChannel0<'d> = esp_hal::peripherals::DMA_I2S0<'d>;
-    } else {
-        type DmaChannel0<'d> = esp_hal::peripherals::DMA_CH0<'d>;
-    }
-}
-
-const BUFFER_SIZE: usize = 2000;
-
-#[derive(Clone)]
-struct SampleSource {
-    i: u8,
-}
-
-impl SampleSource {
-    // choose values which DON'T restart on every descriptor buffer's start
-    const ADD: u8 = 5;
-    const CUT_OFF: u8 = 113;
-
-    fn new() -> Self {
-        Self { i: 0 }
-    }
-}
-
-impl Iterator for SampleSource {
-    type Item = u8;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let i = self.i;
-        self.i = (i + Self::ADD) % Self::CUT_OFF;
-        Some(i)
-    }
-}
-
-#[embassy_executor::task]
-async fn writer(tx_buffer: &'static mut [u8], i2s_tx: I2sTx<'static, Async>) {
-    let mut samples = SampleSource::new();
-    for b in tx_buffer.iter_mut() {
-        *b = samples.next().unwrap();
-    }
-
-    let mut tx_transfer = i2s_tx.write_dma_circular_async(tx_buffer).unwrap();
-
-    loop {
-        tx_transfer
-            .push_with(|buffer| {
-                for b in buffer.iter_mut() {
-                    *b = samples.next().unwrap();
-                }
-                buffer.len()
-            })
-            .await
-            .unwrap();
-    }
-}
-
-fn enable_loopback() {
-    let i2s = esp_hal::peripherals::I2S0::regs();
-    cfg_if::cfg_if! {
-        if #[cfg(any(esp32, esp32s2))] {
-            i2s.conf().modify(|_, w| w.sig_loopback().set_bit());
-            i2s.conf().modify(|_, w| w.rx_slave_mod().set_bit());
-        } else {
-            i2s.tx_conf().modify(|_, w| w.sig_loopback().set_bit());
-            i2s.rx_conf().modify(|_, w| w.rx_slave_mod().set_bit());
-
-            i2s.tx_conf().modify(|_, w| w.tx_update().set_bit());
-            i2s.rx_conf().modify(|_, w| w.rx_update().set_bit());
-        }
-    }
-}
-
+#[cfg(not(esp32))] // FIXME
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
-    use super::*;
+    use esp_hal::{
+        Async,
+        delay::Delay,
+        dma_buffers,
+        gpio::{AnyPin, NoPin, Pin},
+        i2s::master::{Channels, Config, DataFormat, I2s, I2sTx},
+        peripherals::I2S0,
+        time::Rate,
+    };
+
+    cfg_if::cfg_if! {
+        if #[cfg(any(esp32, esp32s2))] {
+            type DmaChannel0<'d> = esp_hal::peripherals::DMA_I2S0<'d>;
+        } else {
+            type DmaChannel0<'d> = esp_hal::peripherals::DMA_CH0<'d>;
+        }
+    }
+
+    const BUFFER_SIZE: usize = 2000;
+
+    #[derive(Clone)]
+    struct SampleSource {
+        i: u8,
+    }
+
+    impl SampleSource {
+        // choose values which DON'T restart on every descriptor buffer's start
+        const ADD: u8 = 5;
+        const CUT_OFF: u8 = 113;
+
+        fn new() -> Self {
+            Self { i: 0 }
+        }
+    }
+
+    impl Iterator for SampleSource {
+        type Item = u8;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            let i = self.i;
+            self.i = (i + Self::ADD) % Self::CUT_OFF;
+            Some(i)
+        }
+    }
+
+    #[embassy_executor::task]
+    async fn writer(tx_buffer: &'static mut [u8], i2s_tx: I2sTx<'static, Async>) {
+        let mut samples = SampleSource::new();
+        for b in tx_buffer.iter_mut() {
+            *b = samples.next().unwrap();
+        }
+
+        let mut tx_transfer = i2s_tx.write_dma_circular_async(tx_buffer).unwrap();
+
+        loop {
+            tx_transfer
+                .push_with(|buffer| {
+                    for b in buffer.iter_mut() {
+                        *b = samples.next().unwrap();
+                    }
+                    buffer.len()
+                })
+                .await
+                .unwrap();
+        }
+    }
+
+    fn enable_loopback() {
+        let i2s = esp_hal::peripherals::I2S0::regs();
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2))] {
+                i2s.conf().modify(|_, w| w.sig_loopback().set_bit());
+                i2s.conf().modify(|_, w| w.rx_slave_mod().set_bit());
+            } else {
+                i2s.tx_conf().modify(|_, w| w.sig_loopback().set_bit());
+                i2s.rx_conf().modify(|_, w| w.rx_slave_mod().set_bit());
+
+                i2s.tx_conf().modify(|_, w| w.tx_update().set_bit());
+                i2s.rx_conf().modify(|_, w| w.rx_update().set_bit());
+            }
+        }
+    }
 
     struct Context {
         dout: AnyPin<'static>,
@@ -394,5 +392,63 @@ mod tests {
             "16-bit Stereo: RX half_sample_bits={}, expected {}",
             rx_half_sample_bits, expected_value
         );
+    }
+}
+
+#[cfg(esp32)]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
+mod parallel_tests {
+    use esp_hal::{
+        gpio::NoPin,
+        i2s::parallel::{I2sParallel, TxSixteenBits},
+        peripherals::{DMA_I2S0, I2S0},
+        time::Rate,
+    };
+    struct Context {
+        dma_channel: DMA_I2S0<'static>,
+        i2s: I2S0<'static>,
+    }
+
+    #[init]
+    fn init() -> Context {
+        let peripherals = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        );
+
+        let dma_channel = peripherals.DMA_I2S0;
+
+        Context {
+            dma_channel,
+            i2s: peripherals.I2S0,
+        }
+    }
+
+    #[test]
+    async fn driver_does_not_hang_when_async(ctx: Context) {
+        let pins = TxSixteenBits::new(
+            NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin,
+            NoPin, NoPin, NoPin, NoPin,
+        );
+        let i2s = I2sParallel::new(ctx.i2s, ctx.dma_channel, Rate::from_mhz(20), pins, NoPin)
+            .into_async();
+
+        // Try sending an empty buffer, as an edge case
+        let tx_buf = esp_hal::dma_tx_buffer!(4096).unwrap();
+        let mut xfer = i2s
+            .send(tx_buf)
+            .map_err(|_| "failed to send empty buffer")
+            .unwrap();
+        xfer.wait_for_done().await.unwrap();
+
+        let (i2s, mut tx_buf) = xfer.wait();
+
+        // Now send some data
+        tx_buf.fill(&[0x12; 128]);
+
+        let mut xfer = i2s
+            .send(tx_buf)
+            .map_err(|_| "failed to send buffer")
+            .unwrap();
+        xfer.wait_for_done().await.unwrap();
     }
 }
