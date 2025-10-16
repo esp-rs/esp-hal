@@ -1,10 +1,8 @@
 //! Embassy access point
 //!
 //! - creates an open access-point with SSID `esp-radio`
-//! - you can connect to it using a static IP in range 192.168.2.2 .. 192.168.2.255, gateway
-//!   192.168.2.1
-//! - open http://192.168.2.1:8080/ in your browser - the example will perform an HTTP get request
-//!   to some "random" server
+//! - DHCP is enabled so there's no need to configure a static IP
+//! - connect to the AP `esp-radio` and open http://1.1.1.1:8080/ in your browser
 //!
 //! On Android you might need to choose _Keep Accesspoint_ when it tells you the
 //! WiFi has no internet connection, Chrome might not want to load the URL - you
