@@ -60,7 +60,6 @@ harness = false
 name    = "spi_half_duplex_slave_qspi"
 harness = false
 
-
 [[bin]]
 name    = "spi_half_duplex_write_psram"
 harness = false
