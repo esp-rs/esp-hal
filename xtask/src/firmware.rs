@@ -188,8 +188,12 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
 
     for entry in fs::read_dir(path).context("Failed to read {path}")? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
         log::debug!("Loading example from path: {}", path.display());
-        let path = windows_safe_path(&entry?.path());
+        let path = windows_safe_path(&entry.path());
         let text = fs::read_to_string(&path)
             .with_context(|| format!("Could not read {}", path.display()))?;
 
