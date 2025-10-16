@@ -321,3 +321,16 @@ pub fn error(input: TokenStream) -> TokenStream {
 pub fn warning(input: TokenStream) -> TokenStream {
     alert::do_alert(termcolor::Color::Yellow, input)
 }
+
+macro_rules! unwrap_or_compile_error {
+    ($($x:tt)*) => {
+        match $($x)* {
+            Ok(x) => x,
+            Err(e) => {
+                return e.into_compile_error()
+            }
+        }
+    };
+}
+
+pub(crate) use unwrap_or_compile_error;

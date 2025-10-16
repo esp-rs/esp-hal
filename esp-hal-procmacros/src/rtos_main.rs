@@ -28,8 +28,8 @@ impl Parse for Args {
 
 /// Procedural macro entry point for the async `main` function.
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
-    let args: Args = syn::parse2(args).unwrap();
-    let f: syn::ItemFn = syn::parse2(item).unwrap();
+    let args: Args = crate::unwrap_or_compile_error!(syn::parse2(args));
+    let f: syn::ItemFn = crate::unwrap_or_compile_error!(syn::parse2(item));
 
     run(&args.meta, f, main_fn()).unwrap_or_else(|x| x)
 }

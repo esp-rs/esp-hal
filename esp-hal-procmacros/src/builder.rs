@@ -36,7 +36,7 @@ const KNOWN_HELPERS: &[&str] = &[
 ///
 /// <https://matklad.github.io/2022/05/29/builder-lite.html>
 pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
-    let input: syn::DeriveInput = syn::parse2(item).unwrap();
+    let input: syn::DeriveInput = crate::unwrap_or_compile_error!(syn::parse2(item));
 
     let span = input.span();
     let ident = input.ident;
@@ -218,4 +218,27 @@ fn collect_helper_attrs(attrs: &[Attribute]) -> Result<Vec<Ident>, syn::Error> {
     }
 
     Ok(helper_attributes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_wrong_item() {
+        let result = builder_lite_derive(
+            quote::quote! {
+                fn main() {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{"expected one of: `struct`, `enum`, `union`"}
+            }
+            .to_string()
+        );
+    }
 }

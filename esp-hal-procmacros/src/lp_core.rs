@@ -107,7 +107,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
             .to_compile_error();
     }
 
-    let f: ItemFn = syn::parse2(input).unwrap();
+    let f: ItemFn = crate::unwrap_or_compile_error!(syn::parse2(input));
 
     let mut argument_types = Vec::new();
     let mut create_peripheral = Vec::new();
