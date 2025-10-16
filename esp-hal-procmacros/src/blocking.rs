@@ -76,4 +76,23 @@ mod tests {
             .to_string()
         );
     }
+
+    #[test]
+    fn test_try_non_emptyargs() {
+        let result = main(
+            quote::quote! {non_empty}.into(),
+            syn::parse2(quote::quote! {
+                fn main() {}
+            })
+            .unwrap(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "This attribute accepts no arguments" }
+            }
+            .to_string()
+        );
+    }
 }

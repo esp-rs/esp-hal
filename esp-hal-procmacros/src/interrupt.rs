@@ -220,4 +220,20 @@ mod tests {
             .to_string()
         );
     }
+
+    #[test]
+    fn test_forbidden_attr() {
+        let result = handler(
+            quote::quote! {}.into(),
+            quote::quote! {
+                #[forbidden]
+                fn foo(){}
+            }
+            .into(),
+        );
+
+        assert_eq!(result.to_string(), quote::quote! {
+            ::core::compile_error!{ "this attribute is not allowed on an interrupt handler controlled by esp-hal" }
+        }.to_string());
+    }
 }

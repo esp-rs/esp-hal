@@ -568,4 +568,24 @@ mod tests {
             .to_string()
         );
     }
+
+    #[cfg(any(feature = "is-lp-core"))]
+    #[test]
+    fn test_lp_entry_non_empty_args() {
+        let result = entry(
+            quote::quote! { foo }.into(),
+            quote::quote! {
+                fn main(){}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "This attribute accepts no arguments" }
+            }
+            .to_string()
+        );
+    }
 }

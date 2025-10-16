@@ -243,6 +243,45 @@ mod tests {
     }
 
     #[test]
+    fn test_wrong_item2() {
+        let result = builder_lite_derive(
+            quote::quote! {
+                enum Foo {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{"#[derive(Builder)] is only defined for structs, not for enums or unions!"}
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_wrong_item_attr() {
+        let result = builder_lite_derive(
+            quote::quote! {
+                struct Foo {
+                    #[builder_lite(foo)]
+                    foo: u32,
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{"Unknown helper attribute `foo`. Only the following are allowed: into, skip, skip_setter, skip_getter, unstable, reference"}
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
     fn test_basic() {
         let result = builder_lite_derive(
             quote::quote! {
@@ -279,6 +318,45 @@ mod tests {
 
                     pub fn baz (& self) -> bool {
                         self.baz
+                    }
+                }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_option_field() {
+        let result = builder_lite_derive(
+            quote::quote! {
+                struct Foo {
+                    bar: Option<u32>,
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[automatically_derived]
+                impl Foo {
+                    #[doc = concat!(" Assign the given value to the `" , stringify!(bar) , "` field.")]
+                    #[must_use]
+                    pub fn with_bar(mut self, bar: u32) -> Self {
+                        self.bar = Some(bar);
+                        self
+                    }
+
+                    #[doc = concat!(" Set the value of `" , stringify ! (bar) , "` to `None`.")]
+                    #[must_use]
+                    pub fn with_bar_none (mut self) -> Self {
+                        self.bar = None;
+                        self
+                    }
+
+                    pub fn bar(&self) -> Option <u32>{
+                        self.bar
                     }
                 }
             }
@@ -362,6 +440,42 @@ mod tests {
                     #[cfg(feature = "unstable")]
                     pub fn foo(&self) -> Foo {
                         self.foo
+                    }
+                }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_skip_getter() {
+        let result = builder_lite_derive(
+            quote::quote! {
+                struct Foo {
+                    #[builder_lite(skip_getter)]
+                    bar: Option<u32>,
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[automatically_derived]
+                impl Foo {
+                    #[doc = concat!(" Assign the given value to the `" , stringify!(bar) , "` field.")]
+                    #[must_use]
+                    pub fn with_bar(mut self, bar: u32) -> Self {
+                        self.bar = Some(bar);
+                        self
+                    }
+
+                    #[doc = concat!(" Set the value of `" , stringify ! (bar) , "` to `None`.")]
+                    #[must_use]
+                    pub fn with_bar_none (mut self) -> Self {
+                        self.bar = None;
+                        self
                     }
                 }
             }
