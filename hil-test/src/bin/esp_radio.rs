@@ -1,4 +1,3 @@
-#![cfg_attr(rustfmt, rustfmt_skip)]
 //! Test we get an error when attempting to initialize esp-radio with interrupts
 //! disabled in common ways
 
@@ -6,9 +5,10 @@
 //% CHIPS(no_ble): esp32s2
 //% CHIPS(has_wifi_ble): esp32 esp32c2 esp32c3 esp32c6 esp32s3
 
-//% FEATURES(no_ble): unstable esp-radio esp-alloc esp-radio/wifi esp-radio/unstable embassy
-//% FEATURES(no_wifi): unstable esp-radio esp-alloc esp-radio/ble esp-radio/unstable embassy
-//% FEATURES(has_wifi_ble): unstable esp-radio esp-alloc esp-radio/wifi esp-radio/ble esp-radio/unstable embassy
+//% FEATURES: unstable esp-radio esp-alloc esp-radio/unstable embassy
+//% FEATURES(no_ble): esp-radio/wifi
+//% FEATURES(no_wifi): esp-radio/ble
+//% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble
 
 #![no_std]
 #![no_main]
