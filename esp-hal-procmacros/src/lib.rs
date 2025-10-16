@@ -182,7 +182,7 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
 #[cfg(any(feature = "has-lp-core", feature = "has-ulp-core"))]
 #[proc_macro]
 pub fn load_lp_code(input: TokenStream) -> TokenStream {
-    lp_core::load_lp_code(input.into()).into()
+    lp_core::load_lp_code(input.into(), lp_core::RealFilesystem).into()
 }
 
 /// Marks the entry function of a LP core / ULP program.

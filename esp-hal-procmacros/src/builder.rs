@@ -241,4 +241,131 @@ mod tests {
             .to_string()
         );
     }
+
+    #[test]
+    fn test_basic() {
+        let result = builder_lite_derive(
+            quote::quote! {
+                struct Foo {
+                    bar: u32,
+                    baz: bool,
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[automatically_derived]
+                impl Foo {
+                    #[doc = concat!(" Assign the given value to the `" , stringify ! (bar) , "` field.")]
+                    #[must_use]
+                    pub fn with_bar(mut self , bar : u32) -> Self {
+                        self.bar = bar;
+                        self
+                    }
+
+                    pub fn bar(&self) -> u32 {
+                        self.bar
+                    }
+
+                    #[doc = concat!(" Assign the given value to the `" , stringify ! (baz) , "` field.")]
+                    #[must_use]
+                    pub fn with_baz(mut self, baz: bool) -> Self {
+                        self.baz = baz;
+                        self
+                    }
+
+                    pub fn baz (& self) -> bool {
+                        self.baz
+                    }
+                }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_field_attrs() {
+        let result = builder_lite_derive(
+            quote::quote! {
+                struct Foo {
+                    #[builder_lite(unstable)]
+                    bar: u32,
+
+                    #[builder_lite(skip_setter)]
+                    baz: bool,
+
+                    #[builder_lite(reference)]
+                    boo: String,
+
+                    #[builder_lite(into)]
+                    bam: Foo,
+
+                    #[builder_lite(unstable)]
+                    #[builder_lite(into)]
+                    foo: Foo,
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[automatically_derived]
+                impl Foo {
+                    # [doc = concat ! (" Assign the given value to the `" , stringify ! (bar) , "` field.")]
+                    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+                    #[cfg(feature = "unstable")]
+                    #[must_use]
+                    pub fn with_bar(mut self, bar: u32) -> Self {
+                        self.bar = bar;
+                        self
+                    }
+                    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+                    #[cfg(feature = "unstable")]
+                    pub fn bar(&self) -> u32 {
+                        self.bar
+                    }
+                    pub fn baz(&self) -> bool {
+                        self.baz
+                    }
+                    # [doc = concat ! (" Assign the given value to the `" , stringify ! (boo) , "` field.")]
+                    #[must_use]
+                    pub fn with_boo(mut self, boo: String) -> Self {
+                        self.boo = boo;
+                        self
+                    }
+                    pub fn boo(&self) -> &String {
+                        &self.boo
+                    }
+                    # [doc = concat ! (" Assign the given value to the `" , stringify ! (bam) , "` field.")]
+                    #[must_use]
+                    pub fn with_bam(mut self, bam: impl Into<Foo>) -> Self {
+                        self.bam = bam.into();
+                        self
+                    }
+                    pub fn bam(&self) -> Foo {
+                        self.bam
+                    }
+                    # [doc = concat ! (" Assign the given value to the `" , stringify ! (foo) , "` field.")]
+                    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+                    #[cfg(feature = "unstable")]
+                    #[must_use]
+                    pub fn with_foo(mut self, foo: impl Into<Foo>) -> Self {
+                        self.foo = foo.into();
+                        self
+                    }
+                    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+                    #[cfg(feature = "unstable")]
+                    pub fn foo(&self) -> Foo {
+                        self.foo
+                    }
+                }
+            }
+            .to_string()
+        );
+    }
 }

@@ -189,7 +189,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_rtc_fast() {
+    fn test_rtc_fast_text() {
         let result = ram(
             quote::quote! {
                 unstable(rtc_fast)
@@ -207,6 +207,78 @@ mod tests {
                 #[unsafe (link_section = ".rtc_fast.text")]
                 #[inline (never)]
                 fn foo () { }
+            }
+            .to_string()
+        );
+    }
+
+    #[cfg(feature = "rtc-slow")]
+    #[test]
+    fn test_rtc_slow_text() {
+        let result = ram(
+            quote::quote! {
+                unstable(rtc_slow)
+            }
+            .into(),
+            quote::quote! {
+                fn foo() {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe (link_section = ".rtc_slow.text")]
+                #[inline (never)]
+                fn foo () { }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_rtc_fast_data() {
+        let result = ram(
+            quote::quote! {
+                unstable(rtc_fast)
+            }
+            .into(),
+            quote::quote! {
+                static mut FOO: [u8; 10] = [0; 10];
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe (link_section = ".rtc_fast.data")]
+                static mut FOO:[u8;10] = [0;10];
+            }
+            .to_string()
+        );
+    }
+
+    #[cfg(feature = "rtc-slow")]
+    #[test]
+    fn test_rtc_slow_data() {
+        let result = ram(
+            quote::quote! {
+                unstable(rtc_slow)
+            }
+            .into(),
+            quote::quote! {
+                static mut FOO: [u8; 10] = [0; 10];
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe (link_section = ".rtc_slow.data")]
+                static mut FOO:[u8;10] = [0;10];
             }
             .to_string()
         );
@@ -231,6 +303,54 @@ mod tests {
                 #[unsafe(link_section = ".dram2_uninit")]
                 static mut FOO: [u8;10] = [0;10];
                 const _ : () = crate::__macro_implementation::assert_is_uninit::<[u8;10]>();
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_rtc_fast_data_zeroed() {
+        let result = ram(
+            quote::quote! {
+                unstable(rtc_fast,zeroed)
+            }
+            .into(),
+            quote::quote! {
+                static mut FOO: [u8; 10] = [0; 10];
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe (link_section = ".rtc_fast.bss")]
+                static mut FOO:[u8;10] = [0;10];
+                const _: () = crate::__macro_implementation::assert_is_zeroable::<[u8; 10]>();
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_rtc_fast_data_peristent() {
+        let result = ram(
+            quote::quote! {
+                unstable(rtc_fast,persistent)
+            }
+            .into(),
+            quote::quote! {
+                static mut FOO: [u8; 10] = [0; 10];
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe (link_section = ".rtc_fast.persistent")]
+                static mut FOO:[u8;10] = [0;10];
+                const _: () = crate::__macro_implementation::assert_is_persistable::<[u8; 10]>();
             }
             .to_string()
         );

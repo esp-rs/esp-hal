@@ -195,3 +195,48 @@ pub fn main_fn() -> TokenStream2 {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_basic() {
+        let result = main(
+            quote::quote! {}.into(),
+            quote::quote! {
+                async fn foo(spawner: Spawner){}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                pub (crate) mod __main {
+                    use super::*;
+                    #[doc(hidden)]
+                    #[::embassy_executor::task()]
+                    async fn __embassy_main (spawner : Spawner) {
+                        { }
+                    }
+
+                    #[doc(hidden)]
+                    unsafe fn __make_static < T > (t : & mut T) -> & 'static mut T {
+                        ::core::mem::transmute(t)
+                    }
+
+                    # [esp_hal :: main]
+                    fn main () -> ! {
+                        let mut executor = ::esp_rtos::embassy::Executor::new();
+                        let executor = unsafe { __make_static (& mut executor) };
+                        executor . run (| spawner | {
+                            spawner.must_spawn(__embassy_main (spawner));
+                        })
+                    }
+                }
+            }
+            .to_string()
+        );
+    }
+}

@@ -4,7 +4,9 @@ use quote::quote;
 
 #[cfg(any(feature = "is-lp-core", feature = "is-ulp-core"))]
 pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
-    use proc_macro_crate::{FoundCrate, crate_name};
+    use proc_macro_crate::FoundCrate;
+    #[cfg(not(test))]
+    use proc_macro_crate::crate_name;
     use proc_macro2::{Ident, Span};
     use quote::format_ident;
     use syn::{
@@ -93,7 +95,12 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
         res
     }
 
+    #[cfg(not(test))]
     let found_crate = crate_name("esp-lp-hal").expect("esp-lp-hal is present in `Cargo.toml`");
+
+    #[cfg(test)]
+    let found_crate = FoundCrate::Itself;
+
     let hal_crate = match found_crate {
         FoundCrate::Itself => quote!(esp_lp_hal),
         FoundCrate::Name(name) => {
@@ -129,7 +136,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                         }
                         used_pins.push(pin);
                         create_peripheral.push(quote!(
-                            let mut #param_name = unsafe { the_hal::gpio::conjure_output().unwrap() };
+                            let mut #param_name = unsafe { the_hal::gpio::conjure_output().unwrap() }
                         ));
                     }
                     "Input" => {
@@ -139,17 +146,17 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                         }
                         used_pins.push(pin);
                         create_peripheral.push(quote!(
-                            let mut #param_name = unsafe { the_hal::gpio::conjure_input().unwrap() };
+                            let mut #param_name = unsafe { the_hal::gpio::conjure_input().unwrap() }
                         ));
                     }
                     "LpUart" => {
                         create_peripheral.push(quote!(
-                            let mut #param_name = unsafe { the_hal::uart::conjure() };
+                            let mut #param_name = unsafe { the_hal::uart::conjure() }
                         ));
                     }
                     "LpI2c" => {
                         create_peripheral.push(quote!(
-                            let mut #param_name = unsafe { the_hal::i2c::conjure() };
+                            let mut #param_name = unsafe { the_hal::i2c::conjure() }
                         ));
                     }
                     _ => {
@@ -192,13 +199,11 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 #[cfg(any(feature = "has-lp-core", feature = "has-ulp-core"))]
-pub fn load_lp_code(input: TokenStream) -> TokenStream {
-    use std::{fs, path::Path};
-
+pub fn load_lp_code(input: TokenStream, fs: impl Filesystem) -> TokenStream {
     use object::{File, Object, ObjectSection, ObjectSymbol, Section, SectionKind};
     use parse::Error;
-    use proc_macro::Span;
     use proc_macro_crate::{FoundCrate, crate_name};
+    use proc_macro2::Span;
     use syn::{Ident, LitStr, parse};
 
     let hal_crate = if cfg!(any(feature = "is-lp-core", feature = "is-ulp-core")) {
@@ -221,12 +226,17 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
 
     let elf_file = lit.value();
 
-    if !Path::new(&elf_file).exists() {
-        return Error::new(Span::call_site().into(), "File not found").to_compile_error();
+    if !fs.exists(&elf_file) {
+        return Error::new(Span::call_site(), "File not found").to_compile_error();
     }
 
-    let bin_data = fs::read(elf_file).unwrap();
-    let obj_file = File::parse(&*bin_data).unwrap();
+    let bin_data = fs.read(&elf_file).unwrap();
+    let obj_file = match File::parse(&*bin_data) {
+        Ok(obj_file) => obj_file,
+        Err(e) => {
+            return Error::new(Span::call_site(), format!("Error: {}", e)).to_compile_error();
+        }
+    };
     let sections = obj_file.sections();
 
     let mut sections: Vec<Section> = sections
@@ -339,5 +349,223 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
 
             LpCoreCode {}
         }
+    }
+}
+
+#[cfg(any(feature = "has-lp-core", feature = "has-ulp-core"))]
+pub(crate) trait Filesystem {
+    fn read(&self, path: &str) -> std::io::Result<Vec<u8>>;
+
+    fn exists(&self, path: &str) -> bool;
+}
+
+#[cfg(any(feature = "has-lp-core", feature = "has-ulp-core"))]
+pub(crate) struct RealFilesystem;
+
+#[cfg(any(feature = "has-lp-core", feature = "has-ulp-core"))]
+impl Filesystem for RealFilesystem {
+    fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
+        std::fs::read(path)
+    }
+
+    fn exists(&self, path: &str) -> bool {
+        std::path::Path::new(path).exists()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(any(feature = "has-lp-core", feature = "has-ulp-core"))]
+    struct TestFilesystem;
+
+    #[cfg(any(feature = "has-lp-core", feature = "has-ulp-core"))]
+    impl Filesystem for TestFilesystem {
+        fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
+            if path == "doesnt_exist.elf" {
+                Err(std::io::ErrorKind::NotFound.into())
+            } else if path == "bad.elf" {
+                Ok(Vec::from(&[1, 2, 3, 4]))
+            } else {
+                std::fs::read("./testdata/ulp_code.elf")
+            }
+        }
+
+        fn exists(&self, path: &str) -> bool {
+            if path == "doesnt_exist.elf" {
+                false
+            } else {
+                true
+            }
+        }
+    }
+
+    #[cfg(any(feature = "has-lp-core", feature = "has-ulp-core"))]
+    #[test]
+    fn test_load_lp_code_file_not_found() {
+        let result = load_lp_code(quote::quote! {"doesnt_exist.elf"}.into(), TestFilesystem);
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error! { "File not found" }
+            }
+            .to_string()
+        );
+    }
+
+    #[cfg(any(feature = "has-lp-core", feature = "has-ulp-core"))]
+    #[test]
+    fn test_load_lp_code_bad() {
+        let result = load_lp_code(quote::quote! {"bad.elf"}.into(), TestFilesystem);
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error! { "Error: Could not read file magic" }
+            }
+            .to_string()
+        );
+    }
+
+    #[cfg(any(feature = "has-lp-core", feature = "has-ulp-core"))]
+    #[test]
+    fn test_load_lp_code_basic() {
+        let result = load_lp_code(quote::quote! {"good.elf"}.into(), TestFilesystem);
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                {
+                    use crate::lp_core::LpCore;
+                    use crate::lp_core::LpCoreWakeupSource;
+                    use crate::gpio::lp_io::LowPowerOutput;
+                    use crate::gpio::*;
+                    use crate::uart::lp_uart::LpUart;
+                    use crate::i2c::lp_i2c::LpI2c;
+
+                    struct LpCoreCode {}
+                    static LP_CODE: &[u8] = &[
+                        19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8,
+                        19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8,
+                        19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8,
+                        19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8,
+                        19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8,
+                        19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8,
+                        19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8,
+                        19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8, 19u8, 0u8, 0u8, 0u8,
+                        9u8, 160u8, 23u8, 65u8, 0u8, 0u8, 19u8, 1u8, 225u8, 247u8, 151u8, 0u8, 0u8, 0u8, 231u8,
+                        128u8, 160u8, 0u8, 1u8, 160u8, 55u8, 5u8, 11u8, 96u8, 3u8, 37u8, 5u8, 64u8, 17u8,
+                        137u8, 9u8, 201u8, 55u8, 5u8, 0u8, 80u8, 183u8, 53u8, 49u8, 1u8, 147u8, 133u8, 5u8,
+                        208u8, 35u8, 46u8, 181u8, 22u8, 151u8, 0u8, 0u8, 0u8, 231u8, 128u8, 192u8, 11u8, 129u8,
+                        67u8, 183u8, 40u8, 11u8, 96u8, 55u8, 40u8, 0u8, 80u8, 137u8, 66u8, 55u8, 3u8, 0u8,
+                        80u8, 133u8, 3u8, 35u8, 32u8, 120u8, 0u8, 35u8, 162u8, 88u8, 0u8, 131u8, 39u8, 195u8,
+                        23u8, 243u8, 37u8, 0u8, 184u8, 243u8, 38u8, 0u8, 176u8, 115u8, 38u8, 0u8, 184u8, 227u8,
+                        154u8, 197u8, 254u8, 133u8, 131u8, 51u8, 6u8, 208u8, 64u8, 179u8, 54u8, 208u8, 0u8,
+                        179u8, 5u8, 176u8, 64u8, 149u8, 141u8, 243u8, 38u8, 0u8, 184u8, 115u8, 39u8, 0u8,
+                        176u8, 115u8, 37u8, 0u8, 184u8, 227u8, 154u8, 166u8, 254u8, 50u8, 151u8, 174u8, 150u8,
+                        51u8, 53u8, 199u8, 0u8, 54u8, 149u8, 179u8, 182u8, 231u8, 0u8, 51u8, 53u8, 160u8, 0u8,
+                        85u8, 141u8, 113u8, 221u8, 35u8, 164u8, 88u8, 0u8, 3u8, 38u8, 195u8, 23u8, 243u8, 37u8,
+                        0u8, 184u8, 243u8, 38u8, 0u8, 176u8, 115u8, 37u8, 0u8, 184u8, 227u8, 154u8, 165u8,
+                        254u8, 5u8, 130u8, 179u8, 7u8, 208u8, 64u8, 51u8, 53u8, 208u8, 0u8, 179u8, 5u8, 176u8,
+                        64u8, 137u8, 141u8, 243u8, 38u8, 0u8, 184u8, 115u8, 39u8, 0u8, 176u8, 115u8, 37u8, 0u8,
+                        184u8, 227u8, 154u8, 166u8, 254u8, 62u8, 151u8, 174u8, 150u8, 51u8, 53u8, 247u8, 0u8,
+                        54u8, 149u8, 179u8, 54u8, 230u8, 0u8, 51u8, 53u8, 160u8, 0u8, 85u8, 141u8, 113u8,
+                        221u8, 185u8, 191u8, 55u8, 5u8, 0u8, 80u8, 3u8, 32u8, 197u8, 23u8, 151u8, 0u8, 0u8,
+                        0u8, 231u8, 128u8, 64u8, 244u8, 0u8, 36u8, 244u8, 0u8
+                    ];
+                    unsafe extern "C" {
+                        static _rtc_fast_data_start: u32;
+                    }
+                    unsafe {
+                        core::ptr::copy_nonoverlapping(
+                            LP_CODE as *const _ as *const u8,
+                            &_rtc_fast_data_start as *const u32 as *mut u8,
+                            LP_CODE.len()
+                        );
+                    }
+                    impl LpCoreCode {
+                        pub fn run(
+                            &self,
+                            lp_core: &mut LpCore,
+                            wakeup_source: LpCoreWakeupSource,
+                            _: LowPowerOutput<1>
+                        ) {
+                            lp_core.run(wakeup_source);
+                        }
+                    }
+                    LpCoreCode {}
+                }
+            }
+            .to_string()
+        );
+    }
+
+    #[cfg(any(feature = "is-lp-core"))]
+    #[test]
+    fn test_lp_entry_basic() {
+        let result = entry(
+            quote::quote! {}.into(),
+            quote::quote! {
+                fn main(){}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[allow(non_snake_case)]
+                #[unsafe(export_name = "main")]
+                pub fn __risc_v_rt__main () -> ! {
+                    #[unsafe(export_name = "__ULP_MAGIC_")]
+                    static ULP_MAGIC: [u32;0] = [0u32;0];
+                    unsafe {
+                        ULP_MAGIC.as_ptr().read_volatile ();
+                    }
+
+                    use esp_lp_hal as the_hal;
+                    main ();
+                }
+
+                fn main () { }
+            }
+            .to_string()
+        );
+    }
+
+    #[cfg(any(feature = "is-lp-core"))]
+    #[test]
+    fn test_lp_entry_with_params() {
+        let result = entry(
+            quote::quote! {}.into(),
+            quote::quote! {
+                fn main(mut gpio1: Output<1>, mut i2c: LpI2c, mut uart: LpUart){}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[allow(non_snake_case)]
+                #[unsafe(export_name = "main")]
+                pub fn __risc_v_rt__main () -> ! {
+                    # [unsafe (export_name = "__ULP_MAGIC_Output<1>$LpI2c$LpUart$")]
+                    static ULP_MAGIC: [u32;0] = [0u32;0];
+                    unsafe { ULP_MAGIC.as_ptr().read_volatile();
+                }
+
+                use esp_lp_hal as the_hal ;
+                let mut param0 = unsafe { the_hal::gpio::conjure_output().unwrap() };
+                let mut param1 = unsafe { the_hal::i2c::conjure() };
+                let mut param2 = unsafe { the_hal::uart::conjure() };
+                main (param0 , param1 , param2) ; }
+
+                fn main (mut gpio1 : Output < 1 > , mut i2c : LpI2c , mut uart : LpUart) { }
+            }
+            .to_string()
+        );
     }
 }

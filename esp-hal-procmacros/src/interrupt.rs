@@ -18,7 +18,7 @@ pub enum WhiteListCaller {
 }
 
 pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
-    let mut f: ItemFn = syn::parse2(input).expect("`#[handler]` must be applied to a function");
+    let mut f: ItemFn = crate::unwrap_or_compile_error!(syn::parse2(input));
     let original_span = f.span();
 
     let attr_args = match Punctuated::<Meta, Token![,]>::parse_terminated.parse2(args) {
@@ -159,4 +159,65 @@ pub fn check_attr_whitelist(
 /// Returns `true` if `attr.path` matches `name`
 fn eq(attr: &Attribute, name: &str) -> bool {
     attr.style == AttrStyle::Outer && attr.path().is_ident(name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_basic() {
+        let result = handler(
+            quote::quote! {}.into(),
+            quote::quote! {
+                fn foo(){}
+            }
+            .into(),
+        );
+
+        assert_eq!(result.to_string(), quote::quote! {
+            extern "C" fn __esp_hal_internal_foo() {}
+            #[allow(non_upper_case_globals)]
+            const foo: crate::interrupt::InterruptHandler = crate::interrupt::InterruptHandler::new(
+                __esp_hal_internal_foo,
+                crate::interrupt::Priority::min()
+            );
+        }.to_string());
+    }
+
+    #[test]
+    fn test_priority() {
+        let result = handler(
+            quote::quote! {
+                priority = esp_hal::interrupt::Priority::Priority2
+            }
+            .into(),
+            quote::quote! {
+                fn foo(){}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                extern "C" fn __esp_hal_internal_foo() {}
+                #[allow(non_upper_case_globals)]
+                const foo: crate::interrupt::InterruptHandler =
+                    crate::interrupt::InterruptHandler::new(__esp_hal_internal_foo, {
+                        const {
+                            core::assert!(
+                                !matches!(
+                                    esp_hal::interrupt::Priority::Priority2,
+                                    crate::interrupt::Priority::None
+                                ),
+                                "Priority::None is not supported",
+                            );
+                        };
+                        esp_hal::interrupt::Priority::Priority2
+                    });
+            }
+            .to_string()
+        );
+    }
 }

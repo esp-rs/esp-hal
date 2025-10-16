@@ -216,3 +216,108 @@ impl ItemLike for Item {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_basic() {
+        let result = replace(
+            quote::quote! {}.into(),
+            quote::quote! {
+                #[doc = "# Configuration"]
+                #[doc = "## Overview"]
+                #[doc = "This module contains the initial configuration for the system."]
+                #[doc = "## Configuration"]
+                #[doc = "In the [`esp_hal::init()`][crate::init] method, we can configure different"]
+                #[doc = "parameters for the system:"]
+                #[doc = "- CPU clock configuration."]
+                #[doc = "- Watchdog configuration."]
+                #[doc = "## Examples"]
+                #[doc = "### Default initialization"]
+                #[doc = "```rust, no_run"]
+                #[doc = "# {before_snippet}"]
+                #[doc = "let peripherals = esp_hal::init(esp_hal::Config::default());"]
+                #[doc = "# {after_snippet}"]
+                #[doc = "```"]
+                struct Foo {
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(result.to_string(), quote::quote! {
+            #[doc = "# Configuration"]
+            #[doc = "## Overview"]
+            #[doc = "This module contains the initial configuration for the system."]
+            #[doc = "## Configuration"]
+            #[doc = "In the [`esp_hal::init()`][crate::init] method, we can configure different"]
+            #[doc = "parameters for the system:"]
+            #[doc = "- CPU clock configuration."]
+            #[doc = "- Watchdog configuration."]
+            #[doc = "## Examples"]
+            #[doc = "### Default initialization"]
+            #[doc = "```rust, no_run"]
+            #[doc = crate::before_snippet!()]
+            #[doc = "let peripherals = esp_hal::init(esp_hal::Config::default());"]
+            #[doc = crate::after_snippet!()]
+            #[doc = "```"]
+            struct Foo {}
+        }.to_string());
+    }
+
+    #[test]
+    fn test_custom_replacements() {
+        let result = replace(
+            quote::quote! {
+                "freq" => {
+                    cfg(esp32h2) => "let freq = Rate::from_mhz(32);",
+                    _ => "let freq = Rate::from_mhz(80);"
+                },
+            }.into(),
+            quote::quote! {
+                #[doc = "# Configuration"]
+                #[doc = "## Overview"]
+                #[doc = "This module contains the initial configuration for the system."]
+                #[doc = "## Configuration"]
+                #[doc = "In the [`esp_hal::init()`][crate::init] method, we can configure different"]
+                #[doc = "parameters for the system:"]
+                #[doc = "- CPU clock configuration."]
+                #[doc = "- Watchdog configuration."]
+                #[doc = "## Examples"]
+                #[doc = "### Default initialization"]
+                #[doc = "```rust, no_run"]
+                #[doc = "# {freq}"]
+                #[doc = "# {before_snippet}"]
+                #[doc = "let peripherals = esp_hal::init(esp_hal::Config::default());"]
+                #[doc = "# {after_snippet}"]
+                #[doc = "```"]
+                struct Foo {
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(result.to_string(), quote::quote! {
+            #[doc = "# Configuration"]
+            #[doc = "## Overview"]
+            #[doc = "This module contains the initial configuration for the system."]
+            #[doc = "## Configuration"]
+            #[doc = "In the [`esp_hal::init()`][crate::init] method, we can configure different"]
+            #[doc = "parameters for the system:"]
+            #[doc = "- CPU clock configuration."]
+            #[doc = "- Watchdog configuration."]
+            #[doc = "## Examples"]
+            #[doc = "### Default initialization"]
+            #[doc = "```rust, no_run"]
+            #[cfg_attr (esp32h2 , doc = "let freq = Rate::from_mhz(32);")] 
+            #[cfg_attr (not (any (esp32h2)) , doc = "let freq = Rate::from_mhz(80);")]
+            #[doc = crate::before_snippet!()]
+            #[doc = "let peripherals = esp_hal::init(esp_hal::Config::default());"]
+            #[doc = crate::after_snippet!()]
+            #[doc = "```"]
+            struct Foo {}
+        }.to_string());
+    }
+}

@@ -57,4 +57,23 @@ mod tests {
             .to_string()
         );
     }
+
+    #[test]
+    fn test_try_async() {
+        let result = main(
+            quote::quote! {}.into(),
+            syn::parse2(quote::quote! {
+                async fn main() {}
+            })
+            .unwrap(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "If you want to use `async` please use `esp-rtos`'s `#[esp_rtos::main]` macro instead." }
+            }
+            .to_string()
+        );
+    }
 }
