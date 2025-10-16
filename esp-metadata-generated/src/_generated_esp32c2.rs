@@ -261,9 +261,12 @@ macro_rules! implement_peripheral_clocks {
             Uart0,
             #[doc = "UART1 peripheral clock signal"]
             Uart1,
+            #[doc = "UART_MEM peripheral clock signal"]
+            UartMem,
         }
         impl Peripheral {
-            const KEEP_ENABLED: &[Peripheral] = &[Self::Systimer, Self::Timg0, Self::Uart0];
+            const KEEP_ENABLED: &[Peripheral] =
+                &[Self::Systimer, Self::Timg0, Self::Uart0, Self::UartMem];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::ApbSarAdc,
@@ -278,6 +281,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Tsens,
                 Self::Uart0,
                 Self::Uart1,
+                Self::UartMem,
             ];
         }
         unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
@@ -342,6 +346,11 @@ macro_rules! implement_peripheral_clocks {
                         .perip_clk_en0()
                         .modify(|_, w| w.uart1_clk_en().bit(enable));
                 }
+                Peripheral::UartMem => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en0()
+                        .modify(|_, w| w.uart_mem_clk_en().bit(enable));
+                }
             }
         }
         unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
@@ -405,6 +414,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .perip_rst_en0()
                         .modify(|_, w| w.uart1_rst().bit(reset));
+                }
+                Peripheral::UartMem => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en0()
+                        .modify(|_, w| w.uart_mem_rst().bit(reset));
                 }
             }
         }

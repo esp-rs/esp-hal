@@ -131,7 +131,7 @@ peripheral_clocks = { templates = [
     #{ name = "SdioHost", template_params = { reg_group = "wifi_clk" } },
     #{ name = "SdioSlave", template_params = { reg_group = "wifi_clk" } },
 
-    #{ name = "UartMem" },
+    { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
     { name = "Uart2" },
     { name = "SpiDma" },
     { name = "I2s1" },

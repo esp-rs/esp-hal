@@ -348,6 +348,8 @@ macro_rules! implement_peripheral_clocks {
             Uart0,
             #[doc = "UART1 peripheral clock signal"]
             Uart1,
+            #[doc = "UART_MEM peripheral clock signal"]
+            UartMem,
             #[doc = "UHCI0 peripheral clock signal"]
             Uhci0,
             #[doc = "UHCI1 peripheral clock signal"]
@@ -358,7 +360,8 @@ macro_rules! implement_peripheral_clocks {
             Wdg,
         }
         impl Peripheral {
-            const KEEP_ENABLED: &[Peripheral] = &[Self::Systimer, Self::Timg0, Self::Uart0];
+            const KEEP_ENABLED: &[Peripheral] =
+                &[Self::Systimer, Self::Timg0, Self::Uart0, Self::UartMem];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::Aes,
@@ -387,6 +390,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Twai0,
                 Self::Uart0,
                 Self::Uart1,
+                Self::UartMem,
                 Self::Uhci0,
                 Self::Uhci1,
                 Self::Usb,
@@ -524,6 +528,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .perip_clk_en0()
                         .modify(|_, w| w.uart1_clk_en().bit(enable));
+                }
+                Peripheral::UartMem => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_clk_en0()
+                        .modify(|_, w| w.uart_mem_clk_en().bit(enable));
                 }
                 Peripheral::Uhci0 => {
                     crate::peripherals::SYSTEM::regs()
@@ -685,6 +694,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .perip_rst_en0()
                         .modify(|_, w| w.uart1_rst().bit(reset));
+                }
+                Peripheral::UartMem => {
+                    crate::peripherals::SYSTEM::regs()
+                        .perip_rst_en0()
+                        .modify(|_, w| w.uart_mem_rst().bit(reset));
                 }
                 Peripheral::Uhci0 => {
                     crate::peripherals::SYSTEM::regs()
