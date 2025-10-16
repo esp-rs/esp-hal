@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
-use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::{TokenStream, TokenStream as TokenStream2};
 use syn::{
     AttrStyle,
     Attribute,
@@ -170,12 +169,12 @@ impl Parse for Branch {
 }
 
 pub(crate) fn replace(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let replacements: Replacements = match syn::parse(attr) {
+    let replacements: Replacements = match syn::parse2(attr) {
         Ok(replacements) => replacements,
-        Err(e) => return e.into_compile_error().into(),
+        Err(e) => return e.into_compile_error(),
     };
 
-    let mut item: Item = syn::parse(input).expect("failed to parse input");
+    let mut item: Item = syn::parse2(input).expect("failed to parse input");
 
     let mut replacement_attrs = Vec::new();
 
@@ -197,7 +196,7 @@ pub(crate) fn replace(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     *item.attrs_mut() = replacement_attrs;
 
-    quote::quote! { #item }.into()
+    quote::quote! { #item }
 }
 
 trait ItemLike {

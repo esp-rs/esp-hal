@@ -32,7 +32,7 @@
 //!
 //! Requires the `embassy` feature to be enabled.
 //!
-//! ```rust, no_run
+//! ```rust,ignore
 //! #[main]
 //! async fn main(spawner: Spawner) {
 //!     // Your application's entry point
@@ -96,7 +96,7 @@ mod rtos_main;
 ///
 /// # Examples
 ///
-/// ```rust, no_run
+/// ```rust, ignore
 /// #[ram(unstable(rtc_fast))]
 /// static mut SOME_INITED_DATA: [u8; 2] = [0xaa, 0xbb];
 ///
@@ -113,7 +113,7 @@ mod rtos_main;
 /// [`bytemuck::Zeroable`]: https://docs.rs/bytemuck/1.9.0/bytemuck/trait.Zeroable.html
 #[proc_macro_attribute]
 pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
-    ram::ram(args, input)
+    ram::ram(args.into(), input.into()).into()
 }
 
 /// Replaces placeholders in rustdoc doc comments.
@@ -134,7 +134,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// ## Examples
 ///
-/// ```rust, no_run
+/// ```rust, ignore
 /// #[doc_replace(
 ///   "literal_placeholder" => "literal value",
 ///   "conditional_placeholder" => {
@@ -158,7 +158,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn doc_replace(args: TokenStream, input: TokenStream) -> TokenStream {
-    doc_replace::replace(args, input)
+    doc_replace::replace(args.into(), input.into()).into()
 }
 
 /// Mark a function as an interrupt handler.
@@ -169,27 +169,27 @@ pub fn doc_replace(args: TokenStream, input: TokenStream) -> TokenStream {
 /// If no priority is given, `Priority::min()` is assumed
 #[proc_macro_attribute]
 pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
-    interrupt::handler(args, input)
+    interrupt::handler(args.into(), input.into()).into()
 }
 
 /// Load code to be run on the LP/ULP core.
 ///
 /// ## Example
-/// ```rust, no_run
+/// ```rust, ignore
 /// let lp_core_code = load_lp_code!("path.elf");
 /// lp_core_code.run(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu, lp_pin);
 /// ````
 #[cfg(any(feature = "has-lp-core", feature = "has-ulp-core"))]
 #[proc_macro]
 pub fn load_lp_code(input: TokenStream) -> TokenStream {
-    lp_core::load_lp_code(input)
+    lp_core::load_lp_code(input.into()).into()
 }
 
 /// Marks the entry function of a LP core / ULP program.
 #[cfg(any(feature = "is-lp-core", feature = "is-ulp-core"))]
 #[proc_macro_attribute]
 pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
-    lp_core::entry(args, input)
+    lp_core::entry(args.into(), input.into()).into()
 }
 
 /// Creates a new instance of `esp_rtos::embassy::Executor` and declares an application entry point
@@ -206,7 +206,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ## Examples
 /// Spawning a task:
 ///
-/// ``` rust
+/// ```rust,ignore
 /// #[esp_rtos::main]
 /// async fn main(_s: embassy_executor::Spawner) {
 ///     // Function body
@@ -214,7 +214,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn rtos_main(args: TokenStream, item: TokenStream) -> TokenStream {
-    rtos_main::main(args, item)
+    rtos_main::main(args.into(), item.into()).into()
 }
 
 /// Attribute to declare the entry point of the program
@@ -235,7 +235,7 @@ pub fn rtos_main(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// - Simple entry point
 ///
-/// ``` no_run
+/// ```ignore
 /// #[main]
 /// fn main() -> ! {
 ///     loop { /* .. */ }
@@ -243,7 +243,8 @@ pub fn rtos_main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn blocking_main(args: TokenStream, input: TokenStream) -> TokenStream {
-    blocking::main(args, input)
+    let f = syn::parse_macro_input!(input as syn::ItemFn);
+    blocking::main(args.into(), f).into()
 }
 
 /// Automatically implement the [Builder Lite] pattern for a struct.
@@ -255,7 +256,7 @@ pub fn blocking_main(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// ## Example
 ///
-/// ```rust, no_run
+/// ```rust, ignore
 /// #[derive(Default)]
 /// enum MyEnum {
 ///     #[default]
@@ -280,7 +281,7 @@ pub fn blocking_main(args: TokenStream, input: TokenStream) -> TokenStream {
 /// [Builder Lite]: https://matklad.github.io/2022/05/29/builder-lite.html
 #[proc_macro_derive(BuilderLite, attributes(builder_lite))]
 pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
-    builder::builder_lite_derive(item)
+    builder::builder_lite_derive(item.into()).into()
 }
 
 /// Print a build error and terminate the process.
@@ -291,7 +292,7 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
 ///
 /// ## Example
 ///
-/// ```rust
+/// ```rust, ignore
 /// esp_hal_procmacros::error! {"
 /// ERROR: something really bad has happened!
 /// "}

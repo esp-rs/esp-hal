@@ -1,4 +1,4 @@
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
     Attribute,
@@ -36,7 +36,7 @@ const KNOWN_HELPERS: &[&str] = &[
 ///
 /// <https://matklad.github.io/2022/05/29/builder-lite.html>
 pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
-    let input = syn::parse_macro_input!(item as syn::DeriveInput);
+    let input: syn::DeriveInput = syn::parse2(item).unwrap();
 
     let span = input.span();
     let ident = input.ident;
@@ -48,13 +48,12 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
             span,
             "#[derive(Builder)] is only defined for structs, not for enums or unions!",
         )
-        .to_compile_error()
-        .into();
+        .to_compile_error();
     };
     for field in fields {
         let helper_attributes = match collect_helper_attrs(&field.attrs) {
             Ok(attr) => attr,
-            Err(err) => return err.to_compile_error().into(),
+            Err(err) => return err.to_compile_error(),
         };
 
         // Ignore field if it has a `skip` helper attribute.
@@ -169,7 +168,7 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
         }
     };
 
-    implementation.into()
+    implementation
 }
 
 // https://stackoverflow.com/a/56264023

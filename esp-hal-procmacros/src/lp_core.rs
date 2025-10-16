@@ -1,5 +1,5 @@
 #[allow(unused)]
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
 use quote::quote;
 
 #[cfg(any(feature = "is-lp-core", feature = "is-ulp-core"))]
@@ -15,7 +15,6 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
         PathArguments,
         Type,
         parse::Error,
-        parse_macro_input,
         spanned::Spanned,
     };
 
@@ -105,11 +104,10 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 
     if !args.is_empty() {
         return Error::new(Span::call_site(), "This attribute accepts no arguments")
-            .to_compile_error()
-            .into();
+            .to_compile_error();
     }
 
-    let f = parse_macro_input!(input as ItemFn);
+    let f: ItemFn = syn::parse2(input).unwrap();
 
     let mut argument_types = Vec::new();
     let mut create_peripheral = Vec::new();
@@ -120,18 +118,14 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
         let param_name = format_ident!("param{}", num);
         match arg {
             FnArg::Receiver(_) => {
-                return Error::new(arg.span(), "invalid argument")
-                    .to_compile_error()
-                    .into();
+                return Error::new(arg.span(), "invalid argument").to_compile_error();
             }
             FnArg::Typed(t) => {
                 match simplename(&t.ty).as_str() {
                     "Output" => {
                         let pin = extract_pin(&t.ty);
                         if used_pins.contains(&pin) {
-                            return Error::new(arg.span(), "duplicate pin")
-                                .to_compile_error()
-                                .into();
+                            return Error::new(arg.span(), "duplicate pin").to_compile_error();
                         }
                         used_pins.push(pin);
                         create_peripheral.push(quote!(
@@ -141,9 +135,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                     "Input" => {
                         let pin = extract_pin(&t.ty);
                         if used_pins.contains(&pin) {
-                            return Error::new(arg.span(), "duplicate pin")
-                                .to_compile_error()
-                                .into();
+                            return Error::new(arg.span(), "duplicate pin").to_compile_error();
                         }
                         used_pins.push(pin);
                         create_peripheral.push(quote!(
@@ -162,8 +154,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                     }
                     _ => {
                         return Error::new(arg.span(), "invalid argument to main")
-                            .to_compile_error()
-                            .into();
+                            .to_compile_error();
                     }
                 }
                 argument_types.push(t);
@@ -198,7 +189,6 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 
         #f
     )
-    .into()
 }
 
 #[cfg(any(feature = "has-lp-core", feature = "has-ulp-core"))]
@@ -218,23 +208,21 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
     };
 
     let hal_crate = if let Ok(FoundCrate::Name(ref name)) = hal_crate {
-        let ident = Ident::new(name, Span::call_site().into());
+        let ident = Ident::new(name, proc_macro2::Span::call_site());
         quote!( #ident )
     } else {
         quote!(crate)
     };
 
-    let lit: LitStr = match syn::parse(input) {
+    let lit: LitStr = match syn::parse2(input) {
         Ok(lit) => lit,
-        Err(e) => return e.into_compile_error().into(),
+        Err(e) => return e.into_compile_error(),
     };
 
     let elf_file = lit.value();
 
     if !Path::new(&elf_file).exists() {
-        return Error::new(Span::call_site().into(), "File not found")
-            .to_compile_error()
-            .into();
+        return Error::new(Span::call_site().into(), "File not found").to_compile_error();
     }
 
     let bin_data = fs::read(elf_file).unwrap();
@@ -283,8 +271,7 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
             Span::call_site().into(),
             "Given file doesn't seem to be an LP/ULP core application.",
         )
-        .to_compile_error()
-        .into();
+        .to_compile_error();
     };
 
     let magic_symbol = magic_symbol.trim_start_matches("__ULP_MAGIC_");
@@ -353,5 +340,4 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
             LpCoreCode {}
         }
     }
-    .into()
 }

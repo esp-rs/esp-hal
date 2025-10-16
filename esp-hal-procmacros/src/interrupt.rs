@@ -1,6 +1,5 @@
-use proc_macro::{Span, TokenStream};
 use proc_macro_crate::{FoundCrate, crate_name};
-use proc_macro2::Ident;
+use proc_macro2::{Ident, Span, TokenStream};
 use syn::{
     AttrStyle,
     Attribute,
@@ -19,12 +18,12 @@ pub enum WhiteListCaller {
 }
 
 pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
-    let mut f: ItemFn = syn::parse(input).expect("`#[handler]` must be applied to a function");
+    let mut f: ItemFn = syn::parse2(input).expect("`#[handler]` must be applied to a function");
     let original_span = f.span();
 
-    let attr_args = match Punctuated::<Meta, Token![,]>::parse_terminated.parse2(args.into()) {
+    let attr_args = match Punctuated::<Meta, Token![,]>::parse_terminated.parse2(args) {
         Ok(v) => v,
-        Err(e) => return e.into_compile_error().into(),
+        Err(e) => return e.into_compile_error(),
     };
 
     let mut priority = None;
@@ -38,20 +37,17 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
                             meta_name_value.span(),
                             "duplicate `priority` attribute",
                         )
-                        .into_compile_error()
-                        .into();
+                        .into_compile_error();
                     }
                     priority = Some(meta_name_value.value);
                 } else {
                     return SynError::new(meta_name_value.span(), "expected `priority = <value>`")
-                        .into_compile_error()
-                        .into();
+                        .into_compile_error();
                 }
             }
             other => {
                 return SynError::new(other.span(), "expected `priority = <value>`")
-                    .into_compile_error()
-                    .into();
+                    .into_compile_error();
             }
         }
     }
@@ -61,7 +57,7 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
             Ok(FoundCrate::Name(ref name)) => name,
             _ => "crate",
         },
-        Span::call_site().into(),
+        Span::call_site(),
     );
 
     let priority = match priority {
@@ -104,8 +100,7 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
             f.span(),
             "`#[handler]` handlers must have signature `[unsafe] fn([&mut Context]) [-> !]`",
         )
-        .to_compile_error()
-        .into();
+        .to_compile_error();
     }
 
     f.sig.abi = syn::parse_quote_spanned!(original_span => extern "C");
@@ -123,7 +118,6 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
         #[allow(non_upper_case_globals)]
         #vis const #orig: #root::interrupt::InterruptHandler = #root::interrupt::InterruptHandler::new(#new, #priority);
     )
-    .into()
 }
 
 pub fn check_attr_whitelist(
@@ -156,9 +150,7 @@ pub fn check_attr_whitelist(
             }
         };
 
-        return Err(SynError::new(attr.span(), err_str)
-            .to_compile_error()
-            .into());
+        return Err(SynError::new(attr.span(), err_str).to_compile_error());
     }
 
     Ok(())

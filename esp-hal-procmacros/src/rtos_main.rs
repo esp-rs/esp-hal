@@ -1,7 +1,6 @@
 use std::{cell::RefCell, fmt::Display, thread};
 
-use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::{TokenStream, TokenStream as TokenStream2};
 use quote::{ToTokens, quote};
 use syn::{
     Attribute,
@@ -29,10 +28,10 @@ impl Parse for Args {
 
 /// Procedural macro entry point for the async `main` function.
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
-    let args = syn::parse_macro_input!(args as Args);
-    let f = syn::parse_macro_input!(item as syn::ItemFn);
+    let args: Args = syn::parse2(args).unwrap();
+    let f: syn::ItemFn = syn::parse2(item).unwrap();
 
-    run(&args.meta, f, main_fn()).unwrap_or_else(|x| x).into()
+    run(&args.meta, f, main_fn()).unwrap_or_else(|x| x)
 }
 
 /// Expands and validates the async `main` function into a task entry point.
