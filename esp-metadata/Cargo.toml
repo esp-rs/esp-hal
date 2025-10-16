@@ -17,15 +17,17 @@ check-configs = [
 clippy-configs = [] # don't waste time on this
 
 [dependencies]
-anyhow     = "1.0"
-clap       = { version = "4.5", features = ["derive"], optional = true }
+anyhow       = "1.0"
+clap         = { version = "4.5", features = ["derive"], optional = true }
 convert_case = "0.8"
-basic-toml = "0.1"
-serde      = { version = "1.0", default-features = false, features = ["derive"] }
-strum      = { version = "0.27", features = ["derive"] }
-proc-macro2 = "1"
-quote      = "1"
-indexmap = { version = "2", features = ["serde"] }
+basic-toml   = "0.1"
+serde        = { version = "1.0", default-features = false, features = ["derive"] }
+somni-parser = "0.2.1"
+somni-expr   = "0.2"
+strum        = { version = "0.27", features = ["derive"] }
+proc-macro2  = "1"
+quote        = "1"
+indexmap     = { version = "2", features = ["serde"] }
 
 [features]
 default = []

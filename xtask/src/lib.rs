@@ -675,7 +675,12 @@ pub fn windows_safe_path(path: &Path) -> PathBuf {
 }
 
 /// Format the specified package in the workspace using `cargo fmt`.
-pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result<()> {
+pub fn format_package(
+    workspace: &Path,
+    package: Package,
+    check: bool,
+    format_rules: Option<&Path>,
+) -> Result<()> {
     log::info!("Formatting package: {}", package);
     let package_path = workspace.join(package.as_ref());
 
@@ -686,7 +691,7 @@ pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result
     };
 
     for path in &paths {
-        format_package_path(workspace, path, check)?;
+        format_package_path(workspace, path, check, format_rules)?;
     }
 
     Ok(())
@@ -789,7 +794,12 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
     }
 }
 
-fn format_package_path(workspace: &Path, package_path: &Path, check: bool) -> Result<()> {
+fn format_package_path(
+    workspace: &Path,
+    package_path: &Path,
+    check: bool,
+    format_rules: Option<&Path>,
+) -> Result<()> {
     // We need to list all source files since modules in `unstable_module!` macros
     // won't get picked up otherwise
     let source_files = walkdir::WalkDir::new(package_path.join("src"))
@@ -814,10 +824,14 @@ fn format_package_path(workspace: &Path, package_path: &Path, check: bool) -> Re
     }
 
     cargo_args.push("--".into());
-    cargo_args.push(format!(
-        "--config-path={}/rustfmt.toml",
-        workspace.display()
-    ));
+    if let Some(rules) = format_rules {
+        cargo_args.push(format!("--config-path={}", rules.display()));
+    } else {
+        cargo_args.push(format!(
+            "--config-path={}/rustfmt.toml",
+            workspace.display()
+        ));
+    }
     cargo_args.extend(source_files);
 
     log::debug!("{cargo_args:#?}");
@@ -831,7 +845,12 @@ pub fn update_metadata(workspace: &Path, check: bool) -> Result<()> {
     update_chip_support_table(workspace)?;
     generate_metadata(workspace, save)?;
 
-    format_package(workspace, Package::EspMetadataGenerated, false)?;
+    format_package(
+        workspace,
+        Package::EspMetadataGenerated,
+        false,
+        Some(&workspace.join("esp-metadata-generated/rustfmt.toml")),
+    )?;
 
     if check {
         let res = std::process::Command::new("git")
