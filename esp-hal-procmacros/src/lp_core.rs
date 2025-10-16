@@ -253,7 +253,7 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
     for section in sections {
         if section.address() > last_address {
             let fill = section.address() - last_address;
-            binary.extend(std::iter::repeat(0).take(fill as usize));
+            binary.extend(std::iter::repeat_n(0, fill as usize));
         }
 
         binary.extend_from_slice(section.data().unwrap());
