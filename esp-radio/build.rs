@@ -65,30 +65,35 @@ fn main() -> Result<(), Box<dyn Error>> {
     // implementation detail.
     assert_unique_features!("log-04", "defmt");
 
-    assert!(
-        !cfg!(feature = "ble") || chip.contains("bt"),
-        r#"
+    if cfg!(feature = "ble") && !chip.contains("bt") {
+        panic!(
+            r#"
 
-        BLE is not supported on this target.
+            BLE is not supported on this target.
+    
+            "#
+        );
+    }
 
-        "#
-    );
-    assert!(
-        !cfg!(feature = "wifi") || chip.contains("wifi"),
-        r#"
+    if cfg!(feature = "wifi") && !chip.contains("wifi") {
+        panic!(
+            r#"
 
-        Wi-Fi is not supported on this target.
+            Wi-Fi is not supported on this target.
+    
+            "#
+        );
+    }
 
-        "#
-    );
-    assert!(
-        !cfg!(feature = "ieee802154") || chip.contains("ieee802154"),
-        r#"
+    if cfg!(feature = "ieee802154") && !chip.contains("ieee802154") {
+        panic!(
+            r#"
 
-        IEEE 802.15.4 is not supported on this target.
-
-        "#
-    );
+            IEEE 802.15.4 is not supported on this target.
+    
+            "#
+        );
+    }
 
     if let Ok(level) = std::env::var("OPT_LEVEL")
         && level != "2"
