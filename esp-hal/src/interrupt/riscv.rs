@@ -226,11 +226,6 @@ pub static RESERVED_INTERRUPTS: &[u32] = PRIORITY_TO_INTERRUPT;
 ///
 /// Trying using a reserved interrupt from [`RESERVED_INTERRUPTS`] will return
 /// an error.
-///
-/// ## Example
-/// Visit the [mod interrupt] test to see a proper example of how to use direct vectoring.
-///
-/// [mod interrupt]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/src/bin/misc_drivers.rs
 pub fn enable_direct(
     interrupt: Interrupt,
     level: Priority,
