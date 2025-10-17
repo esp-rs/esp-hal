@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `queue::CompatQueue` to simplify OS integration. (#4371)
 
 ### Changed
 

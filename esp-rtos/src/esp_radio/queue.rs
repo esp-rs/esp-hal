@@ -13,6 +13,7 @@ struct QueueInner {
     storage: Box<[u8]>,
     item_size: usize,
     capacity: usize,
+    count: usize,
     current_read: usize,
     current_write: usize,
     waiting_for_space: WaitQueue,
@@ -24,6 +25,7 @@ impl QueueInner {
         Self {
             item_size,
             capacity,
+            count: 0,
             current_read: 0,
             current_write: 0,
             storage: vec![0; capacity * item_size].into_boxed_slice(),
@@ -53,6 +55,23 @@ impl QueueInner {
         dst.copy_from_slice(item);
 
         self.current_write = (self.current_write + 1) % self.capacity;
+        self.count += 1;
+
+        true
+    }
+
+    unsafe fn try_enqueue_front(&mut self, item: *const u8) -> bool {
+        if self.full() {
+            return false;
+        }
+
+        let item = unsafe { core::slice::from_raw_parts(item, self.item_size) };
+
+        self.current_read = (self.current_read + self.capacity - 1) % self.capacity;
+        let dst = self.get_mut(self.current_read);
+        dst.copy_from_slice(item);
+
+        self.count += 1;
 
         true
     }
@@ -68,6 +87,7 @@ impl QueueInner {
         dst.copy_from_slice(src);
 
         self.current_read = (self.current_read + 1) % self.capacity;
+        self.count -= 1;
 
         true
     }
@@ -98,11 +118,7 @@ impl QueueInner {
     }
 
     fn len(&self) -> usize {
-        if self.current_write >= self.current_read {
-            self.current_write - self.current_read
-        } else {
-            self.capacity - self.current_read + self.current_write
-        }
+        self.count
     }
 
     fn empty(&self) -> bool {
@@ -148,6 +164,29 @@ impl Queue {
             true
         } else {
             debug!("Queue - send to back - timed out");
+            false
+        }
+    }
+
+    unsafe fn send_to_front(&self, item: *const u8, timeout_us: Option<u32>) -> bool {
+        if crate::with_deadline(timeout_us, |deadline| {
+            self.inner.with(|queue| {
+                if unsafe { queue.try_enqueue_front(item) } {
+                    trace!("Queue - notify with item");
+                    queue.waiting_for_item.notify();
+                    true
+                } else {
+                    // The task will go to sleep when the above critical section is released.
+                    trace!("Queue - wait for space - {:?}", deadline);
+                    queue.waiting_for_space.wait_with_deadline(deadline);
+                    false
+                }
+            })
+        }) {
+            debug!("Queue - send to front - success");
+            true
+        } else {
+            debug!("Queue - send to front - timed out");
             false
         }
     }
@@ -229,8 +268,10 @@ impl QueueImplementation for Queue {
         core::mem::drop(q);
     }
 
-    unsafe fn send_to_front(_queue: QueuePtr, _item: *const u8, _timeout_us: Option<u32>) -> bool {
-        unimplemented!()
+    unsafe fn send_to_front(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool {
+        let queue = unsafe { Queue::from_ptr(queue) };
+
+        unsafe { queue.send_to_front(item, timeout_us) }
     }
 
     unsafe fn send_to_back(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool {
