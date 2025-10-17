@@ -373,7 +373,7 @@ unsafe extern "C" fn ecc_gen_key_pair(_: *const u8, _: *const u8) -> i32 {
 
 unsafe extern "C" fn os_random() -> u32 {
     trace!("os_random");
-    unsafe { (crate::common_adapter::random() & u32::MAX) as u32 }
+    unsafe { (crate::common_adapter::random()) as u32 }
 }
 
 unsafe extern "C" fn task_create(
