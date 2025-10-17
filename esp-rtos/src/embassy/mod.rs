@@ -9,7 +9,7 @@ use esp_hal::system::Cpu;
 use macros::ram;
 use portable_atomic::AtomicPtr;
 
-use crate::task::flags::ThreadFlags;
+use crate::task::flags::ThreadFlag;
 
 #[unsafe(export_name = "__pender")]
 #[ram]
@@ -22,8 +22,8 @@ fn __pender(context: *mut ()) {
         _ => {
             // This forces us to keep the embassy timer queue separate, otherwise we'd need to
             // reentrantly lock SCHEDULER.
-            let flags = unwrap!(unsafe { context.cast::<ThreadFlags>().as_ref() });
-            flags.set(1);
+            let flags = unwrap!(unsafe { context.cast::<ThreadFlag>().as_ref() });
+            flags.set();
         }
     }
 }
@@ -86,7 +86,7 @@ impl Executor {
     ///
     /// This function never returns.
     pub fn run(&'static mut self, init: impl FnOnce(Spawner)) -> ! {
-        let flags = ThreadFlags::new();
+        let flags = ThreadFlag::new();
         struct NoHooks;
 
         impl Callbacks for NoHooks {
@@ -110,8 +110,8 @@ impl Executor {
         init: impl FnOnce(Spawner),
         callbacks: impl Callbacks,
     ) -> ! {
-        let flags = ThreadFlags::new();
-        struct Hooks<'a, CB: Callbacks>(CB, &'a ThreadFlags);
+        let flags = ThreadFlag::new();
+        struct Hooks<'a, CB: Callbacks>(CB, &'a ThreadFlag);
 
         impl<CB: Callbacks> Callbacks for Hooks<'_, CB> {
             fn before_poll(&mut self) {
@@ -120,7 +120,7 @@ impl Executor {
 
             fn on_idle(&mut self) {
                 // Make sure we only call on_idle if the executor would otherwise go to sleep.
-                if self.1.get() == 0 {
+                if !self.1.get() {
                     self.0.on_idle();
                 }
             }
@@ -132,12 +132,12 @@ impl Executor {
     fn run_inner(
         &'static self,
         init: impl FnOnce(Spawner),
-        flags: &ThreadFlags,
+        flags: &ThreadFlag,
         mut hooks: impl Callbacks,
     ) -> ! {
         let executor = unsafe {
             (&mut *self.executor.get()).write(raw::Executor::new(
-                (flags as *const ThreadFlags).cast::<()>().cast_mut(),
+                (flags as *const ThreadFlag).cast::<()>().cast_mut(),
             ))
         };
 
@@ -159,7 +159,7 @@ impl Executor {
             hooks.on_idle();
 
             // Wait for work to become available.
-            flags.wait(1, None);
+            flags.wait();
         }
     }
 }
