@@ -174,7 +174,7 @@ pub(crate) fn replace(attr: TokenStream, input: TokenStream) -> TokenStream {
         Err(e) => return e.into_compile_error(),
     };
 
-    let mut item: Item = syn::parse2(input).expect("failed to parse input");
+    let mut item: Item = crate::unwrap_or_compile_error!(syn::parse2(input));
 
     let mut replacement_attrs = Vec::new();
 
@@ -275,6 +275,7 @@ mod tests {
                     cfg(esp32h2) => "let freq = Rate::from_mhz(32);",
                     _ => "let freq = Rate::from_mhz(80);"
                 },
+                "other" => "replacement"
             }.into(),
             quote::quote! {
                 #[doc = "# Configuration"]
@@ -319,5 +320,162 @@ mod tests {
             #[doc = "```"]
             struct Foo {}
         }.to_string());
+    }
+
+    #[test]
+    fn test_custom_fail() {
+        let result = replace(
+            quote::quote! {
+                "freq" => {
+                    abc(esp32h2) => "let freq = Rate::from_mhz(32);",
+                },
+            }
+            .into(),
+            quote::quote! {}.into(),
+        );
+
+        assert_eq!(result.to_string(), quote::quote! {
+            ::core::compile_error!{ "Expected a cfg condition or catch-all condition using `_`" }
+        }.to_string());
+    }
+
+    #[test]
+    fn test_basic_fn() {
+        let result = replace(
+            quote::quote! {}.into(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = "# {before_snippet}"]
+                fn foo() {
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = crate::before_snippet!()]
+                fn foo () { }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_basic_enum() {
+        let result = replace(
+            quote::quote! {}.into(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = "# {before_snippet}"]
+                enum Foo {
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = crate::before_snippet!()]
+                enum Foo { }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_basic_trait() {
+        let result = replace(
+            quote::quote! {}.into(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = "# {before_snippet}"]
+                trait Foo {
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = crate::before_snippet!()]
+                trait Foo { }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_basic_mod() {
+        let result = replace(
+            quote::quote! {}.into(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = "# {before_snippet}"]
+                mod foo {
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = crate::before_snippet!()]
+                mod foo { }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_basic_macro() {
+        let result = replace(
+            quote::quote! {}.into(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = "# {before_snippet}"]
+                macro_rules! foo {
+                    () => {
+                    };
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = crate::before_snippet!()]
+                macro_rules! foo {
+                    () => {
+                    };
+                }
+            }
+            .to_string()
+        );
+    }
+
+    // TODO panicking is not the nicest way to handle this
+    #[test]
+    #[should_panic]
+    fn test_basic_fail_wrong_item() {
+        replace(
+            quote::quote! {}.into(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = "# {before_snippet}"]
+                static FOO: u32 = 0u32;
+            }
+            .into(),
+        );
     }
 }

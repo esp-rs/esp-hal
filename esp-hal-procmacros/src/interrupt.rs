@@ -236,4 +236,108 @@ mod tests {
             ::core::compile_error!{ "this attribute is not allowed on an interrupt handler controlled by esp-hal" }
         }.to_string());
     }
+
+    #[test]
+    fn test_duplicate_priority() {
+        let result = handler(
+            quote::quote! {
+                priority = esp_hal::interrupt::Priority::Priority2,
+                priority = esp_hal::interrupt::Priority::Priority1,
+            }
+            .into(),
+            quote::quote! {
+                fn foo(){}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "duplicate `priority` attribute" }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_wrong_args() {
+        let result = handler(
+            quote::quote! {
+                true
+            }
+            .into(),
+            quote::quote! {
+                fn foo(){}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "expected identifier, found keyword `true`" }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_illegal_arg() {
+        let result = handler(
+            quote::quote! {
+                not_allowed = true,
+            }
+            .into(),
+            quote::quote! {
+                fn foo(){}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "expected `priority = <value>`" }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_illegal_arg2() {
+        let result = handler(
+            quote::quote! {
+                A,B
+            }
+            .into(),
+            quote::quote! {
+                fn foo(){}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "expected `priority = <value>`" }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_illegal_sig() {
+        let result = handler(
+            quote::quote! {}.into(),
+            quote::quote! {
+                fn foo() -> u32 {}
+            }
+            .into(),
+        );
+
+        assert_eq!(result.to_string(), quote::quote! {
+            ::core::compile_error!{ "`#[handler]` handlers must have signature `[unsafe] fn([&mut Context]) [-> !]`" }
+        }.to_string());
+    }
 }

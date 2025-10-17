@@ -286,6 +286,7 @@ mod tests {
         let result = builder_lite_derive(
             quote::quote! {
                 struct Foo {
+                    #[doc = "keep docs"]
                     bar: u32,
                     baz: bool,
                 }
@@ -305,6 +306,7 @@ mod tests {
                         self
                     }
 
+                    #[doc = "keep docs"]
                     pub fn bar(&self) -> u32 {
                         self.bar
                     }
@@ -477,6 +479,29 @@ mod tests {
                         self.bar = None;
                         self
                     }
+                }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_skip() {
+        let result = builder_lite_derive(
+            quote::quote! {
+                struct Foo {
+                    #[builder_lite(skip)]
+                    bar: Option<u32>,
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[automatically_derived]
+                impl Foo {
                 }
             }
             .to_string()
