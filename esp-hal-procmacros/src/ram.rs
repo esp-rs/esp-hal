@@ -75,7 +75,17 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
                         .into_compile_error();
                 };
                 let arg = match ident {
-                    i if i == "reclaimed" => &mut dram2_uninit,
+                    i if i == "reclaimed" => {
+                        if !cfg!(test) && !cfg!(feature = "__esp_idf_bootloader") {
+                            return syn::Error::new(
+                                ident.span(),
+                                "`ram(reclaimed)` requires the esp-idf bootloader",
+                            )
+                            .into_compile_error();
+                        }
+
+                        &mut dram2_uninit
+                    }
                     _ => {
                         return syn::Error::new(
                             ident.span(),

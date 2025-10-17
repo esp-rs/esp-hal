@@ -72,6 +72,16 @@
 //! }
 //! ```
 //!
+//! ## Reclaimed memory
+//!
+//! After the bootloader has started the application, the `.dram2_uninit` region becomes available
+//! for use. This region can be used for dynamic memory allocation or other purposes, but the data
+//! placed there cannot be initialized (i.e. it must be `MaybeUninit<T>`). For convenience, you can
+//! use the `#[esp_hal::ram(reclaimed)]` attribute, which will also check that the variable can be
+//! placed in the reclaimed memory.
+#![doc = ""]
+#![cfg_attr(not(feature = "std"), doc = concat!("For ", esp_metadata_generated::chip!(), " the size of the reclaimed memory is ", esp_metadata_generated::memory_range!(size as str, "DRAM2_UNINIT")," bytes."))]
+#![doc = ""]
 //! ## Additional configuration
 //!
 //! We've exposed some configuration options that don't fit into cargo
