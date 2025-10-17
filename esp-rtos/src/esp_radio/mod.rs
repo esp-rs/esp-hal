@@ -160,10 +160,14 @@ impl SemaphoreImplementation for Semaphore {
     }
 
     unsafe fn try_give_from_isr(semaphore: SemaphorePtr, _hptw: Option<&mut bool>) -> bool {
+        // FIXME: when the interrupt handler that calls this interrupts the idle hook, the OS
+        // crashes.
         unsafe { <Self as SemaphoreImplementation>::give(semaphore) }
     }
 
     unsafe fn try_take_from_isr(semaphore: SemaphorePtr, _hptw: Option<&mut bool>) -> bool {
+        // FIXME: when the interrupt handler that calls this interrupts the idle hook, the OS
+        // crashes.
         unsafe { <Self as SemaphoreImplementation>::try_take(semaphore) }
     }
 }

@@ -10,13 +10,15 @@
 //!
 //! See the [`QueueImplementation`] documentation for more information.
 //!
+//! You may also choose to use the [`CompatQueue`] implementation provided by this crate.
+//!
 //! ## Usage
 //!
 //! Users should use [`QueueHandle`] to interact with queues created by the driver implementation.
 //!
 //! > Note that the only expected user of this crate is esp-radio.
 
-use core::ptr::NonNull;
+use core::{cell::UnsafeCell, ptr::NonNull};
 
 /// Pointer to an opaque queue created by the driver implementation.
 pub type QueuePtr = NonNull<()>;
@@ -462,5 +464,284 @@ impl Drop for QueueHandle {
     #[inline]
     fn drop(&mut self) {
         unsafe { esp_rtos_queue_delete(self.0) };
+    }
+}
+
+use alloc::{boxed::Box, vec};
+
+use crate::semaphore::{SemaphoreHandle, SemaphoreKind};
+
+struct QueueInner {
+    storage: Box<[u8]>,
+    item_size: usize,
+    capacity: usize,
+    current_read: usize,
+    current_write: usize,
+}
+
+impl QueueInner {
+    fn get(&self, index: usize) -> &[u8] {
+        let item_start = self.item_size * index;
+        &self.storage[item_start..][..self.item_size]
+    }
+
+    fn get_mut(&mut self, index: usize) -> &mut [u8] {
+        let item_start = self.item_size * index;
+        &mut self.storage[item_start..][..self.item_size]
+    }
+
+    fn len(&self) -> usize {
+        if self.current_write >= self.current_read {
+            self.current_write - self.current_read
+        } else {
+            self.capacity - self.current_read + self.current_write
+        }
+    }
+
+    fn send_to_back(&mut self, item: *const u8) {
+        let item = unsafe { core::slice::from_raw_parts(item, self.item_size) };
+
+        let dst = self.get_mut(self.current_write);
+        dst.copy_from_slice(item);
+
+        self.current_write = (self.current_write + 1) % self.capacity;
+    }
+
+    fn read_from_front(&mut self, dst: *mut u8) {
+        let dst = unsafe { core::slice::from_raw_parts_mut(dst, self.item_size) };
+
+        let src = self.get(self.current_read);
+        dst.copy_from_slice(src);
+
+        self.current_read = (self.current_read + 1) % self.capacity;
+    }
+
+    fn remove(&mut self, item: *const u8) -> bool {
+        if self.len() == 0 {
+            return false;
+        }
+
+        let count = self.len();
+
+        let mut tmp_item = vec![0; self.item_size];
+
+        let mut found = false;
+        let item_slice = unsafe { core::slice::from_raw_parts(item, self.item_size) };
+        for _ in 0..count {
+            self.read_from_front(tmp_item.as_mut_ptr().cast());
+
+            if !found {
+                if &tmp_item[..] != item_slice {
+                    self.send_to_back(tmp_item.as_mut_ptr().cast());
+                } else {
+                    found = true;
+                }
+            }
+
+            // Note that even if we find our item, we'll need to keep cycling through everything to
+            // keep insertion order.
+        }
+
+        found
+    }
+}
+
+/// A suitable queue implementation that only requires semaphores from the OS.
+///
+/// Register in your OS implementation by adding the following code:
+///
+/// ```rust
+/// use esp_radio_rtos_driver::{queue::CompatQueue, register_queue_implementation};
+///
+/// register_queue_implementation!(CompatQueue);
+/// ```
+pub struct CompatQueue {
+    /// Allows interior mutability for the queue's inner state, when the mutex is held.
+    inner: UnsafeCell<QueueInner>,
+
+    semaphore_empty: SemaphoreHandle,
+    semaphore_full: SemaphoreHandle,
+    mutex: SemaphoreHandle,
+}
+
+impl CompatQueue {
+    fn new(capacity: usize, item_size: usize) -> Self {
+        let storage = vec![0; capacity * item_size].into_boxed_slice();
+        let semaphore_empty = SemaphoreHandle::new(SemaphoreKind::Counting {
+            max: capacity as u32,
+            initial: capacity as u32,
+        });
+        let semaphore_full = SemaphoreHandle::new(SemaphoreKind::Counting {
+            max: capacity as u32,
+            initial: 0,
+        });
+        let mutex = SemaphoreHandle::new(SemaphoreKind::Mutex);
+        Self {
+            inner: UnsafeCell::new(QueueInner {
+                storage,
+                item_size,
+                capacity,
+                current_read: 0,
+                current_write: 0,
+            }),
+            semaphore_empty,
+            semaphore_full,
+            mutex,
+        }
+    }
+
+    unsafe fn from_ptr<'a>(ptr: QueuePtr) -> &'a Self {
+        unsafe { ptr.cast::<Self>().as_ref() }
+    }
+}
+
+impl QueueImplementation for CompatQueue {
+    fn create(capacity: usize, item_size: usize) -> QueuePtr {
+        let q = Box::new(CompatQueue::new(capacity, item_size));
+        NonNull::from(Box::leak(q)).cast()
+    }
+
+    unsafe fn delete(queue: QueuePtr) {
+        let q = unsafe { Box::from_raw(queue.cast::<CompatQueue>().as_ptr()) };
+        core::mem::drop(q);
+    }
+
+    unsafe fn send_to_front(_queue: QueuePtr, _item: *const u8, _timeout_us: Option<u32>) -> bool {
+        unimplemented!()
+    }
+
+    unsafe fn send_to_back(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool {
+        let queue = unsafe { CompatQueue::from_ptr(queue) };
+
+        if queue.semaphore_empty.take(timeout_us) {
+            // The inner mutex shouldn't be held for a long time, but we still shouldn't block
+            // indefinitely.
+            if queue.mutex.take(timeout_us) {
+                let inner = unsafe { &mut *queue.inner.get() };
+                inner.send_to_back(item);
+
+                queue.mutex.give();
+                queue.semaphore_full.give();
+                true
+            } else {
+                queue.semaphore_empty.give();
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    unsafe fn try_send_to_back_from_isr(
+        queue: QueuePtr,
+        item: *const u8,
+        mut higher_prio_task_waken: Option<&mut bool>,
+    ) -> bool {
+        let queue = unsafe { CompatQueue::from_ptr(queue) };
+
+        if queue
+            .semaphore_empty
+            .try_take_from_isr(higher_prio_task_waken.as_deref_mut())
+        {
+            if queue
+                .mutex
+                .try_take_from_isr(higher_prio_task_waken.as_deref_mut())
+            {
+                let inner = unsafe { &mut *queue.inner.get() };
+                inner.send_to_back(item);
+
+                queue
+                    .mutex
+                    .try_give_from_isr(higher_prio_task_waken.as_deref_mut());
+                queue
+                    .semaphore_full
+                    .try_give_from_isr(higher_prio_task_waken);
+                true
+            } else {
+                queue
+                    .semaphore_empty
+                    .try_give_from_isr(higher_prio_task_waken);
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    unsafe fn receive(queue: QueuePtr, item: *mut u8, timeout_us: Option<u32>) -> bool {
+        let queue = unsafe { CompatQueue::from_ptr(queue) };
+
+        if queue.semaphore_full.take(timeout_us) {
+            if queue.mutex.take(timeout_us) {
+                let inner = unsafe { &mut *queue.inner.get() };
+                inner.read_from_front(item);
+
+                queue.mutex.give();
+                queue.semaphore_empty.give();
+                true
+            } else {
+                queue.semaphore_full.give();
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    unsafe fn try_receive_from_isr(
+        queue: QueuePtr,
+        item: *mut u8,
+        mut higher_prio_task_waken: Option<&mut bool>,
+    ) -> bool {
+        let queue = unsafe { CompatQueue::from_ptr(queue) };
+
+        if queue
+            .semaphore_full
+            .try_take_from_isr(higher_prio_task_waken.as_deref_mut())
+        {
+            if queue
+                .mutex
+                .try_take_from_isr(higher_prio_task_waken.as_deref_mut())
+            {
+                let inner = unsafe { &mut *queue.inner.get() };
+                inner.read_from_front(item);
+
+                queue
+                    .mutex
+                    .try_give_from_isr(higher_prio_task_waken.as_deref_mut());
+                queue
+                    .semaphore_empty
+                    .try_give_from_isr(higher_prio_task_waken);
+                true
+            } else {
+                queue
+                    .semaphore_full
+                    .try_give_from_isr(higher_prio_task_waken);
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    unsafe fn remove(queue: QueuePtr, item: *const u8) {
+        let queue = unsafe { CompatQueue::from_ptr(queue) };
+
+        queue.mutex.take(None);
+
+        let inner = unsafe { &mut *queue.inner.get() };
+        let item_removed = inner.remove(item);
+
+        queue.mutex.give();
+
+        if item_removed {
+            queue.semaphore_empty.give();
+        }
+    }
+
+    fn messages_waiting(queue: QueuePtr) -> usize {
+        let queue = unsafe { CompatQueue::from_ptr(queue) };
+
+        queue.semaphore_empty.current_count() as usize
     }
 }
