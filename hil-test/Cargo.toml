@@ -8,78 +8,17 @@ publish = false
 name = "hil_test"
 
 [[bin]]
-name    = "aes"
-harness = false
+name              = "aes"
+harness           = false
 
 [[bin]]
-name    = "alloc_psram"
-harness = false
+name              = "alloc_psram"
+harness           = false
 required-features = ["psram"]
 
 [[bin]]
-name    = "gpio"
-harness = false
-
-[[bin]]
-name    = "gpio_custom_handler"
-harness = false
-
-[[bin]]
-name    = "misc_drivers"
-harness = false
-
-[[bin]]
-name    = "interrupt"
-harness = false
-
-[[bin]]
-name    = "i2c"
-harness = false
-
-[[bin]]
-name    = "i2s"
-harness = false
-
-[[bin]]
-name    = "lcd_cam"
-harness = false
-
-[[bin]]
-name    = "misc_non_drivers"
-harness = false
-
-[[bin]]
-name    = "spi_full_duplex"
-harness = false
-
-[[bin]]
-name    = "spi_half_duplex_slave_qspi"
-harness = false
-
-[[bin]]
-name    = "spi_half_duplex_write_psram"
-harness = false
-
-[[bin]]
-name    = "storage_read_app_desc"
-harness = false
-
-[[bin]]
-name    = "parl_io"
-harness = false
-
-[[bin]]
-name    = "rmt"
-harness = false
-required-features = ["embassy"]
-
-[[bin]]
-name    = "ecc_rsa_sha"
-harness = false
-
-[[bin]]
-name    = "uart"
-harness = false
+name              = "ecc_rsa_sha"
+harness           = false
 
 [[bin]]
 name              = "embassy_timers_executors"
@@ -90,6 +29,67 @@ required-features = ["embassy"]
 name              = "esp_radio"
 harness           = false
 required-features = ["esp-radio", "esp-alloc"]
+
+[[bin]]
+name              = "gpio"
+harness           = false
+
+[[bin]]
+name              = "gpio_custom_handler"
+harness           = false
+
+[[bin]]
+name              = "i2c"
+harness           = false
+
+[[bin]]
+name              = "i2s"
+harness           = false
+
+[[bin]]
+name              = "interrupt"
+harness           = false
+
+[[bin]]
+name              = "lcd_cam"
+harness           = false
+
+[[bin]]
+name              = "misc_drivers"
+harness           = false
+
+[[bin]]
+name              = "misc_non_drivers"
+harness           = false
+
+[[bin]]
+name              = "parl_io"
+harness           = false
+
+[[bin]]
+name              = "rmt"
+harness           = false
+required-features = ["embassy"]
+
+[[bin]]
+name              = "spi_full_duplex"
+harness           = false
+
+[[bin]]
+name              = "spi_half_duplex_slave_qspi"
+harness           = false
+
+[[bin]]
+name              = "spi_half_duplex_write_psram"
+harness           = false
+
+[[bin]]
+name              = "storage_read_app_desc"
+harness           = false
+
+[[bin]]
+name              = "uart"
+harness           = false
 
 [dependencies]
 allocator-api2    = { version = "0.3.0", default-features = false, features = ["alloc"] }
