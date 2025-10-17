@@ -13,6 +13,7 @@ struct QueueInner {
     storage: Box<[u8]>,
     item_size: usize,
     capacity: usize,
+    count: usize,
     current_read: usize,
     current_write: usize,
     waiting_for_space: WaitQueue,
@@ -24,6 +25,7 @@ impl QueueInner {
         Self {
             item_size,
             capacity,
+            count: 0,
             current_read: 0,
             current_write: 0,
             storage: vec![0; capacity * item_size].into_boxed_slice(),
@@ -53,6 +55,7 @@ impl QueueInner {
         dst.copy_from_slice(item);
 
         self.current_write = (self.current_write + 1) % self.capacity;
+        self.count += 1;
 
         true
     }
@@ -68,6 +71,7 @@ impl QueueInner {
         dst.copy_from_slice(src);
 
         self.current_read = (self.current_read + 1) % self.capacity;
+        self.count -= 1;
 
         true
     }
@@ -98,11 +102,7 @@ impl QueueInner {
     }
 
     fn len(&self) -> usize {
-        if self.current_write >= self.current_read {
-            self.current_write - self.current_read
-        } else {
-            self.capacity - self.current_read + self.current_write
-        }
+        self.count
     }
 
     fn empty(&self) -> bool {

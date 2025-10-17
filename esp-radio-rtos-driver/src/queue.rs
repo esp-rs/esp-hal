@@ -475,6 +475,7 @@ struct QueueInner {
     storage: Box<[u8]>,
     item_size: usize,
     capacity: usize,
+    count: usize,
     current_read: usize,
     current_write: usize,
 }
@@ -491,11 +492,7 @@ impl QueueInner {
     }
 
     fn len(&self) -> usize {
-        if self.current_write >= self.current_read {
-            self.current_write - self.current_read
-        } else {
-            self.capacity - self.current_read + self.current_write
-        }
+        self.count
     }
 
     fn send_to_back(&mut self, item: *const u8) {
@@ -505,6 +502,7 @@ impl QueueInner {
         dst.copy_from_slice(item);
 
         self.current_write = (self.current_write + 1) % self.capacity;
+        self.count += 1;
     }
 
     fn read_from_front(&mut self, dst: *mut u8) {
@@ -514,14 +512,15 @@ impl QueueInner {
         dst.copy_from_slice(src);
 
         self.current_read = (self.current_read + 1) % self.capacity;
+        self.count -= 1;
     }
 
     fn remove(&mut self, item: *const u8) -> bool {
-        if self.len() == 0 {
+        let count = self.len();
+
+        if count == 0 {
             return false;
         }
-
-        let count = self.len();
 
         let mut tmp_item = vec![0; self.item_size];
 
@@ -581,6 +580,7 @@ impl CompatQueue {
                 storage,
                 item_size,
                 capacity,
+                count: 0,
                 current_read: 0,
                 current_write: 0,
             }),
