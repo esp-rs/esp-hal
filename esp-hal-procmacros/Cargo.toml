@@ -8,6 +8,8 @@ documentation = "https://docs.espressif.com/projects/rust/esp-hal-procmacros/lat
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
+exclude = ["testdata"]
+
 [package.metadata.espressif]
 doc-config = { features = [] }
 check-configs = [

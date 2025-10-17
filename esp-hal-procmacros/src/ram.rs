@@ -1,11 +1,10 @@
-use proc_macro::TokenStream;
-use proc_macro2::{Ident, Span};
-use syn::{Item, Token, parse, parse::Parser, punctuated::Punctuated, spanned::Spanned};
+use proc_macro2::{Ident, Span, TokenStream};
+use syn::{Item, Token, parse::Parser, parse2, punctuated::Punctuated, spanned::Spanned};
 
 pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
-    let attr_args = match Punctuated::<syn::Meta, Token![,]>::parse_terminated.parse2(args.into()) {
+    let attr_args = match Punctuated::<syn::Meta, Token![,]>::parse_terminated.parse2(args) {
         Ok(v) => v,
-        Err(e) => return e.to_compile_error().into(),
+        Err(e) => return e.to_compile_error(),
     };
 
     let mut rtc_fast = false;
@@ -22,7 +21,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
                     .parse2(nested.clone())
                 {
                     Ok(v) => v,
-                    Err(e) => return e.to_compile_error().into(),
+                    Err(e) => return e.to_compile_error(),
                 };
 
                 for meta in nested_args {
@@ -33,8 +32,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
                                     path.span(),
                                     "Expected identifier inside `unstable(...)`",
                                 )
-                                .into_compile_error()
-                                .into();
+                                .into_compile_error();
                             };
                             let arg = match ident {
                                 i if i == "rtc_fast" => &mut rtc_fast,
@@ -46,8 +44,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
                                         i.span(),
                                         format!("Unknown unstable argument `{i}`"),
                                     )
-                                    .into_compile_error()
-                                    .into();
+                                    .into_compile_error();
                                 }
                             };
 
@@ -56,8 +53,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
                                     ident.span(),
                                     format!("Argument `{ident}` is already set"),
                                 )
-                                .into_compile_error()
-                                .into();
+                                .into_compile_error();
                             }
 
                             *arg = true;
@@ -67,8 +63,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
                                 list.span(),
                                 "Expected identifiers inside `unstable(...)`",
                             )
-                            .into_compile_error()
-                            .into();
+                            .into_compile_error();
                         }
                     }
                 }
@@ -77,8 +72,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
             syn::Meta::Path(path) => {
                 let Some(ident) = path.get_ident() else {
                     return syn::Error::new(path.span(), "Expected identifier")
-                        .into_compile_error()
-                        .into();
+                        .into_compile_error();
                 };
                 let arg = match ident {
                     i if i == "reclaimed" => &mut dram2_uninit,
@@ -87,8 +81,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
                             ident.span(),
                             format!("`{ident}` must be wrapped in `unstable(...)`"),
                         )
-                        .into_compile_error()
-                        .into();
+                        .into_compile_error();
                     }
                 };
 
@@ -97,21 +90,19 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
                         ident.span(),
                         format!("Argument `{ident}` is already set"),
                     )
-                    .into_compile_error()
-                    .into();
+                    .into_compile_error();
                 }
                 *arg = true;
             }
 
             _ => {
                 return syn::Error::new(attr_arg.span(), "Unsupported attribute syntax for `ram`")
-                    .into_compile_error()
-                    .into();
+                    .into_compile_error();
             }
         }
     }
 
-    let item: Item = parse(input).expect("failed to parse input");
+    let item: Item = crate::unwrap_or_compile_error!(parse2(input));
 
     #[cfg(not(feature = "rtc-slow"))]
     if rtc_slow {
@@ -119,8 +110,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
             Span::call_site(),
             "rtc_slow is not available for this target",
         )
-        .into_compile_error()
-        .into();
+        .into_compile_error();
     }
 
     let is_fn = matches!(item, Item::Fn(_));
@@ -153,8 +143,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         },
         (_, Err(_)) => {
             return syn::Error::new(Span::call_site(), "Invalid combination of ram arguments")
-                .into_compile_error()
-                .into();
+                .into_compile_error();
         }
     };
 
@@ -188,11 +177,452 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     });
 
-    let output = quote::quote! {
+    quote::quote! {
         #section
         #item
         #trait_check
-    };
+    }
+}
 
-    output.into()
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rwtext() {
+        let result = ram(
+            quote::quote! {}.into(),
+            quote::quote! {
+                fn foo() {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe (link_section = ".rwtext")]
+                #[inline (never)]
+                fn foo () { }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_rtc_fast_text() {
+        let result = ram(
+            quote::quote! {
+                unstable(rtc_fast)
+            }
+            .into(),
+            quote::quote! {
+                fn foo() {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe (link_section = ".rtc_fast.text")]
+                #[inline (never)]
+                fn foo () { }
+            }
+            .to_string()
+        );
+    }
+
+    #[cfg(feature = "rtc-slow")]
+    #[test]
+    fn test_rtc_slow_text() {
+        let result = ram(
+            quote::quote! {
+                unstable(rtc_slow)
+            }
+            .into(),
+            quote::quote! {
+                fn foo() {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe (link_section = ".rtc_slow.text")]
+                #[inline (never)]
+                fn foo () { }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_data() {
+        let result = ram(
+            quote::quote! {}.into(),
+            quote::quote! {
+                static mut FOO: [u8; 10] = [0; 10];
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe (link_section = ".data")]
+                static mut FOO:[u8;10] = [0;10];
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_rtc_fast_data() {
+        let result = ram(
+            quote::quote! {
+                unstable(rtc_fast)
+            }
+            .into(),
+            quote::quote! {
+                static mut FOO: [u8; 10] = [0; 10];
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe (link_section = ".rtc_fast.data")]
+                static mut FOO:[u8;10] = [0;10];
+            }
+            .to_string()
+        );
+    }
+
+    #[cfg(feature = "rtc-slow")]
+    #[test]
+    fn test_rtc_slow_data() {
+        let result = ram(
+            quote::quote! {
+                unstable(rtc_slow)
+            }
+            .into(),
+            quote::quote! {
+                static mut FOO: [u8; 10] = [0; 10];
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe (link_section = ".rtc_slow.data")]
+                static mut FOO:[u8;10] = [0;10];
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_reclaimed() {
+        let result = ram(
+            quote::quote! {
+                reclaimed
+            }
+            .into(),
+            quote::quote! {
+                static mut FOO: [u8; 10] = [0; 10];
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe(link_section = ".dram2_uninit")]
+                static mut FOO: [u8;10] = [0;10];
+                const _ : () = crate::__macro_implementation::assert_is_uninit::<[u8;10]>();
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_rtc_fast_data_zeroed() {
+        let result = ram(
+            quote::quote! {
+                unstable(rtc_fast,zeroed)
+            }
+            .into(),
+            quote::quote! {
+                static mut FOO: [u8; 10] = [0; 10];
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe (link_section = ".rtc_fast.bss")]
+                static mut FOO:[u8;10] = [0;10];
+                const _: () = crate::__macro_implementation::assert_is_zeroable::<[u8; 10]>();
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_rtc_fast_data_persistent() {
+        let result = ram(
+            quote::quote! {
+                unstable(rtc_fast,persistent)
+            }
+            .into(),
+            quote::quote! {
+                static mut FOO: [u8; 10] = [0; 10];
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe (link_section = ".rtc_fast.persistent")]
+                static mut FOO:[u8;10] = [0;10];
+                const _: () = crate::__macro_implementation::assert_is_persistable::<[u8; 10]>();
+            }
+            .to_string()
+        );
+    }
+
+    #[cfg(feature = "rtc-slow")]
+    #[test]
+    fn test_rtc_slow_data_zeroed() {
+        let result = ram(
+            quote::quote! {
+                unstable(rtc_slow,zeroed)
+            }
+            .into(),
+            quote::quote! {
+                static mut FOO: [u8; 10] = [0; 10];
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe (link_section = ".rtc_slow.bss")]
+                static mut FOO:[u8;10] = [0;10];
+                const _: () = crate::__macro_implementation::assert_is_zeroable::<[u8; 10]>();
+            }
+            .to_string()
+        );
+    }
+
+    #[cfg(feature = "rtc-slow")]
+    #[test]
+    fn test_rtc_slow_data_persistent() {
+        let result = ram(
+            quote::quote! {
+                unstable(rtc_slow,persistent)
+            }
+            .into(),
+            quote::quote! {
+                static mut FOO: [u8; 10] = [0; 10];
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe (link_section = ".rtc_slow.persistent")]
+                static mut FOO:[u8;10] = [0;10];
+                const _: () = crate::__macro_implementation::assert_is_persistable::<[u8; 10]>();
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_illegal_arg() {
+        let result = ram(
+            quote::quote! {
+                test()
+            }
+            .into(),
+            quote::quote! {
+                fn foo() {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "Unsupported attribute syntax for `ram`" }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_illegal_arg2() {
+        let result = ram(
+            quote::quote! {
+                unstable(unstable(unstable))
+            }
+            .into(),
+            quote::quote! {
+                fn foo() {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "Expected identifiers inside `unstable(...)`" }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_illegal_arg3() {
+        let result = ram(
+            quote::quote! {
+                unstable(unknown)
+            }
+            .into(),
+            quote::quote! {
+                fn foo() {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "Unknown unstable argument `unknown`" }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_illegal_arg4() {
+        let result = ram(
+            quote::quote! {
+                unstable(rtc_fast,rtc_fast)
+            }
+            .into(),
+            quote::quote! {
+                fn foo() {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "Argument `rtc_fast` is already set" }
+            }
+            .to_string()
+        );
+    }
+
+    #[cfg(feature = "rtc-slow")]
+    #[test]
+    fn test_illegal_arg5() {
+        let result = ram(
+            quote::quote! {
+                unstable(rtc_slow,rtc_fast)
+            }
+            .into(),
+            quote::quote! {
+                fn foo() {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "Invalid combination of ram arguments" }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_illegal_arg6() {
+        let result = ram(
+            quote::quote! {
+                rtc_fast
+            }
+            .into(),
+            quote::quote! {
+                fn foo() {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "`rtc_fast` must be wrapped in `unstable(...)`" }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_rtc_fast_data_persistent_on_local_var() {
+        let result = ram(
+            quote::quote! {
+                unstable(rtc_fast,persistent)
+            }
+            .into(),
+            quote::quote! {
+                mut foo: [u8; 10] = [0; 10];
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "expected one of: `fn`, `extern`, `use`, `static`, `const`, `unsafe`, `mod`, `type`, `struct`, `enum`, `union`, `trait`, `auto`, `impl`, `default`, `macro`, identifier, `self`, `super`, `crate`, `::`" }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_rtc_fast_data_persistent_on_non_static() {
+        let result = ram(
+            quote::quote! {
+                unstable(rtc_fast,persistent)
+            }
+            .into(),
+            quote::quote! {
+                struct Foo {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[unsafe(link_section = ".rtc_fast.persistent")]
+                struct Foo { }
+                ::core::compile_error!{ "Expected a `static`" }
+            }
+            .to_string()
+        );
+    }
 }

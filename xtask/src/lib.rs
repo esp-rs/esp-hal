@@ -761,6 +761,19 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
                 &package_path,
             );
         }
+        Package::EspHalProcmacros => {
+            return cargo::run(
+                &cmd.clone()
+                    .subcommand("test")
+                    .features(&vec![
+                        "has-lp-core".into(),
+                        "is-lp-core".into(),
+                        "rtc-slow".into(),
+                    ])
+                    .build(),
+                &package_path,
+            );
+        }
         _ => Err(anyhow!(
             "Instructions for host testing were not provided for: '{}'",
             package,

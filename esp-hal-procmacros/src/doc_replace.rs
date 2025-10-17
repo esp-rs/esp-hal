@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
-use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::{TokenStream, TokenStream as TokenStream2};
 use syn::{
     AttrStyle,
     Attribute,
@@ -170,12 +169,12 @@ impl Parse for Branch {
 }
 
 pub(crate) fn replace(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let replacements: Replacements = match syn::parse(attr) {
+    let replacements: Replacements = match syn::parse2(attr) {
         Ok(replacements) => replacements,
-        Err(e) => return e.into_compile_error().into(),
+        Err(e) => return e.into_compile_error(),
     };
 
-    let mut item: Item = syn::parse(input).expect("failed to parse input");
+    let mut item: Item = crate::unwrap_or_compile_error!(syn::parse2(input));
 
     let mut replacement_attrs = Vec::new();
 
@@ -197,7 +196,7 @@ pub(crate) fn replace(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     *item.attrs_mut() = replacement_attrs;
 
-    quote::quote! { #item }.into()
+    quote::quote! { #item }
 }
 
 trait ItemLike {
@@ -215,5 +214,268 @@ impl ItemLike for Item {
             Item::Macro(item_macro) => &mut item_macro.attrs,
             _ => panic!("Unsupported item type for switch macro"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_basic() {
+        let result = replace(
+            quote::quote! {}.into(),
+            quote::quote! {
+                #[doc = "# Configuration"]
+                #[doc = "## Overview"]
+                #[doc = "This module contains the initial configuration for the system."]
+                #[doc = "## Configuration"]
+                #[doc = "In the [`esp_hal::init()`][crate::init] method, we can configure different"]
+                #[doc = "parameters for the system:"]
+                #[doc = "- CPU clock configuration."]
+                #[doc = "- Watchdog configuration."]
+                #[doc = "## Examples"]
+                #[doc = "### Default initialization"]
+                #[doc = "```rust, no_run"]
+                #[doc = "# {before_snippet}"]
+                #[doc = "let peripherals = esp_hal::init(esp_hal::Config::default());"]
+                #[doc = "# {after_snippet}"]
+                #[doc = "```"]
+                struct Foo {
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(result.to_string(), quote::quote! {
+            #[doc = "# Configuration"]
+            #[doc = "## Overview"]
+            #[doc = "This module contains the initial configuration for the system."]
+            #[doc = "## Configuration"]
+            #[doc = "In the [`esp_hal::init()`][crate::init] method, we can configure different"]
+            #[doc = "parameters for the system:"]
+            #[doc = "- CPU clock configuration."]
+            #[doc = "- Watchdog configuration."]
+            #[doc = "## Examples"]
+            #[doc = "### Default initialization"]
+            #[doc = "```rust, no_run"]
+            #[doc = crate::before_snippet!()]
+            #[doc = "let peripherals = esp_hal::init(esp_hal::Config::default());"]
+            #[doc = crate::after_snippet!()]
+            #[doc = "```"]
+            struct Foo {}
+        }.to_string());
+    }
+
+    #[test]
+    fn test_custom_replacements() {
+        let result = replace(
+            quote::quote! {
+                "freq" => {
+                    cfg(esp32h2) => "let freq = Rate::from_mhz(32);",
+                    _ => "let freq = Rate::from_mhz(80);"
+                },
+                "other" => "replacement"
+            }.into(),
+            quote::quote! {
+                #[doc = "# Configuration"]
+                #[doc = "## Overview"]
+                #[doc = "This module contains the initial configuration for the system."]
+                #[doc = "## Configuration"]
+                #[doc = "In the [`esp_hal::init()`][crate::init] method, we can configure different"]
+                #[doc = "parameters for the system:"]
+                #[doc = "- CPU clock configuration."]
+                #[doc = "- Watchdog configuration."]
+                #[doc = "## Examples"]
+                #[doc = "### Default initialization"]
+                #[doc = "```rust, no_run"]
+                #[doc = "# {freq}"]
+                #[doc = "# {before_snippet}"]
+                #[doc = "let peripherals = esp_hal::init(esp_hal::Config::default());"]
+                #[doc = "# {after_snippet}"]
+                #[doc = "```"]
+                struct Foo {
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(result.to_string(), quote::quote! {
+            #[doc = "# Configuration"]
+            #[doc = "## Overview"]
+            #[doc = "This module contains the initial configuration for the system."]
+            #[doc = "## Configuration"]
+            #[doc = "In the [`esp_hal::init()`][crate::init] method, we can configure different"]
+            #[doc = "parameters for the system:"]
+            #[doc = "- CPU clock configuration."]
+            #[doc = "- Watchdog configuration."]
+            #[doc = "## Examples"]
+            #[doc = "### Default initialization"]
+            #[doc = "```rust, no_run"]
+            #[cfg_attr (esp32h2 , doc = "let freq = Rate::from_mhz(32);")] 
+            #[cfg_attr (not (any (esp32h2)) , doc = "let freq = Rate::from_mhz(80);")]
+            #[doc = crate::before_snippet!()]
+            #[doc = "let peripherals = esp_hal::init(esp_hal::Config::default());"]
+            #[doc = crate::after_snippet!()]
+            #[doc = "```"]
+            struct Foo {}
+        }.to_string());
+    }
+
+    #[test]
+    fn test_custom_fail() {
+        let result = replace(
+            quote::quote! {
+                "freq" => {
+                    abc(esp32h2) => "let freq = Rate::from_mhz(32);",
+                },
+            }
+            .into(),
+            quote::quote! {}.into(),
+        );
+
+        assert_eq!(result.to_string(), quote::quote! {
+            ::core::compile_error!{ "Expected a cfg condition or catch-all condition using `_`" }
+        }.to_string());
+    }
+
+    #[test]
+    fn test_basic_fn() {
+        let result = replace(
+            quote::quote! {}.into(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = "# {before_snippet}"]
+                fn foo() {
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = crate::before_snippet!()]
+                fn foo () { }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_basic_enum() {
+        let result = replace(
+            quote::quote! {}.into(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = "# {before_snippet}"]
+                enum Foo {
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = crate::before_snippet!()]
+                enum Foo { }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_basic_trait() {
+        let result = replace(
+            quote::quote! {}.into(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = "# {before_snippet}"]
+                trait Foo {
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = crate::before_snippet!()]
+                trait Foo { }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_basic_mod() {
+        let result = replace(
+            quote::quote! {}.into(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = "# {before_snippet}"]
+                mod foo {
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = crate::before_snippet!()]
+                mod foo { }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_basic_macro() {
+        let result = replace(
+            quote::quote! {}.into(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = "# {before_snippet}"]
+                macro_rules! foo {
+                    () => {
+                    };
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = crate::before_snippet!()]
+                macro_rules! foo {
+                    () => {
+                    };
+                }
+            }
+            .to_string()
+        );
+    }
+
+    // TODO panicking is not the nicest way to handle this
+    #[test]
+    #[should_panic]
+    fn test_basic_fail_wrong_item() {
+        replace(
+            quote::quote! {}.into(),
+            quote::quote! {
+                #[doc = "docs"]
+                #[doc = "# {before_snippet}"]
+                static FOO: u32 = 0u32;
+            }
+            .into(),
+        );
     }
 }
