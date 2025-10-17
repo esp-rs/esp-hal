@@ -374,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    fn test_rtc_fast_data_peristent() {
+    fn test_rtc_fast_data_persistent() {
         let result = ram(
             quote::quote! {
                 unstable(rtc_fast,persistent)
@@ -424,7 +424,7 @@ mod tests {
 
     #[cfg(feature = "rtc-slow")]
     #[test]
-    fn test_rtc_slow_data_peristent() {
+    fn test_rtc_slow_data_persistent() {
         let result = ram(
             quote::quote! {
                 unstable(rtc_slow,persistent)
@@ -581,7 +581,7 @@ mod tests {
     }
 
     #[test]
-    fn test_rtc_fast_data_peristent_on_local_var() {
+    fn test_rtc_fast_data_persistent_on_local_var() {
         let result = ram(
             quote::quote! {
                 unstable(rtc_fast,persistent)
@@ -603,7 +603,7 @@ mod tests {
     }
 
     #[test]
-    fn test_rtc_fast_data_peristent_on_non_staitc() {
+    fn test_rtc_fast_data_persistent_on_non_static() {
         let result = ram(
             quote::quote! {
                 unstable(rtc_fast,persistent)

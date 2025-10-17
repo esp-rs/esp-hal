@@ -136,7 +136,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                         }
                         used_pins.push(pin);
                         create_peripheral.push(quote!(
-                            let mut #param_name = unsafe { the_hal::gpio::conjure_output().unwrap() }
+                            let mut #param_name = unsafe { the_hal::gpio::conjure_output().unwrap() };
                         ));
                     }
                     "Input" => {
@@ -146,17 +146,17 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                         }
                         used_pins.push(pin);
                         create_peripheral.push(quote!(
-                            let mut #param_name = unsafe { the_hal::gpio::conjure_input().unwrap() }
+                            let mut #param_name = unsafe { the_hal::gpio::conjure_input().unwrap() };
                         ));
                     }
                     "LpUart" => {
                         create_peripheral.push(quote!(
-                            let mut #param_name = unsafe { the_hal::uart::conjure() }
+                            let mut #param_name = unsafe { the_hal::uart::conjure() };
                         ));
                     }
                     "LpI2c" => {
                         create_peripheral.push(quote!(
-                            let mut #param_name = unsafe { the_hal::i2c::conjure() }
+                            let mut #param_name = unsafe { the_hal::i2c::conjure() };
                         ));
                     }
                     _ => {
@@ -188,7 +188,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 
             use #hal_crate as the_hal;
             #(
-                #create_peripheral;
+                #create_peripheral
             )*
 
             main(#(#param_names),*);
