@@ -742,6 +742,6 @@ impl QueueImplementation for CompatQueue {
     fn messages_waiting(queue: QueuePtr) -> usize {
         let queue = unsafe { CompatQueue::from_ptr(queue) };
 
-        queue.semaphore_empty.current_count() as usize
+        queue.semaphore_full.current_count() as usize
     }
 }
