@@ -60,6 +60,22 @@ impl QueueInner {
         true
     }
 
+    unsafe fn try_enqueue_front(&mut self, item: *const u8) -> bool {
+        if self.full() {
+            return false;
+        }
+
+        let item = unsafe { core::slice::from_raw_parts(item, self.item_size) };
+
+        self.current_read = (self.current_read + self.capacity - 1) % self.capacity;
+        let dst = self.get_mut(self.current_read);
+        dst.copy_from_slice(item);
+
+        self.count += 1;
+
+        true
+    }
+
     unsafe fn try_dequeue(&mut self, dst: *mut u8) -> bool {
         if self.empty() {
             return false;
@@ -152,6 +168,29 @@ impl Queue {
         }
     }
 
+    unsafe fn send_to_front(&self, item: *const u8, timeout_us: Option<u32>) -> bool {
+        if crate::with_deadline(timeout_us, |deadline| {
+            self.inner.with(|queue| {
+                if unsafe { queue.try_enqueue_front(item) } {
+                    trace!("Queue - notify with item");
+                    queue.waiting_for_item.notify();
+                    true
+                } else {
+                    // The task will go to sleep when the above critical section is released.
+                    trace!("Queue - wait for space - {:?}", deadline);
+                    queue.waiting_for_space.wait_with_deadline(deadline);
+                    false
+                }
+            })
+        }) {
+            debug!("Queue - send to front - success");
+            true
+        } else {
+            debug!("Queue - send to front - timed out");
+            false
+        }
+    }
+
     unsafe fn try_send_to_back(&self, item: *const u8) -> bool {
         self.inner.with(|queue| {
             if unsafe { queue.try_enqueue(item) } {
@@ -229,8 +268,10 @@ impl QueueImplementation for Queue {
         core::mem::drop(q);
     }
 
-    unsafe fn send_to_front(_queue: QueuePtr, _item: *const u8, _timeout_us: Option<u32>) -> bool {
-        unimplemented!()
+    unsafe fn send_to_front(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool {
+        let queue = unsafe { Queue::from_ptr(queue) };
+
+        unsafe { queue.send_to_front(item, timeout_us) }
     }
 
     unsafe fn send_to_back(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool {

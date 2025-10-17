@@ -505,6 +505,17 @@ impl QueueInner {
         self.count += 1;
     }
 
+    fn send_to_front(&mut self, item: *const u8) {
+        let item = unsafe { core::slice::from_raw_parts(item, self.item_size) };
+
+        self.current_read = (self.current_read + self.capacity - 1) % self.capacity;
+
+        let dst = self.get_mut(self.current_read);
+        dst.copy_from_slice(item);
+
+        self.count += 1;
+    }
+
     fn read_from_front(&mut self, dst: *mut u8) {
         let dst = unsafe { core::slice::from_raw_parts_mut(dst, self.item_size) };
 
@@ -529,12 +540,10 @@ impl QueueInner {
         for _ in 0..count {
             self.read_from_front(tmp_item.as_mut_ptr().cast());
 
-            if !found {
-                if &tmp_item[..] != item_slice {
-                    self.send_to_back(tmp_item.as_mut_ptr().cast());
-                } else {
-                    found = true;
-                }
+            if found || &tmp_item[..] != item_slice {
+                self.send_to_back(tmp_item.as_mut_ptr().cast());
+            } else {
+                found = true;
             }
 
             // Note that even if we find our item, we'll need to keep cycling through everything to
@@ -606,8 +615,26 @@ impl QueueImplementation for CompatQueue {
         core::mem::drop(q);
     }
 
-    unsafe fn send_to_front(_queue: QueuePtr, _item: *const u8, _timeout_us: Option<u32>) -> bool {
-        unimplemented!()
+    unsafe fn send_to_front(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool {
+        let queue = unsafe { CompatQueue::from_ptr(queue) };
+
+        if queue.semaphore_empty.take(timeout_us) {
+            // The inner mutex shouldn't be held for a long time, but we still shouldn't block
+            // indefinitely.
+            if queue.mutex.take(timeout_us) {
+                let inner = unsafe { &mut *queue.inner.get() };
+                inner.send_to_front(item);
+
+                queue.mutex.give();
+                queue.semaphore_full.give();
+                true
+            } else {
+                queue.semaphore_empty.give();
+                false
+            }
+        } else {
+            false
+        }
     }
 
     unsafe fn send_to_back(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool {
@@ -727,15 +754,19 @@ impl QueueImplementation for CompatQueue {
     unsafe fn remove(queue: QueuePtr, item: *const u8) {
         let queue = unsafe { CompatQueue::from_ptr(queue) };
 
-        queue.mutex.take(None);
+        if queue.semaphore_full.take(Some(0)) {
+            queue.mutex.take(None);
 
-        let inner = unsafe { &mut *queue.inner.get() };
-        let item_removed = inner.remove(item);
+            let inner = unsafe { &mut *queue.inner.get() };
+            let item_removed = inner.remove(item);
 
-        queue.mutex.give();
+            queue.mutex.give();
 
-        if item_removed {
-            queue.semaphore_empty.give();
+            if item_removed {
+                queue.semaphore_empty.give();
+            } else {
+                queue.semaphore_full.give();
+            }
         }
     }
 
