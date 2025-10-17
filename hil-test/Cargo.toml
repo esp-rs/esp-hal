@@ -158,6 +158,7 @@ embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
 esp32 = [
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32",
+    "esp-alloc/esp32",
     "esp-radio?/esp32",
     "esp-storage?/esp32",
     "esp-bootloader-esp-idf/esp32",
@@ -166,6 +167,7 @@ esp32 = [
 ]
 esp32c2 = [
     "esp-hal/esp32c2",
+    "esp-alloc/esp32c2",
     "esp-radio?/esp32c2",
     "esp-storage?/esp32c2",
     "esp-bootloader-esp-idf/esp32c2",
@@ -174,6 +176,7 @@ esp32c2 = [
 ]
 esp32c3 = [
     "esp-hal/esp32c3",
+    "esp-alloc/esp32c3",
     "esp-radio?/esp32c3",
     "esp-storage?/esp32c3",
     "esp-bootloader-esp-idf/esp32c3",
@@ -182,6 +185,7 @@ esp32c3 = [
 ]
 esp32c6 = [
     "esp-hal/esp32c6",
+    "esp-alloc/esp32c6",
     "esp-radio?/esp32c6",
     "esp-storage?/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
@@ -190,6 +194,7 @@ esp32c6 = [
 ]
 esp32h2 = [
     "esp-hal/esp32h2",
+    "esp-alloc/esp32h2",
     "esp-radio?/esp32h2",
     "esp-storage?/esp32h2",
     "esp-bootloader-esp-idf/esp32h2",
@@ -199,6 +204,7 @@ esp32h2 = [
 esp32s2 = [
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32s2",
+    "esp-alloc/esp32s2",
     "esp-radio?/esp32s2",
     "esp-storage?/esp32s2",
     "esp-bootloader-esp-idf/esp32s2",
@@ -208,6 +214,7 @@ esp32s2 = [
 esp32s3 = [
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32s3",
+    "esp-alloc/esp32s3",
     "esp-radio?/esp32s3",
     "esp-storage?/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
