@@ -258,7 +258,7 @@ pub use writer::{
     RmtSlot,
     RmtWriter,
 };
-use writer::{EncoderExt, WriterContext, WriterState};
+use writer::{EncoderRef, WriterContext, WriterState};
 
 /// A configuration error
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1459,7 +1459,7 @@ pub struct TxTransaction<'ch, 'data> {
     writer: WriterContext,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    data: &'data mut dyn EncoderExt,
+    data: EncoderRef<'data>,
 }
 
 impl core::fmt::Debug for TxTransaction<'_, '_> {
@@ -1727,13 +1727,14 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         self,
         data: &'data mut impl Encoder,
     ) -> Result<TxTransaction<'ch, 'data>, (Error, Self)> {
+        let data = EncoderRef::new(data);
         self.transmit_impl(data)
     }
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn transmit_impl<'data>(
         self,
-        data: &'data mut dyn EncoderExt,
+        mut data: EncoderRef<'data>,
     ) -> Result<TxTransaction<'ch, 'data>, (Error, Self)> {
         let raw = self.raw;
         let memsize = raw.memsize();
@@ -1774,13 +1775,14 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         data: &mut impl Encoder,
         mode: LoopMode,
     ) -> Result<ContinuousTxTransaction<'ch>, (Error, Self)> {
+        let data = EncoderRef::new(data);
         self.transmit_continuously_impl(data, mode)
     }
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn transmit_continuously_impl(
         self,
-        data: &mut dyn EncoderExt,
+        mut data: EncoderRef<'_>,
         mode: LoopMode,
     ) -> Result<ContinuousTxTransaction<'ch>, (Error, Self)> {
         let raw = self.raw;
@@ -1947,7 +1949,7 @@ struct TxFuture<'a> {
     writer: WriterContext,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    data: &'a mut dyn EncoderExt,
+    data: EncoderRef<'a>,
 
     _guard: TxGuard,
 }
@@ -1994,13 +1996,14 @@ impl Channel<'_, Async, Tx> {
     /// Start transmitting the given pulse code sequence.
     #[inline]
     pub fn transmit(&mut self, data: &mut impl Encoder) -> impl Future<Output = Result<(), Error>> {
+        let data = EncoderRef::new(data);
         self.transmit_impl(data)
     }
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn transmit_impl(
         &mut self,
-        data: &mut dyn EncoderExt,
+        mut data: EncoderRef<'_>,
     ) -> impl Future<Output = Result<(), Error>> {
         let raw = self.raw;
         let memsize = raw.memsize();
