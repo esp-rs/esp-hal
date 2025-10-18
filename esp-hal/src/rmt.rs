@@ -1449,7 +1449,7 @@ pub struct TxTransaction<'ch, 'data> {
     writer: WriterContext,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    data: &'data mut dyn Encoder,
+    data: &'data mut dyn EncoderExt,
 }
 
 impl core::fmt::Debug for TxTransaction<'_, '_> {
@@ -1712,10 +1712,18 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
     /// This returns a [`TxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    #[inline]
     pub fn transmit<'data>(
         self,
-        data: &'data mut dyn Encoder,
+        data: &'data mut impl Encoder,
+    ) -> Result<TxTransaction<'ch, 'data>, (Error, Self)> {
+        self.transmit_impl(data)
+    }
+
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    fn transmit_impl<'data>(
+        self,
+        data: &'data mut dyn EncoderExt,
     ) -> Result<TxTransaction<'ch, 'data>, (Error, Self)> {
         let raw = self.raw;
         let memsize = raw.memsize();
@@ -1750,10 +1758,19 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         doc = "When using a loop `mode` other than [`LoopMode::Infinite`], [`ContinuousTxTransaction::is_loopcount_interrupt_set`] can be used to check if the loop count is reached."
     )]
     /// The length of `data` cannot exceed the size of the allocated RMT RAM.
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    #[inline]
     pub fn transmit_continuously(
         self,
-        data: &mut dyn Encoder,
+        data: &mut impl Encoder,
+        mode: LoopMode,
+    ) -> Result<ContinuousTxTransaction<'ch>, (Error, Self)> {
+        self.transmit_continuously_impl(data, mode)
+    }
+
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    fn transmit_continuously_impl(
+        self,
+        data: &mut dyn EncoderExt,
         mode: LoopMode,
     ) -> Result<ContinuousTxTransaction<'ch>, (Error, Self)> {
         let raw = self.raw;
@@ -1920,7 +1937,7 @@ struct TxFuture<'a> {
     writer: WriterContext,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    data: &'a mut dyn Encoder,
+    data: &'a mut dyn EncoderExt,
 
     _guard: TxGuard,
 }
@@ -1965,8 +1982,16 @@ impl core::future::Future for TxFuture<'_> {
 /// TX channel in async mode
 impl Channel<'_, Async, Tx> {
     /// Start transmitting the given pulse code sequence.
+    #[inline]
+    pub fn transmit(&mut self, data: &mut impl Encoder) -> impl Future<Output = Result<(), Error>> {
+        self.transmit_impl(data)
+    }
+
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit(&mut self, data: &mut dyn Encoder) -> impl Future<Output = Result<(), Error>> {
+    fn transmit_impl(
+        &mut self,
+        data: &mut dyn EncoderExt,
+    ) -> impl Future<Output = Result<(), Error>> {
         let raw = self.raw;
         let memsize = raw.memsize();
 

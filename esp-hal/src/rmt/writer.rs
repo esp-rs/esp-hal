@@ -247,6 +247,8 @@ impl WriterContext {
     }
 }
 
+// Do not add an EncoderExt: Encoder bound here: That would add the Encoder::encode method to the
+// vtable, preventing optimizing it away (it should always be inlined in EncoderExt::write).
 pub(super) trait EncoderExt {
     fn write(&mut self, writer: &mut WriterContext, raw: DynChannelAccess<Tx>, initial: bool);
 }
