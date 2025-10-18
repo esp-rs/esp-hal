@@ -1,4 +1,4 @@
-use core::{marker::PhantomData, ops::ControlFlow};
+use core::{marker::PhantomData, ops::ControlFlow, ptr::NonNull};
 
 #[cfg(place_rmt_driver_in_ram)]
 use procmacros::ram;
@@ -247,99 +247,152 @@ impl WriterContext {
     }
 }
 
-// Do not add an EncoderExt: Encoder bound here: That would add the Encoder::encode method to the
-// vtable, preventing optimizing it away (it should always be inlined in EncoderExt::write).
-pub(super) trait EncoderExt {
-    fn write(&mut self, writer: &mut WriterContext, raw: DynChannelAccess<Tx>, initial: bool);
+// This is a bespoke `&'a dyn mut EncoderExt`, which optimizes for the case of not owning the
+// `Encoder` and using only a single method, where
+//
+// pub(super) trait EncoderExt {
+//     fn write(&mut self, writer: &mut WriterContext, raw: DynChannelAccess<Tx>, initial: bool) {
+//         // ...
+//     }
+// }
+//
+// impl<E: Encoder> EncoderExt for E {}
+//
+// Thus, we only need the data pointer and a single function pointer, rather than the indirection
+// via a vtable (which will likely be in flash).
+pub(super) struct EncoderRef<'a> {
+    // Pointer to the Encoder instance, and a PhantomData to hold onto its lifetime.
+    data: NonNull<()>,
+    _phantom: PhantomData<&'a mut ()>,
+
+    // Function pointer to encoder_write specialized for the type stored in data.
+    func: unsafe fn(NonNull<()>, &mut WriterContext, DynChannelAccess<Tx>, bool),
 }
 
-impl<E: Encoder + ?Sized> EncoderExt for E {
-    // Copy from `data` to the hardware buffer, advancing the `data` slice accordingly.
-    //
-    // If `initial` is set, fill the entire buffer. Otherwise, append half the buffer's length from
-    // `data`.
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    fn write(&mut self, context: &mut WriterContext, raw: DynChannelAccess<Tx>, initial: bool) {
-        if context.state != WriterState::Active {
-            return;
+impl<'a> EncoderRef<'a> {
+    #[inline]
+    pub(super) fn new<E: Encoder>(enc: &'a mut E) -> Self {
+        Self {
+            data: NonNull::from(enc).cast(),
+            _phantom: PhantomData,
+            func: encoder_write::<E>,
         }
-
-        debug_assert!(!initial || context.offset == 0);
-
-        let ram_start = raw.channel_ram_start();
-        let memsize = raw.memsize().codes();
-
-        let max_count = if initial { memsize } else { memsize / 2 };
-
-        let start = unsafe { ram_start.add(context.offset as usize) };
-        let mut writer = RmtWriter {
-            last_code: context.last_code,
-            ptr: start,
-            start,
-            end: unsafe { start.add(max_count) },
-        };
-
-        let done = self.encode(&mut writer);
-        context.last_code = writer.last_code;
-        context.written += unsafe { writer.ptr.offset_from(writer.start) } as usize;
-
-        debug_assert!(writer.ptr.addr() >= writer.start.addr());
-        debug_assert!(writer.ptr.addr() <= writer.end.addr());
-
-        // If the input data was not exhausted, update offset as
-        //
-        // | initial | offset      | max_count   | new offset  |
-        // | ------- + ----------- + ----------- + ----------- |
-        // | true    | 0           | memsize     | 0           |
-        // | false   | 0           | memsize / 2 | memsize / 2 |
-        // | false   | memsize / 2 | memsize / 2 | 0           |
-        //
-        // Otherwise, the new position is invalid but the new slice is empty and we won't use the
-        // offset again. In either case, the unsigned subtraction will not underflow.
-        context.offset = memsize as u16 - max_count as u16 - context.offset;
-
-        if writer.ptr < writer.end || done.is_break() {
-            context.state = if context.written == 0 {
-                // The encoder was empty
-                WriterState::Error(Error::InvalidArgument)
-            } else if writer.last_code.is_end_marker() {
-                // Do not check for end markers in the inner loop in Encoder::encode() since this
-                // would substantially increase the instruction count there. Instead, only check
-                // the last code to report on error.
-                WriterState::Done
-            } else {
-                // Write an extra end marker to prevent looping forever with wrapping tx.
-                if writer.ptr < writer.end {
-                    unsafe { writer.ptr.write_volatile(PulseCode::end_marker()) };
-                    WriterState::Error(Error::EndMarkerMissing)
-                } else {
-                    // // The buffer is full, and we would need to wait for the next
-                    // // Event::Threshold before writing an end marker.
-                    // // However, the data was invalid by missing an end marker,
-                    // // and the only guarantee that we provide is that transmission will
-                    // // eventually stop and return an error. Thus, to avoid the logic to implement
-                    // // this, simply modify the last code that was written to
-                    // // contain an end marker.
-                    // unsafe {
-                    //     writer
-                    //         .ptr
-                    //         .sub(1)
-                    //         .write_volatile(writer.last_code.with_length2(0).unwrap())
-                    // };
-
-                    // The buffer is full, and we can't easily write an end marker. (Short of
-                    // overwriting some other code, which might be ok since hitting this error case
-                    // always indicates a bug in user code.)
-                    // Thus, remain in Active state. On the next Event::Threshold, this function
-                    // will be called again, with data already exhausted, and hit the other arm of
-                    // this conditional.
-                    WriterState::Active
-                }
-            };
-        }
-
-        debug_assert!(context.offset == 0 || context.offset as usize == memsize / 2);
     }
+
+    // Safety: E must be the same this was built with
+    #[allow(unused)]
+    #[inline]
+    pub(super) unsafe fn reconstruct<E: Encoder>(self) -> &'a mut E {
+        unsafe { self.data.cast().as_mut() }
+    }
+
+    // Safety: The only way to construct this is via Self::new, which ensures that self.data and
+    // self.func correspond
+    #[inline]
+    pub(super) fn write(
+        &mut self,
+        writer: &mut WriterContext,
+        raw: DynChannelAccess<Tx>,
+        initial: bool,
+    ) {
+        // SAFETY: The caller holds a mutable reference of self, which in turn keeps the borrow
+        // taken in `new()` alive. Thus, we have exclusive access to the encoder.
+        unsafe { (self.func)(self.data, writer, raw, initial) }
+    }
+}
+
+// Copy from `data` to the hardware buffer, advancing the `data` slice accordingly.
+//
+// If `initial` is set, fill the entire buffer. Otherwise, append half the buffer's length from
+// `data`.
+#[cfg_attr(place_rmt_driver_in_ram, ram)]
+#[cfg_attr(not(place_rmt_driver_in_ram), inline(never))]
+unsafe fn encoder_write<'a, E: Encoder + 'a>(
+    encoder: NonNull<()>,
+    context: &mut WriterContext,
+    raw: DynChannelAccess<Tx>,
+    initial: bool,
+) {
+    let encoder: &'a mut E = unsafe { encoder.cast().as_mut() };
+
+    if context.state != WriterState::Active {
+        return;
+    }
+
+    debug_assert!(!initial || context.offset == 0);
+
+    let ram_start = raw.channel_ram_start();
+    let memsize = raw.memsize().codes();
+
+    let max_count = if initial { memsize } else { memsize / 2 };
+
+    let start = unsafe { ram_start.add(context.offset as usize) };
+    let mut writer = RmtWriter {
+        last_code: context.last_code,
+        ptr: start,
+        start,
+        end: unsafe { start.add(max_count) },
+    };
+
+    let done = encoder.encode(&mut writer);
+    context.last_code = writer.last_code;
+    context.written += unsafe { writer.ptr.offset_from(writer.start) } as usize;
+
+    debug_assert!(writer.ptr.addr() >= writer.start.addr());
+    debug_assert!(writer.ptr.addr() <= writer.end.addr());
+
+    // If the input data was not exhausted, update offset as
+    //
+    // | initial | offset      | max_count   | new offset  |
+    // | ------- + ----------- + ----------- + ----------- |
+    // | true    | 0           | memsize     | 0           |
+    // | false   | 0           | memsize / 2 | memsize / 2 |
+    // | false   | memsize / 2 | memsize / 2 | 0           |
+    //
+    // Otherwise, the new position is invalid but the new slice is empty and we won't use the
+    // offset again. In either case, the unsigned subtraction will not underflow.
+    context.offset = memsize as u16 - max_count as u16 - context.offset;
+
+    if writer.ptr < writer.end || done.is_break() {
+        context.state = if context.written == 0 {
+            // The encoder was empty
+            WriterState::Error(Error::InvalidArgument)
+        } else if writer.last_code.is_end_marker() {
+            // Do not check for end markers in the inner loop in Encoder::encode() since this
+            // would substantially increase the instruction count there. Instead, only check
+            // the last code to report on error.
+            WriterState::Done
+        } else {
+            // Write an extra end marker to prevent looping forever with wrapping tx.
+            if writer.ptr < writer.end {
+                unsafe { writer.ptr.write_volatile(PulseCode::end_marker()) };
+                WriterState::Error(Error::EndMarkerMissing)
+            } else {
+                // // The buffer is full, and we would need to wait for the next Event::Threshold
+                // // before writing an end marker. However, the data was invalid by missing an end
+                // // marker, and the only guarantee that we provide is that transmission will
+                // // eventually stop and return an error. Thus, to avoid the logic to implement
+                // // this, simply modify the last code that was written to
+                // // contain an end marker.
+                // unsafe {
+                //     writer
+                //         .ptr
+                //         .sub(1)
+                //         .write_volatile(writer.last_code.with_length2(0).unwrap())
+                // };
+
+                // The buffer is full, and we can't easily write an end marker. (Short of
+                // overwriting some other code, which might be ok since hitting this error case
+                // always indicates a bu in user code.)
+                // Thus, remain in Active state. On the next Event::Threshold, this function
+                // will be called again, with data already exhausted, and hit the other arm of
+                // this conditional.
+                WriterState::Active
+            }
+        };
+    }
+
+    debug_assert!(context.offset == 0 || context.offset as usize == memsize / 2);
 }
 
 /// An [`Encoder`] that simply copies a slice of `PulseCode`s to the hardware.
