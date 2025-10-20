@@ -86,14 +86,20 @@ impl RmtReader {
 
         // Read in up to 2 chunks to allow wrapping around the buffer end. This is more efficient
         // than checking in each iteration of the inner loop whether we reached the buffer end.
-        let mut ptr = unsafe { ram_start.add(self.offset as usize) };
+        let mut ram_ptr = unsafe { ram_start.add(self.offset as usize) };
+
+        let mut data_ptr = data.as_mut_ptr();
+
         loop {
-            for entry in data.iter_mut().take(count0) {
-                // SAFETY: The iteration `count` is smaller than `max_count` such that incrementing
-                // the `ptr` `count0` times cannot advance further than `ram_start + memsize`.
+            let data_end = unsafe { data_ptr.add(count0) };
+            while data_ptr < data_end {
+                // SAFETY: The iteration count `count0` is smaller than both `max_count` and
+                // `data.len()` such that incrementing both pointers cannot advance them beyond
+                // their allocation's end.
                 unsafe {
-                    *entry = ptr.read_volatile().into();
-                    ptr = ptr.add(1);
+                    data_ptr.write(ram_ptr.read_volatile().into());
+                    ram_ptr = ram_ptr.add(1);
+                    data_ptr = data_ptr.add(1);
                 }
             }
 
@@ -103,7 +109,7 @@ impl RmtReader {
 
             count0 = count1;
             count1 = 0;
-            ptr = ram_start;
+            ram_ptr = ram_start;
         }
 
         // Update offset as
@@ -118,6 +124,8 @@ impl RmtReader {
         // will immediately return due to `self.state != Active`.
         self.offset = (memsize / 2) as u16 - self.offset;
         self.total += count;
+
+        // The panic can never trigger since count <= data.len()!
         data.split_off_mut(..count).unwrap();
 
         if count < max_count {

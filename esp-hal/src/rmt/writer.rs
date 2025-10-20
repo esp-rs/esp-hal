@@ -45,21 +45,26 @@ impl RmtWriter {
             return;
         }
 
+        debug_assert!(!initial || self.offset == 0);
+
         let ram_start = raw.channel_ram_start();
         let memsize = raw.memsize().codes();
 
         let max_count = if initial { memsize } else { memsize / 2 };
         let count = data.len().min(max_count);
 
-        debug_assert!(!initial || self.offset == 0);
+        let mut ram_ptr = unsafe { ram_start.add(self.offset as usize) };
 
-        let mut ptr = unsafe { ram_start.add(self.offset as usize) };
-        for entry in data.iter().take(count) {
-            // SAFETY: The iteration `count` is smaller than `max_count` such that incrementing the
-            // `ptr` `count` times cannot advance further than `ram_start + memsize`.
+        let mut data_ptr = data.as_ptr();
+        let data_end = unsafe { data_ptr.add(count) };
+
+        while data_ptr < data_end {
+            // SAFETY: The iteration `count` is smaller than both `max_count` and `data.len()` such
+            // that incrementing both pointers cannot advance them beyond their allocation's end.
             unsafe {
-                ptr.write_volatile((*entry).into());
-                ptr = ptr.add(1);
+                ram_ptr.write_volatile(data_ptr.read().into());
+                ram_ptr = ram_ptr.add(1);
+                data_ptr = data_ptr.add(1);
             }
         }
 
