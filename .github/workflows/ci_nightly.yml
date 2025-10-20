@@ -86,6 +86,6 @@ jobs:
             gh issue create \
               --title "Nightly CI Failure" \
               --body "One or more jobs failed! [View the failed workflow](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})." \
-              --label "ci-nightly"
+              --label "ci-nightly" \
               --assignee JurajSadel
           fi
