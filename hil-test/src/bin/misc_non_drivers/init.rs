@@ -3,25 +3,23 @@ mod tests {
     use esp_hal::{
         Config,
         clock::CpuClock,
-        config::{WatchdogConfig, WatchdogStatus},
         delay::Delay,
-        rtc_cntl::Rtc,
+        rtc_cntl::{Rtc, RwdtStage},
         time::Duration,
-        timer::timg::TimerGroup,
+        timer::timg::{MwdtStage, TimerGroup},
     };
 
     #[test]
     #[cfg(timergroup_timg0)]
     fn test_feeding_timg0_wdt() {
-        let peripherals = esp_hal::init(
-            Config::default().with_watchdog(
-                WatchdogConfig::default()
-                    .with_timg0(WatchdogStatus::Enabled(Duration::from_millis(500))),
-            ),
-        );
+        let p = esp_hal::init(Config::default());
 
-        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        let timg0 = TimerGroup::new(p.TIMG0);
         let mut wdt0 = timg0.wdt;
+
+        wdt0.set_timeout(MwdtStage::Stage0, Duration::from_millis(500));
+        wdt0.enable();
+
         let delay = Delay::new();
 
         // Loop for more than the timeout of the watchdog.
@@ -37,35 +35,35 @@ mod tests {
     #[test]
     #[cfg(timergroup_timg0)]
     fn test_wdt0_uses_prescaler() {
-        let p = esp_hal::init(
-            Config::default().with_watchdog(
-                WatchdogConfig::default()
-                    .with_timg0(WatchdogStatus::Enabled(Duration::from_micros(53_687_092))), // multiplied by 80 (for the default clock source), then taking the 32 lower bits this is 0x40
-            ),
-        );
+        let p = esp_hal::init(Config::default());
+
+        let timg0 = TimerGroup::new(p.TIMG0);
+        let mut wdt0 = timg0.wdt;
+
+        // multiplied by 80 (for the default clock source), then taking the 32 lower bits this is
+        // 0x40
+        wdt0.set_timeout(MwdtStage::Stage0, Duration::from_millis(53_687_092));
+        wdt0.enable();
 
         let delay = Delay::new();
         delay.delay(Duration::from_millis(250));
 
         // Disable the watchdog, to prevent accidentally resetting the MCU while the host is setting
         // up the next test.
-        let timg0 = TimerGroup::new(p.TIMG0);
-        let mut wdt0 = timg0.wdt;
         wdt0.disable();
     }
 
     #[test]
     #[cfg(timergroup_timg1)]
     fn test_feeding_timg1_wdt() {
-        let peripherals = esp_hal::init(
-            Config::default().with_watchdog(
-                WatchdogConfig::default()
-                    .with_timg1(WatchdogStatus::Enabled(Duration::from_millis(500))),
-            ),
-        );
+        let p = esp_hal::init(Config::default());
 
-        let timg1 = TimerGroup::new(peripherals.TIMG1);
+        let timg1 = TimerGroup::new(p.TIMG1);
         let mut wdt1 = timg1.wdt;
+
+        wdt1.set_timeout(MwdtStage::Stage0, Duration::from_millis(500));
+        wdt1.enable();
+
         let delay = Delay::new();
 
         // Loop for more than the timeout of the watchdog.
@@ -81,17 +79,14 @@ mod tests {
     #[test]
     #[cfg(timergroup_timg0)]
     fn test_feeding_timg0_wdt_max_clock() {
-        let peripherals = esp_hal::init(
-            Config::default()
-                .with_cpu_clock(CpuClock::max())
-                .with_watchdog(
-                    WatchdogConfig::default()
-                        .with_timg0(WatchdogStatus::Enabled(Duration::from_millis(500))),
-                ),
-        );
+        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
 
-        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        let timg0 = TimerGroup::new(p.TIMG0);
         let mut wdt0 = timg0.wdt;
+
+        wdt0.set_timeout(MwdtStage::Stage0, Duration::from_millis(500));
+        wdt0.enable();
+
         let delay = Delay::new();
 
         // Loop for more than the timeout of the watchdog.
@@ -106,14 +101,14 @@ mod tests {
 
     #[test]
     fn test_feeding_rtc_wdt() {
-        let peripherals = esp_hal::init(
-            Config::default().with_watchdog(
-                WatchdogConfig::default()
-                    .with_rwdt(WatchdogStatus::Enabled(Duration::from_millis(500))),
-            ),
-        );
+        let p = esp_hal::init(Config::default());
 
-        let mut rtc = Rtc::new(peripherals.LPWR);
+        let mut rtc = Rtc::new(p.LPWR);
+
+        rtc.rwdt
+            .set_timeout(RwdtStage::Stage0, Duration::from_millis(500));
+        rtc.rwdt.enable();
+
         let delay = Delay::new();
 
         // Loop for more than the timeout of the watchdog.
@@ -127,7 +122,7 @@ mod tests {
     }
 
     #[test]
-    fn test_default_config() {
+    fn test_init_disables_watchdogs() {
         esp_hal::init(Config::default());
 
         let delay = Delay::new();

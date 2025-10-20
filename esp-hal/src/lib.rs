@@ -328,7 +328,6 @@ mod exception_handler;
 
 unstable_module! {
     pub mod asynch;
-    pub mod config;
     pub mod debugger;
     #[cfg(any(soc_has_dport, soc_has_interrupt_core0, soc_has_interrupt_core1))]
     pub mod interrupt;
@@ -613,14 +612,13 @@ pub mod __macro_implementation {
 }
 
 use crate::clock::CpuClock;
-#[cfg(feature = "unstable")]
-use crate::config::{WatchdogConfig, WatchdogStatus};
 #[cfg(feature = "rt")]
 use crate::{clock::Clocks, peripherals::Peripherals};
 
 /// A spinlock for seldom called stuff. Users assume that lock contention is not an issue.
 pub(crate) static ESP_HAL_LOCK: RawMutex = RawMutex::new();
 
+#[procmacros::doc_replace]
 /// System configuration.
 ///
 /// This `struct` is marked with `#[non_exhaustive]` and can't be instantiated
@@ -628,18 +626,29 @@ pub(crate) static ESP_HAL_LOCK: RawMutex = RawMutex::new();
 /// to the `struct`. Instead, use the [`Config::default()`] method to create a
 /// new instance.
 ///
-/// For usage examples, see the [config module documentation](crate::config).
+/// ## Examples
+///
+/// ### Default initialization
+///
+/// ```rust, no_run
+/// # {before_snippet}
+/// let peripherals = esp_hal::init(esp_hal::Config::default());
+/// # {after_snippet}
+/// ```
+///
+/// ### Custom initialization
+/// ```rust, no_run
+/// # {before_snippet}
+/// use esp_hal::{clock::CpuClock, time::Duration};
+/// let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+/// let peripherals = esp_hal::init(config);
+/// # {after_snippet}
+/// ```
 #[non_exhaustive]
 #[derive(Default, Clone, Copy, procmacros::BuilderLite)]
 pub struct Config {
     /// The CPU clock configuration.
     cpu_clock: CpuClock,
-
-    /// Enable watchdog timer(s).
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    #[builder_lite(unstable)]
-    watchdog: WatchdogConfig,
 
     /// PSRAM configuration.
     #[cfg(feature = "unstable")]
@@ -675,7 +684,7 @@ pub fn init(config: Config) -> Peripherals {
 
     let mut peripherals = Peripherals::take();
 
-    Clocks::init(config.cpu_clock);
+    Clocks::init(config.cpu_clock());
 
     crate::rtc_cntl::rtc::configure_clock();
 
@@ -685,7 +694,7 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2))]
     crate::rtc_cntl::sleep::RtcSleepConfig::base_settings(&rtc);
 
-    // Handle watchdog configuration with defaults
+    // Disable watchdog timers
     #[cfg(not(any(esp32, esp32s2)))]
     rtc.swd.disable();
 
@@ -696,34 +705,6 @@ pub fn init(config: Config) -> Peripherals {
 
     #[cfg(timergroup_timg1)]
     crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new().disable();
-
-    #[cfg(feature = "unstable")]
-    {
-        #[cfg(not(any(esp32, esp32s2)))]
-        if config.watchdog.swd() {
-            rtc.swd.enable();
-        }
-
-        if let WatchdogStatus::Enabled(duration) = config.watchdog.rwdt() {
-            rtc.rwdt
-                .set_timeout(crate::rtc_cntl::RwdtStage::Stage0, duration);
-            rtc.rwdt.enable();
-        }
-
-        #[cfg(timergroup_timg0)]
-        if let WatchdogStatus::Enabled(duration) = config.watchdog.timg0() {
-            let mut timg0_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new();
-            timg0_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
-            timg0_wd.enable();
-        }
-
-        #[cfg(timergroup_timg1)]
-        if let WatchdogStatus::Enabled(duration) = config.watchdog.timg1() {
-            let mut timg1_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new();
-            timg1_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
-            timg1_wd.enable();
-        }
-    }
 
     #[cfg(esp32)]
     crate::time::time_init();
