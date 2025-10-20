@@ -4,7 +4,7 @@ mod cfg;
 use core::str::FromStr;
 use std::{fmt::Write, sync::OnceLock};
 
-use anyhow::{Result, bail, ensure};
+use anyhow::{Context, Result, bail, ensure};
 use cfg::PeriConfig;
 use indexmap::IndexMap;
 pub use proc_macro2::TokenStream;
@@ -17,9 +17,14 @@ macro_rules! include_toml {
     (Config, $file:expr) => {{
         static LOADED_TOML: OnceLock<Config> = OnceLock::new();
         LOADED_TOML.get_or_init(|| {
-            let config: Config = basic_toml::from_str(include_str!($file)).unwrap();
+            let config: Config = basic_toml::from_str(include_str!($file))
+                .with_context(|| format!("Failed to load device configuration: {}", $file))
+                .unwrap();
 
-            config.validate().expect("Invalid device configuration");
+            config
+                .validate()
+                .with_context(|| format!("Failed to validate device configuration: {}", $file))
+                .unwrap();
 
             config
         })
