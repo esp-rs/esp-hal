@@ -321,77 +321,102 @@ impl<E: TaskListElement> TaskQueue<E> {
 
 #[cfg(feature = "embassy")]
 pub(crate) mod flags {
+    use core::ptr::NonNull;
+
+    use esp_hal::{
+        system::Cpu,
+        time::{Duration, Instant},
+    };
     use esp_sync::NonReentrantMutex;
 
     use crate::{
-        CurrentThreadHandle,
         SCHEDULER,
         task::{TaskExt, TaskPtr},
     };
 
     pub(crate) struct FlagsInner {
-        owner: Option<TaskPtr>,
-        flags: u32,
+        owner: TaskPtr,
+        waiting: Option<TaskPtr>,
+        set: bool,
     }
     impl FlagsInner {
-        fn wait(&mut self, wait_flags: u32) -> bool {
-            if self.flags & wait_flags == wait_flags {
-                self.flags &= !wait_flags;
+        fn take(&mut self) -> bool {
+            if self.set {
+                // The flag was set while we weren't looking.
+                self.set = false;
                 true
             } else {
-                if self.owner.is_none() {
-                    self.owner = Some(CurrentThreadHandle::get().task);
-                }
+                // `waiting` signals that the owner should be resumed when the flag is set. Copying
+                // the task pointer is an optimization that allows clearing the
+                // waiting state without computing the address of a separate field.
+                self.waiting = Some(self.owner);
 
                 false
             }
         }
     }
 
-    pub(crate) struct ThreadFlags {
+    /// A single event bit, optimized for the thread-mode embassy executor.
+    ///
+    /// This takes shortcuts, which make it unsuitable for general purpose use (such as no wait
+    /// queue, no timeout, assumes a single thread waits for the flag, there is only a single bit of
+    /// flag information).
+    pub(crate) struct ThreadFlag {
         inner: NonReentrantMutex<FlagsInner>,
     }
 
-    impl ThreadFlags {
-        pub(crate) const fn new() -> Self {
+    impl ThreadFlag {
+        pub(crate) fn new() -> Self {
+            let owner = SCHEDULER.with(|scheduler| {
+                let current_cpu = Cpu::current() as usize;
+                if let Some(current_task) = scheduler.per_cpu[current_cpu].current_task {
+                    current_task
+                } else {
+                    // We're cheating, the task hasn't been initialized yet.
+                    NonNull::from(&scheduler.per_cpu[current_cpu].main_task)
+                }
+            });
             Self {
                 inner: NonReentrantMutex::new(FlagsInner {
-                    owner: None,
-                    flags: 0,
+                    owner,
+                    waiting: None,
+                    set: false,
                 }),
             }
         }
 
-        pub(crate) fn set(&self, flag: u32) {
-            self.inner.with(|inner| {
-                inner.flags |= flag;
-                if let Some(owner) = inner.owner {
-                    owner.resume();
+        fn with<R>(&self, f: impl FnOnce(&mut FlagsInner) -> R) -> R {
+            self.inner.with(|inner| f(inner))
+        }
+
+        pub(crate) fn set(&self) {
+            self.with(|inner| {
+                if let Some(waiting) = inner.waiting.take() {
+                    // The task is waiting, there is no need to set the flag - resuming the thread
+                    // is all the signal we need.
+                    waiting.resume();
+                } else {
+                    // The task isn't waiting, set the flag.
+                    inner.set = true;
                 }
             });
         }
 
-        pub(crate) fn get(&self) -> u32 {
-            self.inner.with(|inner| inner.flags)
+        pub(crate) fn get(&self) -> bool {
+            self.with(|inner| inner.set)
         }
 
-        pub(crate) fn wait(&self, wait_flags: u32, timeout_us: Option<u32>) -> bool {
-            if crate::with_deadline(timeout_us, |deadline| {
-                self.inner.with(|inner| {
-                    if inner.wait(wait_flags) {
-                        true
-                    } else {
-                        SCHEDULER.sleep_until(deadline);
-                        false
-                    }
-                })
-            }) {
-                debug!("Flags - wait - success");
-                true
-            } else {
-                trace!("Flags - wait - timed out");
-                false
-            }
+        pub(crate) fn wait(&self) {
+            self.with(|inner| {
+                if !inner.take() {
+                    // SCHEDULER.sleep_until, but we know the current task's ID, and we know there
+                    // is no timeout.
+                    SCHEDULER.with(|scheduler| {
+                        scheduler.sleep_task_until(inner.owner, Instant::EPOCH + Duration::MAX);
+                        crate::task::yield_task();
+                    });
+                }
+            });
         }
     }
 }
