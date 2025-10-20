@@ -5,7 +5,7 @@ use core::sync::atomic::Ordering;
 #[cfg(multi_core)]
 use esp_hal::interrupt::software::SoftwareInterrupt;
 pub(crate) use esp_hal::trapframe::TrapFrame as CpuContext;
-use esp_hal::{xtensa_lx, xtensa_lx_rt};
+use esp_hal::{ram, xtensa_lx, xtensa_lx_rt};
 use portable_atomic::AtomicPtr;
 
 #[cfg(feature = "rtos-trace")]
@@ -102,7 +102,7 @@ pub(crate) fn setup_smp<const IRQ: u8>(mut irq: SoftwareInterrupt<'static, IRQ>)
 }
 
 #[allow(non_snake_case)]
-#[esp_hal::ram]
+#[ram]
 #[cfg_attr(not(esp32), unsafe(export_name = "Software0"))]
 #[cfg_attr(esp32, unsafe(export_name = "Software1"))]
 fn task_switch_interrupt(context: &mut CpuContext) {
@@ -124,6 +124,7 @@ pub(crate) fn yield_task() {
 
 #[cfg(multi_core)]
 #[esp_hal::handler]
+#[ram]
 fn cross_core_yield_handler() {
     use esp_hal::system::Cpu;
     match Cpu::current() {
