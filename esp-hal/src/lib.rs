@@ -199,6 +199,9 @@
     semver_checks,
     allow(rustdoc::private_intra_doc_links, rustdoc::broken_intra_doc_links)
 )]
+// Do not document `cfg` gates by default.
+#![cfg_attr(docsrs, allow(invalid_doc_attributes))] // doc(auto_cfg = false) requires a new nightly (~2025-10-09+)
+#![cfg_attr(docsrs, doc(auto_cfg = false))]
 #![no_std]
 
 // MUST be the first module
