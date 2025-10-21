@@ -49,3 +49,6 @@ is-lp-core = []
 ## Provide an `#[entry]` macro for running applications on the ESP32-S2/S3's
 ## ULP core.
 is-ulp-core = []
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(test)'] }
