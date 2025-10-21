@@ -52,3 +52,6 @@ is-ulp-core = []
 
 # Enables `ram(reclaimed)`
 __esp_idf_bootloader = []
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(test)'] }
