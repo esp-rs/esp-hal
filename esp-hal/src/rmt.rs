@@ -127,7 +127,8 @@
 //!
 //! let rx_config = RxChannelConfig::default()
 //!     .with_clk_divider(1)
-//!     .with_idle_threshold(10000);
+//!     .with_idle_threshold(10000)
+//!     .unwrap();
 //! # {channel}
 //! let delay = Delay::new();
 //! let mut data: [PulseCode; 48] = [PulseCode::default(); 48];
@@ -689,9 +690,27 @@ pub struct RxChannelConfig {
     /// Filter threshold in ticks
     filter_threshold: u8,
     /// Idle threshold in ticks, must not exceed [`MAX_RX_IDLE_THRESHOLD`]
+    // ChannelCreator::configure_rx relies on this being validated in the setter!
+    #[builder_lite(skip_setter)]
     idle_threshold: u16,
     /// The amount of memory blocks allocted to this channel
     memsize: u8,
+}
+
+impl RxChannelConfig {
+    /// Assign the given value to the `idle_threshold` field.
+    ///
+    /// Returns `None` when the `idle_threshold` exceeds [`MAX_RX_IDLE_THRESHOLD`].
+    pub fn with_idle_threshold(mut self, idle_threshold: u16) -> Option<Self> {
+        #[cfg_attr(any(esp32, esp32s2), allow(clippy::absurd_extreme_comparisons))]
+        if idle_threshold > MAX_RX_IDLE_THRESHOLD {
+            return None;
+        }
+
+        self.idle_threshold = idle_threshold;
+
+        Some(self)
+    }
 }
 
 impl Default for RxChannelConfig {
@@ -852,11 +871,6 @@ for_each_rmt_channel!(
                         Self: Sized,
                     {
                         let raw = unsafe { DynChannelAccess::conjure(ChannelIndex::[<Ch $idx>]) };
-
-                        #[cfg_attr(any(esp32, esp32s2), allow(clippy::absurd_extreme_comparisons))]
-                        if config.idle_threshold > MAX_RX_IDLE_THRESHOLD {
-                            return Err((Error::InvalidArgument, self));
-                        }
 
                         let memsize = MemSize::from_blocks(config.memsize);
                         if let Err(e) = reserve_channel(raw.channel(), RmtState::Rx, memsize) {
@@ -2704,6 +2718,8 @@ mod chip_specific {
         }
 
         pub fn set_rx_idle_threshold(self, value: u16) {
+            debug_assert!(value <= MAX_RX_IDLE_THRESHOLD);
+
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
@@ -3221,6 +3237,11 @@ mod chip_specific {
         }
 
         pub fn set_rx_idle_threshold(self, value: u16) {
+            #[allow(clippy::absurd_extreme_comparisons)]
+            {
+                debug_assert!(value <= MAX_RX_IDLE_THRESHOLD);
+            }
+
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 

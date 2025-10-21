@@ -262,6 +262,7 @@ fn do_rmt_loopback<const TX_LEN: usize>(ctx: &mut Context, tx_memsize: u8, rx_me
     let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
     let rx_config = RxChannelConfig::default()
         .with_idle_threshold(1000)
+        .unwrap()
         .with_memsize(rx_memsize);
 
     let (tx_channel, rx_channel) = ctx.setup_loopback(&tx_config, &rx_config);
@@ -315,6 +316,7 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(
     let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
     let rx_config = RxChannelConfig::default()
         .with_idle_threshold(1000)
+        .unwrap()
         .with_memsize(rx_memsize);
 
     let (mut tx_channel, mut rx_channel) = ctx.setup_loopback_async(&tx_config, &rx_config);
@@ -548,7 +550,9 @@ mod tests {
             $rx_channel:ident
         ) => {{
             let tx_config = TxChannelConfig::default();
-            let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
+            let rx_config = RxChannelConfig::default()
+                .with_idle_threshold(1000)
+                .unwrap();
 
             let (rx_pin, tx_pin) = pins!($ctx);
             let mut rmt = Rmt::new($ctx.rmt.reborrow(), FREQ).unwrap();
@@ -644,7 +648,9 @@ mod tests {
 
         let tx_config = TxChannelConfig::default();
         // idle threshold 16383 cycles = ~33ms
-        let rx_config = RxChannelConfig::default().with_idle_threshold(0x3FFF);
+        let rx_config = RxChannelConfig::default()
+            .with_idle_threshold(0x3FFF)
+            .unwrap();
 
         let (_, rx_channel) = Context::setup_impl(rmt, rx_pin, NoPin, &tx_config, &rx_config);
 
@@ -708,7 +714,9 @@ mod tests {
             // If not enabling a defined idle_output level, the output might remain high after
             // dropping the tx transaction, which will lead to an extra edge being received.
             .with_idle_output(true);
-        let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
+        let rx_config = RxChannelConfig::default()
+            .with_idle_threshold(1000)
+            .unwrap();
 
         let (mut tx_channel, mut rx_channel) = ctx.setup_loopback(&tx_config, &rx_config);
 
@@ -725,7 +733,9 @@ mod tests {
             // If not enabling a defined idle_output level, the output might remain high after
             // dropping the tx future, which will lead to an extra edge being received.
             .with_idle_output(true);
-        let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
+        let rx_config = RxChannelConfig::default()
+            .with_idle_threshold(1000)
+            .unwrap();
 
         // Test that dropping & recreating Rmt works
         for _ in 0..3 {
@@ -771,7 +781,9 @@ mod tests {
             // If not enabling a defined idle_output level, the output might remain high after
             // dropping the tx future, which will lead to an extra edge being received.
             .with_idle_output(true);
-        let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
+        let rx_config = RxChannelConfig::default()
+            .with_idle_threshold(1000)
+            .unwrap();
 
         let (mut tx_channel, mut rx_channel) = ctx.setup_loopback_async(&tx_config, &rx_config);
 
@@ -792,7 +804,9 @@ mod tests {
             // If not enabling a defined idle_output level, the output might remain high after
             // dropping the tx future, which will lead to an extra edge being received.
             .with_idle_output(true);
-        let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
+        let rx_config = RxChannelConfig::default()
+            .with_idle_threshold(1000)
+            .unwrap();
 
         // Test that dropping & recreating Rmt works
         for _ in 0..3 {
@@ -837,6 +851,7 @@ mod tests {
             .with_idle_output_level(Level::Low);
         let rx_config = RxChannelConfig::default()
             .with_idle_threshold(1000)
+            .unwrap()
             .with_memsize(2);
 
         let (mut tx_channel, mut rx_channel) = ctx.setup_loopback(&tx_config, &rx_config);
