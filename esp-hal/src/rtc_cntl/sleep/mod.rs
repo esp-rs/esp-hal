@@ -502,6 +502,10 @@ bitfield::bitfield! {
     pub ulp, set_ulp: 9;
     /// BT wakeup (light sleep only)
     pub bt, set_bt: 10;
+    /// Coproc wakeup 
+    pub coproc, set_coproc: 11;
+    /// Coproc trap wakeup 
+    pub coproc_trap, set_coproc_trap: 13;
 }
 
 #[cfg(soc_has_pmu)]
