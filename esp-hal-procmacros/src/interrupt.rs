@@ -1,5 +1,6 @@
 use proc_macro_crate::{FoundCrate, crate_name};
 use proc_macro2::{Ident, Span, TokenStream};
+use quote::ToTokens as _;
 use syn::{
     AttrStyle,
     Attribute,
@@ -144,6 +145,11 @@ pub fn check_attr_whitelist(
             }
         }
 
+        // in case `ram` is used
+        if is_unsafe_link_section(attr) {
+            continue 'o;
+        }
+
         let err_str = match caller {
             WhiteListCaller::Interrupt => {
                 "this attribute is not allowed on an interrupt handler controlled by esp-hal"
@@ -159,6 +165,14 @@ pub fn check_attr_whitelist(
 /// Returns `true` if `attr.path` matches `name`
 fn eq(attr: &Attribute, name: &str) -> bool {
     attr.style == AttrStyle::Outer && attr.path().is_ident(name)
+}
+
+/// `ram` macro is getting expanded to `unsafe(link_section = <SECTION>)`, so we need to also allow
+/// this to make `ram` be properly usable when written above `handler`.
+fn is_unsafe_link_section(attr: &Attribute) -> bool {
+    attr.style == AttrStyle::Outer
+        && attr.path().is_ident("unsafe")
+        && attr.to_token_stream().to_string().contains("link_section")
 }
 
 #[cfg(test)]
