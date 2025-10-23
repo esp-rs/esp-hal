@@ -238,6 +238,33 @@ mod tests {
 
         assert_eq!(buf, bytes);
     }
+
+    #[test]
+    fn test_break_detection(ctx: Context) {
+        let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
+        let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
+
+        tx.send_break(100);
+        assert!(rx.wait_for_break_with_timeout(1_000_000));
+    }
+
+    #[test]
+    fn test_break_detection_no_break(ctx: Context) {
+        let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
+
+        assert!(!rx.wait_for_break_with_timeout(100_000));
+    }
+
+    #[test]
+    fn test_break_detection_multiple(ctx: Context) {
+        let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
+        let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
+
+        for _ in 0..3 {
+            tx.send_break(100);
+            assert!(rx.wait_for_break_with_timeout(1_000_000));
+        }
+    }
 }
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
