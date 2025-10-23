@@ -138,16 +138,10 @@ pub fn check_attr_whitelist(
     ];
 
     'o: for attr in attrs {
-        for val in whitelist {
-            if eq(attr, val) {
+        if let Some(attr_name) = get_attr_name(attr) {
+            if whitelist.contains(&attr_name.as_str()) {
                 continue 'o;
             }
-        }
-
-        // Accept things like #[unsafe(link_section = "...")] ONLY if the first inner meta (e.g.,
-        // link_section) is already allowed in the `whitelist`.
-        if unsafe_unwrap_allowed(attr, whitelist) {
-            continue 'o;
         }
 
         let err_str = match caller {
@@ -162,40 +156,24 @@ pub fn check_attr_whitelist(
     Ok(())
 }
 
-/// Returns `true` if `attr.path` matches `name`
-fn eq(attr: &Attribute, name: &str) -> bool {
-    attr.style == AttrStyle::Outer && attr.path().is_ident(name)
-}
-
-/// Returns `true` if `attr` is `#[unsafe(...)]` and inner meta is in the `whitelist`.
-fn unsafe_unwrap_allowed(attr: &Attribute, whitelist: &[&str]) -> bool {
-    let Meta::List(list) = &attr.meta else {
-        return false;
-    };
-
-    if attr.style != AttrStyle::Outer || !list.path.is_ident("unsafe") {
-        return false;
+/// Extracts the base name of an attribute, including unwrapping of `#[unsafe(...)]`.
+fn get_attr_name(attr: &Attribute) -> Option<String> {
+    if !matches!(attr.style, AttrStyle::Outer) {
+        return None;
     }
 
-    let Ok(inner) = Punctuated::<Meta, Token![,]>::parse_terminated.parse2(list.tokens.clone())
-    else {
-        return false;
-    };
+    let name = attr.path().get_ident().map(|x| x.to_string());
 
-    let Some(first) = inner.first() else {
-        return false;
-    };
-
-    let head = match first {
-        Meta::Path(p) => p.segments.last().map(|s| &s.ident),
-        Meta::NameValue(nv) => nv.path.segments.last().map(|s| &s.ident),
-        Meta::List(l) => l.path.segments.last().map(|s| &s.ident),
-    };
-
-    if let Some(id) = head {
-        whitelist.iter().any(|w| id == w)
-    } else {
-        false
+    match &name {
+        Some(name) if name == "unsafe" => {
+            // Try to parse the inner meta of #[unsafe(...)]
+            if let Ok(inner_meta) = attr.parse_args::<syn::Meta>() {
+                inner_meta.path().get_ident().map(|x| x.to_string())
+            } else {
+                None
+            }
+        }
+        _ => name,
     }
 }
 
