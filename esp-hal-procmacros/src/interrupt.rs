@@ -1,6 +1,5 @@
 use proc_macro_crate::{FoundCrate, crate_name};
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::ToTokens as _;
 use syn::{
     AttrStyle,
     Attribute,
@@ -145,8 +144,9 @@ pub fn check_attr_whitelist(
             }
         }
 
-        // in case `ram` is used
-        if is_unsafe_link_section(attr) {
+        // Accept things like #[unsafe(link_section = "...")] ONLY if the first inner meta (e.g.,
+        // link_section) is already allowed in the `whitelist`.
+        if unsafe_unwrap_allowed(attr, whitelist) {
             continue 'o;
         }
 
@@ -167,12 +167,36 @@ fn eq(attr: &Attribute, name: &str) -> bool {
     attr.style == AttrStyle::Outer && attr.path().is_ident(name)
 }
 
-/// `ram` macro is getting expanded to `unsafe(link_section = <SECTION>)`, so we need to also allow
-/// this to make `ram` be properly usable when written above `handler`.
-fn is_unsafe_link_section(attr: &Attribute) -> bool {
-    attr.style == AttrStyle::Outer
-        && attr.path().is_ident("unsafe")
-        && attr.to_token_stream().to_string().contains("link_section")
+/// Returns `true` if `attr` is `#[unsafe(...)]` and inner meta is in the `whitelist`.
+fn unsafe_unwrap_allowed(attr: &Attribute, whitelist: &[&str]) -> bool {
+    let Meta::List(list) = &attr.meta else {
+        return false;
+    };
+
+    if attr.style != AttrStyle::Outer || !list.path.is_ident("unsafe") {
+        return false;
+    }
+
+    let Ok(inner) = Punctuated::<Meta, Token![,]>::parse_terminated.parse2(list.tokens.clone())
+    else {
+        return false;
+    };
+
+    let Some(first) = inner.first() else {
+        return false;
+    };
+
+    let head = match first {
+        Meta::Path(p) => p.segments.last().map(|s| &s.ident),
+        Meta::NameValue(nv) => nv.path.segments.last().map(|s| &s.ident),
+        Meta::List(l) => l.path.segments.last().map(|s| &s.ident),
+    };
+
+    if let Some(id) = head {
+        whitelist.iter().any(|w| id == w)
+    } else {
+        false
+    }
 }
 
 #[cfg(test)]
