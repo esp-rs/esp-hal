@@ -15,18 +15,17 @@
 //! . Please ensure you are reading the correct [documentation] for your target
 //! device.
 //!
-//! ## Choosing a Device
-//!
-//! Depending on your target device, you need to enable the chip feature
-//! for that device. You may also need to do this on ancillary esp-hal crates.
-//!
 //! ## Overview
+//!
+//! esp-hal is a Hardware Abstraction Layer (HAL) for Espressif's ESP32 lineup of
+//! microcontrollers offering safe, idiotmatic APIs to control hardware peripherals.
 //!
 //! ### Peripheral drivers
 //!
-//! The HAL implements both blocking _and_ async APIs for many peripherals.
+//! The HAL implements both [`Blocking`] _and_ [`Async`] APIs for all applicable peripherals.
 //! Where applicable, driver implement the [embedded-hal] and
-//! [embedded-hal-async] traits.
+//! [embedded-hal-async] traits. Drivers that don't currently have a stable API
+//! are marked as `unstable` in the documentation.
 //!
 //! ### Peripheral singletons
 //!
@@ -89,7 +88,7 @@
 //!
 //! ## Creating a Project
 //!
-//! We have a [book] that explains the full esp-rs ecosystem
+//! We have a [book] that explains the full esp-hal ecosystem
 //! and how to get started, it's advisable to give that a read
 //! before proceeding. We also have a [training] that covers some common
 //! scenarios with examples.
@@ -154,9 +153,9 @@
 #![doc = ""]
 //! ## Don't use `core::mem::forget`
 //!
-//! You should never use `core::mem::forget` on any type defined in the HAL.
-//! Some types heavily rely on their `Drop` implementation to not leave the
-//! hardware in undefined state and causing UB.
+//! You should never use `core::mem::forget` on any type defined in [esp crates].
+//! Many types heavily rely on their `Drop` implementation to not leave the
+//! hardware in undefined state which can cause undefined behaviour in your program.
 //!
 //! You might want to consider using [`#[deny(clippy::mem_forget)`](https://rust-lang.github.io/rust-clippy/v0.0.212/index.html#mem_forget) in your project.
 //!
@@ -185,6 +184,7 @@
 //! [esp-generate]: https://github.com/esp-rs/esp-generate
 //! [book]: https://docs.espressif.com/projects/rust/book/
 //! [training]: https://docs.espressif.com/projects/rust/no_std-training/
+//! [esp crates]: https://docs.espressif.com/projects/rust/book/introduction/ancillary-crates.html#esp-hal-ecosystem
 //!
 //! ## Feature Flags
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
