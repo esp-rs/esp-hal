@@ -348,6 +348,29 @@ impl Default for WakeFromLpCoreWakeupSource {
     }
 }
 
+/// ULP-FSM wakeup source
+///
+/// Wake up from ULP-FSM or ULP-RISCV interrupt.
+/// This wakeup source can be used to wake up from both light and deep sleep.
+/// Does not enable ULP-RISCV TRAP wake-up.
+#[cfg(any(esp32s2,esp32s3))]
+pub struct UlpWakeupSource {}
+
+#[cfg(any(esp32s2,esp32s3))]
+impl UlpWakeupSource {
+    /// Create a new instance of `WakeFromUlpWakeupSource`
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[cfg(any(esp32s2,esp32s3))]
+impl Default for UlpWakeupSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// GPIO wakeup source
 ///
 /// Wake up from GPIO high or low level. Any pin can be used with this wake up
@@ -468,13 +491,15 @@ bitfield::bitfield! {
     pub uart1, set_uart1: 7;
     /// Touch wakeup
     pub touch, set_touch: 8;
-    /// ULP-FSM wakeup
+    /// ULP-FSM or ULP-RISCV wakeup
     pub ulp, set_ulp: 11;
+    /// ULP-RISCV trap wakeup
+    pub ulp_riscv_trap, set_ulp_riscv_trap: 13;
     /// USB wakeup
     pub usb, set_usb: 15;
 }
 
-#[cfg(any(esp32, esp32c2, esp32c3, esp32s3))]
+#[cfg(esp32s3)]
 bitfield::bitfield! {
     /// Represents the wakeup triggers.
     #[derive(Default, Clone, Copy)]
@@ -498,7 +523,42 @@ bitfield::bitfield! {
     pub uart1, set_uart1: 7;
     /// Touch wakeup
     pub touch, set_touch: 8;
-    /// ULP wakeup
+    /// ULP-FSM wakeup
+    pub ulp_fsm, set_ulp_fsm: 9;
+    /// BT wakeup (light sleep only)
+    pub bt, set_bt: 10;
+    /// ULP-RISCV wakeup 
+    pub ulp_riscv, set_ulp_riscv: 11;
+    /// ULP-RISCV trap wakeup 
+    pub ulp_riscv_trap, set_ulp_riscv_trap: 13;
+}
+
+
+#[cfg(any(esp32, esp32c2, esp32c3))]
+bitfield::bitfield! {
+    /// Represents the wakeup triggers.
+    #[derive(Default, Clone, Copy)]
+    pub struct WakeTriggers(u16);
+    impl Debug;
+    /// EXT0 GPIO wakeup
+    pub ext0, set_ext0: 0;
+    /// EXT1 GPIO wakeup
+    pub ext1, set_ext1: 1;
+    /// GPIO wakeup (light sleep only)
+    pub gpio, set_gpio: 2;
+    /// Timer wakeup
+    pub timer, set_timer: 3;
+    /// SDIO wakeup (light sleep only)
+    pub sdio, set_sdio: 4;
+    /// MAC wakeup (light sleep only)
+    pub mac, set_mac: 5;
+    /// UART0 wakeup (light sleep only)
+    pub uart0, set_uart0: 6;
+    /// UART1 wakeup (light sleep only)
+    pub uart1, set_uart1: 7;
+    /// Touch wakeup
+    pub touch, set_touch: 8;
+    /// ULP-FSM wakeup
     pub ulp, set_ulp: 9;
     /// BT wakeup (light sleep only)
     pub bt, set_bt: 10;
