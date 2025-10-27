@@ -442,6 +442,64 @@ mod init_tests {
     }
 
     #[test]
+    async fn test_esp_rtos_timers_dont_stop_when_timer_is_cancelled(p: Peripherals) {
+        #[cfg(riscv)]
+        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_rtos::start(
+            timg0.timer0,
+            #[cfg(riscv)]
+            sw_ints.software_interrupt0,
+        );
+
+        extern "C" fn helper_thread(context: *mut c_void) {
+            let context = unsafe { &*(context as *const TestContext) };
+
+            loop {
+                info!("Helper Task: try take mutex");
+                // Put the thread to sleep with a timeout. Waking this thread
+                // must not cause the timer to stop.
+                context.mutex.take(Some(10_000));
+            }
+        }
+
+        struct TestContext {
+            mutex: Semaphore,
+        }
+        let mut test_context = TestContext {
+            mutex: Semaphore::new_mutex(false),
+        };
+
+        test_context.mutex.take(None);
+
+        unsafe {
+            preempt::task_create(
+                "helper_thread",
+                helper_thread,
+                (&raw mut test_context).cast::<c_void>(),
+                1,
+                None,
+                4096,
+            )
+        };
+
+        // Raise our priority so that giving the mutex does not cause a context switch.
+        CurrentThreadHandle::get().set_priority(2);
+
+        embassy_futures::join::join(
+            embassy_time::Timer::after(embassy_time::Duration::from_millis(10)),
+            async {
+                // Give the mutex AFTER the timer has been scheduler.
+                test_context.mutex.give();
+                info!("Low: mutex given");
+            },
+        )
+        .await;
+
+        info!("Low: exiting");
+    }
+
+    #[test]
     #[cfg(multi_core)]
     fn test_esp_rtos_smp(p: Peripherals) {
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
