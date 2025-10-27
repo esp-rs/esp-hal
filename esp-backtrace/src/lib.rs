@@ -17,7 +17,7 @@
 //! handler).
 //!
 //! ## Features
-#![doc = document_features::document_features!()]
+#![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
 //! ## Additional configuration
 //!
 //! We've exposed some configuration options that don't fit into cargo
