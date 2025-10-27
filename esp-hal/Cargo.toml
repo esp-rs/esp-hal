@@ -129,7 +129,7 @@ crypto-bigint = { version = "0.5.5", default-features = false }
 jiff = { version = "0.2", default-features = false, features = ["static"] }
 
 [features]
-default = ["rt", "exception-handler"]
+default = ["rt", "exception-handler", "float-save-restore"]
 
 # These features are considered private and unstable. They are not covered by
 # semver guarantees and may change or be removed without notice.
@@ -162,6 +162,19 @@ rt = [
 
 ## Enable a simple exception handler turning exceptions into panics.
 exception-handler = []
+
+## Save and restore the floating point co-processor context.
+##
+## This feature enables the floating-point coprocessor in interrupt contexts, and adds code to save and restore the relevant registers.
+##
+## <section class="warning">
+## If you intend to do floating-point calculations in multiple contexts, or in interrupt/exception handlers, you will need to enable this feature.
+## </section>
+##
+## Note that this feature is only effective on ESP32 and ESP32-S3. Other chips don't have a hardware floating-point coprocessor.
+##
+## ⚠️ This feature is considered unstable.
+float-save-restore = ["xtensa-lx-rt/float-save-restore"]
 
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:

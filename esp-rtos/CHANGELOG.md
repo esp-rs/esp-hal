@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed a bug causing timers to stop working in certain cases. (#4393)
+- Place more RTOS code in IRAM to improve performance. (#4394)
 
 ### Removed
 

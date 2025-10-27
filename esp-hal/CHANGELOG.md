@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the `float-save-restore` feature for Xtensa MCUs. (#4394)
 
 ### Changed
 
