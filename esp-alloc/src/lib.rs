@@ -137,7 +137,7 @@
 //! Internal | ████████████░░░░░░░░░░░░░░░░░░░░░░░ | Used: 35% (Used 46148 of 131068, free: 84920)
 //! ```
 //! ## Feature Flags
-#![doc = document_features::document_features!()]
+#![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
 #![no_std]
 #![cfg_attr(feature = "nightly", feature(allocator_api))]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]

@@ -1,5 +1,6 @@
 //! ## Feature Flags
-#![doc = document_features::document_features!()]
+#![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![cfg_attr(not(all(test, feature = "emulation")), no_std)]
 
 #[cfg_attr(not(feature = "emulation"), path = "hardware.rs")]
