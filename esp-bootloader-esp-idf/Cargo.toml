@@ -33,6 +33,8 @@ cfg-if = "1"
 defmt = { version = "1.0.1", optional = true }
 document-features = "0.2"
 esp-config = { version = "0.6.0", path = "../esp-config" }
+esp-hal-procmacros = { version = "0.20.0", path = "../esp-hal-procmacros", features = ["__esp_idf_bootloader"] }
+esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated" }
 esp-rom-sys = { version = "0.1.2", path = "../esp-rom-sys", optional = true }
 embedded-storage = "0.3.1"
 log-04 = { package = "log", version = "0.4", optional = true }
@@ -64,19 +66,19 @@ std = ["dep:crc", "dep:md-5"]
 #! One of the following features must be enabled to select the target chip:
 
 ##
-esp32c2   = ["esp-rom-sys/esp32c2"]
+esp32c2   = ["esp-rom-sys/esp32c2", "esp-metadata-generated/esp32c2"]
 ##
-esp32c3   = ["esp-rom-sys/esp32c3"]
+esp32c3   = ["esp-rom-sys/esp32c3", "esp-metadata-generated/esp32c3"]
 ##
-esp32c6   = ["esp-rom-sys/esp32c6"]
+esp32c6   = ["esp-rom-sys/esp32c6", "esp-metadata-generated/esp32c6"]
 ##
-esp32h2   = ["esp-rom-sys/esp32h2"]
+esp32h2   = ["esp-rom-sys/esp32h2", "esp-metadata-generated/esp32h2"]
 ##
-esp32     = ["esp-rom-sys/esp32"]
+esp32     = ["esp-rom-sys/esp32", "esp-metadata-generated/esp32"]
 ##
-esp32s2   = ["esp-rom-sys/esp32s2"]
+esp32s2   = ["esp-rom-sys/esp32s2", "esp-metadata-generated/esp32s2"]
 ##
-esp32s3   = ["esp-rom-sys/esp32s3"]
+esp32s3   = ["esp-rom-sys/esp32s3", "esp-metadata-generated/esp32s3"]
 
 # "md-5" is hidden behind `std` feature and `cargo machete` incorrectly marks it as unused.
 [package.metadata.cargo-machete]

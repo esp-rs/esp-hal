@@ -100,13 +100,17 @@ symbols = [
     "riscv_coproc_supported",
 ]
 
-memory = [{ name = "dram", start = 0x3FFB_0000, end = 0x4000_0000 }]
-
 [device.soc]
 ref_tick_hz = 1_000_000
 rc_fast_clk_default = 8_500_000
 rc_slow_clock = 90_000
 xtal_options = [40]
+
+memory_map = { ranges = [
+    { name = "dram", start = 0x3FFB_0000, end = 0x4000_0000 },
+    { name = "dram2_uninit", start = 0x3FFD_E000, end = 0x4000_0000 },
+] }
+
 peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },

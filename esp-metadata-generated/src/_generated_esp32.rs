@@ -262,14 +262,6 @@ macro_rules! property {
         true
     };
 }
-/// Macro to get the address range of the given memory region.
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! memory_range {
-    ("DRAM") => {
-        1073405952..1073741824
-    };
-}
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_soc_xtal_options {
@@ -618,6 +610,29 @@ macro_rules! implement_peripheral_clocks {
                 }
             }
         }
+    };
+}
+/// Macro to get the address range of the given memory region.
+///
+/// This macro provides two syntax options for each memory region:
+///
+/// - `memory_range!("region_name")` returns the address range as a range expression (`start..end`).
+/// - `memory_range!(size as str, "region_name")` returns the size of the region as a string
+///   literal.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! memory_range {
+    ("DRAM") => {
+        1073405952..1073741824
+    };
+    (size as str, "DRAM") => {
+        "335872"
+    };
+    ("DRAM2_UNINIT") => {
+        1073643056..1073741824
+    };
+    (size as str, "DRAM2_UNINIT") => {
+        "98768"
     };
 }
 #[macro_export]

@@ -98,13 +98,16 @@ symbols = [
     "ulp_supported",
 ]
 
-memory = [{ name = "dram", start = 0x3FFA_E000, end = 0x4000_0000 }]
-
 [device.soc]
 ref_tick_hz = 1_000_000
 rc_fast_clk_default = 8_500_000
 rc_slow_clock = 150_000
 xtal_options = [26, 40]
+
+memory_map = { ranges = [
+    { name = "dram", start = 0x3FFA_E000, end = 0x4000_0000 },
+    { name = "dram2_uninit", start = 0x3FFE_7E30, end = 0x4000_0000 },
+] }
 
 # PeripheralClockControl templates.
 #

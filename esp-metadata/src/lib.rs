@@ -279,7 +279,6 @@ struct Device {
 
     peripherals: Vec<PeripheralDef>,
     symbols: Vec<String>,
-    memory: Vec<MemoryRegion>,
 
     // Peripheral driver configuration:
     #[serde(flatten)]
@@ -325,7 +324,6 @@ impl Config {
                 trm: String::new(),
                 peripherals: Vec::new(),
                 symbols: Vec::new(),
-                memory: Vec::new(),
                 peri_config: PeriConfig::default(),
             },
             all_symbols: OnceLock::new(),
@@ -375,14 +373,6 @@ impl Config {
     /// User-defined symbols for the device.
     pub fn symbols(&self) -> &[String] {
         &self.device.symbols
-    }
-
-    /// Memory regions.
-    ///
-    /// Will be available as env-variables `REGION-<NAME>-START` /
-    /// `REGION-<NAME>-END`
-    pub fn memory(&self) -> &[MemoryRegion] {
-        &self.device.memory
     }
 
     /// All configuration values for the device.
@@ -462,26 +452,7 @@ impl Config {
     }
 
     fn generate_properties(&self) -> TokenStream {
-        let mut tokens = TokenStream::new();
-
         let chip_name = self.name();
-        // Public API, can't use a private macro:
-        tokens.extend(quote! {
-            /// The name of the chip as `&str`
-            ///
-            /// # Example
-            ///
-            /// ```rust, no_run
-            /// use esp_hal::chip;
-            /// let chip_name = chip!();
-            #[doc = concat!("assert_eq!(chip_name, ", chip!(), ")")]
-            /// ```
-            #[macro_export]
-            #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-            macro_rules! chip {
-                () => { #chip_name };
-            }
-        });
 
         // Translate the chip properties into a macro that can be used in esp-hal:
         let arch = self.device.arch.as_ref();
@@ -527,8 +498,22 @@ impl Config {
                     }
                 });
 
-        // Not public API, can use a private macro:
-        tokens.extend(quote! {
+        quote! {
+            /// The name of the chip as `&str`
+            ///
+            /// # Example
+            ///
+            /// ```rust, no_run
+            /// use esp_hal::chip;
+            /// let chip_name = chip!();
+            #[doc = concat!("assert_eq!(chip_name, ", chip!(), ")")]
+            /// ```
+            #[macro_export]
+            #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+            macro_rules! chip {
+                () => { #chip_name };
+            }
+
             /// The properties of this chip and its drivers.
             #[macro_export]
             #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
@@ -540,32 +525,9 @@ impl Config {
                 ("trm") => { #trm };
                 #(#peripheral_properties)*
             }
-        });
-
-        let region_branches = self.memory().iter().map(|region| {
-            let name = region.name.to_uppercase();
-            let start = number(region.start as usize);
-            let end = number(region.end as usize);
-
-            quote! {
-                ( #name ) => {
-                    #start .. #end
-                };
-            }
-        });
-
-        tokens.extend(quote! {
-            /// Macro to get the address range of the given memory region.
-            #[macro_export]
-            #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-            macro_rules! memory_range {
-                #(#region_branches)*
-            }
 
             #(#macros)*
-        });
-
-        tokens
+        }
     }
 
     fn generate_gpios(&self) -> TokenStream {
@@ -670,11 +632,6 @@ impl Config {
         // Define all necessary configuration symbols for the configured device:
         for symbol in self.all() {
             cfgs.push(symbol.replace('.', "_"));
-        }
-
-        // Define env-vars for all memory regions
-        for memory in self.memory() {
-            cfgs.push(format!("has_{}_region", memory.name.to_lowercase()));
         }
 
         cfgs

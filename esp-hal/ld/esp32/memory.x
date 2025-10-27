@@ -34,7 +34,7 @@ MEMORY
   reserved_rom_stack_pro  : ORIGIN = 0x3ffe1320, len = 11264
   reserved_rom_stack_app  : ORIGIN = 0x3ffe5230, len = 11264
 
-  dram2_seg              : ORIGIN = 0x3ffe7e30, len = 98767  /* the rest of DRAM after the rom data segments and rom stacks in the middle */
+  dram2_seg              : ORIGIN = 0x3ffe7e30, len = 98768  /* the rest of DRAM after the rom data segments and rom stacks in the middle */
 
   /* external flash
      The 0x20 offset is a convenience for the app binary image generation.

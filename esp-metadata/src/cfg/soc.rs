@@ -1,10 +1,11 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, ops::Range, str::FromStr};
 
 use anyhow::{Context, Result};
 use convert_case::{Boundary, Case, Casing, pattern};
 use proc_macro2::TokenStream;
+use quote::quote;
 
-use crate::cfg::Value;
+use crate::{cfg::Value, number};
 
 impl super::SocProperties {
     pub(super) fn computed_properties(&self) -> impl Iterator<Item = (&str, bool, Value)> {
@@ -23,6 +24,66 @@ impl super::SocProperties {
         }
 
         properties.into_iter()
+    }
+}
+
+/// Memory region.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct MemoryRange {
+    name: String,
+    #[serde(flatten)]
+    range: Range<u32>,
+}
+
+/// Memory regions.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct MemoryMap {
+    pub ranges: Vec<MemoryRange>,
+}
+
+impl super::GenericProperty for MemoryMap {
+    fn macros(&self) -> Option<TokenStream> {
+        let region_branches = self.ranges.iter().map(|region| {
+            let name = region.name.to_uppercase();
+            let start = number(region.range.start as usize);
+            let end = number(region.range.end as usize);
+            let size = format!(
+                "{}",
+                region.range.end as usize - region.range.start as usize
+            );
+
+            quote! {
+                ( #name ) => {
+                    #start .. #end
+                };
+                ( size as str, #name ) => {
+                    #size
+                };
+            }
+        });
+
+        Some(quote! {
+            /// Macro to get the address range of the given memory region.
+            ///
+            /// This macro provides two syntax options for each memory region:
+            ///
+            /// - `memory_range!("region_name")` returns the address range as a range expression (`start..end`).
+            /// - `memory_range!(size as str, "region_name")` returns the size of the region as a string literal.
+            #[macro_export]
+            #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+            macro_rules! memory_range {
+                #(#region_branches)*
+            }
+        })
+    }
+
+    fn cfgs(&self) -> Option<Vec<String>> {
+        Some(
+            self.ranges
+                .iter()
+                .map(|region| format!("has_{}_region", region.name.to_lowercase()))
+                .collect(),
+        )
     }
 }
 
@@ -125,7 +186,7 @@ impl PeripheralClocks {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        Ok(quote::quote! {
+        Ok(quote! {
             /// Implement the `Peripheral` enum and enable/disable/reset functions.
             ///
             /// This macro is intended to be placed in `esp_hal::system`.
