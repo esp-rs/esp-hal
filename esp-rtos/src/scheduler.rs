@@ -362,6 +362,7 @@ impl SchedulerState {
         timer_queue.schedule_wakeup(task, at)
     }
 
+    #[esp_hal::ram]
     pub(crate) fn resume_task(&mut self, task: TaskPtr) {
         let timer_queue = unwrap!(self.time_driver.as_mut());
         timer_queue.timer_queue.remove(task);

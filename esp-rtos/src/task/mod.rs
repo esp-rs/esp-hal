@@ -127,6 +127,7 @@ impl TaskExt for TaskPtr {
     }
 
     #[cfg(any(feature = "esp-radio", feature = "embassy"))]
+    #[esp_hal::ram]
     fn resume(self) {
         SCHEDULER.with(|scheduler| scheduler.resume_task(self))
     }
