@@ -4,9 +4,9 @@
         _ => "let freq = Rate::from_mhz(80);"
     },
     "channel" => {
-        cfg(any(esp32, esp32s2)) => "let mut channel = rmt.channel0.configure_rx(peripherals.GPIO4, &rx_config)?;",
-        cfg(esp32s3) => "let mut channel = rmt.channel7.configure_rx(peripherals.GPIO4, &rx_config)?;",
-        _ => "let mut channel = rmt.channel2.configure_rx(peripherals.GPIO4, &rx_config)?;"
+        cfg(any(esp32, esp32s2)) => "let mut channel = rmt.channel0.configure_rx(&rx_config)?.with_pin(peripherals.GPIO4);",
+        cfg(esp32s3) => "let mut channel = rmt.channel7.configure_rx(&rx_config)?.with_pin(peripherals.GPIO4);",
+        _ => "let mut channel = rmt.channel2.configure_rx(&rx_config)?.with_pin(peripherals.GPIO4);"
     },
     "channels_desc" => {
         cfg(esp32) => "8 channels, each of them can be either receiver or transmitter.",
@@ -62,17 +62,19 @@
 //! # use crate::esp_hal::rmt::TxChannelCreator;
 //! # {freq}
 //! let rmt = Rmt::new(peripherals.RMT, freq)?;
-//! let mut channel = rmt.channel0.configure_tx(
-//!     peripherals.GPIO1,
-//!     &TxChannelConfig::default()
-//!         .with_clk_divider(1)
-//!         .with_idle_output_level(Level::Low)
-//!         .with_idle_output(false)
-//!         .with_carrier_modulation(false)
-//!         .with_carrier_high(1)
-//!         .with_carrier_low(1)
-//!         .with_carrier_level(Level::Low),
-//! )?;
+//! let mut channel = rmt
+//!     .channel0
+//!     .configure_tx(
+//!         &TxChannelConfig::default()
+//!             .with_clk_divider(1)
+//!             .with_idle_output_level(Level::Low)
+//!             .with_idle_output(false)
+//!             .with_carrier_modulation(false)
+//!             .with_carrier_high(1)
+//!             .with_carrier_low(1)
+//!             .with_carrier_level(Level::Low),
+//!     )?
+//!     .with_pin(peripherals.GPIO1);
 //! # {after_snippet}
 //! ```
 //!
@@ -89,7 +91,10 @@
 //!
 //! let tx_config = TxChannelConfig::default().with_clk_divider(255);
 //!
-//! let mut channel = rmt.channel0.configure_tx(peripherals.GPIO4, &tx_config)?;
+//! let mut channel = rmt
+//!     .channel0
+//!     .configure_tx(&tx_config)?
+//!     .with_pin(peripherals.GPIO4);
 //!
 //! let delay = Delay::new();
 //!
@@ -797,23 +802,21 @@ for_each_rmt_channel!(
                 where
                     Dm: crate::DriverMode,
                 {
-                    fn configure_tx<P>(
+                    fn configure_tx(
                         self,
-                        pin: P,
                         config: &TxChannelConfig,
-                    ) -> Result<Channel<'ch, Dm, Tx>, (Error, Self, P)>
+                    ) -> Result<Channel<'ch, Dm, Tx>, (Error, Self)>
                     where
                         Self: Sized,
-                        P: PeripheralOutput<'ch>,
                     {
                         let raw = unsafe { DynChannelAccess::conjure(ChannelIndex::[<Ch $idx>]) };
 
                         let memsize = MemSize::from_blocks(config.memsize);
                         if let Err(e) = reserve_channel(raw.channel(), RmtState::Tx, memsize) {
-                            return Err((e, self, pin));
+                            return Err((e, self));
                         };
 
-                        let _guard = unsafe { configure_tx(raw, memsize, pin.into(), config, self._guard) };
+                        let _guard = unsafe { configure_tx(raw, memsize, config, self._guard) };
 
                         Ok(Channel {
                             raw,
@@ -839,28 +842,26 @@ for_each_rmt_channel!(
                 where
                     Dm: crate::DriverMode,
                 {
-                    fn configure_rx<P>(
+                    fn configure_rx(
                         self,
-                        pin: P,
                         config: &RxChannelConfig,
-                    ) -> Result<Channel<'ch, Dm, Rx>, (Error, Self, P)>
+                    ) -> Result<Channel<'ch, Dm, Rx>, (Error, Self)>
                     where
                         Self: Sized,
-                        P: PeripheralInput<'ch>,
                     {
                         let raw = unsafe { DynChannelAccess::conjure(ChannelIndex::[<Ch $idx>]) };
 
                         #[cfg_attr(any(esp32, esp32s2), allow(clippy::absurd_extreme_comparisons))]
                         if config.idle_threshold > MAX_RX_IDLE_THRESHOLD {
-                            return Err((Error::InvalidArgument, self, pin));
+                            return Err((Error::InvalidArgument, self));
                         }
 
                         let memsize = MemSize::from_blocks(config.memsize);
                         if let Err(e) = reserve_channel(raw.channel(), RmtState::Rx, memsize) {
-                            return Err((e, self, pin));
+                            return Err((e, self));
                         };
 
-                        let _guard = unsafe { configure_rx(raw, memsize, pin.into(), config, self._guard) };
+                        let _guard = unsafe { configure_rx(raw, memsize, config, self._guard) };
 
                         Ok(Channel {
                             raw,
@@ -1109,15 +1110,9 @@ pub const HAS_RX_WRAP: bool = property!("rmt.has_rx_wrap");
 unsafe fn configure_tx(
     raw: DynChannelAccess<Tx>,
     memsize: MemSize,
-    pin: gpio::interconnect::OutputSignal<'_>,
     config: &TxChannelConfig,
     guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
 ) -> DropState {
-    pin.apply_output_config(&OutputConfig::default());
-    pin.set_output_enable(true);
-
-    raw.output_signal().connect_to(&pin);
-
     raw.set_divider(config.clk_divider);
     raw.set_tx_carrier(
         config.carrier_modulation,
@@ -1138,15 +1133,9 @@ unsafe fn configure_tx(
 unsafe fn configure_rx(
     raw: DynChannelAccess<Rx>,
     memsize: MemSize,
-    pin: gpio::interconnect::InputSignal<'_>,
     config: &RxChannelConfig,
     guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
 ) -> DropState {
-    pin.apply_input_config(&InputConfig::default());
-    pin.set_input_enable(true);
-
-    raw.input_signal().connect_to(&pin);
-
     raw.set_divider(config.clk_divider);
     raw.set_rx_carrier(
         config.carrier_modulation,
@@ -1188,6 +1177,42 @@ where
     }
 }
 
+impl<'ch, Dm> Channel<'ch, Dm, Tx>
+where
+    Dm: crate::DriverMode,
+{
+    /// Connect a pin to the channel's output signal.
+    ///
+    /// This will replace previous pin assignments for this signal.
+    pub fn with_pin(self, pin: impl PeripheralOutput<'ch>) -> Self {
+        let pin = pin.into();
+        pin.apply_output_config(&OutputConfig::default());
+        pin.set_output_enable(true);
+
+        self.raw.output_signal().connect_to(&pin);
+
+        self
+    }
+}
+
+impl<'ch, Dm> Channel<'ch, Dm, Rx>
+where
+    Dm: crate::DriverMode,
+{
+    /// Connect a pin to the channel's input signal.
+    ///
+    /// This will replace previous pin assignments for this signal.
+    pub fn with_pin(self, pin: impl PeripheralInput<'ch>) -> Self {
+        let pin = pin.into();
+        pin.apply_input_config(&InputConfig::default());
+        pin.set_input_enable(true);
+
+        self.raw.input_signal().connect_to(&pin);
+
+        self
+    }
+}
+
 impl<Dm, Dir> Drop for Channel<'_, Dm, Dir>
 where
     Dm: crate::DriverMode,
@@ -1219,14 +1244,9 @@ where
     Dm: crate::DriverMode,
 {
     /// Configure the TX channel
-    fn configure_tx<P>(
-        self,
-        pin: P,
-        config: &TxChannelConfig,
-    ) -> Result<Channel<'ch, Dm, Tx>, (Error, Self, P)>
+    fn configure_tx(self, config: &TxChannelConfig) -> Result<Channel<'ch, Dm, Tx>, (Error, Self)>
     where
-        Self: Sized,
-        P: PeripheralOutput<'ch>;
+        Self: Sized;
 }
 
 /// Creates a RX channel
@@ -1235,14 +1255,9 @@ where
     Dm: crate::DriverMode,
 {
     /// Configure the RX channel
-    fn configure_rx<P>(
-        self,
-        pin: P,
-        config: &RxChannelConfig,
-    ) -> Result<Channel<'ch, Dm, Rx>, (Error, Self, P)>
+    fn configure_rx(self, config: &RxChannelConfig) -> Result<Channel<'ch, Dm, Rx>, (Error, Self)>
     where
-        Self: Sized,
-        P: PeripheralInput<'ch>;
+        Self: Sized;
 }
 
 /// An in-progress transaction for a single shot TX transaction.

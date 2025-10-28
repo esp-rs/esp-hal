@@ -383,14 +383,14 @@ impl Context {
     ) -> (Channel<'a, Dm, Tx>, Channel<'a, Dm, Rx>) {
         let tx_channel = rmt
             .channel0
-            .configure_tx(tx, &tx_config.with_clk_divider(DIV))
-            .map_err(|(e, _, _)| e)
-            .unwrap();
+            .configure_tx(&tx_config.with_clk_divider(DIV))
+            .unwrap()
+            .with_pin(tx);
 
         let rx_channel = rx_channel_creator!(rmt)
-            .configure_rx(rx, &rx_config.with_clk_divider(DIV))
-            .map_err(|(e, _, _)| e)
-            .unwrap();
+            .configure_rx(&rx_config.with_clk_divider(DIV))
+            .unwrap()
+            .with_pin(rx);
 
         (tx_channel, rx_channel)
     }
@@ -514,16 +514,14 @@ mod tests {
 
         let _ch0 = rmt
             .channel0
-            .configure_tx(NoPin, &TxChannelConfig::default().with_memsize(2))
-            .map_err(|(e, _, _)| e)
+            .configure_tx(&TxChannelConfig::default().with_memsize(2))
+            .map_err(|(e, _)| e)
             .unwrap();
 
         // Configuring channel 1 should fail, since channel 0 already uses its memory.
-        let ch1 = rmt
-            .channel1
-            .configure_tx(NoPin, &TxChannelConfig::default());
+        let ch1 = rmt.channel1.configure_tx(&TxChannelConfig::default());
 
-        assert!(matches!(ch1, Err((Error::MemoryBlockNotAvailable, _, _))));
+        assert!(matches!(ch1, Err((Error::MemoryBlockNotAvailable, _))));
     }
 
     #[test]
@@ -532,16 +530,14 @@ mod tests {
 
         let ch0 = rmt
             .channel0
-            .configure_tx(NoPin, &TxChannelConfig::default().with_memsize(2))
-            .map_err(|(e, _, _)| e)
+            .configure_tx(&TxChannelConfig::default().with_memsize(2))
             .unwrap();
 
         // After dropping channel 0, the memory that it reserved should become available
         // again such that channel 1 configuration succeeds.
         core::mem::drop(ch0);
         rmt.channel1
-            .configure_tx(NoPin, &TxChannelConfig::default())
-            .map_err(|(e, _, _)| e)
+            .configure_tx(&TxChannelConfig::default())
             .unwrap();
     }
 
@@ -560,16 +556,16 @@ mod tests {
             let tx_channel = rmt
                 .$tx_channel
                 .reborrow()
-                .configure_tx(tx_pin, &tx_config)
-                .map_err(|(e, _, _)| e)
-                .unwrap();
+                .configure_tx(&tx_config)
+                .unwrap()
+                .with_pin(tx_pin);
 
             let rx_channel = rmt
                 .$rx_channel
                 .reborrow()
-                .configure_rx(rx_pin, &rx_config)
-                .map_err(|(e, _, _)| e)
-                .unwrap();
+                .configure_rx(&rx_config)
+                .unwrap()
+                .with_pin(rx_pin);
 
             do_rmt_loopback_inner::<20>(tx_channel, rx_channel, false, 1);
         }};
@@ -693,8 +689,7 @@ mod tests {
             let mut ch0 = rmt
                 .channel0
                 .reborrow()
-                .configure_tx(NoPin, &TxChannelConfig::default())
-                .map_err(|(e, _, _)| e)
+                .configure_tx(&TxChannelConfig::default())
                 .unwrap();
 
             let tx_data: [_; 10] = generate_tx_data(true, true);
@@ -743,15 +738,15 @@ mod tests {
                 let mut tx_channel = rmt
                     .channel0
                     .reborrow()
-                    .configure_tx(tx, &tx_config.with_clk_divider(DIV))
-                    .map_err(|(e, _, _)| e)
-                    .unwrap();
+                    .configure_tx(&tx_config.with_clk_divider(DIV))
+                    .unwrap()
+                    .with_pin(tx);
 
                 let mut rx_channel = rx_channel_creator!(rmt)
                     .reborrow()
-                    .configure_rx(rx, &rx_config.with_clk_divider(DIV))
-                    .map_err(|(e, _, _)| e)
-                    .unwrap();
+                    .configure_rx(&rx_config.with_clk_divider(DIV))
+                    .unwrap()
+                    .with_pin(rx);
 
                 // Test that dropping & recreating Channel works
                 for _ in 0..3 {
@@ -810,15 +805,15 @@ mod tests {
                 let mut tx_channel = rmt
                     .channel0
                     .reborrow()
-                    .configure_tx(tx, &tx_config.with_clk_divider(DIV))
-                    .map_err(|(e, _, _)| e)
-                    .unwrap();
+                    .configure_tx(&tx_config.with_clk_divider(DIV))
+                    .unwrap()
+                    .with_pin(tx);
 
                 let mut rx_channel = rx_channel_creator!(rmt)
                     .reborrow()
-                    .configure_rx(rx, &rx_config.with_clk_divider(DIV))
-                    .map_err(|(e, _, _)| e)
-                    .unwrap();
+                    .configure_rx(&rx_config.with_clk_divider(DIV))
+                    .unwrap()
+                    .with_pin(rx);
 
                 // Test that dropping & recreating Channel works
                 for _ in 0..3 {
