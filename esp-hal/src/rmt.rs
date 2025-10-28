@@ -2243,43 +2243,36 @@ mod chip_specific {
 
         #[cfg(not(soc_has_pcr))]
         {
-            RMT::regs().sys_conf().modify(
-                #[inline(always)]
-                |_, w| unsafe {
-                    w.clk_en().clear_bit();
-                    w.sclk_sel().bits(source.bits());
-                    w.sclk_div_num().bits(div);
-                    w.sclk_div_a().bits(0);
-                    w.sclk_div_b().bits(0);
-                    w.apb_fifo_mask().set_bit()
-                },
-            );
+            RMT::regs().sys_conf().modify(|_, w| unsafe {
+                w.clk_en().clear_bit();
+                w.sclk_sel().bits(source.bits());
+                w.sclk_div_num().bits(div);
+                w.sclk_div_a().bits(0);
+                w.sclk_div_b().bits(0);
+                w.apb_fifo_mask().set_bit()
+            });
         }
 
         #[cfg(soc_has_pcr)]
         {
             use crate::peripherals::PCR;
 
-            PCR::regs().rmt_sclk_conf().modify(
-                #[inline(always)]
-                |_, w| unsafe {
-                    cfg_if::cfg_if!(
-                        if #[cfg(esp32c6)] {
-                            w.sclk_sel().bits(source.bits())
-                        } else {
-                            w.sclk_sel().bit(source.bit())
-                        }
-                    );
-                    w.sclk_div_num().bits(div);
-                    w.sclk_div_a().bits(0);
-                    w.sclk_div_b().bits(0)
-                },
-            );
+            PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
+                cfg_if::cfg_if!(
+                    if #[cfg(esp32c6)] {
+                        w.sclk_sel().bits(source.bits())
+                    } else {
+                        w.sclk_sel().bit(source.bit())
+                    }
+                );
+                w.sclk_div_num().bits(div);
+                w.sclk_div_a().bits(0);
+                w.sclk_div_b().bits(0)
+            });
 
-            RMT::regs().sys_conf().modify(
-                #[inline(always)]
-                |_, w| w.apb_fifo_mask().set_bit(),
-            );
+            RMT::regs()
+                .sys_conf()
+                .modify(|_, w| w.apb_fifo_mask().set_bit());
         }
 
         Ok(())
@@ -2334,15 +2327,11 @@ mod chip_specific {
             let ch_idx = self.ch_idx as usize;
 
             if Dir::IS_TX {
-                rmt.ch_tx_conf0(ch_idx).modify(
-                    #[inline(always)]
-                    |_, w| w.conf_update().set_bit(),
-                );
+                rmt.ch_tx_conf0(ch_idx)
+                    .modify(|_, w| w.conf_update().set_bit());
             } else {
-                rmt.ch_rx_conf1(ch_idx).modify(
-                    #[inline(always)]
-                    |_, w| w.conf_update().set_bit(),
-                );
+                rmt.ch_rx_conf1(ch_idx)
+                    .modify(|_, w| w.conf_update().set_bit());
             }
         }
 
@@ -2352,15 +2341,11 @@ mod chip_specific {
             let ch_idx = self.ch_idx as usize;
 
             if Dir::IS_TX {
-                rmt.ch_tx_conf0(ch_idx).modify(
-                    #[inline(always)]
-                    |_, w| unsafe { w.div_cnt().bits(divider) },
-                );
+                rmt.ch_tx_conf0(ch_idx)
+                    .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
             } else {
-                rmt.ch_rx_conf0(ch_idx).modify(
-                    #[inline(always)]
-                    |_, w| unsafe { w.div_cnt().bits(divider) },
-                );
+                rmt.ch_rx_conf0(ch_idx)
+                    .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
             }
         }
 
@@ -2385,15 +2370,11 @@ mod chip_specific {
             let ch_idx = self.ch_idx as usize;
 
             if Dir::IS_TX {
-                rmt.ch_tx_conf0(ch_idx).modify(
-                    #[inline(always)]
-                    |_, w| unsafe { w.mem_size().bits(blocks) },
-                );
+                rmt.ch_tx_conf0(ch_idx)
+                    .modify(|_, w| unsafe { w.mem_size().bits(blocks) });
             } else {
-                rmt.ch_rx_conf0(ch_idx).modify(
-                    #[inline(always)]
-                    |_, w| unsafe { w.mem_size().bits(blocks) },
-                );
+                rmt.ch_rx_conf0(ch_idx)
+                    .modify(|_, w| unsafe { w.mem_size().bits(blocks) });
             }
         }
     }
@@ -2410,30 +2391,23 @@ mod chip_specific {
             let ch_idx = self.ch_idx as usize;
 
             if let Some(mode) = mode {
-                rmt.ch_tx_lim(ch_idx).modify(
-                    #[inline(always)]
-                    |_, w| unsafe {
-                        w.loop_count_reset().set_bit();
-                        w.tx_loop_cnt_en().bit(!matches!(mode, LoopMode::Infinite));
-                        w.tx_loop_num().bits(mode.get_count());
+                rmt.ch_tx_lim(ch_idx).modify(|_, w| unsafe {
+                    w.loop_count_reset().set_bit();
+                    w.tx_loop_cnt_en().bit(!matches!(mode, LoopMode::Infinite));
+                    w.tx_loop_num().bits(mode.get_count());
 
-                        #[cfg(rmt_has_tx_loop_auto_stop)]
-                        w.loop_stop_en().bit(matches!(mode, LoopMode::Finite(_)));
+                    #[cfg(rmt_has_tx_loop_auto_stop)]
+                    w.loop_stop_en().bit(matches!(mode, LoopMode::Finite(_)));
 
-                        w
-                    },
-                );
+                    w
+                });
 
                 // FIXME: Is this required? This is a WT field for esp32c6 at least
-                rmt.ch_tx_lim(ch_idx).modify(
-                    #[inline(always)]
-                    |_, w| w.loop_count_reset().clear_bit(),
-                );
+                rmt.ch_tx_lim(ch_idx)
+                    .modify(|_, w| w.loop_count_reset().clear_bit());
             } else {
-                rmt.ch_tx_lim(ch_idx).modify(
-                    #[inline(always)]
-                    |_, w| w.tx_loop_cnt_en().clear_bit(),
-                );
+                rmt.ch_tx_lim(ch_idx)
+                    .modify(|_, w| w.tx_loop_cnt_en().clear_bit());
             }
         }
 
@@ -2463,10 +2437,8 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            rmt.ch_tx_conf0(ch_idx).modify(
-                #[inline(always)]
-                |_, w| w.tx_conti_mode().bit(continuous),
-            );
+            rmt.ch_tx_conf0(ch_idx)
+                .modify(|_, w| w.tx_conti_mode().bit(continuous));
         }
 
         #[inline(always)]
@@ -2474,10 +2446,8 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            rmt.ch_tx_conf0(ch_idx).modify(
-                #[inline(always)]
-                |_, w| w.mem_tx_wrap_en().bit(wrap),
-            );
+            rmt.ch_tx_conf0(ch_idx)
+                .modify(|_, w| w.mem_tx_wrap_en().bit(wrap));
         }
 
         #[inline(always)]
@@ -2485,19 +2455,14 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            rmt.chcarrier_duty(ch_idx).write(
-                #[inline(always)]
-                |w| unsafe { w.carrier_high().bits(high).carrier_low().bits(low) },
-            );
+            rmt.chcarrier_duty(ch_idx)
+                .write(|w| unsafe { w.carrier_high().bits(high).carrier_low().bits(low) });
 
-            rmt.ch_tx_conf0(ch_idx).modify(
-                #[inline(always)]
-                |_, w| {
-                    w.carrier_en().bit(carrier);
-                    w.carrier_eff_en().set_bit();
-                    w.carrier_out_lv().bit(level.into())
-                },
-            );
+            rmt.ch_tx_conf0(ch_idx).modify(|_, w| {
+                w.carrier_en().bit(carrier);
+                w.carrier_eff_en().set_bit();
+                w.carrier_out_lv().bit(level.into())
+            });
         }
 
         #[inline(always)]
@@ -2505,10 +2470,8 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            rmt.ch_tx_conf0(ch_idx).modify(
-                #[inline(always)]
-                |_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()),
-            );
+            rmt.ch_tx_conf0(ch_idx)
+                .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
         }
 
         #[inline(always)]
@@ -2516,14 +2479,11 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            rmt.ch_tx_conf0(ch_idx).modify(
-                #[inline(always)]
-                |_, w| {
-                    w.mem_rd_rst().set_bit();
-                    w.apb_mem_rst().set_bit();
-                    w.tx_start().set_bit()
-                },
-            );
+            rmt.ch_tx_conf0(ch_idx).modify(|_, w| {
+                w.mem_rd_rst().set_bit();
+                w.apb_mem_rst().set_bit();
+                w.tx_start().set_bit()
+            });
         }
 
         // Return the first flag that is set of, in order of decreasing priority,
@@ -2552,10 +2512,8 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            rmt.ch_tx_lim(ch_idx).modify(
-                #[inline(always)]
-                |_, w| unsafe { w.tx_lim().bits(threshold as u16) },
-            );
+            rmt.ch_tx_lim(ch_idx)
+                .modify(|_, w| unsafe { w.tx_lim().bits(threshold as u16) });
         }
 
         #[inline(always)]
@@ -2576,10 +2534,7 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            rmt.ch_tx_conf0(ch_idx).modify(
-                #[inline(always)]
-                |_, w| w.tx_stop().set_bit(),
-            );
+            rmt.ch_tx_conf0(ch_idx).modify(|_, w| w.tx_stop().set_bit());
             true
         }
 
@@ -2647,10 +2602,8 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            rmt.ch_rx_conf1(ch_idx).modify(
-                #[inline(always)]
-                |_, w| w.mem_rx_wrap_en().bit(wrap),
-            );
+            rmt.ch_rx_conf1(ch_idx)
+                .modify(|_, w| w.mem_rx_wrap_en().bit(wrap));
         }
 
         #[inline(always)]
@@ -2658,23 +2611,17 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            rmt.ch_rx_carrier_rm(ch_idx).write(
-                #[inline(always)]
-                |w| unsafe {
-                    w.carrier_high_thres().bits(high);
-                    w.carrier_low_thres().bits(low)
-                },
-            );
+            rmt.ch_rx_carrier_rm(ch_idx).write(|w| unsafe {
+                w.carrier_high_thres().bits(high);
+                w.carrier_low_thres().bits(low)
+            });
 
-            rmt.ch_rx_conf0(ch_idx).modify(
-                #[inline(always)]
-                |_, w| {
-                    w.carrier_en()
-                        .bit(carrier)
-                        .carrier_out_lv()
-                        .bit(level.into())
-                },
-            );
+            rmt.ch_rx_conf0(ch_idx).modify(|_, w| {
+                w.carrier_en()
+                    .bit(carrier)
+                    .carrier_out_lv()
+                    .bit(level.into())
+            });
         }
 
         #[inline(always)]
@@ -2683,20 +2630,15 @@ mod chip_specific {
             let ch_idx = self.ch_idx as u8;
 
             for i in 1..self.memsize().blocks() {
-                rmt.ch_rx_conf1((ch_idx + i).into()).modify(
-                    #[inline(always)]
-                    |_, w| w.mem_owner().set_bit(),
-                );
+                rmt.ch_rx_conf1((ch_idx + i).into())
+                    .modify(|_, w| w.mem_owner().set_bit());
             }
-            rmt.ch_rx_conf1(ch_idx.into()).modify(
-                #[inline(always)]
-                |_, w| {
-                    w.mem_owner().set_bit();
-                    w.mem_wr_rst().set_bit();
-                    w.apb_mem_rst().set_bit();
-                    w.rx_en().set_bit()
-                },
-            );
+            rmt.ch_rx_conf1(ch_idx.into()).modify(|_, w| {
+                w.mem_owner().set_bit();
+                w.mem_wr_rst().set_bit();
+                w.apb_mem_rst().set_bit();
+                w.rx_en().set_bit()
+            });
         }
 
         // Return the first flag that is set of, in order of decreasing priority,
@@ -2723,10 +2665,8 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            rmt.ch_rx_lim(ch_idx).modify(
-                #[inline(always)]
-                |_, w| unsafe { w.rx_lim().bits(threshold) },
-            );
+            rmt.ch_rx_lim(ch_idx)
+                .modify(|_, w| unsafe { w.rx_lim().bits(threshold) });
         }
 
         // This is immediate and does not update state flags; do not poll on get_rx_status()
@@ -2738,10 +2678,7 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            rmt.ch_rx_conf1(ch_idx).modify(
-                #[inline(always)]
-                |_, w| w.rx_en().clear_bit(),
-            );
+            rmt.ch_rx_conf1(ch_idx).modify(|_, w| w.rx_en().clear_bit());
         }
 
         #[inline(always)]
@@ -2749,13 +2686,10 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            rmt.ch_rx_conf1(ch_idx).modify(
-                #[inline(always)]
-                |_, w| unsafe {
-                    w.rx_filter_en().bit(value > 0);
-                    w.rx_filter_thres().bits(value)
-                },
-            );
+            rmt.ch_rx_conf1(ch_idx).modify(|_, w| unsafe {
+                w.rx_filter_en().bit(value > 0);
+                w.rx_filter_thres().bits(value)
+            });
         }
 
         #[inline(always)]
@@ -2763,10 +2697,8 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            rmt.ch_rx_conf0(ch_idx).modify(
-                #[inline(always)]
-                |_, w| unsafe { w.idle_thres().bits(value) },
-            );
+            rmt.ch_rx_conf0(ch_idx)
+                .modify(|_, w| unsafe { w.idle_thres().bits(value) });
         }
 
         #[inline(always)]
@@ -2833,22 +2765,14 @@ mod chip_specific {
         let rmt = RMT::regs();
 
         for ch_num in 0..NUM_CHANNELS {
-            rmt.chconf1(ch_num).modify(
-                #[inline(always)]
-                |_, w| w.ref_always_on().bit(source.bit()),
-            );
+            rmt.chconf1(ch_num)
+                .modify(|_, w| w.ref_always_on().bit(source.bit()));
         }
 
-        rmt.apb_conf().modify(
-            #[inline(always)]
-            |_, w| w.apb_fifo_mask().set_bit(),
-        );
+        rmt.apb_conf().modify(|_, w| w.apb_fifo_mask().set_bit());
 
         #[cfg(not(esp32))]
-        rmt.apb_conf().modify(
-            #[inline(always)]
-            |_, w| w.clk_en().set_bit(),
-        );
+        rmt.apb_conf().modify(|_, w| w.clk_en().set_bit());
 
         Ok(())
     }
@@ -2900,10 +2824,8 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
-            rmt.chconf0(ch).modify(
-                #[inline(always)]
-                |_, w| unsafe { w.div_cnt().bits(divider) },
-            );
+            rmt.chconf0(ch)
+                .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
         }
 
         #[inline(always)]
@@ -2920,10 +2842,8 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
-            rmt.chconf0(ch).modify(
-                #[inline(always)]
-                |_, w| unsafe { w.mem_size().bits(value.blocks()) },
-            );
+            rmt.chconf0(ch)
+                .modify(|_, w| unsafe { w.mem_size().bits(value.blocks()) });
         }
     }
 
@@ -2941,26 +2861,19 @@ mod chip_specific {
             let ch = self.ch_idx as usize;
 
             if let Some(mode) = mode {
-                rmt.ch_tx_lim(ch).modify(
-                    #[inline(always)]
-                    |_, w| unsafe {
-                        w.loop_count_reset().set_bit();
-                        w.tx_loop_cnt_en()
-                            .bit(!matches!(mode, super::LoopMode::Infinite));
-                        w.tx_loop_num().bits(mode.get_count())
-                    },
-                );
+                rmt.ch_tx_lim(ch).modify(|_, w| unsafe {
+                    w.loop_count_reset().set_bit();
+                    w.tx_loop_cnt_en()
+                        .bit(!matches!(mode, super::LoopMode::Infinite));
+                    w.tx_loop_num().bits(mode.get_count())
+                });
 
                 // FIXME: Is this required?
-                rmt.ch_tx_lim(ch).modify(
-                    #[inline(always)]
-                    |_, w| w.loop_count_reset().clear_bit(),
-                );
+                rmt.ch_tx_lim(ch)
+                    .modify(|_, w| w.loop_count_reset().clear_bit());
             } else {
-                rmt.ch_tx_lim(ch).modify(
-                    #[inline(always)]
-                    |_, w| w.tx_loop_cnt_en().clear_bit(),
-                );
+                rmt.ch_tx_lim(ch)
+                    .modify(|_, w| w.tx_loop_cnt_en().clear_bit());
             }
         }
 
@@ -2990,10 +2903,8 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
-            rmt.chconf1(ch).modify(
-                #[inline(always)]
-                |_, w| w.tx_conti_mode().bit(continuous),
-            );
+            rmt.chconf1(ch)
+                .modify(|_, w| w.tx_conti_mode().bit(continuous));
         }
 
         #[inline(always)]
@@ -3001,10 +2912,7 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
 
             // this is "okay", because we use all TX channels always in wrap mode
-            rmt.apb_conf().modify(
-                #[inline(always)]
-                |_, w| w.mem_tx_wrap_en().bit(wrap),
-            );
+            rmt.apb_conf().modify(|_, w| w.mem_tx_wrap_en().bit(wrap));
         }
 
         #[inline(always)]
@@ -3012,20 +2920,15 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
-            rmt.chcarrier_duty(ch).write(
-                #[inline(always)]
-                |w| unsafe { w.carrier_high().bits(high).carrier_low().bits(low) },
-            );
+            rmt.chcarrier_duty(ch)
+                .write(|w| unsafe { w.carrier_high().bits(high).carrier_low().bits(low) });
 
-            rmt.chconf0(ch).modify(
-                #[inline(always)]
-                |_, w| {
-                    w.carrier_en()
-                        .bit(carrier)
-                        .carrier_out_lv()
-                        .bit(level.into())
-                },
-            );
+            rmt.chconf0(ch).modify(|_, w| {
+                w.carrier_en()
+                    .bit(carrier)
+                    .carrier_out_lv()
+                    .bit(level.into())
+            });
         }
 
         #[inline(always)]
@@ -3033,10 +2936,8 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
-            rmt.chconf1(ch).modify(
-                #[inline(always)]
-                |_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()),
-            );
+            rmt.chconf1(ch)
+                .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
         }
 
         #[inline(always)]
@@ -3045,21 +2946,16 @@ mod chip_specific {
             let ch = self.ch_idx as u8;
 
             for i in 1..self.memsize().blocks() {
-                rmt.chconf1((ch + i).into()).modify(
-                    #[inline(always)]
-                    |_, w| w.mem_owner().clear_bit(),
-                );
+                rmt.chconf1((ch + i).into())
+                    .modify(|_, w| w.mem_owner().clear_bit());
             }
 
-            rmt.chconf1(ch as usize).modify(
-                #[inline(always)]
-                |_, w| {
-                    w.mem_owner().clear_bit();
-                    w.mem_rd_rst().set_bit();
-                    w.apb_mem_rst().set_bit();
-                    w.tx_start().set_bit()
-                },
-            );
+            rmt.chconf1(ch as usize).modify(|_, w| {
+                w.mem_owner().clear_bit();
+                w.mem_rd_rst().set_bit();
+                w.apb_mem_rst().set_bit();
+                w.tx_start().set_bit()
+            });
         }
 
         // Return the first flag that is set of, in order of decreasing priority,
@@ -3092,10 +2988,8 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
-            rmt.ch_tx_lim(ch).modify(
-                #[inline(always)]
-                |_, w| unsafe { w.tx_lim().bits(threshold as u16) },
-            );
+            rmt.ch_tx_lim(ch)
+                .modify(|_, w| unsafe { w.tx_lim().bits(threshold as u16) });
         }
 
         #[cfg(rmt_has_tx_loop_count)]
@@ -3125,10 +3019,7 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
-            rmt.chconf1(ch).modify(
-                #[inline(always)]
-                |_, w| w.tx_stop().set_bit(),
-            );
+            rmt.chconf1(ch).modify(|_, w| w.tx_stop().set_bit());
             true
         }
 
@@ -3207,20 +3098,15 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
-            rmt.chcarrier_duty(ch).write(
-                #[inline(always)]
-                |w| unsafe { w.carrier_high().bits(high).carrier_low().bits(low) },
-            );
+            rmt.chcarrier_duty(ch)
+                .write(|w| unsafe { w.carrier_high().bits(high).carrier_low().bits(low) });
 
-            rmt.chconf0(ch).modify(
-                #[inline(always)]
-                |_, w| {
-                    w.carrier_en()
-                        .bit(carrier)
-                        .carrier_out_lv()
-                        .bit(level.into())
-                },
-            );
+            rmt.chconf0(ch).modify(|_, w| {
+                w.carrier_en()
+                    .bit(carrier)
+                    .carrier_out_lv()
+                    .bit(level.into())
+            });
         }
 
         #[inline(always)]
@@ -3229,21 +3115,16 @@ mod chip_specific {
             let ch = self.ch_idx as u8;
 
             for i in 1..self.memsize().blocks() {
-                rmt.chconf1((ch + i).into()).modify(
-                    #[inline(always)]
-                    |_, w| w.mem_owner().set_bit(),
-                );
+                rmt.chconf1((ch + i).into())
+                    .modify(|_, w| w.mem_owner().set_bit());
             }
 
-            rmt.chconf1(ch as usize).modify(
-                #[inline(always)]
-                |_, w| {
-                    w.mem_owner().set_bit();
-                    w.mem_wr_rst().set_bit();
-                    w.apb_mem_rst().set_bit();
-                    w.rx_en().set_bit()
-                },
-            );
+            rmt.chconf1(ch as usize).modify(|_, w| {
+                w.mem_owner().set_bit();
+                w.mem_wr_rst().set_bit();
+                w.apb_mem_rst().set_bit();
+                w.rx_en().set_bit()
+            });
         }
 
         // Return the first flag that is set of, in order of decreasing priority,
@@ -3297,56 +3178,41 @@ mod chip_specific {
                     return;
                 }
 
-                let (old_idle_thres, old_div) = rmt.chconf0(ch).from_modify(
-                    #[inline(always)]
-                    |r, w| {
-                        let old = (r.idle_thres().bits(), r.div_cnt().bits());
-                        unsafe {
-                            w.idle_thres().bits(1);
-                            w.div_cnt().bits(1);
-                        }
-                        old
-                    },
-                );
+                let (old_idle_thres, old_div) = rmt.chconf0(ch).from_modify(|r, w| {
+                    let old = (r.idle_thres().bits(), r.div_cnt().bits());
+                    unsafe {
+                        w.idle_thres().bits(1);
+                        w.div_cnt().bits(1);
+                    }
+                    old
+                });
 
-                let (old_filter_en, old_filter_thres) = rmt.chconf1(ch).from_modify(
-                    #[inline(always)]
-                    |r, w| {
-                        let old = (r.rx_filter_en().bit(), r.rx_filter_thres().bits());
-                        w.rx_en().clear_bit();
-                        w.rx_filter_en().bit(true);
-                        unsafe { w.rx_filter_thres().bits(0xFF) };
-                        w.mem_owner().clear_bit();
-                        old
-                    },
-                );
+                let (old_filter_en, old_filter_thres) = rmt.chconf1(ch).from_modify(|r, w| {
+                    let old = (r.rx_filter_en().bit(), r.rx_filter_thres().bits());
+                    w.rx_en().clear_bit();
+                    w.rx_filter_en().bit(true);
+                    unsafe { w.rx_filter_thres().bits(0xFF) };
+                    w.mem_owner().clear_bit();
+                    old
+                });
 
                 while !matches!(self.get_rx_status(), Some(Event::Error | Event::End)) {}
 
                 // Restore settings
 
-                rmt.chconf0(ch).modify(
-                    #[inline(always)]
-                    |_, w| unsafe {
-                        w.idle_thres().bits(old_idle_thres);
-                        w.div_cnt().bits(old_div)
-                    },
-                );
+                rmt.chconf0(ch).modify(|_, w| unsafe {
+                    w.idle_thres().bits(old_idle_thres);
+                    w.div_cnt().bits(old_div)
+                });
 
-                rmt.chconf1(ch).modify(
-                    #[inline(always)]
-                    |_, w| {
-                        w.rx_filter_en().bit(old_filter_en);
-                        unsafe { w.rx_filter_thres().bits(old_filter_thres) };
-                        w.mem_owner().set_bit()
-                    },
-                );
+                rmt.chconf1(ch).modify(|_, w| {
+                    w.rx_filter_en().bit(old_filter_en);
+                    unsafe { w.rx_filter_thres().bits(old_filter_thres) };
+                    w.mem_owner().set_bit()
+                });
             } else {
                 // Only disable, don't abort.
-                rmt.chconf1(ch).modify(
-                    #[inline(always)]
-                    |_, w| w.rx_en().clear_bit(),
-                );
+                rmt.chconf1(ch).modify(|_, w| w.rx_en().clear_bit());
             }
         }
 
@@ -3355,13 +3221,10 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
-            rmt.chconf1(ch).modify(
-                #[inline(always)]
-                |_, w| unsafe {
-                    w.rx_filter_en().bit(value > 0);
-                    w.rx_filter_thres().bits(value)
-                },
-            );
+            rmt.chconf1(ch).modify(|_, w| unsafe {
+                w.rx_filter_en().bit(value > 0);
+                w.rx_filter_thres().bits(value)
+            });
         }
 
         #[inline(always)]
@@ -3369,10 +3232,8 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
-            rmt.chconf0(ch).modify(
-                #[inline(always)]
-                |_, w| unsafe { w.idle_thres().bits(value) },
-            );
+            rmt.chconf0(ch)
+                .modify(|_, w| unsafe { w.idle_thres().bits(value) });
         }
 
         #[inline(always)]
