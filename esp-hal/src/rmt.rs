@@ -584,10 +584,12 @@ impl MemSize {
 
 /// Marker for a channel capable of/configured for transmit operations
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Tx;
 
 /// Marker for a channel capable of/configured for receive operations
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Rx;
 
 /// A trait implemented by the `Rx` and `Tx` marker structs.
@@ -611,6 +613,7 @@ impl Direction for Rx {
 }
 
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 struct DynChannelAccess<Dir: Direction> {
     ch_idx: ChannelIndex,
     _direction: PhantomData<Dir>,
@@ -769,6 +772,7 @@ for_each_rmt_channel!(
             // Cf. https://github.com/rust-lang/rust/issues/109958 regarding rustc's capabilities here.
             #[doc(hidden)]
             #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
             #[repr(u8)]
             #[allow(unused)]
             pub enum ChannelIndex {
@@ -982,7 +986,7 @@ mod state {
     static STATE: [AtomicU8; NUM_CHANNELS] =
         [const { AtomicU8::new(RmtState::Unconfigured as u8) }; NUM_CHANNELS];
 
-    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    #[derive(Copy, Clone, PartialEq, Eq)]
     #[repr(u8)]
     pub(super) enum RmtState {
         // The channel is not configured for either rx or tx, and its memory is available
@@ -1077,6 +1081,7 @@ use state::RmtState;
 
 /// RMT Channel
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Channel<'ch, Dm, Dir>
 where
@@ -1160,6 +1165,7 @@ unsafe fn configure_rx(
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 enum DropState {
     None,
     MemoryOnly,
@@ -1246,6 +1252,7 @@ where
 /// underruns.
 #[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct TxTransaction<'ch, 'data, T>
 where
     T: Into<PulseCode> + Copy,
@@ -1353,6 +1360,7 @@ where
 /// An in-progress continuous TX transaction
 #[must_use = "transactions will be aborted when dropped"]
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ContinuousTxTransaction<'ch> {
     channel: Channel<'ch, Blocking, Tx>,
     is_running: bool,
@@ -1451,6 +1459,7 @@ impl<'ch> Drop for ContinuousTxTransaction<'ch> {
 
 /// RMT Channel Creator
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ChannelCreator<'ch, Dm, const CHANNEL: u8>
 where
     Dm: crate::DriverMode,
@@ -1659,6 +1668,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
 /// RX transaction instance
 #[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RxTransaction<'ch, 'data, T>
 where
     T: From<PulseCode>,
@@ -2125,6 +2135,7 @@ impl DynChannelAccess<Rx> {
 for_each_rmt_clock_source!(
     (all $(($name:ident, $bits:literal)),+) => {
         #[derive(Clone, Copy, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         #[repr(u8)]
         enum ClockSource {
             $(
