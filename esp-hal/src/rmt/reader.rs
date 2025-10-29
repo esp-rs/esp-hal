@@ -12,6 +12,7 @@ pub(crate) enum ReaderState {
     Done,
 }
 
+#[derive(Debug)]
 pub(crate) struct RmtReader {
     // The position in channel RAM to continue reading from; must be either
     // 0 or half the available RAM size if there's further data.

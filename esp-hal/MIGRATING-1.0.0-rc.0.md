@@ -133,9 +133,9 @@ The corresponding parameter of the transaction structs has been removed as well
 (`SingleShotTxTransaction`, `ContinuousTxTransaction`, `RxTransaction`).
 
 Transmit and receive methods are now directly implemented by
-`Channel<Dm: DriverMode, Tx>`
+`Channel<'_, Dm: DriverMode, Tx>`
 and
-`Channel<Dm: DriverMode, Rx>`
+`Channel<'_, Dm: DriverMode, Rx>`
 respectively and the `RxChannel`, `TxChannel`, `RxChannelAsync` and `TxChannelAsync`
 traits have been removed.
 Several related types that were previously exported have been removed from the
@@ -145,8 +145,8 @@ API as well.
 -use esp_hal::rmt::{ConstChannelAccess, DynChannelAccess, RawChannelAccess};
 -let mut tx: Channel<Blocking, ConstChannelAccess<Tx, 0>> = rmt.channel0.configure_tx(NoPin, TxChannelConfig::default());
 -let mut rx: Channel<Blocking, ConstChannelAccess<Rx, 2>> = rmt.channel2.configure_rx(NoPin, RxChannelConfig::default());
-+let mut tx: Channel<Blocking, Tx> = rmt.channel0.configure_tx(NoPin, TxChannelConfig::default());
-+let mut rx: Channel<Blocking, Rx> = rmt.channel2.configure_rx(NoPin, RxChannelConfig::default());
++let mut tx: Channel<'_, Blocking, Tx> = rmt.channel0.configure_tx(NoPin, TxChannelConfig::default());
++let mut rx: Channel<'_, Blocking, Rx> = rmt.channel2.configure_rx(NoPin, RxChannelConfig::default());
 
 -let mut tx: Channel<Blocking, DynChannelAccess<Tx>> = tx.degrade();
 -let mut rx: Channel<Blocking, DynChannelAccess<Rx>> = rx.degrade();
@@ -160,20 +160,7 @@ API as well.
 +let rx_transaction: RxTransaction<'_, PulseCode> = rx.transmit(&data);
 ```
 
-### RMT method changes
-
-The `rmt::Channel::transmit_continuously` and
-`rmt::Channel::transmit_continuously_with_loopcount` methods have been merged:
-
-```diff
--let tx_trans0 = tx_channel0.transmit_continuously(&data);
--let tx_trans1 = tx_channel1.transmit_continuously_with_loopcount(&data, count);
-+use core::num::NonZeroU16;
-+use esp_hal::rmt::LoopCount;
-+let tx_trans0 = tx_channel0.transmit_continuously(&data, LoopCount::Infinite);
-+let count = NonZeroU16::new(count).unwrap();
-+let tx_trans1 = tx_channel1.transmit_continuously(&data, LoopCount::Finite(count));
-```
+### RMT Receiver Changes
 
 The receiver methods `rmt::Channel::<'_, Blocking>::receive` and
 `rmt::Channel::<'_, Async>::receive` now return the actual amount of data read,
@@ -208,24 +195,24 @@ Additionally, RMT transaction types
 - `RxTransaction`
 - futures returned by the async API
 are marked as `#[must_use]` to account for the fact that it is in general required to poll them to ensure progress.
-Additionally, they now implement `Drop` and stop the ongoing transfer as quickly as possible when dropped,
+All of them now implement `Drop` and stop the ongoing transfer as quickly as possible when dropped,
 ensuring that subsequent transactions start from a well-defined state.
 
 ### RMT continuous transmit changes
 
-The behavior of `Channel::transmit_continuously` has been clarified to account
-for the varying hardware support between devices: It now takes an additional
-`LoopStop` argument.
+The `rmt::Channel::transmit_continuously` and
+`rmt::Channel::transmit_continuously_with_loopcount` methods have been merged,
+and their signature has been modified to account for the varying hardware
+support between devices: It now takes an additional `LoopMode` argument, the variants
+of which are only defined when the hardware supports them.
 
 ```diff
-- let transaction = channel.transmit_continuously(&data, LoopCount::Finite(count))?;
-+ let transaction = channel.transmit_continuously(&data, LoopCount::Finite(count), LoopStop::Manual)?;
+-let tx_trans0 = tx_channel0.transmit_continuously(&data);
+-let tx_trans1 = tx_channel1.transmit_continuously_with_loopcount(&data, count);
++use esp_hal::rmt::LoopMode;
++let tx_trans0 = tx_channel0.transmit_continuously(&data, LoopMode::Infinite);
++let tx_trans1 = tx_channel1.transmit_continuously(&data, LoopMode::InfiniteWithInterrupt(count));
 ```
-
-Additionally, some enum variants and methods are only defined when the hardware supports them:
-
-- `LoopCount::Finite` and `ContinuousTxTransaction::is_tx_loopcount_interrupt_set` (all except ESP32),
-- `LoopStop::Auto` (ESP32-C6, ESP32-H2, ESP32-S3).
 
 ## DMA changes
 

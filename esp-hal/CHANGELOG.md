@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- All public RMT types now derive `Debug`. (#4302)
 
 - Added the `float-save-restore` feature (enabled by default) for Xtensa MCUs. (#4394)
 
@@ -15,8 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `work_queue` is no longer public (#4357)
 - UART memory is now powered down when the driver is no longer in use. (#4354)
+- `rmt::SingleShotTxTransaction` has been renamed to `rmt::TxTransaction`. (#4302)
+- `rmt::ChannelCreator::configure_tx` and `rmt::ChannelCreator::configure_rx` now take the configuration by reference (#4302)
 
 ### Fixed
+- RMT: All blocking methods now return the channel on failure (#4302)
+- RMT: the `place_rmt_driver_in_ram` option now also places the async interrupt handler in RAM (#4302)
 
 
 ### Removed
