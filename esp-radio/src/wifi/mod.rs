@@ -33,29 +33,42 @@ use self::{
 #[instability::unstable]
 pub use crate::sys::include::wifi_csi_info_t; // FIXME
 use crate::{
-    Controller,
-    common_adapter::*,
-    esp_wifi_result,
-    hal::ram,
-    sys::{
-        c_types,
-        include::{self, *},
-    },
+    common_adapter::*, esp_wifi_result, hal::ram, wifi::private::PacketBuffer, Controller,
 };
 
-pub mod ap;
-pub mod event;
-#[cfg(all(feature = "sniffer", feature = "unstable"))]
-pub mod sniffer;
-pub mod sta;
-
-pub(crate) mod os_adapter;
-pub(crate) mod state;
-
-mod internal;
-mod scan;
-
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
+
+#[cfg(all(feature = "csi", esp32c6))]
+use crate::binary::include::wifi_csi_acquire_config_t;
+#[cfg(feature = "csi")]
+#[instability::unstable]
+pub use crate::binary::include::wifi_csi_info_t;
+#[cfg(feature = "csi")]
+#[instability::unstable]
+use crate::binary::include::{
+    esp_wifi_set_csi, esp_wifi_set_csi_config, esp_wifi_set_csi_rx_cb, wifi_csi_config_t,
+};
+use crate::binary::{
+    c_types,
+    include::{
+        self, __BindgenBitfieldUnit, esp_err_t, esp_interface_t_ESP_IF_WIFI_AP,
+        esp_interface_t_ESP_IF_WIFI_STA, esp_supplicant_deinit, esp_supplicant_init,
+        esp_wifi_deinit_internal, esp_wifi_get_mode, esp_wifi_init_internal,
+        esp_wifi_internal_free_rx_buffer, esp_wifi_internal_reg_rxcb, esp_wifi_internal_tx,
+        esp_wifi_scan_start, esp_wifi_set_config, esp_wifi_set_country, esp_wifi_set_mode,
+        esp_wifi_set_protocol, esp_wifi_set_tx_done_cb, esp_wifi_sta_get_ap_info,
+        esp_wifi_sta_get_rssi, esp_wifi_start, esp_wifi_stop, g_wifi_default_wpa_crypto_funcs,
+        wifi_active_scan_time_t, wifi_ap_config_t, wifi_auth_mode_t,
+        wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP, wifi_config_t,
+        wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL, wifi_country_t, wifi_interface_t,
+        wifi_interface_t_WIFI_IF_AP, wifi_interface_t_WIFI_IF_STA, wifi_mode_t,
+        wifi_mode_t_WIFI_MODE_AP, wifi_mode_t_WIFI_MODE_APSTA, wifi_mode_t_WIFI_MODE_NULL,
+        wifi_mode_t_WIFI_MODE_STA, wifi_pmf_config_t, wifi_scan_config_t, wifi_scan_threshold_t,
+        wifi_scan_time_t, wifi_scan_type_t_WIFI_SCAN_TYPE_ACTIVE,
+        wifi_scan_type_t_WIFI_SCAN_TYPE_PASSIVE, wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
+        wifi_sta_config_t,
+    },
+};
 
 /// Supported Wi-Fi authentication methods.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, PartialOrd)]
@@ -2432,6 +2445,31 @@ impl WifiController<'_> {
             // Will return ESP_FAIL -1 if called in AP mode.
             esp_wifi_result!(unsafe { esp_wifi_sta_get_rssi(&mut rssi) })?;
             Ok(rssi)
+        } else {
+            Err(WifiError::Unsupported)
+        }
+    }
+
+    /// Get the Access Point information of AP to which the device is associated with.
+    /// The value is obtained from the last beacon.
+    ///
+    /// <div class="warning">
+    ///
+    /// - Use this API only in STA or AP-STA mode.
+    /// - This API should be called after the station has connected to an access point.
+    /// </div>
+    ///
+    /// # Errors
+    /// This function returns [`WifiError::Unsupported`] if the STA side isn't
+    /// running. For example, when configured for AP only.
+    pub fn ap_info(&self) -> Result<AccessPointInfo, WifiError> {
+        if self.mode()?.is_sta() {
+            let mut record: MaybeUninit<include::wifi_ap_record_t> = MaybeUninit::uninit();
+            esp_wifi_result!(unsafe { esp_wifi_sta_get_ap_info(record.as_mut_ptr()) })?;
+
+            let record = unsafe { MaybeUninit::assume_init(record) };
+            let ap_info = convert_ap_info(&record);
+            Ok(ap_info)
         } else {
             Err(WifiError::Unsupported)
         }
