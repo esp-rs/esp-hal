@@ -616,16 +616,16 @@ struct SpiPinGuard {
     cs_pin: PinGuard,
     sio0_pin: PinGuard,
     sio1_pin: PinGuard,
-    sio2_pin: Option<PinGuard>,
-    sio3_pin: Option<PinGuard>,
+    sio2_pin: PinGuard,
+    sio3_pin: PinGuard,
     #[cfg(spi_master_has_octal)]
-    sio4_pin: Option<PinGuard>,
+    sio4_pin: PinGuard,
     #[cfg(spi_master_has_octal)]
-    sio5_pin: Option<PinGuard>,
+    sio5_pin: PinGuard,
     #[cfg(spi_master_has_octal)]
-    sio6_pin: Option<PinGuard>,
+    sio6_pin: PinGuard,
     #[cfg(spi_master_has_octal)]
-    sio7_pin: Option<PinGuard>,
+    sio7_pin: PinGuard,
 }
 
 /// Configuration errors.
@@ -710,20 +710,20 @@ impl<'d> Spi<'d, Blocking> {
             _mode: PhantomData,
             guard,
             pins: SpiPinGuard {
-                sclk_pin: PinGuard::new_unconnected(spi.info().sclk),
-                cs_pin: PinGuard::new_unconnected(spi.info().cs(0)),
-                sio0_pin: PinGuard::new_unconnected(spi.info().sio_output(0)),
-                sio1_pin: PinGuard::new_unconnected(spi.info().sio_output(1)),
-                sio2_pin: spi.info().opt_sio_output(2).map(PinGuard::new_unconnected),
-                sio3_pin: spi.info().opt_sio_output(3).map(PinGuard::new_unconnected),
+                sclk_pin: PinGuard::new_unconnected(),
+                cs_pin: PinGuard::new_unconnected(),
+                sio0_pin: PinGuard::new_unconnected(),
+                sio1_pin: PinGuard::new_unconnected(),
+                sio2_pin: PinGuard::new_unconnected(),
+                sio3_pin: PinGuard::new_unconnected(),
                 #[cfg(spi_master_has_octal)]
-                sio4_pin: spi.info().opt_sio_output(4).map(PinGuard::new_unconnected),
+                sio4_pin: PinGuard::new_unconnected(),
                 #[cfg(spi_master_has_octal)]
-                sio5_pin: spi.info().opt_sio_output(5).map(PinGuard::new_unconnected),
+                sio5_pin: PinGuard::new_unconnected(),
                 #[cfg(spi_master_has_octal)]
-                sio6_pin: spi.info().opt_sio_output(6).map(PinGuard::new_unconnected),
+                sio6_pin: PinGuard::new_unconnected(),
                 #[cfg(spi_master_has_octal)]
-                sio7_pin: spi.info().opt_sio_output(7).map(PinGuard::new_unconnected),
+                sio7_pin: PinGuard::new_unconnected(),
             },
             spi: spi.degrade(),
         };
@@ -922,7 +922,7 @@ macro_rules! def_with_sio_pin {
         #[doc = concat!(" to the SIO", stringify!($n), " output and input signals.")]
         #[instability::unstable]
         pub fn $fn(mut self, sio: impl PeripheralOutput<'d>) -> Self {
-            self.pins.$field = Some(self.connect_sio_pin(sio.into(), $n));
+            self.pins.$field = self.connect_sio_pin(sio.into(), $n);
 
             self
         }

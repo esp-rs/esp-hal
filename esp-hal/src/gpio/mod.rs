@@ -64,6 +64,7 @@ crate::unstable_module! {
     #[cfg(all(soc_has_rtc_io, not(esp32)))]
     pub mod rtc_io;
 }
+use interconnect::PeripheralOutput;
 
 mod asynch;
 mod embedded_hal_impls;
@@ -99,24 +100,17 @@ pub(crate) static GPIO_LOCK: RawMutex = RawMutex::new();
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) struct PinGuard {
     pin: u8,
-    signal: OutputSignal,
 }
 
 impl crate::private::Sealed for PinGuard {}
 
 impl PinGuard {
-    pub(crate) fn new(pin: AnyPin<'_>, signal: OutputSignal) -> Self {
-        Self {
-            pin: pin.number(),
-            signal,
-        }
+    pub(crate) fn new(pin: AnyPin<'_>) -> Self {
+        Self { pin: pin.number() }
     }
 
-    pub(crate) fn new_unconnected(signal: OutputSignal) -> Self {
-        Self {
-            pin: u8::MAX,
-            signal,
-        }
+    pub(crate) fn new_unconnected() -> Self {
+        Self { pin: u8::MAX }
     }
 
     #[allow(unused)]
@@ -133,7 +127,7 @@ impl Drop for PinGuard {
     fn drop(&mut self) {
         if self.pin != u8::MAX {
             let pin = unsafe { AnyPin::steal(self.pin) };
-            self.signal.disconnect_from(&pin);
+            pin.disconnect_from_peripheral_output();
         }
     }
 }
