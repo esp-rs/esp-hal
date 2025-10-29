@@ -9,13 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `OtaUpdater::next_partition` (#4339)
 
 ### Changed
 
 
 ### Fixed
 
+
+### Removed
+
+
+## [v0.4.0] - 2025-10-29
+
+### Added
+
+- `OtaUpdater::next_partition` (#4339)
 
 ### Removed
 
@@ -74,4 +82,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-bootloader-esp-idf-v0.1.0
 [v0.2.0]: https://github.com/esp-rs/esp-hal/compare/esp-bootloader-esp-idf-v0.1.0...esp-bootloader-esp-idf-v0.2.0
 [v0.3.0]: https://github.com/esp-rs/esp-hal/compare/esp-bootloader-esp-idf-v0.2.0...esp-bootloader-esp-idf-v0.3.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-bootloader-esp-idf-v0.3.0...HEAD
+[v0.4.0]: https://github.com/esp-rs/esp-hal/compare/esp-bootloader-esp-idf-v0.3.0...esp-bootloader-esp-idf-v0.4.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-bootloader-esp-idf-v0.4.0...HEAD

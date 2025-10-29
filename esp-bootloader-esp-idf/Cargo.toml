@@ -1,6 +1,6 @@
 [package]
 name = "esp-bootloader-esp-idf"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.88.0"
 description = "Functionality related to the esp-idf bootloader"
@@ -33,8 +33,8 @@ cfg-if = "1"
 defmt = { version = "1.0.1", optional = true }
 document-features = "0.2"
 esp-config = { version = "0.6.0", path = "../esp-config" }
-esp-hal-procmacros = { version = "0.20.0", path = "../esp-hal-procmacros", features = ["__esp_idf_bootloader"] }
-esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated" }
+esp-hal-procmacros = { version = "0.21.0", path = "../esp-hal-procmacros", features = ["__esp_idf_bootloader"] }
+esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated" }
 esp-rom-sys = { version = "0.1.2", path = "../esp-rom-sys", optional = true }
 embedded-storage = "0.3.1"
 log-04 = { package = "log", version = "0.4", optional = true }
