@@ -814,16 +814,12 @@ for_each_rmt_channel!(
 
                         apply_tx_config(raw, config, false)?;
 
-                        let _guard = match self._guard {
-                            Some(g) => DropState::MemAndGuard(g),
-                            None => DropState::MemoryOnly,
-                        };
-
                         Ok(Channel {
                             raw,
                             _rmt: core::marker::PhantomData,
                             _pin_guard: PinGuard::new_unconnected(),
-                            _guard,
+                            _mem_guard: MemoryGuard::new(raw),
+                            _guard: self._guard,
                         })
                     }
                 }
@@ -855,16 +851,12 @@ for_each_rmt_channel!(
 
                         apply_rx_config(raw, config, false)?;
 
-                        let _guard = match self._guard {
-                            Some(g) => DropState::MemAndGuard(g),
-                            None => DropState::MemoryOnly,
-                        };
-
                         Ok(Channel {
                             raw,
                             _rmt: core::marker::PhantomData,
                             _pin_guard: PinGuard::new_unconnected(),
-                            _guard,
+                            _mem_guard: MemoryGuard::new(raw),
+                            _guard: self._guard,
                         })
                     }
                 }
@@ -1110,9 +1102,11 @@ where
 
     _pin_guard: PinGuard,
 
+    _mem_guard: MemoryGuard<Dir>,
+
     // Only the "outermost" Channel/ChannelCreator holds the GenericPeripheralGuard, which avoids
     // constant inc/dec of the reference count on reborrow and drop.
-    _guard: DropState,
+    _guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
 }
 
 // The reborrowing API treats Channel similar to a smart pointer: Ensure that it's size is actually
@@ -1185,10 +1179,33 @@ fn apply_rx_config(
 
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-enum DropState {
-    None,
-    MemoryOnly,
-    MemAndGuard(GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>),
+struct MemoryGuard<Dir: Direction> {
+    raw: Option<DynChannelAccess<Dir>>,
+    _dir: PhantomData<Dir>,
+}
+
+impl<Dir: Direction> MemoryGuard<Dir> {
+    fn new(raw: DynChannelAccess<Dir>) -> Self {
+        Self {
+            raw: Some(raw),
+            _dir: PhantomData,
+        }
+    }
+
+    fn new_empty() -> Self {
+        Self {
+            raw: None,
+            _dir: PhantomData,
+        }
+    }
+}
+
+impl<Dir: Direction> Drop for MemoryGuard<Dir> {
+    fn drop(&mut self) {
+        if let Some(raw) = self.raw {
+            release_channel_memory(raw);
+        }
+    }
 }
 
 impl<Dm, Dir> Channel<'_, Dm, Dir>
@@ -1203,7 +1220,8 @@ where
             _rmt: self._rmt,
             // Resources must only be released once the parent is dropped.
             _pin_guard: PinGuard::new_unconnected(),
-            _guard: DropState::None,
+            _mem_guard: MemoryGuard::new_empty(),
+            _guard: None,
         }
     }
 }
@@ -1266,18 +1284,6 @@ where
     /// `config.idle_threshold()` exceeds [`MAX_RX_IDLE_THRESHOLD`].
     pub fn apply_config(&mut self, config: &RxChannelConfig) -> Result<(), Error> {
         apply_rx_config(self.raw, config, true)
-    }
-}
-
-impl<Dm, Dir> Drop for Channel<'_, Dm, Dir>
-where
-    Dm: crate::DriverMode,
-    Dir: Direction,
-{
-    fn drop(&mut self) {
-        if !matches!(self._guard, DropState::None) {
-            release_channel_memory(self.raw);
-        }
     }
 }
 
@@ -1573,6 +1579,7 @@ where
     pub fn reborrow<'a>(&'a mut self) -> ChannelCreator<'a, Dm, CHANNEL> {
         Self {
             _rmt: PhantomData,
+            // Resources must only be released once the parent is dropped.
             _guard: None,
         }
     }
