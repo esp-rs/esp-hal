@@ -105,7 +105,9 @@ pub(crate) struct PinGuard {
 impl crate::private::Sealed for PinGuard {}
 
 impl PinGuard {
-    pub(crate) fn new(pin: AnyPin<'_>) -> Self {
+    // This must only be used with a pin currently configured for output, and the PinGuard must be
+    // dropped before the pin can be reconfigured (e.g. for input).
+    fn new(pin: AnyPin<'_>) -> Self {
         Self { pin: pin.number() }
     }
 

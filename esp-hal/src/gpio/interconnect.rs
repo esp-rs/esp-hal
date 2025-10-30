@@ -393,13 +393,6 @@ impl Signal<'_> {
         }
     }
 
-    fn into_guard(self) -> PinGuard {
-        match self {
-            Signal::Pin(pin) => PinGuard::new(pin),
-            Signal::Level(_) => PinGuard::new_unconnected(),
-        }
-    }
-
     fn connect_to_peripheral_input(
         &self,
         signal: gpio::InputSignal,
@@ -864,7 +857,10 @@ impl<'d> OutputSignal<'d> {
     #[instability::unstable]
     pub(crate) fn connect_with_guard(self, signal: crate::gpio::OutputSignal) -> PinGuard {
         signal.connect_to(&self);
-        self.pin.into_guard()
+        match self.pin {
+            Signal::Pin(pin) => PinGuard::new(pin),
+            Signal::Level(_) => PinGuard::new_unconnected(),
+        }
     }
 
     delegate::delegate! {
