@@ -731,6 +731,8 @@ pub fn generate_build_script_utils() -> TokenStream {
         "Expected exactly one of the following features to be enabled: {all_chip_features}"
     );
 
+    let from_str_err = format!("Unknown chip {{s}}. Possible options: {all_chip_features}");
+
     quote! {
         // make it possible to build documentation without `std`.
         #[cfg(docsrs)]
@@ -738,19 +740,19 @@ pub fn generate_build_script_utils() -> TokenStream {
             ($($any:tt)*) => {};
         }
 
-        #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
         #[cfg_attr(docsrs, doc(cfg(feature = "build-script")))]
         pub enum Chip {
             #(#chip),*
         }
 
         impl core::str::FromStr for Chip {
-            type Err = ();
+            type Err = String;
 
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 match s {
                     #( #name => Ok(Self::#chip),)*
-                    _ => Err(()),
+                    _ => Err(format!(#from_str_err)),
                 }
             }
         }
