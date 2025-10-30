@@ -17,7 +17,7 @@ pub enum Chip {
     Esp32s3,
 }
 impl core::str::FromStr for Chip {
-    type Err = ();
+    type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "esp32" => Ok(Self::Esp32),
@@ -27,7 +27,9 @@ impl core::str::FromStr for Chip {
             "esp32h2" => Ok(Self::Esp32h2),
             "esp32s2" => Ok(Self::Esp32s2),
             "esp32s3" => Ok(Self::Esp32s3),
-            _ => Err(()),
+            _ => Err(format!(
+                "Unknown chip {s}. Possible options: esp32, esp32c2, esp32c3, esp32c6, esp32h2, esp32s2, esp32s3"
+            )),
         }
     }
 }

@@ -22,12 +22,16 @@ struct Args {
     path: Option<PathBuf>,
 
     /// Chip
-    #[arg(short = 'C', long)]
+    #[arg(short = 'C', long, value_parser = chip_from_str)]
     chip: Option<Chip>,
 
     /// Config file - using `config.toml` by default
     #[arg(short = 'c', long)]
     config_file: Option<String>,
+}
+
+fn chip_from_str(str: &str) -> Result<Option<Chip>, String> {
+    Chip::from_str(str).map(Some)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -256,26 +260,24 @@ fn parse_configs(
         chip
     };
 
-    // the "ESP_CONFIG_CHIP" hint env-var if present
+    // the "ESP_CONFIG_CHIP" hint env-var if present (could be set in a config.toml)
     let chip_from_config = || {
         envs.get("ESP_CONFIG_CHIP")
-            .and_then(|chip_str| clap::ValueEnum::from_str(chip_str, true).ok())
+            .and_then(|chip_str| Chip::from_str(&chip_str.to_lowercase()).ok())
     };
 
     // - if given as a parameter, use it
     // - if there is a hint in the config.toml, use it
     // - if we can infer it from metadata, use it
     // otherwise, fail
-    let chip = chip_from_args
+    let Some(chip) = chip_from_args
         .or_else(chip_from_config)
-        .or_else(chip_from_meta);
-
-    if chip.is_none() {
+        .or_else(chip_from_meta)
+    else {
         return Err("No chip given or inferred. Try using the `--chip` argument.".into());
-    }
+    };
 
     let mut configs = Vec::new();
-    let chip = Chip::from_str(chip.unwrap().as_ref()).unwrap();
     let features = vec![];
     for krate in meta.packages {
         let maybe_cfg = krate.manifest_path.parent().unwrap().join("esp_config.yml");
