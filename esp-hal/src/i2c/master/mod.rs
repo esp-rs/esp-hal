@@ -715,8 +715,8 @@ impl<'d> I2c<'d, Blocking> {
     pub fn new(i2c: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(i2c.info().peripheral);
 
-        let sda_pin = PinGuard::new_unconnected(i2c.info().sda_output);
-        let scl_pin = PinGuard::new_unconnected(i2c.info().scl_output);
+        let sda_pin = PinGuard::new_unconnected();
+        let scl_pin = PinGuard::new_unconnected();
 
         let mut i2c = I2c {
             i2c: i2c.degrade(),
