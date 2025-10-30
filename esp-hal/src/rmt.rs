@@ -208,7 +208,6 @@
 use core::{
     default::Default,
     marker::PhantomData,
-    mem::ManuallyDrop,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -1317,6 +1316,82 @@ where
         Self: Sized;
 }
 
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+struct TxGuard {
+    raw: Option<DynChannelAccess<Tx>>,
+}
+
+impl TxGuard {
+    fn new(raw: DynChannelAccess<Tx>) -> Self {
+        Self { raw: Some(raw) }
+    }
+
+    fn new_empty() -> Self {
+        Self { raw: None }
+    }
+
+    /// Indicate that the transaction has completed (or was never started) and does not require
+    /// explicit stopping on drop.
+    fn set_completed(&mut self) {
+        self.raw = None;
+    }
+
+    fn is_active(&self) -> bool {
+        self.raw.is_some()
+    }
+}
+
+impl Drop for TxGuard {
+    fn drop(&mut self) {
+        if let Some(raw) = self.raw {
+            if !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {
+                raw.stop_tx();
+                raw.update();
+
+                // Block until the channel is safe to use again.
+                #[cfg(not(rmt_has_tx_immediate_stop))]
+                while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+            }
+
+            raw.unlisten_tx_interrupt(EnumSet::all());
+        }
+    }
+}
+
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+struct RxGuard {
+    raw: Option<DynChannelAccess<Rx>>,
+}
+
+impl RxGuard {
+    fn new(raw: DynChannelAccess<Rx>) -> Self {
+        Self { raw: Some(raw) }
+    }
+
+    fn new_empty() -> Self {
+        Self { raw: None }
+    }
+
+    /// Indicate that the transaction has completed (or was never started) and does not require
+    /// explicit stopping on drop.
+    fn set_completed(&mut self) {
+        self.raw = None;
+    }
+}
+
+impl Drop for RxGuard {
+    fn drop(&mut self) {
+        if let Some(raw) = self.raw {
+            raw.stop_rx(true);
+            raw.update();
+
+            raw.unlisten_rx_interrupt(EnumSet::all());
+        }
+    }
+}
+
 /// An in-progress transaction for a single shot TX transaction.
 ///
 /// If the data size exceeds the size of the internal buffer, `.poll()` or
@@ -1329,6 +1404,10 @@ pub struct TxTransaction<'ch, 'data, T>
 where
     T: Into<PulseCode> + Copy,
 {
+    // This must go first such that it is dropped before the channel (which might disable the
+    // peripheral on drop)!
+    _guard: TxGuard,
+
     channel: Channel<'ch, Blocking, Tx>,
 
     writer: RmtWriter,
@@ -1372,8 +1451,6 @@ where
     pub fn wait(
         mut self,
     ) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
-        let raw = self.channel.raw;
-
         // Not sure that all the error cases below can happen. However, it's best to
         // handle them to be sure that we don't lock up here in case they can happen.
         let result = loop {
@@ -1392,39 +1469,12 @@ where
             }
         };
 
-        // Disable Drop handler since the transaction is stopped already.
-        let this = ManuallyDrop::new(self);
-        // Rust has no safe API to take values out of ManuallyDrop,
-        // cf. https://github.com/rust-lang/rfcs/pull/3466
-        // This is safe since we own `this`, and don't access it below.
-        let channel = unsafe { core::ptr::read(&this.channel) };
-
-        raw.clear_tx_interrupts(EnumSet::all());
+        self._guard.set_completed();
 
         match result {
-            Ok(()) => Ok(channel),
-            Err(err) => Err((err, channel)),
+            Ok(()) => Ok(self.channel),
+            Err(err) => Err((err, self.channel)),
         }
-    }
-}
-
-impl<T> Drop for TxTransaction<'_, '_, T>
-where
-    T: Into<PulseCode> + Copy,
-{
-    fn drop(&mut self) {
-        let raw = self.channel.raw;
-
-        if !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {
-            raw.stop_tx();
-            raw.update();
-
-            // Block until the channel is safe to use again.
-            #[cfg(not(rmt_has_tx_immediate_stop))]
-            while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
-        }
-
-        raw.clear_tx_interrupts(EnumSet::all());
     }
 }
 
@@ -1433,8 +1483,11 @@ where
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ContinuousTxTransaction<'ch> {
+    // This must go first such that it is dropped before the channel (which might disable the
+    // peripheral on drop)!
+    _guard: TxGuard,
+
     channel: Channel<'ch, Blocking, Tx>,
-    is_running: bool,
 }
 
 impl<'ch> ContinuousTxTransaction<'ch> {
@@ -1456,13 +1509,13 @@ impl<'ch> ContinuousTxTransaction<'ch> {
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn stop_impl(
-        self,
+        mut self,
         immediate: bool,
     ) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
         let raw = self.channel.raw;
 
         let mut result = Ok(());
-        if self.is_running {
+        if self._guard.is_active() {
             // If rmt_has_tx_loop_auto_stop and the engine is stopped already, this is not
             // necessary. However, explicitly stopping unconditionally makes the logic
             // here much simpler and shouldn't create much overhead.
@@ -1485,20 +1538,13 @@ impl<'ch> ContinuousTxTransaction<'ch> {
                     }
                 }
             }
-
-            raw.clear_tx_interrupts(EnumSet::all());
         }
 
-        // Disable Drop handler since the transaction is stopped already.
-        let this = ManuallyDrop::new(self);
-        // Rust has no safe API to take values out of ManuallyDrop,
-        // cf. https://github.com/rust-lang/rfcs/pull/3466
-        // This is safe since we own `this`, and don't access it below.
-        let channel = unsafe { core::ptr::read(&this.channel) };
+        self._guard.set_completed();
 
         match result {
-            Ok(()) => Ok(channel),
-            Err(err) => Err((err, channel)),
+            Ok(()) => Ok(self.channel),
+            Err(err) => Err((err, self.channel)),
         }
     }
 
@@ -1508,24 +1554,7 @@ impl<'ch> ContinuousTxTransaction<'ch> {
     /// provided when starting it.
     #[cfg(rmt_has_tx_loop_count)]
     pub fn is_loopcount_interrupt_set(&self) -> bool {
-        !self.is_running || self.channel.raw.is_tx_loopcount_interrupt_set()
-    }
-}
-
-impl<'ch> Drop for ContinuousTxTransaction<'ch> {
-    fn drop(&mut self) {
-        let raw = self.channel.raw;
-
-        if self.is_running && !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {
-            raw.stop_tx();
-            raw.update();
-
-            // Block until the channel is safe to use again.
-            #[cfg(not(rmt_has_tx_immediate_stop))]
-            while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
-        }
-
-        raw.clear_tx_interrupts(EnumSet::all());
+        !self._guard.is_active() || self.channel.raw.is_tx_loopcount_interrupt_set()
     }
 }
 
@@ -1675,6 +1704,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
             channel: self,
             writer,
             remaining_data: data,
+            _guard: TxGuard::new(raw),
         })
     }
 
@@ -1713,17 +1743,13 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
             return Err((Error::Overflow, self));
         }
 
-        // We need a separate flag to track whether we actually started the transmitter: The
-        // ContinuousTxTransaction looks at the interrupt status to determine this (and would lock
-        // up if it's not running, and will never set them), but unfortunately, it is not possible
-        // (according to the TRM) to manually set the raw interrupt flags here, e.g. do something
-        // like `raw.set_tx_status(Event::End, Event::LoopCount)`.
+        let mut _guard = TxGuard::new(raw);
         #[cfg(rmt_has_tx_loop_auto_stop)]
-        let is_running = mode != LoopMode::Finite(0);
-        #[cfg(not(rmt_has_tx_loop_auto_stop))]
-        let is_running = true;
+        if mode == LoopMode::Finite(0) {
+            _guard.set_completed();
+        }
 
-        if is_running {
+        if _guard.is_active() {
             let mut writer = RmtWriter::new();
             writer.write(&mut data, raw, true);
 
@@ -1733,7 +1759,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
 
         Ok(ContinuousTxTransaction {
             channel: self,
-            is_running,
+            _guard,
         })
     }
 }
@@ -1746,6 +1772,10 @@ pub struct RxTransaction<'ch, 'data, T>
 where
     T: From<PulseCode>,
 {
+    // This must go first such that it is dropped before the channel (which might disable the
+    // peripheral on drop)!
+    _guard: RxGuard,
+
     channel: Channel<'ch, Blocking, Rx>,
 
     reader: RmtReader,
@@ -1768,9 +1798,10 @@ where
             Some(Event::End | Event::Error) => {
                 // Do not clear the interrupt flags here: Subsequent calls of wait() must
                 // be able to observe them if this is currently called via poll()
-                // FIXME: rx should be stopped here, attempt removing this
+                // Rx is stopped already, but we do need to clear the rx enable flag!
+                // Otherwise the next `raw.update` call will start it even though that
+                // might not be desired.
                 raw.stop_rx(false);
-                raw.update();
 
                 // `RmtReader::read()` is safe to call even if `poll_internal` is called repeatedly
                 // after the receiver finished since it returns immediately if already done.
@@ -1806,8 +1837,6 @@ where
     pub fn wait(
         mut self,
     ) -> Result<(usize, Channel<'ch, Blocking, Rx>), (Error, Channel<'ch, Blocking, Rx>)> {
-        let raw = self.channel.raw;
-
         let result = loop {
             match self.poll_internal() {
                 Some(Event::Error) => break Err(Error::ReceiverError),
@@ -1816,33 +1845,12 @@ where
             }
         };
 
-        // Disable Drop handler since the transaction is stopped already.
-        let this = ManuallyDrop::new(self);
-        // Rust has no safe API to take values out of ManuallyDrop,
-        // cf. https://github.com/rust-lang/rfcs/pull/3466
-        // This is safe since we own `this`, and don't access it below.
-        let channel = unsafe { core::ptr::read(&this.channel) };
-
-        raw.clear_rx_interrupts(EnumSet::all());
+        self._guard.set_completed();
 
         match result {
-            Ok(total) => Ok((total, channel)),
-            Err(err) => Err((err, channel)),
+            Ok(total) => Ok((total, self.channel)),
+            Err(err) => Err((err, self.channel)),
         }
-    }
-}
-
-impl<T> Drop for RxTransaction<'_, '_, T>
-where
-    T: From<PulseCode>,
-{
-    fn drop(&mut self) {
-        let raw = self.channel.raw;
-
-        raw.stop_rx(true);
-        raw.update();
-
-        raw.clear_rx_interrupts(EnumSet::all());
     }
 }
 
@@ -1878,6 +1886,7 @@ impl<'ch> Channel<'ch, Blocking, Rx> {
             channel: self,
             reader,
             data,
+            _guard: RxGuard::new(raw),
         })
     }
 }
@@ -1895,6 +1904,8 @@ where
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
     data: &'a [T],
+
+    _guard: TxGuard,
 }
 
 impl<T> core::future::Future for TxFuture<'_, T>
@@ -1938,27 +1949,9 @@ where
             _ => return Poll::Pending,
         };
 
+        this._guard.set_completed();
+
         Poll::Ready(result)
-    }
-}
-
-impl<T> Drop for TxFuture<'_, T>
-where
-    T: Into<PulseCode> + Copy,
-{
-    fn drop(&mut self) {
-        let raw = self.raw;
-
-        if !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {
-            raw.stop_tx();
-            raw.update();
-
-            // Block until the channel is safe to use again.
-            #[cfg(not(rmt_has_tx_immediate_stop))]
-            while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
-        }
-
-        raw.clear_tx_interrupts(EnumSet::all());
     }
 }
 
@@ -1988,7 +1981,7 @@ impl Channel<'_, Async, Tx> {
             }
         }
 
-        if !matches!(writer.state, WriterState::Error(_)) {
+        let _guard = if !matches!(writer.state, WriterState::Error(_)) {
             writer.write(&mut data, raw, true);
 
             let wrap = match writer.state {
@@ -2004,13 +1997,18 @@ impl Channel<'_, Async, Tx> {
             }
             raw.listen_tx_interrupt(events);
             raw.start_send(None, memsize);
-        }
+
+            TxGuard::new(raw)
+        } else {
+            TxGuard::new_empty()
+        };
 
         TxFuture {
             raw,
             _phantom: PhantomData,
             writer,
             data,
+            _guard,
         }
     }
 }
@@ -2024,6 +2022,7 @@ where
     _phantom: PhantomData<Channel<'a, Async, Rx>>,
     reader: RmtReader,
     data: &'a mut [T],
+    _guard: RxGuard,
 }
 
 impl<T> core::future::Future for RxFuture<'_, T>
@@ -2046,6 +2045,11 @@ where
         let result = match raw.get_rx_status() {
             // Read all available data also on error
             Some(ev @ (Event::End | Event::Error)) => {
+                // Rx is stopped already, but we do need to clear the rx enable flag!
+                // Otherwise the next `raw.update` call will start it even though that
+                // might not be desired.
+                raw.stop_rx(false);
+
                 this.reader.read(&mut this.data, raw, true);
 
                 match ev {
@@ -2068,21 +2072,9 @@ where
             _ => return Poll::Pending,
         };
 
+        this._guard.set_completed();
+
         Poll::Ready(result)
-    }
-}
-
-impl<T> Drop for RxFuture<'_, T>
-where
-    T: From<PulseCode> + Unpin,
-{
-    fn drop(&mut self) {
-        let raw = self.raw;
-
-        raw.stop_rx(true);
-        raw.update();
-
-        raw.clear_rx_interrupts(EnumSet::all());
     }
 }
 
@@ -2102,19 +2094,22 @@ impl Channel<'_, Async, Rx> {
 
         let mut reader = RmtReader::new();
 
-        if !property!("rmt.has_rx_wrap") && data.len() > memsize.codes() {
+        let _guard = if !property!("rmt.has_rx_wrap") && data.len() > memsize.codes() {
             reader.state = ReaderState::Error(Error::InvalidDataLength);
+            RxGuard::new_empty()
         } else {
             raw.clear_rx_interrupts(EnumSet::all());
             raw.listen_rx_interrupt(Event::End | Event::Error | Event::Threshold);
             raw.start_receive(true, memsize);
-        }
+            RxGuard::new(raw)
+        };
 
         RxFuture {
             raw,
             reader,
             data,
             _phantom: PhantomData,
+            _guard,
         }
     }
 }
