@@ -8,6 +8,7 @@ use std::{
 use clap::Parser;
 use env_logger::{Builder, Env};
 use esp_config::{ConfigOption, Value};
+use esp_metadata_generated::Chip;
 use serde::Deserialize;
 use toml_edit::{DocumentMut, Formatted, Item, Table};
 
@@ -22,7 +23,7 @@ struct Args {
 
     /// Chip
     #[arg(short = 'C', long)]
-    chip: Option<esp_metadata::Chip>,
+    chip: Option<Chip>,
 
     /// Config file - using `config.toml` by default
     #[arg(short = 'c', long)]
@@ -178,7 +179,7 @@ fn apply_config(
 
 fn parse_configs(
     path: &Path,
-    chip_from_args: Option<esp_metadata::Chip>,
+    chip_from_args: Option<Chip>,
     config_toml_path: &PathBuf,
 ) -> Result<(bool, Vec<CrateConfig>), Box<dyn Error>> {
     let mut hint_about_configs = false;
@@ -244,11 +245,11 @@ fn parse_configs(
         let mut chip = None;
         for pkg in &meta.root_package().unwrap().dependencies {
             if pkg.name == "esp-hal" {
-                let possible_chip_feature_matches: Vec<esp_metadata::Chip> = pkg
+                let possible_chip_feature_matches: Vec<Chip> = pkg
                     .features
                     .iter()
-                    .flat_map(|f| esp_metadata::Chip::from_str(f))
-                    .collect::<Vec<esp_metadata::Chip>>();
+                    .flat_map(|f| Chip::from_str(f))
+                    .collect::<Vec<Chip>>();
                 chip = possible_chip_feature_matches.first().cloned();
             }
         }
@@ -274,7 +275,7 @@ fn parse_configs(
     }
 
     let mut configs = Vec::new();
-    let chip = esp_metadata_generated::Chip::from_str(chip.unwrap().as_ref()).unwrap();
+    let chip = Chip::from_str(chip.unwrap().as_ref()).unwrap();
     let features = vec![];
     for krate in meta.packages {
         let maybe_cfg = krate.manifest_path.parent().unwrap().join("esp_config.yml");
