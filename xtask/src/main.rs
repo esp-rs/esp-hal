@@ -54,6 +54,9 @@ enum Cli {
     /// Check global symbols in the compiled `.rlib` of the specified packages for the specified
     /// chips.
     CheckGlobalSymbols(CheckPackagesArgs),
+    #[cfg(feature = "report")]
+    /// Generate reports from CI data.
+    GenerateReport(generate_report::ReportArgs),
 }
 
 #[derive(Debug, Args)]
@@ -219,6 +222,8 @@ fn main() -> Result<()> {
         Cli::UpdateMetadata(args) => update_metadata(&workspace, args.check),
         Cli::HostTests(args) => host_tests(&workspace, args),
         Cli::CheckGlobalSymbols(args) => check_global_symbols(&args.chips),
+        #[cfg(feature = "report")]
+        Cli::GenerateReport(args) => generate_report::generate_report(&workspace, args),
     }
 }
 

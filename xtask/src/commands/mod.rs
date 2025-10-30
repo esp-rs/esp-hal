@@ -13,6 +13,8 @@ use crate::{
 };
 mod build;
 mod check_changelog;
+#[cfg(feature = "report")]
+pub mod generate_report;
 mod release;
 mod run;
 
