@@ -3043,8 +3043,8 @@ impl WifiController<'_> {
 
         let mut record: MaybeUninit<include::wifi_ap_record_t> = MaybeUninit::uninit();
         for _ in 0..usize::min(bss_total as usize, max) {
-            let record = unsafe { MaybeUninit::assume_init_mut(&mut record) };
-            unsafe { esp_wifi_result!(include::esp_wifi_scan_get_ap_record(record))? };
+            unsafe { esp_wifi_result!(include::esp_wifi_scan_get_ap_record(record.as_mut_ptr()))? };
+            let record = unsafe { MaybeUninit::assume_init_ref(&record) };
             let ap_info = convert_ap_info(record);
             scanned.push(ap_info);
         }
