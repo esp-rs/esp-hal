@@ -981,6 +981,8 @@ impl<'d> UartRx<'d, Blocking> {
         self.uart
             .info()
             .enable_listen_rx(RxEvent::BreakDetected.into(), true);
+        
+        crate::rom::ets_delay_us(5);
 
         while !self.regs().int_raw().read().brk_det().bit_is_set() {
             // wait
@@ -1005,6 +1007,8 @@ impl<'d> UartRx<'d, Blocking> {
         self.uart
             .info()
             .enable_listen_rx(RxEvent::BreakDetected.into(), true);
+        
+        crate::rom::ets_delay_us(5);
 
         let start = crate::time::Instant::now();
         let timeout_duration = crate::time::Duration::from_micros(timeout_us as u64);
@@ -1248,6 +1252,8 @@ where
         self.uart
             .info()
             .enable_listen_rx(RxEvent::BreakDetected.into(), true);
+        
+        crate::rom::ets_delay_us(5);
     }
 
     /// Change the configuration.
