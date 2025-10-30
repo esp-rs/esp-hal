@@ -978,11 +978,7 @@ impl<'d> UartRx<'d, Blocking> {
     /// After detection, the break interrupt flag is automatically cleared.
     #[instability::unstable]
     pub fn wait_for_break(&mut self) {
-        self.uart
-            .info()
-            .enable_listen_rx(RxEvent::BreakDetected.into(), true);
-        
-        crate::rom::ets_delay_us(5);
+        self.enable_break_detection();
 
         while !self.regs().int_raw().read().brk_det().bit_is_set() {
             // wait
@@ -1004,11 +1000,7 @@ impl<'d> UartRx<'d, Blocking> {
     /// * `timeout_us` - Timeout in microseconds
     #[instability::unstable]
     pub fn wait_for_break_with_timeout(&mut self, timeout_us: u32) -> bool {
-        self.uart
-            .info()
-            .enable_listen_rx(RxEvent::BreakDetected.into(), true);
-        
-        crate::rom::ets_delay_us(5);
+        self.enable_break_detection();
 
         let start = crate::time::Instant::now();
         let timeout_duration = crate::time::Duration::from_micros(timeout_us as u64);
@@ -1252,8 +1244,9 @@ where
         self.uart
             .info()
             .enable_listen_rx(RxEvent::BreakDetected.into(), true);
-        
-        crate::rom::ets_delay_us(5);
+
+        #[cfg(any(esp32c6, esp32h2))]
+        sync_regs(self.regs());
     }
 
     /// Change the configuration.
