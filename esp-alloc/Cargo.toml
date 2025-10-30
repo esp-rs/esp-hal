@@ -33,7 +33,7 @@ allocator-api2        = { version = "0.3.0", default-features = false }
 defmt                 = { version = "1.0.1", optional = true }
 cfg-if                = "1"
 enumset               = "1"
-esp-sync              = { version = "0.1.0", path = "../esp-sync" }
+esp-sync              = { version = "0.2.0", path = "../esp-sync" }
 document-features     = "0.2"
 
 linked_list_allocator = { version = "0.10.5", default-features = false, features = ["const_mut_refs"] }

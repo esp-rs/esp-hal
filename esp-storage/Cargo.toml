@@ -32,7 +32,7 @@ procmacros       = { version = "0.21.0", package = "esp-hal-procmacros", path = 
 esp-hal = { version = "1.0.0", path = "../esp-hal", default-features = false, optional = true}
 
 # Optional dependencies
-esp-sync         = { version = "0.1.0", path = "../esp-sync", optional = true }
+esp-sync         = { version = "0.2.0", path = "../esp-sync", optional = true }
 esp-rom-sys      = { version = "0.1.2", path = "../esp-rom-sys", optional = true }
 defmt  = { version = "1.0.1", optional = true }
 

@@ -55,7 +55,7 @@ document-features  = "0.2"
 esp-alloc = { version = "0.9.0", path = "../esp-alloc", optional = true }
 esp-config = { version = "0.6.0", path = "../esp-config" }
 esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated" }
-esp-sync = { version = "0.1.0", path = "../esp-sync" }
+esp-sync = { version = "0.2.0", path = "../esp-sync" }
 esp-phy = { version = "0.1.0", path = "../esp-phy/" }
 esp-wifi-sys = { version = "0.8.1" }
 num-derive = "0.4.2"
