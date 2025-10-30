@@ -1246,7 +1246,10 @@ where
             .enable_listen_rx(RxEvent::BreakDetected.into(), true);
 
         #[cfg(any(esp32c6, esp32h2))]
-        sync_regs(self.regs());
+        {
+            sync_regs(self.regs());
+            crate::rom::ets_delay_us(10);
+        }
     }
 
     /// Change the configuration.
