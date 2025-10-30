@@ -293,6 +293,44 @@ mod tests {
         tx.send_break(100);
         assert!(rx.wait_for_break_with_timeout(1_000_000));
     }
+
+    #[test]
+    fn test_break_detection_with_data(ctx: Context) {
+        let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
+        let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
+
+        rx.enable_break_detection();
+
+        // Test 1: Send break, expect detection
+        tx.send_break(100);
+        assert!(rx.wait_for_break_with_timeout(1_000_000));
+
+        // Test 2: Send normal data (should not trigger break detection)
+        tx.write(&[0x42, 0x43, 0x44]).unwrap();
+        let mut buf = [0u8; 3];
+        rx.read(&mut buf).unwrap();
+        assert_eq!(buf, [0x42, 0x43, 0x44]);
+
+        // Test 3: Verify no false break detection after data
+        assert!(!rx.wait_for_break_with_timeout(100_000));
+
+        // Test 4: Send break after data, expect detection
+        tx.send_break(100);
+        assert!(rx.wait_for_break_with_timeout(1_000_000));
+
+        // Test 5: Send more data
+        tx.write(&[0xAA, 0xBB]).unwrap();
+        let mut buf = [0u8; 2];
+        rx.read(&mut buf).unwrap();
+        assert_eq!(buf, [0xAA, 0xBB]);
+
+        // Test 6: Don't send break, expect timeout
+        assert!(!rx.wait_for_break_with_timeout(100_000));
+
+        // Test 7: Final break detection
+        tx.send_break(100);
+        assert!(rx.wait_for_break_with_timeout(1_000_000));
+    }
 }
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
