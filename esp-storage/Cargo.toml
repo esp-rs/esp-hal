@@ -73,3 +73,6 @@ esp32s2   = ["esp-hal/esp32s2", "esp-hal/unstable", "esp-rom-sys/esp32s2", "esp-
 esp32s3   = ["esp-hal/esp32s3", "esp-hal/unstable", "esp-rom-sys/esp32s3", "esp-sync/esp32s3"]
 ## Used for testing on a host.
 emulation = []
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(test)'] }

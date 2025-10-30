@@ -66,3 +66,6 @@ tui = [
     "dep:esp-metadata-generated",
     "build",
 ]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(test)'] }
