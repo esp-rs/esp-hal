@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.2.0] - 2025-10-30
+
+### Added
+
 - Interrupt-safe semaphore operations (#4396)
 
 ### Changed
@@ -19,9 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed a bug causing timers to stop working in certain cases. (#4393)
 - Place more RTOS code in IRAM to improve performance. (#4394)
-
-### Removed
-
 
 ## [v0.1.1] - 2025-10-14
 
@@ -38,4 +49,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [v0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-rtos-v0.1.0
 [v0.1.1]: https://github.com/esp-rs/esp-hal/compare/esp-rtos-v0.1.0...esp-rtos-v0.1.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-rtos-v0.1.1...HEAD
+[v0.2.0]: https://github.com/esp-rs/esp-hal/compare/esp-rtos-v0.1.1...esp-rtos-v0.2.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-rtos-v0.2.0...HEAD

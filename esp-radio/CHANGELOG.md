@@ -15,11 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Avoid 802.15.4 rx stopping when BLE is used at the same time (#4348)
-- Fixed undefined behaviour in `WifiController::scan_with_config` (#4408)
 
 ### Removed
 
+
+## [v0.17.0] - 2025-10-30
+
+### Fixed
+
+- Avoid 802.15.4 rx stopping when BLE is used at the same time (#4348)
+- Fixed undefined behaviour in `WifiController::scan_with_config` (#4408)
 
 ## [v0.16.0] - 2025-10-13
 
@@ -345,4 +350,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.14.1]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.14.0...esp-wifi-v0.14.1
 [v0.15.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.14.1...esp-wifi-v0.15.0
 [v0.16.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.15.0...esp-radio-v0.16.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.16.0...HEAD
+[v0.17.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.16.0...esp-radio-v0.17.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.17.0...HEAD

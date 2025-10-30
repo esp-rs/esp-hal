@@ -21,7 +21,7 @@ clippy-configs = [{ features = ["defmt"] }]
 [dependencies]
 cfg-if = "1"
 document-features = "0.2"
-esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated" }
+esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated" }
 embassy-sync-06 = { package = "embassy-sync", version = "0.6" }
 embassy-sync-07 = { package = "embassy-sync", version = "0.7" }
 
@@ -36,7 +36,7 @@ riscv            = { version = "0.15" }
 xtensa-lx        = { version = "0.13.0", path = "../xtensa-lx" }
 
 [build-dependencies]
-esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 #! ### Chip Support Feature Flags
