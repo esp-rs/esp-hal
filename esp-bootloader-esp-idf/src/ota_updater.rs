@@ -68,23 +68,20 @@ where
         })
     }
 
-    /// Helper function to access the OTA data partition.
+    /// Returns an [`Ota`] for accessing the OTA-data partition.
     ///
     /// # Errors
     /// [Error::Invalid] if no OTA data partition was found.
-    pub fn with_ota<R>(
-        &mut self,
-        f: impl FnOnce(crate::ota::Ota<'_, F>) -> Result<R, Error>,
-    ) -> Result<R, Error> {
+    pub fn ota_data(&mut self) -> Result<crate::ota::Ota<'_, F>, Error> {
         let ota_part = self
             .pt
             .find_partition(crate::partitions::PartitionType::Data(
                 crate::partitions::DataPartitionSubType::Ota,
             ))?;
         if let Some(ota_part) = ota_part {
-            let mut ota_part = ota_part.as_embedded_storage(self.flash);
-            let ota = crate::ota::Ota::new(&mut ota_part, self.ota_count)?;
-            f(ota)
+            let ota_part = ota_part.as_embedded_storage(self.flash);
+            let ota = crate::ota::Ota::new(ota_part, self.ota_count)?;
+            Ok(ota)
         } else {
             Err(Error::Invalid)
         }
@@ -118,7 +115,7 @@ where
 
     /// Returns the currently selected app partition.
     pub fn selected_partition(&mut self) -> Result<crate::partitions::AppPartitionSubType, Error> {
-        self.with_ota(|mut ota| ota.current_app_partition())
+        self.ota_data()?.current_app_partition()
     }
 
     /// Get the [OtaImageState] of the currently selected partition.
@@ -126,7 +123,7 @@ where
     /// # Errors
     /// A [Error::InvalidState] if no partition is currently selected.
     pub fn current_ota_state(&mut self) -> Result<OtaImageState, Error> {
-        self.with_ota(|mut ota| ota.current_ota_state())
+        self.ota_data()?.current_ota_state()
     }
 
     /// Set the [OtaImageState] of the currently selected slot.
@@ -134,7 +131,7 @@ where
     /// # Errors
     /// A [Error::InvalidState] if no partition is currently selected.
     pub fn set_current_ota_state(&mut self, state: OtaImageState) -> Result<(), Error> {
-        self.with_ota(|mut ota| ota.set_current_ota_state(state))
+        self.ota_data()?.set_current_ota_state(state)
     }
 
     /// Selects the next active OTA-slot as current.
@@ -143,7 +140,7 @@ where
     /// activated partition.
     pub fn activate_next_partition(&mut self) -> Result<(), Error> {
         let next_slot = self.next_ota_part()?;
-        self.with_ota(|mut ota| ota.set_current_app_partition(next_slot))
+        self.ota_data()?.set_current_app_partition(next_slot)
     }
 
     /// Returns a [FlashRegion] along with the [AppPartitionSubType] for the

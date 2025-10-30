@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `OtaUpdater::with_ota` is now public (#4413)
+- `Ota` now takes `FlashRegion` by value (#4413)
 
 ### Fixed
 
