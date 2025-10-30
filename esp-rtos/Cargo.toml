@@ -43,8 +43,8 @@ allocator-api2 = { version = "0.3.0", default-features = false, features = ["all
 document-features  = "0.2"
 embassy-sync = "0.7"
 esp-alloc = { version = "0.9.0", path = "../esp-alloc", optional = true }
-esp-config = { version = "0.6.0", path = "../esp-config" }
-esp-sync = { version = "0.1.0", path = "../esp-sync" }
+esp-config = { version = "0.6.1", path = "../esp-config" }
+esp-sync = { version = "0.1.1", path = "../esp-sync" }
 esp-radio-rtos-driver = { version = "0.2.0", path = "../esp-radio-rtos-driver", optional = true }
 macros = { version = "0.21.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 portable-atomic = { version = "1.11", default-features = false }
@@ -59,7 +59,7 @@ defmt            = { version = "1.0", optional = true }
 log-04           = { package = "log", version = "0.4", optional = true }
 
 [build-dependencies]
-esp-config             = { version = "0.6.0", path = "../esp-config", features = ["build"] }
+esp-config             = { version = "0.6.1", path = "../esp-config", features = ["build"] }
 esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [dev-dependencies]

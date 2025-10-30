@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v0.1.3] - 2025-10-30
+
 ## [v0.1.2] - 2025-10-13
 
 ### Added
@@ -40,4 +42,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-rom-sys-v0.1.0
 [v0.1.1]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.0...esp-rom-sys-v0.1.1
 [v0.1.2]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.1...esp-rom-sys-v0.1.2
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.2...HEAD
+[v0.1.3]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.2...esp-rom-sys-v0.1.3
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.3...HEAD

@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v0.18.1] - 2025-10-30
+
 ## [v0.18.0] - 2025-10-13
 
 ### Changed
@@ -109,4 +111,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.16.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.15.1...esp-backtrace-v0.16.0
 [v0.17.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.16.0...esp-backtrace-v0.17.0
 [v0.18.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.17.0...esp-backtrace-v0.18.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.18.0...HEAD
+[v0.18.1]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.18.0...esp-backtrace-v0.18.1
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.18.1...HEAD
