@@ -120,8 +120,25 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     // Gather semver bump requirements
     let mut update_amounts = vec![];
     let all_chips = Chip::iter().collect::<Vec<_>>();
+
+    let mut changed = HashMap::new();
+
     for package in sorted.iter().copied() {
-        let amount = if package_changed_since_last_release(workspace, package) {
+        if changed.get(&package).copied() != Some(true) {
+            changed.insert(
+                package,
+                package_changed_since_last_release(workspace, package),
+            );
+
+            // Mark all direct and indirect dependencies as changed too.
+            for dep in related_crates(workspace, package) {
+                changed.insert(dep, true);
+            }
+        }
+    }
+
+    for package in sorted.iter().copied() {
+        let amount = if changed[&package] {
             let amount = if package.is_semver_checked() {
                 min_package_update(workspace, package, &all_chips)?
             } else {
