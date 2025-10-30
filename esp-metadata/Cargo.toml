@@ -9,6 +9,7 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
+forever-unstable = true
 check-configs = [
     { features = [] },
     { features = ["clap"] },
