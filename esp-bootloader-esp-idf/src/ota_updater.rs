@@ -68,7 +68,11 @@ where
         })
     }
 
-    fn with_ota<R>(
+    /// Helper function to access the OTA data partition.
+    ///
+    /// # Errors
+    /// [Error::Invalid] if no OTA data partition was found.
+    pub fn with_ota<R>(
         &mut self,
         f: impl FnOnce(crate::ota::Ota<'_, F>) -> Result<R, Error>,
     ) -> Result<R, Error> {
