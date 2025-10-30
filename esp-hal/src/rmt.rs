@@ -1344,13 +1344,12 @@ where
         let raw = self.channel.raw;
 
         if !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {
-            let immediate = raw.stop_tx();
+            raw.stop_tx();
             raw.update();
 
             // Block until the channel is safe to use again.
-            if !immediate {
-                while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
-            }
+            #[cfg(not(rmt_has_tx_immediate_stop))]
+            while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
         }
 
         raw.clear_tx_interrupts(EnumSet::all());
@@ -1396,10 +1395,12 @@ impl<'ch> ContinuousTxTransaction<'ch> {
             // necessary. However, explicitly stopping unconditionally makes the logic
             // here much simpler and shouldn't create much overhead.
             raw.set_tx_continuous(false);
-            let needs_wait = if immediate { !raw.stop_tx() } else { true };
+            if immediate {
+                raw.stop_tx()
+            }
             raw.update();
 
-            if needs_wait {
+            if !immediate || !cfg!(rmt_has_tx_immediate_stop) {
                 loop {
                     match raw.get_tx_status() {
                         Some(Event::Error) => {
@@ -1444,13 +1445,12 @@ impl<'ch> Drop for ContinuousTxTransaction<'ch> {
         let raw = self.channel.raw;
 
         if self.is_running && !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {
-            let immediate = raw.stop_tx();
+            raw.stop_tx();
             raw.update();
 
             // Block until the channel is safe to use again.
-            if !immediate {
-                while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
-            }
+            #[cfg(not(rmt_has_tx_immediate_stop))]
+            while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
         }
 
         raw.clear_tx_interrupts(EnumSet::all());
@@ -1877,13 +1877,12 @@ where
         let raw = self.raw;
 
         if !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {
-            let immediate = raw.stop_tx();
+            raw.stop_tx();
             raw.update();
 
             // Block until the channel is safe to use again.
-            if !immediate {
-                while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
-            }
+            #[cfg(not(rmt_has_tx_immediate_stop))]
+            while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
         }
 
         raw.clear_tx_interrupts(EnumSet::all());
@@ -2509,17 +2508,12 @@ mod chip_specific {
             rmt.int_raw().read().ch_tx_loop(ch_idx).bit()
         }
 
-        // Returns whether stopping was immediate, or needs to wait for tx end.
-        // Due to inlining, the compiler should be able to eliminate code in the caller that
-        // depends on this.
-        //
         // Requires an update() call
-        pub fn stop_tx(self) -> bool {
+        pub fn stop_tx(self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
             rmt.ch_tx_conf0(ch_idx).modify(|_, w| w.tx_stop().set_bit());
-            true
         }
 
         #[inline(always)]
@@ -2972,27 +2966,22 @@ mod chip_specific {
             false
         }
 
-        // Returns whether stopping was immediate, or needs to wait for tx end
-        // Due to inlining, the compiler should be able to eliminate code in the caller that
-        // depends on this.
         #[cfg(rmt_has_tx_immediate_stop)]
-        pub fn stop_tx(self) -> bool {
+        pub fn stop_tx(self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.ch_idx as usize;
 
             rmt.chconf1(ch).modify(|_, w| w.tx_stop().set_bit());
-            true
         }
 
         #[cfg(not(rmt_has_tx_immediate_stop))]
-        pub fn stop_tx(self) -> bool {
+        pub fn stop_tx(self) {
             let ptr = self.channel_ram_start();
             for idx in 0..self.memsize().codes() {
                 unsafe {
                     ptr.add(idx).write_volatile(super::PulseCode::end_marker());
                 }
             }
-            false
         }
 
         #[inline(always)]
