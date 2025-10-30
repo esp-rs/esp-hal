@@ -5,7 +5,7 @@
 macro_rules! println {
     ($($any:tt)*) => {};
 }
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(docsrs, doc(cfg(feature = "build-script")))]
 pub enum Chip {
     Esp32,

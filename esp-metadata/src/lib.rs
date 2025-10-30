@@ -738,7 +738,7 @@ pub fn generate_build_script_utils() -> TokenStream {
             ($($any:tt)*) => {};
         }
 
-        #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
         #[cfg_attr(docsrs, doc(cfg(feature = "build-script")))]
         pub enum Chip {
             #(#chip),*
