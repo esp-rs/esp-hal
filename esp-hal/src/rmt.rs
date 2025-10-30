@@ -1198,6 +1198,10 @@ where
     /// This will replace previous pin assignments for this signal.
     pub fn with_pin(mut self, pin: impl PeripheralOutput<'ch>) -> Self {
         let pin = pin.into();
+
+        // Make sure to not cause a pulse between enabling the output and connecting it.
+        let (_, level) = self.raw.tx_idle_output();
+        pin.set_output_high(level.into());
         pin.apply_output_config(&OutputConfig::default());
         pin.set_output_enable(true);
 
@@ -2480,6 +2484,15 @@ mod chip_specific {
             });
         }
 
+        pub fn tx_idle_output(self) -> (bool, Level) {
+            let rmt = crate::peripherals::RMT::regs();
+            let ch_idx = self.ch_idx as usize;
+
+            let reg = rmt.ch_tx_conf0(ch_idx).read();
+
+            (reg.idle_out_en().bit(), reg.idle_out_lv().bit().into())
+        }
+
         pub fn set_tx_idle_output(self, enable: bool, level: Level) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
@@ -2917,6 +2930,15 @@ mod chip_specific {
                     .carrier_out_lv()
                     .bit(level.into())
             });
+        }
+
+        pub fn tx_idle_output(self) -> (bool, Level) {
+            let rmt = crate::peripherals::RMT::regs();
+            let ch = self.ch_idx as usize;
+
+            let reg = rmt.chconf1(ch).read();
+
+            (reg.idle_out_en().bit(), reg.idle_out_lv().bit().into())
         }
 
         pub fn set_tx_idle_output(self, enable: bool, level: Level) {
