@@ -9,15 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v1.0.0] - 2025-10-30
+
+### Added
+
 - Added the `float-save-restore` feature (enabled by default) for Xtensa MCUs. (#4394)
 
 ### Changed
 
 - `work_queue` is no longer public (#4357)
 - UART memory is now powered down when the driver is no longer in use. (#4354)
-
-### Fixed
-
 
 ### Removed
 
@@ -1444,4 +1455,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v1.0.0-beta.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.0...esp-hal-v1.0.0-beta.1
 [v1.0.0-rc.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.1...esp-hal-v1.0.0-rc.0
 [v1.0.0-rc.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.0...esp-hal-v1.0.0-rc.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.1...HEAD
+[v1.0.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.1...esp-hal-v1.0.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0...HEAD

@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v0.21.0] - 2025-10-30
+
 ## [v0.20.0] - 2025-10-13
 
 ### Added
@@ -119,4 +121,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.18.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.17.0...esp-hal-procmacros-v0.18.0
 [v0.19.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.18.0...esp-hal-procmacros-v0.19.0
 [v0.20.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.19.0...esp-hal-procmacros-v0.20.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.20.0...HEAD
+[v0.21.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.20.0...esp-hal-procmacros-v0.21.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.21.0...HEAD

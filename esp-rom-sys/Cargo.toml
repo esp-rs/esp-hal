@@ -30,7 +30,7 @@ cfg-if              = "1"
 document-features   = "0.2"
 
 [build-dependencies]
-esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 #! ### Chip selection
