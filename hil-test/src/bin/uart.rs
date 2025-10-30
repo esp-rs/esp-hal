@@ -267,6 +267,32 @@ mod tests {
             assert!(rx.wait_for_break_with_timeout(1_000_000));
         }
     }
+
+    #[test]
+    fn test_break_detection_interleaved(ctx: Context) {
+        let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
+        let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
+
+        rx.enable_break_detection();
+
+        // Test 1: Send break, expect detection
+        tx.send_break(100);
+        assert!(rx.wait_for_break_with_timeout(1_000_000));
+
+        // Test 2: Don't send break, expect timeout
+        assert!(!rx.wait_for_break_with_timeout(100_000));
+
+        // Test 3: Send break again, expect detection
+        tx.send_break(100);
+        assert!(rx.wait_for_break_with_timeout(1_000_000));
+
+        // Test 4: Don't send break, expect timeout again
+        assert!(!rx.wait_for_break_with_timeout(100_000));
+
+        // Test 5: Final break detection, expect detection
+        tx.send_break(100);
+        assert!(rx.wait_for_break_with_timeout(1_000_000));
+    }
 }
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
