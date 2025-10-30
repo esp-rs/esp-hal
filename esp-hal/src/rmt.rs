@@ -228,6 +228,7 @@ use crate::{
         InputConfig,
         Level,
         OutputConfig,
+        PinGuard,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
     peripherals::{Interrupt, RMT},
@@ -821,6 +822,7 @@ for_each_rmt_channel!(
                         Ok(Channel {
                             raw,
                             _rmt: core::marker::PhantomData,
+                            _pin_guard: PinGuard::new_unconnected(),
                             _guard,
                         })
                     }
@@ -866,6 +868,7 @@ for_each_rmt_channel!(
                         Ok(Channel {
                             raw,
                             _rmt: core::marker::PhantomData,
+                            _pin_guard: PinGuard::new_unconnected(),
                             _guard,
                         })
                     }
@@ -1095,10 +1098,18 @@ where
     // configured for. Conceptually, for 'ch, we keep the Rmt peripheral alive.
     _rmt: PhantomData<Rmt<'ch, Dm>>,
 
+    _pin_guard: PinGuard,
+
     // Only the "outermost" Channel/ChannelCreator holds the GenericPeripheralGuard, which avoids
     // constant inc/dec of the reference count on reborrow and drop.
     _guard: DropState,
 }
+
+// The reborrowing API treats Channel similar to a smart pointer: Ensure that it's size is actually
+// in line with that notion.
+const _: () = if core::mem::size_of::<Channel<'static, Blocking, Tx>>() > 4 {
+    core::panic!("Channel growing too large!");
+};
 
 /// Per-channel size of the RMT hardware buffer (number of `PulseCode`s).
 pub const CHANNEL_RAM_SIZE: usize = property!("rmt.channel_ram_size");
@@ -1172,6 +1183,7 @@ where
             raw: self.raw,
             _rmt: self._rmt,
             // Resources must only be released once the parent is dropped.
+            _pin_guard: PinGuard::new_unconnected(),
             _guard: DropState::None,
         }
     }
@@ -1184,12 +1196,12 @@ where
     /// Connect a pin to the channel's output signal.
     ///
     /// This will replace previous pin assignments for this signal.
-    pub fn with_pin(self, pin: impl PeripheralOutput<'ch>) -> Self {
+    pub fn with_pin(mut self, pin: impl PeripheralOutput<'ch>) -> Self {
         let pin = pin.into();
         pin.apply_output_config(&OutputConfig::default());
         pin.set_output_enable(true);
 
-        self.raw.output_signal().connect_to(&pin);
+        self._pin_guard = pin.connect_with_guard(self.raw.output_signal());
 
         self
     }
