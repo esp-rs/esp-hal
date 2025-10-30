@@ -244,6 +244,7 @@ mod tests {
         let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
         let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
 
+        rx.enable_break_detection();
         tx.send_break(100);
         assert!(rx.wait_for_break_with_timeout(1_000_000));
     }
@@ -260,6 +261,7 @@ mod tests {
         let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
         let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
 
+        rx.enable_break_detection();
         for _ in 0..3 {
             tx.send_break(100);
             assert!(rx.wait_for_break_with_timeout(1_000_000));

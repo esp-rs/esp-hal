@@ -978,9 +978,14 @@ impl<'d> UartRx<'d, Blocking> {
     /// After detection, the break interrupt flag is automatically cleared.
     #[instability::unstable]
     pub fn wait_for_break(&mut self) {
+        self.uart
+            .info()
+            .enable_listen_rx(RxEvent::BreakDetected.into(), true);
+
         while !self.regs().int_raw().read().brk_det().bit_is_set() {
             // wait
         }
+
         self.regs()
             .int_clr()
             .write(|w| w.brk_det().clear_bit_by_one());
@@ -997,6 +1002,10 @@ impl<'d> UartRx<'d, Blocking> {
     /// * `timeout_us` - Timeout in microseconds
     #[instability::unstable]
     pub fn wait_for_break_with_timeout(&mut self, timeout_us: u32) -> bool {
+        self.uart
+            .info()
+            .enable_listen_rx(RxEvent::BreakDetected.into(), true);
+
         let start = crate::time::Instant::now();
         let timeout_duration = crate::time::Duration::from_micros(timeout_us as u64);
 
@@ -1225,6 +1234,20 @@ where
         self.uart.info().rx_signal.connect_to(&rx);
 
         self
+    }
+
+    /// Enable break detection.
+    ///
+    /// This must be called before any breaks are expected to be received.
+    /// Break detection is enabled automatically by [`Self::wait_for_break`]
+    /// and [`Self::wait_for_break_with_timeout`], but calling this method
+    /// explicitly ensures that breaks occurring before the first wait call
+    /// will be reliably detected.
+    #[instability::unstable]
+    pub fn enable_break_detection(&mut self) {
+        self.uart
+            .info()
+            .enable_listen_rx(RxEvent::BreakDetected.into(), true);
     }
 
     /// Change the configuration.
