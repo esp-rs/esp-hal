@@ -9,15 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `OtaUpdater::with_ota()` (#4413)
 
 ### Changed
 
+- `OtaUpdater::with_ota` is now public (#4413)
+- `Ota` now takes `FlashRegion` by value (#4413)
 
 ### Fixed
 
 
 ### Removed
 
+- `OtaUpdater::with_ota` (#4413)
 
 ## [v0.4.0] - 2025-10-30
 
