@@ -249,12 +249,7 @@ fn parse_configs(
         let mut chip = None;
         for pkg in &meta.root_package().unwrap().dependencies {
             if pkg.name == "esp-hal" {
-                let possible_chip_feature_matches: Vec<Chip> = pkg
-                    .features
-                    .iter()
-                    .flat_map(|f| Chip::from_str(f))
-                    .collect::<Vec<Chip>>();
-                chip = possible_chip_feature_matches.first().cloned();
+                chip = pkg.features.iter().flat_map(|f| Chip::from_str(f)).next();
             }
         }
         chip
