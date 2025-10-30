@@ -307,6 +307,7 @@ mod tests {
 
         // Test 2: Send normal data (should not trigger break detection)
         tx.write(&[0x42, 0x43, 0x44]).unwrap();
+        tx.flush().unwrap();
         let mut buf = [0u8; 3];
         rx.read(&mut buf).unwrap();
         assert_eq!(buf, [0x42, 0x43, 0x44]);
@@ -320,6 +321,7 @@ mod tests {
 
         // Test 5: Send more data
         tx.write(&[0xAA, 0xBB]).unwrap();
+        tx.flush().unwrap();
         let mut buf = [0u8; 2];
         rx.read(&mut buf).unwrap();
         assert_eq!(buf, [0xAA, 0xBB]);
@@ -330,6 +332,42 @@ mod tests {
         // Test 7: Final break detection
         tx.send_break(100);
         assert!(rx.wait_for_break_with_timeout(1_000_000));
+    }
+
+    #[test]
+    fn test_break_detection_preserves_data(ctx: Context) {
+        let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
+        let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
+
+        rx.enable_break_detection();
+
+        // Send data, flush to ensure transmission, then send break
+        tx.write(&[0x01, 0x02, 0x03, 0x04]).unwrap();
+        tx.flush().unwrap();
+        tx.send_break(100);
+
+        // Detect the break
+        assert!(rx.wait_for_break_with_timeout(1_000_000));
+
+        // Data should still be intact and readable after break detection
+        let mut buf = [0u8; 4];
+        rx.read(&mut buf).unwrap();
+        assert_eq!(buf, [0x01, 0x02, 0x03, 0x04]);
+
+        // Send more data after break
+        tx.write(&[0xAA, 0xBB, 0xCC]).unwrap();
+        tx.flush().unwrap();
+
+        // Send another break
+        tx.send_break(100);
+
+        // Detect second break
+        assert!(rx.wait_for_break_with_timeout(1_000_000));
+
+        // Second batch of data should also be intact
+        let mut buf = [0u8; 3];
+        rx.read(&mut buf).unwrap();
+        assert_eq!(buf, [0xAA, 0xBB, 0xCC]);
     }
 }
 
