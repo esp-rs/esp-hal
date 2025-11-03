@@ -18,7 +18,7 @@ pub struct _reent {
 pub static mut _GLOBAL_REENT: _reent = _reent { _unused: [] };
 
 unsafe extern "C" fn __getreent_impl() -> *mut _reent {
-    &raw const _GLOBAL_REENT as *mut _reent
+    &raw mut _GLOBAL_REENT
 }
 
 pub type clock_t = ::core::ffi::c_long;
