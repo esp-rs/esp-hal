@@ -557,7 +557,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         run_doc_tests(
             workspace,
             DocTestArgs {
-                package: Package::EspHal,
+                packages: Package::iter().collect(),
                 chip: args.chip,
             },
         )

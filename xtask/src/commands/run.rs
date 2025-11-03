@@ -10,6 +10,7 @@ use esp_metadata::Chip;
 
 use super::{DocTestArgs, ExamplesArgs, TestsArgs};
 use crate::{
+    Package,
     cargo::{CargoAction, CargoArgsBuilder},
     firmware::Metadata,
 };
@@ -47,23 +48,43 @@ pub struct RunElfsArgs {
 
 /// Run doc tests for the specified package and chip.
 pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
-    log::debug!(
-        "Running doc tests for '{}' on '{}'",
-        args.package,
-        args.chip
-    );
-    let chip = args.chip;
+    let mut success = true;
+    for package in args.packages {
+        success &= run_doc_tests_for_package(workspace, package, args.chip)?;
+    }
+    anyhow::ensure!(success, "One or more doc tests failed");
+    Ok(())
+}
 
-    let package_name = args.package.to_string();
+pub fn run_doc_tests_for_package(workspace: &Path, package: Package, chip: Chip) -> Result<bool> {
+    log::info!("Running doc tests for '{}' on '{}'", package, chip);
+
+    // Ensure that the package/chip combination provided are valid:
+    if let Err(err) = package.validate_package_chip(&chip) {
+        log::warn!("{err}");
+        return Ok(true);
+    }
+
+    // Packages that have doc features are documented. We run doc-tests for these, and only these.
+    let Some(mut features) = package.doc_feature_rules(&esp_metadata::Config::for_chip(&chip))
+    else {
+        log::info!("Skipping undocumented package {package}.");
+        return Ok(true);
+    };
+
+    let package_name = package.to_string();
     let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+
+    if package.has_chip_features() {
+        features.push(chip.to_string());
+    }
 
     // Determine the appropriate build target, and cargo features for the given
     // package and chip:
-    let target = args.package.target_triple(&chip)?;
-    let mut features = args
-        .package
-        .doc_feature_rules(&esp_metadata::Config::for_chip(&chip));
-    features.push(chip.to_string());
+    let Ok(target) = package.target_triple(&chip) else {
+        log::warn!("Package {package} is not applicable for {chip}");
+        return Ok(true);
+    };
 
     // We need `nightly` for building the doc tests, unfortunately:
     let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };
@@ -73,7 +94,7 @@ pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
         .toolchain(toolchain)
         .subcommand("test")
         .arg("--doc")
-        .arg("-Zbuild-std=core,panic_abort")
+        .arg("-Zbuild-std=core,alloc,panic_abort")
         .target(target)
         .features(&features)
         .arg("--release");
@@ -87,9 +108,8 @@ pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
     ];
 
     // Execute `cargo doc` from the package root:
-    crate::cargo::run_with_env(&args, &package_path, envs, false)?;
-
-    Ok(())
+    let success = crate::cargo::run_with_env(&args, &package_path, envs, false).is_ok();
+    Ok(success)
 }
 
 /// Run all ELFs in the specified folder using `probe-rs`.
