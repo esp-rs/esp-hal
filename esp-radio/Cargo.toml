@@ -79,7 +79,6 @@ embedded-io-06 = { package = "embedded-io", version = "0.6", default-features = 
 embedded-io-async-06 = { package = "embedded-io-async", version = "0.6", default-features = false, optional = true }
 embedded-io-07 = { package = "embedded-io", version = "0.7", default-features = false, optional = true }
 embedded-io-async-07 = { package = "embedded-io-async", version = "0.7", default-features = false, optional = true }
-serde = { version = "1.0.218", default-features = false, features = ["derive"], optional = true }
 smoltcp = { version = "0.12.0", default-features = false, features = [
   "medium-ethernet",
   "socket-raw",
@@ -222,9 +221,6 @@ ieee802154 = ["dep:byte", "dep:ieee802154"]
 
 ## Provide implementations of smoltcp traits
 smoltcp = ["dep:smoltcp"]
-
-## Implement serde Serialize / Deserialize
-serde = ["dep:serde", "enumset?/serde"]
 
 #! ### Logging Feature Flags
 ## Enable logging output using version 0.4 of the `log` crate.

@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- The `serde` feature has been removed (#4435)
 
 ## [v0.17.0] - 2025-10-30
 
