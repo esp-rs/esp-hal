@@ -31,7 +31,7 @@ features       = ["esp32c6", "embassy", "esp-radio"]
 bench = false
 
 [dependencies]
-esp-hal = { version = "1.0.0", path = "../esp-hal", features = [
+esp-hal = { version = "1.0.0", path = "../esp-hal", default-features = false, features = [
     "requires-unstable",
 ] }
 
