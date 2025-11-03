@@ -32,7 +32,7 @@ bench = false
 
 [dependencies]
 esp-hal = { version = "1.0.0", path = "../esp-hal", default-features = false, features = [
-    "requires-unstable",
+    "requires-unstable", "rt" # FIXME: rt technically shouldn't be enabled
 ] }
 
 cfg-if = "1"
