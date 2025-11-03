@@ -2648,7 +2648,7 @@ impl OperatingClass {
 /// ```rust,no_run
 /// use esp_radio::wifi::{CountryInfo, OperatingClass};
 ///
-/// let country_info = CountryInfo::from(*b"CN").operating_class(OperatingClass::Indoors);
+/// let country_info = CountryInfo::from(*b"CN").with_operating_class(OperatingClass::Indoors);
 /// ```
 ///
 /// For more information, see the [Wi-Fi Country Code in the ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code).
