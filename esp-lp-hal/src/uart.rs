@@ -21,7 +21,7 @@
 //!
 //! ## Examples
 //!
-//! ```rust
+//! ```rust,no_run
 //! fn main(mut uart: LpUart) -> ! {
 //!     loop {
 //!         writeln!(uart, "Hello, world!").ok();

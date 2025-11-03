@@ -15,7 +15,7 @@
 //!
 //! To use the default values:
 //!
-//! ```rust, ignore
+//! ```rust, no_run
 //! #![no_std]
 //! #![no_main]
 //!
@@ -36,7 +36,7 @@
 //!
 //! If you want to customize the application descriptor:
 //!
-//! ```rust, ignore
+//! ```rust, no_run
 //! #![no_std]
 //! #![no_main]
 //!

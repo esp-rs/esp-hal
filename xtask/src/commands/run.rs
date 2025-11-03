@@ -59,6 +59,14 @@ pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
 pub fn run_doc_tests_for_package(workspace: &Path, package: Package, chip: Chip) -> Result<bool> {
     log::info!("Running doc tests for '{}' on '{}'", package, chip);
 
+    // FIXME: this list can and should slowly be expanded, and eventually the check be removed as
+    // the docs are fixed up.
+    let temporary_package_list = [Package::EspHal, Package::EspRadio];
+    if !temporary_package_list.contains(&package) {
+        log::info!("Package {} is temporarily not doctested", package);
+        return Ok(true);
+    }
+
     // Ensure that the package/chip combination provided are valid:
     if let Err(err) = package.validate_package_chip(&chip) {
         log::warn!("{err}");

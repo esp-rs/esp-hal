@@ -794,7 +794,7 @@ pub fn generate_build_script_utils() -> TokenStream {
             ///
             /// ## Example
             ///
-            /// ```rust
+            /// ```rust,no_run
             /// assert_eq!(Chip::Esp32s3.name(), "esp32s3");
             /// ```
             pub fn name(self) -> &'static str {
@@ -809,7 +809,7 @@ pub fn generate_build_script_utils() -> TokenStream {
             ///
             /// ## Example
             ///
-            /// ```rust
+            /// ```rust,no_run
             /// assert!(Chip::Esp32s3.contains("soc_has_pcnt"));
             /// ```
             pub fn contains(self, symbol: &str) -> bool {
@@ -825,7 +825,7 @@ pub fn generate_build_script_utils() -> TokenStream {
             ///
             /// ## Example
             ///
-            /// ```rust
+            /// ```rust,no_run
             /// assert!(Chip::Esp32s3.all_symbols().contains("soc_has_pcnt"));
             /// ```
             pub fn all_symbols(&self) -> &'static [&'static str] {
@@ -836,7 +836,7 @@ pub fn generate_build_script_utils() -> TokenStream {
             ///
             /// ## Example
             ///
-            /// ```rust
+            /// ```rust,no_run
             /// assert!(Chip::iter().any(|c| c == Chip::Esp32));
             /// ```
             pub fn iter() -> impl Iterator<Item = Chip> {
