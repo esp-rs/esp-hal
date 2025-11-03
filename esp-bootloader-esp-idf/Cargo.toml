@@ -47,6 +47,10 @@ md-5 = { version = "0.10.6", default-features = false, optional = true }
 jiff       = { version = "0.2.13", default-features = false, features = ["std"] }
 esp-config = { version = "0.6.1", path = "../esp-config", features = ["build"] }
 
+# Make doctests & host-tests work together:
+[target.'cfg(any(target_arch = "riscv32", target_arch = "xtensa"))'.dev-dependencies]
+esp-hal = { version = "1.0.0", path = "../esp-hal" }
+
 [features]
 default = ["validation"]
 
@@ -66,19 +70,19 @@ std = ["dep:crc", "dep:md-5"]
 #! One of the following features must be enabled to select the target chip:
 
 ##
-esp32c2   = ["esp-rom-sys/esp32c2", "esp-metadata-generated/esp32c2"]
+esp32c2   = ["esp-rom-sys/esp32c2", "esp-metadata-generated/esp32c2", "esp-hal/esp32c2"]
 ##
-esp32c3   = ["esp-rom-sys/esp32c3", "esp-metadata-generated/esp32c3"]
+esp32c3   = ["esp-rom-sys/esp32c3", "esp-metadata-generated/esp32c3", "esp-hal/esp32c3"]
 ##
-esp32c6   = ["esp-rom-sys/esp32c6", "esp-metadata-generated/esp32c6"]
+esp32c6   = ["esp-rom-sys/esp32c6", "esp-metadata-generated/esp32c6", "esp-hal/esp32c6"]
 ##
-esp32h2   = ["esp-rom-sys/esp32h2", "esp-metadata-generated/esp32h2"]
+esp32h2   = ["esp-rom-sys/esp32h2", "esp-metadata-generated/esp32h2", "esp-hal/esp32h2"]
 ##
-esp32     = ["esp-rom-sys/esp32", "esp-metadata-generated/esp32"]
+esp32     = ["esp-rom-sys/esp32", "esp-metadata-generated/esp32", "esp-hal/esp32"]
 ##
-esp32s2   = ["esp-rom-sys/esp32s2", "esp-metadata-generated/esp32s2"]
+esp32s2   = ["esp-rom-sys/esp32s2", "esp-metadata-generated/esp32s2", "esp-hal/esp32s2"]
 ##
-esp32s3   = ["esp-rom-sys/esp32s3", "esp-metadata-generated/esp32s3"]
+esp32s3   = ["esp-rom-sys/esp32s3", "esp-metadata-generated/esp32s3", "esp-hal/esp32s3"]
 
 # "md-5" is hidden behind `std` feature and `cargo machete` incorrectly marks it as unused.
 [package.metadata.cargo-machete]

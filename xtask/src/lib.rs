@@ -714,6 +714,8 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
             return cargo::run(
                 &cmd.clone()
                     .subcommand("test")
+                    .arg("--lib")
+                    .arg("--tests")
                     .features(&vec!["std".into()])
                     .build(),
                 &package_path,

@@ -61,7 +61,11 @@ pub fn run_doc_tests_for_package(workspace: &Path, package: Package, chip: Chip)
 
     // FIXME: this list can and should slowly be expanded, and eventually the check be removed as
     // the docs are fixed up.
-    let temporary_package_list = [Package::EspHal, Package::EspRadio];
+    let temporary_package_list = [
+        Package::EspHal,
+        Package::EspRadio,
+        Package::EspBootloaderEspIdf,
+    ];
     if !temporary_package_list.contains(&package) {
         log::info!("Package {} is temporarily not doctested", package);
         return Ok(true);
