@@ -88,6 +88,9 @@ log-04 = { package = "log", version = "0.4.27", optional = true }
 esp-config = { version = "0.6.1", path = "../esp-config", features = ["build"] }
 esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
+[dev-dependencies]
+esp-rtos = { version = "0.2.0", path = "../esp-rtos" }
+
 [features]
 default = ["esp-alloc"]
 
@@ -115,6 +118,7 @@ sys-logs = ["esp-wifi-sys/sys-logs"]
 ##
 esp32 = [
   "esp-hal/esp32",
+  "esp-rtos/esp32",
   "esp-phy/esp32",
   "esp-wifi-sys/esp32",
   "esp-metadata-generated/esp32",
@@ -123,6 +127,7 @@ esp32 = [
 ##
 esp32c2 = [
   "esp-hal/esp32c2",
+  "esp-rtos/esp32c2",
   "esp-phy/esp32c2",
   "esp-wifi-sys/esp32c2",
   "esp-metadata-generated/esp32c2",
@@ -130,6 +135,7 @@ esp32c2 = [
 ##
 esp32c3 = [
   "esp-hal/esp32c3",
+  "esp-rtos/esp32c3",
   "esp-phy/esp32c3",
   "esp-wifi-sys/esp32c3",
   "esp-metadata-generated/esp32c3",
@@ -137,6 +143,7 @@ esp32c3 = [
 ##
 esp32c6 = [
   "esp-hal/esp32c6",
+  "esp-rtos/esp32c6",
   "esp-phy/esp32c6",
   "esp-wifi-sys/esp32c6",
   "esp-metadata-generated/esp32c6",
@@ -144,6 +151,7 @@ esp32c6 = [
 ##
 esp32h2 = [
   "esp-hal/esp32h2",
+  "esp-rtos/esp32h2",
   "esp-phy/esp32h2",
   "esp-wifi-sys/esp32h2",
   "esp-metadata-generated/esp32h2",
@@ -151,6 +159,7 @@ esp32h2 = [
 ##
 esp32s2 = [
   "esp-hal/esp32s2",
+  "esp-rtos/esp32s2",
   "esp-phy/esp32s2",
   "esp-wifi-sys/esp32s2",
   "esp-metadata-generated/esp32s2",
@@ -159,6 +168,7 @@ esp32s2 = [
 ##
 esp32s3 = [
   "esp-hal/esp32s3",
+  "esp-rtos/esp32s3",
   "esp-phy/esp32s3",
   "esp-wifi-sys/esp32s3",
   "esp-metadata-generated/esp32s3",

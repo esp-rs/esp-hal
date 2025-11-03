@@ -33,16 +33,18 @@ fn default_handler<Event: 'static>() -> Box<Handler<Event>> {
     Box::new(drop_ref)
 }
 
+#[procmacros::doc_replace]
 /// Extension trait for setting handlers for an event.
 ///
 /// Register a new event handler like:
 ///
 /// ```rust, no_run
-/// # use esp_radio::wifi::event::{self, *};
-/// # fn new_handler(_: &ApStaConnected) {}
-/// event::ApStaConnected::update_handler(|_cs, event| {
-///     new_handler(event);
-/// })
+/// # {before_snippet}
+/// use esp_radio::wifi::event::{self, EventExt};
+/// event::ApStaConnected::update_handler(|event| {
+///     // ... handle ApStaConnected event here
+/// });
+/// # {after_snippet}
 /// ```
 // Implemented like this instead of free functions because the syntax would be
 // ```

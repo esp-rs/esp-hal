@@ -2636,6 +2636,7 @@ impl OperatingClass {
     }
 }
 
+#[procmacros::doc_replace]
 /// Country information.
 ///
 /// Defaults to China (CN) with Operating Class "0".
@@ -2646,9 +2647,11 @@ impl OperatingClass {
 /// ## Example
 ///
 /// ```rust,no_run
+/// # {before_snippet}
 /// use esp_radio::wifi::{CountryInfo, OperatingClass};
 ///
 /// let country_info = CountryInfo::from(*b"CN").with_operating_class(OperatingClass::Indoors);
+/// # {after_snippet}
 /// ```
 ///
 /// For more information, see the [Wi-Fi Country Code in the ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code).
@@ -2959,6 +2962,7 @@ impl WifiController<'_> {
         Ok(())
     }
 
+    #[procmacros::doc_replace]
     /// Set the Wi-Fi protocol.
     ///
     /// This will set the wifi protocol to the desired protocol, the default for
@@ -2970,10 +2974,26 @@ impl WifiController<'_> {
     ///
     /// # Example:
     ///
-    /// ```
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # use esp_radio::wifi::{AccessPointConfig, ModeConfig};
+    /// use esp_radio::wifi::Protocol;
+    ///
+    /// let esp_radio_controller = esp_radio::init().unwrap();
+    ///
+    /// let (mut wifi_controller, _interfaces) =
+    ///     esp_radio::wifi::new(&esp_radio_controller, peripherals.WIFI, Default::default())?;
+    ///
+    /// wifi_controller.set_config(&ModeConfig::AccessPoint(
+    ///     AccessPointConfig::default().with_ssid("esp-radio".into()),
+    /// ))?;
+    ///
     /// wifi_controller.set_protocol(Protocol::P802D11BGNLR.into());
+    /// # {after_snippet}
     /// ```
+    ///
     /// # Note
+    ///
     /// Calling this function before `set_config` will return an error.
     pub fn set_protocol(&mut self, protocols: EnumSet<Protocol>) -> Result<(), WifiError> {
         let protocol = protocols
@@ -3148,7 +3168,7 @@ impl WifiController<'_> {
     /// This will set the mode accordingly.
     /// You need to use [`Self::connect`] for connecting to an AP.
     ///
-    /// Passing [`ModeConfig::None`] will disable both, AP and STA mode.
+    /// Passing [`ModeConfig::None`] will disable both AP and STA modes.
     ///
     /// If you don't intend to use Wi-Fi anymore at all consider tearing down
     /// Wi-Fi completely.
