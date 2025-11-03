@@ -14,6 +14,13 @@ pub struct _reent {
     // the real struct is found here: https://sourceware.org/git/?p=newlib-cygwin.git;a=blob;f=newlib/libc/include/sys/reent.h;h=eafac960fd6ca374b7503f50bf8aa2bd1ee1573e;hb=refs/heads/main#l379
 }
 
+#[unsafe(no_mangle)]
+pub static mut _GLOBAL_REENT: _reent = _reent { _unused: [] };
+
+unsafe extern "C" fn __getreent_impl() -> *mut _reent {
+    &raw const _GLOBAL_REENT as *mut _reent
+}
+
 pub type clock_t = ::core::ffi::c_long;
 
 #[repr(C)]
@@ -74,7 +81,7 @@ unsafe extern "C" fn abort_wrapper() {
 pub unsafe fn init_syscall_table() {
     let syscall_table = unsafe {
         (&mut *core::ptr::addr_of_mut!(S_STUB_TABLE)).write(chip_specific::syscall_stub_table {
-            __getreent: Some(core::mem::transmute(not_implemented as usize)),
+            __getreent: Some(__getreent_impl),
             _malloc_r: Some(core::mem::transmute(not_implemented as usize)),
             _free_r: Some(core::mem::transmute(not_implemented as usize)),
             _realloc_r: Some(core::mem::transmute(not_implemented as usize)),
