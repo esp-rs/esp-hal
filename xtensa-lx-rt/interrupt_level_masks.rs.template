@@ -9,7 +9,7 @@ pub enum CpuInterruptLevel {
 }
 
 impl CpuInterruptLevel {
-    pub fn mask(&self) -> u32 {
+    pub const fn mask(&self) -> u32 {
         match &self {
             CpuInterruptLevel::Level1 => {{ XCHAL_INTLEVEL1_MASK }}u32,
             CpuInterruptLevel::Level2 => {{ XCHAL_INTLEVEL2_MASK }}u32,
