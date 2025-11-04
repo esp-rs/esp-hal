@@ -13,6 +13,7 @@
 #![no_std]
 #![no_main]
 
+#[cfg(multi_core)]
 use esp_hal::system::Stack;
 use hil_test as _;
 

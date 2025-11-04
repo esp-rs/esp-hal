@@ -9,11 +9,6 @@ mod tests {
         time::{Duration, Instant},
         timer::timg::TimerGroup,
     };
-    #[cfg(riscv)]
-    use esp_hal::{
-        interrupt::software::SoftwareInterrupt,
-        riscv::interrupt::free as interrupt_free,
-    };
     #[cfg(multi_core)]
     use esp_hal::{peripherals::CPU_CTRL, system::Cpu};
     use esp_radio_rtos_driver::{
@@ -25,6 +20,7 @@ mod tests {
     use portable_atomic::{AtomicBool, AtomicUsize, Ordering};
 
     struct Context {
+        #[cfg(xtensa)]
         sw_int0: SoftwareInterrupt<'static, 0>,
         #[cfg(multi_core)]
         sw_int1: SoftwareInterrupt<'static, 1>,
