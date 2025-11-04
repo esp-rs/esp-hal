@@ -429,4 +429,52 @@ mod tests {
         let success = unsafe { q.send_to_back(item.as_ptr(), Some(0)) };
         hil_test::assert!(!success); // queue is now full
     }
+
+    #[test]
+    async fn queue_basics() {
+        let q = QueueHandle::new(3, 1);
+
+        let enqueue = |item| unsafe { q.send_to_back(&raw const item, Some(0)) };
+        let dequeue = || -> Option<u8> {
+            let mut item = 0;
+            unsafe { q.receive(&raw mut item, Some(0)) }.then_some(item)
+        };
+
+        hil_test::assert_eq!(q.messages_waiting(), 0);
+
+        hil_test::assert!(enqueue(42));
+        hil_test::assert_eq!(q.messages_waiting(), 1);
+
+        // insert an element that will be removed
+        hil_test::assert!(enqueue(0));
+        hil_test::assert_eq!(q.messages_waiting(), 2);
+
+        hil_test::assert!(enqueue(24));
+        hil_test::assert_eq!(q.messages_waiting(), 3);
+
+        // Verify removing removes an item. The item is in the middle of the queue, so that we can
+        // verify that the order of elements is kept.
+        let item = [0; 1];
+        unsafe { q.remove(item.as_ptr()) };
+        hil_test::assert_eq!(q.messages_waiting(), 2);
+
+        hil_test::assert!(enqueue(66));
+        hil_test::assert_eq!(q.messages_waiting(), 3);
+
+        hil_test::assert!(!enqueue(99)); // queue is full
+        hil_test::assert_eq!(q.messages_waiting(), 3);
+
+        // Verify items are dequeued in the correct order
+        hil_test::assert_eq!(dequeue(), Some(42));
+        hil_test::assert_eq!(q.messages_waiting(), 2);
+
+        hil_test::assert_eq!(dequeue(), Some(24));
+        hil_test::assert_eq!(q.messages_waiting(), 1);
+
+        hil_test::assert_eq!(dequeue(), Some(66));
+        hil_test::assert_eq!(q.messages_waiting(), 0);
+
+        hil_test::assert_eq!(dequeue(), None);
+        hil_test::assert_eq!(q.messages_waiting(), 0);
+    }
 }
