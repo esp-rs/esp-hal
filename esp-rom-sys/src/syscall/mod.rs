@@ -17,8 +17,17 @@ pub struct _reent {
 #[unsafe(no_mangle)]
 pub static mut _GLOBAL_REENT: _reent = _reent { _unused: [] };
 
+// CURRENT_REENT lives in `esp-rtos` and is updated per task
+unsafe extern "C" {
+    static mut CURRENT_REENT: *mut _reent;
+}
+
 unsafe extern "C" fn __getreent_impl() -> *mut _reent {
-    &raw mut _GLOBAL_REENT
+    if unsafe { CURRENT_REENT.is_null() } {
+        &raw mut _GLOBAL_REENT
+    } else {
+        unsafe { CURRENT_REENT }
+    }
 }
 
 pub type clock_t = ::core::ffi::c_long;

@@ -30,6 +30,20 @@ use crate::{
     timer::TimeDriver,
 };
 
+/// Stub type for reentrancy struct `_reent`.
+#[repr(C)]
+pub struct _reent {
+    pub(crate) _unused: [u8; 0],
+}
+
+/// Pointer to the `_reent` of the currently running task.
+#[unsafe(no_mangle)]
+pub static mut CURRENT_REENT: *mut _reent = core::ptr::null_mut();
+
+unsafe extern "C" {
+    static mut _GLOBAL_REENT: _reent;
+}
+
 pub(crate) struct SchedulerState {
     /// A list of all allocated tasks
     pub(crate) all_tasks: TaskList<TaskAllocListElement>,
@@ -90,6 +104,8 @@ impl CpuSchedulerState {
 
                 #[cfg(feature = "alloc")]
                 heap_allocated: false,
+
+                reent: _reent { _unused: [] },
             },
         }
     }
@@ -311,6 +327,12 @@ impl SchedulerState {
 
             // If we went to idle, this will be None and we won't mess up the main task's stack.
             self.per_cpu[current_cpu].current_task = next_task;
+
+            unsafe {
+                CURRENT_REENT = next_task
+                    .map(|task| &mut (*task.as_ptr()).reent as *mut _reent)
+                    .unwrap_or(&raw mut _GLOBAL_REENT);
+            }
         }
 
         let time_driver = unwrap!(self.time_driver.as_mut());

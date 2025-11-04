@@ -23,7 +23,7 @@ use crate::semaphore::Semaphore;
 use crate::{
     SCHEDULER,
     run_queue::{Priority, RunQueue},
-    scheduler::SchedulerState,
+    scheduler::{_reent, SchedulerState},
     wait_queue::WaitQueue,
 };
 
@@ -363,6 +363,9 @@ pub(crate) struct Task {
     /// Whether the task was allocated on the heap.
     #[cfg(feature = "alloc")]
     pub(crate) heap_allocated: bool,
+
+    /// Per-task reentrancy struct.
+    pub reent: _reent,
 }
 
 #[cfg(feature = "esp-radio")]
@@ -445,6 +448,8 @@ impl Task {
 
             #[cfg(feature = "alloc")]
             heap_allocated: false,
+
+            reent: _reent { _unused: [] },
         };
 
         task.set_up_stack_guard(stack_guard_offset, 0xDEED_BAAD);
