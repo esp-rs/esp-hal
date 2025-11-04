@@ -5,16 +5,10 @@
 pub mod event;
 mod internal;
 pub(crate) mod os_adapter;
+mod scan;
 pub(crate) mod state;
-use alloc::{collections::vec_deque::VecDeque, string::String};
-use core::{
-    fmt::Debug,
-    marker::PhantomData,
-    mem::MaybeUninit,
-    ptr::addr_of,
-    task::Poll,
-    time::Duration,
-};
+use alloc::{collections::vec_deque::VecDeque, string::String, vec::Vec};
+use core::{fmt::Debug, marker::PhantomData, ptr::addr_of, task::Poll, time::Duration};
 
 use enumset::{EnumSet, EnumSetType};
 use esp_config::esp_config_int;
@@ -84,7 +78,10 @@ use crate::{
             wifi_scan_channel_bitmap_t,
         },
     },
-    wifi::private::PacketBuffer,
+    wifi::{
+        private::PacketBuffer,
+        scan::{FreeApListOnDrop, ScanResults},
+    },
 };
 
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
@@ -1779,7 +1776,7 @@ pub(crate) fn wifi_start_scan(
     };
 
     let mut ssid_buf = ssid.map(|m| {
-        let mut buf = alloc::vec::Vec::from_iter(m.bytes());
+        let mut buf = Vec::from_iter(m.bytes());
         buf.push(b'\0');
         buf
     });
@@ -1975,33 +1972,6 @@ impl WifiDevice<'_> {
     #[cfg(not(feature = "smoltcp"))]
     pub fn transmit(&mut self) -> Option<WifiTxToken> {
         self.mode.tx_token()
-    }
-}
-
-fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
-    let str_len = record
-        .ssid
-        .iter()
-        .position(|&c| c == 0)
-        .unwrap_or(record.ssid.len());
-    let ssid_ref = unsafe { core::str::from_utf8_unchecked(&record.ssid[..str_len]) };
-
-    let mut ssid = String::new();
-    ssid.push_str(ssid_ref);
-
-    AccessPointInfo {
-        ssid,
-        bssid: record.bssid,
-        channel: record.primary,
-        secondary_channel: match record.second {
-            include::wifi_second_chan_t_WIFI_SECOND_CHAN_NONE => SecondaryChannel::None,
-            include::wifi_second_chan_t_WIFI_SECOND_CHAN_ABOVE => SecondaryChannel::Above,
-            include::wifi_second_chan_t_WIFI_SECOND_CHAN_BELOW => SecondaryChannel::Below,
-            _ => panic!(),
-        },
-        signal_strength: record.rssi,
-        auth_method: Some(AuthMethod::from_raw(record.authmode)),
-        country: Country::try_from_c(&record.country),
     }
 }
 
@@ -2564,21 +2534,6 @@ pub(crate) fn apply_power_saving(ps: PowerSaveMode) -> Result<(), WifiError> {
     Ok(())
 }
 
-struct FreeApListOnDrop;
-impl FreeApListOnDrop {
-    pub fn defuse(self) {
-        core::mem::forget(self);
-    }
-}
-
-impl Drop for FreeApListOnDrop {
-    fn drop(&mut self) {
-        unsafe {
-            include::esp_wifi_clear_ap_list();
-        }
-    }
-}
-
 /// Represents the Wi-Fi controller and its associated interfaces.
 #[non_exhaustive]
 pub struct Interfaces<'d> {
@@ -3049,33 +3004,17 @@ impl WifiController<'_> {
     pub fn scan_with_config(
         &mut self,
         config: ScanConfig<'_>,
-    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
+    ) -> Result<Vec<AccessPointInfo>, WifiError> {
         esp_wifi_result!(crate::wifi::wifi_start_scan(true, config))?;
         self.scan_results(config.max.unwrap_or(usize::MAX))
     }
 
-    fn scan_results(&mut self, max: usize) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
-        let mut scanned = alloc::vec::Vec::<AccessPointInfo>::new();
-        let mut bss_total: u16 = max as u16;
+    fn scan_results_iter(&mut self) -> Result<ScanResults<'_>, WifiError> {
+        ScanResults::new(self)
+    }
 
-        // Prevents memory leak on error
-        let guard = FreeApListOnDrop;
-
-        unsafe { esp_wifi_result!(include::esp_wifi_scan_get_ap_num(&mut bss_total))? };
-
-        guard.defuse();
-
-        let mut record: MaybeUninit<include::wifi_ap_record_t> = MaybeUninit::uninit();
-        for _ in 0..usize::min(bss_total as usize, max) {
-            unsafe { esp_wifi_result!(include::esp_wifi_scan_get_ap_record(record.as_mut_ptr()))? };
-            let record = unsafe { MaybeUninit::assume_init_ref(&record) };
-            let ap_info = convert_ap_info(record);
-            scanned.push(ap_info);
-        }
-
-        unsafe { esp_wifi_result!(include::esp_wifi_clear_ap_list())? };
-
-        Ok(scanned)
+    fn scan_results(&mut self, max: usize) -> Result<Vec<AccessPointInfo>, WifiError> {
+        Ok(self.scan_results_iter()?.take(max).collect::<Vec<_>>())
     }
 
     /// Starts the Wi-Fi controller.
@@ -3282,14 +3221,13 @@ impl WifiController<'_> {
     pub async fn scan_with_config_async(
         &mut self,
         config: ScanConfig<'_>,
-    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
+    ) -> Result<Vec<AccessPointInfo>, WifiError> {
         Self::clear_events(WifiEvent::ScanDone);
         esp_wifi_result!(wifi_start_scan(false, config))?;
 
-        // Prevents memory leak if `scan_n`'s future is dropped.
+        // Prevents memory leak if `scan_with_config_async`'s future is dropped.
         let guard = FreeApListOnDrop;
         WifiEventFuture::new(WifiEvent::ScanDone).await;
-
         guard.defuse();
 
         let result = self.scan_results(config.max.unwrap_or(usize::MAX))?;
