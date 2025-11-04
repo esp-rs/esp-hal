@@ -18,6 +18,7 @@ mod tests {
     use esp_hal::{peripherals::CPU_CTRL, system::Cpu};
     use esp_radio_rtos_driver::{
         self as preempt,
+        queue::QueueHandle,
         semaphore::{SemaphoreHandle, SemaphoreKind},
     };
     use esp_rtos::{CurrentThreadHandle, semaphore::Semaphore};
@@ -405,5 +406,27 @@ mod tests {
             // Park the second core, we don't need it anymore
             esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
         }
+    }
+
+    #[test]
+    async fn primitives_time_out() {
+        let mutex = Semaphore::new_mutex(false);
+        let success = mutex.take(Some(0));
+        hil_test::assert!(success); // mutex is originally untaken
+        let success = mutex.take(Some(0));
+        hil_test::assert!(!success);
+
+        let sem = Semaphore::new_counting(0, 1);
+        let success = sem.take(Some(0));
+        hil_test::assert!(!success);
+
+        let q = QueueHandle::new(1, 1);
+        let mut item = [0u8; 1];
+        let success = unsafe { q.receive(item.as_mut_ptr(), Some(0)) };
+        hil_test::assert!(!success);
+        let success = unsafe { q.send_to_back(item.as_ptr(), Some(0)) };
+        hil_test::assert!(success); // queue is originally empty
+        let success = unsafe { q.send_to_back(item.as_ptr(), Some(0)) };
+        hil_test::assert!(!success); // queue is now full
     }
 }
