@@ -584,63 +584,58 @@ mod vectored {
     #[cfg_attr(place_switch_tables_in_ram, ram)]
     pub(crate) static CPU_INTERRUPT_EDGE: u32 = 0b_0111_0000_0100_0000_0000_1100_1000_0000;
 
-    #[cfg(esp32)]
     pub(crate) mod chip_specific {
         use super::*;
 
-        pub const EDGE_INTERRUPTS: [Interrupt; 8] = [
-            Interrupt::TG0_T0_EDGE,
-            Interrupt::TG0_T1_EDGE,
-            Interrupt::TG0_WDT_EDGE,
-            Interrupt::TG0_LACT_EDGE,
-            Interrupt::TG1_T0_EDGE,
-            Interrupt::TG1_T1_EDGE,
-            Interrupt::TG1_WDT_EDGE,
-            Interrupt::TG1_LACT_EDGE,
-        ];
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                pub const EDGE_INTERRUPTS: [Interrupt; 8] = [
+                    Interrupt::TG0_T0_EDGE,
+                    Interrupt::TG0_T1_EDGE,
+                    Interrupt::TG0_WDT_EDGE,
+                    Interrupt::TG0_LACT_EDGE,
+                    Interrupt::TG1_T0_EDGE,
+                    Interrupt::TG1_T1_EDGE,
+                    Interrupt::TG1_WDT_EDGE,
+                    Interrupt::TG1_LACT_EDGE,
+                ];
 
-        #[cfg_attr(place_switch_tables_in_ram, ram)]
-        pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
-            0b0000_0000_0000_0000_0000_0000_0000_0000,
-            0b1111_1100_0000_0000_0000_0000_0000_0000,
-            0b0000_0000_0000_0000_0000_0000_0000_0011,
-        );
-    }
+                #[cfg_attr(place_switch_tables_in_ram, ram)]
+                pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
+                    0b0000_0000_0000_0000_0000_0000_0000_0000,
+                    0b1111_1100_0000_0000_0000_0000_0000_0000,
+                    0b0000_0000_0000_0000_0000_0000_0000_0011,
+                );
+            } else if #[cfg(esp32s2)] {
+                pub const EDGE_INTERRUPTS: [Interrupt; 11] = [
+                    Interrupt::TG0_T0_EDGE,
+                    Interrupt::TG0_T1_EDGE,
+                    Interrupt::TG0_WDT_EDGE,
+                    Interrupt::TG0_LACT_EDGE,
+                    Interrupt::TG1_T0_EDGE,
+                    Interrupt::TG1_T1_EDGE,
+                    Interrupt::TG1_WDT_EDGE,
+                    Interrupt::TG1_LACT_EDGE,
+                    Interrupt::SYSTIMER_TARGET0,
+                    Interrupt::SYSTIMER_TARGET1,
+                    Interrupt::SYSTIMER_TARGET2,
+                ];
 
-    #[cfg(esp32s2)]
-    pub(crate) mod chip_specific {
-        use super::*;
+                #[cfg_attr(place_switch_tables_in_ram, ram)]
+                pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
+                    0b0000_0000_0000_0000_0000_0000_0000_0000,
+                    0b1100_0000_0000_0000_0000_0000_0000_0000,
+                    0b0000_0000_0000_0000_0000_0011_1011_1111,
+                );
+            } else if #[cfg(esp32s3)] {
+                pub const EDGE_INTERRUPTS: [Interrupt; 0] = [];
 
-        pub const EDGE_INTERRUPTS: [Interrupt; 11] = [
-            Interrupt::TG0_T0_EDGE,
-            Interrupt::TG0_T1_EDGE,
-            Interrupt::TG0_WDT_EDGE,
-            Interrupt::TG0_LACT_EDGE,
-            Interrupt::TG1_T0_EDGE,
-            Interrupt::TG1_T1_EDGE,
-            Interrupt::TG1_WDT_EDGE,
-            Interrupt::TG1_LACT_EDGE,
-            Interrupt::SYSTIMER_TARGET0,
-            Interrupt::SYSTIMER_TARGET1,
-            Interrupt::SYSTIMER_TARGET2,
-        ];
-
-        #[cfg_attr(place_switch_tables_in_ram, ram)]
-        pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
-            0b0000_0000_0000_0000_0000_0000_0000_0000,
-            0b1100_0000_0000_0000_0000_0000_0000_0000,
-            0b0000_0000_0000_0000_0000_0011_1011_1111,
-        );
-    }
-
-    #[cfg(esp32s3)]
-    pub(crate) mod chip_specific {
-        use super::*;
-
-        pub const EDGE_INTERRUPTS: [Interrupt; 0] = [];
-
-        #[cfg_attr(place_switch_tables_in_ram, ram)]
-        pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::empty();
+                #[cfg_attr(place_switch_tables_in_ram, ram)]
+                pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::empty();
+            } else {
+                compiler_error!("Unsupported chip")
+            }
+        }
     }
 }
 
