@@ -2412,10 +2412,9 @@ pub(crate) fn esp_wifi_send_data(interface: wifi_interface_t, data: &mut [u8]) {
     let len = data.len() as u16;
     let ptr = data.as_mut_ptr().cast();
 
-    let res = unsafe { esp_wifi_internal_tx(interface, ptr, len) };
+    let res = unsafe { esp_wifi_result!(esp_wifi_internal_tx(interface, ptr, len)) };
 
-    if res != 0 {
-        warn!("esp_wifi_internal_tx {}", res);
+    if res.is_err() {
         decrement_inflight_counter();
     } else {
         trace!("esp_wifi_internal_tx ok");
@@ -2436,10 +2435,14 @@ macro_rules! esp_wifi_result {
         use num_traits::FromPrimitive;
         let result = $value;
         if result != esp_wifi_sys::include::ESP_OK as i32 {
-            warn!("{} returned an error: {}", stringify!($value), result);
-            Err(WifiError::InternalError(unwrap!(FromPrimitive::from_i32(
+            let error = unwrap!(FromPrimitive::from_i32(result));
+            warn!(
+                "{} returned an error: {:?} ({})",
+                stringify!($value),
+                error,
                 result
-            ))))
+            );
+            Err(WifiError::InternalError(error))
         } else {
             Ok::<(), WifiError>(())
         }
