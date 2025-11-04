@@ -430,10 +430,8 @@ mod vectored {
         interrupt: Interrupt,
         level: Priority,
     ) -> Result<(), Error> {
-        let cpu_interrupt = interrupt_level_to_cpu_interrupt(
-            level,
-            chip_specific::EDGE_INTERRUPTS.contains(&interrupt),
-        )?;
+        let cpu_interrupt =
+            interrupt_level_to_cpu_interrupt(level, EDGE_INTERRUPTS.contains(&interrupt))?;
 
         unsafe {
             map(cpu, interrupt, cpu_interrupt);
@@ -488,56 +486,37 @@ mod vectored {
         })
     }
 
-    pub(crate) mod chip_specific {
-        use super::*;
-
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                pub const EDGE_INTERRUPTS: [Interrupt; 8] = [
-                    Interrupt::TG0_T0_EDGE,
-                    Interrupt::TG0_T1_EDGE,
-                    Interrupt::TG0_WDT_EDGE,
-                    Interrupt::TG0_LACT_EDGE,
-                    Interrupt::TG1_T0_EDGE,
-                    Interrupt::TG1_T1_EDGE,
-                    Interrupt::TG1_WDT_EDGE,
-                    Interrupt::TG1_LACT_EDGE,
-                ];
-            } else if #[cfg(esp32s2)] {
-                pub const EDGE_INTERRUPTS: [Interrupt; 11] = [
-                    Interrupt::TG0_T0_EDGE,
-                    Interrupt::TG0_T1_EDGE,
-                    Interrupt::TG0_WDT_EDGE,
-                    Interrupt::TG0_LACT_EDGE,
-                    Interrupt::TG1_T0_EDGE,
-                    Interrupt::TG1_T1_EDGE,
-                    Interrupt::TG1_WDT_EDGE,
-                    Interrupt::TG1_LACT_EDGE,
-                    Interrupt::SYSTIMER_TARGET0,
-                    Interrupt::SYSTIMER_TARGET1,
-                    Interrupt::SYSTIMER_TARGET2,
-                ];
-            } else if #[cfg(esp32s3)] {
-                pub const EDGE_INTERRUPTS: [Interrupt; 0] = [];
-            } else {
-                compile_error!("Unsupported chip");
-            }
+    cfg_if::cfg_if! {
+        if #[cfg(esp32)] {
+            pub(crate) const EDGE_INTERRUPTS: [Interrupt; 8] = [
+                Interrupt::TG0_T0_EDGE,
+                Interrupt::TG0_T1_EDGE,
+                Interrupt::TG0_WDT_EDGE,
+                Interrupt::TG0_LACT_EDGE,
+                Interrupt::TG1_T0_EDGE,
+                Interrupt::TG1_T1_EDGE,
+                Interrupt::TG1_WDT_EDGE,
+                Interrupt::TG1_LACT_EDGE,
+            ];
+        } else if #[cfg(esp32s2)] {
+            pub(crate) const EDGE_INTERRUPTS: [Interrupt; 11] = [
+                Interrupt::TG0_T0_EDGE,
+                Interrupt::TG0_T1_EDGE,
+                Interrupt::TG0_WDT_EDGE,
+                Interrupt::TG0_LACT_EDGE,
+                Interrupt::TG1_T0_EDGE,
+                Interrupt::TG1_T1_EDGE,
+                Interrupt::TG1_WDT_EDGE,
+                Interrupt::TG1_LACT_EDGE,
+                Interrupt::SYSTIMER_TARGET0,
+                Interrupt::SYSTIMER_TARGET1,
+                Interrupt::SYSTIMER_TARGET2,
+            ];
+        } else if #[cfg(esp32s3)] {
+            pub(crate) const EDGE_INTERRUPTS: [Interrupt; 0] = [];
+        } else {
+            compile_error!("Unsupported chip");
         }
-
-        #[cfg_attr(place_switch_tables_in_ram, ram)]
-        pub static INTERRUPT_EDGE: InterruptStatus = const {
-            let mut masks = [0; crate::interrupt::STATUS_WORDS];
-
-            let mut idx = 0;
-            while idx < EDGE_INTERRUPTS.len() {
-                let interrupt_idx = EDGE_INTERRUPTS[idx] as usize;
-                let word_idx = interrupt_idx / 32;
-                masks[word_idx] |= 1 << (interrupt_idx % 32);
-                idx += 1;
-            }
-
-            InterruptStatus { status: masks }
-        };
     }
 }
 
@@ -545,7 +524,7 @@ mod vectored {
 mod rt {
     use xtensa_lx_rt::interrupt::CpuInterruptLevel;
 
-    use super::{vectored::*, *};
+    use super::*;
 
     #[cfg_attr(place_switch_tables_in_ram, ram)]
     pub(crate) static CPU_INTERRUPT_INTERNAL: u32 = 0b_0010_0000_0000_0001_1000_1000_1100_0000;
@@ -563,6 +542,23 @@ mod rt {
         CpuInterruptLevel::Level6.mask(),
         CpuInterruptLevel::Level7.mask(),
     ];
+
+    /// A bitmap of edge-triggered peripheral interrupts. See `handle_interrupts` why this is
+    /// necessary
+    #[cfg_attr(place_switch_tables_in_ram, ram)]
+    pub static INTERRUPT_EDGE: InterruptStatus = const {
+        let mut masks = [0; crate::interrupt::STATUS_WORDS];
+
+        let mut idx = 0;
+        while idx < EDGE_INTERRUPTS.len() {
+            let interrupt_idx = EDGE_INTERRUPTS[idx] as usize;
+            let word_idx = interrupt_idx / 32;
+            masks[word_idx] |= 1 << (interrupt_idx % 32);
+            idx += 1;
+        }
+
+        InterruptStatus { status: masks }
+    };
 
     #[unsafe(no_mangle)]
     #[ram]
@@ -627,7 +623,7 @@ mod rt {
 
                 // For edge interrupts we cannot rely on the peripherals' interrupt status
                 // registers, therefore call all registered handlers for current level.
-                chip_specific::INTERRUPT_EDGE
+                INTERRUPT_EDGE
             } else {
                 // Finally, check level-triggered peripheral sources.
                 // These interrupts are cleared by the peripheral.
