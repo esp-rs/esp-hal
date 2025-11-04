@@ -176,36 +176,32 @@ pub unsafe fn map(cpu: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     let interrupt_number = interrupt as usize;
     let cpu_interrupt_number = which as u32;
     match cpu {
-        Cpu::ProCpu => unsafe {
-            (*core0_interrupt_peripheral())
+        Cpu::ProCpu => {
+            INTERRUPT_CORE0::regs()
                 .core_0_intr_map(interrupt_number)
-                .write(|w| w.bits(cpu_interrupt_number));
-        },
+                .write(|w| unsafe { w.bits(cpu_interrupt_number) });
+        }
         #[cfg(multi_core)]
-        Cpu::AppCpu => unsafe {
-            (*core1_interrupt_peripheral())
+        Cpu::AppCpu => {
+            INTERRUPT_CORE1::regs()
                 .core_1_intr_map(interrupt_number)
-                .write(|w| w.bits(cpu_interrupt_number));
-        },
+                .write(|w| unsafe { w.bits(cpu_interrupt_number) });
+        }
     }
 }
 
 /// Get cpu interrupt assigned to peripheral interrupt
 pub(crate) fn bound_cpu_interrupt_for(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
     let cpu_intr = match cpu {
-        Cpu::ProCpu => unsafe {
-            (*core0_interrupt_peripheral())
-                .core_0_intr_map(interrupt as usize)
-                .read()
-                .bits()
-        },
+        Cpu::ProCpu => INTERRUPT_CORE0::regs()
+            .core_0_intr_map(interrupt as usize)
+            .read()
+            .bits(),
         #[cfg(multi_core)]
-        Cpu::AppCpu => unsafe {
-            (*core1_interrupt_peripheral())
-                .core_1_intr_map(interrupt as usize)
-                .read()
-                .bits()
-        },
+        Cpu::AppCpu => INTERRUPT_CORE1::regs()
+            .core_1_intr_map(interrupt as usize)
+            .read()
+            .bits(),
     };
     let cpu_intr = CpuInterrupt::from_u32(cpu_intr)?;
 
@@ -229,107 +225,36 @@ pub fn clear(_core: Cpu, which: CpuInterrupt) {
 }
 
 /// Get status of peripheral interrupts
-#[cfg(interrupts_status_registers = "3")]
+#[cfg(any(interrupts_status_registers = "3", interrupts_status_registers = "4"))]
 pub fn status(core: Cpu) -> InterruptStatus {
-    unsafe {
-        match core {
-            Cpu::ProCpu => InterruptStatus::from(
-                (*core0_interrupt_peripheral())
-                    .core_0_intr_status(0)
-                    .read()
-                    .bits(),
-                (*core0_interrupt_peripheral())
-                    .core_0_intr_status(1)
-                    .read()
-                    .bits(),
-                (*core0_interrupt_peripheral())
-                    .core_0_intr_status(2)
-                    .read()
-                    .bits(),
-            ),
-            #[cfg(multi_core)]
-            Cpu::AppCpu => InterruptStatus::from(
-                (*core1_interrupt_peripheral())
-                    .core_1_intr_status(0)
-                    .read()
-                    .bits(),
-                (*core1_interrupt_peripheral())
-                    .core_1_intr_status(1)
-                    .read()
-                    .bits(),
-                (*core1_interrupt_peripheral())
-                    .core_1_intr_status(2)
-                    .read()
-                    .bits(),
-            ),
-        }
+    match core {
+        Cpu::ProCpu => InterruptStatus::from(
+            INTERRUPT_CORE0::regs().core_0_intr_status(0).read().bits(),
+            INTERRUPT_CORE0::regs().core_0_intr_status(1).read().bits(),
+            INTERRUPT_CORE0::regs().core_0_intr_status(2).read().bits(),
+            #[cfg(interrupts_status_registers = "4")]
+            INTERRUPT_CORE0::regs().core_0_intr_status(3).read().bits(),
+        ),
+        #[cfg(multi_core)]
+        Cpu::AppCpu => InterruptStatus::from(
+            INTERRUPT_CORE1::regs().core_1_intr_status(0).read().bits(),
+            INTERRUPT_CORE1::regs().core_1_intr_status(1).read().bits(),
+            INTERRUPT_CORE1::regs().core_1_intr_status(2).read().bits(),
+            #[cfg(interrupts_status_registers = "4")]
+            INTERRUPT_CORE1::regs().core_1_intr_status(3).read().bits(),
+        ),
     }
 }
 
-/// Get status of peripheral interrupts
-#[cfg(interrupts_status_registers = "4")]
-pub fn status(core: Cpu) -> InterruptStatus {
-    unsafe {
-        match core {
-            Cpu::ProCpu => InterruptStatus::from(
-                (*core0_interrupt_peripheral())
-                    .core_0_intr_status(0)
-                    .read()
-                    .bits(),
-                (*core0_interrupt_peripheral())
-                    .core_0_intr_status(1)
-                    .read()
-                    .bits(),
-                (*core0_interrupt_peripheral())
-                    .core_0_intr_status(2)
-                    .read()
-                    .bits(),
-                (*core0_interrupt_peripheral())
-                    .core_0_intr_status(3)
-                    .read()
-                    .bits(),
-            ),
-            #[cfg(multi_core)]
-            Cpu::AppCpu => InterruptStatus::from(
-                (*core1_interrupt_peripheral())
-                    .core_1_intr_status(0)
-                    .read()
-                    .bits(),
-                (*core1_interrupt_peripheral())
-                    .core_1_intr_status(1)
-                    .read()
-                    .bits(),
-                (*core1_interrupt_peripheral())
-                    .core_1_intr_status(2)
-                    .read()
-                    .bits(),
-                (*core1_interrupt_peripheral())
-                    .core_1_intr_status(3)
-                    .read()
-                    .bits(),
-            ),
-        }
+cfg_if::cfg_if! {
+    if #[cfg(esp32)] {
+        use crate::peripherals::DPORT as INTERRUPT_CORE0;
+        use crate::peripherals::DPORT as INTERRUPT_CORE1;
+    } else {
+        use crate::peripherals::INTERRUPT_CORE0;
+        #[cfg(esp32s3)]
+        use crate::peripherals::INTERRUPT_CORE1;
     }
-}
-
-#[cfg(esp32)]
-unsafe fn core0_interrupt_peripheral() -> *const crate::pac::dport::RegisterBlock {
-    pac::DPORT::PTR
-}
-
-#[cfg(esp32)]
-unsafe fn core1_interrupt_peripheral() -> *const crate::pac::dport::RegisterBlock {
-    pac::DPORT::PTR
-}
-
-#[cfg(any(esp32s2, esp32s3))]
-unsafe fn core0_interrupt_peripheral() -> *const crate::pac::interrupt_core0::RegisterBlock {
-    pac::INTERRUPT_CORE0::PTR
-}
-
-#[cfg(esp32s3)]
-unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::RegisterBlock {
-    pac::INTERRUPT_CORE1::PTR
 }
 
 /// Get the current run level (the level below which interrupts are masked).
@@ -472,9 +397,9 @@ mod vectored {
     ) -> InterruptStatus {
         unsafe {
             let intr_map_base = match core {
-                Cpu::ProCpu => (*core0_interrupt_peripheral()).core_0_intr_map(0).as_ptr(),
+                Cpu::ProCpu => INTERRUPT_CORE0::regs().core_0_intr_map(0).as_ptr(),
                 #[cfg(multi_core)]
-                Cpu::AppCpu => (*core1_interrupt_peripheral()).core_1_intr_map(0).as_ptr(),
+                Cpu::AppCpu => INTERRUPT_CORE1::regs().core_1_intr_map(0).as_ptr(),
             };
 
             let mut res = InterruptStatus::empty();
