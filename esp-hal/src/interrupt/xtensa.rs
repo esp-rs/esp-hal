@@ -607,7 +607,7 @@ mod vectored {
             while idx < EDGE_INTERRUPTS.len() {
                 let interrupt_idx = EDGE_INTERRUPTS[idx] as usize;
                 let word_idx = interrupt_idx / 32;
-                masks[word_idx] |= (interrupt_idx % 32) as u32;
+                masks[word_idx] |= 1 << (interrupt_idx % 32);
                 idx += 1;
             }
 
