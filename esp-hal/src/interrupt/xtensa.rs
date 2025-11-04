@@ -561,27 +561,31 @@ mod vectored {
         })
     }
 
-    // TODO use CpuInterrupt::LevelX.mask() // TODO make it const
-    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
+    #[cfg(feature = "rt")]
+    use xtensa_lx_rt::interrupt::CpuInterruptLevel;
+
+    #[cfg_attr(place_switch_tables_in_ram, ram)]
+    #[cfg(feature = "rt")]
     pub(crate) static CPU_INTERRUPT_LEVELS: [u32; 8] = [
-        0b_0000_0000_0000_0000_0000_0000_0000_0000, // Dummy level 0
-        0b_0000_0000_0000_0110_0011_0111_1111_1111, // Level_1
-        0b_0000_0000_0011_1000_0000_0000_0000_0000, // Level 2
-        0b_0010_1000_1100_0000_1000_1000_0000_0000, // Level 3
-        0b_0101_0011_0000_0000_0000_0000_0000_0000, // Level 4
-        0b_1000_0100_0000_0001_0000_0000_0000_0000, // Level 5
-        0b_0000_0000_0000_0000_0000_0000_0000_0000, // Level 6
-        0b_0000_0000_0000_0000_0100_0000_0000_0000, // Level 7
+        0, // Dummy level 0
+        CpuInterruptLevel::Level1.mask(),
+        CpuInterruptLevel::Level2.mask(),
+        CpuInterruptLevel::Level3.mask(),
+        CpuInterruptLevel::Level4.mask(),
+        CpuInterruptLevel::Level5.mask(),
+        CpuInterruptLevel::Level6.mask(),
+        CpuInterruptLevel::Level7.mask(),
     ];
-    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
+
+    #[cfg_attr(place_switch_tables_in_ram, ram)]
     pub(crate) static CPU_INTERRUPT_INTERNAL: u32 = 0b_0010_0000_0000_0001_1000_1000_1100_0000;
-    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
+    #[cfg_attr(place_switch_tables_in_ram, ram)]
     pub(crate) static CPU_INTERRUPT_EDGE: u32 = 0b_0111_0000_0100_0000_0000_1100_1000_0000;
 
     #[cfg(esp32)]
     pub(crate) mod chip_specific {
         use super::*;
-        #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
+        #[cfg_attr(place_switch_tables_in_ram, ram)]
         pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
             0b0000_0000_0000_0000_0000_0000_0000_0000,
             0b1111_1100_0000_0000_0000_0000_0000_0000,
@@ -606,7 +610,7 @@ mod vectored {
     #[cfg(esp32s2)]
     pub(crate) mod chip_specific {
         use super::*;
-        #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
+        #[cfg_attr(place_switch_tables_in_ram, ram)]
         pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
             0b0000_0000_0000_0000_0000_0000_0000_0000,
             0b1100_0000_0000_0000_0000_0000_0000_0000,
@@ -634,7 +638,7 @@ mod vectored {
     #[cfg(esp32s3)]
     pub(crate) mod chip_specific {
         use super::*;
-        #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
+        #[cfg_attr(place_switch_tables_in_ram, ram)]
         pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::empty();
         #[inline]
         pub fn interrupt_is_edge(_interrupt: Interrupt) -> bool {
