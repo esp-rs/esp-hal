@@ -2,11 +2,6 @@
 
 #![deny(missing_docs)]
 
-pub mod event;
-mod internal;
-pub(crate) mod os_adapter;
-mod scan;
-pub(crate) mod state;
 use alloc::{collections::vec_deque::VecDeque, string::String, vec::Vec};
 use core::{fmt::Debug, marker::PhantomData, ptr::addr_of, task::Poll, time::Duration};
 
@@ -15,147 +10,39 @@ use esp_config::esp_config_int;
 use esp_hal::{asynch::AtomicWaker, system::Cpu};
 use esp_sync::NonReentrantMutex;
 use num_derive::FromPrimitive;
-#[doc(hidden)]
-pub(crate) use os_adapter::*;
 use portable_atomic::{AtomicUsize, Ordering};
 use procmacros::BuilderLite;
 #[cfg(all(feature = "smoltcp", feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
-pub use state::*;
 
-#[cfg(all(any(feature = "sniffer", feature = "esp-now"), feature = "unstable"))]
-use crate::sys::include::wifi_pkt_rx_ctrl_t;
-#[cfg(feature = "wifi-eap")]
-use crate::sys::include::{
-    esp_eap_client_clear_ca_cert,
-    esp_eap_client_clear_certificate_and_key,
-    esp_eap_client_clear_identity,
-    esp_eap_client_clear_new_password,
-    esp_eap_client_clear_password,
-    esp_eap_client_clear_username,
-    esp_eap_client_set_ca_cert,
-    esp_eap_client_set_certificate_and_key,
-    esp_eap_client_set_disable_time_check,
-    esp_eap_client_set_fast_params,
-    esp_eap_client_set_identity,
-    esp_eap_client_set_new_password,
-    esp_eap_client_set_pac_file,
-    esp_eap_client_set_password,
-    esp_eap_client_set_ttls_phase2_method,
-    esp_eap_client_set_username,
-    esp_eap_fast_config,
-    esp_wifi_sta_enterprise_enable,
+pub(crate) use self::os_adapter::*;
+pub use self::state::*;
+use self::{
+    private::PacketBuffer,
+    scan::{FreeApListOnDrop, ScanResults},
 };
-#[cfg(all(feature = "sniffer", feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-use crate::sys::include::{
-    esp_wifi_80211_tx,
-    esp_wifi_set_promiscuous,
-    esp_wifi_set_promiscuous_rx_cb,
-    wifi_promiscuous_pkt_t,
-    wifi_promiscuous_pkt_type_t,
-};
+#[cfg(feature = "csi")]
+#[instability::unstable]
+pub use crate::sys::include::wifi_csi_info_t; // FIXME
 use crate::{
     Controller,
     common_adapter::*,
     esp_wifi_result,
     hal::ram,
     sys::{
-        c_types::c_uint,
-        include::{
-            WIFI_INIT_CONFIG_MAGIC,
-            WIFI_PROTOCOL_11AX,
-            WIFI_PROTOCOL_11B,
-            WIFI_PROTOCOL_11G,
-            WIFI_PROTOCOL_11N,
-            WIFI_PROTOCOL_LR,
-            esp_wifi_connect_internal,
-            esp_wifi_disconnect_internal,
-            wifi_init_config_t,
-            wifi_scan_channel_bitmap_t,
-        },
-    },
-    wifi::{
-        private::PacketBuffer,
-        scan::{FreeApListOnDrop, ScanResults},
+        c_types,
+        include::{self, *},
     },
 };
+
+pub mod event;
+mod internal;
+pub(crate) mod os_adapter;
+mod scan;
+pub(crate) mod state;
 
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
-
-#[cfg(all(feature = "csi", esp32c6))]
-use crate::sys::include::wifi_csi_acquire_config_t;
-#[cfg(feature = "csi")]
-#[instability::unstable]
-pub use crate::sys::include::wifi_csi_info_t;
-#[cfg(feature = "csi")]
-#[instability::unstable]
-use crate::sys::include::{
-    esp_wifi_set_csi,
-    esp_wifi_set_csi_config,
-    esp_wifi_set_csi_rx_cb,
-    wifi_csi_config_t,
-};
-use crate::sys::{
-    c_types,
-    include::{
-        self,
-        __BindgenBitfieldUnit,
-        esp_err_t,
-        esp_interface_t_ESP_IF_WIFI_AP,
-        esp_interface_t_ESP_IF_WIFI_STA,
-        esp_supplicant_deinit,
-        esp_supplicant_init,
-        esp_wifi_deinit_internal,
-        esp_wifi_get_mode,
-        esp_wifi_init_internal,
-        esp_wifi_internal_free_rx_buffer,
-        esp_wifi_internal_reg_rxcb,
-        esp_wifi_internal_tx,
-        esp_wifi_scan_start,
-        esp_wifi_set_config,
-        esp_wifi_set_country,
-        esp_wifi_set_mode,
-        esp_wifi_set_protocol,
-        esp_wifi_set_tx_done_cb,
-        esp_wifi_sta_get_rssi,
-        esp_wifi_start,
-        esp_wifi_stop,
-        g_wifi_default_wpa_crypto_funcs,
-        wifi_active_scan_time_t,
-        wifi_ap_config_t,
-        wifi_auth_mode_t,
-        wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP,
-        wifi_config_t,
-        wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
-        wifi_country_t,
-        wifi_interface_t,
-        wifi_interface_t_WIFI_IF_AP,
-        wifi_interface_t_WIFI_IF_STA,
-        wifi_mode_t,
-        wifi_mode_t_WIFI_MODE_AP,
-        wifi_mode_t_WIFI_MODE_APSTA,
-        wifi_mode_t_WIFI_MODE_NULL,
-        wifi_mode_t_WIFI_MODE_STA,
-        wifi_pmf_config_t,
-        wifi_scan_config_t,
-        wifi_scan_threshold_t,
-        wifi_scan_time_t,
-        wifi_scan_type_t_WIFI_SCAN_TYPE_ACTIVE,
-        wifi_scan_type_t_WIFI_SCAN_TYPE_PASSIVE,
-        wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
-        wifi_sta_config_t,
-    },
-};
-
-const _: () = {
-    // make sure we know all the auth modes the driver knows
-    core::assert!(
-        include::wifi_auth_mode_t_WIFI_AUTH_MAX == 17,
-        "Make sure all auth-methods known by the driver are known by us."
-    )
-};
 
 /// Supported Wi-Fi authentication methods.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, PartialOrd)]
@@ -3520,7 +3407,7 @@ impl WifiController<'_> {
             sta: wifi_sta_config_t {
                 ssid: [0; 32],
                 password: [0; 64],
-                scan_method: config.scan_method as c_uint,
+                scan_method: config.scan_method as c_types::c_uint,
                 bssid_set: config.bssid.is_some(),
                 bssid: config.bssid.unwrap_or_default(),
                 channel: config.channel.unwrap_or(0),
@@ -3567,7 +3454,7 @@ impl WifiController<'_> {
             sta: wifi_sta_config_t {
                 ssid: [0; 32],
                 password: [0; 64],
-                scan_method: config.scan_method as c_uint,
+                scan_method: config.scan_method as c_types::c_uint,
                 bssid_set: config.bssid.is_some(),
                 bssid: config.bssid.unwrap_or_default(),
                 channel: config.channel.unwrap_or(0),
