@@ -563,27 +563,6 @@ mod vectored {
         })
     }
 
-    #[cfg(feature = "rt")]
-    use xtensa_lx_rt::interrupt::CpuInterruptLevel;
-
-    #[cfg_attr(place_switch_tables_in_ram, ram)]
-    #[cfg(feature = "rt")]
-    pub(crate) static CPU_INTERRUPT_LEVELS: [u32; 8] = [
-        0, // Dummy level 0
-        CpuInterruptLevel::Level1.mask(),
-        CpuInterruptLevel::Level2.mask(),
-        CpuInterruptLevel::Level3.mask(),
-        CpuInterruptLevel::Level4.mask(),
-        CpuInterruptLevel::Level5.mask(),
-        CpuInterruptLevel::Level6.mask(),
-        CpuInterruptLevel::Level7.mask(),
-    ];
-
-    #[cfg_attr(place_switch_tables_in_ram, ram)]
-    pub(crate) static CPU_INTERRUPT_INTERNAL: u32 = 0b_0010_0000_0000_0001_1000_1000_1100_0000;
-    #[cfg_attr(place_switch_tables_in_ram, ram)]
-    pub(crate) static CPU_INTERRUPT_EDGE: u32 = 0b_0111_0000_0100_0000_0000_1100_1000_0000;
-
     pub(crate) mod chip_specific {
         use super::*;
 
@@ -639,7 +618,26 @@ mod vectored {
 
 #[cfg(feature = "rt")]
 mod rt {
+    use xtensa_lx_rt::interrupt::CpuInterruptLevel;
+
     use super::{vectored::*, *};
+
+    #[cfg_attr(place_switch_tables_in_ram, ram)]
+    pub(crate) static CPU_INTERRUPT_INTERNAL: u32 = 0b_0010_0000_0000_0001_1000_1000_1100_0000;
+    #[cfg_attr(place_switch_tables_in_ram, ram)]
+    pub(crate) static CPU_INTERRUPT_EDGE: u32 = 0b_0111_0000_0100_0000_0000_1100_1000_0000;
+
+    #[cfg_attr(place_switch_tables_in_ram, ram)]
+    pub(crate) static CPU_INTERRUPT_LEVELS: [u32; 8] = [
+        0, // Dummy level 0
+        CpuInterruptLevel::Level1.mask(),
+        CpuInterruptLevel::Level2.mask(),
+        CpuInterruptLevel::Level3.mask(),
+        CpuInterruptLevel::Level4.mask(),
+        CpuInterruptLevel::Level5.mask(),
+        CpuInterruptLevel::Level6.mask(),
+        CpuInterruptLevel::Level7.mask(),
+    ];
 
     #[unsafe(no_mangle)]
     #[ram]
@@ -750,19 +748,19 @@ mod rt {
     }
 
     #[unsafe(no_mangle)]
-    #[unsafe(link_section = ".rwtext")]
+    #[ram]
     unsafe fn __level_4_interrupt(save_frame: &mut Context) {
         unsafe { level4_interrupt(save_frame) }
     }
 
     #[unsafe(no_mangle)]
-    #[unsafe(link_section = ".rwtext")]
+    #[ram]
     unsafe fn __level_5_interrupt(save_frame: &mut Context) {
         unsafe { level5_interrupt(save_frame) }
     }
 
     #[unsafe(no_mangle)]
-    #[unsafe(link_section = ".rwtext")]
+    #[ram]
     unsafe fn __level_6_interrupt(save_frame: &mut Context) {
         cfg_if::cfg_if! {
             if #[cfg(all(feature = "rt", feature = "exception-handler", stack_guard_monitoring))] {
@@ -774,7 +772,7 @@ mod rt {
     }
 
     #[unsafe(no_mangle)]
-    #[unsafe(link_section = ".rwtext")]
+    #[ram]
     unsafe fn __level_7_interrupt(save_frame: &mut Context) {
         unsafe { level7_interrupt(save_frame) }
     }
