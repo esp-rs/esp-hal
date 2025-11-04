@@ -599,13 +599,6 @@ mod vectored {
                     Interrupt::TG1_WDT_EDGE,
                     Interrupt::TG1_LACT_EDGE,
                 ];
-
-                #[cfg_attr(place_switch_tables_in_ram, ram)]
-                pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
-                    0b0000_0000_0000_0000_0000_0000_0000_0000,
-                    0b1111_1100_0000_0000_0000_0000_0000_0000,
-                    0b0000_0000_0000_0000_0000_0000_0000_0011,
-                );
             } else if #[cfg(esp32s2)] {
                 pub const EDGE_INTERRUPTS: [Interrupt; 11] = [
                     Interrupt::TG0_T0_EDGE,
@@ -620,22 +613,27 @@ mod vectored {
                     Interrupt::SYSTIMER_TARGET1,
                     Interrupt::SYSTIMER_TARGET2,
                 ];
-
-                #[cfg_attr(place_switch_tables_in_ram, ram)]
-                pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
-                    0b0000_0000_0000_0000_0000_0000_0000_0000,
-                    0b1100_0000_0000_0000_0000_0000_0000_0000,
-                    0b0000_0000_0000_0000_0000_0011_1011_1111,
-                );
             } else if #[cfg(esp32s3)] {
                 pub const EDGE_INTERRUPTS: [Interrupt; 0] = [];
-
-                #[cfg_attr(place_switch_tables_in_ram, ram)]
-                pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::empty();
             } else {
-                compiler_error!("Unsupported chip")
+                compile_error!("Unsupported chip");
             }
         }
+
+        #[cfg_attr(place_switch_tables_in_ram, ram)]
+        pub static INTERRUPT_EDGE: InterruptStatus = const {
+            let mut masks = [0; crate::interrupt::STATUS_WORDS];
+
+            let mut idx = 0;
+            while idx < EDGE_INTERRUPTS.len() {
+                let interrupt_idx = EDGE_INTERRUPTS[idx] as usize;
+                let word_idx = interrupt_idx / 32;
+                masks[word_idx] |= (interrupt_idx % 32) as u32;
+                idx += 1;
+            }
+
+            InterruptStatus { status: masks }
+        };
     }
 }
 
