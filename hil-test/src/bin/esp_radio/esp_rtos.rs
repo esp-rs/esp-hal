@@ -3,13 +3,9 @@ mod tests {
     use core::ffi::c_void;
 
     use defmt::info;
-    use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
-    #[cfg(multi_core)]
-    use esp_hal::system::Cpu;
     use esp_hal::{
         clock::CpuClock,
-        interrupt::software::SoftwareInterruptControl,
-        peripherals::{Peripherals, TIMG0},
+        interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl},
         time::{Duration, Instant},
         timer::timg::TimerGroup,
     };
@@ -18,13 +14,22 @@ mod tests {
         interrupt::software::SoftwareInterrupt,
         riscv::interrupt::free as interrupt_free,
     };
-    use esp_radio::InitializationError;
+    #[cfg(multi_core)]
+    use esp_hal::{peripherals::CPU_CTRL, system::Cpu};
     use esp_radio_rtos_driver::{
         self as preempt,
         semaphore::{SemaphoreHandle, SemaphoreKind},
     };
     use esp_rtos::{CurrentThreadHandle, semaphore::Semaphore};
     use portable_atomic::{AtomicBool, AtomicUsize, Ordering};
+
+    struct Context {
+        sw_int0: SoftwareInterrupt<'static, 0>,
+        #[cfg(multi_core)]
+        sw_int1: SoftwareInterrupt<'static, 1>,
+        #[cfg(multi_core)]
+        cpu_cntl: CPU_CTRL<'static>,
+    }
 
     #[allow(unused)] // compile test
     fn baremetal_preempt_can_be_initialized_with_any_timer(
@@ -39,37 +44,13 @@ mod tests {
         );
     }
 
-    #[embassy_executor::task]
-    async fn try_init(
-        signal: &'static Signal<CriticalSectionRawMutex, Option<InitializationError>>,
-        timer: TIMG0<'static>,
-    ) {
-        let timg0 = TimerGroup::new(timer);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            unsafe {
-                SoftwareInterrupt::<'static, 0>::steal()
-            },
-        );
-
-        match esp_radio::init() {
-            Ok(_) => signal.signal(None),
-            Err(err) => signal.signal(Some(err)),
-        }
-    }
-
     #[init]
-    fn init() -> Peripherals {
+    fn init() -> Context {
         crate::init_heap();
 
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
-        esp_hal::init(config)
-    }
+        let p = esp_hal::init(config);
 
-    #[test]
-    fn test_esp_rtos_sleep_wakes_up(p: Peripherals) {
-        #[cfg(riscv)]
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);
         esp_rtos::start(
@@ -78,6 +59,18 @@ mod tests {
             sw_ints.software_interrupt0,
         );
 
+        Context {
+            #[cfg(xtensa)]
+            sw_int0: sw_ints.software_interrupt0,
+            #[cfg(multi_core)]
+            sw_int1: sw_ints.software_interrupt1,
+            #[cfg(multi_core)]
+            cpu_cntl: p.CPU_CTRL,
+        }
+    }
+
+    #[test]
+    fn sleep_wakes_up() {
         let now = Instant::now();
 
         CurrentThreadHandle::get().delay(Duration::from_millis(10));
@@ -87,16 +80,7 @@ mod tests {
 
     #[test]
     #[timeout(2)]
-    fn test_esp_rtos_time_slicing(p: Peripherals) {
-        #[cfg(riscv)]
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_ints.software_interrupt0,
-        );
-
+    fn time_slicing() {
         struct TestContext {
             time_slice_observed: SemaphoreHandle,
             counter: AtomicUsize,
@@ -159,16 +143,7 @@ mod tests {
     }
 
     #[test]
-    fn test_esp_rtos_priority_inheritance(p: Peripherals) {
-        #[cfg(riscv)]
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_ints.software_interrupt0,
-        );
-
+    fn priority_inheritance() {
         // We need three tasks to test priority inheritance:
         // - A high priority task that will attempt to acquire the mutex.
         // - A medium priority task that will do some unrelated work.
@@ -259,16 +234,7 @@ mod tests {
     }
 
     #[test]
-    fn test_esp_rtos_task_deletion_does_not_crash(p: Peripherals) {
-        #[cfg(riscv)]
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_ints.software_interrupt0,
-        );
-
+    fn task_deletion_does_not_crash() {
         // Spawn tasks
         extern "C" fn high_priority_task(context: *mut c_void) {
             info!("High: spawning medium priority task");
@@ -308,16 +274,7 @@ mod tests {
     }
 
     #[test]
-    async fn test_esp_rtos_timers_dont_stop_when_timer_is_cancelled(p: Peripherals) {
-        #[cfg(riscv)]
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_ints.software_interrupt0,
-        );
-
+    async fn timers_dont_stop_when_timer_is_cancelled() {
         extern "C" fn helper_thread(context: *mut c_void) {
             let context = unsafe { &*(context as *const TestContext) };
 
@@ -367,11 +324,7 @@ mod tests {
 
     #[test]
     #[cfg(multi_core)]
-    fn test_esp_rtos_smp(p: Peripherals) {
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-
-        let timg0 = TimerGroup::new(p.TIMG0);
-
+    fn smp(ctx: Context) {
         // In this test, we run two tasks that are pinned to each of the cores. They will each
         // increment a counter, if they are scheduled to run on their specific core.
 
@@ -413,17 +366,11 @@ mod tests {
             count_impl(context, Cpu::ProCpu);
         }
 
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_ints.software_interrupt0,
-        );
-
         esp_rtos::start_second_core(
-            p.CPU_CTRL,
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
             #[cfg(xtensa)]
-            sw_ints.software_interrupt0,
-            sw_ints.software_interrupt1,
+            ctx.sw_int0,
+            ctx.sw_int1,
             #[allow(static_mut_refs)]
             unsafe {
                 &mut crate::APP_CORE_STACK
@@ -456,8 +403,7 @@ mod tests {
 
         unsafe {
             // Park the second core, we don't need it anymore
-            esp_hal::system::CpuControl::new(esp_hal::peripherals::CPU_CTRL::steal())
-                .park_core(Cpu::AppCpu);
+            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
         }
     }
 }

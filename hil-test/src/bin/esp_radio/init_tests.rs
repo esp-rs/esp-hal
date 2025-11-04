@@ -20,19 +20,6 @@ mod init_tests {
     use hil_test::mk_static;
     use static_cell::StaticCell;
 
-    #[allow(unused)] // compile test
-    fn baremetal_preempt_can_be_initialized_with_any_timer(
-        timer: esp_hal::timer::AnyTimer<'static>,
-    ) {
-        esp_rtos::start(
-            timer,
-            #[cfg(riscv)]
-            unsafe {
-                SoftwareInterrupt::<'static, 0>::steal()
-            },
-        );
-    }
-
     #[embassy_executor::task]
     async fn try_init(
         signal: &'static Signal<CriticalSectionRawMutex, Option<InitializationError>>,
