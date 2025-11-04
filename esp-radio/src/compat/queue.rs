@@ -1,8 +1,7 @@
-use esp_wifi_sys::c_types::*;
-
 use crate::{
     compat::OSI_FUNCS_TIME_BLOCKING,
     preempt::queue::{QueueHandle, QueuePtr},
+    sys::c_types::*,
 };
 
 pub(crate) fn queue_create(queue_len: c_int, item_size: c_int) -> *mut c_void {

@@ -9,8 +9,8 @@ use esp_phy::{PhyController, PhyInitGuard};
 
 use super::*;
 use crate::{
-    binary::{c_types::*, include::*},
     compat::{self, OSI_FUNCS_TIME_BLOCKING, common::str_from_c, queue},
+    sys::{c_types::*, include::*},
     time::{blob_ticks_to_micros, blob_ticks_to_millis, millis_to_blob_ticks},
 };
 
@@ -1195,7 +1195,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         }
 
         #[cfg(coex)]
-        crate::binary::include::coex_enable();
+        crate::sys::include::coex_enable();
 
         let mut mac = [0u8; 6];
         crate::common_adapter::read_mac(mac.as_mut_ptr(), 2);

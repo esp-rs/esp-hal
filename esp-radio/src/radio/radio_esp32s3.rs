@@ -25,7 +25,7 @@ extern "C" fn WIFI_MAC() {
         trace!("interrupt WIFI_MAC {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
-            let fnc: fn(*mut crate::binary::c_types::c_void) = core::mem::transmute(fnc);
+            let fnc: fn(*mut crate::sys::c_types::c_void) = core::mem::transmute(fnc);
             fnc(arg);
         }
     }
@@ -39,7 +39,7 @@ extern "C" fn WIFI_PWR() {
         trace!("interrupt WIFI_PWR {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
-            let fnc: fn(*mut crate::binary::c_types::c_void) = core::mem::transmute(fnc);
+            let fnc: fn(*mut crate::sys::c_types::c_void) = core::mem::transmute(fnc);
             fnc(arg);
         }
 
@@ -54,7 +54,7 @@ extern "C" fn RWBLE() {
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_8;
         trace!("interrupt RWBLE {:?} {:?}", fnc, arg);
         if !fnc.is_null() {
-            let fnc: fn(*mut crate::binary::c_types::c_void) = core::mem::transmute(fnc);
+            let fnc: fn(*mut crate::sys::c_types::c_void) = core::mem::transmute(fnc);
             fnc(arg);
         }
     });
@@ -68,7 +68,7 @@ extern "C" fn BT_BB() {
         trace!("interrupt RWBT {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
-            let fnc: fn(*mut crate::binary::c_types::c_void) = core::mem::transmute(fnc);
+            let fnc: fn(*mut crate::sys::c_types::c_void) = core::mem::transmute(fnc);
             fnc(arg);
         }
     });

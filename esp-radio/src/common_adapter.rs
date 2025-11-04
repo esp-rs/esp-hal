@@ -1,17 +1,12 @@
 #![allow(dead_code)]
 
-use esp_wifi_sys::{
-    c_types::c_char,
-    include::{esp_phy_calibration_data_t, timeval},
-};
-
 use crate::{
-    binary::{
-        c_types::{c_int, c_ulong, c_void},
-        include::esp_event_base_t,
-    },
     compat::{common::*, semaphore::*},
     hal::{self, ram},
+    sys::{
+        c_types::{c_char, c_int, c_ulong, c_void},
+        include::{esp_event_base_t, esp_phy_calibration_data_t, timeval},
+    },
     time::blob_ticks_to_micros,
 };
 

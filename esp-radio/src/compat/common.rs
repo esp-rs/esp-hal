@@ -10,14 +10,16 @@ use core::{
 
 use esp_hal::time::{Duration, Instant};
 use esp_sync::NonReentrantMutex;
-use esp_wifi_sys::{c_types::c_char, include::malloc};
 
 use super::{OSI_FUNCS_TIME_BLOCKING, malloc::free};
 use crate::{
     ESP_RADIO_LOCK,
-    binary::c_types::{c_int, c_uint, c_void},
     memory_fence::memory_fence,
     preempt::{current_task, yield_task},
+    sys::{
+        c_types::{c_char, c_int, c_uint, c_void},
+        include::malloc,
+    },
 };
 
 #[derive(Clone, Copy, Debug)]

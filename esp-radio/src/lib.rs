@@ -156,6 +156,23 @@ use hal::{
     time::Rate,
 };
 
+pub(crate) mod sys {
+    #[cfg(esp32)]
+    pub use esp_wifi_sys_esp32::*;
+    #[cfg(esp32c2)]
+    pub use esp_wifi_sys_esp32c2::*;
+    #[cfg(esp32c3)]
+    pub use esp_wifi_sys_esp32c3::*;
+    #[cfg(esp32c6)]
+    pub use esp_wifi_sys_esp32c6::*;
+    #[cfg(esp32h2)]
+    pub use esp_wifi_sys_esp32h2::*;
+    #[cfg(esp32s2)]
+    pub use esp_wifi_sys_esp32s2::*;
+    #[cfg(esp32s3)]
+    pub use esp_wifi_sys_esp32s3::*;
+}
+
 use crate::radio::{setup_radio_isr, shutdown_radio_isr};
 #[cfg(feature = "wifi")]
 use crate::wifi::WifiError;
@@ -182,9 +199,6 @@ macro_rules! unstable_module {
     };
 }
 
-mod binary {
-    pub use esp_wifi_sys::*;
-}
 mod compat;
 
 mod radio;
@@ -212,14 +226,14 @@ pub(crate) static ESP_RADIO_LOCK: RawMutex = RawMutex::new();
 const _: () = {
     cfg_if::cfg_if! {
         if #[cfg(not(esp32h2))] {
-            core::assert!(binary::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM == 10);
-            core::assert!(binary::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
-            core::assert!(binary::include::WIFI_STATIC_TX_BUFFER_NUM == 0);
-            core::assert!(binary::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
-            core::assert!(binary::include::CONFIG_ESP_WIFI_AMPDU_RX_ENABLED == 1);
-            core::assert!(binary::include::CONFIG_ESP_WIFI_AMPDU_TX_ENABLED == 1);
-            core::assert!(binary::include::WIFI_AMSDU_TX_ENABLED == 0);
-            core::assert!(binary::include::CONFIG_ESP32_WIFI_RX_BA_WIN == 6);
+            core::assert!(sys::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM == 10);
+            core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
+            core::assert!(sys::include::WIFI_STATIC_TX_BUFFER_NUM == 0);
+            core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
+            core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_RX_ENABLED == 1);
+            core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_TX_ENABLED == 1);
+            core::assert!(sys::include::WIFI_AMSDU_TX_ENABLED == 0);
+            core::assert!(sys::include::CONFIG_ESP32_WIFI_RX_BA_WIN == 6);
         }
     };
 };
@@ -412,7 +426,7 @@ impl From<WifiError> for InitializationError {
 pub fn wifi_set_log_verbose() {
     #[cfg(all(feature = "sys-logs", not(esp32h2)))]
     unsafe {
-        use crate::binary::include::{
+        use crate::sys::include::{
             esp_wifi_internal_set_log_level,
             wifi_log_level_t_WIFI_LOG_VERBOSE,
         };

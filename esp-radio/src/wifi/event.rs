@@ -18,7 +18,7 @@ pub(crate) mod sealed {
         fn handler() -> &'static NonReentrantMutex<Option<Box<Handler<Self>>>>;
         /// # Safety
         /// `ptr` must be a valid for casting to this event's inner event data.
-        unsafe fn from_raw_event_data(ptr: *mut crate::binary::c_types::c_void) -> Self;
+        unsafe fn from_raw_event_data(ptr: *mut crate::sys::c_types::c_void) -> Self;
     }
 }
 
@@ -91,7 +91,7 @@ macro_rules! impl_wifi_event {
         pub struct $newtype;
 
         impl sealed::Event for $newtype {
-            unsafe fn from_raw_event_data(_: *mut crate::binary::c_types::c_void) -> Self {
+            unsafe fn from_raw_event_data(_: *mut crate::sys::c_types::c_void) -> Self {
                 Self
             }
             fn handler() -> &'static NonReentrantMutex<Option<Box<Handler<Self>>>> {
@@ -103,13 +103,13 @@ macro_rules! impl_wifi_event {
     };
 
     ($newtype:ident, $data:ident) => {
-        use esp_wifi_sys::include::$data;
+        use crate::sys::include::$data;
         /// See [`WifiEvent`].
         #[derive(Copy, Clone)]
         pub struct $newtype<'a>(&'a $data);
 
         impl sealed::Event for $newtype<'_> {
-            unsafe fn from_raw_event_data(ptr: *mut crate::binary::c_types::c_void) -> Self {
+            unsafe fn from_raw_event_data(ptr: *mut crate::sys::c_types::c_void) -> Self {
                 Self(unsafe { &*ptr.cast() })
             }
 
@@ -692,7 +692,7 @@ pub fn handle<Event: EventExt>(event_data: &Event) -> bool {
 /// # Safety
 /// The pointer should be valid to cast to `Event`'s inner type (if it has one)
 pub(crate) unsafe fn handle_raw<Event: EventExt>(
-    event_data: *mut crate::binary::c_types::c_void,
+    event_data: *mut crate::sys::c_types::c_void,
     _event_data_size: usize,
 ) -> bool {
     let event = unsafe { Event::from_raw_event_data(event_data) };
@@ -706,7 +706,7 @@ pub(crate) unsafe fn handle_raw<Event: EventExt>(
 #[rustfmt::skip]
 pub(crate) unsafe fn dispatch_event_handler(
     event: WifiEvent,
-    event_data: *mut crate::binary::c_types::c_void,
+    event_data: *mut crate::sys::c_types::c_void,
     event_data_size: usize,
 ) -> bool { unsafe {
     match event {

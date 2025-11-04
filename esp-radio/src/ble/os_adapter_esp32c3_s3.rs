@@ -175,7 +175,7 @@ extern "C" fn coex_schm_register_btdm_callback(_callback: *const ()) -> i32 {
     #[cfg(coex)]
     unsafe {
         // COEX_SCHM_CALLBACK_TYPE_BT
-        coex_schm_register_callback(1, _callback as *mut esp_wifi_sys::c_types::c_void)
+        coex_schm_register_callback(1, _callback as *mut crate::sys::c_types::c_void)
     }
 
     #[cfg(not(coex))]
@@ -187,7 +187,7 @@ extern "C" fn coex_schm_interval_get() -> i32 {
 
     #[cfg(coex)]
     unsafe {
-        esp_wifi_sys::include::coex_schm_interval_get() as i32
+        crate::sys::include::coex_schm_interval_get() as i32
     }
 
     #[cfg(not(coex))]
@@ -199,7 +199,7 @@ extern "C" fn coex_schm_curr_period_get() -> u8 {
 
     #[cfg(coex)]
     unsafe {
-        esp_wifi_sys::include::coex_schm_curr_period_get()
+        crate::sys::include::coex_schm_curr_period_get()
     }
 
     #[cfg(not(coex))]
@@ -211,7 +211,7 @@ extern "C" fn coex_schm_curr_phase_get() -> *const () {
 
     #[cfg(coex)]
     unsafe {
-        esp_wifi_sys::include::coex_schm_curr_phase_get().cast()
+        crate::sys::include::coex_schm_curr_phase_get().cast()
     }
 
     #[cfg(not(coex))]

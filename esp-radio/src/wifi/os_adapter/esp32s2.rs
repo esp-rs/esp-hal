@@ -52,8 +52,8 @@ pub(crate) unsafe extern "C" fn phy_common_clock_enable() {
 /// *************************************************************************
 pub unsafe extern "C" fn set_isr(
     n: i32,
-    f: *mut crate::binary::c_types::c_void,
-    arg: *mut crate::binary::c_types::c_void,
+    f: *mut crate::sys::c_types::c_void,
+    arg: *mut crate::sys::c_types::c_void,
 ) {
     trace!("set_isr - interrupt {} function {:?} arg {:?}", n, f, arg);
 

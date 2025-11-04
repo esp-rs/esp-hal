@@ -1,19 +1,20 @@
-use esp_wifi_sys::include::{
-    ESP_WIFI_OS_ADAPTER_MAGIC,
-    ESP_WIFI_OS_ADAPTER_VERSION,
-    wifi_init_config_t,
-    wifi_osi_funcs_t,
-};
-
 use super::os_adapter::{self, *};
-use crate::common_adapter::*;
+use crate::{
+    common_adapter::*,
+    sys::include::{
+        ESP_WIFI_OS_ADAPTER_MAGIC,
+        ESP_WIFI_OS_ADAPTER_VERSION,
+        wifi_init_config_t,
+        wifi_osi_funcs_t,
+    },
+};
 #[cfg(coex)]
-use crate::{binary::c_types::c_void, hal::ram};
+use crate::{hal::ram, sys::c_types::c_void};
 
 #[cfg(all(coex, any(esp32, esp32c2, esp32c3, esp32c6, esp32s3)))]
-pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::binary::include::coex_adapter_funcs_t =
-    crate::binary::include::coex_adapter_funcs_t {
-        _version: crate::binary::include::COEX_ADAPTER_VERSION as i32,
+pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::sys::include::coex_adapter_funcs_t =
+    crate::sys::include::coex_adapter_funcs_t {
+        _version: crate::sys::include::COEX_ADAPTER_VERSION as i32,
         _task_yield_from_isr: Some(task_yield_from_isr),
         _semphr_create: Some(semphr_create),
         _semphr_delete: Some(semphr_delete),
@@ -26,7 +27,7 @@ pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::binary::include::coex_adapter
         _free: Some(free),
         _esp_timer_get_time: Some(__esp_radio_esp_timer_get_time),
         _env_is_chip: Some(env_is_chip),
-        _magic: crate::binary::include::COEX_ADAPTER_MAGIC as i32,
+        _magic: crate::sys::include::COEX_ADAPTER_MAGIC as i32,
         _timer_disarm: Some(ets_timer_disarm),
         _timer_done: Some(ets_timer_done),
         _timer_setfn: Some(ets_timer_setfn),
@@ -64,7 +65,7 @@ unsafe extern "C" fn esp_coexist_debug_matrix_init_wrapper(
     _rev: bool,
 ) -> i32 {
     // CONFIG_ESP_COEX_GPIO_DEBUG not supported
-    esp_wifi_sys::include::ESP_ERR_NOT_SUPPORTED as i32
+    crate::sys::include::ESP_ERR_NOT_SUPPORTED as i32
 }
 
 #[cfg(coex)]

@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             r#"
 
             BLE is not supported on this target.
-    
+
             "#
         );
     }
@@ -80,7 +80,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             r#"
 
             Wi-Fi is not supported on this target.
-    
+
             "#
         );
     }
@@ -90,7 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             r#"
 
             IEEE 802.15.4 is not supported on this target.
-    
+
             "#
         );
     }
@@ -131,8 +131,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // emit config
     //
-    // keep the defaults aligned with `esp_wifi_sys::include::*` e.g.
-    // `esp_wifi_sys::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM`
+    // keep the defaults aligned with `esp_wifi_sys_xy::include::*` e.g.
+    // `esp_wifi_sys_xy::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM`
     println!("cargo:rerun-if-changed=./esp_config.yml");
     let cfg_yaml = std::fs::read_to_string("./esp_config.yml")
         .expect("Failed to read esp_config.yml for esp-radio");

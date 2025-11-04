@@ -1,4 +1,4 @@
-use esp_wifi_sys::include::esp_phy_init_data_t;
+use crate::sys::include::esp_phy_init_data_t;
 
 const CONFIG_ESP_PHY_MAX_TX_POWER: u8 = 20;
 

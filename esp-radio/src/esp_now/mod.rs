@@ -24,7 +24,7 @@ use super::*;
 #[cfg(feature = "csi")]
 use crate::wifi::CsiConfig;
 use crate::{
-    binary::include::*,
+    sys::include::*,
     wifi::{RxControlInfo, WifiError},
 };
 
