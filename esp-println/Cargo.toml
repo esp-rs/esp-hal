@@ -69,7 +69,7 @@ critical-section = ["dep:esp-sync"]
 ##
 ## This option requires the following function to be implemented:
 ##
-## ```rust
+## ```rust,no_run
 ## extern "Rust" {
 ##     fn _esp_println_timestamp() -> u64;
 ## }
@@ -78,7 +78,7 @@ critical-section = ["dep:esp-sync"]
 ## This function should return the current timestamp in milliseconds since power on.
 ## When using [`esp_hal`], you can define this function as follows:
 ##
-## ```rust
+## ```rust,no_run
 ## #[unsafe(no_mangle)]
 ## pub extern "Rust" fn _esp_println_timestamp() -> u64 {
 ##     esp_hal::time::Instant::now()

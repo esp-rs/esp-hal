@@ -312,7 +312,7 @@ pub fn error(input: TokenStream) -> TokenStream {
 ///
 /// ## Example
 ///
-/// ```rust
+/// ```rust,no_run
 /// esp_hal_procmacros::warning! {"
 /// WARNING: something unpleasant has happened!
 /// "};

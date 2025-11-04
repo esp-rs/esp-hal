@@ -6,7 +6,7 @@
 //!
 //! # Using this as your Global Allocator
 //!
-//! ```rust
+//! ```rust,no_run
 //! use esp_alloc as _;
 //!
 //! fn init_heap() {
@@ -26,7 +26,7 @@
 //! Alternatively, you can use the `heap_allocator!` macro to configure the
 //! global allocator with a given size:
 //!
-//! ```rust
+//! ```rust,no_run
 //! esp_alloc::heap_allocator!(size: 32 * 1024);
 //! ```
 //!
@@ -42,7 +42,7 @@
 //!
 //! Create and initialize an allocator to use in single allocations:
 //!
-//! ```rust
+//! ```rust,no_run
 //! static PSRAM_ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
 //!
 //! fn init_psram_heap() {
@@ -58,14 +58,14 @@
 //!
 //! And then use it in an allocation:
 //!
-//! ```rust
+//! ```rust,no_run
 //! let large_buffer: Vec<u8, _> = Vec::with_capacity_in(1048576, &PSRAM_ALLOCATOR);
 //! ```
 //!
 //! Alternatively, you can use the `psram_allocator!` macro to configure the
 //! global allocator to use PSRAM:
 //!
-//! ```rust
+//! ```rust,no_run
 //! let p = esp_hal::init(esp_hal::Config::default());
 //! esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
 //! ```
@@ -73,7 +73,7 @@
 //! You can also use the `ExternalMemory` allocator to allocate PSRAM memory
 //! with the global allocator:
 //!
-//! ```rust
+//! ```rust,no_run
 //! let p = esp_hal::init(esp_hal::Config::default());
 //! esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
 //!
@@ -97,7 +97,7 @@
 //! With this, you can use the `Box` and `Vec` types from `allocator_api2`, with
 //! `esp-alloc` allocators:
 //!
-//! ```rust
+//! ```rust,no_run
 //! let p = esp_hal::init(esp_hal::Config::default());
 //! esp_alloc::heap_allocator!(size: 64000);
 //! esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
@@ -117,7 +117,7 @@
 //!
 //! You can also get stats about the heap usage at anytime with:
 //!
-//! ```rust
+//! ```rust,no_run
 //! let stats: HeapStats = esp_alloc::HEAP.stats();
 //! // HeapStats implements the Display and defmt::Format traits, so you can
 //! // pretty-print the heap stats.

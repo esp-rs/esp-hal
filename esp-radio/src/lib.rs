@@ -139,7 +139,14 @@ mod fmt;
 use core::marker::PhantomData;
 
 pub use common_adapter::{phy_calibration_data, set_phy_calibration_data};
-use esp_hal::{self as hal};
+use esp_hal::{
+    self as hal,
+
+    // We don't need any esp-radio specific init code, just working no-std scaffolding, so we can
+    // take the macros from esp-hal for doc_replace.
+    after_snippet,
+    before_snippet,
+};
 use esp_radio_rtos_driver as preempt;
 use esp_sync::RawMutex;
 #[cfg(esp32)]
@@ -241,6 +248,7 @@ impl Drop for Controller<'_> {
     }
 }
 
+#[procmacros::doc_replace]
 /// Initialize for using Wi-Fi and or BLE.
 ///
 /// Wi-Fi and BLE require a preemptive scheduler to be present. Without one, the underlying firmware
@@ -270,19 +278,24 @@ impl Drop for Controller<'_> {
 /// function:
 ///
 /// ```rust, no_run
-#[doc = esp_hal::before_snippet!()]
+/// # {before_snippet}
 /// use esp_hal::timer::timg::TimerGroup;
-///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
+#[doc = ""]
 #[cfg_attr(
     riscv,
-    doc = " let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);"
+    doc = r#"
+ // On RISC-V chips, we need to hand over Software Interrupt 0 to the scheduler.
+ use esp_hal::interrupt::software::SoftwareInterruptControl;
+ let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+ esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
+"#
 )]
-#[cfg_attr(riscv, doc = " esp_rtos::start(timg0.timer0, software_interrupt);")]
 #[cfg_attr(xtensa, doc = " esp_rtos::start(timg0.timer0);")]
+#[doc = ""]
 /// // You can now start esp-radio:
 /// let esp_radio_controller = esp_radio::init().unwrap();
-/// # }
+/// # {after_snippet}
 /// ```
 pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
     #[cfg(esp32)]
