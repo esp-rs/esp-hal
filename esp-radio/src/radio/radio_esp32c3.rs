@@ -1,8 +1,8 @@
 #[cfg(any(feature = "wifi", feature = "ble"))]
 #[allow(unused_imports)]
 use crate::{
-    binary,
     hal::{interrupt, peripherals::Interrupt},
+    sys,
 };
 
 pub(crate) fn setup_radio_isr() {
@@ -27,7 +27,7 @@ extern "C" fn WIFI_MAC() {
         trace!("interrupt WIFI_MAC {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
-            let fnc: fn(*mut binary::c_types::c_void) = core::mem::transmute(fnc);
+            let fnc: fn(*mut sys::c_types::c_void) = core::mem::transmute(fnc);
             fnc(arg);
         }
 
@@ -44,7 +44,7 @@ extern "C" fn WIFI_PWR() {
         trace!("interrupt WIFI_PWR {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
-            let fnc: fn(*mut binary::c_types::c_void) = core::mem::transmute(fnc);
+            let fnc: fn(*mut sys::c_types::c_void) = core::mem::transmute(fnc);
             fnc(arg);
         }
 
@@ -61,7 +61,7 @@ extern "C" fn RWBT() {
         trace!("interrupt RWBT {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
-            let fnc: fn(*mut binary::c_types::c_void) = core::mem::transmute(fnc);
+            let fnc: fn(*mut sys::c_types::c_void) = core::mem::transmute(fnc);
             fnc(arg);
         }
 
@@ -78,7 +78,7 @@ extern "C" fn RWBLE() {
         trace!("interrupt RWBLE {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
-            let fnc: fn(*mut binary::c_types::c_void) = core::mem::transmute(fnc);
+            let fnc: fn(*mut sys::c_types::c_void) = core::mem::transmute(fnc);
             fnc(arg);
         }
 
@@ -95,7 +95,7 @@ extern "C" fn BT_BB() {
         trace!("interrupt BT_BB {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
-            let fnc: fn(*mut binary::c_types::c_void) = core::mem::transmute(fnc);
+            let fnc: fn(*mut sys::c_types::c_void) = core::mem::transmute(fnc);
             fnc(arg);
         }
 

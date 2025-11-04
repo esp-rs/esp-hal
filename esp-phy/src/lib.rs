@@ -29,7 +29,23 @@ use esp_hal::{
     system::Cpu,
 };
 use esp_sync::{NonReentrantMutex, RawMutex};
-use esp_wifi_sys::include::*;
+
+pub(crate) mod sys {
+    #[cfg(esp32)]
+    pub use esp_wifi_sys_esp32::*;
+    #[cfg(esp32c2)]
+    pub use esp_wifi_sys_esp32c2::*;
+    #[cfg(esp32c3)]
+    pub use esp_wifi_sys_esp32c3::*;
+    #[cfg(esp32c6)]
+    pub use esp_wifi_sys_esp32c6::*;
+    #[cfg(esp32h2)]
+    pub use esp_wifi_sys_esp32h2::*;
+    #[cfg(esp32s2)]
+    pub use esp_wifi_sys_esp32s2::*;
+    #[cfg(esp32s3)]
+    pub use esp_wifi_sys_esp32s3::*;
+}
 
 mod common_adapter;
 mod phy_init_data;
@@ -40,7 +56,7 @@ pub(crate) mod private {
 
 /// Length of the PHY calibration data.
 pub const PHY_CALIBRATION_DATA_LENGTH: usize =
-    core::mem::size_of::<esp_wifi_sys::include::esp_phy_calibration_data_t>();
+    core::mem::size_of::<sys::include::esp_phy_calibration_data_t>();
 
 /// Type alias for opaque calibration data.
 pub type PhyCalibrationData = [u8; PHY_CALIBRATION_DATA_LENGTH];
@@ -120,7 +136,7 @@ impl PhyState {
         #[cfg(esp32s2)]
         unsafe {
             use esp_hal::efuse::Efuse;
-            phy_eco_version_sel(Efuse::major_chip_version());
+            sys::include::phy_eco_version_sel(Efuse::major_chip_version());
         }
         // Causes headaches for some reason.
         // See: https://github.com/esp-rs/esp-hal/issues/4015
@@ -135,6 +151,8 @@ impl PhyState {
             not(any(esp32s2, esp32h2))
         ))]
         unsafe {
+            // FIXME: we should be using from esp-wifi-sys, but the function is missing for C6
+            // (CONFIG_ESP_PHY_ENABLE_USB is not defined)
             unsafe extern "C" {
                 fn phy_bbpll_en_usb(param: bool);
             }
@@ -149,18 +167,18 @@ impl PhyState {
             if cfg!(phy_skip_calibration_after_deep_sleep)
                 && reset_reason(Cpu::current()) == Some(SocResetReason::CoreDeepSleep)
             {
-                esp_phy_calibration_mode_t_PHY_RF_CAL_NONE
+                sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_NONE
             } else if cfg!(phy_full_calibration) {
-                esp_phy_calibration_mode_t_PHY_RF_CAL_FULL
+                sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_FULL
             } else {
-                esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL
+                sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL
             }
         } else {
-            esp_phy_calibration_mode_t_PHY_RF_CAL_FULL
+            sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_FULL
         };
         let init_data = &phy_init_data::PHY_INIT_DATA_DEFAULT;
         unsafe {
-            register_chipv7_phy(
+            sys::include::register_chipv7_phy(
                 init_data,
                 self.calibration_data() as *mut PhyCalibrationData as *mut _,
                 calibration_mode,
@@ -173,7 +191,7 @@ impl PhyState {
     /// Backup the digital PHY register into memory.
     fn backup_digital_regs(&mut self) {
         unsafe {
-            phy_dig_reg_backup(
+            sys::include::phy_dig_reg_backup(
                 true,
                 self.phy_digital_register_backup.get_or_insert_default() as *mut u32,
             );
@@ -186,7 +204,7 @@ impl PhyState {
     /// This panics if the registers weren't previously backed up.
     fn restore_digital_regs(&mut self) {
         unsafe {
-            phy_dig_reg_backup(
+            sys::include::phy_dig_reg_backup(
                 false,
                 self.phy_digital_register_backup
                     .as_mut()
@@ -211,7 +229,7 @@ impl PhyState {
             }
             if self.calibrated {
                 unsafe {
-                    phy_wakeup_init();
+                    sys::include::phy_wakeup_init();
                 }
                 #[cfg(phy_backed_up_digital_register_count_is_set)]
                 self.restore_digital_regs();
@@ -245,11 +263,11 @@ impl PhyState {
             self.backup_digital_regs();
             unsafe {
                 // Disable PHY and RF.
-                phy_close_rf();
+                sys::include::phy_close_rf();
 
                 // Power down PHY temperature sensor.
                 #[cfg(not(esp32))]
-                phy_xpd_tsens();
+                sys::include::phy_xpd_tsens();
             }
             #[cfg(esp32)]
             {

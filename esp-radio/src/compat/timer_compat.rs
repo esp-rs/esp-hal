@@ -1,8 +1,8 @@
 use esp_radio_rtos_driver::timer::TimerHandle;
 
 use crate::{
-    binary::{c_types::c_void, include::ets_timer},
     preempt::timer::TimerPtr,
+    sys::{c_types::c_void, include::ets_timer},
 };
 
 pub(crate) fn compat_timer_arm(ets_timer: *mut ets_timer, tmout_ms: u32, repeat: bool) {

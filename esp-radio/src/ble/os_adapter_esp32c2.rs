@@ -2,7 +2,6 @@ use procmacros::BuilderLite;
 
 use super::*;
 use crate::{
-    binary::include::esp_bt_controller_config_t,
     ble::InvalidConfigError,
     hal::{
         clock::{Clock, RtcClock},
@@ -10,6 +9,7 @@ use crate::{
         interrupt,
         peripherals::{BT, Interrupt},
     },
+    sys::include::esp_bt_controller_config_t,
 };
 
 pub(crate) static mut ISR_INTERRUPT_4: (*mut c_void, *mut c_void) =
@@ -402,7 +402,7 @@ pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
 
 // Provide the symbol for < eco4 to make the linker happy
 #[unsafe(no_mangle)]
-unsafe fn g_ble_lll_rfmgmt_env_p() -> *mut esp_wifi_sys::c_types::c_void {
+unsafe fn g_ble_lll_rfmgmt_env_p() -> *mut crate::sys::c_types::c_void {
     // prevent "undefined symbol: g_ble_lll_rfmgmt_env_p" for ESP32-C2 < eco4
     unreachable!()
 }

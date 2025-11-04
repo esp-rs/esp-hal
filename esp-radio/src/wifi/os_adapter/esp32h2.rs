@@ -32,7 +32,7 @@ pub(crate) unsafe extern "C" fn set_intr(
 }
 
 pub(crate) unsafe extern "C" fn regdma_link_set_write_wait_content_dummy(
-    _arg1: *mut esp_wifi_sys::c_types::c_void,
+    _arg1: *mut crate::sys::c_types::c_void,
     _arg2: u32,
     _arg3: u32,
 ) {
@@ -40,22 +40,22 @@ pub(crate) unsafe extern "C" fn regdma_link_set_write_wait_content_dummy(
 }
 
 pub(crate) unsafe extern "C" fn sleep_retention_find_link_by_id_dummy(
-    _arg1: esp_wifi_sys::c_types::c_int,
-) -> *mut esp_wifi_sys::c_types::c_void {
+    _arg1: crate::sys::c_types::c_int,
+) -> *mut crate::sys::c_types::c_void {
     todo!()
 }
 
 pub(crate) unsafe extern "C" fn sleep_retention_entries_create_dummy(
-    _arg1: *const esp_wifi_sys::c_types::c_void,
-    _arg2: esp_wifi_sys::c_types::c_int,
-    _arg3: esp_wifi_sys::c_types::c_int,
-    _arg4: esp_wifi_sys::c_types::c_int,
-) -> esp_wifi_sys::c_types::c_int {
+    _arg1: *const crate::sys::c_types::c_void,
+    _arg2: crate::sys::c_types::c_int,
+    _arg3: crate::sys::c_types::c_int,
+    _arg4: crate::sys::c_types::c_int,
+) -> crate::sys::c_types::c_int {
     todo!()
 }
 
 pub(crate) unsafe extern "C" fn sleep_retention_entries_destroy_dummy(
-    _arg1: esp_wifi_sys::c_types::c_int,
+    _arg1: crate::sys::c_types::c_int,
 ) {
     todo!()
 }
@@ -77,8 +77,8 @@ pub(crate) unsafe extern "C" fn sleep_retention_entries_destroy_dummy(
 /// *************************************************************************
 pub unsafe extern "C" fn set_isr(
     n: i32,
-    f: *mut crate::binary::c_types::c_void,
-    arg: *mut crate::binary::c_types::c_void,
+    f: *mut crate::sys::c_types::c_void,
+    arg: *mut crate::sys::c_types::c_void,
 ) {
     trace!("set_isr - interrupt {} function {:?} arg {:?}", n, f, arg);
 

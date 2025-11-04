@@ -8,12 +8,6 @@ use esp_hal::{
 };
 use esp_phy::{PhyController, PhyInitGuard};
 use esp_sync::NonReentrantMutex;
-use esp_wifi_sys::include::{
-    ieee802154_coex_event_t,
-    ieee802154_coex_event_t_IEEE802154_IDLE,
-    ieee802154_coex_event_t_IEEE802154_LOW,
-    ieee802154_coex_event_t_IEEE802154_MIDDLE,
-};
 
 use super::{
     frame::{
@@ -25,6 +19,12 @@ use super::{
     },
     hal::*,
     pib::*,
+};
+use crate::sys::include::{
+    ieee802154_coex_event_t,
+    ieee802154_coex_event_t_IEEE802154_IDLE,
+    ieee802154_coex_event_t_IEEE802154_LOW,
+    ieee802154_coex_event_t_IEEE802154_MIDDLE,
 };
 
 const PHY_ENABLE_VERSION_PRINT: u8 = 1;
