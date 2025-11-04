@@ -469,8 +469,8 @@ where
 
         let mem_guard = create_mem_guard(unsafe { self.uart.clone_unchecked() });
 
-        let rts_pin = PinGuard::new_unconnected(self.uart.info().rts_signal);
-        let tx_pin = PinGuard::new_unconnected(self.uart.info().tx_signal);
+        let rts_pin = PinGuard::new_unconnected();
+        let tx_pin = PinGuard::new_unconnected();
 
         let mut serial = Uart {
             rx: UartRx {
