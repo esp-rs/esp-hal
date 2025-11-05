@@ -876,7 +876,7 @@ where
             .conf0()
             .modify(|_, w| w.txd_inv().bit(!original_txd_inv));
 
-        #[cfg(any(esp32c6, esp32h2))]
+        #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
         sync_regs(self.uart.info().regs());
 
         // Calculate total delay in microseconds: (bits * 1_000_000) / baudrate_bps
@@ -893,7 +893,7 @@ where
             .conf0()
             .modify(|_, w| w.txd_inv().bit(original_txd_inv));
 
-        #[cfg(any(esp32c6, esp32h2))]
+        #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
         sync_regs(self.uart.info().regs());
     }
 
