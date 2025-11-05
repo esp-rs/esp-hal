@@ -278,21 +278,21 @@ mod tests {
 
         // Test 1: Send break, expect detection
         tx.send_break(100);
-        assert!(rx.wait_for_break_with_timeout(1_000_000));
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
 
         // Test 2: Don't send break, expect timeout
         assert!(!rx.wait_for_break_with_timeout(Duration::from_millis(100)));
 
         // Test 3: Send break again, expect detection
         tx.send_break(100);
-        assert!(rx.wait_for_break_with_timeout(1_000_000));
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
 
         // Test 4: Don't send break, expect timeout again
         assert!(!rx.wait_for_break_with_timeout(Duration::from_millis(100)));
 
         // Test 5: Final break detection, expect detection
         tx.send_break(100);
-        assert!(rx.wait_for_break_with_timeout(1_000_000));
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
     }
 
     #[test]
@@ -304,7 +304,7 @@ mod tests {
 
         // Test 1: Send break, expect detection
         tx.send_break(100);
-        assert!(rx.wait_for_break_with_timeout(1_000_000));
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
 
         // Test 2: Send normal data (should not trigger break detection)
         tx.write(&[0x42, 0x43, 0x44]).unwrap();
@@ -318,7 +318,7 @@ mod tests {
 
         // Test 4: Send break after data, expect detection
         tx.send_break(100);
-        assert!(rx.wait_for_break_with_timeout(1_000_000));
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
 
         // Test 5: Send more data
         tx.write(&[0xAA, 0xBB]).unwrap();
@@ -332,7 +332,7 @@ mod tests {
 
         // Test 7: Final break detection
         tx.send_break(100);
-        assert!(rx.wait_for_break_with_timeout(1_000_000));
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
     }
 
     #[test]
@@ -348,7 +348,7 @@ mod tests {
         tx.send_break(100);
 
         // Detect the break
-        assert!(rx.wait_for_break_with_timeout(1_000_000));
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
 
         // Data should still be intact and readable after break detection
         let mut buf = [0u8; 4];
@@ -363,7 +363,7 @@ mod tests {
         tx.send_break(100);
 
         // Detect second break
-        assert!(rx.wait_for_break_with_timeout(1_000_000));
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
 
         // Second batch of data should also be intact
         let mut buf = [0u8; 3];
