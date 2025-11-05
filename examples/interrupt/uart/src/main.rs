@@ -86,7 +86,9 @@ fn main() -> ! {
 
             critical_section::with(|cs| {
                 if let Some(uart) = SERIAL.borrow_ref_mut(cs).as_mut() {
-                    let msg = [0x55, 0x22, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+                    let msg = [
+                        0x55, 0x22, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x46,
+                    ];
                     let _ = uart.write(&msg);
                     let _ = uart.flush();
                 }
