@@ -158,6 +158,7 @@ impl RunQueue {
         }
     }
 
+    #[esp_hal::ram]
     pub(crate) fn mark_task_ready(
         &mut self,
         _state: &[CpuSchedulerState; Cpu::COUNT],
@@ -168,9 +169,7 @@ impl RunQueue {
 
         ready_task.set_state(TaskState::Ready);
         if let Some(mut containing_queue) = unsafe { ready_task.as_mut().current_queue.take() } {
-            unsafe {
-                containing_queue.as_mut().remove(ready_task);
-            }
+            unsafe { containing_queue.as_mut().remove(ready_task) };
         }
         self.ready_tasks[priority_n].push(ready_task);
 
@@ -199,6 +198,7 @@ impl RunQueue {
     }
 
     #[cfg(multi_core)]
+    #[esp_hal::ram]
     fn select_scheduler_trigger_multi_core(
         &mut self,
         state: &[CpuSchedulerState; Cpu::COUNT],
@@ -237,6 +237,7 @@ impl RunQueue {
         }
     }
 
+    #[esp_hal::ram]
     fn select_scheduler_trigger_single_core(&self, priority: usize) -> RunSchedulerOn {
         // Run the scheduler if the new priority is >= current maximum priority. This will trigger a
         // run even if the new task's priority is equal, to make sure time slicing is set up.
@@ -247,6 +248,7 @@ impl RunQueue {
         }
     }
 
+    #[esp_hal::ram]
     pub(crate) fn pop(&mut self) -> Option<TaskPtr> {
         let current_prio = self.ready_priority.ready();
         debug!("pop - from level: {}", current_prio);

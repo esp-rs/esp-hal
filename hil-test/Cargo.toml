@@ -8,87 +8,17 @@ publish = false
 name = "hil_test"
 
 [[bin]]
-name    = "aes"
-harness = false
+name              = "aes"
+harness           = false
 
 [[bin]]
-name    = "alloc_psram"
-harness = false
+name              = "alloc_psram"
+harness           = false
 required-features = ["psram"]
 
 [[bin]]
-name    = "gpio"
-harness = false
-
-[[bin]]
-name    = "gpio_custom_handler"
-harness = false
-
-[[bin]]
-name    = "interrupt"
-harness = false
-
-[[bin]]
-name    = "i2c"
-harness = false
-
-[[bin]]
-name    = "i2s"
-harness = false
-
-[[bin]]
-name    = "i2s_parallel"
-harness = false
-
-[[bin]]
-name    = "lcd_cam"
-harness = false
-
-[[bin]]
-name    = "misc_non_drivers"
-harness = false
-
-[[bin]]
-name    = "rng"
-harness = false
-
-[[bin]]
-name    = "spi_full_duplex"
-harness = false
-
-[[bin]]
-name    = "spi_half_duplex_slave_qspi"
-harness = false
-
-
-[[bin]]
-name    = "spi_half_duplex_write_psram"
-harness = false
-
-[[bin]]
-name    = "storage_read_app_desc"
-harness = false
-
-[[bin]]
-name    = "parl_io"
-harness = false
-
-[[bin]]
-name    = "pcnt"
-harness = false
-
-[[bin]]
-name    = "rmt"
-harness = false
-required-features = ["embassy"]
-
-[[bin]]
-name    = "ecc_rsa_sha"
-harness = false
-
-[[bin]]
-name    = "uart"
-harness = false
+name              = "ecc_rsa_sha"
+harness           = false
 
 [[bin]]
 name              = "embassy_timers_executors"
@@ -96,22 +26,70 @@ harness           = false
 required-features = ["embassy"]
 
 [[bin]]
-name    = "systimer"
-harness = false
-
-[[bin]]
-name    = "twai"
-harness = false
-
-[[bin]]
-name              = "esp_radio_ble_controller"
+name              = "esp_radio"
 harness           = false
 required-features = ["esp-radio", "esp-alloc"]
 
 [[bin]]
-name              = "esp_radio_init"
+name              = "gpio"
 harness           = false
-required-features = ["esp-radio", "esp-alloc"]
+
+[[bin]]
+name              = "gpio_custom_handler"
+harness           = false
+
+[[bin]]
+name              = "i2c"
+harness           = false
+
+[[bin]]
+name              = "i2s"
+harness           = false
+
+[[bin]]
+name              = "interrupt"
+harness           = false
+
+[[bin]]
+name              = "lcd_cam"
+harness           = false
+
+[[bin]]
+name              = "misc_drivers"
+harness           = false
+
+[[bin]]
+name              = "misc_non_drivers"
+harness           = false
+
+[[bin]]
+name              = "parl_io"
+harness           = false
+
+[[bin]]
+name              = "rmt"
+harness           = false
+required-features = ["embassy"]
+
+[[bin]]
+name              = "spi_full_duplex"
+harness           = false
+
+[[bin]]
+name              = "spi_half_duplex_slave_qspi"
+harness           = false
+
+[[bin]]
+name              = "spi_half_duplex_write_psram"
+harness           = false
+
+[[bin]]
+name              = "storage_read_app_desc"
+harness           = false
+
+[[bin]]
+name              = "uart"
+harness           = false
 
 [dependencies]
 allocator-api2    = { version = "0.3.0", default-features = false, features = ["alloc"] }
@@ -145,7 +123,7 @@ crypto-bigint       = { version = "0.5.5", default-features = false }
 digest              = { version = "0.10.7", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
 # Add the `embedded-test/defmt` feature for more verbose testing
-embedded-test       = { version = "0.7.0-alpha.3", default-features = false, features = ["embassy", "external-executor", "semihosting", "defmt"], git = "https://github.com/probe-rs/embedded-test", branch = "next" }
+embedded-test       = { version = "0.7", default-features = false, features = ["embassy", "external-executor", "semihosting", "defmt"] }
 hex-literal         = "1.0.0"
 nb                  = "1.1.0"
 p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
@@ -168,6 +146,7 @@ embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
 esp32 = [
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32",
+    "esp-alloc/esp32",
     "esp-radio?/esp32",
     "esp-storage?/esp32",
     "esp-bootloader-esp-idf/esp32",
@@ -176,6 +155,7 @@ esp32 = [
 ]
 esp32c2 = [
     "esp-hal/esp32c2",
+    "esp-alloc/esp32c2",
     "esp-radio?/esp32c2",
     "esp-storage?/esp32c2",
     "esp-bootloader-esp-idf/esp32c2",
@@ -184,6 +164,7 @@ esp32c2 = [
 ]
 esp32c3 = [
     "esp-hal/esp32c3",
+    "esp-alloc/esp32c3",
     "esp-radio?/esp32c3",
     "esp-storage?/esp32c3",
     "esp-bootloader-esp-idf/esp32c3",
@@ -192,6 +173,7 @@ esp32c3 = [
 ]
 esp32c6 = [
     "esp-hal/esp32c6",
+    "esp-alloc/esp32c6",
     "esp-radio?/esp32c6",
     "esp-storage?/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
@@ -200,6 +182,7 @@ esp32c6 = [
 ]
 esp32h2 = [
     "esp-hal/esp32h2",
+    "esp-alloc/esp32h2",
     "esp-radio?/esp32h2",
     "esp-storage?/esp32h2",
     "esp-bootloader-esp-idf/esp32h2",
@@ -209,6 +192,7 @@ esp32h2 = [
 esp32s2 = [
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32s2",
+    "esp-alloc/esp32s2",
     "esp-radio?/esp32s2",
     "esp-storage?/esp32s2",
     "esp-bootloader-esp-idf/esp32s2",
@@ -218,6 +202,7 @@ esp32s2 = [
 esp32s3 = [
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32s3",
+    "esp-alloc/esp32s3",
     "esp-radio?/esp32s3",
     "esp-storage?/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",

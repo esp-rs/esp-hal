@@ -1,6 +1,4 @@
 //! Low-level access to Xtensa LX processors and peripherals.
-//!
-//! ## Feature Flags
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(asm_sub_register)]
 #![feature(asm_experimental_arch)]

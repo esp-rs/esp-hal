@@ -285,6 +285,12 @@ extern "C" fn timer_tick_handler() {
         if now >= time_driver.timer_queue.time_slice_target[1] {
             crate::task::schedule_other_core();
         }
+
+        // Re-arm the timer. This should be relatively cheap, and ensures that the timer will keep
+        // ticking even if the interrupt doesn't trigger a context switch.
+        // FIXME: this SHOULD be relatively cheap, but arming the timer involves u64 division.
+        time_driver.current_alarm = u64::MAX;
+        time_driver.arm_next_wakeup(now);
     });
 
     #[cfg(feature = "rtos-trace")]

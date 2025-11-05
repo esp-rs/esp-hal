@@ -1,9 +1,9 @@
 use std::{cell::RefCell, fmt::Display, thread};
 
-use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::{TokenStream, TokenStream as TokenStream2};
 use quote::{ToTokens, quote};
 use syn::{
+    Attribute,
     Meta,
     ReturnType,
     Token,
@@ -28,10 +28,10 @@ impl Parse for Args {
 
 /// Procedural macro entry point for the async `main` function.
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
-    let args = syn::parse_macro_input!(args as Args);
-    let f = syn::parse_macro_input!(item as syn::ItemFn);
+    let args: Args = crate::unwrap_or_compile_error!(syn::parse2(args));
+    let f: syn::ItemFn = crate::unwrap_or_compile_error!(syn::parse2(item));
 
-    run(&args.meta, f, main_fn()).unwrap_or_else(|x| x).into()
+    run(&args.meta, f, main_fn()).unwrap_or_else(|x| x)
 }
 
 /// Expands and validates the async `main` function into a task entry point.
@@ -75,24 +75,42 @@ pub fn run(
         ctxt.error_spanned_by(&f.sig, "main function must have 1 argument: the spawner.");
     }
 
+    let fattrs = f.attrs;
+    let lint_attrs: Vec<Attribute> = fattrs
+        .clone()
+        .into_iter()
+        .filter(|item| {
+            item.path().is_ident("deny")
+                || item.path().is_ident("allow")
+                || item.path().is_ident("warn")
+        })
+        .collect();
+
     ctxt.check()?;
 
     let f_body = f.block;
     let out = &f.sig.output;
 
     let result = quote! {
-        #[doc(hidden)]
-        #[::embassy_executor::task()]
-        async fn __embassy_main(#fargs) #out {
-            #f_body
-        }
+        #(#lint_attrs)*
+        pub(crate) mod __main {
+            use super::*;
 
-        #[doc(hidden)]
-        unsafe fn __make_static<T>(t: &mut T) -> &'static mut T {
-            ::core::mem::transmute(t)
-        }
+            #[doc(hidden)]
+            #(#fattrs)*
+            #[::embassy_executor::task()]
+            async fn __embassy_main(#fargs) #out {
+                #f_body
+            }
 
-        #main
+            #[doc(hidden)]
+            unsafe fn __make_static<T>(t: &mut T) -> &'static mut T {
+                ::core::mem::transmute(t)
+            }
+
+            #(#fattrs)*
+            #main
+        }
     };
 
     Ok(result)
@@ -175,5 +193,300 @@ pub fn main_fn() -> TokenStream2 {
                 spawner.must_spawn(__embassy_main(spawner));
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_basic() {
+        let result = main(
+            quote::quote! {}.into(),
+            quote::quote! {
+                async fn foo(spawner: Spawner){}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                pub (crate) mod __main {
+                    use super::*;
+                    #[doc(hidden)]
+                    #[::embassy_executor::task()]
+                    async fn __embassy_main (spawner : Spawner) {
+                        { }
+                    }
+
+                    #[doc(hidden)]
+                    unsafe fn __make_static < T > (t : & mut T) -> & 'static mut T {
+                        ::core::mem::transmute(t)
+                    }
+
+                    #[esp_hal::main]
+                    fn main () -> ! {
+                        let mut executor = ::esp_rtos::embassy::Executor::new();
+                        let executor = unsafe { __make_static (& mut executor) };
+                        executor . run (| spawner | {
+                            spawner.must_spawn(__embassy_main (spawner));
+                        })
+                    }
+                }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_non_async_fn() {
+        let result = main(
+            quote::quote! {}.into(),
+            quote::quote! {
+                fn foo(spawner: Spawner){}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "main function must be async" }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_no_arg() {
+        let result = main(
+            quote::quote! {}.into(),
+            quote::quote! {
+                async fn foo(){}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "main function must have 1 argument: the spawner." }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_not_generic() {
+        let result = main(
+            quote::quote! {}.into(),
+            quote::quote! {
+                async fn foo<S>(spawner: S){}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "main function must not be generic" }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_not_abi() {
+        let result = main(
+            quote::quote! {}.into(),
+            quote::quote! {
+                async extern "C" fn foo(spawner: Spawner){}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "main function must not have an ABI qualifier" }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_not_variadic() {
+        let result = main(
+            quote::quote! {}.into(),
+            quote::quote! {
+                async fn foo(spawner: ...){}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "main function must not be variadic" }
+                ::core::compile_error!{ "main function must have 1 argument: the spawner." }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_not_return_value() {
+        let result = main(
+            quote::quote! {}.into(),
+            quote::quote! {
+                async fn foo(spawner: Spawner) -> u32 {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                ::core::compile_error!{ "main function must either not return a value, return `()` or return `!`" }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_basic_return_never() {
+        let result = main(
+            quote::quote! {}.into(),
+            quote::quote! {
+                async fn foo(spawner: Spawner) -> ! {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                pub (crate) mod __main {
+                    use super::*;
+                    #[doc(hidden)]
+                    #[::embassy_executor::task()]
+                    async fn __embassy_main (spawner : Spawner) -> ! {
+                        { }
+                    }
+
+                    #[doc(hidden)]
+                    unsafe fn __make_static < T > (t : & mut T) -> & 'static mut T {
+                        ::core::mem::transmute(t)
+                    }
+
+                    # [esp_hal::main]
+                    fn main () -> ! {
+                        let mut executor = ::esp_rtos::embassy::Executor::new();
+                        let executor = unsafe { __make_static (& mut executor) };
+                        executor.run (| spawner | {
+                            spawner.must_spawn(__embassy_main (spawner));
+                        })
+                    }
+                }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_basic_return_tuple() {
+        let result = main(
+            quote::quote! {}.into(),
+            quote::quote! {
+                async fn foo(spawner: Spawner) -> () {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                pub (crate) mod __main {
+                    use super::*;
+                    #[doc(hidden)]
+                    #[::embassy_executor::task()]
+                    async fn __embassy_main (spawner : Spawner) -> () {
+                        { }
+                    }
+
+                    #[doc(hidden)]
+                    unsafe fn __make_static < T > (t : & mut T) -> & 'static mut T {
+                        ::core::mem::transmute(t)
+                    }
+
+                    #[esp_hal::main]
+                    fn main () -> ! {
+                        let mut executor = ::esp_rtos::embassy::Executor::new();
+                        let executor = unsafe { __make_static (& mut executor) };
+                        executor.run (| spawner | {
+                            spawner.must_spawn(__embassy_main (spawner));
+                        })
+                    }
+                }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_basic_propagate_lint_attrs() {
+        let result = main(
+            quote::quote! {}.into(),
+            quote::quote! {
+                #[allow(allowed)]
+                #[deny(denied)]
+                #[warn(warning)]
+                #[ram]
+                async fn foo(spawner: Spawner) -> () {}
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote::quote! {
+                #[allow(allowed)]
+                #[deny(denied)]
+                #[warn (warning)]
+                pub (crate) mod __main {
+                    use super::*;
+                    #[doc(hidden)]
+                    #[allow(allowed)]
+                    #[deny(denied)]
+                    #[warn (warning)]
+                    #[ram]
+                    #[::embassy_executor::task()]
+                    async fn __embassy_main (spawner : Spawner) -> () {
+                        { }
+                    }
+
+                    #[doc(hidden)]
+                    unsafe fn __make_static < T > (t : & mut T) -> & 'static mut T {
+                        ::core::mem::transmute(t)
+                    }
+
+                    #[allow(allowed)]
+                    #[deny(denied)]
+                    #[warn(warning)]
+                    #[ram]
+                    #[esp_hal::main]
+                    fn main () -> ! {
+                        let mut executor = ::esp_rtos::embassy::Executor::new();
+                        let executor = unsafe { __make_static (& mut executor) };
+                        executor.run (| spawner | {
+                            spawner.must_spawn(__embassy_main (spawner));
+                        })
+                    }
+                }
+            }
+            .to_string()
+        );
     }
 }

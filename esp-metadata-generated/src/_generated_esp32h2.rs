@@ -258,19 +258,14 @@ macro_rules! property {
     ("uart.ram_size", str) => {
         stringify!(128)
     };
+    ("uart.peripheral_controls_mem_clk") => {
+        true
+    };
     ("bt.controller") => {
         "npl"
     };
     ("phy.combo_module") => {
         false
-    };
-}
-/// Macro to get the address range of the given memory region.
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! memory_range {
-    ("DRAM") => {
-        1082130432..1082458112
     };
 }
 #[macro_export]
@@ -279,6 +274,449 @@ macro_rules! for_each_soc_xtal_options {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
         _for_each_inner!((32)); _for_each_inner!((all(32)));
+    };
+}
+/// Implement the `Peripheral` enum and enable/disable/reset functions.
+///
+/// This macro is intended to be placed in `esp_hal::system`.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! implement_peripheral_clocks {
+    () => {
+        #[doc(hidden)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[repr(u8)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum Peripheral {
+            #[doc = "AES peripheral clock signal"]
+            Aes,
+            #[doc = "APB_SAR_ADC peripheral clock signal"]
+            ApbSarAdc,
+            #[doc = "DMA peripheral clock signal"]
+            Dma,
+            #[doc = "DS peripheral clock signal"]
+            Ds,
+            #[doc = "ECC peripheral clock signal"]
+            Ecc,
+            #[doc = "ECDSA peripheral clock signal"]
+            Ecdsa,
+            #[doc = "ETM peripheral clock signal"]
+            Etm,
+            #[doc = "HMAC peripheral clock signal"]
+            Hmac,
+            #[doc = "I2C_EXT0 peripheral clock signal"]
+            I2cExt0,
+            #[doc = "I2C_EXT1 peripheral clock signal"]
+            I2cExt1,
+            #[doc = "I2S0 peripheral clock signal"]
+            I2s0,
+            #[doc = "LEDC peripheral clock signal"]
+            Ledc,
+            #[doc = "MCPWM0 peripheral clock signal"]
+            Mcpwm0,
+            #[doc = "PARL_IO peripheral clock signal"]
+            ParlIo,
+            #[doc = "PCNT peripheral clock signal"]
+            Pcnt,
+            #[doc = "RMT peripheral clock signal"]
+            Rmt,
+            #[doc = "RSA peripheral clock signal"]
+            Rsa,
+            #[doc = "SHA peripheral clock signal"]
+            Sha,
+            #[doc = "SPI2 peripheral clock signal"]
+            Spi2,
+            #[doc = "SYSTIMER peripheral clock signal"]
+            Systimer,
+            #[doc = "TIMG0 peripheral clock signal"]
+            Timg0,
+            #[doc = "TIMG1 peripheral clock signal"]
+            Timg1,
+            #[doc = "TRACE0 peripheral clock signal"]
+            Trace0,
+            #[doc = "TSENS peripheral clock signal"]
+            Tsens,
+            #[doc = "TWAI0 peripheral clock signal"]
+            Twai0,
+            #[doc = "UART0 peripheral clock signal"]
+            Uart0,
+            #[doc = "UART1 peripheral clock signal"]
+            Uart1,
+            #[doc = "UHCI0 peripheral clock signal"]
+            Uhci0,
+            #[doc = "USB_DEVICE peripheral clock signal"]
+            UsbDevice,
+        }
+        impl Peripheral {
+            const KEEP_ENABLED: &[Peripheral] =
+                &[Self::Systimer, Self::Timg0, Self::Uart0, Self::UsbDevice];
+            const COUNT: usize = Self::ALL.len();
+            const ALL: &[Self] = &[
+                Self::Aes,
+                Self::ApbSarAdc,
+                Self::Dma,
+                Self::Ds,
+                Self::Ecc,
+                Self::Ecdsa,
+                Self::Etm,
+                Self::Hmac,
+                Self::I2cExt0,
+                Self::I2cExt1,
+                Self::I2s0,
+                Self::Ledc,
+                Self::Mcpwm0,
+                Self::ParlIo,
+                Self::Pcnt,
+                Self::Rmt,
+                Self::Rsa,
+                Self::Sha,
+                Self::Spi2,
+                Self::Systimer,
+                Self::Timg0,
+                Self::Timg1,
+                Self::Trace0,
+                Self::Tsens,
+                Self::Twai0,
+                Self::Uart0,
+                Self::Uart1,
+                Self::Uhci0,
+                Self::UsbDevice,
+            ];
+        }
+        unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
+            match peripheral {
+                Peripheral::Aes => {
+                    crate::peripherals::SYSTEM::regs()
+                        .aes_conf()
+                        .modify(|_, w| w.aes_clk_en().bit(enable));
+                }
+                Peripheral::ApbSarAdc => {
+                    crate::peripherals::SYSTEM::regs()
+                        .saradc_conf()
+                        .modify(|_, w| w.saradc_reg_clk_en().bit(enable));
+                }
+                Peripheral::Dma => {
+                    crate::peripherals::SYSTEM::regs()
+                        .gdma_conf()
+                        .modify(|_, w| w.gdma_clk_en().bit(enable));
+                }
+                Peripheral::Ds => {
+                    crate::peripherals::SYSTEM::regs()
+                        .ds_conf()
+                        .modify(|_, w| w.ds_clk_en().bit(enable));
+                }
+                Peripheral::Ecc => {
+                    crate::peripherals::SYSTEM::regs()
+                        .ecc_conf()
+                        .modify(|_, w| w.ecc_clk_en().bit(enable));
+                }
+                Peripheral::Ecdsa => {
+                    crate::peripherals::SYSTEM::regs()
+                        .ecdsa_conf()
+                        .modify(|_, w| w.ecdsa_clk_en().bit(enable));
+                }
+                Peripheral::Etm => {
+                    crate::peripherals::SYSTEM::regs()
+                        .etm_conf()
+                        .modify(|_, w| w.etm_clk_en().bit(enable));
+                }
+                Peripheral::Hmac => {
+                    crate::peripherals::SYSTEM::regs()
+                        .hmac_conf()
+                        .modify(|_, w| w.hmac_clk_en().bit(enable));
+                }
+                Peripheral::I2cExt0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .i2c0_conf()
+                        .modify(|_, w| w.i2c0_clk_en().bit(enable));
+                }
+                Peripheral::I2cExt1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .i2c1_conf()
+                        .modify(|_, w| w.i2c1_clk_en().bit(enable));
+                }
+                Peripheral::I2s0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .i2s_conf()
+                        .modify(|_, w| w.i2s_clk_en().bit(enable));
+                }
+                Peripheral::Ledc => {
+                    crate::peripherals::SYSTEM::regs()
+                        .ledc_conf()
+                        .modify(|_, w| w.ledc_clk_en().bit(enable));
+                }
+                Peripheral::Mcpwm0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .pwm_conf()
+                        .modify(|_, w| w.pwm_clk_en().bit(enable));
+                }
+                Peripheral::ParlIo => {
+                    crate::peripherals::SYSTEM::regs()
+                        .parl_io_conf()
+                        .modify(|_, w| w.parl_clk_en().bit(enable));
+                }
+                Peripheral::Pcnt => {
+                    crate::peripherals::SYSTEM::regs()
+                        .pcnt_conf()
+                        .modify(|_, w| w.pcnt_clk_en().bit(enable));
+                }
+                Peripheral::Rmt => {
+                    crate::peripherals::SYSTEM::regs()
+                        .rmt_conf()
+                        .modify(|_, w| w.rmt_clk_en().bit(enable));
+                }
+                Peripheral::Rsa => {
+                    crate::peripherals::SYSTEM::regs()
+                        .rsa_conf()
+                        .modify(|_, w| w.rsa_clk_en().bit(enable));
+                }
+                Peripheral::Sha => {
+                    crate::peripherals::SYSTEM::regs()
+                        .sha_conf()
+                        .modify(|_, w| w.sha_clk_en().bit(enable));
+                }
+                Peripheral::Spi2 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .spi2_conf()
+                        .modify(|_, w| w.spi2_clk_en().bit(enable));
+                }
+                Peripheral::Systimer => {
+                    crate::peripherals::SYSTEM::regs()
+                        .systimer_conf()
+                        .modify(|_, w| w.systimer_clk_en().bit(enable));
+                }
+                Peripheral::Timg0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .timergroup0_conf()
+                        .modify(|_, w| w.tg0_clk_en().bit(enable));
+                    crate::peripherals::SYSTEM::regs()
+                        .timergroup0_timer_clk_conf()
+                        .modify(|_, w| w.tg0_timer_clk_en().bit(enable));
+                }
+                Peripheral::Timg1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .timergroup1_conf()
+                        .modify(|_, w| w.tg1_clk_en().bit(enable));
+                    crate::peripherals::SYSTEM::regs()
+                        .timergroup1_timer_clk_conf()
+                        .modify(|_, w| w.tg1_timer_clk_en().bit(enable));
+                }
+                Peripheral::Trace0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .trace_conf()
+                        .modify(|_, w| w.trace_clk_en().bit(enable));
+                }
+                Peripheral::Tsens => {
+                    crate::peripherals::SYSTEM::regs()
+                        .tsens_clk_conf()
+                        .modify(|_, w| w.tsens_clk_en().bit(enable));
+                }
+                Peripheral::Twai0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .twai0_conf()
+                        .modify(|_, w| w.twai0_clk_en().bit(enable));
+                    crate::peripherals::SYSTEM::regs()
+                        .twai0_func_clk_conf()
+                        .modify(|_, w| w.twai0_func_clk_en().bit(enable));
+                }
+                Peripheral::Uart0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .uart(0)
+                        .conf()
+                        .modify(|_, w| w.clk_en().bit(enable));
+                }
+                Peripheral::Uart1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .uart(1)
+                        .conf()
+                        .modify(|_, w| w.clk_en().bit(enable));
+                }
+                Peripheral::Uhci0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .uhci_conf()
+                        .modify(|_, w| w.uhci_clk_en().bit(enable));
+                }
+                Peripheral::UsbDevice => {
+                    crate::peripherals::SYSTEM::regs()
+                        .usb_device_conf()
+                        .modify(|_, w| w.usb_device_clk_en().bit(enable));
+                }
+            }
+        }
+        unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
+            match peripheral {
+                Peripheral::Aes => {
+                    crate::peripherals::SYSTEM::regs()
+                        .aes_conf()
+                        .modify(|_, w| w.aes_rst_en().bit(reset));
+                }
+                Peripheral::ApbSarAdc => {
+                    crate::peripherals::SYSTEM::regs()
+                        .saradc_conf()
+                        .modify(|_, w| w.saradc_reg_rst_en().bit(reset));
+                }
+                Peripheral::Dma => {
+                    crate::peripherals::SYSTEM::regs()
+                        .gdma_conf()
+                        .modify(|_, w| w.gdma_rst_en().bit(reset));
+                }
+                Peripheral::Ds => {
+                    crate::peripherals::SYSTEM::regs()
+                        .ds_conf()
+                        .modify(|_, w| w.ds_rst_en().bit(reset));
+                }
+                Peripheral::Ecc => {
+                    crate::peripherals::SYSTEM::regs()
+                        .ecc_conf()
+                        .modify(|_, w| w.ecc_rst_en().bit(reset));
+                }
+                Peripheral::Ecdsa => {
+                    crate::peripherals::SYSTEM::regs()
+                        .ecdsa_conf()
+                        .modify(|_, w| w.ecdsa_rst_en().bit(reset));
+                }
+                Peripheral::Etm => {
+                    crate::peripherals::SYSTEM::regs()
+                        .etm_conf()
+                        .modify(|_, w| w.etm_rst_en().bit(reset));
+                }
+                Peripheral::Hmac => {
+                    crate::peripherals::SYSTEM::regs()
+                        .hmac_conf()
+                        .modify(|_, w| w.hmac_rst_en().bit(reset));
+                }
+                Peripheral::I2cExt0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .i2c0_conf()
+                        .modify(|_, w| w.i2c0_rst_en().bit(reset));
+                }
+                Peripheral::I2cExt1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .i2c1_conf()
+                        .modify(|_, w| w.i2c1_rst_en().bit(reset));
+                }
+                Peripheral::I2s0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .i2s_conf()
+                        .modify(|_, w| w.i2s_rst_en().bit(reset));
+                }
+                Peripheral::Ledc => {
+                    crate::peripherals::SYSTEM::regs()
+                        .ledc_conf()
+                        .modify(|_, w| w.ledc_rst_en().bit(reset));
+                }
+                Peripheral::Mcpwm0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .pwm_conf()
+                        .modify(|_, w| w.pwm_rst_en().bit(reset));
+                }
+                Peripheral::ParlIo => {
+                    crate::peripherals::SYSTEM::regs()
+                        .parl_io_conf()
+                        .modify(|_, w| w.parl_rst_en().bit(reset));
+                }
+                Peripheral::Pcnt => {
+                    crate::peripherals::SYSTEM::regs()
+                        .pcnt_conf()
+                        .modify(|_, w| w.pcnt_rst_en().bit(reset));
+                }
+                Peripheral::Rmt => {
+                    crate::peripherals::SYSTEM::regs()
+                        .rmt_conf()
+                        .modify(|_, w| w.rmt_rst_en().bit(reset));
+                }
+                Peripheral::Rsa => {
+                    crate::peripherals::SYSTEM::regs()
+                        .rsa_conf()
+                        .modify(|_, w| w.rsa_rst_en().bit(reset));
+                }
+                Peripheral::Sha => {
+                    crate::peripherals::SYSTEM::regs()
+                        .sha_conf()
+                        .modify(|_, w| w.sha_rst_en().bit(reset));
+                }
+                Peripheral::Spi2 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .spi2_conf()
+                        .modify(|_, w| w.spi2_rst_en().bit(reset));
+                }
+                Peripheral::Systimer => {
+                    crate::peripherals::SYSTEM::regs()
+                        .systimer_conf()
+                        .modify(|_, w| w.systimer_rst_en().bit(reset));
+                }
+                Peripheral::Timg0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .timergroup0_conf()
+                        .modify(|_, w| w.tg0_rst_en().bit(reset));
+                }
+                Peripheral::Timg1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .timergroup1_conf()
+                        .modify(|_, w| w.tg1_rst_en().bit(reset));
+                }
+                Peripheral::Trace0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .trace_conf()
+                        .modify(|_, w| w.trace_rst_en().bit(reset));
+                }
+                Peripheral::Tsens => {
+                    crate::peripherals::SYSTEM::regs()
+                        .tsens_clk_conf()
+                        .modify(|_, w| w.tsens_rst_en().bit(reset));
+                }
+                Peripheral::Twai0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .twai0_conf()
+                        .modify(|_, w| w.twai0_rst_en().bit(reset));
+                }
+                Peripheral::Uart0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .uart(0)
+                        .conf()
+                        .modify(|_, w| w.rst_en().bit(reset));
+                }
+                Peripheral::Uart1 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .uart(1)
+                        .conf()
+                        .modify(|_, w| w.rst_en().bit(reset));
+                }
+                Peripheral::Uhci0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .uhci_conf()
+                        .modify(|_, w| w.uhci_rst_en().bit(reset));
+                }
+                Peripheral::UsbDevice => {
+                    crate::peripherals::SYSTEM::regs()
+                        .usb_device_conf()
+                        .modify(|_, w| w.usb_device_rst_en().bit(reset));
+                }
+            }
+        }
+    };
+}
+/// Macro to get the address range of the given memory region.
+///
+/// This macro provides two syntax options for each memory region:
+///
+/// - `memory_range!("region_name")` returns the address range as a range expression (`start..end`).
+/// - `memory_range!(size as str, "region_name")` returns the size of the region as a string
+///   literal.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! memory_range {
+    ("DRAM") => {
+        1082130432..1082458112
+    };
+    (size as str, "DRAM") => {
+        "327680"
+    };
+    ("DRAM2_UNINIT") => {
+        1082388432..1082457824
+    };
+    (size as str, "DRAM2_UNINIT") => {
+        "69392"
     };
 }
 #[macro_export]

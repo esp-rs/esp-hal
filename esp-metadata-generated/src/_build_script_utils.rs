@@ -5,7 +5,7 @@
 macro_rules! println {
     ($($any:tt)*) => {};
 }
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(docsrs, doc(cfg(feature = "build-script")))]
 pub enum Chip {
     Esp32,
@@ -75,7 +75,7 @@ impl Chip {
     ///
     /// ## Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// assert_eq!(Chip::Esp32s3.name(), "esp32s3");
     /// ```
     pub fn name(self) -> &'static str {
@@ -95,7 +95,7 @@ impl Chip {
     ///
     /// ## Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// assert!(Chip::Esp32s3.contains("soc_has_pcnt"));
     /// ```
     pub fn contains(self, symbol: &str) -> bool {
@@ -109,7 +109,7 @@ impl Chip {
     ///
     /// ## Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// assert!(Chip::Esp32s3.all_symbols().contains("soc_has_pcnt"));
     /// ```
     pub fn all_symbols(&self) -> &'static [&'static str] {
@@ -119,7 +119,7 @@ impl Chip {
     ///
     /// ## Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// assert!(Chip::iter().any(|c| c == Chip::Esp32));
     /// ```
     pub fn iter() -> impl Iterator<Item = Chip> {
@@ -270,6 +270,8 @@ impl Chip {
                     "soc_rc_fast_clk_default_is_set",
                     "soc_rc_slow_clock=\"150000\"",
                     "soc_rc_slow_clock_is_set",
+                    "has_dram_region",
+                    "has_dram2_uninit_region",
                     "soc_has_multiple_xtal_options",
                     "aes_endianness_configurable",
                     "gpio_has_bank_1",
@@ -299,7 +301,6 @@ impl Chip {
                     "uart_ram_size=\"128\"",
                     "bt_controller=\"btdm\"",
                     "phy_combo_module",
-                    "has_dram_region",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32",
@@ -432,6 +433,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_rc_slow_clock=\"150000\"",
                     "cargo:rustc-cfg=soc_rc_slow_clock_is_set",
+                    "cargo:rustc-cfg=has_dram_region",
+                    "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=soc_has_multiple_xtal_options",
                     "cargo:rustc-cfg=aes_endianness_configurable",
                     "cargo:rustc-cfg=gpio_has_bank_1",
@@ -461,7 +464,6 @@ impl Chip {
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=bt_controller=\"btdm\"",
                     "cargo:rustc-cfg=phy_combo_module",
-                    "cargo:rustc-cfg=has_dram_region",
                 ],
             },
             Self::Esp32c2 => Config {
@@ -557,6 +559,8 @@ impl Chip {
                     "soc_rc_fast_clk_default_is_set",
                     "soc_rc_slow_clock=\"136000\"",
                     "soc_rc_slow_clock_is_set",
+                    "has_dram_region",
+                    "has_dram2_uninit_region",
                     "soc_has_multiple_xtal_options",
                     "assist_debug_has_sp_monitor",
                     "gpio_gpio_function=\"1\"",
@@ -586,7 +590,6 @@ impl Chip {
                     "uart_ram_size=\"128\"",
                     "bt_controller=\"npl\"",
                     "phy_combo_module",
-                    "has_dram_region",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32c2",
@@ -678,6 +681,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_rc_slow_clock=\"136000\"",
                     "cargo:rustc-cfg=soc_rc_slow_clock_is_set",
+                    "cargo:rustc-cfg=has_dram_region",
+                    "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=soc_has_multiple_xtal_options",
                     "cargo:rustc-cfg=assist_debug_has_sp_monitor",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
@@ -707,7 +712,6 @@ impl Chip {
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=bt_controller=\"npl\"",
                     "cargo:rustc-cfg=phy_combo_module",
-                    "cargo:rustc-cfg=has_dram_region",
                 ],
             },
             Self::Esp32c3 => Config {
@@ -819,6 +823,8 @@ impl Chip {
                     "soc_rc_fast_clk_default_is_set",
                     "soc_rc_slow_clock=\"136000\"",
                     "soc_rc_slow_clock_is_set",
+                    "has_dram_region",
+                    "has_dram2_uninit_region",
                     "soc_xtal_frequency=\"40\"",
                     "aes_dma",
                     "aes_dma_mode_ecb",
@@ -873,7 +879,6 @@ impl Chip {
                     "phy_combo_module",
                     "phy_backed_up_digital_register_count=\"21\"",
                     "phy_backed_up_digital_register_count_is_set",
-                    "has_dram_region",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32c3",
@@ -981,6 +986,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_rc_slow_clock=\"136000\"",
                     "cargo:rustc-cfg=soc_rc_slow_clock_is_set",
+                    "cargo:rustc-cfg=has_dram_region",
+                    "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=soc_xtal_frequency=\"40\"",
                     "cargo:rustc-cfg=aes_dma",
                     "cargo:rustc-cfg=aes_dma_mode_ecb",
@@ -1035,7 +1042,6 @@ impl Chip {
                     "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count=\"21\"",
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count_is_set",
-                    "cargo:rustc-cfg=has_dram_region",
                 ],
             },
             Self::Esp32c6 => Config {
@@ -1199,6 +1205,8 @@ impl Chip {
                     "soc_rc_fast_clk_default_is_set",
                     "soc_rc_slow_clock=\"136000\"",
                     "soc_rc_slow_clock_is_set",
+                    "has_dram_region",
+                    "has_dram2_uninit_region",
                     "soc_xtal_frequency=\"40\"",
                     "aes_dma",
                     "aes_dma_mode_ecb",
@@ -1253,11 +1261,11 @@ impl Chip {
                     "timergroup_default_wdt_clock_source=\"1\"",
                     "timergroup_default_wdt_clock_source_is_set",
                     "uart_ram_size=\"128\"",
+                    "uart_peripheral_controls_mem_clk",
                     "lp_uart_ram_size=\"32\"",
                     "wifi_has_wifi6",
                     "bt_controller=\"npl\"",
                     "phy_combo_module",
-                    "has_dram_region",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32c6",
@@ -1417,6 +1425,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_rc_slow_clock=\"136000\"",
                     "cargo:rustc-cfg=soc_rc_slow_clock_is_set",
+                    "cargo:rustc-cfg=has_dram_region",
+                    "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=soc_xtal_frequency=\"40\"",
                     "cargo:rustc-cfg=aes_dma",
                     "cargo:rustc-cfg=aes_dma_mode_ecb",
@@ -1471,11 +1481,11 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_default_wdt_clock_source=\"1\"",
                     "cargo:rustc-cfg=timergroup_default_wdt_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
+                    "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
                     "cargo:rustc-cfg=wifi_has_wifi6",
                     "cargo:rustc-cfg=bt_controller=\"npl\"",
                     "cargo:rustc-cfg=phy_combo_module",
-                    "cargo:rustc-cfg=has_dram_region",
                 ],
             },
             Self::Esp32h2 => Config {
@@ -1616,6 +1626,8 @@ impl Chip {
                     "soc_rc_fast_clk_default_is_set",
                     "soc_rc_slow_clock=\"136000\"",
                     "soc_rc_slow_clock_is_set",
+                    "has_dram_region",
+                    "has_dram2_uninit_region",
                     "soc_xtal_frequency=\"32\"",
                     "aes_dma",
                     "aes_dma_mode_ecb",
@@ -1667,8 +1679,8 @@ impl Chip {
                     "timergroup_default_wdt_clock_source=\"2\"",
                     "timergroup_default_wdt_clock_source_is_set",
                     "uart_ram_size=\"128\"",
+                    "uart_peripheral_controls_mem_clk",
                     "bt_controller=\"npl\"",
-                    "has_dram_region",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32h2",
@@ -1805,6 +1817,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_rc_slow_clock=\"136000\"",
                     "cargo:rustc-cfg=soc_rc_slow_clock_is_set",
+                    "cargo:rustc-cfg=has_dram_region",
+                    "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=soc_xtal_frequency=\"32\"",
                     "cargo:rustc-cfg=aes_dma",
                     "cargo:rustc-cfg=aes_dma_mode_ecb",
@@ -1856,8 +1870,8 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_default_wdt_clock_source=\"2\"",
                     "cargo:rustc-cfg=timergroup_default_wdt_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
+                    "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
                     "cargo:rustc-cfg=bt_controller=\"npl\"",
-                    "cargo:rustc-cfg=has_dram_region",
                 ],
             },
             Self::Esp32s2 => Config {
@@ -1993,6 +2007,8 @@ impl Chip {
                     "soc_rc_fast_clk_default_is_set",
                     "soc_rc_slow_clock=\"90000\"",
                     "soc_rc_slow_clock_is_set",
+                    "has_dram_region",
+                    "has_dram2_uninit_region",
                     "soc_xtal_frequency=\"40\"",
                     "aes_dma",
                     "aes_dma_mode_ecb",
@@ -2039,7 +2055,6 @@ impl Chip {
                     "timergroup_default_clock_source=\"0\"",
                     "timergroup_default_clock_source_is_set",
                     "uart_ram_size=\"128\"",
-                    "has_dram_region",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32s2",
@@ -2171,6 +2186,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_rc_slow_clock=\"90000\"",
                     "cargo:rustc-cfg=soc_rc_slow_clock_is_set",
+                    "cargo:rustc-cfg=has_dram_region",
+                    "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=soc_xtal_frequency=\"40\"",
                     "cargo:rustc-cfg=aes_dma",
                     "cargo:rustc-cfg=aes_dma_mode_ecb",
@@ -2217,7 +2234,6 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_default_clock_source=\"0\"",
                     "cargo:rustc-cfg=timergroup_default_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
-                    "cargo:rustc-cfg=has_dram_region",
                 ],
             },
             Self::Esp32s3 => Config {
@@ -2366,6 +2382,8 @@ impl Chip {
                     "soc_rc_fast_clk_default_is_set",
                     "soc_rc_slow_clock=\"136000\"",
                     "soc_rc_slow_clock_is_set",
+                    "has_dram_region",
+                    "has_dram2_uninit_region",
                     "soc_xtal_frequency=\"40\"",
                     "aes_dma",
                     "aes_dma_mode_ecb",
@@ -2421,7 +2439,6 @@ impl Chip {
                     "phy_combo_module",
                     "phy_backed_up_digital_register_count=\"21\"",
                     "phy_backed_up_digital_register_count_is_set",
-                    "has_dram_region",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32s3",
@@ -2566,6 +2583,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_rc_slow_clock=\"136000\"",
                     "cargo:rustc-cfg=soc_rc_slow_clock_is_set",
+                    "cargo:rustc-cfg=has_dram_region",
+                    "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=soc_xtal_frequency=\"40\"",
                     "cargo:rustc-cfg=aes_dma",
                     "cargo:rustc-cfg=aes_dma_mode_ecb",
@@ -2621,7 +2640,6 @@ impl Chip {
                     "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count=\"21\"",
                     "cargo:rustc-cfg=phy_backed_up_digital_register_count_is_set",
-                    "cargo:rustc-cfg=has_dram_region",
                 ],
             },
         }
@@ -2769,6 +2787,8 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_ref_tick_hz_is_set)");
     println!("cargo:rustc-check-cfg=cfg(soc_rc_fast_clk_default_is_set)");
     println!("cargo:rustc-check-cfg=cfg(soc_rc_slow_clock_is_set)");
+    println!("cargo:rustc-check-cfg=cfg(has_dram_region)");
+    println!("cargo:rustc-check-cfg=cfg(has_dram2_uninit_region)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_multiple_xtal_options)");
     println!("cargo:rustc-check-cfg=cfg(aes_endianness_configurable)");
     println!("cargo:rustc-check-cfg=cfg(gpio_has_bank_1)");
@@ -2909,6 +2929,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_tx_loop_auto_stop)");
     println!("cargo:rustc-check-cfg=cfg(rmt_supports_pll80mhz_clock)");
+    println!("cargo:rustc-check-cfg=cfg(uart_peripheral_controls_mem_clk)");
     println!("cargo:rustc-check-cfg=cfg(wifi_has_wifi6)");
     println!("cargo:rustc-check-cfg=cfg(esp32h2)");
     println!("cargo:rustc-check-cfg=cfg(esp32s2)");

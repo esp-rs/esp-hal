@@ -2,13 +2,13 @@ use procmacros::BuilderLite;
 
 use super::*;
 use crate::{
-    binary::include::esp_bt_controller_config_t,
     ble::InvalidConfigError,
     hal::{
         clock::ModemClockController,
         interrupt,
         peripherals::{BT, Interrupt},
     },
+    sys::include::esp_bt_controller_config_t,
 };
 
 pub(crate) static mut ISR_INTERRUPT_15: (*mut c_void, *mut c_void) =

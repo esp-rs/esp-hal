@@ -4,10 +4,11 @@ use anyhow::{Context, Result, bail, ensure};
 use clap::Args;
 use esp_metadata::Chip;
 use strum::IntoEnumIterator;
+use toml_edit::{Item, Value};
 
 use crate::{
     cargo::CargoToml,
-    commands::{checker::generate_baseline, release::plan::Plan, update_package},
+    commands::{VersionBump, checker::generate_baseline, release::plan::Plan, update_package},
     git::{current_branch, ensure_workspace_clean, get_remote_name_for},
 };
 
@@ -64,6 +65,27 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
                 step.package
             );
         }
+
+        if let Some(metadata) = package.espressif_metadata()
+            && let Some(Item::Value(forever_unstable)) = metadata.get("forever_unstable")
+        {
+            // Special case: some packages are perma-unstable, meaning they won't ever have
+            // a stable release. For these packages, we always use a
+            // patch release.
+            let forever_unstable = if let Value::Boolean(forever_unstable) = forever_unstable {
+                *forever_unstable.value()
+            } else {
+                log::warn!("Invalid value for 'forever_unstable' in metadata - must be a boolean");
+                true
+            };
+
+            if forever_unstable && step.bump != VersionBump::Patch {
+                bail!(
+                    "Cannot bump perma-unstable package {} to a non-patch version",
+                    step.package
+                );
+            }
+        };
 
         let new_version = update_package(&mut package, &step.bump, !args.no_dry_run)?;
 
@@ -340,7 +362,7 @@ Compressing objects: 100% (14/14), done.
 Writing objects: 100% (14/14), 2.61 KiB | 2.61 MiB/s, done.
 Total 14 (delta 13), reused 0 (delta 0), pack-reused 0 (from 0)
 remote: Resolving deltas: 100% (13/13), completed with 6 local objects.
-remote: 
+remote:
 remote: Create a pull request for 'foo' on GitHub by visiting:
 remote:      https://github.com/bugadani/esp-hal/pull/new/foo
 remote:

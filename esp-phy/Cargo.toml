@@ -1,6 +1,6 @@
 [package]
 name          = "esp-phy"
-version       = "0.1.0"
+version       = "0.1.1"
 edition       = "2024"
 description   = "PHY initialization"
 documentation = "https://docs.espressif.com/projects/rust/esp-phy/latest/"
@@ -29,17 +29,24 @@ bench = false
 cfg-if = "1"
 
 document-features = "0.2"
-esp-hal = { version = "1.0.0-rc.1", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
-esp-wifi-sys = "0.8.1"
-esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated" }
-esp-sync = { version = "0.1.0", path = "../esp-sync" }
+esp-hal = { version = "1.0.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
+esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated" }
+esp-sync = { version = "0.1.1", path = "../esp-sync" }
+# Make sure these are aligned with esp-radio's dependencies, too!
+esp-wifi-sys-esp32 = { git = "https://github.com/esp-rs/esp-wifi-sys", rev = "7623c8d", optional = true }
+esp-wifi-sys-esp32c2 = { git = "https://github.com/esp-rs/esp-wifi-sys", rev = "7623c8d", optional = true }
+esp-wifi-sys-esp32c3 = { git = "https://github.com/esp-rs/esp-wifi-sys", rev = "7623c8d", optional = true }
+esp-wifi-sys-esp32c6 = { git = "https://github.com/esp-rs/esp-wifi-sys", rev = "7623c8d", optional = true }
+esp-wifi-sys-esp32h2 = { git = "https://github.com/esp-rs/esp-wifi-sys", rev = "7623c8d", optional = true }
+esp-wifi-sys-esp32s2 = { git = "https://github.com/esp-rs/esp-wifi-sys", rev = "7623c8d", optional = true }
+esp-wifi-sys-esp32s3 = { git = "https://github.com/esp-rs/esp-wifi-sys", rev = "7623c8d", optional = true }
 
 defmt = { version = "1.0.1", optional = true }
 log-04 = { version = "0.4.27", package = "log", optional = true }
 
 [build-dependencies]
-esp-config   = { version = "0.6.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-config   = { version = "0.6.1", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 #! ### Logging Feature Flags
@@ -55,42 +62,42 @@ log-04 = ["dep:log-04"]
 ##
 esp32c2 = [
   "esp-hal/esp32c2",
-  "esp-wifi-sys/esp32c2",
+  "dep:esp-wifi-sys-esp32c2",
   "esp-metadata-generated/esp32c2",
 ]
 ##
 esp32c3 = [
   "esp-hal/esp32c3",
-  "esp-wifi-sys/esp32c3",
+  "dep:esp-wifi-sys-esp32c3",
   "esp-metadata-generated/esp32c3",
 ]
 ##
 esp32c6 = [
   "esp-hal/esp32c6",
-  "esp-wifi-sys/esp32c6",
+  "dep:esp-wifi-sys-esp32c6",
   "esp-metadata-generated/esp32c6",
 ]
 ##
 esp32h2 = [
   "esp-hal/esp32h2",
-  "esp-wifi-sys/esp32h2",
+  "dep:esp-wifi-sys-esp32h2",
   "esp-metadata-generated/esp32h2",
 ]
 ##
 esp32 = [
   "esp-hal/esp32",
-  "esp-wifi-sys/esp32",
+  "dep:esp-wifi-sys-esp32",
   "esp-metadata-generated/esp32",
 ]
 ##
 esp32s2 = [
   "esp-hal/esp32s2",
-  "esp-wifi-sys/esp32s2",
+  "dep:esp-wifi-sys-esp32s2",
   "esp-metadata-generated/esp32s2",
 ]
 ##
 esp32s3 = [
   "esp-hal/esp32s3",
-  "esp-wifi-sys/esp32s3",
+  "dep:esp-wifi-sys-esp32s3",
   "esp-metadata-generated/esp32s3",
 ]

@@ -139,7 +139,14 @@ mod fmt;
 use core::marker::PhantomData;
 
 pub use common_adapter::{phy_calibration_data, set_phy_calibration_data};
-use esp_hal::{self as hal};
+use esp_hal::{
+    self as hal,
+
+    // We don't need any esp-radio specific init code, just working no-std scaffolding, so we can
+    // take the macros from esp-hal for doc_replace.
+    after_snippet,
+    before_snippet,
+};
 use esp_radio_rtos_driver as preempt;
 use esp_sync::RawMutex;
 #[cfg(esp32)]
@@ -148,6 +155,23 @@ use hal::{
     clock::{Clocks, init_radio_clocks},
     time::Rate,
 };
+
+pub(crate) mod sys {
+    #[cfg(esp32)]
+    pub use esp_wifi_sys_esp32::*;
+    #[cfg(esp32c2)]
+    pub use esp_wifi_sys_esp32c2::*;
+    #[cfg(esp32c3)]
+    pub use esp_wifi_sys_esp32c3::*;
+    #[cfg(esp32c6)]
+    pub use esp_wifi_sys_esp32c6::*;
+    #[cfg(esp32h2)]
+    pub use esp_wifi_sys_esp32h2::*;
+    #[cfg(esp32s2)]
+    pub use esp_wifi_sys_esp32s2::*;
+    #[cfg(esp32s3)]
+    pub use esp_wifi_sys_esp32s3::*;
+}
 
 use crate::radio::{setup_radio_isr, shutdown_radio_isr};
 #[cfg(feature = "wifi")]
@@ -175,9 +199,6 @@ macro_rules! unstable_module {
     };
 }
 
-mod binary {
-    pub use esp_wifi_sys::*;
-}
 mod compat;
 
 mod radio;
@@ -205,14 +226,14 @@ pub(crate) static ESP_RADIO_LOCK: RawMutex = RawMutex::new();
 const _: () = {
     cfg_if::cfg_if! {
         if #[cfg(not(esp32h2))] {
-            core::assert!(binary::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM == 10);
-            core::assert!(binary::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
-            core::assert!(binary::include::WIFI_STATIC_TX_BUFFER_NUM == 0);
-            core::assert!(binary::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
-            core::assert!(binary::include::CONFIG_ESP_WIFI_AMPDU_RX_ENABLED == 1);
-            core::assert!(binary::include::CONFIG_ESP_WIFI_AMPDU_TX_ENABLED == 1);
-            core::assert!(binary::include::WIFI_AMSDU_TX_ENABLED == 0);
-            core::assert!(binary::include::CONFIG_ESP32_WIFI_RX_BA_WIN == 6);
+            core::assert!(sys::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM == 10);
+            core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
+            core::assert!(sys::include::WIFI_STATIC_TX_BUFFER_NUM == 0);
+            core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
+            core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_RX_ENABLED == 1);
+            core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_TX_ENABLED == 1);
+            core::assert!(sys::include::WIFI_AMSDU_TX_ENABLED == 0);
+            core::assert!(sys::include::CONFIG_ESP32_WIFI_RX_BA_WIN == 6);
         }
     };
 };
@@ -241,6 +262,7 @@ impl Drop for Controller<'_> {
     }
 }
 
+#[procmacros::doc_replace]
 /// Initialize for using Wi-Fi and or BLE.
 ///
 /// Wi-Fi and BLE require a preemptive scheduler to be present. Without one, the underlying firmware
@@ -270,19 +292,24 @@ impl Drop for Controller<'_> {
 /// function:
 ///
 /// ```rust, no_run
-#[doc = esp_hal::before_snippet!()]
+/// # {before_snippet}
 /// use esp_hal::timer::timg::TimerGroup;
-///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
+#[doc = ""]
 #[cfg_attr(
     riscv,
-    doc = " let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);"
+    doc = r#"
+ // On RISC-V chips, we need to hand over Software Interrupt 0 to the scheduler.
+ use esp_hal::interrupt::software::SoftwareInterruptControl;
+ let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+ esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
+"#
 )]
-#[cfg_attr(riscv, doc = " esp_rtos::start(timg0.timer0, software_interrupt);")]
 #[cfg_attr(xtensa, doc = " esp_rtos::start(timg0.timer0);")]
+#[doc = ""]
 /// // You can now start esp-radio:
 /// let esp_radio_controller = esp_radio::init().unwrap();
-/// # }
+/// # {after_snippet}
 /// ```
 pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
     #[cfg(esp32)]
@@ -399,7 +426,7 @@ impl From<WifiError> for InitializationError {
 pub fn wifi_set_log_verbose() {
     #[cfg(all(feature = "sys-logs", not(esp32h2)))]
     unsafe {
-        use crate::binary::include::{
+        use crate::sys::include::{
             esp_wifi_internal_set_log_level,
             wifi_log_level_t_WIFI_LOG_VERBOSE,
         };

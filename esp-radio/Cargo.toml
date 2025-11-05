@@ -1,6 +1,6 @@
 [package]
 name = "esp-radio"
-version = "0.16.0"
+version = "0.17.0"
 edition = "2024"
 rust-version  = "1.88.0"
 description = "A WiFi, Bluetooth and ESP-NOW driver for use with Espressif chips and bare-metal Rust"
@@ -41,31 +41,38 @@ test  = false
 
 [dependencies]
 cfg-if  = "1"
-esp-hal = { version = "1.0.0-rc.1", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
+esp-hal = { version = "1.0.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
 portable-atomic = { version = "1.11", default-features = false }
 enumset = { version = "1.1", default-features = false, optional = true }
 
 # ⚠️ Unstable dependencies
-esp-radio-rtos-driver = { version = "0.1.0", path = "../esp-radio-rtos-driver" }
+esp-radio-rtos-driver = { version = "0.2.0", path = "../esp-radio-rtos-driver" }
 instability = "0.3.9"
 
 # Unstable dependencies that are not (strictly) part of the public API
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
 document-features  = "0.2"
 esp-alloc = { version = "0.9.0", path = "../esp-alloc", optional = true }
-esp-config = { version = "0.6.0", path = "../esp-config" }
-esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated" }
-esp-sync = { version = "0.1.0", path = "../esp-sync" }
-esp-phy = { version = "0.1.0", path = "../esp-phy/" }
-esp-wifi-sys = { version = "0.8.1" }
+esp-config = { version = "0.6.1", path = "../esp-config" }
+esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated" }
+esp-sync = { version = "0.1.1", path = "../esp-sync" }
+esp-phy = { version = "0.1.1", path = "../esp-phy/" }
 num-derive = "0.4.2"
 num-traits = { version = "0.2.19", default-features = false }
 portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
-procmacros = { version = "0.20.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+procmacros = { version = "0.21.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 xtensa-lx-rt = { version = "0.21.0", path = "../xtensa-lx-rt", optional = true }
 byte = { version = "0.2.7", optional = true }
 ieee802154 = { version = "0.6.1", optional = true }
 heapless = "0.9"
+# Make sure these are aligned with esp-phy's dependencies, too!
+esp-wifi-sys-esp32 = { git = "https://github.com/esp-rs/esp-wifi-sys", rev = "7623c8d", optional = true }
+esp-wifi-sys-esp32c2 = { git = "https://github.com/esp-rs/esp-wifi-sys", rev = "7623c8d", optional = true }
+esp-wifi-sys-esp32c3 = { git = "https://github.com/esp-rs/esp-wifi-sys", rev = "7623c8d", optional = true }
+esp-wifi-sys-esp32c6 = { git = "https://github.com/esp-rs/esp-wifi-sys", rev = "7623c8d", optional = true }
+esp-wifi-sys-esp32h2 = { git = "https://github.com/esp-rs/esp-wifi-sys", rev = "7623c8d", optional = true }
+esp-wifi-sys-esp32s2 = { git = "https://github.com/esp-rs/esp-wifi-sys", rev = "7623c8d", optional = true }
+esp-wifi-sys-esp32s3 = { git = "https://github.com/esp-rs/esp-wifi-sys", rev = "7623c8d", optional = true }
 
 # Optional dependencies enabling ecosystem features
 embedded-io-06 = { package = "embedded-io", version = "0.6", default-features = false, optional = true }
@@ -85,8 +92,11 @@ defmt = { version = "1.0.1", optional = true }
 log-04 = { package = "log", version = "0.4.27", optional = true }
 
 [build-dependencies]
-esp-config = { version = "0.6.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-config = { version = "0.6.1", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"] }
+
+[dev-dependencies]
+esp-rtos = { version = "0.2.0", path = "../esp-rtos" }
 
 [features]
 default = ["esp-alloc"]
@@ -107,7 +117,15 @@ default = ["esp-alloc"]
 esp-alloc = ["dep:esp-alloc"]
 
 ## Logs the Wi-Fi logs from the driver at log level info (needs a nightly-compiler)
-sys-logs = ["esp-wifi-sys/sys-logs"]
+sys-logs = [
+    "esp-wifi-sys-esp32/sys-logs",
+    "esp-wifi-sys-esp32c2/sys-logs",
+    "esp-wifi-sys-esp32c3/sys-logs",
+    "esp-wifi-sys-esp32c6/sys-logs",
+    "esp-wifi-sys-esp32h2/sys-logs",
+    "esp-wifi-sys-esp32s2/sys-logs",
+    "esp-wifi-sys-esp32s3/sys-logs",
+]
 
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:
@@ -115,52 +133,59 @@ sys-logs = ["esp-wifi-sys/sys-logs"]
 ##
 esp32 = [
   "esp-hal/esp32",
+  "esp-rtos/esp32",
   "esp-phy/esp32",
-  "esp-wifi-sys/esp32",
+  "dep:esp-wifi-sys-esp32",
   "esp-metadata-generated/esp32",
   "xtensa-lx-rt/float-save-restore",
 ]
 ##
 esp32c2 = [
   "esp-hal/esp32c2",
+  "esp-rtos/esp32c2",
   "esp-phy/esp32c2",
-  "esp-wifi-sys/esp32c2",
+  "dep:esp-wifi-sys-esp32c2",
   "esp-metadata-generated/esp32c2",
 ]
 ##
 esp32c3 = [
   "esp-hal/esp32c3",
+  "esp-rtos/esp32c3",
   "esp-phy/esp32c3",
-  "esp-wifi-sys/esp32c3",
+  "dep:esp-wifi-sys-esp32c3",
   "esp-metadata-generated/esp32c3",
 ]
 ##
 esp32c6 = [
   "esp-hal/esp32c6",
+  "esp-rtos/esp32c6",
   "esp-phy/esp32c6",
-  "esp-wifi-sys/esp32c6",
+  "dep:esp-wifi-sys-esp32c6",
   "esp-metadata-generated/esp32c6",
 ]
 ##
 esp32h2 = [
   "esp-hal/esp32h2",
+  "esp-rtos/esp32h2",
   "esp-phy/esp32h2",
-  "esp-wifi-sys/esp32h2",
+  "dep:esp-wifi-sys-esp32h2",
   "esp-metadata-generated/esp32h2",
 ]
 ##
 esp32s2 = [
   "esp-hal/esp32s2",
+  "esp-rtos/esp32s2",
   "esp-phy/esp32s2",
-  "esp-wifi-sys/esp32s2",
+  "dep:esp-wifi-sys-esp32s2",
   "esp-metadata-generated/esp32s2",
   "xtensa-lx-rt/float-save-restore",
 ]
 ##
 esp32s3 = [
   "esp-hal/esp32s3",
+  "esp-rtos/esp32s3",
   "esp-phy/esp32s3",
-  "esp-wifi-sys/esp32s3",
+  "dep:esp-wifi-sys-esp32s3",
   "esp-metadata-generated/esp32s3",
   "xtensa-lx-rt/float-save-restore",
 ]
@@ -203,10 +228,37 @@ serde = ["dep:serde", "enumset?/serde"]
 
 #! ### Logging Feature Flags
 ## Enable logging output using version 0.4 of the `log` crate.
-log-04 = ["dep:log-04", "esp-hal/log-04", "esp-wifi-sys/log", "esp-phy/log-04"]
+log-04 = [
+    "dep:log-04",
+   "esp-hal/log-04",
+   "esp-wifi-sys-esp32/log",
+   "esp-wifi-sys-esp32c2/log",
+   "esp-wifi-sys-esp32c3/log",
+   "esp-wifi-sys-esp32c6/log",
+   "esp-wifi-sys-esp32h2/log",
+   "esp-wifi-sys-esp32s2/log",
+   "esp-wifi-sys-esp32s3/log",
+   "esp-phy/log-04",
+]
 
 ## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
-defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt", "enumset/defmt", "heapless/defmt", "esp-sync/defmt", "esp-phy/defmt"]
+defmt = [
+    "dep:defmt",
+    "smoltcp?/defmt",
+    "esp-hal/defmt",
+    "bt-hci?/defmt",
+    "esp-wifi-sys-esp32/defmt",
+    "esp-wifi-sys-esp32c2/defmt",
+    "esp-wifi-sys-esp32c3/defmt",
+    "esp-wifi-sys-esp32c6/defmt",
+    "esp-wifi-sys-esp32h2/defmt",
+    "esp-wifi-sys-esp32s2/defmt",
+    "esp-wifi-sys-esp32s3/defmt",
+    "enumset/defmt",
+    "heapless/defmt",
+    "esp-sync/defmt",
+    "esp-phy/defmt",
+]
 
 #! ### Unstable APIs
 #! Unstable APIs are drivers and features that are not yet ready for general use.

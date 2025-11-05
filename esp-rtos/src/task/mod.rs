@@ -127,6 +127,7 @@ impl TaskExt for TaskPtr {
     }
 
     #[cfg(any(feature = "esp-radio", feature = "embassy"))]
+    #[esp_hal::ram]
     fn resume(self) {
         SCHEDULER.with(|scheduler| scheduler.resume_task(self))
     }
@@ -316,83 +317,6 @@ impl<E: TaskListElement> TaskQueue<E> {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.head.is_none()
-    }
-}
-
-#[cfg(feature = "embassy")]
-pub(crate) mod flags {
-    use esp_sync::NonReentrantMutex;
-
-    use crate::{
-        CurrentThreadHandle,
-        SCHEDULER,
-        task::{TaskExt, TaskPtr},
-    };
-
-    pub(crate) struct FlagsInner {
-        owner: Option<TaskPtr>,
-        flags: u32,
-    }
-    impl FlagsInner {
-        fn wait(&mut self, wait_flags: u32) -> bool {
-            if self.flags & wait_flags == wait_flags {
-                self.flags &= !wait_flags;
-                true
-            } else {
-                if self.owner.is_none() {
-                    self.owner = Some(CurrentThreadHandle::get().task);
-                }
-
-                false
-            }
-        }
-    }
-
-    pub(crate) struct ThreadFlags {
-        inner: NonReentrantMutex<FlagsInner>,
-    }
-
-    impl ThreadFlags {
-        pub(crate) const fn new() -> Self {
-            Self {
-                inner: NonReentrantMutex::new(FlagsInner {
-                    owner: None,
-                    flags: 0,
-                }),
-            }
-        }
-
-        pub(crate) fn set(&self, flag: u32) {
-            self.inner.with(|inner| {
-                inner.flags |= flag;
-                if let Some(owner) = inner.owner {
-                    owner.resume();
-                }
-            });
-        }
-
-        pub(crate) fn get(&self) -> u32 {
-            self.inner.with(|inner| inner.flags)
-        }
-
-        pub(crate) fn wait(&self, wait_flags: u32, timeout_us: Option<u32>) -> bool {
-            if crate::with_deadline(timeout_us, |deadline| {
-                self.inner.with(|inner| {
-                    if inner.wait(wait_flags) {
-                        true
-                    } else {
-                        SCHEDULER.sleep_until(deadline);
-                        false
-                    }
-                })
-            }) {
-                debug!("Flags - wait - success");
-                true
-            } else {
-                trace!("Flags - wait - timed out");
-                false
-            }
-        }
     }
 }
 

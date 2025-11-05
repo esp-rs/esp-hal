@@ -269,11 +269,17 @@ impl Package {
     /// this package.
     ///
     /// Features are read from Cargo.toml metadata, from the `doc-config` table. Currently only
-    /// one feature set is supported.
+    /// one feature set is supported. If the `doc-config` table is not found, this function returns
+    /// `None`. This differs from specifying an empty set of features, which returns `Some(empty
+    /// vector)`.
     // TODO: perhaps we should use the docs.rs metadata for doc features for packages that have no
     // chip-specific features.
-    pub fn doc_feature_rules(&self, config: &Config) -> Vec<String> {
-        let mut features = vec![];
+    pub fn doc_feature_rules(&self, config: &Config) -> Option<Vec<String>> {
+        let mut features = None;
+
+        if *self == Self::Examples {
+            return None;
+        }
 
         let toml = self.toml();
         if let Some(metadata) = toml.espressif_metadata()
@@ -284,7 +290,7 @@ impl Package {
             };
 
             if let Some(fs) = Self::parse_feature_set(table, config) {
-                features = fs;
+                features = Some(fs);
             }
         } else {
             // Nothing
@@ -708,6 +714,8 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
             return cargo::run(
                 &cmd.clone()
                     .subcommand("test")
+                    .arg("--lib")
+                    .arg("--tests")
                     .features(&vec!["std".into()])
                     .build(),
                 &package_path,
@@ -757,6 +765,19 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
                     .features(&vec!["emulation".into(), "bytewise-read".into()])
                     .arg("--")
                     .arg("--test-threads=1")
+                    .build(),
+                &package_path,
+            );
+        }
+        Package::EspHalProcmacros => {
+            return cargo::run(
+                &cmd.clone()
+                    .subcommand("test")
+                    .features(&vec![
+                        "has-lp-core".into(),
+                        "is-lp-core".into(),
+                        "rtc-slow".into(),
+                    ])
                     .build(),
                 &package_path,
             );

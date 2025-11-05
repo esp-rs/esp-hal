@@ -9,8 +9,8 @@ use esp_phy::{PhyController, PhyInitGuard};
 
 use super::*;
 use crate::{
-    binary::{c_types::*, include::*},
     compat::{self, OSI_FUNCS_TIME_BLOCKING, common::str_from_c, queue},
+    sys::{c_types::*, include::*},
     time::{blob_ticks_to_micros, blob_ticks_to_millis, millis_to_blob_ticks},
 };
 
@@ -373,7 +373,7 @@ unsafe extern "C" fn ecc_gen_key_pair(_: *const u8, _: *const u8) -> i32 {
 
 unsafe extern "C" fn os_random() -> u32 {
     trace!("os_random");
-    unsafe { (crate::common_adapter::random() & u32::MAX) as u32 }
+    unsafe { crate::common_adapter::random() as u32 }
 }
 
 unsafe extern "C" fn task_create(
@@ -1038,7 +1038,7 @@ unsafe extern "C" fn ble_npl_get_current_task_id() -> *const c_void {
 }
 
 unsafe extern "C" fn ble_npl_os_started() -> bool {
-    todo!();
+    true
 }
 
 #[repr(C)]
@@ -1185,9 +1185,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             assert!(res == 0, "adv_stack_initEnv returned {}", res);
 
             let res = extAdv_stack_initEnv();
-            if res != 0 {
-                panic!("extAdv_stack_initEnv returned {}", res);
-            }
+            assert!(res == 0, "extAdv_stack_initEnv returned {}", res);
 
             let res = sync_stack_initEnv();
             assert!(res == 0, "sync_stack_initEnv returned {}", res);
@@ -1197,7 +1195,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         }
 
         #[cfg(coex)]
-        crate::binary::include::coex_enable();
+        crate::sys::include::coex_enable();
 
         let mut mac = [0u8; 6];
         crate::common_adapter::read_mac(mac.as_mut_ptr(), 2);
@@ -1225,10 +1223,6 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         #[cfg(not(esp32c2))]
         let res = r_ble_controller_enable(1); // 1 = BLE
         assert!(res == 0, "ble_controller_enable returned {}", res);
-
-        // this is to avoid (ASSERT r_ble_hci_ram_hs_cmd_tx:34 0 0)
-        // we wait a bit to make sure the ble task initialized everything
-        crate::preempt::usleep(10_000);
     }
 
     // At some point the "High-speed ADC" entropy source became available.
@@ -1253,18 +1247,12 @@ pub(crate) fn ble_deinit() {
     }
 
     unsafe {
-        // Prevent ASSERT r_ble_ll_reset:1069 ... ...
-        // TODO: the cause of the issue is that the BLE controller can be dropped while the driver
-        // is in the process of handling a HCI command.
-        crate::preempt::usleep(10_000);
         // HCI deinit
         npl::r_ble_hci_trans_cfg_hs(None, core::ptr::null(), None, core::ptr::null());
 
         #[cfg(not(esp32c2))]
-        npl::r_ble_controller_disable();
-
-        #[cfg(not(esp32c2))]
         {
+            npl::r_ble_controller_disable();
             conn_stack_deinitEnv();
             sync_stack_deinitEnv();
             extAdv_stack_deinitEnv();
@@ -1278,9 +1266,7 @@ pub(crate) fn ble_deinit() {
         #[cfg(esp32c2)]
         let res = npl::ble_controller_deinit();
 
-        if res != 0 {
-            panic!("ble_controller_deinit returned {}", res);
-        }
+        assert!(res == 0, "ble_controller_deinit returned {}", res);
 
         npl::esp_unregister_npl_funcs();
 

@@ -8,12 +8,6 @@ use esp_hal::{
 };
 use esp_phy::{PhyController, PhyInitGuard};
 use esp_sync::NonReentrantMutex;
-use esp_wifi_sys::include::{
-    ieee802154_coex_event_t,
-    ieee802154_coex_event_t_IEEE802154_IDLE,
-    ieee802154_coex_event_t_IEEE802154_LOW,
-    ieee802154_coex_event_t_IEEE802154_MIDDLE,
-};
 
 use super::{
     frame::{
@@ -25,6 +19,12 @@ use super::{
     },
     hal::*,
     pib::*,
+};
+use crate::sys::include::{
+    ieee802154_coex_event_t,
+    ieee802154_coex_event_t_IEEE802154_IDLE,
+    ieee802154_coex_event_t_IEEE802154_LOW,
+    ieee802154_coex_event_t_IEEE802154_MIDDLE,
 };
 
 const PHY_ENABLE_VERSION_PRINT: u8 = 1;
@@ -353,6 +353,17 @@ fn next_operation() {
     let previous_operation = STATE.with(next_operation_inner);
 
     notify_state(previous_operation)
+}
+
+// FIXME: we shouldn't need this - we need to re-align the original driver with our port
+pub(crate) fn ensure_receive_enabled() {
+    // shouldn't be necessary but avoids a problem with rx stopping
+    // unexpectedly when used together with BLE
+    STATE.with(|state| {
+        if state.state == Ieee802154State::Receive {
+            set_cmd(Command::RxStart);
+        }
+    });
 }
 
 #[handler(priority = Priority::Priority1)]

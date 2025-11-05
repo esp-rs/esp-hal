@@ -160,11 +160,15 @@ impl SemaphoreImplementation for Semaphore {
     }
 
     unsafe fn try_give_from_isr(semaphore: SemaphorePtr, _hptw: Option<&mut bool>) -> bool {
-        unsafe { <Self as SemaphoreImplementation>::give(semaphore) }
+        let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
+
+        semaphore.try_give_from_isr()
     }
 
     unsafe fn try_take_from_isr(semaphore: SemaphorePtr, _hptw: Option<&mut bool>) -> bool {
-        unsafe { <Self as SemaphoreImplementation>::try_take(semaphore) }
+        let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
+
+        semaphore.try_take_from_isr()
     }
 }
 

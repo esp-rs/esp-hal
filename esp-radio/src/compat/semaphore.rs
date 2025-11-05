@@ -1,9 +1,9 @@
 use esp_radio_rtos_driver::semaphore::SemaphoreKind;
-use esp_wifi_sys::c_types::c_void;
 
 use crate::{
     compat::OSI_FUNCS_TIME_BLOCKING,
     preempt::semaphore::{SemaphoreHandle, SemaphorePtr},
+    sys::c_types::c_void,
 };
 
 pub(crate) fn sem_create(max: u32, initial: u32) -> *mut c_void {

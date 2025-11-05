@@ -170,11 +170,13 @@ impl<'a> Ieee802154<'a> {
 
     /// Return the raw data of a received frame
     pub fn raw_received(&mut self) -> Option<RawReceived> {
+        raw::ensure_receive_enabled();
         ieee802154_poll()
     }
 
     /// Get a received frame, if available
     pub fn received(&mut self) -> Option<Result<ReceivedFrame, Error>> {
+        raw::ensure_receive_enabled();
         if let Some(raw) = ieee802154_poll() {
             let maybe_decoded = if raw.data[0] as usize > raw.data.len() {
                 // try to decode up to data.len()

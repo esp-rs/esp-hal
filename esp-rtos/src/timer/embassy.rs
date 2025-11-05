@@ -53,9 +53,7 @@ impl TimerQueue {
     }
 
     pub(crate) fn handle_alarm(&self, now: u64) {
-        self.inner.with(|inner| {
-            inner.handle_alarm(now);
-        });
+        self.inner.with(|inner| inner.handle_alarm(now))
     }
 
     pub(crate) fn next_wakeup(&self) -> u64 {

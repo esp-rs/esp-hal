@@ -1,6 +1,6 @@
 [package]
 name          = "esp-rtos"
-version       = "0.1.0"
+version       = "0.2.0"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "A task scheduler for Espressif devices"
@@ -31,12 +31,13 @@ features       = ["esp32c6", "embassy", "esp-radio"]
 bench = false
 
 [dependencies]
-esp-hal = { version = "1.0.0-rc.1", path = "../esp-hal", features = [
-    "requires-unstable",
+esp-hal = { version = "1.0.0", path = "../esp-hal", default-features = false, features = [
+    # FIXME: rt technically shouldn't be enabled, but rtos requires `TrapFrame`
+    # and uses reexported riscv/xtena-lx from esp-hal
+    "requires-unstable", "rt"
 ] }
 
 cfg-if = "1"
-paste = { version = "1", optional = true }
 rtos-trace = { version = "0.2.0", optional = true }
 
 # Unstable dependencies that are not (strictly) part of the public API
@@ -44,10 +45,10 @@ allocator-api2 = { version = "0.3.0", default-features = false, features = ["all
 document-features  = "0.2"
 embassy-sync = "0.7"
 esp-alloc = { version = "0.9.0", path = "../esp-alloc", optional = true }
-esp-config = { version = "0.6.0", path = "../esp-config" }
-esp-sync = { version = "0.1.0", path = "../esp-sync" }
-esp-radio-rtos-driver = { version = "0.1.0", path = "../esp-radio-rtos-driver", optional = true }
-macros = { version = "0.20.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+esp-config = { version = "0.6.1", path = "../esp-config" }
+esp-sync = { version = "0.1.1", path = "../esp-sync" }
+esp-radio-rtos-driver = { version = "0.2.0", path = "../esp-radio-rtos-driver", optional = true }
+macros = { version = "0.21.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 portable-atomic = { version = "1.11", default-features = false }
 
 # Optional dependencies that enable ecosystem support.
@@ -60,11 +61,11 @@ defmt            = { version = "1.0", optional = true }
 log-04           = { package = "log", version = "0.4", optional = true }
 
 [build-dependencies]
-esp-config             = { version = "0.6.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-config             = { version = "0.6.1", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [dev-dependencies]
-esp-hal = { version = "1.0.0-rc.1", path = "../esp-hal", features = ["unstable"] }
+esp-hal = { version = "1.0.0", path = "../esp-hal", features = ["unstable"] }
 
 [features]
 default = []

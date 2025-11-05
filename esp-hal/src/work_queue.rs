@@ -10,7 +10,7 @@
 //!
 //! Posting a work item into the queue returns a handle. The handle can be used to poll whether
 //! the work item has been processed. Dropping the handle will cancel the work item.
-#![cfg_attr(esp32c2, allow(unused))]
+#![cfg_attr(not(feature = "unstable"), allow(unused))]
 
 use core::{future::poll_fn, marker::PhantomData, ptr::NonNull, task::Context};
 

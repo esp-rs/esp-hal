@@ -20,6 +20,7 @@ const MD5_MAGIC: u16 = 0xebeb;
 const OTA_SUBTYPE_OFFSET: u8 = 0x10;
 
 /// Represents a single partition entry.
+#[derive(Clone, Copy)]
 pub struct PartitionEntry<'a> {
     pub(crate) binary: &'a [u8; RAW_ENTRY_LEN],
 }
@@ -106,7 +107,7 @@ impl<'a> PartitionEntry<'a> {
     /// Provides a "view" into the partition allowing to read/write the
     /// partition contents by using the given [embedded_storage::Storage] and/or
     /// [embedded_storage::ReadStorage] implementation.
-    pub fn as_embedded_storage<F>(&'a self, flash: &'a mut F) -> FlashRegion<'a, F>
+    pub fn as_embedded_storage<F>(self, flash: &'a mut F) -> FlashRegion<'a, F>
     where
         F: embedded_storage::ReadStorage,
     {
@@ -548,7 +549,7 @@ pub fn read_partition_table<'a>(
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FlashRegion<'a, F> {
-    pub(crate) raw: &'a PartitionEntry<'a>,
+    pub(crate) raw: PartitionEntry<'a>,
     pub(crate) flash: &'a mut F,
 }
 

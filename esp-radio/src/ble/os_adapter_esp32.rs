@@ -4,7 +4,10 @@ use procmacros::BuilderLite;
 
 use super::*;
 use crate::{
-    binary::include::{
+    ble::InvalidConfigError,
+    common_adapter::*,
+    hal::{interrupt, peripherals::Interrupt},
+    sys::include::{
         esp_bt_controller_config_t,
         esp_bt_mode_t,
         esp_bt_mode_t_ESP_BT_MODE_BLE,
@@ -12,9 +15,6 @@ use crate::{
         esp_bt_mode_t_ESP_BT_MODE_CLASSIC_BT,
         esp_bt_mode_t_ESP_BT_MODE_IDLE,
     },
-    ble::InvalidConfigError,
-    common_adapter::*,
-    hal::{interrupt, peripherals::Interrupt},
 };
 
 pub(crate) static mut ISR_INTERRUPT_5: (*mut c_void, *mut c_void) =
@@ -190,7 +190,7 @@ extern "C" fn patch_apply() {
 
 extern "C" fn coex_version_get_wrapper(major: *mut u32, minor: *mut u32, patch: *mut u32) -> i32 {
     unsafe {
-        let mut version = crate::binary::include::coex_version_t {
+        let mut version = crate::sys::include::coex_version_t {
             major: 0,
             minor: 0,
             patch: 0,
@@ -589,7 +589,7 @@ pub(crate) unsafe extern "C" fn coex_schm_interval_get() -> u32 {
     trace!("coex_schm_interval_get");
 
     #[cfg(coex)]
-    return unsafe { crate::binary::include::coex_schm_interval_get() };
+    return unsafe { crate::sys::include::coex_schm_interval_get() };
 
     #[cfg(not(coex))]
     0
@@ -599,7 +599,7 @@ pub(crate) unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
     trace!("coex_schm_curr_period_get");
 
     #[cfg(coex)]
-    return unsafe { crate::binary::include::coex_schm_curr_period_get() };
+    return unsafe { crate::sys::include::coex_schm_curr_period_get() };
 
     #[cfg(not(coex))]
     0
@@ -609,7 +609,7 @@ pub(crate) unsafe extern "C" fn coex_schm_curr_phase_get() -> *const () {
     trace!("coex_schm_curr_phase_get");
 
     #[cfg(coex)]
-    return unsafe { crate::binary::include::coex_schm_curr_phase_get() } as *const ();
+    return unsafe { crate::sys::include::coex_schm_curr_phase_get() } as *const ();
 
     #[cfg(not(coex))]
     return core::ptr::null::<()>();

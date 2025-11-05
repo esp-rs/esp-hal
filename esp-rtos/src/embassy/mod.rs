@@ -1,15 +1,107 @@
 //! OS-aware embassy executors.
 
-use core::{cell::UnsafeCell, mem::MaybeUninit, sync::atomic::Ordering};
+use core::{cell::UnsafeCell, mem::MaybeUninit, ptr::NonNull, sync::atomic::Ordering};
 
 use embassy_executor::{SendSpawner, Spawner, raw};
-use esp_hal::interrupt::{InterruptHandler, Priority, software::SoftwareInterrupt};
-#[cfg(multi_core)]
-use esp_hal::system::Cpu;
+use esp_hal::{
+    interrupt::{InterruptHandler, Priority, software::SoftwareInterrupt},
+    system::Cpu,
+    time::{Duration, Instant},
+};
+use esp_sync::NonReentrantMutex;
 use macros::ram;
 use portable_atomic::AtomicPtr;
 
-use crate::task::flags::ThreadFlags;
+use crate::{
+    SCHEDULER,
+    task::{TaskExt, TaskPtr},
+};
+
+pub(crate) struct FlagsInner {
+    owner: TaskPtr,
+    waiting: Option<TaskPtr>,
+    set: bool,
+}
+impl FlagsInner {
+    fn take(&mut self) -> bool {
+        if self.set {
+            // The flag was set while we weren't looking.
+            self.set = false;
+            true
+        } else {
+            // `waiting` signals that the owner should be resumed when the flag is set. Copying
+            // the task pointer is an optimization that allows clearing the
+            // waiting state without computing the address of a separate field.
+            self.waiting = Some(self.owner);
+
+            false
+        }
+    }
+}
+
+/// A single event bit, optimized for the thread-mode embassy executor.
+///
+/// This takes shortcuts, which make it unsuitable for general purpose use (such as no wait
+/// queue, no timeout, assumes a single thread waits for the flag, there is only a single bit of
+/// flag information).
+struct ThreadFlag {
+    inner: NonReentrantMutex<FlagsInner>,
+}
+
+impl ThreadFlag {
+    fn new() -> Self {
+        let owner = SCHEDULER.with(|scheduler| {
+            let current_cpu = Cpu::current() as usize;
+            if let Some(current_task) = scheduler.per_cpu[current_cpu].current_task {
+                current_task
+            } else {
+                // We're cheating, the task hasn't been initialized yet.
+                NonNull::from(&scheduler.per_cpu[current_cpu].main_task)
+            }
+        });
+        Self {
+            inner: NonReentrantMutex::new(FlagsInner {
+                owner,
+                waiting: None,
+                set: false,
+            }),
+        }
+    }
+
+    fn with<R>(&self, f: impl FnOnce(&mut FlagsInner) -> R) -> R {
+        self.inner.with(|inner| f(inner))
+    }
+
+    fn set(&self) {
+        self.with(|inner| {
+            if let Some(waiting) = inner.waiting.take() {
+                // The task is waiting, there is no need to set the flag - resuming the thread
+                // is all the signal we need.
+                waiting.resume();
+            } else {
+                // The task isn't waiting, set the flag.
+                inner.set = true;
+            }
+        });
+    }
+
+    fn get(&self) -> bool {
+        self.with(|inner| inner.set)
+    }
+
+    fn wait(&self) {
+        self.with(|inner| {
+            if !inner.take() {
+                // SCHEDULER.sleep_until, but we know the current task's ID, and we know there
+                // is no timeout.
+                SCHEDULER.with(|scheduler| {
+                    scheduler.sleep_task_until(inner.owner, Instant::EPOCH + Duration::MAX);
+                    crate::task::yield_task();
+                });
+            }
+        });
+    }
+}
 
 #[unsafe(export_name = "__pender")]
 #[ram]
@@ -22,8 +114,8 @@ fn __pender(context: *mut ()) {
         _ => {
             // This forces us to keep the embassy timer queue separate, otherwise we'd need to
             // reentrantly lock SCHEDULER.
-            let flags = unwrap!(unsafe { context.cast::<ThreadFlags>().as_ref() });
-            flags.set(1);
+            let flags = unwrap!(unsafe { context.cast::<ThreadFlag>().as_ref() });
+            flags.set();
         }
     }
 }
@@ -43,7 +135,8 @@ pub trait Callbacks {
 /// Thread-mode executor.
 ///
 /// This executor runs in an OS thread, meaning the scheduler needs to be started before using any
-/// async operations.
+/// async operations. If you wish to write async code without the scheduler running, consider
+/// using the [`InterruptExecutor`].
 #[cfg_attr(
     multi_core,
     doc = r"
@@ -85,7 +178,7 @@ impl Executor {
     ///
     /// This function never returns.
     pub fn run(&'static mut self, init: impl FnOnce(Spawner)) -> ! {
-        let flags = ThreadFlags::new();
+        let flags = ThreadFlag::new();
         struct NoHooks;
 
         impl Callbacks for NoHooks {
@@ -109,8 +202,8 @@ impl Executor {
         init: impl FnOnce(Spawner),
         callbacks: impl Callbacks,
     ) -> ! {
-        let flags = ThreadFlags::new();
-        struct Hooks<'a, CB: Callbacks>(CB, &'a ThreadFlags);
+        let flags = ThreadFlag::new();
+        struct Hooks<'a, CB: Callbacks>(CB, &'a ThreadFlag);
 
         impl<CB: Callbacks> Callbacks for Hooks<'_, CB> {
             fn before_poll(&mut self) {
@@ -119,7 +212,7 @@ impl Executor {
 
             fn on_idle(&mut self) {
                 // Make sure we only call on_idle if the executor would otherwise go to sleep.
-                if self.1.get() == 0 {
+                if !self.1.get() {
                     self.0.on_idle();
                 }
             }
@@ -131,12 +224,12 @@ impl Executor {
     fn run_inner(
         &'static self,
         init: impl FnOnce(Spawner),
-        flags: &ThreadFlags,
+        flags: &ThreadFlag,
         mut hooks: impl Callbacks,
     ) -> ! {
         let executor = unsafe {
             (&mut *self.executor.get()).write(raw::Executor::new(
-                (flags as *const ThreadFlags).cast::<()>().cast_mut(),
+                (flags as *const ThreadFlag).cast::<()>().cast_mut(),
             ))
         };
 
@@ -158,7 +251,7 @@ impl Executor {
             hooks.on_idle();
 
             // Wait for work to become available.
-            flags.wait(1, None);
+            flags.wait();
         }
     }
 }

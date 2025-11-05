@@ -2,8 +2,10 @@
     all(docsrs, not(not_really_docsrs)),
     doc = "<div style='padding:30px;background:#810;color:#fff;text-align:center;'><p>You might want to <a href='https://docs.espressif.com/projects/rust/'>browse the <code>esp-hal</code> documentation on the esp-rs website</a> instead.</p><p>The documentation here on <a href='https://docs.rs'>docs.rs</a> is built for a single chip only (ESP32-C6, in particular), while on the esp-rs website you can select your exact chip from the list of supported devices. Available peripherals and their APIs change depending on the chip.</p></div>\n\n<br/>\n\n"
 )]
-//! This crate provides RTOS functionality for `esp-radio`, and provides executors to enable
-//! running `async` code.
+//! An RTOS (Real-Time Operating System) implementation for esp-hal.
+//!
+//! This crate provides the runtime necessary to run `async` code on top of esp-hal,
+//! and implements the necessary capabilities (threads, queues, etc.) required by esp-radio.
 //!
 //! ## Setup
 //!
@@ -60,15 +62,16 @@ esp_rtos::start_second_core(
 //! ```
 //! 
 //! To write `async` code, enable the `embassy` feature, and mark the main function with `#[esp_rtos::main]`.
-//! Note that, to create async tasks, you will need the `task` macro from the `embassy-executor` crate. Do
-//! NOT enable any of the `arch-*` features on `embassy-executor`.
+//! This will create a thread-mode executor on the main thread. Note that, to create async tasks, you will need
+//! the `task` macro from the `embassy-executor` crate. Do NOT enable any of the `arch-*` features on `embassy-executor`.
 //!
 //! ## Additional configuration
 #![doc = ""]
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_rtos_config_table.md"))]
 #![doc = ""]
 //! ## Feature Flags
-#![doc = document_features::document_features!()]
+#![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -465,8 +468,20 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
         .unwrap();
 
     // Spin until the second core scheduler is initialized
-    while SCHEDULER.with(|s| !s.per_cpu[1].initialized) {
+    let start = Instant::now();
+
+    while start.elapsed() < Duration::from_secs(1) {
+        if SCHEDULER.with(|s| s.per_cpu[1].initialized) {
+            break;
+        }
         esp_hal::rom::ets_delay_us(1);
+    }
+
+    if !SCHEDULER.with(|s| s.per_cpu[1].initialized) {
+        panic!(
+            "Second core scheduler failed to initialize. \
+            This can happen if its main function overflowed the stack."
+        );
     }
 
     core::mem::forget(guard);

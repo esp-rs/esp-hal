@@ -1,6 +1,6 @@
 [package]
 name          = "esp-rom-sys"
-version       = "0.1.2"
+version       = "0.1.3"
 edition       = "2024"
 rust-version  = "1.87.0"
 description   = "ROM code support"
@@ -13,6 +13,7 @@ license       = "MIT OR Apache-2.0"
 links         = "esp_rom_sys"
 
 [package.metadata.espressif]
+forever-unstable = true
 check-configs = [{ features = [] }]
 clippy-configs = [{ features = [] }]
 
@@ -29,7 +30,7 @@ cfg-if              = "1"
 document-features   = "0.2"
 
 [build-dependencies]
-esp-metadata-generated = { version = "0.2.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 #! ### Chip selection

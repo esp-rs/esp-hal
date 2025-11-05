@@ -106,14 +106,70 @@ symbols = [
     "rom_md5_bsd",
 ]
 
-memory = [{ name = "dram", start = 0x4080_0000, end = 0x4085_0000 }]
-
 [device.soc]
 cpu_has_csr_pc = true
 cpu_has_prv_mode = true
 rc_fast_clk_default = 8_500_000
 rc_slow_clock = 136_000
 xtal_options = [32]
+
+memory_map = { ranges = [
+    { name = "dram", start = 0x4080_0000, end = 0x4085_0000 },
+    { name = "dram2_uninit", start = 0x4083_EFD0, end = 0x4084_FEE0 },
+] }
+
+peripheral_clocks = { templates = [
+    # templates
+    { name = "default_clk_en_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
+    { name = "clk_en_template", value = "{{default_clk_en_template}}" }, # Indirection allows appending to the template for TWAI
+    { name = "rst_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{rst_field}}().bit(reset));" },
+    # substitutions
+    { name = "control", value = "crate::peripherals::SYSTEM" },
+    { name = "conf_register", value = "{{peripheral}}_conf" },
+    { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
+    { name = "rst_field", value = "{{peripheral}}_rst_en" },
+    # {{peripheral}} is derived automatically (e.g. SpiDma -> spi_dma)
+], peripheral_clocks = [
+    # This list is based on TRM (v1.5) - 7.4.1 PCR Register Summary
+    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
+    { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
+    { name = "I2cExt0", template_params = { peripheral = "i2c0" } },
+    { name = "I2cExt1", template_params = { peripheral = "i2c1" } },
+    { name = "Uhci0", template_params = { peripheral = "uhci" } },
+    { name = "Rmt" },
+    { name = "Ledc" },
+    { name = "Timg0", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup0_conf", peripheral = "tg0", peri_clk_template = "{{control}}::regs().timergroup0_timer_clk_conf().modify(|_, w| w.tg0_timer_clk_en().bit(enable));" }, keep_enabled = true }, # used for clock calibration
+    { name = "Timg1", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup1_conf", peripheral = "tg1", peri_clk_template = "{{control}}::regs().timergroup1_timer_clk_conf().modify(|_, w| w.tg1_timer_clk_en().bit(enable));" } },
+    { name = "Systimer", keep_enabled = true },
+    { name = "Twai0", template_params = { clk_en_template = "{{default_clk_en_template}} {{func_clk_template}}", func_clk_template = "{{control}}::regs().twai0_func_clk_conf().modify(|_, w| w.twai0_func_clk_en().bit(enable));" } },
+    { name = "I2s0", template_params = { peripheral = "i2s" } },
+    { name = "ApbSarAdc", template_params = { peripheral = "saradc", clk_en_field = "saradc_reg_clk_en", rst_field = "saradc_reg_rst_en" } },
+    { name = "Tsens", template_params = { conf_register = "tsens_clk_conf" } },
+    { name = "UsbDevice", keep_enabled = true },
+    # { name = "Intmtx" },
+    { name = "Pcnt" },
+    { name = "Etm" },
+    { name = "Mcpwm0", template_params = { peripheral = "pwm" } },
+    { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" } },
+    { name = "Dma", template_params = { peripheral = "gdma" } },
+    { name = "Spi2" },
+    { name = "Aes" },
+    { name = "Sha" },
+    { name = "Rsa" },
+    { name = "Ecc" },
+    { name = "Ds" },
+    { name = "Hmac" },
+    { name = "Ecdsa" },
+    #{ name = "Iomux" },
+    #{ name = "MemMonitor" },
+    { name = "Trace0", template_params = { peripheral = "trace" } },
+    #{ name = "Assist" },
+    #{ name = "Cache" },
+    #{ name = "ModemApb" },
+    #{ name = "Timeout" },
+    
+    # Radio clocks not modeled here.
+] }
 
 [device.adc]
 support_status = "partial"
@@ -423,6 +479,7 @@ instances = [
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
 ]
 ram_size = 128
+peripheral_controls_mem_clk = true
 
 [device.ds]
 support_status = "not_supported"

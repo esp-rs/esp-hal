@@ -19,6 +19,7 @@ use crate::{
     },
     interrupt::InterruptHandler,
     peripherals::Interrupt,
+    system::Peripheral,
 };
 
 pub(super) type SpiRegisterBlock = crate::pac::spi2::RegisterBlock;
@@ -52,6 +53,19 @@ impl crate::private::Sealed for AnySpiDmaTxChannel<'_> {}
 impl DmaTxChannel for AnySpiDmaTxChannel<'_> {}
 
 impl RegisterAccess for AnySpiDmaTxChannel<'_> {
+    fn peripheral_clock(&self) -> Option<Peripheral> {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                Some(Peripheral::SpiDma)
+            } else {
+                match self.0 {
+                    AnySpiDmaChannel(any::Inner::Spi2(_)) => Some(Peripheral::Spi2Dma),
+                    AnySpiDmaChannel(any::Inner::Spi3(_)) => Some(Peripheral::Spi3Dma),
+                }
+            }
+        }
+    }
+
     fn reset(&self) {
         self.regs().dma_conf().modify(|_, w| w.out_rst().set_bit());
         self.regs()
@@ -238,6 +252,19 @@ impl InterruptAccess<DmaTxInterrupt> for AnySpiDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for AnySpiDmaRxChannel<'_> {
+    fn peripheral_clock(&self) -> Option<Peripheral> {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                Some(Peripheral::SpiDma)
+            } else {
+                match self.0 {
+                    AnySpiDmaChannel(any::Inner::Spi2(_)) => Some(Peripheral::Spi2Dma),
+                    AnySpiDmaChannel(any::Inner::Spi3(_)) => Some(Peripheral::Spi3Dma),
+                }
+            }
+        }
+    }
+
     fn reset(&self) {
         self.regs().dma_conf().modify(|_, w| w.in_rst().set_bit());
         self.regs().dma_conf().modify(|_, w| w.in_rst().clear_bit());

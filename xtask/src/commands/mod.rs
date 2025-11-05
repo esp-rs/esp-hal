@@ -13,6 +13,8 @@ use crate::{
 };
 mod build;
 mod check_changelog;
+#[cfg(feature = "report")]
+pub mod generate_report;
 mod release;
 mod run;
 
@@ -46,9 +48,9 @@ pub struct ExamplesArgs {
 /// Arguments common to commands which act on doctests.
 #[derive(Debug, Args)]
 pub struct DocTestArgs {
-    /// Package where we wish to run doc tests.
-    #[arg(value_enum)]
-    pub package: Package,
+    /// Package(s) where we wish to run doc tests.
+    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
+    pub packages: Vec<Package>,
     /// Chip to target.
     #[arg(value_enum)]
     pub chip: Chip,

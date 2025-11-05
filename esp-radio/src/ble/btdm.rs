@@ -3,12 +3,10 @@ use core::ptr::{addr_of, addr_of_mut};
 
 use esp_phy::{PhyController, PhyInitGuard};
 use esp_sync::RawMutex;
-use esp_wifi_sys::c_types::*;
 use portable_atomic::{AtomicBool, Ordering};
 
 use super::{Config, ReceivedPacket};
 use crate::{
-    binary::include::*,
     ble::{
         HCI_OUT_COLLECTOR,
         HciOutCollector,
@@ -16,6 +14,7 @@ use crate::{
     },
     compat::common::str_from_c,
     hal::ram,
+    sys::{c_types::*, include::*},
 };
 
 #[cfg_attr(esp32c3, path = "os_adapter_esp32c3_s3.rs")]
@@ -122,7 +121,7 @@ unsafe extern "C" fn interrupt_disable() {
 
 #[ram]
 unsafe extern "C" fn task_yield() {
-    todo!();
+    crate::preempt::yield_task();
 }
 
 unsafe extern "C" fn task_yield_from_isr() {
@@ -148,12 +147,12 @@ unsafe extern "C" fn mutex_unlock(_mutex: *const ()) -> i32 {
 }
 
 unsafe extern "C" fn task_create(
-    func: *mut crate::binary::c_types::c_void,
+    func: *mut crate::sys::c_types::c_void,
     name_ptr: *const c_char,
     stack_depth: u32,
-    param: *mut crate::binary::c_types::c_void,
+    param: *mut crate::sys::c_types::c_void,
     prio: u32,
-    handle: *mut crate::binary::c_types::c_void,
+    handle: *mut crate::sys::c_types::c_void,
     core_id: u32,
 ) -> i32 {
     let name = unsafe { str_from_c(name_ptr) };
@@ -164,8 +163,8 @@ unsafe extern "C" fn task_create(
 
     unsafe {
         let task_func = core::mem::transmute::<
-            *mut crate::binary::c_types::c_void,
-            extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
+            *mut crate::sys::c_types::c_void,
+            extern "C" fn(*mut crate::sys::c_types::c_void),
         >(func);
 
         let task = crate::preempt::task_create(
@@ -262,7 +261,7 @@ unsafe extern "C" fn coex_schm_status_bit_set(_typ: i32, status: i32) {
     trace!("coex_schm_status_bit_set {} {}", _typ, status);
     #[cfg(coex)]
     unsafe {
-        crate::binary::include::coex_schm_status_bit_set(_typ as u32, status as u32)
+        crate::sys::include::coex_schm_status_bit_set(_typ as u32, status as u32)
     };
 }
 
@@ -270,7 +269,7 @@ unsafe extern "C" fn coex_schm_status_bit_clear(_typ: i32, status: i32) {
     trace!("coex_schm_status_bit_clear {} {}", _typ, status);
     #[cfg(coex)]
     unsafe {
-        crate::binary::include::coex_schm_status_bit_clear(_typ as u32, status as u32)
+        crate::sys::include::coex_schm_status_bit_clear(_typ as u32, status as u32)
     };
 }
 
@@ -298,7 +297,7 @@ unsafe extern "C" fn interrupt_l3_restore() {
 unsafe extern "C" fn custom_queue_create(
     _len: u32,
     _item_size: u32,
-) -> *mut crate::binary::c_types::c_void {
+) -> *mut crate::sys::c_types::c_void {
     todo!();
 }
 
@@ -354,7 +353,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         debug!("The btdm_controller_init was initialized");
 
         #[cfg(coex)]
-        crate::binary::include::coex_enable();
+        crate::sys::include::coex_enable();
 
         phy_init_guard = esp_hal::peripherals::BT::steal().enable_phy();
 

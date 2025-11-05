@@ -1,0 +1,203 @@
+name: Binary Size Analysis
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+jobs:
+  binary_size:
+    if: ${{ github.event.issue.pull_request && contains(github.event.comment.body, '/test-size') }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      pull-requests: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - soc: esp32c3
+            rust-target: riscv32imc-unknown-none-elf
+            dir-qa: ./qa-test
+            dir-dhcp: ./examples/wifi/embassy_dhcp
+          - soc: esp32c6
+            rust-target: riscv32imac-unknown-none-elf
+            dir-qa: ./qa-test
+            dir-dhcp: ./examples/wifi/embassy_dhcp
+          - soc: esp32
+            rust-target: xtensa-esp32-none-elf
+            dir-qa: ./qa-test
+            dir-dhcp: ./examples/wifi/embassy_dhcp
+
+    steps:
+      - name: Setup Rust
+      # Install the Rust toolchain for RISC-V devices:
+        if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.target.soc) }}
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          target: ${{ matrix.target.rust-target }}
+          toolchain: stable
+          components: rust-src, llvm-tools
+
+      # Install the Rust toolchain for Xtensa devices:
+      - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.target.soc)
+        uses: esp-rs/xtensa-toolchain@v1.6
+        with:
+          buildtargets: ${{ matrix.target.soc }}
+          default: true
+          version: 1.90.0.0
+
+      - name: Install Binutils and Hub
+        run: |
+          cargo install cargo-binutils
+          sudo apt-get update
+          sudo apt-get install -y hub
+      # Checkout PR
+      - name: Checkout Repo (Initial)
+        uses: actions/checkout@v4
+
+      - name: Checkout Pull Request (PR Code at Root)
+        # context https://github.com/actions/checkout/issues/331
+        run: hub pr checkout ${{ github.event.issue.number }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/
+            ~/.cargo/git/
+            ./target/
+          key: ${{ runner.os }}-${{ matrix.target.soc }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Dir for result files
+        run: |
+          cd $HOME
+          mkdir results
+      - name: Build PR QA Binary
+        working-directory: ${{ matrix.target.dir-qa }}
+        run: |
+          cargo build --release --bin sleep_timer --features ${{ matrix.target.soc }} --target ${{ matrix.target.rust-target }}
+          cp target/${{ matrix.target.rust-target }}/release/sleep_timer $HOME/results/pr_qa_build_${{ matrix.target.soc }}.elf
+      - name: Build PR DHCP Binary
+        working-directory: ${{ matrix.target.dir-dhcp }}
+        run: |
+          # Build
+          cargo build --release --features ${{ matrix.target.soc }} --target ${{ matrix.target.rust-target }}
+          
+          # Copy PR binary to parent directory (outside workspace)
+          cp target/${{ matrix.target.rust-target }}/release/embassy-dhcp $HOME/results/pr_dhcp_build_${{ matrix.target.soc }}.elf
+      # Checkout main for comparison
+      - name: Checkout Base Commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+
+      - name: Build Base QA Binary
+        working-directory: ${{ matrix.target.dir-qa }}
+        run: |
+          cargo build --release --bin sleep_timer --features ${{ matrix.target.soc }} --target ${{ matrix.target.rust-target }}
+          cp target/${{ matrix.target.rust-target }}/release/sleep_timer $HOME/results/base_qa_build_${{ matrix.target.soc }}.elf        
+      - name: Build Base DHCP Binary
+        working-directory: ${{ matrix.target.dir-dhcp }}
+        run: |
+          cargo build --release --features ${{ matrix.target.soc }} --target ${{ matrix.target.rust-target }}
+          cp target/${{ matrix.target.rust-target }}/release/embassy-dhcp $HOME/results/base_dhcp_build_${{ matrix.target.soc }}.elf
+      
+      - name: Copy binaries to workspace for Bloaty
+        run: |
+          # Copy files from $HOME/results to current workspace
+          cp $HOME/results/base_qa_build_${{ matrix.target.soc }}.elf ./
+          cp $HOME/results/pr_qa_build_${{ matrix.target.soc }}.elf ./
+          cp $HOME/results/base_dhcp_build_${{ matrix.target.soc }}.elf ./
+          cp $HOME/results/pr_dhcp_build_${{ matrix.target.soc }}.elf ./
+          ls -la *.elf
+      # Diffs and Artifacts
+      - name: Run Bloaty QA Diff
+        id: bloaty-qa
+        uses: carlosperate/bloaty-action@v1
+        with:
+          bloaty-args: -d sections base_qa_build_${{ matrix.target.soc }}.elf -- pr_qa_build_${{ matrix.target.soc }}.elf
+          output-to-summary: false
+        continue-on-error: true
+
+      - name: Save Bloaty QA output
+        run: |
+          echo "QA_DIFF<<EOF" > result-pr-${{ matrix.target.soc }}.txt
+          echo "\`\`\`" >> result-pr-${{ matrix.target.soc }}.txt
+          echo "${{ steps.bloaty-qa.outputs.bloaty-output || 'N/A' }}" >> result-pr-${{ matrix.target.soc }}.txt
+          echo "\`\`\`" >> result-pr-${{ matrix.target.soc }}.txt
+          echo "EOF" >> result-pr-${{ matrix.target.soc }}.txt
+          
+      - name: Run Bloaty DHCP Diff
+        id: bloaty-dhcp
+        uses: carlosperate/bloaty-action@v1
+        with:
+          bloaty-args: -d sections base_dhcp_build_${{ matrix.target.soc }}.elf -- pr_dhcp_build_${{ matrix.target.soc }}.elf
+          output-to-summary: false
+        continue-on-error: true
+
+      - name: Save Bloaty DHCP output
+        run: |
+          echo "DHCP_DIFF<<EOF" >> result-pr-${{ matrix.target.soc }}.txt
+          echo "\`\`\`" >> result-pr-${{ matrix.target.soc }}.txt
+          echo "${{ steps.bloaty-dhcp.outputs.bloaty-output || 'N/A' }}" >> result-pr-${{ matrix.target.soc }}.txt
+          echo "\`\`\`" >> result-pr-${{ matrix.target.soc }}.txt
+          echo "EOF" >> result-pr-${{ matrix.target.soc }}.txt
+          cat result-pr-${{ matrix.target.soc }}.txt
+      - name: Upload Result Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: result-${{ matrix.target.soc }}
+          path: result-pr-${{ matrix.target.soc }}.txt
+
+  report-results:
+    needs: [binary_size]
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: result-*
+          path: ./results
+          merge-multiple: true
+
+      - name: Generate Combined Report
+        id: combine
+        working-directory: ${{ github.workspace }}
+        run: cargo run -p xtask --features report -- generate-report --input results
+
+      - name: Find and Update Comment with GH CLI
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ -n "${{ github.event.pull_request.number }}" ]]; then
+            ISSUE_NUMBER=${{ github.event.pull_request.number }}
+          elif [[ -n "${{ github.event.issue.number }}" ]]; then
+            ISSUE_NUMBER=${{ github.event.issue.number }}
+          else
+            ISSUE_NUMBER=${{ github.event.number }}
+          fi
+          
+          echo "Processing PR/Issue Number: $ISSUE_NUMBER"
+          COMMENTS=$(gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments)
+          COMMENT_ID=$(echo "$COMMENTS" | jq -r '.[] | select(.body | test("^## Binary Size Report")) | select(.user.login == "github-actions[bot]") | .id')
+          echo "$COMMENT_ID"
+          if [ -n "$COMMENT_ID" ]; then
+            echo "Updating existing comment: $COMMENT_ID"
+            gh api -X PATCH \
+              repos/${{ github.repository }}/issues/comments/$COMMENT_ID \
+              -f "body=$(cat report.txt)"
+          else
+            echo "Creating new comment"
+            gh api -X POST \
+              repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments \
+              -f "body=$(cat report.txt)"
+          fi

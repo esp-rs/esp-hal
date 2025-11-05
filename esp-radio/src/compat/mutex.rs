@@ -1,7 +1,9 @@
 use esp_radio_rtos_driver::semaphore::SemaphoreKind;
-use esp_wifi_sys::c_types::c_void;
 
-use crate::preempt::semaphore::{SemaphoreHandle, SemaphorePtr};
+use crate::{
+    preempt::semaphore::{SemaphoreHandle, SemaphorePtr},
+    sys::c_types::c_void,
+};
 
 pub(crate) fn mutex_create(recursive: bool) -> *mut c_void {
     let ptr = SemaphoreHandle::new(if recursive {

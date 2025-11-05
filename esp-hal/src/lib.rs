@@ -15,18 +15,17 @@
 //! . Please ensure you are reading the correct [documentation] for your target
 //! device.
 //!
-//! ## Choosing a Device
-//!
-//! Depending on your target device, you need to enable the chip feature
-//! for that device. You may also need to do this on ancillary esp-hal crates.
-//!
 //! ## Overview
+//!
+//! esp-hal is a Hardware Abstraction Layer (HAL) for Espressif's ESP32 lineup of
+//! microcontrollers offering safe, idiotmatic APIs to control hardware peripherals.
 //!
 //! ### Peripheral drivers
 //!
-//! The HAL implements both blocking _and_ async APIs for many peripherals.
+//! The HAL implements both [`Blocking`] _and_ [`Async`] APIs for all applicable peripherals.
 //! Where applicable, driver implement the [embedded-hal] and
-//! [embedded-hal-async] traits.
+//! [embedded-hal-async] traits. Drivers that don't currently have a stable API
+//! are marked as `unstable` in the documentation.
 //!
 //! ### Peripheral singletons
 //!
@@ -89,7 +88,7 @@
 //!
 //! ## Creating a Project
 //!
-//! We have a [book] that explains the full esp-rs ecosystem
+//! We have a [book] that explains the full esp-hal ecosystem
 //! and how to get started, it's advisable to give that a read
 //! before proceeding. We also have a [training] that covers some common
 //! scenarios with examples.
@@ -154,9 +153,9 @@
 #![doc = ""]
 //! ## Don't use `core::mem::forget`
 //!
-//! You should never use `core::mem::forget` on any type defined in the HAL.
-//! Some types heavily rely on their `Drop` implementation to not leave the
-//! hardware in undefined state and causing UB.
+//! You should never use `core::mem::forget` on any type defined in [esp crates].
+//! Many types heavily rely on their `Drop` implementation to not leave the
+//! hardware in undefined state which can cause undefined behaviour in your program.
 //!
 //! You might want to consider using [`#[deny(clippy::mem_forget)`](https://rust-lang.github.io/rust-clippy/v0.0.212/index.html#mem_forget) in your project.
 //!
@@ -185,6 +184,7 @@
 //! [esp-generate]: https://github.com/esp-rs/esp-generate
 //! [book]: https://docs.espressif.com/projects/rust/book/
 //! [training]: https://docs.espressif.com/projects/rust/no_std-training/
+//! [esp crates]: https://docs.espressif.com/projects/rust/book/introduction/ancillary-crates.html#esp-hal-ecosystem
 //!
 //! ## Feature Flags
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
@@ -199,6 +199,9 @@
     semver_checks,
     allow(rustdoc::private_intra_doc_links, rustdoc::broken_intra_doc_links)
 )]
+// Do not document `cfg` gates by default.
+#![cfg_attr(docsrs, allow(invalid_doc_attributes))] // doc(auto_cfg = false) requires a new nightly (~2025-10-09+)
+#![cfg_attr(docsrs, doc(auto_cfg = false))]
 #![no_std]
 
 // MUST be the first module
@@ -206,67 +209,6 @@ mod fmt;
 
 #[macro_use]
 extern crate esp_metadata_generated;
-
-use core::marker::PhantomData;
-
-pub use esp_metadata_generated::chip;
-use esp_rom_sys as _;
-
-metadata!("build_info", CHIP_NAME, chip!());
-
-#[cfg(all(riscv, feature = "rt"))]
-#[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
-#[cfg_attr(not(feature = "unstable"), doc(hidden))]
-pub use esp_riscv_rt::{self, riscv};
-use esp_sync::RawMutex;
-pub(crate) use peripherals::pac;
-#[cfg(xtensa)]
-#[cfg(all(xtensa, feature = "rt"))]
-#[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
-#[cfg_attr(not(feature = "unstable"), doc(hidden))]
-pub use xtensa_lx_rt::{self, xtensa_lx};
-
-#[cfg(lp_core)]
-#[instability::unstable]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub use self::soc::lp_core;
-#[cfg(ulp_riscv_core)]
-#[instability::unstable]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub use self::soc::ulp_core;
-
-#[cfg(any(soc_has_dport, soc_has_hp_sys, soc_has_pcr, soc_has_system))]
-pub mod clock;
-#[cfg(soc_has_gpio)]
-pub mod gpio;
-#[cfg(any(soc_has_i2c0, soc_has_i2c1))]
-pub mod i2c;
-pub mod peripherals;
-#[cfg(all(feature = "unstable", any(soc_has_hmac, soc_has_sha)))]
-mod reg_access;
-#[cfg(any(soc_has_spi0, soc_has_spi1, soc_has_spi2, soc_has_spi3))]
-pub mod spi;
-pub mod system;
-pub mod time;
-#[cfg(any(soc_has_uart0, soc_has_uart1, soc_has_uart2))]
-pub mod uart;
-
-mod macros;
-
-#[cfg(feature = "rt")]
-pub use procmacros::blocking_main as main;
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-#[instability::unstable]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub use procmacros::handler;
-#[cfg(any(lp_core, ulp_riscv_core))]
-#[instability::unstable]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-pub use procmacros::load_lp_code;
-pub use procmacros::ram;
-
-#[cfg(all(feature = "rt", feature = "exception-handler"))]
-mod exception_handler;
 
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 #[doc(hidden)]
@@ -290,6 +232,28 @@ macro_rules! unstable_module {
     };
 }
 
+// we can't use instability because it mucks up the short description in rustdoc
+#[doc(hidden)]
+macro_rules! unstable_reexport {
+    ($(
+        $(#[$meta:meta])*
+        pub use $path:path;
+    )*) => {
+        $(
+            $(#[$meta])*
+            #[cfg(feature = "unstable")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+            pub use $path;
+
+            $(#[$meta])*
+            #[cfg(not(feature = "unstable"))]
+            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+            #[allow(unused)]
+            pub(crate) use $path;
+        )*
+    };
+}
+
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 // we don't want unstable drivers to be compiled even, unless enabled
 #[doc(hidden)]
@@ -307,11 +271,66 @@ macro_rules! unstable_driver {
     };
 }
 
+use core::marker::PhantomData;
+
+pub use esp_metadata_generated::chip;
+use esp_rom_sys as _;
 pub(crate) use unstable_module;
+
+metadata!("build_info", CHIP_NAME, chip!());
+
+#[cfg(all(riscv, feature = "rt"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
+#[cfg_attr(not(feature = "unstable"), doc(hidden))]
+pub use esp_riscv_rt::{self, riscv};
+use esp_sync::RawMutex;
+pub(crate) use peripherals::pac;
+#[cfg(xtensa)]
+#[cfg(all(xtensa, feature = "rt"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
+#[cfg_attr(not(feature = "unstable"), doc(hidden))]
+pub use xtensa_lx_rt::{self, xtensa_lx};
+
+#[cfg(any(soc_has_dport, soc_has_hp_sys, soc_has_pcr, soc_has_system))]
+pub mod clock;
+#[cfg(soc_has_gpio)]
+pub mod gpio;
+#[cfg(any(soc_has_i2c0, soc_has_i2c1))]
+pub mod i2c;
+pub mod peripherals;
+#[cfg(all(feature = "unstable", any(soc_has_hmac, soc_has_sha)))]
+mod reg_access;
+#[cfg(any(soc_has_spi0, soc_has_spi1, soc_has_spi2, soc_has_spi3))]
+pub mod spi;
+pub mod system;
+pub mod time;
+#[cfg(any(soc_has_uart0, soc_has_uart1, soc_has_uart2))]
+pub mod uart;
+
+mod macros;
+
+#[cfg(feature = "rt")]
+pub use procmacros::blocking_main as main;
+pub use procmacros::ram;
+
+unstable_reexport! {
+    pub use procmacros::handler;
+
+    #[cfg(any(lp_core, ulp_riscv_core))]
+    pub use procmacros::load_lp_code;
+
+    #[cfg(lp_core)]
+    pub use self::soc::lp_core;
+
+    #[cfg(ulp_riscv_core)]
+    pub use self::soc::ulp_core;
+}
+
+#[cfg(all(feature = "rt", feature = "exception-handler"))]
+mod exception_handler;
 
 unstable_module! {
     pub mod asynch;
-    pub mod config;
     pub mod debugger;
     #[cfg(any(soc_has_dport, soc_has_interrupt_core0, soc_has_interrupt_core1))]
     pub mod interrupt;
@@ -334,8 +353,9 @@ unstable_module! {
     #[cfg(psram)] // DMA needs some things from here
     pub mod psram;
     pub mod efuse;
-    pub mod work_queue;
 }
+
+mod work_queue;
 
 unstable_driver! {
     #[cfg(soc_has_aes)]
@@ -552,7 +572,7 @@ pub unsafe trait Persistable: Sized {}
 /// # Safety
 ///
 /// - The type must be some form of `MaybeUninit<T>`
-#[instability::unstable]
+#[doc(hidden)]
 pub unsafe trait Uninit: Sized {}
 
 macro_rules! impl_persistable {
@@ -584,7 +604,6 @@ pub mod __macro_implementation {
     #[instability::unstable]
     pub const fn assert_is_persistable<T: super::Persistable>() {}
 
-    #[instability::unstable]
     pub const fn assert_is_uninit<T: super::Uninit>() {}
 
     #[cfg(feature = "rt")]
@@ -596,14 +615,13 @@ pub mod __macro_implementation {
 }
 
 use crate::clock::CpuClock;
-#[cfg(feature = "unstable")]
-use crate::config::{WatchdogConfig, WatchdogStatus};
 #[cfg(feature = "rt")]
 use crate::{clock::Clocks, peripherals::Peripherals};
 
 /// A spinlock for seldom called stuff. Users assume that lock contention is not an issue.
 pub(crate) static ESP_HAL_LOCK: RawMutex = RawMutex::new();
 
+#[procmacros::doc_replace]
 /// System configuration.
 ///
 /// This `struct` is marked with `#[non_exhaustive]` and can't be instantiated
@@ -611,18 +629,29 @@ pub(crate) static ESP_HAL_LOCK: RawMutex = RawMutex::new();
 /// to the `struct`. Instead, use the [`Config::default()`] method to create a
 /// new instance.
 ///
-/// For usage examples, see the [config module documentation](crate::config).
+/// ## Examples
+///
+/// ### Default initialization
+///
+/// ```rust, no_run
+/// # {before_snippet}
+/// let peripherals = esp_hal::init(esp_hal::Config::default());
+/// # {after_snippet}
+/// ```
+///
+/// ### Custom initialization
+/// ```rust, no_run
+/// # {before_snippet}
+/// use esp_hal::{clock::CpuClock, time::Duration};
+/// let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+/// let peripherals = esp_hal::init(config);
+/// # {after_snippet}
+/// ```
 #[non_exhaustive]
 #[derive(Default, Clone, Copy, procmacros::BuilderLite)]
 pub struct Config {
     /// The CPU clock configuration.
     cpu_clock: CpuClock,
-
-    /// Enable watchdog timer(s).
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    #[builder_lite(unstable)]
-    watchdog: WatchdogConfig,
 
     /// PSRAM configuration.
     #[cfg(feature = "unstable")]
@@ -658,7 +687,7 @@ pub fn init(config: Config) -> Peripherals {
 
     let mut peripherals = Peripherals::take();
 
-    Clocks::init(config.cpu_clock);
+    Clocks::init(config.cpu_clock());
 
     crate::rtc_cntl::rtc::configure_clock();
 
@@ -668,7 +697,7 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2))]
     crate::rtc_cntl::sleep::RtcSleepConfig::base_settings(&rtc);
 
-    // Handle watchdog configuration with defaults
+    // Disable watchdog timers
     #[cfg(not(any(esp32, esp32s2)))]
     rtc.swd.disable();
 
@@ -679,34 +708,6 @@ pub fn init(config: Config) -> Peripherals {
 
     #[cfg(timergroup_timg1)]
     crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new().disable();
-
-    #[cfg(feature = "unstable")]
-    {
-        #[cfg(not(any(esp32, esp32s2)))]
-        if config.watchdog.swd() {
-            rtc.swd.enable();
-        }
-
-        if let WatchdogStatus::Enabled(duration) = config.watchdog.rwdt() {
-            rtc.rwdt
-                .set_timeout(crate::rtc_cntl::RwdtStage::Stage0, duration);
-            rtc.rwdt.enable();
-        }
-
-        #[cfg(timergroup_timg0)]
-        if let WatchdogStatus::Enabled(duration) = config.watchdog.timg0() {
-            let mut timg0_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new();
-            timg0_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
-            timg0_wd.enable();
-        }
-
-        #[cfg(timergroup_timg1)]
-        if let WatchdogStatus::Enabled(duration) = config.watchdog.timg1() {
-            let mut timg1_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new();
-            timg1_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
-            timg1_wd.enable();
-        }
-    }
 
     #[cfg(esp32)]
     crate::time::time_init();

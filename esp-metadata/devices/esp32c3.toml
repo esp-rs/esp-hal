@@ -85,13 +85,59 @@ symbols = [
     "gpio_support_deepsleep_wakeup",
 ]
 
-memory = [{ name = "dram", start = 0x3FC8_0000, end = 0x3FCE_0000 }]
-
 [device.soc]
 cpu_has_csr_pc = true
 rc_fast_clk_default = 17_500_000
 rc_slow_clock = 136_000
 xtal_options = [40]
+
+memory_map = { ranges = [
+    { name = "dram", start = 0x3FC8_0000, end = 0x3FCE_0000 },
+    { name = "dram2_uninit", start = 0x3FCCE400, end = 0x3FCD_E710 },
+] }
+
+peripheral_clocks = { templates = [
+    # templates
+    { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
+    { name = "rst_template", value = "{{control}}::regs().{{rst_register}}().modify(|_, w| w.{{rst_field}}().bit(reset));" },
+    # substitutions
+    { name = "control", value = "crate::peripherals::SYSTEM" },
+    { name = "reg_group", value = "en0" },
+    { name = "clk_en_register", value = "perip_clk_{{reg_group}}" },
+    { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
+    { name = "rst_register", value = "perip_rst_{{reg_group}}" },
+    { name = "rst_field", value = "{{peripheral}}_rst" },
+    # {{peripheral}} is derived automatically (e.g. SpiDma -> spi_dma)
+], peripheral_clocks = [
+    { name = "Tsens", template_params = { reg_group = "en1" } },
+    { name = "Dma", template_params = { reg_group = "en1" } },
+    { name = "Hmac", template_params = { reg_group = "en1", peripheral = "crypto_hmac" } },
+    { name = "Ds", template_params = { reg_group = "en1", peripheral = "crypto_ds" } },
+    { name = "Rsa", template_params = { reg_group = "en1", peripheral = "crypto_rsa" } },
+    { name = "Sha", template_params = { reg_group = "en1", peripheral = "crypto_sha" } },
+    { name = "Aes", template_params = { reg_group = "en1", peripheral = "crypto_aes" } },
+
+    #{ name = "Adc2Arb" },
+    { name = "Systimer", keep_enabled = true },
+    { name = "ApbSarAdc", template_params = { peripheral = "apb_saradc" } },
+    #{ name = "Spi3Dma" },
+    { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
+    { name = "UsbDevice", keep_enabled = true },
+    { name = "I2s0" },
+    { name = "Twai0", template_params = { peripheral = "twai" } },
+    { name = "Timg1", template_params = { peripheral = "timergroup1" } },
+    { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true }, # used for clock calibration
+    { name = "Ledc" },
+    { name = "Rmt" },
+    { name = "Uhci0" },
+    { name = "I2cExt0" },
+    { name = "Spi2" },
+    { name = "Uart1" },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
+    #{ name = "Spi01" },
+    
+    # Radio clocks not modeled here.
+] }
 
 [device.adc]
 support_status = "partial"
