@@ -43,10 +43,13 @@ impl TimerQueueInner {
         let due = props.next_due;
 
         if !props.enqueued {
+            trace!("Enqueueing timer {:x}", timer as *const _ as usize);
             props.enqueued = true;
 
             props.next = head;
             self.head = Some(NonNull::from(timer));
+        } else {
+            trace!("Already enqueued timer {:x}", timer as *const _ as usize);
         }
 
         if let Some(task) = self.task {
@@ -126,6 +129,7 @@ impl TimerQueue {
 
                 // Remove current timer from the list.
                 timers = props.next.take();
+                props.enqueued = false;
 
                 if !props.is_active || props.drop {
                     trace!(
@@ -158,21 +162,12 @@ impl TimerQueue {
 
             self.inner.with(|q| {
                 let props = current_timer.properties(q);
-                // Set this AFTER the callback so that the callback doesn't leave us in an unknown
-                // "queued?" state.
-                props.enqueued = false;
 
                 if props.drop {
                     debug!("Dropping timer {:x} (delayed)", current.addr());
                     let boxed = unsafe { Box::from_raw(current.as_ptr()) };
                     core::mem::drop(boxed);
                 } else if props.is_active {
-                    let next_due = props.next_due;
-                    if next_due < q.next_wakeup {
-                        q.next_wakeup = next_due;
-                    }
-
-                    trace!("Re-queueing timer {:x}", current_timer as *const _ as usize);
                     q.enqueue(current_timer);
                 } else {
                     trace!("Timer {:x} inactive", current_timer as *const _ as usize);
