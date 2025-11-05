@@ -24,6 +24,7 @@ struct TimerQueueInner {
     head: Option<NonNull<Timer>>,
     next_wakeup: u64,
     task: Option<TaskPtr>,
+    processing: bool,
 }
 
 unsafe impl Send for TimerQueueInner {}
@@ -34,6 +35,7 @@ impl TimerQueueInner {
             head: None,
             next_wakeup: 0,
             task: None,
+            processing: false,
         }
     }
 
@@ -55,7 +57,13 @@ impl TimerQueueInner {
         if let Some(task) = self.task {
             if due < self.next_wakeup {
                 self.next_wakeup = due;
-                task.resume();
+
+                // Do not resume the task unless it is sleeping. But if it is sleeping, we need to
+                // unconditionally resume it, so that it can re-schedule its next wakeup time
+                // according to the new due time.
+                if !self.processing {
+                    task.resume();
+                }
             }
         } else {
             // create the timer task
@@ -116,6 +124,7 @@ impl TimerQueue {
     fn process(&self) {
         debug!("Processing timers");
         let mut timers = self.inner.with(|q| {
+            q.processing = true;
             q.next_wakeup = u64::MAX;
             q.head.take()
         });
@@ -148,6 +157,7 @@ impl TimerQueue {
                     return false;
                 }
 
+                // Re-arm periodic timer
                 if props.periodic {
                     props.next_due += props.period;
                 }
@@ -176,6 +186,7 @@ impl TimerQueue {
         }
 
         self.inner.with(|q| {
+            q.processing = false;
             let next_wakeup = q.next_wakeup;
             debug!("next_wakeup: {}", next_wakeup);
             SCHEDULER.sleep_until(Instant::EPOCH + Duration::from_micros(next_wakeup));
