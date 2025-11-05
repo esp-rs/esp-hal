@@ -45,7 +45,10 @@ impl TimerQueue {
 
     fn retain(&mut self, now: u64, mut on_task_ready: impl FnMut(TaskPtr)) {
         if now < self.next_wakeup {
-            trace!("Skipping timer queue");
+            trace!(
+                "Skipping RTOS timer queue, Now: {}, expected wakeup at {}",
+                now, self.next_wakeup
+            );
             return;
         }
 
