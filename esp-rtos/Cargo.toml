@@ -32,7 +32,9 @@ bench = false
 
 [dependencies]
 esp-hal = { version = "1.0.0", path = "../esp-hal", default-features = false, features = [
-    "requires-unstable", "rt" # FIXME: rt technically shouldn't be enabled
+    # FIXME: rt technically shouldn't be enabled, but rtos requires `TrapFrame`
+    # and uses reexported riscv/xtena-lx from esp-hal
+    "requires-unstable", "rt"
 ] }
 
 cfg-if = "1"
