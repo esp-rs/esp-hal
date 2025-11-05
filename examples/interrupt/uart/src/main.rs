@@ -73,9 +73,8 @@ fn main() -> ! {
     });
 
     esp_println::println!("UART interrupt example with break conditions");
-    esp_println::println!("Sending counter every second, break every 3 seconds");
+    esp_println::println!("Sending data every second, break every 3 seconds");
 
-    let mut counter: u8 = 0;
     let mut last_send = Instant::now();
     let mut last_break = Instant::now();
 
@@ -87,21 +86,11 @@ fn main() -> ! {
 
             critical_section::with(|cs| {
                 if let Some(uart) = SERIAL.borrow_ref_mut(cs).as_mut() {
-                    let msg = [
-                        b'T',
-                        b'X',
-                        b':',
-                        b' ',
-                        b'0' + (counter / 10),
-                        b'0' + (counter % 10),
-                        b'\n',
-                    ];
+                    let msg = [0x55, 0x22, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
                     let _ = uart.write(&msg);
                     let _ = uart.flush();
                 }
             });
-
-            counter = counter.wrapping_add(1);
         }
 
         if (now - last_break).as_millis() >= 3000 {
