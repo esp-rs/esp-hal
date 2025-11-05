@@ -413,7 +413,7 @@ impl defmt::Format for AccessPointConfig {
     fn format(&self, fmt: defmt::Formatter<'_>) {
         defmt::write!(
             fmt,
-            "AccessPointConfiguration {{\
+            "AccessPointConfig {{\
             ssid: {}, \
             ssid_hidden: {}, \
             channel: {}, \
@@ -560,7 +560,7 @@ impl defmt::Format for ClientConfig {
     fn format(&self, fmt: defmt::Formatter<'_>) {
         defmt::write!(
             fmt,
-            "ClientConfiguration {{\
+            "ClientConfig {{\
             ssid: {}, \
             bssid: {:?}, \
             auth_method: {:?}, \
@@ -804,7 +804,7 @@ impl defmt::Format for EapClientConfig {
     fn format(&self, fmt: defmt::Formatter<'_>) {
         defmt::write!(
             fmt,
-            "EapClientConfiguration {{\
+            "EapClientConfig {{\
             ssid: {}, \
             bssid: {:?}, \
             auth_method: {:?}, \
