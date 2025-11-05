@@ -31,8 +31,10 @@ features       = ["esp32c6", "embassy", "esp-radio"]
 bench = false
 
 [dependencies]
-esp-hal = { version = "1.0.0", path = "../esp-hal", features = [
-    "requires-unstable",
+esp-hal = { version = "1.0.0", path = "../esp-hal", default-features = false, features = [
+    # FIXME: rt technically shouldn't be enabled, but rtos requires `TrapFrame`
+    # and uses reexported riscv/xtena-lx from esp-hal
+    "requires-unstable", "rt"
 ] }
 
 cfg-if = "1"

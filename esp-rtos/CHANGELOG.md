@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- No longer enables the default feature of `esp-hal` (#4433).
 
 ### Removed
 
