@@ -1003,16 +1003,15 @@ impl<'d> UartRx<'d, Blocking> {
     /// is automatically cleared.
     ///
     /// ## Arguments
-    /// * `timeout_us` - Timeout in microseconds
+    /// * `timeout` - Maximum time to wait for a break condition
     #[instability::unstable]
-    pub fn wait_for_break_with_timeout(&mut self, timeout_us: u32) -> bool {
+    pub fn wait_for_break_with_timeout(&mut self, timeout: crate::time::Duration) -> bool {
         self.enable_break_detection();
 
         let start = crate::time::Instant::now();
-        let timeout_duration = crate::time::Duration::from_micros(timeout_us as u64);
 
         while !self.regs().int_raw().read().brk_det().bit_is_set() {
-            if crate::time::Instant::now() - start >= timeout_duration {
+            if crate::time::Instant::now() - start >= timeout {
                 return false;
             }
         }
@@ -1518,10 +1517,10 @@ impl<'d> Uart<'d, Blocking> {
     /// is automatically cleared.
     ///
     /// ## Arguments
-    /// * `timeout_us` - Timeout in microseconds
+    /// * `timeout` - Maximum time to wait for a break condition
     #[instability::unstable]
-    pub fn wait_for_break_with_timeout(&mut self, timeout_us: u32) -> bool {
-        self.rx.wait_for_break_with_timeout(timeout_us)
+    pub fn wait_for_break_with_timeout(&mut self, timeout: crate::time::Duration) -> bool {
+        self.rx.wait_for_break_with_timeout(timeout)
     }
 }
 

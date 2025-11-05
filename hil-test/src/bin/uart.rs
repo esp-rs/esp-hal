@@ -14,6 +14,7 @@ mod tests {
         Blocking,
         delay::Delay,
         gpio::{AnyPin, Pin},
+        time::Duration,
         uart::{self, ClockSource, Uart},
     };
 
@@ -246,14 +247,14 @@ mod tests {
 
         rx.enable_break_detection();
         tx.send_break(100);
-        assert!(rx.wait_for_break_with_timeout(1_000_000));
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
     }
 
     #[test]
     fn test_break_detection_no_break(ctx: Context) {
         let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
 
-        assert!(!rx.wait_for_break_with_timeout(100_000));
+        assert!(!rx.wait_for_break_with_timeout(Duration::from_millis(100)));
     }
 
     #[test]
@@ -264,7 +265,7 @@ mod tests {
         rx.enable_break_detection();
         for _ in 0..3 {
             tx.send_break(100);
-            assert!(rx.wait_for_break_with_timeout(1_000_000));
+            assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
         }
     }
 
@@ -280,14 +281,14 @@ mod tests {
         assert!(rx.wait_for_break_with_timeout(1_000_000));
 
         // Test 2: Don't send break, expect timeout
-        assert!(!rx.wait_for_break_with_timeout(100_000));
+        assert!(!rx.wait_for_break_with_timeout(Duration::from_millis(100)));
 
         // Test 3: Send break again, expect detection
         tx.send_break(100);
         assert!(rx.wait_for_break_with_timeout(1_000_000));
 
         // Test 4: Don't send break, expect timeout again
-        assert!(!rx.wait_for_break_with_timeout(100_000));
+        assert!(!rx.wait_for_break_with_timeout(Duration::from_millis(100)));
 
         // Test 5: Final break detection, expect detection
         tx.send_break(100);
@@ -313,7 +314,7 @@ mod tests {
         assert_eq!(buf, [0x42, 0x43, 0x44]);
 
         // Test 3: Verify no false break detection after data
-        assert!(!rx.wait_for_break_with_timeout(100_000));
+        assert!(!rx.wait_for_break_with_timeout(Duration::from_millis(100)));
 
         // Test 4: Send break after data, expect detection
         tx.send_break(100);
@@ -327,7 +328,7 @@ mod tests {
         assert_eq!(buf, [0xAA, 0xBB]);
 
         // Test 6: Don't send break, expect timeout
-        assert!(!rx.wait_for_break_with_timeout(100_000));
+        assert!(!rx.wait_for_break_with_timeout(Duration::from_millis(100)));
 
         // Test 7: Final break detection
         tx.send_break(100);
