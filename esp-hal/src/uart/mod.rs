@@ -885,7 +885,6 @@ where
         let total_delay_us = (bits as u64 * 1_000_000) / self.baudrate as u64;
         let delay_us = (total_delay_us as u32).max(1);
 
-        // Delay for the total duration of the break
         crate::rom::ets_delay_us(delay_us);
 
         // Restore the original register state
