@@ -1246,9 +1246,6 @@ where
         self.uart
             .info()
             .enable_listen_rx(RxEvent::BreakDetected.into(), true);
-
-        #[cfg(any(esp32c6, esp32h2))]
-        sync_regs(self.regs());
     }
 
     /// Change the configuration.
