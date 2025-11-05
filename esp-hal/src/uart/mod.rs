@@ -1178,10 +1178,6 @@ impl<'d> UartRx<'d, Async> {
     /// This is an async function that will await until a break condition is
     /// detected on the RX line. After detection, the break interrupt flag is
     /// automatically cleared.
-    ///
-    /// ## Cancellation
-    ///
-    /// This function is cancellation safe.
     #[instability::unstable]
     pub async fn wait_for_break_async(&mut self) {
         UartRxFuture::new(self.uart.reborrow(), RxEvent::BreakDetected).await;
@@ -1664,10 +1660,6 @@ impl<'d> Uart<'d, Async> {
     /// This is an async function that will await until a break condition is
     /// detected on the RX line. After detection, the break interrupt flag is
     /// automatically cleared.
-    ///
-    /// ## Cancellation
-    ///
-    /// This function is cancellation safe.
     #[instability::unstable]
     pub async fn wait_for_break_async(&mut self) {
         self.rx.wait_for_break_async().await
