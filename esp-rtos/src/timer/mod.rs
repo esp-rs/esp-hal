@@ -170,7 +170,7 @@ impl TimeDriver {
         let sleep_duration = next_wakeup.saturating_sub(now);
 
         // assume 52-bit underlying timer. it's not a big deal to sleep for a shorter time
-        let mut timeout = sleep_duration & ((1 << 52) - 1);
+        let mut timeout = sleep_duration.min((1 << 52) - 1);
 
         trace!("Arming timer for {} (target = {})", timeout, next_wakeup);
         loop {
