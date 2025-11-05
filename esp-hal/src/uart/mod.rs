@@ -888,7 +888,11 @@ where
         crate::rom::ets_delay_us(delay_us);
 
         // Restore the original register state
-        self.uart.info().regs().conf0().write(|_| original_conf0);
+        self.uart
+            .info()
+            .regs()
+            .conf0()
+            .write(|w| unsafe { w.bits(original_conf0.bits()) });
 
         #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
         sync_regs(self.uart.info().regs());
