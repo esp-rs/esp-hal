@@ -220,7 +220,7 @@ impl SchedulerState {
         let mut arm_next_timeslice_tick = false;
         let next_task = self.run_queue.pop();
         if next_task != current_task {
-            trace!("Switching task {:?} -> {:?}", current_task, next_task);
+            debug!("Switching task {:?} -> {:?}", current_task, next_task);
 
             // If the current task is deleted, we can skip saving its context. We signal this by
             // using a null pointer.
