@@ -867,7 +867,8 @@ where
     #[instability::unstable]
     pub fn send_break(&mut self, bits: u32) {
         // Read the current TX inversion state
-        let original_txd_inv = self.uart.info().regs().conf0().read().txd_inv().bit();
+        let original_conf0 = self.uart.info().regs().conf0().read();
+        let original_txd_inv = original_conf0.txd_inv().bit();
 
         // Invert the TX line (toggle the current state)
         self.uart
@@ -886,12 +887,8 @@ where
 
         crate::rom::ets_delay_us(delay_us);
 
-        // Restore the original TX inversion state
-        self.uart
-            .info()
-            .regs()
-            .conf0()
-            .modify(|_, w| w.txd_inv().bit(original_txd_inv));
+        // Restore the original register state
+        self.uart.info().regs().conf0().write(|_| original_conf0);
 
         #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
         sync_regs(self.uart.info().regs());
