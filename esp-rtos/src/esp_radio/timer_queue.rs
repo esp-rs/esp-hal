@@ -118,7 +118,7 @@ impl TimerQueue {
         });
 
         while let Some(current) = timers {
-            debug!("Checking timer: {:x}", current.addr());
+            trace!("Checking timer: {:x}", current.addr());
             let current_timer = unsafe { current.as_ref() };
 
             let run_callback = self.inner.with(|q| {
@@ -128,7 +128,7 @@ impl TimerQueue {
                 timers = props.next.take();
 
                 if !props.is_active || props.drop {
-                    debug!(
+                    trace!(
                         "Timer {:x} is inactive or dropped",
                         current_timer as *const _ as usize
                     );
@@ -137,7 +137,7 @@ impl TimerQueue {
 
                 if props.next_due > crate::now() {
                     // Not our time yet.
-                    debug!(
+                    trace!(
                         "Timer {:x} is not due yet",
                         current_timer as *const _ as usize
                     );
@@ -172,10 +172,10 @@ impl TimerQueue {
                         q.next_wakeup = next_due;
                     }
 
-                    debug!("Re-queueing timer {:x}", current_timer as *const _ as usize);
+                    trace!("Re-queueing timer {:x}", current_timer as *const _ as usize);
                     q.enqueue(current_timer);
                 } else {
-                    debug!("Timer {:x} inactive", current_timer as *const _ as usize);
+                    trace!("Timer {:x} inactive", current_timer as *const _ as usize);
                 }
             });
         }
