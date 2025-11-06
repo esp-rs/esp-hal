@@ -100,7 +100,9 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
         dep_graph.insert(*package, toml.repo_dependencies());
     }
 
-    // Topological sort the packages into a release order.
+    // Topological sort the packages into a release order. Note that this is not a stable order,
+    // because the source data is a HashMap which does not have a stable insertion order. This is
+    // okay, as long as the relationships of the dependencies are kept.
     let sorted = topological_sort(&dep_graph);
     log::debug!("Sorted packages: {:?}", sorted);
 
@@ -120,8 +122,16 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     // Gather semver bump requirements
     let mut update_amounts = vec![];
     let all_chips = Chip::iter().collect::<Vec<_>>();
+
+    let changed = collect_changed_packages(
+        &sorted,
+        // Read direct dependencies out of Cargo.toml
+        &|p| CargoToml::new(workspace, p).unwrap().repo_dependencies(),
+        &|p| package_changed_since_last_release(workspace, p),
+    );
+
     for package in sorted.iter().copied() {
-        let amount = if package_changed_since_last_release(workspace, package) {
+        let amount = if changed[&package] {
             let amount = if package.is_semver_checked() {
                 min_package_update(workspace, package, &all_chips)?
             } else {
@@ -258,6 +268,44 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     Ok(())
 }
 
+fn collect_changed_packages(
+    sorted: &[Package],
+    direct_dependencies: &impl Fn(Package) -> Vec<Package>,
+    is_changed: &impl Fn(Package) -> bool,
+) -> HashMap<Package, bool> {
+    let mut changed = HashMap::new();
+
+    // Collect recursive dependencies.
+    let mut all_dependencies_of = HashMap::new();
+    for package in sorted.iter().copied() {
+        let dependencies = related_crates_cb(package, direct_dependencies);
+        all_dependencies_of.insert(package, dependencies);
+    }
+
+    // Check each package whether they should be considered for release. A package should be
+    // released if it has changes since the last release, or if it depends on a package that has
+    // changes.
+    for package in sorted.iter().copied() {
+        if changed.get(&package).copied() == Some(true) {
+            // This package has already been marked as changed, so skip it.
+            continue;
+        }
+
+        let is_changed = is_changed(package);
+        changed.insert(package, is_changed);
+        if is_changed {
+            // Mark all direct and indirect _dependents_ as changed too.
+            for (dependent, deps) in all_dependencies_of.iter() {
+                if deps.contains(&package) {
+                    changed.insert(*dependent, true);
+                }
+            }
+        }
+    }
+
+    changed
+}
+
 /// Ensure we are on the main branch, or allow non-main if specified.
 pub fn ensure_main_branch(allow_non_main: bool) -> Result<String> {
     let current_branch = current_branch()?;
@@ -319,15 +367,18 @@ fn commits_since_tag(workspace: &Path, package_path: &Path, tag: &str) -> usize 
     output.lines().filter(|l| !l.trim().is_empty()).count()
 }
 
-fn related_crates(workspace: &Path, package: Package) -> Vec<Package> {
+/// Collects dependencies recursively, based on a callback that provides direct dependencies.
+///
+/// This is an implementation detail of the `related_crates` function, separate for testing
+/// purposes.
+fn related_crates_cb(
+    package: Package,
+    direct_dependencies: &impl Fn(Package) -> Vec<Package>,
+) -> Vec<Package> {
     let mut packages = vec![package];
 
-    let mut package = CargoToml::new(workspace, package)
-        .map(|cargo_toml| cargo_toml)
-        .unwrap();
-
-    for dep in package.repo_dependencies() {
-        for dep in related_crates(workspace, dep) {
+    for dep in direct_dependencies(package) {
+        for dep in related_crates_cb(dep, direct_dependencies) {
             if !packages.contains(&dep) {
                 packages.push(dep);
             }
@@ -335,6 +386,12 @@ fn related_crates(workspace: &Path, package: Package) -> Vec<Package> {
     }
 
     packages
+}
+
+fn related_crates(workspace: &Path, package: Package) -> Vec<Package> {
+    related_crates_cb(package, &|p| {
+        CargoToml::new(workspace, p).unwrap().repo_dependencies()
+    })
 }
 
 fn topological_sort(dep_graph: &HashMap<Package, Vec<Package>>) -> Vec<Package> {
@@ -360,17 +417,34 @@ fn topological_sort(dep_graph: &HashMap<Package, Vec<Package>>) -> Vec<Package> 
 mod tests {
     use super::*;
 
-    #[test]
-    // Dependencies in this test do not always reflect real dependencies, it is only a test of
+    // Dependencies in this graph do not always reflect real dependencies, it is only a test of
     // correct function operation.
-    fn test_topological_sort() {
+    fn sample_dep_graph() -> HashMap<Package, Vec<Package>> {
+        //           |-------------+-> esp-hal -> esp-alloc
+        // esp-rtos -+> esp-radio -|
+
         let mut dep_graph = HashMap::new();
         dep_graph.insert(Package::EspHal, vec![Package::EspAlloc]);
         dep_graph.insert(Package::EspRtos, vec![Package::EspHal, Package::EspRadio]);
         dep_graph.insert(Package::EspRadio, vec![Package::EspHal]);
         dep_graph.insert(Package::EspAlloc, vec![]);
 
+        dep_graph
+    }
+
+    #[track_caller]
+    fn assert_unstable_lists_equal(actual: &[Package], expected: &[Package]) {
+        use std::collections::HashSet;
+        let actual_set: HashSet<_> = actual.iter().collect();
+        let expected_set: HashSet<_> = expected.iter().collect();
+        assert_eq!(actual_set, expected_set);
+    }
+
+    #[test]
+    fn test_topological_sort() {
+        let dep_graph = sample_dep_graph();
         let sorted = topological_sort(&dep_graph);
+
         assert_eq!(
             sorted,
             [
@@ -379,6 +453,32 @@ mod tests {
                 Package::EspRadio,
                 Package::EspRtos
             ]
+        );
+    }
+
+    #[test]
+    fn test_change_detection() {
+        let dep_graph = sample_dep_graph();
+        let sorted = topological_sort(&dep_graph);
+
+        let assert_changes = |changed: &[Package], expected: &[Package]| {
+            let changed = collect_changed_packages(&sorted, &|p| dep_graph[&p].clone(), &|p| {
+                changed.contains(&p)
+            });
+            let changed = changed
+                .into_iter()
+                .filter_map(|(p, ch)| if ch { Some(p) } else { None })
+                .collect::<Vec<_>>();
+
+            assert_unstable_lists_equal(&changed, expected);
+        };
+
+        assert_changes(&[], &[]);
+        assert_changes(&[Package::EspRtos], &[Package::EspRtos]);
+        assert_changes(&[Package::EspRadio], &[Package::EspRadio, Package::EspRtos]);
+        assert_changes(
+            &[Package::EspHal],
+            &[Package::EspHal, Package::EspRadio, Package::EspRtos],
         );
     }
 }
