@@ -25,12 +25,12 @@ use esp_println::println;
 use esp_radio::{
     Controller,
     wifi::{
-        ClientConfig,
         ModeConfig,
         WifiController,
         WifiDevice,
         WifiEvent,
         WifiStaState,
+        sta::ClientConfig,
         sta_state,
     },
 };

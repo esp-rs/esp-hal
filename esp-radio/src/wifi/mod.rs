@@ -2,7 +2,7 @@
 
 #![deny(missing_docs)]
 
-use alloc::{collections::vec_deque::VecDeque, string::String, vec::Vec};
+use alloc::{collections::vec_deque::VecDeque, vec::Vec};
 use core::{fmt::Debug, marker::PhantomData, ptr::addr_of, task::Poll, time::Duration};
 
 use enumset::{EnumSet, EnumSetType};
@@ -22,6 +22,7 @@ use self::{
     ap::{AccessPointConfig, AccessPointInfo},
     private::PacketBuffer,
     scan::{FreeApListOnDrop, ScanResults},
+    sta::ClientConfig,
 };
 #[cfg(feature = "csi")]
 #[instability::unstable]
@@ -41,6 +42,7 @@ pub mod ap;
 pub mod event;
 #[cfg(all(feature = "sniffer", feature = "unstable"))]
 pub mod sniffer;
+pub mod sta;
 
 pub(crate) mod os_adapter;
 pub(crate) mod state;
@@ -220,426 +222,8 @@ impl defmt::Format for Country {
 pub enum ScanMethod {
     /// Fast scan.
     Fast,
-
     /// Scan all channels.
     AllChannels,
-}
-
-/// Client configuration for a Wi-Fi connection.
-#[derive(BuilderLite, Clone, Eq, PartialEq)]
-pub struct ClientConfig {
-    /// The SSID of the Wi-Fi network.
-    #[builder_lite(reference)]
-    ssid: String,
-
-    /// The BSSID (MAC address) of the client.
-    bssid: Option<[u8; 6]>,
-
-    /// The authentication method for the Wi-Fi connection.
-    auth_method: AuthMethod,
-
-    /// The password for the Wi-Fi connection.
-    #[builder_lite(reference)]
-    password: String,
-
-    /// The Wi-Fi channel to connect to.
-    channel: Option<u8>,
-
-    /// The set of protocols supported by the access point.
-    protocols: EnumSet<Protocol>,
-
-    /// Interval for station to listen to beacon from AP.
-    ///
-    /// The unit of listen interval is one beacon interval.
-    /// For example, if beacon interval is 100 ms and listen interval is 3,
-    /// the interval for station to listen to beacon is 300 ms
-    #[builder_lite(unstable)]
-    listen_interval: u16,
-
-    /// Time to disconnect from AP if no data is received.
-    ///
-    /// Must be between 6 and 31.
-    #[builder_lite(unstable)]
-    beacon_timeout: u16,
-
-    /// Number of connection retries station will do before moving to next AP.
-    ///
-    /// `scan_method` should be set as [`ScanMethod::AllChannels`] to use this config.
-    ///
-    /// Note: Enabling this may cause connection time to increase in case the best AP
-    /// doesn't behave properly.
-    #[builder_lite(unstable)]
-    failure_retry_cnt: u8,
-
-    /// Scan method.
-    #[builder_lite(unstable)]
-    scan_method: ScanMethod,
-}
-
-impl ClientConfig {
-    fn validate(&self) -> Result<(), WifiError> {
-        if self.ssid.len() > 32 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if self.password.len() > 64 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if !(6..=31).contains(&self.beacon_timeout) {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        Ok(())
-    }
-}
-
-impl Default for ClientConfig {
-    fn default() -> Self {
-        ClientConfig {
-            ssid: String::new(),
-            bssid: None,
-            auth_method: AuthMethod::Wpa2Personal,
-            password: String::new(),
-            channel: None,
-            protocols: (Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
-            listen_interval: 3,
-            beacon_timeout: 6,
-            failure_retry_cnt: 1,
-            scan_method: ScanMethod::Fast,
-        }
-    }
-}
-
-impl core::fmt::Debug for ClientConfig {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("ClientConfig")
-            .field("ssid", &self.ssid)
-            .field("bssid", &self.bssid)
-            .field("auth_method", &self.auth_method)
-            .field("password", &"**REDACTED**")
-            .field("channel", &self.channel)
-            .field("protocols", &self.protocols)
-            .field("listen_interval", &self.listen_interval)
-            .field("beacon_timeout", &self.beacon_timeout)
-            .field("failure_retry_cnt", &self.failure_retry_cnt)
-            .field("scan_method", &self.scan_method)
-            .finish()
-    }
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for ClientConfig {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(
-            fmt,
-            "ClientConfig {{\
-            ssid: {}, \
-            bssid: {:?}, \
-            auth_method: {:?}, \
-            password: **REDACTED**, \
-            channel: {:?}, \
-            protocols: {}, \
-            listen_interval: {}, \
-            beacon_timeout: {}, \
-            failure_retry_cnt: {}, \
-            scan_method: {} \
-            }}",
-            self.ssid.as_str(),
-            self.bssid,
-            self.auth_method,
-            self.channel,
-            self.protocols,
-            self.listen_interval,
-            self.beacon_timeout,
-            self.failure_retry_cnt,
-            self.scan_method
-        )
-    }
-}
-
-/// Configuration for EAP-FAST authentication protocol.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg(feature = "wifi-eap")]
-#[instability::unstable]
-pub struct EapFastConfig {
-    /// Specifies the provisioning mode for EAP-FAST.
-    pub fast_provisioning: u8,
-    /// The maximum length of the PAC (Protected Access Credentials) list.
-    pub fast_max_pac_list_len: u8,
-    /// Indicates whether the PAC file is in binary format.
-    pub fast_pac_format_binary: bool,
-}
-
-/// Phase 2 authentication methods
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg(feature = "wifi-eap")]
-#[instability::unstable]
-pub enum TtlsPhase2Method {
-    /// EAP (Extensible Authentication Protocol).
-    Eap,
-
-    /// MSCHAPv2 (Microsoft Challenge Handshake Authentication Protocol 2).
-    Mschapv2,
-
-    /// MSCHAP (Microsoft Challenge Handshake Authentication Protocol).
-    Mschap,
-
-    /// PAP (Password Authentication Protocol).
-    Pap,
-
-    /// CHAP (Challenge Handshake Authentication Protocol).
-    Chap,
-}
-
-#[cfg(feature = "wifi-eap")]
-impl TtlsPhase2Method {
-    /// Maps the phase 2 method to a raw `u32` representation.
-    fn to_raw(&self) -> u32 {
-        match self {
-            TtlsPhase2Method::Eap => {
-                crate::sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_EAP
-            }
-            TtlsPhase2Method::Mschapv2 => {
-                crate::sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_MSCHAPV2
-            }
-            TtlsPhase2Method::Mschap => {
-                crate::sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_MSCHAP
-            }
-            TtlsPhase2Method::Pap => {
-                crate::sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_PAP
-            }
-            TtlsPhase2Method::Chap => {
-                crate::sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_CHAP
-            }
-        }
-    }
-}
-
-#[cfg(feature = "wifi-eap")]
-type CertificateAndKey = (&'static [u8], &'static [u8], Option<&'static [u8]>);
-
-/// Configuration for an EAP (Extensible Authentication Protocol) client.
-#[derive(BuilderLite, Clone, PartialEq, Eq)]
-#[cfg(feature = "wifi-eap")]
-#[instability::unstable]
-pub struct EapClientConfig {
-    /// The SSID of the network the client is connecting to.
-    #[builder_lite(reference)]
-    ssid: String,
-
-    /// The BSSID (MAC Address) of the specific access point.
-    bssid: Option<[u8; 6]>,
-
-    /// The authentication method used for EAP.
-    auth_method: AuthMethod,
-
-    /// The identity used during authentication.
-    #[builder_lite(reference)]
-    identity: Option<String>,
-
-    /// The username used for inner authentication.
-    /// Some EAP methods require a username for authentication.
-    #[builder_lite(reference)]
-    username: Option<String>,
-
-    /// The password used for inner authentication.
-    #[builder_lite(reference)]
-    password: Option<String>,
-
-    /// A new password to be set during the authentication process.
-    /// Some methods support password changes during authentication.
-    #[builder_lite(reference)]
-    new_password: Option<String>,
-
-    /// Configuration for EAP-FAST.
-    #[builder_lite(reference)]
-    eap_fast_config: Option<EapFastConfig>,
-
-    /// A PAC (Protected Access Credential) file for EAP-FAST.
-    pac_file: Option<&'static [u8]>,
-
-    /// A boolean flag indicating whether time checking is enforced during
-    /// authentication.
-    time_check: bool,
-
-    /// A CA (Certificate Authority) certificate for validating the
-    /// authentication server's certificate.
-    ca_cert: Option<&'static [u8]>,
-
-    /// A tuple containing the client's certificate, private key, and an
-    /// intermediate certificate.
-    certificate_and_key: Option<CertificateAndKey>,
-    /// The Phase 2 authentication method used for EAP-TTLS.
-    #[builder_lite(reference)]
-    ttls_phase2_method: Option<TtlsPhase2Method>,
-
-    /// The specific Wi-Fi channel to use for the connection.
-    channel: Option<u8>,
-
-    /// The set of protocols supported by the access point.
-    protocols: EnumSet<Protocol>,
-
-    /// Interval for station to listen to beacon from AP.
-    ///
-    /// The unit of listen interval is one beacon interval.
-    /// For example, if beacon interval is 100 ms and listen interval is 3,
-    /// the interval for station to listen to beacon is 300 ms
-    #[builder_lite(unstable)]
-    listen_interval: u16,
-
-    /// Time to disconnect from AP if no data is received.
-    ///
-    /// Must be between 6 and 31.
-    #[builder_lite(unstable)]
-    beacon_timeout: u16,
-
-    /// Number of connection retries station will do before moving to next AP.
-    ///
-    /// `scan_method` should be set as [`ScanMethod::AllChannels`] to use this config.
-    ///
-    /// Note: Enabling this may cause connection time to increase in case the best AP
-    /// doesn't behave properly.
-    #[builder_lite(unstable)]
-    failure_retry_cnt: u8,
-
-    /// Scan method.
-    #[builder_lite(unstable)]
-    scan_method: ScanMethod,
-}
-
-#[cfg(feature = "wifi-eap")]
-impl EapClientConfig {
-    fn validate(&self) -> Result<(), WifiError> {
-        if self.ssid.len() > 32 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if self.identity.as_ref().unwrap_or(&String::new()).len() > 128 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if self.username.as_ref().unwrap_or(&String::new()).len() > 128 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if self.password.as_ref().unwrap_or(&String::new()).len() > 64 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if self.new_password.as_ref().unwrap_or(&String::new()).len() > 64 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if !(6..=31).contains(&self.beacon_timeout) {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        Ok(())
-    }
-}
-
-#[cfg(feature = "wifi-eap")]
-impl Debug for EapClientConfig {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("EapClientConfig")
-            .field("ssid", &self.ssid)
-            .field("bssid", &self.bssid)
-            .field("auth_method", &self.auth_method)
-            .field("channel", &self.channel)
-            .field("identity", &self.identity)
-            .field("username", &self.username)
-            .field("password", &"**REDACTED**")
-            .field("new_password", &"**REDACTED**")
-            .field("eap_fast_config", &self.eap_fast_config)
-            .field("time_check", &self.time_check)
-            .field("pac_file set", &self.pac_file.is_some())
-            .field("ca_cert set", &self.ca_cert.is_some())
-            .field("certificate_and_key set", &"**REDACTED**")
-            .field("ttls_phase2_method", &self.ttls_phase2_method)
-            .field("protocols", &self.protocols)
-            .field("listen_interval", &self.listen_interval)
-            .field("beacon_timeout", &self.beacon_timeout)
-            .field("failure_retry_cnt", &self.failure_retry_cnt)
-            .field("scan_method", &self.scan_method)
-            .finish()
-    }
-}
-
-#[cfg(feature = "defmt")]
-#[cfg(feature = "wifi-eap")]
-impl defmt::Format for EapClientConfig {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(
-            fmt,
-            "EapClientConfig {{\
-            ssid: {}, \
-            bssid: {:?}, \
-            auth_method: {:?}, \
-            channel: {:?}, \
-            identity: {:?}, \
-            username: {:?}, \
-            password: **REDACTED**, \
-            new_password: **REDACTED**, \
-            eap_fast_config: {:?}, \
-            time_check: {}, \
-            pac_file: {}, \
-            ca_cert: {}, \
-            certificate_and_key: **REDACTED**, \
-            ttls_phase2_method: {:?}, \
-            protocols: {}, \
-            listen_interval: {}, \
-            beacon_timeout: {}, \
-            failure_retry_cnt: {}, \
-            scan_method: {},
-            }}",
-            self.ssid.as_str(),
-            self.bssid,
-            self.auth_method,
-            self.channel,
-            &self.identity.as_ref().map_or("", |v| v.as_str()),
-            &self.username.as_ref().map_or("", |v| v.as_str()),
-            self.eap_fast_config,
-            self.time_check,
-            self.pac_file,
-            self.ca_cert,
-            self.ttls_phase2_method,
-            self.protocols,
-            self.listen_interval,
-            self.beacon_timeout,
-            self.failure_retry_cnt,
-            self.scan_method
-        )
-    }
-}
-
-#[cfg(feature = "wifi-eap")]
-impl Default for EapClientConfig {
-    fn default() -> Self {
-        EapClientConfig {
-            ssid: String::new(),
-            bssid: None,
-            auth_method: AuthMethod::Wpa2Enterprise,
-            identity: None,
-            username: None,
-            password: None,
-            channel: None,
-            eap_fast_config: None,
-            time_check: false,
-            new_password: None,
-            pac_file: None,
-            ca_cert: None,
-            certificate_and_key: None,
-            ttls_phase2_method: None,
-            protocols: (Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
-            listen_interval: 3,
-            beacon_timeout: 6,
-            failure_retry_cnt: 1,
-            scan_method: ScanMethod::Fast,
-        }
-    }
 }
 
 /// Introduces Wi-Fi configuration options.
@@ -680,7 +264,7 @@ pub enum ModeConfig {
 
     /// EAP client configuration for enterprise Wi-Fi.
     #[cfg(feature = "wifi-eap")]
-    EapClient(EapClientConfig),
+    EapClient(self::sta::eap::EapClientConfig),
 }
 
 impl ModeConfig {
@@ -2685,7 +2269,7 @@ impl WifiController<'_> {
     ///
     /// ```rust,no_run
     /// # {before_snippet}
-    /// # use esp_radio::wifi::{AccessPointConfig, ModeConfig};
+    /// # use esp_radio::wifi::{ap::AccessPointConfig, ModeConfig};
     /// use esp_radio::wifi::Protocol;
     ///
     /// let esp_radio_controller = esp_radio::init().unwrap();
@@ -3201,7 +2785,10 @@ impl WifiController<'_> {
     }
 
     #[cfg(feature = "wifi-eap")]
-    fn apply_sta_eap_config(&mut self, config: &EapClientConfig) -> Result<(), WifiError> {
+    fn apply_sta_eap_config(
+        &mut self,
+        config: &self::sta::eap::EapClientConfig,
+    ) -> Result<(), WifiError> {
         self.beacon_timeout = config.beacon_timeout;
 
         let mut cfg = wifi_config_t {

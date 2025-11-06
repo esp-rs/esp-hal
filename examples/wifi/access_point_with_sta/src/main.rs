@@ -29,7 +29,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_radio::wifi::{ClientConfig, ModeConfig, ap::AccessPointConfig};
+use esp_radio::wifi::{ModeConfig, ap::AccessPointConfig, sta::ClientConfig};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::IpAddress,

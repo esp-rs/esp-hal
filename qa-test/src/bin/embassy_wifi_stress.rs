@@ -23,7 +23,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{ClientConfig, Config, ModeConfig, ScanConfig, WifiMode};
+use esp_radio::wifi::{Config, ModeConfig, ScanConfig, WifiMode, sta::ClientConfig};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
