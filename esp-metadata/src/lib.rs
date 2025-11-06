@@ -734,6 +734,8 @@ pub fn generate_build_script_utils() -> TokenStream {
     let from_str_err = format!("Unknown chip {{s}}. Possible options: {all_chip_features}");
 
     quote! {
+        extern crate alloc;
+
         // make it possible to build documentation without `std`.
         #[cfg(docsrs)]
         macro_rules! println {
@@ -747,12 +749,12 @@ pub fn generate_build_script_utils() -> TokenStream {
         }
 
         impl core::str::FromStr for Chip {
-            type Err = String;
+            type Err = alloc::string::String;
 
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 match s {
                     #( #name => Ok(Self::#chip),)*
-                    _ => Err(format!(#from_str_err)),
+                    _ => Err(alloc::format!(#from_str_err)),
                 }
             }
         }
