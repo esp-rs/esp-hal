@@ -194,7 +194,7 @@ pub enum AuthMethod {
     Owe,
 
     /// WPA3 Enterprise Suite B 192-bit Encryption
-    Wap3EntSuiteB192Bit,
+    Wpa3EntSuiteB192Bit,
 
     /// This authentication mode will yield same result as [AuthMethod::Wpa3Personal] and is not
     /// recommended to be used. It will be deprecated in future, please use
@@ -973,7 +973,7 @@ impl AuthMethodExt for AuthMethod {
             AuthMethod::Wpa2Wpa3Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK,
             AuthMethod::WapiPersonal => include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK,
             AuthMethod::Owe => include::wifi_auth_mode_t_WIFI_AUTH_OWE,
-            AuthMethod::Wap3EntSuiteB192Bit => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192,
+            AuthMethod::Wpa3EntSuiteB192Bit => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192,
             AuthMethod::Wpa3ExtPsk => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK,
             AuthMethod::Wpa3ExtPskMixed => {
                 include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK_MIXED_MODE
@@ -999,7 +999,7 @@ impl AuthMethodExt for AuthMethod {
             include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK => AuthMethod::Wpa2Wpa3Personal,
             include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK => AuthMethod::WapiPersonal,
             include::wifi_auth_mode_t_WIFI_AUTH_OWE => AuthMethod::Owe,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192 => AuthMethod::Wap3EntSuiteB192Bit,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192 => AuthMethod::Wpa3EntSuiteB192Bit,
             include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK => AuthMethod::Wpa3ExtPsk,
             include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK_MIXED_MODE => {
                 AuthMethod::Wpa3ExtPskMixed
