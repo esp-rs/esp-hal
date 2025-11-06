@@ -1,8 +1,7 @@
 name: HIL
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  # No automatic PR runs; we'll trigger via slash/label + keep merge queue
   merge_group:
   workflow_dispatch:
     inputs:
@@ -10,10 +9,20 @@ on:
         description: "Owner and repository to test"
         required: true
         default: "esp-rs/esp-hal"
+      # checking out a specific commit when dispatched
+      ref_sha:
+        description: "Commit SHA to checkout (preferred, if provided)"
+        required: false
+        default: ""
       branch:
         description: "Branch, tag or SHA to checkout."
         required: true
         default: "main"
+      # choose quick or full matrix
+      matrix:
+        description: "Test matrix size: quick|full"
+        required: false
+        default: "quick"
 
 # Cancel any currently running workflows from the same PR, branch, or
 # tag when a new workflow is triggered.
@@ -33,13 +42,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # merge_group checks out the merge commit implicitly
       - uses: actions/checkout@v4
-        if: github.event_name != 'workflow_dispatch'
+        if: github.event_name == 'merge_group'
+      # workflow_dispatch: checkout requested repo+ref (prefer SHA when given)
       - uses: actions/checkout@v4
         if: github.event_name == 'workflow_dispatch'
         with:
           repository: ${{ github.event.inputs.repository }}
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ github.event.inputs.ref_sha != '' && github.event.inputs.ref_sha || github.event.inputs.branch }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
@@ -74,32 +85,32 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target:
-          # RISC-V devices:
-          - soc: esp32c2
-            rust-target: riscv32imc-unknown-none-elf
-          - soc: esp32c3
-            rust-target: riscv32imc-unknown-none-elf
-          - soc: esp32c6
-            rust-target: riscv32imac-unknown-none-elf
-          - soc: esp32h2
-            rust-target: riscv32imac-unknown-none-elf
-          # # Xtensa devices:
-          - soc: esp32
-            rust-target: xtensa-esp32-none-elf
-          - soc: esp32s2
-            rust-target: xtensa-esp32s2-none-elf
-          - soc: esp32s3
-            rust-target: xtensa-esp32s3-none-elf
+        # FULL matrix for merge_group or when explicitly requested; otherwise QUICK
+        target: ${{ fromJson(
+          (github.event_name == 'merge_group' || github.event.inputs.matrix == 'full')
+          && '[
+            {"soc":"esp32c2","rust-target":"riscv32imc-unknown-none-elf"},
+            {"soc":"esp32c3","rust-target":"riscv32imc-unknown-none-elf"},
+            {"soc":"esp32c6","rust-target":"riscv32imac-unknown-none-elf"},
+            {"soc":"esp32h2","rust-target":"riscv32imac-unknown-none-elf"},
+            {"soc":"esp32","rust-target":"xtensa-esp32-none-elf"},
+            {"soc":"esp32s2","rust-target":"xtensa-esp32s2-none-elf"},
+            {"soc":"esp32s3","rust-target":"xtensa-esp32s3-none-elf"}
+          ]'
+          ||
+          '[
+            {"soc":"esp32c3","rust-target":"riscv32imc-unknown-none-elf"},
+            {"soc":"esp32s3","rust-target":"xtensa-esp32s3-none-elf"}
+          ]' )}}
 
     steps:
       - uses: actions/checkout@v4
-        if: github.event_name != 'workflow_dispatch'
+        if: github.event_name == 'merge_group'
       - uses: actions/checkout@v4
         if: github.event_name == 'workflow_dispatch'
         with:
           repository: ${{ github.event.inputs.repository }}
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ github.event.inputs.ref_sha != '' && github.event.inputs.ref_sha || github.event.inputs.branch }}
 
       # Install the Rust toolchain for RISC-V devices:
       - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.target.soc) }}
@@ -109,7 +120,7 @@ jobs:
           toolchain: stable
           components: rust-src
 
-        # -Zstack-protector=all tests need to be compiled with nightly.
+      # -Zstack-protector=all tests need to be compiled with nightly.
       - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.target.soc) }}
         name: Install nightly Rust toolchain
         uses: dtolnay/rust-toolchain@v1
@@ -144,6 +155,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Keep full runner map, skip entries that weren’t built in “quick”
         target:
           # RISC-V devices:
           - soc: esp32c2
@@ -173,12 +185,23 @@ jobs:
         with:
           name: tests-${{ matrix.target.soc }}
           path: tests-${{ matrix.target.soc }}
+        # In a quick run, some artifacts won't exist — job wouldn't fail because of that.
+        continue-on-error: true
 
       - uses: actions/download-artifact@v4
         with:
           name: xtask-${{ matrix.target.host }}
 
+      - name: Skip if this target wasn't built
+        id: guard
+        run: |
+          if [ ! -d "tests-${{ matrix.target.soc }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "No tests for ${{ matrix.target.soc }} in this run; skipping."
+          fi
+
       - name: Run Tests
+        if: steps.guard.outputs.skip != 'true'
         id: run-tests
         run: |
           [ -f ~/setup.sh ] && source ~/setup.sh
@@ -190,5 +213,13 @@ jobs:
       - name: Clean up
         if: always()
         run: |
-          rm -rf tests-${{ matrix.target.soc }}
-          rm -f xtask
+          rm -rf tests-${{ matrix.target.soc }} || true
+          rm -f xtask || true
+
+  # Single required check to block merge unless full HIL passed on merge_group
+  required:
+    if: github.event_name == 'merge_group'
+    needs: [hil]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All HIL matrix jobs passed on merge_group."

@@ -1,0 +1,95 @@
+# .github/workflows/hil-slash.yml
+name: HIL (slash)
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  actions: write        # to dispatch the HIL workflow
+  pull-requests: write  # to post a confirmation/help comment
+  contents: read
+
+jobs:
+  hil-quick:
+    # PR comment, correct role, and explicitly '/hil quick'
+    if: >
+      github.event.issue.pull_request &&
+      (
+        github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'OWNER'
+      ) &&
+      contains(github.event.comment.body, '/hil quick')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch HIL (quick)
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: HIL
+          ref: ${{ github.event.repository.default_branch }}
+          inputs: |
+            {
+              "repository": "${{ github.repository }}",
+              "ref_sha": "",
+              "branch": "refs/pull/${{ github.event.issue.number }}/head",
+              "matrix": "quick"
+            }
+
+      - name: Confirm in PR
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: >
+            🚀 Triggered **HIL** (`quick`) for
+            `refs/pull/${{ github.event.issue.number }}/head`.
+
+  hil-full:
+    # PR comment, correct role, and explicitly '/hil full'
+    if: >
+      github.event.issue.pull_request &&
+      (
+        github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'OWNER'
+      ) &&
+      contains(github.event.comment.body, '/hil full')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch HIL (full)
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: HIL
+          ref: ${{ github.event.repository.default_branch }}
+          inputs: |
+            {
+              "repository": "${{ github.repository }}",
+              "ref_sha": "",
+              "branch": "refs/pull/${{ github.event.issue.number }}/head",
+              "matrix": "full"
+            }
+
+      - name: Confirm in PR
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: >
+            🚀 Triggered **HIL** (`full`) for
+            `refs/pull/${{ github.event.issue.number }}/head`.
+
+  hil-help:
+    # If it's a PR comment that starts with '/hil' but not the two valid forms
+    if: >
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/hil') &&
+      !contains(github.event.comment.body, '/hil quick') &&
+      !contains(github.event.comment.body, '/hil full')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain usage
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ℹ️ Usage:
+            - `/hil quick` — run a smoke/quick HIL matrix
+            - `/hil full` — run the full HIL matrix
+            _(Only repository members/collaborators can trigger runs.)_
