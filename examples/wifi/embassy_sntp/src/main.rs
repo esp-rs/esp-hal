@@ -33,13 +33,13 @@ use esp_println::println;
 use esp_radio::{
     Controller,
     wifi::{
-        ClientConfig,
         ModeConfig,
         ScanConfig,
         WifiController,
         WifiDevice,
         WifiEvent,
         WifiStaState,
+        sta::ClientConfig,
     },
 };
 use log::{error, info};
