@@ -5,7 +5,7 @@ use convert_case::{Boundary, Case, Casing, pattern};
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::{cfg::Value, number};
+use crate::{cfg::Value, number_hex};
 
 impl super::SocProperties {
     pub(super) fn computed_properties(&self) -> impl Iterator<Item = (&str, bool, Value)> {
@@ -30,9 +30,9 @@ impl super::SocProperties {
 /// Memory region.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct MemoryRange {
-    name: String,
+    pub name: String,
     #[serde(flatten)]
-    range: Range<u32>,
+    pub range: Range<u32>,
 }
 
 /// Memory regions.
@@ -45,8 +45,8 @@ impl super::GenericProperty for MemoryMap {
     fn macros(&self) -> Option<TokenStream> {
         let region_branches = self.ranges.iter().map(|region| {
             let name = region.name.to_uppercase();
-            let start = number(region.range.start as usize);
-            let end = number(region.range.end as usize);
+            let start = number_hex(region.range.start as usize);
+            let end = number_hex(region.range.end as usize);
             let size = format!(
                 "{}",
                 region.range.end as usize - region.range.start as usize
