@@ -149,6 +149,14 @@ use crate::sys::{
     },
 };
 
+const _: () = {
+    // make sure we know all the auth modes the driver knows
+    core::assert!(
+        include::wifi_auth_mode_t_WIFI_AUTH_MAX == 17,
+        "Make sure all auth-methods known by the driver are known by us."
+    )
+};
+
 /// Supported Wi-Fi authentication methods.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -181,6 +189,34 @@ pub enum AuthMethod {
 
     /// WLAN Authentication and Privacy Infrastructure (WAPI).
     WapiPersonal,
+
+    /// Opportunistic Wireless Encryption (OWE)
+    Owe,
+
+    /// WPA3 Enterprise Suite B 192-bit Encryption
+    Wpa3EntSuiteB192Bit,
+
+    /// This authentication mode will yield same result as [AuthMethod::Wpa3Personal] and is not
+    /// recommended to be used. It will be deprecated in future, please use
+    /// [AuthMethod::Wpa3Personal] instead.
+    Wpa3ExtPsk,
+
+    /// This authentication mode will yield same result as [AuthMethod::Wpa3Personal] and is not
+    /// recommended to be used. It will be deprecated in future, please use
+    /// [AuthMethod::Wpa3Personal] instead.
+    Wpa3ExtPskMixed,
+
+    /// WiFi DPP / Wi-Fi Easy Connect
+    Dpp,
+
+    /// WPA3-Enterprise Only Mode
+    Wpa3Enterprise,
+
+    /// WPA3-Enterprise Transition Mode
+    Wpa2Wpa3Enterprise,
+
+    /// WPA-Enterprise security
+    WpaEnterprise,
 }
 
 /// Supported Wi-Fi protocols.
@@ -936,6 +972,18 @@ impl AuthMethodExt for AuthMethod {
             AuthMethod::Wpa3Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK,
             AuthMethod::Wpa2Wpa3Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK,
             AuthMethod::WapiPersonal => include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK,
+            AuthMethod::Owe => include::wifi_auth_mode_t_WIFI_AUTH_OWE,
+            AuthMethod::Wpa3EntSuiteB192Bit => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192,
+            AuthMethod::Wpa3ExtPsk => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK,
+            AuthMethod::Wpa3ExtPskMixed => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK_MIXED_MODE
+            }
+            AuthMethod::Dpp => include::wifi_auth_mode_t_WIFI_AUTH_DPP,
+            AuthMethod::Wpa3Enterprise => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENTERPRISE,
+            AuthMethod::Wpa2Wpa3Enterprise => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_ENTERPRISE
+            }
+            AuthMethod::WpaEnterprise => include::wifi_auth_mode_t_WIFI_AUTH_WPA_ENTERPRISE,
         }
     }
 
@@ -950,7 +998,25 @@ impl AuthMethodExt for AuthMethod {
             include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK => AuthMethod::Wpa3Personal,
             include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK => AuthMethod::Wpa2Wpa3Personal,
             include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK => AuthMethod::WapiPersonal,
-            _ => unreachable!(),
+            include::wifi_auth_mode_t_WIFI_AUTH_OWE => AuthMethod::Owe,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192 => AuthMethod::Wpa3EntSuiteB192Bit,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK => AuthMethod::Wpa3ExtPsk,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK_MIXED_MODE => {
+                AuthMethod::Wpa3ExtPskMixed
+            }
+            include::wifi_auth_mode_t_WIFI_AUTH_DPP => AuthMethod::Dpp,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENTERPRISE => AuthMethod::Wpa3Enterprise,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_ENTERPRISE => {
+                AuthMethod::Wpa2Wpa3Enterprise
+            }
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA_ENTERPRISE => AuthMethod::WpaEnterprise,
+            // we const-assert we know all the auth-methods the wifi driver knows and it shouldn't
+            // return anything else.
+            //
+            // In fact from observation the drivers will return
+            // `wifi_auth_mode_t_WIFI_AUTH_OPEN` if the method is unsupported (e.g. any WPA3 in our
+            // case, since the supplicant isn't compiled to support it)
+            _ => AuthMethod::None,
         }
     }
 }
