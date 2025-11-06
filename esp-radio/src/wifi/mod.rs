@@ -193,16 +193,17 @@ pub enum AuthMethod {
     /// Opportunistic Wireless Encryption (OWE)
     Owe,
 
-    /// WPA3_ENT_SUITE_B_192_BIT Encryption
+    /// WPA3 Enterprise Suite B 192-bit Encryption
     Wap3EntSuiteB192Bit,
 
-    /// WIFI_AUTH_WPA3_EXT_PSK
-    /// This authentication mode will yield same result as WIFI_AUTH_WPA3_PSK and not recommended to
-    /// be used. It will be deprecated in future, please use WIFI_AUTH_WPA3_PSK instead.
+    /// This authentication mode will yield same result as [AuthMethod::Wpa3Personal] and is not
+    /// recommended to be used. It will be deprecated in future, please use
+    /// [AuthMethod::Wpa3Personal] instead.
     Wpa3ExtPsk,
 
-    /// This authentication mode will yield same result as WIFI_AUTH_WPA3_PSK and not recommended to
-    /// be used. It will be deprecated in future, please use WIFI_AUTH_WPA3_PSK instead.
+    /// This authentication mode will yield same result as [AuthMethod::Wpa3Personal] and is not
+    /// recommended to be used. It will be deprecated in future, please use
+    /// [AuthMethod::Wpa3Personal] instead.
     Wpa3ExtPskMixed,
 
     /// WiFi DPP / Wi-Fi Easy Connect
