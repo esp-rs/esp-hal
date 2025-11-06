@@ -24,6 +24,7 @@ struct TimerQueueInner {
     head: Option<NonNull<Timer>>,
     next_wakeup: u64,
     task: Option<TaskPtr>,
+    processing: bool,
 }
 
 unsafe impl Send for TimerQueueInner {}
@@ -34,6 +35,7 @@ impl TimerQueueInner {
             head: None,
             next_wakeup: 0,
             task: None,
+            processing: false,
         }
     }
 
@@ -43,16 +45,25 @@ impl TimerQueueInner {
         let due = props.next_due;
 
         if !props.enqueued {
+            trace!("Enqueueing timer {:x}", timer as *const _ as usize);
             props.enqueued = true;
 
             props.next = head;
             self.head = Some(NonNull::from(timer));
+        } else {
+            trace!("Already enqueued timer {:x}", timer as *const _ as usize);
         }
 
         if let Some(task) = self.task {
             if due < self.next_wakeup {
                 self.next_wakeup = due;
-                task.resume();
+
+                // Do not resume the task unless it is sleeping. But if it is sleeping, we need to
+                // unconditionally resume it, so that it can re-schedule its next wakeup time
+                // according to the new due time.
+                if !self.processing {
+                    task.resume();
+                }
             }
         } else {
             // create the timer task
@@ -113,12 +124,13 @@ impl TimerQueue {
     fn process(&self) {
         debug!("Processing timers");
         let mut timers = self.inner.with(|q| {
+            q.processing = true;
             q.next_wakeup = u64::MAX;
             q.head.take()
         });
 
         while let Some(current) = timers {
-            debug!("Checking timer: {:x}", current.addr());
+            trace!("Checking timer: {:x}", current.addr());
             let current_timer = unsafe { current.as_ref() };
 
             let run_callback = self.inner.with(|q| {
@@ -126,9 +138,10 @@ impl TimerQueue {
 
                 // Remove current timer from the list.
                 timers = props.next.take();
+                props.enqueued = false;
 
                 if !props.is_active || props.drop {
-                    debug!(
+                    trace!(
                         "Timer {:x} is inactive or dropped",
                         current_timer as *const _ as usize
                     );
@@ -137,13 +150,14 @@ impl TimerQueue {
 
                 if props.next_due > crate::now() {
                     // Not our time yet.
-                    debug!(
+                    trace!(
                         "Timer {:x} is not due yet",
                         current_timer as *const _ as usize
                     );
                     return false;
                 }
 
+                // Re-arm periodic timer
                 if props.periodic {
                     props.next_due += props.period;
                 }
@@ -158,29 +172,21 @@ impl TimerQueue {
 
             self.inner.with(|q| {
                 let props = current_timer.properties(q);
-                // Set this AFTER the callback so that the callback doesn't leave us in an unknown
-                // "queued?" state.
-                props.enqueued = false;
 
                 if props.drop {
                     debug!("Dropping timer {:x} (delayed)", current.addr());
                     let boxed = unsafe { Box::from_raw(current.as_ptr()) };
                     core::mem::drop(boxed);
                 } else if props.is_active {
-                    let next_due = props.next_due;
-                    if next_due < q.next_wakeup {
-                        q.next_wakeup = next_due;
-                    }
-
-                    debug!("Re-queueing timer {:x}", current_timer as *const _ as usize);
                     q.enqueue(current_timer);
                 } else {
-                    debug!("Timer {:x} inactive", current_timer as *const _ as usize);
+                    trace!("Timer {:x} inactive", current_timer as *const _ as usize);
                 }
             });
         }
 
         self.inner.with(|q| {
+            q.processing = false;
             let next_wakeup = q.next_wakeup;
             debug!("next_wakeup: {}", next_wakeup);
             SCHEDULER.sleep_until(Instant::EPOCH + Duration::from_micros(next_wakeup));

@@ -251,7 +251,7 @@ impl RunQueue {
     #[esp_hal::ram]
     pub(crate) fn pop(&mut self) -> Option<TaskPtr> {
         let current_prio = self.ready_priority.ready();
-        debug!("pop - from level: {}", current_prio);
+        trace!("pop - from level: {}", current_prio);
 
         cfg_if::cfg_if! {
             if #[cfg(multi_core)] {
