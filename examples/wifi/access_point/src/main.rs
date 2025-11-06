@@ -28,8 +28,8 @@ use esp_hal::{
 };
 use esp_println::{print, println};
 use esp_radio::wifi::{
-    AccessPointConfig,
     ModeConfig,
+    ap::AccessPointConfig,
     event::{self, EventExt},
 };
 use smoltcp::iface::{SocketSet, SocketStorage};

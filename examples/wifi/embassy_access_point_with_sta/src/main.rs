@@ -45,13 +45,13 @@ use esp_println::{print, println};
 use esp_radio::{
     Controller,
     wifi::{
-        AccessPointConfig,
         ClientConfig,
         ModeConfig,
         WifiApState,
         WifiController,
         WifiDevice,
         WifiEvent,
+        ap::AccessPointConfig,
     },
 };
 
