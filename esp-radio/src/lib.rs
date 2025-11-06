@@ -69,9 +69,9 @@
     doc = "By default the power-saving mode is [`PowerSaveMode::None`](crate::wifi::PowerSaveMode::None) and `ESP_PHY_CONFIG_PHY_ENABLE_USB` is enabled by default."
 )]
 //! In addition pay attention to these configuration keys:
-//! - `ESP_RADIO_RX_QUEUE_SIZE`
-//! - `ESP_RADIO_TX_QUEUE_SIZE`
-//! - `ESP_RADIO_MAX_BURST_SIZE`
+//! - `ESP_RADIO_CONFIG_RX_QUEUE_SIZE`
+//! - `ESP_RADIO_CONFIG_TX_QUEUE_SIZE`
+//! - `ESP_RADIO_CONFIG_MAX_BURST_SIZE`
 #![cfg_attr(
     multi_core,
     doc = concat!(
