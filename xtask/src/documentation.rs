@@ -179,6 +179,74 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     let package_name = package.to_string();
     let package_path = crate::windows_safe_path(&workspace.join(&package_name));
 
+    // Process Cargo.toml for documentation
+    let cargo_toml =
+        std::fs::read_to_string(package_path.join("Cargo.toml")).with_context(|| {
+            format!(
+                "Failed to read {}",
+                package_path.join("Cargo.toml").display()
+            )
+        })?;
+
+    std::fs::rename(
+        package_path.join("Cargo.toml"),
+        package_path.join("Cargo.toml_original"),
+    )
+    .with_context(|| {
+        format!(
+            "Failed to rename {}",
+            package_path.join("Cargo.toml").display()
+        )
+    })?;
+    let cargo_toml = cargo_toml.lines();
+
+    let mut processed_cargo_toml = Vec::new();
+    let mut engine = somni_expr::Context::new();
+    engine.add_function("chip", move |cond: &str| -> bool {
+        cond == chip.as_ref().map(|c| c.to_string()).unwrap_or_default()
+    });
+
+    let mut hide = false;
+    for line in cargo_toml {
+        let mut line = line.to_string();
+
+        if line.starts_with("#DOC_ENDIF") {
+            hide = false;
+            continue;
+        }
+
+        if line.starts_with("#DOC_IF ") {
+            let expr = line.strip_prefix("#DOC_IF ").unwrap();
+            hide = !(engine
+                .evaluate::<bool>(expr)
+                .map_err(|err| anyhow::anyhow!(format!("{:?}", err)))
+                .with_context(|| format!("Error evaluating expression in Cargo.toml: {}", expr))?);
+            continue;
+        }
+
+        if hide {
+            if line.starts_with("#!") {
+                line = format!("#{}", line.strip_prefix("#!").unwrap_or_default());
+            } else if line.starts_with("##") {
+                line = format!("#{}", line.strip_prefix("##").unwrap_or_default());
+            }
+        }
+
+        processed_cargo_toml.push(line);
+    }
+
+    std::fs::write(
+        package_path.join("Cargo.toml"),
+        processed_cargo_toml.join("\n"),
+    )
+    .with_context(|| {
+        format!(
+            "Failed to write pre-processed {}",
+            package_path.join("Cargo.toml").display()
+        )
+    })?;
+
+    // build documentation using the pre-processed Cargo.toml
     if let Some(chip) = chip {
         log::info!("Building '{package_name}' documentation targeting '{chip}'");
     } else {
@@ -243,6 +311,24 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
 
     // Execute `cargo doc` from the package root:
     crate::cargo::run_with_env(&args, &package_path, envs, false)?;
+
+    // Restore the original Cargo.toml
+    std::fs::remove_file(package_path.join("Cargo.toml")).with_context(|| {
+        format!(
+            "Failed to delete {}",
+            package_path.join("Cargo.toml").display()
+        )
+    })?;
+    std::fs::rename(
+        package_path.join("Cargo.toml_original"),
+        package_path.join("Cargo.toml"),
+    )
+    .with_context(|| {
+        format!(
+            "Failed to rename {}",
+            package_path.join("Cargo.toml").display()
+        )
+    })?;
 
     // Build up the path at which the built documentation can be found:
     let mut docs_path = if let Ok(target_path) = std::env::var("CARGO_TARGET_DIR") {
