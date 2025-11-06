@@ -5,7 +5,7 @@ use core::sync::atomic::Ordering;
 #[cfg(multi_core)]
 use esp_hal::interrupt::software::SoftwareInterrupt;
 pub(crate) use esp_hal::trapframe::TrapFrame as CpuContext;
-use esp_hal::{ram, xtensa_lx, xtensa_lx_rt};
+use esp_hal::{ram, xtensa_lx::interrupt};
 use portable_atomic::AtomicPtr;
 
 #[cfg(feature = "rtos-trace")]
@@ -90,9 +90,7 @@ pub(crate) fn task_switch(
 const SW_INTERRUPT: u32 = if cfg!(esp32) { 1 << 29 } else { 1 << 7 };
 
 pub(crate) fn setup_multitasking() {
-    unsafe {
-        xtensa_lx::interrupt::enable_mask(SW_INTERRUPT);
-    }
+    unsafe { interrupt::enable_mask(SW_INTERRUPT) };
 }
 
 #[cfg(multi_core)]
@@ -106,7 +104,7 @@ pub(crate) fn setup_smp<const IRQ: u8>(mut irq: SoftwareInterrupt<'static, IRQ>)
 #[cfg_attr(not(esp32), unsafe(export_name = "Software0"))]
 #[cfg_attr(esp32, unsafe(export_name = "Software1"))]
 fn task_switch_interrupt(context: &mut CpuContext) {
-    unsafe { xtensa_lx_rt::xtensa_lx::interrupt::clear(SW_INTERRUPT) };
+    unsafe { interrupt::clear(SW_INTERRUPT) };
 
     SCHEDULER.with(|scheduler| scheduler.switch_task(context));
 }
@@ -119,9 +117,7 @@ pub(crate) fn yield_task() {
         rtos_trace::trace::marker_end(TraceEvents::YieldTask as u32);
     }
 
-    unsafe {
-        xtensa_lx::interrupt::set(SW_INTERRUPT);
-    };
+    unsafe { interrupt::set(SW_INTERRUPT) };
 }
 
 #[cfg(multi_core)]
