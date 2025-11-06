@@ -37,10 +37,9 @@ pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext, hook_fn: IdleFn
     // Point idle context PC at the assembly that calls the idle hook. We need a new stack
     // frame for the idle task on the main stack.
     idle_context.PC = idle_entry as usize as u32;
-    // Set a valid processor status value
-    let current_ps;
-    unsafe { core::arch::asm!("rsr.ps {0}", out(reg) current_ps, options(nostack)) };
-    idle_context.PS = current_ps;
+    // Set a valid processor status value, that will not end up spilling regiters into the main
+    // task's stack.
+    idle_context.PS = 0x40020;
 }
 
 #[cfg(feature = "esp-radio")]
