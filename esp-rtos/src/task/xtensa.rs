@@ -119,7 +119,9 @@ pub(crate) fn yield_task() {
         rtos_trace::trace::marker_end(TraceEvents::YieldTask as u32);
     }
 
-    unsafe { xtensa_lx::interrupt::set(SW_INTERRUPT) };
+    unsafe {
+        xtensa_lx::interrupt::set(SW_INTERRUPT);
+    };
 }
 
 #[cfg(multi_core)]
