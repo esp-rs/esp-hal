@@ -4,13 +4,13 @@ use crate::{
     esp_wifi_result,
     sys::include,
     wifi::{
-        AccessPointInfo,
         AuthMethod,
         AuthMethodExt as _,
         Country,
         SecondaryChannel,
         WifiController,
         WifiError,
+        ap::AccessPointInfo,
     },
 };
 
@@ -92,6 +92,7 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
 }
 
 pub struct FreeApListOnDrop;
+
 impl FreeApListOnDrop {
     pub fn defuse(self) {
         core::mem::forget(self);
