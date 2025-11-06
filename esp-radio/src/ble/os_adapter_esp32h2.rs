@@ -19,7 +19,6 @@ pub(crate) static mut ISR_INTERRUPT_3: (*mut c_void, *mut c_void) =
 
 /// Transmission Power Level
 #[derive(Default, Clone, Copy, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum TxPower {
     /// -24 dBm
@@ -104,7 +103,6 @@ impl TxPower {
 
 /// Bluetooth controller configuration.
 #[derive(BuilderLite, Clone, Copy, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
     /// The priority of the RTOS task.
