@@ -119,7 +119,11 @@ pub(crate) fn setup_multitasking<const IRQ: u8>(mut _irq: SoftwareInterrupt<'sta
     #[cfg(multi_core)]
     {
         _irq.set_interrupt_handler(InterruptHandler::new(
-            unsafe { core::mem::transmute(cross_core_yield_handler) },
+            unsafe {
+                core::mem::transmute::<*const (), extern "C" fn()>(
+                    cross_core_yield_handler as *const (),
+                )
+            },
             Priority::min(),
         ));
     }

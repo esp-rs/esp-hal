@@ -9,8 +9,8 @@
 //!
 //! ## Setup
 //!
-//! This crate requires an esp-hal timer, as well as the FROM_CPU0 software interrupt to operate,
-//! and needs to be started like so:
+//! This crate requires an `esp-hal` timer, as well as the `FROM_CPU0` software interrupt to
+//! operate, and needs to be started like so:
 //!
 //! ```rust, no_run
 #![doc = esp_hal::before_snippet!()]
