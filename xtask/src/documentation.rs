@@ -291,8 +291,8 @@ fn cargo_doc_without_pre_processing(
 /// This will check for `#DOC_IF <condition>` lines - evaluating the condition to false will turn
 /// any documenting comments into non-documenting comments until a `#DOC_ENDIF` line is encountered.
 ///
-/// The only currently supported function for expressions is `chip(<STRING>)`
-/// e.g. `chip("esp32")  || chip("esp32s2") || chip("esp32s3")`
+/// The only currently supported function for expressions is `has(<SYMBOL>)`
+/// e.g. `has("psram")`
 fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &PathBuf) -> Result<(), anyhow::Error> {
     let cargo_toml = std::fs::read_to_string(windows_safe_path(&package_path.join("Cargo.toml")))
         .with_context(|| {
@@ -315,11 +315,16 @@ fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &PathBuf) -> Result<
 
     let cargo_toml = cargo_toml.lines();
 
+    let chip_cfg = if let Some(chip) = &chip {
+        Some(Config::for_chip(chip))
+    } else {
+        None
+    };
     let mut processed_cargo_toml = Vec::new();
     let mut engine = somni_expr::Context::new();
-    engine.add_function("chip", move |cond: &str| -> bool {
-        if let Some(chip) = chip {
-            cond == chip.to_string()
+    engine.add_function("has", move |cond: &str| -> bool {
+        if let Some(chip_cfg) = chip_cfg {
+            chip_cfg.all().iter().any(|symbol| cond == symbol)
         } else {
             false
         }

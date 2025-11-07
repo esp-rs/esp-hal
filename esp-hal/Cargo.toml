@@ -274,7 +274,7 @@ defmt = [
     "esp-sync/defmt"
 ]
 
-#DOC_IF chip("esp32") || chip("esp32s2") || chip("esp32s3")
+#DOC_IF has("psram")
 #! ### PSRAM Feature Flags
 
 ## Use externally connected PSRAM (`quad` by default, can be configured to `octal` via ESP_HAL_CONFIG_PSRAM_MODE)
