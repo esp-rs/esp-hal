@@ -208,7 +208,7 @@ impl InterruptHandler {
 
     /// Creates a new [InterruptHandler] which will call the given function at
     /// the given priority. The saved context will be passed to the function.
-    #[cfg(xtensa)]
+    #[cfg(all(xtensa, feature = "rt"))]
     pub const fn new_with_context(
         f: extern "C" fn(&mut crate::trapframe::TrapFrame),
         prio: Priority,

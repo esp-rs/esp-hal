@@ -22,6 +22,7 @@ mod tests {
     struct Context {
         #[cfg(multi_core)]
         sw_int1: SoftwareInterrupt<'static, 1>,
+        sw_int2: SoftwareInterrupt<'static, 2>,
         #[cfg(multi_core)]
         cpu_cntl: CPU_CTRL<'static>,
     }
@@ -47,6 +48,7 @@ mod tests {
         Context {
             #[cfg(multi_core)]
             sw_int1: sw_ints.software_interrupt1,
+            sw_int2: sw_ints.software_interrupt2,
             #[cfg(multi_core)]
             cpu_cntl: p.CPU_CTRL,
         }
@@ -254,6 +256,45 @@ mod tests {
         test_context.mutex.give();
 
         info!("Low: exiting");
+    }
+
+    #[test]
+    fn interrupt_handler_is_not_preempted_by_context_switch(mut ctx: Context) {
+        // In this test, we start a thread, and make it wait for a signal. We then trigger a
+        // low-priority interrupt, which sets the signal and exits the test. The test must not time
+        // out.
+
+        static SEM: Semaphore = Semaphore::new_counting(0, 1);
+
+        extern "C" fn helper_thread(_context: *mut c_void) {
+            SEM.take(None);
+            // This thread must never be scheduled. Doing so may mean the interrupt handler never
+            // completes.
+            panic!();
+        }
+
+        unsafe {
+            preempt::task_create(
+                "helper_thread",
+                helper_thread,
+                core::ptr::null_mut(),
+                3,
+                None,
+                4096,
+            )
+        };
+
+        #[esp_hal::handler]
+        fn sw_handler() {
+            unsafe { SoftwareInterrupt::<'static, 2>::steal() }.reset();
+            SEM.give();
+            embedded_test::export::check_outcome(());
+        }
+
+        ctx.sw_int2.set_interrupt_handler(sw_handler);
+        ctx.sw_int2.raise();
+
+        loop {}
     }
 
     #[test]

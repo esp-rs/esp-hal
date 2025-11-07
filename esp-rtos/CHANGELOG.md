@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `esp_rtos::init` now takes `SoftwareInterrupt<'static, 0>` for all CPUs (#4459)
+- `esp_rtos::start` now takes `SoftwareInterrupt<'static, 0>` for all CPUs (#4459)
 - `esp_rtos::start_second_core` no longer takes `SoftwareInterrupt<'static, 0>` (#4459)
 
 ### Fixed
