@@ -75,14 +75,13 @@ use core::mem::MaybeUninit;
 
 #[cfg(feature = "alloc")]
 pub(crate) use esp_alloc::InternalMemory;
-#[cfg(any(multi_core, riscv))]
-use esp_hal::interrupt::software::SoftwareInterrupt;
 #[cfg(systimer)]
 use esp_hal::timer::systimer::Alarm;
 #[cfg(timergroup)]
 use esp_hal::timer::timg::Timer;
 use esp_hal::{
     Blocking,
+    interrupt::software::SoftwareInterrupt,
     system::Cpu,
     time::{Duration, Instant},
     timer::{AnyTimer, OneShotTimer, any::Degrade},
