@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `phy_calibration_data` and `set_phy_calibration_data` are now marked as `unstable`. (#4463)
 
 ### Fixed
 

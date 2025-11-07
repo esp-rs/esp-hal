@@ -138,7 +138,6 @@ mod fmt;
 
 use core::marker::PhantomData;
 
-pub use common_adapter::{phy_calibration_data, set_phy_calibration_data};
 use esp_hal::{
     self as hal,
 
@@ -155,6 +154,7 @@ use hal::{
     clock::{Clocks, init_radio_clocks},
     time::Rate,
 };
+use sys::include::esp_phy_calibration_data_t;
 
 pub(crate) mod sys {
     #[cfg(esp32)]
@@ -425,4 +425,26 @@ pub fn wifi_set_log_verbose() {
 
         esp_wifi_internal_set_log_level(wifi_log_level_t_WIFI_LOG_VERBOSE);
     }
+}
+
+/// Get calibration data.
+///
+/// Returns the last calibration result.
+///
+/// If you see the data is different than what was persisted before, consider persisting the new
+/// data.
+#[instability::unstable]
+pub fn phy_calibration_data(data: &mut [u8; esp_phy::PHY_CALIBRATION_DATA_LENGTH]) {
+    // FIXME: return an error to the user.
+    let _ = esp_phy::backup_phy_calibration_data(data);
+}
+
+/// Set calibration data.
+///
+/// This will be used next time the phy gets initialized.
+#[instability::unstable]
+pub fn set_phy_calibration_data(data: &[u8; core::mem::size_of::<esp_phy_calibration_data_t>()]) {
+    // Although we're ignoring the result here, this doesn't change the behavior, as this just
+    // doesn't do anything in case an error is returned.
+    let _ = esp_phy::set_phy_calibration_data(data);
 }

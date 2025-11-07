@@ -5,7 +5,7 @@ use crate::{
     hal::{self, ram},
     sys::{
         c_types::{c_char, c_int, c_ulong, c_void},
-        include::{esp_event_base_t, esp_phy_calibration_data_t, timeval},
+        include::{esp_event_base_t, timeval},
     },
     time::blob_ticks_to_micros,
 };
@@ -393,27 +393,6 @@ pub(crate) fn enable_wifi_power_domain() {
             .dig_iso()
             .modify(|_, w| w.wifi_force_iso().clear_bit());
     }
-}
-
-/// Get calibration data.
-///
-/// Returns the last calibration result.
-///
-/// If you see the data is different than what was persisted before, consider persisting the new
-/// data.
-pub fn phy_calibration_data(data: &mut [u8; esp_phy::PHY_CALIBRATION_DATA_LENGTH]) {
-    // Although we're ignoring the result here, this doesn't change the behavior, as this just
-    // doesn't do anything in case an error is returned.
-    let _ = esp_phy::backup_phy_calibration_data(data);
-}
-
-/// Set calibration data.
-///
-/// This will be used next time the phy gets initialized.
-pub fn set_phy_calibration_data(data: &[u8; core::mem::size_of::<esp_phy_calibration_data_t>()]) {
-    // Although we're ignoring the result here, this doesn't change the behavior, as this just
-    // doesn't do anything in case an error is returned.
-    let _ = esp_phy::set_phy_calibration_data(data);
 }
 
 /// **************************************************************************
