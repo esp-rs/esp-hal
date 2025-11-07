@@ -1,4 +1,3 @@
-# .github/workflows/hil-slash.yml
 name: HIL (slash)
 
 on:
@@ -13,13 +12,7 @@ permissions:
 jobs:
   hil-quick:
     # PR comment, correct role, and explicitly '/hil quick'
-    if: >
-      github.event.issue.pull_request &&
-      (
-        github.event.comment.author_association == 'MEMBER' ||
-        github.event.comment.author_association == 'OWNER'
-      ) &&
-      contains(github.event.comment.body, '/hil quick')
+    if: ${{ github.event.issue.pull_request && ( github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'OWNER' ) && startsWith(github.event.comment.body, '/hil quick') }}
     runs-on: ubuntu-latest
     steps:
       - name: Dispatch HIL (quick)
@@ -40,18 +33,12 @@ jobs:
         with:
           issue-number: ${{ github.event.issue.number }}
           body: >
-            🚀 Triggered **HIL** (`quick`) for
-            `refs/pull/${{ github.event.issue.number }}/head`.
+            Triggered quick HIL run for
+            #${{ github.event.issue.number }}
 
   hil-full:
     # PR comment, correct role, and explicitly '/hil full'
-    if: >
-      github.event.issue.pull_request &&
-      (
-        github.event.comment.author_association == 'MEMBER' ||
-        github.event.comment.author_association == 'OWNER'
-      ) &&
-      contains(github.event.comment.body, '/hil full')
+    if: ${{ github.event.issue.pull_request && ( github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'OWNER' ) && startsWith(github.event.comment.body, '/hil full') }}
     runs-on: ubuntu-latest
     steps:
       - name: Dispatch HIL (full)
@@ -72,16 +59,12 @@ jobs:
         with:
           issue-number: ${{ github.event.issue.number }}
           body: >
-            🚀 Triggered **HIL** (`full`) for
-            `refs/pull/${{ github.event.issue.number }}/head`.
+            Triggered full HIL run for
+            #${{ github.event.issue.number }}.
 
   hil-help:
     # If it's a PR comment that starts with '/hil' but not the two valid forms
-    if: >
-      github.event.issue.pull_request &&
-      startsWith(github.event.comment.body, '/hil') &&
-      !contains(github.event.comment.body, '/hil quick') &&
-      !contains(github.event.comment.body, '/hil full')
+    if: ${{ github.event.issue.pull_request && startsWith(github.event.comment.body, '/hil') && !startsWith(github.event.comment.body, '/hil quick') && !startsWith(github.event.comment.body, '/hil full') }}
     runs-on: ubuntu-latest
     steps:
       - name: Explain usage
@@ -89,7 +72,7 @@ jobs:
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
-            ℹ️ Usage:
+            Usage:
             - `/hil quick` — run a smoke/quick HIL matrix
             - `/hil full` — run the full HIL matrix
             _(Only repository members/collaborators can trigger runs.)_
