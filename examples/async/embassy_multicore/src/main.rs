@@ -57,11 +57,7 @@ async fn main(_spawner: Spawner) {
 
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(
-        timg0.timer0,
-        #[cfg(target_arch = "riscv32")]
-        sw_int.software_interrupt0,
-    );
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
@@ -70,8 +66,6 @@ async fn main(_spawner: Spawner) {
 
     esp_rtos::start_second_core(
         peripherals.CPU_CTRL,
-        #[cfg(target_arch = "xtensa")]
-        sw_int.software_interrupt0,
         sw_int.software_interrupt1,
         app_core_stack,
         move || {

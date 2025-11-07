@@ -68,11 +68,7 @@ mod tests {
 
         let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_int.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
         let (sda, scl) = hil_test::i2c_pins!(peripherals);
 
         // Create a new peripheral object with the described wiring and standard

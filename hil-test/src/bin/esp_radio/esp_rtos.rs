@@ -20,8 +20,6 @@ mod tests {
     use portable_atomic::{AtomicBool, AtomicUsize, Ordering};
 
     struct Context {
-        #[cfg(xtensa)]
-        sw_int0: SoftwareInterrupt<'static, 0>,
         #[cfg(multi_core)]
         sw_int1: SoftwareInterrupt<'static, 1>,
         #[cfg(multi_core)]
@@ -32,13 +30,7 @@ mod tests {
     fn baremetal_preempt_can_be_initialized_with_any_timer(
         timer: esp_hal::timer::AnyTimer<'static>,
     ) {
-        esp_rtos::start(
-            timer,
-            #[cfg(riscv)]
-            unsafe {
-                SoftwareInterrupt::<'static, 0>::steal()
-            },
-        );
+        esp_rtos::start(timer, unsafe { SoftwareInterrupt::<'static, 0>::steal() });
     }
 
     #[init]
@@ -50,15 +42,9 @@ mod tests {
 
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_ints.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
         Context {
-            #[cfg(xtensa)]
-            sw_int0: sw_ints.software_interrupt0,
             #[cfg(multi_core)]
             sw_int1: sw_ints.software_interrupt1,
             #[cfg(multi_core)]
@@ -365,8 +351,6 @@ mod tests {
 
         esp_rtos::start_second_core(
             unsafe { ctx.cpu_cntl.clone_unchecked() },
-            #[cfg(xtensa)]
-            ctx.sw_int0,
             ctx.sw_int1,
             #[allow(static_mut_refs)]
             unsafe {

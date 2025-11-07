@@ -2,18 +2,18 @@
 mod init_tests {
 
     use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
+    #[cfg(riscv)]
+    use esp_hal::riscv::interrupt::free as interrupt_free;
     #[cfg(xtensa)]
     use esp_hal::xtensa_lx::interrupt::free as interrupt_free;
     use esp_hal::{
         clock::CpuClock,
-        interrupt::{Priority, software::SoftwareInterruptControl},
+        interrupt::{
+            Priority,
+            software::{SoftwareInterrupt, SoftwareInterruptControl},
+        },
         peripherals::{Peripherals, TIMG0},
         timer::timg::TimerGroup,
-    };
-    #[cfg(riscv)]
-    use esp_hal::{
-        interrupt::software::SoftwareInterrupt,
-        riscv::interrupt::free as interrupt_free,
     };
     use esp_radio::InitializationError;
     use esp_rtos::embassy::InterruptExecutor;
@@ -24,15 +24,10 @@ mod init_tests {
     async fn try_init(
         signal: &'static Signal<CriticalSectionRawMutex, Option<InitializationError>>,
         timer: TIMG0<'static>,
+        sw_int0: SoftwareInterrupt<'static, 0>,
     ) {
         let timg0 = TimerGroup::new(timer);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            unsafe {
-                SoftwareInterrupt::<'static, 0>::steal()
-            },
-        );
+        esp_rtos::start(timg0.timer0, sw_int0);
 
         match esp_radio::init() {
             Ok(_) => signal.signal(None),
@@ -60,40 +55,30 @@ mod init_tests {
     }
 
     #[test]
-    fn test_init_fails_cs(peripherals: Peripherals) {
-        let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            unsafe {
-                SoftwareInterrupt::<'static, 0>::steal()
-            },
-        );
+    fn test_init_fails_cs(p: Peripherals) {
+        let timg0 = TimerGroup::new(p.TIMG0);
+        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
         let init = critical_section::with(|_| esp_radio::init());
 
-        assert!(matches!(init, Err(InitializationError::InterruptsDisabled),));
+        assert!(matches!(init, Err(InitializationError::InterruptsDisabled)));
     }
 
     #[test]
-    fn test_init_fails_interrupt_free(peripherals: Peripherals) {
-        let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            unsafe {
-                SoftwareInterrupt::<'static, 0>::steal()
-            },
-        );
+    fn test_init_fails_interrupt_free(p: Peripherals) {
+        let timg0 = TimerGroup::new(p.TIMG0);
+        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
         let init = interrupt_free(|| esp_radio::init());
 
-        assert!(matches!(init, Err(InitializationError::InterruptsDisabled),));
+        assert!(matches!(init, Err(InitializationError::InterruptsDisabled)));
     }
 
     #[test]
-    async fn test_init_fails_in_interrupt_executor_task(peripherals: Peripherals) {
-        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    async fn test_init_fails_in_interrupt_executor_task(p: Peripherals) {
+        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
 
         static EXECUTOR_CORE_0: StaticCell<InterruptExecutor<1>> = StaticCell::new();
         let executor_core0 = InterruptExecutor::new(sw_ints.software_interrupt1);
@@ -104,7 +89,7 @@ mod init_tests {
         let signal =
             mk_static!(Signal<CriticalSectionRawMutex, Option<InitializationError>>, Signal::new());
 
-        spawner.spawn(try_init(signal, peripherals.TIMG0)).ok();
+        spawner.must_spawn(try_init(signal, p.TIMG0, sw_ints.software_interrupt0));
 
         let res = signal.wait().await;
 
@@ -117,14 +102,9 @@ mod init_tests {
     #[test]
     #[cfg(soc_has_wifi)]
     fn test_wifi_can_be_initialized(mut p: Peripherals) {
-        #[cfg(riscv)]
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_ints.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
         let esp_radio_ctrl =
             &*mk_static!(esp_radio::Controller<'static>, esp_radio::init().unwrap());

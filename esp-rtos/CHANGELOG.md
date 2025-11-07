@@ -12,12 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `esp_rtos::init` now takes `SoftwareInterrupt<'static, 0>` for all CPUs (#4459)
+- `esp_rtos::start_second_core` no longer takes `SoftwareInterrupt<'static, 0>` (#4459)
 
 ### Fixed
 
 - No longer enables the default feature of `esp-hal` (#4433)
 - Time driver should no longer generate an interrupt-storm when the wakeup time does not fit 52 bits (#4444)
 - Fixed an issue causing incorrectly re-queueing timers (#4444)
+- Fixed an issue on ESP32 that prevented completing some interrupt handlers (#4459)
 
 ### Removed
 

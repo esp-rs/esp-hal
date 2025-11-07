@@ -421,17 +421,12 @@ mod tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        #[cfg(riscv)]
         let software_interrupt =
             esp_hal::interrupt::software::SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            software_interrupt.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
 
         let pin = AnyPin::from(hil_test::common_test_pins!(peripherals).1);
 

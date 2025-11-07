@@ -1,8 +1,11 @@
 #[embedded_test::tests(default_timeout = 3)]
 mod tests {
-    #[cfg(riscv)]
-    use esp_hal::interrupt::software::SoftwareInterrupt;
-    use esp_hal::{clock::CpuClock, peripherals::Peripherals, timer::timg::TimerGroup};
+    use esp_hal::{
+        clock::CpuClock,
+        interrupt::software::SoftwareInterruptControl,
+        peripherals::Peripherals,
+        timer::timg::TimerGroup,
+    };
     use esp_radio::ble::controller::BleConnector;
 
     fn read_packet(connector: &mut BleConnector, buf: &mut [u8]) -> usize {
@@ -28,13 +31,8 @@ mod tests {
         let p = esp_hal::init(esp_hal::Config::default());
 
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            unsafe {
-                SoftwareInterrupt::<'static, 0>::steal()
-            },
-        );
+        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
         {
             let _init = esp_radio::init().unwrap();
@@ -58,18 +56,13 @@ mod tests {
     }
 
     #[test]
-    fn test_controller_comms(peripherals: Peripherals) {
-        let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            unsafe {
-                SoftwareInterrupt::<'static, 0>::steal()
-            },
-        );
+    fn test_controller_comms(p: Peripherals) {
+        let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
+        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
         let init = esp_radio::init().unwrap();
 
-        let mut connector = BleConnector::new(&init, peripherals.BT, Default::default()).unwrap();
+        let mut connector = BleConnector::new(&init, p.BT, Default::default()).unwrap();
 
         // send reset cmd
         pub const fn opcode(ogf: u8, ocf: u16) -> [u8; 2] {
@@ -114,18 +107,13 @@ mod tests {
     // This test case is a regression test for #3760 and asserts that dropping the controller during
     // reset does not generate an exception.
     #[test]
-    fn test_dropping_controller_during_reset(peripherals: Peripherals) {
-        let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            unsafe {
-                SoftwareInterrupt::<'static, 0>::steal()
-            },
-        );
+    fn test_dropping_controller_during_reset(p: Peripherals) {
+        let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
+        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
         let init = esp_radio::init().unwrap();
 
-        let mut connector = BleConnector::new(&init, peripherals.BT, Default::default()).unwrap();
+        let mut connector = BleConnector::new(&init, p.BT, Default::default()).unwrap();
 
         // send reset cmd
         pub const fn opcode(ogf: u8, ocf: u16) -> [u8; 2] {

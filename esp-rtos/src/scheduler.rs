@@ -7,6 +7,7 @@ use allocator_api2::boxed::Box;
 use embassy_sync::blocking_mutex::Mutex;
 use esp_hal::{system::Cpu, time::Instant};
 use esp_sync::RawMutex;
+use macros::ram;
 
 #[cfg(feature = "alloc")]
 use crate::InternalMemory;

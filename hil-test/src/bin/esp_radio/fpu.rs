@@ -72,18 +72,11 @@ mod tests {
         static DONE: AtomicBool = AtomicBool::new(false);
 
         let timg0 = TimerGroup::new(p.TIMG0);
-        #[cfg(riscv)]
-        let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            software_interrupt,
-        );
-
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+
         esp_rtos::start_second_core::<8192>(
             p.CPU_CTRL,
-            sw_ints.software_interrupt0,
             sw_ints.software_interrupt1,
             #[allow(static_mut_refs)]
             unsafe {

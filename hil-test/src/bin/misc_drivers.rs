@@ -650,11 +650,7 @@ mod twai {
 
             let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-            esp_rtos::start(
-                timg0.timer0,
-                #[cfg(riscv)]
-                _sw_int.software_interrupt0,
-            );
+            esp_rtos::start(timg0.timer0, _sw_int.software_interrupt0);
 
             let twai = config.into_async().start();
 

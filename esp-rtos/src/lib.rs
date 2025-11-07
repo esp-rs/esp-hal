@@ -9,44 +9,19 @@
 //!
 //! ## Setup
 //!
-//! This crate requires an esp-hal timer to operate, and needs to be started like so:
+//! This crate requires an esp-hal timer, as well as the FROM_CPU0 software interrupt to operate,
+//! and needs to be started like so:
 //!
 //! ```rust, no_run
+#![doc = esp_hal::before_snippet!()]
 //! use esp_hal::timer::timg::TimerGroup;
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
-#![doc = esp_hal::before_snippet!()]
+//!
+//! use esp_hal::interrupt::software::SoftwareInterruptControl;
+//! let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+//! esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
 #![cfg_attr(
-    any(riscv, multi_core),
-    doc = "
-
-use esp_hal::interrupt::software::SoftwareInterruptControl;
-let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);"
-)]
-#![cfg_attr(
-    xtensa,
-    doc = "
-
-esp_rtos::start(timg0.timer0);"
-)]
-#![cfg_attr(
-    riscv,
-    doc = "
-
-esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);"
-)]
-#![cfg_attr(
-    all(xtensa, multi_core),
-    doc = "
-// Optionally, start the scheduler on the second core
-esp_rtos::start_second_core(
-    software_interrupt.software_interrupt0,
-    software_interrupt.software_interrupt1,
-    || {}, // Second core's main function.
-);
-"
-)]
-#![cfg_attr(
-    all(riscv, multi_core),
+    multi_core,
     doc = "
 // Optionally, start the scheduler on the second core
 esp_rtos::start_second_core(
@@ -270,13 +245,8 @@ impl TimerSource for Alarm<'static> {
 /// idle hook will wait for an interrupt.
 ///
 /// For information about the arguments, see [`start_with_idle_hook`].
-pub fn start(timer: impl TimerSource, #[cfg(riscv)] int0: SoftwareInterrupt<'static, 0>) {
-    start_with_idle_hook(
-        timer,
-        #[cfg(riscv)]
-        int0,
-        crate::task::idle_hook,
-    )
+pub fn start(timer: impl TimerSource, int0: SoftwareInterrupt<'static, 0>) {
+    start_with_idle_hook(timer, int0, crate::task::idle_hook)
 }
 
 /// Starts the scheduler, with a custom idle hook.
@@ -294,16 +264,14 @@ pub fn start(timer: impl TimerSource, #[cfg(riscv)] int0: SoftwareInterrupt<'sta
 /// - A systimer `Alarm` instance
 /// - An `AnyTimer` instance
 /// - A `OneShotTimer` instance
-#[doc = ""]
-#[cfg_attr(
-    riscv,
-    doc = "The `int0` argument must be `SoftwareInterrupt<0>` which will be used to trigger context switches."
-)]
-#[doc = ""]
+///
+/// The `int0` argument must be `SoftwareInterrupt<0>` which will be used to trigger context
+/// switches.
+///
 /// For an example, see the [crate-level documentation][self].
 pub fn start_with_idle_hook(
     timer: impl TimerSource,
-    #[cfg(riscv)] int0: SoftwareInterrupt<'static, 0>,
+    int0: SoftwareInterrupt<'static, 0>,
     idle_hook: IdleFn,
 ) {
     #[cfg(feature = "rtos-trace")]
@@ -351,11 +319,9 @@ pub fn start_with_idle_hook(
             unsafe { (&raw const __stack_chk_guard).read_volatile() },
         );
 
-        task::setup_multitasking(
-            #[cfg(riscv)]
-            int0,
-        );
+        task::setup_multitasking(int0);
 
+        // Set up the main task's context.
         task::yield_task();
     })
 }
@@ -373,20 +339,11 @@ pub fn start_with_idle_hook(
 #[cfg(multi_core)]
 pub fn start_second_core<const STACK_SIZE: usize>(
     cpu_control: CPU_CTRL,
-    #[cfg(xtensa)] int0: SoftwareInterrupt<'static, 0>,
     int1: SoftwareInterrupt<'static, 1>,
     stack: &'static mut Stack<STACK_SIZE>,
     func: impl FnOnce() + Send + 'static,
 ) {
-    start_second_core_with_stack_guard_offset::<STACK_SIZE>(
-        cpu_control,
-        #[cfg(xtensa)]
-        int0,
-        int1,
-        stack,
-        None,
-        func,
-    );
+    start_second_core_with_stack_guard_offset::<STACK_SIZE>(cpu_control, int1, stack, None, func);
 }
 
 /// Starts the scheduler on the second CPU core.
@@ -406,16 +363,12 @@ pub fn start_second_core<const STACK_SIZE: usize>(
 #[cfg(multi_core)]
 pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
     cpu_control: CPU_CTRL,
-    #[cfg(xtensa)] int0: SoftwareInterrupt<'static, 0>,
     int1: SoftwareInterrupt<'static, 1>,
     stack: &'static mut Stack<STACK_SIZE>,
     stack_guard_offset: Option<usize>,
     func: impl FnOnce() + Send + 'static,
 ) {
     trace!("Starting scheduler for the second core");
-
-    #[cfg(xtensa)]
-    task::setup_smp(int0);
 
     struct SecondCoreStack {
         stack: *mut [MaybeUninit<u32>],
