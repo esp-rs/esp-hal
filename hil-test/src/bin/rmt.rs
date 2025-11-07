@@ -941,7 +941,13 @@ mod tests {
 
         let (mut tx_channel, _) = ctx.setup_loopback(&tx_config, &RxChannelConfig::default());
 
-        let tx_data: [_; 10] = generate_tx_data(false, true);
+        // Use long pulse codes, such that we can use a relatively lare threshold in the assertion
+        // below to ensure that this test is robust against small timing variations
+        let tx_data: [_; 3] = [
+            PulseCode::new(Level::High, 10_000, Level::Low, 10_000),
+            PulseCode::new(Level::High, 10_000, Level::Low, 10_000),
+            PulseCode::end_marker(),
+        ];
 
         let start = Instant::now();
 
@@ -955,9 +961,9 @@ mod tests {
         tx_transaction.stop_next().unwrap();
 
         // overall, this should complete in less time than sending a single code from `tx_data`
-        // would take (see above, the codes are several 100us in length)
+        // would take (see above, the codes are several 2 * 10ms long)
         assert!(
-            start.elapsed().as_micros() < 100,
+            start.elapsed().as_micros() < 1000,
             "tx with loopcount 0 did not complete immediately"
         );
     }
