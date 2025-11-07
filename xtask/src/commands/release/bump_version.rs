@@ -247,7 +247,7 @@ fn bump_crate_version(
 /// Perform the actual version bump logic.
 pub fn do_version_bump(version: &semver::Version, amount: &VersionBump) -> Result<semver::Version> {
     fn bump_version_number(version: &mut semver::Version, amount: &VersionBump) {
-        log::info!("Bumping version number: {version} by {amount:?}");
+        log::debug!("Bumping version number: {version} by {amount:?}");
         match amount {
             VersionBump::Major => {
                 version.major += 1;
