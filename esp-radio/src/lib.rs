@@ -334,7 +334,7 @@ pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
     #[cfg(coex)]
     match crate::wifi::coex_initialize() {
         0 => {}
-        error => return Err(InitializationError::General(error)),
+        error => return Err(InitializationError::Internal),
     }
 
     Ok(Controller {
@@ -358,9 +358,8 @@ fn is_interrupts_disabled() -> bool {
 /// Error which can be returned during [`init`].
 #[non_exhaustive]
 pub enum InitializationError {
-    /// A general error occurred.
-    /// The internal error code is reported.
-    General(i32),
+    /// An internal error occurred.
+    Internal,
     /// An error from the Wi-Fi driver.
     #[cfg(feature = "wifi")]
     WifiError(WifiError),
@@ -381,10 +380,10 @@ impl core::error::Error for InitializationError {}
 impl core::fmt::Display for InitializationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            InitializationError::General(e) => write!(f, "A general error {e} occurred"),
+            InitializationError::Internal => write!(f, "An internal error occurred"),
             #[cfg(feature = "wifi")]
             InitializationError::WifiError(e) => {
-                write!(f, "Wi-Fi driver related error occured: {e}")
+                write!(f, "Wi-Fi driver related error occurred: {e}")
             }
             InitializationError::WrongClockConfig => {
                 write!(f, "The current CPU clock frequency is too low")
