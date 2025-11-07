@@ -6,14 +6,7 @@ on:
 
 jobs:
   binary_size:
-    if: >
-      ${{
-        github.event.issue.pull_request &&
-        contains(github.event.comment.body, '/test-size') &&
-        (
-          github.event.comment.author_association == 'OWNER' ||
-          github.event.comment.author_association == 'MEMBER'
-        ) }}
+    if: ${{ github.event.issue.pull_request && startsWith(github.event.comment.body, '/test-size') && (github.event.comment.author_association == 'OWNER' || github.event.comment.author_association == 'MEMBER') }}
           
     runs-on: ubuntu-latest
     permissions:
