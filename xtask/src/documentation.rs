@@ -318,7 +318,11 @@ fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &PathBuf) -> Result<
     let mut processed_cargo_toml = Vec::new();
     let mut engine = somni_expr::Context::new();
     engine.add_function("chip", move |cond: &str| -> bool {
-        cond == chip.as_ref().map(|c| c.to_string()).unwrap_or_default()
+        if let Some(chip) = chip {
+            cond == chip.to_string()
+        } else {
+            false
+        }
     });
 
     let mut hide = false;
