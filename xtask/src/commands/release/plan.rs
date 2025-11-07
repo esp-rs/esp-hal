@@ -137,7 +137,7 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
             } else {
                 let forever_unstable = if let Some(metadata) =
                     package_tomls[&package].espressif_metadata()
-                    && let Some(Item::Value(forever_unstable)) = metadata.get("forever_unstable")
+                    && let Some(Item::Value(forever_unstable)) = metadata.get("forever-unstable")
                 {
                     // Special case: some packages are perma-unstable, meaning they won't ever have
                     // a stable release. For these packages, we always use a
@@ -146,7 +146,7 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
                         *forever_unstable.value()
                     } else {
                         log::warn!(
-                            "Invalid value for 'forever_unstable' in metadata - must be a boolean"
+                            "Invalid value for 'forever-unstable' in metadata - must be a boolean"
                         );
                         true
                     }
