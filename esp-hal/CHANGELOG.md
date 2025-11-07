@@ -8,14 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- All public RMT types now derive `Debug`. (#4302)
 
 
 ### Changed
+- `rmt::SingleShotTxTransaction` has been renamed to `rmt::TxTransaction`. (#4302)
+- `rmt::ChannelCreator::configure_tx` and `rmt::ChannelCreator::configure_rx` now take the configuration by reference (#4302)
 
 
 ### Fixed
 
 - ESP32: ADC1 readings are no longer inverted (#4423)
+- RMT: All blocking methods now return the channel on failure (#4302)
+- RMT: the `place_rmt_driver_in_ram` option now also places the async interrupt handler in RAM (#4302)
 
 ### Removed
 
@@ -30,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `work_queue` is no longer public (#4357)
 - UART memory is now powered down when the driver is no longer in use. (#4354)
+
 
 ### Removed
 
