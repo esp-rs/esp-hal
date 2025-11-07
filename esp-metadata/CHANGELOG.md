@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- `Config` no longer implements `serde::Serialize` (#4464)
 
 ## [v0.10.0] - 2025-10-30
 

@@ -138,7 +138,7 @@ macro_rules! driver_configs {
             )*
         }
     ) => {
-        #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+        #[derive(Debug, Clone, serde::Deserialize)]
         pub(crate) struct $struct {
             #[serde(default)]
             pub support_status: SupportStatus,
@@ -190,7 +190,7 @@ macro_rules! driver_configs {
 
         // Generate a single PeriConfig struct that contains all the drivers. Each of the
         // drivers is optional to support devices that may not have all peripherals.
-        #[derive(Default, Debug, Clone, serde::Deserialize, serde::Serialize)]
+        #[derive(Default, Debug, Clone, serde::Deserialize)]
         pub(crate) struct PeriConfig {
             $(
                 // Each driver is an optional struct.
@@ -295,7 +295,7 @@ driver_configs![
             rc_slow_clock: Option<u32>,
             xtal_options: Vec<u32>,
             #[serde(default)]
-            peripheral_clocks: PeripheralClocks,
+            clocks: DeviceClocks,
             memory_map: MemoryMap,
         }
     },

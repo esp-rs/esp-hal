@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use convert_case::{Boundary, Case, Casing, pattern};
 use proc_macro2::TokenStream;
 use quote::quote;
+use serde::{Deserialize, Serialize};
 
 use crate::{cfg::Value, number_hex};
 
@@ -28,7 +29,7 @@ impl super::SocProperties {
 }
 
 /// Memory region.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct MemoryRange {
     pub name: String,
     #[serde(flatten)]
@@ -36,7 +37,7 @@ pub struct MemoryRange {
 }
 
 /// Memory regions.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct MemoryMap {
     pub ranges: Vec<MemoryRange>,
 }
@@ -89,7 +90,7 @@ impl super::GenericProperty for MemoryMap {
 
 /// A named template. Can contain `{{placeholder}}` placeholders that will be substituted with
 /// actual values.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Template {
     /// The name of the template. Other templates can substitute this template's value by using the
     /// `{{name}}` placeholder.
@@ -107,7 +108,7 @@ pub struct Template {
 /// `template_params` is a map of substitutions, which will overwrite the defaults set in
 /// `PeripheralClocks`. This way each peripheral clock signal can either simply use the defaults,
 /// or override them with custom values in case they don't fit the scheme for some reason.
-#[derive(Debug, Default, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct PeripheralClock {
     /// The name of the peripheral clock signal. Usually specified as CamelCase. Also determines
     /// the value of the `peripheral` template parameter, by converting the name to snake_case.
@@ -125,7 +126,7 @@ pub struct PeripheralClock {
     keep_enabled: bool,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct PeripheralClocks {
     pub(crate) templates: Vec<Template>,
     pub(crate) peripheral_clocks: Vec<PeripheralClock>,
@@ -305,9 +306,14 @@ impl PeripheralClocks {
     }
 }
 
-impl super::GenericProperty for PeripheralClocks {
+#[derive(Debug, Default, Clone, Deserialize)]
+pub struct DeviceClocks {
+    pub(crate) peripheral_clocks: PeripheralClocks,
+}
+
+impl super::GenericProperty for DeviceClocks {
     fn macros(&self) -> Option<TokenStream> {
-        match self.generate_macro() {
+        match self.peripheral_clocks.generate_macro() {
             Ok(tokens) => Some(tokens),
             Err(err) => panic!(
                 "{:?}",
