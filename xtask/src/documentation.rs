@@ -190,7 +190,7 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
         cargo_doc_res
     } else {
         // Restore the original Cargo.toml
-        restore_cargo_toml(package_path).ok();
+        restore_cargo_toml(package_path)?;
         Err(pre_process_res.err().unwrap())
     }
 }
@@ -370,13 +370,16 @@ fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &PathBuf) -> Result<
 
 /// Restore the original Cargo.toml file
 fn restore_cargo_toml(package_path: PathBuf) -> Result<(), anyhow::Error> {
-    std::fs::remove_file(windows_safe_path(&package_path.join("Cargo.toml"))).ok();
+    if std::fs::exists(windows_safe_path(&package_path.join("Cargo.toml_original")))? {
+        if std::fs::exists(windows_safe_path(&package_path.join("Cargo.toml")))? {
+            std::fs::remove_file(windows_safe_path(&package_path.join("Cargo.toml")))?;
+        }
 
-    std::fs::rename(
-        windows_safe_path(&package_path.join("Cargo.toml_original")),
-        windows_safe_path(&package_path.join("Cargo.toml")),
-    )
-    .ok();
+        std::fs::rename(
+            windows_safe_path(&package_path.join("Cargo.toml_original")),
+            windows_safe_path(&package_path.join("Cargo.toml")),
+        )?;
+    }
 
     Ok(())
 }
