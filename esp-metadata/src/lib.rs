@@ -269,7 +269,7 @@ impl PeripheralDef {
     }
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 struct Device {
     name: String,
     arch: Arch,
@@ -295,7 +295,7 @@ fn number_hex(n: impl std::fmt::Display + std::fmt::UpperHex) -> TokenStream {
 }
 
 /// Device configuration file format.
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct Config {
     device: Device,
     #[serde(skip)]
