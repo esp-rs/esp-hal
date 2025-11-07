@@ -2200,6 +2200,8 @@ macro_rules! max_from_register_spec {
 #[cfg(not(any(esp32, esp32s2)))]
 mod chip_specific {
     use enumset::EnumSet;
+    #[cfg(place_rmt_driver_in_ram)]
+    use procmacros::ram;
 
     use super::{
         ChannelIndex,
@@ -2793,6 +2795,8 @@ mod chip_specific {
 #[cfg(any(esp32, esp32s2))]
 mod chip_specific {
     use enumset::EnumSet;
+    #[cfg(place_rmt_driver_in_ram)]
+    use procmacros::ram;
 
     use super::{
         ChannelIndex,
