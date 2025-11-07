@@ -90,6 +90,8 @@ global_asm!(
     .set PS_UM,            0x00000020
     .set PS_WOE,           0x00040000
 
+    .set EXCCAUSE_LEVEL1_INTERRUPT, 4
+
     // Spills all active windowed registers (i.e. registers not visible as
     // A0-A15) to their ABI-defined spill regions on the stack.
     // It will spill registers to their reserved locations in previous frames.
@@ -514,7 +516,7 @@ __default_naked_exception:
 
     l32i    a6, sp, +XT_STK_EXCCAUSE  // put cause in a6 = a2 in callee
 
-    bnei    a6, 4, .HandleException   // Handle exception elsewhere
+    bnei    a6, EXCCAUSE_LEVEL1_INTERRUPT, .HandleException   // Handle exception elsewhere
 
     movi    a0, (1 | PS_WOE)          // set PS.INTLEVEL accordingly
     wsr     a0, PS

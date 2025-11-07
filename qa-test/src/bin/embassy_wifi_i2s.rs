@@ -12,11 +12,10 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use embassy_time::{Duration, Instant, Timer};
 use esp_alloc;
 use esp_backtrace as _;
-#[cfg(target_arch = "riscv32")]
-use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::{
     dma_buffers,
     i2s::master::{Channels, Config as I2sConfig, DataFormat, I2s},
+    interrupt::software::SoftwareInterruptControl,
     ram,
     rng::Rng,
     time::Rate,
@@ -216,14 +215,9 @@ async fn main(spawner: Spawner) {
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
 
     // Preempt scheduler (WiFi)
-    #[cfg(target_arch = "riscv32")]
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(
-        timg0.timer0,
-        #[cfg(target_arch = "riscv32")]
-        sw_int.software_interrupt0,
-    );
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     esp_rtos::CurrentThreadHandle::get().set_priority(30);
 

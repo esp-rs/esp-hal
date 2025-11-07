@@ -293,20 +293,12 @@ impl Drop for Controller<'_> {
 ///
 /// ```rust, no_run
 /// # {before_snippet}
-/// use esp_hal::timer::timg::TimerGroup;
+/// use esp_hal::{interrupt::software::SoftwareInterruptControl, timer::timg::TimerGroup};
+///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
-#[doc = ""]
-#[cfg_attr(
-    riscv,
-    doc = r#"
- // On RISC-V chips, we need to hand over Software Interrupt 0 to the scheduler.
- use esp_hal::interrupt::software::SoftwareInterruptControl;
- let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
- esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
-"#
-)]
-#[cfg_attr(xtensa, doc = " esp_rtos::start(timg0.timer0);")]
-#[doc = ""]
+/// let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+/// esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
+///
 /// // You can now start esp-radio:
 /// let esp_radio_controller = esp_radio::init().unwrap();
 /// # {after_snippet}

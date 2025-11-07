@@ -7,10 +7,9 @@
 
 use esp_alloc as _;
 use esp_backtrace as _;
-#[cfg(target_arch = "riscv32")]
-use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::{
     clock::CpuClock,
+    interrupt::software::SoftwareInterruptControl,
     main,
     time::{self, Duration},
     timer::timg::TimerGroup,
@@ -28,14 +27,9 @@ fn main() -> ! {
 
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
-    #[cfg(target_arch = "riscv32")]
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(
-        timg0.timer0,
-        #[cfg(target_arch = "riscv32")]
-        sw_int.software_interrupt0,
-    );
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let esp_radio_ctrl = esp_radio::init().unwrap();
 

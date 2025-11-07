@@ -20,10 +20,9 @@ mod tests {
     use portable_atomic::{AtomicBool, AtomicUsize, Ordering};
 
     struct Context {
-        #[cfg(xtensa)]
-        sw_int0: SoftwareInterrupt<'static, 0>,
         #[cfg(multi_core)]
         sw_int1: SoftwareInterrupt<'static, 1>,
+        sw_int2: SoftwareInterrupt<'static, 2>,
         #[cfg(multi_core)]
         cpu_cntl: CPU_CTRL<'static>,
     }
@@ -32,13 +31,7 @@ mod tests {
     fn baremetal_preempt_can_be_initialized_with_any_timer(
         timer: esp_hal::timer::AnyTimer<'static>,
     ) {
-        esp_rtos::start(
-            timer,
-            #[cfg(riscv)]
-            unsafe {
-                SoftwareInterrupt::<'static, 0>::steal()
-            },
-        );
+        esp_rtos::start(timer, unsafe { SoftwareInterrupt::<'static, 0>::steal() });
     }
 
     #[init]
@@ -50,17 +43,12 @@ mod tests {
 
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_ints.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
         Context {
-            #[cfg(xtensa)]
-            sw_int0: sw_ints.software_interrupt0,
             #[cfg(multi_core)]
             sw_int1: sw_ints.software_interrupt1,
+            sw_int2: sw_ints.software_interrupt2,
             #[cfg(multi_core)]
             cpu_cntl: p.CPU_CTRL,
         }
@@ -271,6 +259,45 @@ mod tests {
     }
 
     #[test]
+    fn interrupt_handler_is_not_preempted_by_context_switch(mut ctx: Context) {
+        // In this test, we start a thread, and make it wait for a signal. We then trigger a
+        // low-priority interrupt, which sets the signal and exits the test. The test must not time
+        // out.
+
+        static SEM: Semaphore = Semaphore::new_counting(0, 1);
+
+        extern "C" fn helper_thread(_context: *mut c_void) {
+            SEM.take(None);
+            // This thread must never be scheduled. Doing so may mean the interrupt handler never
+            // completes.
+            panic!();
+        }
+
+        unsafe {
+            preempt::task_create(
+                "helper_thread",
+                helper_thread,
+                core::ptr::null_mut(),
+                3,
+                None,
+                4096,
+            )
+        };
+
+        #[esp_hal::handler]
+        fn sw_handler() {
+            unsafe { SoftwareInterrupt::<'static, 2>::steal() }.reset();
+            SEM.give();
+            embedded_test::export::check_outcome(());
+        }
+
+        ctx.sw_int2.set_interrupt_handler(sw_handler);
+        ctx.sw_int2.raise();
+
+        loop {}
+    }
+
+    #[test]
     async fn timers_dont_stop_when_timer_is_cancelled() {
         extern "C" fn helper_thread(context: *mut c_void) {
             let context = unsafe { &*(context as *const TestContext) };
@@ -365,8 +392,6 @@ mod tests {
 
         esp_rtos::start_second_core(
             unsafe { ctx.cpu_cntl.clone_unchecked() },
-            #[cfg(xtensa)]
-            ctx.sw_int0,
             ctx.sw_int1,
             #[allow(static_mut_refs)]
             unsafe {

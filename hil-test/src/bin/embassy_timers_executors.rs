@@ -86,26 +86,16 @@ mod timers_executors {
     }
 
     fn set_up_embassy_with_timg0(peripherals: Peripherals) {
-        #[cfg(riscv)]
         let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_int.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
     }
 
     #[cfg(not(feature = "esp32"))]
     fn set_up_embassy_with_systimer(peripherals: Peripherals) {
-        #[cfg(riscv)]
         let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let systimer = SystemTimer::new(peripherals.SYSTIMER);
-        esp_rtos::start(
-            systimer.alarm0,
-            #[cfg(riscv)]
-            sw_int.software_interrupt0,
-        );
+        esp_rtos::start(systimer.alarm0, sw_int.software_interrupt0);
     }
 
     #[init]
@@ -178,11 +168,7 @@ mod timers_executors {
     async fn test_interrupt_executor(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_int.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
         let executor = mk_static!(
             InterruptExecutor<2>,
@@ -330,8 +316,6 @@ mod interrupt_executor {
     }
 
     struct Context {
-        #[cfg(xtensa)]
-        sw_int0: SoftwareInterrupt<'static, 0>,
         #[cfg(multi_core)]
         sw_int1: SoftwareInterrupt<'static, 1>,
         sw_int2: SoftwareInterrupt<'static, 2>,
@@ -345,15 +329,9 @@ mod interrupt_executor {
 
         let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_int.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
         Context {
-            #[cfg(xtensa)]
-            sw_int0: sw_int.software_interrupt0,
             #[cfg(multi_core)]
             sw_int1: sw_int.software_interrupt1,
             sw_int2: sw_int.software_interrupt2,
@@ -414,21 +392,14 @@ mod interrupt_executor {
         let response = &*mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
         let signal = &*mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
-        esp_rtos::start_second_core(
-            ctx.cpu_control,
-            #[cfg(xtensa)]
-            ctx.sw_int0,
-            ctx.sw_int1,
-            app_core_stack,
-            || {
-                let interrupt_executor =
-                    mk_static!(InterruptExecutor<2>, InterruptExecutor::new(ctx.sw_int2));
+        esp_rtos::start_second_core(ctx.cpu_control, ctx.sw_int1, app_core_stack, || {
+            let interrupt_executor =
+                mk_static!(InterruptExecutor<2>, InterruptExecutor::new(ctx.sw_int2));
 
-                let spawner = interrupt_executor.start(Priority::Priority3);
+            let spawner = interrupt_executor.start(Priority::Priority3);
 
-                spawner.spawn(responder_task(signal, response)).unwrap();
-            },
-        );
+            spawner.spawn(responder_task(signal, response)).unwrap();
+        });
 
         let thread_executor = mk_static!(Executor, Executor::new());
         thread_executor.run(|spawner| {
@@ -443,19 +414,12 @@ mod interrupt_executor {
         let signal = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
         let response = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
-        esp_rtos::start_second_core(
-            ctx.cpu_control,
-            #[cfg(xtensa)]
-            ctx.sw_int0,
-            ctx.sw_int1,
-            app_core_stack,
-            || {
-                let executor = mk_static!(Executor, Executor::new());
-                executor.run(|spawner| {
-                    spawner.spawn(responder_task(signal, response)).ok();
-                });
-            },
-        );
+        esp_rtos::start_second_core(ctx.cpu_control, ctx.sw_int1, app_core_stack, || {
+            let executor = mk_static!(Executor, Executor::new());
+            executor.run(|spawner| {
+                spawner.spawn(responder_task(signal, response)).ok();
+            });
+        });
 
         let thread_executor = mk_static!(Executor, Executor::new());
         thread_executor.run(|spawner| {
@@ -532,17 +496,14 @@ mod interrupt_spi_dma {
             Timer::after(Duration::from_millis(1)).await;
         }
     }
+
     #[test]
     async fn dma_does_not_lock_up_when_used_in_different_executors() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
         let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_int.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
         cfg_if::cfg_if! {
             if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
@@ -687,11 +648,7 @@ mod interrupt_spi_dma {
 
         let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_int.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
@@ -712,8 +669,6 @@ mod interrupt_spi_dma {
 
         esp_rtos::start_second_core(
             peripherals.CPU_CTRL,
-            #[cfg(xtensa)]
-            sw_int.software_interrupt0,
             sw_int.software_interrupt1,
             app_core_stack,
             || {

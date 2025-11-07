@@ -9,9 +9,15 @@ use core::marker::PhantomData;
 
 use esp_alloc as _;
 use esp_backtrace as _;
-#[cfg(target_arch = "riscv32")]
-use esp_hal::interrupt::software::SoftwareInterruptControl;
-use esp_hal::{clock::CpuClock, delay::Delay, main, ram, time::Duration, timer::timg::TimerGroup};
+use esp_hal::{
+    clock::CpuClock,
+    delay::Delay,
+    interrupt::software::SoftwareInterruptControl,
+    main,
+    ram,
+    time::Duration,
+    timer::timg::TimerGroup,
+};
 use esp_println::println;
 use esp_radio::wifi;
 use ieee80211::{
@@ -41,13 +47,8 @@ fn main() -> ! {
     let delay = Delay::new();
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    #[cfg(target_arch = "riscv32")]
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_rtos::start(
-        timg0.timer0,
-        #[cfg(target_arch = "riscv32")]
-        sw_int.software_interrupt0,
-    );
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let esp_radio_ctrl = esp_radio::init().unwrap();
 

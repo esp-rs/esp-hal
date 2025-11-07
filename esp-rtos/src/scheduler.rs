@@ -7,6 +7,7 @@ use allocator_api2::boxed::Box;
 use embassy_sync::blocking_mutex::Mutex;
 use esp_hal::{system::Cpu, time::Instant};
 use esp_sync::RawMutex;
+use macros::ram;
 
 #[cfg(feature = "alloc")]
 use crate::InternalMemory;
@@ -362,7 +363,7 @@ impl SchedulerState {
         timer_queue.schedule_wakeup(task, at)
     }
 
-    #[esp_hal::ram]
+    #[ram]
     pub(crate) fn resume_task(&mut self, task: TaskPtr) {
         let timer_queue = unwrap!(self.time_driver.as_mut());
         timer_queue.timer_queue.remove(task);

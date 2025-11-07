@@ -203,6 +203,8 @@ pub struct Semaphore {
     inner: NonReentrantMutex<SemaphoreInner>,
 }
 
+unsafe impl Sync for Semaphore {}
+
 impl Semaphore {
     /// Create a new counting semaphore.
     pub const fn new_counting(initial: u32, max: u32) -> Self {
