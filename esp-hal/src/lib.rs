@@ -365,6 +365,8 @@ unstable_driver! {
     pub mod delay;
     #[cfg(soc_has_ecc)]
     pub mod ecc;
+    #[cfg(all(soc_has_emac_dma, soc_has_emac_ext, soc_has_emac_mac))]
+    pub mod eth;
     #[cfg(soc_has_hmac)]
     pub mod hmac;
     #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
