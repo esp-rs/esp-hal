@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added blocking `send_break`, `wait_for_break` and `wait_for_break_with_timeout` for sending and detecting software breaks with the UART driver (#4284)
+- Added support for `RxBreakDetected` interrupt and `wait_for_break_async` for detecting software breaks asynchronously to the UART driver (#4284)
 
 ### Changed
 
@@ -25,8 +27,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added the `float-save-restore` feature (enabled by default) for Xtensa MCUs. (#4394)
-- Added blocking `send_break`, `wait_for_break` and `wait_for_break_with_timeout` for sending and detecting software breaks with the UART driver (#4284)
-- Added support for `RxBreakDetected` interrupt and `wait_for_break_async` for detecting software breaks asynchronously to the UART driver (#4284)
 
 ### Changed
 
