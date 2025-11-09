@@ -1,11 +1,30 @@
+//! Xtensa context switching implementation.
+//!
+//! Context switching is implemented via interrupt handlers. Servicing the interrupt request
+//! saves context to the stack. The OS copies the state to memory, replaces it with the new task's
+//! state, then returns from the interrupt handler.
+//!
+//! To trigger a context switch on the same core, we (where possible) use the Software0 CPU
+//! interrupt. To trigger a cross-core context switch, we use the FROM_CPUn CPU interrupts. On
+//! ESP32, Software0 is not available, so we use FROM_CPUn there, as well.
+//!
+//! Context switching must happen at the lower interrupt priority level. This ensures that context
+//! switching does not interfere with other interrupts, so we don't leave an interrupt handler only
+//! partially executed.
+
 #[cfg(feature = "esp-radio")]
 use core::ffi::c_void;
 use core::sync::atomic::Ordering;
 
-#[cfg(multi_core)]
-use esp_hal::interrupt::software::SoftwareInterrupt;
 pub(crate) use esp_hal::trapframe::TrapFrame as CpuContext;
-use esp_hal::{ram, xtensa_lx, xtensa_lx_rt};
+#[cfg(not(esp32))]
+use esp_hal::xtensa_lx::interrupt;
+use esp_hal::{interrupt::software::SoftwareInterrupt, ram};
+#[cfg(multi_core)]
+use esp_hal::{
+    interrupt::{InterruptHandler, Priority},
+    system::Cpu,
+};
 use portable_atomic::AtomicPtr;
 
 #[cfg(feature = "rtos-trace")]
@@ -37,10 +56,9 @@ pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext, hook_fn: IdleFn
     // Point idle context PC at the assembly that calls the idle hook. We need a new stack
     // frame for the idle task on the main stack.
     idle_context.PC = idle_entry as usize as u32;
-    // Set a valid processor status value
-    let current_ps;
-    unsafe { core::arch::asm!("rsr.ps {0}", out(reg) current_ps, options(nostack)) };
-    idle_context.PS = current_ps;
+    // Set a valid processor status value, that will not end up spilling registers into the main
+    // task's stack.
+    idle_context.PS = 0x40020;
 }
 
 #[cfg(feature = "esp-radio")]
@@ -85,30 +103,48 @@ pub(crate) fn task_switch(
     unsafe { core::ptr::copy_nonoverlapping(next_context, trap_frame, 1) };
 }
 
-// ESP32 uses Software1 (priority 3) for task switching, because it reserves
-// Software0 for the Bluetooth stack.
-const SW_INTERRUPT: u32 = if cfg!(esp32) { 1 << 29 } else { 1 << 7 };
+// S2 and S3 use Software0 (priority 1) for same-core task switching. This is slightly faster than
+// the FROM_CPU0 interrupt.
+#[cfg(not(esp32))]
+const SW_INTERRUPT: u32 = 1 << 7;
 
-pub(crate) fn setup_multitasking() {
+pub(crate) fn setup_multitasking<const IRQ: u8>(mut _irq: SoftwareInterrupt<'static, IRQ>) {
+    #[cfg(not(esp32))]
     unsafe {
-        xtensa_lx::interrupt::enable_mask(SW_INTERRUPT);
+        // Set up a CPU-internal interrupt, which will be used to trigger a context switch on the
+        // same core.
+        interrupt::enable_mask(SW_INTERRUPT);
+    }
+
+    #[cfg(multi_core)]
+    {
+        _irq.set_interrupt_handler(InterruptHandler::new(
+            unsafe {
+                core::mem::transmute::<*const (), extern "C" fn()>(
+                    cross_core_yield_handler as *const (),
+                )
+            },
+            Priority::min(),
+        ));
     }
 }
 
 #[cfg(multi_core)]
-pub(crate) fn setup_smp<const IRQ: u8>(mut irq: SoftwareInterrupt<'static, IRQ>) {
-    setup_multitasking();
-    irq.set_interrupt_handler(cross_core_yield_handler);
+pub(crate) fn setup_smp<const IRQ: u8>(irq: SoftwareInterrupt<'static, IRQ>) {
+    setup_multitasking(irq);
 }
 
+// Non-ESP32 can use Software0 (priority 1) for same-core task switching. This is slightly faster
+// than the FROM_CPU0 interrupt. On ESP32, this is not available because the bluetooth driver uses
+// Software0.
 #[allow(non_snake_case)]
 #[ram]
-#[cfg_attr(not(esp32), unsafe(export_name = "Software0"))]
-#[cfg_attr(esp32, unsafe(export_name = "Software1"))]
+#[cfg(not(esp32))]
+#[unsafe(export_name = "Software0")]
 fn task_switch_interrupt(context: &mut CpuContext) {
-    unsafe { xtensa_lx_rt::xtensa_lx::interrupt::clear(SW_INTERRUPT) };
+    unsafe { interrupt::clear(SW_INTERRUPT) };
 
-    SCHEDULER.with(|scheduler| scheduler.switch_task(context));
+    trigger_task_switch(context);
 }
 
 #[inline]
@@ -119,18 +155,42 @@ pub(crate) fn yield_task() {
         rtos_trace::trace::marker_end(TraceEvents::YieldTask as u32);
     }
 
-    unsafe { xtensa_lx::interrupt::set(SW_INTERRUPT) };
+    #[cfg(not(esp32))]
+    unsafe {
+        interrupt::set(SW_INTERRUPT);
+    }
+
+    #[cfg(esp32)]
+    {
+        match Cpu::current() {
+            Cpu::ProCpu => unsafe { SoftwareInterrupt::<'static, 0>::steal() }.raise(),
+            Cpu::AppCpu => unsafe { SoftwareInterrupt::<'static, 1>::steal() }.raise(),
+        }
+
+        // It takes a bit for the software interrupt to be serviced.
+        unsafe {
+            core::arch::asm!("nop");
+            core::arch::asm!("nop");
+            core::arch::asm!("nop");
+            core::arch::asm!("nop");
+        }
+    }
 }
 
 #[cfg(multi_core)]
-#[esp_hal::handler]
 #[ram]
-fn cross_core_yield_handler() {
-    use esp_hal::system::Cpu;
+extern "C" fn cross_core_yield_handler(context: &mut CpuContext) {
     match Cpu::current() {
         Cpu::ProCpu => unsafe { SoftwareInterrupt::<'static, 0>::steal() }.reset(),
         Cpu::AppCpu => unsafe { SoftwareInterrupt::<'static, 1>::steal() }.reset(),
     }
 
-    yield_task();
+    trigger_task_switch(context);
+}
+
+// Having this function separate ensures there is a single un-inlined copy of the task switch logic
+// living in RAM. `ram` is conditional to ensure the function is inlined on ESP32 and S2.
+#[cfg_attr(esp32s3, ram)]
+fn trigger_task_switch(context: &mut CpuContext) {
+    SCHEDULER.with(|scheduler| scheduler.switch_task(context));
 }

@@ -427,13 +427,13 @@ macro_rules! implement_peripheral_clocks {
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! memory_range {
     ("DRAM") => {
-        1070202880..1070465024
+        0x3FCA0000..0x3FCE0000
     };
     (size as str, "DRAM") => {
         "262144"
     };
     ("DRAM2_UNINIT") => {
-        1070393344..1070459760
+        0x3FCCE800..0x3FCDEB70
     };
     (size as str, "DRAM2_UNINIT") => {
         "66416"

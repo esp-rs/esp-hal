@@ -269,7 +269,7 @@ impl PeripheralDef {
     }
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 struct Device {
     name: String,
     arch: Arch,
@@ -290,9 +290,12 @@ struct Device {
 fn number(n: impl std::fmt::Display) -> TokenStream {
     TokenStream::from_str(&format!("{n}")).unwrap()
 }
+fn number_hex(n: impl std::fmt::Display + std::fmt::UpperHex) -> TokenStream {
+    TokenStream::from_str(&format!("{n:#X}")).unwrap()
+}
 
 /// Device configuration file format.
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct Config {
     device: Device,
     #[serde(skip)]
@@ -713,6 +716,17 @@ pub fn generate_build_script_utils() -> TokenStream {
         let arch = config.device.arch.to_string();
         let target = config.device.target.as_str();
         let cfgs = config.list_of_cfgs();
+        let soc_config = config.device.peri_config.soc.as_ref().unwrap();
+        let memory_regions = soc_config.memory_map.ranges.iter().map(|r| {
+            let name = r.name.as_str();
+            let start = number_hex(r.range.start);
+            let end = number_hex(r.range.end);
+            quote! {
+                (#name, MemoryRegion {
+                    address_range: #start .. #end,
+                })
+            }
+        });
         quote! {
             Config {
                 architecture: #arch,
@@ -723,6 +737,11 @@ pub fn generate_build_script_utils() -> TokenStream {
                 cfgs: &[
                     #(#cfgs,)*
                 ],
+                memory_layout: &MemoryLayout {
+                    regions: &[
+                        #(#memory_regions,)*
+                    ],
+                },
             }
         }
     });
@@ -731,7 +750,13 @@ pub fn generate_build_script_utils() -> TokenStream {
         "Expected exactly one of the following features to be enabled: {all_chip_features}"
     );
 
+    let from_str_err = format!("Unknown chip {{s}}. Possible options: {all_chip_features}");
+
     quote! {
+        use core::ops::Range;
+
+        extern crate alloc;
+
         // make it possible to build documentation without `std`.
         #[cfg(docsrs)]
         macro_rules! println {
@@ -745,12 +770,12 @@ pub fn generate_build_script_utils() -> TokenStream {
         }
 
         impl core::str::FromStr for Chip {
-            type Err = ();
+            type Err = alloc::string::String;
 
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 match s {
                     #( #name => Ok(Self::#chip),)*
-                    _ => Err(()),
+                    _ => Err(alloc::format!(#from_str_err)),
                 }
             }
         }
@@ -832,6 +857,11 @@ pub fn generate_build_script_utils() -> TokenStream {
                 self.config().symbols
             }
 
+            /// Returns memory layout information.
+            pub fn memory_layout(&self) -> &'static MemoryLayout {
+                self.config().memory_layout
+            }
+
             /// Returns an iterator over all chips.
             ///
             /// ## Example
@@ -852,11 +882,41 @@ pub fn generate_build_script_utils() -> TokenStream {
             }
         }
 
+        /// Information about a memory region.
+        pub struct MemoryRegion {
+            address_range: Range<u32>,
+        }
+
+        impl MemoryRegion {
+            /// Returns the address range of the memory region.
+            pub fn range(&self) -> Range<u32> {
+                self.address_range.clone()
+            }
+
+            /// Returns the size of the memory region in bytes.
+            pub fn size(&self) -> u32 {
+                self.address_range.end - self.address_range.start
+            }
+        }
+
+        /// Information about the memory layout of a chip.
+        pub struct MemoryLayout {
+            regions: &'static [(&'static str, MemoryRegion)],
+        }
+
+        impl MemoryLayout {
+            /// Returns the memory region with the given name.
+            pub fn region(&self, name: &str) -> Option<&'static MemoryRegion> {
+                self.regions.iter().find_map(|(n, r)| if *n == name { Some(r) } else { None })
+            }
+        }
+
         struct Config {
             architecture: &'static str,
             target: &'static str,
             symbols: &'static [&'static str],
             cfgs: &'static [&'static str],
+            memory_layout: &'static MemoryLayout,
         }
 
         impl Config {

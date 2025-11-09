@@ -287,7 +287,6 @@ unsafe extern "C" {
 
 /// Antenna Selection
 #[derive(Default, Clone, Copy, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Antenna {
     /// Use Antenna 0
@@ -299,7 +298,6 @@ pub enum Antenna {
 
 /// Transmission Power Level
 #[derive(Default, Clone, Copy, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum TxPower {
     /// -15 dBm
@@ -372,7 +370,6 @@ impl TxPower {
 
 /// BLE CCA mode.
 #[derive(Default, Clone, Copy, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum CcaMode {
     /// Disabled
@@ -386,7 +383,6 @@ pub enum CcaMode {
 
 /// Bluetooth controller configuration.
 #[derive(BuilderLite, Clone, Copy, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
     /// The priority of the RTOS task.

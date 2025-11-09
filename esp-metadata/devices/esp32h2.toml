@@ -118,7 +118,7 @@ memory_map = { ranges = [
     { name = "dram2_uninit", start = 0x4083_EFD0, end = 0x4084_FEE0 },
 ] }
 
-peripheral_clocks = { templates = [
+clocks = { peripheral_clocks = { templates = [
     # templates
     { name = "default_clk_en_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
     { name = "clk_en_template", value = "{{default_clk_en_template}}" }, # Indirection allows appending to the template for TWAI
@@ -169,7 +169,7 @@ peripheral_clocks = { templates = [
     #{ name = "Timeout" },
     
     # Radio clocks not modeled here.
-] }
+] } }
 
 [device.adc]
 support_status = "partial"

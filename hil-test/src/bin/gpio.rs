@@ -137,17 +137,12 @@ mod tests {
 
         #[cfg(feature = "unstable")]
         {
-            #[cfg(riscv)]
             let sw_int = esp_hal::interrupt::software::SoftwareInterruptControl::new(
                 peripherals.SW_INTERRUPT,
             );
             // Timers are unstable
             let timg0 = TimerGroup::new(peripherals.TIMG0);
-            esp_rtos::start(
-                timg0.timer0,
-                #[cfg(riscv)]
-                sw_int.software_interrupt0,
-            );
+            esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
         }
 
         Context {
@@ -582,8 +577,6 @@ mod tests {
 
         esp_rtos::start_second_core(
             unsafe { CPU_CTRL::steal() },
-            #[cfg(xtensa)]
-            sw_int.software_interrupt0,
             sw_int.software_interrupt1,
             app_core_stack,
             move || {

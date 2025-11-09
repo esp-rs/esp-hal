@@ -12,12 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `phy_calibration_data` and `set_phy_calibration_data` are now marked as `unstable`. (#4463)
 
 ### Fixed
 
+- Avoid panicking in WiFi scan if an access point with using an unmapped auth-method is found (#4458)
 
 ### Removed
 
+- The `serde` feature has been removed (#4435)
 
 ## [v0.17.0] - 2025-10-30
 

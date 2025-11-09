@@ -69,9 +69,9 @@
     doc = "By default the power-saving mode is [`PowerSaveMode::None`](crate::wifi::PowerSaveMode::None) and `ESP_PHY_CONFIG_PHY_ENABLE_USB` is enabled by default."
 )]
 //! In addition pay attention to these configuration keys:
-//! - `ESP_RADIO_RX_QUEUE_SIZE`
-//! - `ESP_RADIO_TX_QUEUE_SIZE`
-//! - `ESP_RADIO_MAX_BURST_SIZE`
+//! - `ESP_RADIO_CONFIG_RX_QUEUE_SIZE`
+//! - `ESP_RADIO_CONFIG_TX_QUEUE_SIZE`
+//! - `ESP_RADIO_CONFIG_MAX_BURST_SIZE`
 #![cfg_attr(
     multi_core,
     doc = concat!(
@@ -138,7 +138,6 @@ mod fmt;
 
 use core::marker::PhantomData;
 
-pub use common_adapter::{phy_calibration_data, set_phy_calibration_data};
 use esp_hal::{
     self as hal,
 
@@ -155,6 +154,7 @@ use hal::{
     clock::{Clocks, init_radio_clocks},
     time::Rate,
 };
+use sys::include::esp_phy_calibration_data_t;
 
 pub(crate) mod sys {
     #[cfg(esp32)]
@@ -293,20 +293,12 @@ impl Drop for Controller<'_> {
 ///
 /// ```rust, no_run
 /// # {before_snippet}
-/// use esp_hal::timer::timg::TimerGroup;
+/// use esp_hal::{interrupt::software::SoftwareInterruptControl, timer::timg::TimerGroup};
+///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
-#[doc = ""]
-#[cfg_attr(
-    riscv,
-    doc = r#"
- // On RISC-V chips, we need to hand over Software Interrupt 0 to the scheduler.
- use esp_hal::interrupt::software::SoftwareInterruptControl;
- let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
- esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
-"#
-)]
-#[cfg_attr(xtensa, doc = " esp_rtos::start(timg0.timer0);")]
-#[doc = ""]
+/// let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+/// esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
+///
 /// // You can now start esp-radio:
 /// let esp_radio_controller = esp_radio::init().unwrap();
 /// # {after_snippet}
@@ -433,4 +425,26 @@ pub fn wifi_set_log_verbose() {
 
         esp_wifi_internal_set_log_level(wifi_log_level_t_WIFI_LOG_VERBOSE);
     }
+}
+
+/// Get calibration data.
+///
+/// Returns the last calibration result.
+///
+/// If you see the data is different than what was persisted before, consider persisting the new
+/// data.
+#[instability::unstable]
+pub fn phy_calibration_data(data: &mut [u8; esp_phy::PHY_CALIBRATION_DATA_LENGTH]) {
+    // FIXME: return an error to the user.
+    let _ = esp_phy::backup_phy_calibration_data(data);
+}
+
+/// Set calibration data.
+///
+/// This will be used next time the phy gets initialized.
+#[instability::unstable]
+pub fn set_phy_calibration_data(data: &[u8; core::mem::size_of::<esp_phy_calibration_data_t>()]) {
+    // Although we're ignoring the result here, this doesn't change the behavior, as this just
+    // doesn't do anything in case an error is returned.
+    let _ = esp_phy::set_phy_calibration_data(data);
 }

@@ -296,8 +296,8 @@ pub(crate) fn setup_multitasking<const IRQ: u8>(mut irq: SoftwareInterrupt<'stat
     // Register the interrupt handler without nesting to satisfy the requirements of the task
     // switching code
     let swint_handler = esp_hal::interrupt::InterruptHandler::new_not_nested(
-        unsafe { core::mem::transmute::<*const (), extern "C" fn()>(swint_handler as *const ()) },
-        esp_hal::interrupt::Priority::Priority1,
+        swint_handler,
+        esp_hal::interrupt::Priority::min(),
     );
 
     irq.set_interrupt_handler(swint_handler);

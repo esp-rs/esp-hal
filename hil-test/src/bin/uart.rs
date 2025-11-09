@@ -431,11 +431,7 @@ mod async_tests {
         let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_int.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
         Context {
             interrupt: sw_int.software_interrupt1,
@@ -525,10 +521,9 @@ mod async_tx_rx {
     };
     use embassy_time::{Duration, Timer};
     use embedded_io_async::Write;
-    #[cfg(riscv)]
-    use esp_hal::interrupt::software::SoftwareInterruptControl;
     use esp_hal::{
         Async,
+        interrupt::software::SoftwareInterruptControl,
         timer::timg::TimerGroup,
         uart::{self, RxConfig, RxError, UartRx, UartTx},
     };
@@ -543,14 +538,9 @@ mod async_tx_rx {
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
-        #[cfg(riscv)]
         let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_int.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
         let tx = UartTx::new(peripherals.UART0, uart::Config::default())
             .unwrap()
@@ -788,11 +778,10 @@ mod async_tx_rx {
 #[cfg(not(any(esp32, esp32c2, esp32s2)))]
 #[embedded_test::tests(default_timeout = 5, executor = hil_test::Executor::new())]
 mod uhci {
-    #[cfg(riscv)]
-    use esp_hal::interrupt::software::SoftwareInterruptControl;
     use esp_hal::{
         dma::{DmaRxBuf, DmaTxBuf},
         dma_buffers,
+        interrupt::software::SoftwareInterruptControl,
         peripherals::Peripherals,
         timer::timg::TimerGroup,
         uart::{self, Uart, uhci::Uhci},
@@ -833,15 +822,10 @@ mod uhci {
 
     #[test]
     fn test_send_receive(ctx: Context) {
-        #[cfg(riscv)]
         let sw_int = SoftwareInterruptControl::new(ctx.peripherals.SW_INTERRUPT);
 
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_int.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
         let (rx, tx) = hil_test::common_test_pins!(ctx.peripherals);
         let uart = Uart::new(ctx.peripherals.UART0, uart::Config::default())
@@ -897,15 +881,10 @@ mod uhci {
 
     #[test]
     fn test_long_strings(ctx: Context) {
-        #[cfg(riscv)]
         let sw_int = SoftwareInterruptControl::new(ctx.peripherals.SW_INTERRUPT);
 
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_int.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
         let (rx, tx) = hil_test::common_test_pins!(ctx.peripherals);
         let uart = Uart::new(ctx.peripherals.UART0, uart::Config::default())
@@ -961,15 +940,10 @@ mod uhci {
 
     #[test]
     async fn test_send_receive_async(ctx: Context) {
-        #[cfg(riscv)]
         let sw_int = SoftwareInterruptControl::new(ctx.peripherals.SW_INTERRUPT);
 
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_int.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
         let (rx, tx) = hil_test::common_test_pins!(ctx.peripherals);
         let uart = Uart::new(ctx.peripherals.UART0, uart::Config::default())
@@ -1027,15 +1001,10 @@ mod uhci {
 
     #[test]
     async fn test_long_strings_async(ctx: Context) {
-        #[cfg(riscv)]
         let sw_int = SoftwareInterruptControl::new(ctx.peripherals.SW_INTERRUPT);
 
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_int.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
         let (rx, tx) = hil_test::common_test_pins!(ctx.peripherals);
         let uart = Uart::new(ctx.peripherals.UART0, uart::Config::default())

@@ -7,6 +7,7 @@ use allocator_api2::boxed::Box;
 use embassy_sync::blocking_mutex::Mutex;
 use esp_hal::{system::Cpu, time::Instant};
 use esp_sync::RawMutex;
+use macros::ram;
 
 #[cfg(feature = "alloc")]
 use crate::InternalMemory;
@@ -220,7 +221,7 @@ impl SchedulerState {
         let mut arm_next_timeslice_tick = false;
         let next_task = self.run_queue.pop();
         if next_task != current_task {
-            trace!("Switching task {:?} -> {:?}", current_task, next_task);
+            debug!("Switching task {:?} -> {:?}", current_task, next_task);
 
             // If the current task is deleted, we can skip saving its context. We signal this by
             // using a null pointer.
@@ -362,7 +363,7 @@ impl SchedulerState {
         timer_queue.schedule_wakeup(task, at)
     }
 
-    #[esp_hal::ram]
+    #[ram]
     pub(crate) fn resume_task(&mut self, task: TaskPtr) {
         let timer_queue = unwrap!(self.time_driver.as_mut());
         timer_queue.timer_queue.remove(task);

@@ -79,7 +79,6 @@ embedded-io-06 = { package = "embedded-io", version = "0.6", default-features = 
 embedded-io-async-06 = { package = "embedded-io-async", version = "0.6", default-features = false, optional = true }
 embedded-io-07 = { package = "embedded-io", version = "0.7", default-features = false, optional = true }
 embedded-io-async-07 = { package = "embedded-io-async", version = "0.7", default-features = false, optional = true }
-serde = { version = "1.0.218", default-features = false, features = ["derive"], optional = true }
 smoltcp = { version = "0.12.0", default-features = false, features = [
   "medium-ethernet",
   "socket-raw",
@@ -192,39 +191,52 @@ esp32s3 = [
 
 #! ### Wireless Feature Flags
 
-## Enable Wi-Fi support
+## Enable Wi-Fi support.
 wifi = ["dep:enumset", "dep:embassy-net-driver"]
 
-## Enable Wi-Fi Enterprise Authentication Protocol (EAP) support
+## Enable Wi-Fi Enterprise Authentication Protocol (EAP) support.
+##
+## ⚠️ This feature is considered unstable.
 wifi-eap = ["wifi"]
 
-## Enable ESP-NOW support
+## Enable ESP-NOW support.
+##
+## ⚠️ This feature is considered unstable.
 esp-now = ["wifi"]
 
-## Enable sniffer mode support for Wi-Fi
+## Enable sniffer mode support for Wi-Fi.
+##
+## ⚠️ This feature is considered unstable.
 sniffer = ["wifi"]
 
-## Enable BLE support
+## Enable BLE support.
+##
+## ⚠️ This feature is considered unstable.
 ble = ["esp-hal/__bluetooth", "dep:bt-hci"]
 
 ## Software controls Wi-Fi/Bluetooth coexistence.
-## See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/kconfig-reference.html#config-esp-coex-sw-coexist-enable) for details
+## See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/kconfig-reference.html#config-esp-coex-sw-coexist-enable) for details.
+##
+## ⚠️ This feature is considered unstable.
 coex = []
 
-## Enable Wi-Fi channel state information. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv4N18wifi_init_config_t10csi_enableE),
+## Enable Wi-Fi channel state information. See [Wi-Fi Driver](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/wifi.html#wi-fi-channel-state-information).
+##
+## ⚠️ This feature is considered unstable.
 csi = []
 
 ## Enable IEEE 802.15.4.
 ## Cannot be used together with Wi-Fi.
+##
+## ⚠️ This feature is considered unstable.
 ieee802154 = ["dep:byte", "dep:ieee802154"]
 
 #! ### Ecosystem Feature Flags
 
-## Provide implementations of smoltcp traits
+## Provide implementations of smoltcp traits.
+##
+## ⚠️ This feature is considered unstable.
 smoltcp = ["dep:smoltcp"]
-
-## Implement serde Serialize / Deserialize
-serde = ["dep:serde", "enumset?/serde"]
 
 #! ### Logging Feature Flags
 ## Enable logging output using version 0.4 of the `log` crate.
@@ -263,6 +275,9 @@ defmt = [
 #! ### Unstable APIs
 #! Unstable APIs are drivers and features that are not yet ready for general use.
 #! They may be incomplete, have bugs, or be subject to change without notice.
+
+## Enables APIs that are not stable and thus come with no stability guarantees.
+## Never enable this feature in a library crate using esp-radio.
 unstable = [
   "dep:embedded-io-06",
   "dep:embedded-io-async-06",
@@ -282,13 +297,13 @@ __docs_build = []
 
 [package.metadata.docs.rs]
 features = [
-  "esp32c3",
+  "esp32c6",
   "wifi",
   "ble",
   "coex",
   "esp-hal/default",
 ]
-default-target = "riscv32imc-unknown-none-elf"
+default-target = "riscv32imac-unknown-none-elf"
 
 # `esp-alloc` and `xtensa-lx-rt` are hidden behind features so `cargo machete` incorrectly marks it as unused.
 [package.metadata.cargo-machete]

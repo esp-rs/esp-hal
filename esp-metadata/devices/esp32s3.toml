@@ -120,7 +120,7 @@ memory_map = { ranges = [
     { name = "dram2_uninit", start = 0x3FCD_B700, end = 0x3FCE_D710 },
 ] }
 
-peripheral_clocks = { templates = [
+clocks = { peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
     { name = "rst_template", value = "{{control}}::regs().{{rst_register}}().modify(|_, w| w.{{rst_field}}().bit(reset));" },
@@ -170,7 +170,7 @@ peripheral_clocks = { templates = [
     #{ name = "Timers" },
     
     # Radio clocks not modeled here.
-] }
+] } }
 
 [device.adc]
 support_status = "partial"

@@ -14,12 +14,11 @@ use alloc::{boxed::Box, string::ToString};
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer, WithTimeout};
 use esp_backtrace as _;
-#[cfg(target_arch = "riscv32")]
-use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::{
     Config as EspConfig,
     clock::CpuClock,
     init as initialize_esp_hal,
+    interrupt::software::SoftwareInterruptControl,
     ram,
     timer::timg::TimerGroup,
 };
@@ -39,14 +38,9 @@ async fn main(_spawner: Spawner) {
     esp_alloc::heap_allocator!(size: 32 * 1024);
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
 
-    #[cfg(target_arch = "riscv32")]
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(
-        timg0.timer0,
-        #[cfg(target_arch = "riscv32")]
-        sw_int.software_interrupt0,
-    );
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let esp_wifi_ctrl = Box::leak(Box::new(esp_radio::init().unwrap()));
     let (mut controller, _interfaces) = esp_radio::wifi::new(

@@ -114,14 +114,9 @@ mod tests {
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
-        #[cfg(riscv)]
         let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_int.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
         let counter = drive_pins(gpio1, gpio2).await;
 
@@ -137,14 +132,9 @@ mod tests {
         io.set_interrupt_handler(interrupt_handler);
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
-        #[cfg(riscv)]
         let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_int.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
         let counter = drive_pins(gpio1, gpio2).await;
 
@@ -166,11 +156,7 @@ mod tests {
 
         let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(
-            timg0.timer0,
-            #[cfg(riscv)]
-            sw_int.software_interrupt0,
-        );
+        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
         let interrupt_executor = mk_static!(
             InterruptExecutor<1>,
