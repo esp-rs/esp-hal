@@ -165,6 +165,11 @@ impl Cmd53 {
         }
     }
 
+    /// Gets the [Cmd53] byte slice.
+    pub const fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
     /// Converts the [Cmd53] into a byte array.
     pub const fn into_bytes(self) -> [u8; Self::LEN] {
         self.0

@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 
+use embedded_hal_sdmmc::Common;
 use esp_backtrace as _;
 use esp_hal::{
     dma::{DescriptorFlagFields, Owner},
@@ -89,13 +90,15 @@ impl Context {
 
         let config = Config::new().with_spi_mode(SpiMode::_2);
 
-        let sdio = Sdio::new(
+        let mut sdio = Sdio::new(
             peripherals.SLC,
             peripherals.SLCHOST,
             peripherals.HINF,
             pins,
             config,
         );
+
+        sdio.init().ok();
 
         Self { sdio }
     }

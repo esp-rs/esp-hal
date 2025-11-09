@@ -218,10 +218,23 @@ impl<'d> Sdio<'d> {
 
     /// Performs final low-level HAL hardware initialization.
     pub(crate) fn hardware_init(&mut self) -> Result<(), Error> {
+        self.clock_init()?;
         self.pac_init()?;
         self.pac_enable_hs()?;
         self.pac_set_timing()?;
         self.pac_dev_interrupt_enable(enumset::EnumSet::all())
+    }
+
+    /// Enables the peripheral clock.
+    fn clock_init(&self) -> Result<(), Error> {
+        crate::peripherals::SYSTEM::regs()
+            .sdio_slave_conf()
+            .modify(|_, w| {
+                w.sdio_slave_rst_en().bit(true);
+                w.sdio_slave_clk_en().bit(true)
+            });
+
+        Ok(())
     }
 
     /// Performs low-level initialization of the SDIO peripheral.
@@ -643,6 +656,7 @@ impl Common for Sdio<'_> {
     fn init(&mut self) -> Result<(), Error> {
         // This implementation is based on the `esp-idf` driver:
         // <https://github.com/espressif/esp-idf/blob/release/v5.5/components/esp_driver_sdio/src/sdio_slave.c#L299>
+
         self.hardware_init()?;
 
         self.state_transition(State::Standby)
