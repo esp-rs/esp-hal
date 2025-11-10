@@ -654,7 +654,7 @@ pub enum WifiError {
     /// Out of memory
     OutOfMemory,
 
-    /// Wi-Fi driver was not installed by [esp_wifi_init](crate::sys::include::esp_wifi_init)
+    /// Wi-Fi driver was not installed by [esp_wifi_init]
     NotInitialized,
 
     /// Wi-Fi driver was not started by [esp_wifi_start]
