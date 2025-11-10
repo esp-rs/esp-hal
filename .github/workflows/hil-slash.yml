@@ -5,13 +5,13 @@ on:
     types: [created, edited]
 
 permissions:
-  actions: write        # to dispatch the HIL workflow
-  pull-requests: write  # to post a confirmation/help comment
+  actions: write
+  pull-requests: write
   contents: read
 
 jobs:
   hil-quick:
-    # PR comment, correct role, and explicitly '/hil quick'
+    # check every PR comment, check correct role, and explicitly look for '/hil quick'
     if: ${{ github.event.issue.pull_request && ( github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'OWNER' ) && startsWith(github.event.comment.body, '/hil quick') }}
     runs-on: ubuntu-latest
     steps:
@@ -23,7 +23,6 @@ jobs:
           inputs: |
             {
               "repository": "${{ github.repository }}",
-              "ref_sha": "",
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
               "matrix": "quick"
             }
@@ -37,7 +36,7 @@ jobs:
             #${{ github.event.issue.number }}
 
   hil-full:
-    # PR comment, correct role, and explicitly '/hil full'
+    # check every PR comment, check correct role, and explicitly look for '/hil full'
     if: ${{ github.event.issue.pull_request && ( github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'OWNER' ) && startsWith(github.event.comment.body, '/hil full') }}
     runs-on: ubuntu-latest
     steps:
@@ -49,7 +48,6 @@ jobs:
           inputs: |
             {
               "repository": "${{ github.repository }}",
-              "ref_sha": "",
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
               "matrix": "full"
             }

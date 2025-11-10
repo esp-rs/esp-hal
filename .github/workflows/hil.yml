@@ -9,11 +9,6 @@ on:
         description: "Owner and repository to test"
         required: true
         default: "esp-rs/esp-hal"
-      # checking out a specific commit when dispatched
-      ref_sha:
-        description: "Commit SHA to checkout (preferred, if provided)"
-        required: false
-        default: ""
       branch:
         description: "Branch, tag or SHA to checkout."
         required: true
@@ -50,7 +45,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         with:
           repository: ${{ github.event.inputs.repository }}
-          ref: ${{ github.event.inputs.ref_sha != '' && github.event.inputs.ref_sha || github.event.inputs.branch }}
+          ref: ${{ github.event.inputs.branch }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
@@ -118,7 +113,6 @@ jobs:
         with:
           event_name: ${{ github.event_name }}
           repository: ${{ github.event.inputs.repository || github.repository }}
-          ref_sha: ${{ github.event.inputs.ref_sha }}
           branch: ${{ github.event.inputs.branch || 'main' }}
           soc: ${{ matrix.target.soc }}
           rust_target: ${{ matrix.target.rust-target }}
@@ -143,7 +137,6 @@ jobs:
         with:
           event_name: ${{ github.event_name }}
           repository: ${{ github.event.inputs.repository || github.repository }}
-          ref_sha: ${{ github.event.inputs.ref_sha }}
           branch: ${{ github.event.inputs.branch || 'main' }}
           soc: ${{ matrix.target.soc }}
           rust_target: ${{ matrix.target.rust-target }}
