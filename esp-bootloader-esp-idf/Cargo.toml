@@ -86,4 +86,9 @@ esp32s3   = ["esp-rom-sys/esp32s3", "esp-metadata-generated/esp32s3", "esp-hal/e
 
 # "md-5" is hidden behind `std` feature and `cargo machete` incorrectly marks it as unused.
 [package.metadata.cargo-machete]
-ignored = ["md-5"]
+ignored = ["md-5", "esp-hal-procmacros"]
+
+[lints.rust]
+# Starting with 1.85.0, the test cfg is considered to be a "userspace" config despite being also set by rustc and should be managed by the build system itself.
+# CI started to fail with rustc 1.92.0-nightly (f04e3dfc8 2025-10-19), https://github.com/esp-rs/esp-hal/pull/4386#issuecomment-3491320175 
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(test)'] }

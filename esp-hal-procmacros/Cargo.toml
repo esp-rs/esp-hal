@@ -52,3 +52,8 @@ is-ulp-core = []
 
 # Enables `ram(reclaimed)`
 __esp_idf_bootloader = []
+
+[lints.rust]
+# Starting with 1.85.0, the test cfg is considered to be a "userspace" config despite being also set by rustc and should be managed by the build system itself.
+# CI started to fail with rustc 1.92.0-nightly (f04e3dfc8 2025-10-19), https://github.com/esp-rs/esp-hal/pull/4386#issuecomment-3491320175 
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(test)'] }

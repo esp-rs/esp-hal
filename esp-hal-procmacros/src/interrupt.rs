@@ -138,10 +138,10 @@ pub fn check_attr_whitelist(
     ];
 
     'o: for attr in attrs {
-        if let Some(attr_name) = get_attr_name(attr) {
-            if whitelist.contains(&attr_name.as_str()) {
-                continue 'o;
-            }
+        if let Some(attr_name) = get_attr_name(attr)
+            && whitelist.contains(&attr_name.as_str())
+        {
+            continue 'o;
         }
 
         let err_str = match caller {
