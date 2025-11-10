@@ -1363,7 +1363,7 @@ pub enum WifiError {
     /// Wi-Fi is in sleep state (RF closed) and wakeup failed
     WakeFailed,
 
-    /// The caller would block
+    /// The operation would block
     WouldBlock,
 
     /// Station still in disconnect status
@@ -1440,7 +1440,7 @@ impl core::fmt::Display for WifiError {
             ),
             WifiError::OutOfMemory => write!(f, "Out of memory."),
             WifiError::NotStarted => write!(f, "Wi-Fi driver was not started."),
-            WifiError::NotStopped => write!(f, " Wi-Fi driver was not stopped."),
+            WifiError::NotStopped => write!(f, "Wi-Fi driver was not stopped."),
             WifiError::Interface => write!(f, "Wi-Fi interface error."),
             WifiError::Mode => write!(f, "Wi-Fi mode error."),
             WifiError::State => write!(f, "Wi-Fi internal state error."),
@@ -1456,7 +1456,7 @@ impl core::fmt::Display for WifiError {
             WifiError::WakeFailed => {
                 write!(f, "Wi-Fi is in sleep state (RF closed) and wakeup failed.")
             }
-            WifiError::WouldBlock => write!(f, " The caller would block."),
+            WifiError::WouldBlock => write!(f, "The operation would block."),
             WifiError::NotConnected => write!(f, "Station still in disconnect status."),
             WifiError::PostFail => write!(f, "Failed to post the event to Wi-Fi task."),
             WifiError::InvalidInitState => {
