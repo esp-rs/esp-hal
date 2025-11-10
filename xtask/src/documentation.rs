@@ -12,7 +12,7 @@ use minijinja::Value;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::{Chip, Package, cargo::CargoArgsBuilder};
+use crate::{Chip, Package, cargo::CargoArgsBuilder, windows_safe_path};
 
 // ----------------------------------------------------------------------------
 // Build Documentation
@@ -179,6 +179,31 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     let package_name = package.to_string();
     let package_path = crate::windows_safe_path(&workspace.join(&package_name));
 
+    // Process Cargo.toml for documentation
+    let pre_process_res = pre_process_cargo_toml(chip, &package_path);
+
+    if pre_process_res.is_ok() {
+        let cargo_doc_res = cargo_doc_without_pre_processing(workspace, package, chip);
+
+        // Restore the original Cargo.toml
+        restore_cargo_toml(package_path)?;
+        cargo_doc_res
+    } else {
+        // Restore the original Cargo.toml
+        restore_cargo_toml(package_path)?;
+        Err(pre_process_res.err().unwrap())
+    }
+}
+
+fn cargo_doc_without_pre_processing(
+    workspace: &Path,
+    package: Package,
+    chip: Option<Chip>,
+) -> Result<PathBuf> {
+    let package_name = package.to_string();
+    let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+
+    // build documentation using the pre-processed Cargo.toml
     if let Some(chip) = chip {
         log::info!("Building '{package_name}' documentation targeting '{chip}'");
     } else {
@@ -257,6 +282,111 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     docs_path = docs_path.join("doc");
 
     Ok(crate::windows_safe_path(&docs_path))
+}
+
+/// Pre-process the Cargo.toml file
+///
+/// This will keep the orignal as "Cargo.toml_original"
+///
+/// This will check for `#DOC_IF <condition>` lines - evaluating the condition to false will turn
+/// any documenting comments into non-documenting comments until a `#DOC_ENDIF` line is encountered.
+///
+/// The only currently supported function for expressions is `has(<SYMBOL>)`
+/// e.g. `has("psram")`
+fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &PathBuf) -> Result<(), anyhow::Error> {
+    let cargo_toml = std::fs::read_to_string(windows_safe_path(&package_path.join("Cargo.toml")))
+        .with_context(|| {
+        format!(
+            "Failed to read {}",
+            package_path.join("Cargo.toml").display()
+        )
+    })?;
+
+    std::fs::rename(
+        windows_safe_path(&package_path.join("Cargo.toml")),
+        windows_safe_path(&package_path.join("Cargo.toml_original")),
+    )
+    .with_context(|| {
+        format!(
+            "Failed to rename {}",
+            package_path.join("Cargo.toml").display()
+        )
+    })?;
+
+    let cargo_toml = cargo_toml.lines();
+
+    let chip_cfg = if let Some(chip) = &chip {
+        Some(Config::for_chip(chip))
+    } else {
+        None
+    };
+    let mut processed_cargo_toml = Vec::new();
+    let mut engine = somni_expr::Context::new();
+    engine.add_function("has", move |cond: &str| -> bool {
+        if let Some(chip_cfg) = chip_cfg {
+            chip_cfg.all().iter().any(|symbol| cond == symbol)
+        } else {
+            false
+        }
+    });
+
+    let mut hide = false;
+    for line in cargo_toml {
+        let mut line = line.to_string();
+
+        if line.starts_with("#DOC_ENDIF") {
+            hide = false;
+            continue;
+        }
+
+        if line.starts_with("#DOC_IF ") {
+            let expr = line.strip_prefix("#DOC_IF ").unwrap();
+            hide = !(engine
+                .evaluate::<bool>(expr)
+                .map_err(|err| anyhow::anyhow!(format!("{:?}", err)))
+                .with_context(|| format!("Error evaluating expression in Cargo.toml: {}", expr))?);
+            continue;
+        }
+
+        if hide {
+            if line.starts_with("#!") {
+                line = format!("#{}", line.strip_prefix("#!").unwrap_or_default());
+            } else if line.starts_with("##") {
+                line = format!("#{}", line.strip_prefix("##").unwrap_or_default());
+            }
+        }
+
+        processed_cargo_toml.push(line);
+    }
+
+    std::fs::write(
+        windows_safe_path(&package_path.join("Cargo.toml")),
+        processed_cargo_toml.join("\n"),
+    )
+    .with_context(|| {
+        format!(
+            "Failed to write pre-processed {}",
+            package_path.join("Cargo.toml").display()
+        )
+    })?;
+
+    Ok(())
+}
+
+/// Restore the original Cargo.toml file
+fn restore_cargo_toml(package_path: PathBuf) -> Result<(), anyhow::Error> {
+    if std::fs::exists(windows_safe_path(&package_path.join("Cargo.toml_original")))? {
+        if std::fs::exists(windows_safe_path(&package_path.join("Cargo.toml")))? {
+            std::fs::remove_file(windows_safe_path(&package_path.join("Cargo.toml")))?;
+        }
+
+        std::fs::rename(
+            windows_safe_path(&package_path.join("Cargo.toml_original")),
+            windows_safe_path(&package_path.join("Cargo.toml")),
+        )?;
+    }
+
+    Ok(())
 }
 
 #[cfg(feature = "deploy-docs")]
