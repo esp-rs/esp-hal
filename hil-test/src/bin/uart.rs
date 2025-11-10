@@ -14,6 +14,7 @@ mod tests {
         Blocking,
         delay::Delay,
         gpio::{AnyPin, Pin},
+        time::Duration,
         uart::{self, ClockSource, Uart},
     };
 
@@ -237,6 +238,137 @@ mod tests {
         embedded_io::Read::read_exact(&mut rx, &mut buf).unwrap();
 
         assert_eq!(buf, bytes);
+    }
+
+    #[test]
+    fn test_break_detection(ctx: Context) {
+        let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
+        let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
+
+        rx.enable_break_detection();
+        tx.send_break(100);
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
+    }
+
+    #[test]
+    fn test_break_detection_no_break(ctx: Context) {
+        let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
+
+        assert!(!rx.wait_for_break_with_timeout(Duration::from_millis(100)));
+    }
+
+    #[test]
+    fn test_break_detection_multiple(ctx: Context) {
+        let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
+        let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
+
+        rx.enable_break_detection();
+        for _ in 0..3 {
+            tx.send_break(100);
+            assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
+        }
+    }
+
+    #[test]
+    fn test_break_detection_interleaved(ctx: Context) {
+        let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
+        let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
+
+        rx.enable_break_detection();
+
+        // Test 1: Send break, expect detection
+        tx.send_break(100);
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
+
+        // Test 2: Don't send break, expect timeout
+        assert!(!rx.wait_for_break_with_timeout(Duration::from_millis(100)));
+
+        // Test 3: Send break again, expect detection
+        tx.send_break(100);
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
+
+        // Test 4: Don't send break, expect timeout again
+        assert!(!rx.wait_for_break_with_timeout(Duration::from_millis(100)));
+
+        // Test 5: Final break detection, expect detection
+        tx.send_break(100);
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
+    }
+
+    #[test]
+    fn test_break_detection_with_data(ctx: Context) {
+        let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
+        let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
+
+        rx.enable_break_detection();
+
+        // Test 1: Send break, expect detection
+        tx.send_break(100);
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
+
+        // Test 2: Send normal data (should not trigger break detection)
+        tx.write(&[0x42, 0x43, 0x44]).unwrap();
+        tx.flush().unwrap();
+        let mut buf = [0u8; 3];
+        rx.read(&mut buf).unwrap();
+        assert_eq!(buf, [0x42, 0x43, 0x44]);
+
+        // Test 3: Verify no false break detection after data
+        assert!(!rx.wait_for_break_with_timeout(Duration::from_millis(100)));
+
+        // Test 4: Send break after data, expect detection
+        tx.send_break(100);
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
+
+        // Test 5: Send more data
+        tx.write(&[0xAA, 0xBB]).unwrap();
+        tx.flush().unwrap();
+        let mut buf = [0u8; 2];
+        rx.read(&mut buf).unwrap();
+        assert_eq!(buf, [0xAA, 0xBB]);
+
+        // Test 6: Don't send break, expect timeout
+        assert!(!rx.wait_for_break_with_timeout(Duration::from_millis(100)));
+
+        // Test 7: Final break detection
+        tx.send_break(100);
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
+    }
+
+    #[test]
+    fn test_break_detection_preserves_data(ctx: Context) {
+        let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
+        let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
+
+        rx.enable_break_detection();
+
+        // Send data, flush to ensure transmission, then send break
+        tx.write(&[0x01, 0x02, 0x03, 0x04]).unwrap();
+        tx.flush().unwrap();
+        tx.send_break(100);
+
+        // Detect the break
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
+
+        // Data should still be intact and readable after break detection
+        let mut buf = [0u8; 4];
+        rx.read(&mut buf).unwrap();
+        assert_eq!(buf, [0x01, 0x02, 0x03, 0x04]);
+
+        // Send more data after break
+        tx.write(&[0xAA, 0xBB, 0xCC]).unwrap();
+        tx.flush().unwrap();
+
+        // Send another break
+        tx.send_break(100);
+
+        // Detect second break
+        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
+
+        // Second batch of data should also be intact
+        let mut buf = [0u8; 3];
+        rx.read(&mut buf).unwrap();
+        assert_eq!(buf, [0xAA, 0xBB, 0xCC]);
     }
 }
 
