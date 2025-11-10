@@ -27,6 +27,7 @@ use crate::{
         TaskListItem,
         TaskPtr,
         TaskState,
+        ThreadLocalData,
     },
     timer::TimeDriver,
 };
@@ -67,8 +68,7 @@ impl CpuSchedulerState {
 
             main_task: Task {
                 cpu_context: CpuContext::new(),
-                #[cfg(feature = "esp-radio")]
-                thread_semaphore: None,
+                thread_local: ThreadLocalData::new(),
                 state: TaskState::Ready,
                 stack: core::ptr::slice_from_raw_parts_mut(core::ptr::null_mut(), 0),
                 #[cfg(any(hw_task_overflow_detection, sw_task_overflow_detection))]

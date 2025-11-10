@@ -44,7 +44,7 @@ macro_rules! before_snippet {
 pub mod rom;
 mod syscall;
 
-pub use syscall::init_syscall_table;
+pub use syscall::{_reent, SYSCALL_TABLE, init_syscall_table};
 
 /// This is needed by `libesp_rom.a` (if used)
 /// Other crates (i.e. esp-radio) also rely on this being defined somewhere
