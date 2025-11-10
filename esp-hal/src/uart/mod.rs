@@ -871,7 +871,7 @@ where
     /// Sends a break signal for a specified duration in bit time.
     ///
     /// Duration is in bits, the time it takes to transfer one bit at the
-    /// current baud rate. The delay during the break is just is busy-waiting.
+    /// current baud rate. The delay during the break is just busy-waiting.
     #[instability::unstable]
     pub fn send_break(&mut self, bits: u32) {
         // Read the current TX inversion state
