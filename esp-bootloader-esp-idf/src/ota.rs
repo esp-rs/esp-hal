@@ -149,7 +149,7 @@ pub struct Ota<'a, F>
 where
     F: embedded_storage::Storage,
 {
-    flash: &'a mut FlashRegion<'a, F>,
+    flash: FlashRegion<'a, F>,
     ota_partition_count: usize,
 }
 
@@ -165,10 +165,7 @@ where
     /// doesn't represent a Data/Ota partition or the size is unexpected.
     ///
     /// [Error::InvalidArgument] if the `ota_partition_count` exceeds the maximum or if it's 0.
-    pub fn new(
-        flash: &'a mut FlashRegion<'a, F>,
-        ota_partition_count: usize,
-    ) -> Result<Ota<'a, F>, Error> {
+    pub fn new(flash: FlashRegion<'a, F>, ota_partition_count: usize) -> Result<Ota<'a, F>, Error> {
         if ota_partition_count == 0 || ota_partition_count > 16 {
             return Err(Error::InvalidArgument);
         }
@@ -432,12 +429,12 @@ mod tests {
             data: [0xff; 0x2000],
         };
 
-        let mut mock_region = FlashRegion {
+        let mock_region = FlashRegion {
             raw: mock_entry,
             flash: &mut mock_flash,
         };
 
-        let mut sut = Ota::new(&mut mock_region, 2).unwrap();
+        let mut sut = Ota::new(mock_region, 2).unwrap();
         assert_eq!(
             sut.current_app_partition().unwrap(),
             AppPartitionSubType::Factory
@@ -482,12 +479,12 @@ mod tests {
         mock_flash.data[0x0000..][..0x20].copy_from_slice(SLOT_COUNT_1_VALID);
         mock_flash.data[0x1000..][..0x20].copy_from_slice(SLOT_INITIAL);
 
-        let mut mock_region = FlashRegion {
+        let mock_region = FlashRegion {
             raw: mock_entry,
             flash: &mut mock_flash,
         };
 
-        let mut sut = Ota::new(&mut mock_region, 2).unwrap();
+        let mut sut = Ota::new(mock_region, 2).unwrap();
         assert_eq!(
             sut.current_app_partition().unwrap(),
             AppPartitionSubType::Ota0
@@ -522,12 +519,12 @@ mod tests {
         mock_flash.data[0x0000..][..0x20].copy_from_slice(SLOT_COUNT_1_VALID);
         mock_flash.data[0x1000..][..0x20].copy_from_slice(SLOT_COUNT_2_NEW);
 
-        let mut mock_region = FlashRegion {
+        let mock_region = FlashRegion {
             raw: mock_entry,
             flash: &mut mock_flash,
         };
 
-        let mut sut = Ota::new(&mut mock_region, 2).unwrap();
+        let mut sut = Ota::new(mock_region, 2).unwrap();
         assert_eq!(
             sut.current_app_partition().unwrap(),
             AppPartitionSubType::Ota1
@@ -560,12 +557,12 @@ mod tests {
             data: [0xff; 0x2000],
         };
 
-        let mut mock_region = FlashRegion {
+        let mock_region = FlashRegion {
             raw: mock_entry,
             flash: &mut mock_flash,
         };
 
-        let mut sut = Ota::new(&mut mock_region, 2).unwrap();
+        let mut sut = Ota::new(mock_region, 2).unwrap();
         assert_eq!(
             sut.current_app_partition().unwrap(),
             AppPartitionSubType::Factory
@@ -626,12 +623,12 @@ mod tests {
             data: [0xff; 0x2000],
         };
 
-        let mut mock_region = FlashRegion {
+        let mock_region = FlashRegion {
             raw: mock_entry,
             flash: &mut mock_flash,
         };
 
-        let mut sut = Ota::new(&mut mock_region, 4).unwrap();
+        let mut sut = Ota::new(mock_region, 4).unwrap();
         assert_eq!(
             sut.current_app_partition().unwrap(),
             AppPartitionSubType::Factory
@@ -711,12 +708,12 @@ mod tests {
             data: [0xff; 0x2000],
         };
 
-        let mut mock_region = FlashRegion {
+        let mock_region = FlashRegion {
             raw: mock_entry,
             flash: &mut mock_flash,
         };
 
-        let mut sut = Ota::new(&mut mock_region, 16).unwrap();
+        let mut sut = Ota::new(mock_region, 16).unwrap();
         assert_eq!(
             sut.current_app_partition().unwrap(),
             AppPartitionSubType::Factory

@@ -9,9 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `OtaUpdater::ota_data()` (#4413)
 
 ### Changed
 
+- `Ota::new()` now takes `FlashRegion` by value (#4413)
 
 ### Fixed
 
