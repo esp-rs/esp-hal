@@ -18,9 +18,7 @@ jobs:
       - name: Dispatch HIL (quick)
         uses: benc-uk/workflow-dispatch@v1
         with:
-          workflow: HIL
-          # run the workflow file from the default(main) branch
-          ref: ${{ github.event.repository.default_branch }}
+          workflow: .github/workflows/hil.yml
           inputs: |
             {
               "repository": "${{ github.repository }}",
@@ -32,7 +30,7 @@ jobs:
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          body: Label `quick-hil` detected — triggered **HIL** (`quick`) for \#${{ github.event.pull_request.number }}`.
+          body: Label `quick-hil` detected — triggered **HIL** (`quick`) for \#${{ github.event.pull_request.number }}.
 
       # auto-remove the label to avoid accidental re-triggers later
       - uses: actions-ecosystem/action-remove-labels@v1
@@ -46,8 +44,7 @@ jobs:
       - name: Dispatch HIL (full)
         uses: benc-uk/workflow-dispatch@v1
         with:
-          workflow: HIL
-          ref: ${{ github.event.repository.default_branch }}
+          workflow: .github/workflows/hil.yml
           inputs: |
             {
               "repository": "${{ github.repository }}",
@@ -59,7 +56,7 @@ jobs:
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          body: Label `full-hil` detected — triggered **HIL** (`full`) for \#${{ github.event.pull_request.number }}`.
+          body: Label `full-hil` detected — triggered **HIL** (`full`) for \#${{ github.event.pull_request.number }}.
 
       # auto-remove the label
       - uses: actions-ecosystem/action-remove-labels@v1
