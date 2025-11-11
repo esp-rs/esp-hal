@@ -4,8 +4,6 @@ use esp_hal::{
     time::{Duration, Instant, Rate},
 };
 
-#[cfg(feature = "embassy")]
-use crate::TIMER_QUEUE;
 #[cfg(feature = "rtos-trace")]
 use crate::TraceEvents;
 use crate::{
@@ -75,6 +73,11 @@ impl TimerQueue {
         self.next_wakeup = self.next_wakeup.min(wakeup_at);
     }
 
+    #[cfg(feature = "embassy")]
+    pub fn signal_next_embassy_wakeup(&mut self, wakeup_at: u64) {
+        self.next_wakeup = self.next_wakeup.min(wakeup_at);
+    }
+
     pub fn pop(&mut self) -> Option<TaskPtr> {
         // We can allow waking up sooner than necessary, so this function doesn't need to
         // re-calculate the next wakeup time.
@@ -93,9 +96,6 @@ impl TimerQueue {
         for time_slice_target in self.time_slice_target.iter().copied() {
             wakeup_at = wakeup_at.min(time_slice_target);
         }
-
-        #[cfg(feature = "embassy")]
-        let wakeup_at = wakeup_at.min(TIMER_QUEUE.next_wakeup());
 
         wakeup_at
     }
@@ -231,21 +231,26 @@ extern "C" fn timer_tick_handler() {
 
     trace!("Timer tick");
 
-    SCHEDULER.with_shared(|scheduler| {
+    SCHEDULER.with_shared(|global_state| {
         let now = crate::now();
 
+        #[cfg(feature = "embassy")]
+        let mut embassy_time_driver = global_state.embassy_timer_queue();
+
+        // We must process the embassy timer queue before mutably borrowing the scheduler,
+        // because the `__pender` will lock the scheduler again exclusively to wake threads.
         #[cfg(feature = "embassy")]
         {
             #[cfg(feature = "rtos-trace")]
             rtos_trace::trace::marker_begin(TraceEvents::ProcessEmbassyTimerQueue as u32);
 
-            TIMER_QUEUE.handle_alarm(now);
+            embassy_time_driver.handle_alarm(now);
 
             #[cfg(feature = "rtos-trace")]
             rtos_trace::trace::marker_end(TraceEvents::ProcessEmbassyTimerQueue as u32);
         }
 
-        let mut scheduler = unwrap!(scheduler.try_borrow_mut());
+        let mut scheduler = global_state.scheduler();
         let scheduler = &mut *scheduler;
 
         let time_driver = unwrap!(scheduler.time_driver.as_mut());
@@ -276,6 +281,13 @@ extern "C" fn timer_tick_handler() {
                 RunSchedulerOn::OtherCore => task::schedule_other_core(),
             }
         });
+
+        // After processing the timer queue, the next embassy wakeup time is lost and we have to
+        // let the timer queue know about it again.
+        #[cfg(feature = "embassy")]
+        time_driver
+            .timer_queue
+            .signal_next_embassy_wakeup(embassy_time_driver.next_wakeup);
 
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::marker_end(TraceEvents::ProcessTimerQueue as u32);

@@ -1,24 +1,23 @@
 use core::task::Waker;
 
 use embassy_time_queue_utils::Queue;
-use esp_sync::NonReentrantMutex;
 
 use crate::SCHEDULER;
 
-pub(super) struct TimerQueueInner {
+pub(crate) struct TimerQueue {
     queue: Queue,
     pub next_wakeup: u64,
 }
 
-impl TimerQueueInner {
-    const fn new() -> Self {
+impl TimerQueue {
+    pub const fn new() -> Self {
         Self {
             queue: Queue::new(),
             next_wakeup: u64::MAX,
         }
     }
 
-    pub(crate) fn handle_alarm(&mut self, now: u64) {
+    pub fn handle_alarm(&mut self, now: u64) {
         if now < self.next_wakeup {
             trace!(
                 "Not processing embassy timer queue. Now: {}, expected next wakeup: {}",
@@ -41,27 +40,8 @@ impl TimerQueueInner {
     }
 }
 
-pub(crate) struct TimerQueue {
-    inner: NonReentrantMutex<TimerQueueInner>,
-}
-
-impl TimerQueue {
-    pub(crate) const fn new() -> Self {
-        Self {
-            inner: NonReentrantMutex::new(TimerQueueInner::new()),
-        }
-    }
-
-    pub(crate) fn handle_alarm(&self, now: u64) {
-        self.inner.with(|inner| inner.handle_alarm(now))
-    }
-
-    pub(crate) fn next_wakeup(&self) -> u64 {
-        self.inner.with(|inner| inner.next_wakeup)
-    }
-}
-
-impl embassy_time_driver::Driver for TimerQueue {
+pub(crate) struct EmbassyTimeDriver;
+impl embassy_time_driver::Driver for EmbassyTimeDriver {
     #[inline]
     fn now(&self) -> u64 {
         crate::now()
@@ -71,12 +51,18 @@ impl embassy_time_driver::Driver for TimerQueue {
     fn schedule_wake(&self, at: u64, waker: &Waker) {
         // Note that we don't put the thread to sleep here, as other embassy tasks may be
         // ready. The thread will go to sleep when it can.
-        if self.inner.with(|inner| inner.schedule_wake(at, waker)) {
-            // Next wakeup time became shorter, re-arm the timer.
-            // FIXME: avoid two separate critical sections.
-            SCHEDULER.with(|scheduler| {
-                unwrap!(scheduler.time_driver.as_mut()).arm_next_wakeup(crate::now());
-            });
-        }
+        SCHEDULER.with_shared(|global_state| {
+            let mut embassy_timer_queue = global_state.embassy_timer_queue();
+            if embassy_timer_queue.schedule_wake(at, waker) {
+                // Next wakeup time became shorter, re-arm the timer.
+                let mut scheduler = global_state.scheduler();
+                let time_driver = unwrap!(scheduler.time_driver.as_mut());
+
+                time_driver
+                    .timer_queue
+                    .signal_next_embassy_wakeup(embassy_timer_queue.next_wakeup);
+                time_driver.arm_next_wakeup(crate::now());
+            }
+        });
     }
 }

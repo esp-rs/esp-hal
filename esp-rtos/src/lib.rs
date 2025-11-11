@@ -448,7 +448,7 @@ pub(crate) fn now() -> u64 {
 }
 
 #[cfg(feature = "embassy")]
-embassy_time_driver::time_driver_impl!(static TIMER_QUEUE: crate::timer::embassy::TimerQueue = crate::timer::embassy::TimerQueue::new());
+embassy_time_driver::time_driver_impl!(static TIMER_QUEUE: crate::timer::embassy::EmbassyTimeDriver = crate::timer::embassy::EmbassyTimeDriver);
 
 /// Waits for a condition to be met or a timeout to occur.
 ///

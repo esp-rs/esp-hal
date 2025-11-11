@@ -8,14 +8,32 @@ use esp_hal::{
     system::Cpu,
     time::{Duration, Instant},
 };
-use esp_sync::NonReentrantMutex;
 use macros::ram;
 use portable_atomic::AtomicPtr;
 
-use crate::{
-    SCHEDULER,
-    task::{TaskExt, TaskPtr},
-};
+use crate::{SCHEDULER, scheduler::SchedulerState, task::TaskPtr};
+
+/// A zero-overhead lock that allows mutable access to the contained value through the scheduler.
+struct SchedulerLocked<T> {
+    inner: UnsafeCell<T>,
+}
+
+unsafe impl<T: Send> Sync for SchedulerLocked<T> {}
+unsafe impl<T: Send> Send for SchedulerLocked<T> {}
+
+impl<T> SchedulerLocked<T> {
+    fn new(inner: T) -> Self {
+        Self {
+            inner: UnsafeCell::new(inner),
+        }
+    }
+
+    fn with<'s>(&'s self, _scheduler: &'s mut SchedulerState) -> &'s mut T {
+        // Safety: The `_scheduler` parameter proves the caller holds the scheduler lock,
+        // so exclusive access to the contained value is safe.
+        unsafe { &mut *self.inner.get() }
+    }
+}
 
 pub(crate) struct FlagsInner {
     owner: TaskPtr,
@@ -45,7 +63,7 @@ impl FlagsInner {
 /// queue, no timeout, assumes a single thread waits for the flag, there is only a single bit of
 /// flag information).
 struct ThreadFlag {
-    inner: NonReentrantMutex<FlagsInner>,
+    inner: SchedulerLocked<FlagsInner>,
 }
 
 impl ThreadFlag {
@@ -60,7 +78,7 @@ impl ThreadFlag {
             }
         });
         Self {
-            inner: NonReentrantMutex::new(FlagsInner {
+            inner: SchedulerLocked::new(FlagsInner {
                 owner,
                 waiting: None,
                 set: false,
@@ -68,36 +86,51 @@ impl ThreadFlag {
         }
     }
 
-    fn with<R>(&self, f: impl FnOnce(&mut FlagsInner) -> R) -> R {
-        self.inner.with(|inner| f(inner))
+    fn with<R>(&self, scheduler: &mut SchedulerState, f: impl FnOnce(&mut FlagsInner) -> R) -> R {
+        let inner = self.inner.with(scheduler);
+        f(inner)
     }
 
     fn set(&self) {
-        self.with(|inner| {
-            if let Some(waiting) = inner.waiting.take() {
+        SCHEDULER.with(|scheduler| {
+            let to_resume = self.with(scheduler, |inner| {
+                let to_resume = inner.waiting.take();
+
+                if to_resume.is_none() {
+                    // The task isn't waiting, set the flag.
+                    inner.set = true;
+                }
+
+                to_resume
+            });
+
+            if let Some(waiting) = to_resume {
                 // The task is waiting, there is no need to set the flag - resuming the thread
                 // is all the signal we need.
-                waiting.resume();
-            } else {
-                // The task isn't waiting, set the flag.
-                inner.set = true;
+                scheduler.resume_task(waiting);
             }
         });
     }
 
     fn get(&self) -> bool {
-        self.with(|inner| inner.set)
+        SCHEDULER.with(|scheduler| self.with(scheduler, |inner| inner.set))
     }
 
     fn wait(&self) {
-        self.with(|inner| {
-            if !inner.take() {
-                // SCHEDULER.sleep_until, but we know the current task's ID, and we know there
-                // is no timeout.
-                SCHEDULER.with(|scheduler| {
-                    scheduler.sleep_task_until(inner.owner, Instant::EPOCH + Duration::MAX);
-                    crate::task::yield_task();
-                });
+        // SCHEDULER.sleep_until, but we know the current task's ID, and we know there
+        // is no timeout.
+        SCHEDULER.with(|scheduler| {
+            let owner_to_suspend = self.with(scheduler, |inner| {
+                if !inner.take() {
+                    Some(inner.owner)
+                } else {
+                    None
+                }
+            });
+
+            if let Some(owner) = owner_to_suspend {
+                scheduler.sleep_task_until(owner, Instant::EPOCH + Duration::MAX);
+                crate::task::yield_task();
             }
         });
     }
