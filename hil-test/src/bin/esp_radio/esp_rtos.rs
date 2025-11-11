@@ -429,16 +429,16 @@ mod tests {
         }
     }
 
-
     #[test]
     #[cfg(multi_core)]
     async fn embassy_cross_core(ctx: Context) {
-        // This is a regression test verifying that waking an embassy task does not run into a deadlock.
-        // This is a bit fragile, but the test should not produce false positives, only false negatives.
+        // This is a regression test verifying that waking an embassy task does not run into a
+        // deadlock. This is a bit fragile, but the test should not produce false positives,
+        // only false negatives.
         use embassy_sync::signal::Signal;
+        use esp_rtos::embassy::Executor;
         use esp_sync::RawMutex;
         use static_cell::StaticCell;
-        use esp_rtos::embassy::Executor;
 
         static SIGNAL: Signal<RawMutex, ()> = Signal::new();
 
@@ -455,12 +455,12 @@ mod tests {
                     // Spam timer events on the second core. This arms a timer on core 0, which
                     // wakes up the task on core 1 shortly after.
                     for _ in 0..10000 {
-                        embassy_time::Timer::after(embassy_time::Duration::from_micros(100)).await;
+                        embassy_time::Timer::after(embassy_time::Duration::from_micros(1)).await;
                     }
                     SIGNAL.signal(());
                 }
 
-                static CORE1_EXECUTOR : StaticCell<Executor> = StaticCell::new();
+                static CORE1_EXECUTOR: StaticCell<Executor> = StaticCell::new();
                 let executor = CORE1_EXECUTOR.init(Executor::new());
                 executor.run(|spawner| {
                     spawner.must_spawn(task());

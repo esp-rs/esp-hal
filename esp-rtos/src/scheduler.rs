@@ -1,4 +1,6 @@
 use core::cell::RefCell;
+#[cfg(feature = "embassy")]
+use core::cell::RefMut;
 #[cfg(feature = "esp-radio")]
 use core::{ffi::c_void, ptr::NonNull};
 
@@ -28,7 +30,7 @@ use crate::{
         TaskPtr,
         TaskState,
     },
-    timer::TimeDriver,
+    timer::{TimeDriver, embassy::TimerQueue},
 };
 
 pub(crate) struct SchedulerState {
@@ -404,23 +406,48 @@ impl SchedulerState {
     }
 }
 
+pub(crate) struct GlobalState {
+    pub scheduler: RefCell<SchedulerState>,
+    #[cfg(feature = "embassy")]
+    pub embassy_timer_queue: RefCell<TimerQueue>,
+}
+
+impl GlobalState {
+    const fn new() -> Self {
+        Self {
+            scheduler: RefCell::new(SchedulerState::new()),
+            #[cfg(feature = "embassy")]
+            embassy_timer_queue: RefCell::new(TimerQueue::new()),
+        }
+    }
+
+    pub fn scheduler(&self) -> RefMut<'_, SchedulerState> {
+        unwrap!(self.scheduler.try_borrow_mut())
+    }
+
+    #[cfg(feature = "embassy")]
+    pub fn embassy_timer_queue(&self) -> RefMut<'_, TimerQueue> {
+        unwrap!(self.embassy_timer_queue.try_borrow_mut())
+    }
+}
+
 pub(crate) struct Scheduler {
-    inner: Mutex<RawMutex, RefCell<SchedulerState>>,
+    inner: Mutex<RawMutex, GlobalState>,
 }
 
 impl Scheduler {
     const fn new() -> Self {
         Self {
-            inner: Mutex::new(RefCell::new(SchedulerState::new())),
+            inner: Mutex::new(GlobalState::new()),
         }
     }
 
     pub(crate) fn with<R>(&self, cb: impl FnOnce(&mut SchedulerState) -> R) -> R {
-        self.with_shared(|shared| cb(&mut *unwrap!(shared.try_borrow_mut())))
+        self.with_shared(|shared| cb(&mut *unwrap!(shared.scheduler.try_borrow_mut())))
     }
 
-    pub(crate) fn with_shared<R>(&self, cb: impl FnOnce(&RefCell<SchedulerState>) -> R) -> R {
-        self.inner.lock(|shared| cb(shared))
+    pub(crate) fn with_shared<R>(&self, cb: impl FnOnce(&GlobalState) -> R) -> R {
+        self.inner.lock(cb)
     }
 
     #[cfg(feature = "esp-radio")]
