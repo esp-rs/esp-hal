@@ -1,4 +1,4 @@
-use super::*;
+use crate::syscall::*;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]

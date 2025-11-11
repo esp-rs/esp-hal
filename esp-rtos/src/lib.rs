@@ -63,6 +63,7 @@ mod esp_radio;
 mod run_queue;
 mod scheduler;
 pub mod semaphore;
+mod syscall;
 mod task;
 mod timer;
 mod wait_queue;
@@ -294,6 +295,7 @@ pub fn start_with_idle_hook(
 
     SCHEDULER.with(move |scheduler| {
         scheduler.setup(TimeDriver::new(timer.timer()), idle_hook);
+        syscall::setup_syscalls();
 
         // Allocate the default task.
 

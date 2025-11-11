@@ -7,7 +7,10 @@ use core::ffi::c_void;
 use core::{marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 #[cfg(feature = "alloc")]
-use allocator_api2::alloc::{Allocator, Layout};
+use allocator_api2::{
+    alloc::{Allocator, Layout},
+    boxed::Box,
+};
 pub(crate) use arch_specific::*;
 use esp_hal::{
     system::Cpu,
@@ -320,11 +323,32 @@ impl<E: TaskListElement> TaskQueue<E> {
     }
 }
 
+pub(crate) struct ThreadLocalData {
+    #[cfg(feature = "esp-radio")]
+    pub thread_semaphore: Semaphore,
+
+    // The _reent struct is rarely needed, but big. Let's heap-allocate it, to save a bit of RAM.
+    #[cfg(feature = "alloc")]
+    pub reent: Option<Box<esp_rom_sys::_reent>>,
+}
+impl ThreadLocalData {
+    pub const fn new() -> Self {
+        Self {
+            #[cfg(feature = "esp-radio")]
+            thread_semaphore: Semaphore::new_counting(0, 1),
+
+            #[cfg(feature = "alloc")]
+            reent: None,
+        }
+    }
+}
+
 #[repr(C)]
 pub(crate) struct Task {
     pub cpu_context: CpuContext,
-    #[cfg(feature = "esp-radio")]
-    pub thread_semaphore: Option<Semaphore>,
+
+    pub thread_local: ThreadLocalData,
+
     pub state: TaskState,
     pub stack: *mut [MaybeUninit<u32>],
 
@@ -421,8 +445,7 @@ impl Task {
 
         let mut task = Task {
             cpu_context: new_task_context(task_fn, param, stack_top),
-            #[cfg(feature = "esp-radio")]
-            thread_semaphore: None,
+            thread_local: ThreadLocalData::new(),
             state: TaskState::Ready,
             stack: stack_words,
             #[cfg(any(hw_task_overflow_detection, sw_task_overflow_detection))]
@@ -495,9 +518,6 @@ impl Drop for Task {
     fn drop(&mut self) {
         debug!("Dropping task: {:?}", self as *mut Task);
 
-        #[cfg(feature = "esp-radio")]
-        let _ = self.thread_semaphore.take();
-
         #[cfg(feature = "alloc")]
         if self.heap_allocated {
             let layout = unwrap!(
@@ -535,6 +555,7 @@ pub(super) fn allocate_main_task(
     {
         scheduler.per_cpu[current_cpu].main_task.pinned_to = Some(cpu);
     }
+    scheduler.per_cpu[current_cpu].main_task.thread_local = ThreadLocalData::new();
 
     scheduler.per_cpu[current_cpu]
         .main_task

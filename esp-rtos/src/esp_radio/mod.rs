@@ -94,13 +94,7 @@ impl esp_radio_rtos_driver::Scheduler for Scheduler {
     }
 
     fn current_task_thread_semaphore(&self) -> SemaphorePtr {
-        task::with_current_task(|task| {
-            NonNull::from(
-                task.thread_semaphore
-                    .get_or_insert_with(|| Semaphore::new_counting(0, 1)),
-            )
-            .cast()
-        })
+        task::with_current_task(|task| NonNull::from(&task.thread_local.thread_semaphore).cast())
     }
 
     fn usleep(&self, us: u32) {
