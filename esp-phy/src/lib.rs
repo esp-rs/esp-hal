@@ -86,6 +86,8 @@ struct PhyState {
     calibration_data: Option<PhyCalibrationData>,
     /// Has the PHY been calibrated since the chip was powered up.
     calibrated: bool,
+    /// Last calibration result code.
+    calibration_result: i32,
 
     #[cfg(phy_backed_up_digital_register_count_is_set)]
     /// Backup of the digital PHY registers.
@@ -110,6 +112,7 @@ impl PhyState {
             ref_count: 0,
             calibration_data: None,
             calibrated: false,
+            calibration_result: 0,
 
             #[cfg(phy_backed_up_digital_register_count_is_set)]
             phy_digital_register_backup: None,
@@ -178,7 +181,7 @@ impl PhyState {
         };
         let init_data = &phy_init_data::PHY_INIT_DATA_DEFAULT;
         unsafe {
-            sys::include::register_chipv7_phy(
+            self.calibration_result = sys::include::register_chipv7_phy(
                 init_data,
                 self.calibration_data() as *mut PhyCalibrationData as *mut _,
                 calibration_mode,
@@ -373,6 +376,18 @@ pub struct CalibrationDataAlreadySetError;
 /// No calibration data is available.
 pub struct NoCalibrationDataError;
 
+/// Result of the PHY calibration.
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum CalibrationResult {
+    /// The calibration data was valid and was used for calibration.
+    Ok,
+
+    /// The calibration data data checksum check failed or the calibration data was outdated.
+    DataCheckFailed,
+}
+
 /// Load previously backed up PHY calibration data.
 pub fn set_phy_calibration_data(
     calibration_data: &PhyCalibrationData,
@@ -397,5 +412,25 @@ pub fn backup_phy_calibration_data(
             .as_mut()
             .ok_or(NoCalibrationDataError)
             .map(|calibration_data| buffer.copy_from_slice(calibration_data.as_slice()))
+    })
+}
+
+/// Get the last calibration result.
+///
+/// This can be used to know if any perviously persisted calibration data is outdated/invalid and
+/// needs to get updated.
+pub fn last_calibration_result() -> Option<CalibrationResult> {
+    PHY_STATE.with(|phy_state| {
+        if phy_state.calibrated {
+            Some(
+                if phy_state.calibration_result == sys::include::ESP_CAL_DATA_CHECK_FAIL as i32 {
+                    CalibrationResult::DataCheckFailed
+                } else {
+                    CalibrationResult::Ok
+                },
+            )
+        } else {
+            None
+        }
     })
 }

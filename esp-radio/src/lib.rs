@@ -146,6 +146,11 @@ use esp_hal::{
     after_snippet,
     before_snippet,
 };
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+pub use esp_phy::CalibrationResult;
+#[cfg(not(feature = "unstable"))]
+use esp_phy::CalibrationResult;
 use esp_radio_rtos_driver as preempt;
 use esp_sync::RawMutex;
 #[cfg(esp32)]
@@ -430,11 +435,10 @@ pub fn wifi_set_log_verbose() {
 ///
 /// Returns the last calibration result.
 ///
-/// If you see the data is different than what was persisted before, consider persisting the new
-/// data.
+/// If [last_calibration_result] returns [CalibrationResult::DataCheckFailed], consider persisting
+/// the new data.
 #[instability::unstable]
 pub fn phy_calibration_data(data: &mut [u8; esp_phy::PHY_CALIBRATION_DATA_LENGTH]) {
-    // FIXME: return an error to the user.
     let _ = esp_phy::backup_phy_calibration_data(data);
 }
 
@@ -446,4 +450,13 @@ pub fn set_phy_calibration_data(data: &[u8; core::mem::size_of::<esp_phy_calibra
     // Although we're ignoring the result here, this doesn't change the behavior, as this just
     // doesn't do anything in case an error is returned.
     let _ = esp_phy::set_phy_calibration_data(data);
+}
+
+/// Get the last calibration result.
+///
+/// This can be used to know if any perviously persisted calibration data is outdated/invalid and
+/// needs to get updated.
+#[instability::unstable]
+pub fn last_calibration_result() -> Option<CalibrationResult> {
+    esp_phy::last_calibration_result()
 }
