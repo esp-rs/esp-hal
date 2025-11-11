@@ -384,7 +384,7 @@ pub enum CalibrationResult {
     /// The calibration data was valid and was used for calibration.
     Ok,
 
-    /// The calibration data data checksum check failed, or the calibration data was outdated.
+    /// The calibration data checksum check failed, or the calibration data was outdated.
     DataCheckFailed,
 }
 
