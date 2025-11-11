@@ -435,9 +435,21 @@ pub mod checker {
                             continue;
                         }
                         log::debug!("Extracted {}", out_path.display());
-                        return Ok(true);
                     }
                     Err(e) => log::warn!("Failed to create {}: {}", out_path.display(), e),
+                }
+            }
+            // successfully return if artifact produced any baselines
+            if let Ok(entries) = std::fs::read_dir(&baseline_dir) {
+                if entries.flatten().any(|e| {
+                    let p = e.path();
+                    p.extension().and_then(|s| s.to_str()) == Some("gz")
+                        && p.file_stem()
+                            .and_then(|s| s.to_str())
+                            .map(|s| s.ends_with(".json"))
+                            .unwrap_or(false)
+                }) {
+                    return Ok(true);
                 }
             }
         }
