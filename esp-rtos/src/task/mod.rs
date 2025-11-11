@@ -102,7 +102,7 @@ pub(crate) trait TaskExt {
     #[cfg(feature = "rtos-trace")]
     fn rtos_trace_info(self, run_queue: &mut RunQueue) -> TaskInfo;
 
-    #[cfg(any(feature = "esp-radio", feature = "embassy"))]
+    #[cfg(feature = "esp-radio")]
     fn resume(self);
     fn priority(self, _: &mut RunQueue) -> Priority;
     fn set_priority(self, _: &mut RunQueue, new_pro: Priority);
@@ -126,7 +126,7 @@ impl TaskExt for TaskPtr {
         }
     }
 
-    #[cfg(any(feature = "esp-radio", feature = "embassy"))]
+    #[cfg(feature = "esp-radio")]
     #[esp_hal::ram]
     fn resume(self) {
         SCHEDULER.with(|scheduler| scheduler.resume_task(self))

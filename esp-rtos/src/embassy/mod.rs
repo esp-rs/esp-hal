@@ -29,6 +29,8 @@ impl<T> SchedulerLocked<T> {
     }
 
     fn with<'s>(&'s self, _scheduler: &'s mut SchedulerState) -> &'s mut T {
+        // Safety: The `_scheduler` parameter proves the caller holds the scheduler lock,
+        // so exclusive access to the contained value is safe.
         unsafe { &mut *self.inner.get() }
     }
 }

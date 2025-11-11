@@ -283,7 +283,7 @@ extern "C" fn timer_tick_handler() {
         });
 
         // After processing the timer queue, the next embassy wakeup time is lost and we have to
-        // restore it.
+        // let the timer queue know about it again.
         #[cfg(feature = "embassy")]
         time_driver
             .timer_queue

@@ -1,6 +1,4 @@
-use core::cell::RefCell;
-#[cfg(feature = "embassy")]
-use core::cell::RefMut;
+use core::cell::{RefCell, RefMut};
 #[cfg(feature = "esp-radio")]
 use core::{ffi::c_void, ptr::NonNull};
 
@@ -15,6 +13,8 @@ use macros::ram;
 use crate::InternalMemory;
 #[cfg(feature = "rtos-trace")]
 use crate::TraceEvents;
+#[cfg(feature = "embassy")]
+use crate::timer::embassy::TimerQueue;
 use crate::{
     run_queue::{Priority, RunQueue, RunSchedulerOn},
     task::{
@@ -30,7 +30,7 @@ use crate::{
         TaskPtr,
         TaskState,
     },
-    timer::{TimeDriver, embassy::TimerQueue},
+    timer::TimeDriver,
 };
 
 pub(crate) struct SchedulerState {
@@ -443,7 +443,7 @@ impl Scheduler {
     }
 
     pub(crate) fn with<R>(&self, cb: impl FnOnce(&mut SchedulerState) -> R) -> R {
-        self.with_shared(|shared| cb(&mut *unwrap!(shared.scheduler.try_borrow_mut())))
+        self.with_shared(|shared| cb(&mut shared.scheduler()))
     }
 
     pub(crate) fn with_shared<R>(&self, cb: impl FnOnce(&GlobalState) -> R) -> R {
