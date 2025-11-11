@@ -454,7 +454,7 @@ pub fn set_phy_calibration_data(data: &[u8; core::mem::size_of::<esp_phy_calibra
 
 /// Get the last calibration result.
 ///
-/// This can be used to know if any perviously persisted calibration data is outdated/invalid and
+/// This can be used to know if any previously persisted calibration data is outdated/invalid and
 /// needs to get updated.
 #[instability::unstable]
 pub fn last_calibration_result() -> Option<CalibrationResult> {

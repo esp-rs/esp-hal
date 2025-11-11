@@ -384,7 +384,7 @@ pub enum CalibrationResult {
     /// The calibration data was valid and was used for calibration.
     Ok,
 
-    /// The calibration data data checksum check failed or the calibration data was outdated.
+    /// The calibration data data checksum check failed, or the calibration data was outdated.
     DataCheckFailed,
 }
 
@@ -417,7 +417,7 @@ pub fn backup_phy_calibration_data(
 
 /// Get the last calibration result.
 ///
-/// This can be used to know if any perviously persisted calibration data is outdated/invalid and
+/// This can be used to know if any previously persisted calibration data is outdated/invalid and
 /// needs to get updated.
 pub fn last_calibration_result() -> Option<CalibrationResult> {
     PHY_STATE.with(|phy_state| {
