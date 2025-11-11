@@ -31,6 +31,8 @@ use esp_hal::{
     uart::{Config as UartConfig, DataBits, Parity, RxConfig, StopBits, Uart, UartInterrupt},
 };
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 static SERIAL: Mutex<RefCell<Option<Uart<Blocking>>>> = Mutex::new(RefCell::new(None));
 
 #[main]
