@@ -409,6 +409,12 @@ pub(crate) struct Scheduler {
 }
 
 impl Scheduler {
+    const fn new() -> Self {
+        Self {
+            inner: Mutex::new(RefCell::new(SchedulerState::new())),
+        }
+    }
+
     pub(crate) fn with<R>(&self, cb: impl FnOnce(&mut SchedulerState) -> R) -> R {
         self.with_shared(|shared| cb(&mut *unwrap!(shared.try_borrow_mut())))
     }
@@ -458,14 +464,10 @@ impl Scheduler {
 }
 
 #[cfg(feature = "esp-radio")]
-esp_radio_rtos_driver::scheduler_impl!(pub(crate) static SCHEDULER: Scheduler = Scheduler {
-    inner: Mutex::new(RefCell::new(SchedulerState::new()))
-});
+esp_radio_rtos_driver::scheduler_impl!(pub(crate) static SCHEDULER: Scheduler = Scheduler::new());
 
 #[cfg(not(feature = "esp-radio"))]
-pub(crate) static SCHEDULER: Scheduler = Scheduler {
-    inner: Mutex::new(RefCell::new(SchedulerState::new())),
-};
+pub(crate) static SCHEDULER: Scheduler = Scheduler::new();
 
 #[cfg(feature = "rtos-trace")]
 impl rtos_trace::RtosTraceOSCallbacks for Scheduler {

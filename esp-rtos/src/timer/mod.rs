@@ -231,20 +231,20 @@ extern "C" fn timer_tick_handler() {
 
     trace!("Timer tick");
 
+    let now = crate::now();
+
+    #[cfg(feature = "embassy")]
+    {
+        #[cfg(feature = "rtos-trace")]
+        rtos_trace::trace::marker_begin(TraceEvents::ProcessEmbassyTimerQueue as u32);
+
+        TIMER_QUEUE.handle_alarm(now);
+
+        #[cfg(feature = "rtos-trace")]
+        rtos_trace::trace::marker_end(TraceEvents::ProcessEmbassyTimerQueue as u32);
+    }
+
     SCHEDULER.with_shared(|scheduler| {
-        let now = crate::now();
-
-        #[cfg(feature = "embassy")]
-        {
-            #[cfg(feature = "rtos-trace")]
-            rtos_trace::trace::marker_begin(TraceEvents::ProcessEmbassyTimerQueue as u32);
-
-            TIMER_QUEUE.handle_alarm(now);
-
-            #[cfg(feature = "rtos-trace")]
-            rtos_trace::trace::marker_end(TraceEvents::ProcessEmbassyTimerQueue as u32);
-        }
-
         let mut scheduler = unwrap!(scheduler.try_borrow_mut());
         let scheduler = &mut *scheduler;
 

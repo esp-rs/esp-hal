@@ -429,6 +429,53 @@ mod tests {
         }
     }
 
+
+    #[test]
+    #[cfg(multi_core)]
+    async fn embassy_cross_core(ctx: Context) {
+        // This is a regression test verifying that waking an embassy task does not run into a deadlock.
+        // This is a bit fragile, but the test should not produce false positives, only false negatives.
+        use embassy_sync::signal::Signal;
+        use esp_sync::RawMutex;
+        use static_cell::StaticCell;
+        use esp_rtos::embassy::Executor;
+
+        static SIGNAL: Signal<RawMutex, ()> = Signal::new();
+
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            ctx.sw_int1,
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            || {
+                #[embassy_executor::task]
+                async fn task() {
+                    // Spam timer events on the second core. This arms a timer on core 0, which
+                    // wakes up the task on core 1 shortly after.
+                    for _ in 0..10000 {
+                        embassy_time::Timer::after(embassy_time::Duration::from_micros(100)).await;
+                    }
+                    SIGNAL.signal(());
+                }
+
+                static CORE1_EXECUTOR : StaticCell<Executor> = StaticCell::new();
+                let executor = CORE1_EXECUTOR.init(Executor::new());
+                executor.run(|spawner| {
+                    spawner.must_spawn(task());
+                });
+            },
+        );
+
+        SIGNAL.wait().await;
+
+        unsafe {
+            // Park the second core, we don't need it anymore
+            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
+        }
+    }
+
     #[test]
     async fn primitives_time_out() {
         let mutex = Semaphore::new_mutex(false);
