@@ -23,22 +23,15 @@ extern "C" fn _getreent() -> *mut esp_rom_sys::_reent {
 #[repr(C)]
 struct AllocationHeader {
     size: usize,
-    align: usize,
 }
 
 #[cfg(feature = "alloc")]
 extern "C" fn _malloc_r(_reent: *mut esp_rom_sys::_reent, size: usize) -> *mut c_void {
-    use core::{mem, ptr};
-
-    use allocator_api2::alloc::{Layout, alloc};
-    if size == 0 {
-        return ptr::null_mut();
-    }
-
-    let user_align = mem::align_of::<usize>();
+    use alloc::alloc::alloc;
+    use core::{alloc::Layout, mem, ptr};
 
     let header_layout = Layout::new::<AllocationHeader>();
-    let user_layout = match Layout::from_size_align(size, user_align) {
+    let user_layout = match Layout::from_size_align(size, mem::align_of::<AllocationHeader>()) {
         Ok(l) => l,
         Err(_) => return ptr::null_mut(),
     };
@@ -55,14 +48,11 @@ extern "C" fn _malloc_r(_reent: *mut esp_rom_sys::_reent, size: usize) -> *mut c
         }
 
         let header_ptr = p as *mut AllocationHeader;
-        header_ptr.write(AllocationHeader {
-            size,
-            align: user_align,
-        });
+        header_ptr.write(AllocationHeader { size });
 
         let user_data_ptr = p.add(user_offset);
 
-        info!(
+        debug!(
             "Alloc called for {} bytes, returned {:?}",
             size, user_data_ptr
         );
@@ -72,24 +62,49 @@ extern "C" fn _malloc_r(_reent: *mut esp_rom_sys::_reent, size: usize) -> *mut c
 
 #[cfg(feature = "alloc")]
 extern "C" fn _free_r(_reent: *mut esp_rom_sys::_reent, ptr: *mut c_void) {
-    use allocator_api2::alloc::{Layout, dealloc};
+    use alloc::alloc::dealloc;
+    use core::{alloc::Layout, mem};
 
     if ptr.is_null() {
         return;
     }
 
+    debug!("Freeing {:?}", ptr);
     unsafe {
         let user_ptr = ptr as *mut u8;
         let header_layout = Layout::new::<AllocationHeader>();
         let header_ptr = user_ptr.sub(header_layout.size()) as *mut AllocationHeader;
         let header = header_ptr.read();
 
-        let user_layout = Layout::from_size_align_unchecked(header.size, header.align);
+        let user_layout =
+            Layout::from_size_align_unchecked(header.size, mem::align_of::<AllocationHeader>());
         let (layout, _offset) = header_layout.extend(user_layout).unwrap();
 
         let p = header_ptr as *mut u8;
         dealloc(p, layout);
     }
+}
+
+#[cfg(not(feature = "alloc"))]
+#[link_name = "malloc_internal"]
+extern "C" {
+    fn malloc_internal(size: usize) -> *mut c_void;
+}
+
+#[cfg(not(feature = "alloc"))]
+#[link_name = "free_internal"]
+extern "C" {
+    fn free_internal(ptr: *mut c_void);
+}
+
+#[cfg(not(feature = "alloc"))]
+extern "C" fn _malloc_r(_reent: *mut esp_rom_sys::_reent, size: usize) -> *mut c_void {
+    unsafe { malloc_internal(size) }
+}
+
+#[cfg(not(feature = "alloc"))]
+extern "C" fn _free_r(_reent: *mut esp_rom_sys::_reent, ptr: *mut c_void) {
+    unsafe { free_internal(ptr) }
 }
 
 pub fn setup_syscalls() {
