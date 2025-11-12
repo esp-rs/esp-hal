@@ -39,18 +39,36 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const login = "${{ steps.parse.outputs.login }}";
-            const header = "### [HIL trust list]\n";
+            const login = "${{ steps.parse.outputs.login }}".toLowerCase();
             const existing = `${{ toJson(steps.find.outputs.comment-body || '') }}`;
+
+            // read existing trusted[] from hidden JSON if present
             let list = [];
-            if (existing && existing.includes(header)) {
-              const json = existing.split("\n").slice(1).join("\n");
-              try { list = JSON.parse(json).trusted || []; } catch {}
+            const m = existing.match(/<!--\s*HIL_TRUST_JSON\s*([\s\S]*?)\s*HIL_TRUST_JSON\s*-->/);
+            if (m && m[1]) {
+              try { list = JSON.parse(m[1]).trusted || []; } catch {}
             }
+
             if (!list.includes(login)) list.push(login);
             list = Array.from(new Set(list)).sort();
-            const body = header + JSON.stringify({ trusted: list }, null, 2);
-            core.setOutput("body", body);
+
+            const json = JSON.stringify({ trusted: list }, null, 2);
+            const pretty = list.length ? list.map(u => `- @${u}`).join('\n') : '_None yet_';
+
+            const body =
+            `### [HIL trust list]
+            <!-- HIL_TRUST_JSON
+            ${json}
+            HIL_TRUST_JSON -->
+
+            <details>
+            <summary>Trusted users for this PR (click to expand)</summary>
+
+            ${pretty}
+
+            </details>`;
+
+                        core.setOutput("body", body);
 
       - uses: peter-evans/create-or-update-comment@v4
         with:
@@ -94,17 +112,34 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const login = "${{ steps.parse.outputs.login }}";
-            const header = "### [HIL trust list]\n";
+            const login = "${{ steps.parse.outputs.login }}".toLowerCase();
             const existing = `${{ toJson(steps.find.outputs.comment-body || '') }}`;
+
             let list = [];
-            if (existing && existing.includes(header)) {
-              const json = existing.split("\n").slice(1).join("\n");
-              try { list = JSON.parse(json).trusted || []; } catch {}
+            const m = existing.match(/<!--\s*HIL_TRUST_JSON\s*([\s\S]*?)\s*HIL_TRUST_JSON\s*-->/);
+            if (m && m[1]) {
+              try { list = JSON.parse(m[1]).trusted || []; } catch {}
             }
-            const filtered = list.filter(u => u !== login);
-            const body = header + JSON.stringify({ trusted: filtered }, null, 2);
-            core.setOutput("body", body);
+
+            list = list.filter(u => u !== login).sort();
+
+            const json = JSON.stringify({ trusted: list }, null, 2);
+            const pretty = list.length ? list.map(u => `- @${u}`).join('\n') : '_None yet_';
+
+            const body =
+            `### [HIL trust list]
+            <!-- HIL_TRUST_JSON
+            ${json}
+            HIL_TRUST_JSON -->
+
+            <details>
+            <summary>Trusted users for this PR (click to expand)</summary>
+
+            ${pretty}
+
+            </details>`;
+
+                        core.setOutput("body", body);
 
       - uses: peter-evans/create-or-update-comment@v4
         with:

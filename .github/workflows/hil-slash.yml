@@ -24,14 +24,12 @@ jobs:
             const assoc = context.payload.comment.author_association;
             const commenter = context.payload.comment.user.login.toLowerCase();
             const pr = context.payload.issue.number;
-            // Maintainers are always allowed
+
             if (assoc === 'MEMBER' || assoc === 'OWNER') {
               core.setOutput('allowed', 'true');
               return;
             }
-            // Otherwise, look for the per-PR trust list comment
-            const header = '### [HIL trust list]';
-            let allowed = false;
+
             const { owner, repo } = context.repo;
             const comments = await github.paginate(
               github.rest.issues.listComments,
@@ -40,15 +38,18 @@ jobs:
             const trust = comments.find(c =>
               c.user?.login === 'github-actions[bot]' &&
               typeof c.body === 'string' &&
-              c.body.startsWith(header)
+              c.body.includes('HIL_TRUST_JSON')
             );
+
+            let allowed = false;
             if (trust) {
-              try {
-                const json = trust.body.split('\n').slice(1).join('\n');
-                const list = (JSON.parse(json).trusted || []).map(s => String(s).toLowerCase());
-                allowed = list.includes(commenter);
-              } catch (e) {
-                // ignore parse errors -> not allowed
+              const m = trust.body.match(/<!--\s*HIL_TRUST_JSON\s*([\s\S]*?)\s*HIL_TRUST_JSON\s*-->/);
+              if (m && m[1]) {
+                try {
+                  const data = JSON.parse(m[1]);
+                  const list = (data.trusted || []).map(s => String(s).toLowerCase());
+                  allowed = list.includes(commenter);
+                } catch {}
               }
             }
             core.setOutput('allowed', allowed ? 'true' : 'false');
