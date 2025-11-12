@@ -10,6 +10,48 @@ permissions:
   contents: read
 
 jobs:
+  auth:
+    # Only PR comments need auth
+    if: github.event.issue.pull_request
+    runs-on: ubuntu-latest
+    outputs:
+      allowed: ${{ steps.check.outputs.allowed }}
+    steps:
+      - id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const assoc = context.payload.comment.author_association;
+            const commenter = context.payload.comment.user.login.toLowerCase();
+            const pr = context.payload.issue.number;
+            // Maintainers are always allowed
+            if (assoc === 'MEMBER' || assoc === 'OWNER') {
+              core.setOutput('allowed', 'true');
+              return;
+            }
+            // Otherwise, look for the per-PR trust list comment
+            const header = '### [HIL trust list]';
+            let allowed = false;
+            const { owner, repo } = context.repo;
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              { owner, repo, issue_number: pr, per_page: 100 }
+            );
+            const trust = comments.find(c =>
+              c.user?.login === 'github-actions[bot]' &&
+              typeof c.body === 'string' &&
+              c.body.startsWith(header)
+            );
+            if (trust) {
+              try {
+                const json = trust.body.split('\n').slice(1).join('\n');
+                const list = (JSON.parse(json).trusted || []).map(s => String(s).toLowerCase());
+                allowed = list.includes(commenter);
+              } catch (e) {
+                // ignore parse errors -> not allowed
+              }
+            }
+            core.setOutput('allowed', allowed ? 'true' : 'false');
   hil-quick:
     # check every PR comment, check correct role, and explicitly look for '/hil quick'
     if: ${{ github.event.issue.pull_request && ( github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'OWNER' ) && startsWith(github.event.comment.body, '/hil quick') }}

@@ -1,0 +1,114 @@
+name: HIL (trust)
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  trust:
+    if: >
+      github.event.issue.pull_request &&
+      (github.event.comment.author_association == 'MEMBER' ||
+       github.event.comment.author_association == 'OWNER') &&
+      startsWith(github.event.comment.body, '/i-trust-you ')
+    runs-on: ubuntu-latest
+    steps:
+      - id: parse
+        shell: bash
+        run: |
+          body='${{ github.event.comment.body }}'
+          login=$(echo "$body" | cut -d' ' -f2- | sed 's/^@//' | tr -dc 'A-Za-z0-9-')
+          [ -n "$login" ] || { echo "Empty login"; exit 1; }
+          echo "login=$login" >> $GITHUB_OUTPUT
+
+      - id: find
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          comment-author: github-actions[bot]
+          body-includes: "[HIL trust list]"
+
+      - name: Upsert trust list
+        id: upsert
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const login = "${{ steps.parse.outputs.login }}".toLowerCase();
+            const header = "### [HIL trust list]\n";
+            const existing = `${{ toJson(steps.find.outputs.comment-body || '') }}`;
+            let list = [];
+            if (existing && existing.includes(header)) {
+              const json = existing.split("\n").slice(1).join("\n");
+              try { list = JSON.parse(json).trusted || []; } catch {}
+            }
+            if (!list.includes(login)) list.push(login);
+            const body = header + JSON.stringify({trusted: list}, null, 2);
+            core.setOutput("body", body);
+
+      - uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          comment-id: ${{ steps.find.outputs.comment-id }}
+          body: ${{ steps.upsert.outputs.body }}
+          edit-mode: replace
+
+      - uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: "Trusted **@${{ steps.parse.outputs.login }}** for this PR."
+
+  revoke:
+    if: >
+      github.event.issue.pull_request &&
+      (github.event.comment.author_association == 'MEMBER' ||
+       github.event.comment.author_association == 'OWNER') &&
+      startsWith(github.event.comment.body, '/i-dont-trust ')
+    runs-on: ubuntu-latest
+    steps:
+      - id: parse
+        shell: bash
+        run: |
+          body='${{ github.event.comment.body }}'
+          login=$(echo "$body" | cut -d' ' -f2- | sed 's/^@//' | tr -dc 'A-Za-z0-9-')
+          [ -n "$login" ] || { echo "Empty login"; exit 1; }
+          echo "login=$login" >> $GITHUB_OUTPUT
+
+      - id: find
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          comment-author: github-actions[bot]
+          body-includes: "[HIL trust list]"
+
+      - name: Remove from trust list
+        id: update
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const login = "${{ steps.parse.outputs.login }}".toLowerCase();
+            const header = "### [HIL trust list]\n";
+            const existing = `${{ toJson(steps.find.outputs.comment-body || '') }}`;
+            let list = [];
+            if (existing && existing.includes(header)) {
+              const json = existing.split("\n").slice(1).join("\n");
+              try { list = JSON.parse(json).trusted || []; } catch {}
+            }
+            const filtered = list.filter(u => u !== login);
+            const body = header + JSON.stringify({trusted: filtered}, null, 2);
+            core.setOutput("body", body);
+
+      - uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          comment-id: ${{ steps.find.outputs.comment-id }}
+          body: ${{ steps.update.outputs.body }}
+          edit-mode: replace
+
+      - uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: "Revoked **@${{ steps.parse.outputs.login }}** for this PR."
