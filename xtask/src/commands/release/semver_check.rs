@@ -200,7 +200,9 @@ pub mod checker {
 
             // Try to download from GitHub Actions artifacts
             // Note: Artifacts have a 90-day retention limit for public repositories
-            let baseline_sources = vec![BaselineSource::Artifact("api-baselines-esp-hal".to_string())];
+            let baseline_sources = vec![BaselineSource::Artifact(
+                "api-baselines-esp-hal".to_string(),
+            )];
 
             let mut downloaded = false;
             for baseline_source in baseline_sources {
@@ -268,7 +270,9 @@ pub mod checker {
         artifact_name: &str,
         repo: &str,
     ) -> anyhow::Result<bool> {
-        use std::process::Command;
+        use std::{io::Cursor, process::Command};
+
+        use zip::ZipArchive;
 
         // Check if GitHub CLI is available
         let gh_check = Command::new("gh").arg("--version").output();
@@ -288,10 +292,7 @@ pub mod checker {
                 "Accept: application/vnd.github+json",
                 "-H",
                 "X-GitHub-Api-Version: 2022-11-28",
-                &format!(
-                    "/repos/{}/actions/artifacts?name={}",
-                    repo, artifact_name
-                ),
+                &format!("/repos/{}/actions/artifacts?name={}", repo, artifact_name),
             ])
             .output();
 
@@ -372,71 +373,86 @@ pub mod checker {
                 let stderr = String::from_utf8_lossy(&result.stderr);
                 log::debug!(
                     "Failed to download artifact id {} (name: {}). stderr: {}",
-                    id, artifact_name, stderr
+                    id,
+                    artifact_name,
+                    stderr
                 );
                 continue;
             }
 
-            // Write ZIP to a temporary file
-            let zip_path = package_path.join("artifact.zip");
-            if let Err(e) = std::fs::write(&zip_path, &result.stdout) {
-                log::debug!("Failed to write artifact ZIP to {}: {}", zip_path.display(), e);
-                continue;
-            }
+            let baseline_dir = package_path.join("api-baseline");
+            std::fs::create_dir_all(&baseline_dir)?;
 
-            // Extract ZIP into the package directory
-            let unzip = Command::new("unzip")
-                .args(["-o", zip_path.to_str().unwrap(), "-d", package_path.to_str().unwrap()])
-                .output();
-
-            match unzip {
-                Ok(unzip_result) if unzip_result.status.success() => {
-                    // Cleanup ZIP file
-                    let _ = std::fs::remove_file(&zip_path);
-
-                    // Move extracted baseline files into `api-baseline` directory
-                    let baseline_dir = package_path.join("api-baseline");
-                    std::fs::create_dir_all(&baseline_dir)?;
-
-                    if let Ok(entries) = std::fs::read_dir(package_path) {
-                        for entry in entries.flatten() {
-                            let path = entry.path();
-                            if path.extension().and_then(|s| s.to_str()) == Some("gz")
-                                && path
-                                    .file_stem()
-                                    .and_then(|s| s.to_str())
-                                    .map(|s| s.ends_with(".json"))
-                                    .unwrap_or(false)
-                            {
-                                let filename = path.file_name().unwrap();
-                                let dest = baseline_dir.join(filename);
-                                if let Err(e) = std::fs::rename(&path, &dest) {
-                                    log::warn!(
-                                        "Failed to move {} to baseline directory: {}",
-                                        path.display(),
-                                        e
-                                    );
-                                } else {
-                                    log::debug!("Moved {} to {}", path.display(), dest.display());
-                                }
-                            }
-                        }
-                    }
-
-                    return Ok(true);
-                }
-                Ok(unzip_result) => {
-                    let stderr = String::from_utf8_lossy(&unzip_result.stderr);
-                    log::debug!("Failed to unzip artifact ZIP: {}", stderr);
-                    let _ = std::fs::remove_file(&zip_path);
-                }
+            let mut archive = match ZipArchive::new(Cursor::new(&result.stdout)) {
+                Ok(arc) => arc,
                 Err(e) => {
-                    log::debug!("Error invoking unzip: {}", e);
-                    let _ = std::fs::remove_file(&zip_path);
+                    log::debug!("Failed to open ZIP archive for artifact id {}: {}", id, e);
+                    continue;
+                }
+            };
+
+            // Extract only *.json.gz files into api-baseline/
+            // https://github.com/zip-rs/zip2/blob/master/examples/extract.rs
+            for i in 0..archive.len() {
+                let mut file = match archive.by_index(i) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        log::debug!("Failed to access ZIP entry {}: {}", i, e);
+                        continue;
+                    }
+                };
+
+                if !file.is_file() {
+                    continue;
+                }
+
+                // Sanitize internal path
+                let Some(safe_path) = file.enclosed_name() else {
+                    continue;
+                };
+
+                // We only want files like "<anything>.json.gz"
+                if !(safe_path.extension().and_then(|e| e.to_str()) == Some("gz")
+                    && safe_path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .map(|s| s.ends_with(".json"))
+                        .unwrap_or(false))
+                {
+                    continue;
+                }
+
+                // Flatten to just the filename
+                let out_path = match safe_path.file_name() {
+                    Some(name) => baseline_dir.join(name),
+                    None => continue,
+                };
+
+                match std::fs::File::create(&out_path) {
+                    Ok(mut out) => {
+                        if let Err(e) = std::io::copy(&mut file, &mut out) {
+                            log::warn!("Failed to write {}: {}", out_path.display(), e);
+                            continue;
+                        }
+                        log::debug!("Extracted {}", out_path.display());
+                    }
+                    Err(e) => log::warn!("Failed to create {}: {}", out_path.display(), e),
+                }
+            }
+            // successfully return if artifact produced any baselines
+            if let Ok(entries) = std::fs::read_dir(&baseline_dir) {
+                if entries.flatten().any(|e| {
+                    let p = e.path();
+                    p.extension().and_then(|s| s.to_str()) == Some("gz")
+                        && p.file_stem()
+                            .and_then(|s| s.to_str())
+                            .map(|s| s.ends_with(".json"))
+                            .unwrap_or(false)
+                }) {
+                    return Ok(true);
                 }
             }
         }
-
         log::debug!("No downloadable artifacts found for {}", artifact_name);
         Ok(false)
     }
