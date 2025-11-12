@@ -19,13 +19,13 @@ extern "C" fn _getreent() -> *mut esp_rom_sys::_reent {
     })
 }
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "esp-alloc")]
 #[repr(C)]
 struct AllocationHeader {
     size: usize,
 }
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "esp-alloc")]
 extern "C" fn _malloc_r(_reent: *mut esp_rom_sys::_reent, size: usize) -> *mut c_void {
     use alloc::alloc::alloc;
     use core::{alloc::Layout, mem, ptr};
@@ -60,7 +60,7 @@ extern "C" fn _malloc_r(_reent: *mut esp_rom_sys::_reent, size: usize) -> *mut c
     }
 }
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "esp-alloc")]
 extern "C" fn _free_r(_reent: *mut esp_rom_sys::_reent, ptr: *mut c_void) {
     use alloc::alloc::dealloc;
     use core::{alloc::Layout, mem};
@@ -85,24 +85,22 @@ extern "C" fn _free_r(_reent: *mut esp_rom_sys::_reent, ptr: *mut c_void) {
     }
 }
 
-#[cfg(not(feature = "alloc"))]
-#[link_name = "malloc_internal"]
-extern "C" {
+#[cfg(all(feature = "alloc", not(feature = "esp-alloc")))]
+unsafe extern "C" {
     fn malloc_internal(size: usize) -> *mut c_void;
 }
 
-#[cfg(not(feature = "alloc"))]
-#[link_name = "free_internal"]
-extern "C" {
+#[cfg(all(feature = "alloc", not(feature = "esp-alloc")))]
+unsafe extern "C" {
     fn free_internal(ptr: *mut c_void);
 }
 
-#[cfg(not(feature = "alloc"))]
+#[cfg(all(feature = "alloc", not(feature = "esp-alloc")))]
 extern "C" fn _malloc_r(_reent: *mut esp_rom_sys::_reent, size: usize) -> *mut c_void {
     unsafe { malloc_internal(size) }
 }
 
-#[cfg(not(feature = "alloc"))]
+#[cfg(all(feature = "alloc", not(feature = "esp-alloc")))]
 extern "C" fn _free_r(_reent: *mut esp_rom_sys::_reent, ptr: *mut c_void) {
     unsafe { free_internal(ptr) }
 }

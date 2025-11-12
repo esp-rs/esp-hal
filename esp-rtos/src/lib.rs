@@ -125,14 +125,14 @@ pub enum TraceEvents {
 // Polyfill the InternalMemory allocator
 #[cfg(all(feature = "alloc", not(feature = "esp-alloc")))]
 mod esp_alloc {
-    use core::{alloc::Layout, ptr::NonNull};
+    use core::{alloc::Layout, ffi::c_void, ptr::NonNull};
 
     use allocator_api2::alloc::{AllocError, Allocator};
 
     unsafe extern "C" {
-        fn malloc_internal(size: usize) -> *mut u8;
+        fn malloc_internal(size: usize) -> *mut c_void;
 
-        fn free_internal(ptr: *mut u8);
+        fn free_internal(ptr: *mut c_void);
     }
 
     /// An allocator that uses internal memory only.
@@ -173,20 +173,23 @@ mod esp_alloc {
             };
 
             let ptr = NonNull::new(ptr).ok_or(AllocError)?;
-            Ok(NonNull::slice_from_raw_parts(ptr, layout.size()))
+            Ok(NonNull::slice_from_raw_parts(
+                ptr.cast::<u8>(),
+                layout.size(),
+            ))
         }
 
         unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
             // We assume malloc returns a 4-byte aligned pointer. In that case we don't have to
             // align, so we don't have a prefix.
             if layout.align() <= 4 {
-                unsafe { free_internal(ptr.as_ptr()) };
+                unsafe { free_internal(ptr.as_ptr().cast::<c_void>()) };
             } else {
                 // Retrieve the amount of padding bytes used for alignment.
                 let prefix_ptr = ptr.as_ptr().wrapping_sub(4);
                 let prefix_bytes = unsafe { prefix_ptr.cast::<usize>().read() };
 
-                unsafe { free_internal(prefix_ptr.wrapping_sub(prefix_bytes)) };
+                unsafe { free_internal(prefix_ptr.wrapping_sub(prefix_bytes).cast::<c_void>()) };
             }
         }
     }
