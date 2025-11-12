@@ -17,13 +17,15 @@ jobs:
       startsWith(github.event.comment.body, '/i-trust-you ')
     runs-on: ubuntu-latest
     steps:
-      - id: parse
-        shell: bash
-        run: |
-          body='${{ github.event.comment.body }}'
-          login=$(echo "$body" | cut -d' ' -f2- | sed 's/^@//' | tr -dc 'A-Za-z0-9-')
-          [ -n "$login" ] || { echo "Empty login"; exit 1; }
-          echo "login=$login" >> $GITHUB_OUTPUT
+      - name: Parse login
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = (context.payload.comment.body || '').trim();
+            const m = body.match(/^\/i-trust-you\s+@([A-Za-z0-9-]+)\b$/i);
+            if (!m) core.setFailed("Usage: /i-trust-you @<login>");
+            core.setOutput('login', m[1].toLowerCase());
 
       - id: find
         uses: peter-evans/find-comment@v3
@@ -37,7 +39,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const login = "${{ steps.parse.outputs.login }}".toLowerCase();
+            const login = "${{ steps.parse.outputs.login }}";
             const header = "### [HIL trust list]\n";
             const existing = `${{ toJson(steps.find.outputs.comment-body || '') }}`;
             let list = [];
@@ -46,7 +48,8 @@ jobs:
               try { list = JSON.parse(json).trusted || []; } catch {}
             }
             if (!list.includes(login)) list.push(login);
-            const body = header + JSON.stringify({trusted: list}, null, 2);
+            list = Array.from(new Set(list)).sort();
+            const body = header + JSON.stringify({ trusted: list }, null, 2);
             core.setOutput("body", body);
 
       - uses: peter-evans/create-or-update-comment@v4
@@ -59,7 +62,7 @@ jobs:
       - uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.issue.number }}
-          body: "Trusted **@${{ steps.parse.outputs.login }}** for this PR."
+          body: "Trusted **@${{ steps.parse.outputs.login }}** for this PR. They can now use `/hil quick` or `/hil full`."
 
   revoke:
     if: >
@@ -69,13 +72,15 @@ jobs:
       startsWith(github.event.comment.body, '/i-dont-trust ')
     runs-on: ubuntu-latest
     steps:
-      - id: parse
-        shell: bash
-        run: |
-          body='${{ github.event.comment.body }}'
-          login=$(echo "$body" | cut -d' ' -f2- | sed 's/^@//' | tr -dc 'A-Za-z0-9-')
-          [ -n "$login" ] || { echo "Empty login"; exit 1; }
-          echo "login=$login" >> $GITHUB_OUTPUT
+      - name: Parse login
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = (context.payload.comment.body || '').trim();
+            const m = body.match(/^\/i-dont-trust\s+@([A-Za-z0-9-]+)\b$/i);
+            if (!m) core.setFailed("Usage: /i-dont-trust @<login>");
+            core.setOutput('login', m[1].toLowerCase());
 
       - id: find
         uses: peter-evans/find-comment@v3
@@ -89,7 +94,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const login = "${{ steps.parse.outputs.login }}".toLowerCase();
+            const login = "${{ steps.parse.outputs.login }}";
             const header = "### [HIL trust list]\n";
             const existing = `${{ toJson(steps.find.outputs.comment-body || '') }}`;
             let list = [];
@@ -98,7 +103,7 @@ jobs:
               try { list = JSON.parse(json).trusted || []; } catch {}
             }
             const filtered = list.filter(u => u !== login);
-            const body = header + JSON.stringify({trusted: filtered}, null, 2);
+            const body = header + JSON.stringify({ trusted: filtered }, null, 2);
             core.setOutput("body", body);
 
       - uses: peter-evans/create-or-update-comment@v4

@@ -52,6 +52,7 @@ jobs:
               }
             }
             core.setOutput('allowed', allowed ? 'true' : 'false');
+
   hil-quick:
     # check every PR comment, check correct role, and explicitly look for '/hil quick'
     if: ${{ github.event.issue.pull_request && ( github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'OWNER' ) && startsWith(github.event.comment.body, '/hil quick') }}
@@ -100,6 +101,19 @@ jobs:
             Triggered full HIL run for
             #${{ github.event.issue.number }}.
 
+  # reply to untrusted users who try run HIL
+  hil-deny:
+    needs: auth
+    if: needs.auth.outputs.allowed != 'true' &&
+        (startsWith(github.event.comment.body, '/hil quick') || startsWith(github.event.comment.body, '/hil full'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inform not allowed
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: @${{ github.event.comment.user.login }}, sorry — you're not allowed to execute HIL runs for this PR.\n Please ask an `esp-rs` member/owner to grant you access.
+
   hil-help:
     # If it's a PR comment that starts with '/hil' but not the two valid forms
     if: ${{ github.event.issue.pull_request && startsWith(github.event.comment.body, '/hil') && !startsWith(github.event.comment.body, '/hil quick') && !startsWith(github.event.comment.body, '/hil full') }}
@@ -113,4 +127,12 @@ jobs:
             Usage:
             - `/hil quick` — run a smoke/quick HIL matrix
             - `/hil full` — run the full HIL matrix
-            _(Only repository members/collaborators can trigger runs.)_
+            If you aren't a repository **member/owner**, you must be **trusted for this PR**.
+            Maintainers can grant access with:
+            ```
+            /i-trust-you @<login>
+            ```
+            and revoke with:
+            ```
+            /i-dont-trust @<login>
+            ```
