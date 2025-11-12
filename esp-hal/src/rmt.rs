@@ -127,8 +127,7 @@
 //!
 //! let rx_config = RxChannelConfig::default()
 //!     .with_clk_divider(1)
-//!     .with_idle_threshold(10000)
-//!     .unwrap();
+//!     .with_idle_threshold(10000);
 //! # {channel}
 //! let delay = Delay::new();
 //! let mut data: [PulseCode; 48] = [PulseCode::default(); 48];
@@ -690,27 +689,9 @@ pub struct RxChannelConfig {
     /// Filter threshold in ticks
     filter_threshold: u8,
     /// Idle threshold in ticks, must not exceed [`MAX_RX_IDLE_THRESHOLD`]
-    // ChannelCreator::configure_rx relies on this being validated in the setter!
-    #[builder_lite(skip_setter)]
     idle_threshold: u16,
     /// The amount of memory blocks allocted to this channel
     memsize: u8,
-}
-
-impl RxChannelConfig {
-    /// Assign the given value to the `idle_threshold` field.
-    ///
-    /// Returns `None` when the `idle_threshold` exceeds [`MAX_RX_IDLE_THRESHOLD`].
-    pub fn with_idle_threshold(mut self, idle_threshold: u16) -> Option<Self> {
-        #[cfg_attr(any(esp32, esp32s2), allow(clippy::absurd_extreme_comparisons))]
-        if idle_threshold > MAX_RX_IDLE_THRESHOLD {
-            return None;
-        }
-
-        self.idle_threshold = idle_threshold;
-
-        Some(self)
-    }
 }
 
 impl Default for RxChannelConfig {
@@ -825,18 +806,18 @@ for_each_rmt_channel!(
                     fn configure_tx(
                         self,
                         config: &TxChannelConfig,
-                    ) -> Result<Channel<'ch, Dm, Tx>, (Error, Self)>
+                    ) -> Result<Channel<'ch, Dm, Tx>, Error>
                     where
                         Self: Sized,
                     {
                         let raw = unsafe { DynChannelAccess::conjure(ChannelIndex::[<Ch $idx>]) };
 
-                        let memsize = MemSize::from_blocks(config.memsize);
-                        if let Err(e) = reserve_channel(raw.channel(), RmtState::Tx, memsize) {
-                            return Err((e, self));
-                        };
+                        apply_tx_config(raw, config, false)?;
 
-                        let _guard = unsafe { configure_tx(raw, memsize, config, self._guard) };
+                        let _guard = match self._guard {
+                            Some(g) => DropState::MemAndGuard(g),
+                            None => DropState::MemoryOnly,
+                        };
 
                         Ok(Channel {
                             raw,
@@ -866,18 +847,18 @@ for_each_rmt_channel!(
                     fn configure_rx(
                         self,
                         config: &RxChannelConfig,
-                    ) -> Result<Channel<'ch, Dm, Rx>, (Error, Self)>
+                    ) -> Result<Channel<'ch, Dm, Rx>, Error>
                     where
                         Self: Sized,
                     {
                         let raw = unsafe { DynChannelAccess::conjure(ChannelIndex::[<Ch $idx>]) };
 
-                        let memsize = MemSize::from_blocks(config.memsize);
-                        if let Err(e) = reserve_channel(raw.channel(), RmtState::Rx, memsize) {
-                            return Err((e, self));
-                        };
+                        apply_rx_config(raw, config, false)?;
 
-                        let _guard = unsafe { configure_rx(raw, memsize, config, self._guard) };
+                        let _guard = match self._guard {
+                            Some(g) => DropState::MemAndGuard(g),
+                            None => DropState::MemoryOnly,
+                        };
 
                         Ok(Channel {
                             raw,
@@ -956,7 +937,7 @@ impl crate::interrupt::InterruptConfigurable for Rmt<'_, Blocking> {
 // because subsequent channels are in use so that we can't reserve the RAM),
 // restore all state and return with an error.
 #[inline(never)]
-fn reserve_channel(channel: u8, state: RmtState, memsize: MemSize) -> Result<(), Error> {
+fn reserve_channel_memory(channel: u8, state: RmtState, memsize: MemSize) -> Result<(), Error> {
     if memsize.blocks() == 0 || memsize.blocks() > NUM_CHANNELS as u8 - channel {
         return Err(Error::InvalidMemsize);
     }
@@ -974,8 +955,7 @@ fn reserve_channel(channel: u8, state: RmtState, memsize: MemSize) -> Result<(),
         {
             RmtState::store_range_rev(
                 RmtState::Unconfigured,
-                channel,
-                cur_channel,
+                channel..cur_channel,
                 Ordering::Relaxed,
             );
 
@@ -990,6 +970,20 @@ fn reserve_channel(channel: u8, state: RmtState, memsize: MemSize) -> Result<(),
     Ok(())
 }
 
+#[inline(never)]
+fn release_channel_memory<Dir: Direction>(raw: DynChannelAccess<Dir>) {
+    let channel = raw.channel();
+    let memsize = raw.memsize().blocks();
+
+    raw.set_memsize(MemSize::from_blocks(0));
+
+    RmtState::store_range_rev(
+        RmtState::Unconfigured,
+        channel..channel + memsize,
+        Ordering::Release,
+    );
+}
+
 // We store values of type `RmtState` in the global `STATE`. However, we also need atomic access,
 // thus the enum needs to be represented as AtomicU8. Thus, we end up with unsafe conversions
 // between `RmtState` and `u8` to avoid constant range checks.
@@ -997,6 +991,8 @@ fn reserve_channel(channel: u8, state: RmtState, memsize: MemSize) -> Result<(),
 // be stored to `STATE` such that other code in this driver does not need to be concerned with
 // these details.
 mod state {
+    use core::ops::Range;
+
     use portable_atomic::{AtomicU8, Ordering};
 
     use super::{Direction, DynChannelAccess, NUM_CHANNELS};
@@ -1056,9 +1052,9 @@ mod state {
 
         /// Store the given state to all channel states for an index range in reverse order.
         #[inline]
-        pub(super) fn store_range_rev(self, start: u8, end: u8, ordering: Ordering) {
-            for ch_num in (start as usize..end as usize).rev() {
-                STATE[ch_num].store(self as u8, ordering);
+        pub(super) fn store_range_rev(self, range: Range<u8>, ordering: Ordering) {
+            for ch_num in range.rev() {
+                STATE[ch_num as usize].store(self as u8, ordering);
             }
         }
 
@@ -1132,12 +1128,17 @@ pub const CHANNEL_RAM_SIZE: usize = property!("rmt.channel_ram_size");
 pub const HAS_RX_WRAP: bool = property!("rmt.has_rx_wrap");
 
 #[inline(never)]
-unsafe fn configure_tx(
+fn apply_tx_config(
     raw: DynChannelAccess<Tx>,
-    memsize: MemSize,
     config: &TxChannelConfig,
-    guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
-) -> DropState {
+    reconfigure: bool,
+) -> Result<(), Error> {
+    let memsize = MemSize::from_blocks(config.memsize);
+    if reconfigure {
+        release_channel_memory(raw);
+    }
+    reserve_channel_memory(raw.channel(), RmtState::Tx, memsize)?;
+
     raw.set_divider(config.clk_divider);
     raw.set_tx_carrier(
         config.carrier_modulation,
@@ -1148,19 +1149,26 @@ unsafe fn configure_tx(
     raw.set_tx_idle_output(config.idle_output, config.idle_output_level);
     raw.set_memsize(memsize);
 
-    match guard {
-        Some(g) => DropState::MemAndGuard(g),
-        None => DropState::MemoryOnly,
-    }
+    Ok(())
 }
 
 #[inline(never)]
-unsafe fn configure_rx(
+fn apply_rx_config(
     raw: DynChannelAccess<Rx>,
-    memsize: MemSize,
     config: &RxChannelConfig,
-    guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
-) -> DropState {
+    reconfigure: bool,
+) -> Result<(), Error> {
+    #[cfg_attr(any(esp32, esp32s2), allow(clippy::absurd_extreme_comparisons))]
+    if config.idle_threshold > MAX_RX_IDLE_THRESHOLD {
+        return Err(Error::InvalidArgument);
+    }
+
+    let memsize = MemSize::from_blocks(config.memsize);
+    if reconfigure {
+        release_channel_memory(raw);
+    }
+    reserve_channel_memory(raw.channel(), RmtState::Rx, memsize)?;
+
     raw.set_divider(config.clk_divider);
     raw.set_rx_carrier(
         config.carrier_modulation,
@@ -1172,10 +1180,7 @@ unsafe fn configure_rx(
     raw.set_rx_idle_threshold(config.idle_threshold);
     raw.set_memsize(memsize);
 
-    match guard {
-        Some(g) => DropState::MemAndGuard(g),
-        None => DropState::MemoryOnly,
-    }
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -1223,6 +1228,15 @@ where
 
         self
     }
+
+    /// Change the configuration.
+    ///
+    /// ## Errors
+    ///
+    /// This function returns an error if the ...
+    pub fn apply_config(&mut self, config: &TxChannelConfig) -> Result<(), Error> {
+        apply_tx_config(self.raw, config, true)
+    }
 }
 
 impl<'ch, Dm> Channel<'ch, Dm, Rx>
@@ -1241,6 +1255,15 @@ where
 
         self
     }
+
+    /// Change the configuration.
+    ///
+    /// ## Errors
+    ///
+    /// This function returns an error if the ...
+    pub fn apply_config(&mut self, config: &RxChannelConfig) -> Result<(), Error> {
+        apply_rx_config(self.raw, config, true)
+    }
 }
 
 impl<Dm, Dir> Drop for Channel<'_, Dm, Dir>
@@ -1250,20 +1273,7 @@ where
 {
     fn drop(&mut self) {
         if !matches!(self._guard, DropState::None) {
-            let memsize = self.raw.memsize();
-
-            // This isn't really necessary, but be extra sure that this channel can't
-            // interfere with others.
-            self.raw.set_memsize(MemSize::from_blocks(0));
-
-            // Existence of this `Channel` struct implies exclusive access to these hardware
-            // channels, thus simply store the new state.
-            RmtState::store_range_rev(
-                RmtState::Unconfigured,
-                self.raw.channel(),
-                self.raw.channel() + memsize.blocks(),
-                Ordering::Release,
-            );
+            release_channel_memory(self.raw);
         }
     }
 }
@@ -1274,7 +1284,7 @@ where
     Dm: crate::DriverMode,
 {
     /// Configure the TX channel
-    fn configure_tx(self, config: &TxChannelConfig) -> Result<Channel<'ch, Dm, Tx>, (Error, Self)>
+    fn configure_tx(self, config: &TxChannelConfig) -> Result<Channel<'ch, Dm, Tx>, Error>
     where
         Self: Sized;
 }
@@ -1285,7 +1295,7 @@ where
     Dm: crate::DriverMode,
 {
     /// Configure the RX channel
-    fn configure_rx(self, config: &RxChannelConfig) -> Result<Channel<'ch, Dm, Rx>, (Error, Self)>
+    fn configure_rx(self, config: &RxChannelConfig) -> Result<Channel<'ch, Dm, Rx>, Error>
     where
         Self: Sized;
 }
