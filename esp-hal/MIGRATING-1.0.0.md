@@ -2,17 +2,6 @@
 
 ## RMT Changes
 
-`RxChannelConfig` now validates the idle threshold, returning `None` in case the maximum value supported by hardware is exceeded:
-
-```diff
- let rx_config = RxChannelConfig::default()
--    .with_idle_threshold(1000);
-+    .with_idle_threshold(1000)
-+    .expect("Idle threshold of 1000 not supported by RMT peripheral");
-```
-
-Previously, `ChannelCreator::configure_rx` would return an error in this case.
-
 `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` have changed in a few ways:
 - both methods now take the configuration by reference,
 - the pin argument has been removed in favor of `Channel::with_pin`, which is infallible and avoids consuming the pin on error.

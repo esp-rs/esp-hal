@@ -9,13 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - RMT: All public types now derive `Debug` and `defmt::Format`. (#4302)
+- RMT: `Channel::apply_config` has been added. (#4302)
 
 
 ### Changed
 - RMT: `SingleShotTxTransaction` has been renamed to `TxTransaction`. (#4302)
 - RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` now take the configuration by reference. (#4302)
 - RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` don't take a pin anymore, instead `Channel::with_pin` has been added. (#4302)
-- RMT: `RxChannelConfig::with_idle_threshold` now validates the threshold, returning `None` in case its maximum value is exceeded. (#4302)
 
 
 ### Fixed
