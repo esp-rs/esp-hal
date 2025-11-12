@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Provide implementation for the `_getreent` syscall when the `alloc` feature is enabled (#4473)
+- Provide implementation for the `_malloc_r` and `_free_r` syscalls when the `alloc` feature is enabled (#4484)
 
 ### Changed
 
