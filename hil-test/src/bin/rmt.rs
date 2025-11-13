@@ -526,21 +526,21 @@ mod tests {
 
     #[test]
     fn rmt_loopback_simple(mut ctx: Context) {
-        // 20 codes fit a single RAM block
+        // Fit both tx and rx data into a single memory block
         let conf = LoopbackConfig::default();
         do_rmt_loopback(&mut ctx, &conf);
     }
 
     #[test]
     async fn rmt_loopback_simple_async(mut ctx: Context) {
-        // 20 codes fit a single RAM block
+        // Fit both tx and rx data into a single memory block
         let conf = LoopbackConfig::default();
         do_rmt_loopback_async(&mut ctx, &conf).await;
     }
 
     #[test]
     fn rmt_loopback_end_marker_field2(mut ctx: Context) {
-        // 20 codes fit a single RAM block
+        // Fit both tx and rx data into a single memory block
         let conf = LoopbackConfig {
             end_marker: EndMarkerConfig::Field2,
             ..Default::default()
@@ -550,6 +550,7 @@ mod tests {
 
     #[test]
     fn rmt_loopback_extended_ram(mut ctx: Context) {
+        // require/use 2 memory blocks for both tx and rx data -> no wrapping
         let conf = LoopbackConfig {
             tx_len: CHANNEL_RAM_SIZE * 3 / 2,
             tx_memsize: 2,
@@ -573,6 +574,7 @@ mod tests {
 
     #[test]
     async fn rmt_loopback_tx_wrap_async(mut ctx: Context) {
+        // require two RAM blocks; thus a tx channel with only 1 block requires wrapping.
         let conf = LoopbackConfig {
             tx_len: CHANNEL_RAM_SIZE * 3 / 2,
             tx_memsize: 1,
@@ -596,6 +598,7 @@ mod tests {
 
     #[test]
     async fn rmt_loopback_rx_wrap_async(mut ctx: Context) {
+        // require two RAM blocks; thus an rx channel with only 1 block requires wrapping.
         let conf = LoopbackConfig {
             tx_len: CHANNEL_RAM_SIZE * 3 / 2,
             tx_memsize: 2,
