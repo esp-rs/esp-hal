@@ -1,5 +1,12 @@
 name: HIL
 
+run-name: >
+  ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.pr_number != '' &&
+      format('HIL for PR #{0} ({1})', github.event.inputs.pr_number, github.event.inputs.matrix) ||
+      github.event_name == 'workflow_dispatch' &&
+      format('HIL (manual dispatch, {0})', github.event.inputs.matrix) ||
+      'HIL (merge queue)' }}
+
 on:
   # No automatic PR runs; we'll trigger via slash/label + keep merge queue
   merge_group:
@@ -18,6 +25,10 @@ on:
         description: "Test matrix size: quick|full"
         required: false
         default: "quick"
+      pr_number:
+        description: "Pull request number (for slash-triggered runs)"
+        required: false
+        default: ""
 
 # Cancel any currently running workflows from the same PR, branch, or
 # tag when a new workflow is triggered.
@@ -109,6 +120,7 @@ jobs:
           runner: esp32s3-usb
           host: armv7
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/build-tests
         with:
           event_name: ${{ github.event_name }}
@@ -133,6 +145,7 @@ jobs:
             runner: esp32s3-usb
             host: armv7
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/build-tests
         with:
           event_name: ${{ github.event_name }}
