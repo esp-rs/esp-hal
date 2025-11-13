@@ -1958,8 +1958,6 @@ where
 /// TX channel in async mode
 impl Channel<'_, Async, Tx> {
     /// Start transmitting the given pulse code sequence.
-    /// The length of sequence cannot exceed the size of the allocated RMT
-    /// RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn transmit<T>(&mut self, mut data: &[T]) -> impl Future<Output = Result<(), Error>>
     where
