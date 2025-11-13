@@ -2,6 +2,8 @@
 mod init_tests {
 
     use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
+    #[cfg(soc_has_wifi)]
+    use esp_hal::peripherals::WIFI;
     #[cfg(riscv)]
     use esp_hal::riscv::interrupt::free as interrupt_free;
     #[cfg(xtensa)]
@@ -15,21 +17,27 @@ mod init_tests {
         peripherals::{Peripherals, TIMG0},
         timer::timg::TimerGroup,
     };
-    use esp_radio::InitializationError;
+    #[cfg(soc_has_bt)]
+    use esp_radio::ble::controller::BleConnector;
+    #[cfg(soc_has_wifi)]
+    use esp_radio::wifi::WifiError;
     use esp_rtos::embassy::InterruptExecutor;
     use hil_test::mk_static;
+    use portable_atomic::Ordering;
     use static_cell::StaticCell;
 
     #[embassy_executor::task]
+    #[cfg(soc_has_wifi)]
     async fn try_init(
-        signal: &'static Signal<CriticalSectionRawMutex, Option<InitializationError>>,
+        signal: &'static Signal<CriticalSectionRawMutex, Option<WifiError>>,
+        wifi_peripheral: WIFI<'static>,
         timer: TIMG0<'static>,
         sw_int0: SoftwareInterrupt<'static, 0>,
     ) {
         let timg0 = TimerGroup::new(timer);
         esp_rtos::start(timg0.timer0, sw_int0);
 
-        match esp_radio::init() {
+        match esp_radio::wifi::new(wifi_peripheral, Default::default()) {
             Ok(_) => signal.signal(None),
             Err(err) => signal.signal(Some(err)),
         }
@@ -44,39 +52,40 @@ mod init_tests {
     }
 
     #[test]
-    fn test_init_fails_without_scheduler(_peripherals: Peripherals) {
+    #[cfg(soc_has_wifi)]
+    fn test_init_fails_without_scheduler(p: Peripherals) {
         // esp-rtos must be initialized before esp-radio.
-        let init = esp_radio::init();
+        let init = esp_radio::wifi::new(p.WIFI, Default::default());
 
-        assert!(matches!(
-            init,
-            Err(InitializationError::SchedulerNotInitialized),
-        ));
+        assert!(matches!(init, Err(WifiError::Unsupported)));
     }
 
     #[test]
+    #[cfg(soc_has_wifi)]
     fn test_init_fails_cs(p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
-        let init = critical_section::with(|_| esp_radio::init());
+        let init = critical_section::with(|_| esp_radio::wifi::new(p.WIFI, Default::default()));
 
-        assert!(matches!(init, Err(InitializationError::InterruptsDisabled)));
+        assert!(matches!(init, Err(WifiError::Unsupported)));
     }
 
     #[test]
+    #[cfg(soc_has_wifi)]
     fn test_init_fails_interrupt_free(p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
-        let init = interrupt_free(|| esp_radio::init());
+        let init = interrupt_free(|| esp_radio::wifi::new(p.WIFI, Default::default()));
 
-        assert!(matches!(init, Err(InitializationError::InterruptsDisabled)));
+        assert!(matches!(init, Err(WifiError::Unsupported)));
     }
 
     #[test]
+    #[cfg(soc_has_wifi)]
     async fn test_init_fails_in_interrupt_executor_task(p: Peripherals) {
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
 
@@ -86,17 +95,19 @@ mod init_tests {
 
         let spawner = executor_core0.start(Priority::Priority1);
 
-        let signal =
-            mk_static!(Signal<CriticalSectionRawMutex, Option<InitializationError>>, Signal::new());
+        let signal = mk_static!(Signal<CriticalSectionRawMutex, Option<WifiError>>,
+    Signal::new());
 
-        spawner.must_spawn(try_init(signal, p.TIMG0, sw_ints.software_interrupt0));
+        spawner.must_spawn(try_init(
+            signal,
+            p.WIFI,
+            p.TIMG0,
+            sw_ints.software_interrupt0,
+        ));
 
         let res = signal.wait().await;
 
-        assert!(matches!(
-            res,
-            Some(esp_radio::InitializationError::InterruptsDisabled),
-        ));
+        assert!(matches!(res, Some(WifiError::Unsupported)));
     }
 
     #[test]
@@ -106,16 +117,41 @@ mod init_tests {
         let timg0 = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
-        let esp_radio_ctrl =
-            &*mk_static!(esp_radio::Controller<'static>, esp_radio::init().unwrap());
-
         // Initialize, then de-initialize wifi
-        let wifi =
-            esp_radio::wifi::new(&esp_radio_ctrl, p.WIFI.reborrow(), Default::default()).unwrap();
+        let wifi = esp_radio::wifi::new(p.WIFI.reborrow(), Default::default()).unwrap();
+        assert_eq!(esp_radio::RADIO_REFCOUNT.load(Ordering::SeqCst), 1);
         drop(wifi);
 
         // Now, can we do it again?
-        let _wifi =
-            esp_radio::wifi::new(&esp_radio_ctrl, p.WIFI.reborrow(), Default::default()).unwrap();
+        let _wifi = esp_radio::wifi::new(p.WIFI.reborrow(), Default::default()).unwrap();
+        assert_eq!(esp_radio::RADIO_REFCOUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    #[cfg(soc_has_wifi)]
+    #[cfg(soc_has_bt)]
+    fn test_ref_counter(mut p: Peripherals) {
+        use portable_atomic::Ordering;
+        let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
+        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+
+        let connector = BleConnector::new(p.BT.reborrow(), Default::default()).unwrap();
+        assert_eq!(esp_radio::RADIO_REFCOUNT.load(Ordering::SeqCst), 1);
+
+        let _wifi = esp_radio::wifi::new(p.WIFI.reborrow(), Default::default()).unwrap();
+
+        assert_eq!(esp_radio::RADIO_REFCOUNT.load(Ordering::SeqCst), 2);
+
+        drop(connector);
+        assert_eq!(esp_radio::RADIO_REFCOUNT.load(Ordering::SeqCst), 1);
+
+        {
+            let _connector = BleConnector::new(p.BT.reborrow(), Default::default()).unwrap();
+
+            assert_eq!(esp_radio::RADIO_REFCOUNT.load(Ordering::SeqCst), 2);
+        }
+
+        assert_eq!(esp_radio::RADIO_REFCOUNT.load(Ordering::SeqCst), 1);
     }
 }

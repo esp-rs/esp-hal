@@ -9,7 +9,7 @@
 
 extern crate alloc;
 
-use alloc::{boxed::Box, string::ToString};
+use alloc::string::ToString;
 
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer, WithTimeout};
@@ -42,13 +42,8 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let esp_wifi_ctrl = Box::leak(Box::new(esp_radio::init().unwrap()));
-    let (mut controller, _interfaces) = esp_radio::wifi::new(
-        esp_wifi_ctrl,
-        peripherals.WIFI.reborrow(),
-        Config::default(),
-    )
-    .unwrap();
+    let (mut controller, _interfaces) =
+        esp_radio::wifi::new(peripherals.WIFI.reborrow(), Config::default()).unwrap();
 
     let mut i = 0;
     loop {
