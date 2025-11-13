@@ -374,7 +374,7 @@ struct Context {
 }
 
 impl Context {
-    fn setup_impl<'a, Dm: DriverMode + core::fmt::Debug>(
+    fn setup_impl<'a, Dm: DriverMode>(
         rmt: Rmt<'a, Dm>,
         rx: impl PeripheralInput<'a>,
         tx: impl PeripheralOutput<'a>,
