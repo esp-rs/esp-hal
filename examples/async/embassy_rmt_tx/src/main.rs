@@ -45,11 +45,9 @@ async fn main(_spawner: Spawner) {
 
     let mut channel = rmt
         .channel0
-        .configure_tx(
-            peripherals.GPIO4,
-            TxChannelConfig::default().with_clk_divider(255),
-        )
-        .unwrap();
+        .configure_tx(&TxChannelConfig::default().with_clk_divider(255))
+        .unwrap()
+        .with_pin(peripherals.GPIO4);
 
     let mut data = [PulseCode::new(Level::High, 200, Level::Low, 50); 20];
 

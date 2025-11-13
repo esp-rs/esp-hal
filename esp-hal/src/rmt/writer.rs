@@ -3,8 +3,9 @@ use procmacros::ram;
 
 use super::{DynChannelAccess, Error, PulseCode, Tx};
 
-#[derive(PartialEq)]
-pub(crate) enum WriterState {
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(super) enum WriterState {
     Active,
 
     Error(Error),
@@ -12,7 +13,9 @@ pub(crate) enum WriterState {
     Done,
 }
 
-pub(crate) struct RmtWriter {
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(super) struct RmtWriter {
     // The position in channel RAM to continue writing at; must be either
     // 0 or half the available RAM size if there's further data.
     // The position may be invalid if there's no data left.
@@ -22,7 +25,7 @@ pub(crate) struct RmtWriter {
 }
 
 impl RmtWriter {
-    pub(crate) fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             offset: 0,
             state: WriterState::Active,
@@ -34,7 +37,7 @@ impl RmtWriter {
     // If `initial` is set, fill the entire buffer. Otherwise, append half the buffer's length from
     // `data`.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub(crate) fn write<T>(&mut self, data: &mut &[T], raw: DynChannelAccess<Tx>, initial: bool)
+    pub(super) fn write<T>(&mut self, data: &mut &[T], raw: DynChannelAccess<Tx>, initial: bool)
     where
         T: Into<PulseCode> + Copy,
     {

@@ -4,7 +4,8 @@ use procmacros::ram;
 use super::{DynChannelAccess, Error, PulseCode, Rx};
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum ReaderState {
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(super) enum ReaderState {
     Active,
 
     Error(Error),
@@ -12,7 +13,9 @@ pub(crate) enum ReaderState {
     Done,
 }
 
-pub(crate) struct RmtReader {
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(super) struct RmtReader {
     // The position in channel RAM to continue reading from; must be either
     // 0 or half the available RAM size if there's further data.
     // The position may be invalid if there's no data left.
@@ -24,7 +27,7 @@ pub(crate) struct RmtReader {
 }
 
 impl RmtReader {
-    pub(crate) fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             offset: 0,
             total: 0,
@@ -37,7 +40,7 @@ impl RmtReader {
     // If `final_` is set, read a full buffer length, potentially wrapping around. Otherwise, fetch
     // half the buffer's length.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub(crate) fn read<T>(&mut self, data: &mut &mut [T], raw: DynChannelAccess<Rx>, final_: bool)
+    pub(super) fn read<T>(&mut self, data: &mut &mut [T], raw: DynChannelAccess<Rx>, final_: bool)
     where
         T: From<PulseCode>,
     {

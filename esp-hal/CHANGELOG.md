@@ -8,16 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- RMT: All public types now derive `Debug` and `defmt::Format`. (#4302)
+- RMT: `Channel::apply_config` has been added. (#4302)
 
 - Added blocking `send_break`, `wait_for_break` and `wait_for_break_with_timeout` for sending and detecting software breaks with the UART driver (#4284)
 - Added support for `RxBreakDetected` interrupt and `wait_for_break_async` for detecting software breaks asynchronously to the UART driver (#4284)
 
 ### Changed
+- RMT: `SingleShotTxTransaction` has been renamed to `TxTransaction`. (#4302)
+- RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` now take the configuration by reference. (#4302)
+- RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` don't take a pin anymore, instead `Channel::with_pin` has been added. (#4302)
 
 
 ### Fixed
 
 - ESP32: ADC1 readings are no longer inverted (#4423)
+- RMT: All blocking methods now return the channel on failure. (#4302)
+- RMT: the `place_rmt_driver_in_ram` option now also places the async interrupt handler in RAM. (#4302)
+- RMT: When dropping a Tx channel, the driver now disconnects the output pin from the peripheral. (#4302)
 
 ### Removed
 
@@ -32,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `work_queue` is no longer public (#4357)
 - UART memory is now powered down when the driver is no longer in use. (#4354)
+
 
 ### Removed
 
