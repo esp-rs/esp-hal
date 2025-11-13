@@ -241,14 +241,44 @@ use reader::{ReaderState, RmtReader};
 mod writer;
 use writer::{RmtWriter, WriterState};
 
+/// A configuration error
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum ConfigError {
+    /// The desired frequency is impossible to reach
+    UnreachableTargetFrequency,
+    /// The idle threshold exceeds [`MAX_RX_IDLE_THRESHOLD`]
+    IdleThresholdOutOfRange,
+    /// The memsize is 0 or larger than what the channel can support
+    MemsizeOutOfRange,
+    /// (Part of) the requested channel memory is in use by another channel
+    MemoryBlockNotAvailable,
+}
+
+impl core::error::Error for ConfigError {}
+
+impl core::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::UnreachableTargetFrequency => {
+                write!(f, "The desired frequency is impossible to reach")
+            }
+            Self::IdleThresholdOutOfRange => write!(f, "The idle threshold is out of range"),
+            Self::MemsizeOutOfRange => write!(f, "The memsize is out of range"),
+            Self::MemoryBlockNotAvailable => {
+                write!(f, "Memory block is not available for channel")
+            }
+        }
+    }
+}
+
 /// Errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 #[non_exhaustive]
 pub enum Error {
-    /// The desired frequency is impossible to reach
-    UnreachableTargetFrequency,
     /// The amount of pulses exceeds the size of the FIFO
     Overflow,
     /// An argument is invalid
@@ -257,14 +287,10 @@ pub enum Error {
     TransmissionError,
     /// No transmission end marker found
     EndMarkerMissing,
-    /// Memsize is not correct,
-    InvalidMemsize,
     /// The data length is invalid
     InvalidDataLength,
     /// Receiver error most likely RMT memory overflow
     ReceiverError,
-    /// Memory block is not available for channel
-    MemoryBlockNotAvailable,
 }
 
 impl core::error::Error for Error {}
@@ -272,19 +298,12 @@ impl core::error::Error for Error {}
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::UnreachableTargetFrequency => {
-                write!(f, "The desired frequency is impossible to reach")
-            }
-            Error::Overflow => write!(f, "The amount of pulses exceeds the size of the FIFO"),
-            Error::InvalidArgument => write!(f, "An argument is invalid"),
-            Error::TransmissionError => write!(f, "An error occurred during transmission"),
-            Error::EndMarkerMissing => write!(f, "No transmission end marker found"),
-            Error::InvalidMemsize => write!(f, "Memsize is not correct,"),
-            Error::InvalidDataLength => write!(f, "The data length is invalid"),
-            Error::ReceiverError => write!(f, "Receiver error most likely RMT memory overflow"),
-            Error::MemoryBlockNotAvailable => {
-                write!(f, "Memory block is not available for channel")
-            }
+            Self::Overflow => write!(f, "The amount of pulses exceeds the size of the FIFO"),
+            Self::InvalidArgument => write!(f, "An argument is invalid"),
+            Self::TransmissionError => write!(f, "An error occurred during transmission"),
+            Self::EndMarkerMissing => write!(f, "No transmission end marker found"),
+            Self::InvalidDataLength => write!(f, "The data length is invalid"),
+            Self::ReceiverError => write!(f, "Receiver error most likely RMT memory overflow"),
         }
     }
 }
@@ -806,7 +825,7 @@ for_each_rmt_channel!(
                     fn configure_tx(
                         self,
                         config: &TxChannelConfig,
-                    ) -> Result<Channel<'ch, Dm, Tx>, Error>
+                    ) -> Result<Channel<'ch, Dm, Tx>, ConfigError>
                     where
                         Self: Sized,
                     {
@@ -847,7 +866,7 @@ for_each_rmt_channel!(
                     fn configure_rx(
                         self,
                         config: &RxChannelConfig,
-                    ) -> Result<Channel<'ch, Dm, Rx>, Error>
+                    ) -> Result<Channel<'ch, Dm, Rx>, ConfigError>
                     where
                         Self: Sized,
                     {
@@ -902,7 +921,12 @@ impl ChannelIndex {
 
 impl<'rmt> Rmt<'rmt, Blocking> {
     /// Create a new RMT instance
-    pub fn new(peripheral: RMT<'rmt>, frequency: Rate) -> Result<Self, Error> {
+    ///
+    /// ## Errors
+    ///
+    /// This function can return
+    /// - [`ConfigError::UnreachableTargetFrequency`].
+    pub fn new(peripheral: RMT<'rmt>, frequency: Rate) -> Result<Self, ConfigError> {
         let this = Rmt::create(peripheral);
         self::chip_specific::configure_clock(ClockSource::default(), frequency)?;
         Ok(this)
@@ -937,9 +961,13 @@ impl crate::interrupt::InterruptConfigurable for Rmt<'_, Blocking> {
 // because subsequent channels are in use so that we can't reserve the RAM),
 // restore all state and return with an error.
 #[inline(never)]
-fn reserve_channel_memory(channel: u8, state: RmtState, memsize: MemSize) -> Result<(), Error> {
+fn reserve_channel_memory(
+    channel: u8,
+    state: RmtState,
+    memsize: MemSize,
+) -> Result<(), ConfigError> {
     if memsize.blocks() == 0 || memsize.blocks() > NUM_CHANNELS as u8 - channel {
-        return Err(Error::InvalidMemsize);
+        return Err(ConfigError::MemsizeOutOfRange);
     }
 
     let mut next_state = state;
@@ -959,7 +987,7 @@ fn reserve_channel_memory(channel: u8, state: RmtState, memsize: MemSize) -> Res
                 Ordering::Relaxed,
             );
 
-            return Err(Error::MemoryBlockNotAvailable);
+            return Err(ConfigError::MemoryBlockNotAvailable);
         }
 
         // Set the first channel to `state` (`Rx`|`Tx`), the remaining (if any) to
@@ -1132,7 +1160,7 @@ fn apply_tx_config(
     raw: DynChannelAccess<Tx>,
     config: &TxChannelConfig,
     reconfigure: bool,
-) -> Result<(), Error> {
+) -> Result<(), ConfigError> {
     let memsize = MemSize::from_blocks(config.memsize);
     if reconfigure {
         release_channel_memory(raw);
@@ -1157,10 +1185,10 @@ fn apply_rx_config(
     raw: DynChannelAccess<Rx>,
     config: &RxChannelConfig,
     reconfigure: bool,
-) -> Result<(), Error> {
+) -> Result<(), ConfigError> {
     #[cfg_attr(any(esp32, esp32s2), allow(clippy::absurd_extreme_comparisons))]
     if config.idle_threshold > MAX_RX_IDLE_THRESHOLD {
-        return Err(Error::InvalidArgument);
+        return Err(ConfigError::IdleThresholdOutOfRange);
     }
 
     let memsize = MemSize::from_blocks(config.memsize);
@@ -1233,9 +1261,10 @@ where
     ///
     /// ## Errors
     ///
-    /// This function returns [`Error::MemoryBlockNotAvailable`] if the requested hardware buffer is
-    /// already in use by another channel.
-    pub fn apply_config(&mut self, config: &TxChannelConfig) -> Result<(), Error> {
+    /// This function can return
+    /// - [`ConfigError::MemoryBlockNotAvailable`],
+    /// - [`ConfigError::MemsizeOutOfRange`].
+    pub fn apply_config(&mut self, config: &TxChannelConfig) -> Result<(), ConfigError> {
         apply_tx_config(self.raw, config, true)
     }
 }
@@ -1261,10 +1290,11 @@ where
     ///
     /// ## Errors
     ///
-    /// This function returns [`Error::MemoryBlockNotAvailable`] if the requested hardware buffer is
-    /// already in use by another channel. It returns [`Error::InvalidArgument`] if
-    /// `config.idle_threshold()` exceeds [`MAX_RX_IDLE_THRESHOLD`].
-    pub fn apply_config(&mut self, config: &RxChannelConfig) -> Result<(), Error> {
+    /// This function can return
+    /// - [`ConfigError::MemoryBlockNotAvailable`],
+    /// - [`ConfigError::MemsizeOutOfRange`],
+    /// - [`ConfigError::IdleThresholdOutOfRange`].
+    pub fn apply_config(&mut self, config: &RxChannelConfig) -> Result<(), ConfigError> {
         apply_rx_config(self.raw, config, true)
     }
 }
@@ -1291,7 +1321,7 @@ where
     /// ## Errors
     ///
     /// Returns errors under the same conditions as [`Channel<Tx>::apply_config`].
-    fn configure_tx(self, config: &TxChannelConfig) -> Result<Channel<'ch, Dm, Tx>, Error>
+    fn configure_tx(self, config: &TxChannelConfig) -> Result<Channel<'ch, Dm, Tx>, ConfigError>
     where
         Self: Sized;
 }
@@ -1306,7 +1336,7 @@ where
     /// ## Errors
     ///
     /// Returns errors under the same conditions as [`Channel<Rx>::apply_config`].
-    fn configure_rx(self, config: &RxChannelConfig) -> Result<Channel<'ch, Dm, Rx>, Error>
+    fn configure_rx(self, config: &RxChannelConfig) -> Result<Channel<'ch, Dm, Rx>, ConfigError>
     where
         Self: Sized;
 }
@@ -2279,9 +2309,9 @@ mod chip_specific {
     use super::{
         ChannelIndex,
         ClockSource,
+        ConfigError,
         Direction,
         DynChannelAccess,
-        Error,
         Event,
         Level,
         LoopMode,
@@ -2292,15 +2322,15 @@ mod chip_specific {
     };
     use crate::{peripherals::RMT, time::Rate};
 
-    pub(super) fn configure_clock(source: ClockSource, frequency: Rate) -> Result<(), Error> {
+    pub(super) fn configure_clock(source: ClockSource, frequency: Rate) -> Result<(), ConfigError> {
         let src_clock = source.freq();
 
         if frequency > src_clock {
-            return Err(Error::UnreachableTargetFrequency);
+            return Err(ConfigError::UnreachableTargetFrequency);
         }
 
         let Ok(div) = u8::try_from((src_clock / frequency) - 1) else {
-            return Err(Error::UnreachableTargetFrequency);
+            return Err(ConfigError::UnreachableTargetFrequency);
         };
 
         #[cfg(not(soc_has_pcr))]
@@ -2790,9 +2820,9 @@ mod chip_specific {
     use super::{
         ChannelIndex,
         ClockSource,
+        ConfigError,
         Direction,
         DynChannelAccess,
-        Error,
         Event,
         Level,
         MemSize,
@@ -2803,9 +2833,9 @@ mod chip_specific {
     };
     use crate::{peripherals::RMT, time::Rate};
 
-    pub(super) fn configure_clock(source: ClockSource, frequency: Rate) -> Result<(), Error> {
+    pub(super) fn configure_clock(source: ClockSource, frequency: Rate) -> Result<(), ConfigError> {
         if frequency != source.freq() {
-            return Err(Error::UnreachableTargetFrequency);
+            return Err(ConfigError::UnreachableTargetFrequency);
         }
 
         let rmt = RMT::regs();

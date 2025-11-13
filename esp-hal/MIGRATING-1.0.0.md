@@ -61,3 +61,11 @@ This applies to
 - `Channel<'_, Blocking, Tx>::transmit`,
 - `Channel<'_, Blocking, Tx>::transmit_continuously`,
 - `Channel<'_, Blocking, Rx>::receive`.
+
+Configuration methods
+- `Rmt::new`,
+- `ChannelCreator::configure_tx`,
+- `ChannelCreator::configure_rx`,
+now return `ConfigError` instead of `Error`.
+Corresponding enum variants have been removed from `Error`, and some variants
+that are now part of `ConfigError` have been renamed.
