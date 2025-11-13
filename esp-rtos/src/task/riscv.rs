@@ -131,7 +131,7 @@ pub(crate) fn new_task_context(
     let stack_top = stack_top - (stack_top % 16);
 
     CpuContext {
-        pc: super::task_wrapper as usize,
+        pc: super::task_wrapper as *const () as usize,
         a0: task as usize,
         a1: param as usize,
         sp: stack_top,
@@ -171,7 +171,7 @@ pub fn task_switch(old_ctx: *mut CpuContext, new_ctx: *mut CpuContext) {
         register::mstatus::write(register::mstatus::Mstatus::from_bits(mstatus & !(1 << 7)));
 
         // load address of sys_switch into MEPC - will run after all registers are restored
-        register::mepc::write(sys_switch as usize);
+        register::mepc::write(sys_switch as *const () as usize);
     }
 }
 
