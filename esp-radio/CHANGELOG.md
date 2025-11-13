@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ble::mac` to get the MAC address of the device (#4485)
 - `last_calibration_result` to get the result of the last calibration (#4479)
 
 ### Changed
