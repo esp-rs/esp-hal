@@ -87,22 +87,22 @@ extern "C" fn _free_r(_reent: *mut esp_rom_sys::_reent, ptr: *mut c_void) {
 
 #[cfg(all(feature = "alloc", not(feature = "esp-alloc")))]
 unsafe extern "C" {
-    fn malloc_internal(size: usize) -> *mut c_void;
+    fn malloc_internal(size: usize) -> *mut u8;
 }
 
 #[cfg(all(feature = "alloc", not(feature = "esp-alloc")))]
 unsafe extern "C" {
-    fn free_internal(ptr: *mut c_void);
+    fn free_internal(ptr: *mut u8);
 }
 
 #[cfg(all(feature = "alloc", not(feature = "esp-alloc")))]
 extern "C" fn _malloc_r(_reent: *mut esp_rom_sys::_reent, size: usize) -> *mut c_void {
-    unsafe { malloc_internal(size) }
+    unsafe { malloc_internal(size) as *mut c_void }
 }
 
 #[cfg(all(feature = "alloc", not(feature = "esp-alloc")))]
 extern "C" fn _free_r(_reent: *mut esp_rom_sys::_reent, ptr: *mut c_void) {
-    unsafe { free_internal(ptr) }
+    unsafe { free_internal(ptr as *mut u8) }
 }
 
 pub fn setup_syscalls() {
