@@ -12,7 +12,7 @@ use esp_hal::asynch::AtomicWaker;
 use esp_phy::PhyInitGuard;
 
 use crate::{
-    Controller,
+    RadioRc,
     ble::{Config, InvalidConfigError, have_hci_read_data, read_hci, read_next, send_hci},
 };
 
@@ -21,7 +21,9 @@ use crate::{
 pub struct BleConnector<'d> {
     _phy_init_guard: PhyInitGuard<'d>,
     _device: crate::hal::peripherals::BT<'d>,
+    pub(crate) _radio_controller: RadioRc<'d>,
 }
+
 impl Drop for BleConnector<'_> {
     fn drop(&mut self) {
         crate::ble::ble_deinit();
@@ -31,14 +33,16 @@ impl<'d> BleConnector<'d> {
     /// Create and init a new BLE connector.
     #[instability::unstable]
     pub fn new(
-        _init: &'d Controller<'d>,
         device: crate::hal::peripherals::BT<'d>,
         config: Config,
     ) -> Result<BleConnector<'d>, InvalidConfigError> {
         config.validate()?;
+        let _radio_controller = RadioRc::init().map_err(|_init_err| InvalidConfigError)?;
+
         Ok(Self {
             _phy_init_guard: crate::ble::ble_init(&config),
             _device: device,
+            _radio_controller,
         })
     }
 

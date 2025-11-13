@@ -15,7 +15,6 @@ use esp_hal::{
 };
 use esp_radio::ble::controller::BleConnector;
 use log::{info, warn};
-use static_cell::StaticCell;
 use trouble_host::prelude::*;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -29,11 +28,8 @@ async fn main(_s: Spawner) {
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    static RADIO: StaticCell<esp_radio::Controller<'static>> = StaticCell::new();
-    let radio = RADIO.init(esp_radio::init().unwrap());
-
     let bluetooth = peripherals.BT;
-    let connector = BleConnector::new(radio, bluetooth, Default::default()).unwrap();
+    let connector = BleConnector::new(bluetooth, Default::default()).unwrap();
     let controller: ExternalController<_, 1> = ExternalController::new(connector);
 
     ble_bas_peripheral_run(controller).await;

@@ -74,13 +74,11 @@ fn main() -> ! {
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let esp_radio_ctrl = esp_radio::init().unwrap();
-
     let now = || time::Instant::now().duration_since_epoch().as_millis();
 
     // initializing Bluetooth first results in a more stable WiFi connection on
     // ESP32
-    let connector = BleConnector::new(&esp_radio_ctrl, peripherals.BT, Default::default()).unwrap();
+    let connector = BleConnector::new(peripherals.BT, Default::default()).unwrap();
     let hci = HciConnector::new(connector, now);
     let mut ble = Ble::new(&hci);
 
@@ -102,7 +100,7 @@ fn main() -> ! {
     println!("started advertising");
 
     let (mut controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI, Default::default()).unwrap();
+        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
     let mut device = interfaces.sta;
     let iface = create_interface(&mut device);

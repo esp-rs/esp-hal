@@ -40,7 +40,7 @@ use self::{
 #[instability::unstable]
 pub use crate::sys::include::wifi_csi_info_t; // FIXME
 use crate::{
-    Controller,
+    RadioRc,
     common_adapter::*,
     esp_wifi_result,
     hal::ram,
@@ -2142,7 +2142,6 @@ impl Config {
 /// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
 /// currently in use.
 pub fn new<'d>(
-    _inited: &'d Controller<'d>,
     device: crate::hal::peripherals::WIFI<'d>,
     config: Config,
 ) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
@@ -2151,6 +2150,8 @@ pub fn new<'d>(
     }
 
     config.validate();
+
+    let _radio_controller = RadioRc::init().map_err(|_| WifiError::Unsupported)?;
 
     unsafe {
         internal::G_CONFIG = wifi_init_config_t {
@@ -2203,6 +2204,7 @@ pub fn new<'d>(
     // Only create WifiController after we've enabled TRNG - otherwise returning an error from this
     // function will cause panic because WifiController::drop tries to disable the TRNG.
     let mut controller = WifiController {
+        _radio_controller,
         _phantom: Default::default(),
         beacon_timeout: 6,
         ap_beacon_timeout: 100,
@@ -2232,6 +2234,7 @@ pub fn new<'d>(
 /// Wi-Fi controller.
 #[non_exhaustive]
 pub struct WifiController<'d> {
+    _radio_controller: RadioRc<'d>,
     _phantom: PhantomData<&'d ()>,
     // Things we have to remember due to how esp-wifi works:
     beacon_timeout: u16,
@@ -2283,10 +2286,8 @@ impl WifiController<'_> {
     /// # use esp_radio::wifi::{ap::AccessPointConfig, ModeConfig};
     /// use esp_radio::wifi::Protocol;
     ///
-    /// let esp_radio_controller = esp_radio::init().unwrap();
-    ///
     /// let (mut wifi_controller, _interfaces) =
-    ///     esp_radio::wifi::new(&esp_radio_controller, peripherals.WIFI, Default::default())?;
+    ///     esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
     ///
     /// wifi_controller.set_config(&ModeConfig::AccessPoint(
     ///     AccessPointConfig::default().with_ssid("esp-radio".into()),
