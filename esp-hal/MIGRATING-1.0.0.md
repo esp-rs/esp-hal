@@ -29,7 +29,7 @@
 
 ```diff
 -let txn: SingleShotTxTransaction<'_, '_, PulseCode> = tx_channel.transmit(&data)?;
--let txn: TxTransaction<'_, '_, PulseCode> = tx_channel.transmit(&data)?;
++let txn: TxTransaction<'_, '_, PulseCode> = tx_channel.transmit(&data)?;
 ```
 
 Some blocking `Channel` methods that previously consumed the channel on error now return it in all cases:

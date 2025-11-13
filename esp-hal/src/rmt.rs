@@ -1233,7 +1233,8 @@ where
     ///
     /// ## Errors
     ///
-    /// This function returns an error if the ...
+    /// This function returns [`Error::MemoryBlockNotAvailable`] if the requested hardware buffer is
+    /// already in use by another channel.
     pub fn apply_config(&mut self, config: &TxChannelConfig) -> Result<(), Error> {
         apply_tx_config(self.raw, config, true)
     }
@@ -1260,7 +1261,9 @@ where
     ///
     /// ## Errors
     ///
-    /// This function returns an error if the ...
+    /// This function returns [`Error::MemoryBlockNotAvailable`] if the requested hardware buffer is
+    /// already in use by another channel. It returns [`Error::InvalidArgument`] if
+    /// `config.idle_threshold()` exceeds [`MAX_RX_IDLE_THRESHOLD`].
     pub fn apply_config(&mut self, config: &RxChannelConfig) -> Result<(), Error> {
         apply_rx_config(self.raw, config, true)
     }
@@ -1284,6 +1287,10 @@ where
     Dm: crate::DriverMode,
 {
     /// Configure the TX channel
+    ///
+    /// ## Errors
+    ///
+    /// Returns errors under the same conditions as [`Channel<Tx>::apply_config`].
     fn configure_tx(self, config: &TxChannelConfig) -> Result<Channel<'ch, Dm, Tx>, Error>
     where
         Self: Sized;
@@ -1295,6 +1302,10 @@ where
     Dm: crate::DriverMode,
 {
     /// Configure the RX channel
+    ///
+    /// ## Errors
+    ///
+    /// Returns errors under the same conditions as [`Channel<Rx>::apply_config`].
     fn configure_rx(self, config: &RxChannelConfig) -> Result<Channel<'ch, Dm, Rx>, Error>
     where
         Self: Sized;
