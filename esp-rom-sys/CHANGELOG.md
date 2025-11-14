@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed `ets_update_cpu_frequency_rom` not linking on ESP32 (#4500)
 
 ### Removed
 
