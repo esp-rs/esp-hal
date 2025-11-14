@@ -28,18 +28,18 @@ mod tests {
 
     // Compile-time test to check that esp-radio can be reinitialized.
     fn _esp_radio_can_be_reinited() {
-        let p = esp_hal::init(esp_hal::Config::default());
+        let mut p = esp_hal::init(esp_hal::Config::default());
 
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
         {
-            let _init = esp_radio::init().unwrap();
+            let _connector = BleConnector::new(p.BT.reborrow(), Default::default()).unwrap();
         }
 
         {
-            let _init = esp_radio::init().unwrap();
+            let _connector = BleConnector::new(p.BT.reborrow(), Default::default()).unwrap();
         }
     }
     const H4_TYPE_COMMAND: u8 = 1;
@@ -60,9 +60,8 @@ mod tests {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
-        let init = esp_radio::init().unwrap();
 
-        let mut connector = BleConnector::new(&init, p.BT, Default::default()).unwrap();
+        let mut connector = BleConnector::new(p.BT, Default::default()).unwrap();
 
         // send reset cmd
         pub const fn opcode(ogf: u8, ocf: u16) -> [u8; 2] {
@@ -111,9 +110,8 @@ mod tests {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
-        let init = esp_radio::init().unwrap();
 
-        let mut connector = BleConnector::new(&init, p.BT, Default::default()).unwrap();
+        let mut connector = BleConnector::new(p.BT, Default::default()).unwrap();
 
         // send reset cmd
         pub const fn opcode(ogf: u8, ocf: u16) -> [u8; 2] {

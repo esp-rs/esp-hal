@@ -136,8 +136,6 @@ extern crate alloc;
 // MUST be the first module
 mod fmt;
 
-use core::marker::PhantomData;
-
 use esp_hal::{
     self as hal,
 
@@ -177,6 +175,8 @@ pub(crate) mod sys {
     #[cfg(esp32s3)]
     pub use esp_wifi_sys_esp32s3::*;
 }
+
+use portable_atomic::{AtomicU32, Ordering};
 
 use crate::radio::{setup_radio_isr, shutdown_radio_isr};
 #[cfg(feature = "wifi")]
@@ -225,6 +225,7 @@ pub(crate) mod common_adapter;
 pub(crate) mod memory_fence;
 
 pub(crate) static ESP_RADIO_LOCK: RawMutex = RawMutex::new();
+pub static RADIO_REFCOUNT: AtomicU32 = AtomicU32::new(0);
 
 // this is just to verify that we use the correct defaults in `build.rs`
 #[allow(clippy::assertions_on_constants)] // TODO: try assert_eq once it's usable in const context
@@ -242,30 +243,6 @@ const _: () = {
         }
     };
 };
-
-#[derive(Debug, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-/// Controller for the ESP Radio driver.
-pub struct Controller<'d> {
-    _inner: PhantomData<&'d ()>,
-}
-
-impl Drop for Controller<'_> {
-    fn drop(&mut self) {
-        // Disable coexistence
-        #[cfg(coex)]
-        {
-            unsafe { crate::wifi::os_adapter::coex_disable() };
-            unsafe { crate::wifi::os_adapter::coex_deinit() };
-        }
-
-        shutdown_radio_isr();
-
-        #[cfg(esp32)]
-        // Allow using `ADC2` again
-        release_adc2(unsafe { esp_hal::Internal::conjure() });
-    }
-}
 
 #[procmacros::doc_replace]
 /// Initialize for using Wi-Fi and or BLE.
@@ -289,33 +266,10 @@ impl Drop for Controller<'_> {
 )]
 /// - The function may return an error if interrupts are disabled.
 /// - The function may return an error if initializing the underlying driver fails.
-///
-/// ## Example
-///
-/// For examples of the necessary setup, see your RTOS's documentation. If you are
-/// using the `esp-rtos` crate, you will need to initialize the scheduler before calling this
-/// function:
-///
-/// ```rust, no_run
-/// # {before_snippet}
-/// use esp_hal::{interrupt::software::SoftwareInterruptControl, timer::timg::TimerGroup};
-///
-/// let timg0 = TimerGroup::new(peripherals.TIMG0);
-/// let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-/// esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
-///
-/// // You can now start esp-radio:
-/// let esp_radio_controller = esp_radio::init().unwrap();
-/// # {after_snippet}
-/// ```
-pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
+pub(crate) fn init() -> Result<(), InitializationError> {
     #[cfg(esp32)]
     if try_claim_adc2(unsafe { hal::Internal::conjure() }).is_err() {
         return Err(InitializationError::Adc2IsUsed);
-    }
-
-    if crate::is_interrupts_disabled() {
-        return Err(InitializationError::InterruptsDisabled);
     }
 
     if !preempt::initialized() {
@@ -342,9 +296,67 @@ pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
         error => return Err(InitializationError::Internal),
     }
 
-    Ok(Controller {
-        _inner: PhantomData,
-    })
+    debug!("Radio initialized");
+
+    Ok(())
+}
+
+pub(crate) fn deinit() {
+    // Disable coexistence
+    #[cfg(coex)]
+    {
+        unsafe { crate::wifi::os_adapter::coex_disable() };
+        unsafe { crate::wifi::os_adapter::coex_deinit() };
+    }
+
+    shutdown_radio_isr();
+
+    #[cfg(esp32)]
+    // Allow using `ADC2` again
+    release_adc2(unsafe { esp_hal::Internal::conjure() });
+
+    debug!("Radio deinitialized");
+}
+
+/// Management of the global reference count
+/// and conditional hardware initialization/deinitialization.
+#[derive(Debug)]
+pub(crate) struct RadioRefGuard;
+
+impl RadioRefGuard {
+    /// Increments the refcount. If the old count was 0, it performs hardware init.
+    /// If hardware init fails, it rolls back the refcount only once.
+    fn new() -> Result<Self, InitializationError> {
+        use critical_section::with;
+        with(|_| {
+            let prev = RADIO_REFCOUNT.fetch_add(1, Ordering::SeqCst);
+
+            if prev == 0
+                && let Err(e) = init()
+            {
+                RADIO_REFCOUNT.fetch_sub(1, Ordering::SeqCst);
+                return Err(e);
+            }
+
+            Ok(RadioRefGuard)
+        })
+    }
+}
+
+impl Drop for RadioRefGuard {
+    /// Decrements the refcount. If the count drops to 0, it performs hardware de-init.
+    fn drop(&mut self) {
+        use critical_section;
+        critical_section::with(|_| {
+            debug!("Dropping RadioRefGuard");
+            let prev = RADIO_REFCOUNT.fetch_sub(1, Ordering::SeqCst);
+
+            if prev == 1 {
+                // Last user dropped, run de-initialization
+                deinit();
+            }
+        });
+    }
 }
 
 /// Returns true if at least some interrupt levels are disabled.
@@ -360,7 +372,7 @@ fn is_interrupts_disabled() -> bool {
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-/// Error which can be returned during [`init`].
+/// Error which can be returned during .
 #[non_exhaustive]
 pub enum InitializationError {
     /// An internal error occurred.
@@ -370,9 +382,6 @@ pub enum InitializationError {
     WifiError(WifiError),
     /// The current CPU clock frequency is too low.
     WrongClockConfig,
-    /// Tried to initialize while interrupts are disabled.
-    /// This is not supported.
-    InterruptsDisabled,
     /// The scheduler is not initialized.
     SchedulerNotInitialized,
     #[cfg(esp32)]
@@ -393,10 +402,6 @@ impl core::fmt::Display for InitializationError {
             InitializationError::WrongClockConfig => {
                 write!(f, "The current CPU clock frequency is too low")
             }
-            InitializationError::InterruptsDisabled => write!(
-                f,
-                "Attempted to initialize while interrupts are disabled (Unsupported)"
-            ),
             InitializationError::SchedulerNotInitialized => {
                 write!(f, "The scheduler is not initialized")
             }
