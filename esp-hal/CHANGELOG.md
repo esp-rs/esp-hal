@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` don't take a pin anymore, instead `Channel::with_pin` has been added. (#4302)
 - RMT: Configuration errors have been split out of `rmt::Error` into the new `rmt::ConfigError` enum. (#4494)
 
+- Internal clock configuration rework (#4501)
 
 ### Fixed
 

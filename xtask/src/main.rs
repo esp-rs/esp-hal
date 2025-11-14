@@ -235,7 +235,7 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
     packages.sort();
 
     for package in packages {
-        xtask::format_package(workspace, package, args.check)?;
+        xtask::format_package(workspace, package, args.check, None)?;
     }
 
     Ok(())

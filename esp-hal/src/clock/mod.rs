@@ -1125,6 +1125,7 @@ impl Clocks {
         Self::measure_xtal_frequency().frequency()
     }
 
+    #[cfg(not(esp32))] // unused
     const fn xtal_frequency_from_config() -> Option<XtalClock> {
         let frequency_conf = esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY");
 
@@ -1144,6 +1145,7 @@ impl Clocks {
         );
     }
 
+    #[cfg(not(esp32))] // unused - the build-time config can be removed in favour of explicit configuration via esp_hal::init
     fn measure_xtal_frequency() -> XtalClock {
         if let Some(clock) = const { Self::xtal_frequency_from_config() } {
             // Use the configured frequency
@@ -1167,31 +1169,31 @@ impl Clocks {
 impl Clocks {
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = Self::measure_xtal_frequency();
+        use crate::soc::clocks::{ClockTree, request_cpu_clk};
 
-        if cpu_clock_speed != CpuClock::default() {
-            let pll_freq = match cpu_clock_speed {
-                CpuClock::_80MHz => PllClock::Pll320MHz,
-                CpuClock::_160MHz => PllClock::Pll320MHz,
-                CpuClock::_240MHz => PllClock::Pll480MHz,
-            };
-
-            clocks_ll::esp32_rtc_update_to_xtal(xtal_freq, 1);
-            clocks_ll::esp32_rtc_bbpll_enable();
-            clocks_ll::esp32_rtc_bbpll_configure(xtal_freq, pll_freq);
-            clocks_ll::set_cpu_freq(cpu_clock_speed);
+        // TODO: expose the whole new enum for custom options
+        match cpu_clock_speed {
+            CpuClock::_80MHz => crate::soc::clocks::CpuClock::_80MHz,
+            CpuClock::_160MHz => crate::soc::clocks::CpuClock::_160MHz,
+            CpuClock::_240MHz => crate::soc::clocks::CpuClock::_240MHz,
         }
+        .configure();
 
-        Self {
-            cpu_clock: cpu_clock_speed.frequency(),
-            apb_clock: Rate::from_mhz(80),
-            xtal_clock: Rate::from_mhz(xtal_freq.mhz()),
-            i2c_clock: Rate::from_mhz(80),
-            // The docs are unclear here. pwm_clock seems to be tied to clocks.apb_clock
-            // while simultaneously being fixed at 160 MHz.
-            // Testing showed 160 MHz to be correct for current clock configurations.
-            pwm_clock: Rate::from_mhz(160),
-        }
+        ClockTree::with(|clocks| {
+            request_cpu_clk(clocks);
+
+            // TODO: this struct can be removed once everything uses the new internal clock tree
+            // code
+            Self {
+                cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
+                apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
+                // FIXME: this assumes there is a crystal
+                xtal_clock: Rate::from_hz(crate::soc::clocks::xtl_clk_frequency(clocks)),
+                i2c_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
+                // TODO: model PLL_F160M
+                pwm_clock: Rate::from_mhz(160),
+            }
+        })
     }
 }
 

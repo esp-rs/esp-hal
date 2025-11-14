@@ -750,9 +750,6 @@ fn now() -> Instant {
 #[cfg(all(esp32, feature = "rt"))]
 pub(crate) fn time_init() {
     let apb = crate::Clocks::get().apb_clock.as_hz();
-    // we assume 80MHz APB clock source - there is no way to configure it in a
-    // different way currently
-    assert_eq!(apb, 80_000_000u32);
 
     let tg0 = TIMG0::regs();
 

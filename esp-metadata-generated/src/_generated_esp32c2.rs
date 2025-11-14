@@ -217,6 +217,49 @@ macro_rules! for_each_soc_xtal_options {
         (40)));
     };
 }
+#[macro_export]
+/// ESP-HAL must provide implementation for the following functions:
+/// ```rust, ignore
+/// ```
+macro_rules! define_clock_tree_types {
+    () => {
+        #[doc = r" Represents the device's clock tree."]
+        pub struct ClockTree {}
+        impl ClockTree {
+            #[doc = r" Locks the clock tree for exclusive access."]
+            pub fn with<R>(f: impl FnOnce(&mut ClockTree) -> R) -> R {
+                CLOCK_TREE.with(f)
+            }
+        }
+        static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
+            ::esp_sync::NonReentrantMutex::new(ClockTree {});
+        #[doc = r" Clock tree configuration."]
+        #[doc = r""]
+        #[doc = r" The fields of this struct are optional, with the following caveats:"]
+        #[doc = r" - If `XTL_CLK` is not specified, the crystal frequency will be"]
+        #[doc = r"   automatically detected if possible."]
+        #[doc = r" - The CPU and its upstream clock nodes will be set to a default configuration."]
+        #[doc = r" - Other unspecified clock sources will not be useable by peripherals."]
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub struct ClockConfig {}
+        impl ClockConfig {
+            fn apply(&self) {
+                ClockTree::with(|clocks| {});
+            }
+        }
+        fn increment_reference_count(refcount: &mut u32) -> bool {
+            let first = *refcount == 0;
+            *refcount += 1;
+            first
+        }
+        fn decrement_reference_count(refcount: &mut u32) -> bool {
+            *refcount -= 1;
+            let last = *refcount == 0;
+            last
+        }
+    };
+}
 /// Implement the `Peripheral` enum and enable/disable/reset functions.
 ///
 /// This macro is intended to be placed in `esp_hal::system`.

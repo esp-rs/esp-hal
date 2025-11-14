@@ -30,7 +30,8 @@ impl core::str::FromStr for Chip {
             "esp32s2" => Ok(Self::Esp32s2),
             "esp32s3" => Ok(Self::Esp32s3),
             _ => Err(alloc::format!(
-                "Unknown chip {s}. Possible options: esp32, esp32c2, esp32c3, esp32c6, esp32h2, esp32s2, esp32s3"
+                "Unknown chip {s}. Possible options: esp32, esp32c2, esp32c3, esp32c6, esp32h2, \
+                 esp32s2, esp32s3"
             )),
         }
     }
@@ -54,7 +55,8 @@ impl Chip {
             if std::env::var(env).is_ok() {
                 if chip.is_some() {
                     return Err(
-                        "Expected exactly one of the following features to be enabled: esp32, esp32c2, esp32c3, esp32c6, esp32h2, esp32s2, esp32s3",
+                        "Expected exactly one of the following features to be enabled: esp32, \
+                         esp32c2, esp32c3, esp32c6, esp32h2, esp32s2, esp32s3",
                     );
                 }
                 chip = Some(c);
@@ -63,7 +65,8 @@ impl Chip {
         match chip {
             Some(chip) => Ok(chip),
             None => Err(
-                "Expected exactly one of the following features to be enabled: esp32, esp32c2, esp32c3, esp32c6, esp32h2, esp32s2, esp32s3",
+                "Expected exactly one of the following features to be enabled: esp32, esp32c2, \
+                 esp32c3, esp32c6, esp32h2, esp32s2, esp32s3",
             ),
         }
     }
@@ -278,6 +281,33 @@ impl Chip {
                     "soc_rc_fast_clk_default_is_set",
                     "soc_rc_slow_clock=\"150000\"",
                     "soc_rc_slow_clock_is_set",
+                    "soc_has_clock_node_xtl_clk",
+                    "soc_has_clock_node_pll_clk",
+                    "soc_has_clock_node_apll_clk",
+                    "soc_has_clock_node_rc_fast_clk",
+                    "soc_has_clock_node_cpu_pll_div_in",
+                    "soc_has_clock_node_cpu_pll_div",
+                    "soc_has_clock_node_syscon_pre_div_in",
+                    "soc_has_clock_node_syscon_pre_div",
+                    "soc_has_clock_node_cpu_clk",
+                    "soc_has_clock_node_apb_clk_cpu_div2",
+                    "soc_has_clock_node_apb_clk_80m",
+                    "soc_has_clock_node_apb_clk",
+                    "soc_has_clock_node_ref_tick_pll",
+                    "soc_has_clock_node_ref_tick_apll",
+                    "soc_has_clock_node_ref_tick_xtal",
+                    "soc_has_clock_node_ref_tick_fosc",
+                    "soc_has_clock_node_ref_tick",
+                    "soc_has_clock_node_xtal32k_clk",
+                    "soc_has_clock_node_rc_slow_clk",
+                    "soc_has_clock_node_rc_fast_div_clk",
+                    "soc_has_clock_node_xtal_div_clk",
+                    "soc_has_clock_node_rtc_slow_clk",
+                    "soc_has_clock_node_rtc_fast_clk",
+                    "soc_has_clock_node_timg1_peripheral_clock",
+                    "soc_has_clock_node_timg1_calibration_clock",
+                    "soc_has_clock_node_timg0_peripheral_clock",
+                    "soc_has_clock_node_timg0_calibration_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "soc_has_multiple_xtal_options",
@@ -441,6 +471,33 @@ impl Chip {
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_rc_slow_clock=\"150000\"",
                     "cargo:rustc-cfg=soc_rc_slow_clock_is_set",
+                    "cargo:rustc-cfg=soc_has_clock_node_xtl_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_apll_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_rc_fast_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_cpu_pll_div_in",
+                    "cargo:rustc-cfg=soc_has_clock_node_cpu_pll_div",
+                    "cargo:rustc-cfg=soc_has_clock_node_syscon_pre_div_in",
+                    "cargo:rustc-cfg=soc_has_clock_node_syscon_pre_div",
+                    "cargo:rustc-cfg=soc_has_clock_node_cpu_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_apb_clk_cpu_div2",
+                    "cargo:rustc-cfg=soc_has_clock_node_apb_clk_80m",
+                    "cargo:rustc-cfg=soc_has_clock_node_apb_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_ref_tick_pll",
+                    "cargo:rustc-cfg=soc_has_clock_node_ref_tick_apll",
+                    "cargo:rustc-cfg=soc_has_clock_node_ref_tick_xtal",
+                    "cargo:rustc-cfg=soc_has_clock_node_ref_tick_fosc",
+                    "cargo:rustc-cfg=soc_has_clock_node_ref_tick",
+                    "cargo:rustc-cfg=soc_has_clock_node_xtal32k_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_rc_slow_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_rc_fast_div_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_xtal_div_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_rtc_slow_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_rtc_fast_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_timg1_peripheral_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_timg1_calibration_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_timg0_peripheral_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_timg0_calibration_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=soc_has_multiple_xtal_options",
@@ -2934,6 +2991,33 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_ref_tick_hz_is_set)");
     println!("cargo:rustc-check-cfg=cfg(soc_rc_fast_clk_default_is_set)");
     println!("cargo:rustc-check-cfg=cfg(soc_rc_slow_clock_is_set)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_xtl_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_apll_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_rc_fast_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpu_pll_div_in)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpu_pll_div)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_syscon_pre_div_in)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_syscon_pre_div)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpu_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_apb_clk_cpu_div2)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_apb_clk_80m)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_apb_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ref_tick_pll)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ref_tick_apll)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ref_tick_xtal)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ref_tick_fosc)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ref_tick)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_xtal32k_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_rc_slow_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_rc_fast_div_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_xtal_div_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_rtc_slow_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_rtc_fast_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg1_peripheral_clock)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg1_calibration_clock)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg0_peripheral_clock)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg0_calibration_clock)");
     println!("cargo:rustc-check-cfg=cfg(has_dram_region)");
     println!("cargo:rustc-check-cfg=cfg(has_dram2_uninit_region)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_multiple_xtal_options)");
@@ -3119,20 +3203,25 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(gpio_constant_1_input, values(\"56\",\"30\"))");
     println!("cargo:rustc-check-cfg=cfg(gpio_func_in_sel_offset, values(\"0\"))");
     println!(
-        "cargo:rustc-check-cfg=cfg(gpio_input_signal_max, values(\"206\",\"100\",\"124\",\"242\",\"255\"))"
+        "cargo:rustc-check-cfg=cfg(gpio_input_signal_max, \
+         values(\"206\",\"100\",\"124\",\"242\",\"255\"))"
     );
     println!("cargo:rustc-check-cfg=cfg(gpio_output_signal_max, values(\"256\",\"128\"))");
     println!(
-        "cargo:rustc-check-cfg=cfg(i2c_master_i2c0_data_register_ahb_address, values(\"1610690588\"))"
+        "cargo:rustc-check-cfg=cfg(i2c_master_i2c0_data_register_ahb_address, \
+         values(\"1610690588\"))"
     );
     println!(
-        "cargo:rustc-check-cfg=cfg(i2c_master_max_bus_timeout, values(\"1048575\",\"31\",\"16777215\"))"
+        "cargo:rustc-check-cfg=cfg(i2c_master_max_bus_timeout, \
+         values(\"1048575\",\"31\",\"16777215\"))"
     );
     println!("cargo:rustc-check-cfg=cfg(i2c_master_ll_intr_mask, values(\"262143\",\"131071\"))");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_fifo_size, values(\"32\",\"16\"))");
     println!("cargo:rustc-check-cfg=cfg(interrupts_status_registers, values(\"3\",\"2\",\"4\"))");
     println!(
-        "cargo:rustc-check-cfg=cfg(rmt_ram_start, values(\"1073047552\",\"1610703872\",\"1610638336\",\"1610642432\",\"1061250048\",\"1610704896\"))"
+        "cargo:rustc-check-cfg=cfg(rmt_ram_start, \
+         values(\"1073047552\",\"1610703872\",\"1610638336\",\"1610642432\",\"1061250048\",\"\
+         1610704896\"))"
     );
     println!("cargo:rustc-check-cfg=cfg(rmt_channel_ram_size, values(\"64\",\"48\"))");
     println!("cargo:rustc-check-cfg=cfg(rng_apb_cycle_wait_num, values(\"16\"))");
