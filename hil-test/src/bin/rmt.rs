@@ -35,6 +35,7 @@ use esp_hal::{
     rmt::{
         CHANNEL_RAM_SIZE,
         Channel,
+        ConfigError,
         Error,
         HAS_RX_WRAP,
         PulseCode,
@@ -637,7 +638,7 @@ mod tests {
         // Configuring channel 1 should fail, since channel 0 already uses its memory.
         let ch1 = rmt.channel1.configure_tx(&TxChannelConfig::default());
 
-        assert!(matches!(ch1, Err(Error::MemoryBlockNotAvailable)));
+        assert!(matches!(ch1, Err(ConfigError::MemoryBlockNotAvailable)));
     }
 
     #[test]
@@ -673,7 +674,7 @@ mod tests {
             .unwrap();
 
         let res = ch0.apply_config(&TxChannelConfig::default().with_memsize(2));
-        assert!(matches!(res, Err(Error::MemoryBlockNotAvailable)));
+        assert!(matches!(res, Err(ConfigError::MemoryBlockNotAvailable)));
 
         core::mem::drop(ch1);
 
@@ -683,7 +684,7 @@ mod tests {
         let res = rmt
             .channel1
             .configure_tx(&TxChannelConfig::default().with_memsize(1));
-        assert!(matches!(res, Err(Error::MemoryBlockNotAvailable)));
+        assert!(matches!(res, Err(ConfigError::MemoryBlockNotAvailable)));
     }
 
     macro_rules! test_channel_pair {
