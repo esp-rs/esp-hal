@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- ESP32: Reduced the TIMG0_LACT divider to 1 MHz (#4503)
 
 ### Fixed
 
