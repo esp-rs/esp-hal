@@ -27,3 +27,12 @@ impl From<ScanMethod> for esp_radio::wifi::ScanMethod {
     }
 }
 ```
+
+## Many types/functions in the `wifi` module are now in submodules
+
+- `PromiscuousPkt` and `Sniffer` are now located in `wifi::sniffer`.
+- `AccessPointInfo` and `AccessPointConfig` are now located in `wifi::ap`.
+- `ClientConfig` is now located in `wifi::sta`.
+- `EapFastConfig`, `TlsPhase2Method` and `EapClientConfig` are now located in `wifi::ap::eap`.
+
+You will need to update any imports in your project accordingly.
