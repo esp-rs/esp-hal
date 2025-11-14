@@ -214,6 +214,7 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
+use esp_sync::RawMutex;
 use portable_atomic::Ordering;
 #[cfg(place_rmt_driver_in_ram)]
 use procmacros::ram;
@@ -1877,6 +1878,9 @@ impl<'ch> Channel<'ch, Blocking, Rx> {
 
 static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_CHANNELS];
 
+// Lock to synchronize access to registers that are shared between channels.
+static RMT_LOCK: RawMutex = RawMutex::new();
+
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct TxFuture<'a, T>
 where
@@ -2284,6 +2288,7 @@ mod chip_specific {
         Level,
         LoopMode,
         MemSize,
+        RMT_LOCK,
         Rx,
         Tx,
         WAKER,
@@ -2593,23 +2598,25 @@ mod chip_specific {
         pub fn set_tx_interrupt(self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
 
-            rmt.int_ena().modify(
-                #[inline(always)]
-                |_, w| {
-                    let ch_idx = self.ch_idx as u8;
+            RMT_LOCK.lock(|| {
+                rmt.int_ena().modify(
+                    #[inline(always)]
+                    |_, w| {
+                        let ch_idx = self.ch_idx as u8;
 
-                    if events.contains(Event::Error) {
-                        w.ch_tx_err(ch_idx).bit(enable);
-                    }
-                    if events.contains(Event::End) {
-                        w.ch_tx_end(ch_idx).bit(enable);
-                    }
-                    if events.contains(Event::Threshold) {
-                        w.ch_tx_thr_event(ch_idx).bit(enable);
-                    }
-                    w
-                },
-            );
+                        if events.contains(Event::Error) {
+                            w.ch_tx_err(ch_idx).bit(enable);
+                        }
+                        if events.contains(Event::End) {
+                            w.ch_tx_end(ch_idx).bit(enable);
+                        }
+                        if events.contains(Event::Threshold) {
+                            w.ch_tx_thr_event(ch_idx).bit(enable);
+                        }
+                        w
+                    },
+                )
+            });
         }
 
         #[allow(unused)]
@@ -2750,23 +2757,25 @@ mod chip_specific {
         pub fn set_rx_interrupt(self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
 
-            rmt.int_ena().modify(
-                #[inline(always)]
-                |_, w| {
-                    let ch_idx = self.ch_idx as u8;
+            RMT_LOCK.lock(|| {
+                rmt.int_ena().modify(
+                    #[inline(always)]
+                    |_, w| {
+                        let ch_idx = self.ch_idx as u8;
 
-                    if events.contains(Event::Error) {
-                        w.ch_rx_err(ch_idx).bit(enable);
-                    }
-                    if events.contains(Event::End) {
-                        w.ch_rx_end(ch_idx).bit(enable);
-                    }
-                    if events.contains(Event::Threshold) {
-                        w.ch_rx_thr_event(ch_idx).bit(enable);
-                    }
-                    w
-                },
-            );
+                        if events.contains(Event::Error) {
+                            w.ch_rx_err(ch_idx).bit(enable);
+                        }
+                        if events.contains(Event::End) {
+                            w.ch_rx_end(ch_idx).bit(enable);
+                        }
+                        if events.contains(Event::Threshold) {
+                            w.ch_rx_thr_event(ch_idx).bit(enable);
+                        }
+                        w
+                    },
+                )
+            });
         }
 
         pub fn hw_offset(self) -> usize {
@@ -2795,6 +2804,7 @@ mod chip_specific {
         Level,
         MemSize,
         NUM_CHANNELS,
+        RMT_LOCK,
         Rx,
         Tx,
         WAKER,
@@ -3072,23 +3082,25 @@ mod chip_specific {
         pub fn set_tx_interrupt(self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
 
-            rmt.int_ena().modify(
-                #[inline(always)]
-                |_, w| {
-                    let ch = self.ch_idx as u8;
+            RMT_LOCK.lock(|| {
+                rmt.int_ena().modify(
+                    #[inline(always)]
+                    |_, w| {
+                        let ch = self.ch_idx as u8;
 
-                    if events.contains(Event::Error) {
-                        w.ch_err(ch).bit(enable);
-                    }
-                    if events.contains(Event::End) {
-                        w.ch_tx_end(ch).bit(enable);
-                    }
-                    if events.contains(Event::Threshold) {
-                        w.ch_tx_thr_event(ch).bit(enable);
-                    }
-                    w
-                },
-            );
+                        if events.contains(Event::Error) {
+                            w.ch_err(ch).bit(enable);
+                        }
+                        if events.contains(Event::End) {
+                            w.ch_tx_end(ch).bit(enable);
+                        }
+                        if events.contains(Event::Threshold) {
+                            w.ch_tx_thr_event(ch).bit(enable);
+                        }
+                        w
+                    },
+                )
+            });
         }
 
         #[allow(unused)]
@@ -3272,20 +3284,22 @@ mod chip_specific {
         pub fn set_rx_interrupt(self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
 
-            rmt.int_ena().modify(
-                #[inline(always)]
-                |_, w| {
-                    let ch = self.ch_idx as u8;
+            RMT_LOCK.lock(|| {
+                rmt.int_ena().modify(
+                    #[inline(always)]
+                    |_, w| {
+                        let ch = self.ch_idx as u8;
 
-                    if events.contains(Event::Error) {
-                        w.ch_err(ch).bit(enable);
-                    }
-                    if events.contains(Event::End) {
-                        w.ch_rx_end(ch).bit(enable);
-                    }
-                    w
-                },
-            );
+                        if events.contains(Event::Error) {
+                            w.ch_err(ch).bit(enable);
+                        }
+                        if events.contains(Event::End) {
+                            w.ch_rx_end(ch).bit(enable);
+                        }
+                        w
+                    },
+                )
+            });
         }
 
         pub fn hw_offset(self) -> usize {
