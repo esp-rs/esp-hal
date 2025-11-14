@@ -40,7 +40,8 @@ use self::{
 #[instability::unstable]
 pub use crate::sys::include::wifi_csi_info_t; // FIXME
 use crate::{
-    RadioRc,
+    InitializationError,
+    RadioRefGuard,
     common_adapter::*,
     esp_wifi_result,
     hal::ram,
@@ -2135,6 +2136,24 @@ impl Config {
     }
 }
 
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+/// Comprehensive error enum for Wi-Fi initialization failures.
+pub enum WifiInitError {
+    /// Failure during the acquisition or initialization of the global radio hardware.
+    RadioInit(InitializationError),
+    /// Failure from other Wi-Fi specific operations (e.g., config, internal driver issues).
+    WifiOp(WifiError),
+}
+
+// Allows any existing code that returns WifiError to be seamlessly converted
+// into the WifiOp variant of the new error enum using the '?' operator.
+impl From<WifiError> for WifiInitError {
+    fn from(err: WifiError) -> Self {
+        WifiInitError::WifiOp(err)
+    }
+}
+
 /// Create a Wi-Fi controller and it's associated interfaces.
 ///
 /// Dropping the controller will deinitialize / stop Wi-Fi.
@@ -2144,14 +2163,14 @@ impl Config {
 pub fn new<'d>(
     device: crate::hal::peripherals::WIFI<'d>,
     config: Config,
-) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
+) -> Result<(WifiController<'d>, Interfaces<'d>), WifiInitError> {
+    let _guard = RadioRefGuard::new().map_err(WifiInitError::RadioInit)?;
+
     if crate::is_interrupts_disabled() {
-        return Err(WifiError::Unsupported);
+        return Err(WifiError::Unsupported.into());
     }
 
     config.validate();
-
-    let _radio_controller = RadioRc::init().map_err(|_| WifiError::Unsupported)?;
 
     unsafe {
         internal::G_CONFIG = wifi_init_config_t {
@@ -2204,7 +2223,7 @@ pub fn new<'d>(
     // Only create WifiController after we've enabled TRNG - otherwise returning an error from this
     // function will cause panic because WifiController::drop tries to disable the TRNG.
     let mut controller = WifiController {
-        _radio_controller,
+        _guard,
         _phantom: Default::default(),
         beacon_timeout: 6,
         ap_beacon_timeout: 100,
@@ -2234,7 +2253,7 @@ pub fn new<'d>(
 /// Wi-Fi controller.
 #[non_exhaustive]
 pub struct WifiController<'d> {
-    _radio_controller: RadioRc<'d>,
+    _guard: RadioRefGuard,
     _phantom: PhantomData<&'d ()>,
     // Things we have to remember due to how esp-wifi works:
     beacon_timeout: u16,

@@ -12,16 +12,34 @@ use esp_hal::asynch::AtomicWaker;
 use esp_phy::PhyInitGuard;
 
 use crate::{
-    RadioRc,
+    InitializationError,
+    RadioRefGuard,
     ble::{Config, InvalidConfigError, have_hci_read_data, read_hci, read_next, send_hci},
 };
+
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+/// Error enum for BLE initialization failures.
+pub enum BleInitError {
+    /// Failure during initial validation of the provided configuration.
+    Config(InvalidConfigError),
+    /// Failure during the acquisition or initialization of the global radio hardware.
+    RadioInit(InitializationError),
+}
+
+// Implement the From trait for cleaner error mapping
+impl From<InvalidConfigError> for BleInitError {
+    fn from(err: InvalidConfigError) -> Self {
+        BleInitError::Config(err)
+    }
+}
 
 /// A blocking HCI connector
 #[instability::unstable]
 pub struct BleConnector<'d> {
     _phy_init_guard: PhyInitGuard<'d>,
     _device: crate::hal::peripherals::BT<'d>,
-    pub(crate) _radio_controller: RadioRc<'d>,
+    _guard: RadioRefGuard,
 }
 
 impl Drop for BleConnector<'_> {
@@ -35,14 +53,15 @@ impl<'d> BleConnector<'d> {
     pub fn new(
         device: crate::hal::peripherals::BT<'d>,
         config: Config,
-    ) -> Result<BleConnector<'d>, InvalidConfigError> {
+    ) -> Result<BleConnector<'d>, BleInitError> {
+        let _guard = RadioRefGuard::new().map_err(BleInitError::RadioInit)?;
+
         config.validate()?;
-        let _radio_controller = RadioRc::init().map_err(|_init_err| InvalidConfigError)?;
 
         Ok(Self {
             _phy_init_guard: crate::ble::ble_init(&config),
             _device: device,
-            _radio_controller,
+            _guard,
         })
     }
 
