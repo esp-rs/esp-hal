@@ -23,7 +23,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{ClientConfig, CsiConfig, ModeConfig, ScanConfig};
+use esp_radio::wifi::{CsiConfig, ModeConfig, ScanConfig, sta::ClientConfig};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::DhcpOption,

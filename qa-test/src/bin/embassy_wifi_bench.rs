@@ -35,7 +35,7 @@ use esp_hal::{
 use esp_println::println;
 use esp_radio::{
     Controller,
-    wifi::{ClientConfig, ModeConfig, WifiController, WifiDevice, WifiEvent, WifiStaState},
+    wifi::{ModeConfig, WifiController, WifiDevice, WifiEvent, WifiStaState, sta::ClientConfig},
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
