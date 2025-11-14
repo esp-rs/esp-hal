@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Avoid panicking in WiFi scan if an access point with using an unmapped auth-method is found (#4458)
+- `Controller::stop_async()` now returns early when the `Controller` has not been started (#4504)
 
 ### Removed
 

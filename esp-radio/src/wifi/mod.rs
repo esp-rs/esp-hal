@@ -3371,6 +3371,10 @@ impl WifiController<'_> {
     ///
     /// This function will wait for the Wi-Fi controller to stop before returning.
     pub async fn stop_async(&mut self) -> Result<(), WifiError> {
+        if !self.is_started()? {
+            return Ok(());
+        }
+
         let mut events = enumset::enum_set! {};
 
         let mode = self.mode()?;
