@@ -136,8 +136,6 @@ extern crate alloc;
 // MUST be the first module
 mod fmt;
 
-use core::marker::PhantomData;
-
 use esp_hal::{
     self as hal,
 
@@ -246,26 +244,6 @@ const _: () = {
     };
 };
 
-#[derive(Debug)]
-/// Reference counter for BLE and Wi-Fi usage.
-pub(crate) struct RadioRc<'d> {
-    // Now holds the private RAII guard
-    _guard: RadioRefGuard,
-    _inner: PhantomData<&'d ()>,
-}
-
-impl<'d> RadioRc<'d> {
-    /// Initialize for using Wi-Fi and or BLE.
-    pub(crate) fn init() -> Result<RadioRc<'d>, InitializationError> {
-        let _guard = RadioRefGuard::new()?;
-
-        Ok(RadioRc {
-            _guard,
-            _inner: PhantomData,
-        })
-    }
-}
-
 #[procmacros::doc_replace]
 /// Initialize for using Wi-Fi and or BLE.
 ///
@@ -288,33 +266,10 @@ impl<'d> RadioRc<'d> {
 )]
 /// - The function may return an error if interrupts are disabled.
 /// - The function may return an error if initializing the underlying driver fails.
-///
-/// ## Example
-///
-/// For examples of the necessary setup, see your RTOS's documentation. If you are
-/// using the `esp-rtos` crate, you will need to initialize the scheduler before calling this
-/// function:
-///
-/// ```rust, no_run
-/// # {before_snippet}
-/// use esp_hal::{interrupt::software::SoftwareInterruptControl, timer::timg::TimerGroup};
-///
-/// let timg0 = TimerGroup::new(peripherals.TIMG0);
-/// let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-/// esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
-///
-/// // You can now start esp-radio:
-/// let esp_radio_controller = esp_radio::init().unwrap();
-/// # {after_snippet}
-/// ```
-pub(crate) fn init<'d>() -> Result<(), InitializationError> {
+pub(crate) fn init() -> Result<(), InitializationError> {
     #[cfg(esp32)]
     if try_claim_adc2(unsafe { hal::Internal::conjure() }).is_err() {
         return Err(InitializationError::Adc2IsUsed);
-    }
-
-    if crate::is_interrupts_disabled() {
-        return Err(InitializationError::InterruptsDisabled);
     }
 
     if !preempt::initialized() {
@@ -341,6 +296,8 @@ pub(crate) fn init<'d>() -> Result<(), InitializationError> {
         error => return Err(InitializationError::Internal),
     }
 
+    debug!("Radio initialized");
+
     Ok(())
 }
 
@@ -357,6 +314,8 @@ pub(crate) fn deinit() {
     #[cfg(esp32)]
     // Allow using `ADC2` again
     release_adc2(unsafe { esp_hal::Internal::conjure() });
+
+    debug!("Radio deinitialized");
 }
 
 /// Management of the global reference count
@@ -366,30 +325,37 @@ pub(crate) struct RadioRefGuard;
 
 impl RadioRefGuard {
     /// Increments the refcount. If the old count was 0, it performs hardware init.
-    /// If hardware init fails, it rolls back the refcount only once (THE FIX).
-    pub fn new() -> Result<Self, InitializationError> {
-        let prev = RADIO_REFCOUNT.fetch_add(1, Ordering::SeqCst);
+    /// If hardware init fails, it rolls back the refcount only once.
+    fn new() -> Result<Self, InitializationError> {
+        use critical_section::with;
+        with(|_| {
+            let prev = RADIO_REFCOUNT.fetch_add(1, Ordering::SeqCst);
 
-        if prev == 0
-            && let Err(e) = init()
-        {
-            RADIO_REFCOUNT.fetch_sub(1, Ordering::SeqCst);
-            return Err(e);
-        }
+            if prev == 0
+                && let Err(e) = init()
+            {
+                RADIO_REFCOUNT.fetch_sub(1, Ordering::SeqCst);
+                return Err(e);
+            }
 
-        Ok(Self)
+            Ok(RadioRefGuard)
+        })
     }
 }
 
 impl Drop for RadioRefGuard {
     /// Decrements the refcount. If the count drops to 0, it performs hardware de-init.
     fn drop(&mut self) {
-        let prev = RADIO_REFCOUNT.fetch_sub(1, Ordering::SeqCst);
+        use critical_section;
+        critical_section::with(|_| {
+            debug!("Dropping RadioRefGuard");
+            let prev = RADIO_REFCOUNT.fetch_sub(1, Ordering::SeqCst);
 
-        if prev == 1 {
-            // Last user dropped, run de-initialization
-            deinit();
-        }
+            if prev == 1 {
+                // Last user dropped, run de-initialization
+                deinit();
+            }
+        });
     }
 }
 
@@ -406,7 +372,7 @@ fn is_interrupts_disabled() -> bool {
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-/// Error which can be returned during [`init`].
+/// Error which can be returned during .
 #[non_exhaustive]
 pub enum InitializationError {
     /// An internal error occurred.
@@ -416,9 +382,6 @@ pub enum InitializationError {
     WifiError(WifiError),
     /// The current CPU clock frequency is too low.
     WrongClockConfig,
-    /// Tried to initialize while interrupts are disabled.
-    /// This is not supported.
-    InterruptsDisabled,
     /// The scheduler is not initialized.
     SchedulerNotInitialized,
     #[cfg(esp32)]
@@ -439,10 +402,6 @@ impl core::fmt::Display for InitializationError {
             InitializationError::WrongClockConfig => {
                 write!(f, "The current CPU clock frequency is too low")
             }
-            InitializationError::InterruptsDisabled => write!(
-                f,
-                "Attempted to initialize while interrupts are disabled (Unsupported)"
-            ),
             InitializationError::SchedulerNotInitialized => {
                 write!(f, "The scheduler is not initialized")
             }

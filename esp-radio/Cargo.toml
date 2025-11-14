@@ -44,6 +44,7 @@ cfg-if  = "1"
 esp-hal = { version = "1.0.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
 portable-atomic = { version = "1.11", default-features = false }
 enumset = { version = "1.1", default-features = false, optional = true }
+critical-section         = { version = "1", features = ["restore-state-u32"], optional = true }
 
 # ⚠️ Unstable dependencies
 esp-radio-rtos-driver = { version = "0.2.0", path = "../esp-radio-rtos-driver" }
@@ -137,6 +138,7 @@ esp32 = [
   "dep:esp-wifi-sys-esp32",
   "esp-metadata-generated/esp32",
   "xtensa-lx-rt/float-save-restore",
+  "critical-section",
 ]
 ##
 esp32c2 = [
@@ -145,6 +147,7 @@ esp32c2 = [
   "esp-phy/esp32c2",
   "dep:esp-wifi-sys-esp32c2",
   "esp-metadata-generated/esp32c2",
+  "critical-section",
 ]
 ##
 esp32c3 = [
@@ -153,6 +156,7 @@ esp32c3 = [
   "esp-phy/esp32c3",
   "dep:esp-wifi-sys-esp32c3",
   "esp-metadata-generated/esp32c3",
+  "critical-section",
 ]
 ##
 esp32c6 = [
@@ -161,6 +165,7 @@ esp32c6 = [
   "esp-phy/esp32c6",
   "dep:esp-wifi-sys-esp32c6",
   "esp-metadata-generated/esp32c6",
+  "critical-section",
 ]
 ##
 esp32h2 = [
@@ -169,6 +174,7 @@ esp32h2 = [
   "esp-phy/esp32h2",
   "dep:esp-wifi-sys-esp32h2",
   "esp-metadata-generated/esp32h2",
+  "critical-section",
 ]
 ##
 esp32s2 = [
@@ -178,6 +184,7 @@ esp32s2 = [
   "dep:esp-wifi-sys-esp32s2",
   "esp-metadata-generated/esp32s2",
   "xtensa-lx-rt/float-save-restore",
+  "critical-section",
 ]
 ##
 esp32s3 = [
@@ -187,6 +194,7 @@ esp32s3 = [
   "dep:esp-wifi-sys-esp32s3",
   "esp-metadata-generated/esp32s3",
   "xtensa-lx-rt/float-save-restore",
+  "critical-section",
 ]
 
 #! ### Wireless Feature Flags
