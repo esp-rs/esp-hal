@@ -383,3 +383,42 @@ impl<'a> Encoder for CopyEncoder<'a> {
         }
     }
 }
+
+/// An [`Encoder`] that writes `PulseCode`s from an iterator to the hardware.
+#[derive(Clone, Debug)]
+pub struct IterEncoder<D>
+where
+    D: Iterator<Item = PulseCode>,
+{
+    data: D,
+}
+
+impl<D> IterEncoder<D>
+where
+    D: Iterator<Item = PulseCode>,
+{
+    /// Create a new instance that transmits the provided `data`.
+    pub fn new(data: impl IntoIterator<IntoIter = D>) -> Self {
+        Self {
+            data: data.into_iter(),
+        }
+    }
+}
+
+impl<D> Encoder for IterEncoder<D>
+where
+    D: Iterator<Item = PulseCode>,
+{
+    #[inline(always)]
+    fn encode(&mut self, writer: &mut RmtWriter) -> ControlFlow<()> {
+        while let Some(slot) = writer.next() {
+            if let Some(code) = self.data.next() {
+                slot.write(code);
+            } else {
+                return ControlFlow::Break(());
+            }
+        }
+
+        ControlFlow::Continue(())
+    }
+}
