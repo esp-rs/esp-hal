@@ -247,7 +247,17 @@ use crate::{
 mod reader;
 use reader::{ReaderState, RmtReader};
 mod writer;
-pub use writer::{CopyEncoder, Encoder, IterEncoder, RmtSlot, RmtWriter};
+pub use writer::{
+    BitOrder,
+    BytesEncoder,
+    CopyEncoder,
+    Encoder,
+    IterEncoder,
+    LsbFirst,
+    MsbFirst,
+    RmtSlot,
+    RmtWriter,
+};
 use writer::{EncoderExt, WriterContext, WriterState};
 
 /// A configuration error

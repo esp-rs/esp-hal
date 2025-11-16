@@ -1,4 +1,4 @@
-use core::ops::ControlFlow;
+use core::{marker::PhantomData, ops::ControlFlow};
 
 #[cfg(place_rmt_driver_in_ram)]
 use procmacros::ram;
@@ -420,5 +420,151 @@ where
         }
 
         ControlFlow::Continue(())
+    }
+}
+
+/// A trait implemented by bit orders [`MsbFirst`] and [`LsbFirst`].
+// Use marker types that implement this trait rather than a BitOrder enum such that
+// BytesEncoder::encode can be specialized depending on the bit order.
+pub trait BitOrder: crate::private::Sealed {
+    #[doc(hidden)]
+    fn shift(value: u8, shift: usize) -> u8;
+
+    #[doc(hidden)]
+    fn get_bit(value: u8, bit: usize) -> bool;
+}
+
+/// Marker for MSB-first transmission
+pub struct MsbFirst;
+
+/// Marker for LSB-first transmission
+pub struct LsbFirst;
+
+impl crate::private::Sealed for MsbFirst {}
+
+impl crate::private::Sealed for LsbFirst {}
+
+impl BitOrder for MsbFirst {
+    #[inline(always)]
+    fn shift(value: u8, shift: usize) -> u8 {
+        value << shift
+    }
+
+    #[inline(always)]
+    fn get_bit(value: u8, bit: usize) -> bool {
+        debug_assert!((bit as u32) < u8::BITS);
+        (value >> (7 - bit)) & 1 != 0
+    }
+}
+
+impl BitOrder for LsbFirst {
+    #[inline(always)]
+    fn shift(value: u8, shift: usize) -> u8 {
+        value >> shift
+    }
+
+    #[inline(always)]
+    fn get_bit(value: u8, bit: usize) -> bool {
+        debug_assert!((bit as u32) < u8::BITS);
+        (value >> bit) & 1 != 0
+    }
+}
+
+/// An [`Encoder`] that writes `PulseCode`s for each bit of the data to the hardware.
+#[derive(Clone, Copy, Debug)]
+pub struct BytesEncoder<'a, B>
+where
+    B: BitOrder,
+{
+    // remaining data
+    data: &'a [u8],
+
+    // number of bits left in the first item in the data
+    bits: u8,
+
+    // bit ordering when transmitting data
+    _bit_order: PhantomData<B>,
+
+    // the PulseCode for 0 bits
+    pulse_zero: PulseCode,
+
+    // the PulseCode for 1 bits
+    pulse_one: PulseCode,
+
+    // the final PulseCode
+    pulse_end: PulseCode,
+}
+
+impl<'a, B> BytesEncoder<'a, B>
+where
+    B: BitOrder,
+{
+    /// Create a new instance that transmits the provided `data`.
+    ///
+    /// For each 0 and 1 bit in `data`, `pulse_zero` and `pulse_one` will be sent, respectively.
+    /// After the data is exhausted, one copy of `pulse_end` will be sent. This should usually be
+    /// an end marker.
+    pub fn new(
+        data: &'a [u8],
+        bit_order: B,
+        pulse_one: PulseCode,
+        pulse_zero: PulseCode,
+        pulse_end: PulseCode,
+    ) -> Self {
+        let _ = bit_order;
+        Self {
+            data,
+            _bit_order: PhantomData,
+            bits: 8,
+            pulse_zero,
+            pulse_one,
+            pulse_end,
+        }
+    }
+}
+
+impl<B> Encoder for BytesEncoder<'_, B>
+where
+    B: BitOrder,
+{
+    #[inline(always)]
+    fn encode(&mut self, writer: &mut RmtWriter) -> ControlFlow<()> {
+        let mut data = self.data;
+        let mut bits = self.bits as usize;
+
+        let result = 'outer: {
+            while let Some(&byte) = data.first() {
+                let mut byte = B::shift(byte, u8::BITS as usize - bits);
+
+                let written = writer.write_many(bits, || {
+                    // MSB first for now
+                    let bit = B::get_bit(byte, 0);
+                    byte = B::shift(byte, 1);
+                    core::hint::select_unpredictable(bit, self.pulse_one, self.pulse_zero)
+                });
+
+                bits -= written;
+
+                if bits > 0 {
+                    // buffer is full
+                    break 'outer ControlFlow::Continue(());
+                }
+
+                let _ = data.split_off_first().unwrap();
+                bits = 8;
+            }
+
+            if let Some(slot) = writer.next() {
+                slot.write(self.pulse_end);
+            } else {
+                break 'outer ControlFlow::Continue(());
+            }
+
+            ControlFlow::Break(())
+        };
+
+        self.data = data;
+        self.bits = bits as u8;
+        result
     }
 }
