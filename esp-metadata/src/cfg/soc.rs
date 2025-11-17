@@ -669,7 +669,7 @@ impl DeviceClocks {
                 node.name_str().clone(),
                 ManagementProperties {
                     name: format_ident!("{}", node.name().to_case(Case::Snake)),
-                    refcounted: node.refcounted(),
+                    refcounted: !node.always_on(),
                     state_ty: node.config_type_name(),
                 },
             );

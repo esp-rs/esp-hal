@@ -198,8 +198,8 @@ pub(crate) trait ClockTreeNodeType: Any {
     fn affected_nodes<'s>(&'s self) -> Vec<&'s str> {
         vec![]
     }
-    fn refcounted(&self) -> bool {
-        true
+    fn always_on(&self) -> bool {
+        false
     }
     fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()>;
     fn is_configurable(&self) -> bool;
@@ -334,7 +334,7 @@ impl ClockTreeItem {
         ClockNodeFunctions {
             request: Function {
                 _name: request_fn_name.to_string(),
-                implementation: if node.refcounted() {
+                implementation: if refcount_name.is_some() {
                     quote! {
                         pub fn #request_fn_name(clocks: &mut ClockTree) {
                             if increment_reference_count(&mut clocks.#refcount_name) {
@@ -353,7 +353,7 @@ impl ClockTreeItem {
             },
             release: Function {
                 _name: release_fn_name.to_string(),
-                implementation: if node.refcounted() {
+                implementation: if refcount_name.is_some() {
                     quote! {
                         pub fn #release_fn_name(clocks: &mut ClockTree) {
                             if decrement_reference_count(&mut clocks.#refcount_name) {
@@ -386,7 +386,7 @@ impl ClockTreeItem {
             },
 
             hal_functions: vec![
-                if node.refcounted() {
+                if refcount_name.is_some() {
                     quote! {
                         fn #enable_fn_impl_name(_clocks: &mut ClockTree, _en: bool) {}
                     }

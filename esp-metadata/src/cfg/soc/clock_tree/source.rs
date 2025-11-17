@@ -55,8 +55,8 @@ pub struct Source {
     /// The unique name of the clock tree item.
     name: String,
 
-    #[serde(default = "default_true")]
-    refcount: bool,
+    #[serde(default)]
+    always_on: bool,
 
     /// If set, this expression will be used to validate the clock configuration.
     ///
@@ -72,17 +72,13 @@ pub struct Source {
     output: OutputExpression,
 }
 
-fn default_true() -> bool {
-    true
-}
-
 impl ClockTreeNodeType for Source {
     fn name_str<'a>(&'a self) -> &'a String {
         &self.name
     }
 
-    fn refcounted(&self) -> bool {
-        self.refcount
+    fn always_on(&self) -> bool {
+        self.always_on
     }
 
     fn validate_source_data(&self, _ctx: &ValidationContext<'_>) -> Result<()> {
