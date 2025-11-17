@@ -11,6 +11,7 @@ use crate::cfg::{
 pub(crate) struct PeripheralClockSource {
     pub peripheral: String,
     pub template: String,
+    pub is_definition: bool,
     pub mux: Multiplexer,
 }
 
@@ -58,6 +59,9 @@ impl ClockTreeNodeType for PeripheralClockSource {
     }
 
     fn config_type(&self) -> Option<TokenStream> {
+        if !self.is_definition {
+            return None;
+        }
         let ty_name = self.config_type_name()?;
 
         let variants = self.mux.variants.iter().map(|v| v.config_enum_variant());

@@ -236,14 +236,6 @@ pub(crate) trait ClockTreeNodeType {
         Some(format!(" `{}` configuration.", self.name_str()))
     }
 
-    fn properties(&self) -> ManagementProperties {
-        ManagementProperties {
-            name: format_ident!("{}", self.name().to_case(Case::Snake)),
-            refcounted: self.refcounted(),
-            state_ty: self.config_type_name(),
-        }
-    }
-
     fn apply_configuration(
         &self,
         _expr: &Expression,
@@ -311,9 +303,6 @@ pub enum ClockTreeItem {
 
     #[serde(rename = "derived")]
     Derived(DerivedClockSource),
-
-    #[serde(skip)]
-    Peripheral(peripheral_source::PeripheralClockSource),
 }
 
 impl ClockTreeItem {
@@ -323,7 +312,6 @@ impl ClockTreeItem {
             ClockTreeItem::Source(src) => src,
             ClockTreeItem::Divider(div) => div,
             ClockTreeItem::Derived(drv) => drv,
-            ClockTreeItem::Peripheral(per) => per,
         }
     }
 
@@ -335,7 +323,7 @@ impl ClockTreeItem {
 
         let request_fn_name = node.request_fn_name();
         let release_fn_name = node.release_fn_name();
-        let refcount_name = node.properties().refcount_field_name();
+        let refcount_name = tree.properties(node).refcount_field_name();
         let enable_fn_name = node.enable_fn_name();
         let enable_fn_impl_name = format_ident!("{}_impl", enable_fn_name);
 

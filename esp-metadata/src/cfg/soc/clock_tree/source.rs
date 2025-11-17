@@ -95,7 +95,7 @@ impl ClockTreeNodeType for Source {
 
     fn config_apply_function(&self, tree: &ProcessedClockData<'_>) -> TokenStream {
         let ty_name = self.config_type_name();
-        let state = self.properties().field_name();
+        let state = tree.properties(self).field_name();
         let apply_fn_name = self.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
         let reject_exprs = self.reject.as_ref().map(|reject| {
@@ -106,7 +106,7 @@ impl ClockTreeNodeType for Source {
             variables.insert("VALUE", quote! { config.value() });
             reject.0.visit_variables(|var| {
                 if var != "VALUE" {
-                    config_fields.push((var, tree.node(var).properties().field_name()));
+                    config_fields.push((var, tree.properties(tree.node(var)).field_name()));
                 }
             });
 
@@ -130,8 +130,8 @@ impl ClockTreeNodeType for Source {
         }
     }
 
-    fn node_frequency_impl(&self, _tree: &ProcessedClockData<'_>) -> TokenStream {
-        let state_field = self.properties().field_name();
+    fn node_frequency_impl(&self, tree: &ProcessedClockData<'_>) -> TokenStream {
+        let state_field = tree.properties(self).field_name();
 
         if self.values.is_some() {
             quote! { unwrap!(clocks.#state_field).value() }
