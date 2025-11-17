@@ -43,15 +43,11 @@ PROVIDE( sleep = __esp_radio_sleep );
 PROVIDE( usleep = __esp_radio_usleep );
 
 #IF wifi
-EXTERN( __esp_radio_misc_nvs_deinit );
-EXTERN( __esp_radio_misc_nvs_init );
 EXTERN( __ESP_RADIO_G_LOG_LEVEL );
 EXTERN( __ESP_RADIO_G_MISC_NVS );
 EXTERN( __esp_radio_sleep );
 EXTERN( __esp_radio_usleep );
 
-PROVIDE( misc_nvs_deinit = __esp_radio_misc_nvs_deinit );
-PROVIDE( misc_nvs_init = __esp_radio_misc_nvs_init );
 PROVIDE( g_log_level = __ESP_RADIO_G_LOG_LEVEL );
 PROVIDE( g_misc_nvs = __ESP_RADIO_G_MISC_NVS );
 PROVIDE( sleep = __esp_radio_sleep );
