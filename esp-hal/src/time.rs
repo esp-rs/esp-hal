@@ -762,9 +762,8 @@ pub(crate) fn time_init() {
     tg0.lactload().write(|w| unsafe { w.load().bits(1) });
 
     // 16 MHz counter
-    tg0.lactconfig()
-        .modify(|_, w| unsafe { w.divider().bits((apb / 16_000_000u32) as u16) });
-    tg0.lactconfig().modify(|_, w| {
+    tg0.lactconfig().write(|w| {
+        unsafe { w.divider().bits((apb / 16_000_000u32) as u16) };
         w.increase().bit(true);
         w.autoreload().bit(true);
         w.en().bit(true)
