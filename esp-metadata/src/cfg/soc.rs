@@ -158,18 +158,7 @@ enum ClockType {
 }
 
 impl SystemClocks {
-    fn cfgs(&self) -> Vec<String> {
-        self.clock_tree
-            .iter()
-            .map(|node| node.as_dyn_ref())
-            .map(|node| node.name().to_case(Case::Snake))
-            .map(|name| format!("soc_has_clock_node_{name}"))
-            .collect::<Vec<_>>()
-    }
-
-    fn generate_macro(&self, data: &DeviceClocks) -> Result<TokenStream> {
-        let processed_clocks = data.process().unwrap();
-
+    fn generate_macro(&self, tree: &ProcessedClockData) -> Result<TokenStream> {
         let mut clock_tree_node_defs = vec![];
         let mut clock_tree_node_impls = vec![];
         let mut clock_tree_state_fields = vec![];
@@ -178,12 +167,12 @@ impl SystemClocks {
         let mut configurables = vec![];
         let mut system_config_steps = vec![];
         let mut hal_enable_functions = vec![];
-        for (item, kind) in processed_clocks
+        for (item, kind) in tree
             .classified_clocks
             .iter()
             .map(|(item, kind)| (item, kind.clone()))
         {
-            let clock_item = processed_clocks.node(item);
+            let clock_item = tree.node(item);
 
             // Generate code for all clock tree nodes
             if let Some(config_type) = clock_item.config_type() {
@@ -195,7 +184,7 @@ impl SystemClocks {
                     #config_type
                 });
             }
-            let node_state = processed_clocks.properties(clock_item);
+            let node_state = tree.properties(clock_item);
             if let Some(type_name) = node_state.type_name() {
                 clock_tree_state_fields.push(node_state.field_name());
                 clock_tree_state_field_types.push(type_name);
@@ -204,7 +193,7 @@ impl SystemClocks {
                 clock_tree_refcount_fields.push(refcount_field);
             }
 
-            let node_funcs = ClockTreeItem::node_functions(clock_item, &processed_clocks);
+            let node_funcs = ClockTreeItem::node_functions(clock_item, tree);
             clock_tree_node_impls.push(node_funcs.implement_functions());
             hal_enable_functions.extend_from_slice(&node_funcs.hal_functions);
 
@@ -401,24 +390,7 @@ pub struct PeripheralClocks {
 }
 
 impl PeripheralClocks {
-    fn cfgs(&self) -> Vec<String> {
-        self.peripheral_clocks
-            .iter()
-            .flat_map(|clock| {
-                let clocks = clock.clock_signals(self);
-
-                clocks.iter().map(|peri_clock| {
-                    format!(
-                        "soc_has_clock_node_{}_{}",
-                        clock.name.from_case(Case::Ada).to_case(Case::Snake),
-                        peri_clock.as_dyn_ref().name().to_case(Case::Snake)
-                    )
-                })
-            })
-            .collect::<Vec<_>>()
-    }
-
-    fn generate_macro(&self, _data: &DeviceClocks) -> Result<TokenStream> {
+    fn generate_macro(&self, _tree: &ProcessedClockData) -> Result<TokenStream> {
         let mut clocks = self.peripheral_clocks.clone();
         clocks.sort_by(|a, b| a.name.cmp(&b.name));
 
@@ -713,20 +685,29 @@ impl DeviceClocks {
 
 impl super::GenericProperty for DeviceClocks {
     fn cfgs(&self) -> Option<Vec<String>> {
-        let sys = self.system_clocks.cfgs();
-        let per = self.peripheral_clocks.cfgs();
-        Some([sys, per].concat())
+        let processed_clocks = self.process().unwrap();
+
+        let cfgs = processed_clocks
+            .clock_tree
+            .iter()
+            .map(|node| node.name().to_case(Case::Snake))
+            .map(|name| format!("soc_has_clock_node_{name}"))
+            .collect::<Vec<_>>();
+
+        Some(cfgs)
     }
 
     fn macros(&self) -> Option<TokenStream> {
-        let system_clocks = match self.system_clocks.generate_macro(self) {
+        let processed_clocks = self.process().unwrap();
+
+        let system_clocks = match self.system_clocks.generate_macro(&processed_clocks) {
             Ok(tokens) => tokens,
             Err(err) => panic!(
                 "{:?}",
                 err.context("Failed to generate system clock control code")
             ),
         };
-        let peripheral_clocks = match self.peripheral_clocks.generate_macro(self) {
+        let peripheral_clocks = match self.peripheral_clocks.generate_macro(&processed_clocks) {
             Ok(tokens) => tokens,
             Err(err) => panic!(
                 "{:?}",

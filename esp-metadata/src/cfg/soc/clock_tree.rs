@@ -184,12 +184,8 @@ impl ManagementProperties {
         self.state_ty.clone()
     }
 
-    pub fn refcounted(&self) -> bool {
-        self.refcounted
-    }
-
     pub fn refcount_field_name(&self) -> Option<Ident> {
-        if self.refcounted() {
+        if self.refcounted {
             Some(format_ident!("{}_refcount", self.name))
         } else {
             None
