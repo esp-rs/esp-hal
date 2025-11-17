@@ -825,10 +825,7 @@ for_each_rmt_channel!(
                     fn configure_tx(
                         self,
                         config: &TxChannelConfig,
-                    ) -> Result<Channel<'ch, Dm, Tx>, ConfigError>
-                    where
-                        Self: Sized,
-                    {
+                    ) -> Result<Channel<'ch, Dm, Tx>, ConfigError> {
                         let raw = unsafe { DynChannelAccess::conjure(ChannelIndex::[<Ch $idx>]) };
 
                         apply_tx_config(raw, config, false)?;
@@ -862,10 +859,7 @@ for_each_rmt_channel!(
                     fn configure_rx(
                         self,
                         config: &RxChannelConfig,
-                    ) -> Result<Channel<'ch, Dm, Rx>, ConfigError>
-                    where
-                        Self: Sized,
-                    {
+                    ) -> Result<Channel<'ch, Dm, Rx>, ConfigError> {
                         let raw = unsafe { DynChannelAccess::conjure(ChannelIndex::[<Ch $idx>]) };
 
                         apply_rx_config(raw, config, false)?;
@@ -1898,7 +1892,6 @@ impl<'ch> Channel<'ch, Blocking, Rx> {
         data: &'data mut [T],
     ) -> Result<RxTransaction<'ch, 'data, T>, (Error, Self)>
     where
-        Self: Sized,
         T: From<PulseCode>,
     {
         let raw = self.raw;
@@ -1995,7 +1988,6 @@ impl Channel<'_, Async, Tx> {
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn transmit<T>(&mut self, mut data: &[T]) -> impl Future<Output = Result<(), Error>>
     where
-        Self: Sized,
         T: Into<PulseCode> + Copy,
     {
         let raw = self.raw;
@@ -2118,7 +2110,6 @@ impl Channel<'_, Async, Rx> {
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn receive<T>(&mut self, data: &mut [T]) -> impl Future<Output = Result<usize, Error>>
     where
-        Self: Sized,
         T: From<PulseCode> + Unpin,
     {
         let raw = self.raw;
