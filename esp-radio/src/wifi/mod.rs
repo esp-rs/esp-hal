@@ -17,6 +17,11 @@ use procmacros::BuilderLite;
 use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
 
 pub(crate) use self::os_adapter::*;
+#[cfg(all(feature = "sniffer", feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+use self::sniffer::Sniffer;
+#[cfg(feature = "wifi-eap")]
+use self::sta::eap::EapClientConfig;
 pub use self::state::*;
 use self::{
     ap::{AccessPointConfig, AccessPointInfo},
@@ -264,7 +269,7 @@ pub enum ModeConfig {
 
     /// EAP client configuration for enterprise Wi-Fi.
     #[cfg(feature = "wifi-eap")]
-    EapClient(self::sta::eap::EapClientConfig),
+    EapClient(EapClientConfig),
 }
 
 impl ModeConfig {
@@ -654,7 +659,7 @@ pub enum WifiError {
     /// Out of memory
     OutOfMemory,
 
-    /// Wi-Fi driver was not installed by [esp_wifi_init]
+    /// Wi-Fi driver was not initialized
     NotInitialized,
 
     /// Wi-Fi driver was not started by [esp_wifi_start]
@@ -1882,7 +1887,7 @@ pub struct Interfaces<'d> {
     /// Wi-Fi sniffer interface.
     #[cfg(all(feature = "sniffer", feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    pub sniffer: self::sniffer::Sniffer<'d>,
+    pub sniffer: Sniffer<'d>,
 }
 
 /// Wi-Fi operating class.
@@ -2213,7 +2218,7 @@ pub fn new<'d>(
             #[cfg(all(feature = "esp-now", feature = "unstable"))]
             esp_now: crate::esp_now::EspNow::new_internal(),
             #[cfg(all(feature = "sniffer", feature = "unstable"))]
-            sniffer: self::sniffer::Sniffer::new(),
+            sniffer: Sniffer::new(),
         },
     ))
 }
@@ -2785,10 +2790,7 @@ impl WifiController<'_> {
     }
 
     #[cfg(feature = "wifi-eap")]
-    fn apply_sta_eap_config(
-        &mut self,
-        config: &self::sta::eap::EapClientConfig,
-    ) -> Result<(), WifiError> {
+    fn apply_sta_eap_config(&mut self, config: &EapClientConfig) -> Result<(), WifiError> {
         self.beacon_timeout = config.beacon_timeout;
 
         let mut cfg = wifi_config_t {
