@@ -184,12 +184,17 @@ impl DependencyGraph {
 
         for node in clock_tree.iter() {
             for input in node.input_clocks() {
-                dependency_graph
+                let node_name = node.name_str();
+
+                let graph_node = dependency_graph
                     .entry(input.clone())
-                    .or_insert_with(Vec::new)
-                    .push(node.name_str().clone());
+                    .or_insert_with(Vec::new);
+
+                if !graph_node.contains(node_name) {
+                    graph_node.push(node_name.clone());
+                }
                 reverse_dependency_graph
-                    .entry(node.name_str().clone())
+                    .entry(node_name.clone())
                     .or_insert_with(Vec::new)
                     .push(input);
             }

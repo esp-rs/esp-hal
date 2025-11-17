@@ -647,8 +647,6 @@ macro_rules! define_clock_tree_types {
             timg1_calibration_clock: Option<Timg0CalibrationClockConfig>,
             pll_clk_refcount: u32,
             rc_fast_clk_refcount: u32,
-            cpu_pll_div_refcount: u32,
-            syscon_pre_div_refcount: u32,
             apb_clk_refcount: u32,
             ref_tick_refcount: u32,
             rtc_slow_clk_refcount: u32,
@@ -688,8 +686,6 @@ macro_rules! define_clock_tree_types {
                 timg1_calibration_clock: None,
                 pll_clk_refcount: 0,
                 rc_fast_clk_refcount: 0,
-                cpu_pll_div_refcount: 0,
-                syscon_pre_div_refcount: 0,
                 apb_clk_refcount: 0,
                 ref_tick_refcount: 0,
                 rtc_slow_clk_refcount: 0,
@@ -802,16 +798,12 @@ macro_rules! define_clock_tree_types {
             configure_cpu_pll_div_impl(clocks, config);
         }
         pub fn request_cpu_pll_div(clocks: &mut ClockTree) {
-            if increment_reference_count(&mut clocks.cpu_pll_div_refcount) {
-                request_cpu_pll_div_in(clocks);
-                enable_cpu_pll_div_impl(clocks, true);
-            }
+            request_cpu_pll_div_in(clocks);
+            enable_cpu_pll_div_impl(clocks, true);
         }
         pub fn release_cpu_pll_div(clocks: &mut ClockTree) {
-            if decrement_reference_count(&mut clocks.cpu_pll_div_refcount) {
-                enable_cpu_pll_div_impl(clocks, false);
-                release_cpu_pll_div_in(clocks);
-            }
+            enable_cpu_pll_div_impl(clocks, false);
+            release_cpu_pll_div_in(clocks);
         }
         pub fn cpu_pll_div_frequency(clocks: &mut ClockTree) -> u32 {
             (cpu_pll_div_in_frequency(clocks) / unwrap!(clocks.cpu_pll_div).value())
@@ -866,16 +858,12 @@ macro_rules! define_clock_tree_types {
             configure_syscon_pre_div_impl(clocks, config);
         }
         pub fn request_syscon_pre_div(clocks: &mut ClockTree) {
-            if increment_reference_count(&mut clocks.syscon_pre_div_refcount) {
-                request_syscon_pre_div_in(clocks);
-                enable_syscon_pre_div_impl(clocks, true);
-            }
+            request_syscon_pre_div_in(clocks);
+            enable_syscon_pre_div_impl(clocks, true);
         }
         pub fn release_syscon_pre_div(clocks: &mut ClockTree) {
-            if decrement_reference_count(&mut clocks.syscon_pre_div_refcount) {
-                enable_syscon_pre_div_impl(clocks, false);
-                release_syscon_pre_div_in(clocks);
-            }
+            enable_syscon_pre_div_impl(clocks, false);
+            release_syscon_pre_div_in(clocks);
         }
         pub fn syscon_pre_div_frequency(clocks: &mut ClockTree) -> u32 {
             (syscon_pre_div_in_frequency(clocks) / (unwrap!(clocks.syscon_pre_div).value() + 1))
