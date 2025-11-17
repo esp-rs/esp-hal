@@ -913,8 +913,14 @@ impl<'rmt> Rmt<'rmt, Blocking> {
     /// This function can return
     /// - [`ConfigError::UnreachableTargetFrequency`].
     pub fn new(peripheral: RMT<'rmt>, frequency: Rate) -> Result<Self, ConfigError> {
+        let clk_src = ClockSource::default();
+        let div = self::chip_specific::validate_clock(clk_src, frequency)?;
+
+        // Only create the peripheral guards after validate_clock() to avoid that this function
+        // contains lots of code to drop them again on error.
         let this = Rmt::create(peripheral);
-        self::chip_specific::configure_clock(ClockSource::default(), frequency)?;
+
+        self::chip_specific::configure_clock(clk_src, div);
         Ok(this)
     }
 
@@ -2318,17 +2324,22 @@ mod chip_specific {
     };
     use crate::{peripherals::RMT, time::Rate};
 
-    pub(super) fn configure_clock(source: ClockSource, frequency: Rate) -> Result<(), ConfigError> {
+    pub(super) fn validate_clock(source: ClockSource, frequency: Rate) -> Result<u8, ConfigError> {
         let src_clock = source.freq();
 
         if frequency > src_clock {
             return Err(ConfigError::UnreachableTargetFrequency);
         }
 
-        let Ok(div) = u8::try_from((src_clock / frequency) - 1) else {
-            return Err(ConfigError::UnreachableTargetFrequency);
-        };
+        let div = src_clock
+            .as_hz()
+            .checked_div(frequency.as_hz())
+            .ok_or(ConfigError::UnreachableTargetFrequency)?;
 
+        u8::try_from(div - 1).map_err(|_| ConfigError::UnreachableTargetFrequency)
+    }
+
+    pub(super) fn configure_clock(source: ClockSource, div: u8) {
         #[cfg(not(soc_has_pcr))]
         {
             RMT::regs().sys_conf().modify(|_, w| unsafe {
@@ -2362,8 +2373,6 @@ mod chip_specific {
                 .sys_conf()
                 .modify(|_, w| w.apb_fifo_mask().set_bit());
         }
-
-        Ok(())
     }
 
     #[crate::handler]
@@ -2834,11 +2843,15 @@ mod chip_specific {
     };
     use crate::{peripherals::RMT, time::Rate};
 
-    pub(super) fn configure_clock(source: ClockSource, frequency: Rate) -> Result<(), ConfigError> {
+    pub(super) fn validate_clock(source: ClockSource, frequency: Rate) -> Result<u8, ConfigError> {
         if frequency != source.freq() {
             return Err(ConfigError::UnreachableTargetFrequency);
         }
 
+        Ok(1)
+    }
+
+    pub(super) fn configure_clock(source: ClockSource, _div: u8) {
         let rmt = RMT::regs();
 
         for ch_num in 0..NUM_CHANNELS {
@@ -2850,8 +2863,6 @@ mod chip_specific {
 
         #[cfg(not(esp32))]
         rmt.apb_conf().modify(|_, w| w.clk_en().set_bit());
-
-        Ok(())
     }
 
     #[crate::handler]
