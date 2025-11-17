@@ -2,12 +2,7 @@
 
 #![deny(missing_docs)]
 
-pub mod event;
-mod internal;
-pub(crate) mod os_adapter;
-mod scan;
-pub(crate) mod state;
-use alloc::{collections::vec_deque::VecDeque, string::String, vec::Vec};
+use alloc::{collections::vec_deque::VecDeque, vec::Vec};
 use core::{fmt::Debug, marker::PhantomData, ptr::addr_of, task::Poll, time::Duration};
 
 use enumset::{EnumSet, EnumSetType};
@@ -15,147 +10,52 @@ use esp_config::esp_config_int;
 use esp_hal::{asynch::AtomicWaker, system::Cpu};
 use esp_sync::NonReentrantMutex;
 use num_derive::FromPrimitive;
-#[doc(hidden)]
-pub(crate) use os_adapter::*;
 use portable_atomic::{AtomicUsize, Ordering};
 use procmacros::BuilderLite;
 #[cfg(all(feature = "smoltcp", feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
-pub use state::*;
 
-#[cfg(all(any(feature = "sniffer", feature = "esp-now"), feature = "unstable"))]
-use crate::sys::include::wifi_pkt_rx_ctrl_t;
-#[cfg(feature = "wifi-eap")]
-use crate::sys::include::{
-    esp_eap_client_clear_ca_cert,
-    esp_eap_client_clear_certificate_and_key,
-    esp_eap_client_clear_identity,
-    esp_eap_client_clear_new_password,
-    esp_eap_client_clear_password,
-    esp_eap_client_clear_username,
-    esp_eap_client_set_ca_cert,
-    esp_eap_client_set_certificate_and_key,
-    esp_eap_client_set_disable_time_check,
-    esp_eap_client_set_fast_params,
-    esp_eap_client_set_identity,
-    esp_eap_client_set_new_password,
-    esp_eap_client_set_pac_file,
-    esp_eap_client_set_password,
-    esp_eap_client_set_ttls_phase2_method,
-    esp_eap_client_set_username,
-    esp_eap_fast_config,
-    esp_wifi_sta_enterprise_enable,
-};
+pub(crate) use self::os_adapter::*;
 #[cfg(all(feature = "sniffer", feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-use crate::sys::include::{
-    esp_wifi_80211_tx,
-    esp_wifi_set_promiscuous,
-    esp_wifi_set_promiscuous_rx_cb,
-    wifi_promiscuous_pkt_t,
-    wifi_promiscuous_pkt_type_t,
+use self::sniffer::Sniffer;
+#[cfg(feature = "wifi-eap")]
+use self::sta::eap::EapClientConfig;
+pub use self::state::*;
+use self::{
+    ap::{AccessPointConfig, AccessPointInfo},
+    private::PacketBuffer,
+    scan::{FreeApListOnDrop, ScanResults},
+    sta::ClientConfig,
 };
+#[cfg(feature = "csi")]
+#[instability::unstable]
+pub use crate::sys::include::wifi_csi_info_t; // FIXME
 use crate::{
     Controller,
     common_adapter::*,
     esp_wifi_result,
     hal::ram,
     sys::{
-        c_types::c_uint,
-        include::{
-            WIFI_INIT_CONFIG_MAGIC,
-            WIFI_PROTOCOL_11AX,
-            WIFI_PROTOCOL_11B,
-            WIFI_PROTOCOL_11G,
-            WIFI_PROTOCOL_11N,
-            WIFI_PROTOCOL_LR,
-            esp_wifi_connect_internal,
-            esp_wifi_disconnect_internal,
-            wifi_init_config_t,
-            wifi_scan_channel_bitmap_t,
-        },
-    },
-    wifi::{
-        private::PacketBuffer,
-        scan::{FreeApListOnDrop, ScanResults},
+        c_types,
+        include::{self, *},
     },
 };
+
+pub mod ap;
+pub mod event;
+#[cfg(all(feature = "sniffer", feature = "unstable"))]
+pub mod sniffer;
+pub mod sta;
+
+pub(crate) mod os_adapter;
+pub(crate) mod state;
+
+mod internal;
+mod scan;
 
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
-
-#[cfg(all(feature = "csi", esp32c6))]
-use crate::sys::include::wifi_csi_acquire_config_t;
-#[cfg(feature = "csi")]
-#[instability::unstable]
-pub use crate::sys::include::wifi_csi_info_t;
-#[cfg(feature = "csi")]
-#[instability::unstable]
-use crate::sys::include::{
-    esp_wifi_set_csi,
-    esp_wifi_set_csi_config,
-    esp_wifi_set_csi_rx_cb,
-    wifi_csi_config_t,
-};
-use crate::sys::{
-    c_types,
-    include::{
-        self,
-        __BindgenBitfieldUnit,
-        esp_err_t,
-        esp_interface_t_ESP_IF_WIFI_AP,
-        esp_interface_t_ESP_IF_WIFI_STA,
-        esp_supplicant_deinit,
-        esp_supplicant_init,
-        esp_wifi_deinit_internal,
-        esp_wifi_get_mode,
-        esp_wifi_init_internal,
-        esp_wifi_internal_free_rx_buffer,
-        esp_wifi_internal_reg_rxcb,
-        esp_wifi_internal_tx,
-        esp_wifi_scan_start,
-        esp_wifi_set_config,
-        esp_wifi_set_country,
-        esp_wifi_set_mode,
-        esp_wifi_set_protocol,
-        esp_wifi_set_tx_done_cb,
-        esp_wifi_sta_get_rssi,
-        esp_wifi_start,
-        esp_wifi_stop,
-        g_wifi_default_wpa_crypto_funcs,
-        wifi_active_scan_time_t,
-        wifi_ap_config_t,
-        wifi_auth_mode_t,
-        wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP,
-        wifi_config_t,
-        wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
-        wifi_country_t,
-        wifi_interface_t,
-        wifi_interface_t_WIFI_IF_AP,
-        wifi_interface_t_WIFI_IF_STA,
-        wifi_mode_t,
-        wifi_mode_t_WIFI_MODE_AP,
-        wifi_mode_t_WIFI_MODE_APSTA,
-        wifi_mode_t_WIFI_MODE_NULL,
-        wifi_mode_t_WIFI_MODE_STA,
-        wifi_pmf_config_t,
-        wifi_scan_config_t,
-        wifi_scan_threshold_t,
-        wifi_scan_time_t,
-        wifi_scan_type_t_WIFI_SCAN_TYPE_ACTIVE,
-        wifi_scan_type_t_WIFI_SCAN_TYPE_PASSIVE,
-        wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
-        wifi_sta_config_t,
-    },
-};
-
-const _: () = {
-    // make sure we know all the auth modes the driver knows
-    core::assert!(
-        include::wifi_auth_mode_t_WIFI_AUTH_MAX == 17,
-        "Make sure all auth-methods known by the driver are known by us."
-    )
-};
 
 /// Supported Wi-Fi authentication methods.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, PartialOrd)]
@@ -319,153 +219,6 @@ impl defmt::Format for Country {
     }
 }
 
-/// Information about a detected Wi-Fi access point.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct AccessPointInfo {
-    /// The SSID of the access point.
-    // TODO: we can use the `alloc` feature once we have `defmt` 1.0.2
-    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
-    pub ssid: String,
-
-    /// The BSSID (MAC address) of the access point.
-    pub bssid: [u8; 6],
-
-    /// The channel the access point is operating on.
-    pub channel: u8,
-
-    /// The secondary channel configuration of the access point.
-    pub secondary_channel: SecondaryChannel,
-
-    /// The signal strength of the access point (RSSI).
-    pub signal_strength: i8,
-
-    /// The authentication method used by the access point.
-    pub auth_method: Option<AuthMethod>,
-
-    /// The country information of the access point (if available from beacon frames).
-    pub country: Option<Country>,
-}
-
-/// Configuration for a Wi-Fi access point.
-#[derive(BuilderLite, Clone, Eq, PartialEq)]
-pub struct AccessPointConfig {
-    /// The SSID of the access point.
-    #[builder_lite(reference)]
-    ssid: String,
-
-    /// Whether the SSID is hidden or visible.
-    ssid_hidden: bool,
-
-    /// The channel the access point will operate on.
-    channel: u8,
-
-    /// The secondary channel configuration.
-    secondary_channel: Option<u8>,
-
-    /// The set of protocols supported by the access point.
-    protocols: EnumSet<Protocol>,
-
-    /// The authentication method to be used by the access point.
-    auth_method: AuthMethod,
-
-    /// The password for securing the access point (if applicable).
-    #[builder_lite(reference)]
-    password: String,
-
-    /// The maximum number of connections allowed on the access point.
-    max_connections: u16,
-    /// Dtim period of the access point (Range: 1 ~ 10).
-    dtim_period: u8,
-
-    /// Time to force deauth the STA if the SoftAP doesn't receive any data.
-    #[builder_lite(unstable)]
-    beacon_timeout: u16,
-}
-
-impl AccessPointConfig {
-    fn validate(&self) -> Result<(), WifiError> {
-        if self.ssid.len() > 32 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if self.password.len() > 64 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if !(1..=10).contains(&self.dtim_period) {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        Ok(())
-    }
-}
-
-impl Default for AccessPointConfig {
-    fn default() -> Self {
-        Self {
-            ssid: String::from("iot-device"),
-            ssid_hidden: false,
-            channel: 1,
-            secondary_channel: None,
-            protocols: (Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
-            auth_method: AuthMethod::None,
-            password: String::new(),
-            max_connections: 255,
-            dtim_period: 2,
-            beacon_timeout: 300,
-        }
-    }
-}
-
-impl core::fmt::Debug for AccessPointConfig {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("AccessPointConfig")
-            .field("ssid", &self.ssid)
-            .field("ssid_hidden", &self.ssid_hidden)
-            .field("channel", &self.channel)
-            .field("secondary_channel", &self.secondary_channel)
-            .field("protocols", &self.protocols)
-            .field("auth_method", &self.auth_method)
-            .field("password", &"**REDACTED**")
-            .field("max_connections", &self.max_connections)
-            .field("dtim_period", &self.dtim_period)
-            .field("beacon_timeout", &self.beacon_timeout)
-            .finish()
-    }
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for AccessPointConfig {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(
-            fmt,
-            "AccessPointConfig {{\
-            ssid: {}, \
-            ssid_hidden: {}, \
-            channel: {}, \
-            secondary_channel: {}, \
-            protocols: {}, \
-            auth_method: {}, \
-            password: **REDACTED**, \
-            max_connections: {}, \
-            dtim_period: {}, \
-            beacon_timeout: {} \
-            }}",
-            self.ssid.as_str(),
-            self.ssid_hidden,
-            self.channel,
-            self.secondary_channel,
-            self.protocols,
-            self.auth_method,
-            self.max_connections,
-            self.dtim_period,
-            self.beacon_timeout
-        );
-    }
-}
-
 /// Wi-Fi scan method.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -474,426 +227,8 @@ impl defmt::Format for AccessPointConfig {
 pub enum ScanMethod {
     /// Fast scan.
     Fast,
-
     /// Scan all channels.
     AllChannels,
-}
-
-/// Client configuration for a Wi-Fi connection.
-#[derive(BuilderLite, Clone, Eq, PartialEq)]
-pub struct ClientConfig {
-    /// The SSID of the Wi-Fi network.
-    #[builder_lite(reference)]
-    ssid: String,
-
-    /// The BSSID (MAC address) of the client.
-    bssid: Option<[u8; 6]>,
-
-    /// The authentication method for the Wi-Fi connection.
-    auth_method: AuthMethod,
-
-    /// The password for the Wi-Fi connection.
-    #[builder_lite(reference)]
-    password: String,
-
-    /// The Wi-Fi channel to connect to.
-    channel: Option<u8>,
-
-    /// The set of protocols supported by the access point.
-    protocols: EnumSet<Protocol>,
-
-    /// Interval for station to listen to beacon from AP.
-    ///
-    /// The unit of listen interval is one beacon interval.
-    /// For example, if beacon interval is 100 ms and listen interval is 3,
-    /// the interval for station to listen to beacon is 300 ms
-    #[builder_lite(unstable)]
-    listen_interval: u16,
-
-    /// Time to disconnect from AP if no data is received.
-    ///
-    /// Must be between 6 and 31.
-    #[builder_lite(unstable)]
-    beacon_timeout: u16,
-
-    /// Number of connection retries station will do before moving to next AP.
-    ///
-    /// `scan_method` should be set as [`ScanMethod::AllChannels`] to use this config.
-    ///
-    /// Note: Enabling this may cause connection time to increase in case the best AP
-    /// doesn't behave properly.
-    #[builder_lite(unstable)]
-    failure_retry_cnt: u8,
-
-    /// Scan method.
-    #[builder_lite(unstable)]
-    scan_method: ScanMethod,
-}
-
-impl ClientConfig {
-    fn validate(&self) -> Result<(), WifiError> {
-        if self.ssid.len() > 32 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if self.password.len() > 64 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if !(6..=31).contains(&self.beacon_timeout) {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        Ok(())
-    }
-}
-
-impl Default for ClientConfig {
-    fn default() -> Self {
-        ClientConfig {
-            ssid: String::new(),
-            bssid: None,
-            auth_method: AuthMethod::Wpa2Personal,
-            password: String::new(),
-            channel: None,
-            protocols: (Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
-            listen_interval: 3,
-            beacon_timeout: 6,
-            failure_retry_cnt: 1,
-            scan_method: ScanMethod::Fast,
-        }
-    }
-}
-
-impl core::fmt::Debug for ClientConfig {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("ClientConfig")
-            .field("ssid", &self.ssid)
-            .field("bssid", &self.bssid)
-            .field("auth_method", &self.auth_method)
-            .field("password", &"**REDACTED**")
-            .field("channel", &self.channel)
-            .field("protocols", &self.protocols)
-            .field("listen_interval", &self.listen_interval)
-            .field("beacon_timeout", &self.beacon_timeout)
-            .field("failure_retry_cnt", &self.failure_retry_cnt)
-            .field("scan_method", &self.scan_method)
-            .finish()
-    }
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for ClientConfig {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(
-            fmt,
-            "ClientConfig {{\
-            ssid: {}, \
-            bssid: {:?}, \
-            auth_method: {:?}, \
-            password: **REDACTED**, \
-            channel: {:?}, \
-            protocols: {}, \
-            listen_interval: {}, \
-            beacon_timeout: {}, \
-            failure_retry_cnt: {}, \
-            scan_method: {} \
-            }}",
-            self.ssid.as_str(),
-            self.bssid,
-            self.auth_method,
-            self.channel,
-            self.protocols,
-            self.listen_interval,
-            self.beacon_timeout,
-            self.failure_retry_cnt,
-            self.scan_method
-        )
-    }
-}
-
-/// Configuration for EAP-FAST authentication protocol.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg(feature = "wifi-eap")]
-#[instability::unstable]
-pub struct EapFastConfig {
-    /// Specifies the provisioning mode for EAP-FAST.
-    pub fast_provisioning: u8,
-    /// The maximum length of the PAC (Protected Access Credentials) list.
-    pub fast_max_pac_list_len: u8,
-    /// Indicates whether the PAC file is in binary format.
-    pub fast_pac_format_binary: bool,
-}
-
-/// Phase 2 authentication methods
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg(feature = "wifi-eap")]
-#[instability::unstable]
-pub enum TtlsPhase2Method {
-    /// EAP (Extensible Authentication Protocol).
-    Eap,
-
-    /// MSCHAPv2 (Microsoft Challenge Handshake Authentication Protocol 2).
-    Mschapv2,
-
-    /// MSCHAP (Microsoft Challenge Handshake Authentication Protocol).
-    Mschap,
-
-    /// PAP (Password Authentication Protocol).
-    Pap,
-
-    /// CHAP (Challenge Handshake Authentication Protocol).
-    Chap,
-}
-
-#[cfg(feature = "wifi-eap")]
-impl TtlsPhase2Method {
-    /// Maps the phase 2 method to a raw `u32` representation.
-    fn to_raw(&self) -> u32 {
-        match self {
-            TtlsPhase2Method::Eap => {
-                crate::sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_EAP
-            }
-            TtlsPhase2Method::Mschapv2 => {
-                crate::sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_MSCHAPV2
-            }
-            TtlsPhase2Method::Mschap => {
-                crate::sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_MSCHAP
-            }
-            TtlsPhase2Method::Pap => {
-                crate::sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_PAP
-            }
-            TtlsPhase2Method::Chap => {
-                crate::sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_CHAP
-            }
-        }
-    }
-}
-
-#[cfg(feature = "wifi-eap")]
-type CertificateAndKey = (&'static [u8], &'static [u8], Option<&'static [u8]>);
-
-/// Configuration for an EAP (Extensible Authentication Protocol) client.
-#[derive(BuilderLite, Clone, PartialEq, Eq)]
-#[cfg(feature = "wifi-eap")]
-#[instability::unstable]
-pub struct EapClientConfig {
-    /// The SSID of the network the client is connecting to.
-    #[builder_lite(reference)]
-    ssid: String,
-
-    /// The BSSID (MAC Address) of the specific access point.
-    bssid: Option<[u8; 6]>,
-
-    /// The authentication method used for EAP.
-    auth_method: AuthMethod,
-
-    /// The identity used during authentication.
-    #[builder_lite(reference)]
-    identity: Option<String>,
-
-    /// The username used for inner authentication.
-    /// Some EAP methods require a username for authentication.
-    #[builder_lite(reference)]
-    username: Option<String>,
-
-    /// The password used for inner authentication.
-    #[builder_lite(reference)]
-    password: Option<String>,
-
-    /// A new password to be set during the authentication process.
-    /// Some methods support password changes during authentication.
-    #[builder_lite(reference)]
-    new_password: Option<String>,
-
-    /// Configuration for EAP-FAST.
-    #[builder_lite(reference)]
-    eap_fast_config: Option<EapFastConfig>,
-
-    /// A PAC (Protected Access Credential) file for EAP-FAST.
-    pac_file: Option<&'static [u8]>,
-
-    /// A boolean flag indicating whether time checking is enforced during
-    /// authentication.
-    time_check: bool,
-
-    /// A CA (Certificate Authority) certificate for validating the
-    /// authentication server's certificate.
-    ca_cert: Option<&'static [u8]>,
-
-    /// A tuple containing the client's certificate, private key, and an
-    /// intermediate certificate.
-    certificate_and_key: Option<CertificateAndKey>,
-    /// The Phase 2 authentication method used for EAP-TTLS.
-    #[builder_lite(reference)]
-    ttls_phase2_method: Option<TtlsPhase2Method>,
-
-    /// The specific Wi-Fi channel to use for the connection.
-    channel: Option<u8>,
-
-    /// The set of protocols supported by the access point.
-    protocols: EnumSet<Protocol>,
-
-    /// Interval for station to listen to beacon from AP.
-    ///
-    /// The unit of listen interval is one beacon interval.
-    /// For example, if beacon interval is 100 ms and listen interval is 3,
-    /// the interval for station to listen to beacon is 300 ms
-    #[builder_lite(unstable)]
-    listen_interval: u16,
-
-    /// Time to disconnect from AP if no data is received.
-    ///
-    /// Must be between 6 and 31.
-    #[builder_lite(unstable)]
-    beacon_timeout: u16,
-
-    /// Number of connection retries station will do before moving to next AP.
-    ///
-    /// `scan_method` should be set as [`ScanMethod::AllChannels`] to use this config.
-    ///
-    /// Note: Enabling this may cause connection time to increase in case the best AP
-    /// doesn't behave properly.
-    #[builder_lite(unstable)]
-    failure_retry_cnt: u8,
-
-    /// Scan method.
-    #[builder_lite(unstable)]
-    scan_method: ScanMethod,
-}
-
-#[cfg(feature = "wifi-eap")]
-impl EapClientConfig {
-    fn validate(&self) -> Result<(), WifiError> {
-        if self.ssid.len() > 32 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if self.identity.as_ref().unwrap_or(&String::new()).len() > 128 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if self.username.as_ref().unwrap_or(&String::new()).len() > 128 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if self.password.as_ref().unwrap_or(&String::new()).len() > 64 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if self.new_password.as_ref().unwrap_or(&String::new()).len() > 64 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if !(6..=31).contains(&self.beacon_timeout) {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        Ok(())
-    }
-}
-
-#[cfg(feature = "wifi-eap")]
-impl Debug for EapClientConfig {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("EapClientConfig")
-            .field("ssid", &self.ssid)
-            .field("bssid", &self.bssid)
-            .field("auth_method", &self.auth_method)
-            .field("channel", &self.channel)
-            .field("identity", &self.identity)
-            .field("username", &self.username)
-            .field("password", &"**REDACTED**")
-            .field("new_password", &"**REDACTED**")
-            .field("eap_fast_config", &self.eap_fast_config)
-            .field("time_check", &self.time_check)
-            .field("pac_file set", &self.pac_file.is_some())
-            .field("ca_cert set", &self.ca_cert.is_some())
-            .field("certificate_and_key set", &"**REDACTED**")
-            .field("ttls_phase2_method", &self.ttls_phase2_method)
-            .field("protocols", &self.protocols)
-            .field("listen_interval", &self.listen_interval)
-            .field("beacon_timeout", &self.beacon_timeout)
-            .field("failure_retry_cnt", &self.failure_retry_cnt)
-            .field("scan_method", &self.scan_method)
-            .finish()
-    }
-}
-
-#[cfg(feature = "defmt")]
-#[cfg(feature = "wifi-eap")]
-impl defmt::Format for EapClientConfig {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(
-            fmt,
-            "EapClientConfig {{\
-            ssid: {}, \
-            bssid: {:?}, \
-            auth_method: {:?}, \
-            channel: {:?}, \
-            identity: {:?}, \
-            username: {:?}, \
-            password: **REDACTED**, \
-            new_password: **REDACTED**, \
-            eap_fast_config: {:?}, \
-            time_check: {}, \
-            pac_file: {}, \
-            ca_cert: {}, \
-            certificate_and_key: **REDACTED**, \
-            ttls_phase2_method: {:?}, \
-            protocols: {}, \
-            listen_interval: {}, \
-            beacon_timeout: {}, \
-            failure_retry_cnt: {}, \
-            scan_method: {},
-            }}",
-            self.ssid.as_str(),
-            self.bssid,
-            self.auth_method,
-            self.channel,
-            &self.identity.as_ref().map_or("", |v| v.as_str()),
-            &self.username.as_ref().map_or("", |v| v.as_str()),
-            self.eap_fast_config,
-            self.time_check,
-            self.pac_file,
-            self.ca_cert,
-            self.ttls_phase2_method,
-            self.protocols,
-            self.listen_interval,
-            self.beacon_timeout,
-            self.failure_retry_cnt,
-            self.scan_method
-        )
-    }
-}
-
-#[cfg(feature = "wifi-eap")]
-impl Default for EapClientConfig {
-    fn default() -> Self {
-        EapClientConfig {
-            ssid: String::new(),
-            bssid: None,
-            auth_method: AuthMethod::Wpa2Enterprise,
-            identity: None,
-            username: None,
-            password: None,
-            channel: None,
-            eap_fast_config: None,
-            time_check: false,
-            new_password: None,
-            pac_file: None,
-            ca_cert: None,
-            certificate_and_key: None,
-            ttls_phase2_method: None,
-            protocols: (Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
-            listen_interval: 3,
-            beacon_timeout: 6,
-            failure_retry_cnt: 1,
-            scan_method: ScanMethod::Fast,
-        }
-    }
 }
 
 /// Introduces Wi-Fi configuration options.
@@ -1324,7 +659,7 @@ pub enum WifiError {
     /// Out of memory
     OutOfMemory,
 
-    /// Wi-Fi driver was not installed by [esp_wifi_init](crate::sys::include::esp_wifi_init)
+    /// Wi-Fi driver was not initialized
     NotInitialized,
 
     /// Wi-Fi driver was not started by [esp_wifi_start]
@@ -2250,111 +1585,6 @@ impl RxControlInfo {
         rx_control_info
     }
 }
-/// Represents a Wi-Fi packet in promiscuous mode.
-#[cfg(all(feature = "sniffer", feature = "unstable"))]
-#[instability::unstable]
-pub struct PromiscuousPkt<'a> {
-    /// Control information related to packet reception.
-    pub rx_cntl: RxControlInfo,
-    /// Frame type of the received packet.
-    pub frame_type: wifi_promiscuous_pkt_type_t,
-    /// Length of the received packet.
-    pub len: usize,
-    /// Data contained in the received packet.
-    pub data: &'a [u8],
-}
-#[cfg(all(feature = "sniffer", feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl PromiscuousPkt<'_> {
-    /// # Safety
-    /// When calling this, you have to ensure, that `buf` points to a valid
-    /// [wifi_promiscuous_pkt_t].
-    pub(crate) unsafe fn from_raw(
-        buf: *const wifi_promiscuous_pkt_t,
-        frame_type: wifi_promiscuous_pkt_type_t,
-    ) -> Self {
-        let rx_cntl = unsafe { RxControlInfo::from_raw(&(*buf).rx_ctrl) };
-        let len = rx_cntl.sig_len as usize;
-        PromiscuousPkt {
-            rx_cntl,
-            frame_type,
-            len,
-            data: unsafe {
-                core::slice::from_raw_parts(
-                    (buf as *const u8).add(core::mem::size_of::<wifi_pkt_rx_ctrl_t>()),
-                    len,
-                )
-            },
-        }
-    }
-}
-
-#[cfg(all(feature = "sniffer", feature = "unstable"))]
-static SNIFFER_CB: NonReentrantMutex<Option<fn(PromiscuousPkt<'_>)>> = NonReentrantMutex::new(None);
-
-#[cfg(all(feature = "sniffer", feature = "unstable"))]
-unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: u32) {
-    unsafe {
-        if let Some(sniffer_callback) = SNIFFER_CB.with(|callback| *callback) {
-            let promiscuous_pkt = PromiscuousPkt::from_raw(buf as *const _, frame_type);
-            sniffer_callback(promiscuous_pkt);
-        }
-    }
-}
-
-#[cfg(all(feature = "sniffer", feature = "unstable"))]
-#[instability::unstable]
-/// A Wi-Fi sniffer.
-#[non_exhaustive]
-pub struct Sniffer<'d> {
-    _phantom: PhantomData<&'d ()>,
-}
-
-#[cfg(all(feature = "sniffer", feature = "unstable"))]
-impl Sniffer<'_> {
-    pub(crate) fn new() -> Self {
-        // This shouldn't fail, since the way this is created, means that wifi will
-        // always be initialized.
-        unwrap!(esp_wifi_result!(unsafe {
-            esp_wifi_set_promiscuous_rx_cb(Some(promiscuous_rx_cb))
-        }));
-        Self {
-            _phantom: PhantomData,
-        }
-    }
-    /// Set promiscuous mode enabled or disabled.
-    #[instability::unstable]
-    pub fn set_promiscuous_mode(&self, enabled: bool) -> Result<(), WifiError> {
-        esp_wifi_result!(unsafe { esp_wifi_set_promiscuous(enabled) })?;
-        Ok(())
-    }
-    /// Transmit a raw frame.
-    #[instability::unstable]
-    pub fn send_raw_frame(
-        &mut self,
-        use_sta_interface: bool,
-        buffer: &[u8],
-        use_internal_seq_num: bool,
-    ) -> Result<(), WifiError> {
-        esp_wifi_result!(unsafe {
-            esp_wifi_80211_tx(
-                if use_sta_interface {
-                    wifi_interface_t_WIFI_IF_STA
-                } else {
-                    wifi_interface_t_WIFI_IF_AP
-                } as wifi_interface_t,
-                buffer.as_ptr() as *const _,
-                buffer.len() as i32,
-                use_internal_seq_num,
-            )
-        })
-    }
-    /// Set the callback for receiving a packet.
-    #[instability::unstable]
-    pub fn set_receive_cb(&mut self, cb: fn(PromiscuousPkt<'_>)) {
-        SNIFFER_CB.with(|callback| *callback = Some(cb));
-    }
-}
 
 // see https://docs.rs/smoltcp/0.7.1/smoltcp/phy/index.html
 #[cfg(all(feature = "smoltcp", feature = "unstable"))]
@@ -3044,7 +2274,7 @@ impl WifiController<'_> {
     ///
     /// ```rust,no_run
     /// # {before_snippet}
-    /// # use esp_radio::wifi::{AccessPointConfig, ModeConfig};
+    /// # use esp_radio::wifi::{ap::AccessPointConfig, ModeConfig};
     /// use esp_radio::wifi::Protocol;
     ///
     /// let esp_radio_controller = esp_radio::init().unwrap();
@@ -3520,7 +2750,7 @@ impl WifiController<'_> {
             sta: wifi_sta_config_t {
                 ssid: [0; 32],
                 password: [0; 64],
-                scan_method: config.scan_method as c_uint,
+                scan_method: config.scan_method as c_types::c_uint,
                 bssid_set: config.bssid.is_some(),
                 bssid: config.bssid.unwrap_or_default(),
                 channel: config.channel.unwrap_or(0),
@@ -3567,7 +2797,7 @@ impl WifiController<'_> {
             sta: wifi_sta_config_t {
                 ssid: [0; 32],
                 password: [0; 64],
-                scan_method: config.scan_method as c_uint,
+                scan_method: config.scan_method as c_types::c_uint,
                 bssid_set: config.bssid.is_some(),
                 bssid: config.bssid.unwrap_or_default(),
                 channel: config.channel.unwrap_or(0),

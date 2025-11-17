@@ -40,7 +40,7 @@ use esp_hal::{
 use esp_println::{print, println};
 use esp_radio::{
     ble::controller::BleConnector,
-    wifi::{ClientConfig, ModeConfig},
+    wifi::{ModeConfig, sta::ClientConfig},
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},

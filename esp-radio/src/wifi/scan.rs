@@ -4,23 +4,17 @@ use crate::{
     esp_wifi_result,
     sys::include,
     wifi::{
-        AccessPointInfo,
-        AuthMethod,
-        AuthMethodExt as _,
-        Country,
-        SecondaryChannel,
         WifiController,
         WifiError,
+        ap::{AccessPointInfo, convert_ap_info},
     },
 };
 
 pub struct ScanResults<'d> {
     /// Number of APs to return
     remaining: usize,
-
     /// Ensures the result list is free'd when this struct is dropped.
     _drop_guard: FreeApListOnDrop,
-
     /// Hold a lifetime to ensure the scan list is freed before a new scan is started.
     _marker: PhantomData<&'d mut ()>,
 }
@@ -67,31 +61,8 @@ impl Iterator for ScanResults<'_> {
     }
 }
 
-fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
-    let str_len = record
-        .ssid
-        .iter()
-        .position(|&c| c == 0)
-        .unwrap_or(record.ssid.len());
-    let ssid = alloc::string::String::from_utf8_lossy(&record.ssid[..str_len]).into_owned();
-
-    AccessPointInfo {
-        ssid,
-        bssid: record.bssid,
-        channel: record.primary,
-        secondary_channel: match record.second {
-            include::wifi_second_chan_t_WIFI_SECOND_CHAN_NONE => SecondaryChannel::None,
-            include::wifi_second_chan_t_WIFI_SECOND_CHAN_ABOVE => SecondaryChannel::Above,
-            include::wifi_second_chan_t_WIFI_SECOND_CHAN_BELOW => SecondaryChannel::Below,
-            _ => panic!(),
-        },
-        signal_strength: record.rssi,
-        auth_method: Some(AuthMethod::from_raw(record.authmode)),
-        country: Country::try_from_c(&record.country),
-    }
-}
-
 pub struct FreeApListOnDrop;
+
 impl FreeApListOnDrop {
     pub fn defuse(self) {
         core::mem::forget(self);
