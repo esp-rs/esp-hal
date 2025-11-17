@@ -651,7 +651,6 @@ macro_rules! define_clock_tree_types {
             syscon_pre_div_refcount: u32,
             apb_clk_refcount: u32,
             ref_tick_refcount: u32,
-            cpu_clk_refcount: u32,
             rtc_slow_clk_refcount: u32,
             rtc_fast_clk_refcount: u32,
             timg0_peripheral_clock_refcount: u32,
@@ -693,7 +692,6 @@ macro_rules! define_clock_tree_types {
                 syscon_pre_div_refcount: 0,
                 apb_clk_refcount: 0,
                 ref_tick_refcount: 0,
-                cpu_clk_refcount: 0,
                 rtc_slow_clk_refcount: 0,
                 rtc_fast_clk_refcount: 0,
                 timg0_peripheral_clock_refcount: 0,
@@ -1075,14 +1073,10 @@ macro_rules! define_clock_tree_types {
                     configure_ref_tick_pll(clocks, config_value);
                 }
             }
-            if clocks.cpu_clk_refcount > 0 {
-                cpu_clk_request_upstream(clocks, new_selector);
-                configure_cpu_clk_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    cpu_clk_release_upstream(clocks, old_selector);
-                }
-            } else {
-                configure_cpu_clk_impl(clocks, old_selector, new_selector);
+            cpu_clk_request_upstream(clocks, new_selector);
+            configure_cpu_clk_impl(clocks, old_selector, new_selector);
+            if let Some(old_selector) = old_selector {
+                cpu_clk_release_upstream(clocks, old_selector);
             }
         }
         fn cpu_clk_request_upstream(clocks: &mut ClockTree, selector: CpuClkConfig) {
@@ -1102,18 +1096,14 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn request_cpu_clk(clocks: &mut ClockTree) {
-            if increment_reference_count(&mut clocks.cpu_clk_refcount) {
-                let selector = unwrap!(clocks.cpu_clk);
-                cpu_clk_request_upstream(clocks, selector);
-                enable_cpu_clk_impl(clocks, true);
-            }
+            let selector = unwrap!(clocks.cpu_clk);
+            cpu_clk_request_upstream(clocks, selector);
+            enable_cpu_clk_impl(clocks, true);
         }
         pub fn release_cpu_clk(clocks: &mut ClockTree) {
-            if decrement_reference_count(&mut clocks.cpu_clk_refcount) {
-                enable_cpu_clk_impl(clocks, false);
-                let selector = unwrap!(clocks.cpu_clk);
-                cpu_clk_release_upstream(clocks, selector);
-            }
+            enable_cpu_clk_impl(clocks, false);
+            let selector = unwrap!(clocks.cpu_clk);
+            cpu_clk_release_upstream(clocks, selector);
         }
         pub fn cpu_clk_frequency(clocks: &mut ClockTree) -> u32 {
             match unwrap!(clocks.cpu_clk) {

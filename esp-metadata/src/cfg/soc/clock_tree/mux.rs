@@ -17,7 +17,9 @@ pub struct Multiplexer {
     /// The unique name of the clock tree item.
     name: String,
 
-    //#[serde(default)]
+    #[serde(default)]
+    always_on: bool,
+
     // reject: Option<RejectExpression>,
     pub variants: Vec<MultiplexerVariant>,
 }
@@ -25,6 +27,10 @@ pub struct Multiplexer {
 impl ClockTreeNodeType for Multiplexer {
     fn name_str<'a>(&'a self) -> &'a String {
         &self.name
+    }
+
+    fn always_on(&self) -> bool {
+        self.always_on
     }
 
     fn input_clocks(&self) -> Vec<String> {

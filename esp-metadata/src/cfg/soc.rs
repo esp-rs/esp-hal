@@ -683,7 +683,9 @@ impl DeviceClocks {
                 ManagementProperties {
                     name: format_ident!("{}", node.name().to_case(Case::Snake)),
                     refcounted,
-                    has_enable: !node.always_on(),
+                    // Always-on clock sources don't need enable functions.
+                    has_enable: !(node.always_on()
+                        && dependency_graph.inputs(node.name_str()).is_empty()),
                     state_ty: node.config_type_name(),
                 },
             );
