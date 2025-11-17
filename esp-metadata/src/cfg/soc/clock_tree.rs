@@ -41,6 +41,7 @@ use std::{any::Any, collections::HashMap, str::FromStr};
 
 use anyhow::Result;
 use convert_case::{Case, Casing, StateConverter};
+use indexmap::IndexMap;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 use serde::{
@@ -169,10 +170,57 @@ impl ValidationContext<'_> {
     }
 }
 
+pub(crate) struct DependencyGraph {
+    /// Direct upstream -> downstream clock relationships
+    graph: IndexMap<String, Vec<String>>,
+    /// Direct downstream -> upstream clock relationships
+    reverse_graph: IndexMap<String, Vec<String>>,
+}
+
+impl DependencyGraph {
+    pub fn build_from(clock_tree: &[Box<dyn ClockTreeNodeType>]) -> Self {
+        let mut dependency_graph = IndexMap::new();
+        let mut reverse_dependency_graph = IndexMap::new();
+
+        for node in clock_tree.iter() {
+            for input in node.input_clocks() {
+                dependency_graph
+                    .entry(input.clone())
+                    .or_insert_with(Vec::new)
+                    .push(node.name_str().clone());
+                reverse_dependency_graph
+                    .entry(node.name_str().clone())
+                    .or_insert_with(Vec::new)
+                    .push(input);
+            }
+        }
+
+        DependencyGraph {
+            graph: dependency_graph,
+            reverse_graph: reverse_dependency_graph,
+        }
+    }
+
+    pub fn inputs(&self, clk: &str) -> &[String] {
+        self.reverse_graph
+            .get(clk)
+            .map(|v| v.as_slice())
+            .unwrap_or_default()
+    }
+
+    pub fn users(&self, clk: &str) -> &[String] {
+        self.graph
+            .get(clk)
+            .map(|v| v.as_slice())
+            .unwrap_or_default()
+    }
+}
+
 pub(crate) struct ManagementProperties {
     pub name: Ident,
     pub state_ty: Option<Ident>,
     pub refcounted: bool,
+    pub has_enable: bool,
 }
 
 impl ManagementProperties {
@@ -191,6 +239,10 @@ impl ManagementProperties {
             None
         }
     }
+
+    pub fn has_enable(&self) -> bool {
+        self.has_enable
+    }
 }
 
 pub(crate) trait ClockTreeNodeType: Any {
@@ -198,6 +250,11 @@ pub(crate) trait ClockTreeNodeType: Any {
     fn affected_nodes<'s>(&'s self) -> Vec<&'s str> {
         vec![]
     }
+
+    fn input_clocks(&self) -> Vec<String> {
+        vec![]
+    }
+
     fn always_on(&self) -> bool {
         false
     }
@@ -315,7 +372,8 @@ impl ClockTreeItem {
 
         let request_fn_name = node.request_fn_name();
         let release_fn_name = node.release_fn_name();
-        let refcount_name = tree.properties(node).refcount_field_name();
+        let properties = tree.properties(node);
+        let refcount_name = properties.refcount_field_name();
         let enable_fn_name = node.enable_fn_name();
         let enable_fn_impl_name = format_ident!("{}_impl", enable_fn_name);
 
@@ -343,6 +401,13 @@ impl ClockTreeItem {
                             }
                         }
                     }
+                } else if properties.has_enable() {
+                    quote! {
+                        pub fn #request_fn_name(clocks: &mut ClockTree) {
+                            #request_direct_dependencies
+                            #enable_fn_impl_name(clocks, true);
+                        }
+                    }
                 } else {
                     quote! {
                         pub fn #request_fn_name(clocks: &mut ClockTree) {
@@ -360,6 +425,13 @@ impl ClockTreeItem {
                                 #enable_fn_impl_name(clocks, false);
                                 #release_direct_dependencies
                             }
+                        }
+                    }
+                } else if properties.has_enable() {
+                    quote! {
+                        pub fn #release_fn_name(clocks: &mut ClockTree) {
+                            #enable_fn_impl_name(clocks, false);
+                            #release_direct_dependencies
                         }
                     }
                 } else {
@@ -386,7 +458,7 @@ impl ClockTreeItem {
             },
 
             hal_functions: vec![
-                if refcount_name.is_some() {
+                if refcount_name.is_some() || properties.has_enable() {
                     quote! {
                         fn #enable_fn_impl_name(_clocks: &mut ClockTree, _en: bool) {}
                     }

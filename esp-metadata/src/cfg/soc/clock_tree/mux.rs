@@ -27,6 +27,10 @@ impl ClockTreeNodeType for Multiplexer {
         &self.name
     }
 
+    fn input_clocks(&self) -> Vec<String> {
+        self.upstream_clocks().map(ToString::to_string).collect()
+    }
+
     fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
         for variant in &self.variants {
             variant.validate_source_data(ctx).with_context(|| {
@@ -219,21 +223,32 @@ impl Multiplexer {
             }
         };
 
+        let apply_and_switch_input = quote! {
+            #request_upstream_fn(clocks, new_selector);
+            #hal_impl(clocks, old_selector, new_selector);
+            if let Some(old_selector) = old_selector {
+                #release_upstream_fn(clocks, old_selector);
+            }
+        };
+        let apply_impl = if refcount_field.is_some() {
+            quote! {
+                if clocks.#refcount_field > 0 {
+                    #apply_and_switch_input
+                } else {
+                    #hal_impl(clocks, old_selector, new_selector);
+                }
+            }
+        } else {
+            apply_and_switch_input
+        };
+
         quote! {
             pub fn #apply_fn_name(clocks: &mut ClockTree, new_selector: #ty_name) {
                 let old_selector = clocks.#state.replace(new_selector);
 
                 #configures
 
-                if clocks.#refcount_field > 0 {
-                    #request_upstream_fn(clocks, new_selector);
-                    #hal_impl(clocks, old_selector, new_selector);
-                    if let Some(old_selector) = old_selector {
-                        #release_upstream_fn(clocks, old_selector);
-                    }
-                } else {
-                    #hal_impl(clocks, old_selector, new_selector);
-                }
+                #apply_impl
             }
 
             fn #request_upstream_fn(clocks: &mut ClockTree, selector: #ty_name) {

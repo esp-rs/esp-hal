@@ -290,6 +290,10 @@ impl ClockTreeNodeType for DerivedClockSource {
         self.source_options.name_str()
     }
 
+    fn input_clocks(&self) -> Vec<String> {
+        vec![self.from.clone()]
+    }
+
     fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
         anyhow::ensure!(
             ctx.has_clock(&self.from),

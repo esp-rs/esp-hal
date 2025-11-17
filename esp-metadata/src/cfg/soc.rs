@@ -13,6 +13,7 @@ use crate::{
         clock_tree::{
             ClockTreeItem,
             ClockTreeNodeType,
+            DependencyGraph,
             ManagementProperties,
             PeripheralClockSource,
             ValidationContext,
@@ -590,6 +591,11 @@ impl DeviceClocks {
             })
             .collect::<Vec<_>>();
 
+        // To compute refcount requirement and correct initialization order, we need to be able to
+        // access direct dependencies (downstream clocks). As it is simpler to define
+        // dependents (inputs), we have to do a bit of maths.
+        let dependency_graph = DependencyGraph::build_from(&clock_tree);
+
         let validation_context = ValidationContext {
             tree: self.system_clocks.clock_tree.as_slice(),
         };
@@ -665,11 +671,19 @@ impl DeviceClocks {
                 );
             }
 
+            // If there's a single dependent clock, we can piggyback on its refcount.
+            // Note that this is only valid if the clock node is not expected to be manually
+            // managed. In the current model, manually managed clocks have 0 consumers.
+            let has_one_direct_dependent = dependency_graph.users(node.name_str()).len() == 1;
+
+            let refcounted = !(node.always_on() || has_one_direct_dependent);
+
             management_properties.insert(
                 node.name_str().clone(),
                 ManagementProperties {
                     name: format_ident!("{}", node.name().to_case(Case::Snake)),
-                    refcounted: !node.always_on(),
+                    refcounted,
+                    has_enable: !node.always_on(),
                     state_ty: node.config_type_name(),
                 },
             );

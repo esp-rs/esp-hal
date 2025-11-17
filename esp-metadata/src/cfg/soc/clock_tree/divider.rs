@@ -76,6 +76,13 @@ impl ClockTreeNodeType for Divider {
         &self.name
     }
 
+    fn input_clocks(&self) -> Vec<String> {
+        self.upstream_clock()
+            .iter()
+            .map(ToString::to_string)
+            .collect()
+    }
+
     fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
         let mut result = Ok(());
         self.output.visit_variables(|v| {

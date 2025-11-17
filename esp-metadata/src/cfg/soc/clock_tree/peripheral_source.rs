@@ -20,6 +20,10 @@ impl ClockTreeNodeType for PeripheralClockSource {
         self.mux.validate_source_data(ctx)
     }
 
+    fn input_clocks(&self) -> Vec<String> {
+        self.mux.input_clocks()
+    }
+
     fn name_str<'a>(&'a self) -> &'a String {
         &self.peripheral
     }
