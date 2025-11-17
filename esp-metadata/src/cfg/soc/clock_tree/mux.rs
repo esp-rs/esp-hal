@@ -40,11 +40,7 @@ impl ClockTreeNodeType for Multiplexer {
         self.upstream_clocks().count() > 1
     }
 
-    fn apply_configuration(
-        &self,
-        expr: &Expression,
-        _tree: &ProcessedClockData<'_>,
-    ) -> TokenStream {
+    fn apply_configuration(&self, expr: &Expression, _tree: &ProcessedClockData) -> TokenStream {
         let config_function = self.config_apply_function_name();
 
         let enum_name = self.config_type_name().unwrap();
@@ -63,11 +59,11 @@ impl ClockTreeNodeType for Multiplexer {
         }
     }
 
-    fn config_apply_function(&self, tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream {
         self.impl_config_apply_function(self, tree)
     }
 
-    fn config_apply_impl_function(&self, _tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn config_apply_impl_function(&self, _tree: &ProcessedClockData) -> TokenStream {
         let ty_name = self.config_type_name();
         let apply_fn_name = self.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
@@ -77,7 +73,7 @@ impl ClockTreeNodeType for Multiplexer {
         }
     }
 
-    fn node_frequency_impl(&self, tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn node_frequency_impl(&self, tree: &ProcessedClockData) -> TokenStream {
         self.node_frequency_impl2(self, tree)
     }
 
@@ -109,7 +105,7 @@ impl ClockTreeNodeType for Multiplexer {
     fn request_direct_dependencies(
         &self,
         node: &dyn ClockTreeNodeType,
-        tree: &ProcessedClockData<'_>,
+        tree: &ProcessedClockData,
     ) -> TokenStream {
         let state_field = tree.properties(node).field_name();
         let request_upstream_fn =
@@ -123,7 +119,7 @@ impl ClockTreeNodeType for Multiplexer {
     fn release_direct_dependencies(
         &self,
         node: &dyn ClockTreeNodeType,
-        tree: &ProcessedClockData<'_>,
+        tree: &ProcessedClockData,
     ) -> TokenStream {
         let state_field = tree.properties(node).field_name();
         let release_upstream_fn =
@@ -153,7 +149,7 @@ impl Multiplexer {
     pub fn impl_config_apply_function(
         &self,
         node: &dyn ClockTreeNodeType,
-        tree: &ProcessedClockData<'_>,
+        tree: &ProcessedClockData,
     ) -> TokenStream {
         let ty_name = node.config_type_name();
         let apply_fn_name = node.config_apply_function_name();
@@ -258,7 +254,7 @@ impl Multiplexer {
     pub fn node_frequency_impl2(
         &self,
         node: &dyn ClockTreeNodeType,
-        tree: &ProcessedClockData<'_>,
+        tree: &ProcessedClockData,
     ) -> TokenStream {
         let ty_name = node.config_type_name();
         let state = tree.properties(node).field_name();

@@ -93,7 +93,7 @@ impl ClockTreeNodeType for Source {
         self.values.is_some() || !self.output.is_constant()
     }
 
-    fn config_apply_function(&self, tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream {
         let ty_name = self.config_type_name();
         let state = tree.properties(self).field_name();
         let apply_fn_name = self.config_apply_function_name();
@@ -121,7 +121,7 @@ impl ClockTreeNodeType for Source {
         }
     }
 
-    fn config_apply_impl_function(&self, _tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn config_apply_impl_function(&self, _tree: &ProcessedClockData) -> TokenStream {
         let ty_name = self.config_type_name();
         let apply_fn_name = self.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
@@ -130,7 +130,7 @@ impl ClockTreeNodeType for Source {
         }
     }
 
-    fn node_frequency_impl(&self, tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn node_frequency_impl(&self, tree: &ProcessedClockData) -> TokenStream {
         let state_field = tree.properties(self).field_name();
 
         if self.values.is_some() {
@@ -259,7 +259,7 @@ impl ClockTreeNodeType for Source {
     fn request_direct_dependencies(
         &self,
         _node: &dyn ClockTreeNodeType,
-        _tree: &ProcessedClockData<'_>,
+        _tree: &ProcessedClockData,
     ) -> TokenStream {
         // Normal sources don't have dependencies
         quote! {}
@@ -268,7 +268,7 @@ impl ClockTreeNodeType for Source {
     fn release_direct_dependencies(
         &self,
         _node: &dyn ClockTreeNodeType,
-        _tree: &ProcessedClockData<'_>,
+        _tree: &ProcessedClockData,
     ) -> TokenStream {
         // Normal sources don't have dependencies
         quote! {}
@@ -308,15 +308,15 @@ impl ClockTreeNodeType for DerivedClockSource {
         self.source_options.is_configurable()
     }
 
-    fn config_apply_function(&self, tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream {
         self.source_options.config_apply_function(tree)
     }
 
-    fn config_apply_impl_function(&self, tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn config_apply_impl_function(&self, tree: &ProcessedClockData) -> TokenStream {
         self.source_options.config_apply_impl_function(tree)
     }
 
-    fn node_frequency_impl(&self, tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn node_frequency_impl(&self, tree: &ProcessedClockData) -> TokenStream {
         self.source_options.node_frequency_impl(tree)
     }
 
@@ -333,7 +333,7 @@ impl ClockTreeNodeType for DerivedClockSource {
     fn request_direct_dependencies(
         &self,
         _node: &dyn ClockTreeNodeType,
-        tree: &ProcessedClockData<'_>,
+        tree: &ProcessedClockData,
     ) -> TokenStream {
         let request_fn_name = tree.node(&self.from).request_fn_name();
         quote! {
@@ -344,7 +344,7 @@ impl ClockTreeNodeType for DerivedClockSource {
     fn release_direct_dependencies(
         &self,
         _node: &dyn ClockTreeNodeType,
-        tree: &ProcessedClockData<'_>,
+        tree: &ProcessedClockData,
     ) -> TokenStream {
         let release_fn_name = tree.node(&self.from).release_fn_name();
         quote! {

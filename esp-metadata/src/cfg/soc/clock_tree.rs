@@ -37,7 +37,7 @@
 // TODO: classified clocks should be returned in a topological order
 // TODO: ClockConfig should configure clocks in topological order
 
-use std::{collections::HashMap, str::FromStr};
+use std::{any::Any, collections::HashMap, str::FromStr};
 
 use anyhow::Result;
 use convert_case::{Case, Casing, StateConverter};
@@ -197,7 +197,7 @@ impl ManagementProperties {
     }
 }
 
-pub(crate) trait ClockTreeNodeType {
+pub(crate) trait ClockTreeNodeType: Any {
     /// Returns which clock nodes' configurations are affected when this node is configured.
     fn affected_nodes<'s>(&'s self) -> Vec<&'s str> {
         vec![]
@@ -207,12 +207,12 @@ pub(crate) trait ClockTreeNodeType {
     }
     fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()>;
     fn is_configurable(&self) -> bool;
-    fn config_apply_function(&self, tree: &ProcessedClockData<'_>) -> TokenStream;
-    fn config_apply_impl_function(&self, _tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream;
+    fn config_apply_impl_function(&self, _tree: &ProcessedClockData) -> TokenStream {
         quote! {}
     }
 
-    fn node_frequency_impl(&self, _tree: &ProcessedClockData<'_>) -> TokenStream;
+    fn node_frequency_impl(&self, _tree: &ProcessedClockData) -> TokenStream;
 
     fn name_str<'a>(&'a self) -> &'a String;
     fn name<'a>(&'a self) -> StateConverter<'a, String> {
@@ -236,11 +236,7 @@ pub(crate) trait ClockTreeNodeType {
         Some(format!(" `{}` configuration.", self.name_str()))
     }
 
-    fn apply_configuration(
-        &self,
-        _expr: &Expression,
-        _tree: &ProcessedClockData<'_>,
-    ) -> TokenStream {
+    fn apply_configuration(&self, _expr: &Expression, _tree: &ProcessedClockData) -> TokenStream {
         if self.is_configurable() {
             unimplemented!();
         } else {
@@ -279,12 +275,12 @@ pub(crate) trait ClockTreeNodeType {
     fn request_direct_dependencies(
         &self,
         node: &dyn ClockTreeNodeType,
-        tree: &ProcessedClockData<'_>,
+        tree: &ProcessedClockData,
     ) -> TokenStream;
     fn release_direct_dependencies(
         &self,
         node: &dyn ClockTreeNodeType,
-        tree: &ProcessedClockData<'_>,
+        tree: &ProcessedClockData,
     ) -> TokenStream;
 }
 
@@ -317,7 +313,7 @@ impl ClockTreeItem {
 
     pub(crate) fn node_functions(
         node: &dyn ClockTreeNodeType,
-        tree: &ProcessedClockData<'_>,
+        tree: &ProcessedClockData,
     ) -> ClockNodeFunctions {
         let ty_name = node.config_type_name();
 

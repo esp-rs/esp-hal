@@ -101,7 +101,7 @@ impl ClockTreeNodeType for Divider {
         }
     }
 
-    fn config_apply_function(&self, tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream {
         let ty_name = self.config_type_name();
         let state = tree.properties(self).field_name();
         let apply_fn_name = self.config_apply_function_name();
@@ -129,7 +129,7 @@ impl ClockTreeNodeType for Divider {
         }
     }
 
-    fn config_apply_impl_function(&self, _tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn config_apply_impl_function(&self, _tree: &ProcessedClockData) -> TokenStream {
         let ty_name = self.config_type_name();
         let apply_fn_name = self.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
@@ -138,7 +138,7 @@ impl ClockTreeNodeType for Divider {
         }
     }
 
-    fn apply_configuration(&self, expr: &Expression, tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn apply_configuration(&self, expr: &Expression, tree: &ProcessedClockData) -> TokenStream {
         let config_function = self.config_apply_function_name();
 
         let state = self.config_type_name().unwrap();
@@ -159,7 +159,7 @@ impl ClockTreeNodeType for Divider {
         }
     }
 
-    fn node_frequency_impl(&self, tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn node_frequency_impl(&self, tree: &ProcessedClockData) -> TokenStream {
         let state = tree.properties(self).field_name();
         let parent_clock = self.upstream_clock().unwrap();
         let parent_frequency_fn = tree.node(parent_clock).frequency_function_name();
@@ -273,7 +273,7 @@ impl ClockTreeNodeType for Divider {
     fn request_direct_dependencies(
         &self,
         _node: &dyn ClockTreeNodeType,
-        tree: &ProcessedClockData<'_>,
+        tree: &ProcessedClockData,
     ) -> TokenStream {
         let request_fn_name = tree.node(self.upstream_clock().unwrap()).request_fn_name();
         quote! {
@@ -284,7 +284,7 @@ impl ClockTreeNodeType for Divider {
     fn release_direct_dependencies(
         &self,
         _node: &dyn ClockTreeNodeType,
-        tree: &ProcessedClockData<'_>,
+        tree: &ProcessedClockData,
     ) -> TokenStream {
         let release_fn_name = tree.node(self.upstream_clock().unwrap()).release_fn_name();
         quote! {
