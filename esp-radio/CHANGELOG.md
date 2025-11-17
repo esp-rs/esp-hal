@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Avoid panicking in WiFi scan if an access point with using an unmapped auth-method is found (#4458)
-- Fixed a linker error (about missing symbols) when the `wifi` feature is selected but the code doesn't use it
+- Fixed a linker error (about missing symbols) when the `wifi` feature is selected but the code doesn't use it (#4513)
 
 ### Removed
 
