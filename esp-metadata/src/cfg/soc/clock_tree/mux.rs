@@ -111,7 +111,7 @@ impl ClockTreeNodeType for Multiplexer {
         node: &dyn ClockTreeNodeType,
         _tree: &ProcessedClockData<'_>,
     ) -> TokenStream {
-        let state_field = node.node_state().field_name();
+        let state_field = node.properties().field_name();
         let request_upstream_fn =
             format_ident!("{}_request_upstream", node.name().to_case(Case::Snake));
         quote! {
@@ -125,7 +125,7 @@ impl ClockTreeNodeType for Multiplexer {
         node: &dyn ClockTreeNodeType,
         _tree: &ProcessedClockData<'_>,
     ) -> TokenStream {
-        let state_field = node.node_state().field_name();
+        let state_field = node.properties().field_name();
         let release_upstream_fn =
             format_ident!("{}_release_upstream", node.name().to_case(Case::Snake));
         quote! {
@@ -158,8 +158,8 @@ impl Multiplexer {
         let ty_name = node.config_type_name();
         let apply_fn_name = node.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
-        let state = node.node_state().field_name();
-        let refcount_field = node.node_state().refcount_field_name();
+        let state = node.properties().field_name();
+        let refcount_field = node.properties().refcount_field_name();
 
         let request_upstream_fn =
             format_ident!("{}_request_upstream", node.name().to_case(Case::Snake));
@@ -261,7 +261,7 @@ impl Multiplexer {
         tree: &ProcessedClockData<'_>,
     ) -> TokenStream {
         let ty_name = node.config_type_name();
-        let state = node.node_state().field_name();
+        let state = node.properties().field_name();
         let variants = self
             .variants
             .iter()

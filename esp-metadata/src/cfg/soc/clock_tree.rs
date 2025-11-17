@@ -169,34 +169,23 @@ impl ValidationContext<'_> {
     }
 }
 
-pub(crate) struct NodeState {
+pub(crate) struct ManagementProperties {
     pub name: Ident,
-    pub kind: NodeStateKind,
-}
-pub(crate) enum NodeStateKind {
-    Configurable(Ident),
-    ConfigurableNonRefcounted(Ident),
-    Refcount,
+    pub state_ty: Option<Ident>,
+    pub refcounted: bool,
 }
 
-impl NodeState {
+impl ManagementProperties {
     pub fn field_name(&self) -> Ident {
         self.name.clone()
     }
 
     pub fn type_name(&self) -> Option<Ident> {
-        match &self.kind {
-            NodeStateKind::Configurable(state)
-            | NodeStateKind::ConfigurableNonRefcounted(state) => Some(state.clone()),
-            NodeStateKind::Refcount => None,
-        }
+        self.state_ty.clone()
     }
 
     pub fn refcounted(&self) -> bool {
-        match &self.kind {
-            NodeStateKind::ConfigurableNonRefcounted(_) => false,
-            _ => true,
-        }
+        self.refcounted
     }
 
     pub fn refcount_field_name(&self) -> Option<Ident> {
@@ -247,18 +236,11 @@ pub(crate) trait ClockTreeNodeType {
         Some(format!(" `{}` configuration.", self.name_str()))
     }
 
-    fn node_state(&self) -> NodeState {
-        NodeState {
+    fn properties(&self) -> ManagementProperties {
+        ManagementProperties {
             name: format_ident!("{}", self.name().to_case(Case::Snake)),
-            kind: if let Some(state) = self.config_type_name() {
-                if self.refcounted() {
-                    NodeStateKind::Configurable(state)
-                } else {
-                    NodeStateKind::ConfigurableNonRefcounted(state)
-                }
-            } else {
-                NodeStateKind::Refcount
-            },
+            refcounted: self.refcounted(),
+            state_ty: self.config_type_name(),
         }
     }
 
@@ -353,7 +335,7 @@ impl ClockTreeItem {
 
         let request_fn_name = node.request_fn_name();
         let release_fn_name = node.release_fn_name();
-        let refcount_name = node.node_state().refcount_field_name();
+        let refcount_name = node.properties().refcount_field_name();
         let enable_fn_name = node.enable_fn_name();
         let enable_fn_impl_name = format_ident!("{}_impl", enable_fn_name);
 

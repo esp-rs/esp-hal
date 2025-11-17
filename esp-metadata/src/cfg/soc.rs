@@ -227,7 +227,7 @@ impl SystemClocks {
                     #config_type
                 });
             }
-            let node_state = clock_item.node_state();
+            let node_state = clock_item.properties();
             if let Some(type_name) = node_state.type_name() {
                 clock_tree_state_fields.push(node_state.field_name());
                 clock_tree_state_field_types.push(type_name);
@@ -309,7 +309,7 @@ impl SystemClocks {
                         };
                         let node = node.as_dyn_ref();
 
-                        let node_state = node.node_state();
+                        let node_state = node.properties();
                         if let Some(type_name) = node_state.type_name() {
                             clock_tree_state_fields.push(node_state.field_name());
                             clock_tree_state_field_types.push(type_name);
