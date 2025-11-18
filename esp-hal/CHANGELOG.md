@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- The `ESP_HAL_CONFIG_XTAL_FREQUENCY` configuration option has been removed (#4517)
 
 ## [v1.0.0] - 2025-10-30
 

@@ -27,41 +27,6 @@ options:
   default:
     - value: false
 
-# Ideally, we should be able to set any clock frequency for any chip. However,
-# currently only the 32 and C2 implements any sort of configurability, and
-# the rest have a fixed clock frequency.
-- name: xtal-frequency
-  description: "The frequency of the crystal oscillator, in MHz. Set to `auto` to
-               automatically detect the frequency. `auto` may not be able to identify the clock
-               frequency in some cases. Also, configuring a specific frequency may increase
-               performance slightly."
-  default:
-    - if: 'chip == "esp32" || chip == "esp32c2"'
-      value: '"auto"'
-    - if: 'chip == "esp32c3" || chip == "esp32c6" || chip == "esp32s2" || chip == "esp32s3"'
-      value: '"40"'
-    - if: 'chip == "esp32h2"'
-      value: '"32"'
-  constraints:
-    - if: 'chip == "esp32" || chip == "esp32c2"'
-      type:
-        validator: enumeration
-        value:
-        - 'auto'
-        - '26'
-        - '40'
-    - if: 'chip == "esp32c3" || chip == "esp32c6" || chip == "esp32s2" || chip == "esp32s3"'
-      type:
-        validator: enumeration
-        value:
-        - '40'
-    - if: 'chip == "esp32h2"'
-      type:
-        validator: enumeration
-        value:
-        - '32'
-  active: 'chip == "esp32" || chip == "esp32c2"'
-
 - name: spi-address-workaround
   description: "Enables a workaround for the issue where SPI in
                half-duplex mode incorrectly transmits the address on a single line if the
