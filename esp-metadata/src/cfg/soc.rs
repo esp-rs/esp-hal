@@ -2,11 +2,21 @@ use std::{collections::HashMap, ops::Range, str::FromStr};
 
 use anyhow::{Context, Result};
 use convert_case::{Boundary, Case, Casing, pattern};
+use indexmap::IndexMap;
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 use serde::{Deserialize, Serialize};
 
-use crate::{cfg::Value, number_hex};
+use crate::{
+    cfg::{
+        Value,
+        clock_tree::{ClockTreeItem, ClockTreeNodeType, PeripheralClockSource, ValidationContext},
+        soc::clock_tree::PeripheralClockTreeEntry,
+    },
+    number_hex,
+};
+
+pub mod clock_tree;
 
 impl super::SocProperties {
     pub(super) fn computed_properties(&self) -> impl Iterator<Item = (&str, bool, Value)> {
@@ -88,6 +98,338 @@ impl super::GenericProperty for MemoryMap {
     }
 }
 
+/// Represents the clock sources and clock distribution tree in the SoC.
+#[derive(Debug, Default, Clone, Deserialize)]
+pub struct SystemClocks {
+    clock_tree: Vec<ClockTreeItem>,
+}
+
+pub(crate) struct ProcessedClockData<'c> {
+    /// For each clock tree node, this map stores which of them are fixed, configurable, or
+    /// dependent on other nodes.
+    classified_clocks: IndexMap<&'c str, ClockType<'c>>,
+
+    /// The device's `system_clocks` data.
+    clock_tree: Vec<&'c dyn ClockTreeNodeType>,
+}
+
+impl ProcessedClockData<'_> {
+    /// Returns a node by its name (e.g. `XTL_CLK`).
+    ///
+    /// As the clock tree is stored as a vector, this method performs a linear search.
+    fn node(&self, name: &str) -> &dyn ClockTreeNodeType {
+        self.clock_tree
+            .iter()
+            .find(|item| item.name_str() == name)
+            .cloned()
+            .unwrap()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum ClockType<'s> {
+    /// The clock tree item is not configurable.
+    Fixed,
+
+    /// The clock tree item is configurable.
+    Configurable,
+
+    /// The clock tree item is configured by some other item.
+    Dependent(&'s str),
+}
+
+impl SystemClocks {
+    fn cfgs(&self) -> Vec<String> {
+        self.clock_tree
+            .iter()
+            .map(|node| node.as_dyn_ref())
+            .map(|node| node.name().to_case(Case::Snake))
+            .map(|name| format!("soc_has_clock_node_{name}"))
+            .collect::<Vec<_>>()
+    }
+
+    /// Returns an iterator over the clock tree items.
+    fn process(&self) -> Result<ProcessedClockData<'_>> {
+        let clock_tree = self
+            .clock_tree
+            .iter()
+            .map(|node| node.as_dyn_ref())
+            .collect::<Vec<_>>();
+
+        let validation_context = ValidationContext {
+            tree: self.clock_tree.as_slice(),
+        };
+        for node in clock_tree.iter() {
+            node.validate_source_data(&validation_context)
+                .with_context(|| format!("Invalid clock tree item: {}", node.name_str()))?;
+        }
+
+        // Classify clock tree items
+        let mut classified_clocks = IndexMap::new();
+        for node in clock_tree.iter() {
+            // If item A configures item B, then item B is a dependent clock tree item.
+            for clock in node.affected_nodes() {
+                classified_clocks.insert(clock, ClockType::Dependent(node.name_str()));
+            }
+
+            // Each tree item tells its own clock type, except for dependent items. If something has
+            // already been classified, we can only change it from its kind to dependent.
+            if classified_clocks.get(node.name_str().as_str()).is_none() {
+                classified_clocks.insert(
+                    node.name_str(),
+                    if node.is_configurable() {
+                        ClockType::Configurable
+                    } else {
+                        ClockType::Fixed
+                    },
+                );
+            }
+        }
+
+        Ok(ProcessedClockData {
+            clock_tree,
+            classified_clocks,
+        })
+    }
+
+    fn clock_item(&self, name: &str) -> &ClockTreeItem {
+        self.clock_tree
+            .iter()
+            .find(|item| item.as_dyn_ref().name_str() == name)
+            .unwrap_or_else(|| panic!("Clock item {} not found", name))
+    }
+
+    fn generate_macro(&self, data: &DeviceClocks) -> Result<TokenStream> {
+        let processed_clocks = self.process().unwrap();
+
+        let mut clock_tree_node_defs = vec![];
+        let mut clock_tree_node_impls = vec![];
+        let mut clock_tree_state_fields = vec![];
+        let mut clock_tree_state_field_types = vec![];
+        let mut clock_tree_refcount_fields = vec![];
+        let mut configurables = vec![];
+        let mut system_config_steps = vec![];
+        let mut hal_enable_functions = vec![];
+        for (item, kind) in processed_clocks
+            .classified_clocks
+            .iter()
+            .map(|(item, kind)| (item, kind.clone()))
+        {
+            let clock_item = self.clock_item(item).as_dyn_ref();
+
+            // Generate code for all clock tree nodes
+            if let Some(config_type) = clock_item.config_type() {
+                let doclines = clock_item.config_docline().unwrap();
+                let doclines = doclines.lines();
+
+                clock_tree_node_defs.push(quote! {
+                    #(#[doc = #doclines])*
+                    #config_type
+                });
+            }
+            let node_state = clock_item.node_state();
+            if let Some(type_name) = node_state.type_name() {
+                clock_tree_state_fields.push(node_state.field_name());
+                clock_tree_state_field_types.push(type_name);
+            }
+            if let Some(refcount_field) = node_state.refcount_field_name() {
+                clock_tree_refcount_fields.push(refcount_field);
+            }
+
+            let node_funcs = ClockTreeItem::node_functions(clock_item, &processed_clocks);
+            clock_tree_node_impls.push(node_funcs.implement_functions());
+            hal_enable_functions.extend_from_slice(&node_funcs.hal_functions);
+
+            if kind == ClockType::Configurable {
+                // Generate code for the global clock configuration
+                let config_type_name = clock_item.config_type_name();
+                let config_apply_function_name = clock_item.config_apply_function_name();
+
+                let item = clock_item.name().to_case(Case::Snake);
+
+                let name = format_ident!("{}", item);
+
+                let docline = clock_item.config_documentation().map(|doc| {
+                    // TODO: add explanation what happens if the field is left `None`.
+                    let doc = doc.lines();
+                    quote! { #(#[doc = #doc])* }
+                });
+
+                configurables.push(quote! {
+                    #docline
+                    pub #name: Option<#config_type_name>,
+                });
+
+                system_config_steps.push(quote! {
+                    if let Some(config) = self.#name {
+                        #config_apply_function_name(clocks, config);
+                    }
+                });
+            }
+        }
+
+        let mut clocks = data.peripheral_clocks.peripheral_clocks.clone();
+        clocks.sort_by(|a, b| a.name.cmp(&b.name));
+        let peripheral_clock_sources = clocks
+            .iter()
+            .map(|clock| {
+                // A peripheral can have any number of clock sources. We'll return a vector of clock
+                // sources.
+
+                // Resolve references:
+                let template_peripheral = clock.template_peripheral_name();
+                let multiplexers = clock.clock_signals(&data.peripheral_clocks);
+
+                // Generate code:
+                multiplexers
+                    .iter()
+                    .map(|def| {
+                        // A fake node because we need to prefix the peripheral name, and the
+                        // behaviour differs slightly from the standard mutex (we generate a type
+                        // for all variant counts for now).
+                        let node = match def {
+                            ClockTreeItem::Multiplexer(mux) => {
+                                ClockTreeItem::Peripheral(PeripheralClockSource {
+                                    peripheral: format!(
+                                        "{}_{}",
+                                        clock.name.from_case(Case::Ada).to_case(Case::Constant),
+                                        mux.name_str()
+                                    ),
+                                    template: format!(
+                                        "{}_{}",
+                                        template_peripheral
+                                            .from_case(Case::Ada)
+                                            .to_case(Case::Constant),
+                                        mux.name_str()
+                                    ),
+                                    mux: mux.clone(),
+                                })
+                            }
+                            _ => anyhow::bail!("only muxes are supported as clock source data"),
+                        };
+                        let node = node.as_dyn_ref();
+
+                        let node_state = node.node_state();
+                        if let Some(type_name) = node_state.type_name() {
+                            clock_tree_state_fields.push(node_state.field_name());
+                            clock_tree_state_field_types.push(type_name);
+                        }
+                        if let Some(refcount_field) = node_state.refcount_field_name() {
+                            clock_tree_refcount_fields.push(refcount_field);
+                        }
+
+                        // If this is a definition, implement the config type. Otherwise, we'll
+                        // reuse an existing type.
+                        let enum_definition =
+                            matches!(clock.clocks, PeripheralClockTreeEntry::Definition(_)).then(
+                                || {
+                                    let config_type = node.config_type()?;
+                                    let doclines = node.config_docline().unwrap();
+                                    let doclines = doclines.lines();
+
+                                    Some(quote! {
+                                        #(#[doc = #doclines])*
+                                        #config_type
+                                    })
+                                },
+                            );
+
+                        clock_tree_node_defs.push(quote! { #enum_definition });
+
+                        // Implement the multiplexer functions.
+                        let node_funcs = ClockTreeItem::node_functions(node, &processed_clocks);
+                        hal_enable_functions.extend_from_slice(&node_funcs.hal_functions);
+
+                        Ok(node_funcs.implement_functions())
+                    })
+                    .collect::<Result<Vec<_>>>()
+                    .context("Failed to generate peripheral clock sources")
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let funcs_to_provide = hal_enable_functions
+            .iter()
+            .filter_map(|f| {
+                if f.is_empty() {
+                    None
+                } else {
+                    Some(format!(" {}", f.to_string()))
+                }
+            })
+            .collect::<Vec<_>>();
+
+        Ok(quote! {
+            #[macro_export]
+            /// ESP-HAL must provide implementation for the following functions:
+            /// ```rust, ignore
+            #(#[doc = #funcs_to_provide])*
+            /// ```
+            macro_rules! define_clock_tree_types {
+                () => {
+                    #(#clock_tree_node_defs)*
+
+                    /// Represents the device's clock tree.
+                    pub struct ClockTree {
+                        #(#clock_tree_state_fields: Option<#clock_tree_state_field_types>,)*
+                        #(#clock_tree_refcount_fields: u32,)*
+                    }
+                    impl ClockTree {
+                        /// Locks the clock tree for exclusive access.
+                        pub fn with<R>(f: impl FnOnce(&mut ClockTree) -> R) -> R {
+                            CLOCK_TREE.with(f)
+                        }
+                    }
+
+                    static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
+                        ::esp_sync::NonReentrantMutex::new(ClockTree {
+                            #(#clock_tree_state_fields: None,)*
+                            #(#clock_tree_refcount_fields: 0,)*
+                        });
+
+                    #(#clock_tree_node_impls)*
+
+                    #(#(#peripheral_clock_sources)*)*
+
+                    /// Clock tree configuration.
+                    ///
+                    /// The fields of this struct are optional, with the following caveats:
+                    /// - If `XTL_CLK` is not specified, the crystal frequency will be
+                    ///   automatically detected if possible.
+                    /// - The CPU and its upstream clock nodes will be set to a default configuration.
+                    /// - Other unspecified clock sources will not be useable by peripherals.
+                    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+                    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+                    pub struct ClockConfig {
+                        #(#configurables)*
+                    }
+
+                    impl ClockConfig {
+                        fn apply(&self) {
+                            ClockTree::with(|clocks| {
+                                #(#system_config_steps)*
+                            });
+                        }
+                    }
+
+                    // static CLOCK_BITMAP: ::portable_atomic::AtomicU32 = ::portable_atomic::AtomicU32::new(0);
+                    fn increment_reference_count(refcount: &mut u32) -> bool {
+                        let first = *refcount == 0;
+                        // CLOCK_BITMAP.fetch_or(!clock_id, Ordering::Relaxed);
+                        *refcount += 1;
+                        first
+                    }
+                    fn decrement_reference_count(refcount: &mut u32) -> bool {
+                        *refcount -= 1;
+                        let last = *refcount == 0;
+                        // CLOCK_BITMAP.fetch_and(!clock_id, Ordering::Relaxed);
+                        last
+                    }
+                };
+            }
+        })
+    }
+}
+
 /// A named template. Can contain `{{placeholder}}` placeholders that will be substituted with
 /// actual values.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -108,7 +450,7 @@ pub struct Template {
 /// `template_params` is a map of substitutions, which will overwrite the defaults set in
 /// `PeripheralClocks`. This way each peripheral clock signal can either simply use the defaults,
 /// or override them with custom values in case they don't fit the scheme for some reason.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 pub struct PeripheralClock {
     /// The name of the peripheral clock signal. Usually specified as CamelCase. Also determines
     /// the value of the `peripheral` template parameter, by converting the name to snake_case.
@@ -124,16 +466,72 @@ pub struct PeripheralClock {
     // outside of clock calibrations when the device has Systimer.
     #[serde(default)]
     keep_enabled: bool,
+
+    /// Peripheral clock source data.
+    ///
+    /// These can be new definitions, or they can reference another `peripheral_clocks` entry, in
+    /// which case the peripherals will use the same data types, and the same API will be
+    /// generated for them.
+    #[serde(default)]
+    #[serde(deserialize_with = "clock_tree::ref_or_def")]
+    clocks: PeripheralClockTreeEntry,
+}
+impl PeripheralClock {
+    fn clock_signals<'a>(&'a self, peripheral_clocks: &'a PeripheralClocks) -> &'a [ClockTreeItem] {
+        match &self.clocks {
+            PeripheralClockTreeEntry::Definition(items) => items.as_slice(),
+            PeripheralClockTreeEntry::Reference(template) => peripheral_clocks
+                .peripheral_clocks
+                .iter()
+                .filter_map(|c| {
+                    if c.name.as_str() != template {
+                        return None;
+                    }
+                    match &c.clocks {
+                        PeripheralClockTreeEntry::Definition(items) => Some(items.as_slice()),
+                        PeripheralClockTreeEntry::Reference(_) => {
+                            panic!("Referenced peripheral must have clock node definitions");
+                        }
+                    }
+                })
+                .next()
+                .unwrap(),
+        }
+    }
+
+    fn template_peripheral_name(&self) -> &str {
+        match &self.clocks {
+            PeripheralClockTreeEntry::Definition(_) => self.name.as_str(),
+            PeripheralClockTreeEntry::Reference(inherit_from) => inherit_from.as_str(),
+        }
+    }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 pub struct PeripheralClocks {
     pub(crate) templates: Vec<Template>,
     pub(crate) peripheral_clocks: Vec<PeripheralClock>,
 }
 
 impl PeripheralClocks {
-    fn generate_macro(&self) -> Result<TokenStream> {
+    fn cfgs(&self) -> Vec<String> {
+        self.peripheral_clocks
+            .iter()
+            .flat_map(|clock| {
+                let clocks = clock.clock_signals(self);
+
+                clocks.iter().map(|peri_clock| {
+                    format!(
+                        "soc_has_clock_node_{}_{}",
+                        clock.name.from_case(Case::Ada).to_case(Case::Snake),
+                        peri_clock.as_dyn_ref().name().to_case(Case::Snake)
+                    )
+                })
+            })
+            .collect::<Vec<_>>()
+    }
+
+    fn generate_macro(&self, _data: &DeviceClocks) -> Result<TokenStream> {
         let mut clocks = self.peripheral_clocks.clone();
         clocks.sort_by(|a, b| a.name.cmp(&b.name));
 
@@ -152,21 +550,21 @@ impl PeripheralClocks {
         });
         let clock_names = clocks
             .iter()
-            .map(|clock| quote::format_ident!("{}", clock.name))
+            .map(|clock| format_ident!("{}", clock.name))
             .collect::<Vec<_>>();
         let keep_enabled = clocks.iter().filter_map(|clock| {
             clock
                 .keep_enabled
-                .then_some(quote::format_ident!("{}", clock.name))
+                .then_some(format_ident!("{}", clock.name))
         });
 
         let clk_en_arms = clocks
             .iter()
             .map(|clock| {
-                let clock_name = quote::format_ident!("{}", clock.name);
+                let clock_name = format_ident!("{}", clock.name);
                 let clock_en = self.clk_en(clock)?;
 
-                Ok(quote::quote! {
+                Ok(quote! {
                     Peripheral::#clock_name => {
                         #clock_en
                     }
@@ -176,10 +574,10 @@ impl PeripheralClocks {
         let rst_arms = clocks
             .iter()
             .map(|clock| {
-                let clock_name = quote::format_ident!("{}", clock.name);
+                let clock_name = format_ident!("{}", clock.name);
                 let rst = self.rst(clock)?;
 
-                Ok(quote::quote! {
+                Ok(quote! {
                     Peripheral::#clock_name => {
                         #rst
                     }
@@ -308,17 +706,39 @@ impl PeripheralClocks {
 
 #[derive(Debug, Default, Clone, Deserialize)]
 pub struct DeviceClocks {
+    #[serde(default)]
+    pub(crate) system_clocks: SystemClocks,
+
+    #[serde(default)]
     pub(crate) peripheral_clocks: PeripheralClocks,
 }
 
 impl super::GenericProperty for DeviceClocks {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        let sys = self.system_clocks.cfgs();
+        let per = self.peripheral_clocks.cfgs();
+        Some([sys, per].concat())
+    }
+
     fn macros(&self) -> Option<TokenStream> {
-        match self.peripheral_clocks.generate_macro() {
-            Ok(tokens) => Some(tokens),
+        let system_clocks = match self.system_clocks.generate_macro(self) {
+            Ok(tokens) => tokens,
+            Err(err) => panic!(
+                "{:?}",
+                err.context("Failed to generate system clock control code")
+            ),
+        };
+        let peripheral_clocks = match self.peripheral_clocks.generate_macro(self) {
+            Ok(tokens) => tokens,
             Err(err) => panic!(
                 "{:?}",
                 err.context("Failed to generate peripheral clock control macro")
             ),
-        }
+        };
+
+        Some(quote! {
+            #system_clocks
+            #peripheral_clocks
+        })
     }
 }
