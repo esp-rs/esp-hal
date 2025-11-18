@@ -2601,6 +2601,13 @@ impl WifiController<'_> {
     ///
     /// This function will wait for the Wi-Fi controller to stop before returning.
     pub async fn stop_async(&mut self) -> Result<(), WifiError> {
+        // TODO: This might be racey when there is a start operation in progress but it didn't made
+        // it to the state where the driver emits the Started event?
+        // https://github.com/esp-rs/esp-hal/pull/4504#discussion_r2533184425
+        if !self.is_started()? {
+            return Err(WifiError::NotStarted);
+        }
+
         let mut events = enumset::enum_set! {};
 
         let mode = self.mode()?;
