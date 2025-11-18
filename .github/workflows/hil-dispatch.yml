@@ -428,6 +428,8 @@ jobs:
                 body += `\n\nCould not determine run URL yet. Please check the **HIL** workflow runs manually.`;
             }
 
+            core.setOutput('body', body);
+
       - name: Confirm in PR
         uses: peter-evans/create-or-update-comment@v4
         with:
