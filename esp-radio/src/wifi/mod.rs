@@ -2605,7 +2605,7 @@ impl WifiController<'_> {
         // it to the state where the driver emits the Started event?
         // https://github.com/esp-rs/esp-hal/pull/4504#discussion_r2533184425
         if !self.is_started()? {
-            return Ok(());
+            return Err(WifiError::NotStarted);
         }
 
         let mut events = enumset::enum_set! {};
