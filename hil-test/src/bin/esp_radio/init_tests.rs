@@ -21,8 +21,6 @@ mod init_tests {
     use esp_radio::ble::controller::BleConnector;
     #[cfg(soc_has_wifi)]
     use esp_radio::wifi::WifiError;
-    #[cfg(soc_has_wifi)]
-    use esp_radio::{InitializationError, wifi::WifiInitError};
     use esp_rtos::embassy::InterruptExecutor;
     use hil_test::mk_static;
     use portable_atomic::Ordering;
@@ -31,7 +29,7 @@ mod init_tests {
     #[embassy_executor::task]
     #[cfg(soc_has_wifi)]
     async fn try_init(
-        signal: &'static Signal<CriticalSectionRawMutex, Option<WifiInitError>>,
+        signal: &'static Signal<CriticalSectionRawMutex, Option<WifiError>>,
         wifi_peripheral: WIFI<'static>,
         timer: TIMG0<'static>,
         sw_int0: SoftwareInterrupt<'static, 0>,
@@ -59,12 +57,7 @@ mod init_tests {
         // esp-rtos must be initialized before esp-radio.
         let init = esp_radio::wifi::new(p.WIFI, Default::default());
 
-        assert!(matches!(
-            init,
-            Err(WifiInitError::RadioInit(
-                InitializationError::SchedulerNotInitialized
-            ))
-        ));
+        assert!(matches!(init, Err(WifiError::SchedulerNotInitialized)));
     }
 
     #[test]
@@ -76,10 +69,12 @@ mod init_tests {
 
         let init = critical_section::with(|_| esp_radio::wifi::new(p.WIFI, Default::default()));
 
-        assert!(matches!(
-            init,
-            Err(WifiInitError::WifiOp(WifiError::Unsupported))
-        ));
+        match init {
+            Ok(_) => defmt::info!("Initialized wifi in critical section"),
+            Err(ref e) => defmt::info!("Failed to initialize wifi in critical section: {:?}", e),
+        }
+
+        assert!(matches!(init, Err(WifiError::Unsupported)));
     }
 
     #[test]
@@ -91,10 +86,7 @@ mod init_tests {
 
         let init = interrupt_free(|| esp_radio::wifi::new(p.WIFI, Default::default()));
 
-        assert!(matches!(
-            init,
-            Err(WifiInitError::WifiOp(WifiError::Unsupported))
-        ));
+        assert!(matches!(init, Err(WifiError::Unsupported)));
     }
 
     #[test]
@@ -108,7 +100,7 @@ mod init_tests {
 
         let spawner = executor_core0.start(Priority::Priority1);
 
-        let signal = mk_static!(Signal<CriticalSectionRawMutex, Option<WifiInitError>>,
+        let signal = mk_static!(Signal<CriticalSectionRawMutex, Option<WifiError>>,
     Signal::new());
 
         spawner.must_spawn(try_init(
@@ -120,10 +112,7 @@ mod init_tests {
 
         let res = signal.wait().await;
 
-        assert!(matches!(
-            res,
-            Some(WifiInitError::WifiOp(WifiError::Unsupported))
-        ));
+        assert!(matches!(res, Some(WifiError::Unsupported)));
     }
 
     #[test]

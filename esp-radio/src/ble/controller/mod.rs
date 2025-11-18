@@ -16,7 +16,6 @@ use crate::{
     RadioRefGuard,
     ble::{Config, InvalidConfigError, have_hci_read_data, read_hci, read_next, send_hci},
 };
-
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Error enum for BLE initialization failures.
