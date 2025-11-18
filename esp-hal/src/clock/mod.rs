@@ -1118,51 +1118,30 @@ impl Clocks {
     #[cfg(systimer)]
     #[inline]
     pub(crate) fn xtal_freq() -> Rate {
-        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto"
-            && let Some(clocks) = Self::try_get()
-        {
+        if let Some(clocks) = Self::try_get() {
             return clocks.xtal_clock;
         }
 
         Self::measure_xtal_frequency().frequency()
     }
 
-    #[cfg(not(esp32))] // unused
-    const fn xtal_frequency_from_config() -> Option<XtalClock> {
-        let frequency_conf = esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY");
-
-        for_each_soc_xtal_options!(
-            (all $( ($freq:literal) ),*) => {
-                paste::paste! {
-                    return match frequency_conf.as_bytes() {
-                        b"auto" => None,
-
-                        // If the frequency is a pre-set value for the chip, return the associated enum variant.
-                        $( _ if esp_config::esp_config_int_parse!(u32, frequency_conf) == $freq => Some(XtalClock::[<_ $freq M>]), )*
-
-                        _ => None,
-                    };
-                }
-            };
-        );
-    }
-
-    #[cfg(not(esp32))] // unused - the build-time config can be removed in favour of explicit configuration via esp_hal::init
+    #[cfg(not(esp32))]
     fn measure_xtal_frequency() -> XtalClock {
-        if let Some(clock) = const { Self::xtal_frequency_from_config() } {
-            // Use the configured frequency
-            clock
-        } else if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
-            // TODO: we should be able to read from a retention register, but probe-rs flashes a
-            // bootloader that assumes a frequency, instead of choosing a matching one.
-            let mhz = RtcClock::estimate_xtal_frequency();
+        cfg_if::cfg_if! {
+            if #[cfg(esp32h2)] {
+                XtalClock::_32M
+            } else if #[cfg(not(esp32c2))] {
+                XtalClock::_40M
+            } else {
+                // TODO: we should be able to read from a retention register, but probe-rs flashes a
+                // bootloader that assumes a frequency, instead of choosing a matching one.
+                let mhz = RtcClock::estimate_xtal_frequency();
 
-            debug!("Working with a {}MHz crystal", mhz);
+                debug!("Working with a {}MHz crystal", mhz);
 
-            // Try to guess the closest possible crystal value.
-            XtalClock::closest_from_mhz(mhz)
-        } else {
-            unreachable!("Invalid crystal frequency configured, this should not be possible.")
+                // Try to guess the closest possible crystal value.
+                XtalClock::closest_from_mhz(mhz)
+            }
         }
     }
 }
