@@ -3,7 +3,9 @@
 #![deny(missing_docs)]
 
 use alloc::{collections::vec_deque::VecDeque, vec::Vec};
-use core::{fmt::Debug, marker::PhantomData, ptr::addr_of, task::Poll, time::Duration};
+use core::{
+    fmt::Debug, marker::PhantomData, mem::MaybeUninit, ptr::addr_of, task::Poll, time::Duration,
+};
 
 use enumset::{EnumSet, EnumSetType};
 use esp_config::esp_config_int;
@@ -24,7 +26,7 @@ use self::sniffer::Sniffer;
 use self::sta::eap::EapClientConfig;
 pub use self::state::*;
 use self::{
-    ap::{AccessPointConfig, AccessPointInfo,convert_ap_info},
+    ap::{AccessPointConfig, AccessPointInfo, convert_ap_info},
     private::PacketBuffer,
     scan::{FreeApListOnDrop, ScanResults},
     sta::ClientConfig,
