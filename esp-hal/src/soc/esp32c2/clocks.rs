@@ -186,7 +186,7 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
     // regi2c_ctrl_ll_i2c_bbpll_enable
     I2C_ANA_MST::regs()
         .ana_config()
-        .modify(|r, w| w.bbpll_pd().bit(!en));
+        .modify(|_, w| w.bbpll_pd().bit(!en));
 
     LPWR::regs().options0().modify(|_, w| {
         let power_down = !en;
