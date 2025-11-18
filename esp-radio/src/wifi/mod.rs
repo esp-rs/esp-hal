@@ -4,7 +4,12 @@
 
 use alloc::{collections::vec_deque::VecDeque, vec::Vec};
 use core::{
-    fmt::Debug, marker::PhantomData, mem::MaybeUninit, ptr::addr_of, task::Poll, time::Duration,
+    fmt::Debug,
+    marker::PhantomData,
+    mem::MaybeUninit,
+    ptr::addr_of,
+    task::Poll,
+    time::Duration,
 };
 
 use enumset::{EnumSet, EnumSetType};
