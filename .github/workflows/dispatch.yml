@@ -586,7 +586,6 @@ jobs:
         (startsWith(github.event.comment.body, '/hil quick') ||
          startsWith(github.event.comment.body, '/hil full')  ||
          startsWith(github.event.comment.body, '/test-size'))
-
     runs-on: ubuntu-latest
     steps:
       - name: Inform not allowed
@@ -599,7 +598,7 @@ jobs:
             ```
             /trust @${{ github.event.comment.user.login }}
             ```
-            After that, you can use `/hil quick` or `/hil full`.
+            After that, you can use `/hil quick`, `/hil full` or `/test-size`.
 
   hil-help:
     if: github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/hil') && !startsWith(github.event.comment.body, '/hil quick') && !startsWith(github.event.comment.body, '/hil full')

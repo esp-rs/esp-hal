@@ -191,9 +191,24 @@ jobs:
           echo "Processing PR Number: $ISSUE_NUMBER"
 
           COMMENTS=$(gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments)
-          COMMENT_ID=$(echo "$COMMENTS" | jq -r '.[] | select(.body | test("^## Binary Size Report")) | select(.user.login == "github-actions[bot]") | .id')
-          echo "$COMMENT_ID"
-          if [ -n "$COMMENT_ID" ]; then
+
+          # 1) Prefer the trigger comment ("Triggered binary size analysis ...")
+          COMMENT_ID=$(echo "$COMMENTS" | jq -r '
+            .[]
+            | select(.user.login == "github-actions[bot]")
+            | select(.body | contains("Triggered binary size analysis"))
+            | .id' | head -n1)
+
+          # 2) Fallback to an existing Binary Size Report comment (for older runs)
+          if [ -z "$COMMENT_ID" ] || [ "$COMMENT_ID" = "null" ]; then
+            COMMENT_ID=$(echo "$COMMENTS" | jq -r '
+              .[]
+              | select(.user.login == "github-actions[bot]")
+              | select(.body | test("^## Binary Size Report"))
+              | .id' | head -n1)
+          fi
+
+          if [ -n "$COMMENT_ID" ] && [ "$COMMENT_ID" != "null" ]; then
             echo "Updating existing comment: $COMMENT_ID"
             gh api -X PATCH \
               repos/${{ github.repository }}/issues/comments/$COMMENT_ID \
