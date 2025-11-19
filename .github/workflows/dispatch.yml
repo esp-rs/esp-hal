@@ -1,4 +1,4 @@
-name: HIL (dispatch)
+name: Dispatch
 
 on:
   # labels on PRs
@@ -93,7 +93,7 @@ jobs:
             They can now use `/hil quick` or `/hil full`.
 
   # ---------------------------------------------------------------------------
-  # TRUST MANAGEMENT (/i-trust-you, /i-dont-trust)
+  # TRUST MANAGEMENT (/trust, /revoke)
   # ---------------------------------------------------------------------------
 
   trust:
@@ -102,7 +102,7 @@ jobs:
       github.event.issue.pull_request &&
       (github.event.comment.author_association == 'MEMBER' ||
        github.event.comment.author_association == 'OWNER') &&
-      startsWith(github.event.comment.body, '/i-trust-you ')
+      startsWith(github.event.comment.body, '/trust ')
     runs-on: ubuntu-latest
     steps:
       - name: Parse login
@@ -111,8 +111,8 @@ jobs:
         with:
           script: |
             const body = (context.payload.comment.body || '').trim();
-            const m = body.match(/^\/i-trust-you\s+@([A-Za-z0-9-]+)\b$/i);
-            if (!m) core.setFailed("Usage: /i-trust-you @<login>");
+            const m = body.match(/^\/trust\s+@([A-Za-z0-9-]+)\b$/i);
+            if (!m) core.setFailed("Usage: /trust @<login>");
             core.setOutput('login', m[1].toLowerCase());
 
       - id: find
@@ -177,7 +177,7 @@ jobs:
       github.event.issue.pull_request &&
       (github.event.comment.author_association == 'MEMBER' ||
        github.event.comment.author_association == 'OWNER') &&
-      startsWith(github.event.comment.body, '/i-dont-trust ')
+      startsWith(github.event.comment.body, '/revoke ')
     runs-on: ubuntu-latest
     steps:
       - name: Parse login
@@ -186,8 +186,8 @@ jobs:
         with:
           script: |
             const body = (context.payload.comment.body || '').trim();
-            const m = body.match(/^\/i-dont-trust\s+@([A-Za-z0-9-]+)\b$/i);
-            if (!m) core.setFailed("Usage: /i-dont-trust @<login>");
+            const m = body.match(/^\/revoke\s+@([A-Za-z0-9-]+)\b$/i);
+            if (!m) core.setFailed("Usage: /revoke @<login>");
             core.setOutput('login', m[1].toLowerCase());
 
       - id: find
@@ -411,13 +411,13 @@ jobs:
 
             let suffix;
             if (!conclusion) {
-              suffix = `\n\n_Status update: HIL (${matrix}) run is still in progress or status unknown._`;
+              suffix = `\n\n**Status update:** HIL (${matrix}) run is still in progress or status unknown.`;
             } else if (conclusion === 'success') {
-              suffix = `\n\n✅ HIL (${matrix}) run **succeeded**.`;
+              suffix = `\n\n**Status update:** ✅ HIL (${matrix}) run **succeeded**.`;
             } else if (conclusion === 'cancelled') {
-              suffix = `\n\n⚠️ HIL (${matrix}) run was **cancelled**.`;
+              suffix = `\n\n**Status update:** ⚠️ HIL (${matrix}) run was **cancelled**.`;
             } else {
-              suffix = `\n\n❌ HIL (${matrix}) run **failed** (conclusion: ${conclusion}).`;
+              suffix = `\n\n**Status update:** ❌ HIL (${matrix}) run **failed** (conclusion: ${conclusion}).`;
             }
 
             // Fetch existing comment
@@ -555,13 +555,13 @@ jobs:
 
             let suffix;
             if (!conclusion) {
-              suffix = `\n\nStatus update: HIL (${matrix}) run is still in progress or status unknown._`;
+              suffix = `\n\n**Status update:** HIL (${matrix}) run is still in progress or status unknown._`;
             } else if (conclusion === 'success') {
-              suffix = `\n\nStatus update: ✅ HIL (${matrix}) run **succeeded**.`;
+              suffix = `\n\n**Status update:** ✅ HIL (${matrix}) run **succeeded**.`;
             } else if (conclusion === 'cancelled') {
-              suffix = `\n\nStatus update: ⚠️ HIL (${matrix}) run was **cancelled**.`;
+              suffix = `\n\n**Status update:** ⚠️ HIL (${matrix}) run was **cancelled**.`;
             } else {
-              suffix = `\n\nStatus update: ❌ HIL (${matrix}) run **failed** (conclusion: ${conclusion}).`;
+              suffix = `\n\n**Status update:** ❌ HIL (${matrix}) run **failed** (conclusion: ${conclusion}).`;
             }
 
             // Fetch existing comment
@@ -584,7 +584,9 @@ jobs:
     needs: auth
     if: github.event_name == 'issue_comment' && needs.auth.outputs.allowed != 'true' &&
         (startsWith(github.event.comment.body, '/hil quick') ||
-         startsWith(github.event.comment.body, '/hil full'))
+         startsWith(github.event.comment.body, '/hil full')  ||
+         startsWith(github.event.comment.body, '/test-size'))
+
     runs-on: ubuntu-latest
     steps:
       - name: Inform not allowed
@@ -592,10 +594,10 @@ jobs:
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
-            @${{ github.event.comment.user.login }}, sorry — you're not allowed to execute HIL runs for this PR.
+            @${{ github.event.comment.user.login }}, sorry — you're not allowed to execute HIL runs or binary size analysis for this PR.
             Please ask an `esp-rs` member/owner to grant access with:
             ```
-            /i-trust-you @${{ github.event.comment.user.login }}
+            /trust @${{ github.event.comment.user.login }}
             ```
             After that, you can use `/hil quick` or `/hil full`.
 
@@ -614,9 +616,34 @@ jobs:
             If you aren't a repository **member/owner**, you must be **trusted for this PR**.
             Maintainers can grant access with a `trusted-author` label or with:
             ```
-            /i-trust-you @<login>
+            /trust @<login>
             ```
             and revoke with:
             ```
-            /i-dont-trust @<login>
+            /revoke @<login>
             ```
+
+  binary-size:
+    needs: auth
+    if: github.event_name == 'issue_comment' &&
+        needs.auth.outputs.allowed == 'true' &&
+        startsWith(github.event.comment.body, '/test-size')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Binary Size Analysis
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: binary_size.yml
+          ref: ${{ github.event.repository.default_branch }}
+          inputs: |
+            {
+              "pr_number": "${{ github.event.issue.number }}"
+            }
+
+      - name: Confirm in PR
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: >
+            Triggered binary size analysis for
+            #${{ github.event.issue.number }}. Results will be posted as a comment when ready.
