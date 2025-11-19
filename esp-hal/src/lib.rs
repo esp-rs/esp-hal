@@ -385,6 +385,8 @@ unstable_driver! {
     pub mod rng;
     #[cfg(soc_has_rsa)]
     pub mod rsa;
+    #[cfg(any(soc_has_slc, soc_has_slchost))]
+    pub mod sdio;
     #[cfg(soc_has_sha)]
     pub mod sha;
     #[cfg(touch)]

@@ -15,6 +15,7 @@ embassy-net = { version = "0.7.0", features = [ "tcp", "udp", "dhcpv4", "medium-
 embassy-sync = "0.7"
 embedded-graphics = "0.8.1"
 embedded-hal-async = "1.0.0"
+embedded-hal-sdmmc = { version = "0.1.0-alpha.3", optional = true }
 embedded-io = { version = "0.6.1", default-features = false }
 esp-alloc = { path = "../esp-alloc" }
 esp-backtrace = { path = "../esp-backtrace", features = [
@@ -63,6 +64,7 @@ esp32 = [
     "esp-println/esp32",
     "esp-radio?/esp32",
     "esp-storage?/esp32",
+    "dep:embedded-hal-sdmmc",
 ]
 esp32c2 = [
     "esp-backtrace/esp32c2",
@@ -87,6 +89,7 @@ esp32c6 = [
     "esp-rtos/esp32c6",
     "esp-println/esp32c6",
     "esp-radio?/esp32c6",
+    "dep:embedded-hal-sdmmc",
 ]
 esp32h2 = [
     "esp-backtrace/esp32h2",
