@@ -3,7 +3,14 @@
 #![deny(missing_docs)]
 
 use alloc::{collections::vec_deque::VecDeque, vec::Vec};
-use core::{fmt::Debug, marker::PhantomData, ptr::addr_of, task::Poll, time::Duration};
+use core::{
+    fmt::Debug,
+    marker::PhantomData,
+    mem::MaybeUninit,
+    ptr::addr_of,
+    task::Poll,
+    time::Duration,
+};
 
 use enumset::{EnumSet, EnumSetType};
 use esp_config::esp_config_int;
@@ -24,7 +31,7 @@ use self::sniffer::Sniffer;
 use self::sta::eap::EapClientConfig;
 pub use self::state::*;
 use self::{
-    ap::{AccessPointConfig, AccessPointInfo},
+    ap::{AccessPointConfig, AccessPointInfo, convert_ap_info},
     private::PacketBuffer,
     scan::{FreeApListOnDrop, ScanResults},
     sta::ClientConfig,
@@ -54,7 +61,6 @@ pub(crate) mod state;
 
 mod internal;
 mod scan;
-
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
 
 /// Supported Wi-Fi authentication methods.
@@ -2432,6 +2438,31 @@ impl WifiController<'_> {
             // Will return ESP_FAIL -1 if called in AP mode.
             esp_wifi_result!(unsafe { esp_wifi_sta_get_rssi(&mut rssi) })?;
             Ok(rssi)
+        } else {
+            Err(WifiError::Unsupported)
+        }
+    }
+
+    /// Get the Access Point information of AP to which the device is associated with.
+    /// The value is obtained from the last beacon.
+    ///
+    /// <div class="warning">
+    ///
+    /// - Use this API only in STA or AP-STA mode.
+    /// - This API should be called after the station has connected to an access point.
+    /// </div>
+    ///
+    /// # Errors
+    /// This function returns [`WifiError::Unsupported`] if the STA side isn't
+    /// running. For example, when configured for AP only.
+    pub fn ap_info(&self) -> Result<AccessPointInfo, WifiError> {
+        if self.mode()?.is_sta() {
+            let mut record: MaybeUninit<include::wifi_ap_record_t> = MaybeUninit::uninit();
+            esp_wifi_result!(unsafe { esp_wifi_sta_get_ap_info(record.as_mut_ptr()) })?;
+
+            let record = unsafe { MaybeUninit::assume_init(record) };
+            let ap_info = convert_ap_info(&record);
+            Ok(ap_info)
         } else {
             Err(WifiError::Unsupported)
         }
