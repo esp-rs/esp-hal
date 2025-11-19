@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: All blocking methods now return the channel on failure. (#4302)
 - RMT: the `place_rmt_driver_in_ram` option now also places the async interrupt handler in RAM. (#4302)
 - RMT: When dropping a Tx channel, the driver now disconnects the output pin from the peripheral. (#4302)
+- I2C: avoid potential infinite loop while checking for command completion (#4519)
 
 ### Removed
 
