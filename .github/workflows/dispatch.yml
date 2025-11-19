@@ -610,7 +610,7 @@ jobs:
           issue-number: ${{ github.event.issue.number }}
           body: |
             Usage:
-            - `/hil quick` — run a quick HIL matrix (only `ESP32-S3` (Xtensa) and `ESP32-C3` (RISC-V) tests)
+            - `/hil quick` — run a quick HIL matrix (only `ESP32-S3` (Xtensa) and `ESP32-C6` (RISC-V) tests)
             - `/hil full`  — run the full HIL matrix
             If you aren't a repository **member/owner**, you must be **trusted for this PR**.
             Maintainers can grant access with a `trusted-author` label or with:

@@ -41,8 +41,8 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-jobs:      
+
+jobs:
   build-xtasks:
     name: Build xtasks
     runs-on: ubuntu-latest
@@ -136,9 +136,9 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - soc: esp32c3
-            rust-target: riscv32imc-unknown-none-elf
-            runner: esp32c3-usb
+          - soc: esp32c6
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32c6-usb
             host: armv7
           - soc: esp32s3
             rust-target: xtensa-esp32s3-none-elf
@@ -164,9 +164,9 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - soc: esp32c3
-            rust-target: riscv32imc-unknown-none-elf
-            runner: esp32c3-usb
+          - soc: esp32c6
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32c6-usb
             host: armv7
           - soc: esp32s3
             rust-target: xtensa-esp32s3-none-elf
