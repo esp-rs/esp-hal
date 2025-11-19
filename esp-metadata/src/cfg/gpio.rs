@@ -49,6 +49,10 @@ pub(crate) struct PinConfig {
     /// Available LP/RTC IO functions for this pin.
     #[serde(default, alias = "rtc")]
     pub lp: LowPowerMap,
+
+    /// GPIO pin is only available in certain cases.
+    #[serde(default)]
+    pub limited: bool,
 }
 
 /// Available alternate functions for a given GPIO pin.

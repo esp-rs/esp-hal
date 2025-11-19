@@ -1063,29 +1063,33 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((@ peri_type GPIO20 <= virtual())); _for_each_inner!((@
         peri_type GPIO21 <= virtual())); _for_each_inner!((@ peri_type GPIO22 <=
         virtual())); _for_each_inner!((@ peri_type GPIO23 <= virtual()));
-        _for_each_inner!((@ peri_type GPIO27 <= virtual())); _for_each_inner!((@
-        peri_type AES <= AES(AES : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable))); _for_each_inner!((@ peri_type APB_SARADC
-        <= APB_SARADC() (unstable))); _for_each_inner!((@ peri_type ASSIST_DEBUG <=
-        ASSIST_DEBUG() (unstable))); _for_each_inner!((@ peri_type ATOMIC <= ATOMIC()
-        (unstable))); _for_each_inner!((@ peri_type DMA <= DMA() (unstable)));
-        _for_each_inner!((@ peri_type DS <= DS() (unstable))); _for_each_inner!((@
-        peri_type ECC <= ECC() (unstable))); _for_each_inner!((@ peri_type EFUSE <=
-        EFUSE() (unstable))); _for_each_inner!((@ peri_type EXTMEM <= EXTMEM()
-        (unstable))); _for_each_inner!((@ peri_type GPIO <= GPIO() (unstable)));
-        _for_each_inner!((@ peri_type GPIO_SD <= GPIO_SD() (unstable)));
-        _for_each_inner!((@ peri_type HINF <= HINF() (unstable))); _for_each_inner!((@
-        peri_type HMAC <= HMAC() (unstable))); _for_each_inner!((@ peri_type HP_APM <=
-        HP_APM() (unstable))); _for_each_inner!((@ peri_type HP_SYS <= HP_SYS()
-        (unstable))); _for_each_inner!((@ peri_type I2C_ANA_MST <= I2C_ANA_MST()
-        (unstable))); _for_each_inner!((@ peri_type I2C0 <= I2C0(I2C_EXT0 : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })));
-        _for_each_inner!((@ peri_type I2S0 <= I2S0(I2S0 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
-        _for_each_inner!((@ peri_type IEEE802154 <= IEEE802154() (unstable)));
-        _for_each_inner!((@ peri_type INTERRUPT_CORE0 <= INTERRUPT_CORE0() (unstable)));
-        _for_each_inner!((@ peri_type INTPRI <= INTPRI() (unstable)));
-        _for_each_inner!((@ peri_type IO_MUX <= IO_MUX() (unstable)));
+        _for_each_inner!((@ peri_type GPIO24 <= virtual())); _for_each_inner!((@
+        peri_type GPIO25 <= virtual())); _for_each_inner!((@ peri_type GPIO26 <=
+        virtual())); _for_each_inner!((@ peri_type GPIO27 <= virtual()));
+        _for_each_inner!((@ peri_type GPIO28 <= virtual())); _for_each_inner!((@
+        peri_type GPIO29 <= virtual())); _for_each_inner!((@ peri_type GPIO30 <=
+        virtual())); _for_each_inner!((@ peri_type AES <= AES(AES : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable))); _for_each_inner!((@ peri_type APB_SARADC <= APB_SARADC()
+        (unstable))); _for_each_inner!((@ peri_type ASSIST_DEBUG <= ASSIST_DEBUG()
+        (unstable))); _for_each_inner!((@ peri_type ATOMIC <= ATOMIC() (unstable)));
+        _for_each_inner!((@ peri_type DMA <= DMA() (unstable))); _for_each_inner!((@
+        peri_type DS <= DS() (unstable))); _for_each_inner!((@ peri_type ECC <= ECC()
+        (unstable))); _for_each_inner!((@ peri_type EFUSE <= EFUSE() (unstable)));
+        _for_each_inner!((@ peri_type EXTMEM <= EXTMEM() (unstable)));
+        _for_each_inner!((@ peri_type GPIO <= GPIO() (unstable))); _for_each_inner!((@
+        peri_type GPIO_SD <= GPIO_SD() (unstable))); _for_each_inner!((@ peri_type HINF
+        <= HINF() (unstable))); _for_each_inner!((@ peri_type HMAC <= HMAC()
+        (unstable))); _for_each_inner!((@ peri_type HP_APM <= HP_APM() (unstable)));
+        _for_each_inner!((@ peri_type HP_SYS <= HP_SYS() (unstable)));
+        _for_each_inner!((@ peri_type I2C_ANA_MST <= I2C_ANA_MST() (unstable)));
+        _for_each_inner!((@ peri_type I2C0 <= I2C0(I2C_EXT0 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }))); _for_each_inner!((@ peri_type
+        I2S0 <= I2S0(I2S0 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner!((@ peri_type IEEE802154
+        <= IEEE802154() (unstable))); _for_each_inner!((@ peri_type INTERRUPT_CORE0 <=
+        INTERRUPT_CORE0() (unstable))); _for_each_inner!((@ peri_type INTPRI <= INTPRI()
+        (unstable))); _for_each_inner!((@ peri_type IO_MUX <= IO_MUX() (unstable)));
         _for_each_inner!((@ peri_type LEDC <= LEDC() (unstable))); _for_each_inner!((@
         peri_type LP_ANA <= LP_ANA() (unstable))); _for_each_inner!((@ peri_type LP_AON
         <= LP_AON() (unstable))); _for_each_inner!((@ peri_type LP_APM <= LP_APM()
@@ -1219,20 +1223,22 @@ macro_rules! for_each_peripheral {
         virtual()), (@ peri_type GPIO18 <= virtual()), (@ peri_type GPIO19 <= virtual()),
         (@ peri_type GPIO20 <= virtual()), (@ peri_type GPIO21 <= virtual()), (@
         peri_type GPIO22 <= virtual()), (@ peri_type GPIO23 <= virtual()), (@ peri_type
-        GPIO27 <= virtual()), (@ peri_type AES <= AES(AES : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type
-        APB_SARADC <= APB_SARADC() (unstable)), (@ peri_type ASSIST_DEBUG <=
-        ASSIST_DEBUG() (unstable)), (@ peri_type ATOMIC <= ATOMIC() (unstable)), (@
-        peri_type DMA <= DMA() (unstable)), (@ peri_type DS <= DS() (unstable)), (@
-        peri_type ECC <= ECC() (unstable)), (@ peri_type EFUSE <= EFUSE() (unstable)), (@
-        peri_type EXTMEM <= EXTMEM() (unstable)), (@ peri_type GPIO <= GPIO()
-        (unstable)), (@ peri_type GPIO_SD <= GPIO_SD() (unstable)), (@ peri_type HINF <=
-        HINF() (unstable)), (@ peri_type HMAC <= HMAC() (unstable)), (@ peri_type HP_APM
-        <= HP_APM() (unstable)), (@ peri_type HP_SYS <= HP_SYS() (unstable)), (@
-        peri_type I2C_ANA_MST <= I2C_ANA_MST() (unstable)), (@ peri_type I2C0 <=
-        I2C0(I2C_EXT0 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt })), (@ peri_type I2S0 <= I2S0(I2S0 : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        GPIO24 <= virtual()), (@ peri_type GPIO25 <= virtual()), (@ peri_type GPIO26 <=
+        virtual()), (@ peri_type GPIO27 <= virtual()), (@ peri_type GPIO28 <= virtual()),
+        (@ peri_type GPIO29 <= virtual()), (@ peri_type GPIO30 <= virtual()), (@
+        peri_type AES <= AES(AES : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (@ peri_type APB_SARADC <= APB_SARADC()
+        (unstable)), (@ peri_type ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)), (@
+        peri_type ATOMIC <= ATOMIC() (unstable)), (@ peri_type DMA <= DMA() (unstable)),
+        (@ peri_type DS <= DS() (unstable)), (@ peri_type ECC <= ECC() (unstable)), (@
+        peri_type EFUSE <= EFUSE() (unstable)), (@ peri_type EXTMEM <= EXTMEM()
+        (unstable)), (@ peri_type GPIO <= GPIO() (unstable)), (@ peri_type GPIO_SD <=
+        GPIO_SD() (unstable)), (@ peri_type HINF <= HINF() (unstable)), (@ peri_type HMAC
+        <= HMAC() (unstable)), (@ peri_type HP_APM <= HP_APM() (unstable)), (@ peri_type
+        HP_SYS <= HP_SYS() (unstable)), (@ peri_type I2C_ANA_MST <= I2C_ANA_MST()
+        (unstable)), (@ peri_type I2C0 <= I2C0(I2C_EXT0 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt })), (@ peri_type I2S0 <= I2S0(I2S0
+        : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type IEEE802154 <= IEEE802154() (unstable)), (@ peri_type
         INTERRUPT_CORE0 <= INTERRUPT_CORE0() (unstable)), (@ peri_type INTPRI <= INTPRI()
         (unstable)), (@ peri_type IO_MUX <= IO_MUX() (unstable)), (@ peri_type LEDC <=
@@ -1366,7 +1372,13 @@ macro_rules! for_each_gpio {
         GPIO21(_0 => SDIO_DATA1) (_0 => SDIO_DATA1 _2 => FSPICS5) ([Input] [Output])));
         _for_each_inner!((22, GPIO22(_0 => SDIO_DATA2) (_0 => SDIO_DATA2) ([Input]
         [Output]))); _for_each_inner!((23, GPIO23(_0 => SDIO_DATA3) (_0 => SDIO_DATA3)
-        ([Input] [Output]))); _for_each_inner!((27, GPIO27() () ([Input] [Output])));
+        ([Input] [Output]))); _for_each_inner!((24, GPIO24() (_0 => SPICS0) ([Input]
+        [Output]))); _for_each_inner!((25, GPIO25(_0 => SPIQ) (_0 => SPIQ) ([Input]
+        [Output]))); _for_each_inner!((26, GPIO26(_0 => SPIWP) (_0 => SPIWP) ([Input]
+        [Output]))); _for_each_inner!((27, GPIO27() () ([Input] [Output])));
+        _for_each_inner!((28, GPIO28(_0 => SPIHD) (_0 => SPIHD) ([Input] [Output])));
+        _for_each_inner!((29, GPIO29() (_0 => SPICLK) ([Input] [Output])));
+        _for_each_inner!((30, GPIO30(_0 => SPID) (_0 => SPID) ([Input] [Output])));
         _for_each_inner!((all(0, GPIO0() () ([Input] [Output])), (1, GPIO1() () ([Input]
         [Output])), (2, GPIO2(_2 => FSPIQ) (_2 => FSPIQ) ([Input] [Output])), (3, GPIO3()
         () ([Input] [Output])), (4, GPIO4(_0 => MTMS _2 => FSPIHD) (_2 => FSPIHD)
@@ -1384,7 +1396,12 @@ macro_rules! for_each_gpio {
         => SDIO_DATA0 _2 => FSPICS4) ([Input] [Output])), (21, GPIO21(_0 => SDIO_DATA1)
         (_0 => SDIO_DATA1 _2 => FSPICS5) ([Input] [Output])), (22, GPIO22(_0 =>
         SDIO_DATA2) (_0 => SDIO_DATA2) ([Input] [Output])), (23, GPIO23(_0 => SDIO_DATA3)
-        (_0 => SDIO_DATA3) ([Input] [Output])), (27, GPIO27() () ([Input] [Output]))));
+        (_0 => SDIO_DATA3) ([Input] [Output])), (24, GPIO24() (_0 => SPICS0) ([Input]
+        [Output])), (25, GPIO25(_0 => SPIQ) (_0 => SPIQ) ([Input] [Output])), (26,
+        GPIO26(_0 => SPIWP) (_0 => SPIWP) ([Input] [Output])), (27, GPIO27() () ([Input]
+        [Output])), (28, GPIO28(_0 => SPIHD) (_0 => SPIHD) ([Input] [Output])), (29,
+        GPIO29() (_0 => SPICLK) ([Input] [Output])), (30, GPIO30(_0 => SPID) (_0 => SPID)
+        ([Input] [Output]))));
     };
 }
 /// This macro can be used to generate code for each analog function of each GPIO.

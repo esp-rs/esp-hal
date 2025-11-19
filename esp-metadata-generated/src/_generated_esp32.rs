@@ -2226,24 +2226,29 @@ macro_rules! for_each_peripheral {
         GPIO1 <= virtual())); _for_each_inner!((@ peri_type GPIO2 <= virtual()));
         _for_each_inner!((@ peri_type GPIO3 <= virtual())); _for_each_inner!((@ peri_type
         GPIO4 <= virtual())); _for_each_inner!((@ peri_type GPIO5 <= virtual()));
+        _for_each_inner!((@ peri_type GPIO6 <= virtual())); _for_each_inner!((@ peri_type
+        GPIO7 <= virtual())); _for_each_inner!((@ peri_type GPIO8 <= virtual()));
+        _for_each_inner!((@ peri_type GPIO9 <= virtual())); _for_each_inner!((@ peri_type
+        GPIO10 <= virtual())); _for_each_inner!((@ peri_type GPIO11 <= virtual()));
         _for_each_inner!((@ peri_type GPIO12 <= virtual())); _for_each_inner!((@
         peri_type GPIO13 <= virtual())); _for_each_inner!((@ peri_type GPIO14 <=
         virtual())); _for_each_inner!((@ peri_type GPIO15 <= virtual()));
         _for_each_inner!((@ peri_type GPIO16 <= virtual())); _for_each_inner!((@
         peri_type GPIO17 <= virtual())); _for_each_inner!((@ peri_type GPIO18 <=
         virtual())); _for_each_inner!((@ peri_type GPIO19 <= virtual()));
-        _for_each_inner!((@ peri_type GPIO21 <= virtual())); _for_each_inner!((@
-        peri_type GPIO22 <= virtual())); _for_each_inner!((@ peri_type GPIO23 <=
-        virtual())); _for_each_inner!((@ peri_type GPIO25 <= virtual()));
-        _for_each_inner!((@ peri_type GPIO26 <= virtual())); _for_each_inner!((@
-        peri_type GPIO27 <= virtual())); _for_each_inner!((@ peri_type GPIO32 <=
-        virtual())); _for_each_inner!((@ peri_type GPIO33 <= virtual()));
-        _for_each_inner!((@ peri_type GPIO34 <= virtual())); _for_each_inner!((@
-        peri_type GPIO35 <= virtual())); _for_each_inner!((@ peri_type GPIO36 <=
-        virtual())); _for_each_inner!((@ peri_type GPIO37 <= virtual()));
-        _for_each_inner!((@ peri_type GPIO38 <= virtual())); _for_each_inner!((@
-        peri_type GPIO39 <= virtual())); _for_each_inner!((@ peri_type AES <= AES()
-        (unstable))); _for_each_inner!((@ peri_type APB_CTRL <= APB_CTRL() (unstable)));
+        _for_each_inner!((@ peri_type GPIO20 <= virtual())); _for_each_inner!((@
+        peri_type GPIO21 <= virtual())); _for_each_inner!((@ peri_type GPIO22 <=
+        virtual())); _for_each_inner!((@ peri_type GPIO23 <= virtual()));
+        _for_each_inner!((@ peri_type GPIO25 <= virtual())); _for_each_inner!((@
+        peri_type GPIO26 <= virtual())); _for_each_inner!((@ peri_type GPIO27 <=
+        virtual())); _for_each_inner!((@ peri_type GPIO32 <= virtual()));
+        _for_each_inner!((@ peri_type GPIO33 <= virtual())); _for_each_inner!((@
+        peri_type GPIO34 <= virtual())); _for_each_inner!((@ peri_type GPIO35 <=
+        virtual())); _for_each_inner!((@ peri_type GPIO36 <= virtual()));
+        _for_each_inner!((@ peri_type GPIO37 <= virtual())); _for_each_inner!((@
+        peri_type GPIO38 <= virtual())); _for_each_inner!((@ peri_type GPIO39 <=
+        virtual())); _for_each_inner!((@ peri_type AES <= AES() (unstable)));
+        _for_each_inner!((@ peri_type APB_CTRL <= APB_CTRL() (unstable)));
         _for_each_inner!((@ peri_type BB <= BB() (unstable))); _for_each_inner!((@
         peri_type DPORT <= DPORT() (unstable))); _for_each_inner!((@ peri_type SYSTEM <=
         DPORT() (unstable))); _for_each_inner!((@ peri_type EFUSE <= EFUSE()
@@ -2352,20 +2357,23 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((TOUCH(unstable))); _for_each_inner!((all(@ peri_type GPIO0 <=
         virtual()), (@ peri_type GPIO1 <= virtual()), (@ peri_type GPIO2 <= virtual()),
         (@ peri_type GPIO3 <= virtual()), (@ peri_type GPIO4 <= virtual()), (@ peri_type
-        GPIO5 <= virtual()), (@ peri_type GPIO12 <= virtual()), (@ peri_type GPIO13 <=
-        virtual()), (@ peri_type GPIO14 <= virtual()), (@ peri_type GPIO15 <= virtual()),
-        (@ peri_type GPIO16 <= virtual()), (@ peri_type GPIO17 <= virtual()), (@
-        peri_type GPIO18 <= virtual()), (@ peri_type GPIO19 <= virtual()), (@ peri_type
-        GPIO21 <= virtual()), (@ peri_type GPIO22 <= virtual()), (@ peri_type GPIO23 <=
-        virtual()), (@ peri_type GPIO25 <= virtual()), (@ peri_type GPIO26 <= virtual()),
-        (@ peri_type GPIO27 <= virtual()), (@ peri_type GPIO32 <= virtual()), (@
-        peri_type GPIO33 <= virtual()), (@ peri_type GPIO34 <= virtual()), (@ peri_type
-        GPIO35 <= virtual()), (@ peri_type GPIO36 <= virtual()), (@ peri_type GPIO37 <=
-        virtual()), (@ peri_type GPIO38 <= virtual()), (@ peri_type GPIO39 <= virtual()),
-        (@ peri_type AES <= AES() (unstable)), (@ peri_type APB_CTRL <= APB_CTRL()
-        (unstable)), (@ peri_type BB <= BB() (unstable)), (@ peri_type DPORT <= DPORT()
-        (unstable)), (@ peri_type SYSTEM <= DPORT() (unstable)), (@ peri_type EFUSE <=
-        EFUSE() (unstable)), (@ peri_type EMAC_DMA <= EMAC_DMA() (unstable)), (@
+        GPIO5 <= virtual()), (@ peri_type GPIO6 <= virtual()), (@ peri_type GPIO7 <=
+        virtual()), (@ peri_type GPIO8 <= virtual()), (@ peri_type GPIO9 <= virtual()),
+        (@ peri_type GPIO10 <= virtual()), (@ peri_type GPIO11 <= virtual()), (@
+        peri_type GPIO12 <= virtual()), (@ peri_type GPIO13 <= virtual()), (@ peri_type
+        GPIO14 <= virtual()), (@ peri_type GPIO15 <= virtual()), (@ peri_type GPIO16 <=
+        virtual()), (@ peri_type GPIO17 <= virtual()), (@ peri_type GPIO18 <= virtual()),
+        (@ peri_type GPIO19 <= virtual()), (@ peri_type GPIO20 <= virtual()), (@
+        peri_type GPIO21 <= virtual()), (@ peri_type GPIO22 <= virtual()), (@ peri_type
+        GPIO23 <= virtual()), (@ peri_type GPIO25 <= virtual()), (@ peri_type GPIO26 <=
+        virtual()), (@ peri_type GPIO27 <= virtual()), (@ peri_type GPIO32 <= virtual()),
+        (@ peri_type GPIO33 <= virtual()), (@ peri_type GPIO34 <= virtual()), (@
+        peri_type GPIO35 <= virtual()), (@ peri_type GPIO36 <= virtual()), (@ peri_type
+        GPIO37 <= virtual()), (@ peri_type GPIO38 <= virtual()), (@ peri_type GPIO39 <=
+        virtual()), (@ peri_type AES <= AES() (unstable)), (@ peri_type APB_CTRL <=
+        APB_CTRL() (unstable)), (@ peri_type BB <= BB() (unstable)), (@ peri_type DPORT
+        <= DPORT() (unstable)), (@ peri_type SYSTEM <= DPORT() (unstable)), (@ peri_type
+        EFUSE <= EFUSE() (unstable)), (@ peri_type EMAC_DMA <= EMAC_DMA() (unstable)), (@
         peri_type EMAC_EXT <= EMAC_EXT() (unstable)), (@ peri_type EMAC_MAC <= EMAC_MAC()
         (unstable)), (@ peri_type FLASH_ENCRYPTION <= FLASH_ENCRYPTION() (unstable)), (@
         peri_type FRC_TIMER <= FRC_TIMER() (unstable)), (@ peri_type GPIO <= GPIO()
@@ -2471,61 +2479,82 @@ macro_rules! for_each_gpio {
         SD_DATA1 _5 => EMAC_TX_ER) (_1 => HSPIHD _3 => HS2_DATA1 _4 => SD_DATA1 _5 =>
         EMAC_TX_ER) ([Input] [Output]))); _for_each_inner!((5, GPIO5(_1 => VSPICS0 _3 =>
         HS1_DATA6 _5 => EMAC_RX_CLK) (_1 => VSPICS0 _3 => HS1_DATA6) ([Input]
-        [Output]))); _for_each_inner!((12, GPIO12(_0 => MTDI _1 => HSPIQ _3 => HS2_DATA2
-        _4 => SD_DATA2) (_1 => HSPIQ _3 => HS2_DATA2 _4 => SD_DATA2 _5 => EMAC_TXD3)
-        ([Input] [Output]))); _for_each_inner!((13, GPIO13(_0 => MTCK _1 => HSPID _3 =>
-        HS2_DATA3 _4 => SD_DATA3 _5 => EMAC_RX_ER) (_1 => HSPID _3 => HS2_DATA3 _4 =>
-        SD_DATA3 _5 => EMAC_RX_ER) ([Input] [Output]))); _for_each_inner!((14, GPIO14(_0
-        => MTMS _1 => HSPICLK) (_1 => HSPICLK _3 => HS2_CLK _4 => SD_CLK _5 => EMAC_TXD2)
-        ([Input] [Output]))); _for_each_inner!((15, GPIO15(_1 => HSPICS0 _4 => SD_CMD _5
-        => EMAC_RXD3) (_0 => MTDO _1 => HSPICS0 _3 => HS2_CMD _4 => SD_CMD) ([Input]
+        [Output]))); _for_each_inner!((6, GPIO6(_1 => SPICLK _4 => U1CTS) (_0 => SD_CLK
+        _1 => SPICLK _3 => HS1_CLK) ([Input] [Output]))); _for_each_inner!((7, GPIO7(_0
+        => SD_DATA0 _1 => SPIQ _3 => HS1_DATA0) (_0 => SD_DATA0 _1 => SPIQ _3 =>
+        HS1_DATA0 _4 => U2RTS) ([Input] [Output]))); _for_each_inner!((8, GPIO8(_0 =>
+        SD_DATA1 _1 => SPID _3 => HS1_DATA1 _4 => U2CTS) (_0 => SD_DATA1 _1 => SPID _3 =>
+        HS1_DATA1) ([Input] [Output]))); _for_each_inner!((9, GPIO9(_0 => SD_DATA2 _1 =>
+        SPIHD _3 => HS1_DATA2 _4 => U1RXD) (_0 => SD_DATA2 _1 => SPIHD _3 => HS1_DATA2)
+        ([Input] [Output]))); _for_each_inner!((10, GPIO10(_0 => SD_DATA3 _1 => SPIWP _3
+        => HS1_DATA3) (_0 => SD_DATA3 _1 => SPIWP _3 => HS1_DATA3 _4 => U1TXD) ([Input]
+        [Output]))); _for_each_inner!((11, GPIO11(_0 => SD_CMD _1 => SPICS0) (_0 =>
+        SD_CMD _1 => SPICS0 _3 => HS1_CMD _4 => U1RTS) ([Input] [Output])));
+        _for_each_inner!((12, GPIO12(_0 => MTDI _1 => HSPIQ _3 => HS2_DATA2 _4 =>
+        SD_DATA2) (_1 => HSPIQ _3 => HS2_DATA2 _4 => SD_DATA2 _5 => EMAC_TXD3) ([Input]
+        [Output]))); _for_each_inner!((13, GPIO13(_0 => MTCK _1 => HSPID _3 => HS2_DATA3
+        _4 => SD_DATA3 _5 => EMAC_RX_ER) (_1 => HSPID _3 => HS2_DATA3 _4 => SD_DATA3 _5
+        => EMAC_RX_ER) ([Input] [Output]))); _for_each_inner!((14, GPIO14(_0 => MTMS _1
+        => HSPICLK) (_1 => HSPICLK _3 => HS2_CLK _4 => SD_CLK _5 => EMAC_TXD2) ([Input]
+        [Output]))); _for_each_inner!((15, GPIO15(_1 => HSPICS0 _4 => SD_CMD _5 =>
+        EMAC_RXD3) (_0 => MTDO _1 => HSPICS0 _3 => HS2_CMD _4 => SD_CMD) ([Input]
         [Output]))); _for_each_inner!((16, GPIO16(_3 => HS1_DATA4 _4 => U2RXD) (_3 =>
         HS1_DATA4 _5 => EMAC_CLK_OUT) ([Input] [Output]))); _for_each_inner!((17,
         GPIO17(_3 => HS1_DATA5) (_3 => HS1_DATA5 _4 => U2TXD _5 => EMAC_CLK_180) ([Input]
         [Output]))); _for_each_inner!((18, GPIO18(_1 => VSPICLK _3 => HS1_DATA7) (_1 =>
         VSPICLK _3 => HS1_DATA7) ([Input] [Output]))); _for_each_inner!((19, GPIO19(_1 =>
         VSPIQ _3 => U0CTS) (_1 => VSPIQ _5 => EMAC_TXD0) ([Input] [Output])));
-        _for_each_inner!((21, GPIO21(_1 => VSPIHD) (_1 => VSPIHD _5 => EMAC_TX_EN)
-        ([Input] [Output]))); _for_each_inner!((22, GPIO22(_1 => VSPIWP) (_1 => VSPIWP _3
-        => U0RTS _5 => EMAC_TXD1) ([Input] [Output]))); _for_each_inner!((23, GPIO23(_1
-        => VSPID) (_1 => VSPID _3 => HS1_STROBE) ([Input] [Output])));
-        _for_each_inner!((25, GPIO25(_5 => EMAC_RXD0) () ([Input] [Output])));
-        _for_each_inner!((26, GPIO26(_5 => EMAC_RXD1) () ([Input] [Output])));
-        _for_each_inner!((27, GPIO27(_5 => EMAC_RX_DV) () ([Input] [Output])));
-        _for_each_inner!((32, GPIO32() () ([Input] [Output]))); _for_each_inner!((33,
-        GPIO33() () ([Input] [Output]))); _for_each_inner!((34, GPIO34() () ([Input]
-        []))); _for_each_inner!((35, GPIO35() () ([Input] []))); _for_each_inner!((36,
-        GPIO36() () ([Input] []))); _for_each_inner!((37, GPIO37() () ([Input] [])));
-        _for_each_inner!((38, GPIO38() () ([Input] []))); _for_each_inner!((39, GPIO39()
-        () ([Input] []))); _for_each_inner!((all(0, GPIO0(_5 => EMAC_TX_CLK) (_1 =>
-        CLK_OUT1 _5 => EMAC_TX_CLK) ([Input] [Output])), (1, GPIO1(_5 => EMAC_RXD2) (_0
-        => U0TXD _1 => CLK_OUT3) ([Input] [Output])), (2, GPIO2(_1 => HSPIWP _3 =>
-        HS2_DATA0 _4 => SD_DATA0) (_1 => HSPIWP _3 => HS2_DATA0 _4 => SD_DATA0) ([Input]
-        [Output])), (3, GPIO3(_0 => U0RXD) (_1 => CLK_OUT2) ([Input] [Output])), (4,
-        GPIO4(_1 => HSPIHD _3 => HS2_DATA1 _4 => SD_DATA1 _5 => EMAC_TX_ER) (_1 => HSPIHD
-        _3 => HS2_DATA1 _4 => SD_DATA1 _5 => EMAC_TX_ER) ([Input] [Output])), (5,
-        GPIO5(_1 => VSPICS0 _3 => HS1_DATA6 _5 => EMAC_RX_CLK) (_1 => VSPICS0 _3 =>
-        HS1_DATA6) ([Input] [Output])), (12, GPIO12(_0 => MTDI _1 => HSPIQ _3 =>
-        HS2_DATA2 _4 => SD_DATA2) (_1 => HSPIQ _3 => HS2_DATA2 _4 => SD_DATA2 _5 =>
-        EMAC_TXD3) ([Input] [Output])), (13, GPIO13(_0 => MTCK _1 => HSPID _3 =>
-        HS2_DATA3 _4 => SD_DATA3 _5 => EMAC_RX_ER) (_1 => HSPID _3 => HS2_DATA3 _4 =>
-        SD_DATA3 _5 => EMAC_RX_ER) ([Input] [Output])), (14, GPIO14(_0 => MTMS _1 =>
-        HSPICLK) (_1 => HSPICLK _3 => HS2_CLK _4 => SD_CLK _5 => EMAC_TXD2) ([Input]
-        [Output])), (15, GPIO15(_1 => HSPICS0 _4 => SD_CMD _5 => EMAC_RXD3) (_0 => MTDO
-        _1 => HSPICS0 _3 => HS2_CMD _4 => SD_CMD) ([Input] [Output])), (16, GPIO16(_3 =>
-        HS1_DATA4 _4 => U2RXD) (_3 => HS1_DATA4 _5 => EMAC_CLK_OUT) ([Input] [Output])),
-        (17, GPIO17(_3 => HS1_DATA5) (_3 => HS1_DATA5 _4 => U2TXD _5 => EMAC_CLK_180)
-        ([Input] [Output])), (18, GPIO18(_1 => VSPICLK _3 => HS1_DATA7) (_1 => VSPICLK _3
-        => HS1_DATA7) ([Input] [Output])), (19, GPIO19(_1 => VSPIQ _3 => U0CTS) (_1 =>
-        VSPIQ _5 => EMAC_TXD0) ([Input] [Output])), (21, GPIO21(_1 => VSPIHD) (_1 =>
-        VSPIHD _5 => EMAC_TX_EN) ([Input] [Output])), (22, GPIO22(_1 => VSPIWP) (_1 =>
-        VSPIWP _3 => U0RTS _5 => EMAC_TXD1) ([Input] [Output])), (23, GPIO23(_1 => VSPID)
-        (_1 => VSPID _3 => HS1_STROBE) ([Input] [Output])), (25, GPIO25(_5 => EMAC_RXD0)
-        () ([Input] [Output])), (26, GPIO26(_5 => EMAC_RXD1) () ([Input] [Output])), (27,
-        GPIO27(_5 => EMAC_RX_DV) () ([Input] [Output])), (32, GPIO32() () ([Input]
-        [Output])), (33, GPIO33() () ([Input] [Output])), (34, GPIO34() () ([Input] [])),
-        (35, GPIO35() () ([Input] [])), (36, GPIO36() () ([Input] [])), (37, GPIO37() ()
-        ([Input] [])), (38, GPIO38() () ([Input] [])), (39, GPIO39() () ([Input] []))));
+        _for_each_inner!((20, GPIO20() () ([Input] [Output]))); _for_each_inner!((21,
+        GPIO21(_1 => VSPIHD) (_1 => VSPIHD _5 => EMAC_TX_EN) ([Input] [Output])));
+        _for_each_inner!((22, GPIO22(_1 => VSPIWP) (_1 => VSPIWP _3 => U0RTS _5 =>
+        EMAC_TXD1) ([Input] [Output]))); _for_each_inner!((23, GPIO23(_1 => VSPID) (_1 =>
+        VSPID _3 => HS1_STROBE) ([Input] [Output]))); _for_each_inner!((25, GPIO25(_5 =>
+        EMAC_RXD0) () ([Input] [Output]))); _for_each_inner!((26, GPIO26(_5 => EMAC_RXD1)
+        () ([Input] [Output]))); _for_each_inner!((27, GPIO27(_5 => EMAC_RX_DV) ()
+        ([Input] [Output]))); _for_each_inner!((32, GPIO32() () ([Input] [Output])));
+        _for_each_inner!((33, GPIO33() () ([Input] [Output]))); _for_each_inner!((34,
+        GPIO34() () ([Input] []))); _for_each_inner!((35, GPIO35() () ([Input] [])));
+        _for_each_inner!((36, GPIO36() () ([Input] []))); _for_each_inner!((37, GPIO37()
+        () ([Input] []))); _for_each_inner!((38, GPIO38() () ([Input] [])));
+        _for_each_inner!((39, GPIO39() () ([Input] []))); _for_each_inner!((all(0,
+        GPIO0(_5 => EMAC_TX_CLK) (_1 => CLK_OUT1 _5 => EMAC_TX_CLK) ([Input] [Output])),
+        (1, GPIO1(_5 => EMAC_RXD2) (_0 => U0TXD _1 => CLK_OUT3) ([Input] [Output])), (2,
+        GPIO2(_1 => HSPIWP _3 => HS2_DATA0 _4 => SD_DATA0) (_1 => HSPIWP _3 => HS2_DATA0
+        _4 => SD_DATA0) ([Input] [Output])), (3, GPIO3(_0 => U0RXD) (_1 => CLK_OUT2)
+        ([Input] [Output])), (4, GPIO4(_1 => HSPIHD _3 => HS2_DATA1 _4 => SD_DATA1 _5 =>
+        EMAC_TX_ER) (_1 => HSPIHD _3 => HS2_DATA1 _4 => SD_DATA1 _5 => EMAC_TX_ER)
+        ([Input] [Output])), (5, GPIO5(_1 => VSPICS0 _3 => HS1_DATA6 _5 => EMAC_RX_CLK)
+        (_1 => VSPICS0 _3 => HS1_DATA6) ([Input] [Output])), (6, GPIO6(_1 => SPICLK _4 =>
+        U1CTS) (_0 => SD_CLK _1 => SPICLK _3 => HS1_CLK) ([Input] [Output])), (7,
+        GPIO7(_0 => SD_DATA0 _1 => SPIQ _3 => HS1_DATA0) (_0 => SD_DATA0 _1 => SPIQ _3 =>
+        HS1_DATA0 _4 => U2RTS) ([Input] [Output])), (8, GPIO8(_0 => SD_DATA1 _1 => SPID
+        _3 => HS1_DATA1 _4 => U2CTS) (_0 => SD_DATA1 _1 => SPID _3 => HS1_DATA1) ([Input]
+        [Output])), (9, GPIO9(_0 => SD_DATA2 _1 => SPIHD _3 => HS1_DATA2 _4 => U1RXD) (_0
+        => SD_DATA2 _1 => SPIHD _3 => HS1_DATA2) ([Input] [Output])), (10, GPIO10(_0 =>
+        SD_DATA3 _1 => SPIWP _3 => HS1_DATA3) (_0 => SD_DATA3 _1 => SPIWP _3 => HS1_DATA3
+        _4 => U1TXD) ([Input] [Output])), (11, GPIO11(_0 => SD_CMD _1 => SPICS0) (_0 =>
+        SD_CMD _1 => SPICS0 _3 => HS1_CMD _4 => U1RTS) ([Input] [Output])), (12,
+        GPIO12(_0 => MTDI _1 => HSPIQ _3 => HS2_DATA2 _4 => SD_DATA2) (_1 => HSPIQ _3 =>
+        HS2_DATA2 _4 => SD_DATA2 _5 => EMAC_TXD3) ([Input] [Output])), (13, GPIO13(_0 =>
+        MTCK _1 => HSPID _3 => HS2_DATA3 _4 => SD_DATA3 _5 => EMAC_RX_ER) (_1 => HSPID _3
+        => HS2_DATA3 _4 => SD_DATA3 _5 => EMAC_RX_ER) ([Input] [Output])), (14, GPIO14(_0
+        => MTMS _1 => HSPICLK) (_1 => HSPICLK _3 => HS2_CLK _4 => SD_CLK _5 => EMAC_TXD2)
+        ([Input] [Output])), (15, GPIO15(_1 => HSPICS0 _4 => SD_CMD _5 => EMAC_RXD3) (_0
+        => MTDO _1 => HSPICS0 _3 => HS2_CMD _4 => SD_CMD) ([Input] [Output])), (16,
+        GPIO16(_3 => HS1_DATA4 _4 => U2RXD) (_3 => HS1_DATA4 _5 => EMAC_CLK_OUT) ([Input]
+        [Output])), (17, GPIO17(_3 => HS1_DATA5) (_3 => HS1_DATA5 _4 => U2TXD _5 =>
+        EMAC_CLK_180) ([Input] [Output])), (18, GPIO18(_1 => VSPICLK _3 => HS1_DATA7) (_1
+        => VSPICLK _3 => HS1_DATA7) ([Input] [Output])), (19, GPIO19(_1 => VSPIQ _3 =>
+        U0CTS) (_1 => VSPIQ _5 => EMAC_TXD0) ([Input] [Output])), (20, GPIO20() ()
+        ([Input] [Output])), (21, GPIO21(_1 => VSPIHD) (_1 => VSPIHD _5 => EMAC_TX_EN)
+        ([Input] [Output])), (22, GPIO22(_1 => VSPIWP) (_1 => VSPIWP _3 => U0RTS _5 =>
+        EMAC_TXD1) ([Input] [Output])), (23, GPIO23(_1 => VSPID) (_1 => VSPID _3 =>
+        HS1_STROBE) ([Input] [Output])), (25, GPIO25(_5 => EMAC_RXD0) () ([Input]
+        [Output])), (26, GPIO26(_5 => EMAC_RXD1) () ([Input] [Output])), (27, GPIO27(_5
+        => EMAC_RX_DV) () ([Input] [Output])), (32, GPIO32() () ([Input] [Output])), (33,
+        GPIO33() () ([Input] [Output])), (34, GPIO34() () ([Input] [])), (35, GPIO35() ()
+        ([Input] [])), (36, GPIO36() () ([Input] [])), (37, GPIO37() () ([Input] [])),
+        (38, GPIO38() () ([Input] [])), (39, GPIO39() () ([Input] []))));
     };
 }
 /// This macro can be used to generate code for each analog function of each GPIO.
@@ -3142,6 +3171,12 @@ macro_rules! define_io_mux_reg {
                 3 => iomux.gpio3(),
                 4 => iomux.gpio4(),
                 5 => iomux.gpio5(),
+                6 => iomux.gpio6(),
+                7 => iomux.gpio7(),
+                8 => iomux.gpio8(),
+                9 => iomux.gpio9(),
+                10 => iomux.gpio10(),
+                11 => iomux.gpio11(),
                 12 => iomux.gpio12(),
                 13 => iomux.gpio13(),
                 14 => iomux.gpio14(),
@@ -3150,6 +3185,7 @@ macro_rules! define_io_mux_reg {
                 17 => iomux.gpio17(),
                 18 => iomux.gpio18(),
                 19 => iomux.gpio19(),
+                20 => iomux.gpio20(),
                 21 => iomux.gpio21(),
                 22 => iomux.gpio22(),
                 23 => iomux.gpio23(),

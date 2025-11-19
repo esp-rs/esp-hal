@@ -585,13 +585,15 @@ impl Config {
         }
 
         if let Some(gpio) = self.device.peri_config.gpio.as_ref() {
-            for pin in gpio.pins_and_signals.pins.iter() {
-                let pin = format_ident!("GPIO{}", pin.pin);
+            for gpio in gpio.pins_and_signals.pins.iter() {
+                let pin = format_ident!("GPIO{}", gpio.pin);
                 let tokens = quote! {
                     #pin <= virtual ()
                 };
                 all_peripherals.push(quote! { @peri_type #tokens });
-                singleton_peripherals.push(quote! { #pin });
+                if !gpio.limited {
+                    singleton_peripherals.push(quote! { #pin });
+                }
                 stable.push(tokens);
             }
         }

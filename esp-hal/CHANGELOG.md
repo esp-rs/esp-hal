@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added blocking `send_break`, `wait_for_break` and `wait_for_break_with_timeout` for sending and detecting software breaks with the UART driver (#4284)
 - Added support for `RxBreakDetected` interrupt and `wait_for_break_async` for detecting software breaks asynchronously to the UART driver (#4284)
+- Unsafely expose GPIO pins that are only available on certain chip/module variants (#4520)
 
 ### Changed
 - RMT: `SingleShotTxTransaction` has been renamed to `TxTransaction`. (#4302)

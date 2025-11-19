@@ -330,6 +330,12 @@ pins = [
     { pin =  3, functions = { 0 = "U0RXD",    1 = "CLK_OUT2"                                                     } },
     { pin =  4, functions = {                 1 = "HSPIHD",  3 = "HS2_DATA1", 4 = "SD_DATA1", 5 = "EMAC_TX_ER"   }, analog = { 1 = "ADC2_CH0", 2 = "TOUCH0" }, rtc = { 0 = "RTC_GPIO10", 1 = "SAR_I2C_SCL" } },
     { pin =  5, functions = {                 1 = "VSPICS0", 3 = "HS1_DATA6",                 5 = "EMAC_RX_CLK"  } },
+    { pin =  6, functions = { 0 = "SD_CLK",   1 = "SPICLK",  3 = "HS1_CLK",   4 = "U1CTS"                        }, limited = true },
+    { pin =  7, functions = { 0 = "SD_DATA0", 1 = "SPIQ",    3 = "HS1_DATA0", 4 = "U2RTS"                        }, limited = true },
+    { pin =  8, functions = { 0 = "SD_DATA1", 1 = "SPID",    3 = "HS1_DATA1", 4 = "U2CTS"                        }, limited = true },
+    { pin =  9, functions = { 0 = "SD_DATA2", 1 = "SPIHD",   3 = "HS1_DATA2", 4 = "U1RXD"                        }, limited = true },
+    { pin = 10, functions = { 0 = "SD_DATA3", 1 = "SPIWP",   3 = "HS1_DATA3", 4 = "U1TXD"                        }, limited = true },
+    { pin = 11, functions = { 0 = "SD_CMD",   1 = "SPICS0",  3 = "HS1_CMD",   4 = "U1RTS"                        }, limited = true },
     { pin = 12, functions = { 0 = "MTDI",     1 = "HSPIQ",   3 = "HS2_DATA2", 4 = "SD_DATA2", 5 = "EMAC_TXD3"    }, analog = { 1 = "ADC2_CH5", 2 = "TOUCH5" }, rtc = { 0 = "RTC_GPIO15" } },
     { pin = 13, functions = { 0 = "MTCK",     1 = "HSPID",   3 = "HS2_DATA3", 4 = "SD_DATA3", 5 = "EMAC_RX_ER"   }, analog = { 1 = "ADC2_CH4", 2 = "TOUCH4" }, rtc = { 0 = "RTC_GPIO14" } },
     { pin = 14, functions = { 0 = "MTMS",     1 = "HSPICLK", 3 = "HS2_CLK",   4 = "SD_CLK",   5 = "EMAC_TXD2"    }, analog = { 1 = "ADC2_CH6", 2 = "TOUCH6" }, rtc = { 0 = "RTC_GPIO16" } },
@@ -338,7 +344,7 @@ pins = [
     { pin = 17, functions = {                                3 = "HS1_DATA5", 4 = "U2TXD",    5 = "EMAC_CLK_180" }, analog = {}, rtc = {} },
     { pin = 18, functions = {                 1 = "VSPICLK", 3 = "HS1_DATA7"                                     }, analog = {}, rtc = {} },
     { pin = 19, functions = {                 1 = "VSPIQ",   3 = "U0CTS",                     5 = "EMAC_TXD0"    }, analog = {}, rtc = {} },
-    # { pin = 20 }, # ESP32-PICO-V3 only see https://github.com/esp-rs/esp-hal/pull/4202#discussion_r2390041983
+    { pin = 20, limited = true }, # ESP32-PICO-V3 only see https://github.com/esp-rs/esp-hal/pull/4202#discussion_r2390041983
     { pin = 21, functions = { 1 = "VSPIHD",              5 = "EMAC_TX_EN" } },
     { pin = 22, functions = { 1 = "VSPIWP", 3 = "U0RTS", 5 = "EMAC_TXD1"  } },
     { pin = 23, functions = { 1 = "VSPID",  3 = "HS1_STROBE"              } },
