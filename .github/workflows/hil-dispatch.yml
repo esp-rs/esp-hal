@@ -297,6 +297,9 @@ jobs:
         needs.auth.outputs.allowed == 'true' &&
         startsWith(github.event.comment.body, '/hil quick')
     runs-on: ubuntu-latest
+    outputs:
+      run_id: ${{ steps.find-run.outputs.run_id }}
+      comment_id: ${{ steps.comment.outputs.comment-id }}
     steps:
       - name: Dispatch HIL (quick)
         uses: benc-uk/workflow-dispatch@v1
@@ -325,25 +328,25 @@ jobs:
 
             let run = null;
 
-            // Try multiple times to give GitHub a chance to register/update the run
+            // Try multiple times; keep the *last* matching run we see
             for (let attempt = 1; attempt <= 10; attempt++) {
                 const { data } = await github.rest.actions.listWorkflowRuns({
-                owner,
-                repo,
-                workflow_id: 'hil.yml',
-                event: 'workflow_dispatch',
-                per_page: 50,
+                    owner,
+                    repo,
+                    workflow_id: 'hil.yml',
+                    event: 'workflow_dispatch',
+                    per_page: 50,
                 });
 
                 if (data.workflow_runs && data.workflow_runs.length > 0) {
-                const candidate = data.workflow_runs.find(r =>
-                    (r.display_title && r.display_title.trim() === expectedTitle) ||
-                    (r.name && r.name.trim() === expectedTitle)
-                );
-                // Keep the *last* matching run we see across all attempts
-                if (candidate) {
-                    run = candidate;
-                }
+                    const candidate = data.workflow_runs.find(r =>
+                        (r.display_title && r.display_title.trim() === expectedTitle) ||
+                        (r.name && r.name.trim() === expectedTitle)
+                    );
+                    // Keep the *last* matching run we see across all attempts
+                    if (candidate) {
+                        run = candidate;
+                    }
                 }
 
                 await delay(3000);
@@ -356,13 +359,82 @@ jobs:
                 body += `\n\nCould not determine run URL yet. Please check the **HIL** workflow runs manually.`;
             }
 
+            if (run && run.id) {
+                core.setOutput('run_id', String(run.id));
+            } else {
+                core.setOutput('run_id', '');
+            }
+
             core.setOutput('body', body);
 
       - name: Confirm in PR
+        id: comment
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.issue.number }}
           body: ${{ steps.find-run.outputs.body }}
+
+  hil-quick-status:
+    needs: hil-quick
+    if: needs.hil-quick.outputs.run_id != '' && needs.hil-quick.outputs.comment_id != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for quick HIL run and update comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const runId = Number('${{ needs.hil-quick.outputs.run_id }}');
+            const commentId = Number('${{ needs.hil-quick.outputs.comment_id }}');
+            const pr = context.payload.issue.number;
+            const matrix = 'quick';
+
+            const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+            let conclusion = null;
+
+            // Poll up to ~15 minutes (60 * 15s)
+            for (let i = 0; i < 60; i++) {
+              const { data } = await github.rest.actions.getWorkflowRun({
+                owner,
+                repo,
+                run_id: runId,
+              });
+
+              if (data.status === 'completed') {
+                conclusion = data.conclusion;
+                break;
+              }
+
+              await delay(15000);
+            }
+
+            let suffix;
+            if (!conclusion) {
+              suffix = `\n\n_Status update: HIL (${matrix}) run is still in progress or status unknown._`;
+            } else if (conclusion === 'success') {
+              suffix = `\n\n✅ HIL (${matrix}) run **succeeded**.`;
+            } else if (conclusion === 'cancelled') {
+              suffix = `\n\n⚠️ HIL (${matrix}) run was **cancelled**.`;
+            } else {
+              suffix = `\n\n❌ HIL (${matrix}) run **failed** (conclusion: ${conclusion}).`;
+            }
+
+            // Fetch existing comment
+            const comment = await github.rest.issues.getComment({
+              owner,
+              repo,
+              comment_id: commentId,
+            });
+
+            const body = `${comment.data.body}\n${suffix}`;
+
+            await github.rest.issues.updateComment({
+              owner,
+              repo,
+              comment_id: commentId,
+              body,
+            });
 
   hil-full:
     needs: auth
@@ -370,6 +442,9 @@ jobs:
         needs.auth.outputs.allowed == 'true' &&
         startsWith(github.event.comment.body, '/hil full')
     runs-on: ubuntu-latest
+    outputs:
+      run_id: ${{ steps.find-run.outputs.run_id }}
+      comment_id: ${{ steps.comment.outputs.comment-id }}
     steps:
       - name: Dispatch HIL (full)
         uses: benc-uk/workflow-dispatch@v1
@@ -398,25 +473,25 @@ jobs:
 
             let run = null;
 
+            // Try multiple times; keep the *last* matching run we see
             for (let attempt = 1; attempt <= 10; attempt++) {
                 const { data } = await github.rest.actions.listWorkflowRuns({
-                owner,
-                repo,
-                workflow_id: 'hil.yml',
-                event: 'workflow_dispatch',
-                per_page: 50,
+                    owner,
+                    repo,
+                    workflow_id: 'hil.yml',
+                    event: 'workflow_dispatch',
+                    per_page: 50,
                 });
 
-                if (data.workflow_runs && data.workflow_runs.length > 0) {
+              if (data.workflow_runs && data.workflow_runs.length > 0) {
                 const candidate = data.workflow_runs.find(r =>
                     (r.display_title && r.display_title.trim() === expectedTitle) ||
                     (r.name && r.name.trim() === expectedTitle)
                 );
-                // Keep the *last* matching run we see across all attempts
                 if (candidate) {
                     run = candidate;
                 }
-                }
+              }
 
                 await delay(3000);
             }
@@ -428,13 +503,82 @@ jobs:
                 body += `\n\nCould not determine run URL yet. Please check the **HIL** workflow runs manually.`;
             }
 
+            if (run && run.id) {
+              core.setOutput('run_id', String(run.id));
+            } else {
+              core.setOutput('run_id', '');
+            }
+
             core.setOutput('body', body);
 
       - name: Confirm in PR
+        id: comment
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.issue.number }}
           body: ${{ steps.find-run.outputs.body }}
+
+  hil-full-status:
+    needs: hil-full
+    if: needs.hil-full.outputs.run_id != '' && needs.hil-full.outputs.comment_id != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for full HIL run and update comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const runId = Number('${{ needs.hil-full.outputs.run_id }}');
+            const commentId = Number('${{ needs.hil-full.outputs.comment_id }}');
+            const pr = context.payload.issue.number;
+            const matrix = 'full';
+
+            const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+            let conclusion = null;
+
+            // Poll up to ~15 minutes (60 * 15s)
+            for (let i = 0; i < 60; i++) {
+              const { data } = await github.rest.actions.getWorkflowRun({
+                owner,
+                repo,
+                run_id: runId,
+              });
+
+              if (data.status === 'completed') {
+                conclusion = data.conclusion;
+                break;
+              }
+
+              await delay(15000);
+            }
+
+            let suffix;
+            if (!conclusion) {
+              suffix = `\n\n_Status update: HIL (${matrix}) run is still in progress or status unknown._`;
+            } else if (conclusion === 'success') {
+              suffix = `\n\n✅ HIL (${matrix}) run **succeeded**.`;
+            } else if (conclusion === 'cancelled') {
+              suffix = `\n\n⚠️ HIL (${matrix}) run was **cancelled**.`a;
+            } else {
+              suffix = `\n\n❌ HIL (${matrix}) run **failed** (conclusion: ${conclusion}).`;
+            }
+
+            // Fetch existing comment
+            const comment = await github.rest.issues.getComment({
+              owner,
+              repo,
+              comment_id: commentId,
+            });
+
+            const body = `${comment.data.body}\n${suffix}`;
+
+            await github.rest.issues.updateComment({
+              owner,
+              repo,
+              comment_id: commentId,
+              body,
+            });
 
   hil-deny:
     needs: auth
@@ -465,10 +609,10 @@ jobs:
           issue-number: ${{ github.event.issue.number }}
           body: |
             Usage:
-            - `/hil quick` — run a smoke/quick HIL matrix
-            - `/hil full` — run the full HIL matrix
+            - `/hil quick` — run a quick HIL matrix (only `ESP32-S3` (Xtensa) and `ESP32-C3` (RISC-V) tests)
+            - `/hil full`  — run the full HIL matrix
             If you aren't a repository **member/owner**, you must be **trusted for this PR**.
-            Maintainers can grant access with:
+            Maintainers can grant access with a `trusted-author` label or with:
             ```
             /i-trust-you @<login>
             ```
