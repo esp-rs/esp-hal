@@ -791,11 +791,11 @@ macro_rules! for_each_gpio {
         FSPICLK) (_2 => FSPICLK) ([Input] [Output]))); _for_each_inner!((7, GPIO7(_2 =>
         FSPID) (_0 => MTDO _2 => FSPID) ([Input] [Output]))); _for_each_inner!((8,
         GPIO8() () ([Input] [Output]))); _for_each_inner!((9, GPIO9() () ([Input]
-        [Output]))); _for_each_inner!((10, GPIO10() () ([Input] [Output])));
-        _for_each_inner!((11, GPIO11(_0 => SPIHD) (_0 => SPIHD) ([Input] [Output])));
-        _for_each_inner!((12, GPIO12(_0 => SPIHD) (_0 => SPIHD) ([Input] [Output])));
-        _for_each_inner!((13, GPIO13(_0 => SPIWP) (_0 => SPIWP) ([Input] [Output])));
-        _for_each_inner!((14, GPIO14() (_0 => SPICS0) ([Input] [Output])));
+        [Output]))); _for_each_inner!((10, GPIO10(_2 => FSPICS0) (_2 => FSPICS0) ([Input]
+        [Output]))); _for_each_inner!((11, GPIO11(_0 => SPIHD) (_0 => SPIHD) ([Input]
+        [Output]))); _for_each_inner!((12, GPIO12(_0 => SPIHD) (_0 => SPIHD) ([Input]
+        [Output]))); _for_each_inner!((13, GPIO13(_0 => SPIWP) (_0 => SPIWP) ([Input]
+        [Output]))); _for_each_inner!((14, GPIO14() (_0 => SPICS0) ([Input] [Output])));
         _for_each_inner!((15, GPIO15() (_0 => SPICLK) ([Input] [Output])));
         _for_each_inner!((16, GPIO16(_0 => SPID) (_0 => SPID) ([Input] [Output])));
         _for_each_inner!((17, GPIO17(_0 => SPIQ) (_0 => SPIQ) ([Input] [Output])));
@@ -808,14 +808,14 @@ macro_rules! for_each_gpio {
         FSPIWP) (_2 => FSPIWP) ([Input] [Output])), (6, GPIO6(_0 => MTCK _2 => FSPICLK)
         (_2 => FSPICLK) ([Input] [Output])), (7, GPIO7(_2 => FSPID) (_0 => MTDO _2 =>
         FSPID) ([Input] [Output])), (8, GPIO8() () ([Input] [Output])), (9, GPIO9() ()
-        ([Input] [Output])), (10, GPIO10() () ([Input] [Output])), (11, GPIO11(_0 =>
-        SPIHD) (_0 => SPIHD) ([Input] [Output])), (12, GPIO12(_0 => SPIHD) (_0 => SPIHD)
-        ([Input] [Output])), (13, GPIO13(_0 => SPIWP) (_0 => SPIWP) ([Input] [Output])),
-        (14, GPIO14() (_0 => SPICS0) ([Input] [Output])), (15, GPIO15() (_0 => SPICLK)
-        ([Input] [Output])), (16, GPIO16(_0 => SPID) (_0 => SPID) ([Input] [Output])),
-        (17, GPIO17(_0 => SPIQ) (_0 => SPIQ) ([Input] [Output])), (18, GPIO18() ()
-        ([Input] [Output])), (19, GPIO19(_0 => U0RXD) () ([Input] [Output])), (20,
-        GPIO20() (_0 => U0TXD) ([Input] [Output]))));
+        ([Input] [Output])), (10, GPIO10(_2 => FSPICS0) (_2 => FSPICS0) ([Input]
+        [Output])), (11, GPIO11(_0 => SPIHD) (_0 => SPIHD) ([Input] [Output])), (12,
+        GPIO12(_0 => SPIHD) (_0 => SPIHD) ([Input] [Output])), (13, GPIO13(_0 => SPIWP)
+        (_0 => SPIWP) ([Input] [Output])), (14, GPIO14() (_0 => SPICS0) ([Input]
+        [Output])), (15, GPIO15() (_0 => SPICLK) ([Input] [Output])), (16, GPIO16(_0 =>
+        SPID) (_0 => SPID) ([Input] [Output])), (17, GPIO17(_0 => SPIQ) (_0 => SPIQ)
+        ([Input] [Output])), (18, GPIO18() () ([Input] [Output])), (19, GPIO19(_0 =>
+        U0RXD) () ([Input] [Output])), (20, GPIO20() (_0 => U0TXD) ([Input] [Output]))));
     };
 }
 /// This macro can be used to generate code for each analog function of each GPIO.

@@ -148,7 +148,7 @@ pins = [
     { pin =  7, functions = { 0 = "MTDO", 2 = "FSPID"   } },
     { pin =  8 },
     { pin =  9 },
-    { pin = 10 },
+    { pin = 10, functions = {             2 = "FSPICS0" } },
     { pin = 11, functions = { 0 = "SPIHD"  }, limited = true },
     { pin = 12, functions = { 0 = "SPIHD"  }, limited = true },
     { pin = 13, functions = { 0 = "SPIWP"  }, limited = true },
