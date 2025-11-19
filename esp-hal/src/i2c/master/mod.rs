@@ -2221,6 +2221,8 @@ impl Driver<'_> {
             Instant::EPOCH
         };
 
+        self.check_errors()?;
+
         for cmd_reg in self.regs().comd_iter() {
             let cmd = cmd_reg.read();
 
