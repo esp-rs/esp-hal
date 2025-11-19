@@ -176,8 +176,6 @@ pub(crate) mod sys {
     pub use esp_wifi_sys_esp32s3::*;
 }
 
-use portable_atomic::{AtomicU32, Ordering};
-
 use crate::radio::{setup_radio_isr, shutdown_radio_isr};
 #[cfg(feature = "wifi")]
 use crate::wifi::WifiError;
@@ -225,7 +223,8 @@ pub(crate) mod common_adapter;
 pub(crate) mod memory_fence;
 
 pub(crate) static ESP_RADIO_LOCK: RawMutex = RawMutex::new();
-pub static RADIO_REFCOUNT: AtomicU32 = AtomicU32::new(0);
+static RADIO_REFCOUNT: critical_section::Mutex<core::cell::Cell<u32>> =
+    critical_section::Mutex::new(core::cell::Cell::new(0));
 
 // this is just to verify that we use the correct defaults in `build.rs`
 #[allow(clippy::assertions_on_constants)] // TODO: try assert_eq once it's usable in const context
@@ -327,15 +326,18 @@ impl RadioRefGuard {
     /// Increments the refcount. If the old count was 0, it performs hardware init.
     /// If hardware init fails, it rolls back the refcount only once.
     fn new() -> Result<Self, InitializationError> {
-        use critical_section::with;
-        with(|_| {
-            let prev = RADIO_REFCOUNT.fetch_add(1, Ordering::SeqCst);
+        critical_section::with(|cs| {
+            debug!("Creating RadioRefGuard");
+            let rc = RADIO_REFCOUNT.borrow(cs);
 
-            if prev == 0
-                && let Err(e) = init()
-            {
-                RADIO_REFCOUNT.fetch_sub(1, Ordering::SeqCst);
-                return Err(e);
+            let prev = rc.get();
+            rc.set(prev + 1);
+
+            if prev == 0 {
+                if let Err(e) = init() {
+                    rc.set(prev);
+                    return Err(e);
+                }
             }
 
             Ok(RadioRefGuard)
@@ -346,10 +348,12 @@ impl RadioRefGuard {
 impl Drop for RadioRefGuard {
     /// Decrements the refcount. If the count drops to 0, it performs hardware de-init.
     fn drop(&mut self) {
-        use critical_section;
-        critical_section::with(|_| {
+        critical_section::with(|cs| {
             debug!("Dropping RadioRefGuard");
-            let prev = RADIO_REFCOUNT.fetch_sub(1, Ordering::SeqCst);
+            let rc = RADIO_REFCOUNT.borrow(cs);
+
+            let prev = rc.get();
+            rc.set(prev - 1);
 
             if prev == 1 {
                 // Last user dropped, run de-initialization

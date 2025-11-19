@@ -23,7 +23,6 @@ mod init_tests {
     use esp_radio::wifi::WifiError;
     use esp_rtos::embassy::InterruptExecutor;
     use hil_test::mk_static;
-    use portable_atomic::Ordering;
     use static_cell::StaticCell;
 
     #[embassy_executor::task]
@@ -124,39 +123,50 @@ mod init_tests {
 
         // Initialize, then de-initialize wifi
         let wifi = esp_radio::wifi::new(p.WIFI.reborrow(), Default::default()).unwrap();
-        assert_eq!(esp_radio::RADIO_REFCOUNT.load(Ordering::SeqCst), 1);
         drop(wifi);
 
         // Now, can we do it again?
         let _wifi = esp_radio::wifi::new(p.WIFI.reborrow(), Default::default()).unwrap();
-        assert_eq!(esp_radio::RADIO_REFCOUNT.load(Ordering::SeqCst), 1);
     }
 
     #[test]
     #[cfg(soc_has_wifi)]
     #[cfg(soc_has_bt)]
-    fn test_ref_counter(mut p: Peripherals) {
-        use portable_atomic::Ordering;
+    fn test_init_and_drop(mut p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
+        // Initialize BLE and WiFi then drop BLE
         let connector = BleConnector::new(p.BT.reborrow(), Default::default()).unwrap();
-        assert_eq!(esp_radio::RADIO_REFCOUNT.load(Ordering::SeqCst), 1);
+        let wifi = esp_radio::wifi::new(p.WIFI.reborrow(), Default::default()).unwrap();
+        drop(connector);
 
-        let _wifi = esp_radio::wifi::new(p.WIFI.reborrow(), Default::default()).unwrap();
+        // Re-initialize BLE and drop WiFi and BLE
+        let connector = BleConnector::new(p.BT.reborrow(), Default::default()).unwrap();
+        drop(wifi);
+        drop(connector);
+    }
 
-        assert_eq!(esp_radio::RADIO_REFCOUNT.load(Ordering::SeqCst), 2);
+    #[test]
+    #[cfg(soc_has_wifi)]
+    #[cfg(soc_has_bt)]
+    fn test_create_ble_wifi_drop_ble_wifi_create_wifi_ble(mut p: Peripherals) {
+        let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
+        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+
+        // Initialize WiFi and BLE then drop BLE and WiFi
+        let wifi = esp_radio::wifi::new(p.WIFI.reborrow(), Default::default()).unwrap();
+        let connector = BleConnector::new(p.BT.reborrow(), Default::default()).unwrap();
 
         drop(connector);
-        assert_eq!(esp_radio::RADIO_REFCOUNT.load(Ordering::SeqCst), 1);
+        drop(wifi);
 
-        {
-            let _connector = BleConnector::new(p.BT.reborrow(), Default::default()).unwrap();
+        // Re-initialize WiFi and BLE then drop WiFi
+        let wifi = esp_radio::wifi::new(p.WIFI.reborrow(), Default::default()).unwrap();
+        let _connector = BleConnector::new(p.BT.reborrow(), Default::default()).unwrap();
 
-            assert_eq!(esp_radio::RADIO_REFCOUNT.load(Ordering::SeqCst), 2);
-        }
-
-        assert_eq!(esp_radio::RADIO_REFCOUNT.load(Ordering::SeqCst), 1);
+        drop(wifi);
     }
 }
