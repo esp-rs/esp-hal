@@ -732,9 +732,6 @@ pub enum WifiError {
     // unmapped error.
     Unknown(i32),
 
-    /// An internal error occurred.
-    Internal,
-
     /// The current CPU clock frequency is too low.
     WrongClockConfig,
 
@@ -823,7 +820,6 @@ impl core::fmt::Display for WifiError {
             WifiError::Unknown(_) => {
                 write!(f, "An unknown error was reported by the Wi-Fi driver.")
             }
-            WifiError::Internal => write!(f, "An internal error occurred"),
             WifiError::WrongClockConfig => {
                 write!(f, "The current CPU clock frequency is too low")
             }
@@ -844,7 +840,6 @@ impl core::error::Error for WifiError {}
 impl From<InitializationError> for WifiError {
     fn from(err: InitializationError) -> Self {
         match err {
-            InitializationError::Internal => WifiError::Internal,
             InitializationError::WifiError(e) => e,
             InitializationError::SchedulerNotInitialized => WifiError::SchedulerNotInitialized,
             InitializationError::WrongClockConfig => WifiError::WrongClockConfig,
@@ -2186,7 +2181,7 @@ pub fn new<'d>(
 ) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
     let _guard = RadioRefGuard::new()?;
 
-    // TODO: is this check necessary?
+    // TODO: Re-check, if not having interrupts disabled pre-condition is still true
     if crate::is_interrupts_disabled() {
         return Err(WifiError::Unsupported);
     }

@@ -223,6 +223,7 @@ pub(crate) mod common_adapter;
 pub(crate) mod memory_fence;
 
 pub(crate) static ESP_RADIO_LOCK: RawMutex = RawMutex::new();
+
 static RADIO_REFCOUNT: critical_section::Mutex<core::cell::Cell<u32>> =
     critical_section::Mutex::new(core::cell::Cell::new(0));
 
@@ -292,7 +293,7 @@ pub(crate) fn init() -> Result<(), InitializationError> {
     #[cfg(coex)]
     match crate::wifi::coex_initialize() {
         0 => {}
-        error => return Err(InitializationError::Internal),
+        error => panic!("Failed to initialize coexistence, error code: {}", error),
     }
 
     debug!("Radio initialized");
@@ -333,11 +334,11 @@ impl RadioRefGuard {
             let prev = rc.get();
             rc.set(prev + 1);
 
-            if prev == 0 {
-                if let Err(e) = init() {
-                    rc.set(prev);
-                    return Err(e);
-                }
+            if prev == 0
+                && let Err(e) = init()
+            {
+                rc.set(prev);
+                return Err(e);
             }
 
             Ok(RadioRefGuard)
@@ -379,8 +380,6 @@ fn is_interrupts_disabled() -> bool {
 /// Error which can be returned during radio initialization.
 #[non_exhaustive]
 pub enum InitializationError {
-    /// An internal error occurred.
-    Internal,
     /// An error from the Wi-Fi driver.
     #[cfg(feature = "wifi")]
     WifiError(WifiError),
@@ -398,7 +397,6 @@ impl core::error::Error for InitializationError {}
 impl core::fmt::Display for InitializationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            InitializationError::Internal => write!(f, "An internal error occurred"),
             #[cfg(feature = "wifi")]
             InitializationError::WifiError(e) => {
                 write!(f, "Wi-Fi driver related error occurred: {e}")
