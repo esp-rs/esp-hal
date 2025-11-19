@@ -372,7 +372,7 @@ fn is_interrupts_disabled() -> bool {
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-/// Error which can be returned during .
+/// Error which can be returned during radio initialization.
 #[non_exhaustive]
 pub enum InitializationError {
     /// An internal error occurred.

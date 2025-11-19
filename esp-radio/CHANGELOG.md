@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `ble::mac` to get the MAC address of the device (#4485)
 - `last_calibration_result` to get the result of the last calibration (#4479)
+- `BleInitError` for BLE init failures and `Internal`, `WrongClockConfig`, `SchedulerNotInitialized` and `Adc2IsUsed` variants to `WifiError (#4482) 
 
 ### Changed
 
@@ -19,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `InitializationError::General` is replaced by `InitializationError::Internal` (#4467)
 - The `WifiError::InternalError` is removed and `InternalWifiError` was folded into `WifiError`, some variants renamed for clarity (#4467)
 - Refactor: extract submodules from `esp_radio::wifi` module (#4460)
+- `BleConnector::new` returns `BleInitError` instead of `InvalidConfigError` (#4482)
+- `esp_radio::init()` is not public anymore (#4482)
+- `esp_radio::wifi::new` and `BleConnector::new` no longer take a `Controller` (#4482)
 
 ### Fixed
 
@@ -29,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - The `serde` feature has been removed (#4435)
+- `Controller` struct and `InitializationError::InterruptsDisabled` enum variant have been removed (#4482)
 
 ## [v0.17.0] - 2025-10-30
 

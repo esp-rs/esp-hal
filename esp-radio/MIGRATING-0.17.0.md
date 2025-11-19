@@ -36,3 +36,21 @@ impl From<ScanMethod> for esp_radio::wifi::ScanMethod {
 - `EapFastConfig`, `TlsPhase2Method` and `EapClientConfig` are now located in `wifi::ap::eap`.
 
 You will need to update any imports in your project accordingly.
+
+## `esp_radio::init()` and `Controller` is no longer available
+
+WiFi initialization:
+```diff
+-    let esp_radio_ctrl = esp_radio::init().unwrap();
+-    let (mut controller, interfaces) =
+-        esp_radio::wifi::new(&esp_radio_ctrl, wifi, Default::default()).unwrap();
++    let (mut controller, interfaces) = esp_radio::wifi::new(wifi, Default::default()).unwrap();
+```
+
+BLE initialization:
+```diff
+-    static RADIO: StaticCell<esp_radio::Controller<'static>> = StaticCell::new();
+-    let radio = RADIO.init(esp_radio::init().unwrap());
+-    let connector = BleConnector::new(radio, bluetooth, Default::default()).unwrap();
++    let connector = BleConnector::new(bluetooth, Default::default()).unwrap();
+```
