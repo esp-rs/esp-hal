@@ -555,13 +555,13 @@ jobs:
 
             let suffix;
             if (!conclusion) {
-              suffix = `\n\n_Status update: HIL (${matrix}) run is still in progress or status unknown._`;
+              suffix = `\n\nStatus update: HIL (${matrix}) run is still in progress or status unknown._`;
             } else if (conclusion === 'success') {
-              suffix = `\n\n✅ HIL (${matrix}) run **succeeded**.`;
+              suffix = `\n\nStatus update: ✅ HIL (${matrix}) run **succeeded**.`;
             } else if (conclusion === 'cancelled') {
-              suffix = `\n\n⚠️ HIL (${matrix}) run was **cancelled**.`a;
+              suffix = `\n\nStatus update: ⚠️ HIL (${matrix}) run was **cancelled**.`;
             } else {
-              suffix = `\n\n❌ HIL (${matrix}) run **failed** (conclusion: ${conclusion}).`;
+              suffix = `\n\nStatus update: ❌ HIL (${matrix}) run **failed** (conclusion: ${conclusion}).`;
             }
 
             // Fetch existing comment
