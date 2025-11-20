@@ -297,23 +297,23 @@ macro_rules! for_each_soc_xtal_options {
 /// ```
 macro_rules! define_clock_tree_types {
     () => {
-        #[doc = r" Represents the device's clock tree."]
+        /// Represents the device's clock tree.
         pub struct ClockTree {}
         impl ClockTree {
-            #[doc = r" Locks the clock tree for exclusive access."]
+            /// Locks the clock tree for exclusive access.
             pub fn with<R>(f: impl FnOnce(&mut ClockTree) -> R) -> R {
                 CLOCK_TREE.with(f)
             }
         }
         static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
             ::esp_sync::NonReentrantMutex::new(ClockTree {});
-        #[doc = r" Clock tree configuration."]
-        #[doc = r""]
-        #[doc = r" The fields of this struct are optional, with the following caveats:"]
-        #[doc = r" - If `XTL_CLK` is not specified, the crystal frequency will be"]
-        #[doc = r"   automatically detected if possible."]
-        #[doc = r" - The CPU and its upstream clock nodes will be set to a default configuration."]
-        #[doc = r" - Other unspecified clock sources will not be useable by peripherals."]
+        /// Clock tree configuration.
+        ///
+        /// The fields of this struct are optional, with the following caveats:
+        /// - If `XTL_CLK` is not specified, the crystal frequency will be automatically detected if
+        ///   possible.
+        /// - The CPU and its upstream clock nodes will be set to a default configuration.
+        /// - Other unspecified clock sources will not be useable by peripherals.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct ClockConfig {}
@@ -346,63 +346,63 @@ macro_rules! implement_peripheral_clocks {
         #[repr(u8)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum Peripheral {
-            #[doc = "AES peripheral clock signal"]
+            /// AES peripheral clock signal
             Aes,
-            #[doc = "APB_SAR_ADC peripheral clock signal"]
+            /// APB_SAR_ADC peripheral clock signal
             ApbSarAdc,
-            #[doc = "DMA peripheral clock signal"]
+            /// DMA peripheral clock signal
             Dma,
-            #[doc = "DS peripheral clock signal"]
+            /// DS peripheral clock signal
             Ds,
-            #[doc = "ECC peripheral clock signal"]
+            /// ECC peripheral clock signal
             Ecc,
-            #[doc = "ETM peripheral clock signal"]
+            /// ETM peripheral clock signal
             Etm,
-            #[doc = "HMAC peripheral clock signal"]
+            /// HMAC peripheral clock signal
             Hmac,
-            #[doc = "I2C_EXT0 peripheral clock signal"]
+            /// I2C_EXT0 peripheral clock signal
             I2cExt0,
-            #[doc = "I2S0 peripheral clock signal"]
+            /// I2S0 peripheral clock signal
             I2s0,
-            #[doc = "LEDC peripheral clock signal"]
+            /// LEDC peripheral clock signal
             Ledc,
-            #[doc = "MCPWM0 peripheral clock signal"]
+            /// MCPWM0 peripheral clock signal
             Mcpwm0,
-            #[doc = "PARL_IO peripheral clock signal"]
+            /// PARL_IO peripheral clock signal
             ParlIo,
-            #[doc = "PCNT peripheral clock signal"]
+            /// PCNT peripheral clock signal
             Pcnt,
-            #[doc = "RMT peripheral clock signal"]
+            /// RMT peripheral clock signal
             Rmt,
-            #[doc = "RSA peripheral clock signal"]
+            /// RSA peripheral clock signal
             Rsa,
-            #[doc = "SDIO_SLAVE peripheral clock signal"]
+            /// SDIO_SLAVE peripheral clock signal
             SdioSlave,
-            #[doc = "SHA peripheral clock signal"]
+            /// SHA peripheral clock signal
             Sha,
-            #[doc = "SPI2 peripheral clock signal"]
+            /// SPI2 peripheral clock signal
             Spi2,
-            #[doc = "SYSTIMER peripheral clock signal"]
+            /// SYSTIMER peripheral clock signal
             Systimer,
-            #[doc = "TIMG0 peripheral clock signal"]
+            /// TIMG0 peripheral clock signal
             Timg0,
-            #[doc = "TIMG1 peripheral clock signal"]
+            /// TIMG1 peripheral clock signal
             Timg1,
-            #[doc = "TRACE0 peripheral clock signal"]
+            /// TRACE0 peripheral clock signal
             Trace0,
-            #[doc = "TSENS peripheral clock signal"]
+            /// TSENS peripheral clock signal
             Tsens,
-            #[doc = "TWAI0 peripheral clock signal"]
+            /// TWAI0 peripheral clock signal
             Twai0,
-            #[doc = "TWAI1 peripheral clock signal"]
+            /// TWAI1 peripheral clock signal
             Twai1,
-            #[doc = "UART0 peripheral clock signal"]
+            /// UART0 peripheral clock signal
             Uart0,
-            #[doc = "UART1 peripheral clock signal"]
+            /// UART1 peripheral clock signal
             Uart1,
-            #[doc = "UHCI0 peripheral clock signal"]
+            /// UHCI0 peripheral clock signal
             Uhci0,
-            #[doc = "USB_DEVICE peripheral clock signal"]
+            /// USB_DEVICE peripheral clock signal
             UsbDevice,
         }
         impl Peripheral {

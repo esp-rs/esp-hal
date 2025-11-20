@@ -270,8 +270,8 @@ impl SystemClocks {
                     /// Clock tree configuration.
                     ///
                     /// The fields of this struct are optional, with the following caveats:
-                    /// - If `XTL_CLK` is not specified, the crystal frequency will be
-                    ///   automatically detected if possible.
+                    /// - If `XTL_CLK` is not specified, the crystal frequency will be automatically detected if
+                    ///   possible.
                     /// - The CPU and its upstream clock nodes will be set to a default configuration.
                     /// - Other unspecified clock sources will not be useable by peripherals.
                     #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
