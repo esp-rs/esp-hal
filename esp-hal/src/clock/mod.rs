@@ -432,7 +432,7 @@ impl RtcClock {
     }
 
     /// Select source for RTC_SLOW_CLK.
-    #[cfg(not(any(esp32c2, esp32c6, esp32h2)))]
+    #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
     pub(crate) fn set_slow_freq(slow_freq: RtcSlowClock) {
         LPWR::regs().clk_conf().modify(|_, w| {
             unsafe {
@@ -455,7 +455,7 @@ impl RtcClock {
     }
 
     /// Select source for RTC_FAST_CLK.
-    #[cfg(not(any(esp32c2, esp32c6, esp32h2)))]
+    #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
     pub(crate) fn set_fast_freq(fast_freq: RtcFastClock) {
         LPWR::regs().clk_conf().modify(|_, w| {
             w.fast_clk_rtc_sel().bit(match fast_freq {
@@ -1091,6 +1091,8 @@ impl Clocks {
             crate::rtc_cntl::rtc::init();
 
             let config = Self::configure(cpu_clock_speed);
+
+            // TODO: remove
             RtcClock::update_xtal_freq_mhz(config.xtal_clock.as_mhz());
             unsafe { ACTIVE_CLOCKS = Some(config) };
         });
@@ -1206,31 +1208,25 @@ impl Clocks {
 impl Clocks {
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = Self::measure_xtal_frequency();
+        use crate::soc::clocks::{ClockTree, request_low_power_clk};
 
-        let apb_freq;
-        if cpu_clock_speed != CpuClock::default() {
-            if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
-                apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
-                clocks_ll::esp32c3_rtc_update_to_xtal(xtal_freq, 1);
-                clocks_ll::esp32c3_rtc_apb_freq_update(apb_freq);
-            } else {
-                let pll_freq = PllClock::Pll480MHz;
-                apb_freq = ApbClock::ApbFreq80MHz;
-                clocks_ll::esp32c3_rtc_bbpll_enable();
-                clocks_ll::esp32c3_rtc_bbpll_configure(xtal_freq, pll_freq);
-                clocks_ll::esp32c3_rtc_freq_to_pll_mhz(cpu_clock_speed);
-                clocks_ll::esp32c3_rtc_apb_freq_update(apb_freq);
+        // TODO: expose the whole new enum for custom options
+        match cpu_clock_speed {
+            CpuClock::_80MHz => crate::soc::clocks::CpuClock::_80MHz,
+            CpuClock::_160MHz => crate::soc::clocks::CpuClock::_160MHz,
+        }
+        .configure();
+
+        ClockTree::with(|clocks| {
+            // TODO: this should be managed by esp-radio. The actual clock is probably managed by
+            // the hardware, but we need to make sure the upstream clocks are running.
+            request_low_power_clk(clocks);
+            Self {
+                cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
+                apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
+                xtal_clock: Rate::from_hz(crate::soc::clocks::xtl_clk_frequency(clocks)),
             }
-        } else {
-            apb_freq = ApbClock::ApbFreq80MHz;
-        }
-
-        Self {
-            cpu_clock: cpu_clock_speed.frequency(),
-            apb_clock: apb_freq.frequency(),
-            xtal_clock: xtal_freq.frequency(),
-        }
+        })
     }
 }
 

@@ -135,7 +135,7 @@ impl ProcessedClockData {
             .iter()
             .find(|item| item.name_str() == name)
             .map(|b| b.as_ref())
-            .unwrap()
+            .unwrap_or_else(|| panic!("Clock node {} not found", name))
     }
 
     fn properties(&self, node: &dyn ClockTreeNodeType) -> &ManagementProperties {
