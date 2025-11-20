@@ -118,7 +118,7 @@ memory_map = { ranges = [
 #
 # `clocks` in a peripheral clock definition can either be a different `peripheral_clocks` entry (string), or a new definition (array) that uses the same syntax as `system_clocks` above.
 clocks = { system_clocks = { clock_tree = [
-    { name = "XTL_CLK",     type = "source",                    values = "26, 40",                     output = "VALUE * 1_000_000", refcount = false }, # 2-40MHz, always on? sw ability to measure using an internal RC clock
+    { name = "XTL_CLK",     type = "source",                    values = "26, 40",                     output = "VALUE * 1_000_000", always_on = true }, # 2-40MHz, always on? sw ability to measure using an internal RC clock
     { name = "PLL_CLK",     type = "derived", from = "XTL_CLK", values = "320, 480",                   output = "VALUE * 1_000_000", reject = "VALUE == 480_000_000 && CPU_PLL_DIV == 4" },
     { name = "APLL_CLK",    type = "derived", from = "PLL_CLK", values = "16_000_000 ..= 128_000_000", output = "VALUE" },
     { name = "RC_FAST_CLK", type = "source",  output = "8_000_000" }, # this is supposed to be adjustable using RTC_CNTL_CK8M_DIV_SEL
@@ -183,7 +183,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "SYSCON_PRE_DIV", type = "divider", divisors = "0 .. 1024", output = "SYSCON_PRE_DIV_IN / (DIVISOR + 1)" },
 
     # The meta-switch
-    { name = "CPU_CLK", type = "mux", variants = [
+    { name = "CPU_CLK", type = "mux", always_on = true, variants = [
         # source clock      CPU clock                   additional config (mux = variant name, divider = divisor expression)
         { name = "XTAL",    outputs = "SYSCON_PRE_DIV", configures = [ "APB_CLK = CPU",      "SYSCON_PRE_DIV_IN = XTAL",    "REF_TICK = XTAL", "REF_TICK_XTAL = APB_CLK / 1_000_000 - 1" ] },
         { name = "RC_FAST", outputs = "SYSCON_PRE_DIV", configures = [ "APB_CLK = CPU",      "SYSCON_PRE_DIV_IN = RC_FAST", "REF_TICK = FOSC", "REF_TICK_FOSC = APB_CLK / 1_000_000 - 1" ] },

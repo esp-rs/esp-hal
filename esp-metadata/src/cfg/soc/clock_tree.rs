@@ -37,10 +37,11 @@
 // TODO: classified clocks should be returned in a topological order
 // TODO: ClockConfig should configure clocks in topological order
 
-use std::{collections::HashMap, str::FromStr};
+use std::{any::Any, collections::HashMap, str::FromStr};
 
 use anyhow::Result;
 use convert_case::{Case, Casing, StateConverter};
+use indexmap::IndexMap;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 use serde::{
@@ -169,61 +170,107 @@ impl ValidationContext<'_> {
     }
 }
 
-pub(crate) struct NodeState {
-    pub name: Ident,
-    pub kind: NodeStateKind,
-}
-pub(crate) enum NodeStateKind {
-    Configurable(Ident),
-    ConfigurableNonRefcounted(Ident),
-    Refcount,
+pub(crate) struct DependencyGraph {
+    /// Direct upstream -> downstream clock relationships
+    graph: IndexMap<String, Vec<String>>,
+    /// Direct downstream -> upstream clock relationships
+    reverse_graph: IndexMap<String, Vec<String>>,
 }
 
-impl NodeState {
+impl DependencyGraph {
+    pub fn build_from(clock_tree: &[Box<dyn ClockTreeNodeType>]) -> Self {
+        let mut dependency_graph = IndexMap::new();
+        let mut reverse_dependency_graph = IndexMap::new();
+
+        for node in clock_tree.iter() {
+            for input in node.input_clocks() {
+                let node_name = node.name_str();
+
+                let graph_node = dependency_graph
+                    .entry(input.clone())
+                    .or_insert_with(Vec::new);
+
+                if !graph_node.contains(node_name) {
+                    graph_node.push(node_name.clone());
+                }
+                reverse_dependency_graph
+                    .entry(node_name.clone())
+                    .or_insert_with(Vec::new)
+                    .push(input);
+            }
+        }
+
+        DependencyGraph {
+            graph: dependency_graph,
+            reverse_graph: reverse_dependency_graph,
+        }
+    }
+
+    pub fn inputs(&self, clk: &str) -> &[String] {
+        self.reverse_graph
+            .get(clk)
+            .map(|v| v.as_slice())
+            .unwrap_or_default()
+    }
+
+    pub fn users(&self, clk: &str) -> &[String] {
+        self.graph
+            .get(clk)
+            .map(|v| v.as_slice())
+            .unwrap_or_default()
+    }
+}
+
+pub(crate) struct ManagementProperties {
+    pub name: Ident,
+    pub state_ty: Option<Ident>,
+    pub refcounted: bool,
+    pub has_enable: bool,
+}
+
+impl ManagementProperties {
     pub fn field_name(&self) -> Ident {
         self.name.clone()
     }
 
     pub fn type_name(&self) -> Option<Ident> {
-        match &self.kind {
-            NodeStateKind::Configurable(state)
-            | NodeStateKind::ConfigurableNonRefcounted(state) => Some(state.clone()),
-            NodeStateKind::Refcount => None,
-        }
-    }
-
-    pub fn refcounted(&self) -> bool {
-        match &self.kind {
-            NodeStateKind::ConfigurableNonRefcounted(_) => false,
-            _ => true,
-        }
+        self.state_ty.clone()
     }
 
     pub fn refcount_field_name(&self) -> Option<Ident> {
-        if self.refcounted() {
+        if self.refcounted {
             Some(format_ident!("{}_refcount", self.name))
         } else {
             None
         }
     }
+
+    pub fn has_enable(&self) -> bool {
+        self.has_enable
+    }
 }
 
-pub(crate) trait ClockTreeNodeType {
+pub(crate) trait ClockTreeNodeType: Any {
     /// Returns which clock nodes' configurations are affected when this node is configured.
     fn affected_nodes<'s>(&'s self) -> Vec<&'s str> {
         vec![]
     }
-    fn refcounted(&self) -> bool {
-        true
+
+    fn input_clocks(&self) -> Vec<String> {
+        vec![]
+    }
+
+    fn always_on(&self) -> bool {
+        false
     }
     fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()>;
     fn is_configurable(&self) -> bool;
-    fn config_apply_function(&self, tree: &ProcessedClockData<'_>) -> TokenStream;
-    fn config_apply_impl_function(&self, _tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream;
+    fn config_apply_impl_function(&self, _tree: &ProcessedClockData) -> TokenStream {
         quote! {}
     }
 
-    fn node_frequency_impl(&self, _tree: &ProcessedClockData<'_>) -> TokenStream;
+    fn node_frequency_impl(&self, _tree: &ProcessedClockData) -> TokenStream;
 
     fn name_str<'a>(&'a self) -> &'a String;
     fn name<'a>(&'a self) -> StateConverter<'a, String> {
@@ -247,26 +294,7 @@ pub(crate) trait ClockTreeNodeType {
         Some(format!(" `{}` configuration.", self.name_str()))
     }
 
-    fn node_state(&self) -> NodeState {
-        NodeState {
-            name: format_ident!("{}", self.name().to_case(Case::Snake)),
-            kind: if let Some(state) = self.config_type_name() {
-                if self.refcounted() {
-                    NodeStateKind::Configurable(state)
-                } else {
-                    NodeStateKind::ConfigurableNonRefcounted(state)
-                }
-            } else {
-                NodeStateKind::Refcount
-            },
-        }
-    }
-
-    fn apply_configuration(
-        &self,
-        _expr: &Expression,
-        _tree: &ProcessedClockData<'_>,
-    ) -> TokenStream {
+    fn apply_configuration(&self, _expr: &Expression, _tree: &ProcessedClockData) -> TokenStream {
         if self.is_configurable() {
             unimplemented!();
         } else {
@@ -305,12 +333,12 @@ pub(crate) trait ClockTreeNodeType {
     fn request_direct_dependencies(
         &self,
         node: &dyn ClockTreeNodeType,
-        tree: &ProcessedClockData<'_>,
+        tree: &ProcessedClockData,
     ) -> TokenStream;
     fn release_direct_dependencies(
         &self,
         node: &dyn ClockTreeNodeType,
-        tree: &ProcessedClockData<'_>,
+        tree: &ProcessedClockData,
     ) -> TokenStream;
 }
 
@@ -329,9 +357,6 @@ pub enum ClockTreeItem {
 
     #[serde(rename = "derived")]
     Derived(DerivedClockSource),
-
-    #[serde(skip)]
-    Peripheral(peripheral_source::PeripheralClockSource),
 }
 
 impl ClockTreeItem {
@@ -341,19 +366,19 @@ impl ClockTreeItem {
             ClockTreeItem::Source(src) => src,
             ClockTreeItem::Divider(div) => div,
             ClockTreeItem::Derived(drv) => drv,
-            ClockTreeItem::Peripheral(per) => per,
         }
     }
 
     pub(crate) fn node_functions(
         node: &dyn ClockTreeNodeType,
-        tree: &ProcessedClockData<'_>,
+        tree: &ProcessedClockData,
     ) -> ClockNodeFunctions {
         let ty_name = node.config_type_name();
 
         let request_fn_name = node.request_fn_name();
         let release_fn_name = node.release_fn_name();
-        let refcount_name = node.node_state().refcount_field_name();
+        let properties = tree.properties(node);
+        let refcount_name = properties.refcount_field_name();
         let enable_fn_name = node.enable_fn_name();
         let enable_fn_impl_name = format_ident!("{}_impl", enable_fn_name);
 
@@ -372,13 +397,20 @@ impl ClockTreeItem {
         ClockNodeFunctions {
             request: Function {
                 _name: request_fn_name.to_string(),
-                implementation: if node.refcounted() {
+                implementation: if refcount_name.is_some() {
                     quote! {
                         pub fn #request_fn_name(clocks: &mut ClockTree) {
                             if increment_reference_count(&mut clocks.#refcount_name) {
                                 #request_direct_dependencies
                                 #enable_fn_impl_name(clocks, true);
                             }
+                        }
+                    }
+                } else if properties.has_enable() {
+                    quote! {
+                        pub fn #request_fn_name(clocks: &mut ClockTree) {
+                            #request_direct_dependencies
+                            #enable_fn_impl_name(clocks, true);
                         }
                     }
                 } else {
@@ -391,13 +423,20 @@ impl ClockTreeItem {
             },
             release: Function {
                 _name: release_fn_name.to_string(),
-                implementation: if node.refcounted() {
+                implementation: if refcount_name.is_some() {
                     quote! {
                         pub fn #release_fn_name(clocks: &mut ClockTree) {
                             if decrement_reference_count(&mut clocks.#refcount_name) {
                                 #enable_fn_impl_name(clocks, false);
                                 #release_direct_dependencies
                             }
+                        }
+                    }
+                } else if properties.has_enable() {
+                    quote! {
+                        pub fn #release_fn_name(clocks: &mut ClockTree) {
+                            #enable_fn_impl_name(clocks, false);
+                            #release_direct_dependencies
                         }
                     }
                 } else {
@@ -424,7 +463,7 @@ impl ClockTreeItem {
             },
 
             hal_functions: vec![
-                if node.refcounted() {
+                if refcount_name.is_some() || properties.has_enable() {
                     quote! {
                         fn #enable_fn_impl_name(_clocks: &mut ClockTree, _en: bool) {}
                     }

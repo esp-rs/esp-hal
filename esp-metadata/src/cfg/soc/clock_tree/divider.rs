@@ -76,6 +76,13 @@ impl ClockTreeNodeType for Divider {
         &self.name
     }
 
+    fn input_clocks(&self) -> Vec<String> {
+        self.upstream_clock()
+            .iter()
+            .map(ToString::to_string)
+            .collect()
+    }
+
     fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
         let mut result = Ok(());
         self.output.visit_variables(|v| {
@@ -101,9 +108,9 @@ impl ClockTreeNodeType for Divider {
         }
     }
 
-    fn config_apply_function(&self, tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream {
         let ty_name = self.config_type_name();
-        let state = self.node_state().field_name();
+        let state = tree.properties(self).field_name();
         let apply_fn_name = self.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
         let reject_exprs = self.reject.as_ref().map(|reject| {
@@ -114,7 +121,7 @@ impl ClockTreeNodeType for Divider {
             variables.insert("DIVISOR", quote! { config.value() });
             reject.0.visit_variables(|var| {
                 if var != "DIVISOR" {
-                    config_fields.push((var, tree.node(var).node_state().field_name()));
+                    config_fields.push((var, tree.properties(tree.node(var)).field_name()));
                 }
             });
 
@@ -129,7 +136,7 @@ impl ClockTreeNodeType for Divider {
         }
     }
 
-    fn config_apply_impl_function(&self, _tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn config_apply_impl_function(&self, _tree: &ProcessedClockData) -> TokenStream {
         let ty_name = self.config_type_name();
         let apply_fn_name = self.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
@@ -138,7 +145,7 @@ impl ClockTreeNodeType for Divider {
         }
     }
 
-    fn apply_configuration(&self, expr: &Expression, tree: &ProcessedClockData<'_>) -> TokenStream {
+    fn apply_configuration(&self, expr: &Expression, tree: &ProcessedClockData) -> TokenStream {
         let config_function = self.config_apply_function_name();
 
         let state = self.config_type_name().unwrap();
@@ -159,8 +166,8 @@ impl ClockTreeNodeType for Divider {
         }
     }
 
-    fn node_frequency_impl(&self, tree: &ProcessedClockData<'_>) -> TokenStream {
-        let state = self.node_state().field_name();
+    fn node_frequency_impl(&self, tree: &ProcessedClockData) -> TokenStream {
+        let state = tree.properties(self).field_name();
         let parent_clock = self.upstream_clock().unwrap();
         let parent_frequency_fn = tree.node(parent_clock).frequency_function_name();
         let divisor = quote! { unwrap!(clocks.#state).value() };
@@ -273,7 +280,7 @@ impl ClockTreeNodeType for Divider {
     fn request_direct_dependencies(
         &self,
         _node: &dyn ClockTreeNodeType,
-        tree: &ProcessedClockData<'_>,
+        tree: &ProcessedClockData,
     ) -> TokenStream {
         let request_fn_name = tree.node(self.upstream_clock().unwrap()).request_fn_name();
         quote! {
@@ -284,7 +291,7 @@ impl ClockTreeNodeType for Divider {
     fn release_direct_dependencies(
         &self,
         _node: &dyn ClockTreeNodeType,
-        tree: &ProcessedClockData<'_>,
+        tree: &ProcessedClockData,
     ) -> TokenStream {
         let release_fn_name = tree.node(self.upstream_clock().unwrap()).release_fn_name();
         quote! {
