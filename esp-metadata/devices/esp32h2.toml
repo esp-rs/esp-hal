@@ -205,6 +205,8 @@ pins = [
     { pin =  3, functions = { 0 = "MTDI", 2 = "FSPIHD"  }, analog = { 1 = "ADC1_CH2" } },
     { pin =  4, functions = { 0 = "MTCK", 2 = "FSPICLK" }, analog = { 1 = "ADC1_CH3" } },
     { pin =  5, functions = { 0 = "MTDO", 2 = "FSPID"   }, analog = { 1 = "ADC1_CH4" } },
+    { pin =  6, limited = true },
+    { pin =  7, limited = true },
     { pin =  8 },
     { pin =  9 },
     { pin = 10, analog = { 0 = "ZCD0" } },

@@ -568,6 +568,7 @@ impl Config {
         let mut stable = vec![];
         let mut unstable = vec![];
         let mut all_peripherals = vec![];
+        let mut singleton_peripherals = vec![];
 
         let mut stable_peris = vec![];
 
@@ -584,12 +585,15 @@ impl Config {
         }
 
         if let Some(gpio) = self.device.peri_config.gpio.as_ref() {
-            for pin in gpio.pins_and_signals.pins.iter() {
-                let pin = format_ident!("GPIO{}", pin.pin);
+            for gpio in gpio.pins_and_signals.pins.iter() {
+                let pin = format_ident!("GPIO{}", gpio.pin);
                 let tokens = quote! {
                     #pin <= virtual ()
                 };
-                all_peripherals.push(quote! { #tokens });
+                all_peripherals.push(quote! { @peri_type #tokens });
+                if !gpio.limited {
+                    singleton_peripherals.push(quote! { #pin });
+                }
                 stable.push(tokens);
             }
         }
@@ -618,15 +622,23 @@ impl Config {
                 .iter()
                 .any(|p| peri.name.eq_ignore_ascii_case(p))
             {
-                all_peripherals.push(quote! { #tokens });
+                all_peripherals.push(quote! { @peri_type #tokens });
+                singleton_peripherals.push(quote! { #hal });
                 stable.push(tokens);
             } else {
-                all_peripherals.push(quote! { #tokens (unstable) });
+                all_peripherals.push(quote! { @peri_type #tokens (unstable) });
+                singleton_peripherals.push(quote! { #hal (unstable) });
                 unstable.push(tokens);
             }
         }
 
-        generate_for_each_macro("peripheral", &[("all", &all_peripherals)])
+        generate_for_each_macro(
+            "peripheral",
+            &[
+                ("all", &all_peripherals),
+                ("singletons", &singleton_peripherals),
+            ],
+        )
     }
 
     pub fn active_cfgs(&self) -> Vec<String> {

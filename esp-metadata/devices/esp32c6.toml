@@ -244,7 +244,13 @@ pins = [
     { pin = 21, functions = { 0 = "SDIO_DATA1", 2 = "FSPICS5" } },
     { pin = 22, functions = { 0 = "SDIO_DATA2" } },
     { pin = 23, functions = { 0 = "SDIO_DATA3" } },
-    { pin = 27 },
+    { pin = 24, functions = { 0 = "SPICS0" }, limited = true },
+    { pin = 25, functions = { 0 = "SPIQ" }, limited = true },
+    { pin = 26, functions = { 0 = "SPIWP" }, limited = true },
+    { pin = 27 }, # This should be a limited pin (VDD_SPI), but we've already made it available stably
+    { pin = 28, functions = { 0 = "SPIHD" }, limited = true },
+    { pin = 29, functions = { 0 = "SPICLK" }, limited = true },
+    { pin = 30, functions = { 0 = "SPID" }, limited = true },
 ]
 input_signals = [
     { name = "EXT_ADC_START",       id = 0 },

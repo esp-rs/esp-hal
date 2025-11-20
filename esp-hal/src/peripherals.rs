@@ -121,17 +121,17 @@ macro_rules! create_peripheral {
 
 for_each_peripheral! {
     // Define stable peripheral singletons
-    ($name:ident <= $from_pac:tt $interrupts:tt) => {
+    (@peri_type $name:ident <= $from_pac:tt $interrupts:tt) => {
         create_peripheral!($name <= $from_pac $interrupts);
     };
 
     // Define unstable peripheral singletons
-    ($name:ident <= $from_pac:tt $interrupts:tt (unstable)) => {
+    (@peri_type $name:ident <= $from_pac:tt $interrupts:tt (unstable)) => {
         create_peripheral!(#[instability::unstable] $name <= $from_pac $interrupts);
     };
 
     // Define the Peripherals struct
-    (all $( ($name:ident <= $from_pac:tt $interrupts:tt $(($unstable:ident))?) ),*) => {
+    (singletons $( ($name:ident $(($unstable:ident))?) ),*) => {
         // We need a way to ignore the "unstable" marker, but macros can't generate attributes or struct fields.
         // The solution is printing an empty doc comment.
         macro_rules! ignore { ($any:tt) => {""} }
