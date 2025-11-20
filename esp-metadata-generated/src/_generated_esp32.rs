@@ -346,25 +346,11 @@ macro_rules! for_each_soc_xtal_options {
 ///     _new_selector: RtcFastClkConfig,
 /// ) {
 /// }
-/// fn enable_timg0_peripheral_clock_impl(_clocks: &mut ClockTree, _en: bool) {}
-/// fn configure_timg0_peripheral_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0PeripheralClockConfig>,
-///     _new_selector: Timg0PeripheralClockConfig,
-/// ) {
-/// }
 /// fn enable_timg0_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {}
 /// fn configure_timg0_calibration_clock_impl(
 ///     _clocks: &mut ClockTree,
 ///     _old_selector: Option<Timg0CalibrationClockConfig>,
 ///     _new_selector: Timg0CalibrationClockConfig,
-/// ) {
-/// }
-/// fn enable_timg1_peripheral_clock_impl(_clocks: &mut ClockTree, _en: bool) {}
-/// fn configure_timg1_peripheral_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0PeripheralClockConfig>,
-///     _new_selector: Timg0PeripheralClockConfig,
 /// ) {
 /// }
 /// fn enable_timg1_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {}
@@ -657,13 +643,6 @@ macro_rules! define_clock_tree_types {
             /// Selects `RC_FAST_CLK`.
             Rc,
         }
-        /// The list of clock signals that the `TIMG0_PERIPHERAL_CLOCK` multiplexer can output.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum Timg0PeripheralClockConfig {
-            /// Selects `APB_CLK`.
-            ApbClk,
-        }
         /// The list of clock signals that the `TIMG0_CALIBRATION_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -694,9 +673,7 @@ macro_rules! define_clock_tree_types {
             cpu_clk: Option<CpuClkConfig>,
             rtc_slow_clk: Option<RtcSlowClkConfig>,
             rtc_fast_clk: Option<RtcFastClkConfig>,
-            timg0_peripheral_clock: Option<Timg0PeripheralClockConfig>,
             timg0_calibration_clock: Option<Timg0CalibrationClockConfig>,
-            timg1_peripheral_clock: Option<Timg0PeripheralClockConfig>,
             timg1_calibration_clock: Option<Timg0CalibrationClockConfig>,
             pll_clk_refcount: u32,
             rc_fast_clk_refcount: u32,
@@ -704,9 +681,7 @@ macro_rules! define_clock_tree_types {
             ref_tick_refcount: u32,
             rtc_slow_clk_refcount: u32,
             rtc_fast_clk_refcount: u32,
-            timg0_peripheral_clock_refcount: u32,
             timg0_calibration_clock_refcount: u32,
-            timg1_peripheral_clock_refcount: u32,
             timg1_calibration_clock_refcount: u32,
         }
         impl ClockTree {
@@ -733,9 +708,7 @@ macro_rules! define_clock_tree_types {
                 cpu_clk: None,
                 rtc_slow_clk: None,
                 rtc_fast_clk: None,
-                timg0_peripheral_clock: None,
                 timg0_calibration_clock: None,
-                timg1_peripheral_clock: None,
                 timg1_calibration_clock: None,
                 pll_clk_refcount: 0,
                 rc_fast_clk_refcount: 0,
@@ -743,9 +716,7 @@ macro_rules! define_clock_tree_types {
                 ref_tick_refcount: 0,
                 rtc_slow_clk_refcount: 0,
                 rtc_fast_clk_refcount: 0,
-                timg0_peripheral_clock_refcount: 0,
                 timg0_calibration_clock_refcount: 0,
-                timg1_peripheral_clock_refcount: 0,
                 timg1_calibration_clock_refcount: 0,
             });
         pub fn configure_xtl_clk(clocks: &mut ClockTree, config: XtlClkConfig) {
@@ -1299,54 +1270,6 @@ macro_rules! define_clock_tree_types {
                 RtcFastClkConfig::Rc => rc_fast_clk_frequency(clocks),
             }
         }
-        pub fn configure_timg0_peripheral_clock(
-            clocks: &mut ClockTree,
-            new_selector: Timg0PeripheralClockConfig,
-        ) {
-            let old_selector = clocks.timg0_peripheral_clock.replace(new_selector);
-            if clocks.timg0_peripheral_clock_refcount > 0 {
-                timg0_peripheral_clock_request_upstream(clocks, new_selector);
-                configure_timg0_peripheral_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    timg0_peripheral_clock_release_upstream(clocks, old_selector);
-                }
-            } else {
-                configure_timg0_peripheral_clock_impl(clocks, old_selector, new_selector);
-            }
-        }
-        fn timg0_peripheral_clock_request_upstream(
-            clocks: &mut ClockTree,
-            selector: Timg0PeripheralClockConfig,
-        ) {
-            match selector {
-                Timg0PeripheralClockConfig::ApbClk => request_apb_clk(clocks),
-            }
-        }
-        fn timg0_peripheral_clock_release_upstream(
-            clocks: &mut ClockTree,
-            selector: Timg0PeripheralClockConfig,
-        ) {
-            match selector {
-                Timg0PeripheralClockConfig::ApbClk => release_apb_clk(clocks),
-            }
-        }
-        pub fn request_timg0_peripheral_clock(clocks: &mut ClockTree) {
-            if increment_reference_count(&mut clocks.timg0_peripheral_clock_refcount) {
-                let selector = unwrap!(clocks.timg0_peripheral_clock);
-                timg0_peripheral_clock_request_upstream(clocks, selector);
-                enable_timg0_peripheral_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_timg0_peripheral_clock(clocks: &mut ClockTree) {
-            if decrement_reference_count(&mut clocks.timg0_peripheral_clock_refcount) {
-                enable_timg0_peripheral_clock_impl(clocks, false);
-                let selector = unwrap!(clocks.timg0_peripheral_clock);
-                timg0_peripheral_clock_release_upstream(clocks, selector);
-            }
-        }
-        pub fn timg0_peripheral_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            apb_clk_frequency(clocks)
-        }
         pub fn configure_timg0_calibration_clock(
             clocks: &mut ClockTree,
             new_selector: Timg0CalibrationClockConfig,
@@ -1402,54 +1325,6 @@ macro_rules! define_clock_tree_types {
                 Timg0CalibrationClockConfig::RcFastDivClk => rc_fast_div_clk_frequency(clocks),
                 Timg0CalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(clocks),
             }
-        }
-        pub fn configure_timg1_peripheral_clock(
-            clocks: &mut ClockTree,
-            new_selector: Timg0PeripheralClockConfig,
-        ) {
-            let old_selector = clocks.timg1_peripheral_clock.replace(new_selector);
-            if clocks.timg1_peripheral_clock_refcount > 0 {
-                timg1_peripheral_clock_request_upstream(clocks, new_selector);
-                configure_timg1_peripheral_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    timg1_peripheral_clock_release_upstream(clocks, old_selector);
-                }
-            } else {
-                configure_timg1_peripheral_clock_impl(clocks, old_selector, new_selector);
-            }
-        }
-        fn timg1_peripheral_clock_request_upstream(
-            clocks: &mut ClockTree,
-            selector: Timg0PeripheralClockConfig,
-        ) {
-            match selector {
-                Timg0PeripheralClockConfig::ApbClk => request_apb_clk(clocks),
-            }
-        }
-        fn timg1_peripheral_clock_release_upstream(
-            clocks: &mut ClockTree,
-            selector: Timg0PeripheralClockConfig,
-        ) {
-            match selector {
-                Timg0PeripheralClockConfig::ApbClk => release_apb_clk(clocks),
-            }
-        }
-        pub fn request_timg1_peripheral_clock(clocks: &mut ClockTree) {
-            if increment_reference_count(&mut clocks.timg1_peripheral_clock_refcount) {
-                let selector = unwrap!(clocks.timg1_peripheral_clock);
-                timg1_peripheral_clock_request_upstream(clocks, selector);
-                enable_timg1_peripheral_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_timg1_peripheral_clock(clocks: &mut ClockTree) {
-            if decrement_reference_count(&mut clocks.timg1_peripheral_clock_refcount) {
-                enable_timg1_peripheral_clock_impl(clocks, false);
-                let selector = unwrap!(clocks.timg1_peripheral_clock);
-                timg1_peripheral_clock_release_upstream(clocks, selector);
-            }
-        }
-        pub fn timg1_peripheral_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            apb_clk_frequency(clocks)
         }
         pub fn configure_timg1_calibration_clock(
             clocks: &mut ClockTree,

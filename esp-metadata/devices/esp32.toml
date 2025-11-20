@@ -267,10 +267,6 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Timg1", template_params = { peripheral = "timergroup1" }, clocks = "Timg0" }, # same clock options, but different instance
     #{ name = "Efuse" },
     { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true, clocks = [
-        # by convention, PERIPHERAL_CLOCK is enabled when the PeripheralClock is enabled?
-        { name = "PERIPHERAL_CLOCK", type = "mux", variants = [
-            { name = "APB_CLK", outputs = "APB_CLK" },
-        ] },
         { name = "CALIBRATION_CLOCK", type = "mux", default = "RC_SLOW_CLK", variants = [
             { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
             { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },

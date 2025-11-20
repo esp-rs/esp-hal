@@ -304,9 +304,7 @@ impl Chip {
                     "soc_has_clock_node_xtal_div_clk",
                     "soc_has_clock_node_rtc_slow_clk",
                     "soc_has_clock_node_rtc_fast_clk",
-                    "soc_has_clock_node_timg0_peripheral_clock",
                     "soc_has_clock_node_timg0_calibration_clock",
-                    "soc_has_clock_node_timg1_peripheral_clock",
                     "soc_has_clock_node_timg1_calibration_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
@@ -494,9 +492,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_div_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_rtc_slow_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_rtc_fast_clk",
-                    "cargo:rustc-cfg=soc_has_clock_node_timg0_peripheral_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_calibration_clock",
-                    "cargo:rustc-cfg=soc_has_clock_node_timg1_peripheral_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_calibration_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
@@ -3014,9 +3010,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_xtal_div_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_rtc_slow_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_rtc_fast_clk)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg0_peripheral_clock)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg0_calibration_clock)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg1_peripheral_clock)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg1_calibration_clock)");
     println!("cargo:rustc-check-cfg=cfg(has_dram_region)");
     println!("cargo:rustc-check-cfg=cfg(has_dram2_uninit_region)");
