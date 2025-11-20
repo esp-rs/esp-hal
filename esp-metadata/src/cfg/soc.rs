@@ -687,6 +687,7 @@ impl DeviceClocks {
                     has_enable: !(node.always_on()
                         && dependency_graph.inputs(node.name_str()).is_empty()),
                     state_ty: node.config_type_name(),
+                    always_on: node.always_on(),
                 },
             );
         }
