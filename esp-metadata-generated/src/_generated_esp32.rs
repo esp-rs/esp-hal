@@ -320,7 +320,6 @@ macro_rules! for_each_soc_xtal_options {
 /// fn configure_ref_tick_apll_impl(_clocks: &mut ClockTree, _new_config: RefTickApllConfig) {}
 /// fn enable_ref_tick_pll_impl(_clocks: &mut ClockTree, _en: bool) {}
 /// fn configure_ref_tick_pll_impl(_clocks: &mut ClockTree, _new_config: RefTickPllConfig) {}
-/// fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
 /// fn configure_cpu_clk_impl(
 ///     _clocks: &mut ClockTree,
 ///     _old_selector: Option<CpuClkConfig>,
@@ -752,8 +751,8 @@ macro_rules! define_clock_tree_types {
             clocks.xtl_clk = Some(config);
             configure_xtl_clk_impl(clocks, config);
         }
-        pub fn request_xtl_clk(clocks: &mut ClockTree) {}
-        pub fn release_xtl_clk(clocks: &mut ClockTree) {}
+        fn request_xtl_clk(_clocks: &mut ClockTree) {}
+        fn release_xtl_clk(_clocks: &mut ClockTree) {}
         pub fn xtl_clk_frequency(clocks: &mut ClockTree) -> u32 {
             unwrap!(clocks.xtl_clk).value()
         }
@@ -1136,16 +1135,8 @@ macro_rules! define_clock_tree_types {
                 CpuClkConfig::Pll => release_cpu_pll_div(clocks),
             }
         }
-        pub fn request_cpu_clk(clocks: &mut ClockTree) {
-            let selector = unwrap!(clocks.cpu_clk);
-            cpu_clk_request_upstream(clocks, selector);
-            enable_cpu_clk_impl(clocks, true);
-        }
-        pub fn release_cpu_clk(clocks: &mut ClockTree) {
-            enable_cpu_clk_impl(clocks, false);
-            let selector = unwrap!(clocks.cpu_clk);
-            cpu_clk_release_upstream(clocks, selector);
-        }
+        fn request_cpu_clk(_clocks: &mut ClockTree) {}
+        fn release_cpu_clk(_clocks: &mut ClockTree) {}
         pub fn cpu_clk_frequency(clocks: &mut ClockTree) -> u32 {
             match unwrap!(clocks.cpu_clk) {
                 CpuClkConfig::Xtal => syscon_pre_div_frequency(clocks),

@@ -419,10 +419,6 @@ fn configure_ref_tick_pll_impl(_clocks: &mut ClockTree, new_config: RefTickPllCo
         .write(|w| unsafe { w.pll_tick_num().bits(new_config.value() as u8) });
 }
 
-fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do.
-}
-
 fn configure_cpu_clk_impl(
     clocks: &mut ClockTree,
     _old_selector: Option<CpuClkConfig>,

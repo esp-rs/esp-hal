@@ -1169,7 +1169,7 @@ impl Clocks {
 impl Clocks {
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        use crate::soc::clocks::{ClockTree, request_cpu_clk};
+        use crate::soc::clocks::ClockTree;
 
         // TODO: expose the whole new enum for custom options
         match cpu_clock_speed {
@@ -1180,8 +1180,6 @@ impl Clocks {
         .configure();
 
         ClockTree::with(|clocks| {
-            request_cpu_clk(clocks);
-
             // TODO: this struct can be removed once everything uses the new internal clock tree
             // code
             Self {

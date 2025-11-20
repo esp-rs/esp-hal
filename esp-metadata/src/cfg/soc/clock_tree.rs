@@ -226,6 +226,9 @@ pub(crate) struct ManagementProperties {
     pub state_ty: Option<Ident>,
     pub refcounted: bool,
     pub has_enable: bool,
+
+    /// This clock node is considered always running.
+    pub always_on: bool,
 }
 
 impl ManagementProperties {
@@ -247,6 +250,10 @@ impl ManagementProperties {
 
     pub fn has_enable(&self) -> bool {
         self.has_enable
+    }
+
+    pub fn always_on(&self) -> bool {
+        self.always_on
     }
 }
 
@@ -381,6 +388,7 @@ impl ClockTreeItem {
         let refcount_name = properties.refcount_field_name();
         let enable_fn_name = node.enable_fn_name();
         let enable_fn_impl_name = format_ident!("{}_impl", enable_fn_name);
+        let always_on = properties.always_on();
 
         let request_direct_dependencies = node.request_direct_dependencies(node, tree);
         let release_direct_dependencies = node.release_direct_dependencies(node, tree);
@@ -397,7 +405,11 @@ impl ClockTreeItem {
         ClockNodeFunctions {
             request: Function {
                 _name: request_fn_name.to_string(),
-                implementation: if refcount_name.is_some() {
+                implementation: if always_on {
+                    quote! {
+                        fn #request_fn_name(_clocks: &mut ClockTree) { }
+                    }
+                } else if refcount_name.is_some() {
                     quote! {
                         pub fn #request_fn_name(clocks: &mut ClockTree) {
                             if increment_reference_count(&mut clocks.#refcount_name) {
@@ -423,7 +435,11 @@ impl ClockTreeItem {
             },
             release: Function {
                 _name: release_fn_name.to_string(),
-                implementation: if refcount_name.is_some() {
+                implementation: if always_on {
+                    quote! {
+                        fn #release_fn_name(_clocks: &mut ClockTree) { }
+                    }
+                } else if refcount_name.is_some() {
                     quote! {
                         pub fn #release_fn_name(clocks: &mut ClockTree) {
                             if decrement_reference_count(&mut clocks.#refcount_name) {
@@ -463,7 +479,7 @@ impl ClockTreeItem {
             },
 
             hal_functions: vec![
-                if refcount_name.is_some() || properties.has_enable() {
+                if !always_on && (refcount_name.is_some() || properties.has_enable()) {
                     quote! {
                         fn #enable_fn_impl_name(_clocks: &mut ClockTree, _en: bool) {}
                     }
