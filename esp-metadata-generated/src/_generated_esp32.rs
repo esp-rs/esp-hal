@@ -273,63 +273,118 @@ macro_rules! for_each_soc_xtal_options {
 }
 #[macro_export]
 /// ESP-HAL must provide implementation for the following functions:
-/// ```rust, ignore
-/// fn configure_xtl_clk_impl (_clocks : & mut ClockTree , _config : XtlClkConfig) { }
-/// fn enable_pll_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_pll_clk_impl (_clocks : & mut ClockTree , _config : PllClkConfig) { }
-/// fn enable_apll_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_apll_clk_impl (_clocks : & mut ClockTree , _config : ApllClkConfig) { }
-/// fn enable_rc_fast_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn enable_cpu_pll_div_in_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_cpu_pll_div_in_impl (_clocks : & mut ClockTree , _old_selector : Option < CpuPllDivInConfig > , _new_selector : CpuPllDivInConfig) { }
-/// fn enable_cpu_pll_div_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_cpu_pll_div_impl (_clocks : & mut ClockTree , _new_config : CpuPllDivConfig) { }
-/// fn enable_syscon_pre_div_in_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_syscon_pre_div_in_impl (_clocks : & mut ClockTree , _old_selector : Option < SysconPreDivInConfig > , _new_selector : SysconPreDivInConfig) { }
-/// fn enable_syscon_pre_div_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_syscon_pre_div_impl (_clocks : & mut ClockTree , _new_config : SysconPreDivConfig) { }
-/// fn enable_apb_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_apb_clk_impl (_clocks : & mut ClockTree , _old_selector : Option < ApbClkConfig > , _new_selector : ApbClkConfig) { }
-/// fn enable_ref_tick_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_ref_tick_impl (_clocks : & mut ClockTree , _old_selector : Option < RefTickConfig > , _new_selector : RefTickConfig) { }
-/// fn enable_ref_tick_xtal_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_ref_tick_xtal_impl (_clocks : & mut ClockTree , _new_config : RefTickXtalConfig) { }
-/// fn enable_ref_tick_fosc_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_ref_tick_fosc_impl (_clocks : & mut ClockTree , _new_config : RefTickFoscConfig) { }
-/// fn enable_ref_tick_apll_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_ref_tick_apll_impl (_clocks : & mut ClockTree , _new_config : RefTickApllConfig) { }
-/// fn enable_ref_tick_pll_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_ref_tick_pll_impl (_clocks : & mut ClockTree , _new_config : RefTickPllConfig) { }
-/// fn enable_cpu_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_cpu_clk_impl (_clocks : & mut ClockTree , _old_selector : Option < CpuClkConfig > , _new_selector : CpuClkConfig) { }
-/// fn enable_apb_clk_cpu_div2_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn enable_apb_clk_80m_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn enable_xtal32k_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn enable_rc_slow_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn enable_rc_fast_div_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn enable_xtal_div_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn enable_rtc_slow_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_rtc_slow_clk_impl (_clocks : & mut ClockTree , _old_selector : Option < RtcSlowClkConfig > , _new_selector : RtcSlowClkConfig) { }
-/// fn enable_rtc_fast_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_rtc_fast_clk_impl (_clocks : & mut ClockTree , _old_selector : Option < RtcFastClkConfig > , _new_selector : RtcFastClkConfig) { }
-/// fn enable_timg0_peripheral_clock_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_timg0_peripheral_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Timg0PeripheralClockConfig > , _new_selector : Timg0PeripheralClockConfig) { }
-/// fn enable_timg0_calibration_clock_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_timg0_calibration_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Timg0CalibrationClockConfig > , _new_selector : Timg0CalibrationClockConfig) { }
-/// fn enable_timg1_peripheral_clock_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_timg1_peripheral_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Timg0PeripheralClockConfig > , _new_selector : Timg0PeripheralClockConfig) { }
-/// fn enable_timg1_calibration_clock_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_timg1_calibration_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Timg0CalibrationClockConfig > , _new_selector : Timg0CalibrationClockConfig) { }
+/// ```rust, no_run
+/// fn configure_xtl_clk_impl(_clocks: &mut ClockTree, _config: XtlClkConfig) {}
+/// fn enable_pll_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_pll_clk_impl(_clocks: &mut ClockTree, _config: PllClkConfig) {}
+/// fn enable_apll_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_apll_clk_impl(_clocks: &mut ClockTree, _config: ApllClkConfig) {}
+/// fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn enable_cpu_pll_div_in_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_cpu_pll_div_in_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<CpuPllDivInConfig>,
+///     _new_selector: CpuPllDivInConfig,
+/// ) {
+/// }
+/// fn enable_cpu_pll_div_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_cpu_pll_div_impl(_clocks: &mut ClockTree, _new_config: CpuPllDivConfig) {}
+/// fn enable_syscon_pre_div_in_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_syscon_pre_div_in_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<SysconPreDivInConfig>,
+///     _new_selector: SysconPreDivInConfig,
+/// ) {
+/// }
+/// fn enable_syscon_pre_div_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_syscon_pre_div_impl(_clocks: &mut ClockTree, _new_config: SysconPreDivConfig) {}
+/// fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_apb_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<ApbClkConfig>,
+///     _new_selector: ApbClkConfig,
+/// ) {
+/// }
+/// fn enable_ref_tick_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_ref_tick_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<RefTickConfig>,
+///     _new_selector: RefTickConfig,
+/// ) {
+/// }
+/// fn enable_ref_tick_xtal_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_ref_tick_xtal_impl(_clocks: &mut ClockTree, _new_config: RefTickXtalConfig) {}
+/// fn enable_ref_tick_fosc_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_ref_tick_fosc_impl(_clocks: &mut ClockTree, _new_config: RefTickFoscConfig) {}
+/// fn enable_ref_tick_apll_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_ref_tick_apll_impl(_clocks: &mut ClockTree, _new_config: RefTickApllConfig) {}
+/// fn enable_ref_tick_pll_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_ref_tick_pll_impl(_clocks: &mut ClockTree, _new_config: RefTickPllConfig) {}
+/// fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_cpu_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<CpuClkConfig>,
+///     _new_selector: CpuClkConfig,
+/// ) {
+/// }
+/// fn enable_apb_clk_cpu_div2_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn enable_apb_clk_80m_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn enable_rc_fast_div_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn enable_xtal_div_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn enable_rtc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_rtc_slow_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<RtcSlowClkConfig>,
+///     _new_selector: RtcSlowClkConfig,
+/// ) {
+/// }
+/// fn enable_rtc_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_rtc_fast_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<RtcFastClkConfig>,
+///     _new_selector: RtcFastClkConfig,
+/// ) {
+/// }
+/// fn enable_timg0_peripheral_clock_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_timg0_peripheral_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<Timg0PeripheralClockConfig>,
+///     _new_selector: Timg0PeripheralClockConfig,
+/// ) {
+/// }
+/// fn enable_timg0_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_timg0_calibration_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<Timg0CalibrationClockConfig>,
+///     _new_selector: Timg0CalibrationClockConfig,
+/// ) {
+/// }
+/// fn enable_timg1_peripheral_clock_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_timg1_peripheral_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<Timg0PeripheralClockConfig>,
+///     _new_selector: Timg0PeripheralClockConfig,
+/// ) {
+/// }
+/// fn enable_timg1_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_timg1_calibration_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<Timg0CalibrationClockConfig>,
+///     _new_selector: Timg0CalibrationClockConfig,
+/// ) {
+/// }
 /// ```
 macro_rules! define_clock_tree_types {
     () => {
-        #[doc = " Selects the output frequency of `XTL_CLK`."]
+        /// Selects the output frequency of `XTL_CLK`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum XtlClkConfig {
-            #[doc = " 26 MHz"]
+            /// 26 MHz
             _26,
-            #[doc = " 40 MHz"]
+            /// 40 MHz
             _40,
         }
         impl XtlClkConfig {
@@ -340,13 +395,13 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
-        #[doc = " Selects the output frequency of `PLL_CLK`. Depends on `XTL_CLK`."]
+        /// Selects the output frequency of `PLL_CLK`. Depends on `XTL_CLK`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum PllClkConfig {
-            #[doc = " 320 MHz"]
+            /// 320 MHz
             _320,
-            #[doc = " 480 MHz"]
+            /// 480 MHz
             _480,
         }
         impl PllClkConfig {
@@ -357,17 +412,17 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
-        #[doc = " The target frequency of the `APLL_CLK` clock source. Depends on `PLL_CLK`."]
+        /// The target frequency of the `APLL_CLK` clock source. Depends on `PLL_CLK`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct ApllClkConfig(u32);
         impl ApllClkConfig {
-            #[doc = r" Creates a new clock source configuration."]
-            #[doc = ""]
-            #[doc = " # Panics"]
-            #[doc = ""]
-            #[doc = " Panics if the output frequency value is outside the"]
-            #[doc = " valid range (16 MHz - 128 MHz)."]
+            /// Creates a new clock source configuration.
+            ///
+            /// # Panics
+            ///
+            /// Panics if the output frequency value is outside the
+            /// valid range (16 MHz - 128 MHz).
             pub const fn new(frequency: u32) -> Self {
                 ::core::assert!(
                     frequency >= 16000000u32 && frequency <= 128000000u32,
@@ -382,24 +437,24 @@ macro_rules! define_clock_tree_types {
                 self.0
             }
         }
-        #[doc = " The list of clock signals that the `CPU_PLL_DIV_IN` multiplexer can output."]
+        /// The list of clock signals that the `CPU_PLL_DIV_IN` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum CpuPllDivInConfig {
-            #[doc = " Selects `PLL_CLK`."]
+            /// Selects `PLL_CLK`.
             Pll,
-            #[doc = " Selects `APLL_CLK`."]
+            /// Selects `APLL_CLK`.
             Apll,
         }
-        #[doc = " Configures the `CPU_PLL_DIV` clock divider."]
-        #[doc = ""]
-        #[doc = " The output is calculated as `OUTPUT = CPU_PLL_DIV_IN / DIVISOR`."]
+        /// Configures the `CPU_PLL_DIV` clock divider.
+        ///
+        /// The output is calculated as `OUTPUT = CPU_PLL_DIV_IN / DIVISOR`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum CpuPllDivConfig {
-            #[doc = " Selects `DIVISOR = 2`."]
+            /// Selects `DIVISOR = 2`.
             _2 = 2,
-            #[doc = " Selects `DIVISOR = 4`."]
+            /// Selects `DIVISOR = 4`.
             _4 = 4,
         }
         impl CpuPllDivConfig {
@@ -417,28 +472,28 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
-        #[doc = " The list of clock signals that the `SYSCON_PRE_DIV_IN` multiplexer can output."]
+        /// The list of clock signals that the `SYSCON_PRE_DIV_IN` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum SysconPreDivInConfig {
-            #[doc = " Selects `XTL_CLK`."]
+            /// Selects `XTL_CLK`.
             Xtal,
-            #[doc = " Selects `RC_FAST_CLK`."]
+            /// Selects `RC_FAST_CLK`.
             RcFast,
         }
-        #[doc = " Configures the `SYSCON_PRE_DIV` clock divider."]
-        #[doc = ""]
-        #[doc = " The output is calculated as `OUTPUT = SYSCON_PRE_DIV_IN / (DIVISOR + 1)`."]
+        /// Configures the `SYSCON_PRE_DIV` clock divider.
+        ///
+        /// The output is calculated as `OUTPUT = SYSCON_PRE_DIV_IN / (DIVISOR + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct SysconPreDivConfig(u32);
         impl SysconPreDivConfig {
-            #[doc = r" Creates a new divider configuration."]
-            #[doc = ""]
-            #[doc = " # Panics"]
-            #[doc = ""]
-            #[doc = " Panics if the output frequency value is outside the"]
-            #[doc = " valid range (0 ..= 1023)."]
+            /// Creates a new divider configuration.
+            ///
+            /// # Panics
+            ///
+            /// Panics if the output frequency value is outside the
+            /// valid range (0 ..= 1023).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
                     divisor >= 0u32 && divisor <= 1023u32,
@@ -450,43 +505,43 @@ macro_rules! define_clock_tree_types {
                 self.0
             }
         }
-        #[doc = " The list of clock signals that the `APB_CLK` multiplexer can output."]
+        /// The list of clock signals that the `APB_CLK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum ApbClkConfig {
-            #[doc = " Selects `APB_CLK_80M`."]
+            /// Selects `APB_CLK_80M`.
             Pll80m,
-            #[doc = " Selects `APB_CLK_CPU_DIV2`."]
+            /// Selects `APB_CLK_CPU_DIV2`.
             CpuDiv2,
-            #[doc = " Selects `CPU_CLK`."]
+            /// Selects `CPU_CLK`.
             Cpu,
         }
-        #[doc = " The list of clock signals that the `REF_TICK` multiplexer can output."]
+        /// The list of clock signals that the `REF_TICK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum RefTickConfig {
-            #[doc = " Selects `REF_TICK_PLL`."]
+            /// Selects `REF_TICK_PLL`.
             Pll,
-            #[doc = " Selects `REF_TICK_APLL`."]
+            /// Selects `REF_TICK_APLL`.
             Apll,
-            #[doc = " Selects `REF_TICK_XTAL`."]
+            /// Selects `REF_TICK_XTAL`.
             Xtal,
-            #[doc = " Selects `REF_TICK_FOSC`."]
+            /// Selects `REF_TICK_FOSC`.
             Fosc,
         }
-        #[doc = " Configures the `REF_TICK_XTAL` clock divider."]
-        #[doc = ""]
-        #[doc = " The output is calculated as `OUTPUT = APB_CLK / (DIVISOR + 1)`."]
+        /// Configures the `REF_TICK_XTAL` clock divider.
+        ///
+        /// The output is calculated as `OUTPUT = APB_CLK / (DIVISOR + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct RefTickXtalConfig(u32);
         impl RefTickXtalConfig {
-            #[doc = r" Creates a new divider configuration."]
-            #[doc = ""]
-            #[doc = " # Panics"]
-            #[doc = ""]
-            #[doc = " Panics if the output frequency value is outside the"]
-            #[doc = " valid range (0 ..= 255)."]
+            /// Creates a new divider configuration.
+            ///
+            /// # Panics
+            ///
+            /// Panics if the output frequency value is outside the
+            /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
                     divisor >= 0u32 && divisor <= 255u32,
@@ -498,19 +553,19 @@ macro_rules! define_clock_tree_types {
                 self.0
             }
         }
-        #[doc = " Configures the `REF_TICK_FOSC` clock divider."]
-        #[doc = ""]
-        #[doc = " The output is calculated as `OUTPUT = APB_CLK / (DIVISOR + 1)`."]
+        /// Configures the `REF_TICK_FOSC` clock divider.
+        ///
+        /// The output is calculated as `OUTPUT = APB_CLK / (DIVISOR + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct RefTickFoscConfig(u32);
         impl RefTickFoscConfig {
-            #[doc = r" Creates a new divider configuration."]
-            #[doc = ""]
-            #[doc = " # Panics"]
-            #[doc = ""]
-            #[doc = " Panics if the output frequency value is outside the"]
-            #[doc = " valid range (0 ..= 255)."]
+            /// Creates a new divider configuration.
+            ///
+            /// # Panics
+            ///
+            /// Panics if the output frequency value is outside the
+            /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
                     divisor >= 0u32 && divisor <= 255u32,
@@ -522,19 +577,19 @@ macro_rules! define_clock_tree_types {
                 self.0
             }
         }
-        #[doc = " Configures the `REF_TICK_APLL` clock divider."]
-        #[doc = ""]
-        #[doc = " The output is calculated as `OUTPUT = APB_CLK / (DIVISOR + 1)`."]
+        /// Configures the `REF_TICK_APLL` clock divider.
+        ///
+        /// The output is calculated as `OUTPUT = APB_CLK / (DIVISOR + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct RefTickApllConfig(u32);
         impl RefTickApllConfig {
-            #[doc = r" Creates a new divider configuration."]
-            #[doc = ""]
-            #[doc = " # Panics"]
-            #[doc = ""]
-            #[doc = " Panics if the output frequency value is outside the"]
-            #[doc = " valid range (0 ..= 255)."]
+            /// Creates a new divider configuration.
+            ///
+            /// # Panics
+            ///
+            /// Panics if the output frequency value is outside the
+            /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
                     divisor >= 0u32 && divisor <= 255u32,
@@ -546,19 +601,19 @@ macro_rules! define_clock_tree_types {
                 self.0
             }
         }
-        #[doc = " Configures the `REF_TICK_PLL` clock divider."]
-        #[doc = ""]
-        #[doc = " The output is calculated as `OUTPUT = APB_CLK / (DIVISOR + 1)`."]
+        /// Configures the `REF_TICK_PLL` clock divider.
+        ///
+        /// The output is calculated as `OUTPUT = APB_CLK / (DIVISOR + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct RefTickPllConfig(u32);
         impl RefTickPllConfig {
-            #[doc = r" Creates a new divider configuration."]
-            #[doc = ""]
-            #[doc = " # Panics"]
-            #[doc = ""]
-            #[doc = " Panics if the output frequency value is outside the"]
-            #[doc = " valid range (0 ..= 255)."]
+            /// Creates a new divider configuration.
+            ///
+            /// # Panics
+            ///
+            /// Panics if the output frequency value is outside the
+            /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
                     divisor >= 0u32 && divisor <= 255u32,
@@ -570,60 +625,58 @@ macro_rules! define_clock_tree_types {
                 self.0
             }
         }
-        #[doc = " The list of clock signals that the `CPU_CLK` multiplexer can output."]
+        /// The list of clock signals that the `CPU_CLK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum CpuClkConfig {
-            #[doc = " Selects `SYSCON_PRE_DIV`."]
+            /// Selects `SYSCON_PRE_DIV`.
             Xtal,
-            #[doc = " Selects `SYSCON_PRE_DIV`."]
+            /// Selects `SYSCON_PRE_DIV`.
             RcFast,
-            #[doc = " Selects `CPU_PLL_DIV`."]
+            /// Selects `CPU_PLL_DIV`.
             Apll,
-            #[doc = " Selects `CPU_PLL_DIV`."]
+            /// Selects `CPU_PLL_DIV`.
             Pll,
         }
-        #[doc = " The list of clock signals that the `RTC_SLOW_CLK` multiplexer can output."]
+        /// The list of clock signals that the `RTC_SLOW_CLK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum RtcSlowClkConfig {
-            #[doc = " Selects `XTAL32K_CLK`."]
+            /// Selects `XTAL32K_CLK`.
             Xtal,
-            #[doc = " Selects `RC_SLOW_CLK`."]
+            /// Selects `RC_SLOW_CLK`.
             RcSlow,
-            #[doc = " Selects `RC_FAST_DIV_CLK`."]
+            /// Selects `RC_FAST_DIV_CLK`.
             RcFast,
         }
-        #[doc = " The list of clock signals that the `RTC_FAST_CLK` multiplexer can output."]
+        /// The list of clock signals that the `RTC_FAST_CLK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum RtcFastClkConfig {
-            #[doc = " Selects `XTAL_DIV_CLK`."]
+            /// Selects `XTAL_DIV_CLK`.
             Xtal,
-            #[doc = " Selects `RC_FAST_CLK`."]
+            /// Selects `RC_FAST_CLK`.
             Rc,
         }
-        #[doc = " The list of clock signals that the `TIMG0_PERIPHERAL_CLOCK` multiplexer can \
-                 output."]
+        /// The list of clock signals that the `TIMG0_PERIPHERAL_CLOCK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum Timg0PeripheralClockConfig {
-            #[doc = " Selects `APB_CLK`."]
+            /// Selects `APB_CLK`.
             ApbClk,
         }
-        #[doc = " The list of clock signals that the `TIMG0_CALIBRATION_CLOCK` multiplexer can \
-                 output."]
+        /// The list of clock signals that the `TIMG0_CALIBRATION_CLOCK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum Timg0CalibrationClockConfig {
-            #[doc = " Selects `RC_SLOW_CLK`."]
+            /// Selects `RC_SLOW_CLK`.
             RcSlowClk,
-            #[doc = " Selects `RC_FAST_DIV_CLK`."]
+            /// Selects `RC_FAST_DIV_CLK`.
             RcFastDivClk,
-            #[doc = " Selects `XTAL32K_CLK`."]
+            /// Selects `XTAL32K_CLK`.
             Xtal32kClk,
         }
-        #[doc = r" Represents the device's clock tree."]
+        /// Represents the device's clock tree.
         pub struct ClockTree {
             xtl_clk: Option<XtlClkConfig>,
             pll_clk: Option<PllClkConfig>,
@@ -657,7 +710,7 @@ macro_rules! define_clock_tree_types {
             timg1_calibration_clock_refcount: u32,
         }
         impl ClockTree {
-            #[doc = r" Locks the clock tree for exclusive access."]
+            /// Locks the clock tree for exclusive access.
             pub fn with<R>(f: impl FnOnce(&mut ClockTree) -> R) -> R {
                 CLOCK_TREE.with(f)
             }
@@ -1462,31 +1515,31 @@ macro_rules! define_clock_tree_types {
                 Timg0CalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(clocks),
             }
         }
-        #[doc = r" Clock tree configuration."]
-        #[doc = r""]
-        #[doc = r" The fields of this struct are optional, with the following caveats:"]
-        #[doc = r" - If `XTL_CLK` is not specified, the crystal frequency will be"]
-        #[doc = r"   automatically detected if possible."]
-        #[doc = r" - The CPU and its upstream clock nodes will be set to a default configuration."]
-        #[doc = r" - Other unspecified clock sources will not be useable by peripherals."]
+        /// Clock tree configuration.
+        ///
+        /// The fields of this struct are optional, with the following caveats:
+        /// - If `XTL_CLK` is not specified, the crystal frequency will be automatically detected if
+        ///   possible.
+        /// - The CPU and its upstream clock nodes will be set to a default configuration.
+        /// - Other unspecified clock sources will not be useable by peripherals.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct ClockConfig {
-            #[doc = " `XTL_CLK` configuration."]
+            /// `XTL_CLK` configuration.
             pub xtl_clk: Option<XtlClkConfig>,
-            #[doc = " `PLL_CLK` configuration."]
+            /// `PLL_CLK` configuration.
             pub pll_clk: Option<PllClkConfig>,
-            #[doc = " `APLL_CLK` configuration."]
+            /// `APLL_CLK` configuration.
             pub apll_clk: Option<ApllClkConfig>,
-            #[doc = " `CPU_PLL_DIV` configuration."]
+            /// `CPU_PLL_DIV` configuration.
             pub cpu_pll_div: Option<CpuPllDivConfig>,
-            #[doc = " `SYSCON_PRE_DIV` configuration."]
+            /// `SYSCON_PRE_DIV` configuration.
             pub syscon_pre_div: Option<SysconPreDivConfig>,
-            #[doc = " `CPU_CLK` configuration."]
+            /// `CPU_CLK` configuration.
             pub cpu_clk: Option<CpuClkConfig>,
-            #[doc = " `RTC_SLOW_CLK` configuration."]
+            /// `RTC_SLOW_CLK` configuration.
             pub rtc_slow_clk: Option<RtcSlowClkConfig>,
-            #[doc = " `RTC_FAST_CLK` configuration."]
+            /// `RTC_FAST_CLK` configuration.
             pub rtc_fast_clk: Option<RtcFastClkConfig>,
         }
         impl ClockConfig {
@@ -1543,53 +1596,53 @@ macro_rules! implement_peripheral_clocks {
         #[repr(u8)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum Peripheral {
-            #[doc = "AES peripheral clock signal"]
+            /// AES peripheral clock signal
             Aes,
-            #[doc = "I2C_EXT0 peripheral clock signal"]
+            /// I2C_EXT0 peripheral clock signal
             I2cExt0,
-            #[doc = "I2C_EXT1 peripheral clock signal"]
+            /// I2C_EXT1 peripheral clock signal
             I2cExt1,
-            #[doc = "I2S0 peripheral clock signal"]
+            /// I2S0 peripheral clock signal
             I2s0,
-            #[doc = "I2S1 peripheral clock signal"]
+            /// I2S1 peripheral clock signal
             I2s1,
-            #[doc = "LEDC peripheral clock signal"]
+            /// LEDC peripheral clock signal
             Ledc,
-            #[doc = "MCPWM0 peripheral clock signal"]
+            /// MCPWM0 peripheral clock signal
             Mcpwm0,
-            #[doc = "MCPWM1 peripheral clock signal"]
+            /// MCPWM1 peripheral clock signal
             Mcpwm1,
-            #[doc = "PCNT peripheral clock signal"]
+            /// PCNT peripheral clock signal
             Pcnt,
-            #[doc = "RMT peripheral clock signal"]
+            /// RMT peripheral clock signal
             Rmt,
-            #[doc = "RSA peripheral clock signal"]
+            /// RSA peripheral clock signal
             Rsa,
-            #[doc = "SHA peripheral clock signal"]
+            /// SHA peripheral clock signal
             Sha,
-            #[doc = "SPI2 peripheral clock signal"]
+            /// SPI2 peripheral clock signal
             Spi2,
-            #[doc = "SPI3 peripheral clock signal"]
+            /// SPI3 peripheral clock signal
             Spi3,
-            #[doc = "SPI_DMA peripheral clock signal"]
+            /// SPI_DMA peripheral clock signal
             SpiDma,
-            #[doc = "TIMG0 peripheral clock signal"]
+            /// TIMG0 peripheral clock signal
             Timg0,
-            #[doc = "TIMG1 peripheral clock signal"]
+            /// TIMG1 peripheral clock signal
             Timg1,
-            #[doc = "TWAI0 peripheral clock signal"]
+            /// TWAI0 peripheral clock signal
             Twai0,
-            #[doc = "UART0 peripheral clock signal"]
+            /// UART0 peripheral clock signal
             Uart0,
-            #[doc = "UART1 peripheral clock signal"]
+            /// UART1 peripheral clock signal
             Uart1,
-            #[doc = "UART2 peripheral clock signal"]
+            /// UART2 peripheral clock signal
             Uart2,
-            #[doc = "UART_MEM peripheral clock signal"]
+            /// UART_MEM peripheral clock signal
             UartMem,
-            #[doc = "UHCI0 peripheral clock signal"]
+            /// UHCI0 peripheral clock signal
             Uhci0,
-            #[doc = "UHCI1 peripheral clock signal"]
+            /// UHCI1 peripheral clock signal
             Uhci1,
         }
         impl Peripheral {

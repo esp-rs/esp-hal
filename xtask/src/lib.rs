@@ -824,14 +824,17 @@ fn format_package_path(
     }
 
     cargo_args.push("--".into());
-    if let Some(rules) = format_rules {
-        cargo_args.push(format!("--config-path={}", rules.display()));
+    let mut config_file_path;
+    let config_file = if let Some(rules) = format_rules {
+        rules
     } else {
-        cargo_args.push(format!(
-            "--config-path={}/rustfmt.toml",
-            workspace.display()
-        ));
-    }
+        config_file_path = package_path.join("rustfmt.toml");
+        if !config_file_path.exists() {
+            config_file_path = workspace.join("rustfmt.toml");
+        }
+        &config_file_path
+    };
+    cargo_args.push(format!("--config-path={}", config_file.display()));
     cargo_args.extend(source_files);
 
     log::debug!("{cargo_args:#?}");
