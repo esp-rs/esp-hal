@@ -273,53 +273,108 @@ macro_rules! for_each_soc_xtal_options {
 }
 #[macro_export]
 /// ESP-HAL must provide implementation for the following functions:
-/// ```rust, ignore
-/// fn configure_xtl_clk_impl (_clocks : & mut ClockTree , _config : XtlClkConfig) { }
-/// fn enable_pll_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_pll_clk_impl (_clocks : & mut ClockTree , _config : PllClkConfig) { }
-/// fn enable_apll_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_apll_clk_impl (_clocks : & mut ClockTree , _config : ApllClkConfig) { }
-/// fn enable_rc_fast_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn enable_cpu_pll_div_in_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_cpu_pll_div_in_impl (_clocks : & mut ClockTree , _old_selector : Option < CpuPllDivInConfig > , _new_selector : CpuPllDivInConfig) { }
-/// fn enable_cpu_pll_div_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_cpu_pll_div_impl (_clocks : & mut ClockTree , _new_config : CpuPllDivConfig) { }
-/// fn enable_syscon_pre_div_in_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_syscon_pre_div_in_impl (_clocks : & mut ClockTree , _old_selector : Option < SysconPreDivInConfig > , _new_selector : SysconPreDivInConfig) { }
-/// fn enable_syscon_pre_div_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_syscon_pre_div_impl (_clocks : & mut ClockTree , _new_config : SysconPreDivConfig) { }
-/// fn enable_apb_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_apb_clk_impl (_clocks : & mut ClockTree , _old_selector : Option < ApbClkConfig > , _new_selector : ApbClkConfig) { }
-/// fn enable_ref_tick_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_ref_tick_impl (_clocks : & mut ClockTree , _old_selector : Option < RefTickConfig > , _new_selector : RefTickConfig) { }
-/// fn enable_ref_tick_xtal_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_ref_tick_xtal_impl (_clocks : & mut ClockTree , _new_config : RefTickXtalConfig) { }
-/// fn enable_ref_tick_fosc_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_ref_tick_fosc_impl (_clocks : & mut ClockTree , _new_config : RefTickFoscConfig) { }
-/// fn enable_ref_tick_apll_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_ref_tick_apll_impl (_clocks : & mut ClockTree , _new_config : RefTickApllConfig) { }
-/// fn enable_ref_tick_pll_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_ref_tick_pll_impl (_clocks : & mut ClockTree , _new_config : RefTickPllConfig) { }
-/// fn enable_cpu_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_cpu_clk_impl (_clocks : & mut ClockTree , _old_selector : Option < CpuClkConfig > , _new_selector : CpuClkConfig) { }
-/// fn enable_apb_clk_cpu_div2_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn enable_apb_clk_80m_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn enable_xtal32k_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn enable_rc_slow_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn enable_rc_fast_div_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn enable_xtal_div_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn enable_rtc_slow_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_rtc_slow_clk_impl (_clocks : & mut ClockTree , _old_selector : Option < RtcSlowClkConfig > , _new_selector : RtcSlowClkConfig) { }
-/// fn enable_rtc_fast_clk_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_rtc_fast_clk_impl (_clocks : & mut ClockTree , _old_selector : Option < RtcFastClkConfig > , _new_selector : RtcFastClkConfig) { }
-/// fn enable_timg0_peripheral_clock_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_timg0_peripheral_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Timg0PeripheralClockConfig > , _new_selector : Timg0PeripheralClockConfig) { }
-/// fn enable_timg0_calibration_clock_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_timg0_calibration_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Timg0CalibrationClockConfig > , _new_selector : Timg0CalibrationClockConfig) { }
-/// fn enable_timg1_peripheral_clock_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_timg1_peripheral_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Timg0PeripheralClockConfig > , _new_selector : Timg0PeripheralClockConfig) { }
-/// fn enable_timg1_calibration_clock_impl (_clocks : & mut ClockTree , _en : bool) { }
-/// fn configure_timg1_calibration_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Timg0CalibrationClockConfig > , _new_selector : Timg0CalibrationClockConfig) { }
+/// ```rust, no_run
+/// fn configure_xtl_clk_impl(_clocks: &mut ClockTree, _config: XtlClkConfig) {}
+/// fn enable_pll_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_pll_clk_impl(_clocks: &mut ClockTree, _config: PllClkConfig) {}
+/// fn enable_apll_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_apll_clk_impl(_clocks: &mut ClockTree, _config: ApllClkConfig) {}
+/// fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn enable_cpu_pll_div_in_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_cpu_pll_div_in_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<CpuPllDivInConfig>,
+///     _new_selector: CpuPllDivInConfig,
+/// ) {
+/// }
+/// fn enable_cpu_pll_div_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_cpu_pll_div_impl(_clocks: &mut ClockTree, _new_config: CpuPllDivConfig) {}
+/// fn enable_syscon_pre_div_in_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_syscon_pre_div_in_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<SysconPreDivInConfig>,
+///     _new_selector: SysconPreDivInConfig,
+/// ) {
+/// }
+/// fn enable_syscon_pre_div_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_syscon_pre_div_impl(_clocks: &mut ClockTree, _new_config: SysconPreDivConfig) {}
+/// fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_apb_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<ApbClkConfig>,
+///     _new_selector: ApbClkConfig,
+/// ) {
+/// }
+/// fn enable_ref_tick_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_ref_tick_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<RefTickConfig>,
+///     _new_selector: RefTickConfig,
+/// ) {
+/// }
+/// fn enable_ref_tick_xtal_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_ref_tick_xtal_impl(_clocks: &mut ClockTree, _new_config: RefTickXtalConfig) {}
+/// fn enable_ref_tick_fosc_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_ref_tick_fosc_impl(_clocks: &mut ClockTree, _new_config: RefTickFoscConfig) {}
+/// fn enable_ref_tick_apll_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_ref_tick_apll_impl(_clocks: &mut ClockTree, _new_config: RefTickApllConfig) {}
+/// fn enable_ref_tick_pll_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_ref_tick_pll_impl(_clocks: &mut ClockTree, _new_config: RefTickPllConfig) {}
+/// fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_cpu_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<CpuClkConfig>,
+///     _new_selector: CpuClkConfig,
+/// ) {
+/// }
+/// fn enable_apb_clk_cpu_div2_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn enable_apb_clk_80m_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn enable_rc_fast_div_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn enable_xtal_div_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn enable_rtc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_rtc_slow_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<RtcSlowClkConfig>,
+///     _new_selector: RtcSlowClkConfig,
+/// ) {
+/// }
+/// fn enable_rtc_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_rtc_fast_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<RtcFastClkConfig>,
+///     _new_selector: RtcFastClkConfig,
+/// ) {
+/// }
+/// fn enable_timg0_peripheral_clock_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_timg0_peripheral_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<Timg0PeripheralClockConfig>,
+///     _new_selector: Timg0PeripheralClockConfig,
+/// ) {
+/// }
+/// fn enable_timg0_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_timg0_calibration_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<Timg0CalibrationClockConfig>,
+///     _new_selector: Timg0CalibrationClockConfig,
+/// ) {
+/// }
+/// fn enable_timg1_peripheral_clock_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_timg1_peripheral_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<Timg0PeripheralClockConfig>,
+///     _new_selector: Timg0PeripheralClockConfig,
+/// ) {
+/// }
+/// fn enable_timg1_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {}
+/// fn configure_timg1_calibration_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<Timg0CalibrationClockConfig>,
+///     _new_selector: Timg0CalibrationClockConfig,
+/// ) {
+/// }
 /// ```
 macro_rules! define_clock_tree_types {
     () => {

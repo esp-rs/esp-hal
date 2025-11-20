@@ -278,7 +278,7 @@ macro_rules! for_each_soc_xtal_options {
 }
 #[macro_export]
 /// ESP-HAL must provide implementation for the following functions:
-/// ```rust, ignore
+/// ```rust, no_run
 /// ```
 macro_rules! define_clock_tree_types {
     () => {

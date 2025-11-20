@@ -240,7 +240,7 @@ impl SystemClocks {
         Ok(quote! {
             #[macro_export]
             /// ESP-HAL must provide implementation for the following functions:
-            /// ```rust, ignore
+            /// ```rust, no_run
             #(#[doc = #funcs_to_provide])*
             /// ```
             macro_rules! define_clock_tree_types {
