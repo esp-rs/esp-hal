@@ -68,7 +68,7 @@ If you are a user of `unstable` APIs, we will never push breaking changes in a p
 esp-hal = { version = "~1.1" }
 ```
 
-Using the `~` operator will prevent cargo auto updating to minor versions, allowing you to use `cargo update` without the possiblity of breaking your project.
+Using the [`~` operator](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#tilde-requirements) will prevent cargo auto updating to minor versions, allowing you to use `cargo update` without the possiblity of breaking your project.
 
 ## Contributing
 
