@@ -24,17 +24,14 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::{
-    Controller,
-    wifi::{
-        ModeConfig,
-        ScanConfig,
-        WifiController,
-        WifiDevice,
-        WifiEvent,
-        WifiStaState,
-        sta::ClientConfig,
-    },
+use esp_radio::wifi::{
+    ModeConfig,
+    ScanConfig,
+    WifiController,
+    WifiDevice,
+    WifiEvent,
+    WifiStaState,
+    sta::ClientConfig,
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -65,10 +62,8 @@ async fn main(spawner: Spawner) -> ! {
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let esp_radio_ctrl = &*mk_static!(Controller<'static>, esp_radio::init().unwrap());
-
     let (controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI, Default::default()).unwrap();
+        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
     let wifi_interface = interfaces.sta;
 

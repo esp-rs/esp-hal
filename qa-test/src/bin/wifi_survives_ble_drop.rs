@@ -1,12 +1,16 @@
-//! WiFi and BLE COEXistence example
+//! This example creates BLE and WiFi and while waiting for WiFi to connect, BLE gets dropped - it
+//! shows that WiFi still works afterwards.
 //!
 //! - set SSID and PASSWORD env variable
 //! - gets an ip address via DHCP
 //! - performs an HTTP get request to some "random" server
-//! - does BLE advertising (you cannot connect to it - it's just not implemented in the example)
 //!
 //! Note: On ESP32-C2 and ESP32-C3 you need a wifi-heap size of 70000, on
 //! ESP32-C6 you need 80000 and a tx_queue_size of 10
+
+//% FEATURES: esp-radio esp-radio/wifi esp-radio/ble esp-radio/smoltcp
+//% FEATURES: esp-radio/unstable esp-hal/unstable
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32s3
 
 #![no_std]
 #![no_main]
@@ -135,6 +139,9 @@ fn main() -> ! {
     println!("is wifi started: {:?}", controller.is_started());
     println!("{:?}", controller.capabilities());
     println!("wifi_connect {:?}", controller.connect());
+
+    drop(hci);
+    println!("Dropped BLE HCI");
 
     // wait to get connected
     println!("Wait to get connected");

@@ -22,17 +22,14 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::{
-    Controller,
-    wifi::{
-        ModeConfig,
-        WifiController,
-        WifiDevice,
-        WifiEvent,
-        WifiStaState,
-        sta::ClientConfig,
-        sta_state,
-    },
+use esp_radio::wifi::{
+    ModeConfig,
+    WifiController,
+    WifiDevice,
+    WifiEvent,
+    WifiStaState,
+    sta::ClientConfig,
+    sta_state,
 };
 use static_cell::StaticCell;
 
@@ -245,9 +242,8 @@ async fn main(spawner: Spawner) {
         .build(rx_descriptors);
 
     // WiFi + network stack
-    let esp_radio_ctrl = &*mk_static!(Controller<'static>, esp_radio::init().unwrap());
     let (controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI, Default::default()).unwrap();
+        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
     let wifi_interface = interfaces.sta;
 
     let config = embassy_net::Config::dhcpv4(Default::default());
