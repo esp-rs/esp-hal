@@ -183,9 +183,15 @@ impl DependencyGraph {
         let mut reverse_dependency_graph = IndexMap::new();
 
         for node in clock_tree.iter() {
-            for input in node.input_clocks() {
-                let node_name = node.name_str();
+            let node_name = node.name_str();
+            dependency_graph
+                .entry(node_name.clone())
+                .or_insert_with(Vec::new);
+            reverse_dependency_graph
+                .entry(node_name.clone())
+                .or_insert_with(Vec::new);
 
+            for input in node.input_clocks() {
                 let graph_node = dependency_graph
                     .entry(input.clone())
                     .or_insert_with(Vec::new);
@@ -219,6 +225,30 @@ impl DependencyGraph {
             .map(|v| v.as_slice())
             .unwrap_or_default()
     }
+
+    /// Returns the names of nodes in a topological order.
+    pub fn iter(&self) -> impl Iterator<Item = String> {
+        topological_sort(&self.reverse_graph)
+    }
+}
+
+fn topological_sort(dep_graph: &IndexMap<String, Vec<String>>) -> impl Iterator<Item = String> {
+    let mut sorted = Vec::new();
+    let mut dep_graph = dep_graph.clone();
+    while !dep_graph.is_empty() {
+        dep_graph.retain(|node, deps| {
+            deps.retain(|dep| !sorted.contains(dep));
+
+            if deps.is_empty() {
+                sorted.push(node.clone());
+                false
+            } else {
+                true
+            }
+        });
+    }
+
+    sorted.into_iter()
 }
 
 pub(crate) struct ManagementProperties {
