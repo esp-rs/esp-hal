@@ -58,7 +58,7 @@ When browsing the examples, we recommend viewing the tag for the `esp-hal` relea
 
 ## Support policy
 
-All active development will occur in `main`.
+All active development will occur on `main`.
 
 We will only backport fixes to the _latest_ minor release in a major version. For example, this means we will apply patches (bug fixes) to `1.1.x` until `1.2.0` is released, at which point all patches are only backported to the `1.2.x` series of releases.
 
