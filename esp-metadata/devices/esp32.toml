@@ -271,7 +271,7 @@ clocks = { system_clocks = { clock_tree = [
         { name = "PERIPHERAL_CLOCK", type = "mux", variants = [
             { name = "APB_CLK", outputs = "APB_CLK" },
         ] },
-        { name = "CALIBRATION_CLOCK", type = "mux", variants = [
+        { name = "CALIBRATION_CLOCK", type = "mux", default = "RC_SLOW_CLK", variants = [
             { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
             { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
             { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },

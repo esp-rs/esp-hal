@@ -21,6 +21,8 @@ pub struct Multiplexer {
     always_on: bool,
 
     // reject: Option<RejectExpression>,
+    #[serde(default)]
+    pub default: Option<String>,
     pub variants: Vec<MultiplexerVariant>,
 }
 
@@ -38,11 +40,18 @@ impl ClockTreeNodeType for Multiplexer {
     }
 
     fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
+        let mut default_exists = false;
         for variant in &self.variants {
+            default_exists |= Some(variant.name.as_str()) == self.default.as_deref();
             variant.validate_source_data(ctx).with_context(|| {
                 format!("Multiplexer option {} has incorrect data", variant.name)
             })?;
         }
+        anyhow::ensure!(
+            self.default.is_none() || default_exists,
+            "Multiplexer default option {} not found",
+            self.default.as_ref().unwrap()
+        );
         Ok(())
     }
 
@@ -97,15 +106,7 @@ impl ClockTreeNodeType for Multiplexer {
     fn config_type(&self) -> Option<TokenStream> {
         let ty_name = self.config_type_name()?;
 
-        let variants = self.variants.iter().map(|v| v.config_enum_variant());
-
-        Some(quote! {
-            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-            pub enum #ty_name {
-                #(#variants)*
-            }
-        })
+        Some(self.impl_config_type(ty_name))
     }
 
     fn affected_nodes<'s>(&'s self) -> Vec<&'s str> {
@@ -154,6 +155,30 @@ impl Multiplexer {
         self.variants
             .iter()
             .flat_map(|v| v.configures.iter().map(|c| c.target.as_str()))
+    }
+
+    pub fn impl_config_type(&self, ty_name: Ident) -> TokenStream {
+        let variants = self.variants.iter().map(|v| {
+            let variant = v.config_enum_variant();
+            if Some(v.name.as_str()) == self.default.as_deref() {
+                quote! {
+                    #[default]
+                    #variant
+                }
+            } else {
+                variant
+            }
+        });
+
+        let default = self.default.as_ref().map(|_| quote! { Default, });
+
+        quote! {
+            #[derive(Debug, #default Clone, Copy, PartialEq, Eq, Hash)]
+            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+            pub enum #ty_name {
+                #(#variants)*
+            }
+        }
     }
 
     pub fn impl_config_apply_function(

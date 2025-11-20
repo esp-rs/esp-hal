@@ -665,9 +665,10 @@ macro_rules! define_clock_tree_types {
             ApbClk,
         }
         /// The list of clock signals that the `TIMG0_CALIBRATION_CLOCK` multiplexer can output.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum Timg0CalibrationClockConfig {
+            #[default]
             /// Selects `RC_SLOW_CLK`.
             RcSlowClk,
             /// Selects `RC_FAST_DIV_CLK`.

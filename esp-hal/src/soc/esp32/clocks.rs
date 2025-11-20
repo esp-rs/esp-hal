@@ -117,7 +117,7 @@ fn detect_xtal_freq(clocks: &mut ClockTree) -> XtlClkConfig {
         .rtccalicfg()
         .modify(|_, w| w.rtc_cali_start().clear_bit());
 
-    configure_timg0_calibration_clock(clocks, Timg0CalibrationClockConfig::RcSlowClk);
+    configure_timg0_calibration_clock(clocks, Timg0CalibrationClockConfig::default());
     request_timg0_calibration_clock(clocks);
 
     let calibration_clock_frequency = timg0_calibration_clock_frequency(clocks);
