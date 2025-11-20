@@ -1,0 +1,7 @@
+GIT_REV: 3b783df8
+__assert_func
+__atoi
+__mktime
+__strcasecmp
+__strnlen
+rtc_clk_xtal_freq_get

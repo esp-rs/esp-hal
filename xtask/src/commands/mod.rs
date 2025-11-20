@@ -16,6 +16,7 @@ mod check_changelog;
 #[cfg(feature = "report")]
 pub mod generate_report;
 mod release;
+pub mod rlib_symbols;
 mod run;
 
 // ----------------------------------------------------------------------------

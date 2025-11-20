@@ -248,6 +248,22 @@ jobs:
       # Run host tests for all applicable packages:
       - run: cargo xtask host-tests
 
+  host-tests-rlib-symbols:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: esp-rs/xtensa-toolchain@v1.6
+        with:
+          version: 1.90.0.0
+
+      # Check global symbols for all packages
+      - name: Check global symbols
+        run: cargo xtask check-global-symbols
+      
+      # Check rlib symbols for esp-rom-sys
+      - name: Check esp-rom-sys symbols
+        run: cargo xtask check-rom-sys-symbols
+
   # --------------------------------------------------------------------------
   # Check links in .rs, .md, and .toml files
 
