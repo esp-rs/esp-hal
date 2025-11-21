@@ -30,7 +30,6 @@ trouble-host = { version = "0.5.0", features = [
     "derive",
     "scan",
 ] }
-static_cell = "2.1.1"
 
 [features]
 esp32 = [
