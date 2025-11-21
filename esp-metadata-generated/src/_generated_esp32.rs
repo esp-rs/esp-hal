@@ -491,7 +491,7 @@ macro_rules! define_clock_tree_types {
             ///
             /// # Panics
             ///
-            /// Panics if the output frequency value is outside the
+            /// Panics if the divisor value is outside the
             /// valid range (0 ..= 1023).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
@@ -539,7 +539,7 @@ macro_rules! define_clock_tree_types {
             ///
             /// # Panics
             ///
-            /// Panics if the output frequency value is outside the
+            /// Panics if the divisor value is outside the
             /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
@@ -563,7 +563,7 @@ macro_rules! define_clock_tree_types {
             ///
             /// # Panics
             ///
-            /// Panics if the output frequency value is outside the
+            /// Panics if the divisor value is outside the
             /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
@@ -587,7 +587,7 @@ macro_rules! define_clock_tree_types {
             ///
             /// # Panics
             ///
-            /// Panics if the output frequency value is outside the
+            /// Panics if the divisor value is outside the
             /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
@@ -611,7 +611,7 @@ macro_rules! define_clock_tree_types {
             ///
             /// # Panics
             ///
-            /// Panics if the output frequency value is outside the
+            /// Panics if the divisor value is outside the
             /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(

@@ -10,7 +10,7 @@ pub mod crc;
 pub mod md5;
 pub mod spiflash;
 
-/// Busy-loop CPU for the given about of us.
+/// Busy-loop CPU for the given amount of microseconds.
 #[inline(always)]
 pub fn ets_delay_us(us: u32) {
     unsafe extern "C" {

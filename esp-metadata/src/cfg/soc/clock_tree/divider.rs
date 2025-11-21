@@ -246,7 +246,7 @@ impl ClockTreeNodeType for Divider {
                     r#"
  # Panics
 
- Panics if the output frequency value is outside the
+ Panics if the divisor value is outside the
  valid range ({min} ..= {max})."#
                 )
                 .lines()
