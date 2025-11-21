@@ -23,7 +23,6 @@ esp-radio = { path = "../../../esp-radio", features = [
     "unstable",
     "wifi",
 ] }
-static_cell = "2.1.0"
 
 [features]
 esp32 = [

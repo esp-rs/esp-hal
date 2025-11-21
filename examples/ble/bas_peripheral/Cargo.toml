@@ -82,4 +82,5 @@ lto              = "fat"
 codegen-units    = 1
 
 [package.metadata.cargo-machete]
-ignored = ["embassy-sync"]
+# static_cell is used indirectly in #[gatt_service] macro.
+ignored = ["embassy-sync", "static_cell"]
