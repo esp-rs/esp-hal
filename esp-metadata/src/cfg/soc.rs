@@ -602,11 +602,6 @@ impl DeviceClocks {
             })
             .collect::<Vec<_>>();
 
-        // To compute refcount requirement and correct initialization order, we need to be able to
-        // access direct dependencies (downstream clocks). As it is simpler to define
-        // dependents (inputs), we have to do a bit of maths.
-        let dependency_graph = DependencyGraph::build_from(&clock_tree);
-
         let validation_context = ValidationContext {
             tree: self.system_clocks.clock_tree.as_slice(),
         };
@@ -656,6 +651,11 @@ impl DeviceClocks {
                 clock_tree.push(Box::new(node));
             }
         }
+
+        // To compute refcount requirement and correct initialization order, we need to be able to
+        // access direct dependencies (downstream clocks). As it is simpler to define
+        // dependents (inputs), we have to do a bit of maths.
+        let dependency_graph = DependencyGraph::build_from(&clock_tree);
 
         // Classify clock tree items
         for node in clock_tree.iter() {
