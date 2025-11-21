@@ -121,6 +121,9 @@ pub(crate) struct ProcessedClockData {
 
     /// Refcount/config type properties of the clock tree nodes.
     management_properties: HashMap<String, ManagementProperties>,
+
+    /// System clock graph.
+    dependency_graph: DependencyGraph,
 }
 
 impl ProcessedClockData {
@@ -166,7 +169,7 @@ impl SystemClocks {
         let mut clock_tree_state_field_types = vec![];
         let mut clock_tree_refcount_fields = vec![];
         let mut configurables = vec![];
-        let mut system_config_steps = vec![];
+        let mut system_config_steps = HashMap::new();
         let mut hal_enable_functions = vec![];
         for (item, kind) in tree
             .classified_clocks
@@ -218,13 +221,21 @@ impl SystemClocks {
                     pub #name: Option<#config_type_name>,
                 });
 
-                system_config_steps.push(quote! {
-                    if let Some(config) = self.#name {
-                        #config_apply_function_name(clocks, config);
-                    }
-                });
+                system_config_steps.insert(
+                    clock_item.name_str(),
+                    quote! {
+                        if let Some(config) = self.#name {
+                            #config_apply_function_name(clocks, config);
+                        }
+                    },
+                );
             }
         }
+
+        let system_config_steps = tree
+            .dependency_graph
+            .iter()
+            .map(|node| system_config_steps.get(&node));
 
         let funcs_to_provide = hal_enable_functions
             .iter()
@@ -696,6 +707,7 @@ impl DeviceClocks {
             clock_tree,
             classified_clocks,
             management_properties,
+            dependency_graph,
         })
     }
 }
