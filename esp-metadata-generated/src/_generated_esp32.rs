@@ -701,6 +701,9 @@ macro_rules! define_clock_tree_types {
             rc_fast_clk_refcount: u32,
             apb_clk_refcount: u32,
             ref_tick_refcount: u32,
+            xtal32k_clk_refcount: u32,
+            rc_slow_clk_refcount: u32,
+            rc_fast_div_clk_refcount: u32,
             rtc_slow_clk_refcount: u32,
             rtc_fast_clk_refcount: u32,
             timg0_peripheral_clock_refcount: u32,
@@ -740,6 +743,9 @@ macro_rules! define_clock_tree_types {
                 rc_fast_clk_refcount: 0,
                 apb_clk_refcount: 0,
                 ref_tick_refcount: 0,
+                xtal32k_clk_refcount: 0,
+                rc_slow_clk_refcount: 0,
+                rc_fast_div_clk_refcount: 0,
                 rtc_slow_clk_refcount: 0,
                 rtc_fast_clk_refcount: 0,
                 timg0_peripheral_clock_refcount: 0,
@@ -1168,30 +1174,42 @@ macro_rules! define_clock_tree_types {
             80000000
         }
         pub fn request_xtal32k_clk(clocks: &mut ClockTree) {
-            enable_xtal32k_clk_impl(clocks, true);
+            if increment_reference_count(&mut clocks.xtal32k_clk_refcount) {
+                enable_xtal32k_clk_impl(clocks, true);
+            }
         }
         pub fn release_xtal32k_clk(clocks: &mut ClockTree) {
-            enable_xtal32k_clk_impl(clocks, false);
+            if decrement_reference_count(&mut clocks.xtal32k_clk_refcount) {
+                enable_xtal32k_clk_impl(clocks, false);
+            }
         }
         pub fn xtal32k_clk_frequency(clocks: &mut ClockTree) -> u32 {
             32768
         }
         pub fn request_rc_slow_clk(clocks: &mut ClockTree) {
-            enable_rc_slow_clk_impl(clocks, true);
+            if increment_reference_count(&mut clocks.rc_slow_clk_refcount) {
+                enable_rc_slow_clk_impl(clocks, true);
+            }
         }
         pub fn release_rc_slow_clk(clocks: &mut ClockTree) {
-            enable_rc_slow_clk_impl(clocks, false);
+            if decrement_reference_count(&mut clocks.rc_slow_clk_refcount) {
+                enable_rc_slow_clk_impl(clocks, false);
+            }
         }
         pub fn rc_slow_clk_frequency(clocks: &mut ClockTree) -> u32 {
             150000
         }
         pub fn request_rc_fast_div_clk(clocks: &mut ClockTree) {
-            request_rc_fast_clk(clocks);
-            enable_rc_fast_div_clk_impl(clocks, true);
+            if increment_reference_count(&mut clocks.rc_fast_div_clk_refcount) {
+                request_rc_fast_clk(clocks);
+                enable_rc_fast_div_clk_impl(clocks, true);
+            }
         }
         pub fn release_rc_fast_div_clk(clocks: &mut ClockTree) {
-            enable_rc_fast_div_clk_impl(clocks, false);
-            release_rc_fast_clk(clocks);
+            if decrement_reference_count(&mut clocks.rc_fast_div_clk_refcount) {
+                enable_rc_fast_div_clk_impl(clocks, false);
+                release_rc_fast_clk(clocks);
+            }
         }
         pub fn rc_fast_div_clk_frequency(clocks: &mut ClockTree) -> u32 {
             (rc_fast_clk_frequency(clocks) / 256)
