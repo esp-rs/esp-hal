@@ -300,17 +300,25 @@ impl TimerImplementation for Timer {
         TIMER_QUEUE.inner.with(|q| {
             let timer = unsafe { Box::from_raw(timer.cast::<Timer>().as_ptr()) };
 
-            // There are two cases:
-            // - We can remove the timer from the queue - we can drop it.
-            // - We can't remove the timer from the queue. There are the following cases:
-            //   - The timer isn't in the queue. We can drop it.
-            //   - The timer is in the queue and the queue is being processed. We need to mark it to
-            //     be dropped by the timer queue.
-            if q.dequeue(&timer) {
-                core::mem::drop(timer);
-            } else {
+            // There are multiple cases:
+            // - the queue is currently processing - mem-forget the timer and mark it to be dropped
+            //   later in during processing.
+            //
+            // - the queue is currently not processing
+            //      - we can dequeue the timer -> drop it
+            //      - we can't dequeue the timer (i.e. it's not in the queue) -> drop it
+            if q.processing {
+                debug!("forgetting timer while processing the queue");
                 timer.properties(q).drop = true;
                 core::mem::forget(timer);
+            } else {
+                if q.dequeue(&timer) {
+                    debug!("dropping dequeued timer");
+                    core::mem::drop(timer);
+                } else {
+                    debug!("dropping timer not in queue, queue is not processing");
+                    core::mem::drop(timer);
+                }
             }
         })
     }
