@@ -144,6 +144,15 @@ impl TimerGroupInstance for TIMG0<'_> {
     }
 
     fn configure_src_clk() {
+        #[cfg(soc_has_clock_node_timg0_function_clock)]
+        crate::soc::clocks::ClockTree::with(|clocks| {
+            crate::soc::clocks::configure_timg0_function_clock(
+                clocks,
+                crate::soc::clocks::Timg0FunctionClockConfig::default(),
+            );
+            crate::soc::clocks::request_timg0_function_clock(clocks);
+        });
+
         cfg_if::cfg_if! {
             if #[cfg(not(timergroup_default_clock_source_is_set))] {
                 // Clock source is not configurable
