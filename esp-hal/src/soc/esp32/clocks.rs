@@ -105,10 +105,6 @@ fn detect_xtal_freq(clocks: &mut ClockTree) -> XtlClkConfig {
     configure_syscon_pre_div(clocks, SysconPreDivConfig(0));
     configure_cpu_clk(clocks, CpuClkConfig::Xtal);
 
-    // Without the peripheral clock, we can't write peripheral registers.
-    configure_timg0_peripheral_clock(clocks, Timg0PeripheralClockConfig::ApbClk);
-    request_timg0_peripheral_clock(clocks);
-
     // Make sure the process doesn't time out due to some spooky configuration.
     #[cfg(not(esp32))]
     TIMG0::regs().rtccalicfg2().reset();
@@ -117,7 +113,7 @@ fn detect_xtal_freq(clocks: &mut ClockTree) -> XtlClkConfig {
         .rtccalicfg()
         .modify(|_, w| w.rtc_cali_start().clear_bit());
 
-    configure_timg0_calibration_clock(clocks, Timg0CalibrationClockConfig::RcSlowClk);
+    configure_timg0_calibration_clock(clocks, Timg0CalibrationClockConfig::default());
     request_timg0_calibration_clock(clocks);
 
     let calibration_clock_frequency = timg0_calibration_clock_frequency(clocks);
@@ -146,7 +142,6 @@ fn detect_xtal_freq(clocks: &mut ClockTree) -> XtlClkConfig {
         .rtccalicfg()
         .modify(|_, w| w.rtc_cali_start().clear_bit());
     release_timg0_calibration_clock(clocks);
-    release_timg0_peripheral_clock(clocks);
 
     let mhz = (cali_value * (calibration_clock_frequency / SLOW_CLOCK_CYCLES)) / 1_000_000;
     if mhz.abs_diff(40) < mhz.abs_diff(26) {
@@ -563,19 +558,6 @@ fn configure_rtc_fast_clk_impl(
     });
 }
 
-fn enable_timg0_peripheral_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-    // TODO: currently managed by PeripheralClockControl. Perhaps these function impls should be
-    // generated?
-}
-
-fn configure_timg0_peripheral_clock_impl(
-    _clocks: &mut ClockTree,
-    _old_selector: Option<Timg0PeripheralClockConfig>,
-    _new_selector: Timg0PeripheralClockConfig,
-) {
-    // TIMG on ESP32 can only use a single clock source, it doesn't need to be configured.
-}
-
 fn enable_timg0_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do, calibration clocks can only be selected. They are gated by the CALI_START bit,
     // which is managed by the calibration process.
@@ -599,19 +581,6 @@ fn configure_timg0_calibration_clock_impl(
     TIMG0::regs()
         .rtccalicfg()
         .modify(|_, w| unsafe { w.rtc_cali_clk_sel().bits(new_selector.cali_clk_sel_bits()) });
-}
-
-fn enable_timg1_peripheral_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-    // TODO: currently managed by PeripheralClockControl. Perhaps these function impls should be
-    // generated?
-}
-
-fn configure_timg1_peripheral_clock_impl(
-    _clocks: &mut ClockTree,
-    _old_selector: Option<Timg0PeripheralClockConfig>,
-    _new_selector: Timg0PeripheralClockConfig,
-) {
-    // TIMG on ESP32 can only use a single clock source, it doesn't need to be configured.
 }
 
 fn enable_timg1_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {

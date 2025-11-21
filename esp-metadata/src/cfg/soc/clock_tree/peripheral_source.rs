@@ -68,15 +68,7 @@ impl ClockTreeNodeType for PeripheralClockSource {
         }
         let ty_name = self.config_type_name()?;
 
-        let variants = self.mux.variants.iter().map(|v| v.config_enum_variant());
-
-        Some(quote! {
-            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-            pub enum #ty_name {
-                #(#variants)*
-            }
-        })
+        Some(self.mux.impl_config_type(ty_name))
     }
 
     fn config_docline(&self) -> Option<String> {
