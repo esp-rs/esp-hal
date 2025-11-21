@@ -545,4 +545,69 @@ mod tests {
         hil_test::assert_eq!(dequeue(), None);
         hil_test::assert_eq!(q.messages_waiting(), 0);
     }
+
+    #[test]
+    fn esp_radio_timer_delete() {
+        unsafe extern "C" fn my_func(_ptr: *mut core::ffi::c_void) {
+            esp_radio_rtos_driver::usleep(5_000);
+        }
+
+        // delayed timer deletion
+        let mut low_watermark = usize::MAX;
+        for i in 0..30 {
+            unsafe {
+                let handle1 = esp_radio_rtos_driver::timer::TimerHandle::new(
+                    my_func,
+                    core::ptr::null::<()>() as _,
+                );
+                handle1.arm(10, false);
+                let handle2 = esp_radio_rtos_driver::timer::TimerHandle::new(
+                    my_func,
+                    core::ptr::null::<()>() as _,
+                );
+                handle2.arm(1000, false);
+
+                core::mem::drop(handle2);
+                core::mem::drop(handle1);
+
+                esp_radio_rtos_driver::usleep(5_000);
+
+                if i < 15 {
+                    low_watermark = usize::min(low_watermark, esp_alloc::HEAP.free());
+                } else {
+                    assert!(esp_alloc::HEAP.free() >= low_watermark);
+                }
+            }
+        }
+
+        // non-delayed timer deletion
+        let mut low_watermark = usize::MAX;
+        for i in 0..30 {
+            unsafe {
+                let handle1 = esp_radio_rtos_driver::timer::TimerHandle::new(
+                    my_func,
+                    core::ptr::null::<()>() as _,
+                );
+                handle1.arm(1000, false);
+                let handle2 = esp_radio_rtos_driver::timer::TimerHandle::new(
+                    my_func,
+                    core::ptr::null::<()>() as _,
+                );
+                handle2.arm(1000, false);
+
+                esp_radio_rtos_driver::usleep(15_000);
+
+                core::mem::drop(handle2);
+                core::mem::drop(handle1);
+
+                esp_radio_rtos_driver::usleep(5_000);
+
+                if i < 15 {
+                    low_watermark = usize::min(low_watermark, esp_alloc::HEAP.free());
+                } else {
+                    assert!(esp_alloc::HEAP.free() >= low_watermark);
+                }
+            }
+        }
+    }
 }

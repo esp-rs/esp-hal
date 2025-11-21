@@ -42,6 +42,10 @@ mod init_tests;
 #[path = "esp_radio/ble_controller.rs"]
 mod ble_controller;
 
+#[cfg(soc_has_wifi)]
+#[path = "esp_radio/wifi_controller.rs"]
+mod wifi_controller;
+
 #[cfg(xtensa)]
 #[path = "esp_radio/fpu.rs"]
 mod fpu;
