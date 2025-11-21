@@ -25,6 +25,7 @@ struct TimerQueueInner {
     next_wakeup: u64,
     task: Option<TaskPtr>,
     processing: bool,
+    scheduled_for_drop: alloc::vec::Vec<Box<Timer>>,
 }
 
 unsafe impl Send for TimerQueueInner {}
@@ -36,6 +37,7 @@ impl TimerQueueInner {
             next_wakeup: 0,
             task: None,
             processing: false,
+            scheduled_for_drop: alloc::vec::Vec::new(),
         }
     }
 
@@ -45,7 +47,7 @@ impl TimerQueueInner {
         let due = props.next_due;
 
         if !props.enqueued {
-            trace!("Enqueueing timer {:x}", timer as *const _ as usize);
+            debug!("Enqueueing timer {:x}", timer as *const _ as usize);
             props.enqueued = true;
 
             props.next = head;
@@ -173,19 +175,26 @@ impl TimerQueue {
             self.inner.with(|q| {
                 let props = current_timer.properties(q);
 
-                if props.drop {
-                    debug!("Dropping timer {:x} (delayed)", current.addr());
-                    let boxed = unsafe { Box::from_raw(current.as_ptr()) };
-                    core::mem::drop(boxed);
-                } else if props.is_active {
+                if props.is_active && !props.drop {
                     q.enqueue(current_timer);
                 } else {
-                    trace!("Timer {:x} inactive", current_timer as *const _ as usize);
+                    trace!(
+                        "Timer {:x} inactive or about to get dropped",
+                        current_timer as *const _ as usize
+                    );
                 }
             });
         }
 
         self.inner.with(|q| {
+            for timer in q.scheduled_for_drop.drain(..) {
+                debug!(
+                    "Dropping timer {:x} (delayed)",
+                    (&*timer) as *const _ as usize
+                );
+                core::mem::drop(timer);
+            }
+
             q.processing = false;
             let next_wakeup = q.next_wakeup;
             debug!("next_wakeup: {}", next_wakeup);
@@ -308,9 +317,17 @@ impl TimerImplementation for Timer {
             //      - we can dequeue the timer -> drop it
             //      - we can't dequeue the timer (i.e. it's not in the queue) -> drop it
             if q.processing {
-                debug!("forgetting timer while processing the queue");
                 timer.properties(q).drop = true;
-                core::mem::forget(timer);
+
+                if timer.properties(q).enqueued {
+                    // it's queued so process will make sure to drop it
+                    debug!("schedule timer for dropping after processing the queue");
+                    q.scheduled_for_drop.push(timer);
+                } else {
+                    // drop it since process won't do it for us
+                    debug!("dropping not enqueued timer while processing the queue");
+                    core::mem::drop(timer);
+                }
             } else {
                 if q.dequeue(&timer) {
                     debug!("dropping dequeued timer");
