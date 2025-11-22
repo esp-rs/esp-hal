@@ -154,7 +154,7 @@ pub static mut SYSCALL_TABLE: chip_specific::syscall_stub_table = unsafe {
         )),
         _printf_float: Some(core::mem::transmute(not_implemented as *const fn())),
         _scanf_float: Some(core::mem::transmute(not_implemented as *const fn())),
-        __assert_func: Some(super::__assert_func),
+        __assert_func: Some(core::mem::transmute(not_implemented as *const fn())),
         __sinit: Some(core::mem::transmute(not_implemented as *const fn())),
         _cleanup_r: Some(core::mem::transmute(not_implemented as *const fn())),
     }
