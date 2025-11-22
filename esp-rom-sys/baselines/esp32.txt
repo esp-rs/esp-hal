@@ -1,4 +1,4 @@
-GIT_REV: 3b783df8
+GIT_REV: f60817cc
 __assert_func
 __atoi
 __mktime
