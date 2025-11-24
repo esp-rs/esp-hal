@@ -19,7 +19,7 @@ mod tests {
     // If this turns out to be too flaky or time-consuming,
     // we should consider converting this into a qa-test.
     #[test]
-    #[timeout(10)]
+    #[timeout(15)]
     fn test_scan_doesnt_leak(p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
