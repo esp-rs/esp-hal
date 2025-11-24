@@ -50,6 +50,7 @@ unsafe extern "Rust" {
     fn esp_rtos_current_task_thread_semaphore() -> SemaphorePtr;
 
     fn esp_rtos_usleep(us: u32);
+    fn esp_rtos_usleep_until(us: u64);
     fn esp_rtos_now() -> u64;
 }
 
@@ -132,6 +133,12 @@ macro_rules! scheduler_impl {
 
         #[unsafe(no_mangle)]
         #[inline]
+        fn esp_rtos_usleep_until(target: u64) {
+            <$t as $crate::Scheduler>::usleep_until(&$driver, target)
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
         fn esp_rtos_now() -> u64 {
             <$t as $crate::Scheduler>::now(&$driver)
         }
@@ -195,6 +202,10 @@ macro_rules! scheduler_impl {
 ///         unimplemented!()
 ///     }
 ///
+///     fn usleep_until(&self, target: u64) {
+///         unimplemented!()
+///     }
+///
 ///     fn now(&self) -> u64 {
 ///         unimplemented!()
 ///     }
@@ -247,6 +258,11 @@ pub trait Scheduler: Send + Sync + 'static {
 
     /// This function is called by a task to sleep for the specified number of microseconds.
     fn usleep(&self, us: u32);
+
+    /// This function is called by a task to sleep until the specified timestamp.
+    ///
+    /// The timestamp is measured in microseconds, from the time the timer was started.
+    fn usleep_until(&self, target: u64);
 
     /// Returns the current timestamp in microseconds.
     ///
@@ -331,6 +347,14 @@ pub fn current_task_thread_semaphore() -> SemaphorePtr {
 #[inline]
 pub fn usleep(us: u32) {
     unsafe { esp_rtos_usleep(us) }
+}
+
+/// Puts the current task to sleep until the specified timestamp.
+///
+/// The timestamp is measured in microseconds, from the time the timer was started.
+#[inline]
+pub fn usleep_until(target: u64) {
+    unsafe { esp_rtos_usleep_until(target) }
 }
 
 /// Returns the current timestamp, in microseconds.

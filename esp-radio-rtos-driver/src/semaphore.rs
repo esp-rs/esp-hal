@@ -19,7 +19,8 @@
 //! Users should use [`SemaphoreHandle`] to interact with semaphores created by the driver
 //! implementation. Use [`SemaphoreKind`] to specify the type of semaphore or mutex to create.
 //!
-//! > Note that the only expected user of this crate is esp-radio.
+//! > Note that the only expected user of this crate is esp-radio. Application code should rely on
+//! > the platform's implementation of semaphores and mutexes.
 
 use core::ptr::NonNull;
 
@@ -43,6 +44,10 @@ unsafe extern "Rust" {
     fn esp_rtos_semaphore_delete(semaphore: SemaphorePtr);
 
     fn esp_rtos_semaphore_take(semaphore: SemaphorePtr, timeout_us: Option<u32>) -> bool;
+    fn esp_rtos_semaphore_take_with_deadline(
+        semaphore: SemaphorePtr,
+        deadline_instant: Option<u64>,
+    ) -> bool;
     fn esp_rtos_semaphore_give(semaphore: SemaphorePtr) -> bool;
     fn esp_rtos_semaphore_try_give_from_isr(
         semaphore: SemaphorePtr,
@@ -130,7 +135,7 @@ pub trait SemaphoreImplementation {
     /// `semaphore` must be a pointer returned from [`Self::create`].
     unsafe fn delete(semaphore: SemaphorePtr);
 
-    /// Increments the semaphore's counter.
+    /// Decrements the semaphore's counter.
     ///
     /// If a timeout is given, this function should block until either a semaphore could be taken,
     /// or the timeout has been reached. If no timeout is specified, the function should block
@@ -146,6 +151,24 @@ pub trait SemaphoreImplementation {
     ///
     /// `semaphore` must be a pointer returned from [`Self::create`].
     unsafe fn take(semaphore: SemaphorePtr, timeout_us: Option<u32>) -> bool;
+
+    /// Decrements the semaphore's counter.
+    ///
+    /// If a deadline is given, this function should block until either a semaphore could be taken,
+    /// or the deadline has been reached. If no deadline is specified, the function should block
+    /// indefinitely.
+    ///
+    /// Recursive mutexes can be repeatedly taken by the same task.
+    ///
+    /// The deadline is specified in microseconds since epoch.
+    ///
+    /// This function returns `true` if the semaphore was taken, `false` if the deadline was
+    /// reached.
+    ///
+    /// # Safety
+    ///
+    /// `semaphore` must be a pointer returned from [`Self::create`].
+    unsafe fn take_with_deadline(semaphore: SemaphorePtr, deadline_instant: Option<u64>) -> bool;
 
     /// Increments the semaphore's counter.
     ///
@@ -232,6 +255,20 @@ macro_rules! register_semaphore_implementation {
         ) -> bool {
             unsafe {
                 <$t as $crate::semaphore::SemaphoreImplementation>::take(semaphore, timeout_us)
+            }
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_rtos_semaphore_take_with_deadline(
+            semaphore: $crate::semaphore::SemaphorePtr,
+            deadline_instant: Option<u64>,
+        ) -> bool {
+            unsafe {
+                <$t as $crate::semaphore::SemaphoreImplementation>::take_with_deadline(
+                    semaphore,
+                    deadline_instant,
+                )
             }
         }
 
@@ -332,7 +369,7 @@ impl SemaphoreHandle {
         unsafe { core::mem::transmute(ptr) }
     }
 
-    /// Increments the semaphore's counter.
+    /// Decrements the semaphore's counter.
     ///
     /// If a timeout is given, this function blocks until either a semaphore could be taken, or the
     /// timeout has been reached. If no timeout is given, this function blocks until the operation
@@ -342,6 +379,19 @@ impl SemaphoreHandle {
     #[inline]
     pub fn take(&self, timeout_us: Option<u32>) -> bool {
         unsafe { esp_rtos_semaphore_take(self.0, timeout_us) }
+    }
+
+    /// Decrements the semaphore's counter.
+    ///
+    /// If a deadline is given, this function blocks until either a semaphore could be taken, or the
+    /// deadline has been reached. If no deadline is given, this function blocks until the operation
+    /// succeeds.
+    ///
+    /// This function returns `true` if the semaphore was taken, `false` if the deadline was
+    /// reached.
+    #[inline]
+    pub fn take_with_deadline(&self, deadline_instant: Option<u64>) -> bool {
+        unsafe { esp_rtos_semaphore_take_with_deadline(self.0, deadline_instant) }
     }
 
     /// Increments the semaphore's counter.

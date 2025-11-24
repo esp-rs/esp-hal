@@ -32,17 +32,34 @@ unsafe extern "Rust" {
         item: *const u8,
         timeout_us: Option<u32>,
     ) -> bool;
+    fn esp_rtos_queue_send_to_front_with_deadline(
+        queue: QueuePtr,
+        item: *const u8,
+        deadline_instant: Option<u64>,
+    ) -> bool;
+
     fn esp_rtos_queue_send_to_back(
         queue: QueuePtr,
         item: *const u8,
         timeout_us: Option<u32>,
     ) -> bool;
+    fn esp_rtos_queue_send_to_back_with_deadline(
+        queue: QueuePtr,
+        item: *const u8,
+        deadline_instant: Option<u64>,
+    ) -> bool;
+
     fn esp_rtos_queue_try_send_to_back_from_isr(
         queue: QueuePtr,
         item: *const u8,
         higher_prio_task_waken: Option<&mut bool>,
     ) -> bool;
     fn esp_rtos_queue_receive(queue: QueuePtr, item: *mut u8, timeout_us: Option<u32>) -> bool;
+    fn esp_rtos_queue_receive_with_deadline(
+        queue: QueuePtr,
+        item: *mut u8,
+        deadline_instant: Option<u64>,
+    ) -> bool;
     fn esp_rtos_queue_try_receive_from_isr(
         queue: QueuePtr,
         item: *mut u8,
@@ -141,6 +158,23 @@ pub trait QueueImplementation {
     /// a size equal to the queue's item size.
     unsafe fn send_to_front(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool;
 
+    /// Enqueues a high-priority item.
+    ///
+    /// If the queue is full, this function will block until the deadline is reached. If the
+    /// deadline is None, the function will block indefinitely.
+    ///
+    /// This function returns `true` if the item was successfully enqueued, `false` otherwise.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `item` can be dereferenced and points to an allocation of
+    /// a size equal to the queue's item size.
+    unsafe fn send_to_front_with_deadline(
+        queue: QueuePtr,
+        item: *const u8,
+        deadline_instant: Option<u64>,
+    ) -> bool;
+
     /// Enqueues an item.
     ///
     /// If the queue is full, this function will block for the given timeout. If timeout is None,
@@ -153,6 +187,23 @@ pub trait QueueImplementation {
     /// The caller must ensure that `item` can be dereferenced and points to an allocation of
     /// a size equal to the queue's item size.
     unsafe fn send_to_back(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool;
+
+    /// Enqueues an item.
+    ///
+    /// If the queue is full, this function will block until the given deadline. If deadline is
+    /// None, the function will block indefinitely.
+    ///
+    /// This function returns `true` if the item was successfully enqueued, `false` otherwise.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `item` can be dereferenced and points to an allocation of
+    /// a size equal to the queue's item size.
+    unsafe fn send_to_back_with_deadline(
+        queue: QueuePtr,
+        item: *const u8,
+        deadline_instant: Option<u64>,
+    ) -> bool;
 
     /// Attempts to enqueues an item.
     ///
@@ -183,6 +234,23 @@ pub trait QueueImplementation {
     /// The caller must ensure that `item` can be dereferenced and points to an allocation of
     /// a size equal to the queue's item size.
     unsafe fn receive(queue: QueuePtr, item: *mut u8, timeout_us: Option<u32>) -> bool;
+
+    /// Dequeues an item from the queue.
+    ///
+    /// If the queue is empty, this function will block until the given deadline is reached. If the
+    /// deadline is None, the function will block indefinitely.
+    ///
+    /// This function returns `true` if the item was successfully dequeued, `false` otherwise.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `item` can be dereferenced and points to an allocation of
+    /// a size equal to the queue's item size.
+    unsafe fn receive_with_deadline(
+        queue: QueuePtr,
+        item: *mut u8,
+        deadline_instant: Option<u64>,
+    ) -> bool;
 
     /// Attempts to dequeue an item from the queue.
     ///
@@ -244,6 +312,22 @@ macro_rules! register_queue_implementation {
 
         #[unsafe(no_mangle)]
         #[inline]
+        fn esp_rtos_queue_send_to_front_with_deadline(
+            queue: QueuePtr,
+            item: *const u8,
+            deadline_instant: Option<u64>,
+        ) -> bool {
+            unsafe {
+                <$t as $crate::queue::QueueImplementation>::send_to_front_with_deadline(
+                    queue,
+                    item,
+                    deadline_instant,
+                )
+            }
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
         fn esp_rtos_queue_send_to_back(
             queue: QueuePtr,
             item: *const u8,
@@ -251,6 +335,22 @@ macro_rules! register_queue_implementation {
         ) -> bool {
             unsafe {
                 <$t as $crate::queue::QueueImplementation>::send_to_back(queue, item, timeout_us)
+            }
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_rtos_queue_send_to_back_with_deadline(
+            queue: QueuePtr,
+            item: *const u8,
+            deadline_instant: Option<u64>,
+        ) -> bool {
+            unsafe {
+                <$t as $crate::queue::QueueImplementation>::send_to_back_with_deadline(
+                    queue,
+                    item,
+                    deadline_instant,
+                )
             }
         }
 
@@ -274,6 +374,22 @@ macro_rules! register_queue_implementation {
         #[inline]
         fn esp_rtos_queue_receive(queue: QueuePtr, item: *mut u8, timeout_us: Option<u32>) -> bool {
             unsafe { <$t as $crate::queue::QueueImplementation>::receive(queue, item, timeout_us) }
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_rtos_queue_receive_with_deadline(
+            queue: QueuePtr,
+            item: *mut u8,
+            deadline_instant: Option<u64>,
+        ) -> bool {
+            unsafe {
+                <$t as $crate::queue::QueueImplementation>::receive_with_deadline(
+                    queue,
+                    item,
+                    deadline_instant,
+                )
+            }
         }
 
         #[unsafe(no_mangle)]
@@ -366,6 +482,26 @@ impl QueueHandle {
         unsafe { esp_rtos_queue_send_to_front(self.0, item, timeout_us) }
     }
 
+    /// Enqueues a high-priority item.
+    ///
+    /// If the queue is full, this function will block until the deadline is reached. If the
+    /// deadline is None, the function will block indefinitely.
+    ///
+    /// This function returns `true` if the item was successfully enqueued, `false` otherwise.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `item` can be dereferenced and points to an allocation of
+    /// a size equal to the queue's item size.
+    #[inline]
+    pub unsafe fn send_to_front_with_deadline(
+        &self,
+        item: *const u8,
+        deadline_instant: Option<u64>,
+    ) -> bool {
+        unsafe { esp_rtos_queue_send_to_front_with_deadline(self.0, item, deadline_instant) }
+    }
+
     /// Enqueues an item.
     ///
     /// If the queue is full, this function will block for the given timeout. If timeout is None,
@@ -380,6 +516,26 @@ impl QueueHandle {
     #[inline]
     pub unsafe fn send_to_back(&self, item: *const u8, timeout_us: Option<u32>) -> bool {
         unsafe { esp_rtos_queue_send_to_back(self.0, item, timeout_us) }
+    }
+
+    /// Enqueues an item.
+    ///
+    /// If the queue is full, this function will block until the given deadline. If deadline is
+    /// None, the function will block indefinitely.
+    ///
+    /// This function returns `true` if the item was successfully enqueued, `false` otherwise.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `item` can be dereferenced and points to an allocation of
+    /// a size equal to the queue's item size.
+    #[inline]
+    pub unsafe fn send_to_back_with_deadline(
+        &self,
+        item: *const u8,
+        deadline_instant: Option<u64>,
+    ) -> bool {
+        unsafe { esp_rtos_queue_send_to_back_with_deadline(self.0, item, deadline_instant) }
     }
 
     /// Attempts to enqueues an item.
@@ -418,6 +574,26 @@ impl QueueHandle {
     #[inline]
     pub unsafe fn receive(&self, item: *mut u8, timeout_us: Option<u32>) -> bool {
         unsafe { esp_rtos_queue_receive(self.0, item, timeout_us) }
+    }
+
+    /// Dequeues an item from the queue.
+    ///
+    /// If the queue is empty, this function will block until the given deadline is reached. If
+    /// deadline is None, the function will block indefinitely.
+    ///
+    /// This function returns `true` if the item was successfully dequeued, `false` otherwise.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `item` can be dereferenced and points to an allocation of
+    /// a size equal to the queue's item size.
+    #[inline]
+    pub unsafe fn receive_with_deadline(
+        &self,
+        item: *mut u8,
+        deadline_instant: Option<u64>,
+    ) -> bool {
+        unsafe { esp_rtos_queue_receive_with_deadline(self.0, item, deadline_instant) }
     }
 
     /// Attempts to dequeue an item from the queue.
@@ -469,7 +645,10 @@ impl Drop for QueueHandle {
 
 use alloc::{boxed::Box, vec};
 
-use crate::semaphore::{SemaphoreHandle, SemaphoreKind};
+use crate::{
+    now,
+    semaphore::{SemaphoreHandle, SemaphoreKind},
+};
 
 struct QueueInner {
     storage: Box<[u8]>,
@@ -616,12 +795,21 @@ impl QueueImplementation for CompatQueue {
     }
 
     unsafe fn send_to_front(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool {
+        let deadline_instant = timeout_us.map(|timeout| now() + timeout as u64);
+        unsafe { Self::send_to_front_with_deadline(queue, item, deadline_instant) }
+    }
+
+    unsafe fn send_to_front_with_deadline(
+        queue: QueuePtr,
+        item: *const u8,
+        deadline_instant: Option<u64>,
+    ) -> bool {
         let queue = unsafe { CompatQueue::from_ptr(queue) };
 
-        if queue.semaphore_empty.take(timeout_us) {
+        if queue.semaphore_empty.take_with_deadline(deadline_instant) {
             // The inner mutex shouldn't be held for a long time, but we still shouldn't block
             // indefinitely.
-            if queue.mutex.take(timeout_us) {
+            if queue.mutex.take_with_deadline(deadline_instant) {
                 let inner = unsafe { &mut *queue.inner.get() };
                 inner.send_to_front(item);
 
@@ -638,12 +826,21 @@ impl QueueImplementation for CompatQueue {
     }
 
     unsafe fn send_to_back(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool {
+        let deadline_instant = timeout_us.map(|timeout| now() + timeout as u64);
+        unsafe { Self::send_to_back_with_deadline(queue, item, deadline_instant) }
+    }
+
+    unsafe fn send_to_back_with_deadline(
+        queue: QueuePtr,
+        item: *const u8,
+        deadline_instant: Option<u64>,
+    ) -> bool {
         let queue = unsafe { CompatQueue::from_ptr(queue) };
 
-        if queue.semaphore_empty.take(timeout_us) {
+        if queue.semaphore_empty.take_with_deadline(deadline_instant) {
             // The inner mutex shouldn't be held for a long time, but we still shouldn't block
             // indefinitely.
-            if queue.mutex.take(timeout_us) {
+            if queue.mutex.take_with_deadline(deadline_instant) {
                 let inner = unsafe { &mut *queue.inner.get() };
                 inner.send_to_back(item);
 
@@ -696,10 +893,19 @@ impl QueueImplementation for CompatQueue {
     }
 
     unsafe fn receive(queue: QueuePtr, item: *mut u8, timeout_us: Option<u32>) -> bool {
+        let deadline_instant = timeout_us.map(|timeout| now() + timeout as u64);
+        unsafe { Self::receive_with_deadline(queue, item, deadline_instant) }
+    }
+
+    unsafe fn receive_with_deadline(
+        queue: QueuePtr,
+        item: *mut u8,
+        deadline_instant: Option<u64>,
+    ) -> bool {
         let queue = unsafe { CompatQueue::from_ptr(queue) };
 
-        if queue.semaphore_full.take(timeout_us) {
-            if queue.mutex.take(timeout_us) {
+        if queue.semaphore_full.take_with_deadline(deadline_instant) {
+            if queue.mutex.take_with_deadline(deadline_instant) {
                 let inner = unsafe { &mut *queue.inner.get() };
                 inner.read_from_front(item);
 

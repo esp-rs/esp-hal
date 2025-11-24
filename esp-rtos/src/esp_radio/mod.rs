@@ -14,6 +14,8 @@ use esp_radio_rtos_driver::{
 
 use crate::{
     SCHEDULER,
+    micros_to_deadline,
+    micros_to_timeout,
     run_queue::MaxPriority,
     scheduler::Scheduler,
     semaphore::Semaphore,
@@ -101,6 +103,10 @@ impl esp_radio_rtos_driver::Scheduler for Scheduler {
         SCHEDULER.sleep_until(Instant::now() + Duration::from_micros(us as u64));
     }
 
+    fn usleep_until(&self, target: u64) {
+        SCHEDULER.sleep_until(Instant::EPOCH + Duration::from_micros(target));
+    }
+
     fn now(&self) -> u64 {
         // We're using a SingleShotTimer as the time driver, which lets us use the system timer's
         // timestamps.
@@ -132,7 +138,13 @@ impl SemaphoreImplementation for Semaphore {
     unsafe fn take(semaphore: SemaphorePtr, timeout_us: Option<u32>) -> bool {
         let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
 
-        semaphore.take(timeout_us)
+        semaphore.take(micros_to_timeout(timeout_us))
+    }
+
+    unsafe fn take_with_deadline(semaphore: SemaphorePtr, deadline_instant: Option<u64>) -> bool {
+        let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
+
+        semaphore.take_with_deadline(micros_to_deadline(deadline_instant))
     }
 
     unsafe fn give(semaphore: SemaphorePtr) -> bool {

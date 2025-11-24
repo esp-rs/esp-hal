@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `usleep_until` and `Scheduler::usleep_until` to put the current task to sleep until the specified timestamp. (#4555)
+- `SemaphoreHandle::take_with_deadline` to take a semaphore with a deadline. (#4555)
+- `QueueHandle::{send_to_front_with_deadline, send_to_back_with_deadline, receive_with_deadline}` for queue operations with a deadline. (#4555)
 
 ### Changed
 
