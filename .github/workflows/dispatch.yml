@@ -613,12 +613,24 @@ jobs:
             ));
 
             if (!chips.length) {
-                core.setFailed('No valid chips specified. Allowed: ' + allowed.join(', '));
+                const msg = 'No valid chips specified.\n\nAllowed chips are: ' + allowed.join(', ');
+                core.setOutput('chips', '');
+                core.setOutput('chips_label', '');
+                core.setOutput('error', msg);
                 return;
             }
 
             core.setOutput('chips', chips.join(' '));
             core.setOutput('chips_label', chips.join(', '));
+            core.setOutput('error', '');
+
+      - name: Report invalid chips
+        if: steps.parse.outputs.chips == '' && steps.parse.outputs.error != ''
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            @${{ github.event.comment.user.login }}, HIL **per-chip** request failed: ${{ steps.parse.outputs.error }}
 
       - name: Dispatch HIL (per-chip)
         if: steps.parse.outputs.chips != ''
