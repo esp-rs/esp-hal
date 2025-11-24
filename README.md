@@ -13,14 +13,14 @@
   </a>
 </p>
 
-Bare-metal (`no_std`) hardware abstraction layer for Espressif devices. Currently supports, to varying degrees, the following devices:
+Bare-metal (`no_std`) hardware abstraction layer for Espressif devices. Currently supports the following devices:
 
 - ESP32 Series: _ESP32_
 - ESP32-C Series: _ESP32-C2, ESP32-C3, ESP32-C6_
 - ESP32-H Series: _ESP32-H2_
 - ESP32-S Series: _ESP32-S2, ESP32-S3_
 
-Additionally provides limited support for programming the low-power RISC-V cores found on the _ESP32-C6_, _ESP32-S2_, and _ESP32-S3_ via the [esp-lp-hal] package.
+Additionally provides support for programming the low-power RISC-V cores found on the _ESP32-C6_, _ESP32-S2_, and _ESP32-S3_ via the [esp-lp-hal] package.
 
 For additional information regarding any of the crates in this repository, please refer to the relevant crate's `README.md` file. If you have any questions, comments, or concerns, please [open an issue], [start a new discussion], or join us on [Matrix].
 
@@ -69,6 +69,10 @@ esp-hal = { version = "~1.1" }
 ```
 
 Using the [`~` operator](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#tilde-requirements) will prevent cargo auto updating to minor versions, allowing you to use `cargo update` without the possiblity of breaking your project.
+
+## AI Contribution Policy
+
+We follow the same policy as the official Rust Embedded working group, please review [the policy](https://github.com/rust-embedded/wg/blob/HEAD/CODE_OF_CONDUCT.md#ai-tool-use-policy) before contributing with AI tools.
 
 ## Contributing
 
