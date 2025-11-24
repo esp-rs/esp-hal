@@ -25,6 +25,7 @@ struct TimerQueueInner {
     next_wakeup: u64,
     task: Option<TaskPtr>,
     processing: bool,
+    scheduled_for_drop: alloc::vec::Vec<TimerPtr>,
 }
 
 unsafe impl Send for TimerQueueInner {}
@@ -36,6 +37,7 @@ impl TimerQueueInner {
             next_wakeup: 0,
             task: None,
             processing: false,
+            scheduled_for_drop: alloc::vec::Vec::new(),
         }
     }
 
@@ -45,7 +47,7 @@ impl TimerQueueInner {
         let due = props.next_due;
 
         if !props.enqueued {
-            trace!("Enqueueing timer {:x}", timer as *const _ as usize);
+            debug!("Enqueueing timer {:x}", timer as *const _ as usize);
             props.enqueued = true;
 
             props.next = head;
@@ -140,7 +142,7 @@ impl TimerQueue {
                 timers = props.next.take();
                 props.enqueued = false;
 
-                if !props.is_active || props.drop {
+                if !props.is_active {
                     trace!(
                         "Timer {:x} is inactive or dropped",
                         current_timer as *const _ as usize
@@ -173,19 +175,28 @@ impl TimerQueue {
             self.inner.with(|q| {
                 let props = current_timer.properties(q);
 
-                if props.drop {
-                    debug!("Dropping timer {:x} (delayed)", current.addr());
-                    let boxed = unsafe { Box::from_raw(current.as_ptr()) };
-                    core::mem::drop(boxed);
-                } else if props.is_active {
+                if props.is_active {
                     q.enqueue(current_timer);
                 } else {
-                    trace!("Timer {:x} inactive", current_timer as *const _ as usize);
+                    trace!(
+                        "Timer {:x} inactive or about to get dropped",
+                        current_timer as *const _ as usize
+                    );
                 }
             });
         }
 
         self.inner.with(|q| {
+            while let Some(timer) = q.scheduled_for_drop.pop() {
+                debug!(
+                    "Dropping timer {:x} (delayed)",
+                    timer.as_ptr() as *const _ as usize
+                );
+                let timer = unsafe { Box::from_raw(timer.cast::<Timer>().as_ptr()) };
+                q.dequeue(&timer);
+                core::mem::drop(timer);
+            }
+
             q.processing = false;
             let next_wakeup = q.next_wakeup;
             debug!("next_wakeup: {}", next_wakeup);
@@ -199,7 +210,6 @@ struct TimerProperties {
     next_due: u64,
     period: u64,
     periodic: bool,
-    drop: bool,
 
     enqueued: bool,
     next: Option<NonNull<Timer>>,
@@ -232,7 +242,6 @@ impl Timer {
                 next_due: 0,
                 period: 0,
                 periodic: false,
-                drop: false,
 
                 enqueued: false,
                 next: None,
@@ -298,20 +307,23 @@ impl TimerImplementation for Timer {
     unsafe fn delete(timer: TimerPtr) {
         debug!("Deleting timer: {:x}", timer.addr());
         TIMER_QUEUE.inner.with(|q| {
-            let timer = unsafe { Box::from_raw(timer.cast::<Timer>().as_ptr()) };
+            // we don't drop the timer right now, since it might be
+            // processed currently
+            debug!("schedule timer for dropping after processing the queue");
+            q.scheduled_for_drop.push(timer);
 
-            // There are two cases:
-            // - We can remove the timer from the queue - we can drop it.
-            // - We can't remove the timer from the queue. There are the following cases:
-            //   - The timer isn't in the queue. We can drop it.
-            //   - The timer is in the queue and the queue is being processed. We need to mark it to
-            //     be dropped by the timer queue.
-            if q.dequeue(&timer) {
-                core::mem::drop(timer);
-            } else {
-                timer.properties(q).drop = true;
-                core::mem::forget(timer);
+            // make sure the queue will get processed soon
+            // and cleanup will happen
+            if !q.processing && q.next_wakeup == u64::MAX {
+                q.next_wakeup = 0;
+
+                if let Some(task) = q.task {
+                    task.resume();
+                }
             }
+
+            let timer = unsafe { Timer::from_ptr(timer) };
+            timer.properties(q).is_active = false;
         })
     }
 
