@@ -2,9 +2,13 @@ name: HIL
 
 run-name: >
   ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.pr_number != '' &&
-      format('HIL for PR #{0} ({1})', github.event.inputs.pr_number, github.event.inputs.matrix) ||
+      (github.event.inputs.chips != '' &&
+        format('HIL for PR #{0} ({1})', github.event.inputs.pr_number, github.event.inputs.chips) ||
+        format('HIL for PR #{0} ({1})', github.event.inputs.pr_number, github.event.inputs.matrix)) ||
       github.event_name == 'workflow_dispatch' &&
-      format('HIL (manual dispatch, {0})', github.event.inputs.matrix) ||
+      (github.event.inputs.chips != '' &&
+        format('HIL (manual dispatch, {0})', github.event.inputs.chips) ||
+        format('HIL (manual dispatch, {0})', github.event.inputs.matrix)) ||
       'HIL (merge queue)' }}
 
 on:
@@ -27,6 +31,10 @@ on:
         default: "quick"
       pr_number:
         description: "Pull request number (for slash-triggered runs)"
+        required: false
+        default: ""
+      chips:
+        description: "Space-separated list of SoCs to test (for per-chip runs)"
         required: false
         default: ""
 
@@ -85,7 +93,11 @@ jobs:
           path: target/aarch64-unknown-linux-gnu/release/xtask
 
   build-tests-full:
-    if: github.event_name == 'merge_group' || github.event.inputs.matrix == 'full'
+    if: >
+      github.event_name == 'merge_group' ||
+      (github.event_name == 'workflow_dispatch' &&
+       github.event.inputs.matrix == 'full' &&
+       (github.event.inputs.chips == '' ))
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -154,7 +166,6 @@ jobs:
           soc: ${{ matrix.target.soc }}
           rust_target: ${{ matrix.target.rust-target }}
 
-
   hil-quick:
     if: github.event_name != 'merge_group' && github.event.inputs.matrix != 'full'
     needs: [build-tests-quick, build-xtasks]
@@ -177,7 +188,6 @@ jobs:
         with:
           name: tests-${{ matrix.target.soc }}
           path: tests-${{ matrix.target.soc }}
-        # In a quick run, some artifacts won't exist — job wouldn't fail because of that.
         continue-on-error: true
 
       - uses: actions/download-artifact@v4
@@ -209,7 +219,11 @@ jobs:
           rm -f xtask || true
 
   hil-full:
-    if: github.event_name == 'merge_group' || github.event.inputs.matrix == 'full'
+    if: >
+      github.event_name == 'merge_group' ||
+      (github.event_name == 'workflow_dispatch' &&
+       github.event.inputs.matrix == 'full' &&
+       (github.event.inputs.chips == '' ))
     needs: [build-tests-full, build-xtasks]
     runs-on:
       labels: [self-hosted, "${{ matrix.target.runner }}"]
@@ -250,7 +264,6 @@ jobs:
         with:
           name: tests-${{ matrix.target.soc }}
           path: tests-${{ matrix.target.soc }}
-        # In a quick run, some artifacts won't exist — job wouldn't fail because of that.
         continue-on-error: true
 
       - uses: actions/download-artifact@v4

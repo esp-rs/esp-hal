@@ -50,7 +50,6 @@ jobs:
             const login = "${{ steps.pr.outputs.login }}".toLowerCase();
             const existing = `${{ toJson(steps.find.outputs.comment-body || '') }}`;
 
-            // read existing trusted[] from hidden JSON if present
             let list = [];
             const m = existing.match(/<!--\s*HIL_TRUST_JSON\s*([\s\S]*?)\s*HIL_TRUST_JSON\s*-->/);
             if (m && m[1]) {
@@ -130,7 +129,6 @@ jobs:
             const login = "${{ steps.parse.outputs.login }}".toLowerCase();
             const existing = `${{ toJson(steps.find.outputs.comment-body || '') }}`;
 
-            // read existing trusted[] from hidden JSON if present
             let list = [];
             const m = existing.match(/<!--\s*HIL_TRUST_JSON\s*([\s\S]*?)\s*HIL_TRUST_JSON\s*-->/);
             if (m && m[1]) {
@@ -156,7 +154,7 @@ jobs:
 
             </details>`;
 
-                        core.setOutput("body", body);
+            core.setOutput("body", body);
 
       - uses: peter-evans/create-or-update-comment@v4
         with:
@@ -168,7 +166,6 @@ jobs:
       - uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.issue.number }}
-        # separate short confirmation comment
           body: "Trusted **@${{ steps.parse.outputs.login }}** for this PR. They can now use `/hil quick` or `/hil full`."
 
   revoke:
@@ -229,7 +226,7 @@ jobs:
 
             </details>`;
 
-                        core.setOutput("body", body);
+            core.setOutput("body", body);
 
       - uses: peter-evans/create-or-update-comment@v4
         with:
@@ -244,7 +241,7 @@ jobs:
           body: "Revoked **@${{ steps.parse.outputs.login }}** for this PR."
 
   # ---------------------------------------------------------------------------
-  # SLASH-BASED DISPATCHES (/hil quick, /hil full)
+  # SLASH-BASED DISPATCHES (/hil quick, /hil full, /hil <chips...>)
   # ---------------------------------------------------------------------------
 
   auth:
@@ -311,7 +308,8 @@ jobs:
               "repository": "${{ github.repository }}",
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
               "matrix": "quick",
-              "pr_number": "${{ github.event.issue.number }}"
+              "pr_number": "${{ github.event.issue.number }}",
+              "chips": ""
             }
 
       - name: Find HIL run URL (quick)
@@ -325,10 +323,8 @@ jobs:
             const expectedTitle = `HIL for PR #${pr} (${matrix})`;
 
             const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-
             let run = null;
 
-            // Try multiple times; keep the *last* matching run we see
             for (let attempt = 1; attempt <= 10; attempt++) {
                 const { data } = await github.rest.actions.listWorkflowRuns({
                     owner,
@@ -343,7 +339,6 @@ jobs:
                         (r.display_title && r.display_title.trim() === expectedTitle) ||
                         (r.name && r.name.trim() === expectedTitle)
                     );
-                    // Keep the *last* matching run we see across all attempts
                     if (candidate) {
                         run = candidate;
                     }
@@ -352,7 +347,7 @@ jobs:
                 await delay(3000);
             }
 
-            let body = `Triggered **${matrix}** HIL run for #${pr}.`;
+            let body = `Triggered **quick** HIL run for #${pr}.`;
             if (run && run.html_url) {
                 body += `\n\nRun: ${run.html_url}`;
             } else {
@@ -386,14 +381,10 @@ jobs:
             const { owner, repo } = context.repo;
             const runId = Number('${{ needs.hil-quick.outputs.run_id }}');
             const commentId = Number('${{ needs.hil-quick.outputs.comment_id }}');
-            const pr = context.payload.issue.number;
-            const matrix = 'quick';
-
             const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
             let conclusion = null;
 
-            // Poll up to ~15 minutes (60 * 15s)
             for (let i = 0; i < 60; i++) {
               const { data } = await github.rest.actions.getWorkflowRun({
                 owner,
@@ -405,19 +396,18 @@ jobs:
                 conclusion = data.conclusion;
                 break;
               }
-
               await delay(15000);
             }
 
             let suffix;
             if (!conclusion) {
-              suffix = `\n\n**Status update:** HIL (${matrix}) run is still in progress or status unknown.`;
+              suffix = `\n\n**Status update:** HIL (quick) run is still in progress or status unknown.`;
             } else if (conclusion === 'success') {
-              suffix = `\n\n**Status update:** ✅ HIL (${matrix}) run **succeeded**.`;
+              suffix = `\n\n**Status update:** ✅ HIL (quick) run **succeeded**.`;
             } else if (conclusion === 'cancelled') {
-              suffix = `\n\n**Status update:** ⚠️ HIL (${matrix}) run was **cancelled**.`;
+              suffix = `\n\n**Status update:** ⚠️ HIL (quick) run was **cancelled**.`;
             } else {
-              suffix = `\n\n**Status update:** ❌ HIL (${matrix}) run **failed** (conclusion: ${conclusion}).`;
+              suffix = `\n\n**Status update:** ❌ HIL (quick) run **failed** (conclusion: ${conclusion}).`;
             }
 
             // Fetch existing comment
@@ -456,7 +446,8 @@ jobs:
               "repository": "${{ github.repository }}",
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
               "matrix": "full",
-              "pr_number": "${{ github.event.issue.number }}"
+              "pr_number": "${{ github.event.issue.number }}",
+              "chips": ""
             }
 
       - name: Find HIL run URL (full)
@@ -470,10 +461,8 @@ jobs:
             const expectedTitle = `HIL for PR #${pr} (${matrix})`;
 
             const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-
             let run = null;
 
-            // Try multiple times; keep the *last* matching run we see
             for (let attempt = 1; attempt <= 10; attempt++) {
                 const { data } = await github.rest.actions.listWorkflowRuns({
                     owner,
@@ -496,7 +485,7 @@ jobs:
                 await delay(3000);
             }
 
-            let body = `Triggered **${matrix}** HIL run for #${pr}.`;
+            let body = `Triggered **full** HIL run for #${pr}.`;
             if (run && run.html_url) {
                 body += `\n\nRun: ${run.html_url}`;
             } else {
@@ -530,61 +519,193 @@ jobs:
             const { owner, repo } = context.repo;
             const runId = Number('${{ needs.hil-full.outputs.run_id }}');
             const commentId = Number('${{ needs.hil-full.outputs.comment_id }}');
-            const pr = context.payload.issue.number;
-            const matrix = 'full';
-
             const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
             let conclusion = null;
 
-            // Poll up to ~15 minutes (60 * 15s)
             for (let i = 0; i < 60; i++) {
-              const { data } = await github.rest.actions.getWorkflowRun({
-                owner,
-                repo,
-                run_id: runId,
+                const { data } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: runId });
+                if (data.status === 'completed') {
+                    conclusion = data.conclusion;
+                    break;
+                }
+                await delay(15000);
+            }
+
+            let suffix;
+            if (!conclusion) {
+                suffix = `\n\n**Status update:** HIL (full) run is still in progress or status unknown._`;
+            } else if (conclusion === 'success') {
+                suffix = `\n\n**Status update:** ✅ HIL (full) run **succeeded**.`;
+            } else if (conclusion === 'cancelled') {
+                suffix = `\n\n**Status update:** ⚠️ HIL (full) run was **cancelled**.`;
+            } else {
+                suffix = `\n\n**Status update:** ❌ HIL (full) run **failed** (conclusion: ${conclusion}).`;
+            }
+
+            const comment = await github.rest.issues.getComment({ owner, repo, comment_id: commentId });
+            const body = `${comment.data.body}\n${suffix}`;
+
+            await github.rest.issues.updateComment({ owner, repo, comment_id: commentId, body });
+
+  # ---------------------------------------------------------------------------
+  # PER-CHIP HIL: /hil esp32c3 [esp32s3 ...]
+  # ---------------------------------------------------------------------------
+
+  hil-chips:
+    needs: auth
+    if: github.event_name == 'issue_comment' &&
+        needs.auth.outputs.allowed == 'true' &&
+        startsWith(github.event.comment.body, '/hil ') &&
+        !startsWith(github.event.comment.body, '/hil quick') &&
+        !startsWith(github.event.comment.body, '/hil full')
+    runs-on: ubuntu-latest
+    outputs:
+      run_id: ${{ steps.find-run.outputs.run_id }}
+      comment_id: ${{ steps.comment.outputs.comment-id }}
+    steps:
+      - name: Parse chips
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = (context.payload.comment.body || '').trim();
+            const parts = body.split(/\s+/).slice(1); // skip "/hil"
+            const allowed = ['esp32c2','esp32c3','esp32c6','esp32h2','esp32','esp32s2','esp32s3'];
+
+            const chips = Array.from(new Set(
+                parts.map(s => s.toLowerCase()).filter(s => allowed.includes(s))
+            ));
+
+            if (!chips.length) {
+                core.setFailed('No valid chips specified. Allowed: ' + allowed.join(', '));
+                return;
+            }
+
+            core.setOutput('chips', chips.join(' '));
+            core.setOutput('chips_label', chips.join(', '));
+
+      - name: Dispatch HIL (per-chip full)
+        if: steps.parse.outputs.chips != ''
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: hil.yml
+          ref: ${{ github.event.repository.default_branch }}
+          inputs: |
+            {
+              "repository": "${{ github.repository }}",
+              "branch": "refs/pull/${{ github.event.issue.number }}/head",
+              "matrix": "full",
+              "pr_number": "${{ github.event.issue.number }}",
+              "chips": "${{ steps.parse.outputs.chips }}"
+            }
+
+      - name: Find HIL run URL (per-chip)
+        if: steps.parse.outputs.chips != ''
+        id: find-run
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.issue.number;
+            const chips = '${{ steps.parse.outputs.chips }}';
+            const expectedTitle = `HIL for PR #${pr} (${chips})`;
+
+            const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+            let run = null;
+
+            for (let attempt = 1; attempt <= 10; attempt++) {
+                const { data } = await github.rest.actions.listWorkflowRuns({
+                    owner,
+                    repo,
+                    workflow_id: 'hil.yml',
+                    event: 'workflow_dispatch',
+                    per_page: 50,
               });
 
+              if (data.workflow_runs && data.workflow_runs.length > 0) {
+                const candidate = data.workflow_runs.find(r =>
+                    (r.display_title && r.display_title.trim() === expectedTitle) ||
+                    (r.name && r.name.trim() === expectedTitle)
+                );
+                if (candidate) {
+                    run = candidate;
+                }
+              }
+
+              await delay(3000);
+            }
+
+            let body = `Triggered **HIL** run for #${pr} (chips: ${chips}).`;
+            if (run && run.html_url) {
+                body += `\n\nRun: ${run.html_url}`;
+            } else {
+                body += `\n\nCould not determine run URL yet. Please check the **HIL** workflow runs manually.`;
+            }
+
+            if (run && run.id) {
+                core.setOutput('run_id', String(run.id));
+            } else {
+                core.setOutput('run_id', '');
+            }
+
+            core.setOutput('body', body);
+
+      - name: Confirm in PR
+        if: steps.parse.outputs.chips != ''
+        id: comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: ${{ steps.find-run.outputs.body }}
+
+  hil-chips-status:
+    needs: hil-chips
+    if: needs.hil-chips.outputs.run_id != '' && needs.hil-chips.outputs.comment_id != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for per-chip HIL run and update comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const runId = Number('${{ needs.hil-chips.outputs.run_id }}');
+            const commentId = Number('${{ needs.hil-chips.outputs.comment_id }}');
+            const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+            let conclusion = null;
+
+            for (let i = 0; i < 60; i++) {
+              const { data } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: runId });
               if (data.status === 'completed') {
                 conclusion = data.conclusion;
                 break;
               }
-
               await delay(15000);
             }
 
             let suffix;
             if (!conclusion) {
-              suffix = `\n\n**Status update:** HIL (${matrix}) run is still in progress or status unknown._`;
+              suffix = `\n\n**Status update:** HIL (per-chip) run is still in progress or status unknown.`;
             } else if (conclusion === 'success') {
-              suffix = `\n\n**Status update:** ✅ HIL (${matrix}) run **succeeded**.`;
+              suffix = `\n\n**Status update:** ✅ HIL (per-chip) run **succeeded**.`;
             } else if (conclusion === 'cancelled') {
-              suffix = `\n\n**Status update:** ⚠️ HIL (${matrix}) run was **cancelled**.`;
+              suffix = `\n\n**Status update:** ⚠️ HIL (per-chip) run was **cancelled**.`;
             } else {
-              suffix = `\n\n**Status update:** ❌ HIL (${matrix}) run **failed** (conclusion: ${conclusion}).`;
+              suffix = `\n\n**Status update:** ❌ HIL (per-chip) run **failed** (conclusion: ${conclusion}).`;
             }
 
-            // Fetch existing comment
-            const comment = await github.rest.issues.getComment({
-              owner,
-              repo,
-              comment_id: commentId,
-            });
-
+            const comment = await github.rest.issues.getComment({ owner, repo, comment_id: commentId });
             const body = `${comment.data.body}\n${suffix}`;
 
-            await github.rest.issues.updateComment({
-              owner,
-              repo,
-              comment_id: commentId,
-              body,
-            });
+            await github.rest.issues.updateComment({ owner, repo, comment_id: commentId, body });
 
   hil-deny:
     needs: auth
     if: github.event_name == 'issue_comment' && needs.auth.outputs.allowed != 'true' &&
         (startsWith(github.event.comment.body, '/hil quick') ||
          startsWith(github.event.comment.body, '/hil full')  ||
+         startsWith(github.event.comment.body, '/hil ')      ||
          startsWith(github.event.comment.body, '/test-size'))
     runs-on: ubuntu-latest
     steps:
@@ -598,10 +719,15 @@ jobs:
             ```
             /trust @${{ github.event.comment.user.login }}
             ```
-            After that, you can use `/hil quick`, `/hil full` or `/test-size`.
+            After that, you can use `/hil quick`, `/hil full`, `/hil <chips...>` or `/test-size`.
 
   hil-help:
-    if: github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/hil') && !startsWith(github.event.comment.body, '/hil quick') && !startsWith(github.event.comment.body, '/hil full')
+    if: github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        startsWith(github.event.comment.body, '/hil') &&
+        !startsWith(github.event.comment.body, '/hil quick') &&
+        !startsWith(github.event.comment.body, '/hil full') &&
+        !contains(github.event.comment.body, 'esp32')
     runs-on: ubuntu-latest
     steps:
       - name: Explain usage
@@ -611,7 +737,8 @@ jobs:
           body: |
             Usage:
             - `/hil quick` — run a quick HIL matrix (only `ESP32-S3` (Xtensa) and `ESP32-C6` (RISC-V) tests)
-            - `/hil full`  — run the full HIL matrix
+            - `/hil full`  — run the full HIL matrix for all supported chips
+            - `/hil <chip> [<chip> ...]` — run the full HIL tests **only** for the listed chips
             If you aren't a repository **member/owner**, you must be **trusted for this PR**.
             Maintainers can grant access with a `trusted-author` label or with:
             ```
