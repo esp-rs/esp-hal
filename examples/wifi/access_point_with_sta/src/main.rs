@@ -56,10 +56,10 @@ fn main() -> ! {
     let (mut controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
-    let mut ap_device = interfaces.ap;
+    let mut ap_device = interfaces.access_point;
     let ap_interface = create_interface(&mut ap_device);
 
-    let mut sta_device = interfaces.sta;
+    let mut sta_device = interfaces.station;
     let sta_interface = create_interface(&mut sta_device);
 
     let rng = Rng::new();
@@ -73,7 +73,7 @@ fn main() -> ! {
     sta_socket_set.add(smoltcp::socket::dhcpv4::Socket::new());
     let sta_stack = Stack::new(sta_interface, sta_device, sta_socket_set, now, rng.random());
 
-    let station_config = ModeConfig::ApSta(
+    let station_config = ModeConfig::AccessPointStation(
         StationConfig::default()
             .with_ssid(SSID.into())
             .with_password(PASSWORD.into()),
@@ -107,7 +107,7 @@ fn main() -> ! {
 
     println!("wifi_connect {:?}", controller.connect());
 
-    // wait for STA getting an ip address
+    // wait for Station getting an ip address
     println!("Wait to get an ip address");
     loop {
         sta_stack.work();

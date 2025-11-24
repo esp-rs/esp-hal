@@ -298,7 +298,7 @@ pub struct PeerInfo {
 
     /// Whether the data sent/received by this peer is encrypted.
     pub encrypt: bool,
-    // we always use STA for now
+    // we always use station for now
 }
 
 /// Information about a received packet.
@@ -355,25 +355,25 @@ impl Debug for ReceivedData {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum EspNowWifiInterface {
-    /// Use the AP interface
-    Ap,
-    /// Use the STA interface
-    Sta,
+    /// Use the access point interface
+    AccessPoint,
+    /// Use the station interface
+    Station,
 }
 
 impl EspNowWifiInterface {
     fn as_wifi_interface(&self) -> wifi_interface_t {
         match self {
-            EspNowWifiInterface::Ap => wifi_interface_t_WIFI_IF_AP,
-            EspNowWifiInterface::Sta => wifi_interface_t_WIFI_IF_STA,
+            EspNowWifiInterface::AccessPoint => wifi_interface_t_WIFI_IF_AP,
+            EspNowWifiInterface::Station => wifi_interface_t_WIFI_IF_STA,
         }
     }
 
     fn from_wifi_interface(interface: wifi_interface_t) -> Self {
         #[allow(non_upper_case_globals)]
         match interface {
-            wifi_interface_t_WIFI_IF_AP => EspNowWifiInterface::Ap,
-            wifi_interface_t_WIFI_IF_STA => EspNowWifiInterface::Sta,
+            wifi_interface_t_WIFI_IF_AP => EspNowWifiInterface::AccessPoint,
+            wifi_interface_t_WIFI_IF_STA => EspNowWifiInterface::Station,
             wifi_interface_t_WIFI_IF_NAN => panic!("NAN is unsupported"),
             _ => unreachable!("Unknown interface"),
         }
@@ -388,7 +388,7 @@ pub struct EspNowManager<'d> {
 
 impl EspNowManager<'_> {
     /// Set primary Wi-Fi channel.
-    /// Should only be used when using ESP-NOW without AP or STA.
+    /// Should only be used when using ESP-NOW without access point or station.
     #[instability::unstable]
     pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {
         check_error!({ esp_wifi_set_channel(channel, 0) })
@@ -692,7 +692,7 @@ impl Drop for EspNowRc<'_> {
 /// protect the action frame for security. ESP-NOW is widely used in smart
 /// light, remote controlling, sensor, etc.
 ///
-/// For convenience, by default there will be a broadcast peer added on the STA
+/// For convenience, by default there will be a broadcast peer added on the Station
 /// interface.
 #[instability::unstable]
 pub struct EspNow<'d> {
@@ -728,7 +728,7 @@ impl<'d> EspNow<'d> {
 
         esp_now
             .add_peer(PeerInfo {
-                interface: EspNowWifiInterface::Sta,
+                interface: EspNowWifiInterface::Station,
                 peer_address: BROADCAST_ADDRESS,
                 lmk: None,
                 channel: None,
@@ -747,7 +747,7 @@ impl<'d> EspNow<'d> {
     }
 
     /// Set primary Wi-Fi channel.
-    /// Should only be used when using ESP-NOW without AP or STA.
+    /// Should only be used when using ESP-NOW without access point or station.
     #[instability::unstable]
     pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {
         self.manager.set_channel(channel)

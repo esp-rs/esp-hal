@@ -36,7 +36,7 @@ use esp_radio::wifi::{
     WifiController,
     WifiDevice,
     WifiEvent,
-    WifiStaState,
+    WifiStationState,
     sta::StationConfig,
 };
 use log::{error, info};
@@ -98,7 +98,7 @@ async fn main(spawner: Spawner) -> ! {
     let (controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
-    let wifi_interface = interfaces.sta;
+    let wifi_interface = interfaces.station;
 
     let config = embassy_net::Config::dhcpv4(Default::default());
 
@@ -209,9 +209,11 @@ async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
     println!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        if esp_radio::wifi::sta_state() == WifiStaState::Connected {
+        if esp_radio::wifi::station_state() == WifiStationState::Connected {
             // wait until we're no longer connected
-            controller.wait_for_event(WifiEvent::StaDisconnected).await;
+            controller
+                .wait_for_event(WifiEvent::StationDisconnected)
+                .await;
             Timer::after(Duration::from_millis(5000)).await
         }
         if !matches!(controller.is_started(), Ok(true)) {

@@ -252,7 +252,7 @@ pub enum Capability {
 
     /// The device can operate in both station and access point modes
     /// simultaneously.
-    ApSta,
+    AccessPointStation,
 }
 
 /// Configuration of Wi-Fi operation mode.
@@ -272,7 +272,7 @@ pub enum ModeConfig {
     AccessPoint(AccessPointConfig),
 
     /// Simultaneous station and access point configuration.
-    ApSta(StationConfig, AccessPointConfig),
+    AccessPointStation(StationConfig, AccessPointConfig),
 
     /// EAP station configuration for enterprise Wi-Fi.
     #[cfg(feature = "wifi-eap")]
@@ -287,7 +287,7 @@ impl ModeConfig {
             ModeConfig::AccessPoint(access_point_configuration) => {
                 access_point_configuration.validate()
             }
-            ModeConfig::ApSta(station_configuration, access_point_configuration) => {
+            ModeConfig::AccessPointStation(station_configuration, access_point_configuration) => {
                 station_configuration.validate()?;
                 access_point_configuration.validate()
             }
@@ -365,17 +365,17 @@ impl AuthMethodExt for AuthMethod {
     }
 }
 
-/// Wi-Fi Mode (Sta and/or Ap)
+/// Wi-Fi Mode (Station and/or AccessPoint).
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum WifiMode {
     /// Station mode.
-    Sta,
+    Station,
     /// Access Point mode.
-    Ap,
-    /// Both Station and Access Point modes.
-    ApSta,
+    AccessPoint,
+    /// Both Access Point and Station modes.
+    AccessPointStation,
 }
 
 impl WifiMode {
@@ -387,18 +387,18 @@ impl WifiMode {
     }
 
     /// Returns true if this mode works as a station.
-    pub fn is_sta(&self) -> bool {
+    pub fn is_station(&self) -> bool {
         match self {
-            Self::Sta | Self::ApSta => true,
-            Self::Ap => false,
+            Self::Station | Self::AccessPointStation => true,
+            Self::AccessPoint => false,
         }
     }
 
     /// Returns true if this mode works as an access point
-    pub fn is_ap(&self) -> bool {
+    pub fn is_access_point(&self) -> bool {
         match self {
-            Self::Sta => false,
-            Self::Ap | Self::ApSta => true,
+            Self::Station => false,
+            Self::AccessPoint | Self::AccessPointStation => true,
         }
     }
 }
@@ -410,11 +410,11 @@ impl TryFrom<&ModeConfig> for WifiMode {
     fn try_from(config: &ModeConfig) -> Result<Self, Self::Error> {
         let mode = match config {
             ModeConfig::None => return Err(WifiError::UnknownWifiMode),
-            ModeConfig::AccessPoint(_) => Self::Ap,
-            ModeConfig::Station(_) => Self::Sta,
-            ModeConfig::ApSta(_, _) => Self::ApSta,
+            ModeConfig::AccessPoint(_) => Self::AccessPoint,
+            ModeConfig::Station(_) => Self::Station,
+            ModeConfig::AccessPointStation(_, _) => Self::AccessPointStation,
             #[cfg(feature = "wifi-eap")]
-            ModeConfig::EapStation(_) => Self::Sta,
+            ModeConfig::EapStation(_) => Self::Station,
         };
 
         Ok(mode)
@@ -429,9 +429,9 @@ impl TryFrom<wifi_mode_t> for WifiMode {
     fn try_from(value: wifi_mode_t) -> Result<Self, Self::Error> {
         #[allow(non_upper_case_globals)]
         match value {
-            include::wifi_mode_t_WIFI_MODE_STA => Ok(Self::Sta),
-            include::wifi_mode_t_WIFI_MODE_AP => Ok(Self::Ap),
-            include::wifi_mode_t_WIFI_MODE_APSTA => Ok(Self::ApSta),
+            include::wifi_mode_t_WIFI_MODE_STA => Ok(Self::Station),
+            include::wifi_mode_t_WIFI_MODE_AP => Ok(Self::AccessPoint),
+            include::wifi_mode_t_WIFI_MODE_APSTA => Ok(Self::AccessPointStation),
             _ => Err(WifiError::UnknownWifiMode),
         }
     }
@@ -442,9 +442,9 @@ impl From<WifiMode> for wifi_mode_t {
     fn from(val: WifiMode) -> Self {
         #[allow(non_upper_case_globals)]
         match val {
-            WifiMode::Sta => wifi_mode_t_WIFI_MODE_STA,
-            WifiMode::Ap => wifi_mode_t_WIFI_MODE_AP,
-            WifiMode::ApSta => wifi_mode_t_WIFI_MODE_APSTA,
+            WifiMode::Station => wifi_mode_t_WIFI_MODE_STA,
+            WifiMode::AccessPoint => wifi_mode_t_WIFI_MODE_AP,
+            WifiMode::AccessPointStation => wifi_mode_t_WIFI_MODE_APSTA,
         }
     }
 }
@@ -653,7 +653,7 @@ pub enum WifiError {
     /// The device disconnected from the network or failed to connect to it.
     Disconnected,
 
-    /// Unknown Wi-Fi mode (not Sta/Ap/ApSta).
+    /// Unknown Wi-Fi mode (not Station/AccessPoint/AccessPointStation).
     UnknownWifiMode,
 
     /// Unsupported operation or mode.
@@ -686,7 +686,7 @@ pub enum WifiError {
     /// Wi-Fi internal state error
     State,
 
-    /// Wi-Fi internal control block of station or soft-AP error
+    /// Wi-Fi internal control block of station or soft-AccessPoint error
     ControlBlock,
 
     /// Wi-Fi internal NVS module error
@@ -800,7 +800,7 @@ impl core::fmt::Display for WifiError {
             WifiError::State => write!(f, "Wi-Fi internal state error."),
             WifiError::ControlBlock => write!(
                 f,
-                "Wi-Fi internal control block of station or soft-AP error."
+                "Wi-Fi internal control block of station or soft-AccessPoint error."
             ),
             WifiError::Nvs => write!(f, "Wi-Fi internal NVS module error."),
             WifiError::InvalidMac => write!(f, "MAC address is invalid."),
@@ -862,64 +862,64 @@ pub enum WifiEvent {
     /// Scan operation has completed.
     ScanDone,
     /// Station mode started.
-    StaStart,
+    StationStart,
     /// Station mode stopped.
-    StaStop,
+    StationStop,
     /// Station connected to a network.
-    StaConnected,
+    StationConnected,
     /// Station disconnected from a network.
-    StaDisconnected,
+    StationDisconnected,
     /// Station authentication mode changed.
-    StaAuthmodeChange,
+    StationAuthmodeChange,
 
     /// Station WPS succeeds in enrollee mode.
-    StaWpsErSuccess,
+    StationWpsErSuccess,
     /// Station WPS fails in enrollee mode.
-    StaWpsErFailed,
+    StationWpsErFailed,
     /// Station WPS timeout in enrollee mode.
-    StaWpsErTimeout,
+    StationWpsErTimeout,
     /// Station WPS pin code in enrollee mode.
-    StaWpsErPin,
+    StationWpsErPin,
     /// Station WPS overlap in enrollee mode.
-    StaWpsErPbcOverlap,
+    StationWpsErPbcOverlap,
 
-    /// Soft-AP start.
-    ApStart,
-    /// Soft-AP stop.
-    ApStop,
-    /// A station connected to Soft-AP.
-    ApStaConnected,
-    /// A station disconnected from Soft-AP.
-    ApStaDisconnected,
-    /// Received probe request packet in Soft-AP interface.
-    ApProbeReqReceived,
+    /// Soft-AccessPoint start.
+    AccessPointStart,
+    /// Soft-AccessPoint stop.
+    AccessPointStop,
+    /// A station connected to Soft-AccessPoint.
+    AccessPointStationConnected,
+    /// A station disconnected from Soft-AccessPoint.
+    AccessPointStationDisconnected,
+    /// Received probe request packet in Soft-AccessPoint interface.
+    AccessPointProbeReqReceived,
 
     /// Received report of FTM procedure.
     FtmReport,
 
-    /// AP's RSSI crossed configured threshold.
-    StaBssRssiLow,
+    /// Station RSSI goes below the configured threshold.
+    StationBssRssiLow,
     /// Status indication of Action Tx operation.
     ActionTxStatus,
     /// Remain-on-Channel operation complete.
     RocDone,
 
     /// Station beacon timeout.
-    StaBeaconTimeout,
+    StationBeaconTimeout,
 
     /// Connectionless module wake interval has started.
     ConnectionlessModuleWakeIntervalStart,
 
-    /// Soft-AP WPS succeeded in registrar mode.
-    ApWpsRgSuccess,
-    /// Soft-AP WPS failed in registrar mode.
-    ApWpsRgFailed,
-    /// Soft-AP WPS timed out in registrar mode.
-    ApWpsRgTimeout,
-    /// Soft-AP WPS pin code in registrar mode.
-    ApWpsRgPin,
-    /// Soft-AP WPS overlap in registrar mode.
-    ApWpsRgPbcOverlap,
+    /// Soft-AccessPoint WPS succeeded in registrar mode.
+    AccessPointWpsRgSuccess,
+    /// Soft-AccessPoint WPS failed in registrar mode.
+    AccessPointWpsRgFailed,
+    /// Soft-AccessPoint WPS timed out in registrar mode.
+    AccessPointWpsRgTimeout,
+    /// Soft-AccessPoint WPS pin code in registrar mode.
+    AccessPointWpsRgPin,
+    /// Soft-AccessPoint WPS overlap in registrar mode.
+    AccessPointWpsRgPbcOverlap,
 
     /// iTWT setup.
     ItwtSetup,
@@ -956,11 +956,11 @@ pub enum WifiEvent {
     HomeChannelChange,
 
     /// Received Neighbor Report response.
-    StaNeighborRep,
+    StationNeighborRep,
 }
 
-/// Get the AP MAC address of the device.
-pub fn ap_mac() -> [u8; 6] {
+/// Get the access point MAC address of the device.
+pub fn access_point_mac() -> [u8; 6] {
     let mut mac = [0u8; 6];
     unsafe {
         read_mac(mac.as_mut_ptr(), 1);
@@ -968,8 +968,8 @@ pub fn ap_mac() -> [u8; 6] {
     mac
 }
 
-/// Get the STA MAC address of the device.
-pub fn sta_mac() -> [u8; 6] {
+/// Get the station MAC address of the device.
+pub fn station_mac() -> [u8; 6] {
     let mut mac = [0u8; 6];
     unsafe {
         read_mac(mac.as_mut_ptr(), 0);
@@ -1008,7 +1008,7 @@ pub(crate) fn wifi_init(_wifi: crate::hal::peripherals::WIFI<'_>) -> Result<(), 
             Some(recv_cb_sta)
         ))?;
 
-        // until we support APSTA we just register the same callback for AP and STA
+        // until we support APSTA we just register the same callback for AP and station
         esp_wifi_result!(esp_wifi_internal_reg_rxcb(
             esp_interface_t_ESP_IF_WIFI_AP,
             Some(recv_cb_ap)
@@ -1178,7 +1178,7 @@ pub enum ScanTypeConfig {
     ///
     /// # Note
     /// It is recommended to avoid duration longer thean 1500ms, as it may cause
-    /// a station to disconnect from the AP.
+    /// a station to disconnect from the Access Point.
     Passive(Duration),
 }
 
@@ -1195,7 +1195,7 @@ impl ScanTypeConfig {
     fn validate(&self) {
         if matches!(self, Self::Passive(dur) if *dur > Duration::from_millis(1500)) {
             warn!(
-                "Passive scan duration longer than 1500ms may cause a station to disconnect from the AP"
+                "Passive scan duration longer than 1500ms may cause a station to disconnect from the access point"
             );
         }
     }
@@ -1332,23 +1332,23 @@ mod private {
 #[derive(Debug, Clone, Copy)]
 enum WifiDeviceMode {
     /// Station mode.
-    Sta,
+    Station,
     /// Access Point mode.
-    Ap,
+    AccessPoint,
 }
 
 impl WifiDeviceMode {
     fn mac_address(&self) -> [u8; 6] {
         match self {
-            WifiDeviceMode::Sta => sta_mac(),
-            WifiDeviceMode::Ap => ap_mac(),
+            WifiDeviceMode::Station => station_mac(),
+            WifiDeviceMode::AccessPoint => access_point_mac(),
         }
     }
 
     fn data_queue_rx(&self) -> &'static NonReentrantMutex<VecDeque<PacketBuffer>> {
         match self {
-            WifiDeviceMode::Sta => &DATA_QUEUE_RX_STA,
-            WifiDeviceMode::Ap => &DATA_QUEUE_RX_AP,
+            WifiDeviceMode::Station => &DATA_QUEUE_RX_STA,
+            WifiDeviceMode::AccessPoint => &DATA_QUEUE_RX_AP,
         }
     }
 
@@ -1391,8 +1391,8 @@ impl WifiDeviceMode {
 
     fn interface(&self) -> wifi_interface_t {
         match self {
-            WifiDeviceMode::Sta => wifi_interface_t_WIFI_IF_STA,
-            WifiDeviceMode::Ap => wifi_interface_t_WIFI_IF_AP,
+            WifiDeviceMode::Station => wifi_interface_t_WIFI_IF_STA,
+            WifiDeviceMode::AccessPoint => wifi_interface_t_WIFI_IF_AP,
         }
     }
 
@@ -1402,29 +1402,29 @@ impl WifiDeviceMode {
 
     fn register_receive_waker(&self, cx: &mut core::task::Context<'_>) {
         match self {
-            WifiDeviceMode::Sta => embassy::STA_RECEIVE_WAKER.register(cx.waker()),
-            WifiDeviceMode::Ap => embassy::AP_RECEIVE_WAKER.register(cx.waker()),
+            WifiDeviceMode::Station => embassy::STA_RECEIVE_WAKER.register(cx.waker()),
+            WifiDeviceMode::AccessPoint => embassy::AP_RECEIVE_WAKER.register(cx.waker()),
         }
     }
 
     fn register_link_state_waker(&self, cx: &mut core::task::Context<'_>) {
         match self {
-            WifiDeviceMode::Sta => embassy::STA_LINK_STATE_WAKER.register(cx.waker()),
-            WifiDeviceMode::Ap => embassy::AP_LINK_STATE_WAKER.register(cx.waker()),
+            WifiDeviceMode::Station => embassy::STA_LINK_STATE_WAKER.register(cx.waker()),
+            WifiDeviceMode::AccessPoint => embassy::AP_LINK_STATE_WAKER.register(cx.waker()),
         }
     }
 
     fn link_state(&self) -> embassy_net_driver::LinkState {
         match self {
-            WifiDeviceMode::Sta => {
-                if matches!(sta_state(), WifiStaState::Connected) {
+            WifiDeviceMode::Station => {
+                if matches!(station_state(), WifiStationState::Connected) {
                     embassy_net_driver::LinkState::Up
                 } else {
                     embassy_net_driver::LinkState::Down
                 }
             }
-            WifiDeviceMode::Ap => {
-                if matches!(ap_state(), WifiApState::Started) {
+            WifiDeviceMode::AccessPoint => {
+                if matches!(access_point_state(), WifiAccessPointState::Started) {
                     embassy_net_driver::LinkState::Up
                 } else {
                     embassy_net_driver::LinkState::Down
@@ -1919,9 +1919,9 @@ pub(crate) fn apply_power_saving(ps: PowerSaveMode) -> Result<(), WifiError> {
 #[non_exhaustive]
 pub struct Interfaces<'d> {
     /// Station mode Wi-Fi device.
-    pub sta: WifiDevice<'d>,
+    pub station: WifiDevice<'d>,
     /// Access Point mode Wi-Fi device.
-    pub ap: WifiDevice<'d>,
+    pub access_point: WifiDevice<'d>,
     /// ESP-NOW interface.
     #[cfg(all(feature = "esp-now", feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
@@ -1939,17 +1939,19 @@ pub struct Interfaces<'d> {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum OperatingClass {
-    /// The regulations under which the station/AP is operating encompass all environments for the
-    /// current frequency band in the country.
+    /// The regulations under which the Station/Access Point is operating encompass all environments
+    /// for the current frequency band in the country.
     AllEnvironments,
 
-    /// The regulations under which the station/AP is operating are for an outdoor environment only.
+    /// The regulations under which the Station/Access Point is operating are for an outdoor
+    /// environment only.
     Outdoors,
 
-    /// The regulations under which the station/AP is operating are for an indoor environment only.
+    /// The regulations under which the Station/Access Point is operating are for an indoor
+    /// environment only.
     Indoors,
 
-    /// The station/AP is operating under a noncountry entity. The first two octets of the
+    /// The Station/Access Point is operating under a noncountry entity. The first two octets of the
     /// noncountry entity is two ASCII ‘XX’ characters.
     NonCountryEntity,
 
@@ -2252,13 +2254,13 @@ pub fn new<'d>(
     Ok((
         controller,
         Interfaces {
-            sta: WifiDevice {
+            station: WifiDevice {
                 _phantom: Default::default(),
-                mode: WifiDeviceMode::Sta,
+                mode: WifiDeviceMode::Station,
             },
-            ap: WifiDevice {
+            access_point: WifiDevice {
                 _phantom: Default::default(),
-                mode: WifiDeviceMode::Ap,
+                mode: WifiDeviceMode::AccessPoint,
             },
             #[cfg(all(feature = "esp-now", feature = "unstable"))]
             esp_now: crate::esp_now::EspNow::new_internal(),
@@ -2355,12 +2357,12 @@ impl WifiController<'_> {
             .fold(0, |combined, protocol| combined | protocol) as u8;
 
         let mode = self.mode()?;
-        if mode.is_sta() {
+        if mode.is_station() {
             esp_wifi_result!(unsafe {
                 esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_STA, protocol)
             })?;
         }
-        if mode.is_ap() {
+        if mode.is_access_point() {
             esp_wifi_result!(unsafe {
                 esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_AP, protocol)
             })?;
@@ -2410,14 +2412,14 @@ impl WifiController<'_> {
 
             let mode = WifiMode::current()?;
 
-            // This is not an if-else because in AP-STA mode, both are true
-            if mode.is_ap() {
+            // This is not an if-else because in AccessPoint-Station mode, both are true
+            if mode.is_access_point() {
                 esp_wifi_result!(include::esp_wifi_set_inactive_time(
                     wifi_interface_t_WIFI_IF_AP,
                     self.ap_beacon_timeout
                 ))?;
             }
-            if mode.is_sta() {
+            if mode.is_station() {
                 esp_wifi_result!(include::esp_wifi_set_inactive_time(
                     wifi_interface_t_WIFI_IF_STA,
                     self.beacon_timeout
@@ -2436,21 +2438,21 @@ impl WifiController<'_> {
         self.stop_impl()
     }
 
-    /// Connect Wi-Fi station to the AP.
+    /// Connect Wi-Fi station to the Access Point.
     ///
     /// This method is not blocking. Use the [`Self::is_connected`] method to see if the station is
     /// connected.
     ///
     /// - If station is connected, call [`Self::disconnect`] to disconnect.
     /// - Calling [`Self::scan_with_config`] or [`Self::scan_with_config_async`] will not be
-    ///   effective until connection between device and the AP is established.
+    ///   effective until connection between device and the access point is established.
     /// - If device is scanning and connecting at the same time, it will abort scanning and return a
     ///   warning message and error.
     pub fn connect(&mut self) -> Result<(), WifiError> {
         self.connect_impl()
     }
 
-    /// Disconnect Wi-Fi station from the AP.
+    /// Disconnect Wi-Fi station from the access point.
     ///
     /// This method is not blocking. Use the [`Self::is_connected`] method to see if the station is
     /// still connected.
@@ -2458,22 +2460,22 @@ impl WifiController<'_> {
         self.disconnect_impl()
     }
 
-    /// Get the RSSI information of AP to which the device is associated with.
+    /// Get the RSSI information of access point to which the device is associated with.
     /// The value is obtained from the last beacon.
     ///
     /// <div class="warning">
     ///
-    /// - Use this API only in STA or AP-STA mode.
+    /// - Use this API only in Station or AccessPoint-Station mode.
     /// - This API should be called after the station has connected to an access point.
     /// </div>
     ///
     /// # Errors
-    /// This function returns [`WifiError::Unsupported`] if the STA side isn't
-    /// running. For example, when configured for AP only.
+    /// This function returns [`WifiError::Unsupported`] if the Station side isn't
+    /// running. For example, when configured for access point only.
     pub fn rssi(&self) -> Result<i32, WifiError> {
-        if self.mode()?.is_sta() {
+        if self.mode()?.is_station() {
             let mut rssi: i32 = 0;
-            // Will return ESP_FAIL -1 if called in AP mode.
+            // Will return ESP_FAIL -1 if called in access point mode.
             esp_wifi_result!(unsafe { esp_wifi_sta_get_rssi(&mut rssi) })?;
             Ok(rssi)
         } else {
@@ -2481,20 +2483,20 @@ impl WifiController<'_> {
         }
     }
 
-    /// Get the Access Point information of AP to which the device is associated with.
+    /// Get the Access Point information of access point to which the device is associated with.
     /// The value is obtained from the last beacon.
     ///
     /// <div class="warning">
     ///
-    /// - Use this API only in STA or AP-STA mode.
+    /// - Use this API only in Station or AccessPoint-Station mode.
     /// - This API should be called after the station has connected to an access point.
     /// </div>
     ///
     /// # Errors
-    /// This function returns [`WifiError::Unsupported`] if the STA side isn't
-    /// running. For example, when configured for AP only.
+    /// This function returns [`WifiError::Unsupported`] if the Station side isn't
+    /// running. For example, when configured for access point only.
     pub fn ap_info(&self) -> Result<AccessPointInfo, WifiError> {
-        if self.mode()?.is_sta() {
+        if self.mode()?.is_station() {
             let mut record: MaybeUninit<include::wifi_ap_record_t> = MaybeUninit::uninit();
             esp_wifi_result!(unsafe { esp_wifi_sta_get_ap_info(record.as_mut_ptr()) })?;
 
@@ -2508,7 +2510,7 @@ impl WifiController<'_> {
 
     /// Get the supported capabilities of the controller.
     pub fn capabilities(&self) -> Result<EnumSet<crate::wifi::Capability>, WifiError> {
-        let caps = enumset::enum_set! { Capability::Station | Capability::AccessPoint | Capability::ApSta };
+        let caps = enumset::enum_set! { Capability::Station | Capability::AccessPoint | Capability::AccessPointStation };
 
         Ok(caps)
     }
@@ -2516,9 +2518,9 @@ impl WifiController<'_> {
     /// Set the configuration.
     ///
     /// This will set the mode accordingly.
-    /// You need to use [`Self::connect`] for connecting to an AP.
+    /// You need to use [`Self::connect`] for connecting to an access point.
     ///
-    /// Passing [`ModeConfig::None`] will disable both AP and STA modes.
+    /// Passing [`ModeConfig::None`] will disable both access point and station modes.
     ///
     /// If you don't intend to use Wi-Fi anymore at all consider tearing down
     /// Wi-Fi completely.
@@ -2529,7 +2531,7 @@ impl WifiController<'_> {
             ModeConfig::None => wifi_mode_t_WIFI_MODE_NULL,
             ModeConfig::Station(_) => wifi_mode_t_WIFI_MODE_STA,
             ModeConfig::AccessPoint(_) => wifi_mode_t_WIFI_MODE_AP,
-            ModeConfig::ApSta(_, _) => wifi_mode_t_WIFI_MODE_APSTA,
+            ModeConfig::AccessPointStation(_, _) => wifi_mode_t_WIFI_MODE_APSTA,
             #[cfg(feature = "wifi-eap")]
             ModeConfig::EapStation(_) => wifi_mode_t_WIFI_MODE_STA,
         };
@@ -2546,7 +2548,7 @@ impl WifiController<'_> {
                 self.apply_ap_config(config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_AP, &config.protocols)
             }
-            ModeConfig::ApSta(sta_config, ap_config) => {
+            ModeConfig::AccessPointStation(sta_config, ap_config) => {
                 self.apply_ap_config(ap_config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_AP, &ap_config.protocols)?;
                 self.apply_sta_config(sta_config)?;
@@ -2560,7 +2562,7 @@ impl WifiController<'_> {
         }
         .inspect_err(|_| {
             // we/the driver might have applied a partial configuration
-            // so we better disable AP/STA just in case the caller ignores the error we
+            // so we better disable AccessPoint/Station just in case the caller ignores the error we
             // return here - they will run into futher errors this way
             unsafe { esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_NULL) };
         })?;
@@ -2590,31 +2592,37 @@ impl WifiController<'_> {
         esp_wifi_result!(unsafe { esp_wifi_disconnect_internal() })
     }
 
-    /// Checks if the Wi-Fi controller has started. Returns true if STA and/or AP are started.
+    /// Checks if the Wi-Fi controller has started. Returns true if Station and/or AccessPoint are
+    /// started.
     ///
     /// This function should be called after the [`Self::start`] method to verify if the
     /// Wi-Fi controller has started successfully.
     pub fn is_started(&self) -> Result<bool, WifiError> {
         if matches!(
-            crate::wifi::sta_state(),
-            WifiStaState::Started | WifiStaState::Connected | WifiStaState::Disconnected
+            crate::wifi::station_state(),
+            WifiStationState::Started
+                | WifiStationState::Connected
+                | WifiStationState::Disconnected
         ) {
             return Ok(true);
         }
-        if matches!(crate::wifi::ap_state(), WifiApState::Started) {
+        if matches!(
+            crate::wifi::access_point_state(),
+            WifiAccessPointState::Started
+        ) {
             return Ok(true);
         }
         Ok(false)
     }
 
-    /// Checks if the Wi-Fi controller is connected to an AP.
+    /// Checks if the Wi-Fi controller is connected to an access point.
     ///
     /// This function should be called after the [`Self::connect`] method to verify if
     /// the connection was successful.
     pub fn is_connected(&self) -> Result<bool, WifiError> {
-        match crate::wifi::sta_state() {
-            crate::wifi::WifiStaState::Connected => Ok(true),
-            crate::wifi::WifiStaState::Disconnected => Err(WifiError::Disconnected),
+        match crate::wifi::station_state() {
+            crate::wifi::WifiStationState::Connected => Ok(true),
+            crate::wifi::WifiStationState::Disconnected => Err(WifiError::Disconnected),
             // FIXME: Should any other enum value trigger an error instead of returning false?
             _ => Ok(false),
         }
@@ -2649,11 +2657,11 @@ impl WifiController<'_> {
         let mut events = enumset::enum_set! {};
 
         let mode = self.mode()?;
-        if mode.is_ap() {
-            events |= WifiEvent::ApStart;
+        if mode.is_access_point() {
+            events |= WifiEvent::AccessPointStart;
         }
-        if mode.is_sta() {
-            events |= WifiEvent::StaStart;
+        if mode.is_station() {
+            events |= WifiEvent::StationStart;
         }
 
         Self::clear_events(events);
@@ -2679,11 +2687,11 @@ impl WifiController<'_> {
         let mut events = enumset::enum_set! {};
 
         let mode = self.mode()?;
-        if mode.is_ap() {
-            events |= WifiEvent::ApStop;
+        if mode.is_access_point() {
+            events |= WifiEvent::AccessPointStop;
         }
-        if mode.is_sta() {
-            events |= WifiEvent::StaStop;
+        if mode.is_station() {
+            events |= WifiEvent::StationStop;
         }
 
         Self::clear_events(events);
@@ -2692,8 +2700,8 @@ impl WifiController<'_> {
 
         self.wait_for_all_events(events, false).await;
 
-        reset_ap_state();
-        reset_sta_state();
+        reset_access_point_state();
+        reset_station_state();
 
         Ok(())
     }
@@ -2702,13 +2710,13 @@ impl WifiController<'_> {
     ///
     /// This function will wait for the connection to be established before returning.
     pub async fn connect_async(&mut self) -> Result<(), WifiError> {
-        Self::clear_events(WifiEvent::StaConnected | WifiEvent::StaDisconnected);
+        Self::clear_events(WifiEvent::StationConnected | WifiEvent::StationDisconnected);
 
         let err = self.connect_impl().err();
 
-        if MultiWifiEventFuture::new(WifiEvent::StaConnected | WifiEvent::StaDisconnected)
+        if MultiWifiEventFuture::new(WifiEvent::StationConnected | WifiEvent::StationDisconnected)
             .await
-            .contains(WifiEvent::StaDisconnected)
+            .contains(WifiEvent::StationDisconnected)
         {
             Err(err.unwrap_or(WifiError::Disconnected))
         } else {
@@ -2721,15 +2729,15 @@ impl WifiController<'_> {
     /// This function will wait for the connection to be closed before returning.
     pub async fn disconnect_async(&mut self) -> Result<(), WifiError> {
         // If not connected, this will do nothing.
-        // It will also wait forever for a `StaDisconnected` event that will never come.
+        // It will also wait forever for a `StationDisconnected` event that will never come.
         // Return early instead of hanging.
         if !matches!(self.is_connected(), Ok(true)) {
             return Ok(());
         }
 
-        Self::clear_events(WifiEvent::StaDisconnected);
+        Self::clear_events(WifiEvent::StationDisconnected);
         self.disconnect_impl()?;
-        WifiEventFuture::new(WifiEvent::StaDisconnected).await;
+        WifiEventFuture::new(WifiEvent::StationDisconnected).await;
 
         Ok(())
     }

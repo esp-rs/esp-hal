@@ -64,7 +64,7 @@ async fn main(_spawner: Spawner) {
             // Timer::after(Duration::from_secs(10)).await;
         }
 
-        controller.set_mode(WifiMode::Sta).unwrap();
+        controller.set_mode(WifiMode::Station).unwrap();
         println!("Wifi stack setup (STA)");
         controller.start_async().await.unwrap();
         println!("Connecting to WiFi SSID: {}", SSID);

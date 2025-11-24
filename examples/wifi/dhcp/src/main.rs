@@ -53,7 +53,7 @@ fn main() -> ! {
     let (mut controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
-    let mut device = interfaces.sta;
+    let mut device = interfaces.station;
     let iface = create_interface(&mut device);
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();

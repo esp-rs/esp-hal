@@ -29,23 +29,23 @@ pub struct StationConfig {
     pub(crate) channel: Option<u8>,
     /// The set of protocols supported by the access point.
     pub(crate) protocols: EnumSet<Protocol>,
-    /// Interval for station to listen to beacon from AP.
+    /// Interval for station to listen to beacon from access point.
     ///
     /// The unit of listen interval is one beacon interval.
     /// For example, if beacon interval is 100 ms and listen interval is 3,
     /// the interval for station to listen to beacon is 300 ms
     #[builder_lite(unstable)]
     pub(crate) listen_interval: u16,
-    /// Time to disconnect from AP if no data is received.
+    /// Time to disconnect from access point if no data is received.
     ///
     /// Must be between 6 and 31.
     #[builder_lite(unstable)]
     pub(crate) beacon_timeout: u16,
-    /// Number of connection retries station will do before moving to next AP.
+    /// Number of connection retries station will do before moving to next access point.
     ///
     /// `scan_method` should be set as [`ScanMethod::AllChannels`] to use this config.
     ///
-    /// Note: Enabling this may cause connection time to increase in case the best AP
+    /// Note: Enabling this may cause connection time to increase in case the best access point
     /// doesn't behave properly.
     #[builder_lite(unstable)]
     pub(crate) failure_retry_cnt: u8,

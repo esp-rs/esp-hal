@@ -38,7 +38,7 @@ use esp_radio::wifi::{
     WifiController,
     WifiDevice,
     WifiEvent,
-    WifiStaState,
+    WifiStationState,
     sta::StationConfig,
 };
 
@@ -88,7 +88,7 @@ async fn main(spawner: Spawner) -> ! {
     let (mut controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
-    let wifi_interface = interfaces.sta;
+    let wifi_interface = interfaces.station;
 
     controller
         .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
@@ -146,10 +146,12 @@ async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
     println!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        match esp_radio::wifi::sta_state() {
-            WifiStaState::Connected => {
+        match esp_radio::wifi::station_state() {
+            WifiStationState::Connected => {
                 // wait until we're no longer connected
-                controller.wait_for_event(WifiEvent::StaDisconnected).await;
+                controller
+                    .wait_for_event(WifiEvent::StationDisconnected)
+                    .await;
                 Timer::after(Duration::from_millis(5000)).await
             }
             _ => {}
