@@ -40,7 +40,7 @@ Before adding or changing code, review the [esp-rs API guidelines].
 [GitHub Flow]: https://docs.github.com/en/get-started/quickstart/github-flow
 [Pull Requests]: https://docs.github.com/en/github/collaborating-with-pull-requests
 [esp-rs developer guidelines]: ./documentation/DEVELOPER-GUIDELINES.md
-[HIL guide]: ./documentation/HIL-GUIDE.md
+[HIL guide]: https://github.com/esp-rs/esp-hal/blob/main/documentation/HIL-GUIDE.md
 
 ## Getting Started
 

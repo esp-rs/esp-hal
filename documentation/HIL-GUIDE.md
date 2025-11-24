@@ -60,6 +60,10 @@ These commands are for maintainers (MEMBER/OWNER) and operate per PR.
 
 Trusted users can then run all the aforementioned commands.
 
+### `trusted-author` label
+
+When this label is assigned, the author of this PR will receive the rights to run HIL and binary size tests, just as when using the `/trust` command.
+
 ### `/revoke @username`
 
 - Removes `@username` from the PR’s HIL trust list.
