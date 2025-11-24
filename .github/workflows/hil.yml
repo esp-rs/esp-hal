@@ -26,7 +26,7 @@ on:
         default: "main"
       # choose quick or full matrix
       matrix:
-        description: "Test matrix size: quick|full"
+        description: "Test matrix size: quick|full|chips"
         required: false
         default: "quick"
       pr_number:
@@ -97,7 +97,7 @@ jobs:
       github.event_name == 'merge_group' ||
       (github.event_name == 'workflow_dispatch' &&
        github.event.inputs.matrix == 'full' &&
-       (github.event.inputs.chips == '' ))
+       github.event.inputs.chips == '')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -142,7 +142,10 @@ jobs:
           rust_target: ${{ matrix.target.rust-target }}
 
   build-tests-quick:
-    if: github.event_name != 'merge_group' && github.event.inputs.matrix != 'full'
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.chips == '' &&
+      github.event.inputs.matrix != 'full'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -166,8 +169,76 @@ jobs:
           soc: ${{ matrix.target.soc }}
           rust_target: ${{ matrix.target.rust-target }}
 
+
+  build-tests-chips:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.chips != ''
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+        - soc: esp32c2
+          rust-target: riscv32imc-unknown-none-elf
+          runner: esp32c2-jtag
+          host: aarch64
+        - soc: esp32c3
+          rust-target: riscv32imc-unknown-none-elf
+          runner: esp32c3-usb
+          host: armv7
+        - soc: esp32c6
+          rust-target: riscv32imac-unknown-none-elf
+          runner: esp32c6-usb
+          host: armv7
+        - soc: esp32h2
+          rust-target: riscv32imac-unknown-none-elf
+          runner: esp32h2-usb
+          host: armv7
+        - soc: esp32
+          rust-target: xtensa-esp32-none-elf
+          runner: esp32-jtag
+          host: aarch64
+        - soc: esp32s2
+          rust-target: xtensa-esp32s2-none-elf
+          runner: esp32s2-jtag
+          host: armv7
+        - soc: esp32s3
+          rust-target: xtensa-esp32s3-none-elf
+          runner: esp32s3-usb
+          host: armv7
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.repository || github.repository }}
+          ref: ${{ github.event.inputs.branch || 'main' }}
+
+      - name: Decide if this SoC is requested
+        id: filter
+        run: |
+          CHIPS="${{ github.event.inputs.chips }}"
+          SOC="${{ matrix.target.soc }}"
+          if echo " $CHIPS " | grep -qw "$SOC"; then
+            echo "run=true" >> $GITHUB_OUTPUT
+            echo "Including $SOC in this per-chip run."
+          else
+            echo "run=false" >> $GITHUB_OUTPUT
+            echo "Skipping $SOC (not requested)."
+          fi
+
+      - uses: ./.github/actions/build-tests
+        if: steps.filter.outputs.run == 'true'
+        with:
+          event_name: ${{ github.event_name }}
+          repository: ${{ github.event.inputs.repository || github.repository }}
+          branch: ${{ github.event.inputs.branch || 'main' }}
+          soc: ${{ matrix.target.soc }}
+          rust_target: ${{ matrix.target.rust-target }}
+
   hil-quick:
-    if: github.event_name != 'merge_group' && github.event.inputs.matrix != 'full'
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.chips == '' &&
+      github.event.inputs.matrix != 'full'
     needs: [build-tests-quick, build-xtasks]
     runs-on:
       labels: [self-hosted, "${{ matrix.target.runner }}"]
@@ -188,6 +259,7 @@ jobs:
         with:
           name: tests-${{ matrix.target.soc }}
           path: tests-${{ matrix.target.soc }}
+        # In a quick run, some artifacts won't exist — job wouldn't fail because of that.
         continue-on-error: true
 
       - uses: actions/download-artifact@v4
@@ -223,7 +295,7 @@ jobs:
       github.event_name == 'merge_group' ||
       (github.event_name == 'workflow_dispatch' &&
        github.event.inputs.matrix == 'full' &&
-       (github.event.inputs.chips == '' ))
+       github.event.inputs.chips == '')
     needs: [build-tests-full, build-xtasks]
     runs-on:
       labels: [self-hosted, "${{ matrix.target.runner }}"]
@@ -294,7 +366,78 @@ jobs:
           rm -rf tests-${{ matrix.target.soc }} || true
           rm -f xtask || true
 
-  # Single required check to block merge unless full HIL passed on merge_group
+  hil-chips:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.chips != ''
+    needs: [build-tests-chips, build-xtasks]
+    runs-on:
+      labels: [self-hosted, "${{ matrix.target.runner }}"]
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+        - soc: esp32c2
+          rust-target: riscv32imc-unknown-none-elf
+          runner: esp32c2-jtag
+          host: aarch64
+        - soc: esp32c3
+          rust-target: riscv32imc-unknown-none-elf
+          runner: esp32c3-usb
+          host: armv7
+        - soc: esp32c6
+          rust-target: riscv32imac-unknown-none-elf
+          runner: esp32c6-usb
+          host: armv7
+        - soc: esp32h2
+          rust-target: riscv32imac-unknown-none-elf
+          runner: esp32h2-usb
+          host: armv7
+        - soc: esp32
+          rust-target: xtensa-esp32-none-elf
+          runner: esp32-jtag
+          host: aarch64
+        - soc: esp32s2
+          rust-target: xtensa-esp32s2-none-elf
+          runner: esp32s2-jtag
+          host: armv7
+        - soc: esp32s3
+          rust-target: xtensa-esp32s3-none-elf
+          runner: esp32s3-usb
+          host: armv7
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: tests-${{ matrix.target.soc }}
+          path: tests-${{ matrix.target.soc }}
+        continue-on-error: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: xtask-${{ matrix.target.host }}
+
+      - name: Skip if this target wasn't built
+        id: guard
+        run: |
+          if [ ! -d "tests-${{ matrix.target.soc }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "No tests for ${{ matrix.target.soc }} in this per-chip run; skipping."
+          fi
+
+      - name: Run Tests
+        if: steps.guard.outputs.skip != 'true'
+        id: run-tests
+        run: |
+          [ -f ~/setup.sh ] && source ~/setup.sh
+
+          export PATH=$PATH:/home/espressif/.cargo/bin
+          chmod +x xtask
+          ./xtask run elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
+
+      - name: Clean up
+        if: always()
+        run: |
+          rm -rf tests-${{ matrix.target.soc }} || true
+          rm -f xtask || true
+
   required:
     if: github.event_name == 'merge_group'
     needs: [hil-full]

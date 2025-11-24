@@ -50,6 +50,7 @@ jobs:
             const login = "${{ steps.pr.outputs.login }}".toLowerCase();
             const existing = `${{ toJson(steps.find.outputs.comment-body || '') }}`;
 
+            // read existing trusted[] from hidden JSON if present
             let list = [];
             const m = existing.match(/<!--\s*HIL_TRUST_JSON\s*([\s\S]*?)\s*HIL_TRUST_JSON\s*-->/);
             if (m && m[1]) {
@@ -129,6 +130,7 @@ jobs:
             const login = "${{ steps.parse.outputs.login }}".toLowerCase();
             const existing = `${{ toJson(steps.find.outputs.comment-body || '') }}`;
 
+            // read existing trusted[] from hidden JSON if present
             let list = [];
             const m = existing.match(/<!--\s*HIL_TRUST_JSON\s*([\s\S]*?)\s*HIL_TRUST_JSON\s*-->/);
             if (m && m[1]) {
@@ -166,6 +168,7 @@ jobs:
       - uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.issue.number }}
+          # separate short confirmation comment
           body: "Trusted **@${{ steps.parse.outputs.login }}** for this PR. They can now use `/hil quick` or `/hil full`."
 
   revoke:
@@ -202,6 +205,7 @@ jobs:
             const login = "${{ steps.parse.outputs.login }}".toLowerCase();
             const existing = `${{ toJson(steps.find.outputs.comment-body || '') }}`;
 
+            // read existing trusted[] from hidden JSON if present
             let list = [];
             const m = existing.match(/<!--\s*HIL_TRUST_JSON\s*([\s\S]*?)\s*HIL_TRUST_JSON\s*-->/);
             if (m && m[1]) {
@@ -325,6 +329,7 @@ jobs:
             const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
             let run = null;
 
+            // Try multiple times; keep the *last* matching run we see
             for (let attempt = 1; attempt <= 10; attempt++) {
                 const { data } = await github.rest.actions.listWorkflowRuns({
                     owner,
@@ -339,6 +344,7 @@ jobs:
                         (r.display_title && r.display_title.trim() === expectedTitle) ||
                         (r.name && r.name.trim() === expectedTitle)
                     );
+                    // Keep the *last* matching run we see across all attempts
                     if (candidate) {
                         run = candidate;
                     }
@@ -385,6 +391,7 @@ jobs:
 
             let conclusion = null;
 
+            // Poll up to ~15 minutes (60 * 15s)
             for (let i = 0; i < 60; i++) {
               const { data } = await github.rest.actions.getWorkflowRun({
                 owner,
@@ -396,6 +403,7 @@ jobs:
                 conclusion = data.conclusion;
                 break;
               }
+
               await delay(15000);
             }
 
@@ -463,6 +471,7 @@ jobs:
             const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
             let run = null;
 
+            // Try multiple times; keep the *last* matching run we see
             for (let attempt = 1; attempt <= 10; attempt++) {
                 const { data } = await github.rest.actions.listWorkflowRuns({
                     owner,
@@ -477,6 +486,7 @@ jobs:
                     (r.display_title && r.display_title.trim() === expectedTitle) ||
                     (r.name && r.name.trim() === expectedTitle)
                 );
+                // Keep the *last* matching run we see across all attempts
                 if (candidate) {
                     run = candidate;
                 }
@@ -523,8 +533,14 @@ jobs:
 
             let conclusion = null;
 
+            // Poll up to ~15 minutes (60 * 15s)
             for (let i = 0; i < 60; i++) {
-                const { data } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: runId });
+                const { data } = await github.rest.actions.getWorkflowRun({
+                  owner,
+                  repo,
+                  run_id: runId,
+                });
+
                 if (data.status === 'completed') {
                     conclusion = data.conclusion;
                     break;
@@ -543,10 +559,21 @@ jobs:
                 suffix = `\n\n**Status update:** ❌ HIL (full) run **failed** (conclusion: ${conclusion}).`;
             }
 
-            const comment = await github.rest.issues.getComment({ owner, repo, comment_id: commentId });
+            // Fetch existing comment
+            const comment = await github.rest.issues.getComment({
+              owner,
+              repo,
+              comment_id: commentId,
+            });
+
             const body = `${comment.data.body}\n${suffix}`;
 
-            await github.rest.issues.updateComment({ owner, repo, comment_id: commentId, body });
+            await github.rest.issues.updateComment({
+              owner,
+              repo,
+              comment_id: commentId,
+              body,
+            });
 
   # ---------------------------------------------------------------------------
   # PER-CHIP HIL: /hil esp32c3 [esp32s3 ...]
@@ -585,7 +612,7 @@ jobs:
             core.setOutput('chips', chips.join(' '));
             core.setOutput('chips_label', chips.join(', '));
 
-      - name: Dispatch HIL (per-chip full)
+      - name: Dispatch HIL (per-chip)
         if: steps.parse.outputs.chips != ''
         uses: benc-uk/workflow-dispatch@v1
         with:
@@ -595,7 +622,7 @@ jobs:
             {
               "repository": "${{ github.repository }}",
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
-              "matrix": "full",
+              "matrix": "chips",
               "pr_number": "${{ github.event.issue.number }}",
               "chips": "${{ steps.parse.outputs.chips }}"
             }
@@ -614,6 +641,7 @@ jobs:
             const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
             let run = null;
 
+            // Try multiple times; keep the *last* matching run we see
             for (let attempt = 1; attempt <= 10; attempt++) {
                 const { data } = await github.rest.actions.listWorkflowRuns({
                     owner,
@@ -628,6 +656,7 @@ jobs:
                     (r.display_title && r.display_title.trim() === expectedTitle) ||
                     (r.name && r.name.trim() === expectedTitle)
                 );
+                // Keep the *last* matching run we see across all attempts
                 if (candidate) {
                     run = candidate;
                 }
@@ -675,12 +704,19 @@ jobs:
 
             let conclusion = null;
 
+            // Poll up to ~15 minutes (60 * 15s)
             for (let i = 0; i < 60; i++) {
-              const { data } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: runId });
+              const { data } = await github.rest.actions.getWorkflowRun({
+                  owner,
+                  repo,
+                  run_id: runId,
+              });
+
               if (data.status === 'completed') {
                 conclusion = data.conclusion;
                 break;
               }
+
               await delay(15000);
             }
 
@@ -695,10 +731,21 @@ jobs:
               suffix = `\n\n**Status update:** ❌ HIL (per-chip) run **failed** (conclusion: ${conclusion}).`;
             }
 
-            const comment = await github.rest.issues.getComment({ owner, repo, comment_id: commentId });
+            // Fetch existing comment
+            const comment = await github.rest.issues.getComment({
+              owner,
+              repo,
+              comment_id: commentId,
+            });
+
             const body = `${comment.data.body}\n${suffix}`;
 
-            await github.rest.issues.updateComment({ owner, repo, comment_id: commentId, body });
+            await github.rest.issues.updateComment({
+              owner,
+              repo,
+              comment_id: commentId,
+              body,
+            });
 
   hil-deny:
     needs: auth
