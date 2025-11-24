@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `BleConnector::new` returns `BleInitError` instead of `InvalidConfigError` (#4482)
 - `esp_radio::init()` is not public anymore (#4482)
 - `esp_radio::wifi::new` and `BleConnector::new` no longer take a `Controller` (#4482)
-- The `Client` is replaced with `Station` (#4546)
+- The `Client` and `Sta` are replaced with `Station`, `Ap` with `AccessPoint` and `ApSta` with `AccessPointStation` (#4546)
 
 ### Fixed
 
