@@ -58,7 +58,7 @@ When browsing the examples, we recommend viewing the tag for the `esp-hal` relea
 
 ## AI Contribution Policy
 
-We follow the same policy as the official Rust Embedded working group, please review [the policy](https://github.com/rust-embedded/wg/blob/master/CODE_OF_CONDUCT.md#ai-tool-use-policy) before contributing with AI tools.
+We follow the same policy as the official Rust Embedded working group, please review [the policy](https://github.com/rust-embedded/wg/blob/HEAD/CODE_OF_CONDUCT.md#ai-tool-use-policy) before contributing with AI tools.
 
 ## Contributing
 
