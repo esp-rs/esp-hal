@@ -25,7 +25,7 @@ struct TimerQueueInner {
     next_wakeup: u64,
     task: Option<TaskPtr>,
     processing: bool,
-    scheduled_for_drop: alloc::vec::Vec<Box<Timer>>,
+    scheduled_for_drop: alloc::vec::Vec<TimerPtr>,
 }
 
 unsafe impl Send for TimerQueueInner {}
@@ -190,8 +190,9 @@ impl TimerQueue {
             while let Some(timer) = q.scheduled_for_drop.pop() {
                 debug!(
                     "Dropping timer {:x} (delayed)",
-                    (&*timer) as *const _ as usize
+                    timer.as_ptr() as *const _ as usize
                 );
+                let timer = unsafe { Box::from_raw(timer.cast::<Timer>().as_ptr()) };
                 q.dequeue(&timer);
                 core::mem::drop(timer);
             }
@@ -306,9 +307,6 @@ impl TimerImplementation for Timer {
     unsafe fn delete(timer: TimerPtr) {
         debug!("Deleting timer: {:x}", timer.addr());
         TIMER_QUEUE.inner.with(|q| {
-            let timer = unsafe { Box::from_raw(timer.cast::<Timer>().as_ptr()) };
-            timer.properties(q).is_active = false;
-
             // we don't drop the timer right now, since it might be
             // processed currently
             debug!("schedule timer for dropping after processing the queue");
@@ -323,6 +321,10 @@ impl TimerImplementation for Timer {
                     task.resume();
                 }
             }
+
+            let timer = unsafe { Box::from_raw(timer.cast::<Timer>().as_ptr()) };
+            timer.properties(q).is_active = false;
+            core::mem::forget(timer);
         })
     }
 
