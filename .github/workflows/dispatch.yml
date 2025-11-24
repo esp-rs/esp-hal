@@ -597,11 +597,19 @@ jobs:
         with:
           script: |
             const body = (context.payload.comment.body || '').trim();
-            const parts = body.split(/\s+/).slice(1); // skip "/hil"
             const allowed = ['esp32c2','esp32c3','esp32c6','esp32h2','esp32','esp32s2','esp32s3'];
 
+            // Remove the leading "/hil" command
+            const withoutCmd = body.replace(/^\/hil\s+/i, '');
+
+            // Split on commas and/or whitespace, normalize and dedupe
+            const parts = withoutCmd
+              .split(/[,\s]+/)
+              .map(s => s.toLowerCase())
+              .filter(Boolean);
+
             const chips = Array.from(new Set(
-                parts.map(s => s.toLowerCase()).filter(s => allowed.includes(s))
+              parts.filter(s => allowed.includes(s))
             ));
 
             if (!chips.length) {
