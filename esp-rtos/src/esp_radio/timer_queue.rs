@@ -322,9 +322,8 @@ impl TimerImplementation for Timer {
                 }
             }
 
-            let timer = unsafe { Box::from_raw(timer.cast::<Timer>().as_ptr()) };
+            let timer = unsafe { Timer::from_ptr(timer) };
             timer.properties(q).is_active = false;
-            core::mem::forget(timer);
         })
     }
 
