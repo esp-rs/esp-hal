@@ -10,6 +10,7 @@ pub(crate) struct Changelog {
 }
 
 impl Changelog {
+    /// Parse the changelog, normalizing it in the process.
     pub fn parse(changelog: &str) -> Result<Self> {
         let mut lines = changelog.lines().peekable();
 
@@ -44,6 +45,7 @@ impl Changelog {
         Ok(this)
     }
 
+    /// Finalize the changelog for a new release.
     pub fn finalize(
         &mut self,
         package: Package,
@@ -186,9 +188,11 @@ impl ChangelogForVersion {
                 current_group.lines.push(line);
             } else if line.trim().is_empty() {
                 // Empty line, just skip
-            } else {
-                // Not ours any more.
+            } else if line.starts_with("[") {
+                // Link definitions in footer
                 break;
+            } else {
+                bail!("Changelog line {} starts with unexpected character", line);
             }
             lines.next();
         }
@@ -271,9 +275,20 @@ impl ChangelogLine {
                 .trim_end_matches('.') // normalize "(#pr)."
                 .trim_end_matches(')')
                 .split(',')
-                .map(|pr| pr.trim().trim_start_matches('#').parse::<usize>())
-                .collect::<Result<Vec<_>, _>>()
-                .with_context(|| format!("Could not parse PR number {prs}"))?
+                .map(|pr| {
+                    pr.trim()
+                        .trim_start_matches('#')
+                        .parse::<usize>()
+                        .with_context(|| format!("Could not parse PR number {prs}"))
+                })
+                .map(|pr| {
+                    if let Ok(0) = pr {
+                        bail!("PR number cannot be zero")
+                    } else {
+                        pr
+                    }
+                })
+                .collect::<Result<Vec<_>, _>>()?
         } else if indentation == 0 {
             bail!("Missing PR number");
         } else {
@@ -342,7 +357,7 @@ fn parse_tag_link(line: &str) -> Result<(&str, &str)> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]

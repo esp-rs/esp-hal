@@ -34,19 +34,22 @@ use embassy_net::{
 use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{
+    clock::CpuClock,
+    interrupt::software::SoftwareInterruptControl,
+    ram,
+    rng::Rng,
+    timer::timg::TimerGroup,
+};
 use esp_println::{print, println};
-use esp_radio::{
-    Controller,
-    wifi::{
-        AccessPointConfiguration,
-        ClientConfiguration,
-        Configuration,
-        WifiController,
-        WifiDevice,
-        WifiEvent,
-        WifiState,
-    },
+use esp_radio::wifi::{
+    ModeConfig,
+    WifiApState,
+    WifiController,
+    WifiDevice,
+    WifiEvent,
+    ap::AccessPointConfig,
+    sta::ClientConfig,
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -64,35 +67,24 @@ macro_rules! mk_static {
     }};
 }
 
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(size: 72 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_preempt::init(timg0.timer0);
-
-    let esp_radio_ctrl = &*mk_static!(Controller<'static>, esp_radio::init().unwrap());
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let (mut controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI).unwrap();
+        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
     let wifi_ap_device = interfaces.ap;
     let wifi_sta_device = interfaces.sta;
-
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32")] {
-            let timg1 = TimerGroup::new(peripherals.TIMG1);
-            esp_hal_embassy::init(timg1.timer0);
-        } else {
-            use esp_hal::timer::systimer::SystemTimer;
-            let systimer = SystemTimer::new(peripherals.SYSTIMER);
-            esp_hal_embassy::init(systimer.alarm0);
-        }
-    }
 
     let ap_config = embassy_net::Config::ipv4_static(StaticConfigV4 {
         address: Ipv4Cidr::new(Ipv4Addr::new(192, 168, 2, 1), 24),
@@ -118,18 +110,13 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    let client_config = Configuration::Mixed(
-        ClientConfiguration {
-            ssid: SSID.into(),
-            password: PASSWORD.into(),
-            ..Default::default()
-        },
-        AccessPointConfiguration {
-            ssid: "esp-radio".into(),
-            ..Default::default()
-        },
+    let client_config = ModeConfig::ApSta(
+        ClientConfig::default()
+            .with_ssid(SSID.into())
+            .with_password(PASSWORD.into()),
+        AccessPointConfig::default().with_ssid("esp-radio".into()),
     );
-    controller.set_configuration(&client_config).unwrap();
+    controller.set_config(&client_config).unwrap();
 
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(ap_runner)).ok();
@@ -333,7 +320,7 @@ async fn connection(mut controller: WifiController<'static>) {
 
     loop {
         match esp_radio::wifi::ap_state() {
-            WifiState::ApStarted => {
+            WifiApState::Started => {
                 println!("About to connect...");
 
                 match controller.connect_async().await {

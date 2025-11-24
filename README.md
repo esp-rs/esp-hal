@@ -42,11 +42,11 @@ For information relating to the development of Rust applications on ESP devices,
 
 For information about the HAL and how to use it in your own projects, please refer to the [documentation].
 
-When browsing the examples, we recommend viewing the tag for the `esp-hal` release you are using to ensure compatibility, e.g. [esp-hal-v1.0.0-beta.0], as the `main` branch is used for development and APIs may have changed in the meantime.
+When browsing the examples, we recommend viewing the tag for the `esp-hal` release you are using to ensure compatibility, e.g. [esp-hal-v1.0.0], as the `main` branch is used for development and APIs may have changed in the meantime.
 
 [The Rust on ESP Book]: https://docs.espressif.com/projects/rust/book/
 [documentation]: https://docs.espressif.com/projects/rust/
-[esp-hal-v1.0.0-beta.0]: https://github.com/esp-rs/esp-hal/tree/esp-hal-v1.0.0-beta.0/examples
+[esp-hal-v1.0.0]: https://github.com/esp-rs/esp-hal/tree/esp-hal-v1.0.0/examples
 
 ## Resources
 
@@ -54,7 +54,21 @@ When browsing the examples, we recommend viewing the tag for the `esp-hal` relea
 - [The Embedded Rust Book](https://docs.rust-embedded.org/book/index.html)
 - [The Embedonomicon](https://docs.rust-embedded.org/embedonomicon/)
 - [The Rust on ESP Book](https://docs.espressif.com/projects/rust/esp-hal/latest/)
-- [Embedded Rust (no_std) on Espressif](https://esp-rs.github.io/no_std-training/)
+- [Embedded Rust (no_std) on Espressif](https://docs.espressif.com/projects/rust/no_std-training/)
+
+## Support policy
+
+All active development will occur on `main`.
+
+We will only backport fixes to the _latest_ minor release in a major version. For example, this means we will apply patches (bug fixes) to `1.1.x` until `1.2.0` is released, at which point all patches are only backported to the `1.2.x` series of releases.
+
+If you are a user of `unstable` APIs, we will never push breaking changes in a patch release. However, `unstable` changes _will_ make there way into minor releases. This means that as an `unstable` user updating from `1.1.x` to `1.2.x` _may_ introduce breaking changes. If you depend on `unstable`, we recommend defining your esp-hal dependency as follows:
+
+```toml
+esp-hal = { version = "~1.1" }
+```
+
+Using the [`~` operator](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#tilde-requirements) will prevent cargo auto updating to minor versions, allowing you to use `cargo update` without the possiblity of breaking your project.
 
 ## AI Contribution Policy
 

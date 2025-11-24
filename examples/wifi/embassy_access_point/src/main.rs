@@ -1,10 +1,8 @@
 //! Embassy access point
 //!
 //! - creates an open access-point with SSID `esp-radio`
-//! - you can connect to it using a static IP in range 192.168.2.2 .. 192.168.2.255, gateway
-//!   192.168.2.1
-//! - open http://192.168.2.1:8080/ in your browser - the example will perform an HTTP get request
-//!   to some "random" server
+//! - DHCP is enabled so there's no need to configure a static IP
+//! - connect to the AP `esp-radio` and open http://1.1.1.1:8080/ in your browser
 //!
 //! On Android you might need to choose _Keep Accesspoint_ when it tells you the
 //! WiFi has no internet connection, Chrome might not want to load the URL - you
@@ -28,18 +26,21 @@ use embassy_net::{
 use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{
+    clock::CpuClock,
+    interrupt::software::SoftwareInterruptControl,
+    ram,
+    rng::Rng,
+    timer::timg::TimerGroup,
+};
 use esp_println::{print, println};
-use esp_radio::{
-    Controller,
-    wifi::{
-        AccessPointConfiguration,
-        Configuration,
-        WifiController,
-        WifiDevice,
-        WifiEvent,
-        WifiState,
-    },
+use esp_radio::wifi::{
+    ModeConfig,
+    WifiApState,
+    WifiController,
+    WifiDevice,
+    WifiEvent,
+    ap::AccessPointConfig,
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -56,33 +57,23 @@ macro_rules! mk_static {
 
 const GW_IP_ADDR_ENV: Option<&'static str> = option_env!("GATEWAY_IP");
 
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(size: 72 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_preempt::init(timg0.timer0);
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let esp_radio_ctrl = &*mk_static!(Controller<'static>, esp_radio::init().unwrap());
-
-    let (controller, interfaces) = esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI).unwrap();
+    let (controller, interfaces) =
+        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
     let device = interfaces.ap;
-
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32")] {
-            let timg1 = TimerGroup::new(peripherals.TIMG1);
-            esp_hal_embassy::init(timg1.timer0);
-        } else {
-            use esp_hal::timer::systimer::SystemTimer;
-            let systimer = SystemTimer::new(peripherals.SYSTIMER);
-            esp_hal_embassy::init(systimer.alarm0);
-        }
-    }
 
     let gw_ip_addr_str = GW_IP_ADDR_ENV.unwrap_or("192.168.2.1");
     let gw_ip_addr = Ipv4Addr::from_str(gw_ip_addr_str).expect("failed to parse gateway ip");
@@ -247,8 +238,8 @@ async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
     println!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        match esp_radio::wifi::wifi_state() {
-            WifiState::ApStarted => {
+        match esp_radio::wifi::ap_state() {
+            WifiApState::Started => {
                 // wait until we're no longer connected
                 controller.wait_for_event(WifiEvent::ApStop).await;
                 Timer::after(Duration::from_millis(5000)).await
@@ -256,11 +247,9 @@ async fn connection(mut controller: WifiController<'static>) {
             _ => {}
         }
         if !matches!(controller.is_started(), Ok(true)) {
-            let client_config = Configuration::AccessPoint(AccessPointConfiguration {
-                ssid: "esp-radio".try_into().unwrap(),
-                ..Default::default()
-            });
-            controller.set_configuration(&client_config).unwrap();
+            let client_config =
+                ModeConfig::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
+            controller.set_config(&client_config).unwrap();
             println!("Starting wifi");
             controller.start_async().await.unwrap();
             println!("Wifi started!");

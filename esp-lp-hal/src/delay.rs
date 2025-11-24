@@ -7,7 +7,7 @@
 //!
 //! ## Examples
 //!
-//! ```rust
+//! ```rust,no_run
 //! esp_lp_hal::delay::Delay.delay_millis(500);
 //! ```
 

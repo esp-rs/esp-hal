@@ -9,17 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- A new feature `defmt` which implements `defmt::Format` on `Context` (#3887)
-
 
 ### Changed
 
+- `CpuInterruptLevel::mask` is now a const function. (#4437)
 
 ### Fixed
 
 
 ### Removed
 
+
+## [v0.21.0] - 2025-10-13
+
+### Added
+
+- A new feature `defmt` which implements `defmt::Format` on `Context` (#3887)
+
+### Changed
+
+- Removed the `r0` dependency (#4117)
 
 ## [v0.20.0] - 2025-07-16
 
@@ -64,4 +73,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.18.0]: https://github.com/esp-rs/esp-hal/releases/tag/xtensa-lx-rt-v0.18.0
 [v0.19.0]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-rt-v0.18.0...xtensa-lx-rt-v0.19.0
 [v0.20.0]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-rt-v0.19.0...xtensa-lx-rt-v0.20.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-rt-v0.20.0...HEAD
+[v0.21.0]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-rt-v0.20.0...xtensa-lx-rt-v0.21.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-rt-v0.21.0...HEAD

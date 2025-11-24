@@ -24,6 +24,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
     gpio::{Flex, OutputConfig},
+    interrupt::software::SoftwareInterruptControl,
     timer::timg::TimerGroup,
 };
 
@@ -31,7 +32,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 static SIGNAL: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let p = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
@@ -48,8 +49,9 @@ async fn main(spawner: Spawner) {
     enc_b.set_output_enable(true);
     enc_b.set_input_enable(true);
 
+    let sw_int = SoftwareInterruptControl::new(p.SW_INTERRUPT);
     let timg0 = TimerGroup::new(p.TIMG0);
-    esp_hal_embassy::init(timg0.timer0);
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     spawner.must_spawn(toggle(enc_a_clone, enc_b_clone, &SIGNAL));
     spawner.must_spawn(wait(enc_a, enc_b, &SIGNAL));

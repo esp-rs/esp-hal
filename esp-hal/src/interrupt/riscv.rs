@@ -210,7 +210,19 @@ pub static RESERVED_INTERRUPTS: &[u32] = PRIORITY_TO_INTERRUPT;
 
 /// Enable an interrupt by directly binding it to a available CPU interrupt
 ///
-/// Unless you are sure, you most likely want to use [`enable`] instead.
+/// ⚠️ This installs a *raw trap handler*, the `handler` user provides is written directly into the
+/// CPU interrupt vector table. That means:
+///
+/// - Provided handler will be used as an actual trap-handler
+/// - It is user's responsibility to:
+///   - Save and restore all registers they use.
+///   - Clear the interrupt source if necessary.
+///   - Return using the `mret` instruction.
+/// - The handler should be declared as naked function. The compiler will not insert a function
+///   prologue/epilogue for the user, normal Rust `fn` will result in an error.
+///
+/// Unless you are sure that you need such low-level control to achieve the lowest possible latency,
+/// you most likely want to use [`enable`] instead.
 ///
 /// Trying using a reserved interrupt from [`RESERVED_INTERRUPTS`] will return
 /// an error.
@@ -218,6 +230,7 @@ pub fn enable_direct(
     interrupt: Interrupt,
     level: Priority,
     cpu_interrupt: CpuInterrupt,
+    handler: unsafe extern "C" fn(),
 ) -> Result<(), Error> {
     if RESERVED_INTERRUPTS.contains(&(cpu_interrupt as _)) {
         return Err(Error::CpuInterruptReserved);
@@ -228,9 +241,60 @@ pub fn enable_direct(
     unsafe {
         map(Cpu::current(), interrupt, cpu_interrupt);
         set_priority(Cpu::current(), cpu_interrupt, level);
+
+        let mt = mtvec::read();
+
+        assert_eq!(
+            mt.trap_mode().into_usize(),
+            mtvec::TrapMode::Vectored.into_usize()
+        );
+
+        let base_addr = mt.address() as usize;
+
+        let int_slot = base_addr.wrapping_add((cpu_interrupt as usize) * 4);
+
+        let instr = encode_jal_x0(handler as usize, int_slot)?;
+
+        if crate::debugger::debugger_connected() {
+            core::ptr::write_volatile(int_slot as *mut u32, instr);
+        } else {
+            crate::debugger::DEBUGGER_LOCK.lock(|| {
+                let wp = crate::debugger::clear_watchpoint(1);
+                core::ptr::write_volatile(int_slot as *mut u32, instr);
+                crate::debugger::restore_watchpoint(1, wp);
+            });
+        }
+
+        core::arch::asm!("fence.i");
+
         enable_cpu_interrupt(cpu_interrupt);
     }
     Ok(())
+}
+
+// helper: returns correctly encoded RISC-V `jal` instruction
+fn encode_jal_x0(target: usize, pc: usize) -> Result<u32, Error> {
+    let offset = (target as isize) - (pc as isize);
+
+    const MIN: isize = -(1isize << 20);
+    const MAX: isize = (1isize << 20) - 1;
+
+    assert!(offset % 2 == 0 && (MIN..=MAX).contains(&offset));
+
+    let imm = offset as u32;
+    let imm20 = (imm >> 20) & 0x1;
+    let imm10_1 = (imm >> 1) & 0x3ff;
+    let imm11 = (imm >> 11) & 0x1;
+    let imm19_12 = (imm >> 12) & 0xff;
+
+    let instr = (imm20 << 31)
+        | (imm19_12 << 12)
+        | (imm11 << 20)
+        | (imm10_1 << 21)
+        // https://lhtin.github.io/01world/app/riscv-isa/?xlen=32&insn_name=jal
+        | 0b1101111u32;
+
+    Ok(instr)
 }
 
 /// Disable the given peripheral interrupt.
@@ -392,7 +456,16 @@ mod vectored {
         unsafe {
             let ptr =
                 &pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as *const _ as *mut usize;
-            ptr.write_volatile(handler.raw_value());
+
+            if crate::debugger::debugger_connected() {
+                ptr.write_volatile(handler.raw_value());
+            } else {
+                crate::debugger::DEBUGGER_LOCK.lock(|| {
+                    let wp = crate::debugger::clear_watchpoint(1);
+                    ptr.write_volatile(handler.raw_value());
+                    crate::debugger::restore_watchpoint(1, wp);
+                });
+            }
         }
     }
 
@@ -763,93 +836,39 @@ mod rt {
         let prio = INTERRUPT_TO_PRIORITY[cpu_intr as usize];
         let configured_interrupts = vectored::configured_interrupts(core, status, prio);
 
+        // Change the current runlevel so that interrupt handlers can access the correct runlevel.
+        let level = unsafe { change_current_runlevel(prio) };
+
+        // When nesting is possible, we run the nestable interrupts first. This ensures that we
+        // don't violate assumptions made by non-nestable handlers.
+
+        if prio != Priority::max() {
+            for interrupt_nr in configured_interrupts.iterator() {
+                let handler =
+                    unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler } as usize;
+                let nested = (handler & 1) == 0;
+                if nested {
+                    let handler: fn() =
+                        unsafe { core::mem::transmute::<usize, fn()>(handler & !1) };
+
+                    unsafe { riscv::interrupt::nested(handler) };
+                }
+            }
+        }
+
+        // Now we can run the non-nestable interrupt handlers.
+
         for interrupt_nr in configured_interrupts.iterator() {
             let handler =
                 unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler } as usize;
             let not_nested = (handler & 1) == 1;
-            let handler = handler & !1;
+            if not_nested || prio == Priority::max() {
+                let handler: fn() = unsafe { core::mem::transmute::<usize, fn()>(handler & !1) };
 
-            let handler: fn() = unsafe { core::mem::transmute::<usize, fn()>(handler) };
-
-            if not_nested || prio == Priority::Priority15 {
                 handler();
-            } else {
-                let elevated = prio as u8;
-                unsafe {
-                    let level =
-                        change_current_runlevel(unwrap!(Priority::try_from(elevated as u32)));
-                    riscv::interrupt::nested(handler);
-                    change_current_runlevel(level);
-                }
             }
         }
+
+        unsafe { change_current_runlevel(level) };
     }
-
-    // The compiler generates quite unfortunate code for
-    // ```rust,ignore
-    // #[no_mangle]
-    // #[ram]
-    // unsafe fn interrupt1(context: &mut TrapFrame) {
-    //    handle_interrupts(CpuInterrupt::Interrupt1, context)
-    // }
-    // ```
-    //
-    // Resulting in
-    // ```asm,ignore
-    // interrupt1:
-    // add	sp,sp,-16
-    // sw	ra,12(sp)
-    // sw	s0,8(sp)
-    // add	s0,sp,16
-    // mv	a1,a0
-    // li	a0,1
-    // lw	ra,12(sp)
-    // lw	s0,8(sp)
-    // add	sp,sp,16
-    // auipc	t1,0x0
-    // jr	handle_interrupts
-    // ```
-    //
-    // We can do better manually - use Rust again once/if that changes
-    macro_rules! interrupt_handler {
-        ($num:literal) => {
-            core::arch::global_asm! {
-                concat!(
-                r#"
-                    .section .rwtext, "ax"
-                    .global interrupt"#,$num,r#"
-
-                interrupt"#,$num,r#":
-                    li a0,"#,$num,r#"
-                    j handle_interrupts
-                "#
-            )
-            }
-        };
-    }
-
-    interrupt_handler!(1);
-    interrupt_handler!(2);
-    interrupt_handler!(3);
-    interrupt_handler!(4);
-    interrupt_handler!(5);
-    interrupt_handler!(6);
-    interrupt_handler!(7);
-    interrupt_handler!(8);
-    interrupt_handler!(9);
-    interrupt_handler!(10);
-    interrupt_handler!(11);
-    interrupt_handler!(12);
-    interrupt_handler!(13);
-    interrupt_handler!(14);
-    interrupt_handler!(15);
-
-    #[cfg(plic)]
-    interrupt_handler!(16);
-    #[cfg(plic)]
-    interrupt_handler!(17);
-    #[cfg(plic)]
-    interrupt_handler!(18);
-    #[cfg(plic)]
-    interrupt_handler!(19);
 }

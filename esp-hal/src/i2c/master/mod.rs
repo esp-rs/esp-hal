@@ -184,6 +184,12 @@ impl I2cAddress {
 
         Ok(())
     }
+
+    fn bytes(self) -> usize {
+        match self {
+            I2cAddress::SevenBit(_) => 1,
+        }
+    }
 }
 
 impl From<u8> for I2cAddress {
@@ -683,7 +689,7 @@ impl<Dm: DriverMode> embedded_hal::i2c::I2c for I2c<'_, Dm> {
                 I2cAddress::SevenBit(address),
                 operations.iter_mut().map(Operation::from),
             )
-            .inspect_err(|_| self.internal_recover())
+            .inspect_err(|error| self.internal_recover(error))
     }
 }
 
@@ -709,8 +715,8 @@ impl<'d> I2c<'d, Blocking> {
     pub fn new(i2c: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(i2c.info().peripheral);
 
-        let sda_pin = PinGuard::new_unconnected(i2c.info().sda_output);
-        let scl_pin = PinGuard::new_unconnected(i2c.info().scl_output);
+        let sda_pin = PinGuard::new_unconnected();
+        let scl_pin = PinGuard::new_unconnected();
 
         let mut i2c = I2c {
             i2c: i2c.degrade(),
@@ -824,6 +830,7 @@ struct I2cFuture<'a> {
     events: EnumSet<Event>,
     driver: Driver<'a>,
     deadline: Option<Instant>,
+    /// True if the Future has been polled to completion.
     finished: bool,
 }
 
@@ -882,28 +889,32 @@ impl<'a> I2cFuture<'a> {
         };
         let error = self.driver.check_errors();
 
-        if self.is_done() {
-            self.finished = true;
+        let result = if self.is_done() {
             // Even though we are done, we have to check for NACK and arbitration loss.
             let result = if error == Err(Error::Timeout) {
+                // We are both done, and timed out. Likely the transaction has completed, but we
+                // checked too late?
                 Ok(())
             } else {
                 error
             };
             Poll::Ready(result)
         } else if error.is_err() {
-            self.finished = true;
             Poll::Ready(error)
+        } else if let Some(deadline) = self.deadline
+            && now > deadline
+        {
+            // If the deadline is reached, we return an error.
+            Poll::Ready(Err(Error::Timeout))
         } else {
-            if let Some(deadline) = self.deadline
-                && now > deadline
-            {
-                // If the deadline is reached, we return an error.
-                return Poll::Ready(Err(Error::Timeout));
-            }
-
             Poll::Pending
+        };
+
+        if result.is_ready() {
+            self.finished = true;
         }
+
+        result
     }
 }
 
@@ -926,8 +937,10 @@ impl core::future::Future for I2cFuture<'_> {
 impl Drop for I2cFuture<'_> {
     fn drop(&mut self) {
         if !self.finished {
-            self.driver.reset_fsm();
-            self.driver.clear_bus_blocking();
+            let result = self.poll_completion();
+            if result.is_pending() || result == Poll::Ready(Err(Error::Timeout)) {
+                self.driver.reset_fsm(true);
+            }
         }
     }
 }
@@ -949,7 +962,10 @@ impl<'d> I2c<'d, Async> {
     }
 
     #[procmacros::doc_replace]
-    /// Writes bytes to slave with given `address`
+    /// Writes bytes to slave with given `address`.
+    ///
+    /// Note that dropping the returned Future will abort the transfer, but doing so will
+    /// block while the driver is finishing clearing and releasing the bus.
     ///
     /// ## Example
     ///
@@ -975,7 +991,10 @@ impl<'d> I2c<'d, Async> {
     }
 
     #[procmacros::doc_replace]
-    /// Reads enough bytes from slave with `address` to fill `buffer`
+    /// Reads enough bytes from slave with `address` to fill `buffer`.
+    ///
+    /// Note that dropping the returned Future will abort the transfer, but doing so will
+    /// block while the driver is finishing clearing and releasing the bus.
     ///
     /// ## Errors
     ///
@@ -1008,7 +1027,10 @@ impl<'d> I2c<'d, Async> {
 
     #[procmacros::doc_replace]
     /// Writes bytes to slave with given `address` and then reads enough
-    /// bytes to fill `buffer` *in a single transaction*
+    /// bytes to fill `buffer` *in a single transaction*.
+    ///
+    /// Note that dropping the returned Future will abort the transfer, but doing so will
+    /// block while the driver is finishing clearing and releasing the bus.
     ///
     /// ## Errors
     ///
@@ -1045,8 +1067,10 @@ impl<'d> I2c<'d, Async> {
     }
 
     #[procmacros::doc_replace]
-    /// Execute the provided operations on the I2C bus as a single
-    /// transaction.
+    /// Execute the provided operations on the I2C bus as a single transaction.
+    ///
+    /// Note that dropping the returned Future will abort the transfer, but doing so will
+    /// block while the driver is finishing clearing and releasing the bus.
     ///
     /// Transaction contract:
     /// - Before executing the first operation an ST is sent automatically. This is followed by
@@ -1098,7 +1122,7 @@ impl<'d> I2c<'d, Async> {
         self.driver()
             .transaction_impl_async(address.into(), operations.into_iter().map(Operation::from))
             .await
-            .inspect_err(|_| self.internal_recover())
+            .inspect_err(|error| self.internal_recover(error))
     }
 }
 
@@ -1114,13 +1138,10 @@ where
         }
     }
 
-    fn internal_recover(&self) {
-        if self.driver().regs().sr().read().bus_busy().bit_is_set() {
-            // Send clock pulses to make sure the slave releases the bus.
-            self.driver().clear_bus_blocking();
-        }
-
-        self.driver().reset_fsm();
+    fn internal_recover(&self, error: &Error) {
+        // Timeout errors mean our hardware is (possibly) working when it gets reset. Clear the bus
+        // in this case, to prevent leaving the I2C device mid-transfer.
+        self.driver().reset_fsm(*error == Error::Timeout)
     }
 
     /// Connect a pin to the I2C SDA signal.
@@ -1293,7 +1314,7 @@ where
     ) -> Result<(), Error> {
         self.driver()
             .transaction_impl(address.into(), operations.into_iter().map(Operation::from))
-            .inspect_err(|_| self.internal_recover())
+            .inspect_err(|error| self.internal_recover(error))
     }
 
     #[procmacros::doc_replace]
@@ -1317,7 +1338,7 @@ where
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.config.config = *config;
         self.driver().setup(config)?;
-        self.driver().reset_fsm();
+        self.driver().reset_fsm(false);
         Ok(())
     }
 }
@@ -1331,7 +1352,7 @@ impl embedded_hal_async::i2c::I2c for I2c<'_, Async> {
         self.driver()
             .transaction_impl_async(address.into(), operations.iter_mut().map(Operation::from))
             .await
-            .inspect_err(|_| self.internal_recover())
+            .inspect_err(|error| self.internal_recover(error))
     }
 }
 
@@ -1660,15 +1681,7 @@ impl Driver<'_> {
         Ok(())
     }
 
-    /// Resets the I2C controller (FIFO + FSM + command list)
-    // This function implements esp-idf's `s_i2c_hw_fsm_reset`, without the
-    // clear_bus=true parts.
-    // https://github.com/espressif/esp-idf/blob/27d68f57e6bdd3842cd263585c2c352698a9eda2/components/esp_driver_i2c/i2c_master.c#L115
-    //
-    // Make sure you don't call this function in the middle of a transaction. If the
-    // first command in the command list is not a START, the hardware will hang
-    // with no timeouts.
-    fn reset_fsm(&self) {
+    fn do_fsm_reset(&self) {
         cfg_if::cfg_if! {
             if #[cfg(i2c_master_has_reliable_fsm_reset)] {
                 // Device has a working FSM reset mechanism
@@ -1677,9 +1690,7 @@ impl Driver<'_> {
                 // Even though C2 and C3 have a FSM reset bit, esp-idf does not
                 // define SOC_I2C_SUPPORT_HW_FSM_RST for them, so include them in the fallback impl.
 
-                // Do the reset
-                crate::system::PeripheralClockControl::disable(self.info.peripheral);
-                crate::system::PeripheralClockControl::enable(self.info.peripheral);
+                crate::system::PeripheralClockControl::reset(self.info.peripheral);
 
                 // Restore configuration. This operation has succeeded once, so we can
                 // assume that the config is valid and we can ignore the result.
@@ -1688,15 +1699,34 @@ impl Driver<'_> {
         }
     }
 
+    /// Resets the I2C controller (FIFO + FSM + command list)
+    // This function implements esp-idf's `s_i2c_hw_fsm_reset`
+    // https://github.com/espressif/esp-idf/blob/27d68f57e6bdd3842cd263585c2c352698a9eda2/components/esp_driver_i2c/i2c_master.c#L115
+    //
+    // Make sure you don't call this function in the middle of a transaction. If the
+    // first command in the command list is not a START, the hardware will hang
+    // with no timeouts.
+    fn reset_fsm(&self, clear_bus: bool) {
+        if clear_bus {
+            self.clear_bus_blocking(true);
+        } else {
+            self.do_fsm_reset();
+        }
+    }
+
+    fn bus_busy(&self) -> bool {
+        self.regs().sr().read().bus_busy().bit_is_set()
+    }
+
     fn ensure_idle_blocking(&self) {
-        if self.regs().sr().read().bus_busy().bit_is_set() {
+        if self.bus_busy() {
             // If the bus is busy, we need to clear it.
-            self.clear_bus_blocking();
+            self.clear_bus_blocking(false);
         }
     }
 
     async fn ensure_idle(&self) {
-        if self.regs().sr().read().bus_busy().bit_is_set() {
+        if self.bus_busy() {
             // If the bus is busy, we need to clear it.
             self.clear_bus().await;
         }
@@ -1718,8 +1748,8 @@ impl Driver<'_> {
     /// If a transaction ended incorrectly for some reason, the slave may drive
     /// SDA indefinitely. This function forces the slave to release the
     /// bus by sending 9 clock pulses.
-    fn clear_bus_blocking(&self) {
-        let mut future = ClearBusFuture::new(*self);
+    fn clear_bus_blocking(&self, reset_fsm: bool) {
+        let mut future = ClearBusFuture::new(*self, reset_fsm);
         let start = Instant::now();
         while future.poll_completion().is_pending() {
             if start.elapsed() > CLEAR_BUS_TIMEOUT_MS {
@@ -1729,7 +1759,7 @@ impl Driver<'_> {
     }
 
     async fn clear_bus(&self) {
-        let clear_bus = ClearBusFuture::new(*self);
+        let clear_bus = ClearBusFuture::new(*self, true);
         let start = Instant::now();
 
         embassy_futures::select::select(clear_bus, async {
@@ -1878,7 +1908,7 @@ impl Driver<'_> {
         Ok(())
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+    #[cfg(not(any(esp32, esp32s2)))]
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
@@ -1905,7 +1935,7 @@ impl Driver<'_> {
         };
         let scl_high = half_cycle - scl_wait_high;
         let sda_hold = half_cycle / 4;
-        let sda_sample = half_cycle / 2 + scl_wait_high;
+        let sda_sample = half_cycle / 2;
         let setup = half_cycle;
         let hold = half_cycle;
 
@@ -1952,12 +1982,14 @@ impl Driver<'_> {
     /// - `bytes` is the data two be sent.
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
+    /// - `stop` indicates whether the operation will end with a STOP condition.
     /// - `cmd_iterator` is an iterator over the command registers.
     fn setup_write<'a, I>(
         &self,
         addr: I2cAddress,
         bytes: &[u8],
         start: bool,
+        stop: bool,
         cmd_iterator: &mut I,
     ) -> Result<(), Error>
     where
@@ -1981,60 +2013,32 @@ impl Driver<'_> {
         let write_len = if start { bytes.len() + 1 } else { bytes.len() };
         // don't issue write if there is no data to write
         if write_len > 0 {
-            if cfg!(any(esp32, esp32s2)) {
-                // try to place END at the same index
-                if write_len < 2 {
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Write {
-                            ack_exp: Ack::Ack,
-                            ack_check_en: true,
-                            length: write_len as u8,
-                        },
-                    )?;
-                } else if start {
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Write {
-                            ack_exp: Ack::Ack,
-                            ack_check_en: true,
-                            length: (write_len as u8) - 1,
-                        },
-                    )?;
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Write {
-                            ack_exp: Ack::Ack,
-                            ack_check_en: true,
-                            length: 1,
-                        },
-                    )?;
-                } else {
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Write {
-                            ack_exp: Ack::Ack,
-                            ack_check_en: true,
-                            length: (write_len as u8) - 2,
-                        },
-                    )?;
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Write {
-                            ack_exp: Ack::Ack,
-                            ack_check_en: true,
-                            length: 1,
-                        },
-                    )?;
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Write {
-                            ack_exp: Ack::Ack,
-                            ack_check_en: true,
-                            length: 1,
-                        },
-                    )?;
-                }
+            // ESP32 can't alter the position of END, so we need to split the chunk always into
+            // 3-command sequences. Chunking makes sure not to place a 1-byte
+            // command at the end, which would cause an arithmetic underflow.
+            // The sequences we can generate are:
+            // - START-WRITE-STOP
+            // - START-WRITE-END-WRITE-STOP
+            // - START-WRITE-END-(WRITE-WRITE-END)*-WRITE-STOP sequence.
+            if cfg!(esp32) && !(start || stop) {
+                // Chunks that do not have a START or STOP command need to be split into multiple
+                // commands.
+                add_cmd(
+                    cmd_iterator,
+                    Command::Write {
+                        ack_exp: Ack::Ack,
+                        ack_check_en: true,
+                        length: (write_len as u8) - 1,
+                    },
+                )?;
+                add_cmd(
+                    cmd_iterator,
+                    Command::Write {
+                        ack_exp: Ack::Ack,
+                        ack_check_en: true,
+                        length: 1,
+                    },
+                )?;
             } else {
                 add_cmd(
                     cmd_iterator,
@@ -2067,6 +2071,7 @@ impl Driver<'_> {
     /// - `buffer` is the buffer to store the read data.
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
+    /// - `stop` indicates whether the operation will end with a STOP condition.
     /// - `will_continue` indicates whether there is another read operation following this one and
     ///   we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
@@ -2075,6 +2080,7 @@ impl Driver<'_> {
         addr: I2cAddress,
         buffer: &mut [u8],
         start: bool,
+        stop: bool,
         will_continue: bool,
         cmd_iterator: &mut I,
     ) -> Result<(), Error>
@@ -2095,7 +2101,7 @@ impl Driver<'_> {
 
         if start {
             add_cmd(cmd_iterator, Command::Start)?;
-            // WRITE command
+            // WRITE 7-bit address
             add_cmd(
                 cmd_iterator,
                 Command::Write {
@@ -2107,60 +2113,32 @@ impl Driver<'_> {
         }
 
         if initial_len > 0 {
-            if cfg!(any(esp32, esp32s2)) {
-                // try to place END at the same index
-                if initial_len < 2 || start {
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Read {
-                            ack_value: Ack::Ack,
-                            length: initial_len as u8,
-                        },
-                    )?;
-                } else if !will_continue {
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Read {
-                            ack_value: Ack::Ack,
-                            length: (initial_len as u8) - 1,
-                        },
-                    )?;
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Read {
-                            ack_value: Ack::Ack,
-                            length: 1,
-                        },
-                    )?;
-                } else {
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Read {
-                            ack_value: Ack::Ack,
-                            length: (initial_len as u8) - 2,
-                        },
-                    )?;
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Read {
-                            ack_value: Ack::Ack,
-                            length: 1,
-                        },
-                    )?;
-                    add_cmd(
-                        cmd_iterator,
-                        Command::Read {
-                            ack_value: Ack::Ack,
-                            length: 1,
-                        },
-                    )?;
+            let extra_commands = if cfg!(esp32) {
+                match (start, will_continue) {
+                    // No chunking (START-WRITE-READ-STOP) or first chunk (START-WRITE-READ-END)
+                    (true, _) => 0,
+                    // Middle chunk - (READ-READ-READ-END)
+                    (false, true) => 2,
+                    // Last chunk - (READ-READ-STOP-END)
+                    (false, false) => 1 - stop as u8,
                 }
             } else {
+                0
+            };
+
+            add_cmd(
+                cmd_iterator,
+                Command::Read {
+                    ack_value: Ack::Ack,
+                    length: initial_len as u8 - extra_commands,
+                },
+            )?;
+            for _ in 0..extra_commands {
                 add_cmd(
                     cmd_iterator,
                     Command::Read {
                         ack_value: Ack::Ack,
-                        length: initial_len as u8,
+                        length: 1,
                     },
                 )?;
             }
@@ -2243,6 +2221,8 @@ impl Driver<'_> {
             Instant::EPOCH
         };
 
+        self.check_errors()?;
+
         for cmd_reg in self.regs().comd_iter() {
             let cmd = cmd_reg.read();
 
@@ -2281,6 +2261,7 @@ impl Driver<'_> {
     fn check_all_commands_done_blocking(&self, deadline: Option<Instant>) -> Result<(), Error> {
         // loop until commands are actually done
         while !self.all_commands_done(deadline)? {}
+        self.check_errors()?;
 
         Ok(())
     }
@@ -2291,6 +2272,7 @@ impl Driver<'_> {
         while !self.all_commands_done(deadline)? {
             embassy_futures::yield_now().await;
         }
+        self.check_errors()?;
 
         Ok(())
     }
@@ -2364,7 +2346,7 @@ impl Driver<'_> {
     #[cfg(not(esp32))]
     fn reset_fifo(&self) {
         // First, reset the fifo buffers
-        self.regs().fifo_conf().modify(|_, w| unsafe {
+        self.regs().fifo_conf().write(|w| unsafe {
             w.tx_fifo_rst().set_bit();
             w.rx_fifo_rst().set_bit();
             w.nonfifo_en().clear_bit();
@@ -2390,7 +2372,7 @@ impl Driver<'_> {
     #[cfg(esp32)]
     fn reset_fifo(&self) {
         // First, reset the fifo buffers
-        self.regs().fifo_conf().modify(|_, w| unsafe {
+        self.regs().fifo_conf().write(|w| unsafe {
             w.tx_fifo_rst().set_bit();
             w.rx_fifo_rst().set_bit();
             w.nonfifo_en().clear_bit();
@@ -2411,24 +2393,28 @@ impl Driver<'_> {
     fn start_write_operation(
         &self,
         address: I2cAddress,
-        bytes: &[u8],
+        buffer: &[u8],
         start: bool,
         stop: bool,
         deadline: Deadline,
     ) -> Result<Option<Instant>, Error> {
         let cmd_iterator = &mut self.regs().comd_iter();
 
-        self.setup_write(address, bytes, start, cmd_iterator)?;
+        self.setup_write(address, buffer, start, stop, cmd_iterator)?;
 
         if stop {
             add_cmd(cmd_iterator, Command::Stop)?;
-        } else {
+        }
+        if !(start && stop) {
+            // Multi-chunk write, terminate with END. ESP32 TRM suggests a write should work with
+            // only a STOP at the end, but STOP does not seem to generate a TX_COMPLETE interrupt
+            // without END.
             add_cmd(cmd_iterator, Command::End)?;
         }
-        self.start_transmission();
-        let deadline = deadline.start(bytes.len() + start as usize);
 
-        Ok(deadline)
+        self.start_transmission();
+
+        Ok(deadline.start(buffer.len() + address.bytes()))
     }
 
     /// Executes an I2C read operation.
@@ -2456,17 +2442,19 @@ impl Driver<'_> {
 
         let cmd_iterator = &mut self.regs().comd_iter();
 
-        self.setup_read(address, buffer, start, will_continue, cmd_iterator)?;
+        self.setup_read(address, buffer, start, stop, will_continue, cmd_iterator)?;
 
         if stop {
             add_cmd(cmd_iterator, Command::Stop)?;
-        } else {
+        }
+        if !(start && stop) {
+            // Multi-chunk read, terminate with END. On ESP32, assume same limitation as writes.
             add_cmd(cmd_iterator, Command::End)?;
         }
-        self.start_transmission();
-        let deadline = deadline.start(buffer.len() + start as usize);
 
-        Ok(deadline)
+        self.start_transmission();
+
+        Ok(deadline.start(buffer.len() + address.bytes()))
     }
 
     /// Executes an I2C write operation.
@@ -2900,6 +2888,8 @@ fn calculate_chunk_size(remaining: usize) -> usize {
 
 #[cfg(i2c_master_has_hw_bus_clear)]
 mod bus_clear {
+    use esp_rom_sys::rom::ets_delay_us;
+
     use super::*;
 
     pub struct ClearBusFuture<'a> {
@@ -2909,9 +2899,23 @@ mod bus_clear {
     impl<'a> ClearBusFuture<'a> {
         // Number of SCL pulses to clear the bus
         const BUS_CLEAR_BITS: u8 = 9;
+        const DELAY_US: u32 = 5; // 5us -> 100kHz
 
-        pub fn new(driver: Driver<'a>) -> Self {
+        pub fn new(driver: Driver<'a>, reset_fsm: bool) -> Self {
+            // If we have a HW implementation, reset FSM to make sure it's not trying to transmit
+            // while we clear the bus.
+            if reset_fsm {
+                // Resetting the FSM may still generate a short SCL pulse, but I don't know how to
+                // work around it - just waiting doesn't solve anything if the hardware is running.
+                driver.do_fsm_reset();
+            }
+
             let mut this = Self { driver };
+
+            // Prevent SCL from going low immediately after FSM reset/previous operation has set
+            // it high
+            ets_delay_us(Self::DELAY_US);
+
             this.configure(Self::BUS_CLEAR_BITS);
             this
         }
@@ -2944,9 +2948,51 @@ mod bus_clear {
 
     impl Drop for ClearBusFuture<'_> {
         fn drop(&mut self) {
+            use crate::gpio::AnyPin;
             if !self.is_done() {
                 self.configure(0);
             }
+
+            // Generate a stop condition
+            let sda = self
+                .driver
+                .config
+                .sda_pin
+                .pin_number()
+                .map(|n| unsafe { AnyPin::steal(n) });
+            let scl = self
+                .driver
+                .config
+                .scl_pin
+                .pin_number()
+                .map(|n| unsafe { AnyPin::steal(n) });
+
+            if let (Some(sda), Some(scl)) = (sda, scl) {
+                // Prevent short SCL pulse right after HW clearing completes
+                ets_delay_us(Self::DELAY_US);
+
+                sda.set_output_high(true);
+                scl.set_output_high(false);
+
+                self.driver.info.scl_output.disconnect_from(&scl);
+                self.driver.info.sda_output.disconnect_from(&sda);
+
+                // Set SDA low - whatever state it was in, we need a low -> high transition.
+                sda.set_output_high(false);
+                ets_delay_us(Self::DELAY_US);
+
+                // Set SCL high to prepare for STOP condition
+                scl.set_output_high(true);
+                ets_delay_us(Self::DELAY_US);
+
+                // STOP
+                sda.set_output_high(true);
+                ets_delay_us(Self::DELAY_US);
+
+                self.driver.info.sda_output.connect_to(&sda);
+                self.driver.info.scl_output.connect_to(&scl);
+            }
+
             // We don't care about errors during bus clearing
             self.driver.clear_all_interrupts();
         }
@@ -2977,6 +3023,7 @@ mod bus_clear {
         driver: Driver<'a>,
         wait: Instant,
         state: State,
+        reset_fsm: bool,
         pins: Option<(AnyPin<'static>, AnyPin<'static>)>,
     }
 
@@ -2986,10 +3033,7 @@ mod bus_clear {
         // use standard 100kHz data rate
         const SCL_DELAY: Duration = Duration::from_micros(5);
 
-        pub fn new(driver: Driver<'a>) -> Self {
-            // ESP32: The chip is lacking hardware support for bus clearing.
-            // ESP32-S2: The hardware bus clearing doesn't seem to work
-            // -> so we implement it in software.
+        pub fn new(driver: Driver<'a>, reset_fsm: bool) -> Self {
             let sda = driver
                 .config
                 .sda_pin
@@ -3003,10 +3047,14 @@ mod bus_clear {
 
             let (Some(sda), Some(scl)) = (sda, scl) else {
                 // If we don't have the pins, we can't clear the bus.
+                if reset_fsm {
+                    driver.do_fsm_reset();
+                }
                 return Self {
                     driver,
                     wait: Instant::now(),
                     state: State::Idle,
+                    reset_fsm: false,
                     pins: None,
                 };
             };
@@ -3017,22 +3065,18 @@ mod bus_clear {
             driver.info.scl_output.disconnect_from(&scl);
             driver.info.sda_output.disconnect_from(&sda);
 
-            let state = if sda.is_input_high() {
-                // SDA is high, the device is not holding it, we don't need to do anything.
-                State::Idle
-            } else {
-                // Starting from (9, false), becase:
-                // - we start with SCL low
-                // - a complete SCL cycle consists of a high period and a low period
-                // - we decrement the remaining counter at the beginning of a cycle, which gives us
-                //   9 complete SCL cycles.
-                State::SendClock(Self::BUS_CLEAR_BITS, false)
-            };
+            // Starting from (9, false), becase:
+            // - we start with SCL low
+            // - a complete SCL cycle consists of a high period and a low period
+            // - we decrement the remaining counter at the beginning of a cycle, which gives us 9
+            //   complete SCL cycles.
+            let state = State::SendClock(Self::BUS_CLEAR_BITS, false);
 
             Self {
                 driver,
                 wait: Instant::now() + Self::SCL_DELAY,
                 state,
+                reset_fsm,
                 pins: Some((sda, scl)),
             }
         }
@@ -3072,19 +3116,22 @@ mod bus_clear {
                     self.state = State::SendStop;
                 }
                 State::SendClock(n, false) => {
-                    if let Some((_sda, scl)) = self.pins.as_ref() {
+                    if let Some((sda, scl)) = self.pins.as_ref() {
                         scl.set_output_high(true);
+                        if sda.is_input_high() {
+                            sda.set_output_high(false);
+                            // The device has released SDA, we can move on to generating a STOP
+                            // condition
+                            self.wait = Instant::now() + Self::SCL_DELAY;
+                            self.state = State::SendStop;
+                            return Poll::Pending;
+                        }
                     }
                     self.state = State::SendClock(n - 1, true);
                 }
                 State::SendClock(n, true) => {
-                    if let Some((sda, scl)) = self.pins.as_ref() {
+                    if let Some((_sda, scl)) = self.pins.as_ref() {
                         scl.set_output_high(false);
-                        if sda.is_input_high() {
-                            // The device has released SDA, we can move on to generating a NACK
-                            self.state = State::SendClock(0, false);
-                            return Poll::Pending;
-                        }
                     }
                     self.state = State::SendClock(n, false);
                 }
@@ -3101,6 +3148,12 @@ mod bus_clear {
                 // Make sure _we_ release the bus.
                 scl.set_output_high(true);
                 sda.set_output_high(true);
+
+                // If we don't have a HW implementation, reset the peripheral after clearing the
+                // bus, but before we reconnect the pins in Drop. This should prevent glitches.
+                if self.reset_fsm {
+                    self.driver.do_fsm_reset();
+                }
 
                 self.driver.info.sda_output.connect_to(&sda);
                 self.driver.info.scl_output.connect_to(&scl);

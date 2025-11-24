@@ -15,7 +15,7 @@
 //!
 //! To use the default values:
 //!
-//! ```rust, ignore
+//! ```rust, no_run
 //! #![no_std]
 //! #![no_main]
 //!
@@ -36,7 +36,7 @@
 //!
 //! If you want to customize the application descriptor:
 //!
-//! ```rust, ignore
+//! ```rust, no_run
 //! #![no_std]
 //! #![no_main]
 //!
@@ -72,6 +72,16 @@
 //! }
 //! ```
 //!
+//! ## Reclaimed memory
+//!
+//! After the bootloader has started the application, the `.dram2_uninit` region becomes available
+//! for use. This region can be used for dynamic memory allocation or other purposes, but the data
+//! placed there cannot be initialized (i.e. it must be `MaybeUninit<T>`). For convenience, you can
+//! use the `#[esp_hal::ram(reclaimed)]` attribute, which will also check that the variable can be
+//! placed in the reclaimed memory.
+#![doc = ""]
+#![cfg_attr(not(feature = "std"), doc = concat!("For ", esp_metadata_generated::chip!(), " the size of the reclaimed memory is ", esp_metadata_generated::memory_range!(size as str, "DRAM2_UNINIT")," bytes."))]
+#![doc = ""]
 //! ## Additional configuration
 //!
 //! We've exposed some configuration options that don't fit into cargo
@@ -104,6 +114,8 @@ pub(crate) use non_rom as crypto;
 pub mod partitions;
 
 pub mod ota;
+
+pub mod ota_updater;
 
 // We run tests on the host which happens to be MacOS machines and mach-o
 // doesn't like `link-sections` this way
@@ -339,7 +351,7 @@ pub const MMU_PAGE_SIZE: u32 = {
 
 /// The (pretended) ESP-IDF version
 pub const ESP_IDF_COMPATIBLE_VERSION: &str =
-    esp_config::esp_config_str!("ESP_BOOTLOADER_ESP_IDF_CONFIG_MMU_PAGE_SIZE");
+    esp_config::esp_config_str!("ESP_BOOTLOADER_ESP_IDF_CONFIG_ESP_IDF_VERSION");
 
 /// This macro populates the application descriptor (see [EspAppDesc]) which is
 /// available as a static named `ESP_APP_DESC`
@@ -372,6 +384,7 @@ macro_rules! esp_app_desc {
     ) => {
         #[unsafe(export_name = "esp_app_desc")]
         #[unsafe(link_section = ".rodata_desc.appdesc")]
+        /// Application metadata descriptor.
         pub static ESP_APP_DESC: $crate::EspAppDesc = $crate::EspAppDesc::new_internal(
             $version,
             $project_name,

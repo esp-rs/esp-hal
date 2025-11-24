@@ -1,19 +1,20 @@
-use esp_wifi_sys::include::{
-    ESP_WIFI_OS_ADAPTER_MAGIC,
-    ESP_WIFI_OS_ADAPTER_VERSION,
-    WIFI_INIT_CONFIG_MAGIC,
-    wifi_init_config_t,
-    wifi_osi_funcs_t,
-    wpa_crypto_funcs_t,
+use super::os_adapter::{self, *};
+use crate::{
+    common_adapter::*,
+    sys::include::{
+        ESP_WIFI_OS_ADAPTER_MAGIC,
+        ESP_WIFI_OS_ADAPTER_VERSION,
+        wifi_init_config_t,
+        wifi_osi_funcs_t,
+    },
 };
-
-use super::os_adapter::*;
-use crate::common_adapter::*;
+#[cfg(coex)]
+use crate::{hal::ram, sys::c_types::c_void};
 
 #[cfg(all(coex, any(esp32, esp32c2, esp32c3, esp32c6, esp32s3)))]
-pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::binary::include::coex_adapter_funcs_t =
-    crate::binary::include::coex_adapter_funcs_t {
-        _version: crate::binary::include::COEX_ADAPTER_VERSION as i32,
+pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::sys::include::coex_adapter_funcs_t =
+    crate::sys::include::coex_adapter_funcs_t {
+        _version: crate::sys::include::COEX_ADAPTER_VERSION as i32,
         _task_yield_from_isr: Some(task_yield_from_isr),
         _semphr_create: Some(semphr_create),
         _semphr_delete: Some(semphr_delete),
@@ -26,7 +27,7 @@ pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::binary::include::coex_adapter
         _free: Some(free),
         _esp_timer_get_time: Some(__esp_radio_esp_timer_get_time),
         _env_is_chip: Some(env_is_chip),
-        _magic: crate::binary::include::COEX_ADAPTER_MAGIC as i32,
+        _magic: crate::sys::include::COEX_ADAPTER_MAGIC as i32,
         _timer_disarm: Some(ets_timer_disarm),
         _timer_done: Some(ets_timer_done),
         _timer_setfn: Some(ets_timer_setfn),
@@ -43,22 +44,40 @@ pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::binary::include::coex_adapter
 
         #[cfg(esp32c2)]
         _slowclk_cal_get: Some(slowclk_cal_get),
+
+        _debug_matrix_init: Some(esp_coexist_debug_matrix_init_wrapper),
+        _xtal_freq_get: Some(xtal_freq_get_wrapper),
     };
 
 #[cfg(coex)]
-unsafe extern "C" fn semphr_take_from_isr_wrapper(
-    semphr: *mut crate::binary::c_types::c_void,
-    hptw: *mut crate::binary::c_types::c_void,
-) -> i32 {
-    unsafe { crate::common_adapter::semphr_take_from_isr(semphr as *const (), hptw as *const ()) }
+#[ram]
+unsafe extern "C" fn xtal_freq_get_wrapper() -> i32 {
+    use esp_hal::clock::Clock;
+
+    let xtal = crate::hal::clock::RtcClock::xtal_freq();
+    xtal.mhz() as i32
 }
 
 #[cfg(coex)]
-unsafe extern "C" fn semphr_give_from_isr_wrapper(
-    semphr: *mut crate::binary::c_types::c_void,
-    hptw: *mut crate::binary::c_types::c_void,
+unsafe extern "C" fn esp_coexist_debug_matrix_init_wrapper(
+    _evt: i32,
+    _sig: i32,
+    _rev: bool,
 ) -> i32 {
-    unsafe { crate::common_adapter::semphr_give_from_isr(semphr as *const (), hptw as *const ()) }
+    // CONFIG_ESP_COEX_GPIO_DEBUG not supported
+    crate::sys::include::ESP_ERR_NOT_SUPPORTED as i32
+}
+
+#[cfg(coex)]
+#[ram]
+unsafe extern "C" fn semphr_take_from_isr_wrapper(semphr: *mut c_void, hptw: *mut c_void) -> i32 {
+    unsafe { crate::common_adapter::semphr_take_from_isr(semphr, hptw as *mut bool) }
+}
+
+#[cfg(coex)]
+#[ram]
+unsafe extern "C" fn semphr_give_from_isr_wrapper(semphr: *mut c_void, hptw: *mut c_void) -> i32 {
+    unsafe { crate::common_adapter::semphr_give_from_isr(semphr, hptw as *mut bool) }
 }
 
 #[cfg(coex)]
@@ -67,7 +86,7 @@ unsafe extern "C" fn is_in_isr_wrapper() -> i32 {
 }
 
 #[unsafe(no_mangle)]
-static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_funcs_t {
+pub(crate) static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _version: ESP_WIFI_OS_ADAPTER_VERSION as i32,
     _env_is_chip: Some(env_is_chip),
     _set_intr: Some(set_intr),
@@ -120,8 +139,8 @@ static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _dport_access_stall_other_cpu_end_wrap: Some(dport_access_stall_other_cpu_end_wrap),
     _wifi_apb80m_request: Some(wifi_apb80m_request),
     _wifi_apb80m_release: Some(wifi_apb80m_release),
-    _phy_disable: Some(phy_disable),
-    _phy_enable: Some(phy_enable),
+    _phy_disable: Some(os_adapter::phy_disable),
+    _phy_enable: Some(os_adapter::phy_enable),
     _phy_update_country_info: Some(phy_update_country_info),
     _read_mac: Some(read_mac),
     _timer_arm: Some(ets_timer_arm),
@@ -205,10 +224,11 @@ static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _coex_schm_process_restart: Some(coex_schm_process_restart_wrapper),
     _coex_schm_register_cb: Some(coex_schm_register_cb_wrapper),
 
-    _magic: ESP_WIFI_OS_ADAPTER_MAGIC as i32,
-
     _coex_schm_flexible_period_set: Some(coex_schm_flexible_period_set),
     _coex_schm_flexible_period_get: Some(coex_schm_flexible_period_get),
+    _coex_schm_get_phase_by_idx: Some(coex_schm_get_phase_by_idx),
+
+    _magic: ESP_WIFI_OS_ADAPTER_MAGIC as i32,
 };
 
 const WIFI_ENABLE_WPA3_SAE: u64 = 1 << 0;
@@ -224,64 +244,4 @@ const WIFI_FEATURE_CAPS: u64 = WIFI_ENABLE_WPA3_SAE | WIFI_ENABLE_ENTERPRISE;
 #[unsafe(no_mangle)]
 pub(super) static mut __ESP_RADIO_G_WIFI_FEATURE_CAPS: u64 = WIFI_FEATURE_CAPS;
 
-pub(super) static mut G_CONFIG: wifi_init_config_t = wifi_init_config_t {
-    osi_funcs: core::ptr::addr_of!(__ESP_RADIO_G_WIFI_OSI_FUNCS).cast_mut(),
-
-    // dummy for now - populated in init
-    wpa_crypto_funcs: wpa_crypto_funcs_t {
-        size: 0,
-        version: 1,
-        aes_wrap: None,
-        aes_unwrap: None,
-        hmac_sha256_vector: None,
-        sha256_prf: None,
-        hmac_md5: None,
-        hamc_md5_vector: None,
-        hmac_sha1: None,
-        hmac_sha1_vector: None,
-        sha1_prf: None,
-        sha1_vector: None,
-        pbkdf2_sha1: None,
-        rc4_skip: None,
-        md5_vector: None,
-        aes_encrypt: None,
-        aes_encrypt_init: None,
-        aes_encrypt_deinit: None,
-        aes_decrypt: None,
-        aes_decrypt_init: None,
-        aes_decrypt_deinit: None,
-        aes_128_encrypt: None,
-        aes_128_decrypt: None,
-        omac1_aes_128: None,
-        ccmp_decrypt: None,
-        ccmp_encrypt: None,
-        aes_gmac: None,
-        sha256_vector: None,
-        crc32: None,
-    },
-    static_rx_buf_num: crate::CONFIG.static_rx_buf_num as i32,
-    dynamic_rx_buf_num: crate::CONFIG.dynamic_rx_buf_num as i32,
-    tx_buf_type: esp_wifi_sys::include::CONFIG_ESP_WIFI_TX_BUFFER_TYPE as i32,
-    static_tx_buf_num: crate::CONFIG.static_tx_buf_num as i32,
-    dynamic_tx_buf_num: crate::CONFIG.dynamic_tx_buf_num as i32,
-    rx_mgmt_buf_type: esp_wifi_sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUF as i32,
-    rx_mgmt_buf_num: esp_wifi_sys::include::CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF as i32,
-    cache_tx_buf_num: esp_wifi_sys::include::WIFI_CACHE_TX_BUFFER_NUM as i32,
-    csi_enable: cfg!(feature = "csi") as i32,
-    ampdu_rx_enable: crate::CONFIG.ampdu_rx_enable as i32,
-    ampdu_tx_enable: crate::CONFIG.ampdu_tx_enable as i32,
-    amsdu_tx_enable: crate::CONFIG.amsdu_tx_enable as i32,
-    nvs_enable: 0,
-    nano_enable: 0,
-    rx_ba_win: crate::CONFIG.rx_ba_win as i32,
-    wifi_task_core_id: 0,
-    beacon_max_len: esp_wifi_sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
-    mgmt_sbuf_num: esp_wifi_sys::include::WIFI_MGMT_SBUF_NUM as i32,
-    feature_caps: WIFI_FEATURE_CAPS,
-    sta_disconnected_pm: false,
-    espnow_max_encrypt_num: esp_wifi_sys::include::CONFIG_ESP_WIFI_ESPNOW_MAX_ENCRYPT_NUM as i32,
-    magic: WIFI_INIT_CONFIG_MAGIC as i32,
-
-    tx_hetb_queue_num: 3,
-    dump_hesigb_enable: false,
-};
+pub(super) static mut G_CONFIG: wifi_init_config_t = unsafe { core::mem::zeroed() };

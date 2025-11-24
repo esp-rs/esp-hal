@@ -2,7 +2,7 @@
 #
 # Empty [`device.driver`] tables imply `partial` support status.
 #
-# If you modify a driver support status, run `cargo xtask update-chip-support-table` to
+# If you modify a driver support status, run `cargo xtask update-metadata` to
 # update the table in the esp-hal README.
 
 [device]
@@ -80,6 +80,7 @@ peripherals = [
 
     { name = "ADC1", virtual = true },
     { name = "BT", virtual = true },
+    { name = "FLASH", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "MEM2MEM1", virtual = true },
     { name = "MEM2MEM4", virtual = true },
@@ -97,22 +98,78 @@ symbols = [
     "gdma",
     "plic",
     "phy",
+    "swd",
 
     # ROM capabilities
     "rom_crc_le",
     "rom_crc_be",
     "rom_md5_bsd",
-
-    # Which bluetooth implementation
-    "npl",
 ]
-
-memory = [{ name = "dram", start = 0x4080_0000, end = 0x4085_0000 }]
 
 [device.soc]
 cpu_has_csr_pc = true
 cpu_has_prv_mode = true
-rc_fast_clk_default = 8_000_000
+rc_fast_clk_default = 8_500_000
+rc_slow_clock = 136_000
+xtal_options = [32]
+
+memory_map = { ranges = [
+    { name = "dram", start = 0x4080_0000, end = 0x4085_0000 },
+    { name = "dram2_uninit", start = 0x4083_EFD0, end = 0x4084_FEE0 },
+] }
+
+clocks = { peripheral_clocks = { templates = [
+    # templates
+    { name = "default_clk_en_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
+    { name = "clk_en_template", value = "{{default_clk_en_template}}" }, # Indirection allows appending to the template for TWAI
+    { name = "rst_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{rst_field}}().bit(reset));" },
+    # substitutions
+    { name = "control", value = "crate::peripherals::SYSTEM" },
+    { name = "conf_register", value = "{{peripheral}}_conf" },
+    { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
+    { name = "rst_field", value = "{{peripheral}}_rst_en" },
+    # {{peripheral}} is derived automatically (e.g. SpiDma -> spi_dma)
+], peripheral_clocks = [
+    # This list is based on TRM (v1.5) - 7.4.1 PCR Register Summary
+    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
+    { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
+    { name = "I2cExt0", template_params = { peripheral = "i2c0" } },
+    { name = "I2cExt1", template_params = { peripheral = "i2c1" } },
+    { name = "Uhci0", template_params = { peripheral = "uhci" } },
+    { name = "Rmt" },
+    { name = "Ledc" },
+    { name = "Timg0", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup0_conf", peripheral = "tg0", peri_clk_template = "{{control}}::regs().timergroup0_timer_clk_conf().modify(|_, w| w.tg0_timer_clk_en().bit(enable));" }, keep_enabled = true }, # used for clock calibration
+    { name = "Timg1", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup1_conf", peripheral = "tg1", peri_clk_template = "{{control}}::regs().timergroup1_timer_clk_conf().modify(|_, w| w.tg1_timer_clk_en().bit(enable));" } },
+    { name = "Systimer", keep_enabled = true },
+    { name = "Twai0", template_params = { clk_en_template = "{{default_clk_en_template}} {{func_clk_template}}", func_clk_template = "{{control}}::regs().twai0_func_clk_conf().modify(|_, w| w.twai0_func_clk_en().bit(enable));" } },
+    { name = "I2s0", template_params = { peripheral = "i2s" } },
+    { name = "ApbSarAdc", template_params = { peripheral = "saradc", clk_en_field = "saradc_reg_clk_en", rst_field = "saradc_reg_rst_en" } },
+    { name = "Tsens", template_params = { conf_register = "tsens_clk_conf" } },
+    { name = "UsbDevice", keep_enabled = true },
+    # { name = "Intmtx" },
+    { name = "Pcnt" },
+    { name = "Etm" },
+    { name = "Mcpwm0", template_params = { peripheral = "pwm" } },
+    { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" } },
+    { name = "Dma", template_params = { peripheral = "gdma" } },
+    { name = "Spi2" },
+    { name = "Aes" },
+    { name = "Sha" },
+    { name = "Rsa" },
+    { name = "Ecc" },
+    { name = "Ds" },
+    { name = "Hmac" },
+    { name = "Ecdsa" },
+    #{ name = "Iomux" },
+    #{ name = "MemMonitor" },
+    { name = "Trace0", template_params = { peripheral = "trace" } },
+    #{ name = "Assist" },
+    #{ name = "Cache" },
+    #{ name = "ModemApb" },
+    #{ name = "Timeout" },
+    
+    # Radio clocks not modeled here.
+] } }
 
 [device.adc]
 support_status = "partial"
@@ -148,8 +205,8 @@ pins = [
     { pin =  3, functions = { 0 = "MTDI", 2 = "FSPIHD"  }, analog = { 1 = "ADC1_CH2" } },
     { pin =  4, functions = { 0 = "MTCK", 2 = "FSPICLK" }, analog = { 1 = "ADC1_CH3" } },
     { pin =  5, functions = { 0 = "MTDO", 2 = "FSPID"   }, analog = { 1 = "ADC1_CH4" } },
-    { pin =  6 },
-    { pin =  7 },
+    { pin =  6, limited = true },
+    { pin =  7, limited = true },
     { pin =  8 },
     { pin =  9 },
     { pin = 10, analog = { 0 = "ZCD0" } },
@@ -376,6 +433,17 @@ status_registers = 2
 support_status = "partial"
 ram_start = 0x60007400
 channel_ram_size = 48
+channels = ["Tx", "Tx", "Rx", "Rx"]
+has_tx_immediate_stop = true
+has_tx_loop_count = true
+has_tx_loop_auto_stop = true
+has_tx_carrier_data_only = true
+has_tx_sync = true
+has_rx_wrap = true
+has_rx_demodulation = true
+clock_sources.supported = ["Xtal", "RcFast" ]
+# Power-on value is RcFast!
+clock_sources.default = "Xtal"
 
 [device.rsa]
 support_status = "partial"
@@ -385,7 +453,7 @@ memory_size_bytes = 384
 [device.sha]
 support_status = "partial"
 dma = true
-algo = ["SHA-1", "SHA-224", "SHA-256"]
+algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.spi_master]
 support_status = "supported"
@@ -413,6 +481,7 @@ instances = [
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
 ]
 ram_size = 128
+peripheral_controls_mem_clk = true
 
 [device.ds]
 support_status = "not_supported"
@@ -446,4 +515,9 @@ apb_cycle_wait_num = 16 # TODO
 
 ## Radio
 [device.bt]
+support_status = "partial"
+controller = "npl"
+
 [device.ieee802154]
+
+[device.phy]

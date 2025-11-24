@@ -8,13 +8,15 @@ use strum::IntoEnumIterator as _;
 use super::{ExamplesArgs, TestsArgs};
 use crate::{
     Package,
-    cargo::{self, CargoAction, CargoArgsBuilder},
+    cargo::{self, CargoAction, CargoArgsBuilder, CargoCommandBatcher},
+    commands::move_artifacts,
     firmware::Metadata,
 };
 
 // ----------------------------------------------------------------------------
 // Subcommands
 
+/// Build subcommands and their arguments.
 #[derive(Debug, Subcommand)]
 pub enum Build {
     /// Build documentation for the specified chip.
@@ -33,6 +35,7 @@ pub enum Build {
 // ----------------------------------------------------------------------------
 // Subcommand Arguments
 
+/// Arguments for building documentation.
 #[derive(Debug, Default, Args)]
 pub struct BuildDocumentationArgs {
     /// Package(s) to document.
@@ -49,6 +52,7 @@ pub struct BuildDocumentationArgs {
     pub serve: bool,
 }
 
+/// Arguments for building a package.
 #[derive(Debug, Args)]
 pub struct BuildPackageArgs {
     /// Package to build.
@@ -71,7 +75,13 @@ pub struct BuildPackageArgs {
 // ----------------------------------------------------------------------------
 // Subcommand Actions
 
+/// Build documentation for the specified packages and chips.
 pub fn build_documentation(workspace: &Path, mut args: BuildDocumentationArgs) -> Result<()> {
+    log::debug!(
+        "Building documentation for packages {:?} on chips {:?}",
+        args.packages,
+        args.chips
+    );
     crate::documentation::build_documentation(
         workspace,
         &mut args.packages,
@@ -112,6 +122,7 @@ pub fn build_documentation(workspace: &Path, mut args: BuildDocumentationArgs) -
     Ok(())
 }
 
+/// Build the documentation index for all packages.
 #[cfg(feature = "deploy-docs")]
 pub fn build_documentation_index(workspace: &Path) -> Result<()> {
     let mut packages = Package::iter().collect::<Vec<_>>();
@@ -120,74 +131,58 @@ pub fn build_documentation_index(workspace: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Build all examples for the specified package and chip.
 pub fn build_examples(
     args: ExamplesArgs,
     examples: Vec<Metadata>,
     package_path: &Path,
-    out_path: &Path,
+    out_path: Option<&Path>,
 ) -> Result<()> {
     let chip = args.chip.unwrap();
 
     // Determine the appropriate build target for the given package and chip:
     let target = args.package.target_triple(&chip)?;
 
-    if !args.example.eq_ignore_ascii_case("all") {
-        // Attempt to build only the specified example:
-        let mut filtered = examples
-            .iter()
-            .filter(|ex| ex.matches_name(&args.example))
-            .collect::<Vec<_>>();
+    // Attempt to build each supported example, with all required features enabled:
 
-        if filtered.is_empty() {
-            log::warn!(
-                "Example '{}' not found or unsupported for the given chip. Please select one of the existing examples in the desired package.",
-                args.example
-            );
-
-            let example_idx = inquire::Select::new(
-                "Select the example:",
-                examples.iter().map(|ex| ex.binary_name()).collect(),
-            ).prompt()?;
-
-            if let Some(selected) = examples.iter().find(|ex| ex.binary_name() == example_idx) {
-                filtered.push(selected);
-            }
-        }
-
-        for example in filtered {
-            crate::execute_app(
-                package_path,
-                chip,
-                &target,
-                example,
-                CargoAction::Build(out_path.to_path_buf()),
-                1,
-                args.debug,
-                args.toolchain.as_deref(),
-                args.timings,
-            )?;
-        }
-
-        Ok(())
-    } else {
-        // Attempt to build each supported example, with all required features enabled:
-        examples.iter().try_for_each(|example| {
-            crate::execute_app(
-                package_path,
-                chip,
-                &target,
-                example,
-                CargoAction::Build(out_path.to_path_buf()),
-                1,
-                args.debug,
-                args.toolchain.as_deref(),
-                args.timings,
-            )
-        })
+    let action = CargoAction::Build(out_path.map(|p| p.to_path_buf()));
+    let mut commands = CargoCommandBatcher::new();
+    // Build command list
+    for example in examples.iter() {
+        let command = crate::generate_build_command(
+            &package_path,
+            chip,
+            &target,
+            example,
+            action.clone(),
+            args.debug,
+            args.toolchain.as_deref(),
+            args.timings,
+            &[],
+        )?;
+        commands.push(command);
     }
+    // Execute the specified action:
+    for c in commands.build(false) {
+        println!(
+            "Command: cargo {}",
+            c.command.join(" ").replace("---", "\n    ---")
+        );
+        c.run(false)?;
+    }
+    move_artifacts(chip, &action);
+
+    Ok(())
 }
 
+/// Build the specified package with the given options.
 pub fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {
+    log::debug!(
+        "Building package '{}' with target '{:?}' and features {:?}",
+        args.package,
+        args.target,
+        args.features
+    );
     // Absolute path of the package's root:
     let package_path = crate::windows_safe_path(&workspace.join(args.package.to_string()));
 

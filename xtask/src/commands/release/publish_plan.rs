@@ -1,6 +1,6 @@
 use std::{path::Path, process::Command};
 
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{Context, Result, bail, ensure};
 use clap::Args;
 
 use crate::{
@@ -9,6 +9,7 @@ use crate::{
     git::{current_branch, ensure_workspace_clean, get_remote_name_for},
 };
 
+/// Arguments for publishing the packages in the release plan to crates.io.
 #[derive(Debug, Args)]
 pub struct PublishPlanArgs {
     /// Do not pass the `--dry-run` argument, actually try to publish.
@@ -16,7 +17,9 @@ pub struct PublishPlanArgs {
     no_dry_run: bool,
 }
 
+/// Publish the packages in the release plan to crates.io.
 pub fn publish_plan(workspace: &Path, args: PublishPlanArgs) -> Result<()> {
+    log::debug!("Publishing packages in the release plan...");
     ensure_workspace_clean(workspace)?;
 
     let plan_path = workspace.join("release_plan.jsonc");
@@ -47,6 +50,11 @@ pub fn publish_plan(workspace: &Path, args: PublishPlanArgs) -> Result<()> {
     // Check that all packages are updated and ready to go. This is meant to prevent
     // publishing unupdated packages.
     for (step, toml) in plan.packages.iter().zip(tomls.iter()) {
+        log::debug!(
+            "Checking that package {} is updated to {}...",
+            step.package,
+            step.new_version
+        );
         if toml.package_version() != step.new_version {
             if toml.package_version() == step.current_version {
                 bail!(
@@ -63,6 +71,7 @@ pub fn publish_plan(workspace: &Path, args: PublishPlanArgs) -> Result<()> {
 
     // Actually publish the packages.
     for (step, toml) in plan.packages.iter().zip(tomls.iter()) {
+        log::debug!("Actually publishing package {}...", step.package);
         let mut publish_args =
             if step.package.has_chip_features() || step.package.has_inline_assembly(workspace) {
                 vec!["--no-verify"]
@@ -82,7 +91,8 @@ pub fn publish_plan(workspace: &Path, args: PublishPlanArgs) -> Result<()> {
         log::debug!("{args:#?}");
 
         // Execute `cargo publish` command from the package root:
-        crate::cargo::run(&args, &toml.package_path())?;
+        crate::cargo::run(&args, &toml.package_path())
+            .with_context(|| format!("Failed to run `cargo publish` with {args:?} args"))?;
     }
 
     // Tag the releases
@@ -90,6 +100,8 @@ pub fn publish_plan(workspace: &Path, args: PublishPlanArgs) -> Result<()> {
     for (step, toml) in plan.packages.iter().zip(tomls.iter()) {
         let tag_name = toml.package.tag(&toml.package_version());
         let tag_message = format!("{} {}", step.package, toml.version());
+
+        log::debug!("Tagging package {} with tag {}...", step.package, tag_name);
 
         if args.no_dry_run {
             let output = Command::new("git")

@@ -99,6 +99,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | WIFI               | ⚒️   | ⚒️      | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      |
 | Bluetooth          | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |          | ⚒️      |
 | IEEE 802.15.4      |       |          |          | ⚒️      | ⚒️      |          |          |
+| PHY                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 
  * Empty cell: not available
  * ❌: Not supported

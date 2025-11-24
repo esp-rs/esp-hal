@@ -6,6 +6,8 @@
 // development, and when a test fails. In these cases, you can enable
 // the `defmt` feature to get the output.
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 use esp_hal as _;
 
 #[cfg(not(feature = "defmt"))]
@@ -22,8 +24,6 @@ unsafe impl defmt::Logger for Logger {
 
 #[cfg(feature = "defmt")]
 use defmt_rtt as _;
-// Make sure esp_backtrace is not removed.
-use esp_backtrace as _;
 
 #[cfg(feature = "defmt")]
 #[macro_export]
@@ -55,7 +55,7 @@ macro_rules! i2c_pins {
         // Order: (SDA, SCL)
         cfg_if::cfg_if! {
             if #[cfg(any(esp32s2, esp32s3))] {
-                ($peripherals.GPIO2, $peripherals.GPIO3)
+                ($peripherals.GPIO3, $peripherals.GPIO2)
             } else if #[cfg(esp32)] {
                 ($peripherals.GPIO32, $peripherals.GPIO33)
             } else if #[cfg(esp32c6)] {
@@ -152,38 +152,6 @@ mod executor {
 }
 
 #[cfg(feature = "embassy")]
-pub use esp_hal_embassy::Executor;
+pub use esp_rtos::embassy::Executor;
 #[cfg(not(feature = "embassy"))]
 pub use executor::Executor;
-
-/// Initialize esp-hal-embassy with 2 timers.
-#[macro_export]
-macro_rules! init_embassy {
-    ($peripherals:expr, 2) => {{
-        cfg_if::cfg_if! {
-            if #[cfg(timergroup_timg_has_timer1)] {
-                use esp_hal::timer::timg::TimerGroup;
-                let timg0 = TimerGroup::new($peripherals.TIMG0);
-                esp_hal_embassy::init([
-                    timg0.timer0,
-                    timg0.timer1,
-                ]);
-            } else if #[cfg(timergroup_timg1)] {
-                use esp_hal::timer::timg::TimerGroup;
-                let timg0 = TimerGroup::new($peripherals.TIMG0);
-                let timg1 = TimerGroup::new($peripherals.TIMG1);
-                esp_hal_embassy::init([
-                    timg0.timer0,
-                    timg1.timer0,
-                ]);
-            } else if #[cfg(systimer)] {
-                use esp_hal::timer::systimer::SystemTimer;
-                let systimer = SystemTimer::new($peripherals.SYSTIMER);
-                esp_hal_embassy::init([
-                    systimer.alarm0,
-                    systimer.alarm1,
-                ]);
-            }
-        }
-    }};
-}

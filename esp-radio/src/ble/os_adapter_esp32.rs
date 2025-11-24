@@ -1,35 +1,30 @@
 use core::ptr::addr_of_mut;
 
+use procmacros::BuilderLite;
+
 use super::*;
 use crate::{
-    binary::{
-        c_types,
-        include::{
-            esp_bt_controller_config_t,
-            esp_bt_mode_t,
-            esp_bt_mode_t_ESP_BT_MODE_BLE,
-            esp_bt_mode_t_ESP_BT_MODE_BTDM,
-            esp_bt_mode_t_ESP_BT_MODE_CLASSIC_BT,
-            esp_bt_mode_t_ESP_BT_MODE_IDLE,
-        },
-    },
+    ble::InvalidConfigError,
+    common_adapter::*,
     hal::{interrupt, peripherals::Interrupt},
+    sys::include::{
+        esp_bt_controller_config_t,
+        esp_bt_mode_t,
+        esp_bt_mode_t_ESP_BT_MODE_BLE,
+        esp_bt_mode_t_ESP_BT_MODE_BTDM,
+        esp_bt_mode_t_ESP_BT_MODE_CLASSIC_BT,
+        esp_bt_mode_t_ESP_BT_MODE_IDLE,
+    },
 };
 
-pub(crate) static mut ISR_INTERRUPT_5: (
-    *mut crate::binary::c_types::c_void,
-    *mut crate::binary::c_types::c_void,
-) = (core::ptr::null_mut(), core::ptr::null_mut());
+pub(crate) static mut ISR_INTERRUPT_5: (*mut c_void, *mut c_void) =
+    (core::ptr::null_mut(), core::ptr::null_mut());
 
-pub(crate) static mut ISR_INTERRUPT_8: (
-    *mut crate::binary::c_types::c_void,
-    *mut crate::binary::c_types::c_void,
-) = (core::ptr::null_mut(), core::ptr::null_mut());
+pub(crate) static mut ISR_INTERRUPT_8: (*mut c_void, *mut c_void) =
+    (core::ptr::null_mut(), core::ptr::null_mut());
 
-pub(crate) static mut ISR_INTERRUPT_7: (
-    *mut crate::binary::c_types::c_void,
-    *mut crate::binary::c_types::c_void,
-) = (core::ptr::null_mut(), core::ptr::null_mut());
+pub(crate) static mut ISR_INTERRUPT_7: (*mut c_void, *mut c_void) =
+    (core::ptr::null_mut(), core::ptr::null_mut());
 
 #[repr(C)]
 pub(super) struct osi_funcs_s {
@@ -40,39 +35,39 @@ pub(super) struct osi_funcs_s {
     interrupt_restore: Option<unsafe extern "C" fn()>,
     task_yield: Option<unsafe extern "C" fn()>,
     task_yield_from_isr: Option<unsafe extern "C" fn()>,
-    semphr_create: Option<unsafe extern "C" fn(u32, u32) -> *const ()>,
-    semphr_delete: Option<unsafe extern "C" fn(*const ())>,
-    semphr_take_from_isr: Option<unsafe extern "C" fn(*const (), *const ()) -> i32>,
-    semphr_give_from_isr: Option<unsafe extern "C" fn(*const (), *const ()) -> i32>,
-    semphr_take: Option<unsafe extern "C" fn(*const (), u32) -> i32>,
-    semphr_give: Option<unsafe extern "C" fn(*const ()) -> i32>,
+    semphr_create: Option<unsafe extern "C" fn(u32, u32) -> *mut c_void>,
+    semphr_delete: Option<unsafe extern "C" fn(*mut c_void)>,
+    semphr_take_from_isr: Option<unsafe extern "C" fn(*mut c_void, *mut bool) -> i32>,
+    semphr_give_from_isr: Option<unsafe extern "C" fn(*mut c_void, *mut bool) -> i32>,
+    semphr_take: Option<unsafe extern "C" fn(*mut c_void, u32) -> i32>,
+    semphr_give: Option<unsafe extern "C" fn(*mut c_void) -> i32>,
     mutex_create: Option<unsafe extern "C" fn() -> *const ()>,
     mutex_delete: Option<unsafe extern "C" fn(*const ())>,
     mutex_lock: Option<unsafe extern "C" fn(*const ()) -> i32>,
     mutex_unlock: Option<unsafe extern "C" fn(*const ()) -> i32>,
-    queue_create: Option<unsafe extern "C" fn(u32, u32) -> *const ()>,
-    queue_delete: Option<unsafe extern "C" fn(*const ())>,
-    queue_send: Option<unsafe extern "C" fn(*const (), *const (), u32) -> i32>,
-    queue_send_from_isr: Option<unsafe extern "C" fn(*const (), *const (), *const ()) -> i32>,
-    queue_recv: Option<unsafe extern "C" fn(*const (), *const (), u32) -> i32>,
-    queue_recv_from_isr: Option<unsafe extern "C" fn(*const (), *const (), *const ()) -> i32>,
+    queue_create: Option<unsafe extern "C" fn(u32, u32) -> *mut c_void>,
+    queue_delete: Option<unsafe extern "C" fn(*mut c_void)>,
+    queue_send: Option<unsafe extern "C" fn(*mut c_void, *mut c_void, u32) -> i32>,
+    queue_send_from_isr: Option<unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void) -> i32>,
+    queue_recv: Option<unsafe extern "C" fn(*mut c_void, *mut c_void, u32) -> i32>,
+    queue_recv_from_isr: Option<unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void) -> i32>,
     task_create: Option<
         unsafe extern "C" fn(
-            *mut crate::binary::c_types::c_void,
-            *const crate::binary::c_types::c_char,
+            *mut c_void,
+            *const c_char,
             u32,
-            *mut crate::binary::c_types::c_void,
+            *mut c_void,
             u32,
-            *mut crate::binary::c_types::c_void,
+            *mut c_void,
             u32,
         ) -> i32,
     >,
     task_delete: Option<unsafe extern "C" fn(*mut ())>,
     is_in_isr: Option<unsafe extern "C" fn() -> i32>,
     cause_sw_intr_to_core: Option<unsafe extern "C" fn(i32, i32) -> i32>,
-    malloc: Option<unsafe extern "C" fn(u32) -> *mut crate::binary::c_types::c_void>,
-    malloc_internal: Option<unsafe extern "C" fn(u32) -> *mut crate::binary::c_types::c_void>,
-    free: Option<unsafe extern "C" fn(*mut crate::binary::c_types::c_void)>,
+    malloc: Option<unsafe extern "C" fn(u32) -> *mut c_void>,
+    malloc_internal: Option<unsafe extern "C" fn(u32) -> *mut c_void>,
+    free: Option<unsafe extern "C" fn(*mut c_void)>,
     read_efuse_mac: Option<unsafe extern "C" fn(*const ()) -> i32>,
     srand: Option<unsafe extern "C" fn(u32)>,
     rand: Option<unsafe extern "C" fn() -> i32>,
@@ -103,15 +98,8 @@ pub(super) struct osi_funcs_s {
     set_isr13: Option<unsafe extern "C" fn(i32, unsafe extern "C" fn(), *const ()) -> i32>,
     interrupt_l3_disable: Option<unsafe extern "C" fn()>,
     interrupt_l3_restore: Option<unsafe extern "C" fn()>,
-    custom_queue_create:
-        Option<unsafe extern "C" fn(u32, u32) -> *mut crate::binary::c_types::c_void>,
-    coex_version_get: Option<
-        unsafe extern "C" fn(
-            *mut crate::binary::c_types::c_uint,
-            *mut crate::binary::c_types::c_uint,
-            *mut crate::binary::c_types::c_uint,
-        ) -> crate::binary::c_types::c_int,
-    >,
+    custom_queue_create: Option<unsafe extern "C" fn(u32, u32) -> *mut c_void>,
+    coex_version_get: Option<unsafe extern "C" fn(*mut c_uint, *mut c_uint, *mut c_uint) -> c_int>,
     patch_apply: Option<unsafe extern "C" fn()>,
     magic: u32,
 }
@@ -126,8 +114,8 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     task_yield_from_isr: Some(task_yield_from_isr),
     semphr_create: Some(semphr_create),
     semphr_delete: Some(semphr_delete),
-    semphr_take_from_isr: Some(crate::common_adapter::semphr_take_from_isr),
-    semphr_give_from_isr: Some(crate::common_adapter::semphr_give_from_isr),
+    semphr_take_from_isr: Some(semphr_take_from_isr),
+    semphr_give_from_isr: Some(semphr_give_from_isr),
     semphr_take: Some(semphr_take),
     semphr_give: Some(semphr_give),
     mutex_create: Some(mutex_create),
@@ -202,7 +190,7 @@ extern "C" fn patch_apply() {
 
 extern "C" fn coex_version_get_wrapper(major: *mut u32, minor: *mut u32, patch: *mut u32) -> i32 {
     unsafe {
-        let mut version = crate::binary::include::coex_version_t {
+        let mut version = crate::sys::include::coex_version_t {
             major: 0,
             minor: 0,
             patch: 0,
@@ -289,22 +277,106 @@ static BTDM_DRAM_AVAILABLE_REGION: [btdm_dram_available_region_t; 7] = [
     },
 ];
 
-pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
+/// Bluetooth controller configuration.
+#[derive(BuilderLite, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Config {
+    /// The priority of the RTOS task.
+    task_priority: u8,
+
+    /// The stack size of the RTOS task.
+    task_stack_size: u16,
+
+    /// The maximum number of simultaneous connections.
+    ///
+    /// Range: 1 - 9
+    max_connections: u8,
+
+    /// Maximum number of devices in scan duplicate filtering list.
+    ///
+    /// Range: 10 - 1000
+    scan_duplicate_list_count: u16,
+
+    /// Scan duplicate filtering list refresh period in seconds.
+    ///
+    /// Range: 0 - 1000 seconds
+    scan_duplicate_refresh_period: u16,
+
+    /// Enable BLE scan backoff.
+    ble_scan_backoff: bool,
+
+    /// Minimum encryption key size.
+    ///
+    /// Range: 7 - 16
+    enc_key_sz_min: u8,
+
+    /// Enable verification of the Access Address within the `CONNECT_IND` PDU.
+    verify_access_address: bool,
+
+    /// Enable BLE channel assessment.
+    channel_assessment: bool,
+
+    /// Enable BLE ping procedure.
+    ping: bool,
+
+    /// Disconnect when Instant Passed (0x28) occurs during ACL connection update.
+    disconnect_llcp_conn_update: bool,
+
+    /// Disconnect when Instant Passed (0x28) occurs during ACL channel map update.
+    disconnect_llcp_chan_map_update: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            // same priority as the wifi task, when using esp-rtos (I'm assuming it's MAX_PRIO - 2)
+            task_priority: 29,
+            task_stack_size: 4096,
+            max_connections: CONFIG_BTDM_CTRL_BLE_MAX_CONN_EFF as _,
+            scan_duplicate_list_count: CONFIG_BTDM_SCAN_DUPL_CACHE_SIZE as _,
+            scan_duplicate_refresh_period: SCAN_DUPL_CACHE_REFRESH_PERIOD as _,
+            ble_scan_backoff: false,
+            enc_key_sz_min: 7,
+            verify_access_address: false,
+            channel_assessment: false,
+            ping: false,
+            disconnect_llcp_conn_update: false,
+            disconnect_llcp_chan_map_update: false,
+        }
+    }
+}
+
+impl Config {
+    pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
+        crate::ble::validate_range!(self, max_connections, 1, 9);
+        crate::ble::validate_range!(self, scan_duplicate_list_count, 10, 1000);
+        crate::ble::validate_range!(self, scan_duplicate_refresh_period, 0, 1000);
+        crate::ble::validate_range!(self, enc_key_sz_min, 7, 16);
+
+        Ok(())
+    }
+}
+
+pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
     // keep them aligned with BT_CONTROLLER_INIT_CONFIG_DEFAULT in ESP-IDF
     // ideally _some_ of these values should be configurable
     esp_bt_controller_config_t {
-        controller_task_stack_size: 4096,
-        controller_task_prio: 110,
+        controller_task_stack_size: config.task_stack_size,
+        controller_task_prio: config.task_priority,
+
+        // We're using VHCI but esp-idf has these defaults:
         hci_uart_no: 1,
         hci_uart_baudrate: 921600,
-        scan_duplicate_mode: 0,
+        // Bluetooth mesh options, currently not supported
+        scan_duplicate_mode: 0, // normal mode
         scan_duplicate_type: 0,
-        normal_adv_size: 200,
         mesh_adv_size: 0,
-        send_adv_reserved_size: 1000,
-        controller_debug_flag: 0,
-        mode: 0x01, // BLE
-        ble_max_conn: 3,
+
+        normal_adv_size: config.scan_duplicate_list_count,
+        send_adv_reserved_size: SCAN_SEND_ADV_RESERVED_SIZE as _,
+        controller_debug_flag: BTDM_CTRL_CONTROLLER_DEBUG_FLAG as _,
+        mode: esp_bt_mode_t_ESP_BT_MODE_BLE as _,
+        ble_max_conn: config.max_connections,
         bt_max_acl_conn: 0,
         bt_sco_datapath: 0,
         auto_latency: false,
@@ -314,10 +386,16 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
         pcm_role: 0,
         pcm_polar: 0,
         hli: false,
-        dup_list_refresh_period: 0,
-        ble_scan_backoff: false,
+        dup_list_refresh_period: config.scan_duplicate_refresh_period,
+        ble_scan_backoff: config.ble_scan_backoff,
         pcm_fsyncshp: 0,
-        magic: 0x20240722,
+        enc_key_sz_min: config.enc_key_sz_min,
+        ble_llcp_disc_flag: config.disconnect_llcp_conn_update as u8
+            | ((config.disconnect_llcp_chan_map_update as u8) << 1),
+        ble_aa_check: config.verify_access_address,
+        ble_chan_ass_en: config.channel_assessment as u8,
+        ble_ping_en: config.ping as u8,
+        magic: ESP_BT_CONTROLLER_CONFIG_MAGIC_VAL,
     }
 }
 
@@ -510,7 +588,7 @@ pub(crate) unsafe extern "C" fn coex_schm_interval_get() -> u32 {
     trace!("coex_schm_interval_get");
 
     #[cfg(coex)]
-    return unsafe { crate::binary::include::coex_schm_interval_get() };
+    return unsafe { crate::sys::include::coex_schm_interval_get() };
 
     #[cfg(not(coex))]
     0
@@ -520,7 +598,7 @@ pub(crate) unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
     trace!("coex_schm_curr_period_get");
 
     #[cfg(coex)]
-    return unsafe { crate::binary::include::coex_schm_curr_period_get() };
+    return unsafe { crate::sys::include::coex_schm_curr_period_get() };
 
     #[cfg(not(coex))]
     0
@@ -530,7 +608,7 @@ pub(crate) unsafe extern "C" fn coex_schm_curr_phase_get() -> *const () {
     trace!("coex_schm_curr_phase_get");
 
     #[cfg(coex)]
-    return unsafe { crate::binary::include::coex_schm_curr_phase_get() } as *const ();
+    return unsafe { crate::sys::include::coex_schm_curr_phase_get() } as *const ();
 
     #[cfg(not(coex))]
     return core::ptr::null::<()>();
@@ -574,7 +652,7 @@ pub(crate) unsafe extern "C" fn set_isr(n: i32, f: unsafe extern "C" fn(), arg: 
     match n {
         5 => {
             unsafe {
-                ISR_INTERRUPT_5 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
+                ISR_INTERRUPT_5 = (f as *mut c_void, arg as *mut c_void);
             }
             unwrap!(interrupt::enable(
                 Interrupt::RWBT,
@@ -586,11 +664,11 @@ pub(crate) unsafe extern "C" fn set_isr(n: i32, f: unsafe extern "C" fn(), arg: 
             ));
         }
         7 => unsafe {
-            ISR_INTERRUPT_7 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
+            ISR_INTERRUPT_7 = (f as *mut c_void, arg as *mut c_void);
         },
         8 => {
             unsafe {
-                ISR_INTERRUPT_8 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
+                ISR_INTERRUPT_8 = (f as *mut c_void, arg as *mut c_void);
             }
             unwrap!(interrupt::enable(
                 Interrupt::BT_BB,

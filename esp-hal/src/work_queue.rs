@@ -10,13 +10,12 @@
 //!
 //! Posting a work item into the queue returns a handle. The handle can be used to poll whether
 //! the work item has been processed. Dropping the handle will cancel the work item.
-#![cfg_attr(esp32c2, allow(unused))]
+#![cfg_attr(not(feature = "unstable"), allow(unused))]
 
 use core::{future::poll_fn, marker::PhantomData, ptr::NonNull, task::Context};
 
 use embassy_sync::waitqueue::WakerRegistration;
-
-use crate::sync::Locked;
+use esp_sync::NonReentrantMutex;
 
 /// Queue driver operations.
 ///
@@ -79,6 +78,9 @@ struct Inner<T: Sync + Send> {
     // time).
     suspend_waker: WakerRegistration,
 }
+
+unsafe impl<T: Sync + Send> Send for Inner<T> {}
+unsafe impl<T: Sync + Send> Sync for Inner<T> {}
 
 impl<T: Sync + Send> Inner<T> {
     /// Places a work item at the end of the queue.
@@ -337,14 +339,14 @@ impl<T: Sync + Send> Inner<T> {
 
 /// A generic work queue.
 pub(crate) struct WorkQueue<T: Sync + Send> {
-    inner: Locked<Inner<T>>,
+    inner: NonReentrantMutex<Inner<T>>,
 }
 
 impl<T: Sync + Send> WorkQueue<T> {
     /// Creates a new `WorkQueue`.
     pub const fn new() -> Self {
         Self {
-            inner: Locked::new(Inner {
+            inner: NonReentrantMutex::new(Inner {
                 head: None,
                 tail: None,
                 current: None,
@@ -512,6 +514,21 @@ pub(crate) struct Handle<'t, T: Sync + Send> {
 }
 
 impl<'t, T: Sync + Send> Handle<'t, T> {
+    pub(crate) fn from_completed_work_item(
+        queue: &'t WorkQueue<T>,
+        work_item: &'t mut WorkItem<T>,
+    ) -> Self {
+        // Don't use `complete` here, we don't need to wake anything, just ensure that the item will
+        // not be put into the queue.
+        work_item.status = Poll::Ready(Status::Completed);
+
+        Self {
+            queue,
+            work_item: NonNull::from(work_item),
+            _marker: PhantomData,
+        }
+    }
+
     fn poll_inner(&mut self) -> Poll {
         unsafe { self.queue.poll(self.work_item) }
     }
@@ -693,4 +710,11 @@ impl<T: Sync + Send> WorkQueueFrontend<T> {
     pub fn post<'t>(&'t mut self, queue: &'t WorkQueue<T>) -> Handle<'t, T> {
         queue.post_work(&mut self.work_item)
     }
+
+    /// Creates a Handle for a work item that does not need to be put into the queue.
+    pub fn post_completed<'t>(&'t mut self, queue: &'t WorkQueue<T>) -> Handle<'t, T> {
+        Handle::from_completed_work_item(queue, &mut self.work_item)
+    }
 }
+
+// TODO: implement individual algo context wrappers

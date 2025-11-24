@@ -1,8 +1,8 @@
 #[cfg(any(feature = "wifi", feature = "ble"))]
 #[allow(unused_imports)]
 use crate::{
-    binary,
     hal::{interrupt, peripherals::Interrupt},
+    sys,
 };
 
 pub(crate) fn setup_radio_isr() {
@@ -26,7 +26,7 @@ extern "C" fn WIFI_MAC() {
         trace!("interrupt WIFI_MAC {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
-            let fnc: fn(*mut binary::c_types::c_void) = core::mem::transmute(fnc);
+            let fnc: fn(*mut sys::c_types::c_void) = core::mem::transmute(fnc);
             fnc(arg);
         }
 
@@ -43,7 +43,7 @@ extern "C" fn WIFI_PWR() {
         trace!("interrupt WIFI_PWR {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
-            let fnc: fn(*mut binary::c_types::c_void) = core::mem::transmute(fnc);
+            let fnc: fn(*mut sys::c_types::c_void) = core::mem::transmute(fnc);
             fnc(arg);
         }
 
@@ -64,7 +64,7 @@ extern "C" fn LP_TIMER() {
         if !fnc.is_null() {
             trace!("interrupt LP_TIMER call");
 
-            let fnc: fn(*mut binary::c_types::c_void) = core::mem::transmute(fnc);
+            let fnc: fn(*mut sys::c_types::c_void) = core::mem::transmute(fnc);
             fnc(arg);
             trace!("LP_TIMER done");
         }
@@ -86,7 +86,7 @@ extern "C" fn BT_MAC() {
         if !fnc.is_null() {
             trace!("interrupt BT_MAC call");
 
-            let fnc: fn(*mut binary::c_types::c_void) = core::mem::transmute(fnc);
+            let fnc: fn(*mut sys::c_types::c_void) = core::mem::transmute(fnc);
             fnc(arg);
             trace!("BT_MAC done");
         }

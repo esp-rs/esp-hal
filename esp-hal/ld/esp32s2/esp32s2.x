@@ -1,13 +1,3 @@
-
-/* before memory.x to allow override */
-ENTRY(ESP32Reset)
-
-/* after memory.x to allow override */
-PROVIDE(__pre_init = DefaultPreInit);
-PROVIDE(__zero_bss = default_mem_hook);
-PROVIDE(__init_data = default_mem_hook);
-PROVIDE(__post_init = default_post_init);
-
 INCLUDE exception.x
 
 /* This represents .rwtext but in .data */
@@ -34,8 +24,5 @@ INCLUDE "rtc_slow.x"
 INCLUDE "stack.x"
 INCLUDE "dram2.x"
 INCLUDE "metadata.x"
+INCLUDE "eh_frame.x"
 /* End of Shared sections */
-
-EXTERN(DefaultHandler);
-
-INCLUDE "device.x"

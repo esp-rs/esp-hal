@@ -9,17 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- New default feature (`compat`) enables implementations for `malloc`, `free`, `calloc`, `realloc` (#3890)
 
 ### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.9.0] - 2025-10-13
+
+### Added
+
+- Added chip-selection features (#4023)
+- New default feature (`compat`) enables implementations for `malloc`, `free`, `calloc`, `realloc` and others (#3890, #4043)
+- `ESP_ALLOC_CONFIG_HEAP_ALGORITHM` to select the global heap algorithm (LLFF, TLSF) (#4130, #4316)
+- Added option to use TLSF as the heap allocator, implemented by the `rlsf` crate (#4130, #4316)
+
+### Changed
+
 - Make stats structs fields public (#3828)
+- Fixed documentation to use `ram(reclaimed)` instead of a no longer valid linker_section syntax. (#4245)
 
 ### Fixed
 
 - Fix problem of not de-allocating memory in some situations (#3949)
-
-### Removed
-
 
 ## [v0.8.0] - 2025-06-03
 
@@ -72,4 +88,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.7.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-alloc-v0.7.0
 [v0.8.0]: https://github.com/esp-rs/esp-hal/compare/esp-alloc-v0.7.0...esp-alloc-v0.8.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-alloc-v0.8.0...HEAD
+[v0.9.0]: https://github.com/esp-rs/esp-hal/compare/esp-alloc-v0.8.0...esp-alloc-v0.9.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-alloc-v0.9.0...HEAD

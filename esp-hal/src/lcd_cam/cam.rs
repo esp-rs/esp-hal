@@ -76,8 +76,10 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EofMode {
-    /// Generate GDMA SUC EOF by data byte length
-    ByteLen,
+    /// Generate GDMA SUC EOF by data byte length.
+    ///
+    /// When the length of received data reaches this value + 1, GDMA in_suc_eof is triggered.
+    ByteLen(u16),
     /// Generate GDMA SUC EOF by the vsync signal
     VsyncSignal,
 }
@@ -126,6 +128,9 @@ pub enum VhdeMode {
 pub enum ConfigError {
     /// The frequency is out of range.
     Clock(ClockError),
+
+    /// The line interrupt value is too large. Max value is 127.
+    LineInterrupt,
 }
 
 /// Represents the camera interface.
@@ -184,6 +189,12 @@ impl<'d> Camera<'d> {
         )
         .map_err(ConfigError::Clock)?;
 
+        if let Some(value) = config.line_interrupt
+            && value > 0b0111_1111
+        {
+            return Err(ConfigError::LineInterrupt);
+        }
+
         self.regs().cam_ctrl().write(|w| {
             // Force enable the clock for all configuration registers.
             unsafe {
@@ -198,8 +209,9 @@ impl<'d> Camera<'d> {
                     .bit(config.byte_order != ByteOrder::default());
                 w.cam_bit_order()
                     .bit(config.bit_order != BitOrder::default());
-                w.cam_vs_eof_en().set_bit();
-                w.cam_line_int_en().clear_bit();
+                w.cam_vs_eof_en()
+                    .bit(matches!(config.eof_mode, EofMode::VsyncSignal));
+                w.cam_line_int_en().bit(config.line_interrupt.is_some());
                 w.cam_stop_en().clear_bit()
             }
         });
@@ -207,14 +219,18 @@ impl<'d> Camera<'d> {
             w.cam_2byte_en().bit(config.enable_2byte_mode);
             w.cam_vh_de_mode_en()
                 .bit(matches!(config.vh_de_mode, VhdeMode::VsyncHsync));
-            w.cam_rec_data_bytelen().bits(0);
-            w.cam_line_int_num().bits(0);
+            if let EofMode::ByteLen(value) = config.eof_mode {
+                w.cam_rec_data_bytelen().bits(value);
+            }
+            if let Some(value) = config.line_interrupt {
+                w.cam_line_int_num().bits(value);
+            }
             w.cam_vsync_filter_en()
                 .bit(config.vsync_filter_threshold.is_some());
-            w.cam_clk_inv().clear_bit();
-            w.cam_de_inv().clear_bit();
-            w.cam_hsync_inv().clear_bit();
-            w.cam_vsync_inv().clear_bit()
+            w.cam_clk_inv().bit(config.invert_pixel_clock);
+            w.cam_de_inv().bit(config.invert_h_enable);
+            w.cam_hsync_inv().bit(config.invert_hsync);
+            w.cam_vsync_inv().bit(config.invert_vsync)
         });
 
         self.regs()
@@ -563,6 +579,27 @@ pub struct Config {
 
     /// The Vsync filter threshold.
     vsync_filter_threshold: Option<VsyncFilterThreshold>,
+
+    /// Conditions under which Camera should emit a SUC_EOF to the DMA.
+    eof_mode: EofMode,
+
+    /// If set, the line interrupt is enabled and will be triggered when
+    /// the number of received lines reaches this value + 1.
+    ///
+    /// This is a 7 bit value which means a max of 128 lines.
+    line_interrupt: Option<u8>,
+
+    /// Invert VSYNC signal, valid in high level.
+    invert_vsync: bool,
+
+    /// Invert HSYNC signal, valid in high level.
+    invert_hsync: bool,
+
+    /// Invert H_ENABLE signal (Also known as "Data Enable"), valid in high level.
+    invert_h_enable: bool,
+
+    /// Invert PCLK signal.
+    invert_pixel_clock: bool,
 }
 
 impl Default for Config {
@@ -574,6 +611,12 @@ impl Default for Config {
             bit_order: Default::default(),
             vh_de_mode: VhdeMode::De,
             vsync_filter_threshold: None,
+            eof_mode: EofMode::VsyncSignal,
+            line_interrupt: None,
+            invert_vsync: false,
+            invert_hsync: false,
+            invert_h_enable: false,
+            invert_pixel_clock: false,
         }
     }
 }

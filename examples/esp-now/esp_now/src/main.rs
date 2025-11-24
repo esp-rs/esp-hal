@@ -9,6 +9,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
+    interrupt::software::SoftwareInterruptControl,
     main,
     time::{self, Duration},
     timer::timg::TimerGroup,
@@ -26,13 +27,12 @@ fn main() -> ! {
 
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_preempt::init(timg0.timer0);
-
-    let esp_radio_ctrl = esp_radio::init().unwrap();
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let wifi = peripherals.WIFI;
-    let (mut controller, interfaces) = esp_radio::wifi::new(&esp_radio_ctrl, wifi).unwrap();
+    let (mut controller, interfaces) = esp_radio::wifi::new(wifi, Default::default()).unwrap();
     controller.set_mode(esp_radio::wifi::WifiMode::Sta).unwrap();
     controller.start().unwrap();
 

@@ -16,8 +16,6 @@
 
 use core::marker::PhantomData;
 
-use critical_section::CriticalSection;
-
 use crate::{
     dma::*,
     handler,
@@ -791,7 +789,7 @@ crate::dma::impl_dma_eligible! {
     }
 }
 
-pub(super) fn init_dma(_cs: CriticalSection<'_>) {
+pub(super) fn init_dma_racey() {
     DMA::regs()
         .misc_conf()
         .modify(|_, w| w.ahbm_rst_inter().set_bit());

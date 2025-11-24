@@ -96,13 +96,6 @@ impl Input<'_> {
     #[procmacros::doc_replace]
     /// Wait until the pin experiences a particular [`Event`].
     ///
-    /// The GPIO driver will disable listening for the event once it occurs,
-    /// or if the `Future` is dropped - which also means this method is **not**
-    /// cancellation-safe, it will always wait for a future event.
-    ///
-    /// Note that calling this function will overwrite previous
-    /// [`listen`][Self::listen] operations for this pin.
-    ///
     /// ## Example
     ///
     /// ```rust, no_run
@@ -113,7 +106,18 @@ impl Input<'_> {
     /// input_pin.wait_for(Event::LowLevel).await;
     /// # {after_snippet}
     /// ```
+    ///
+    /// ## Cancellation
+    ///
+    /// This function is not cancellation-safe.
+    ///
+    /// - Calling this function will overwrite previous [`listen`][Self::listen] operations for this
+    ///   pin, making it side-effectful.
+    /// - Dropping the [`Future`] returned by this function will cancel the wait operation. If the
+    ///   event occurs after the future is dropped, a consequent wait operation will ignore the
+    ///   event.
     #[inline]
+    #[instability::unstable]
     pub async fn wait_for(&mut self, event: Event) {
         self.pin.wait_for(event).await
     }

@@ -18,6 +18,8 @@ Commands:
   semver-check               Semver Checks
   check-changelog            Check the changelog for packages
   update-chip-support-table  Re-generate the chip support table in the esp-hal README
+  host-tests                 Run host tests for all the packages where they are present
+  check-global-symbols       Check global symbols in the compiled `.rlib`
   help                       Print this message or the help of the given subcommand(s)
 
 Options:

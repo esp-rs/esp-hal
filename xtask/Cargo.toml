@@ -5,27 +5,32 @@ edition = "2024"
 publish = false
 
 [dependencies]
-anyhow       = "1.0.93"
-clap         = { version = "4.5.20", features = ["derive", "wrap_help"] }
-console      = "0.15.10"
-env_logger   = { version = "0.11.5", default-features = false, features = ["auto-color", "humantime"] }
-esp-metadata = { path = "../esp-metadata", features = ["clap"] }
-inquire         = "0.7.5"
-jiff         = { version = "0.2.13", default-features = false, features = ["std"] }
-kuchikiki    = { version = "0.8.2", optional = true }
-log          = "0.4.22"
-minijinja    = { version = "2.5.0", default-features = false }
-opener       = { version = "0.7.2", optional = true }
-prettyplease = { version = "0.2.34" }
-regex        = { version = "1.11.1", optional = true }
-rocket       = { version = "0.5.1", optional = true }
-semver       = { version = "1.0.23", features = ["serde"] }
-serde        = { version = "1.0.215", default-features = false, features = ["derive"] }
-serde_json   = "1.0.70"
-strum        = { version = "0.27.1", features = ["derive"] }
-syn          = { version = "2", default-features = false, features = ["full", "parsing"] }
-toml_edit    = { version = "0.22.22", features = ["serde"] }
-walkdir      = "2.5.0"
+anyhow         = "1.0.93"
+clap           = { version = "4.5.20", features = ["derive", "wrap_help"] }
+console        = "0.15.10"
+env_logger     = { version = "0.11.5", default-features = false, features = ["auto-color", "humantime"] }
+esp-metadata   = { path = "../esp-metadata", features = ["clap"] }
+inquire        = "0.7.5"
+jiff           = { version = "0.2.13", default-features = false, features = ["std"] }
+kuchikiki      = { version = "0.8.2", optional = true }
+log            = "0.4.22"
+minijinja      = { version = "2.5.0", default-features = false }
+opener         = { version = "0.7.2", optional = true }
+object         = "0.37"
+parking_lot    = "0.12.3"
+prettyplease   = { version = "0.2.34" }
+regex          = { version = "1.11.1", optional = true }
+rustc-demangle = "0.1"
+rocket         = { version = "0.5.1", optional = true }
+semver         = { version = "1.0.23", features = ["serde"] }
+serde          = { version = "1.0.215", default-features = false, features = ["derive"] }
+serde_json     = "1.0.70"
+somni-expr     = { version = "0.2.0" }
+strum          = { version = "0.27.1", features = ["derive"] }
+syn            = { version = "2", default-features = false, features = ["full", "parsing"] }
+toml_edit      = { version = "0.22.22", features = ["serde"] }
+walkdir        = "2.5.0"
+zip            = "6.0.0"
 
 # Only required when building documentation for deployment:
 reqwest = { version = "0.12.12", features = [
@@ -35,7 +40,7 @@ reqwest = { version = "0.12.12", features = [
 ], optional = true }
 
 # This pulls a gazillion crates - don't include it by default
-cargo-semver-checks = { version = "0.41.0", optional = true }
+cargo-semver-checks = { version = "0.43.0", optional = true }
 
 flate2 = { version = "1.1.1", optional = true }
 temp-file = { version = "0.1.9", optional = true }
@@ -49,3 +54,4 @@ deploy-docs  = ["dep:reqwest", "dep:kuchikiki"]
 preview-docs = ["dep:opener", "dep:rocket"]
 semver-checks = [ "dep:cargo-semver-checks", "dep:flate2", "dep:temp-file" ]
 release = ["semver-checks", "dep:opener", "dep:urlencoding", "dep:regex"]
+report = ["dep:regex"]

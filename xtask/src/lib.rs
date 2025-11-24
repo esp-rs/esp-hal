@@ -1,15 +1,18 @@
 use std::{
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use cargo::CargoAction;
 use esp_metadata::{Chip, Config, TokenStream};
+use parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
 use serde::{Deserialize, Serialize};
+use toml_edit::{InlineTable, Item, Value};
 
 use crate::{
-    cargo::{CargoArgsBuilder, CargoToml},
+    cargo::{CargoArgsBuilder, CargoCommandBatcher, CargoToml},
     firmware::Metadata,
 };
 
@@ -41,24 +44,26 @@ pub mod semver_check;
 )]
 #[serde(rename_all = "kebab-case")]
 #[strum(serialize_all = "kebab-case")]
+/// Represents the packages in the `esp-hal` workspace.
 pub enum Package {
     EspAlloc,
     EspBacktrace,
     EspBootloaderEspIdf,
     EspConfig,
     EspHal,
-    EspHalEmbassy,
     EspHalProcmacros,
     EspRomSys,
     EspLpHal,
     EspMetadata,
     EspMetadataGenerated,
+    EspPhy,
     EspPrintln,
     EspRiscvRt,
     EspStorage,
+    EspSync,
     EspRadio,
-    EspRadioPreemptDriver,
-    EspPreempt,
+    EspRadioRtosDriver,
+    EspRtos,
     Examples,
     HilTest,
     QaTest,
@@ -70,22 +75,31 @@ pub enum Package {
 impl Package {
     /// Does the package have chip-specific cargo features?
     pub fn has_chip_features(&self) -> bool {
-        use Package::*;
+        use strum::IntoEnumIterator;
+        let chips = Chip::iter()
+            .map(|chip| chip.to_string())
+            .collect::<Vec<_>>();
+        let toml = self.toml();
+        let Some(Item::Table(features)) = toml.manifest.get("features") else {
+            return false;
+        };
 
-        matches!(
-            self,
-            EspBacktrace
-                | EspBootloaderEspIdf
-                | EspHal
-                | EspHalEmbassy
-                | EspMetadataGenerated
-                | EspRomSys
-                | EspLpHal
-                | EspPrintln
-                | EspPreempt
-                | EspStorage
-                | EspRadio
-        )
+        // This is intended to opt-out in case there are features that look like chip names, but
+        // aren't supposed to be handled like them.
+        if let Some(metadata) = toml.espressif_metadata() {
+            if let Some(Item::Value(ov)) = metadata.get("has_chip_features") {
+                let Value::Boolean(ov) = ov else {
+                    log::warn!("Invalid value for 'has_chip_features' in metadata");
+                    return false;
+                };
+
+                return *ov.value();
+            }
+        }
+
+        features
+            .iter()
+            .any(|(feature, _)| chips.iter().any(|c| c == feature))
     }
 
     /// Does the package have inline assembly?
@@ -110,6 +124,7 @@ impl Package {
             .any(|line| line.contains("asm_experimental_arch"))
     }
 
+    /// Does the package have a migration guide?
     pub fn has_migration_guide(&self, workspace: &Path) -> bool {
         let package_path = workspace.join(self.to_string());
 
@@ -130,6 +145,23 @@ impl Package {
         false
     }
 
+    /// Does the package have any host tests?
+    pub fn has_host_tests(&self, workspace: &Path) -> bool {
+        if *self == Package::HilTest {
+            return false;
+        }
+        let package_path = workspace.join(self.to_string()).join("src");
+
+        walkdir::WalkDir::new(package_path)
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "rs"))
+            .any(|entry| {
+                std::fs::read_to_string(entry.path()).map_or(false, |src| src.contains("#[test]"))
+            })
+    }
+
+    /// Does the package need to be built with the standard library?
     pub fn needs_build_std(&self) -> bool {
         use Package::*;
 
@@ -145,28 +177,23 @@ impl Package {
             EspHal
                 | EspLpHal
                 | EspRadio
-                | EspHalEmbassy
+                | EspPhy
                 | EspRomSys
                 | EspBootloaderEspIdf
                 | EspMetadataGenerated
-                | EspPreempt
+                | EspRtos
         )
     }
 
     /// Should documentation be built for the package, and should the package be
     /// published?
-    pub fn is_published(&self, workspace: &Path) -> bool {
+    pub fn is_published(&self) -> bool {
         if *self == Package::Examples {
             // The `examples/` directory does not contain `Cargo.toml` in its root, and even if it
             // did nothing in this directory will be published.
             false
         } else {
-            // TODO: we should use some sort of cache instead of parsing the TOML every
-            // time, but for now this should be good enough.
-            let toml =
-                crate::cargo::CargoToml::new(workspace, *self).expect("Failed to parse Cargo.toml");
-
-            toml.is_published()
+            self.toml().is_published()
         }
     }
 
@@ -179,136 +206,198 @@ impl Package {
         }
     }
 
-    /// Given a device config, return the features which should be enabled for
-    /// this package.
-    pub fn feature_rules(&self, config: &Config) -> Vec<String> {
-        let mut features = vec![];
-        match self {
-            Package::EspBacktrace => features.push("defmt".to_owned()),
-            Package::EspConfig => features.push("build".to_owned()),
-            Package::EspHal => {
-                features.push("unstable".to_owned());
-                features.push("rt".to_owned());
-                if config.contains("psram") {
-                    // TODO this doesn't test octal psram (since `ESP_HAL_CONFIG_PSRAM_MODE`
-                    // defaults to `quad`) as it would require a separate build
-                    features.push("psram".to_owned())
-                }
-                if config.contains("usb0") {
-                    features.push("__usb_otg".to_owned());
-                }
-                if config.contains("bt") {
-                    features.push("__bluetooth".to_owned());
-                }
+    fn parse_conditional_features(table: &InlineTable, config: &Config) -> Option<Vec<String>> {
+        let mut eval_context = somni_expr::Context::new();
+        eval_context.add_function("chip_has", |symbol: &str| {
+            config.all().iter().any(|sym| sym == symbol)
+        });
+        eval_context.add_variable("chip", config.name());
+
+        if let Some(condition) = table.get("if") {
+            let Some(expr) = condition.as_str() else {
+                panic!("`if` condition must be a string.");
+            };
+
+            if !eval_context
+                .evaluate::<bool>(expr)
+                .expect("Failed to evaluate expression")
+            {
+                return None;
             }
-            Package::EspRadio => {
-                features.push("esp-hal/unstable".to_owned());
-                features.push("esp-hal/rt".to_owned());
-                features.push("defmt".to_owned());
-                if config.contains("wifi") {
-                    features.push("wifi".to_owned());
-                    features.push("wifi-eap".to_owned());
-                    features.push("esp-now".to_owned());
-                    features.push("sniffer".to_owned());
-                    features.push("smoltcp/proto-ipv4".to_owned());
-                    features.push("smoltcp/proto-ipv6".to_owned());
-                }
-                if config.contains("bt") {
-                    features.push("ble".to_owned());
-                }
-                if config.contains("wifi") && config.contains("bt") {
-                    features.push("coex".to_owned());
-                }
-                if features.iter().any(|f| {
-                    f == "csi" || f == "ble" || f == "esp-now" || f == "sniffer" || f == "coex"
-                }) {
-                    features.push("unstable".to_owned());
-                }
-            }
-            Package::EspHalProcmacros => {
-                features.push("embassy".to_owned());
-            }
-            Package::EspHalEmbassy => {
-                features.push("esp-hal/unstable".to_owned());
-                features.push("esp-hal/rt".to_owned());
-                features.push("defmt".to_owned());
-                features.push("executors".to_owned());
-            }
-            Package::EspLpHal => {
-                if config.contains("lp_core") {
-                    features.push("embedded-io".to_owned());
-                }
-                features.push("embedded-hal".to_owned());
-            }
-            Package::EspPrintln => {
-                features.push("auto".to_owned());
-                features.push("defmt-espflash".to_owned());
-            }
-            Package::EspStorage => {}
-            Package::EspBootloaderEspIdf => {
-                features.push("defmt".to_owned());
-                features.push("validation".to_owned());
-            }
-            Package::EspAlloc => {
-                features.push("defmt".to_owned());
-            }
-            Package::EspMetadataGenerated => {}
-            Package::EspPreempt => features.push("esp-hal/unstable".to_owned()),
-            _ => {}
         }
 
+        let Some(config_features) = table.get("features") else {
+            panic!("Missing features array.");
+        };
+        let Value::Array(config_features) = config_features else {
+            panic!("features must be an array.");
+        };
+
+        let mut features = Vec::new();
+        for feature in config_features {
+            let feature = feature.as_str().expect("features must be strings.");
+            features.push(feature.to_owned());
+        }
+
+        Some(features)
+    }
+
+    fn parse_feature_set(table: &InlineTable, config: &Config) -> Option<Vec<String>> {
+        // Base features. If their condition is not met, the whole item is ignored.
+        let mut features = Self::parse_conditional_features(table, config)?;
+
+        if let Some(conditionals) = table.get("append") {
+            // Optional features. If their conditions are met, they are appended to the base
+            // features.
+            let Value::Array(conditionals) = conditionals else {
+                panic!("append must be an array.");
+            };
+            for cond in conditionals {
+                let Value::InlineTable(cond_table) = cond else {
+                    panic!("append items must be inline tables.");
+                };
+                if let Some(cond_features) = Self::parse_conditional_features(cond_table, config) {
+                    features.extend(cond_features);
+                }
+            }
+        };
+
+        Some(features)
+    }
+
+    /// Given a device config, return the features which should be enabled for
+    /// this package.
+    ///
+    /// Features are read from Cargo.toml metadata, from the `doc-config` table. Currently only
+    /// one feature set is supported. If the `doc-config` table is not found, this function returns
+    /// `None`. This differs from specifying an empty set of features, which returns `Some(empty
+    /// vector)`.
+    // TODO: perhaps we should use the docs.rs metadata for doc features for packages that have no
+    // chip-specific features.
+    pub fn doc_feature_rules(&self, config: &Config) -> Option<Vec<String>> {
+        let mut features = None;
+
+        if *self == Self::Examples {
+            return None;
+        }
+
+        let toml = self.toml();
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(config_meta) = metadata.get("doc-config")
+        {
+            let Item::Value(Value::InlineTable(table)) = config_meta else {
+                panic!("doc-config must be inline tables.");
+            };
+
+            if let Some(fs) = Self::parse_feature_set(table, config) {
+                features = Some(fs);
+            }
+        } else {
+            // Nothing
+        }
+
+        log::debug!("Doc features for package '{}': {:?}", self, features);
         features
     }
 
     /// Additional feature rules to test subsets of features for a package.
-    pub fn lint_feature_rules(&self, config: &Config) -> Vec<Vec<String>> {
-        let mut cases = Vec::new();
+    pub fn check_feature_rules(&self, config: &Config) -> Vec<Vec<String>> {
+        let mut cases = vec![];
 
-        match self {
-            Package::EspHal => {
-                // This checks if the `esp-hal` crate compiles with the no features (other than the
-                // chip selection)
+        let toml = self.toml();
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(config_meta) = metadata.get("check-configs")
+        {
+            let Item::Value(Value::Array(tables)) = config_meta else {
+                panic!(
+                    "check-configs must be an array of tables. {:?}",
+                    config_meta
+                );
+            };
 
-                // This tests that disabling the `rt` feature works
-                cases.push(vec![]);
-                // This checks if the `esp-hal` crate compiles _without_ the `unstable` feature
-                // enabled
-                cases.push(vec!["rt".to_owned()]);
-            }
-            Package::EspRadio => {
-                // Minimal set of features that when enabled _should_ still compile:
-                cases.push(vec!["esp-hal/rt".to_owned(), "esp-hal/unstable".to_owned()]);
-                if config.contains("wifi") {
-                    // This tests if `wifi` feature works without `esp-radio/unstable`
-                    cases.push(vec![
-                        "esp-hal/rt".to_owned(),
-                        "esp-hal/unstable".to_owned(),
-                        "wifi".to_owned(),
-                    ]);
-                    // This tests `wifi-eap` feature
-                    cases.push(vec![
-                        "esp-hal/rt".to_owned(),
-                        "esp-hal/unstable".to_owned(),
-                        "wifi-eap".to_owned(),
-                        "unstable".to_owned(),
-                    ]);
+            for table in tables {
+                let Value::InlineTable(table) = table else {
+                    panic!("check-configs items must be inline tables.");
+                };
+                if let Some(features) = Self::parse_feature_set(table, config) {
+                    cases.push(features);
                 }
             }
-            Package::EspMetadataGenerated => {
-                cases.push(vec!["build-script".to_owned()]);
-            }
-            Package::EspPreempt => {
-                cases.push(vec!["esp-alloc".to_owned(), "esp-hal/unstable".to_owned()])
-            }
-            _ => {}
+        } else {
+            // Nothing specified, just test no features
+            cases.push(vec![]);
         }
 
+        log::debug!("Check features for package '{}': {:?}", self, cases);
         cases
+    }
+
+    /// Additional feature rules to test subsets of features for a package.
+    pub fn lint_feature_rules(&self, config: &Config) -> Vec<Vec<String>> {
+        let mut cases = vec![];
+
+        let toml = self.toml();
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(config_meta) = metadata.get("clippy-configs")
+        {
+            let Item::Value(Value::Array(tables)) = config_meta else {
+                panic!(
+                    "clippy-configs must be an array of tables. {:?}",
+                    config_meta
+                );
+            };
+
+            for table in tables {
+                let Value::InlineTable(table) = table else {
+                    panic!("clippy-configs items must be inline tables.");
+                };
+                if let Some(features) = Self::parse_feature_set(table, config) {
+                    cases.push(features);
+                }
+            }
+        }
+
+        log::debug!("Check features for package '{}': {:?}", self, cases);
+        cases
+    }
+
+    fn toml(&self) -> MappedMutexGuard<'_, CargoToml> {
+        static TOML: Mutex<Option<HashMap<Package, CargoToml>>> = Mutex::new(None);
+
+        let tomls = TOML.lock();
+
+        MutexGuard::map(tomls, |tomls| {
+            let tomls = tomls.get_or_insert_default();
+
+            tomls.entry(*self).or_insert_with(|| {
+                CargoToml::new(&std::env::current_dir().unwrap(), *self)
+                    .expect("Failed to parse Cargo.toml")
+            })
+        })
+    }
+
+    fn targets_lp_core(&self) -> bool {
+        if *self == Package::Examples {
+            return false;
+        }
+
+        let toml = self.toml();
+        let Some(metadata) = toml.espressif_metadata() else {
+            return false;
+        };
+
+        let Some(Item::Value(targets_lp_core)) = metadata.get("targets_lp_core") else {
+            return false;
+        };
+
+        targets_lp_core
+            .as_bool()
+            .expect("targets_lp_core must be a boolean")
     }
 
     /// Return the target triple for a given package/chip pair.
     pub fn target_triple(&self, chip: &Chip) -> Result<String> {
-        if *self == Package::EspLpHal {
+        if self.targets_lp_core() {
             chip.lp_target().map(ToString::to_string)
         } else {
             Ok(chip.target())
@@ -317,38 +406,61 @@ impl Package {
 
     /// Validate that the specified chip is valid for the specified package.
     pub fn validate_package_chip(&self, chip: &Chip) -> Result<()> {
-        let check = match self {
-            Package::EspLpHal => chip.has_lp_core(),
-            Package::XtensaLx | Package::XtensaLxRt | Package::XtensaLxRtProcMacros => {
-                chip.is_xtensa()
-            }
-            Package::EspRiscvRt => chip.is_riscv(),
-            _ => true,
-        };
-
-        if check {
-            Ok(())
-        } else {
-            Err(anyhow!(
-                "Invalid chip provided for package '{}': '{}'",
-                self,
-                chip
-            ))
+        if *self == Package::Examples {
+            return Ok(());
         }
+
+        if self.targets_lp_core() && !chip.has_lp_core() {
+            return Err(anyhow!(
+                "Package '{self}' requires an LP core, but '{chip}' does not have one",
+            ));
+        }
+
+        let toml = self.toml();
+
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(Item::Value(Value::Array(targets))) = metadata.get("requires_target")
+            && !targets.iter().any(|t| t.as_str() == Some(&chip.target()))
+        {
+            return Err(anyhow!(
+                "Package '{self}' is not compatible with {chip_target} chips",
+                chip_target = chip.target()
+            ));
+        }
+
+        Ok(())
     }
 
+    /// Creates a tag string for this [`Package`] combined with a semantic version.
     pub fn tag(&self, version: &semver::Version) -> String {
+        log::debug!(
+            "Creating tag for package '{}' with version '{}'",
+            self,
+            version
+        );
         format!("{self}-v{version}")
     }
 
     #[cfg(feature = "release")]
     fn is_semver_checked(&self) -> bool {
-        [Self::EspHal].contains(self)
+        let toml = self.toml();
+        let Some(metadata) = toml.espressif_metadata() else {
+            return false;
+        };
+
+        let Some(Item::Value(semver_checked)) = metadata.get("semver_checked") else {
+            return false;
+        };
+
+        semver_checked
+            .as_bool()
+            .expect("semver_checked must be a boolean")
     }
 }
 
 #[derive(Debug, Clone, Copy, strum::Display, clap::ValueEnum, Serialize, Deserialize)]
 #[strum(serialize_all = "lowercase")]
+/// Represents the versioning scheme for a package.
 pub enum Version {
     Major,
     Minor,
@@ -362,17 +474,55 @@ pub fn execute_app(
     target: &str,
     app: &Metadata,
     action: CargoAction,
-    repeat: usize,
     debug: bool,
     toolchain: Option<&str>,
     timings: bool,
+    extra_args: &[&str],
 ) -> Result<()> {
     let package = app.example_path().strip_prefix(package_path)?;
     log::info!("Building example '{}' for '{}'", package.display(), chip);
 
-    if !app.configuration().is_empty() {
-        log::info!("  Configuration: {}", app.configuration());
-    }
+    let builder = generate_build_command(
+        package_path,
+        chip,
+        target,
+        app,
+        action,
+        debug,
+        toolchain,
+        timings,
+        extra_args,
+    )?;
+
+    let command = CargoCommandBatcher::build_one_for_cargo(&builder);
+
+    command.run(false)?;
+
+    Ok(())
+}
+
+pub fn generate_build_command(
+    package_path: &Path,
+    chip: Chip,
+    target: &str,
+    app: &Metadata,
+    action: CargoAction,
+    debug: bool,
+    toolchain: Option<&str>,
+    timings: bool,
+    extra_args: &[&str],
+) -> Result<CargoArgsBuilder> {
+    let package = app.example_path().strip_prefix(package_path)?;
+    log::info!(
+        "Building command: {} '{}' for '{}'",
+        if matches!(action, CargoAction::Build(_)) {
+            "Build"
+        } else {
+            "Run"
+        },
+        package.display(),
+        chip
+    );
 
     let mut features = app.feature_set().to_vec();
     if !features.is_empty() {
@@ -380,19 +530,27 @@ pub fn execute_app(
     }
     features.push(chip.to_string());
 
-    let env_vars = app.env_vars();
-    for (key, value) in env_vars {
-        log::info!("  esp-config:    {} = {}", key, value);
-    }
+    let cwd = if package_path.ends_with("examples") {
+        package_path.join(package).to_path_buf()
+    } else {
+        package_path.to_path_buf()
+    };
 
-    let mut builder = CargoArgsBuilder::default()
+    let mut builder = CargoArgsBuilder::new(app.output_file_name())
+        .manifest_path(cwd.join("Cargo.toml"))
+        .config_path(cwd.join(".cargo").join("config.toml"))
         .target(target)
         .features(&features);
 
+    let subcommand = if matches!(action, CargoAction::Build(_)) {
+        "build"
+    } else {
+        "run"
+    };
+    builder = builder.subcommand(subcommand);
+
     let bin_arg = if package.starts_with("src/bin") {
         Some(format!("--bin={}", app.binary_name()))
-    } else if package.starts_with("tests") {
-        Some(format!("--test={}", app.binary_name()))
     } else if !package_path.ends_with("examples") {
         Some(format!("--example={}", app.binary_name()))
     } else {
@@ -403,21 +561,22 @@ pub fn execute_app(
         builder.add_arg(arg);
     }
 
-    let subcommand = if matches!(action, CargoAction::Build(_)) {
-        "build"
-    } else if package.starts_with("tests") {
-        "test"
-    } else {
-        "run"
-    };
-    builder = builder.subcommand(subcommand);
+    if !app.configuration().is_empty() {
+        log::info!("  Configuration: {}", app.configuration());
+    }
 
     for config in app.cargo_config() {
         log::info!(" Cargo --config: {config}");
-        builder.add_arg("--config").add_arg(config);
+        builder.add_config("--config").add_config(config);
         // Some configuration requires nightly rust, so let's just assume it. May be
         // overwritten by the esp toolchain on xtensa.
         builder = builder.toolchain("nightly");
+    }
+
+    let env_vars = app.env_vars();
+    for (key, value) in env_vars {
+        log::info!("  esp-config:    {} = {}", key, value);
+        builder.add_env_var(key, value);
     }
 
     if !debug {
@@ -434,64 +593,42 @@ pub fn execute_app(
         _ if target.starts_with("xtensa") => Some("esp"),
         _ => None,
     };
-
     if let Some(toolchain) = toolchain {
-        if toolchain.starts_with("esp") {
-            builder = builder.arg("-Zbuild-std=core,alloc");
-        }
         builder = builder.toolchain(toolchain);
     }
 
-    let args = builder.build();
-    log::debug!("{args:#?}");
-
-    let cwd = if package_path.ends_with("examples") {
-        package_path.join(package).to_path_buf()
-    } else {
-        package_path.to_path_buf()
-    };
-
-    if let CargoAction::Build(out_dir) = action {
-        cargo::run_with_env(&args, &cwd, env_vars, false)?;
-
-        // Now that the build has succeeded and we printed the output, we can
-        // rerun the build again quickly enough to capture JSON. We'll use this to
-        // copy the binary to the output directory.
-        builder.add_arg("--message-format=json");
-        let args = builder.build();
-
-        let output = cargo::run_with_env(&args, &cwd, env_vars, true)?;
-        for line in output.lines() {
-            if let Ok(artifact) = serde_json::from_str::<cargo::Artifact>(line) {
-                let out_dir = out_dir.join(chip.to_string());
-                std::fs::create_dir_all(&out_dir)?;
-
-                let output_file = out_dir.join(app.output_file_name());
-                std::fs::copy(artifact.executable, &output_file)?;
-                log::info!("Output ready: {}", output_file.display());
-            }
-        }
-    } else {
-        for i in 0..repeat {
-            if repeat != 1 {
-                log::info!("Run {}/{}", i + 1, repeat);
-            }
-            cargo::run_with_env(&args, &cwd, env_vars, false)?;
-        }
+    if let CargoAction::Build(Some(out_dir)) = action {
+        // We have to place the binary into a directory named after the app, because
+        // we can't set the binary name.
+        builder.add_arg("--artifact-dir");
+        builder.add_arg(
+            out_dir
+                .join("tmp") // This will be deleted in one go
+                .join(app.output_file_name()) // This sets the name of the binary
+                .display()
+                .to_string(),
+        );
     }
 
-    Ok(())
+    let builder = builder.args(extra_args);
+
+    Ok(builder)
 }
 
 // ----------------------------------------------------------------------------
 // Helper Functions
 
-// Copy an entire directory recursively.
+/// Copy an entire directory recursively.
 // https://stackoverflow.com/a/65192210
 pub fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()> {
-    fs::create_dir_all(&dst)?;
+    log::debug!(
+        "Copying directory '{}' to '{}'",
+        src.as_ref().display(),
+        dst.as_ref().display()
+    );
+    fs::create_dir_all(&dst).with_context(|| "Failed to create a {dst}")?;
 
-    for entry in fs::read_dir(src)? {
+    for entry in fs::read_dir(src).with_context(|| "Failed to read {src}")? {
         let entry = entry?;
         let ty = entry.file_type()?;
 
@@ -509,7 +646,7 @@ pub fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()> 
 /// workspace.
 pub fn package_paths(workspace: &Path) -> Result<Vec<PathBuf>> {
     let mut paths = Vec::new();
-    for entry in fs::read_dir(workspace)? {
+    for entry in fs::read_dir(workspace).context("Failed to read {workspace}")? {
         let entry = entry?;
         if entry.file_type()?.is_dir() && entry.path().join("Cargo.toml").exists() {
             paths.push(entry.path());
@@ -518,12 +655,18 @@ pub fn package_paths(workspace: &Path) -> Result<Vec<PathBuf>> {
 
     paths.sort();
 
+    log::debug!(
+        "Found {} packages in workspace '{}':",
+        paths.len(),
+        workspace.display()
+    );
+
     Ok(paths)
 }
 
 /// Parse the version from the specified package's Cargo manifest.
-pub fn package_version(workspace: &Path, package: Package) -> Result<semver::Version> {
-    CargoToml::new(workspace, package).map(|toml| toml.package_version())
+pub fn package_version(_workspace: &Path, package: Package) -> Result<semver::Version> {
+    Ok(package.toml().package_version())
 }
 
 /// Make the path "Windows"-safe
@@ -531,7 +674,13 @@ pub fn windows_safe_path(path: &Path) -> PathBuf {
     PathBuf::from(path.to_str().unwrap().to_string().replace("\\\\?\\", ""))
 }
 
-pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result<()> {
+/// Format the specified package in the workspace using `cargo fmt`.
+pub fn format_package(
+    workspace: &Path,
+    package: Package,
+    check: bool,
+    format_rules: Option<&Path>,
+) -> Result<()> {
     log::info!("Formatting package: {}", package);
     let package_path = workspace.join(package.as_ref());
 
@@ -542,13 +691,115 @@ pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result
     };
 
     for path in &paths {
-        format_package_path(workspace, path, check)?;
+        format_package_path(workspace, path, check, format_rules)?;
     }
 
     Ok(())
 }
 
-fn format_package_path(workspace: &Path, package_path: &Path, check: bool) -> Result<()> {
+/// Run the host tests for the specified package.
+pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
+    log::info!("Running host tests for package: {}", package);
+    let package_path = workspace.join(package.as_ref());
+
+    let cmd = CargoArgsBuilder::default();
+
+    match package {
+        Package::EspConfig => {
+            return cargo::run(
+                &cmd.clone()
+                    .subcommand("test")
+                    .features(&vec!["build".into(), "tui".into()])
+                    .build(),
+                &package_path,
+            );
+        }
+
+        Package::EspBootloaderEspIdf => {
+            return cargo::run(
+                &cmd.clone()
+                    .subcommand("test")
+                    .arg("--lib")
+                    .arg("--tests")
+                    .features(&vec!["std".into()])
+                    .build(),
+                &package_path,
+            );
+        }
+
+        Package::EspStorage => {
+            cargo::run(
+                &cmd.clone()
+                    .subcommand("test")
+                    .features(&vec!["emulation".into()])
+                    .arg("--")
+                    .arg("--test-threads=1")
+                    .build(),
+                &package_path,
+            )?;
+
+            cargo::run(
+                &cmd.clone()
+                    .subcommand("test")
+                    .features(&vec!["emulation".into(), "bytewise-read".into()])
+                    .arg("--")
+                    .arg("--test-threads=1")
+                    .build(),
+                &package_path,
+            )?;
+
+            log::info!("Running miri host tests for package: {}", package);
+
+            cargo::run(
+                &cmd.clone()
+                    .toolchain("nightly")
+                    .subcommand("miri")
+                    .subcommand("test")
+                    .features(&vec!["emulation".into()])
+                    .arg("--")
+                    .arg("--test-threads=1")
+                    .build(),
+                &package_path,
+            )?;
+
+            return cargo::run(
+                &cmd.clone()
+                    .toolchain("nightly")
+                    .subcommand("miri")
+                    .subcommand("test")
+                    .features(&vec!["emulation".into(), "bytewise-read".into()])
+                    .arg("--")
+                    .arg("--test-threads=1")
+                    .build(),
+                &package_path,
+            );
+        }
+        Package::EspHalProcmacros => {
+            return cargo::run(
+                &cmd.clone()
+                    .subcommand("test")
+                    .features(&vec![
+                        "has-lp-core".into(),
+                        "is-lp-core".into(),
+                        "rtc-slow".into(),
+                    ])
+                    .build(),
+                &package_path,
+            );
+        }
+        _ => Err(anyhow!(
+            "Instructions for host testing were not provided for: '{}'",
+            package,
+        )),
+    }
+}
+
+fn format_package_path(
+    workspace: &Path,
+    package_path: &Path,
+    check: bool,
+    format_rules: Option<&Path>,
+) -> Result<()> {
     // We need to list all source files since modules in `unstable_module!` macros
     // won't get picked up otherwise
     let source_files = walkdir::WalkDir::new(package_path.join("src"))
@@ -573,25 +824,42 @@ fn format_package_path(workspace: &Path, package_path: &Path, check: bool) -> Re
     }
 
     cargo_args.push("--".into());
-    cargo_args.push(format!(
-        "--config-path={}/rustfmt.toml",
-        workspace.display()
-    ));
+    let mut config_file_path;
+    let config_file = if let Some(rules) = format_rules {
+        rules
+    } else {
+        config_file_path = package_path.join("rustfmt.toml");
+        if !config_file_path.exists() {
+            config_file_path = workspace.join("rustfmt.toml");
+        }
+        &config_file_path
+    };
+    cargo_args.push(format!("--config-path={}", config_file.display()));
     cargo_args.extend(source_files);
+
+    log::debug!("{cargo_args:#?}");
 
     cargo::run(&cargo_args, &package_path)
 }
 
+/// Update the metadata and chip support table in the esp-hal README.
 pub fn update_metadata(workspace: &Path, check: bool) -> Result<()> {
+    log::info!("Updating esp-metadata and chip support table...");
     update_chip_support_table(workspace)?;
     generate_metadata(workspace, save)?;
 
-    format_package(workspace, Package::EspMetadataGenerated, false)?;
+    format_package(
+        workspace,
+        Package::EspMetadataGenerated,
+        false,
+        Some(&workspace.join("esp-metadata-generated/rustfmt.toml")),
+    )?;
 
     if check {
         let res = std::process::Command::new("git")
             .args(["diff", "HEAD", "esp-metadata-generated"])
-            .output()?;
+            .output()
+            .context("Failed to run `git diff HEAD esp-metadata-generated`")?;
         if !res.stdout.is_empty() {
             return Err(anyhow::Error::msg(
                 "detected `esp-metadata-generated` changes. Run `cargo xtask update-metadata`, and commit the changes.",
@@ -643,8 +911,10 @@ fn save(out_path: &Path, tokens: TokenStream) -> Result<()> {
 }
 
 fn update_chip_support_table(workspace: &Path) -> Result<()> {
+    log::debug!("Updating chip support table in README.md...");
     let mut output = String::new();
-    let readme = std::fs::read_to_string(workspace.join("esp-hal").join("README.md"))?;
+    let readme = std::fs::read_to_string(workspace.join("esp-hal").join("README.md"))
+        .context("Failed to read {workspace}")?;
 
     let mut in_support_table = false;
     let mut generate_support_table = true;
@@ -675,10 +945,14 @@ fn update_chip_support_table(workspace: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Recursively find all packages in the given path that contain a `Cargo.toml` file.
 pub fn find_packages(path: &Path) -> Result<Vec<PathBuf>> {
     let mut packages = Vec::new();
 
-    for result in fs::read_dir(path)? {
+    for result in
+        fs::read_dir(path).with_context(|| format!("Failed to read {}", path.display()))?
+    {
+        log::debug!("Inspecting path: {}", path.display());
         let entry = result?;
         if entry.path().is_file() {
             continue;
@@ -691,6 +965,12 @@ pub fn find_packages(path: &Path) -> Result<Vec<PathBuf>> {
             packages.extend(find_packages(&entry.path())?);
         }
     }
+
+    log::debug!(
+        "Found {} packages in path '{}':",
+        packages.len(),
+        path.display()
+    );
 
     Ok(packages)
 }

@@ -4,7 +4,7 @@
 # updates which must be made to the CI workflow in order to reflect this; the
 # changes are:
 #
-# 1.) In the 'esp-hal' job, add the name of the chip to the `matrix.soc` array.
+# 1.) In the 'esp-hal' job, add the appropriate build command.
 # 1a.) If the device has a low-power core (which is supported in
 #      `esp-lp-hal`), then update the `if` condition to build prerequisites.
 # 2.) In the 'msrv' job, add checks as needed for the new chip.
@@ -40,8 +40,7 @@ jobs:
   # Build Packages
 
   esp-hal:
-    name: esp-hal (${{ matrix.device.soc }})
-    runs-on: ubuntu-latest
+    runs-on: macos-m1-self-hosted
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
       CI: 1
@@ -54,17 +53,90 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        device: [
-            # RISC-V devices:
-            { soc: "esp32c2", toolchain: "stable" },
-            { soc: "esp32c3", toolchain: "stable" },
-            { soc: "esp32c6", toolchain: "stable" },
-            { soc: "esp32h2", toolchain: "stable" },
-            # Xtensa devices:
-            { soc: "esp32", toolchain: "esp" },
-            { soc: "esp32s2", toolchain: "esp" },
-            { soc: "esp32s3", toolchain: "esp" },
-          ]
+        # load-blance runners a bit
+        group:
+          - xtensa
+          - riscv
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install the Rust toolchain for Xtensa devices:
+      - uses: esp-rs/xtensa-toolchain@v1.6
+        if: matrix.group == 'xtensa'
+        with:
+          version: 1.90.0.0
+
+      # Install the Rust stable toolchain for RISC-V devices:
+      - uses: dtolnay/rust-toolchain@v1
+        if: matrix.group == 'riscv'
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: stable
+          components: rust-src
+
+      - name: Setup cargo-batch
+        run: |
+          if ! command -v cargo-batch &> /dev/null; then
+              cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
+          fi
+
+      - name: Build and Check Xtensa
+        if: matrix.group == 'xtensa'
+        shell: bash
+        run: |
+          # lints and docs are checked separately
+          cargo xcheck ci esp32 --toolchain esp --no-lint --no-docs
+          cargo xcheck ci esp32s2 --toolchain esp --no-lint --no-docs
+          cargo xcheck ci esp32s3 --toolchain esp --no-lint --no-docs
+
+      - name: Build and Check RISC-V
+        if: matrix.group == 'riscv'
+        shell: bash
+        run: |
+          # lints and docs are checked separately
+          cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
+
+  detect-extras-runner:
+    uses: ./.github/workflows/check_runner.yml
+    with:
+      primary-runner: macos-m1-self-hosted
+      fallback-runner: ubuntu-latest
+
+  extras:
+    needs: detect-extras-runner
+    runs-on: ${{ needs.detect-extras-runner.outputs.selected-runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      # Install dependencies for building the extra crates on ubuntu
+      - name: Install dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get -y install musl-tools libudev-dev pkg-config
+      # Build the extra crates
+      - name: Build the bench-server
+        run: cd extras/bench-server && cargo build
+      - name: Build esp-wifishark
+        run: cd extras/esp-wifishark && cargo build
+      - name: Build ieee802154-sniffer
+        run: cd extras/ieee802154-sniffer && cargo build
+
+  docs:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        group:
+          - xtensa
+          - riscv
+
     steps:
       - uses: actions/checkout@v4
 
@@ -79,80 +151,81 @@ jobs:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
           components: rust-src
-      # Install the Rust nightly toolchain for RISC-V devices, because of `-Zdoctest-xcompile`
+      # Install the Rust nightly toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: nightly
           components: rust-src
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: "ci-${{ matrix.device.soc }}"
-          cache-all-crates: true
-
-      - name: Build and Check
+      - name: Build Xtensa docs
+        if: matrix.group == 'xtensa'
         shell: bash
-        run: cargo xcheck ci ${{ matrix.device.soc }} --toolchain ${{ matrix.device.toolchain }}
+        run: cargo xtask build documentation --chips esp32,esp32s2,esp32s3
 
-      - name: Semver-Check
+      - name: Build RISC-V docs
+        if: matrix.group == 'riscv'
         shell: bash
-        # always invokes +esp internally
-        run: cargo xcheck semver-check --chips ${{ matrix.device.soc }} check
-
-  extras:
-    runs-on: macos-m1-self-hosted
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-
-      # Build the extra crates
-      - name: Build the bench-server
-        run: cd extras/bench-server && cargo build
-      - name: Build esp-wifishark
-        run: cd extras/esp-wifishark && cargo build
-      - name: Build ieee802154-sniffer
-        run: cd extras/ieee802154-sniffer && cargo build
+        run: cargo xtask build documentation --chips esp32c2,esp32c3,esp32c6,esp32h2
 
   # --------------------------------------------------------------------------
   # MSRV
 
   msrv:
-    runs-on: macos-m1-self-hosted
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        group:
+          - xtensa
+          - riscv
 
     steps:
       - uses: actions/checkout@v4
       - uses: esp-rs/xtensa-toolchain@v1.6
+        if: matrix.group == 'xtensa'
         with:
           version: ${{ env.MSRV }}
+
+      - name: esp toolchain checks
+        if: matrix.group == 'xtensa'
+        run: rustc +esp --version --verbose
+
       - uses: dtolnay/rust-toolchain@v1
+        if: matrix.group == 'riscv'
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,x86_64-unknown-linux-gnu
           toolchain: ${{ env.MSRV }}
           components: rust-src,clippy
 
       - name: Stable toolchain checks
+        if: matrix.group == 'riscv'
         run: rustc +${{ env.MSRV }} --version --verbose
-      - name: esp toolchain checks
-        run: rustc +esp --version --verbose
 
       # Verify the MSRV for all chips by running a lint session
-      - name: msrv RISCV (esp-hal)
+      - name: msrv RISC-V (esp-hal)
+        if: matrix.group == 'riscv'
         run: |
           cargo xtask lint-packages --chips esp32c2,esp32c3,esp32c6,esp32h2 --toolchain ${{ env.MSRV }}
+
       - name: msrv Xtensa (esp-hal)
+        if: matrix.group == 'xtensa'
         run: |
           cargo xtask lint-packages --chips esp32,esp32s2,esp32s3 --toolchain esp
 
   # --------------------------------------------------------------------------
   # host tests
 
-  host-tests:
-    runs-on: macos-m1-self-hosted
+  detect-host-tests-runner:
+    uses: ./.github/workflows/check_runner.yml
+    with:
+      primary-runner: macos-m1-self-hosted
+      fallback-runner: ubuntu-latest
 
+  host-tests:
+    needs: detect-host-tests-runner
+    runs-on: ${{ needs.detect-host-tests-runner.outputs.selected-runner }}
     steps:
       - uses: actions/checkout@v4
       # Some of the configuration items in 'rustfmt.toml' require the 'nightly'
@@ -172,16 +245,27 @@ jobs:
       # Check metadata generation for all packages:
       - run: cargo xtask update-metadata --check
 
-      # Run tests in esp-config
-      - run: cd esp-config && cargo test --features build,tui
+      # Run host tests for all applicable packages:
+      - run: cargo xtask host-tests
 
-      # Run tests in esp-bootloader-esp-idf
-      - run: cd esp-bootloader-esp-idf && cargo test --features=std
+  # --------------------------------------------------------------------------
+  # Check links in .rs, .md, and .toml files
 
-      # Run tests in esp-storage
-      - run: cd esp-storage && cargo test --features=emulation -- --test-threads=1
-      - run: cd esp-storage && cargo test --features=emulation,bytewise-read -- --test-threads=1
-
-      # Miri tests in esp-storage
-      - run: cd esp-storage && cargo +nightly miri test --features=emulation -- --test-threads=1
-      - run: cd esp-storage && cargo +nightly miri test --features=emulation,bytewise-read -- --test-threads=1
+  link-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          args: >
+            --verbose
+            --no-progress
+            --format detailed
+            --timeout 7
+            --max-concurrency 6
+            --accept "200,301,302"
+            --exclude-path ".*/target/.*|.*/static\.files/.*|.*/docs/.*"
+            --remap "https://github.com/${{ github.repository }}/(?:blob|tree)/[^/]+/(.+) file://$GITHUB_WORKSPACE/\$1"
+            './**/*.rs'
+            './**/*.md'
+            './**/*.toml'

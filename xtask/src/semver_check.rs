@@ -4,10 +4,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use anyhow::{Context, Error};
 use cargo_semver_checks::{Check, GlobalConfig, ReleaseType, Rustdoc};
 use esp_metadata::Chip;
 
-use crate::{Package, cargo::CargoArgsBuilder};
+use crate::{Package, cargo::CargoArgsBuilder, commands::checker::download_baselines};
 
 /// Return the minimum required bump for the next release.
 /// Even if nothing changed this will be [ReleaseType::Patch]
@@ -15,7 +16,7 @@ pub fn minimum_update(
     workspace: &Path,
     package: Package,
     chip: Chip,
-) -> Result<ReleaseType, anyhow::Error> {
+) -> Result<ReleaseType, Error> {
     log::info!("Package = {}, Chip = {}", package, chip);
 
     let package_name = package.to_string();
@@ -30,7 +31,11 @@ pub fn minimum_update(
 
     let baseline_path_gz =
         PathBuf::from(&package_path).join(format!("api-baseline/{}.json.gz", file_name));
-    let baseline_path = temp_file::TempFile::new()?;
+    if !baseline_path_gz.exists() {
+        download_baselines(&package_path, vec![package])?;
+    }
+    let baseline_path =
+        temp_file::TempFile::new().with_context(|| format!("Failed to create a TempFile!"))?;
     let buffer = Vec::new();
     let mut decoder = flate2::write::GzDecoder::new(buffer);
     decoder.write_all(&(fs::read(&baseline_path_gz)?))?;
@@ -61,7 +66,7 @@ pub(crate) fn build_doc_json(
     package: Package,
     chip: &Chip,
     package_path: &PathBuf,
-) -> Result<PathBuf, anyhow::Error> {
+) -> Result<PathBuf, Error> {
     let target_dir = std::env::var("CARGO_TARGET_DIR");
 
     let target_path = if let Ok(target) = target_dir {
@@ -108,6 +113,7 @@ pub(crate) fn build_doc_json(
         .arg("--config=host.rustflags=[\"--cfg=instability_disable_unstable_docs\"]");
     let cargo_args = cargo_builder.build();
     log::debug!("{cargo_args:#?}");
-    crate::cargo::run_with_env(&cargo_args, package_path, envs, false)?;
+    crate::cargo::run_with_env(&cargo_args, package_path, envs, false)
+        .with_context(|| format!("Failed to run `cargo rustdoc` with {cargo_args:?}",))?;
     Ok(current_path)
 }

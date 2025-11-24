@@ -328,7 +328,8 @@ impl core::ops::Sub for Instant {
 
     #[inline]
     fn sub(self, rhs: Self) -> Self::Output {
-        Duration(self.0 - rhs.0)
+        // Avoid "Sub failed! Other > self" panics
+        Duration::from_micros(self.0.ticks().wrapping_sub(rhs.0.ticks()))
     }
 }
 
@@ -749,9 +750,6 @@ fn now() -> Instant {
 #[cfg(all(esp32, feature = "rt"))]
 pub(crate) fn time_init() {
     let apb = crate::Clocks::get().apb_clock.as_hz();
-    // we assume 80MHz APB clock source - there is no way to configure it in a
-    // different way currently
-    assert_eq!(apb, 80_000_000u32);
 
     let tg0 = TIMG0::regs();
 
@@ -761,9 +759,8 @@ pub(crate) fn time_init() {
     tg0.lactload().write(|w| unsafe { w.load().bits(1) });
 
     // 16 MHz counter
-    tg0.lactconfig()
-        .modify(|_, w| unsafe { w.divider().bits((apb / 16_000_000u32) as u16) });
-    tg0.lactconfig().modify(|_, w| {
+    tg0.lactconfig().write(|w| {
+        unsafe { w.divider().bits((apb / 16_000_000u32) as u16) };
         w.increase().bit(true);
         w.autoreload().bit(true);
         w.en().bit(true)

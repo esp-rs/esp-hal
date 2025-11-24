@@ -12,7 +12,7 @@ options:
                RAM consumption."
   default:
     - value: true
-  stability: !Stable '1.0.0-beta.0'
+  stability: !Stable '1.0.0'
 
 - name: place-anon-in-ram
   description: "Places anonymous symbols into RAM - resulting in better performance
@@ -20,7 +20,7 @@ options:
                `place-switch-tables-in-ram`."
   default:
     - value: false
-  stability: !Stable '1.0.0-beta.0'
+  stability: !Stable '1.0.0'
 
 - name: place-rmt-driver-in-ram
   description: Places the RMT driver in RAM for better performance
@@ -70,12 +70,6 @@ options:
     - value: true
   active: 'chip == "esp32"'
 
-- name: flip-link
-  description: Move the stack to start of RAM to get zero-cost stack overflow protection.
-  default:
-    - value: false
-  active: 'chip == "esp32c6" || chip == "esp32h2"'
-
 - name: psram-mode
   description: SPIRAM chip mode
   default:
@@ -95,10 +89,11 @@ options:
   active: 'feature("psram")'
 
 - name: stack-guard-offset
-  description: The stack guard variable will be placed this many bytes from the stack's end.
+  description: The stack guard variable will be placed this many bytes from the stack's end. Needs to be a multiple of 4.
   default:
-    - value: 4096
+    - value: 60
   active: 'true'
+  stability: !Stable '1.0.0'
 
 - name: stack-guard-value
   description: The value to be written to the stack guard variable.
@@ -106,9 +101,102 @@ options:
     - value: 3740121773
   display_hint: Hex
 
+- name: stack-guard-monitoring
+  description: Use a data watchpoint to check if the stack guard was overwritten.
+  default:
+    - value: true
+
+- name: write-vec-table-monitoring
+  description: Use a data watchpoint to check that the vector table was not unintentionally overwritten.
+  default:
+    - value: false
+  active: 'chip == "esp32c2" || chip == "esp32c3" || chip == "esp32c6" || chip == "esp32h2"'
+
+- name: stack-guard-monitoring-with-debugger-connected
+  description: Enable the stack guard also with a debugger connected. Also applies to `write-vec-table-monitoring`.
+  default:
+    - value: true
+
 - name: impl-critical-section
   description: "Provide a `critical-section` implementation. Note that if disabled,
                you will need to provide a `critical-section` implementation which is
                using `restore-state-u32`."
   default:
     - value: true
+
+- name: instruction-cache-size
+  description: Instruction cache size to be set on application startup.
+  default:
+    - value: '"32KB"'
+  constraints:
+    - type:
+        validator: enumeration
+        value:
+          - '16KB'
+          - '32KB'
+  active: 'chip == "esp32s3"'
+
+- name: instruction-cache-line-size
+  description: Instruction cache line size to be set on application startup.
+  default:
+    - value: '"32B"'
+  constraints:
+    - type:
+        validator: enumeration
+        value:
+          - '16B'
+          - '32B'
+  active: 'chip == "esp32s3"'
+
+- name: icache-associated-ways
+  description: Instruction cache associated ways to be set on application startup.
+  default:
+    - value: '"8"'
+  constraints:
+    - type:
+        validator: enumeration
+        value:
+          - '4'
+          - '8'
+  active: 'chip == "esp32s3"'
+
+- name: data-cache-size
+  description: Data cache size to be set on application startup.
+  default:
+    - value: '"32KB"'
+  constraints:
+    - type:
+        validator: enumeration
+        value:
+          - '16KB'
+          - '32KB'
+          - '64KB'
+  active: 'chip == "esp32s3"'
+
+- name: data-cache-line-size
+  description: Data cache line size to be set on application startup.
+  default:
+    - value: '"32B"'
+  constraints:
+    - type:
+        validator: enumeration
+        value:
+          - '16B'
+          - '32B'
+          - '64B'
+  active: 'chip == "esp32s3"'
+
+- name: dcache-associated-ways
+  description: Data cache associated ways to be set on application startup.
+  default:
+    - value: '"8"'
+  constraints:
+    - type:
+        validator: enumeration
+        value:
+          - '4'
+          - '8'
+  active: 'chip == "esp32s3"'
+
+checks:
+  - "ESP_HAL_CONFIG_STACK_GUARD_OFFSET % 4 == 0"

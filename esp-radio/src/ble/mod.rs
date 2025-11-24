@@ -2,43 +2,66 @@
 //!
 //! The usage of BLE is currently incompatible with the usage of IEEE 802.15.4.
 
-#[cfg(any(esp32, esp32c3, esp32s3))]
+#[cfg(bt_controller = "btdm")]
 pub(crate) mod btdm;
 
-#[cfg(any(esp32c2, esp32c6, esp32h2))]
+#[cfg(bt_controller = "npl")]
 pub(crate) mod npl;
 
 use alloc::{boxed::Box, collections::vec_deque::VecDeque, vec::Vec};
-use core::{cell::RefCell, mem::MaybeUninit};
+use core::mem::MaybeUninit;
 
+pub use ble::ble_os_adapter_chip_specific::Config;
 pub(crate) use ble::{ble_deinit, ble_init, send_hci};
-use critical_section::Mutex;
+use esp_sync::NonReentrantMutex;
 
-#[cfg(btdm)]
+/// An error that is returned when the configuration is invalid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct InvalidConfigError;
+
+#[cfg(bt_controller = "btdm")]
 use self::btdm as ble;
-#[cfg(npl)]
+#[cfg(bt_controller = "npl")]
 use self::npl as ble;
 
 unstable_module! {
     pub mod controller;
 }
 
-pub(crate) unsafe extern "C" fn malloc(size: u32) -> *mut crate::binary::c_types::c_void {
+pub(crate) unsafe extern "C" fn malloc(size: u32) -> *mut crate::sys::c_types::c_void {
     unsafe { crate::compat::malloc::malloc(size as usize).cast() }
 }
 
 #[cfg(any(esp32, esp32c3, esp32s3))]
-pub(crate) unsafe extern "C" fn malloc_internal(size: u32) -> *mut crate::binary::c_types::c_void {
+pub(crate) unsafe extern "C" fn malloc_internal(size: u32) -> *mut crate::sys::c_types::c_void {
     unsafe { crate::compat::malloc::malloc_internal(size as usize).cast() }
 }
 
-pub(crate) unsafe extern "C" fn free(ptr: *mut crate::binary::c_types::c_void) {
+pub(crate) unsafe extern "C" fn free(ptr: *mut crate::sys::c_types::c_void) {
     unsafe { crate::compat::malloc::free(ptr.cast()) }
 }
 
-// Stores received packets until the the BLE stack dequeues them
-static BT_RECEIVE_QUEUE: Mutex<RefCell<VecDeque<ReceivedPacket>>> =
-    Mutex::new(RefCell::new(VecDeque::new()));
+/// Gets the MAC address of the device.
+#[instability::unstable]
+pub fn mac() -> [u8; 6] {
+    let mut mac = [0u8; 6];
+    unsafe {
+        crate::common_adapter::read_mac(mac.as_mut_ptr(), 2);
+    }
+    mac
+}
+
+struct BleState {
+    pub rx_queue: VecDeque<ReceivedPacket>,
+    pub hci_read_data: Vec<u8>,
+}
+
+static BT_STATE: NonReentrantMutex<BleState> = NonReentrantMutex::new(BleState {
+    rx_queue: VecDeque::new(),
+    hci_read_data: Vec::new(),
+});
 
 static mut HCI_OUT_COLLECTOR: MaybeUninit<HciOutCollector> = MaybeUninit::uninit();
 
@@ -107,8 +130,6 @@ impl HciOutCollector {
     }
 }
 
-static BLE_HCI_READ_DATA: Mutex<RefCell<Vec<u8>>> = Mutex::new(RefCell::new(Vec::new()));
-
 #[derive(Debug, Clone)]
 /// Represents a received BLE packet.
 #[instability::unstable]
@@ -127,51 +148,52 @@ impl defmt::Format for ReceivedPacket {
 /// Checks if there is any HCI data available to read.
 #[instability::unstable]
 pub fn have_hci_read_data() -> bool {
-    critical_section::with(|cs| {
-        let queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-        let hci_read_data = BLE_HCI_READ_DATA.borrow_ref(cs);
-        !queue.is_empty() || !hci_read_data.is_empty()
-    })
+    BT_STATE.with(|state| !state.rx_queue.is_empty() || !state.hci_read_data.is_empty())
 }
 
 pub(crate) fn read_next(data: &mut [u8]) -> usize {
-    critical_section::with(|cs| {
-        let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-
-        match queue.pop_front() {
-            Some(packet) => {
-                data[..packet.data.len()].copy_from_slice(&packet.data[..packet.data.len()]);
-                packet.data.len()
-            }
-            None => 0,
-        }
-    })
+    if let Some(packet) = BT_STATE.with(|state| state.rx_queue.pop_front()) {
+        data[..packet.data.len()].copy_from_slice(&packet.data[..packet.data.len()]);
+        packet.data.len()
+    } else {
+        0
+    }
 }
 
 /// Reads the next HCI packet from the BLE controller.
 #[instability::unstable]
 pub fn read_hci(data: &mut [u8]) -> usize {
-    critical_section::with(|cs| {
-        let mut hci_read_data = BLE_HCI_READ_DATA.borrow_ref_mut(cs);
-
-        if hci_read_data.is_empty() {
-            let mut queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-
-            if let Some(packet) = queue.pop_front() {
-                hci_read_data.extend_from_slice(&packet.data);
-            }
+    BT_STATE.with(|state| {
+        if state.hci_read_data.is_empty()
+            && let Some(packet) = state.rx_queue.pop_front()
+        {
+            state.hci_read_data.extend_from_slice(&packet.data);
         }
 
-        let l = usize::min(hci_read_data.len(), data.len());
-        data[..l].copy_from_slice(&hci_read_data[..l]);
-        hci_read_data.drain(..l);
+        let l = usize::min(state.hci_read_data.len(), data.len());
+        data[..l].copy_from_slice(&state.hci_read_data[..l]);
+        state.hci_read_data.drain(..l);
         l
     })
 }
 
 fn dump_packet_info(_buffer: &[u8]) {
     #[cfg(dump_packets)]
-    critical_section::with(|_cs| {
-        info!("@HCIFRAME {:?}", _buffer);
-    });
+    info!("@HCIFRAME {:?}", _buffer);
 }
+
+macro_rules! validate_range {
+    ($this:ident, $field:ident, $min:literal, $max:literal) => {
+        if !($min..=$max).contains(&$this.$field) {
+            error!(
+                "{} must be between {} and {}, current value is {}",
+                stringify!($field),
+                $min,
+                $max,
+                $this.$field
+            );
+            return Err(InvalidConfigError);
+        }
+    };
+}
+pub(crate) use validate_range;

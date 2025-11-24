@@ -1,6 +1,8 @@
+//! Wi-Fi event handlers.
+
 use alloc::boxed::Box;
 
-use esp_hal::sync::Locked;
+use esp_sync::NonReentrantMutex;
 
 use super::WifiEvent;
 use crate::wifi::include::{
@@ -13,12 +15,13 @@ pub(crate) mod sealed {
 
     pub trait Event {
         /// Get the static reference to the handler for this event.
-        fn handler() -> &'static Locked<Option<Box<Handler<Self>>>>;
+        fn handler() -> &'static NonReentrantMutex<Option<Box<Handler<Self>>>>;
         /// # Safety
         /// `ptr` must be a valid for casting to this event's inner event data.
-        unsafe fn from_raw_event_data(ptr: *mut crate::binary::c_types::c_void) -> Self;
+        unsafe fn from_raw_event_data(ptr: *mut crate::sys::c_types::c_void) -> Self;
     }
 }
+
 /// The type of handlers of events.
 #[instability::unstable]
 pub type Handler<T> = dyn FnMut(&T) + Sync + Send;
@@ -30,20 +33,22 @@ fn default_handler<Event: 'static>() -> Box<Handler<Event>> {
     Box::new(drop_ref)
 }
 
+#[procmacros::doc_replace]
 /// Extension trait for setting handlers for an event.
 ///
 /// Register a new event handler like:
 ///
 /// ```rust, no_run
-/// # use esp_radio::wifi::event::{self, *};
-/// # fn new_handler(_: &ApStaconnected) {}
-/// event::ApStaconnected::update_handler(|_cs, event| {
-///     new_handler(event);
-/// })
+/// # {before_snippet}
+/// use esp_radio::wifi::event::{self, EventExt};
+/// event::ApStaConnected::update_handler(|event| {
+///     // ... handle ApStaConnected event here
+/// });
+/// # {after_snippet}
 /// ```
 // Implemented like this instead of free functions because the syntax would be
 // ```
-// event::update_handler::<event::ApStaconnected, _>(...)
+// event::update_handler::<event::ApStaConnected, _>(...)
 // ```
 #[instability::unstable]
 pub trait EventExt: sealed::Event + Sized + 'static {
@@ -51,6 +56,7 @@ pub trait EventExt: sealed::Event + Sized + 'static {
     fn take_handler() -> Box<Handler<Self>> {
         Self::handler().with(|handler| handler.take().unwrap_or_else(default_handler::<Self>))
     }
+
     /// Set the handler for this event, returning the old handler.
     fn replace_handler<F: FnMut(&Self) + Sync + Send + 'static>(f: F) -> Box<Handler<Self>> {
         Self::handler().with(|handler| {
@@ -59,6 +65,7 @@ pub trait EventExt: sealed::Event + Sized + 'static {
                 .unwrap_or_else(default_handler::<Self>)
         })
     }
+
     /// Atomic combination of [`Self::take_handler`] and
     /// [`Self::replace_handler`]. Use this to add a new handler which runs
     /// after the previously registered handlers.
@@ -73,6 +80,7 @@ pub trait EventExt: sealed::Event + Sized + 'static {
         })
     }
 }
+
 impl<T: sealed::Event + 'static> EventExt for T {}
 
 macro_rules! impl_wifi_event {
@@ -81,28 +89,33 @@ macro_rules! impl_wifi_event {
         /// See [`WifiEvent`].
         #[derive(Copy, Clone)]
         pub struct $newtype;
+
         impl sealed::Event for $newtype {
-            unsafe fn from_raw_event_data(_: *mut crate::binary::c_types::c_void) -> Self {
+            unsafe fn from_raw_event_data(_: *mut crate::sys::c_types::c_void) -> Self {
                 Self
             }
-            fn handler() -> &'static Locked<Option<Box<Handler<Self>>>> {
-                static HANDLE: Locked<Option<Box<Handler<$newtype>>>> = Locked::new(None);
+            fn handler() -> &'static NonReentrantMutex<Option<Box<Handler<Self>>>> {
+                static HANDLE: NonReentrantMutex<Option<Box<Handler<$newtype>>>> =
+                    NonReentrantMutex::new(None);
                 &HANDLE
             }
         }
     };
-    // data
+
     ($newtype:ident, $data:ident) => {
-        use esp_wifi_sys::include::$data;
+        use crate::sys::include::$data;
         /// See [`WifiEvent`].
         #[derive(Copy, Clone)]
-        pub struct $newtype($data);
-        impl sealed::Event for $newtype {
-            unsafe fn from_raw_event_data(ptr: *mut crate::binary::c_types::c_void) -> Self {
-                Self(unsafe { *ptr.cast() })
+        pub struct $newtype<'a>(&'a $data);
+
+        impl sealed::Event for $newtype<'_> {
+            unsafe fn from_raw_event_data(ptr: *mut crate::sys::c_types::c_void) -> Self {
+                Self(unsafe { &*ptr.cast() })
             }
-            fn handler() -> &'static Locked<Option<Box<Handler<Self>>>> {
-                static HANDLE: Locked<Option<Box<Handler<$newtype>>>> = Locked::new(None);
+
+            fn handler() -> &'static NonReentrantMutex<Option<Box<Handler<Self>>>> {
+                static HANDLE: NonReentrantMutex<Option<Box<Handler<$newtype<'_>>>>> =
+                    NonReentrantMutex::new(None);
                 &HANDLE
             }
         }
@@ -123,9 +136,9 @@ impl_wifi_event!(StaWpsErPin, wifi_event_sta_wps_er_pin_t);
 impl_wifi_event!(StaWpsErPbcOverlap);
 impl_wifi_event!(ApStart);
 impl_wifi_event!(ApStop);
-impl_wifi_event!(ApStaconnected, wifi_event_ap_staconnected_t);
-impl_wifi_event!(ApStadisconnected, wifi_event_ap_stadisconnected_t);
-impl_wifi_event!(ApProbereqrecved, wifi_event_ap_probe_req_rx_t);
+impl_wifi_event!(ApStaConnected, wifi_event_ap_staconnected_t);
+impl_wifi_event!(ApStaDisconnected, wifi_event_ap_stadisconnected_t);
+impl_wifi_event!(ApProbeReqReceived, wifi_event_ap_probe_req_rx_t);
 impl_wifi_event!(FtmReport, wifi_event_ftm_report_t);
 impl_wifi_event!(StaBssRssiLow, wifi_event_bss_rssi_low_t);
 impl_wifi_event!(ActionTxStatus, wifi_event_action_tx_status_t);
@@ -137,25 +150,13 @@ impl_wifi_event!(ApWpsRgFailed, wifi_event_ap_wps_rg_fail_reason_t);
 impl_wifi_event!(ApWpsRgTimeout);
 impl_wifi_event!(ApWpsRgPin, wifi_event_ap_wps_rg_pin_t);
 impl_wifi_event!(ApWpsRgPbcOverlap);
-cfg_if::cfg_if! {
-    if #[cfg(wifi_has_wifi6)] {
-        impl_wifi_event!(ItwtSetup, wifi_event_sta_itwt_setup_t);
-        impl_wifi_event!(ItwtTeardown, wifi_event_sta_itwt_teardown_t);
-        impl_wifi_event!(ItwtProbe, wifi_event_sta_itwt_probe_t);
-        impl_wifi_event!(ItwtSuspend, wifi_event_sta_itwt_suspend_t);
-        impl_wifi_event!(TwtWakeup);
-        impl_wifi_event!(BtwtSetup, wifi_event_sta_btwt_setup_t);
-        impl_wifi_event!(BtwtTeardown, wifi_event_sta_btwt_teardown_t);
-    } else {
-        impl_wifi_event!(ItwtSetup);
-        impl_wifi_event!(ItwtTeardown);
-        impl_wifi_event!(ItwtProbe);
-        impl_wifi_event!(ItwtSuspend);
-        impl_wifi_event!(TwtWakeup);
-        impl_wifi_event!(BtwtSetup);
-        impl_wifi_event!(BtwtTeardown);
-    }
-}
+impl_wifi_event!(ItwtSetup);
+impl_wifi_event!(ItwtTeardown);
+impl_wifi_event!(ItwtProbe);
+impl_wifi_event!(ItwtSuspend);
+impl_wifi_event!(TwtWakeup);
+impl_wifi_event!(BtwtSetup);
+impl_wifi_event!(BtwtTeardown);
 impl_wifi_event!(NanStarted);
 impl_wifi_event!(NanStopped);
 impl_wifi_event!(NanSvcMatch, wifi_event_nan_svc_match_t);
@@ -167,7 +168,7 @@ impl_wifi_event!(NdpTerminated, wifi_event_ndp_terminated_t);
 impl_wifi_event!(HomeChannelChange, wifi_event_home_channel_change_t);
 impl_wifi_event!(StaNeighborRep, wifi_event_neighbor_report_t);
 
-impl ApStaconnected {
+impl ApStaConnected<'_> {
     /// Get the MAC address of the connected station.
     pub fn mac(&self) -> &[u8] {
         &self.0.mac
@@ -177,9 +178,14 @@ impl ApStaconnected {
     pub fn aid(&self) -> u8 {
         self.0.aid
     }
+
+    /// Flag indicating whether the connected station is a mesh child.
+    pub fn is_mesh_child(&self) -> bool {
+        self.0.is_mesh_child
+    }
 }
 
-impl ApStadisconnected {
+impl ApStaDisconnected<'_> {
     /// Get the MAC address of the disconnected station.
     pub fn mac(&self) -> &[u8] {
         &self.0.mac
@@ -189,9 +195,19 @@ impl ApStadisconnected {
     pub fn reason(&self) -> u16 {
         self.0.reason
     }
+
+    /// AID that the Soft-AP assigned to the disconnected station.
+    pub fn aid(&self) -> u8 {
+        self.0.aid
+    }
+
+    /// Flag indicating whether the connected station is a mesh child.
+    pub fn is_mesh_child(&self) -> bool {
+        self.0.is_mesh_child
+    }
 }
 
-impl ScanDone {
+impl ScanDone<'_> {
     /// Get the status of the scan operation.
     pub fn status(&self) -> u32 {
         self.0.status
@@ -208,7 +224,7 @@ impl ScanDone {
     }
 }
 
-impl StaConnected {
+impl StaConnected<'_> {
     /// Get the SSID of the connected station.
     pub fn ssid(&self) -> &[u8] {
         &self.0.ssid
@@ -240,7 +256,7 @@ impl StaConnected {
     }
 }
 
-impl StaDisconnected {
+impl StaDisconnected<'_> {
     /// Get the SSID of the disconnected station.
     pub fn ssid(&self) -> &[u8] {
         &self.0.ssid
@@ -267,7 +283,23 @@ impl StaDisconnected {
     }
 }
 
-impl StaAuthmodeChange {
+/// All AP credentials received from WPS handshake.
+#[repr(transparent)]
+pub struct ApCredential(wifi_event_sta_wps_er_success_t__bindgen_ty_1);
+
+impl ApCredential {
+    /// Get the SSID of an AP.
+    pub fn ssid(&self) -> &[u8] {
+        &self.0.ssid
+    }
+
+    /// Get passphrase for the AP.
+    pub fn passphrase(&self) -> &[u8] {
+        &self.0.passphrase
+    }
+}
+
+impl StaAuthmodeChange<'_> {
     /// Get the old authentication mode.
     pub fn old_mode(&self) -> u32 {
         self.0.old_mode
@@ -279,26 +311,71 @@ impl StaAuthmodeChange {
     }
 }
 
-impl StaWpsErSuccess {
+impl StaWpsErSuccess<'_> {
     /// Get number of AP credentials received.
     pub fn ap_cred_cnt(&self) -> u8 {
         self.0.ap_cred_cnt
     }
 
     /// Get all AP credentials received.
-    pub fn ap_cred(&self) -> &[wifi_event_sta_wps_er_success_t__bindgen_ty_1] {
-        &self.0.ap_cred
+    pub fn ap_cred(&self) -> &[ApCredential] {
+        let array_ref: &[ApCredential; 3] =
+            // cast reference of fixed-size array to wrapper type
+            unsafe { &*(&self.0.ap_cred as *const _ as *const [ApCredential; 3]) };
+
+        &array_ref[..]
     }
 }
 
-impl StaWpsErPin {
+impl StaWpsErPin<'_> {
     /// Get the PIN code received from the WPS.
     pub fn pin(&self) -> &[u8] {
         &self.0.pin_code
     }
 }
 
-impl FtmReport {
+/// A safe, read-only wrapper for a single FTM report entry.
+#[repr(transparent)]
+pub struct FtmReportEntry<'a>(&'a wifi_ftm_report_entry_t);
+
+impl FtmReportEntry<'_> {
+    /// Gets the Dialog Token of the FTM frame.
+    pub fn dialog_token(&self) -> u8 {
+        self.0.dlog_token
+    }
+
+    /// Gets the Received Signal Strength Indicator (RSSI) of the FTM frame.
+    pub fn rssi(&self) -> i8 {
+        self.0.rssi
+    }
+
+    /// Gets the Round Trip Time (RTT) in picoseconds.
+    pub fn rtt(&self) -> u32 {
+        self.0.rtt
+    }
+
+    /// Gets T1: Time of departure of the FTM frame from the Responder (in picoseconds).
+    pub fn t1(&self) -> u64 {
+        self.0.t1
+    }
+
+    /// Gets T2: Time of arrival of the FTM frame at the Initiator (in picoseconds).
+    pub fn t2(&self) -> u64 {
+        self.0.t2
+    }
+
+    /// Gets T3: Time of departure of the ACK from the Initiator (in picoseconds).
+    pub fn t3(&self) -> u64 {
+        self.0.t3
+    }
+
+    /// Gets T4: Time of arrival of the ACK at the Responder (in picoseconds).
+    pub fn t4(&self) -> u64 {
+        self.0.t4
+    }
+}
+
+impl FtmReport<'_> {
     /// Get the MAC address of the FTM peer.
     pub fn peer_mac(&self) -> &[u8] {
         &self.0.peer_mac
@@ -324,18 +401,30 @@ impl FtmReport {
         self.0.dist_est
     }
 
-    /// Get Pointer to FTM Report, should be freed after use.
-    pub fn report_data(&self) -> *mut wifi_ftm_report_entry_t {
-        self.0.ftm_report_data
-    }
-
     /// Get the number of entries in the FTM report data.
     pub fn report_num_entries(&self) -> u8 {
         self.0.ftm_report_num_entries
     }
+
+    /// Returns an iterator over the detailed FTM report entries.
+    pub fn entries(&self) -> impl Iterator<Item = FtmReportEntry<'_>> + '_ {
+        let ptr = self.0.ftm_report_data;
+        let len = self.0.ftm_report_num_entries as usize;
+
+        // Return an empty slice when there are no entries.
+        let entries_slice = if ptr.is_null() || len == 0 {
+            &[]
+        } else {
+            // Otherwise, it's the slice from the data.
+            // Can we trust the C API to provide a valid pointer and length?
+            unsafe { core::slice::from_raw_parts(ptr, len) }
+        };
+
+        entries_slice.iter().map(FtmReportEntry)
+    }
 }
 
-impl ApProbereqrecved {
+impl ApProbeReqReceived<'_> {
     /// Get received probe request SSID.
     pub fn rssi(&self) -> i32 {
         self.0.rssi
@@ -347,15 +436,15 @@ impl ApProbereqrecved {
     }
 }
 
-impl StaBssRssiLow {
+impl StaBssRssiLow<'_> {
     /// Get received probe request SSID of bss.
     pub fn rssi(&self) -> i32 {
         self.0.rssi
     }
 }
 
-impl ActionTxStatus {
-    /// Get WiFi interface to send request to.
+impl ActionTxStatus<'_> {
+    /// Get Wi-Fi interface to send request to.
     pub fn ifx(&self) -> u32 {
         self.0.ifx
     }
@@ -365,191 +454,62 @@ impl ActionTxStatus {
         self.0.context
     }
 
-    /// Get destination MAC address.
-    pub fn da(&self) -> &[u8] {
-        &self.0.da
+    /// ID of the corresponding operation that was provided during action tx request.
+    pub fn op_id(&self) -> u8 {
+        self.0.op_id
+    }
+
+    /// Channel provided in tx request.
+    pub fn channel(&self) -> u8 {
+        self.0.channel
     }
 
     /// Get the status of the operation.
-    pub fn status(&self) -> u8 {
+    pub fn status(&self) -> u32 {
         self.0.status
     }
 }
 
-impl RocDone {
+impl RocDone<'_> {
     /// Get context to identify the request.
     pub fn context(&self) -> u32 {
         self.0.context
     }
 }
 
-impl ApWpsRgSuccess {
-    /// Gegt enrollee mac address.
+impl ApWpsRgSuccess<'_> {
+    /// Get enrollee mac address.
     pub fn peer_mac(&self) -> &[u8] {
         &self.0.peer_macaddr
     }
 }
 
-impl ApWpsRgFailed {
+impl ApWpsRgFailed<'_> {
     /// Get WPS failure reason.
     pub fn reason(&self) -> u32 {
         self.0.reason
     }
 
-    /// Gegt enrollee mac address.
+    /// Get enrollee mac address.
     pub fn peer_macaddr(&self) -> &[u8; 6] {
         &self.0.peer_macaddr
     }
 }
 
-impl ApWpsRgPin {
-    /// Get the  PIN code of station in enrollee mode.
+impl ApWpsRgPin<'_> {
+    /// Get the PIN code of station in enrollee mode.
     pub fn pin_code(&self) -> &[u8] {
         &self.0.pin_code
     }
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(wifi_has_wifi6)] {
-        use crate::wifi::include::wifi_twt_setup_config_t;
-
-        impl ItwtSetup {
-            /// Get the itwt setup config, this value is determined by the AP.
-            pub fn config(&self) -> &wifi_twt_setup_config_t {
-                &self.0.config
-            }
-
-            /// Get the itwt setup status, 1 indicates success, others indicate setup failure.
-            pub fn status(&self) -> i32 {
-                self.0.status
-            }
-
-            /// Get the itwt setup frame tx fail reason.
-            pub fn reason(&self) -> u8 {
-                self.0.reason
-            }
-
-            /// Get TWT SP start time.
-            pub fn target_wake_time(&self) -> u64 {
-                self.0.target_wake_time
-            }
-        }
-
-        impl ItwtTeardown {
-            /// Get flow id.
-            pub fn flow_id(&self) -> u8 {
-                self.0.flow_id
-            }
-
-            /// Get itwt teardown status.
-            pub fn status(&self) -> u32 {
-                self.0.status
-            }
-        }
-
-        impl ItwtProbe {
-            /// Get probe status.
-            pub fn status(&self) -> u32 {
-                self.0.status
-            }
-
-            /// Get failure reason.
-            pub fn reason(&self) -> u8 {
-                self.0.reason
-            }
-        }
-
-        impl ItwtSuspend {
-            /// Get suspend status.
-            pub fn status(&self) -> i32 {
-                self.0.status
-            }
-
-            /// Get bitmap of the suspended flow id.
-            pub fn flow_id_bitmap(&self) -> u8 {
-                self.0.flow_id_bitmap
-            }
-
-            /// Get the actual suspend time for each flow id in milliseconds.
-            pub fn actual_suspend_time_ms(&self) -> &[u32] {
-                &self.0.actual_suspend_time_ms
-            }
-        }
-
-        impl BtwtSetup {
-            /// Get the btwt setup status.
-            pub fn status(&self) -> u32 {
-                self.0.status
-            }
-
-            /// Get the type of TWT command.
-            pub fn cmd(&self) -> u32 {
-                self.0.setup_cmd
-            }
-
-            /// Get the TWT id.
-            pub fn btwt_id(&self) -> u8 {
-                self.0.btwt_id
-            }
-
-            /// Get the Nominal Minimum Wake Duration, indicates the minimum amount of time,
-            /// in units of 256 µs, that the TWT requesting STA expects that it needs to be awake.
-            pub fn min_wake_dura(&self) -> u8 {
-                self.0.min_wake_dura
-            }
-
-            /// Get the TWT Wake Interval Exponent.
-            pub fn wake_invl_expn(&self) -> u8 {
-                self.0.wake_invl_expn
-            }
-
-            /// Get the TWT Wake Interval Mantissa.
-            pub fn wake_invl_mant(&self) -> u16 {
-                self.0.wake_invl_mant
-            }
-
-            /// Get whether this is a trigger-enabled TWT (true) or a non-trigger-enabled TWT (false).
-            pub fn trigger(&self) -> bool {
-                self.0.trigger
-            }
-
-            /// Get the TWT flow type, an announced TWT (true) or an unannounced TWT (false).
-            pub fn flow_type(&self) -> u8 {
-                self.0.flow_type
-            }
-
-            /// Get the btwt setup frame tx fail reason.
-            pub fn reason(&self) -> u8 {
-                self.0.reason
-            }
-
-            /// Get the TWT SP start time.
-            pub fn target_wake_time(&self) -> u64 {
-                self.0.target_wake_time
-            }
-        }
-
-        impl BtwtTeardown {
-            /// Get the TWT id.
-            pub fn id(&self) -> u8 {
-                self.0.btwt_id
-            }
-
-            /// Get the btwt teardown status.
-            pub fn status(&self) -> u32 {
-                self.0.status
-            }
-        }
-    }
-}
-
-impl NanSvcMatch {
-    /// Get the Subscribe Service id.
+impl NanSvcMatch<'_> {
+    /// Get the Subscribe Service ID.
     pub fn subscribe_id(&self) -> u8 {
         self.0.subscribe_id
     }
 
-    /// Get the Publish Service id.
+    /// Get the Publish Service ID.
     pub fn publish_id(&self) -> u8 {
         self.0.publish_id
     }
@@ -565,13 +525,13 @@ impl NanSvcMatch {
     }
 }
 
-impl NanReplied {
-    /// Get the Subscribe Service id.
+impl NanReplied<'_> {
+    /// Get the Subscribe Service ID.
     pub fn subscribe_id(&self) -> u8 {
         self.0.subscribe_id
     }
 
-    /// Get the Publish Service id.
+    /// Get the Publish Service ID.
     pub fn publish_id(&self) -> u8 {
         self.0.publish_id
     }
@@ -582,7 +542,7 @@ impl NanReplied {
     }
 }
 
-impl NanReceive {
+impl NanReceive<'_> {
     /// Get Our Service Identifier.
     pub fn inst_id(&self) -> u8 {
         self.0.inst_id
@@ -604,13 +564,13 @@ impl NanReceive {
     }
 }
 
-impl NdpIndication {
-    /// Get Publish Id for NAN Service.
+impl NdpIndication<'_> {
+    /// Get Publish ID for NAN Service.
     pub fn publish_id(&self) -> u8 {
         self.0.publish_id
     }
 
-    /// Get NDF instance id.
+    /// Get NDF instance ID.
     pub fn ndp_id(&self) -> u8 {
         self.0.ndp_id
     }
@@ -631,13 +591,13 @@ impl NdpIndication {
     }
 }
 
-impl NdpConfirm {
+impl NdpConfirm<'_> {
     /// Get NDP status code.
     pub fn status(&self) -> u8 {
         self.0.status
     }
 
-    /// Get NDP instance id.
+    /// Get NDP instance ID.
     pub fn id(&self) -> u8 {
         self.0.ndp_id
     }
@@ -663,13 +623,13 @@ impl NdpConfirm {
     }
 }
 
-impl NdpTerminated {
+impl NdpTerminated<'_> {
     /// Get termination reason code.
     pub fn reason(&self) -> u8 {
         self.0.reason
     }
 
-    /// Get NDP instance id.
+    /// Get NDP instance ID.
     pub fn id(&self) -> u8 {
         self.0.ndp_id
     }
@@ -680,7 +640,7 @@ impl NdpTerminated {
     }
 }
 
-impl HomeChannelChange {
+impl HomeChannelChange<'_> {
     /// Get the old home channel of the device.
     pub fn old_chan(&self) -> u8 {
         self.0.old_chan
@@ -702,7 +662,7 @@ impl HomeChannelChange {
     }
 }
 
-impl StaNeighborRep {
+impl StaNeighborRep<'_> {
     /// Get the Neighbor Report received from the AP.
     pub fn report(&self) -> &[u8] {
         &self.0.report[..self.0.report_len as usize]
@@ -713,6 +673,7 @@ impl StaNeighborRep {
         self.0.report_len
     }
 }
+
 /// Handle the given event using the registered event handlers.
 #[instability::unstable]
 pub fn handle<Event: EventExt>(event_data: &Event) -> bool {
@@ -727,29 +688,25 @@ pub fn handle<Event: EventExt>(event_data: &Event) -> bool {
 }
 
 /// Handle an event given the raw pointers.
+///
 /// # Safety
 /// The pointer should be valid to cast to `Event`'s inner type (if it has one)
 pub(crate) unsafe fn handle_raw<Event: EventExt>(
-    event_data: *mut crate::binary::c_types::c_void,
-    event_data_size: usize,
+    event_data: *mut crate::sys::c_types::c_void,
+    _event_data_size: usize,
 ) -> bool {
-    debug_assert_eq!(
-        event_data_size,
-        core::mem::size_of::<Event>(),
-        "wrong size event data"
-    );
-
     let event = unsafe { Event::from_raw_event_data(event_data) };
     handle::<Event>(&event)
 }
 
 /// Handle event regardless of its type.
+///
 /// # Safety
 /// Arguments should be self-consistent.
 #[rustfmt::skip]
 pub(crate) unsafe fn dispatch_event_handler(
     event: WifiEvent,
-    event_data: *mut crate::binary::c_types::c_void,
+    event_data: *mut crate::sys::c_types::c_void,
     event_data_size: usize,
 ) -> bool { unsafe {
     match event {
@@ -757,7 +714,7 @@ pub(crate) unsafe fn dispatch_event_handler(
             handle_raw::<WifiReady>(event_data, event_data_size)
         }
         WifiEvent::ScanDone => {
-            handle_raw::<ScanDone>(event_data, event_data_size)
+            handle_raw::<ScanDone<'_>>(event_data, event_data_size)
         }
         WifiEvent::StaStart => {
             handle_raw::<StaStart>(event_data, event_data_size)
@@ -766,16 +723,16 @@ pub(crate) unsafe fn dispatch_event_handler(
             handle_raw::<StaStop>(event_data, event_data_size)
         }
         WifiEvent::StaConnected => {
-            handle_raw::<StaConnected>(event_data, event_data_size)
+            handle_raw::<StaConnected<'_>>(event_data, event_data_size)
         }
         WifiEvent::StaDisconnected => {
-            handle_raw::<StaDisconnected>(event_data, event_data_size)
+            handle_raw::<StaDisconnected<'_>>(event_data, event_data_size)
         }
         WifiEvent::StaAuthmodeChange => {
-            handle_raw::<StaAuthmodeChange>(event_data, event_data_size)
+            handle_raw::<StaAuthmodeChange<'_>>(event_data, event_data_size)
         }
         WifiEvent::StaWpsErSuccess => {
-            handle_raw::<StaWpsErSuccess>(event_data, event_data_size)
+            handle_raw::<StaWpsErSuccess<'_>>(event_data, event_data_size)
         }
         WifiEvent::StaWpsErFailed => {
             handle_raw::<StaWpsErFailed>(event_data, event_data_size)
@@ -784,7 +741,7 @@ pub(crate) unsafe fn dispatch_event_handler(
             handle_raw::<StaWpsErTimeout>(event_data, event_data_size)
         }
         WifiEvent::StaWpsErPin => {
-            handle_raw::<StaWpsErPin>(event_data, event_data_size)
+            handle_raw::<StaWpsErPin<'_>>(event_data, event_data_size)
         }
         WifiEvent::StaWpsErPbcOverlap => {
             handle_raw::<StaWpsErPbcOverlap>(event_data, event_data_size)
@@ -795,26 +752,26 @@ pub(crate) unsafe fn dispatch_event_handler(
         WifiEvent::ApStop => {
             handle_raw::<ApStop>(event_data, event_data_size)
         }
-        WifiEvent::ApStaconnected => {
-            handle_raw::<ApStaconnected>(event_data, event_data_size)
+        WifiEvent::ApStaConnected => {
+            handle_raw::<ApStaConnected<'_>>(event_data, event_data_size)
         }
-        WifiEvent::ApStadisconnected => {
-            handle_raw::<ApStadisconnected>(event_data, event_data_size)
+        WifiEvent::ApStaDisconnected => {
+            handle_raw::<ApStaDisconnected<'_>>(event_data, event_data_size)
         }
-        WifiEvent::ApProbereqrecved => {
-            handle_raw::<ApProbereqrecved>(event_data, event_data_size)
+        WifiEvent::ApProbeReqReceived => {
+            handle_raw::<ApProbeReqReceived<'_>>(event_data, event_data_size)
         }
         WifiEvent::FtmReport => {
-            handle_raw::<FtmReport>(event_data, event_data_size)
+            handle_raw::<FtmReport<'_>>(event_data, event_data_size)
         }
         WifiEvent::StaBssRssiLow => {
-            handle_raw::<StaBssRssiLow>(event_data, event_data_size)
+            handle_raw::<StaBssRssiLow<'_>>(event_data, event_data_size)
         }
         WifiEvent::ActionTxStatus => {
-            handle_raw::<ActionTxStatus>(event_data, event_data_size)
+            handle_raw::<ActionTxStatus<'_>>(event_data, event_data_size)
         }
         WifiEvent::RocDone => {
-            handle_raw::<RocDone>(event_data, event_data_size)
+            handle_raw::<RocDone<'_>>(event_data, event_data_size)
         }
         WifiEvent::StaBeaconTimeout => {
             handle_raw::<StaBeaconTimeout>(event_data, event_data_size)
@@ -823,16 +780,16 @@ pub(crate) unsafe fn dispatch_event_handler(
             handle_raw::<ConnectionlessModuleWakeIntervalStart>(event_data, event_data_size)
         }
         WifiEvent::ApWpsRgSuccess => {
-            handle_raw::<ApWpsRgSuccess>(event_data, event_data_size)
+            handle_raw::<ApWpsRgSuccess<'_>>(event_data, event_data_size)
         }
         WifiEvent::ApWpsRgFailed => {
-            handle_raw::<ApWpsRgFailed>(event_data, event_data_size)
+            handle_raw::<ApWpsRgFailed<'_>>(event_data, event_data_size)
         }
         WifiEvent::ApWpsRgTimeout => {
             handle_raw::<ApWpsRgTimeout>(event_data, event_data_size)
         }
         WifiEvent::ApWpsRgPin => {
-            handle_raw::<ApWpsRgPin>(event_data, event_data_size)
+            handle_raw::<ApWpsRgPin<'_>>(event_data, event_data_size)
         }
         WifiEvent::ApWpsRgPbcOverlap => {
             handle_raw::<ApWpsRgPbcOverlap>(event_data, event_data_size)
@@ -865,28 +822,28 @@ pub(crate) unsafe fn dispatch_event_handler(
             handle_raw::<NanStopped>(event_data, event_data_size)
         }
         WifiEvent::NanSvcMatch => {
-            handle_raw::<NanSvcMatch>(event_data, event_data_size)
+            handle_raw::<NanSvcMatch<'_>>(event_data, event_data_size)
         }
         WifiEvent::NanReplied => {
-            handle_raw::<NanReplied>(event_data, event_data_size)
+            handle_raw::<NanReplied<'_>>(event_data, event_data_size)
         }
         WifiEvent::NanReceive => {
-            handle_raw::<NanReceive>(event_data, event_data_size)
+            handle_raw::<NanReceive<'_>>(event_data, event_data_size)
         }
         WifiEvent::NdpIndication => {
-            handle_raw::<NdpIndication>(event_data, event_data_size)
+            handle_raw::<NdpIndication<'_>>(event_data, event_data_size)
         }
         WifiEvent::NdpConfirm => {
-            handle_raw::<NdpConfirm>(event_data, event_data_size)
+            handle_raw::<NdpConfirm<'_>>(event_data, event_data_size)
         }
         WifiEvent::NdpTerminated => {
-            handle_raw::<NdpTerminated>(event_data, event_data_size)
+            handle_raw::<NdpTerminated<'_>>(event_data, event_data_size)
         }
         WifiEvent::HomeChannelChange => {
-            handle_raw::<HomeChannelChange>(event_data, event_data_size)
+            handle_raw::<HomeChannelChange<'_>>(event_data, event_data_size)
         }
         WifiEvent::StaNeighborRep => {
-            handle_raw::<StaNeighborRep>(event_data, event_data_size)
+            handle_raw::<StaNeighborRep<'_>>(event_data, event_data_size)
         }
     }
 }}

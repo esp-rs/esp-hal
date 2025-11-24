@@ -6,6 +6,7 @@ use strum::IntoEnumIterator;
 
 use crate::{Package, package_version};
 
+/// Tag the releases for the specified packages.
 #[derive(Debug, Args)]
 pub struct TagReleasesArgs {
     /// Package(s) to tag.
@@ -17,6 +18,7 @@ pub struct TagReleasesArgs {
     no_dry_run: bool,
 }
 
+/// Tag the releases for the specified packages.
 pub fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
     args.packages.sort();
 
@@ -31,7 +33,7 @@ pub fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
         // If a package does not require documentation, this also means that it is not
         // published (maybe this function needs a better name), so we can skip tagging
         // it:
-        if !package.is_published(workspace) {
+        if !package.is_published() {
             continue;
         }
 

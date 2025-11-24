@@ -1,10 +1,11 @@
 use std::path::Path;
 
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, ensure};
 use clap::Args;
 
 use crate::{Package, cargo::CargoArgsBuilder, windows_safe_path};
 
+/// Arguments for publishing a package to crates.io.
 #[derive(Debug, Args)]
 pub struct PublishArgs {
     /// Package to publish (performs a dry-run by default).
@@ -16,12 +17,13 @@ pub struct PublishArgs {
     no_dry_run: bool,
 }
 
+/// Publish a package to crates.io.
 pub fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
     let package_name = args.package.to_string();
     let package_path = windows_safe_path(&workspace.join(&package_name));
 
     ensure!(
-        args.package.is_published(workspace),
+        args.package.is_published(),
         "Invalid package '{}' specified, this package should not be published!",
         args.package
     );
@@ -44,7 +46,8 @@ pub fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
     log::debug!("{args:#?}");
 
     // Execute `cargo publish` command from the package root:
-    crate::cargo::run(&args, &package_path)?;
+    crate::cargo::run(&args, &package_path)
+        .with_context(|| format!("Failed to run `cargo publish` with {args:?} args"))?;
 
     Ok(())
 }

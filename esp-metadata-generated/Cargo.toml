@@ -1,6 +1,6 @@
 [package]
 name          = "esp-metadata-generated"
-version       = "0.1.0"
+version       = "0.3.0"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "Generated metadata for Espressif devices"
@@ -8,10 +8,14 @@ documentation = "https://docs.espressif.com/projects/rust/esp-metadata-generated
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
-[dependencies]
+[package.metadata.espressif]
+check-configs = [
+    { features = [] },
+    { features = ["build-script"] },
+]
+clippy-configs = [] # don't waste time on this
 
-[build-dependencies]
-esp-metadata = { version = "0.8.0", path = "../esp-metadata" } # TODO: remove
+[dependencies]
 
 [features]
 build-script = []

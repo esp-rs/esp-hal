@@ -13,7 +13,8 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::Level,
-    rmt::{PulseCode, Rmt, TxChannelAsync, TxChannelConfig, TxChannelCreator},
+    interrupt::software::SoftwareInterruptControl,
+    rmt::{PulseCode, Rmt, TxChannelConfig, TxChannelCreator},
     time::Rate,
     timer::timg::TimerGroup,
 };
@@ -21,15 +22,16 @@ use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(_spawner: Spawner) {
     println!("Init!");
 
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_hal_embassy::init(timg0.timer0);
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {
@@ -43,11 +45,9 @@ async fn main(_spawner: Spawner) {
 
     let mut channel = rmt
         .channel0
-        .configure_tx(
-            peripherals.GPIO4,
-            TxChannelConfig::default().with_clk_divider(255),
-        )
-        .unwrap();
+        .configure_tx(&TxChannelConfig::default().with_clk_divider(255))
+        .unwrap()
+        .with_pin(peripherals.GPIO4);
 
     let mut data = [PulseCode::new(Level::High, 200, Level::Low, 50); 20];
 

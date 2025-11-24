@@ -121,17 +121,17 @@ macro_rules! create_peripheral {
 
 for_each_peripheral! {
     // Define stable peripheral singletons
-    ($name:ident <= $from_pac:tt $interrupts:tt) => {
+    (@peri_type $name:ident <= $from_pac:tt $interrupts:tt) => {
         create_peripheral!($name <= $from_pac $interrupts);
     };
 
     // Define unstable peripheral singletons
-    ($name:ident <= $from_pac:tt $interrupts:tt (unstable)) => {
+    (@peri_type $name:ident <= $from_pac:tt $interrupts:tt (unstable)) => {
         create_peripheral!(#[instability::unstable] $name <= $from_pac $interrupts);
     };
 
     // Define the Peripherals struct
-    (all $( ($name:ident <= $from_pac:tt $interrupts:tt $(($unstable:ident))?) ),*) => {
+    (singletons $( ($name:ident $(($unstable:ident))?) ),*) => {
         // We need a way to ignore the "unstable" marker, but macros can't generate attributes or struct fields.
         // The solution is printing an empty doc comment.
         macro_rules! ignore { ($any:tt) => {""} }
@@ -188,14 +188,14 @@ for_each_peripheral! {
         }
 
         impl Peripherals {
-            /// Returns all the peripherals *once*
+            /// Returns all the peripherals *once*.
             #[inline]
-            #[cfg_attr(not(feature = "rt"), expect(dead_code))]
+            #[cfg(feature = "rt")]
             pub(crate) fn take() -> Self {
                 #[unsafe(no_mangle)]
                 static mut _ESP_HAL_DEVICE_PERIPHERALS: bool = false;
 
-                critical_section::with(|_| unsafe {
+                crate::ESP_HAL_LOCK.lock(|| unsafe {
                     if _ESP_HAL_DEVICE_PERIPHERALS {
                         panic!("init called more than once!")
                     }

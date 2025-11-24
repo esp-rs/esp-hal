@@ -39,6 +39,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
+    #[cfg(not(feature = "__docs_build"))]
+    if cfg!(feature = "ieee802154") && (cfg!(feature = "wifi") || cfg!(feature = "wifi-eap")) {
+        panic!("\n\n802.15.4 and Wi-Fi won't work together\n\n");
+    }
+
     if (cfg!(feature = "ble")
         || cfg!(feature = "coex")
         || cfg!(feature = "csi")
@@ -60,30 +65,35 @@ fn main() -> Result<(), Box<dyn Error>> {
     // implementation detail.
     assert_unique_features!("log-04", "defmt");
 
-    assert!(
-        !cfg!(feature = "ble") || chip.contains("bt"),
-        r#"
+    if cfg!(feature = "ble") && !chip.contains("bt") {
+        panic!(
+            r#"
 
-        BLE is not supported on this target.
+            BLE is not supported on this target.
 
-        "#
-    );
-    assert!(
-        !cfg!(feature = "wifi") || chip.contains("wifi"),
-        r#"
+            "#
+        );
+    }
 
-        WiFi is not supported on this target.
+    if cfg!(feature = "wifi") && !chip.contains("wifi") {
+        panic!(
+            r#"
 
-        "#
-    );
-    assert!(
-        !cfg!(feature = "ieee802154") || chip.contains("ieee802154"),
-        r#"
+            Wi-Fi is not supported on this target.
 
-        IEEE 802.15.4 is not supported on this target.
+            "#
+        );
+    }
 
-        "#
-    );
+    if cfg!(feature = "ieee802154") && !chip.contains("ieee802154") {
+        panic!(
+            r#"
+
+            IEEE 802.15.4 is not supported on this target.
+
+            "#
+        );
+    }
 
     if let Ok(level) = std::env::var("OPT_LEVEL")
         && level != "2"
@@ -92,7 +102,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     {
         let message = format!(
             "esp-radio should be built with optimization level 2, 3 or s - yours is {level}.
-                See https://github.com/esp-rs/esp-radio",
+                See https://github.com/esp-rs/esp-hal/tree/main/esp-radio",
         );
         print_warning(message);
     }
@@ -104,7 +114,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             chip.contains("wifi") && chip.contains("bt"),
             r#"
 
-            WiFi/Bluetooth coexistence is not supported on this target.
+            Wi-Fi/Bluetooth coexistence is not supported on this target.
 
             "#
         );
@@ -121,8 +131,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // emit config
     //
-    // keep the defaults aligned with `esp_wifi_sys::include::*` e.g.
-    // `esp_wifi_sys::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM`
+    // keep the defaults aligned with `esp_wifi_sys_xy::include::*` e.g.
+    // `esp_wifi_sys_xy::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM`
     println!("cargo:rerun-if-changed=./esp_config.yml");
     let cfg_yaml = std::fs::read_to_string("./esp_config.yml")
         .expect("Failed to read esp_config.yml for esp-radio");

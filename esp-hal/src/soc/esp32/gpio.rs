@@ -76,6 +76,7 @@ macro_rules! rtcio_analog {
 
             impl $crate::peripherals::$pin_peri<'_> {
                 /// Configures the pin for analog mode.
+                #[cfg(feature = "unstable")]
                 pub(crate) fn set_analog_impl(&self) {
                     use $crate::gpio::RtcPin;
                     let rtcio = $crate::peripherals::RTC_IO::regs();

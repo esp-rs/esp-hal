@@ -21,13 +21,15 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
+    interrupt::software::SoftwareInterruptControl,
     main,
+    ram,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_radio::wifi::{AccessPointConfiguration, ClientConfiguration, Configuration};
+use esp_radio::wifi::{ModeConfig, ap::AccessPointConfig, sta::ClientConfig};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::IpAddress,
@@ -44,15 +46,15 @@ fn main() -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(size: 72 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_preempt::init(timg0.timer0);
-
-    let esp_radio_ctrl = esp_radio::init().unwrap();
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let (mut controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI).unwrap();
+        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
     let mut ap_device = interfaces.ap;
     let ap_interface = create_interface(&mut ap_device);
@@ -71,18 +73,13 @@ fn main() -> ! {
     sta_socket_set.add(smoltcp::socket::dhcpv4::Socket::new());
     let sta_stack = Stack::new(sta_interface, sta_device, sta_socket_set, now, rng.random());
 
-    let client_config = Configuration::Mixed(
-        ClientConfiguration {
-            ssid: SSID.into(),
-            password: PASSWORD.into(),
-            ..Default::default()
-        },
-        AccessPointConfiguration {
-            ssid: "esp-radio".into(),
-            ..Default::default()
-        },
+    let client_config = ModeConfig::ApSta(
+        ClientConfig::default()
+            .with_ssid(SSID.into())
+            .with_password(PASSWORD.into()),
+        AccessPointConfig::default().with_ssid("esp-radio".into()),
     );
-    let res = controller.set_configuration(&client_config);
+    let res = controller.set_config(&client_config);
     println!("wifi_set_configuration returned {:?}", res);
 
     controller.start().unwrap();

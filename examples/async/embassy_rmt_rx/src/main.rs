@@ -11,7 +11,8 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Level, Output, OutputConfig},
-    rmt::{PulseCode, Rmt, RxChannelAsync, RxChannelConfig, RxChannelCreator},
+    interrupt::software::SoftwareInterruptControl,
+    rmt::{PulseCode, Rmt, RxChannelConfig, RxChannelCreator},
     time::Rate,
     timer::timg::TimerGroup,
 };
@@ -35,15 +36,16 @@ async fn signal_task(mut pin: Output<'static>) {
     }
 }
 
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(spawner: Spawner) {
     println!("Init!");
 
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_hal_embassy::init(timg0.timer0);
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {
@@ -60,13 +62,15 @@ async fn main(spawner: Spawner) {
 
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
-            let mut channel = rmt.channel0.configure_rx(peripherals.GPIO4, rx_config).unwrap();
+            let channel = rmt.channel0.configure_rx(&rx_config).unwrap();
         } else if #[cfg(feature = "esp32s3")] {
-            let mut channel = rmt.channel7.configure_rx(peripherals.GPIO4, rx_config).unwrap();
+            let channel = rmt.channel7.configure_rx(&rx_config).unwrap();
         } else {
-            let mut channel = rmt.channel2.configure_rx(peripherals.GPIO4, rx_config).unwrap();
+            let channel = rmt.channel2.configure_rx(&rx_config).unwrap();
         }
     }
+
+    let mut channel = channel.with_pin(peripherals.GPIO4);
 
     spawner
         .spawn(signal_task(Output::new(

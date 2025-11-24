@@ -15,6 +15,17 @@ impl super::Efuse {
     pub fn rwdt_multiplier() -> u8 {
         Self::read_field_le::<u8>(WDT_DELAY_SEL)
     }
+
+    /// Returns the major hardware revision
+    pub fn major_chip_version() -> u8 {
+        Self::read_field_le(WAFER_VERSION_MAJOR)
+    }
+
+    /// Returns the minor hardware revision
+    pub fn minor_chip_version() -> u8 {
+        Self::read_field_le::<u8>(WAFER_VERSION_MINOR_HI) << 3
+            | Self::read_field_le::<u8>(WAFER_VERSION_MINOR_LO)
+    }
 }
 
 #[derive(Debug, Clone, Copy, strum::FromRepr)]

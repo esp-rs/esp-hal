@@ -7,8 +7,6 @@
 //!
 //! For more information see <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/partition-tables.html#built-in-partition-tables>
 
-use embedded_storage::Region;
-
 /// Maximum length of a partition table.
 pub const PARTITION_TABLE_MAX_LEN: usize = 0xC00;
 
@@ -19,7 +17,10 @@ const RAW_ENTRY_LEN: usize = 32;
 const ENTRY_MAGIC: u16 = 0x50aa;
 const MD5_MAGIC: u16 = 0xebeb;
 
+const OTA_SUBTYPE_OFFSET: u8 = 0x10;
+
 /// Represents a single partition entry.
+#[derive(Clone, Copy)]
 pub struct PartitionEntry<'a> {
     pub(crate) binary: &'a [u8; RAW_ENTRY_LEN],
 }
@@ -106,7 +107,7 @@ impl<'a> PartitionEntry<'a> {
     /// Provides a "view" into the partition allowing to read/write the
     /// partition contents by using the given [embedded_storage::Storage] and/or
     /// [embedded_storage::ReadStorage] implementation.
-    pub fn as_embedded_storage<F>(&'a self, flash: &'a mut F) -> FlashRegion<'a, F>
+    pub fn as_embedded_storage<F>(self, flash: &'a mut F) -> FlashRegion<'a, F>
     where
         F: embedded_storage::ReadStorage,
     {
@@ -162,8 +163,9 @@ impl defmt::Format for PartitionEntry<'_> {
 /// Errors which can be returned.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, strum::Display)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum Error {
-    /// The partition table is invalid.
+    /// The partition table is invalid or doesn't contain a needed partition.
     Invalid,
     /// An operation tries to access data that is out of bounds.
     OutOfBounds,
@@ -178,11 +180,15 @@ pub enum Error {
     },
     /// Invalid tate
     InvalidState,
+    /// The given argument is invalid.
+    InvalidArgument,
 }
 
 impl core::error::Error for Error {}
 
 /// A partition table.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PartitionTable<'a> {
     binary: &'a [[u8; RAW_ENTRY_LEN]],
     entries: usize,
@@ -194,7 +200,8 @@ impl<'a> PartitionTable<'a> {
             return Err(Error::Invalid);
         }
 
-        if binary.len() % RAW_ENTRY_LEN != 0 {
+        let (binary, rem) = binary.as_chunks::<RAW_ENTRY_LEN>();
+        if !rem.is_empty() {
             return Err(Error::Invalid);
         }
 
@@ -204,14 +211,6 @@ impl<'a> PartitionTable<'a> {
                 entries: 0,
             });
         }
-
-        // we checked binary before
-        let binary = unsafe {
-            core::slice::from_raw_parts(
-                binary.as_ptr() as *const [u8; RAW_ENTRY_LEN],
-                binary.len() / RAW_ENTRY_LEN,
-            )
-        };
 
         let mut raw_table = Self {
             binary,
@@ -301,6 +300,59 @@ impl<'a> PartitionTable<'a> {
         }
         Ok(None)
     }
+
+    /// Returns an iterator over the partitions.
+    pub fn iter(&self) -> impl Iterator<Item = PartitionEntry<'a>> {
+        (0..self.entries).filter_map(|i| self.get_partition(i).ok())
+    }
+
+    #[cfg(feature = "std")]
+    /// Get the currently booted partition.
+    pub fn booted_partition(&self) -> Result<Option<PartitionEntry<'a>>, Error> {
+        Err(Error::Invalid)
+    }
+
+    #[cfg(not(feature = "std"))]
+    /// Get the currently booted partition.
+    pub fn booted_partition(&self) -> Result<Option<PartitionEntry<'a>>, Error> {
+        // Read entry 0 from MMU to know which partition is mapped
+        //
+        // See <https://github.com/espressif/esp-idf/blob/758939caecb16e5542b3adfba0bc85025517db45/components/hal/mmu_hal.c#L124>
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "esp32")] {
+                let paddr = unsafe {
+                    ((0x3FF10000 as *const u32).read_volatile() & 0xff) << 16
+                };
+            } else if #[cfg(feature = "esp32s2")] {
+                let paddr = unsafe {
+                    (((0x61801000 + 128 * 4) as *const u32).read_volatile() & 0xff) << 16
+                };
+            } else if #[cfg(feature = "esp32s3")] {
+                // Revisit this once we support XiP from PSRAM for ESP32-S3
+                let paddr = unsafe {
+                    ((0x600C5000 as *const u32).read_volatile() & 0xff) << 16
+                };
+            } else if #[cfg(any(feature = "esp32c2", feature = "esp32c3"))] {
+                let paddr = unsafe {
+                    ((0x600c5000 as *const u32).read_volatile() & 0xff) << 16
+                };
+            } else if #[cfg(any(feature = "esp32c6", feature = "esp32h2"))] {
+                let paddr = unsafe {
+                    ((0x60002000 + 0x380) as *mut u32).write_volatile(0);
+                    (((0x60002000 + 0x37c) as *const u32).read_volatile() & 0xff) << 16
+                };
+            }
+        }
+
+        for id in 0..self.len() {
+            let entry = self.get_partition(id)?;
+            if entry.offset() == paddr {
+                return Ok(Some(entry));
+            }
+        }
+
+        Ok(None)
+    }
 }
 
 /// A partition type including the sub-type.
@@ -340,7 +392,7 @@ pub enum AppPartitionSubType {
     /// Factory image
     Factory = 0,
     /// OTA slot 0
-    Ota0    = 0x10,
+    Ota0    = OTA_SUBTYPE_OFFSET,
     /// OTA slot 1
     Ota1,
     /// OTA slot 2
@@ -373,6 +425,19 @@ pub enum AppPartitionSubType {
     Ota15,
     /// Test image
     Test,
+}
+
+impl AppPartitionSubType {
+    pub(crate) fn ota_app_number(&self) -> u8 {
+        *self as u8 - OTA_SUBTYPE_OFFSET
+    }
+
+    pub(crate) fn from_ota_app_number(number: u8) -> Result<Self, Error> {
+        if number > 16 {
+            return Err(Error::InvalidArgument);
+        }
+        Self::try_from(number + OTA_SUBTYPE_OFFSET)
+    }
 }
 
 impl TryFrom<u8> for AppPartitionSubType {
@@ -484,7 +549,7 @@ pub fn read_partition_table<'a>(
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FlashRegion<'a, F> {
-    pub(crate) raw: &'a PartitionEntry<'a>,
+    pub(crate) raw: PartitionEntry<'a>,
     pub(crate) flash: &'a mut F,
 }
 
@@ -493,11 +558,19 @@ impl<F> FlashRegion<'_, F> {
     pub fn partition_size(&self) -> usize {
         self.raw.len() as _
     }
+
+    fn range(&self) -> core::ops::Range<u32> {
+        self.raw.offset()..self.raw.offset() + self.raw.len()
+    }
+
+    fn in_range(&self, start: u32, len: usize) -> bool {
+        self.range().contains(&start) && (start + len as u32 <= self.range().end)
+    }
 }
 
 impl<F> embedded_storage::Region for FlashRegion<'_, F> {
     fn contains(&self, address: u32) -> bool {
-        address >= self.raw.offset() && address < self.raw.offset() + self.raw.len()
+        self.range().contains(&address)
     }
 }
 
@@ -510,11 +583,7 @@ where
     fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
         let address = offset + self.raw.offset();
 
-        if !self.contains(address) {
-            return Err(Error::OutOfBounds);
-        }
-
-        if !self.contains(address + bytes.len() as u32) {
+        if !self.in_range(address, bytes.len()) {
             return Err(Error::OutOfBounds);
         }
 
@@ -539,11 +608,7 @@ where
             return Err(Error::WriteProtected);
         }
 
-        if !self.contains(address) {
-            return Err(Error::OutOfBounds);
-        }
-
-        if !self.contains(address + bytes.len() as u32) {
+        if !self.in_range(address, bytes.len()) {
             return Err(Error::OutOfBounds);
         }
 
@@ -575,11 +640,7 @@ where
     fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
         let address = offset + self.raw.offset();
 
-        if !self.contains(address) {
-            return Err(Error::OutOfBounds);
-        }
-
-        if !self.contains(address + bytes.len() as u32) {
+        if !self.in_range(address, bytes.len()) {
             return Err(Error::OutOfBounds);
         }
 
@@ -609,11 +670,11 @@ where
             return Err(Error::WriteProtected);
         }
 
-        if !self.contains(address_from) {
+        if !self.range().contains(&address_from) {
             return Err(Error::OutOfBounds);
         }
 
-        if !self.contains(address_to) {
+        if !self.range().contains(&address_to) {
             return Err(Error::OutOfBounds);
         }
 
@@ -629,11 +690,7 @@ where
             return Err(Error::WriteProtected);
         }
 
-        if !self.contains(address) {
-            return Err(Error::OutOfBounds);
-        }
-
-        if !self.contains(address + bytes.len() as u32) {
+        if !self.in_range(address, bytes.len()) {
             return Err(Error::OutOfBounds);
         }
 
@@ -818,5 +875,91 @@ mod tests {
                 .unwrap()
                 .len()
         );
+    }
+}
+
+#[cfg(test)]
+mod storage_tests {
+    use embedded_storage::{ReadStorage, Storage};
+
+    use super::*;
+
+    struct MockFlash {
+        data: [u8; 0x10000],
+    }
+
+    impl MockFlash {
+        fn new() -> Self {
+            let mut data = [23u8; 0x10000];
+            data[PARTITION_TABLE_OFFSET as usize..][..PARTITION_TABLE_MAX_LEN as usize]
+                .copy_from_slice(include_bytes!("../testdata/single_factory_no_ota.bin"));
+            Self { data }
+        }
+    }
+
+    impl embedded_storage::Storage for MockFlash {
+        fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
+            self.data[offset as usize..][..bytes.len()].copy_from_slice(bytes);
+            Ok(())
+        }
+    }
+
+    impl embedded_storage::ReadStorage for MockFlash {
+        type Error = crate::partitions::Error;
+        fn read(&mut self, offset: u32, buffer: &mut [u8]) -> Result<(), Self::Error> {
+            let l = buffer.len();
+            buffer[..l].copy_from_slice(&self.data[offset as usize..][..l]);
+            Ok(())
+        }
+
+        fn capacity(&self) -> usize {
+            unimplemented!()
+        }
+    }
+
+    #[test]
+    fn can_read_write_all_of_nvs() {
+        let mut storage = MockFlash::new();
+
+        let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
+        let pt = read_partition_table(&mut storage, &mut buffer).unwrap();
+
+        let nvs = pt
+            .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
+            .unwrap()
+            .unwrap();
+        let mut nvs_partition = nvs.as_embedded_storage(&mut storage);
+        assert_eq!(nvs_partition.raw.offset(), 36864);
+
+        assert_eq!(nvs_partition.capacity(), 24576);
+
+        let mut buffer = [0u8; 24576];
+        nvs_partition.read(0, &mut buffer).unwrap();
+        assert!(buffer.iter().all(|v| *v == 23));
+        buffer.fill(42);
+        nvs_partition.write(0, &mut buffer).unwrap();
+        let mut buffer = [0u8; 24576];
+        nvs_partition.read(0, &mut buffer).unwrap();
+        assert!(buffer.iter().all(|v| *v == 42));
+    }
+
+    #[test]
+    fn cannot_read_write_more_than_partition_size() {
+        let mut storage = MockFlash::new();
+
+        let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
+        let pt = read_partition_table(&mut storage, &mut buffer).unwrap();
+
+        let nvs = pt
+            .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
+            .unwrap()
+            .unwrap();
+        let mut nvs_partition = nvs.as_embedded_storage(&mut storage);
+        assert_eq!(nvs_partition.raw.offset(), 36864);
+
+        assert_eq!(nvs_partition.capacity(), 24576);
+
+        let mut buffer = [0u8; 24577];
+        assert!(nvs_partition.read(0, &mut buffer) == Err(Error::OutOfBounds));
     }
 }

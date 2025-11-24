@@ -12,7 +12,7 @@
 //!
 //! ## Examples
 //!
-//! ```rust
+//! ```rust,no_run
 //! fn main(gpio0: Input<0>, gpio1: Output<1>) -> ! {
 //!     loop {
 //!         let input_state: bool = gpio0.input_state();

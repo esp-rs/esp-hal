@@ -9,13 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added support for lifetimes and generics to `BuilderLite` derive macro (#3963)
 
 ### Changed
 
+
 ### Fixed
 
+
 ### Removed
+
+
+## [v0.21.0] - 2025-10-30
+
+## [v0.20.0] - 2025-10-13
+
+### Added
+
+- Added support for lifetimes and generics to `BuilderLite` derive macro (#3963)
+- Added `ram(reclaimed)` as an alias for `link_section = ".dram2_uninit"` (#4245)
+
+### Changed
+
+- All `ram` proc macro options except `reclaimed` are considered `unstable` (#4309)
+
+### Fixed
+
+- Replaced `embassy_main` with `rtos_main` (intended to be called as `esp_rtos::main`) (#4172)
 
 ## [v0.19.0] - 2025-07-16
 
@@ -101,4 +120,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.17.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-hal-procmacros-v0.17.0
 [v0.18.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.17.0...esp-hal-procmacros-v0.18.0
 [v0.19.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.18.0...esp-hal-procmacros-v0.19.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.19.0...HEAD
+[v0.20.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.19.0...esp-hal-procmacros-v0.20.0
+[v0.21.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.20.0...esp-hal-procmacros-v0.21.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.21.0...HEAD

@@ -74,6 +74,7 @@ macro_rules! rtcio_analog {
                 $crate::ignore!($analog);
                 impl $crate::peripherals::[<GPIO $pin_num>]<'_> {
                     /// Configures the pin for analog mode.
+                    #[cfg(feature = "unstable")]
                     pub(crate) fn set_analog_impl(&self) {
                         use $crate::gpio::RtcPin;
                         enable_iomux_clk_gate();

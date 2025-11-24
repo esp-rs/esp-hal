@@ -16,6 +16,9 @@ SECTIONS {
     . = ALIGN(4);
   } > rtc_slow_seg AT > RODATA
 
+  /* LMA of .data */
+  _rtc_slow_sidata = LOADADDR(.rtc_slow.data);
+
  .rtc_slow.bss (NOLOAD) :
   {
     . = ALIGN(4);

@@ -67,24 +67,22 @@ mod implementation;
 #[cfg(feature = "unstable")]
 pub use self::implementation::*;
 
-/// The attenuation of the ADC pin.
+/// The approximate attenuation of the ADC pin.
 ///
 /// The effective measurement range for a given attenuation is dependent on the
 /// device being targeted. Please refer to "ADC Characteristics" section of your
 /// device's datasheet for more information.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
+#[allow(clippy::enum_variant_names, reason = "unit of measurement")]
 pub enum Attenuation {
-    /// 0dB attenuation
+    /// About 0dB attenuation.
     _0dB   = 0b00,
-    /// 2.5dB attenuation
-    #[cfg(not(esp32c2))]
+    /// About 2.5dB attenuation.
     _2p5dB = 0b01,
-    /// 6dB attenuation
-    #[cfg(not(esp32c2))]
+    /// About 6dB attenuation.
     _6dB   = 0b10,
-    /// 11dB attenuation
+    /// About 11dB attenuation.
     _11dB  = 0b11,
 }
 
@@ -111,7 +109,7 @@ pub struct AdcPin<PIN, ADCI, CS = ()> {
 /// Configuration for the ADC.
 #[cfg(feature = "unstable")]
 pub struct AdcConfig<ADCI> {
-    #[cfg_attr(not(esp32), expect(unused))]
+    #[cfg(esp32)]
     resolution: Resolution,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     _phantom: PhantomData<ADCI>,
@@ -131,7 +129,7 @@ impl<ADCI> AdcConfig<ADCI> {
     {
         // TODO revert this on drop
         pin.set_analog(crate::private::Internal);
-        self.attenuations[PIN::CHANNEL as usize] = Some(attenuation);
+        self.attenuations[pin.adc_channel() as usize] = Some(attenuation);
 
         AdcPin {
             pin,
@@ -156,7 +154,7 @@ impl<ADCI> AdcConfig<ADCI> {
     {
         // TODO revert this on drop
         pin.set_analog(crate::private::Internal);
-        self.attenuations[PIN::CHANNEL as usize] = Some(attenuation);
+        self.attenuations[pin.adc_channel() as usize] = Some(attenuation);
 
         AdcPin {
             pin,
@@ -170,6 +168,7 @@ impl<ADCI> AdcConfig<ADCI> {
 impl<ADCI> Default for AdcConfig<ADCI> {
     fn default() -> Self {
         Self {
+            #[cfg(esp32)]
             resolution: Resolution::default(),
             attenuations: [None; NUM_ATTENS],
             _phantom: PhantomData,
@@ -194,7 +193,7 @@ pub trait CalibrationAccess: RegisterAccess {
 /// A helper trait to get the ADC channel of a compatible GPIO pin.
 pub trait AdcChannel {
     /// Channel number used by the ADC
-    const CHANNEL: u8;
+    fn adc_channel(&self) -> u8;
 }
 
 /// A trait abstracting over calibration methods.
@@ -245,7 +244,9 @@ trait AdcCalEfuse {
 for_each_analog_function! {
     (($ch_name:ident, ADCn_CHm, $adc:literal, $ch:literal), $gpio:ident) => {
         impl $crate::analog::adc::AdcChannel for $crate::peripherals::$gpio<'_> {
-            const CHANNEL: u8 = $ch;
+            fn adc_channel(&self) -> u8 {
+                $ch
+            }
         }
     };
 }

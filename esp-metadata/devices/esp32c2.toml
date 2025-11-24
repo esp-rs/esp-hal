@@ -2,7 +2,7 @@
 #
 # Empty [`device.driver`] tables imply `partial` support status.
 #
-# If you modify a driver support status, run `cargo xtask update-chip-support-table` to
+# If you modify a driver support status, run `cargo xtask update-metadata` to
 # update the table in the esp-hal README.
 
 [device]
@@ -46,6 +46,7 @@ peripherals = [
 
     { name = "ADC1", virtual = true },
     { name = "BT", virtual = true },
+    { name = "FLASH", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "WIFI", virtual = true },
     { name = "MEM2MEM1", virtual = true },
@@ -62,6 +63,7 @@ symbols = [
     # Additional peripherals defined by us (the developers):
     "gdma",
     "phy",
+    "swd",
 
     # ROM capabilities
     "rom_crc_le",
@@ -73,16 +75,52 @@ symbols = [
     "pm_support_bt_wakeup",
     "uart_support_wakeup_int",
     "gpio_support_deepsleep_wakeup",
-
-    # Which bluetooth implementation
-    "npl",
 ]
-
-memory = [{ name = "dram", start = 0x3FCA_0000, end = 0x3FCE_0000 }]
 
 [device.soc]
 cpu_has_csr_pc = true
 rc_fast_clk_default = 17_500_000
+rc_slow_clock = 136_000
+xtal_options = [26, 40]
+
+memory_map = { ranges = [
+    { name = "dram", start = 0x3FCA_0000, end = 0x3FCE_0000 },
+    { name = "dram2_uninit", start = 0x3FCC_E800, end = 0x3FCD_EB70 },
+] }
+
+
+clocks = { peripheral_clocks = { templates = [
+    # templates
+    { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
+    { name = "rst_template", value = "{{control}}::regs().{{rst_register}}().modify(|_, w| w.{{rst_field}}().bit(reset));" },
+    # substitutions
+    { name = "control", value = "crate::peripherals::SYSTEM" },
+    { name = "reg_group", value = "en0" },
+    { name = "clk_en_register", value = "perip_clk_{{reg_group}}" },
+    { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
+    { name = "rst_register", value = "perip_rst_{{reg_group}}" },
+    { name = "rst_field", value = "{{peripheral}}_rst" },
+], peripheral_clocks = [
+    { name = "Tsens", template_params = { reg_group = "en1" } },
+    { name = "Dma", template_params = { reg_group = "en1" } },
+    { name = "Sha", template_params = { reg_group = "en1", peripheral = "crypto_sha" } },
+    { name = "Ecc", template_params = { reg_group = "en1", peripheral = "crypto_ecc" } },
+
+    #{ name = "Adc2Arb" },
+    { name = "Systimer", keep_enabled = true },
+    { name = "ApbSarAdc", template_params = { peripheral = "apb_saradc" } },
+    { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
+    { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true }, # used for clock calibration
+    { name = "Ledc" },
+    { name = "I2cExt0" },
+    { name = "Spi2" },
+    { name = "Uart1" },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
+    #{ name = "Spi01" },
+    #{ name = "Timers" },
+    
+    # Radio clocks not modeled here.
+] } }
 
 [device.adc]
 support_status = "partial"
@@ -110,14 +148,14 @@ pins = [
     { pin =  7, functions = { 0 = "MTDO", 2 = "FSPID"   } },
     { pin =  8 },
     { pin =  9 },
-    { pin = 10 }, # Available without SiP flash
-    { pin = 11, functions = { 0 = "SPIHD"  } }, # Available without SiP flash
-    { pin = 12, functions = { 0 = "SPIHD"  } }, # Available without SiP flash
-    { pin = 13, functions = { 0 = "SPIWP"  } }, # Available without SiP flash
-    { pin = 14, functions = { 0 = "SPICS0" } }, # Available without SiP flash
-    { pin = 15, functions = { 0 = "SPICLK" } }, # Available without SiP flash
-    { pin = 16, functions = { 0 = "SPID"   } }, # Available without SiP flash
-    { pin = 17, functions = { 0 = "SPIQ"   } }, # Available without SiP flash
+    { pin = 10, functions = {             2 = "FSPICS0" } },
+    { pin = 11, functions = { 0 = "SPIHD"  }, limited = true },
+    { pin = 12, functions = { 0 = "SPIHD"  }, limited = true },
+    { pin = 13, functions = { 0 = "SPIWP"  }, limited = true },
+    { pin = 14, functions = { 0 = "SPICS0" }, limited = true },
+    { pin = 15, functions = { 0 = "SPICLK" }, limited = true },
+    { pin = 16, functions = { 0 = "SPID"   }, limited = true },
+    { pin = 17, functions = { 0 = "SPIQ"   }, limited = true },
     { pin = 18 },
     { pin = 19, functions = { 0 = "U0RXD" } },
     { pin = 20, functions = { 0 = "U0TXD" } },
@@ -251,7 +289,7 @@ status_registers = 2
 [device.sha]
 support_status = "partial"
 dma = true
-algo = ["SHA-1", "SHA-224", "SHA-256"]
+algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.spi_master]
 support_status = "supported"
@@ -302,4 +340,10 @@ apb_cycle_wait_num = 16 # TODO
 
 ## Radio
 [device.wifi]
+
 [device.bt]
+support_status = "partial"
+controller = "npl"
+
+[device.phy]
+combo_module = true

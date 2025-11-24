@@ -13,6 +13,29 @@ pub enum PsramCacheSpeed {
     PsramCacheF80mS80m,
 }
 
+/// PSRAM virtual address mode.
+///
+/// Specifies how PSRAM is mapped for the CPU cores.
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum PsramVaddrMode {
+    /// App and pro CPU use their own flash cache for external RAM access.
+    ///
+    /// In this mode both cores access the same physical PSRAM.
+    #[default]
+    Normal = 0,
+    /// App and pro CPU share external RAM caches: pro CPU has low * 2M, app
+    /// CPU has high 2M.
+    ///
+    /// In this mode the two cores will access different parts of PSRAM.
+    LowHigh,
+    /// App and pro CPU share external RAM caches: pro CPU does even 32 byte
+    /// ranges, app does odd ones.
+    ///
+    /// In this mode the two cores will access different parts of PSRAM.
+    Evenodd,
+}
+
 /// PSRAM configuration
 #[derive(Copy, Clone, Debug, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -21,6 +44,8 @@ pub struct PsramConfig {
     pub size: PsramSize,
     /// Cache speed
     pub cache_speed: PsramCacheSpeed,
+    /// PSRAM virtual address mode
+    pub psram_vaddr_mode: PsramVaddrMode,
 }
 
 /// Initializes the PSRAM memory on supported devices.
@@ -38,9 +63,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
         // for unknown reason)
         //
         // As a workaround we just map 4m (maximum we can do) and
-        // probe if we can access top of PSRAM - if not we assume it's 2m
-        //
-        // This currently doesn't work as expected because of https://github.com/esp-rs/esp-hal/issues/2182
+        // probe how much memory we can write/read
         utils::s_mapping(EXTMEM_ORIGIN as u32, MAX_MEM_SIZE as u32);
 
         let guessed_size = unsafe {
@@ -448,23 +471,10 @@ pub(crate) mod utils {
         psram_set_cs_timing_spi0(mode, clk_mode); // SPI_CACHE_PORT
         psram_enable_qio_mode_spi1(clk_mode, mode);
 
-        info!("PS-RAM vaddrmode = {:?}", PsramVaddrMode::Lowhigh);
+        let psram_vaddr_mode = config.psram_vaddr_mode;
+        info!("PS-RAM vaddrmode = {:?}", psram_vaddr_mode);
 
-        psram_cache_init(mode, PsramVaddrMode::Lowhigh, clk_mode, extra_dummy);
-    }
-
-    #[allow(unused)]
-    #[derive(Debug, Clone, Copy, PartialEq)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    enum PsramVaddrMode {
-        /// App and pro CPU use their own flash cache for external RAM access
-        Normal = 0,
-        /// App and pro CPU share external RAM caches: pro CPU has low * 2M, app
-        /// CPU has high 2M
-        Lowhigh,
-        ///  App and pro CPU share external RAM caches: pro CPU does even 32yte
-        /// ranges, app does odd ones.
-        Evenodd,
+        psram_cache_init(mode, psram_vaddr_mode, clk_mode, extra_dummy);
     }
 
     // register initialization for sram cache params and r/w commands
@@ -582,7 +592,7 @@ pub(crate) mod utils {
             dport
                 .app_cache_ctrl()
                 .modify(|_, w| w.app_dram_hl().clear_bit().app_dram_split().clear_bit());
-            if vaddrmode == PsramVaddrMode::Lowhigh {
+            if vaddrmode == PsramVaddrMode::LowHigh {
                 dport
                     .pro_cache_ctrl()
                     .modify(|_, w| w.pro_dram_hl().set_bit());
@@ -991,7 +1001,18 @@ pub(crate) mod utils {
 
             fn configure_gpio(gpio: u8, field: Field, bits: u8) {
                 unsafe {
-                    let ptr = crate::gpio::io_mux_reg(gpio);
+                    // pins 6-11 should not be exposed to the user, so we access them directly to
+                    // configure the gpios for PSRAM
+                    let ptr = match gpio {
+                        6 => crate::peripherals::IO_MUX::regs().gpio6(),
+                        7 => crate::peripherals::IO_MUX::regs().gpio7(),
+                        8 => crate::peripherals::IO_MUX::regs().gpio8(),
+                        9 => crate::peripherals::IO_MUX::regs().gpio9(),
+                        10 => crate::peripherals::IO_MUX::regs().gpio10(),
+                        11 => crate::peripherals::IO_MUX::regs().gpio11(),
+                        _ => crate::gpio::io_mux_reg(gpio),
+                    };
+
                     ptr.modify(|_, w| apply_to_field!(w, field, bits));
                 }
             }

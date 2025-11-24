@@ -17,7 +17,6 @@ esp-radio = { path = "../../../esp-radio", features = [
     "ieee802154",
     "unstable",
 ] }
-heapless = "0.8.0"
 ieee802154 = "0.6.1"
 
 [features]

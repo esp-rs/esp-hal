@@ -8,8 +8,8 @@ EXTERN( __esp_radio_strrchr );
 EXTERN( __esp_radio_misc_nvs_deinit );
 EXTERN( __esp_radio_misc_nvs_init );
 EXTERN( __ESP_RADIO_G_LOG_LEVEL );
-EXTERN( __esp_radio_esp_dport_access_reg_read );
-EXTERN( __esp_radio_rtc_get_xtal );
+
+
 EXTERN( __esp_radio_putchar );
 EXTERN( __esp_radio_putchar );
 EXTERN( __esp_radio_fwrite );
@@ -17,6 +17,9 @@ EXTERN( __esp_radio_fopen );
 EXTERN( __esp_radio_fgets );
 EXTERN( __esp_radio_fclose );
 EXTERN( __esp_radio_esp_timer_get_time );
+EXTERN( __esp_radio_puts );
+EXTERN( __esp_radio_sleep );
+EXTERN( __esp_radio_usleep );
 
 PROVIDE( strdup = __esp_radio_strdup );
 PROVIDE( g_wifi_osi_funcs = __ESP_RADIO_G_WIFI_OSI_FUNCS );
@@ -28,8 +31,8 @@ PROVIDE( strrchr = __esp_radio_strrchr );
 PROVIDE( misc_nvs_deinit = __esp_radio_misc_nvs_deinit );
 PROVIDE( misc_nvs_init = __esp_radio_misc_nvs_init );
 PROVIDE( g_log_level = __ESP_RADIO_G_LOG_LEVEL );
-PROVIDE( esp_dport_access_reg_read = __esp_radio_esp_dport_access_reg_read );
-PROVIDE( rtc_get_xtal = __esp_radio_rtc_get_xtal );
+
+
 PROVIDE( putchar = __esp_radio_putchar );
 PROVIDE( _putchar = __esp_radio_putchar );
 PROVIDE( fwrite = __esp_radio_fwrite );
@@ -37,3 +40,6 @@ PROVIDE( fopen = __esp_radio_fopen );
 PROVIDE( fgets = __esp_radio_fgets );
 PROVIDE( fclose = __esp_radio_fclose );
 PROVIDE( esp_timer_get_time = __esp_radio_esp_timer_get_time );
+PROVIDE( puts = __esp_radio_puts );
+PROVIDE( sleep = __esp_radio_sleep );
+PROVIDE( usleep = __esp_radio_usleep );

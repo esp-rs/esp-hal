@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
@@ -93,19 +93,22 @@ impl Metadata {
         self.description.clone()
     }
 
-    pub fn matches(&self, filter: &Option<String>) -> bool {
-        let Some(filter) = filter.as_deref() else {
+    /// Check if the example matches the given filter.
+    pub fn matches(&self, filter: Option<&str>) -> bool {
+        let Some(filter) = filter else {
             return false;
         };
 
         filter == self.binary_name() || filter == self.output_file_name()
     }
 
+    /// Check if the example matches the given name (case insensitive).
     pub fn matches_name(&self, name: &str) -> bool {
         name.to_lowercase() == self.binary_name() || name.to_lowercase() == self.output_file_name()
     }
 }
 
+/// A single configuration of an example, as parsed from metadata lines.
 #[derive(Debug, Default, Clone)]
 pub struct Configuration {
     chips: Vec<Chip>,
@@ -184,8 +187,13 @@ fn parse_meta_line(line: &str) -> anyhow::Result<MetaLine> {
 pub fn load(path: &Path) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
 
-    for entry in fs::read_dir(path)? {
-        let path = windows_safe_path(&entry?.path());
+    for entry in fs::read_dir(path).context("Failed to read {path}")? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        log::debug!("Loading example from path: {}", path.display());
+        let path = windows_safe_path(&entry.path());
         let text = fs::read_to_string(&path)
             .with_context(|| format!("Could not read {}", path.display()))?;
 
@@ -330,6 +338,7 @@ struct CargoToml {
     features: HashMap<String, Vec<String>>,
 }
 
+/// Load all examples by finding all packages in the given path, and parsing their metadata.
 pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
 
@@ -337,6 +346,7 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
     packages.sort();
 
     for package_path in packages {
+        log::debug!("Loading package from path: {}", package_path.display());
         let cargo_toml_path = package_path.join("Cargo.toml");
         let main_rs_path = package_path.join("src").join("main.rs");
 
@@ -353,8 +363,7 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
         let chips = toml
             .features
             .keys()
-            .map(|chip| Chip::from_str(&chip, true).unwrap())
-            .collect::<BTreeSet<_>>();
+            .filter_map(|chip| Chip::from_str(&chip, true).ok());
 
         for chip in chips {
             examples.push(Metadata {
@@ -383,6 +392,8 @@ fn parse_description(text: &str) -> Option<String> {
         descr.push('\n');
         description = Some(descr);
     }
+
+    log::debug!("Parsed description: {:?}", description);
 
     description
 }

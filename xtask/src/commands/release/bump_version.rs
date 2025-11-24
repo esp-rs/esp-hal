@@ -11,8 +11,16 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use toml_edit::{Item, TableLike, Value};
 
-use crate::{Package, Version, cargo::CargoToml, changelog::Changelog, commands::PLACEHOLDER};
+use crate::{
+    Package,
+    Version,
+    cargo::CargoToml,
+    changelog::Changelog,
+    commands::PLACEHOLDER,
+    find_packages,
+};
 
+/// How to bump the version of a package.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub enum VersionBump {
     PreRelease(String),
@@ -21,6 +29,7 @@ pub enum VersionBump {
     Major,
 }
 
+/// Arguments for bumping the version of packages.
 #[derive(Debug, Args)]
 pub struct BumpVersionArgs {
     /// How much to bump the version by.
@@ -41,6 +50,7 @@ pub struct BumpVersionArgs {
     packages: Vec<Package>,
 }
 
+/// Bump the version of the specified packages by the specified amount.
 pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
     // Bump the version by the specified amount for each given package:
     for package in args.packages {
@@ -60,8 +70,9 @@ pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
     Ok(())
 }
 
+/// Update the specified package by bumping its version, updating its changelog,
 pub fn update_package(
-    package: &mut CargoToml<'_>,
+    package: &mut CargoToml,
     version: &VersionBump,
     dry_run: bool,
 ) -> Result<semver::Version> {
@@ -73,7 +84,7 @@ pub fn update_package(
     Ok(new_version)
 }
 
-fn check_crate_before_bumping(manifest: &mut CargoToml<'_>) -> Result<()> {
+fn check_crate_before_bumping(manifest: &mut CargoToml) -> Result<()> {
     // Collect errors into a vector to preserve order.
     let mut errors = Vec::new();
 
@@ -171,7 +182,7 @@ fn check_dependency_before_bumping(item: &Item) -> Result<()> {
 
 /// Bump the version of the specified package by the specified amount.
 fn bump_crate_version(
-    bumped_package: &mut CargoToml<'_>,
+    bumped_package: &mut CargoToml,
     amount: &VersionBump,
     dry_run: bool,
 ) -> Result<semver::Version> {
@@ -192,20 +203,38 @@ fn bump_crate_version(
     }
 
     let package_name = bumped_package.package.to_string();
-    for pkg in Package::iter() {
-        let mut dependent = CargoToml::new(bumped_package.workspace, pkg)
-            .with_context(|| format!("Could not load Cargo.toml of {pkg}"))?;
 
+    let examples = find_packages(&bumped_package.workspace.join("examples"))?
+        .into_iter()
+        .map(|p| p.join("Cargo.toml"));
+
+    let tomls = Package::iter()
+        .filter(|&p| p != Package::Examples)
+        .map(|p| {
+            CargoToml::new(&bumped_package.workspace, p)
+                .with_context(|| format!("Could not load Cargo.toml of {p}"))
+        })
+        // special case, examples are stand alone projects so we must add these in a special way
+        .chain(examples.into_iter().map(|p| {
+            let content = fs::read_to_string(&p)
+                .with_context(|| format!("Could not read {}", p.display()))?;
+            CargoToml::from_str(&bumped_package.workspace, Package::Examples, &content)
+                .with_context(|| format!("Could not parse Cargo.toml"))
+        }));
+
+    for dependent in tomls {
+        let mut dependent = dependent?;
         if dependent.change_version_of_dependency(&package_name, &version) {
             if dry_run {
                 log::info!(
                     "  Dry run: would update {} in {}: ({prev_version} -> {version})",
                     package_name,
-                    pkg,
+                    dependent.package(),
                 );
             } else {
                 log::info!(
-                    "  Bumping {package_name} version for package {pkg}: ({prev_version} -> {version})"
+                    "  Bumping {package_name} version for package {}: ({prev_version} -> {version})",
+                    dependent.package()
                 );
                 dependent.save()?;
             }
@@ -215,9 +244,10 @@ fn bump_crate_version(
     Ok(version)
 }
 
+/// Perform the actual version bump logic.
 pub fn do_version_bump(version: &semver::Version, amount: &VersionBump) -> Result<semver::Version> {
     fn bump_version_number(version: &mut semver::Version, amount: &VersionBump) {
-        log::info!("Bumping version number: {version} by {amount:?}");
+        log::debug!("Bumping version number: {version} by {amount:?}");
         match amount {
             VersionBump::Major => {
                 version.major += 1;
@@ -263,7 +293,7 @@ pub fn do_version_bump(version: &semver::Version, amount: &VersionBump) -> Resul
 }
 
 fn finalize_changelog(
-    bumped_package: &CargoToml<'_>,
+    bumped_package: &CargoToml,
     new_version: &semver::Version,
     dry_run: bool,
 ) -> Result<()> {
@@ -301,7 +331,7 @@ fn finalize_changelog(
 }
 
 fn finalize_placeholders(
-    bumped_package: &CargoToml<'_>,
+    bumped_package: &CargoToml,
     new_version: &semver::Version,
     dry_run: bool,
 ) -> Result<()> {
@@ -345,7 +375,7 @@ fn finalize_placeholders(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use toml_edit::DocumentMut;
 
     use super::*;
@@ -400,7 +430,7 @@ mod test {
         let mut doc = CargoToml {
             manifest: toml.parse::<DocumentMut>().unwrap(),
             package: Package::EspHal,
-            workspace: Path::new(""),
+            workspace: PathBuf::new(),
         };
         let errors = check_crate_before_bumping(&mut doc);
         pretty_assertions::assert_eq!(

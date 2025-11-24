@@ -1,22 +1,13 @@
 use alloc::collections::VecDeque as Queue;
-use core::cell::RefCell;
 
-use critical_section::Mutex;
 use esp_hal::{
     clock::{ModemClockController, PhyClockGuard, init_radio_clocks},
     handler,
     interrupt::Priority,
     peripherals::IEEE802154,
 };
-use esp_wifi_sys::include::{
-    esp_phy_calibration_data_t,
-    esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
-    ieee802154_coex_event_t,
-    ieee802154_coex_event_t_IEEE802154_IDLE,
-    ieee802154_coex_event_t_IEEE802154_LOW,
-    ieee802154_coex_event_t_IEEE802154_MIDDLE,
-    register_chipv7_phy,
-};
+use esp_phy::{PhyController, PhyInitGuard};
+use esp_sync::NonReentrantMutex;
 
 use super::{
     frame::{
@@ -29,23 +20,37 @@ use super::{
     hal::*,
     pib::*,
 };
+use crate::sys::include::{
+    ieee802154_coex_event_t,
+    ieee802154_coex_event_t_IEEE802154_IDLE,
+    ieee802154_coex_event_t_IEEE802154_LOW,
+    ieee802154_coex_event_t_IEEE802154_MIDDLE,
+};
 
-const PHY_ENABLE_VERSION_PRINT: u32 = 1;
+const PHY_ENABLE_VERSION_PRINT: u8 = 1;
 
 static mut RX_BUFFER: [u8; FRAME_SIZE] = [0u8; FRAME_SIZE];
-static RX_QUEUE: Mutex<RefCell<Queue<RawReceived>>> = Mutex::new(RefCell::new(Queue::new()));
-static STATE: Mutex<RefCell<Ieee802154State>> = Mutex::new(RefCell::new(Ieee802154State::Idle));
+
+struct IeeeState {
+    state: Ieee802154State,
+    rx_queue: Queue<RawReceived>,
+    rx_queue_size: usize,
+}
+
+static STATE: NonReentrantMutex<IeeeState> = NonReentrantMutex::new(IeeeState {
+    state: Ieee802154State::Idle,
+    rx_queue: Queue::new(),
+    rx_queue_size: 10,
+});
 
 unsafe extern "C" {
-    fn bt_bb_v2_init_cmplx(print_version: u32); // from libbtbb.a
+    fn bt_bb_v2_init_cmplx(print_version: u8); // from libbtbb.a
 
     fn bt_bb_set_zb_tx_on_delay(time: u16); // from libbtbb.a
 
     fn esp_coex_ieee802154_ack_pti_set(event: ieee802154_coex_event_t); // from ???
 
     fn esp_coex_ieee802154_txrx_pti_set(event: ieee802154_coex_event_t); // from ???
-
-    fn phy_version_print(); // from libphy.a
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -75,34 +80,20 @@ pub struct RawReceived {
     pub channel: u8,
 }
 
-pub(crate) fn esp_ieee802154_enable(mut radio: IEEE802154<'_>) -> PhyClockGuard<'_> {
+pub(crate) fn esp_ieee802154_enable(
+    mut radio: IEEE802154<'_>,
+) -> (PhyClockGuard<'_>, PhyInitGuard<'_>) {
     init_radio_clocks();
     let phy_clock_guard = radio.enable_phy_clock();
     radio.enable_modem_clock(true);
 
-    esp_phy_enable();
+    let phy_init_guard = radio.enable_phy();
+
     esp_btbb_enable();
     ieee802154_mac_init();
 
-    unsafe { phy_version_print() }; // libphy.a
     info!("date={:x}", mac_date());
-    phy_clock_guard
-}
-
-fn esp_phy_enable() {
-    unsafe {
-        let mut calibration_data = esp_phy_calibration_data_t {
-            version: [0u8; 4],
-            mac: [0u8; 6],
-            opaque: [0u8; 1894],
-        };
-
-        register_chipv7_phy(
-            core::ptr::null(),
-            &mut calibration_data as *mut esp_phy_calibration_data_t,
-            esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
-        );
-    }
+    (phy_clock_guard, phy_init_guard)
 }
 
 fn esp_btbb_enable() {
@@ -154,10 +145,14 @@ fn ieee802154_mac_init() {
     unsafe {
         esp_hal::interrupt::bind_interrupt(
             esp_hal::peripherals::Interrupt::ZB_MAC,
-            ZB_MAC.handler(),
+            zb_mac_handler.handler(),
         );
     }
-    esp_hal::interrupt::enable(esp_hal::peripherals::Interrupt::ZB_MAC, ZB_MAC.priority()).unwrap();
+    esp_hal::interrupt::enable(
+        esp_hal::peripherals::Interrupt::ZB_MAC,
+        zb_mac_handler.priority(),
+    )
+    .unwrap();
 }
 
 fn ieee802154_set_txrx_pti(txrx_scene: Ieee802154TxRxScene) {
@@ -190,8 +185,14 @@ pub fn tx_init(frame: *const u8) {
     }
 }
 
+pub(crate) fn set_queue_size(rx_queue_size: usize) {
+    STATE.with(|state| {
+        state.rx_queue_size = rx_queue_size;
+    });
+}
+
 pub fn ieee802154_transmit(frame: *const u8, cca: bool) -> i32 {
-    critical_section::with(|cs| {
+    STATE.with(|state| {
         tx_init(frame);
 
         ieee802154_set_txrx_pti(Ieee802154TxRxScene::Tx);
@@ -207,7 +208,7 @@ pub fn ieee802154_transmit(frame: *const u8, cca: bool) -> i32 {
             // {
             //     ieee802154_state = IEEE802154_STATE_TX_ENH_ACK;
             // } else {
-            *STATE.borrow_ref_mut(cs) = Ieee802154State::Transmit;
+            state.state = Ieee802154State::Transmit;
             // }
         }
     });
@@ -216,25 +217,22 @@ pub fn ieee802154_transmit(frame: *const u8, cca: bool) -> i32 {
 }
 
 pub fn ieee802154_receive() -> i32 {
-    critical_section::with(|cs| {
-        if *STATE.borrow_ref(cs) == Ieee802154State::Receive {
+    STATE.with(|state| {
+        if state.state == Ieee802154State::Receive {
             return;
         }
 
         rx_init();
         enable_rx();
 
-        *STATE.borrow_ref_mut(cs) = Ieee802154State::Receive;
+        state.state = Ieee802154State::Receive;
     });
 
     0 // ESP-OK
 }
 
 pub fn ieee802154_poll() -> Option<RawReceived> {
-    critical_section::with(|cs| {
-        let mut queue = RX_QUEUE.borrow_ref_mut(cs);
-        queue.pop_front()
-    })
+    STATE.with(|state| state.rx_queue.pop_front())
 }
 
 fn rx_init() {
@@ -258,10 +256,7 @@ fn stop_current_operation() {
 }
 
 fn set_next_rx_buffer() {
-    #[allow(unused_unsafe)] // stable compiler needs unsafe, nightly complains about it
-    unsafe {
-        set_rx_addr(core::ptr::addr_of_mut!(RX_BUFFER).cast());
-    }
+    set_rx_addr(core::ptr::addr_of_mut!(RX_BUFFER).cast());
 }
 
 pub fn set_promiscuous(enable: bool) {
@@ -333,21 +328,20 @@ fn ieee802154_sec_update() {
     // ieee802154_sec_clr_transmit_security();
 }
 
-fn next_operation() {
-    let previous_operation = critical_section::with(|cs| {
-        let state = *STATE.borrow_ref(cs);
+fn next_operation_inner(state: &mut IeeeState) -> Ieee802154State {
+    let prev_state = state.state;
+    state.state = if ieee802154_pib_get_rx_when_idle() {
+        enable_rx();
+        Ieee802154State::Receive
+    } else {
+        Ieee802154State::Idle
+    };
 
-        if ieee802154_pib_get_rx_when_idle() {
-            enable_rx();
-            *STATE.borrow_ref_mut(cs) = Ieee802154State::Receive;
-        } else {
-            *STATE.borrow_ref_mut(cs) = Ieee802154State::Idle;
-        }
+    prev_state
+}
 
-        state
-    });
-
-    match previous_operation {
+fn notify_state(state: Ieee802154State) {
+    match state {
         Ieee802154State::Receive => super::rx_available(),
         Ieee802154State::Transmit => super::tx_done(),
         Ieee802154State::TxAck => super::tx_done(),
@@ -355,8 +349,25 @@ fn next_operation() {
     }
 }
 
+fn next_operation() {
+    let previous_operation = STATE.with(next_operation_inner);
+
+    notify_state(previous_operation)
+}
+
+// FIXME: we shouldn't need this - we need to re-align the original driver with our port
+pub(crate) fn ensure_receive_enabled() {
+    // shouldn't be necessary but avoids a problem with rx stopping
+    // unexpectedly when used together with BLE
+    STATE.with(|state| {
+        if state.state == Ieee802154State::Receive {
+            set_cmd(Command::RxStart);
+        }
+    });
+}
+
 #[handler(priority = Priority::Priority1)]
-fn ZB_MAC() {
+fn zb_mac_handler() {
     trace!("ZB_MAC interrupt");
 
     let events = events();
@@ -388,14 +399,14 @@ fn ZB_MAC() {
                 "Received raw {:?}",
                 crate::fmt::Bytes(&*core::ptr::addr_of!(RX_BUFFER))
             );
-            critical_section::with(|cs| {
-                let mut queue = RX_QUEUE.borrow_ref_mut(cs);
-                if queue.len() <= crate::CONFIG.rx_queue_size {
+            let mut state_for_notify = Ieee802154State::Idle;
+            STATE.with(|state| {
+                if state.rx_queue.len() <= state.rx_queue_size {
                     let item = RawReceived {
                         data: RX_BUFFER,
                         channel: freq_to_channel(freq()),
                     };
-                    queue.push_back(item);
+                    state.rx_queue.push_back(item);
                 } else {
                     warn!("Receive queue full");
                 }
@@ -407,19 +418,21 @@ fn ZB_MAC() {
                     &RX_BUFFER[1..][..RX_BUFFER[0] as usize]
                 };
                 if will_auto_send_ack(frm) {
-                    *STATE.borrow_ref_mut(cs) = Ieee802154State::TxAck;
+                    state.state = Ieee802154State::TxAck;
                 } else if should_send_enhanced_ack(frm) {
                     // TODO
                 } else {
+                    state_for_notify = next_operation_inner(state)
                     // esp_ieee802154_coex_pti_set(IEEE802154_IDLE_RX);
-                    next_operation();
                 }
             });
+
+            notify_state(state_for_notify)
         }
     }
 
     if events & Event::AckRxDone != 0 {
-        info!("EventAckRxDone");
+        trace!("EventAckRxDone");
     }
 
     if events & Event::AckTxDone != 0 {

@@ -19,6 +19,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v0.8.1] - 2025-10-30
+
+## [v0.8.0] - 2025-10-13
+
+### Added
+
+- `defmt` feature and `FlashStorage`, `FlashStorageError` now implements `Defmt` (#4127)
+- `Drop` impl for `FlashStorage` (#4132)
+- `FlashStorage::new()` now takes a `Flash` argument (#4173)
+
+### Removed
+
+- `Default` impl for `FlashStorage` (#4132)
+
+## v0.8.0 - 2025-09-10
+
+### Added
+
+- Added strategies for dealing with multi-core systems (#4082)
+
 ## [v0.7.0] - 2025-07-16
 
 ### Fixed
@@ -61,4 +81,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.5.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-storage-v0.5.0
 [v0.6.0]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.5.0...esp-storage-v0.6.0
 [v0.7.0]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.6.0...esp-storage-v0.7.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.7.0...HEAD
+[v0.8.0]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.7.0...esp-storage-v0.8.0
+[v0.8.1]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.8.0...esp-storage-v0.8.1
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.8.1...HEAD

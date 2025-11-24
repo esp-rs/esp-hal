@@ -1,8 +1,8 @@
 [package]
 name          = "esp-riscv-rt"
-version       = "0.12.0"
+version       = "0.13.0"
 edition       = "2024"
-rust-version  = "1.86.0"
+rust-version  = "1.88.0"
 description   = "Minimal runtime / startup for RISC-V CPUs from Espressif"
 documentation = "https://docs.espressif.com/projects/rust/esp-riscv-rt/latest/"
 keywords      = ["esp32", "espressif", "riscv", "runtime", "startup"]
@@ -11,25 +11,36 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 links         = "esp-riscv-rt"
 
+[package.metadata.espressif]
+doc-config = { features = ["rtc-ram"] }
+requires_target = ["riscv32imc-unknown-none-elf", "riscv32imac-unknown-none-elf"]
+check-configs = [
+    { features = [] },
+    { features = ["rtc-ram"] },
+    { features = ["no-mie-mip"] },
+    { features = ["rtc-ram", "no-mie-mip"] },
+]
+clippy-configs = [{ features = ["rtc-ram"] }]
+
 [lib]
 bench = false
 test  = false
 
 [dependencies]
-document-features = "0.2.11"
-defmt             = {version = "1.0.1", optional = true}
-riscv             = "0.14.0"
-riscv-rt-macros   = "0.5.0"
+document-features = "0.2"
+defmt             = { version = "1.0.1", optional = true }
+riscv             = "0.15.0"
+# We use the `single-hart` feature since starting up harts != 0 is handled by the HAL, not the runtime.
+riscv-rt          = {version = "0.16.0", features = ["pre-init", "no-exceptions", "no-interrupts", "single-hart", "v-trap", "pre-default-start-trap"]}
 
 [features]
-## Indicate that the device supports `mie` and `mip` CSRs.
-has-mie-mip = []
-
+## Indicate that the device does NOT support `mie` and `mip` CSRs.
+no-mie-mip = ["riscv-rt/no-xie-xip"]
 ## Indicate that the device has RTC RAM.
 rtc-ram = []
 
 ## Implement `defmt::Format`
-defmt = ["dep:defmt"]
+defmt = ["dep:defmt", "riscv-rt/defmt"]
 
-# This feature is intended for testing; you probably don't want to enable it:
-ci = ["has-mie-mip", "rtc-ram"]
+[package.metadata.cargo-machete]
+ignored = ["defmt"]

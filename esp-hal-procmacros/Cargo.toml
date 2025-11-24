@@ -1,6 +1,6 @@
 [package]
 name          = "esp-hal-procmacros"
-version       = "0.19.0"
+version       = "0.21.0"
 edition       = "2024"
 rust-version  = "1.88.0"
 description   = "Procedural macros for esp-hal"
@@ -8,25 +8,33 @@ documentation = "https://docs.espressif.com/projects/rust/esp-hal-procmacros/lat
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
+exclude = ["testdata"]
+
+[package.metadata.espressif]
+doc-config = { features = [] }
+check-configs = [
+    { features = [] },
+]
+clippy-configs = [
+    { features = [] },
+]
+
 [package.metadata.docs.rs]
-features = ["embassy", "has-ulp-core", "interrupt", "ram", "is-ulp-core"]
+features = ["has-ulp-core", "interrupt", "ram", "is-ulp-core"]
 
 [lib]
 proc-macro = true
 
 [dependencies]
-document-features = "0.2.11"
-litrs             = "0.4.1"
-object            = { version = "0.36.7", default-features = false, features = ["read_core", "elf"], optional = true }
-proc-macro-crate  = "3.3.0"
-proc-macro2       = "1.0.95"
-quote             = "1.0.40"
-syn               = { version = "2.0.100", features = ["extra-traits", "full"] }
-termcolor         = "1.4.1"
+document-features = "0.2"
+object            = { version = "0.37", default-features = false, features = ["read_core", "elf"], optional = true }
+proc-macro-crate  = "3.4"
+proc-macro2       = "1.0"
+quote             = "1.0"
+syn               = { version = "2.0", features = ["extra-traits", "full"] }
+termcolor         = "1.4"
 
 [features]
-## Provide a `#[main]` procmacro to mark the entry point for Embassy applications.
-embassy = []
 ## Indicates the target device has RTC slow memory available.
 rtc-slow = []
 
@@ -41,3 +49,11 @@ is-lp-core = []
 ## Provide an `#[entry]` macro for running applications on the ESP32-S2/S3's
 ## ULP core.
 is-ulp-core = []
+
+# Enables `ram(reclaimed)`
+__esp_idf_bootloader = []
+
+[lints.rust]
+# Starting with 1.85.0, the test cfg is considered to be a "userspace" config despite being also set by rustc and should be managed by the build system itself.
+# CI started to fail with rustc 1.92.0-nightly (f04e3dfc8 2025-10-19), https://github.com/esp-rs/esp-hal/pull/4386#issuecomment-3491320175 
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(test)'] }

@@ -572,7 +572,7 @@ fn screaming_snake_case(name: &str) -> String {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use crate::generate::{validator::Validator, value::Value};
 

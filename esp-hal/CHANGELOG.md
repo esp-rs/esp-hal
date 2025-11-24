@@ -8,6 +8,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- RMT: All public types now derive `Debug` and `defmt::Format`. (#4302)
+- RMT: `Channel::apply_config` has been added. (#4302)
+
+- Added blocking `send_break`, `wait_for_break` and `wait_for_break_with_timeout` for sending and detecting software breaks with the UART driver (#4284)
+- Added support for `RxBreakDetected` interrupt and `wait_for_break_async` for detecting software breaks asynchronously to the UART driver (#4284)
+- Unsafely expose GPIO pins that are only available on certain chip/module variants (#4520)
+
+### Changed
+- RMT: `SingleShotTxTransaction` has been renamed to `TxTransaction`. (#4302)
+- RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` now take the configuration by reference. (#4302)
+- RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` don't take a pin anymore, instead `Channel::with_pin` has been added. (#4302)
+- RMT: Configuration errors have been split out of `rmt::Error` into the new `rmt::ConfigError` enum. (#4494)
+- RMT: `Rmt::new()` now returns `Error::UnreachableTargetFrequency` instead of panicking when requesting 0 Hz. (#4509)
+
+- Internal clock configuration rework (#4501)
+
+### Fixed
+
+- ESP32: ADC1 readings are no longer inverted (#4423)
+- RMT: All blocking methods now return the channel on failure. (#4302)
+- RMT: the `place_rmt_driver_in_ram` option now also places the async interrupt handler in RAM. (#4302)
+- RMT: When dropping a Tx channel, the driver now disconnects the output pin from the peripheral. (#4302)
+- I2C: avoid potential infinite loop while checking for command completion (#4519)
+
+### Removed
+
+
+## [v1.0.0] - 2025-10-30
+
+### Added
+
+- Added the `float-save-restore` feature (enabled by default) for Xtensa MCUs. (#4394)
+
+### Changed
+
+- `work_queue` is no longer public (#4357)
+- UART memory is now powered down when the driver is no longer in use. (#4354)
+
+
+### Removed
+
+- The `WatchdogConfig` enum and watchdog timer configuration from `esp_hal::init` (#4377)
+
+## [v1.0.0-rc.1] - 2025-10-13
+
+### Added
 
 - A reimplemntation of the `assign_resources!` macro (#3809)
 - `TrngSource` to manage random number generator entropy (#3829)
@@ -20,6 +66,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `aes::{AesBackend, AesContext, dma::AesDmaBackend}`: Work-queue based AES driver (#3880, #3897)
 - `aes::cipher_modes`, `aes::CipherState` for constructing `AesContext`s (#3895)
 - `aes::dma::DmaCipherState` so that `AesDma` can properly support cipher modes that require state (IV, nonce, etc.) (#3897)
+- `uart::Uhci`: for UART with DMA using the UHCI peripheral (#3871, #4008, #4011)
+- Align `I8080` driver pin configurations with latest guidelines (#3997)
+- Expose cache line configuration (#3946)
+- ESP32: Expose `psram_vaddr_mode` via `PsramConfig` (#3990)
+- ESP32-S3: Expose more `Camera` config options (#3996)
+- Functions to query chip revision for every chip (#3892)
+- ESP32-S3: Add RtcI2c driver (#4016)
+- `ShaBackend, Sha<N>Context`: Work-queue based SHA driver (#4013)
+- I2S: `i2s::master::Config` with support for more TDM mode standards (#3985)
+- ESP32: support outputting the main I2S clock signal (#4128)
+- ESP32 and S3 has `is_running()` function from `esp-storage (#4188)
+- `Cpu::other()` is now marked as public (#4188)
+- The ESP_HAL_CONFIG_STACK_GUARD_MONITORING (enabled by default) enables a data watchpoint on the stack guard value to protect the main stack (#4207, #4289)
+- `start_app_core_with_stack_guard_offset` (#4207)
+- Chip version Efuse accessors for ESP32, ESP32-C2, ESP32-C3 (#4248)
+- The `rmt::PulseCode::MAX_LEN` constant was added. (#4246)
+- `rmt::Error` now implements `core::error::Error` (#4247)
+- `ram(reclaimed)` as an alias for `link_section = ".dram2_uninit"` (#4245)
+- `rmt::MAX_TX_LOOPCOUNT` and `rmt::MAX_RX_IDLE_THRESHOLD` constants have been added (#4276)
+- Added support for `embedded-io 0.7` (#4280)
+- RMT: Wrapping the hardware buffer is now supported for rx/tx and blocking/async channels (#4049)
+- `rmt::CHANNEL_RAM_SIZE` and `rmt::HAS_RX_WRAP` constants have been added (#4049)
+- A new option `ESP_HAL_CONFIG_WRITE_VEC_TABLE_MONITORING` (disabled by default) to check that no unintentional writes to a very vital memory area are made. (Only RISC-V) (#4225)
+- ESP32-C2: Added `Attenuation::_2p5dB` and `Attenuation::_6dB` options (#4324)
 
 ### Changed
 
@@ -40,7 +110,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DmaTxBuffer::from_view` and `DmaRxBuffer::from_view` now return an object with type `DmaTx/RxBuffer::Final`. (#3923)
 - `i2c::master::Config::timeout` has been de-stabilized, and `i2c::master::Config::software_timeout`. (#3926)
 - The default values of `i2c::master::Config` timeouts have been changed to their maximum possible values. (#3926)
+- Adc CHANNEL constant moved to trait function. (#3942)
 - `ShaDigest::finish` has been reimplemented to be properly non-blocking (#3948)
+- Replace Timer's `pub fn enable_interrupt(&mut self, enable: bool)` with `pub fn listen(&mut self)` and `pub fn unlisten(&mut self)` (#3933)
+- ESP32-S3: `PsramConfig::core_clock` is now an `Option` (#3974)
+- `RtcSlowClock::RtcFastClock8m` has been renamed to `RtcFastClock::RtcFastClockRcFast` (#3993)
+- `RtcSlowClock::RtcSlowClockRtc` has been renamed to `RtcSlowClock::RtcSlowClockRcSlow` (#3993)
+- The `Raw: RawChannelAccess` of `rmt::Channel` has been erased; channel numbers are always dynamic now. (#3980)
+- ESP32-S2: `i2s::master::DataFormat` now includes 8-bit and 24-bit data widths (#3985)
+- Bump `embassy-embedded-hal` to v0.5.0 (#4075)
+- Make `uart::Uhci` configurable after splitting, improve DMA channel handling (#4039)
+- `RtcClock`, `RtcFastClock`, and `RtcSlowClock` moved to `clock` module (#4089)
+- Resolved enum variant naming violations in `RtcFastClock` and `RtcSlowClock` enums (#4089)
+- The `rmt::Channel::transmit_continuously` and `rmt::Channel::transmit_continuously_with_loopcount` methods have been merged (#4100)
+- Introduced `Error::FrequencyUnset` in `ledc::timer::Error` (#4214)
+- `ESP_HAL_CONFIG_STACK_GUARD_OFFSET` is now considered stable (#4220)
+- `rmt::Channel` and `rmt::ChannelCreator` now carry a lifetime and can be reborrowed. (#4174)
+- RMT transactions and futures are marked as `#[must_use]` and implement `Drop`. (#4174)
+- The behavior of `rmt::PulseCode` constructors (`new`, `new_clamped`, `try_new`) has been reworked to be more convenient and clear. (#4246)
+- RMT: `Channel::transmit_continuously` now takes an additional `LoopStop` argument. (#4260)
+- RMT: `LoopCount::Finite` and `ContinuousTxTransaction::is_tx_loopcount_interrupt_set` are only defined when the hardware supports it (all except ESP32). (#4260)
+- RMT: `Channel::transmit_continuously` now verifies that loop counts don't exceed the hardware limit (#4276)
+- RMT: Receive operations read only received codes instead of the entire buffer and return the number of codes read (#4049)
+- `esp_hal::clock::{RtcFastClock, RtcSlowClock, RtcClock}`, `esp_hal::gpio::Input::wait_for` and `esp_hal::gpio::Event` have been marked unstable (#4293, #4326)
+- All `ram` proc macro options except `#[ram(reclaimed)]` are considered `unstable` (#4309)
+- ESP32: Stripped prefix from `esp_hal::adc::Resolution` variants (`ResolutionXBit -> _XBit`) (#4324)
 
 ### Fixed
 
@@ -50,12 +144,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Switched GPIO32 and GPIO33 ADC channel numbers (#3908, #3911)
 - Calling `Input::unlisten` in a GPIO interrupt handler no longer panics (#3913)
 - ESP32, ESP32-S2: Fixed I2C bus clearing algorithm (#3926)
+- Check serial instead of jtag fifo status in UsbSerialJtag's async flush function (#3957)
+- ESP32: Enable up to 4M of PSRAM (#3990)
+- I2C error recovery logic issues (#4000)
+- I2S: Fixed RX half-sample bits configuration bug causing microphone noise (#4109)
+- RISC-V: Direct interrupt vectoring (#4171)
+- TWAI: Fixed unnecessary transmission abortions (#4227)
+- TWAI: Fixed receive_async returning corrupt frames (#4243)
+- TWAI: Fixed receive_async erroneously returning RX FIFO overrun errors (#4244)
+- Subtracting Instant values with large difference no longer panics (#4249)
+- ADC: Fixed integer overflow in curve calibration polynomial evaluation (#4240)
+- ADC: Fixed bug where ADC1 would use ADC2 efuse calibration data (#4286)
+- RMT: `Channel::transmit_continuously` also triggers the loopcount interrupt when only using a single repetition. (#4260)
+- I2C: Fix position of SDA sampling point (#4268)
 
 ### Removed
 
 - `Trng::new` (replaced by `Trng::try_new`) (#3829)
 - `AesDma::{write_key, write_block}` have been removed. (#3880, #3882)
 - `AesFlavour` trait and `AesX` structs have been removed. (#3880)
+- `Xtal::Other` has been removed (#3983)
+- ESP32-C3/S3: removed the UHCI1 peripheral singleton (#4007)
+- `i2s::master::Standard` has been removed (#3985)
+- `ledc::channel::PinConfig` has been removed and used `DriveMode` instead (#4214)
+- ESP32: removed integrated SPI-connected pins (6 to 11 both included) (#4202)
+- ESP32H2: removed pins 6 and 7 (#4202)
+- ESP32C3 and ESP32C2: removed pins 11 to 17 both included (#4202)
+- ESP32C6: removed pins 24, 25, 26, 28, 29 and 30 (#4202)
+- ESP32S2 and ESP32S3: removed pins 26 to 32 both included (#4202)
+- `adc::Resolution` has been removed from chips other than ESP32 (#4324)
 
 ## [v1.0.0-rc.0] - 2025-07-16
 
@@ -90,7 +207,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adjusted ESP32-S2 deep-sleep to hibernate for the Ext1WakeupSource (#3785)
 - Libraries depending on esp-hal should now disable default features, so that only the final binary crate enables the `rt` feature (#3706)
 - Changed `interrupt::RESERVED_INTERRUPTS` from `&[usize]` to `&[u32]` (#3798)
-- Replace Timer's `pub fn enable_interrupt(&mut self, enable: bool)` with `pub fn listen(&mut self)` and `pub fn unlisten(&mut self)` #(3933)
 
 ### Fixed
 
@@ -218,6 +334,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the `FullDuplex` trait from the PARL_IO driver. (#3339)
 - Removed `Flex::{set_as_input, set_as_output, set_drive_strength, set_as_open_drain, pull_direction}` functions (#3387)
 - The `Efuse::read_field_be` function has been removed (#3440)
+- The config option (`ESP_HAL_CONFIG_FLIP_LINK`) got removed, `ESP_HAL_CONFIG_WRITE_VEC_TABLE_MONITORING` will yield equally good results (#4295)
 
 ## [v1.0.0-beta.0] - 2025-02-24
 
@@ -1354,4 +1471,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v1.0.0-beta.0]: https://github.com/esp-rs/esp-hal/compare/v0.23.1...esp-hal-v1.0.0-beta.0
 [v1.0.0-beta.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.0...esp-hal-v1.0.0-beta.1
 [v1.0.0-rc.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.1...esp-hal-v1.0.0-rc.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.0...HEAD
+[v1.0.0-rc.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.0...esp-hal-v1.0.0-rc.1
+[v1.0.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.1...esp-hal-v1.0.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0...HEAD

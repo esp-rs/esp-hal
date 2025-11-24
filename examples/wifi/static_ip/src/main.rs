@@ -15,13 +15,14 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
+    interrupt::software::SoftwareInterruptControl,
     main,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_radio::wifi::{ClientConfiguration, Configuration, ScanConfig};
+use esp_radio::wifi::{ModeConfig, ScanConfig, sta::ClientConfig};
 use smoltcp::iface::{SocketSet, SocketStorage};
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -30,6 +31,7 @@ const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 const STATIC_IP: &str = env!("STATIC_IP");
 const GATEWAY_IP: &str = env!("GATEWAY_IP");
+const FERRIS_GIF: &str = "https://rustacean.net/more-crabby-things/dancing-ferris.gif";
 
 #[main]
 fn main() -> ! {
@@ -40,18 +42,17 @@ fn main() -> ! {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_preempt::init(timg0.timer0);
-
-    let esp_radio_ctrl = esp_radio::init().unwrap();
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let (mut controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI).unwrap();
+        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
     let mut device = interfaces.sta;
     let iface = create_interface(&mut device);
 
     controller
-        .set_power_saving(esp_radio::config::PowerSaveMode::None)
+        .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
         .unwrap();
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
@@ -61,12 +62,12 @@ fn main() -> ! {
     let now = || time::Instant::now().duration_since_epoch().as_millis();
     let mut stack = Stack::new(iface, device, socket_set, now, rng.random());
 
-    let client_config = Configuration::Client(ClientConfiguration {
-        ssid: SSID.into(),
-        password: PASSWORD.into(),
-        ..Default::default()
-    });
-    let res = controller.set_configuration(&client_config);
+    let client_config = ModeConfig::Client(
+        ClientConfig::default()
+            .with_ssid(SSID.into())
+            .with_password(PASSWORD.into()),
+    );
+    let res = controller.set_config(&client_config);
     println!("wifi_set_configuration returned {:?}", res);
 
     controller.start().unwrap();
@@ -74,7 +75,7 @@ fn main() -> ! {
 
     println!("Start Wifi Scan");
     let scan_config = ScanConfig::default().with_max(10);
-    let res = controller.scan_with_config_sync(scan_config).unwrap();
+    let res = controller.scan_with_config(scan_config).unwrap();
     for ap in res {
         println!("{:?}", ap);
     }
@@ -158,16 +159,20 @@ fn main() -> ! {
             }
 
             if !time_out {
-                socket.write_all(
-                    b"HTTP/1.0 200 OK\r\n\r\n\
-                    <html>\
-                        <body>\
-                            <h1>Hello Rust! Hello esp-radio!</h1>\
-                            <img src=\"https://rustacean.net/more-crabby-things/dancing-ferris.gif\"/>
-                        </body>\
-                    </html>\r\n\
-                    "
-                ).unwrap();
+                if !time_out {
+                    write!(
+                        socket,
+                        "HTTP/1.0 200 OK\r\n\r\n\
+                        <html>\
+                            <body>\
+                                <h1>Hello Rust! Hello esp-radio!</h1>\
+                                <img src=\"{}\"/>\
+                            </body>\
+                        </html>\r\n",
+                        FERRIS_GIF
+                    )
+                    .unwrap();
+                }
 
                 socket.flush().unwrap();
             }

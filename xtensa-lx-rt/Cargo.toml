@@ -1,6 +1,6 @@
 [package]
 name          = "xtensa-lx-rt"
-version       = "0.20.0"
+version       = "0.21.0"
 edition       = "2024"
 rust-version  = "1.88.0"
 description   = "Minimal startup/runtime for Xtensa LX CPUs"
@@ -11,16 +11,18 @@ keywords      = ["lx", "peripheral", "register", "xtensa"]
 categories    = ["embedded", "hardware-support", "no-std"]
 links         = "xtensa-lx-rt"
 
+[package.metadata.espressif]
+requires_target = ["xtensa-esp32-none-elf", "xtensa-esp32s2-none-elf", "xtensa-esp32s3-none-elf"]
+
 [lib]
 bench = false
 test  = false
 
 [dependencies]
-document-features = "0.2.11"
+document-features = "0.2"
 defmt             = {version = "1.0.1", optional = true}
-macros            = { version = "0.4.0", package = "xtensa-lx-rt-proc-macros", path = "../xtensa-lx-rt-proc-macros" }
-r0                = "1.0.0"
-xtensa-lx         = { version = "0.12.0", path = "../xtensa-lx" }
+macros            = { version = "0.5.0", package = "xtensa-lx-rt-proc-macros", path = "../xtensa-lx-rt-proc-macros" }
+xtensa-lx         = { version = "0.13.0", path = "../xtensa-lx" }
 
 [build-dependencies]
 

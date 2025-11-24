@@ -19,15 +19,17 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
+    interrupt::software::SoftwareInterruptControl,
     main,
+    ram,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
 use esp_radio::wifi::{
-    AccessPointConfiguration,
-    Configuration,
+    ModeConfig,
+    ap::AccessPointConfig,
     event::{self, EventExt},
 };
 use smoltcp::iface::{SocketSet, SocketStorage};
@@ -40,22 +42,24 @@ fn main() -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(size: 72 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_preempt::init(timg0.timer0);
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     // Set event handlers for wifi before init to avoid missing any.
     let mut connections = 0u32;
     _ = event::ApStart::replace_handler(|_| println!("ap start event"));
-    event::ApStaconnected::update_handler(move |event| {
+    event::ApStaConnected::update_handler(move |event| {
         connections += 1;
         esp_println::println!("connected {}, mac: {:?}", connections, event.mac());
     });
-    event::ApStaconnected::update_handler(|event| {
+    event::ApStaConnected::update_handler(|event| {
         esp_println::println!("connected aid: {}", event.aid());
     });
-    event::ApStadisconnected::update_handler(|event| {
+    event::ApStaDisconnected::update_handler(|event| {
         println!(
             "disconnected mac: {:?}, reason: {:?}",
             event.mac(),
@@ -63,10 +67,8 @@ fn main() -> ! {
         );
     });
 
-    let esp_radio_ctrl = esp_radio::init().unwrap();
-
     let (mut controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI).unwrap();
+        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
     let mut device = interfaces.ap;
     let iface = create_interface(&mut device);
@@ -78,11 +80,9 @@ fn main() -> ! {
     let socket_set = SocketSet::new(&mut socket_set_entries[..]);
     let mut stack = Stack::new(iface, device, socket_set, now, rng.random());
 
-    let client_config = Configuration::AccessPoint(AccessPointConfiguration {
-        ssid: "esp-radio".into(),
-        ..Default::default()
-    });
-    let res = controller.set_configuration(&client_config);
+    let ap_config =
+        ModeConfig::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
+    let res = controller.set_config(&ap_config);
     println!("wifi_set_configuration returned {:?}", res);
 
     controller.start().unwrap();

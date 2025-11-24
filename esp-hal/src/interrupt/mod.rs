@@ -87,7 +87,7 @@ pub mod software;
 #[cfg(feature = "rt")]
 #[unsafe(no_mangle)]
 extern "C" fn EspDefaultHandler() {
-    panic!("Unhandled interrupt");
+    panic!("Unhandled interrupt on {:?}", crate::system::Cpu::current());
 }
 
 /// Default (unhandled) interrupt handler

@@ -17,7 +17,7 @@
 //! detailed study of how to use this LP Core please visit [the repository
 //! with corresponding example].
 //!
-//! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/lp_core_basic.rs
+//! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/examples/peripheral/lp_core/src/main.rs
 
 use crate::peripherals::{LP_AON, LP_CORE, LP_PERI, LPWR, PMU};
 

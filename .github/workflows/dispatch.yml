@@ -1,0 +1,648 @@
+name: Dispatch
+
+on:
+  # labels on PRs
+  pull_request_target:
+    types: [labeled]
+  # slash commands & trust commands
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  actions: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # LABEL: TRUSTED AUTHOR
+  # ---------------------------------------------------------------------------
+
+  label-trusted-author:
+    if: github.event_name == 'pull_request_target' &&
+        github.event.label.name == 'trusted-author'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get PR author login
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const login = (context.payload.pull_request.user.login || '').toLowerCase();
+            if (!login) {
+              core.setFailed('Could not determine PR author login');
+              return;
+            }
+            core.setOutput('login', login);
+
+      - id: find
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: github-actions[bot]
+          body-includes: "[HIL trust list]"
+
+      - name: Upsert trust list for author
+        id: upsert
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const login = "${{ steps.pr.outputs.login }}".toLowerCase();
+            const existing = `${{ toJson(steps.find.outputs.comment-body || '') }}`;
+
+            // read existing trusted[] from hidden JSON if present
+            let list = [];
+            const m = existing.match(/<!--\s*HIL_TRUST_JSON\s*([\s\S]*?)\s*HIL_TRUST_JSON\s*-->/);
+            if (m && m[1]) {
+              try { list = JSON.parse(m[1]).trusted || []; } catch {}
+            }
+
+            if (!list.includes(login)) list.push(login);
+            list = Array.from(new Set(list)).sort();
+
+            const json = JSON.stringify({ trusted: list }, null, 2);
+            const pretty = list.length ? list.map(u => `- @${u}`).join('\n') : '_None yet_';
+
+            const body =
+            `### [HIL trust list]
+            <!-- HIL_TRUST_JSON
+            ${json}
+            HIL_TRUST_JSON -->
+
+            <details>
+            <summary>Trusted users for this PR (click to expand)</summary>
+
+            ${pretty}
+
+            </details>`;
+
+            core.setOutput("body", body);
+
+      - uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-id: ${{ steps.find.outputs.comment-id }}
+          body: ${{ steps.upsert.outputs.body }}
+          edit-mode: replace
+
+      - uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            Author **@${{ steps.pr.outputs.login }}** was trusted for this PR via the `trusted-author` label.
+            They can now use `/hil quick` or `/hil full`.
+
+  # ---------------------------------------------------------------------------
+  # TRUST MANAGEMENT (/trust, /revoke)
+  # ---------------------------------------------------------------------------
+
+  trust:
+    if: >
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      (github.event.comment.author_association == 'MEMBER' ||
+       github.event.comment.author_association == 'OWNER') &&
+      startsWith(github.event.comment.body, '/trust ')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Parse login
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = (context.payload.comment.body || '').trim();
+            const m = body.match(/^\/trust\s+@([A-Za-z0-9-]+)\b$/i);
+            if (!m) core.setFailed("Usage: /trust @<login>");
+            core.setOutput('login', m[1].toLowerCase());
+
+      - id: find
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          comment-author: github-actions[bot]
+          body-includes: "[HIL trust list]"
+
+      - name: Upsert trust list
+        id: upsert
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const login = "${{ steps.parse.outputs.login }}".toLowerCase();
+            const existing = `${{ toJson(steps.find.outputs.comment-body || '') }}`;
+
+            // read existing trusted[] from hidden JSON if present
+            let list = [];
+            const m = existing.match(/<!--\s*HIL_TRUST_JSON\s*([\s\S]*?)\s*HIL_TRUST_JSON\s*-->/);
+            if (m && m[1]) {
+              try { list = JSON.parse(m[1]).trusted || []; } catch {}
+            }
+
+            if (!list.includes(login)) list.push(login);
+            list = Array.from(new Set(list)).sort();
+
+            const json = JSON.stringify({ trusted: list }, null, 2);
+            const pretty = list.length ? list.map(u => `- @${u}`).join('\n') : '_None yet_';
+
+            const body =
+            `### [HIL trust list]
+            <!-- HIL_TRUST_JSON
+            ${json}
+            HIL_TRUST_JSON -->
+
+            <details>
+            <summary>Trusted users for this PR (click to expand)</summary>
+
+            ${pretty}
+
+            </details>`;
+
+                        core.setOutput("body", body);
+
+      - uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          comment-id: ${{ steps.find.outputs.comment-id }}
+          body: ${{ steps.upsert.outputs.body }}
+          edit-mode: replace
+
+      - uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+        # separate short confirmation comment
+          body: "Trusted **@${{ steps.parse.outputs.login }}** for this PR. They can now use `/hil quick` or `/hil full`."
+
+  revoke:
+    if: >
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      (github.event.comment.author_association == 'MEMBER' ||
+       github.event.comment.author_association == 'OWNER') &&
+      startsWith(github.event.comment.body, '/revoke ')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Parse login
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = (context.payload.comment.body || '').trim();
+            const m = body.match(/^\/revoke\s+@([A-Za-z0-9-]+)\b$/i);
+            if (!m) core.setFailed("Usage: /revoke @<login>");
+            core.setOutput('login', m[1].toLowerCase());
+
+      - id: find
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          comment-author: github-actions[bot]
+          body-includes: "[HIL trust list]"
+
+      - name: Remove from trust list
+        id: update
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const login = "${{ steps.parse.outputs.login }}".toLowerCase();
+            const existing = `${{ toJson(steps.find.outputs.comment-body || '') }}`;
+
+            let list = [];
+            const m = existing.match(/<!--\s*HIL_TRUST_JSON\s*([\s\S]*?)\s*HIL_TRUST_JSON\s*-->/);
+            if (m && m[1]) {
+              try { list = JSON.parse(m[1]).trusted || []; } catch {}
+            }
+
+            list = list.filter(u => u !== login).sort();
+
+            const json = JSON.stringify({ trusted: list }, null, 2);
+            const pretty = list.length ? list.map(u => `- @${u}`).join('\n') : '_None yet_';
+
+            const body =
+            `### [HIL trust list]
+            <!-- HIL_TRUST_JSON
+            ${json}
+            HIL_TRUST_JSON -->
+
+            <details>
+            <summary>Trusted users for this PR (click to expand)</summary>
+
+            ${pretty}
+
+            </details>`;
+
+                        core.setOutput("body", body);
+
+      - uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          comment-id: ${{ steps.find.outputs.comment-id }}
+          body: ${{ steps.update.outputs.body }}
+          edit-mode: replace
+
+      - uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: "Revoked **@${{ steps.parse.outputs.login }}** for this PR."
+
+  # ---------------------------------------------------------------------------
+  # SLASH-BASED DISPATCHES (/hil quick, /hil full)
+  # ---------------------------------------------------------------------------
+
+  auth:
+    # Only PR comments need auth
+    if: github.event_name == 'issue_comment' && github.event.issue.pull_request
+    runs-on: ubuntu-latest
+    outputs:
+      allowed: ${{ steps.check.outputs.allowed }}
+    steps:
+      - id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const assoc = context.payload.comment.author_association;
+            const commenter = context.payload.comment.user.login.toLowerCase();
+            const pr = context.payload.issue.number;
+
+            if (assoc === 'MEMBER' || assoc === 'OWNER') {
+              core.setOutput('allowed', 'true');
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              { owner, repo, issue_number: pr, per_page: 100 }
+            );
+            const trust = comments.find(c =>
+              c.user?.login === 'github-actions[bot]' &&
+              typeof c.body === 'string' &&
+              c.body.includes('HIL_TRUST_JSON')
+            );
+
+            let allowed = false;
+            if (trust) {
+              const m = trust.body.match(/<!--\s*HIL_TRUST_JSON\s*([\s\S]*?)\s*HIL_TRUST_JSON\s*-->/);
+              if (m && m[1]) {
+                try {
+                  const data = JSON.parse(m[1]);
+                  const list = (data.trusted || []).map(s => String(s).toLowerCase());
+                  allowed = list.includes(commenter);
+                } catch {}
+              }
+            }
+            core.setOutput('allowed', allowed ? 'true' : 'false');
+
+  hil-quick:
+    needs: auth
+    if: github.event_name == 'issue_comment' &&
+        needs.auth.outputs.allowed == 'true' &&
+        startsWith(github.event.comment.body, '/hil quick')
+    runs-on: ubuntu-latest
+    outputs:
+      run_id: ${{ steps.find-run.outputs.run_id }}
+      comment_id: ${{ steps.comment.outputs.comment-id }}
+    steps:
+      - name: Dispatch HIL (quick)
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: hil.yml
+          ref: ${{ github.event.repository.default_branch }}
+          inputs: |
+            {
+              "repository": "${{ github.repository }}",
+              "branch": "refs/pull/${{ github.event.issue.number }}/head",
+              "matrix": "quick",
+              "pr_number": "${{ github.event.issue.number }}"
+            }
+
+      - name: Find HIL run URL (quick)
+        id: find-run
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.issue.number;
+            const matrix = 'quick';
+            const expectedTitle = `HIL for PR #${pr} (${matrix})`;
+
+            const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+            let run = null;
+
+            // Try multiple times; keep the *last* matching run we see
+            for (let attempt = 1; attempt <= 10; attempt++) {
+                const { data } = await github.rest.actions.listWorkflowRuns({
+                    owner,
+                    repo,
+                    workflow_id: 'hil.yml',
+                    event: 'workflow_dispatch',
+                    per_page: 50,
+                });
+
+                if (data.workflow_runs && data.workflow_runs.length > 0) {
+                    const candidate = data.workflow_runs.find(r =>
+                        (r.display_title && r.display_title.trim() === expectedTitle) ||
+                        (r.name && r.name.trim() === expectedTitle)
+                    );
+                    // Keep the *last* matching run we see across all attempts
+                    if (candidate) {
+                        run = candidate;
+                    }
+                }
+
+                await delay(3000);
+            }
+
+            let body = `Triggered **${matrix}** HIL run for #${pr}.`;
+            if (run && run.html_url) {
+                body += `\n\nRun: ${run.html_url}`;
+            } else {
+                body += `\n\nCould not determine run URL yet. Please check the **HIL** workflow runs manually.`;
+            }
+
+            if (run && run.id) {
+                core.setOutput('run_id', String(run.id));
+            } else {
+                core.setOutput('run_id', '');
+            }
+
+            core.setOutput('body', body);
+
+      - name: Confirm in PR
+        id: comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: ${{ steps.find-run.outputs.body }}
+
+  hil-quick-status:
+    needs: hil-quick
+    if: needs.hil-quick.outputs.run_id != '' && needs.hil-quick.outputs.comment_id != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for quick HIL run and update comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const runId = Number('${{ needs.hil-quick.outputs.run_id }}');
+            const commentId = Number('${{ needs.hil-quick.outputs.comment_id }}');
+            const pr = context.payload.issue.number;
+            const matrix = 'quick';
+
+            const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+            let conclusion = null;
+
+            // Poll up to ~15 minutes (60 * 15s)
+            for (let i = 0; i < 60; i++) {
+              const { data } = await github.rest.actions.getWorkflowRun({
+                owner,
+                repo,
+                run_id: runId,
+              });
+
+              if (data.status === 'completed') {
+                conclusion = data.conclusion;
+                break;
+              }
+
+              await delay(15000);
+            }
+
+            let suffix;
+            if (!conclusion) {
+              suffix = `\n\n**Status update:** HIL (${matrix}) run is still in progress or status unknown.`;
+            } else if (conclusion === 'success') {
+              suffix = `\n\n**Status update:** ✅ HIL (${matrix}) run **succeeded**.`;
+            } else if (conclusion === 'cancelled') {
+              suffix = `\n\n**Status update:** ⚠️ HIL (${matrix}) run was **cancelled**.`;
+            } else {
+              suffix = `\n\n**Status update:** ❌ HIL (${matrix}) run **failed** (conclusion: ${conclusion}).`;
+            }
+
+            // Fetch existing comment
+            const comment = await github.rest.issues.getComment({
+              owner,
+              repo,
+              comment_id: commentId,
+            });
+
+            const body = `${comment.data.body}\n${suffix}`;
+
+            await github.rest.issues.updateComment({
+              owner,
+              repo,
+              comment_id: commentId,
+              body,
+            });
+
+  hil-full:
+    needs: auth
+    if: github.event_name == 'issue_comment' &&
+        needs.auth.outputs.allowed == 'true' &&
+        startsWith(github.event.comment.body, '/hil full')
+    runs-on: ubuntu-latest
+    outputs:
+      run_id: ${{ steps.find-run.outputs.run_id }}
+      comment_id: ${{ steps.comment.outputs.comment-id }}
+    steps:
+      - name: Dispatch HIL (full)
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: hil.yml
+          ref: ${{ github.event.repository.default_branch }}
+          inputs: |
+            {
+              "repository": "${{ github.repository }}",
+              "branch": "refs/pull/${{ github.event.issue.number }}/head",
+              "matrix": "full",
+              "pr_number": "${{ github.event.issue.number }}"
+            }
+
+      - name: Find HIL run URL (full)
+        id: find-run
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.issue.number;
+            const matrix = 'full';
+            const expectedTitle = `HIL for PR #${pr} (${matrix})`;
+
+            const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+            let run = null;
+
+            // Try multiple times; keep the *last* matching run we see
+            for (let attempt = 1; attempt <= 10; attempt++) {
+                const { data } = await github.rest.actions.listWorkflowRuns({
+                    owner,
+                    repo,
+                    workflow_id: 'hil.yml',
+                    event: 'workflow_dispatch',
+                    per_page: 50,
+                });
+
+              if (data.workflow_runs && data.workflow_runs.length > 0) {
+                const candidate = data.workflow_runs.find(r =>
+                    (r.display_title && r.display_title.trim() === expectedTitle) ||
+                    (r.name && r.name.trim() === expectedTitle)
+                );
+                if (candidate) {
+                    run = candidate;
+                }
+              }
+
+                await delay(3000);
+            }
+
+            let body = `Triggered **${matrix}** HIL run for #${pr}.`;
+            if (run && run.html_url) {
+                body += `\n\nRun: ${run.html_url}`;
+            } else {
+                body += `\n\nCould not determine run URL yet. Please check the **HIL** workflow runs manually.`;
+            }
+
+            if (run && run.id) {
+              core.setOutput('run_id', String(run.id));
+            } else {
+              core.setOutput('run_id', '');
+            }
+
+            core.setOutput('body', body);
+
+      - name: Confirm in PR
+        id: comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: ${{ steps.find-run.outputs.body }}
+
+  hil-full-status:
+    needs: hil-full
+    if: needs.hil-full.outputs.run_id != '' && needs.hil-full.outputs.comment_id != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for full HIL run and update comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const runId = Number('${{ needs.hil-full.outputs.run_id }}');
+            const commentId = Number('${{ needs.hil-full.outputs.comment_id }}');
+            const pr = context.payload.issue.number;
+            const matrix = 'full';
+
+            const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+            let conclusion = null;
+
+            // Poll up to ~15 minutes (60 * 15s)
+            for (let i = 0; i < 60; i++) {
+              const { data } = await github.rest.actions.getWorkflowRun({
+                owner,
+                repo,
+                run_id: runId,
+              });
+
+              if (data.status === 'completed') {
+                conclusion = data.conclusion;
+                break;
+              }
+
+              await delay(15000);
+            }
+
+            let suffix;
+            if (!conclusion) {
+              suffix = `\n\n**Status update:** HIL (${matrix}) run is still in progress or status unknown._`;
+            } else if (conclusion === 'success') {
+              suffix = `\n\n**Status update:** ✅ HIL (${matrix}) run **succeeded**.`;
+            } else if (conclusion === 'cancelled') {
+              suffix = `\n\n**Status update:** ⚠️ HIL (${matrix}) run was **cancelled**.`;
+            } else {
+              suffix = `\n\n**Status update:** ❌ HIL (${matrix}) run **failed** (conclusion: ${conclusion}).`;
+            }
+
+            // Fetch existing comment
+            const comment = await github.rest.issues.getComment({
+              owner,
+              repo,
+              comment_id: commentId,
+            });
+
+            const body = `${comment.data.body}\n${suffix}`;
+
+            await github.rest.issues.updateComment({
+              owner,
+              repo,
+              comment_id: commentId,
+              body,
+            });
+
+  hil-deny:
+    needs: auth
+    if: github.event_name == 'issue_comment' && needs.auth.outputs.allowed != 'true' &&
+        (startsWith(github.event.comment.body, '/hil quick') ||
+         startsWith(github.event.comment.body, '/hil full')  ||
+         startsWith(github.event.comment.body, '/test-size'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inform not allowed
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            @${{ github.event.comment.user.login }}, sorry — you're not allowed to execute HIL runs or binary size analysis for this PR.
+            Please ask an `esp-rs` member/owner to grant access with:
+            ```
+            /trust @${{ github.event.comment.user.login }}
+            ```
+            After that, you can use `/hil quick`, `/hil full` or `/test-size`.
+
+  hil-help:
+    if: github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/hil') && !startsWith(github.event.comment.body, '/hil quick') && !startsWith(github.event.comment.body, '/hil full')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain usage
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            Usage:
+            - `/hil quick` — run a quick HIL matrix (only `ESP32-S3` (Xtensa) and `ESP32-C6` (RISC-V) tests)
+            - `/hil full`  — run the full HIL matrix
+            If you aren't a repository **member/owner**, you must be **trusted for this PR**.
+            Maintainers can grant access with a `trusted-author` label or with:
+            ```
+            /trust @<login>
+            ```
+            and revoke with:
+            ```
+            /revoke @<login>
+            ```
+
+  binary-size:
+    needs: auth
+    if: github.event_name == 'issue_comment' &&
+        needs.auth.outputs.allowed == 'true' &&
+        startsWith(github.event.comment.body, '/test-size')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Binary Size Analysis
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: binary_size.yml
+          ref: ${{ github.event.repository.default_branch }}
+          inputs: |
+            {
+              "pr_number": "${{ github.event.issue.number }}"
+            }
+
+      - name: Confirm in PR
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: >
+            Triggered binary size analysis for
+            #${{ github.event.issue.number }}. Results will be posted as a comment when ready.

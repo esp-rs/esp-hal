@@ -64,6 +64,7 @@ crate::unstable_module! {
     #[cfg(all(soc_has_rtc_io, not(esp32)))]
     pub mod rtc_io;
 }
+use interconnect::PeripheralOutput;
 
 mod asynch;
 mod embedded_hal_impls;
@@ -74,6 +75,7 @@ mod placeholder;
 
 use core::fmt::Display;
 
+use esp_sync::RawMutex;
 pub use placeholder::NoPin;
 use portable_atomic::AtomicU32;
 use strum::EnumCount;
@@ -83,7 +85,6 @@ use crate::{
     interrupt::{InterruptHandler, Priority},
     peripherals::{GPIO, IO_MUX, Interrupt},
     private::{self, Sealed},
-    sync::RawMutex,
 };
 
 define_io_mux_signals!();
@@ -99,24 +100,19 @@ pub(crate) static GPIO_LOCK: RawMutex = RawMutex::new();
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) struct PinGuard {
     pin: u8,
-    signal: OutputSignal,
 }
 
 impl crate::private::Sealed for PinGuard {}
 
 impl PinGuard {
-    pub(crate) fn new(pin: AnyPin<'_>, signal: OutputSignal) -> Self {
-        Self {
-            pin: pin.number(),
-            signal,
-        }
+    // This must only be used with a pin currently configured for output, and the PinGuard must be
+    // dropped before the pin can be reconfigured (e.g. for input).
+    fn new(pin: AnyPin<'_>) -> Self {
+        Self { pin: pin.number() }
     }
 
-    pub(crate) fn new_unconnected(signal: OutputSignal) -> Self {
-        Self {
-            pin: u8::MAX,
-            signal,
-        }
+    pub(crate) fn new_unconnected() -> Self {
+        Self { pin: u8::MAX }
     }
 
     #[allow(unused)]
@@ -133,7 +129,7 @@ impl Drop for PinGuard {
     fn drop(&mut self) {
         if self.pin != u8::MAX {
             let pin = unsafe { AnyPin::steal(self.pin) };
-            self.signal.disconnect_from(&pin);
+            pin.disconnect_from_peripheral_output();
         }
     }
 }
@@ -141,6 +137,7 @@ impl Drop for PinGuard {
 /// Event used to trigger interrupts.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum Event {
     /// Interrupts trigger on rising pin edge.
     RisingEdge  = 1,
@@ -357,6 +354,9 @@ pub enum RtcFunction {
     Rtc     = 0,
     /// Digital mode.
     Digital = 1,
+    /// RTC_I2C mode.
+    #[cfg(soc_has_rtc_i2c)]
+    I2c     = 3,
 }
 
 /// Trait implemented by RTC pins
@@ -431,7 +431,7 @@ pub trait Pin: Sealed {
     ///     }
     /// }
     ///
-    /// let pins: [AnyPin; 2] = [peripherals.GPIO5.degrade(), peripherals.GPIO6.degrade()];
+    /// let pins: [AnyPin; 2] = [peripherals.GPIO5.degrade(), peripherals.GPIO4.degrade()];
     ///
     /// let mut delay = Delay::new();
     /// toggle_pins(pins, &mut delay);
@@ -696,7 +696,7 @@ impl crate::interrupt::InterruptConfigurable for Io<'_> {
 
 for_each_analog_function! {
     (($_ch:ident, ADCn_CHm, $_n:literal, $_m:literal), $gpio:ident) => {
-        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+        #[instability::unstable]
         impl $crate::gpio::AnalogPin for crate::peripherals::$gpio<'_> {
             #[cfg(riscv)]
             fn set_analog(&self, _: private::Internal) {

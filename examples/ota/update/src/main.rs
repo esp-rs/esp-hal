@@ -8,15 +8,16 @@
 //! Adjust the target and the chip in the following commands according to the
 //! chip used!
 //!
-//! - `cargo xtask build examples examples esp32 --example=gpio_interrupt`
-//! - `espflash save-image --chip=esp32 examples/target/xtensa-esp32-none-elf/release/gpio_interrupt
-//!   examples/target/ota_image`
-//! - `cargo xtask build examples examples esp32 --example=ota_update`
-//! - `espflash save-image --chip=esp32 examples/target/xtensa-esp32-none-elf/release/ota_update
-//!   examples/target/ota_image`
-//! - erase whole flash via `espflash erase-flash` (this is to make sure otadata is cleared and no
-//!   code is flashed to any partition)
-//! - run via `cargo xtask run example examples esp32 --example=ota_update`
+//! ```ignore,bash
+//! cargo xtask build examples gpio --chip=esp32
+//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/gpio_interrupt examples/target/ota_image
+//! cargo xtask build examples update --chip=esp32
+//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update examples/target/ota_image
+//! cargo xtask build examples update --chip=esp32
+//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update examples/target/ota_image
+//! espflash erase-flash
+//! cargo xtask run example update --chip=esp32
+//! ```
 //!
 //! On first boot notice the firmware partition gets booted ("Loaded app from
 //! partition at offset 0x10000"). Press the BOOT button, once finished press
@@ -28,22 +29,19 @@
 //! You will see the `gpio_interrupt` example gets booted from OTA1 ("Loaded app
 //! from partition at offset 0x210000")
 //!
-//! See https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/ota.html
+//! See <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/ota.html>
 
 #![no_std]
 #![no_main]
 
 use embedded_storage::Storage;
 use esp_backtrace as _;
-use esp_bootloader_esp_idf::{
-    ota::Slot,
-    partitions::{self, AppPartitionSubType, DataPartitionSubType},
-};
 use esp_hal::{
     gpio::{Input, InputConfig, Pull},
     main,
 };
 use esp_println::println;
+use esp_storage::FlashStorage;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -54,46 +52,40 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut storage = esp_storage::FlashStorage::new();
+    let mut flash = FlashStorage::new(peripherals.FLASH);
 
     let mut buffer = [0u8; esp_bootloader_esp_idf::partitions::PARTITION_TABLE_MAX_LEN];
-    let pt = esp_bootloader_esp_idf::partitions::read_partition_table(&mut storage, &mut buffer)
-        .unwrap();
+    let pt =
+        esp_bootloader_esp_idf::partitions::read_partition_table(&mut flash, &mut buffer).unwrap();
 
     // List all partitions - this is just FYI
-    for i in 0..pt.len() {
-        println!("{:?}", pt.get_partition(i));
+    for part in pt.iter() {
+        println!("{:?}", part);
     }
 
-    // Find the OTA-data partition and show the currently active partition
-    let ota_part = pt
-        .find_partition(esp_bootloader_esp_idf::partitions::PartitionType::Data(
-            DataPartitionSubType::Ota,
-        ))
-        .unwrap()
-        .unwrap();
-    let mut ota_part = ota_part.as_embedded_storage(&mut storage);
-    println!("Found ota data");
+    println!("Currently booted partition {:?}", pt.booted_partition());
 
-    let mut ota = esp_bootloader_esp_idf::ota::Ota::new(&mut ota_part).unwrap();
-    let current = ota.current_slot().unwrap();
+    let mut ota =
+        esp_bootloader_esp_idf::ota_updater::OtaUpdater::new(&mut flash, &mut buffer).unwrap();
+
+    let current = ota.selected_partition().unwrap();
     println!(
         "current image state {:?} (only relevant if the bootloader was built with auto-rollback support)",
         ota.current_ota_state()
     );
-    println!("current {:?} - next {:?}", current, current.next());
+    println!("currently selected partition {:?}", current);
 
     // Mark the current slot as VALID - this is only needed if the bootloader was
     // built with auto-rollback support. The default pre-compiled bootloader in
     // espflash is NOT.
-    if ota.current_slot().unwrap() != Slot::None
-        && (ota.current_ota_state().unwrap() == esp_bootloader_esp_idf::ota::OtaImageState::New
-            || ota.current_ota_state().unwrap()
-                == esp_bootloader_esp_idf::ota::OtaImageState::PendingVerify)
-    {
-        println!("Changed state to VALID");
-        ota.set_current_ota_state(esp_bootloader_esp_idf::ota::OtaImageState::Valid)
-            .unwrap();
+    if let Ok(state) = ota.current_ota_state() {
+        if state == esp_bootloader_esp_idf::ota::OtaImageState::New
+            || state == esp_bootloader_esp_idf::ota::OtaImageState::PendingVerify
+        {
+            println!("Changed state to VALID");
+            ota.set_current_ota_state(esp_bootloader_esp_idf::ota::OtaImageState::Valid)
+                .unwrap();
+        }
     }
 
     cfg_if::cfg_if! {
@@ -112,51 +104,22 @@ fn main() -> ! {
         if boot_button.is_low() && !done {
             done = true;
 
-            let next_slot = current.next();
+            let (mut next_app_partition, part_type) = ota.next_partition().unwrap();
 
-            println!("Flashing image to {:?}", next_slot);
-
-            // find the target app partition
-            let next_app_partition = match next_slot {
-                Slot::None => {
-                    // None is FACTORY if present, OTA0 otherwise
-                    pt.find_partition(partitions::PartitionType::App(AppPartitionSubType::Factory))
-                        .or_else(|_| {
-                            pt.find_partition(partitions::PartitionType::App(
-                                AppPartitionSubType::Ota0,
-                            ))
-                        })
-                        .unwrap()
-                }
-                Slot::Slot0 => pt
-                    .find_partition(partitions::PartitionType::App(AppPartitionSubType::Ota0))
-                    .unwrap(),
-                Slot::Slot1 => pt
-                    .find_partition(partitions::PartitionType::App(AppPartitionSubType::Ota1))
-                    .unwrap(),
-            }
-            .unwrap();
-            println!("Found partition: {:?}", next_app_partition);
-            let mut next_app_partition = next_app_partition.as_embedded_storage(&mut storage);
+            println!("Flashing image to {:?}", part_type);
 
             // write to the app partition
             for (sector, chunk) in OTA_IMAGE.chunks(4096).enumerate() {
                 println!("Writing sector {sector}...");
+
                 next_app_partition
                     .write((sector * 4096) as u32, chunk)
                     .unwrap();
             }
 
             println!("Changing OTA slot and setting the state to NEW");
-            let ota_part = pt
-                .find_partition(esp_bootloader_esp_idf::partitions::PartitionType::Data(
-                    DataPartitionSubType::Ota,
-                ))
-                .unwrap()
-                .unwrap();
-            let mut ota_part = ota_part.as_embedded_storage(&mut storage);
-            let mut ota = esp_bootloader_esp_idf::ota::Ota::new(&mut ota_part).unwrap();
-            ota.set_current_slot(next_slot).unwrap();
+
+            ota.activate_next_partition().unwrap();
             ota.set_current_ota_state(esp_bootloader_esp_idf::ota::OtaImageState::New)
                 .unwrap();
         }

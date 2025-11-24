@@ -15,7 +15,12 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_backtrace as _;
-use esp_hal::{clock::CpuClock, main, timer::timg::TimerGroup};
+use esp_hal::{
+    clock::CpuClock,
+    interrupt::software::SoftwareInterruptControl,
+    main,
+    timer::timg::TimerGroup,
+};
 use esp_println::println;
 use esp_radio::wifi;
 use ieee80211::{match_frames, mgmt_frame::BeaconFrame};
@@ -33,13 +38,12 @@ fn main() -> ! {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_preempt::init(timg0.timer0);
-
-    let esp_radio_ctrl = esp_radio::init().unwrap();
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     // We must initialize some kind of interface and start it.
     let (mut controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI).unwrap();
+        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
     controller.set_mode(wifi::WifiMode::Sta).unwrap();
     controller.start().unwrap();

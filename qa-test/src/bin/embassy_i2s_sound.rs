@@ -34,7 +34,8 @@ use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
     dma_buffers,
-    i2s::master::{DataFormat, I2s, Standard},
+    i2s::master::{Channels, Config, DataFormat, I2s},
+    interrupt::software::SoftwareInterruptControl,
     time::Rate,
     timer::timg::TimerGroup,
 };
@@ -50,13 +51,13 @@ const SINE: [i16; 64] = [
     -28897, -27244, -25329, -23169, -20787, -18204, -15446, -12539, -9511, -6392, -3211,
 ];
 
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(_spawner: Spawner) {
     println!("Init!");
     let peripherals = esp_hal::init(esp_hal::Config::default());
-
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_hal_embassy::init(timg0.timer0);
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
@@ -70,11 +71,13 @@ async fn main(_spawner: Spawner) {
 
     let i2s = I2s::new(
         peripherals.I2S0,
-        Standard::Philips,
-        DataFormat::Data16Channel16,
-        Rate::from_hz(44100),
         dma_channel,
+        Config::new_tdm_philips()
+            .with_sample_rate(Rate::from_hz(44100))
+            .with_data_format(DataFormat::Data16Channel16)
+            .with_channels(Channels::STEREO),
     )
+    .unwrap()
     .into_async();
 
     let i2s_tx = i2s

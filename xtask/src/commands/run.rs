@@ -8,8 +8,9 @@ use anyhow::{Context as _, Result, bail};
 use clap::{Args, Subcommand};
 use esp_metadata::Chip;
 
-use super::{ExamplesArgs, TestsArgs, DocTestArgs};
+use super::{DocTestArgs, ExamplesArgs, TestsArgs};
 use crate::{
+    Package,
     cargo::{CargoAction, CargoArgsBuilder},
     firmware::Metadata,
 };
@@ -32,6 +33,7 @@ pub enum Run {
 // ----------------------------------------------------------------------------
 // Subcommand Arguments
 
+/// Arguments for running ELFs.
 #[derive(Debug, Args)]
 pub struct RunElfsArgs {
     /// Which chip to run the tests for.
@@ -44,19 +46,57 @@ pub struct RunElfsArgs {
 // ----------------------------------------------------------------------------
 // Subcommand Actions
 
+/// Run doc tests for the specified package and chip.
 pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
-    let chip = args.chip;
+    let mut success = true;
+    for package in args.packages {
+        success &= run_doc_tests_for_package(workspace, package, args.chip)?;
+    }
+    anyhow::ensure!(success, "One or more doc tests failed");
+    Ok(())
+}
 
-    let package_name = args.package.to_string();
+pub fn run_doc_tests_for_package(workspace: &Path, package: Package, chip: Chip) -> Result<bool> {
+    log::info!("Running doc tests for '{}' on '{}'", package, chip);
+
+    // FIXME: this list can and should slowly be expanded, and eventually the check be removed as
+    // the docs are fixed up.
+    let temporary_package_list = [
+        Package::EspHal,
+        Package::EspRadio,
+        Package::EspBootloaderEspIdf,
+    ];
+    if !temporary_package_list.contains(&package) {
+        log::info!("Package {} is temporarily not doctested", package);
+        return Ok(true);
+    }
+
+    // Ensure that the package/chip combination provided are valid:
+    if let Err(err) = package.validate_package_chip(&chip) {
+        log::warn!("{err}");
+        return Ok(true);
+    }
+
+    // Packages that have doc features are documented. We run doc-tests for these, and only these.
+    let Some(mut features) = package.doc_feature_rules(&esp_metadata::Config::for_chip(&chip))
+    else {
+        log::info!("Skipping undocumented package {package}.");
+        return Ok(true);
+    };
+
+    let package_name = package.to_string();
     let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+
+    if package.has_chip_features() {
+        features.push(chip.to_string());
+    }
 
     // Determine the appropriate build target, and cargo features for the given
     // package and chip:
-    let target = args.package.target_triple(&chip)?;
-    let mut features = args
-        .package
-        .feature_rules(&esp_metadata::Config::for_chip(&chip));
-    features.push(chip.to_string());
+    let Ok(target) = package.target_triple(&chip) else {
+        log::warn!("Package {package} is not applicable for {chip}");
+        return Ok(true);
+    };
 
     // We need `nightly` for building the doc tests, unfortunately:
     let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };
@@ -66,8 +106,7 @@ pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
         .toolchain(toolchain)
         .subcommand("test")
         .arg("--doc")
-        .arg("-Zdoctest-xcompile")
-        .arg("-Zbuild-std=core,panic_abort")
+        .arg("-Zbuild-std=core,alloc,panic_abort")
         .target(target)
         .features(&features)
         .arg("--release");
@@ -81,14 +120,16 @@ pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
     ];
 
     // Execute `cargo doc` from the package root:
-    crate::cargo::run_with_env(&args, &package_path, envs, false)?;
-
-    Ok(())
+    let success = crate::cargo::run_with_env(&args, &package_path, envs, false).is_ok();
+    Ok(success)
 }
 
+/// Run all ELFs in the specified folder using `probe-rs`.
 pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
     let mut failed: Vec<String> = Vec::new();
-    for elf in fs::read_dir(&args.path)? {
+    for elf in fs::read_dir(&args.path)
+        .with_context(|| format!("Failed to read {}", args.path.display()))?
+    {
         let entry = elf?;
 
         let elf_path = entry.path();
@@ -125,6 +166,7 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
     Ok(())
 }
 
+/// Run the specified examples for the given chip.
 pub fn run_examples(
     args: ExamplesArgs,
     examples: Vec<Metadata>,
@@ -134,42 +176,7 @@ pub fn run_examples(
 
     // At this point, chip can never be `None`, so we can safely unwrap it.
     let chip = args.chip.unwrap();
-
-    // Determine the appropriate build target for the given package and chip:
     let target = args.package.target_triple(&chip)?;
-
-    // Filter the examples down to only the binaries supported by the given chip
-    examples.retain(|ex| ex.supports_chip(chip));
-
-    // Handle "all" examples and specific example
-    if !args.example.eq_ignore_ascii_case("all") {
-        let mut filtered = examples
-            .iter()
-            .filter(|ex| ex.matches_name(&args.example))
-            .cloned()
-            .collect::<Vec<_>>();
-
-        if filtered.is_empty() {
-            log::warn!(
-                "Example '{}' not found or unsupported for {}. Please select one of the existing examples in the desired package.",
-                args.example,
-                chip
-            );
-
-            let example_idx = inquire::Select::new(
-                "Select the example:",
-                examples.iter().map(|ex| ex.binary_name()).collect(),
-            )
-            .prompt()?;
-
-            if let Some(selected) = examples.into_iter().find(|ex| ex.binary_name() == example_idx) {
-                filtered.push(selected);
-            }
-        }
-
-        examples = filtered;
-    }
-
 
     examples.sort_by_key(|ex| ex.tag());
 
@@ -201,22 +208,22 @@ pub fn run_examples(
             }
         }
 
-        if !skip {
-            while !skip
-                && crate::execute_app(
-                    package_path,
-                    chip,
-                    &target,
-                    &example,
-                    CargoAction::Run,
-                    1,
-                    args.debug,
-                    args.toolchain.as_deref(),
-                    args.timings,
-                )
-                .is_err()
-            {
-                log::info!("Failed to run example. Retry or skip? (r/s)");
+        while !skip {
+            let result = crate::execute_app(
+                package_path,
+                chip,
+                &target,
+                &example,
+                CargoAction::Run,
+                args.debug,
+                args.toolchain.as_deref(),
+                args.timings,
+                &[],
+            );
+
+            if let Err(error) = result {
+                log::error!("Failed to run example: {}", error);
+                log::info!("Retry or skip? (r/s)");
                 loop {
                     let key = console.read_key();
 
@@ -229,6 +236,8 @@ pub fn run_examples(
                         _ => (),
                     }
                 }
+            } else {
+                break;
             }
         }
     }

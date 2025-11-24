@@ -1,14 +1,11 @@
-//! WiFi
+//! Wi-Fi
 
-pub mod event;
-mod internal;
-pub(crate) mod os_adapter;
-pub(crate) mod state;
-use alloc::{collections::vec_deque::VecDeque, string::String};
+#![deny(missing_docs)]
+
+use alloc::{collections::vec_deque::VecDeque, vec::Vec};
 use core::{
     fmt::Debug,
     marker::PhantomData,
-    mem,
     mem::MaybeUninit,
     ptr::addr_of,
     task::Poll,
@@ -16,141 +13,61 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
-use esp_hal::{asynch::AtomicWaker, sync::Locked};
-use esp_wifi_sys::include::{
-    WIFI_PROTOCOL_11AX,
-    WIFI_PROTOCOL_11B,
-    WIFI_PROTOCOL_11G,
-    WIFI_PROTOCOL_11N,
-    WIFI_PROTOCOL_LR,
-    wifi_pkt_rx_ctrl_t,
-    wifi_scan_channel_bitmap_t,
-};
-#[cfg(feature = "wifi-eap")]
-use esp_wifi_sys::include::{
-    esp_eap_client_clear_ca_cert,
-    esp_eap_client_clear_certificate_and_key,
-    esp_eap_client_clear_identity,
-    esp_eap_client_clear_new_password,
-    esp_eap_client_clear_password,
-    esp_eap_client_clear_username,
-    esp_eap_client_set_ca_cert,
-    esp_eap_client_set_certificate_and_key,
-    esp_eap_client_set_disable_time_check,
-    esp_eap_client_set_fast_params,
-    esp_eap_client_set_identity,
-    esp_eap_client_set_new_password,
-    esp_eap_client_set_pac_file,
-    esp_eap_client_set_password,
-    esp_eap_client_set_ttls_phase2_method,
-    esp_eap_client_set_username,
-    esp_eap_fast_config,
-    esp_wifi_sta_enterprise_enable,
-};
-#[cfg(all(feature = "sniffer", feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-use esp_wifi_sys::include::{
-    esp_wifi_80211_tx,
-    esp_wifi_set_promiscuous,
-    esp_wifi_set_promiscuous_rx_cb,
-    wifi_promiscuous_pkt_t,
-    wifi_promiscuous_pkt_type_t,
-};
+use esp_config::esp_config_int;
+use esp_hal::{asynch::AtomicWaker, system::Cpu};
+use esp_sync::NonReentrantMutex;
 use num_derive::FromPrimitive;
-#[doc(hidden)]
-pub(crate) use os_adapter::*;
 use portable_atomic::{AtomicUsize, Ordering};
 use procmacros::BuilderLite;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 #[cfg(all(feature = "smoltcp", feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
-pub use state::*;
 
+pub(crate) use self::os_adapter::*;
+#[cfg(all(feature = "sniffer", feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+use self::sniffer::Sniffer;
+#[cfg(feature = "wifi-eap")]
+use self::sta::eap::EapClientConfig;
+pub use self::state::*;
+use self::{
+    ap::{AccessPointConfig, AccessPointInfo, convert_ap_info},
+    private::PacketBuffer,
+    scan::{FreeApListOnDrop, ScanResults},
+    sta::ClientConfig,
+};
+#[cfg(feature = "csi")]
+#[instability::unstable]
+pub use crate::sys::include::wifi_csi_info_t; // FIXME
 use crate::{
-    Controller,
+    InitializationError,
+    RadioRefGuard,
     common_adapter::*,
-    config::PowerSaveMode,
     esp_wifi_result,
     hal::ram,
-    wifi::private::PacketBuffer,
-};
-
-const MTU: usize = crate::CONFIG.mtu;
-
-#[cfg(all(feature = "csi", esp32c6))]
-use crate::binary::include::wifi_csi_acquire_config_t;
-#[cfg(feature = "csi")]
-#[instability::unstable]
-pub use crate::binary::include::wifi_csi_info_t;
-#[cfg(feature = "csi")]
-#[instability::unstable]
-use crate::binary::include::{
-    esp_wifi_set_csi,
-    esp_wifi_set_csi_config,
-    esp_wifi_set_csi_rx_cb,
-    wifi_csi_config_t,
-};
-use crate::binary::{
-    c_types,
-    include::{
-        self,
-        __BindgenBitfieldUnit,
-        esp_err_t,
-        esp_interface_t_ESP_IF_WIFI_AP,
-        esp_interface_t_ESP_IF_WIFI_STA,
-        esp_supplicant_deinit,
-        esp_supplicant_init,
-        esp_wifi_connect,
-        esp_wifi_deinit_internal,
-        esp_wifi_disconnect,
-        esp_wifi_get_mode,
-        esp_wifi_init_internal,
-        esp_wifi_internal_free_rx_buffer,
-        esp_wifi_internal_reg_rxcb,
-        esp_wifi_internal_tx,
-        esp_wifi_scan_start,
-        esp_wifi_set_config,
-        esp_wifi_set_country,
-        esp_wifi_set_mode,
-        esp_wifi_set_protocol,
-        esp_wifi_set_tx_done_cb,
-        esp_wifi_sta_get_rssi,
-        esp_wifi_start,
-        esp_wifi_stop,
-        g_wifi_default_wpa_crypto_funcs,
-        wifi_active_scan_time_t,
-        wifi_ap_config_t,
-        wifi_auth_mode_t,
-        wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP,
-        wifi_config_t,
-        wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
-        wifi_country_t,
-        wifi_interface_t,
-        wifi_interface_t_WIFI_IF_AP,
-        wifi_interface_t_WIFI_IF_STA,
-        wifi_mode_t,
-        wifi_mode_t_WIFI_MODE_AP,
-        wifi_mode_t_WIFI_MODE_APSTA,
-        wifi_mode_t_WIFI_MODE_NULL,
-        wifi_mode_t_WIFI_MODE_STA,
-        wifi_pmf_config_t,
-        wifi_scan_config_t,
-        wifi_scan_threshold_t,
-        wifi_scan_time_t,
-        wifi_scan_type_t_WIFI_SCAN_TYPE_ACTIVE,
-        wifi_scan_type_t_WIFI_SCAN_TYPE_PASSIVE,
-        wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
-        wifi_sta_config_t,
+    sys::{
+        c_types,
+        include::{self, *},
     },
 };
 
+pub mod ap;
+pub mod event;
+#[cfg(all(feature = "sniffer", feature = "unstable"))]
+pub mod sniffer;
+pub mod sta;
+
+pub(crate) mod os_adapter;
+pub(crate) mod state;
+
+mod internal;
+mod scan;
+const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
+
 /// Supported Wi-Fi authentication methods.
-#[derive(EnumSetType, Debug, PartialOrd)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(Default)]
+#[non_exhaustive]
 pub enum AuthMethod {
     /// No authentication (open network).
     None,
@@ -179,13 +96,40 @@ pub enum AuthMethod {
 
     /// WLAN Authentication and Privacy Infrastructure (WAPI).
     WapiPersonal,
+
+    /// Opportunistic Wireless Encryption (OWE)
+    Owe,
+
+    /// WPA3 Enterprise Suite B 192-bit Encryption
+    Wpa3EntSuiteB192Bit,
+
+    /// This authentication mode will yield same result as [AuthMethod::Wpa3Personal] and is not
+    /// recommended to be used. It will be deprecated in future, please use
+    /// [AuthMethod::Wpa3Personal] instead.
+    Wpa3ExtPsk,
+
+    /// This authentication mode will yield same result as [AuthMethod::Wpa3Personal] and is not
+    /// recommended to be used. It will be deprecated in future, please use
+    /// [AuthMethod::Wpa3Personal] instead.
+    Wpa3ExtPskMixed,
+
+    /// WiFi DPP / Wi-Fi Easy Connect
+    Dpp,
+
+    /// WPA3-Enterprise Only Mode
+    Wpa3Enterprise,
+
+    /// WPA3-Enterprise Transition Mode
+    Wpa2Wpa3Enterprise,
+
+    /// WPA-Enterprise security
+    WpaEnterprise,
 }
 
 /// Supported Wi-Fi protocols.
-#[derive(EnumSetType, Debug, PartialOrd)]
+#[derive(Debug, Default, PartialOrd, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(Default)]
+#[non_exhaustive]
 pub enum Protocol {
     /// 802.11b protocol.
     P802D11B,
@@ -207,11 +151,26 @@ pub enum Protocol {
     P802D11BGNAX,
 }
 
+impl Protocol {
+    fn to_mask(self) -> u32 {
+        match self {
+            Protocol::P802D11B => WIFI_PROTOCOL_11B,
+            Protocol::P802D11BG => WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G,
+            Protocol::P802D11BGN => WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N,
+            Protocol::P802D11BGNLR => {
+                WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_LR
+            }
+            Protocol::P802D11LR => WIFI_PROTOCOL_LR,
+            Protocol::P802D11BGNAX => {
+                WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_11AX
+            }
+        }
+    }
+}
+
 /// Secondary Wi-Fi channels.
-#[derive(EnumSetType, Debug, PartialOrd)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(Default)]
 pub enum SecondaryChannel {
     // TODO: Need to extend that for 5GHz
     /// No secondary channel (default).
@@ -227,7 +186,6 @@ pub enum SecondaryChannel {
 
 /// Access point country information.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct Country([u8; 2]);
 
 impl Country {
@@ -268,449 +226,22 @@ impl defmt::Format for Country {
     }
 }
 
-/// Information about a detected Wi-Fi access point.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+/// Wi-Fi scan method.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-pub struct AccessPointInfo {
-    /// The SSID of the access point.
-    // TODO: we can use the `alloc` feature once we have `defmt` 1.0.2
-    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
-    pub ssid: String,
-
-    /// The BSSID (MAC address) of the access point.
-    pub bssid: [u8; 6],
-
-    /// The channel the access point is operating on.
-    pub channel: u8,
-
-    /// The secondary channel configuration of the access point.
-    pub secondary_channel: SecondaryChannel,
-
-    /// The signal strength of the access point (RSSI).
-    pub signal_strength: i8,
-
-    /// The authentication method used by the access point.
-    pub auth_method: Option<AuthMethod>,
-
-    /// The country information of the access point (if available from beacon frames).
-    pub country: Option<Country>,
-}
-
-/// Configuration for a Wi-Fi access point.
-#[derive(Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-pub struct AccessPointConfiguration {
-    /// The SSID of the access point.
-    pub ssid: String,
-
-    /// Whether the SSID is hidden or visible.
-    pub ssid_hidden: bool,
-
-    /// The channel the access point will operate on.
-    pub channel: u8,
-
-    /// The secondary channel configuration.
-    pub secondary_channel: Option<u8>,
-
-    /// The set of protocols supported by the access point.
-    pub protocols: EnumSet<Protocol>,
-
-    /// The authentication method to be used by the access point.
-    pub auth_method: AuthMethod,
-
-    /// The password for securing the access point (if applicable).
-    pub password: String,
-
-    /// The maximum number of connections allowed on the access point.
-    pub max_connections: u16,
-}
-
-impl AccessPointConfiguration {
-    fn validate(&self) -> Result<(), WifiError> {
-        if self.ssid.len() > 32 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if self.password.len() > 64 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        Ok(())
-    }
-}
-
-impl Default for AccessPointConfiguration {
-    fn default() -> Self {
-        Self {
-            ssid: String::from("iot-device"),
-            ssid_hidden: false,
-            channel: 1,
-            secondary_channel: None,
-            protocols: (Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
-            auth_method: AuthMethod::None,
-            password: String::new(),
-            max_connections: 255,
-        }
-    }
-}
-
-impl core::fmt::Debug for AccessPointConfiguration {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("AccessPointConfiguration")
-            .field("ssid", &self.ssid)
-            .field("ssid_hidden", &self.ssid_hidden)
-            .field("channel", &self.channel)
-            .field("secondary_channel", &self.secondary_channel)
-            .field("protocols", &self.protocols)
-            .field("auth_method", &self.auth_method)
-            .field("password", &"**REDACTED**")
-            .field("max_connections", &self.max_connections)
-            .finish()
-    }
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for AccessPointConfiguration {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Default)]
-        #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-        pub struct ProtocolSet(EnumSet<Protocol>);
-
-        #[cfg(feature = "defmt")]
-        impl defmt::Format for ProtocolSet {
-            fn format(&self, fmt: defmt::Formatter<'_>) {
-                for (i, p) in self.0.into_iter().enumerate() {
-                    if i > 0 {
-                        defmt::write!(fmt, " ");
-                    }
-                    defmt::write!(fmt, "{}", p);
-                }
-            }
-        }
-
-        let protocol_set = ProtocolSet(self.protocols);
-
-        defmt::write!(
-            fmt,
-            "AccessPointConfiguration {{\
-            ssid: {}, \
-            ssid_hidden: {}, \
-            channel: {}, \
-            secondary_channel: {}, \
-            protocols: {}, \
-            auth_method: {}, \
-            password: **REDACTED**, \
-            max_connections: {}, \
-            }}",
-            self.ssid.as_str(),
-            self.ssid_hidden,
-            self.channel,
-            self.secondary_channel,
-            protocol_set,
-            self.auth_method,
-            self.max_connections
-        );
-    }
-}
-
-/// Client configuration for a Wi-Fi connection.
-#[derive(Clone, PartialEq, Eq, Default)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-pub struct ClientConfiguration {
-    /// The SSID of the Wi-Fi network.
-    pub ssid: String,
-
-    /// The BSSID (MAC address) of the client.
-    pub bssid: Option<[u8; 6]>,
-
-    // pub protocol: Protocol,
-    /// The authentication method for the Wi-Fi connection.
-    pub auth_method: AuthMethod,
-
-    /// The password for the Wi-Fi connection.
-    pub password: String,
-
-    /// The Wi-Fi channel to connect to.
-    pub channel: Option<u8>,
-}
-
-impl ClientConfiguration {
-    fn validate(&self) -> Result<(), WifiError> {
-        if self.ssid.len() > 32 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if self.password.len() > 64 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        Ok(())
-    }
-}
-
-impl core::fmt::Debug for ClientConfiguration {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("ClientConfiguration")
-            .field("ssid", &self.ssid)
-            .field("bssid", &self.bssid)
-            .field("auth_method", &self.auth_method)
-            .field("password", &"**REDACTED**")
-            .field("channel", &self.channel)
-            .finish()
-    }
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for ClientConfiguration {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(
-            fmt,
-            "ClientConfiguration {{\
-            ssid: {}, \
-            bssid: {:?}, \
-            auth_method: {:?}, \
-            password: **REDACTED**, \
-            channel: {:?}, \
-            }}",
-            self.ssid.as_str(),
-            self.bssid,
-            self.auth_method,
-            self.channel
-        )
-    }
-}
-
-/// Configuration for EAP-FAST authentication protocol.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[cfg(feature = "wifi-eap")]
+#[repr(u8)]
 #[instability::unstable]
-pub struct EapFastConfig {
-    /// Specifies the provisioning mode for EAP-FAST.
-    pub fast_provisioning: u8,
-    /// The maximum length of the PAC (Protected Access Credentials) list.
-    pub fast_max_pac_list_len: u8,
-    /// Indicates whether the PAC file is in binary format.
-    pub fast_pac_format_binary: bool,
-}
-
-/// Phase 2 authentication methods
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[cfg(feature = "wifi-eap")]
-#[instability::unstable]
-pub enum TtlsPhase2Method {
-    /// EAP (Extensible Authentication Protocol).
-    Eap,
-
-    /// MSCHAPv2 (Microsoft Challenge Handshake Authentication Protocol 2).
-    Mschapv2,
-
-    /// MSCHAP (Microsoft Challenge Handshake Authentication Protocol).
-    Mschap,
-
-    /// PAP (Password Authentication Protocol).
-    Pap,
-
-    /// CHAP (Challenge Handshake Authentication Protocol).
-    Chap,
-}
-
-#[cfg(feature = "wifi-eap")]
-impl TtlsPhase2Method {
-    /// Maps the phase 2 method to a raw `u32` representation.
-    fn to_raw(&self) -> u32 {
-        match self {
-            TtlsPhase2Method::Eap => {
-                esp_wifi_sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_EAP
-            }
-            TtlsPhase2Method::Mschapv2 => {
-                esp_wifi_sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_MSCHAPV2
-            }
-            TtlsPhase2Method::Mschap => {
-                esp_wifi_sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_MSCHAP
-            }
-            TtlsPhase2Method::Pap => {
-                esp_wifi_sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_PAP
-            }
-            TtlsPhase2Method::Chap => {
-                esp_wifi_sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_CHAP
-            }
-        }
-    }
-}
-
-/// Configuration for an EAP (Extensible Authentication Protocol) client.
-#[derive(Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[cfg(feature = "wifi-eap")]
-#[instability::unstable]
-pub struct EapClientConfiguration {
-    /// The SSID of the network the client is connecting to.
-    pub ssid: String,
-
-    /// The BSSID (MAC Address) of the specific access point.
-    pub bssid: Option<[u8; 6]>,
-
-    // pub protocol: Protocol,
-    /// The authentication method used for EAP.
-    pub auth_method: AuthMethod,
-
-    /// The identity used during authentication.
-    pub identity: Option<String>,
-
-    /// The username used for inner authentication.
-    /// Some EAP methods require a username for authentication.
-    pub username: Option<String>,
-
-    /// The password used for inner authentication.
-    pub password: Option<String>,
-
-    /// A new password to be set during the authentication process.
-    /// Some methods support password changes during authentication.
-    pub new_password: Option<String>,
-
-    /// Configuration for EAP-FAST.
-    pub eap_fast_config: Option<EapFastConfig>,
-
-    /// A PAC (Protected Access Credential) file for EAP-FAST.
-    pub pac_file: Option<&'static [u8]>,
-
-    /// A boolean flag indicating whether time checking is enforced during
-    /// authentication.
-    pub time_check: bool,
-
-    /// A CA (Certificate Authority) certificate for validating the
-    /// authentication server's certificate.
-    pub ca_cert: Option<&'static [u8]>,
-
-    /// A tuple containing the client's certificate, private key, and an
-    /// intermediate certificate.
-    #[allow(clippy::type_complexity)]
-    pub certificate_and_key: Option<(&'static [u8], &'static [u8], Option<&'static [u8]>)>,
-
-    /// The Phase 2 authentication method used for EAP-TTLS.
-    pub ttls_phase2_method: Option<TtlsPhase2Method>,
-
-    /// The specific Wi-Fi channel to use for the connection.
-    pub channel: Option<u8>,
-}
-
-#[cfg(feature = "wifi-eap")]
-impl EapClientConfiguration {
-    fn validate(&self) -> Result<(), WifiError> {
-        if self.ssid.len() > 32 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if self.identity.as_ref().unwrap_or(&String::new()).len() > 128 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if self.username.as_ref().unwrap_or(&String::new()).len() > 128 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if self.password.as_ref().unwrap_or(&String::new()).len() > 64 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        if self.new_password.as_ref().unwrap_or(&String::new()).len() > 64 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        Ok(())
-    }
-}
-
-#[cfg(feature = "wifi-eap")]
-impl Debug for EapClientConfiguration {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("EapClientConfiguration")
-            .field("ssid", &self.ssid)
-            .field("bssid", &self.bssid)
-            .field("auth_method", &self.auth_method)
-            .field("channel", &self.channel)
-            .field("identity", &self.identity)
-            .field("username", &self.username)
-            .field("password", &"**REDACTED**")
-            .field("new_password", &"**REDACTED**")
-            .field("eap_fast_config", &self.eap_fast_config)
-            .field("time_check", &self.time_check)
-            .field("pac_file set", &self.pac_file.is_some())
-            .field("ca_cert set", &self.ca_cert.is_some())
-            .field("certificate_and_key set", &"**REDACTED**")
-            .field("ttls_phase2_method", &self.ttls_phase2_method)
-            .finish()
-    }
-}
-
-#[cfg(feature = "defmt")]
-#[cfg(feature = "wifi-eap")]
-impl defmt::Format for EapClientConfiguration {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(
-            fmt,
-            "EapClientConfiguration {{\
-            ssid: {}, \
-            bssid: {:?}, \
-            auth_method: {:?}, \
-            channel: {:?}, \
-            identity: {:?}, \
-            username: {:?}, \
-            password: **REDACTED**, \
-            new_password: **REDACTED**, \
-            eap_fast_config: {:?}, \
-            time_check: {}, \
-            pac_file: {}, \
-            ca_cert: {}, \
-            certificate_and_key: **REDACTED**, \
-            ttls_phase2_method: {:?}, \
-            }}",
-            self.ssid.as_str(),
-            self.bssid,
-            self.auth_method,
-            self.channel,
-            &self.identity.as_ref().map_or("", |v| v.as_str()),
-            &self.username.as_ref().map_or("", |v| v.as_str()),
-            self.eap_fast_config,
-            self.time_check,
-            self.pac_file,
-            self.ca_cert,
-            self.ttls_phase2_method,
-        )
-    }
-}
-
-#[cfg(feature = "wifi-eap")]
-impl Default for EapClientConfiguration {
-    fn default() -> Self {
-        EapClientConfiguration {
-            ssid: String::new(),
-            bssid: None,
-            auth_method: AuthMethod::Wpa2Enterprise,
-            identity: None,
-            username: None,
-            password: None,
-            channel: None,
-            eap_fast_config: None,
-            time_check: false,
-            new_password: None,
-            pac_file: None,
-            ca_cert: None,
-            certificate_and_key: None,
-            ttls_phase2_method: None,
-        }
-    }
+pub enum ScanMethod {
+    /// Fast scan.
+    Fast,
+    /// Scan all channels.
+    AllChannels,
 }
 
 /// Introduces Wi-Fi configuration options.
 #[derive(EnumSetType, Debug, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[non_exhaustive]
 pub enum Capability {
     /// The device operates as a client, connecting to an existing network.
     Client,
@@ -721,146 +252,47 @@ pub enum Capability {
 
     /// The device can operate in both client and access point modes
     /// simultaneously.
-    Mixed,
+    ApSta,
 }
 
 /// Configuration of Wi-Fi operation mode.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[allow(clippy::large_enum_variant)]
-pub enum Configuration {
+#[non_exhaustive]
+pub enum ModeConfig {
     /// No configuration (default).
     #[default]
     None,
 
     /// Client-only configuration.
-    Client(ClientConfiguration),
+    Client(ClientConfig),
 
     /// Access point-only configuration.
-    AccessPoint(AccessPointConfiguration),
+    AccessPoint(AccessPointConfig),
 
     /// Simultaneous client and access point configuration.
-    Mixed(ClientConfiguration, AccessPointConfiguration),
+    ApSta(ClientConfig, AccessPointConfig),
 
     /// EAP client configuration for enterprise Wi-Fi.
     #[cfg(feature = "wifi-eap")]
-    #[cfg_attr(feature = "serde", serde(skip))]
-    EapClient(EapClientConfiguration),
+    EapClient(EapClientConfig),
 }
 
-impl Configuration {
+impl ModeConfig {
     fn validate(&self) -> Result<(), WifiError> {
         match self {
-            Configuration::None => Ok(()),
-            Configuration::Client(client_configuration) => client_configuration.validate(),
-            Configuration::AccessPoint(access_point_configuration) => {
+            ModeConfig::None => Ok(()),
+            ModeConfig::Client(client_configuration) => client_configuration.validate(),
+            ModeConfig::AccessPoint(access_point_configuration) => {
                 access_point_configuration.validate()
             }
-            Configuration::Mixed(client_configuration, access_point_configuration) => {
+            ModeConfig::ApSta(client_configuration, access_point_configuration) => {
                 client_configuration.validate()?;
                 access_point_configuration.validate()
             }
             #[cfg(feature = "wifi-eap")]
-            Configuration::EapClient(eap_client_configuration) => {
-                eap_client_configuration.validate()
-            }
-        }
-    }
-
-    /// Returns a reference to the client configuration if available.
-    pub fn as_client_conf_ref(&self) -> Option<&ClientConfiguration> {
-        match self {
-            Self::Client(client_conf) => Some(client_conf),
-            Self::Mixed(client_conf, _) => Some(client_conf),
-            _ => None,
-        }
-    }
-
-    /// Returns a reference to the access point configuration if available.
-    pub fn as_ap_conf_ref(&self) -> Option<&AccessPointConfiguration> {
-        match self {
-            Self::AccessPoint(ap_conf) => Some(ap_conf),
-            Self::Mixed(_, ap_conf) => Some(ap_conf),
-            _ => None,
-        }
-    }
-
-    /// Returns a mutable reference to the client configuration, creating it if
-    /// necessary.
-    pub fn as_client_conf_mut(&mut self) -> &mut ClientConfiguration {
-        match self {
-            Self::Client(client_conf) => client_conf,
-            Self::Mixed(_, _) => {
-                let prev = mem::replace(self, Self::None);
-                match prev {
-                    Self::Mixed(client_conf, _) => {
-                        *self = Self::Client(client_conf);
-                        self.as_client_conf_mut()
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            _ => {
-                *self = Self::Client(Default::default());
-                self.as_client_conf_mut()
-            }
-        }
-    }
-
-    /// Returns a mutable reference to the access point configuration, creating
-    /// it if necessary.
-    pub fn as_ap_conf_mut(&mut self) -> &mut AccessPointConfiguration {
-        match self {
-            Self::AccessPoint(ap_conf) => ap_conf,
-            Self::Mixed(_, _) => {
-                let prev = mem::replace(self, Self::None);
-                match prev {
-                    Self::Mixed(_, ap_conf) => {
-                        *self = Self::AccessPoint(ap_conf);
-                        self.as_ap_conf_mut()
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            _ => {
-                *self = Self::AccessPoint(Default::default());
-                self.as_ap_conf_mut()
-            }
-        }
-    }
-
-    /// Retrieves mutable references to both the `ClientConfiguration`
-    /// and `AccessPointConfiguration`.
-    pub fn as_mixed_conf_mut(
-        &mut self,
-    ) -> (&mut ClientConfiguration, &mut AccessPointConfiguration) {
-        match self {
-            Self::Mixed(client_conf, ap_conf) => (client_conf, ap_conf),
-            Self::AccessPoint(_) => {
-                let prev = mem::replace(self, Self::None);
-                match prev {
-                    Self::AccessPoint(ap_conf) => {
-                        *self = Self::Mixed(Default::default(), ap_conf);
-                        self.as_mixed_conf_mut()
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            Self::Client(_) => {
-                let prev = mem::replace(self, Self::None);
-                match prev {
-                    Self::Client(client_conf) => {
-                        *self = Self::Mixed(client_conf, Default::default());
-                        self.as_mixed_conf_mut()
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            _ => {
-                *self = Self::Mixed(Default::default(), Default::default());
-                self.as_mixed_conf_mut()
-            }
+            ModeConfig::EapClient(eap_client_configuration) => eap_client_configuration.validate(),
         }
     }
 }
@@ -882,6 +314,18 @@ impl AuthMethodExt for AuthMethod {
             AuthMethod::Wpa3Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK,
             AuthMethod::Wpa2Wpa3Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK,
             AuthMethod::WapiPersonal => include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK,
+            AuthMethod::Owe => include::wifi_auth_mode_t_WIFI_AUTH_OWE,
+            AuthMethod::Wpa3EntSuiteB192Bit => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192,
+            AuthMethod::Wpa3ExtPsk => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK,
+            AuthMethod::Wpa3ExtPskMixed => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK_MIXED_MODE
+            }
+            AuthMethod::Dpp => include::wifi_auth_mode_t_WIFI_AUTH_DPP,
+            AuthMethod::Wpa3Enterprise => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENTERPRISE,
+            AuthMethod::Wpa2Wpa3Enterprise => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_ENTERPRISE
+            }
+            AuthMethod::WpaEnterprise => include::wifi_auth_mode_t_WIFI_AUTH_WPA_ENTERPRISE,
         }
     }
 
@@ -896,15 +340,33 @@ impl AuthMethodExt for AuthMethod {
             include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK => AuthMethod::Wpa3Personal,
             include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK => AuthMethod::Wpa2Wpa3Personal,
             include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK => AuthMethod::WapiPersonal,
-            _ => unreachable!(),
+            include::wifi_auth_mode_t_WIFI_AUTH_OWE => AuthMethod::Owe,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192 => AuthMethod::Wpa3EntSuiteB192Bit,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK => AuthMethod::Wpa3ExtPsk,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK_MIXED_MODE => {
+                AuthMethod::Wpa3ExtPskMixed
+            }
+            include::wifi_auth_mode_t_WIFI_AUTH_DPP => AuthMethod::Dpp,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENTERPRISE => AuthMethod::Wpa3Enterprise,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_ENTERPRISE => {
+                AuthMethod::Wpa2Wpa3Enterprise
+            }
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA_ENTERPRISE => AuthMethod::WpaEnterprise,
+            // we const-assert we know all the auth-methods the wifi driver knows and it shouldn't
+            // return anything else.
+            //
+            // In fact from observation the drivers will return
+            // `wifi_auth_mode_t_WIFI_AUTH_OPEN` if the method is unsupported (e.g. any WPA3 in our
+            // case, since the supplicant isn't compiled to support it)
+            _ => AuthMethod::None,
         }
     }
 }
 
-/// Wifi Mode (Sta and/or Ap)
+/// Wi-Fi Mode (Sta and/or Ap)
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[non_exhaustive]
 pub enum WifiMode {
     /// Station mode.
     Sta,
@@ -939,24 +401,25 @@ impl WifiMode {
     }
 }
 
-impl TryFrom<&Configuration> for WifiMode {
+impl TryFrom<&ModeConfig> for WifiMode {
     type Error = WifiError;
 
-    /// Based on the current `Configuration`, derives a `WifiMode` based on it.
-    fn try_from(config: &Configuration) -> Result<Self, Self::Error> {
+    /// Based on the current `ModeConfig`, derives a `WifiMode` based on it.
+    fn try_from(config: &ModeConfig) -> Result<Self, Self::Error> {
         let mode = match config {
-            Configuration::None => return Err(WifiError::UnknownWifiMode),
-            Configuration::AccessPoint(_) => Self::Ap,
-            Configuration::Client(_) => Self::Sta,
-            Configuration::Mixed(_, _) => Self::ApSta,
+            ModeConfig::None => return Err(WifiError::UnknownWifiMode),
+            ModeConfig::AccessPoint(_) => Self::Ap,
+            ModeConfig::Client(_) => Self::Sta,
+            ModeConfig::ApSta(_, _) => Self::ApSta,
             #[cfg(feature = "wifi-eap")]
-            Configuration::EapClient(_) => Self::Sta,
+            ModeConfig::EapClient(_) => Self::Sta,
         };
 
         Ok(mode)
     }
 }
 
+#[doc(hidden)]
 impl TryFrom<wifi_mode_t> for WifiMode {
     type Error = WifiError;
 
@@ -972,6 +435,7 @@ impl TryFrom<wifi_mode_t> for WifiMode {
     }
 }
 
+#[doc(hidden)]
 impl From<WifiMode> for wifi_mode_t {
     fn from(val: WifiMode) -> Self {
         #[allow(non_upper_case_globals)]
@@ -984,15 +448,15 @@ impl From<WifiMode> for wifi_mode_t {
 }
 
 #[cfg(feature = "csi")]
-pub(crate) trait CsiCallback: FnMut(crate::binary::include::wifi_csi_info_t) {}
+pub(crate) trait CsiCallback: FnMut(crate::sys::include::wifi_csi_info_t) {}
 
 #[cfg(feature = "csi")]
-impl<T> CsiCallback for T where T: FnMut(crate::binary::include::wifi_csi_info_t) {}
+impl<T> CsiCallback for T where T: FnMut(crate::sys::include::wifi_csi_info_t) {}
 
 #[cfg(feature = "csi")]
 unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
     ctx: *mut crate::wifi::c_types::c_void,
-    data: *mut crate::binary::include::wifi_csi_info_t,
+    data: *mut crate::sys::include::wifi_csi_info_t,
 ) {
     unsafe {
         let csi_callback = &mut *(ctx as *mut C);
@@ -1000,9 +464,8 @@ unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
     }
 }
 
+/// Channel state information (CSI) configuration.
 #[derive(Clone, PartialEq, Eq)]
-// https://github.com/esp-rs/esp-wifi-sys/blob/main/esp-wifi-sys/headers/local/esp_wifi_types_native.h#L94
-/// Channel state information(CSI) configuration
 #[cfg(all(not(esp32c6), feature = "csi"))]
 pub struct CsiConfig {
     /// Enable to receive legacy long training field(lltf) data.
@@ -1029,9 +492,9 @@ pub struct CsiConfig {
     pub dump_ack_en: bool,
 }
 
+/// Channel state information (CSI) configuration.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg(all(esp32c6, feature = "csi"))]
-// See https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/src/include/esp32c6.rs#L5702-L5705
 pub struct CsiConfig {
     /// Enable to acquire CSI.
     pub enable: u32,
@@ -1097,6 +560,7 @@ impl Default for CsiConfig {
     }
 }
 
+#[doc(hidden)]
 #[cfg(feature = "csi")]
 impl From<CsiConfig> for wifi_csi_config_t {
     fn from(config: CsiConfig) -> Self {
@@ -1170,25 +634,20 @@ impl CsiConfig {
     }
 }
 
-const RX_QUEUE_SIZE: usize = crate::CONFIG.rx_queue_size;
-const TX_QUEUE_SIZE: usize = crate::CONFIG.tx_queue_size;
+static RX_QUEUE_SIZE: AtomicUsize = AtomicUsize::new(0);
+static TX_QUEUE_SIZE: AtomicUsize = AtomicUsize::new(0);
 
-pub(crate) static DATA_QUEUE_RX_AP: Locked<VecDeque<PacketBuffer>> = Locked::new(VecDeque::new());
+pub(crate) static DATA_QUEUE_RX_AP: NonReentrantMutex<VecDeque<PacketBuffer>> =
+    NonReentrantMutex::new(VecDeque::new());
 
-pub(crate) static DATA_QUEUE_RX_STA: Locked<VecDeque<PacketBuffer>> = Locked::new(VecDeque::new());
+pub(crate) static DATA_QUEUE_RX_STA: NonReentrantMutex<VecDeque<PacketBuffer>> =
+    NonReentrantMutex::new(VecDeque::new());
 
 /// Common errors.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum WifiError {
-    /// Wi-Fi module is not initialized or not initialized for `Wi-Fi`
-    /// operations.
-    NotInitialized,
-
-    /// Internal Wi-Fi error.
-    InternalError(InternalWifiError),
-
     /// The device disconnected from the network or failed to connect to it.
     Disconnected,
 
@@ -1200,12 +659,201 @@ pub enum WifiError {
 
     /// Passed arguments are invalid.
     InvalidArguments,
+
+    /// Generic failure - not further specified
+    Failed,
+
+    /// Out of memory
+    OutOfMemory,
+
+    /// Wi-Fi driver was not initialized
+    NotInitialized,
+
+    /// Wi-Fi driver was not started by [esp_wifi_start]
+    NotStarted,
+
+    /// Wi-Fi driver was not stopped by [esp_wifi_stop]
+    NotStopped,
+
+    /// Wi-Fi interface error
+    Interface,
+
+    /// Wi-Fi mode error
+    Mode,
+
+    /// Wi-Fi internal state error
+    State,
+
+    /// Wi-Fi internal control block of station or soft-AP error
+    ControlBlock,
+
+    /// Wi-Fi internal NVS module error
+    Nvs,
+
+    /// MAC address is invalid
+    InvalidMac,
+
+    /// SSID is invalid
+    InvalidSsid,
+
+    /// Password is invalid
+    InvalidPassword,
+
+    /// Timeout error
+    Timeout,
+
+    /// Wi-Fi is in sleep state (RF closed) and wakeup failed
+    WakeFailed,
+
+    /// The operation would block
+    WouldBlock,
+
+    /// Station still in disconnect status
+    NotConnected,
+
+    /// Failed to post the event to Wi-Fi task
+    PostFail,
+
+    /// Invalid Wi-Fi state when init/deinit is called
+    InvalidInitState,
+
+    /// Returned when Wi-Fi is stopping
+    StopState,
+
+    /// The Wi-Fi connection is not associated
+    NotAssociated,
+
+    /// The Wi-Fi TX is disallowed
+    TxDisallowed,
+
+    /// An unknown error was reported by the Wi-Fi driver.
+    // This is here just in case we encounter an unmapped error - there doesn't seem to be a
+    // definitive and exhausting list of errors we should expect and panicking because of an
+    // unmapped error.
+    Unknown(i32),
+
+    /// The current CPU clock frequency is too low.
+    WrongClockConfig,
+
+    /// The scheduler is not initialized.
+    SchedulerNotInitialized,
+
+    #[cfg(esp32)]
+    /// ADC2 is required by esp-radio, but it is in use by esp-hal.
+    Adc2IsUsed,
 }
 
-/// Events generated by the WiFi driver.
-#[repr(i32)]
+impl WifiError {
+    fn from_error_code(code: i32) -> Self {
+        if crate::sys::include::ESP_FAIL == code {
+            return WifiError::Failed;
+        }
+
+        match code as u32 {
+            crate::sys::include::ESP_ERR_NO_MEM => WifiError::OutOfMemory,
+            crate::sys::include::ESP_ERR_INVALID_ARG => WifiError::InvalidArguments,
+            crate::sys::include::ESP_ERR_WIFI_NOT_INIT => WifiError::NotInitialized,
+            crate::sys::include::ESP_ERR_WIFI_NOT_STARTED => WifiError::NotStarted,
+            crate::sys::include::ESP_ERR_WIFI_NOT_STOPPED => WifiError::NotStopped,
+            crate::sys::include::ESP_ERR_WIFI_IF => WifiError::Interface,
+            crate::sys::include::ESP_ERR_WIFI_MODE => WifiError::Mode,
+            crate::sys::include::ESP_ERR_WIFI_STATE => WifiError::State,
+            crate::sys::include::ESP_ERR_WIFI_CONN => WifiError::ControlBlock,
+            crate::sys::include::ESP_ERR_WIFI_NVS => WifiError::Nvs,
+            crate::sys::include::ESP_ERR_WIFI_MAC => WifiError::InvalidMac,
+            crate::sys::include::ESP_ERR_WIFI_SSID => WifiError::InvalidSsid,
+            crate::sys::include::ESP_ERR_WIFI_PASSWORD => WifiError::InvalidPassword,
+            crate::sys::include::ESP_ERR_WIFI_TIMEOUT => WifiError::Timeout,
+            crate::sys::include::ESP_ERR_WIFI_WAKE_FAIL => WifiError::WakeFailed,
+            crate::sys::include::ESP_ERR_WIFI_WOULD_BLOCK => WifiError::WouldBlock,
+            crate::sys::include::ESP_ERR_WIFI_NOT_CONNECT => WifiError::NotConnected,
+            crate::sys::include::ESP_ERR_WIFI_POST => WifiError::PostFail,
+            crate::sys::include::ESP_ERR_WIFI_INIT_STATE => WifiError::InvalidInitState,
+            crate::sys::include::ESP_ERR_WIFI_STOP_STATE => WifiError::StopState,
+            crate::sys::include::ESP_ERR_WIFI_NOT_ASSOC => WifiError::NotAssociated,
+            crate::sys::include::ESP_ERR_WIFI_TX_DISALLOW => WifiError::TxDisallowed,
+            _ => WifiError::Unknown(code),
+        }
+    }
+}
+
+/// Events generated by the Wi-Fi driver.
+impl core::fmt::Display for WifiError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            WifiError::Disconnected => write!(f, "Wi-Fi disconnected."),
+            WifiError::UnknownWifiMode => write!(f, "Unknown Wi-Fi mode."),
+            WifiError::Unsupported => write!(f, "Unsupported operation or mode."),
+            WifiError::InvalidArguments => write!(f, "Invalid arguments."),
+            WifiError::Failed => write!(f, "Generic unspecified failure."),
+            WifiError::NotInitialized => write!(
+                f,
+                "Wi-Fi module is not initialized or not initialized for `Wi-Fi` operations."
+            ),
+            WifiError::OutOfMemory => write!(f, "Out of memory."),
+            WifiError::NotStarted => write!(f, "Wi-Fi driver was not started."),
+            WifiError::NotStopped => write!(f, "Wi-Fi driver was not stopped."),
+            WifiError::Interface => write!(f, "Wi-Fi interface error."),
+            WifiError::Mode => write!(f, "Wi-Fi mode error."),
+            WifiError::State => write!(f, "Wi-Fi internal state error."),
+            WifiError::ControlBlock => write!(
+                f,
+                "Wi-Fi internal control block of station or soft-AP error."
+            ),
+            WifiError::Nvs => write!(f, "Wi-Fi internal NVS module error."),
+            WifiError::InvalidMac => write!(f, "MAC address is invalid."),
+            WifiError::InvalidSsid => write!(f, "SSID is invalid."),
+            WifiError::InvalidPassword => write!(f, "Password is invalid."),
+            WifiError::Timeout => write!(f, "Timeout error."),
+            WifiError::WakeFailed => {
+                write!(f, "Wi-Fi is in sleep state (RF closed) and wakeup failed.")
+            }
+            WifiError::WouldBlock => write!(f, "The operation would block."),
+            WifiError::NotConnected => write!(f, "Station still in disconnect status."),
+            WifiError::PostFail => write!(f, "Failed to post the event to Wi-Fi task."),
+            WifiError::InvalidInitState => {
+                write!(f, "Invalid Wi-Fi state when init/deinit is called.")
+            }
+            WifiError::StopState => write!(f, "Returned when Wi-Fi is stopping."),
+            WifiError::NotAssociated => write!(f, "The Wi-Fi connection is not associated."),
+            WifiError::TxDisallowed => write!(f, "The Wi-Fi TX is disallowed."),
+            WifiError::Unknown(_) => {
+                write!(f, "An unknown error was reported by the Wi-Fi driver.")
+            }
+            WifiError::WrongClockConfig => {
+                write!(f, "The current CPU clock frequency is too low")
+            }
+            WifiError::SchedulerNotInitialized => {
+                write!(f, "The scheduler is not initialized")
+            }
+            #[cfg(esp32)]
+            WifiError::Adc2IsUsed => write!(
+                f,
+                "ADC2 cannot be used with `radio` functionality on `esp32`"
+            ),
+        }
+    }
+}
+
+impl core::error::Error for WifiError {}
+
+impl From<InitializationError> for WifiError {
+    fn from(err: InitializationError) -> Self {
+        match err {
+            InitializationError::WifiError(e) => e,
+            InitializationError::SchedulerNotInitialized => WifiError::SchedulerNotInitialized,
+            InitializationError::WrongClockConfig => WifiError::WrongClockConfig,
+            #[cfg(esp32)]
+            InitializationError::Adc2IsUsed => WifiError::Adc2IsUsed,
+        }
+    }
+}
+
+/// Events generated by the Wi-Fi driver.
 #[derive(Debug, FromPrimitive, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[repr(i32)]
 pub enum WifiEvent {
     /// Wi-Fi is ready for operation.
     WifiReady = 0,
@@ -1238,11 +886,11 @@ pub enum WifiEvent {
     /// Soft-AP stop.
     ApStop,
     /// A station connected to Soft-AP.
-    ApStaconnected,
+    ApStaConnected,
     /// A station disconnected from Soft-AP.
-    ApStadisconnected,
+    ApStaDisconnected,
     /// Received probe request packet in Soft-AP interface.
-    ApProbereqrecved,
+    ApProbeReqReceived,
 
     /// Received report of FTM procedure.
     FtmReport,
@@ -1309,97 +957,40 @@ pub enum WifiEvent {
     StaNeighborRep,
 }
 
-/// Error originating from the underlying drivers
-#[repr(i32)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, FromPrimitive)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum InternalWifiError {
-    /// Out of memory
-    NoMem            = 0x101,
-
-    /// Invalid argument
-    InvalidArg       = 0x102,
-
-    /// WiFi driver was not installed by esp_wifi_init
-    NotInit          = 0x3001,
-
-    /// WiFi driver was not started by esp_wifi_start
-    NotStarted       = 0x3002,
-
-    /// WiFi driver was not stopped by esp_wifi_stop
-    NotStopped       = 0x3003,
-
-    /// WiFi interface error
-    Interface        = 0x3004,
-
-    /// WiFi mode error
-    Mode             = 0x3005,
-
-    /// WiFi internal state error
-    State            = 0x3006,
-
-    /// WiFi internal control block of station or soft-AP error
-    Conn             = 0x3007,
-
-    /// WiFi internal NVS module error
-    Nvs              = 0x3008,
-
-    /// MAC address is invalid
-    InvalidMac       = 0x3009,
-
-    /// SSID is invalid
-    InvalidSsid      = 0x300A,
-
-    /// Password is invalid
-    InvalidPassword  = 0x300B,
-
-    /// Timeout error
-    Timeout          = 0x300C,
-
-    /// WiFi is in sleep state (RF closed) and wakeup failed
-    WakeFail         = 0x300D,
-
-    /// The caller would block
-    WouldBlock       = 0x300E,
-
-    /// Station still in disconnect status
-    NotConnected     = 0x300F,
-
-    /// Failed to post the event to WiFi task
-    PostFail         = 0x3012,
-
-    /// Invalid WiFi state when init/deinit is called
-    InvalidInitState = 0x3013,
-
-    /// Returned when WiFi is stopping
-    StopState        = 0x3014,
-
-    /// The WiFi connection is not associated
-    NotAssociated    = 0x3015,
-
-    /// The WiFi TX is disallowed
-    TxDisallowed     = 0x3016,
+/// Get the AP MAC address of the device.
+pub fn ap_mac() -> [u8; 6] {
+    let mut mac = [0u8; 6];
+    unsafe {
+        read_mac(mac.as_mut_ptr(), 1);
+    }
+    mac
 }
 
-/// Get the STA MAC address
-pub fn sta_mac(mac: &mut [u8; 6]) {
+/// Get the STA MAC address of the device.
+pub fn sta_mac() -> [u8; 6] {
+    let mut mac = [0u8; 6];
     unsafe {
-        read_mac(mac as *mut u8, 0);
+        read_mac(mac.as_mut_ptr(), 0);
+    }
+    mac
+}
+
+#[cfg(esp32)]
+fn set_mac_time_update_cb(wifi: crate::hal::peripherals::WIFI<'_>) {
+    use esp_phy::MacTimeExt;
+
+    use crate::sys::include::esp_wifi_internal_update_mac_time;
+    unsafe {
+        wifi.set_mac_time_update_cb(|duration| {
+            esp_wifi_internal_update_mac_time(duration.as_micros() as u32);
+        });
     }
 }
 
-/// Get the AP MAC address
-pub fn ap_mac(mac: &mut [u8; 6]) {
+pub(crate) fn wifi_init(_wifi: crate::hal::peripherals::WIFI<'_>) -> Result<(), WifiError> {
+    #[cfg(esp32)]
+    set_mac_time_update_cb(_wifi);
     unsafe {
-        read_mac(mac as *mut u8, 1);
-    }
-}
-
-pub(crate) fn wifi_init() -> Result<(), WifiError> {
-    unsafe {
-        internal::G_CONFIG.wpa_crypto_funcs = g_wifi_default_wpa_crypto_funcs;
-        internal::G_CONFIG.feature_caps = internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS;
-
         #[cfg(coex)]
         esp_wifi_result!(coex_init())?;
 
@@ -1421,12 +1012,6 @@ pub(crate) fn wifi_init() -> Result<(), WifiError> {
             Some(recv_cb_ap)
         ))?;
 
-        #[cfg(any(esp32, esp32s3))]
-        {
-            static mut NVS_STRUCT: [u32; 12] = [0; 12];
-            chip_specific::__ESP_RADIO_G_MISC_NVS = addr_of!(NVS_STRUCT) as u32;
-        }
-
         Ok(())
     }
 }
@@ -1435,14 +1020,14 @@ pub(crate) fn wifi_init() -> Result<(), WifiError> {
 pub(crate) fn coex_initialize() -> i32 {
     debug!("call coex-initialize");
     unsafe {
-        let res = crate::binary::include::esp_coex_adapter_register(
+        let res = crate::sys::include::esp_coex_adapter_register(
             core::ptr::addr_of_mut!(internal::G_COEX_ADAPTER_FUNCS).cast(),
         );
         if res != 0 {
             error!("Error: esp_coex_adapter_register {}", res);
             return res;
         }
-        let res = crate::binary::include::coex_pre_init();
+        let res = crate::sys::include::coex_pre_init();
         if res != 0 {
             error!("Error: coex_pre_init {}", res);
             return res;
@@ -1456,14 +1041,14 @@ pub(crate) unsafe extern "C" fn coex_init() -> i32 {
     {
         debug!("coex-init");
         #[allow(clippy::needless_return)]
-        return unsafe { crate::binary::include::coex_init() };
+        return unsafe { crate::sys::include::coex_init() };
     }
 
     #[cfg(not(coex))]
     0
 }
 
-fn wifi_deinit() -> Result<(), crate::InitializationError> {
+fn wifi_deinit() -> Result<(), crate::WifiError> {
     esp_wifi_result!(unsafe { esp_wifi_stop() })?;
     esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
     esp_wifi_result!(unsafe { esp_supplicant_deinit() })?;
@@ -1483,7 +1068,7 @@ unsafe extern "C" fn recv_cb_sta(
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
     match DATA_QUEUE_RX_STA.with(|queue| {
-        if queue.len() < RX_QUEUE_SIZE {
+        if queue.len() < RX_QUEUE_SIZE.load(Ordering::Relaxed) {
             queue.push_back(packet);
             Ok(())
         } else {
@@ -1514,7 +1099,7 @@ unsafe extern "C" fn recv_cb_ap(
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
     match DATA_QUEUE_RX_AP.with(|queue| {
-        if queue.len() < RX_QUEUE_SIZE {
+        if queue.len() < RX_QUEUE_SIZE.load(Ordering::Relaxed) {
             queue.push_back(packet);
             Ok(())
         } else {
@@ -1556,31 +1141,7 @@ unsafe extern "C" fn esp_wifi_tx_done_cb(
     embassy::TRANSMIT_WAKER.wake();
 }
 
-pub(crate) fn wifi_start() -> Result<(), WifiError> {
-    unsafe {
-        esp_wifi_result!(esp_wifi_start())?;
-
-        let mode = WifiMode::current()?;
-
-        // This is not an if-else because in AP-STA mode, both are true
-        if mode.is_ap() {
-            esp_wifi_result!(include::esp_wifi_set_inactive_time(
-                wifi_interface_t_WIFI_IF_AP,
-                crate::CONFIG.ap_beacon_timeout
-            ))?;
-        }
-        if mode.is_sta() {
-            esp_wifi_result!(include::esp_wifi_set_inactive_time(
-                wifi_interface_t_WIFI_IF_STA,
-                crate::CONFIG.beacon_timeout
-            ))?;
-        };
-    }
-
-    Ok(())
-}
-
-/// Configuration for active or passive scan. For details see the [WIFI Alliance FAQ](https://www.wi-fi.org/knowledge-center/faq/what-are-passive-and-active-scanning).
+/// Configuration for active or passive scan.
 ///
 /// # Comparison of active and passive scan
 ///
@@ -1588,7 +1149,8 @@ pub(crate) fn wifi_start() -> Result<(), WifiError> {
 /// |--------------------------------------|------------|-------------|
 /// | **Power consumption**                |    High    |     Low     |
 /// | **Time required (typical behavior)** |     Low    |     High    |
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ScanTypeConfig {
     /// Active scan with min and max scan time per channel. This is the default
     /// and recommended if you are unsure.
@@ -1644,25 +1206,25 @@ pub struct ScanConfig<'a> {
     /// If [`None`] is passed, all SSIDs will be returned.
     /// If [`Some`] is passed, only the APs matching the given SSID will be
     /// returned.
-    pub ssid: Option<&'a str>,
+    ssid: Option<&'a str>,
     /// BSSID to filter for.
     /// If [`None`] is passed, all BSSIDs will be returned.
     /// If [`Some`] is passed, only the APs matching the given BSSID will be
     /// returned.
-    pub bssid: Option<[u8; 6]>,
+    bssid: Option<[u8; 6]>,
     /// Channel to filter for.
     /// If [`None`] is passed, all channels will be returned.
     /// If [`Some`] is passed, only the APs on the given channel will be
     /// returned.
-    pub channel: Option<u8>,
+    channel: Option<u8>,
     /// Whether to show hidden networks.
-    pub show_hidden: bool,
+    show_hidden: bool,
     /// Scan type, active or passive.
-    pub scan_type: ScanTypeConfig,
+    scan_type: ScanTypeConfig,
     /// The maximum number of networks to return when scanning.
     /// If [`None`] is passed, all networks will be returned.
     /// If [`Some`] is passed, the specified number of networks will be returned.
-    pub max: Option<usize>,
+    max: Option<usize>,
 }
 
 pub(crate) fn wifi_start_scan(
@@ -1698,7 +1260,7 @@ pub(crate) fn wifi_start_scan(
     };
 
     let mut ssid_buf = ssid.map(|m| {
-        let mut buf = alloc::vec::Vec::from_iter(m.bytes());
+        let mut buf = Vec::from_iter(m.bytes());
         buf.push(b'\0');
         buf
     });
@@ -1724,6 +1286,7 @@ pub(crate) fn wifi_start_scan(
             ghz_2_channels: 0,
             ghz_5_channels: 0,
         },
+        coex_background_scan: false,
     };
 
     unsafe { esp_wifi_scan_start(&scan_config, block) }
@@ -1763,30 +1326,24 @@ mod private {
     }
 }
 
-/// Provides methods for retrieving the Wi-Fi mode and MAC address.
+/// Wi-Fi device operational modes.
 #[derive(Debug, Clone, Copy)]
-pub enum WifiDeviceMode {
+enum WifiDeviceMode {
+    /// Station mode.
     Sta,
+    /// Access Point mode.
     Ap,
 }
 
 impl WifiDeviceMode {
     fn mac_address(&self) -> [u8; 6] {
         match self {
-            WifiDeviceMode::Sta => {
-                let mut mac = [0; 6];
-                sta_mac(&mut mac);
-                mac
-            }
-            WifiDeviceMode::Ap => {
-                let mut mac = [0; 6];
-                ap_mac(&mut mac);
-                mac
-            }
+            WifiDeviceMode::Sta => sta_mac(),
+            WifiDeviceMode::Ap => ap_mac(),
         }
     }
 
-    fn data_queue_rx(&self) -> &'static Locked<VecDeque<PacketBuffer>> {
+    fn data_queue_rx(&self) -> &'static NonReentrantMutex<VecDeque<PacketBuffer>> {
         match self {
             WifiDeviceMode::Sta => &DATA_QUEUE_RX_STA,
             WifiDeviceMode::Ap => &DATA_QUEUE_RX_AP,
@@ -1794,7 +1351,7 @@ impl WifiDeviceMode {
     }
 
     fn can_send(&self) -> bool {
-        WIFI_TX_INFLIGHT.load(Ordering::SeqCst) < TX_QUEUE_SIZE
+        WIFI_TX_INFLIGHT.load(Ordering::SeqCst) < TX_QUEUE_SIZE.load(Ordering::Relaxed)
     }
 
     fn increase_in_flight_counter(&self) {
@@ -1803,6 +1360,7 @@ impl WifiDeviceMode {
 
     fn tx_token(&self) -> Option<WifiTxToken> {
         if !self.can_send() {
+            // TODO: perhaps we can use a counting semaphore with a short blocking timeout
             crate::preempt::yield_task();
         }
 
@@ -1816,6 +1374,7 @@ impl WifiDeviceMode {
     fn rx_token(&self) -> Option<(WifiRxToken, WifiTxToken)> {
         let is_empty = self.data_queue_rx().with(|q| q.is_empty());
         if is_empty || !self.can_send() {
+            // TODO: use an OS queue with a short timeout
             crate::preempt::yield_task();
         }
 
@@ -1856,14 +1415,14 @@ impl WifiDeviceMode {
     fn link_state(&self) -> embassy_net_driver::LinkState {
         match self {
             WifiDeviceMode::Sta => {
-                if matches!(sta_state(), WifiState::StaConnected) {
+                if matches!(sta_state(), WifiStaState::Connected) {
                     embassy_net_driver::LinkState::Up
                 } else {
                     embassy_net_driver::LinkState::Down
                 }
             }
             WifiDeviceMode::Ap => {
-                if matches!(ap_state(), WifiState::ApStarted) {
+                if matches!(ap_state(), WifiApState::Started) {
                     embassy_net_driver::LinkState::Up
                 } else {
                     embassy_net_driver::LinkState::Down
@@ -1900,38 +1459,12 @@ impl WifiDevice<'_> {
     }
 }
 
-fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
-    let str_len = record
-        .ssid
-        .iter()
-        .position(|&c| c == 0)
-        .unwrap_or(record.ssid.len());
-    let ssid_ref = unsafe { core::str::from_utf8_unchecked(&record.ssid[..str_len]) };
-
-    let mut ssid = String::new();
-    ssid.push_str(ssid_ref);
-
-    AccessPointInfo {
-        ssid,
-        bssid: record.bssid,
-        channel: record.primary,
-        secondary_channel: match record.second {
-            include::wifi_second_chan_t_WIFI_SECOND_CHAN_NONE => SecondaryChannel::None,
-            include::wifi_second_chan_t_WIFI_SECOND_CHAN_ABOVE => SecondaryChannel::Above,
-            include::wifi_second_chan_t_WIFI_SECOND_CHAN_BELOW => SecondaryChannel::Below,
-            _ => panic!(),
-        },
-        signal_strength: record.rssi,
-        auth_method: Some(AuthMethod::from_raw(record.authmode)),
-        country: Country::try_from_c(&record.country),
-    }
-}
-
 /// The radio metadata header of the received packet, which is the common header
 /// at the beginning of all RX callback buffers in promiscuous mode.
-#[cfg(not(any(esp32c6)))]
+#[cfg(not(esp32c6))]
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
 pub struct RxControlInfo {
     /// Received Signal Strength Indicator (RSSI) of the packet, in dBm.
     pub rssi: i32,
@@ -1989,6 +1522,7 @@ pub struct RxControlInfo {
 #[cfg(esp32c6)]
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
 pub struct RxControlInfo {
     /// Received Signal Strength Indicator (RSSI) of the packet, in dBm.
     pub rssi: i32,
@@ -2031,6 +1565,8 @@ pub struct RxControlInfo {
     /// Indicate whether the reception frame is from interface 0.
     pub rxmatch0: u32,
 }
+
+#[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
 impl RxControlInfo {
     /// Create an instance from a raw pointer to [wifi_pkt_rx_ctrl_t].
     ///
@@ -2089,107 +1625,6 @@ impl RxControlInfo {
         rx_control_info
     }
 }
-/// Represents a Wi-Fi packet in promiscuous mode.
-#[cfg(all(feature = "sniffer", feature = "unstable"))]
-#[instability::unstable]
-pub struct PromiscuousPkt<'a> {
-    /// Control information related to packet reception.
-    pub rx_cntl: RxControlInfo,
-    /// Frame type of the received packet.
-    pub frame_type: wifi_promiscuous_pkt_type_t,
-    /// Length of the received packet.
-    pub len: usize,
-    /// Data contained in the received packet.
-    pub data: &'a [u8],
-}
-#[cfg(all(feature = "sniffer", feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl PromiscuousPkt<'_> {
-    /// # Safety
-    /// When calling this, you have to ensure, that `buf` points to a valid
-    /// [wifi_promiscuous_pkt_t].
-    pub(crate) unsafe fn from_raw(
-        buf: *const wifi_promiscuous_pkt_t,
-        frame_type: wifi_promiscuous_pkt_type_t,
-    ) -> Self {
-        let rx_cntl = unsafe { RxControlInfo::from_raw(&(*buf).rx_ctrl) };
-        let len = rx_cntl.sig_len as usize;
-        PromiscuousPkt {
-            rx_cntl,
-            frame_type,
-            len,
-            data: unsafe {
-                core::slice::from_raw_parts(
-                    (buf as *const u8).add(core::mem::size_of::<wifi_pkt_rx_ctrl_t>()),
-                    len,
-                )
-            },
-        }
-    }
-}
-
-#[cfg(all(feature = "sniffer", feature = "unstable"))]
-static SNIFFER_CB: Locked<Option<fn(PromiscuousPkt<'_>)>> = Locked::new(None);
-
-#[cfg(all(feature = "sniffer", feature = "unstable"))]
-unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: u32) {
-    unsafe {
-        if let Some(sniffer_callback) = SNIFFER_CB.with(|callback| *callback) {
-            let promiscuous_pkt = PromiscuousPkt::from_raw(buf as *const _, frame_type);
-            sniffer_callback(promiscuous_pkt);
-        }
-    }
-}
-
-#[cfg(all(feature = "sniffer", feature = "unstable"))]
-#[instability::unstable]
-/// A wifi sniffer.
-#[non_exhaustive]
-pub struct Sniffer {}
-
-#[cfg(all(feature = "sniffer", feature = "unstable"))]
-impl Sniffer {
-    pub(crate) fn new() -> Self {
-        // This shouldn't fail, since the way this is created, means that wifi will
-        // always be initialized.
-        unwrap!(esp_wifi_result!(unsafe {
-            esp_wifi_set_promiscuous_rx_cb(Some(promiscuous_rx_cb))
-        }));
-        Self {}
-    }
-    /// Set promiscuous mode enabled or disabled.
-    #[instability::unstable]
-    pub fn set_promiscuous_mode(&self, enabled: bool) -> Result<(), WifiError> {
-        esp_wifi_result!(unsafe { esp_wifi_set_promiscuous(enabled) })?;
-        Ok(())
-    }
-    /// Transmit a raw frame.
-    #[instability::unstable]
-    pub fn send_raw_frame(
-        &mut self,
-        use_sta_interface: bool,
-        buffer: &[u8],
-        use_internal_seq_num: bool,
-    ) -> Result<(), WifiError> {
-        esp_wifi_result!(unsafe {
-            esp_wifi_80211_tx(
-                if use_sta_interface {
-                    wifi_interface_t_WIFI_IF_STA
-                } else {
-                    wifi_interface_t_WIFI_IF_AP
-                } as wifi_interface_t,
-                buffer.as_ptr() as *const _,
-                buffer.len() as i32,
-                use_internal_seq_num,
-            )
-        })
-    }
-    /// Set the callback for receiving a packet.
-    #[instability::unstable]
-    pub fn set_receive_cb(&mut self, cb: fn(PromiscuousPkt<'_>)) {
-        SNIFFER_CB.with(|callback| *callback = Some(cb));
-    }
-}
 
 // see https://docs.rs/smoltcp/0.7.1/smoltcp/phy/index.html
 #[cfg(all(feature = "smoltcp", feature = "unstable"))]
@@ -2218,10 +1653,14 @@ impl Device for WifiDevice<'_> {
     fn capabilities(&self) -> smoltcp::phy::DeviceCapabilities {
         let mut caps = DeviceCapabilities::default();
         caps.max_transmission_unit = MTU;
-        caps.max_burst_size = if crate::CONFIG.max_burst_size == 0 {
+        caps.max_burst_size = if esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MAX_BURST_SIZE") == 0
+        {
             None
         } else {
-            Some(crate::CONFIG.max_burst_size)
+            Some(esp_config_int!(
+                usize,
+                "ESP_RADIO_CONFIG_WIFI_MAX_BURST_SIZE"
+            ))
         };
         caps
     }
@@ -2286,7 +1725,7 @@ impl WifiTxToken {
     {
         self.mode.increase_in_flight_counter();
 
-        // (safety): creation of multiple WiFi devices with the same mode is impossible
+        // (safety): creation of multiple Wi-Fi devices with the same mode is impossible
         // in safe Rust, therefore only smoltcp _or_ embassy-net can be used at
         // one time
         static mut BUFFER: [u8; MTU] = [0u8; MTU];
@@ -2323,226 +1762,12 @@ pub(crate) fn esp_wifi_send_data(interface: wifi_interface_t, data: &mut [u8]) {
     let len = data.len() as u16;
     let ptr = data.as_mut_ptr().cast();
 
-    let res = unsafe { esp_wifi_internal_tx(interface, ptr, len) };
+    let res = unsafe { esp_wifi_result!(esp_wifi_internal_tx(interface, ptr, len)) };
 
-    if res != 0 {
-        warn!("esp_wifi_internal_tx {}", res);
+    if res.is_err() {
         decrement_inflight_counter();
     } else {
         trace!("esp_wifi_internal_tx ok");
-    }
-}
-
-fn apply_ap_config(config: &AccessPointConfiguration) -> Result<(), WifiError> {
-    let mut cfg = wifi_config_t {
-        ap: wifi_ap_config_t {
-            ssid: [0; 32],
-            password: [0; 64],
-            ssid_len: 0,
-            channel: config.channel,
-            authmode: config.auth_method.to_raw(),
-            ssid_hidden: if config.ssid_hidden { 1 } else { 0 },
-            max_connection: config.max_connections as u8,
-            beacon_interval: 100,
-            pairwise_cipher: wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP,
-            ftm_responder: false,
-            pmf_cfg: wifi_pmf_config_t {
-                capable: true,
-                required: false,
-            },
-            sae_pwe_h2e: 0,
-            csa_count: 3,
-            dtim_period: 2,
-        },
-    };
-
-    if config.auth_method == AuthMethod::None && !config.password.is_empty() {
-        return Err(WifiError::InternalError(InternalWifiError::InvalidArg));
-    }
-
-    unsafe {
-        cfg.ap.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
-        cfg.ap.ssid_len = config.ssid.len() as u8;
-        cfg.ap.password[0..(config.password.len())].copy_from_slice(config.password.as_bytes());
-
-        esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_AP, &mut cfg))
-    }
-}
-
-fn apply_sta_config(config: &ClientConfiguration) -> Result<(), WifiError> {
-    let mut cfg = wifi_config_t {
-        sta: wifi_sta_config_t {
-            ssid: [0; 32],
-            password: [0; 64],
-            scan_method: crate::CONFIG.scan_method,
-            bssid_set: config.bssid.is_some(),
-            bssid: config.bssid.unwrap_or_default(),
-            channel: config.channel.unwrap_or(0),
-            listen_interval: crate::CONFIG.listen_interval,
-            sort_method: wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
-            threshold: wifi_scan_threshold_t {
-                rssi: -99,
-                authmode: config.auth_method.to_raw(),
-            },
-            pmf_cfg: wifi_pmf_config_t {
-                capable: true,
-                required: false,
-            },
-            sae_pwe_h2e: 3,
-            _bitfield_align_1: [0; 0],
-            _bitfield_1: __BindgenBitfieldUnit::new([0; 4]),
-            failure_retry_cnt: crate::CONFIG.failure_retry_cnt,
-            _bitfield_align_2: [0; 0],
-            _bitfield_2: __BindgenBitfieldUnit::new([0; 4]),
-            sae_pk_mode: 0, // ??
-            sae_h2e_identifier: [0; 32],
-        },
-    };
-
-    if config.auth_method == AuthMethod::None && !config.password.is_empty() {
-        return Err(WifiError::InternalError(InternalWifiError::InvalidArg));
-    }
-
-    unsafe {
-        cfg.sta.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
-        cfg.sta.password[0..(config.password.len())].copy_from_slice(config.password.as_bytes());
-
-        esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_STA, &mut cfg))
-    }
-}
-
-#[cfg(feature = "wifi-eap")]
-fn apply_sta_eap_config(config: &EapClientConfiguration) -> Result<(), WifiError> {
-    let mut cfg = wifi_config_t {
-        sta: wifi_sta_config_t {
-            ssid: [0; 32],
-            password: [0; 64],
-            scan_method: crate::CONFIG.scan_method,
-            bssid_set: config.bssid.is_some(),
-            bssid: config.bssid.unwrap_or_default(),
-            channel: config.channel.unwrap_or(0),
-            listen_interval: crate::CONFIG.listen_interval,
-            sort_method: wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
-            threshold: wifi_scan_threshold_t {
-                rssi: -99,
-                authmode: config.auth_method.to_raw(),
-            },
-            pmf_cfg: wifi_pmf_config_t {
-                capable: true,
-                required: false,
-            },
-            sae_pwe_h2e: 3,
-            _bitfield_align_1: [0; 0],
-            _bitfield_1: __BindgenBitfieldUnit::new([0; 4]),
-            failure_retry_cnt: crate::CONFIG.failure_retry_cnt,
-            _bitfield_align_2: [0; 0],
-            _bitfield_2: __BindgenBitfieldUnit::new([0; 4]),
-            sae_pk_mode: 0, // ??
-            sae_h2e_identifier: [0; 32],
-        },
-    };
-
-    unsafe {
-        cfg.sta.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
-        esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_STA, &mut cfg))?;
-
-        if let Some(identity) = &config.identity {
-            esp_wifi_result!(esp_eap_client_set_identity(
-                identity.as_str().as_ptr(),
-                identity.len() as i32
-            ))?;
-        } else {
-            esp_eap_client_clear_identity();
-        }
-
-        if let Some(username) = &config.username {
-            esp_wifi_result!(esp_eap_client_set_username(
-                username.as_str().as_ptr(),
-                username.len() as i32
-            ))?;
-        } else {
-            esp_eap_client_clear_username();
-        }
-
-        if let Some(password) = &config.password {
-            esp_wifi_result!(esp_eap_client_set_password(
-                password.as_str().as_ptr(),
-                password.len() as i32
-            ))?;
-        } else {
-            esp_eap_client_clear_password();
-        }
-
-        if let Some(new_password) = &config.new_password {
-            esp_wifi_result!(esp_eap_client_set_new_password(
-                new_password.as_str().as_ptr(),
-                new_password.len() as i32
-            ))?;
-        } else {
-            esp_eap_client_clear_new_password();
-        }
-
-        if let Some(pac_file) = &config.pac_file {
-            esp_wifi_result!(esp_eap_client_set_pac_file(
-                pac_file.as_ptr(),
-                pac_file.len() as i32
-            ))?;
-        }
-
-        if let Some(phase2_method) = &config.ttls_phase2_method {
-            esp_wifi_result!(esp_eap_client_set_ttls_phase2_method(
-                phase2_method.to_raw()
-            ))?;
-        }
-
-        if let Some(ca_cert) = config.ca_cert {
-            esp_wifi_result!(esp_eap_client_set_ca_cert(
-                ca_cert.as_ptr(),
-                ca_cert.len() as i32
-            ))?;
-        } else {
-            esp_eap_client_clear_ca_cert();
-        }
-
-        if let Some((cert, key, password)) = config.certificate_and_key {
-            let (pwd, pwd_len) = if let Some(pwd) = password {
-                (pwd.as_ptr(), pwd.len() as i32)
-            } else {
-                (core::ptr::null(), 0)
-            };
-
-            esp_wifi_result!(esp_eap_client_set_certificate_and_key(
-                cert.as_ptr(),
-                cert.len() as i32,
-                key.as_ptr(),
-                key.len() as i32,
-                pwd,
-                pwd_len,
-            ))?;
-        } else {
-            esp_eap_client_clear_certificate_and_key();
-        }
-
-        if let Some(cfg) = &config.eap_fast_config {
-            let params = esp_eap_fast_config {
-                fast_provisioning: cfg.fast_provisioning as i32,
-                fast_max_pac_list_len: cfg.fast_max_pac_list_len as i32,
-                fast_pac_format_binary: cfg.fast_pac_format_binary,
-            };
-            esp_wifi_result!(esp_eap_client_set_fast_params(params))?;
-        }
-
-        esp_wifi_result!(esp_eap_client_set_disable_time_check(!&config.time_check))?;
-
-        // esp_eap_client_set_suiteb_192bit_certification unsupported because we build
-        // without MBEDTLS
-
-        // esp_eap_client_use_default_cert_bundle unsupported because we build without
-        // MBEDTLS
-
-        esp_wifi_result!(esp_wifi_sta_enterprise_enable())?;
-
-        Ok(())
     }
 }
 
@@ -2559,11 +1784,15 @@ macro_rules! esp_wifi_result {
     ($value:expr) => {{
         use num_traits::FromPrimitive;
         let result = $value;
-        if result != esp_wifi_sys::include::ESP_OK as i32 {
-            warn!("{} returned an error: {}", stringify!($value), result);
-            Err(WifiError::InternalError(unwrap!(FromPrimitive::from_i32(
+        if result != $crate::sys::include::ESP_OK as i32 {
+            let error = unwrap!(FromPrimitive::from_i32(result));
+            warn!(
+                "{} returned an error: {:?} ({})",
+                stringify!($value),
+                error,
                 result
-            ))))
+            );
+            Err(WifiError::from_error_code(error))
         } else {
             Ok::<(), WifiError>(())
         }
@@ -2639,11 +1868,15 @@ pub(crate) mod embassy {
         fn capabilities(&self) -> Capabilities {
             let mut caps = Capabilities::default();
             caps.max_transmission_unit = MTU;
-            caps.max_burst_size = if crate::CONFIG.max_burst_size == 0 {
-                None
-            } else {
-                Some(crate::CONFIG.max_burst_size)
-            };
+            caps.max_burst_size =
+                if esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MAX_BURST_SIZE") == 0 {
+                    None
+                } else {
+                    Some(esp_config_int!(
+                        usize,
+                        "ESP_RADIO_CONFIG_WIFI_MAX_BURST_SIZE"
+                    ))
+                };
             caps
         }
 
@@ -2653,79 +1886,366 @@ pub(crate) mod embassy {
     }
 }
 
+/// Power saving mode settings for the modem.
+#[non_exhaustive]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum PowerSaveMode {
+    /// No power saving.
+    #[default]
+    None,
+    /// Minimum power save mode. In this mode, station wakes up to receive beacon every DTIM
+    /// period.
+    Minimum,
+    /// Maximum power save mode. In this mode, interval to receive beacons is determined by the
+    /// `listen_interval` config option.
+    Maximum,
+}
+
 pub(crate) fn apply_power_saving(ps: PowerSaveMode) -> Result<(), WifiError> {
-    esp_wifi_result!(unsafe { esp_wifi_sys::include::esp_wifi_set_ps(ps.into()) })?;
+    esp_wifi_result!(unsafe {
+        crate::sys::include::esp_wifi_set_ps(match ps {
+            PowerSaveMode::None => crate::sys::include::wifi_ps_type_t_WIFI_PS_NONE,
+            PowerSaveMode::Minimum => crate::sys::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM,
+            PowerSaveMode::Maximum => crate::sys::include::wifi_ps_type_t_WIFI_PS_MAX_MODEM,
+        })
+    })?;
     Ok(())
-}
-
-struct FreeApListOnDrop;
-impl FreeApListOnDrop {
-    pub fn defuse(self) {
-        core::mem::forget(self);
-    }
-}
-
-impl Drop for FreeApListOnDrop {
-    fn drop(&mut self) {
-        unsafe {
-            include::esp_wifi_clear_ap_list();
-        }
-    }
 }
 
 /// Represents the Wi-Fi controller and its associated interfaces.
 #[non_exhaustive]
 pub struct Interfaces<'d> {
+    /// Station mode Wi-Fi device.
     pub sta: WifiDevice<'d>,
+    /// Access Point mode Wi-Fi device.
     pub ap: WifiDevice<'d>,
+    /// ESP-NOW interface.
     #[cfg(all(feature = "esp-now", feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub esp_now: crate::esp_now::EspNow<'d>,
+    /// Wi-Fi sniffer interface.
     #[cfg(all(feature = "sniffer", feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    pub sniffer: Sniffer,
+    pub sniffer: Sniffer<'d>,
 }
 
-/// Create a WiFi controller and it's associated interfaces.
+/// Wi-Fi operating class.
 ///
-/// Dropping the controller will deinitialize / stop WiFi.
-///
-/// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
-/// currently in use.
-pub fn new<'d>(
-    _inited: &'d Controller<'d>,
-    _device: crate::hal::peripherals::WIFI<'d>,
-) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
-    if crate::is_interrupts_disabled() {
-        return Err(WifiError::Unsupported);
+/// Refer to Annex E of IEEE Std 802.11-2020.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum OperatingClass {
+    /// The regulations under which the station/AP is operating encompass all environments for the
+    /// current frequency band in the country.
+    AllEnvironments,
+
+    /// The regulations under which the station/AP is operating are for an outdoor environment only.
+    Outdoors,
+
+    /// The regulations under which the station/AP is operating are for an indoor environment only.
+    Indoors,
+
+    /// The station/AP is operating under a noncountry entity. The first two octets of the
+    /// noncountry entity is two ASCII ‘XX’ characters.
+    NonCountryEntity,
+
+    /// Binary representation of the Operating Class table number currently in use. Refer to Annex E
+    /// of IEEE Std 802.11-2020.
+    Repr(u8),
+}
+
+impl Default for OperatingClass {
+    fn default() -> Self {
+        OperatingClass::Repr(0) // TODO: is this valid?
     }
+}
 
-    let mut controller = WifiController {
-        _phantom: Default::default(),
-    };
+impl OperatingClass {
+    fn into_code(self) -> u8 {
+        match self {
+            OperatingClass::AllEnvironments => b' ',
+            OperatingClass::Outdoors => b'O',
+            OperatingClass::Indoors => b'I',
+            OperatingClass::NonCountryEntity => b'X',
+            OperatingClass::Repr(code) => code,
+        }
+    }
+}
 
-    crate::wifi::wifi_init()?;
+#[procmacros::doc_replace]
+/// Country information.
+///
+/// Defaults to China (CN) with Operating Class "0".
+///
+/// To create a [`CountryInfo`] instance, use the `from` method first, then set additional
+/// properties using the builder methods.
+///
+/// ## Example
+///
+/// ```rust,no_run
+/// # {before_snippet}
+/// use esp_radio::wifi::{CountryInfo, OperatingClass};
+///
+/// let country_info = CountryInfo::from(*b"CN").with_operating_class(OperatingClass::Indoors);
+/// # {after_snippet}
+/// ```
+///
+/// For more information, see the [Wi-Fi Country Code in the ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct CountryInfo {
+    /// Country code.
+    #[builder_lite(skip)]
+    country: [u8; 2],
 
-    let mut cntry_code = [0u8; 3];
-    cntry_code[..crate::CONFIG.country_code.len()]
-        .copy_from_slice(crate::CONFIG.country_code.as_bytes());
-    cntry_code[2] = crate::CONFIG.country_code_operating_class;
+    /// Operating class.
+    #[builder_lite(unstable)]
+    operating_class: OperatingClass,
+}
 
-    unsafe {
-        let country = wifi_country_t {
-            cc: cntry_code,
+impl From<[u8; 2]> for CountryInfo {
+    fn from(country: [u8; 2]) -> Self {
+        Self {
+            country,
+            operating_class: OperatingClass::default(),
+        }
+    }
+}
+
+impl CountryInfo {
+    fn into_blob(self) -> wifi_country_t {
+        wifi_country_t {
+            cc: [
+                self.country[0],
+                self.country[1],
+                self.operating_class.into_code(),
+            ],
+            // TODO: these may be valid defaults, but they should be configurable.
             schan: 1,
             nchan: 13,
             max_tx_power: 20,
             policy: wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
+        }
+    }
+}
+
+/// Wi-Fi configuration.
+#[derive(Clone, Copy, BuilderLite, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Config {
+    /// Power save mode.
+    power_save_mode: PowerSaveMode,
+
+    /// Country code.
+    #[builder_lite(into)]
+    #[builder_lite(unstable)]
+    country_code: CountryInfo,
+
+    /// Size of the RX queue in frames.
+    #[builder_lite(unstable)]
+    rx_queue_size: usize,
+    /// Size of the TX queue in frames.
+    #[builder_lite(unstable)]
+    tx_queue_size: usize,
+
+    /// Max number of WiFi static RX buffers.
+    ///
+    /// Each buffer takes approximately 1.6KB of RAM. The static rx buffers are allocated when
+    /// esp_wifi_init is called, they are not freed until esp_wifi_deinit is called.
+    ///
+    /// WiFi hardware use these buffers to receive all 802.11 frames. A higher number may allow
+    /// higher throughput but increases memory use. If [`Self::ampdu_rx_enable`] is enabled,
+    /// this value is recommended to set equal or bigger than [`Self::rx_ba_win`] in order to
+    /// achieve better throughput and compatibility with both stations and APs.
+    #[builder_lite(unstable)]
+    static_rx_buf_num: u8,
+
+    /// Max number of WiFi dynamic RX buffers
+    ///
+    /// Set the number of WiFi dynamic RX buffers, 0 means unlimited RX buffers will be allocated
+    /// (provided sufficient free RAM). The size of each dynamic RX buffer depends on the size of
+    /// the received data frame.
+    ///
+    /// For each received data frame, the WiFi driver makes a copy to an RX buffer and then
+    /// delivers it to the high layer TCP/IP stack. The dynamic RX buffer is freed after the
+    /// higher layer has successfully received the data frame.
+    ///
+    /// For some applications, WiFi data frames may be received faster than the application can
+    /// process them. In these cases we may run out of memory if RX buffer number is unlimited
+    /// (0).
+    ///
+    /// If a dynamic RX buffer limit is set, it should be at least the number of
+    /// static RX buffers.
+    #[builder_lite(unstable)]
+    dynamic_rx_buf_num: u16,
+
+    /// Set the number of WiFi static TX buffers.
+    ///
+    /// Each buffer takes approximately 1.6KB of RAM.
+    /// The static RX buffers are allocated when esp_wifi_init() is called, they are not released
+    /// until esp_wifi_deinit() is called.
+    ///
+    /// For each transmitted data frame from the higher layer TCP/IP stack, the WiFi driver makes a
+    /// copy of it in a TX buffer.
+    ///
+    /// For some applications especially UDP applications, the upper layer can deliver frames
+    /// faster than WiFi layer can transmit. In these cases, we may run out of TX buffers.
+    #[builder_lite(unstable)]
+    static_tx_buf_num: u8,
+
+    /// Set the number of WiFi dynamic TX buffers.
+    ///
+    /// The size of each dynamic TX buffer is not fixed,
+    /// it depends on the size of each transmitted data frame.
+    ///
+    /// For each transmitted frame from the higher layer TCP/IP stack, the WiFi driver makes a copy
+    /// of it in a TX buffer.
+    ///
+    /// For some applications, especially UDP applications, the upper layer can deliver frames
+    /// faster than WiFi layer can transmit. In these cases, we may run out of TX buffers.
+    #[builder_lite(unstable)]
+    dynamic_tx_buf_num: u16,
+
+    /// Select this option to enable AMPDU RX feature.
+    #[builder_lite(unstable)]
+    ampdu_rx_enable: bool,
+
+    /// Select this option to enable AMPDU TX feature.
+    #[builder_lite(unstable)]
+    ampdu_tx_enable: bool,
+
+    /// Select this option to enable AMSDU TX feature.
+    #[builder_lite(unstable)]
+    amsdu_tx_enable: bool,
+
+    /// Set the size of WiFi Block Ack RX window.
+    ///
+    /// Generally a bigger value means higher throughput and better compatibility but more memory.
+    /// Most of time we should NOT change the default value unless special reason, e.g. test
+    /// the maximum UDP RX throughput with iperf etc. For iperf test in shieldbox, the
+    /// recommended value is 9~12.
+    ///
+    /// If PSRAM is used and WiFi memory is preferred to allocate in PSRAM first, the default and
+    /// minimum value should be 16 to achieve better throughput and compatibility with both
+    /// stations and APs.
+    #[builder_lite(unstable)]
+    rx_ba_win: u8,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            power_save_mode: PowerSaveMode::default(),
+            country_code: CountryInfo::from(*b"CN"),
+
+            rx_queue_size: 5,
+            tx_queue_size: 3,
+
+            static_rx_buf_num: 10,
+            dynamic_rx_buf_num: 32,
+
+            static_tx_buf_num: 0,
+            dynamic_tx_buf_num: 32,
+
+            ampdu_rx_enable: true,
+            ampdu_tx_enable: true,
+            amsdu_tx_enable: false,
+
+            rx_ba_win: 6,
+        }
+    }
+}
+
+impl Config {
+    fn validate(&self) {
+        if self.rx_ba_win as u16 >= self.dynamic_rx_buf_num {
+            warn!("RX BA window size should be less than the number of dynamic RX buffers.");
+        }
+        if self.rx_ba_win as u16 >= 2 * (self.static_rx_buf_num as u16) {
+            warn!("RX BA window size should be less than twice the number of static RX buffers.");
+        }
+    }
+}
+
+/// Create a Wi-Fi controller and it's associated interfaces.
+///
+/// Dropping the controller will deinitialize / stop Wi-Fi.
+///
+/// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
+/// currently in use.
+pub fn new<'d>(
+    device: crate::hal::peripherals::WIFI<'d>,
+    config: Config,
+) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
+    let _guard = RadioRefGuard::new()?;
+
+    // TODO: Re-check, if not having interrupts disabled pre-condition is still true
+    if crate::is_interrupts_disabled() {
+        return Err(WifiError::Unsupported);
+    }
+
+    config.validate();
+
+    unsafe {
+        internal::G_CONFIG = wifi_init_config_t {
+            osi_funcs: (&raw const internal::__ESP_RADIO_G_WIFI_OSI_FUNCS).cast_mut(),
+
+            wpa_crypto_funcs: g_wifi_default_wpa_crypto_funcs,
+            static_rx_buf_num: config.static_rx_buf_num as _,
+            dynamic_rx_buf_num: config.dynamic_rx_buf_num as _,
+            tx_buf_type: crate::sys::include::CONFIG_ESP_WIFI_TX_BUFFER_TYPE as i32,
+            static_tx_buf_num: config.static_tx_buf_num as _,
+            dynamic_tx_buf_num: config.dynamic_tx_buf_num as _,
+            rx_mgmt_buf_type: crate::sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUF as i32,
+            rx_mgmt_buf_num: crate::sys::include::CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF as i32,
+            cache_tx_buf_num: crate::sys::include::WIFI_CACHE_TX_BUFFER_NUM as i32,
+            csi_enable: cfg!(feature = "csi") as i32,
+            ampdu_rx_enable: config.ampdu_rx_enable as _,
+            ampdu_tx_enable: config.ampdu_tx_enable as _,
+            amsdu_tx_enable: config.amsdu_tx_enable as _,
+            nvs_enable: 0,
+            nano_enable: 0,
+            rx_ba_win: config.rx_ba_win as _,
+            wifi_task_core_id: Cpu::current() as _,
+            beacon_max_len: crate::sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
+            mgmt_sbuf_num: crate::sys::include::WIFI_MGMT_SBUF_NUM as i32,
+            feature_caps: internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS,
+            sta_disconnected_pm: false,
+            espnow_max_encrypt_num: crate::sys::include::CONFIG_ESP_WIFI_ESPNOW_MAX_ENCRYPT_NUM
+                as i32,
+
+            tx_hetb_queue_num: 3,
+            dump_hesigb_enable: false,
+
+            magic: WIFI_INIT_CONFIG_MAGIC as i32,
         };
+
+        RX_QUEUE_SIZE.store(config.rx_queue_size, Ordering::Relaxed);
+        TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
+    };
+
+    crate::wifi::wifi_init(device)?;
+
+    unsafe {
+        let country = config.country_code.into_blob();
         esp_wifi_result!(esp_wifi_set_country(&country))?;
     }
 
     // At some point the "High-speed ADC" entropy source became available.
     unsafe { esp_hal::rng::TrngSource::increase_entropy_source_counter() };
 
-    controller.set_power_saving(PowerSaveMode::default())?;
+    // Only create WifiController after we've enabled TRNG - otherwise returning an error from this
+    // function will cause panic because WifiController::drop tries to disable the TRNG.
+    let mut controller = WifiController {
+        _guard,
+        _phantom: Default::default(),
+        beacon_timeout: 6,
+        ap_beacon_timeout: 100,
+    };
+
+    controller.set_power_saving(config.power_save_mode)?;
 
     Ok((
         controller,
@@ -2746,9 +2266,14 @@ pub fn new<'d>(
     ))
 }
 
+/// Wi-Fi controller.
 #[non_exhaustive]
 pub struct WifiController<'d> {
+    _guard: RadioRefGuard,
     _phantom: PhantomData<&'d ()>,
+    // Things we have to remember due to how esp-wifi works:
+    beacon_timeout: u16,
+    ap_beacon_timeout: u16,
 }
 
 impl Drop for WifiController<'_> {
@@ -2779,7 +2304,8 @@ impl WifiController<'_> {
         Ok(())
     }
 
-    /// Set the wifi protocol.
+    #[procmacros::doc_replace]
+    /// Set the Wi-Fi protocol.
     ///
     /// This will set the wifi protocol to the desired protocol, the default for
     /// this is: `WIFI_PROTOCOL_11B|WIFI_PROTOCOL_11G|WIFI_PROTOCOL_11N`
@@ -2790,9 +2316,25 @@ impl WifiController<'_> {
     ///
     /// # Example:
     ///
-    /// ```
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # use esp_radio::wifi::{ap::AccessPointConfig, ModeConfig};
+    /// use esp_radio::wifi::Protocol;
+    ///
+    /// let (mut wifi_controller, _interfaces) =
+    ///     esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    ///
+    /// wifi_controller.set_config(&ModeConfig::AccessPoint(
+    ///     AccessPointConfig::default().with_ssid("esp-radio".into()),
+    /// ))?;
+    ///
     /// wifi_controller.set_protocol(Protocol::P802D11BGNLR.into());
+    /// # {after_snippet}
     /// ```
+    ///
+    /// # Note
+    ///
+    /// Calling this function before `set_config` will return an error.
     pub fn set_protocol(&mut self, protocols: EnumSet<Protocol>) -> Result<(), WifiError> {
         let protocol = protocols
             .into_iter()
@@ -2825,80 +2367,106 @@ impl WifiController<'_> {
         Ok(())
     }
 
-    /// Configures modem power saving
+    fn apply_protocols(
+        iface: wifi_interface_t,
+        protocols: &EnumSet<Protocol>,
+    ) -> Result<(), WifiError> {
+        let mask = protocols.iter().fold(0, |acc, p| acc | p.to_mask());
+        debug!("Setting protocols with mask {:b}", mask);
+        esp_wifi_result!(unsafe { esp_wifi_set_protocol(iface, mask as u8) })
+    }
+
+    /// Configures modem power saving.
     pub fn set_power_saving(&mut self, ps: PowerSaveMode) -> Result<(), WifiError> {
         apply_power_saving(ps)
     }
 
     /// A blocking wifi network scan with caller-provided scanning options.
-    pub fn scan_with_config_sync(
+    pub fn scan_with_config(
         &mut self,
         config: ScanConfig<'_>,
-    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
+    ) -> Result<Vec<AccessPointInfo>, WifiError> {
         esp_wifi_result!(crate::wifi::wifi_start_scan(true, config))?;
         self.scan_results(config.max.unwrap_or(usize::MAX))
     }
 
-    fn scan_results(&mut self, max: usize) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
-        let mut scanned = alloc::vec::Vec::<AccessPointInfo>::new();
-        let mut bss_total: u16 = max as u16;
+    fn scan_results_iter(&mut self) -> Result<ScanResults<'_>, WifiError> {
+        ScanResults::new(self)
+    }
 
-        // Prevents memory leak on error
-        let guard = FreeApListOnDrop;
+    fn scan_results(&mut self, max: usize) -> Result<Vec<AccessPointInfo>, WifiError> {
+        Ok(self.scan_results_iter()?.take(max).collect::<Vec<_>>())
+    }
 
-        unsafe { esp_wifi_result!(include::esp_wifi_scan_get_ap_num(&mut bss_total))? };
+    /// Starts the Wi-Fi controller.
+    ///
+    /// This method is not blocking. To check if the controller has started, use the
+    /// [`Self::is_started`] method.
+    pub fn start(&mut self) -> Result<(), WifiError> {
+        unsafe {
+            esp_wifi_result!(esp_wifi_start())?;
 
-        guard.defuse();
+            let mode = WifiMode::current()?;
 
-        let mut record: MaybeUninit<include::wifi_ap_record_t> = MaybeUninit::uninit();
-        for _ in 0..usize::min(bss_total as usize, max) {
-            let record = unsafe { MaybeUninit::assume_init_mut(&mut record) };
-            unsafe { esp_wifi_result!(include::esp_wifi_scan_get_ap_record(record))? };
-            let ap_info = convert_ap_info(record);
-            scanned.push(ap_info);
+            // This is not an if-else because in AP-STA mode, both are true
+            if mode.is_ap() {
+                esp_wifi_result!(include::esp_wifi_set_inactive_time(
+                    wifi_interface_t_WIFI_IF_AP,
+                    self.ap_beacon_timeout
+                ))?;
+            }
+            if mode.is_sta() {
+                esp_wifi_result!(include::esp_wifi_set_inactive_time(
+                    wifi_interface_t_WIFI_IF_STA,
+                    self.beacon_timeout
+                ))?;
+            }
         }
 
-        unsafe { esp_wifi_result!(include::esp_wifi_clear_ap_list())? };
-
-        Ok(scanned)
+        Ok(())
     }
 
-    /// Starts the WiFi controller.
-    pub fn start(&mut self) -> Result<(), WifiError> {
-        crate::wifi::wifi_start()
-    }
-
-    /// Stops the WiFi controller.
+    /// Stops the Wi-Fi controller.
+    ///
+    /// This method is not blocking. Use the [`Self::is_started`] method to see if the controller is
+    /// still running.
     pub fn stop(&mut self) -> Result<(), WifiError> {
         self.stop_impl()
     }
 
-    /// Connect WiFi station to the AP.
+    /// Connect Wi-Fi station to the AP.
     ///
-    /// - If station is connected , call [Self::disconnect] to disconnect.
-    /// - Scanning will not be effective until connection between device and the AP is established.
+    /// This method is not blocking. Use the [`Self::is_connected`] method to see if the station is
+    /// connected.
+    ///
+    /// - If station is connected, call [`Self::disconnect`] to disconnect.
+    /// - Calling [`Self::scan_with_config`] or [`Self::scan_with_config_async`] will not be
+    ///   effective until connection between device and the AP is established.
     /// - If device is scanning and connecting at the same time, it will abort scanning and return a
-    ///   warning message and error
+    ///   warning message and error.
     pub fn connect(&mut self) -> Result<(), WifiError> {
         self.connect_impl()
     }
 
-    /// Disconnect WiFi station from the AP.
+    /// Disconnect Wi-Fi station from the AP.
+    ///
+    /// This method is not blocking. Use the [`Self::is_connected`] method to see if the station is
+    /// still connected.
     pub fn disconnect(&mut self) -> Result<(), WifiError> {
         self.disconnect_impl()
     }
 
-    /// Get the rssi information of AP to which the device is associated with.
+    /// Get the RSSI information of AP to which the device is associated with.
     /// The value is obtained from the last beacon.
     ///
     /// <div class="warning">
     ///
-    /// - This API should be called after station connected to AP.
     /// - Use this API only in STA or AP-STA mode.
+    /// - This API should be called after the station has connected to an access point.
     /// </div>
     ///
     /// # Errors
-    /// This function returns [WifiError::Unsupported] if the STA side isn't
+    /// This function returns [`WifiError::Unsupported`] if the STA side isn't
     /// running. For example, when configured for AP only.
     pub fn rssi(&self) -> Result<i32, WifiError> {
         if self.mode()?.is_sta() {
@@ -2911,10 +2479,35 @@ impl WifiController<'_> {
         }
     }
 
+    /// Get the Access Point information of AP to which the device is associated with.
+    /// The value is obtained from the last beacon.
+    ///
+    /// <div class="warning">
+    ///
+    /// - Use this API only in STA or AP-STA mode.
+    /// - This API should be called after the station has connected to an access point.
+    /// </div>
+    ///
+    /// # Errors
+    /// This function returns [`WifiError::Unsupported`] if the STA side isn't
+    /// running. For example, when configured for AP only.
+    pub fn ap_info(&self) -> Result<AccessPointInfo, WifiError> {
+        if self.mode()?.is_sta() {
+            let mut record: MaybeUninit<include::wifi_ap_record_t> = MaybeUninit::uninit();
+            esp_wifi_result!(unsafe { esp_wifi_sta_get_ap_info(record.as_mut_ptr()) })?;
+
+            let record = unsafe { MaybeUninit::assume_init(record) };
+            let ap_info = convert_ap_info(&record);
+            Ok(ap_info)
+        } else {
+            Err(WifiError::Unsupported)
+        }
+    }
+
     /// Get the supported capabilities of the controller.
     pub fn capabilities(&self) -> Result<EnumSet<crate::wifi::Capability>, WifiError> {
         let caps =
-            enumset::enum_set! { Capability::Client | Capability::AccessPoint | Capability::Mixed };
+            enumset::enum_set! { Capability::Client | Capability::AccessPoint | Capability::ApSta };
 
         Ok(caps)
     }
@@ -2922,35 +2515,47 @@ impl WifiController<'_> {
     /// Set the configuration.
     ///
     /// This will set the mode accordingly.
-    /// You need to use Wifi::connect() for connecting to an AP.
+    /// You need to use [`Self::connect`] for connecting to an AP.
     ///
-    /// Passing [Configuration::None] will disable both, AP and STA mode.
+    /// Passing [`ModeConfig::None`] will disable both AP and STA modes.
     ///
-    /// If you don't intent to use WiFi anymore at all consider tearing down
-    /// WiFi completely.
-    pub fn set_configuration(&mut self, conf: &Configuration) -> Result<(), WifiError> {
+    /// If you don't intend to use Wi-Fi anymore at all consider tearing down
+    /// Wi-Fi completely.
+    pub fn set_config(&mut self, conf: &ModeConfig) -> Result<(), WifiError> {
         conf.validate()?;
 
         let mode = match conf {
-            Configuration::None => wifi_mode_t_WIFI_MODE_NULL,
-            Configuration::Client(_) => wifi_mode_t_WIFI_MODE_STA,
-            Configuration::AccessPoint(_) => wifi_mode_t_WIFI_MODE_AP,
-            Configuration::Mixed(_, _) => wifi_mode_t_WIFI_MODE_APSTA,
+            ModeConfig::None => wifi_mode_t_WIFI_MODE_NULL,
+            ModeConfig::Client(_) => wifi_mode_t_WIFI_MODE_STA,
+            ModeConfig::AccessPoint(_) => wifi_mode_t_WIFI_MODE_AP,
+            ModeConfig::ApSta(_, _) => wifi_mode_t_WIFI_MODE_APSTA,
             #[cfg(feature = "wifi-eap")]
-            Configuration::EapClient(_) => wifi_mode_t_WIFI_MODE_STA,
+            ModeConfig::EapClient(_) => wifi_mode_t_WIFI_MODE_STA,
         };
 
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) })?;
 
         match conf {
-            Configuration::None => Ok::<(), WifiError>(()),
-            Configuration::Client(config) => apply_sta_config(config),
-            Configuration::AccessPoint(config) => apply_ap_config(config),
-            Configuration::Mixed(sta_config, ap_config) => {
-                apply_ap_config(ap_config).and_then(|()| apply_sta_config(sta_config))
+            ModeConfig::None => Ok(()),
+            ModeConfig::Client(config) => {
+                self.apply_sta_config(config)?;
+                Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)
+            }
+            ModeConfig::AccessPoint(config) => {
+                self.apply_ap_config(config)?;
+                Self::apply_protocols(wifi_interface_t_WIFI_IF_AP, &config.protocols)
+            }
+            ModeConfig::ApSta(sta_config, ap_config) => {
+                self.apply_ap_config(ap_config)?;
+                Self::apply_protocols(wifi_interface_t_WIFI_IF_AP, &ap_config.protocols)?;
+                self.apply_sta_config(sta_config)?;
+                Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &sta_config.protocols)
             }
             #[cfg(feature = "wifi-eap")]
-            Configuration::EapClient(config) => apply_sta_eap_config(config),
+            ModeConfig::EapClient(config) => {
+                self.apply_sta_eap_config(config)?;
+                Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)
+            }
         }
         .inspect_err(|_| {
             // we/the driver might have applied a partial configuration
@@ -2962,9 +2567,9 @@ impl WifiController<'_> {
         Ok(())
     }
 
-    /// Set the WiFi mode.
+    /// Set the Wi-Fi mode.
     ///
-    /// This will override the mode inferred by [Self::set_configuration].
+    /// This will override the mode inferred by [`Self::set_config`].
     pub fn set_mode(&mut self, mode: WifiMode) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode.into()) })?;
         Ok(())
@@ -2975,38 +2580,40 @@ impl WifiController<'_> {
     }
 
     fn connect_impl(&mut self) -> Result<(), WifiError> {
-        esp_wifi_result!(unsafe { esp_wifi_connect() })
+        // TODO: implement ROAMING
+        esp_wifi_result!(unsafe { esp_wifi_connect_internal() })
     }
 
     fn disconnect_impl(&mut self) -> Result<(), WifiError> {
-        esp_wifi_result!(unsafe { esp_wifi_disconnect() })
+        // TODO: implement ROAMING
+        esp_wifi_result!(unsafe { esp_wifi_disconnect_internal() })
     }
 
-    /// Checks if the WiFi controller has started.
+    /// Checks if the Wi-Fi controller has started. Returns true if STA and/or AP are started.
     ///
-    /// This function should be called after the `start` method to verify if the
-    /// WiFi has started successfully.
+    /// This function should be called after the [`Self::start`] method to verify if the
+    /// Wi-Fi controller has started successfully.
     pub fn is_started(&self) -> Result<bool, WifiError> {
         if matches!(
             crate::wifi::sta_state(),
-            WifiState::StaStarted | WifiState::StaConnected | WifiState::StaDisconnected
+            WifiStaState::Started | WifiStaState::Connected | WifiStaState::Disconnected
         ) {
             return Ok(true);
         }
-        if matches!(crate::wifi::ap_state(), WifiState::ApStarted) {
+        if matches!(crate::wifi::ap_state(), WifiApState::Started) {
             return Ok(true);
         }
         Ok(false)
     }
 
-    /// Checks if the WiFi controller is connected to an AP.
+    /// Checks if the Wi-Fi controller is connected to an AP.
     ///
-    /// This function should be called after the `connect` method to verify if
+    /// This function should be called after the [`Self::connect`] method to verify if
     /// the connection was successful.
     pub fn is_connected(&self) -> Result<bool, WifiError> {
         match crate::wifi::sta_state() {
-            crate::wifi::WifiState::StaConnected => Ok(true),
-            crate::wifi::WifiState::StaDisconnected => Err(WifiError::Disconnected),
+            crate::wifi::WifiStaState::Connected => Ok(true),
+            crate::wifi::WifiStaState::Disconnected => Err(WifiError::Disconnected),
             // FIXME: Should any other enum value trigger an error instead of returning false?
             _ => Ok(false),
         }
@@ -3016,18 +2623,17 @@ impl WifiController<'_> {
         WifiMode::current()
     }
 
-    /// An async wifi network scan with caller-provided scanning options.
+    /// An async Wi-Fi network scan with caller-provided scanning options.
     pub async fn scan_with_config_async(
         &mut self,
         config: ScanConfig<'_>,
-    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
+    ) -> Result<Vec<AccessPointInfo>, WifiError> {
         Self::clear_events(WifiEvent::ScanDone);
         esp_wifi_result!(wifi_start_scan(false, config))?;
 
-        // Prevents memory leak if `scan_n`'s future is dropped.
+        // Prevents memory leak if `scan_with_config_async`'s future is dropped.
         let guard = FreeApListOnDrop;
         WifiEventFuture::new(WifiEvent::ScanDone).await;
-
         guard.defuse();
 
         let result = self.scan_results(config.max.unwrap_or(usize::MAX))?;
@@ -3035,7 +2641,9 @@ impl WifiController<'_> {
         Ok(result)
     }
 
-    /// Async version of [`crate::wifi::WifiController`]'s `start` method
+    /// Async version of [`Self::start`].
+    ///
+    /// This function will wait for the Wi-Fi controller to start before returning.
     pub async fn start_async(&mut self) -> Result<(), WifiError> {
         let mut events = enumset::enum_set! {};
 
@@ -3049,15 +2657,24 @@ impl WifiController<'_> {
 
         Self::clear_events(events);
 
-        wifi_start()?;
+        self.start()?;
 
         self.wait_for_all_events(events, false).await;
 
         Ok(())
     }
 
-    /// Async version of [`crate::wifi::WifiController`]'s `stop` method
+    /// Async version of [`Self::stop`].
+    ///
+    /// This function will wait for the Wi-Fi controller to stop before returning.
     pub async fn stop_async(&mut self) -> Result<(), WifiError> {
+        // TODO: This might be racey when there is a start operation in progress but it didn't made
+        // it to the state where the driver emits the Started event?
+        // https://github.com/esp-rs/esp-hal/pull/4504#discussion_r2533184425
+        if !self.is_started()? {
+            return Err(WifiError::NotStarted);
+        }
+
         let mut events = enumset::enum_set! {};
 
         let mode = self.mode()?;
@@ -3070,7 +2687,7 @@ impl WifiController<'_> {
 
         Self::clear_events(events);
 
-        crate::wifi::WifiController::stop_impl(self)?;
+        self.stop_impl()?;
 
         self.wait_for_all_events(events, false).await;
 
@@ -3080,11 +2697,13 @@ impl WifiController<'_> {
         Ok(())
     }
 
-    /// Async version of [`crate::wifi::WifiController`]'s `connect` method
+    /// Async version of [`Self::connect`].
+    ///
+    /// This function will wait for the connection to be established before returning.
     pub async fn connect_async(&mut self) -> Result<(), WifiError> {
         Self::clear_events(WifiEvent::StaConnected | WifiEvent::StaDisconnected);
 
-        let err = crate::wifi::WifiController::connect_impl(self).err();
+        let err = self.connect_impl().err();
 
         if MultiWifiEventFuture::new(WifiEvent::StaConnected | WifiEvent::StaDisconnected)
             .await
@@ -3096,8 +2715,9 @@ impl WifiController<'_> {
         }
     }
 
-    /// Async version of [`crate::wifi::WifiController`]'s `Disconnect`
-    /// method
+    /// Async version of [`Self::disconnect`].
+    ///
+    /// This function will wait for the connection to be closed before returning.
     pub async fn disconnect_async(&mut self) -> Result<(), WifiError> {
         // If not connected, this will do nothing.
         // It will also wait forever for a `StaDisconnected` event that will never come.
@@ -3107,14 +2727,14 @@ impl WifiController<'_> {
         }
 
         Self::clear_events(WifiEvent::StaDisconnected);
-        crate::wifi::WifiController::disconnect_impl(self)?;
+        self.disconnect_impl()?;
         WifiEventFuture::new(WifiEvent::StaDisconnected).await;
 
         Ok(())
     }
 
     fn clear_events(events: impl Into<EnumSet<WifiEvent>>) {
-        WIFI_EVENTS.with(|evts| evts.get_mut().remove_all(events.into()));
+        WIFI_EVENTS.with(|evts| evts.remove_all(events.into()));
     }
 
     /// Wait for one [`WifiEvent`].
@@ -3151,6 +2771,235 @@ impl WifiController<'_> {
             events -= fired;
         }
     }
+
+    fn apply_ap_config(&mut self, config: &AccessPointConfig) -> Result<(), WifiError> {
+        self.ap_beacon_timeout = config.beacon_timeout;
+
+        let mut cfg = wifi_config_t {
+            ap: wifi_ap_config_t {
+                ssid: [0; 32],
+                password: [0; 64],
+                ssid_len: 0,
+                channel: config.channel,
+                authmode: config.auth_method.to_raw(),
+                ssid_hidden: if config.ssid_hidden { 1 } else { 0 },
+                max_connection: config.max_connections as u8,
+                beacon_interval: 100,
+                pairwise_cipher: wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP,
+                ftm_responder: false,
+                pmf_cfg: wifi_pmf_config_t {
+                    capable: true,
+                    required: false,
+                },
+                sae_pwe_h2e: 0,
+                csa_count: 3,
+                dtim_period: config.dtim_period,
+                transition_disable: 0,
+                sae_ext: 0,
+                bss_max_idle_cfg: include::wifi_bss_max_idle_config_t {
+                    period: 0,
+                    protected_keep_alive: false,
+                },
+                gtk_rekey_interval: 0,
+            },
+        };
+
+        if config.auth_method == AuthMethod::None && !config.password.is_empty() {
+            return Err(WifiError::InvalidArguments);
+        }
+
+        unsafe {
+            cfg.ap.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
+            cfg.ap.ssid_len = config.ssid.len() as u8;
+            cfg.ap.password[0..(config.password.len())].copy_from_slice(config.password.as_bytes());
+
+            esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_AP, &mut cfg))
+        }
+    }
+
+    fn apply_sta_config(&mut self, config: &ClientConfig) -> Result<(), WifiError> {
+        self.beacon_timeout = config.beacon_timeout;
+
+        let mut cfg = wifi_config_t {
+            sta: wifi_sta_config_t {
+                ssid: [0; 32],
+                password: [0; 64],
+                scan_method: config.scan_method as c_types::c_uint,
+                bssid_set: config.bssid.is_some(),
+                bssid: config.bssid.unwrap_or_default(),
+                channel: config.channel.unwrap_or(0),
+                listen_interval: config.listen_interval,
+                sort_method: wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
+                threshold: wifi_scan_threshold_t {
+                    rssi: -99,
+                    authmode: config.auth_method.to_raw(),
+                    rssi_5g_adjustment: 0,
+                },
+                pmf_cfg: wifi_pmf_config_t {
+                    capable: true,
+                    required: false,
+                },
+                sae_pwe_h2e: 3,
+                _bitfield_align_1: [0; 0],
+                _bitfield_1: __BindgenBitfieldUnit::new([0; 4]),
+                failure_retry_cnt: config.failure_retry_cnt,
+                _bitfield_align_2: [0; 0],
+                _bitfield_2: __BindgenBitfieldUnit::new([0; 4]),
+                sae_pk_mode: 0, // ??
+                sae_h2e_identifier: [0; 32],
+            },
+        };
+
+        if config.auth_method == AuthMethod::None && !config.password.is_empty() {
+            return Err(WifiError::InvalidArguments);
+        }
+
+        unsafe {
+            cfg.sta.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
+            cfg.sta.password[0..(config.password.len())]
+                .copy_from_slice(config.password.as_bytes());
+
+            esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_STA, &mut cfg))
+        }
+    }
+
+    #[cfg(feature = "wifi-eap")]
+    fn apply_sta_eap_config(&mut self, config: &EapClientConfig) -> Result<(), WifiError> {
+        self.beacon_timeout = config.beacon_timeout;
+
+        let mut cfg = wifi_config_t {
+            sta: wifi_sta_config_t {
+                ssid: [0; 32],
+                password: [0; 64],
+                scan_method: config.scan_method as c_types::c_uint,
+                bssid_set: config.bssid.is_some(),
+                bssid: config.bssid.unwrap_or_default(),
+                channel: config.channel.unwrap_or(0),
+                listen_interval: config.listen_interval,
+                sort_method: wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
+                threshold: wifi_scan_threshold_t {
+                    rssi: -99,
+                    authmode: config.auth_method.to_raw(),
+                    rssi_5g_adjustment: 0,
+                },
+                pmf_cfg: wifi_pmf_config_t {
+                    capable: true,
+                    required: false,
+                },
+                sae_pwe_h2e: 3,
+                _bitfield_align_1: [0; 0],
+                _bitfield_1: __BindgenBitfieldUnit::new([0; 4]),
+                failure_retry_cnt: config.failure_retry_cnt,
+                _bitfield_align_2: [0; 0],
+                _bitfield_2: __BindgenBitfieldUnit::new([0; 4]),
+                sae_pk_mode: 0, // ??
+                sae_h2e_identifier: [0; 32],
+            },
+        };
+
+        unsafe {
+            cfg.sta.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
+            esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_STA, &mut cfg))?;
+
+            if let Some(identity) = &config.identity {
+                esp_wifi_result!(esp_eap_client_set_identity(
+                    identity.as_str().as_ptr(),
+                    identity.len() as i32
+                ))?;
+            } else {
+                esp_eap_client_clear_identity();
+            }
+
+            if let Some(username) = &config.username {
+                esp_wifi_result!(esp_eap_client_set_username(
+                    username.as_str().as_ptr(),
+                    username.len() as i32
+                ))?;
+            } else {
+                esp_eap_client_clear_username();
+            }
+
+            if let Some(password) = &config.password {
+                esp_wifi_result!(esp_eap_client_set_password(
+                    password.as_str().as_ptr(),
+                    password.len() as i32
+                ))?;
+            } else {
+                esp_eap_client_clear_password();
+            }
+
+            if let Some(new_password) = &config.new_password {
+                esp_wifi_result!(esp_eap_client_set_new_password(
+                    new_password.as_str().as_ptr(),
+                    new_password.len() as i32
+                ))?;
+            } else {
+                esp_eap_client_clear_new_password();
+            }
+
+            if let Some(pac_file) = &config.pac_file {
+                esp_wifi_result!(esp_eap_client_set_pac_file(
+                    pac_file.as_ptr(),
+                    pac_file.len() as i32
+                ))?;
+            }
+
+            if let Some(phase2_method) = &config.ttls_phase2_method {
+                esp_wifi_result!(esp_eap_client_set_ttls_phase2_method(
+                    phase2_method.to_raw()
+                ))?;
+            }
+
+            if let Some(ca_cert) = config.ca_cert {
+                esp_wifi_result!(esp_eap_client_set_ca_cert(
+                    ca_cert.as_ptr(),
+                    ca_cert.len() as i32
+                ))?;
+            } else {
+                esp_eap_client_clear_ca_cert();
+            }
+
+            if let Some((cert, key, password)) = config.certificate_and_key {
+                let (pwd, pwd_len) = if let Some(pwd) = password {
+                    (pwd.as_ptr(), pwd.len() as i32)
+                } else {
+                    (core::ptr::null(), 0)
+                };
+
+                esp_wifi_result!(esp_eap_client_set_certificate_and_key(
+                    cert.as_ptr(),
+                    cert.len() as i32,
+                    key.as_ptr(),
+                    key.len() as i32,
+                    pwd,
+                    pwd_len,
+                ))?;
+            } else {
+                esp_eap_client_clear_certificate_and_key();
+            }
+
+            if let Some(cfg) = &config.eap_fast_config {
+                let params = esp_eap_fast_config {
+                    fast_provisioning: cfg.fast_provisioning as i32,
+                    fast_max_pac_list_len: cfg.fast_max_pac_list_len as i32,
+                    fast_pac_format_binary: cfg.fast_pac_format_binary,
+                };
+                esp_wifi_result!(esp_eap_client_set_fast_params(params))?;
+            }
+
+            esp_wifi_result!(esp_eap_client_set_disable_time_check(!&config.time_check))?;
+
+            // esp_eap_client_set_suiteb_192bit_certification unsupported because we build
+            // without MBEDTLS
+
+            // esp_eap_client_use_default_cert_bundle unsupported because we build without
+            // MBEDTLS
+
+            esp_wifi_result!(esp_wifi_sta_enterprise_enable())?;
+
+            Ok(())
+        }
+    }
 }
 
 impl WifiEvent {
@@ -3169,7 +3018,7 @@ pub(crate) struct WifiEventFuture {
 }
 
 impl WifiEventFuture {
-    /// Creates a new `Future` for the specified WiFi event.
+    /// Creates a new `Future` for the specified Wi-Fi event.
     pub fn new(event: WifiEvent) -> Self {
         Self { event }
     }
@@ -3183,7 +3032,7 @@ impl core::future::Future for WifiEventFuture {
         cx: &mut core::task::Context<'_>,
     ) -> Poll<Self::Output> {
         self.event.waker().register(cx.waker());
-        if WIFI_EVENTS.with(|events| events.get_mut().remove(self.event)) {
+        if WIFI_EVENTS.with(|events| events.remove(self.event)) {
             Poll::Ready(())
         } else {
             Poll::Pending
@@ -3197,7 +3046,7 @@ pub(crate) struct MultiWifiEventFuture {
 }
 
 impl MultiWifiEventFuture {
-    /// Creates a new `Future` for the specified set of WiFi events.
+    /// Creates a new `Future` for the specified set of Wi-Fi events.
     pub fn new(event: EnumSet<WifiEvent>) -> Self {
         Self { event }
     }
@@ -3211,7 +3060,6 @@ impl core::future::Future for MultiWifiEventFuture {
         cx: &mut core::task::Context<'_>,
     ) -> Poll<Self::Output> {
         let output = WIFI_EVENTS.with(|events| {
-            let events = events.get_mut();
             let active = events.intersection(self.event);
             events.remove_all(active);
             active

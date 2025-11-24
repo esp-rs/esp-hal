@@ -159,9 +159,7 @@ pub fn enable_direct(interrupt: Interrupt, cpu_interrupt: CpuInterrupt) -> Resul
     unsafe {
         map(Cpu::current(), interrupt, cpu_interrupt);
 
-        xtensa_lx::interrupt::enable_mask(
-            xtensa_lx::interrupt::get_mask() | (1 << cpu_interrupt as u32),
-        );
+        xtensa_lx::interrupt::enable_mask(1 << cpu_interrupt as u32);
     }
     Ok(())
 }
@@ -178,36 +176,32 @@ pub unsafe fn map(cpu: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     let interrupt_number = interrupt as usize;
     let cpu_interrupt_number = which as u32;
     match cpu {
-        Cpu::ProCpu => unsafe {
-            (*core0_interrupt_peripheral())
+        Cpu::ProCpu => {
+            INTERRUPT_CORE0::regs()
                 .core_0_intr_map(interrupt_number)
-                .write(|w| w.bits(cpu_interrupt_number));
-        },
+                .write(|w| unsafe { w.bits(cpu_interrupt_number) });
+        }
         #[cfg(multi_core)]
-        Cpu::AppCpu => unsafe {
-            (*core1_interrupt_peripheral())
+        Cpu::AppCpu => {
+            INTERRUPT_CORE1::regs()
                 .core_1_intr_map(interrupt_number)
-                .write(|w| w.bits(cpu_interrupt_number));
-        },
+                .write(|w| unsafe { w.bits(cpu_interrupt_number) });
+        }
     }
 }
 
 /// Get cpu interrupt assigned to peripheral interrupt
 pub(crate) fn bound_cpu_interrupt_for(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
     let cpu_intr = match cpu {
-        Cpu::ProCpu => unsafe {
-            (*core0_interrupt_peripheral())
-                .core_0_intr_map(interrupt as usize)
-                .read()
-                .bits()
-        },
+        Cpu::ProCpu => INTERRUPT_CORE0::regs()
+            .core_0_intr_map(interrupt as usize)
+            .read()
+            .bits(),
         #[cfg(multi_core)]
-        Cpu::AppCpu => unsafe {
-            (*core1_interrupt_peripheral())
-                .core_1_intr_map(interrupt as usize)
-                .read()
-                .bits()
-        },
+        Cpu::AppCpu => INTERRUPT_CORE1::regs()
+            .core_1_intr_map(interrupt as usize)
+            .read()
+            .bits(),
     };
     let cpu_intr = CpuInterrupt::from_u32(cpu_intr)?;
 
@@ -231,107 +225,36 @@ pub fn clear(_core: Cpu, which: CpuInterrupt) {
 }
 
 /// Get status of peripheral interrupts
-#[cfg(interrupts_status_registers = "3")]
+#[cfg(any(interrupts_status_registers = "3", interrupts_status_registers = "4"))]
 pub fn status(core: Cpu) -> InterruptStatus {
-    unsafe {
-        match core {
-            Cpu::ProCpu => InterruptStatus::from(
-                (*core0_interrupt_peripheral())
-                    .core_0_intr_status(0)
-                    .read()
-                    .bits(),
-                (*core0_interrupt_peripheral())
-                    .core_0_intr_status(1)
-                    .read()
-                    .bits(),
-                (*core0_interrupt_peripheral())
-                    .core_0_intr_status(2)
-                    .read()
-                    .bits(),
-            ),
-            #[cfg(multi_core)]
-            Cpu::AppCpu => InterruptStatus::from(
-                (*core1_interrupt_peripheral())
-                    .core_1_intr_status(0)
-                    .read()
-                    .bits(),
-                (*core1_interrupt_peripheral())
-                    .core_1_intr_status(1)
-                    .read()
-                    .bits(),
-                (*core1_interrupt_peripheral())
-                    .core_1_intr_status(2)
-                    .read()
-                    .bits(),
-            ),
-        }
+    match core {
+        Cpu::ProCpu => InterruptStatus::from(
+            INTERRUPT_CORE0::regs().core_0_intr_status(0).read().bits(),
+            INTERRUPT_CORE0::regs().core_0_intr_status(1).read().bits(),
+            INTERRUPT_CORE0::regs().core_0_intr_status(2).read().bits(),
+            #[cfg(interrupts_status_registers = "4")]
+            INTERRUPT_CORE0::regs().core_0_intr_status(3).read().bits(),
+        ),
+        #[cfg(multi_core)]
+        Cpu::AppCpu => InterruptStatus::from(
+            INTERRUPT_CORE1::regs().core_1_intr_status(0).read().bits(),
+            INTERRUPT_CORE1::regs().core_1_intr_status(1).read().bits(),
+            INTERRUPT_CORE1::regs().core_1_intr_status(2).read().bits(),
+            #[cfg(interrupts_status_registers = "4")]
+            INTERRUPT_CORE1::regs().core_1_intr_status(3).read().bits(),
+        ),
     }
 }
 
-/// Get status of peripheral interrupts
-#[cfg(interrupts_status_registers = "4")]
-pub fn status(core: Cpu) -> InterruptStatus {
-    unsafe {
-        match core {
-            Cpu::ProCpu => InterruptStatus::from(
-                (*core0_interrupt_peripheral())
-                    .core_0_intr_status(0)
-                    .read()
-                    .bits(),
-                (*core0_interrupt_peripheral())
-                    .core_0_intr_status(1)
-                    .read()
-                    .bits(),
-                (*core0_interrupt_peripheral())
-                    .core_0_intr_status(2)
-                    .read()
-                    .bits(),
-                (*core0_interrupt_peripheral())
-                    .core_0_intr_status(3)
-                    .read()
-                    .bits(),
-            ),
-            #[cfg(multi_core)]
-            Cpu::AppCpu => InterruptStatus::from(
-                (*core1_interrupt_peripheral())
-                    .core_1_intr_status(0)
-                    .read()
-                    .bits(),
-                (*core1_interrupt_peripheral())
-                    .core_1_intr_status(1)
-                    .read()
-                    .bits(),
-                (*core1_interrupt_peripheral())
-                    .core_1_intr_status(2)
-                    .read()
-                    .bits(),
-                (*core1_interrupt_peripheral())
-                    .core_1_intr_status(3)
-                    .read()
-                    .bits(),
-            ),
-        }
+cfg_if::cfg_if! {
+    if #[cfg(esp32)] {
+        use crate::peripherals::DPORT as INTERRUPT_CORE0;
+        use crate::peripherals::DPORT as INTERRUPT_CORE1;
+    } else {
+        use crate::peripherals::INTERRUPT_CORE0;
+        #[cfg(esp32s3)]
+        use crate::peripherals::INTERRUPT_CORE1;
     }
-}
-
-#[cfg(esp32)]
-unsafe fn core0_interrupt_peripheral() -> *const crate::pac::dport::RegisterBlock {
-    pac::DPORT::PTR
-}
-
-#[cfg(esp32)]
-unsafe fn core1_interrupt_peripheral() -> *const crate::pac::dport::RegisterBlock {
-    pac::DPORT::PTR
-}
-
-#[cfg(any(esp32s2, esp32s3))]
-unsafe fn core0_interrupt_peripheral() -> *const crate::pac::interrupt_core0::RegisterBlock {
-    pac::INTERRUPT_CORE0::PTR
-}
-
-#[cfg(esp32s3)]
-unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::RegisterBlock {
-    pac::INTERRUPT_CORE1::PTR
 }
 
 /// Get the current run level (the level below which interrupts are masked).
@@ -474,9 +397,9 @@ mod vectored {
     ) -> InterruptStatus {
         unsafe {
             let intr_map_base = match core {
-                Cpu::ProCpu => (*core0_interrupt_peripheral()).core_0_intr_map(0).as_ptr(),
+                Cpu::ProCpu => INTERRUPT_CORE0::regs().core_0_intr_map(0).as_ptr(),
                 #[cfg(multi_core)]
-                Cpu::AppCpu => (*core1_interrupt_peripheral()).core_1_intr_map(0).as_ptr(),
+                Cpu::AppCpu => INTERRUPT_CORE1::regs().core_1_intr_map(0).as_ptr(),
             };
 
             let mut res = InterruptStatus::empty();
@@ -508,14 +431,12 @@ mod vectored {
         level: Priority,
     ) -> Result<(), Error> {
         let cpu_interrupt =
-            interrupt_level_to_cpu_interrupt(level, chip_specific::interrupt_is_edge(interrupt))?;
+            interrupt_level_to_cpu_interrupt(level, EDGE_INTERRUPTS.contains(&interrupt))?;
 
         unsafe {
             map(cpu, interrupt, cpu_interrupt);
 
-            xtensa_lx::interrupt::enable_mask(
-                xtensa_lx::interrupt::get_mask() | (1 << cpu_interrupt as u32),
-            );
+            xtensa_lx::interrupt::enable_mask(1 << cpu_interrupt as u32);
         }
         Ok(())
     }
@@ -565,35 +486,9 @@ mod vectored {
         })
     }
 
-    // TODO use CpuInterrupt::LevelX.mask() // TODO make it const
-    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(crate) static CPU_INTERRUPT_LEVELS: [u32; 8] = [
-        0b_0000_0000_0000_0000_0000_0000_0000_0000, // Dummy level 0
-        0b_0000_0000_0000_0110_0011_0111_1111_1111, // Level_1
-        0b_0000_0000_0011_1000_0000_0000_0000_0000, // Level 2
-        0b_0010_1000_1100_0000_1000_1000_0000_0000, // Level 3
-        0b_0101_0011_0000_0000_0000_0000_0000_0000, // Level 4
-        0b_1000_0100_0000_0001_0000_0000_0000_0000, // Level 5
-        0b_0000_0000_0000_0000_0000_0000_0000_0000, // Level 6
-        0b_0000_0000_0000_0000_0100_0000_0000_0000, // Level 7
-    ];
-    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(crate) static CPU_INTERRUPT_INTERNAL: u32 = 0b_0010_0000_0000_0001_1000_1000_1100_0000;
-    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(crate) static CPU_INTERRUPT_EDGE: u32 = 0b_0111_0000_0100_0000_0000_1100_1000_0000;
-
-    #[cfg(esp32)]
-    pub(crate) mod chip_specific {
-        use super::*;
-        #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-        pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
-            0b0000_0000_0000_0000_0000_0000_0000_0000,
-            0b1111_1100_0000_0000_0000_0000_0000_0000,
-            0b0000_0000_0000_0000_0000_0000_0000_0011,
-        );
-        #[inline]
-        pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
-            [
+    cfg_if::cfg_if! {
+        if #[cfg(esp32)] {
+            pub(crate) const EDGE_INTERRUPTS: [Interrupt; 8] = [
                 Interrupt::TG0_T0_EDGE,
                 Interrupt::TG0_T1_EDGE,
                 Interrupt::TG0_WDT_EDGE,
@@ -602,23 +497,9 @@ mod vectored {
                 Interrupt::TG1_T1_EDGE,
                 Interrupt::TG1_WDT_EDGE,
                 Interrupt::TG1_LACT_EDGE,
-            ]
-            .contains(&interrupt)
-        }
-    }
-
-    #[cfg(esp32s2)]
-    pub(crate) mod chip_specific {
-        use super::*;
-        #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-        pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
-            0b0000_0000_0000_0000_0000_0000_0000_0000,
-            0b1100_0000_0000_0000_0000_0000_0000_0000,
-            0b0000_0000_0000_0000_0000_0011_1011_1111,
-        );
-        #[inline]
-        pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
-            [
+            ];
+        } else if #[cfg(esp32s2)] {
+            pub(crate) const EDGE_INTERRUPTS: [Interrupt; 11] = [
                 Interrupt::TG0_T0_EDGE,
                 Interrupt::TG0_T1_EDGE,
                 Interrupt::TG0_WDT_EDGE,
@@ -630,26 +511,54 @@ mod vectored {
                 Interrupt::SYSTIMER_TARGET0,
                 Interrupt::SYSTIMER_TARGET1,
                 Interrupt::SYSTIMER_TARGET2,
-            ]
-            .contains(&interrupt)
-        }
-    }
-
-    #[cfg(esp32s3)]
-    pub(crate) mod chip_specific {
-        use super::*;
-        #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-        pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::empty();
-        #[inline]
-        pub fn interrupt_is_edge(_interrupt: Interrupt) -> bool {
-            false
+            ];
+        } else if #[cfg(esp32s3)] {
+            pub(crate) const EDGE_INTERRUPTS: [Interrupt; 0] = [];
+        } else {
+            compile_error!("Unsupported chip");
         }
     }
 }
 
 #[cfg(feature = "rt")]
 mod rt {
-    use super::{vectored::*, *};
+    use xtensa_lx_rt::interrupt::CpuInterruptLevel;
+
+    use super::*;
+
+    #[cfg_attr(place_switch_tables_in_ram, ram)]
+    pub(crate) static CPU_INTERRUPT_INTERNAL: u32 = 0b_0010_0000_0000_0001_1000_1000_1100_0000;
+    #[cfg_attr(place_switch_tables_in_ram, ram)]
+    pub(crate) static CPU_INTERRUPT_EDGE: u32 = 0b_0111_0000_0100_0000_0000_1100_1000_0000;
+
+    #[cfg_attr(place_switch_tables_in_ram, ram)]
+    pub(crate) static CPU_INTERRUPT_LEVELS: [u32; 8] = [
+        0, // Dummy level 0
+        CpuInterruptLevel::Level1.mask(),
+        CpuInterruptLevel::Level2.mask(),
+        CpuInterruptLevel::Level3.mask(),
+        CpuInterruptLevel::Level4.mask(),
+        CpuInterruptLevel::Level5.mask(),
+        CpuInterruptLevel::Level6.mask(),
+        CpuInterruptLevel::Level7.mask(),
+    ];
+
+    /// A bitmap of edge-triggered peripheral interrupts. See `handle_interrupts` why this is
+    /// necessary
+    #[cfg_attr(place_switch_tables_in_ram, ram)]
+    pub static INTERRUPT_EDGE: InterruptStatus = const {
+        let mut masks = [0; crate::interrupt::STATUS_WORDS];
+
+        let mut idx = 0;
+        while idx < EDGE_INTERRUPTS.len() {
+            let interrupt_idx = EDGE_INTERRUPTS[idx] as usize;
+            let word_idx = interrupt_idx / 32;
+            masks[word_idx] |= 1 << (interrupt_idx % 32);
+            idx += 1;
+        }
+
+        InterruptStatus { status: masks }
+    };
 
     #[unsafe(no_mangle)]
     #[ram]
@@ -714,7 +623,7 @@ mod rt {
 
                 // For edge interrupts we cannot rely on the peripherals' interrupt status
                 // registers, therefore call all registered handlers for current level.
-                chip_specific::INTERRUPT_EDGE
+                INTERRUPT_EDGE
             } else {
                 // Finally, check level-triggered peripheral sources.
                 // These interrupts are cleared by the peripheral.
@@ -754,30 +663,37 @@ mod rt {
     unsafe extern "C" {
         fn level4_interrupt(save_frame: &mut Context);
         fn level5_interrupt(save_frame: &mut Context);
+        #[cfg(not(all(feature = "rt", feature = "exception-handler", stack_guard_monitoring)))]
         fn level6_interrupt(save_frame: &mut Context);
         fn level7_interrupt(save_frame: &mut Context);
     }
 
     #[unsafe(no_mangle)]
-    #[unsafe(link_section = ".rwtext")]
+    #[ram]
     unsafe fn __level_4_interrupt(save_frame: &mut Context) {
         unsafe { level4_interrupt(save_frame) }
     }
 
     #[unsafe(no_mangle)]
-    #[unsafe(link_section = ".rwtext")]
+    #[ram]
     unsafe fn __level_5_interrupt(save_frame: &mut Context) {
         unsafe { level5_interrupt(save_frame) }
     }
 
     #[unsafe(no_mangle)]
-    #[unsafe(link_section = ".rwtext")]
+    #[ram]
     unsafe fn __level_6_interrupt(save_frame: &mut Context) {
-        unsafe { level6_interrupt(save_frame) }
+        cfg_if::cfg_if! {
+            if #[cfg(all(feature = "rt", feature = "exception-handler", stack_guard_monitoring))] {
+                crate::exception_handler::breakpoint_interrupt(save_frame);
+            } else {
+                unsafe { level6_interrupt(save_frame) }
+            }
+        }
     }
 
     #[unsafe(no_mangle)]
-    #[unsafe(link_section = ".rwtext")]
+    #[ram]
     unsafe fn __level_7_interrupt(save_frame: &mut Context) {
         unsafe { level7_interrupt(save_frame) }
     }

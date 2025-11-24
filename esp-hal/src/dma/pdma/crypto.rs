@@ -23,6 +23,7 @@ use crate::{
     },
     interrupt::{InterruptHandler, Priority},
     peripherals::{DMA_CRYPTO, Interrupt},
+    system::Peripheral,
 };
 
 pub(super) type CryptoRegisterBlock = crate::pac::crypto_dma::RegisterBlock;
@@ -56,6 +57,10 @@ impl crate::private::Sealed for CryptoDmaTxChannel<'_> {}
 impl DmaTxChannel for CryptoDmaTxChannel<'_> {}
 
 impl RegisterAccess for CryptoDmaTxChannel<'_> {
+    fn peripheral_clock(&self) -> Option<Peripheral> {
+        Some(Peripheral::CryptoDma)
+    }
+
     fn reset(&self) {
         self.regs().conf().modify(|_, w| {
             w.out_rst().set_bit();
@@ -251,6 +256,10 @@ impl InterruptAccess<DmaTxInterrupt> for CryptoDmaTxChannel<'_> {
 }
 
 impl RegisterAccess for CryptoDmaRxChannel<'_> {
+    fn peripheral_clock(&self) -> Option<Peripheral> {
+        Some(Peripheral::CryptoDma)
+    }
+
     fn reset(&self) {
         self.regs().conf().modify(|_, w| {
             w.in_rst().set_bit();

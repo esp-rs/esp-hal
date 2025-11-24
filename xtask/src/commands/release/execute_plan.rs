@@ -4,13 +4,15 @@ use anyhow::{Context, Result, bail, ensure};
 use clap::Args;
 use esp_metadata::Chip;
 use strum::IntoEnumIterator;
+use toml_edit::{Item, Value};
 
 use crate::{
     cargo::CargoToml,
-    commands::{checker::generate_baseline, release::plan::Plan, update_package},
+    commands::{VersionBump, checker::generate_baseline, release::plan::Plan, update_package},
     git::{current_branch, ensure_workspace_clean, get_remote_name_for},
 };
 
+/// Arguments for executing the release plan.
 #[derive(Debug, Args)]
 pub struct ApplyPlanArgs {
     /// Actually make git changes. Without this flag, the command will only
@@ -23,8 +25,10 @@ pub struct ApplyPlanArgs {
     manual_pull_request: bool,
 }
 
+/// Execute the release plan by making code changes, committing them to a new
 pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
-    ensure_workspace_clean(workspace)?;
+    ensure_workspace_clean(workspace)
+        .with_context(|| format!("Workspace {workspace:?} is not clean!"))?;
 
     let plan_path = workspace.join("release_plan.jsonc");
     let plan_path = crate::windows_safe_path(&plan_path);
@@ -41,7 +45,12 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
 
     // Make code changes
     for step in plan.packages.iter_mut() {
-        let mut package = CargoToml::new(workspace, step.package)?;
+        let mut package = CargoToml::new(workspace, step.package).with_context(|| {
+            format!(
+                "Couldn't create Cargo.toml in workspace {workspace:?} for {:?}",
+                step.package
+            )
+        })?;
 
         if package.package_version() != step.current_version {
             if package.package_version() == step.new_version {
@@ -56,6 +65,27 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
                 step.package
             );
         }
+
+        if let Some(metadata) = package.espressif_metadata()
+            && let Some(Item::Value(forever_unstable)) = metadata.get("forever_unstable")
+        {
+            // Special case: some packages are perma-unstable, meaning they won't ever have
+            // a stable release. For these packages, we always use a
+            // patch release.
+            let forever_unstable = if let Value::Boolean(forever_unstable) = forever_unstable {
+                *forever_unstable.value()
+            } else {
+                log::warn!("Invalid value for 'forever_unstable' in metadata - must be a boolean");
+                true
+            };
+
+            if forever_unstable && step.bump != VersionBump::Patch {
+                bail!(
+                    "Cannot bump perma-unstable package {} to a non-patch version",
+                    step.package
+                );
+            }
+        };
 
         let new_version = update_package(&mut package, &step.bump, !args.no_dry_run)?;
 
@@ -102,10 +132,20 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         );
     }
 
-    let branch = make_git_changes(!args.no_dry_run, "release-branch", "Finalize crate releases")?;
+    let branch = make_git_changes(
+        !args.no_dry_run,
+        "release-branch",
+        "Finalize crate releases",
+    )?;
 
-    open_pull_request(&branch, !args.no_dry_run, args.manual_pull_request, &plan_source, &plan)
-        .with_context(|| "Failed to open pull request")?;
+    open_pull_request(
+        &branch,
+        !args.no_dry_run,
+        args.manual_pull_request,
+        &plan_source,
+        &plan,
+    )
+    .with_context(|| "Failed to open pull request")?;
 
     if !args.no_dry_run {
         println!(
@@ -151,7 +191,11 @@ pub(crate) fn make_git_changes(dry_run: bool, branch_name: &str, commit: &str) -
     if dry_run {
         println!("Dry run: would commit changes to branch: {branch_name}");
     } else {
-        Command::new("git").arg("add").arg(".").status().context("Failed to stage changes")?;
+        Command::new("git")
+            .arg("add")
+            .arg(".")
+            .status()
+            .context("Failed to stage changes")?;
         Command::new("git")
             .arg("commit")
             .arg("-m")
@@ -306,7 +350,7 @@ pub(crate) fn comparison_url(base: &str, url: &str, branch_name: &str) -> Result
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]
@@ -318,7 +362,7 @@ Compressing objects: 100% (14/14), done.
 Writing objects: 100% (14/14), 2.61 KiB | 2.61 MiB/s, done.
 Total 14 (delta 13), reused 0 (delta 0), pack-reused 0 (from 0)
 remote: Resolving deltas: 100% (13/13), completed with 6 local objects.
-remote: 
+remote:
 remote: Create a pull request for 'foo' on GitHub by visiting:
 remote:      https://github.com/bugadani/esp-hal/pull/new/foo
 remote:

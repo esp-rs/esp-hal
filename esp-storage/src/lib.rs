@@ -1,5 +1,6 @@
 //! ## Feature Flags
-#![doc = document_features::document_features!()]
+#![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![cfg_attr(not(all(test, feature = "emulation")), no_std)]
 
 #[cfg_attr(not(feature = "emulation"), path = "hardware.rs")]
@@ -17,10 +18,13 @@ mod storage;
 
 #[cfg(not(feature = "emulation"))]
 #[inline(always)]
-#[cfg_attr(not(target_os = "macos"), unsafe(link_section = ".rwtext"))]
 fn maybe_with_critical_section<R>(f: impl FnOnce() -> R) -> R {
     #[cfg(feature = "critical-section")]
-    return critical_section::with(|_| f());
+    {
+        static LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
+
+        LOCK.lock(f)
+    }
 
     #[cfg(not(feature = "critical-section"))]
     f()

@@ -18,13 +18,15 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
+    interrupt::software::SoftwareInterruptControl,
     main,
+    ram,
     rng::Rng,
     time::{self, Duration},
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_radio::wifi::{ClientConfiguration, Configuration, ScanConfig};
+use esp_radio::wifi::{ModeConfig, ScanConfig, sta::ClientConfig};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::{DhcpOption, IpAddress},
@@ -41,15 +43,15 @@ fn main() -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(size: 72 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_preempt::init(timg0.timer0);
-
-    let esp_radio_ctrl = esp_radio::init().unwrap();
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let (mut controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI).unwrap();
+        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
     let mut device = interfaces.sta;
     let iface = create_interface(&mut device);
@@ -69,15 +71,15 @@ fn main() -> ! {
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     controller
-        .set_power_saving(esp_radio::config::PowerSaveMode::None)
+        .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
         .unwrap();
 
-    let client_config = Configuration::Client(ClientConfiguration {
-        ssid: SSID.into(),
-        password: PASSWORD.into(),
-        ..Default::default()
-    });
-    let res = controller.set_configuration(&client_config);
+    let client_config = ModeConfig::Client(
+        ClientConfig::default()
+            .with_ssid(SSID.into())
+            .with_password(PASSWORD.into()),
+    );
+    let res = controller.set_config(&client_config);
     println!("wifi_set_configuration returned {:?}", res);
 
     controller.start().unwrap();
@@ -85,7 +87,7 @@ fn main() -> ! {
 
     println!("Start Wifi Scan");
     let scan_config = ScanConfig::default().with_max(10);
-    let res = controller.scan_with_config_sync(scan_config).unwrap();
+    let res = controller.scan_with_config(scan_config).unwrap();
     for ap in res {
         println!("{:?}", ap);
     }

@@ -27,3 +27,5 @@ EXTERN(__atoi);
 PROVIDE ( strnlen = __strnlen );
 PROVIDE ( atoi = __atoi );
 PROVIDE ( mktime = __mktime );
+
+syscall_table_ptr = 0x3fceffd4;

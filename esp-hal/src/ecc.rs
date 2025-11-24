@@ -18,11 +18,6 @@
 //!
 //! Inputs of the ECC hardware accelerator must be provided in big-endian
 //! representation. The driver handles the inner representation of the blocks.
-//!
-//! ## Examples
-//! Visit the [ECC] test for an example of using the ECC Accelerator.
-//!
-//! [ECC]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/ecc.rs
 
 use core::marker::PhantomData;
 

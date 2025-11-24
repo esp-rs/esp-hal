@@ -29,6 +29,9 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release-pr')) }}
+    # required for this step, as stdout is captured by `hal-xtask release tag-releases`
+    env:
+      RUST_LOG: off
     steps:
       - uses: dtolnay/rust-toolchain@v1
         with:
@@ -86,7 +89,7 @@ jobs:
       - uses: esp-rs/xtensa-toolchain@v1.6
         with:
           default: true
-          version: 1.88.0.0
+          version: 1.90.0.0
 
       # xtensa-toolchain installs rustup and a basic toolchain, but doesn't install rust-src
       - name: rust-src

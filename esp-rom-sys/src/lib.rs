@@ -1,6 +1,6 @@
 #![doc = include_str!("../README.md")]
 //! ## Feature Flags
-#![doc = document_features::document_features!()]
+#![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(rustdoc::bare_urls)]
 #![no_std]
@@ -42,16 +42,19 @@ macro_rules! before_snippet {
 }
 
 pub mod rom;
+mod syscall;
+
+pub use syscall::{_reent, SYSCALL_TABLE, init_syscall_table};
 
 /// This is needed by `libesp_rom.a` (if used)
 /// Other crates (i.e. esp-radio) also rely on this being defined somewhere
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __assert_func(
     file: *const core::ffi::c_char,
-    line: u32,
+    line: i32,
     func: *const core::ffi::c_char,
     expr: *const core::ffi::c_char,
-) {
+) -> ! {
     unsafe {
         panic!(
             "__assert_func in {}:{} ({}): {}",

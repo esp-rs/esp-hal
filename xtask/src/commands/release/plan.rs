@@ -6,6 +6,7 @@ use clap::Args;
 use esp_metadata::Chip;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
+use toml_edit::{Item, Value};
 
 use crate::{
     Package,
@@ -14,6 +15,7 @@ use crate::{
     git::current_branch,
 };
 
+/// Arguments for generating a release plan.
 #[derive(Debug, Args)]
 pub struct PlanArgs {
     /// Allow making a release from the current (non-main) branch. The
@@ -26,6 +28,7 @@ pub struct PlanArgs {
     packages: Vec<Package>,
 }
 
+/// A package in the release plan.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PackagePlan {
     pub package: Package,
@@ -44,11 +47,14 @@ pub struct PackagePlan {
 /// order in which the packages are released.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Plan {
+    /// The branch the release is made from.
     pub base: String,
+    /// The packages to be released, in order.
     pub packages: Vec<PackagePlan>,
 }
 
 impl Plan {
+    /// Load a release plan from a file.
     pub fn from_path(plan_path: &Path) -> Result<Self> {
         let plan_source = std::fs::read_to_string(&plan_path)
             .with_context(|| format!("Failed to read release plan from {}. Run `cargo xrelease plan` to generate a release plan.", plan_path.display()))?;
@@ -67,6 +73,7 @@ impl Plan {
     }
 }
 
+/// Generate a release plan for the specified packages.
 pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     let current_branch = ensure_main_branch(args.allow_non_main)?;
 
@@ -75,7 +82,7 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     let mut packages_to_release = args
         .packages
         .iter()
-        .filter(|p| p.is_published(workspace))
+        .filter(|p| p.is_published())
         .flat_map(|p| related_crates(workspace, *p))
         .collect::<Vec<_>>();
 
@@ -93,7 +100,9 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
         dep_graph.insert(*package, toml.repo_dependencies());
     }
 
-    // Topological sort the packages into a release order.
+    // Topological sort the packages into a release order. Note that this is not a stable order,
+    // because the source data is a HashMap which does not have a stable insertion order. This is
+    // okay, as long as the relationships of the dependencies are kept.
     let sorted = topological_sort(&dep_graph);
     log::debug!("Sorted packages: {:?}", sorted);
 
@@ -113,25 +122,43 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     // Gather semver bump requirements
     let mut update_amounts = vec![];
     let all_chips = Chip::iter().collect::<Vec<_>>();
+
+    let changed = collect_changed_packages(
+        &sorted,
+        // Read direct dependencies out of Cargo.toml
+        &|p| CargoToml::new(workspace, p).unwrap().repo_dependencies(),
+        &|p| package_changed_since_last_release(workspace, p),
+    );
+
     for package in sorted.iter().copied() {
-        let amount = if package_changed_since_last_release(workspace, package) {
+        let amount = if changed[&package] {
             let amount = if package.is_semver_checked() {
                 min_package_update(workspace, package, &all_chips)?
             } else {
-                ReleaseType::Minor
-            };
+                let forever_unstable = if let Some(metadata) =
+                    package_tomls[&package].espressif_metadata()
+                    && let Some(Item::Value(forever_unstable)) = metadata.get("forever-unstable")
+                {
+                    // Special case: some packages are perma-unstable, meaning they won't ever have
+                    // a stable release. For these packages, we always use a
+                    // patch release.
+                    if let Value::Boolean(forever_unstable) = forever_unstable {
+                        *forever_unstable.value()
+                    } else {
+                        log::warn!(
+                            "Invalid value for 'forever-unstable' in metadata - must be a boolean"
+                        );
+                        true
+                    }
+                } else {
+                    false
+                };
 
-            // Special case: some packages are perma-unstable, meaning they won't ever have a stable
-            // release. For these packages, we always use a patch release.
-            let amount = match package {
-                Package::EspRomSys if amount != ReleaseType::Patch => {
-                    log::debug!(
-                        "Bump '{:?}' is not acceptable for package esp-rom-sys - using 'Patch'",
-                        amount
-                    );
+                if forever_unstable {
                     ReleaseType::Patch
+                } else {
+                    ReleaseType::Minor
                 }
-                _ => amount,
             };
 
             log::debug!("{} needs {:?} version bump", package, amount);
@@ -222,9 +249,13 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
 "#,
     );
 
-    let mut plan_file = std::fs::File::create(&plan_path)?;
-    plan_file.write_all(plan_header.as_bytes())?;
-    serde_json::to_writer_pretty(&mut plan_file, &plan)?;
+    let mut plan_file = std::fs::File::create(&plan_path)
+        .with_context(|| format!("Failed to create {plan_path:?}"))?;
+    plan_file
+        .write_all(plan_header.as_bytes())
+        .with_context(|| format!("Failed to write to {plan_file:?}"))?;
+    serde_json::to_writer_pretty(&mut plan_file, &plan)
+        .with_context(|| format!("Failed to serialize {plan:?} as pretty-printed JSON"))?;
     log::debug!("Release plan written to {}", plan_path.display());
 
     println!("Release plan written to {}.", plan_path.display());
@@ -237,6 +268,45 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     Ok(())
 }
 
+fn collect_changed_packages(
+    sorted: &[Package],
+    direct_dependencies: &impl Fn(Package) -> Vec<Package>,
+    is_changed: &impl Fn(Package) -> bool,
+) -> HashMap<Package, bool> {
+    let mut changed = HashMap::new();
+
+    // Collect recursive dependencies.
+    let mut all_dependencies_of = HashMap::new();
+    for package in sorted.iter().copied() {
+        let dependencies = related_crates_cb(package, direct_dependencies);
+        all_dependencies_of.insert(package, dependencies);
+    }
+
+    // Check each package whether they should be considered for release. A package should be
+    // released if it has changes since the last release, or if it depends on a package that has
+    // changes.
+    for package in sorted.iter().copied() {
+        if changed.get(&package).copied() == Some(true) {
+            // This package has already been marked as changed, so skip it.
+            continue;
+        }
+
+        let is_changed = is_changed(package);
+        changed.insert(package, is_changed);
+        if is_changed {
+            // Mark all direct and indirect _dependents_ as changed too.
+            for (dependent, deps) in all_dependencies_of.iter() {
+                if deps.contains(&package) {
+                    changed.insert(*dependent, true);
+                }
+            }
+        }
+    }
+
+    changed
+}
+
+/// Ensure we are on the main branch, or allow non-main if specified.
 pub fn ensure_main_branch(allow_non_main: bool) -> Result<String> {
     let current_branch = current_branch()?;
 
@@ -297,15 +367,18 @@ fn commits_since_tag(workspace: &Path, package_path: &Path, tag: &str) -> usize 
     output.lines().filter(|l| !l.trim().is_empty()).count()
 }
 
-fn related_crates(workspace: &Path, package: Package) -> Vec<Package> {
+/// Collects dependencies recursively, based on a callback that provides direct dependencies.
+///
+/// This is an implementation detail of the `related_crates` function, separate for testing
+/// purposes.
+fn related_crates_cb(
+    package: Package,
+    direct_dependencies: &impl Fn(Package) -> Vec<Package>,
+) -> Vec<Package> {
     let mut packages = vec![package];
 
-    let mut package = CargoToml::new(workspace, package)
-        .map(|cargo_toml| cargo_toml)
-        .unwrap();
-
-    for dep in package.repo_dependencies() {
-        for dep in related_crates(workspace, dep) {
+    for dep in direct_dependencies(package) {
+        for dep in related_crates_cb(dep, direct_dependencies) {
             if !packages.contains(&dep) {
                 packages.push(dep);
             }
@@ -313,6 +386,12 @@ fn related_crates(workspace: &Path, package: Package) -> Vec<Package> {
     }
 
     packages
+}
+
+fn related_crates(workspace: &Path, package: Package) -> Vec<Package> {
+    related_crates_cb(package, &|p| {
+        CargoToml::new(workspace, p).unwrap().repo_dependencies()
+    })
 }
 
 fn topological_sort(dep_graph: &HashMap<Package, Vec<Package>>) -> Vec<Package> {
@@ -335,27 +414,71 @@ fn topological_sort(dep_graph: &HashMap<Package, Vec<Package>>) -> Vec<Package> 
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
-    #[test]
-    // Dependencies in this test do not always reflect real dependencies, it is only a test of correct function operation. 
-    fn test_topological_sort() {
+    // Dependencies in this graph do not always reflect real dependencies, it is only a test of
+    // correct function operation.
+    fn sample_dep_graph() -> HashMap<Package, Vec<Package>> {
+        //           |-------------+-> esp-hal -> esp-alloc
+        // esp-rtos -+> esp-radio -|
+
         let mut dep_graph = HashMap::new();
         dep_graph.insert(Package::EspHal, vec![Package::EspAlloc]);
-        dep_graph.insert(Package::EspHalEmbassy, vec![Package::EspHal, Package::EspRadio]);
+        dep_graph.insert(Package::EspRtos, vec![Package::EspHal, Package::EspRadio]);
         dep_graph.insert(Package::EspRadio, vec![Package::EspHal]);
         dep_graph.insert(Package::EspAlloc, vec![]);
 
+        dep_graph
+    }
+
+    #[track_caller]
+    fn assert_unstable_lists_equal(actual: &[Package], expected: &[Package]) {
+        use std::collections::HashSet;
+        let actual_set: HashSet<_> = actual.iter().collect();
+        let expected_set: HashSet<_> = expected.iter().collect();
+        assert_eq!(actual_set, expected_set);
+    }
+
+    #[test]
+    fn test_topological_sort() {
+        let dep_graph = sample_dep_graph();
         let sorted = topological_sort(&dep_graph);
+
         assert_eq!(
             sorted,
             [
                 Package::EspAlloc,
                 Package::EspHal,
                 Package::EspRadio,
-                Package::EspHalEmbassy
+                Package::EspRtos
             ]
+        );
+    }
+
+    #[test]
+    fn test_change_detection() {
+        let dep_graph = sample_dep_graph();
+        let sorted = topological_sort(&dep_graph);
+
+        let assert_changes = |changed: &[Package], expected: &[Package]| {
+            let changed = collect_changed_packages(&sorted, &|p| dep_graph[&p].clone(), &|p| {
+                changed.contains(&p)
+            });
+            let changed = changed
+                .into_iter()
+                .filter_map(|(p, ch)| if ch { Some(p) } else { None })
+                .collect::<Vec<_>>();
+
+            assert_unstable_lists_equal(&changed, expected);
+        };
+
+        assert_changes(&[], &[]);
+        assert_changes(&[Package::EspRtos], &[Package::EspRtos]);
+        assert_changes(&[Package::EspRadio], &[Package::EspRadio, Package::EspRtos]);
+        assert_changes(
+            &[Package::EspHal],
+            &[Package::EspHal, Package::EspRadio, Package::EspRtos],
         );
     }
 }

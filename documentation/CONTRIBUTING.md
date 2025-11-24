@@ -28,7 +28,6 @@ This guide outlines the contribution workflow, from reporting issues and submitt
 
 Welcome aboard! If you're new to `esp-hal` or open-source contribution, here are some resources to get you started:
 
-*   [Understanding the Project]: A high-level overview of `esp-hal`.
 *   Intro to Open Source Contribution: [GitHub's Guide]
 *   [Setting Up Git]
 *   Workflow Insights: [GitHub Flow]
@@ -36,7 +35,6 @@ Welcome aboard! If you're new to `esp-hal` or open-source contribution, here are
 
 Before adding or changing code, review the [esp-rs API guidelines].
 
-[Understanding the Project]: README.md
 [GitHub's Guide]: https://docs.github.com/en/get-started/exploring-projects-on-github/finding-ways-to-contribute-to-open-source-on-github
 [Setting Up Git]: https://docs.github.com/en/get-started/quickstart/set-up-git
 [GitHub Flow]: https://docs.github.com/en/get-started/quickstart/github-flow
@@ -82,7 +80,7 @@ By taking these extra steps to test your contributions, you help maintain the hi
 
 ### Testing Your Contributions
 
-Ensuring the quality and reliability of `esp-hal` is a shared responsibility, and testing plays a critical role in this process. Our GitHub CI automatically checks the buildability of all examples and drivers within the project. However, automated tests can't catch everything, especially when it comes to the nuanced behavior of hardware interactions. So make sure that the example affected by your change works as expected. 
+Ensuring the quality and reliability of `esp-hal` is a shared responsibility, and testing plays a critical role in this process. Our GitHub CI automatically checks the buildability of all examples and drivers within the project. However, automated tests can't catch everything, especially when it comes to the nuanced behavior of hardware interactions. So make sure that the example affected by your change works as expected.
 
 Further steps that can (or should) be taken in testing:
 
@@ -121,16 +119,17 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 *   Fill the pull request template so that we can review your PR. This template helps reviewers understand your changes as well as the purpose of your pull request.
 *   [Link your PR] to any relevant issues it addresses.
 *   [Allow edits from maintainers] so the branch can be updated for a merge. Once you submit your PR, a Docs team member will review your proposal. We may ask questions or request additional information.
-*   Make sure you add an entry with your changes to the [Changelog]. Also make sure that it is in the appropriate section of the document.
-*   Make sure you add your changes to the current [migration guide].
+*   Make sure you add an entry with your changes to the relevant crate's changelog.
+  * Place your entry in the appropriate section of the upcoming version
+  * Make sure you reference the right pull request at the end of the changelog entry. If you made a change in PR 1234, end your changelog entry with `(#1234)`.
+  * You can amend existing changelog entries, when appropriate. In this case, just append your PR number to that entry's, like `(#789, #1234)`.
+*   If your change requires user code to be changed, make sure you add your changes to the next version's migration guide.
 *   We may ask for changes to be made before a PR can be merged, either using [suggested changes] or pull request comments. You can apply suggested changes directly through the UI. You can make any other changes in your fork, then commit them to your branch.
 *   As you update your PR and apply changes, mark each conversation as [resolved].
 *   Resolve merge conflicts if they arise, using resources like [this git tutorial] for help.
 
 [Link your PR]: https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue
-[Allow edits from maintainers]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/allowing-changes-to-a-pull-request-branch-created-from-a-forkmember
-[Changelog]: esp-hal/CHANGELOG.md
-[migration guide]: esp-hal/MIGRATING-0.20.md
+[Allow edits from maintainers]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/allowing-changes-to-a-pull-request-branch-created-from-a-fork#enabling-repository-maintainer-permissions-on-existing-pull-requests
 [suggested changes]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/incorporating-feedback-in-your-pull-request
 [resolved]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/commenting-on-a-pull-request#resolving-conversations
 [this git tutorial]: https://github.com/skills/resolve-merge-conflicts

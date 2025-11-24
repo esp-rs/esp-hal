@@ -1,8 +1,9 @@
 use strum::FromRepr;
 
 use crate::{
+    clock::{RtcClock, RtcFastClock, RtcSlowClock},
     peripherals::{APB_CTRL, EXTMEM, LPWR, SPI0, SPI1, SYSTEM},
-    rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
+    rtc_cntl::RtcCalSel,
     soc::regi2c,
 };
 
@@ -34,25 +35,23 @@ pub(crate) fn init() {
     }
 
     regi2c::I2C_ULP_IR_FORCE_XPD_CK.write_field(0);
+
+    // from esp_clk_init:
+    // clk_ll_rc_fast_enable();
+    rtc_cntl.clk_conf().modify(|_, w| w.enb_ck8m().clear_bit());
+    rtc_cntl
+        .timer1()
+        .modify(|_, w| unsafe { w.ck8m_wait().bits(5) });
+    // esp_rom_delay_us(SOC_DELAY_RC_FAST_ENABLE);
+    crate::rom::ets_delay_us(50);
+
+    RtcClock::set_fast_freq(RtcFastClock::RcFast);
+    RtcClock::set_slow_freq(RtcSlowClock::RcSlow);
 }
 
 pub(crate) fn configure_clock() {
-    unsafe {
-        // from esp_clk_init:
-        // clk_ll_rc_fast_enable();
-        LPWR::regs()
-            .clk_conf()
-            .modify(|_, w| w.enb_ck8m().clear_bit());
-        LPWR::regs().timer1().modify(|_, w| w.ck8m_wait().bits(5));
-        // esp_rom_delay_us(SOC_DELAY_RC_FAST_ENABLE);
-        crate::rom::ets_delay_us(50);
-    }
-    RtcClock::set_fast_freq(RtcFastClock::RtcFastClock8m);
-
     let cal_val = loop {
-        RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRtc);
-
-        let res = RtcClock::calibrate(RtcCalSel::RtcCalRtcMux, 1024);
+        let res = RtcClock::calibrate(RtcCalSel::RtcMux, 1024);
         if res != 0 {
             break res;
         }

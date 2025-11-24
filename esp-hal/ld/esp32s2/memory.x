@@ -1,12 +1,9 @@
-/* This memory map assumes the flash cache is on; 
-   the blocks used are excluded from the various memory ranges 
-   
+/* This memory map assumes the flash cache is on;
+   the blocks used are excluded from the various memory ranges
+
    see: https://github.com/espressif/esp-idf/blob/5b1189570025ba027f2ff6c2d91f6ffff3809cc2/components/heap/port/esp32s2/memory_layout.c
    for details
    */
-
-/* override entry point */
-ENTRY(ESP32Reset)
 
 INCLUDE "memory_extras.x"
 
@@ -23,7 +20,7 @@ MEMORY
   /* memory available after the 2nd stage bootloader is finished */
   dram2_seg ( RW )       : ORIGIN = ORIGIN(dram_seg) + LENGTH(dram_seg), len = 136K
 
-  /* external flash 
+  /* external flash
      The 0x20 offset is a convenience for the app binary image generation.
      Flash cache has 64KB pages. The .bin file which is flashed to the chip
      has a 0x18 byte file header, and each segment has a 0x08 byte segment

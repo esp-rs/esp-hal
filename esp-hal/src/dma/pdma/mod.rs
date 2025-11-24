@@ -11,7 +11,6 @@
 //! [SPI]: ../spi/index.html
 //! [I2S]: ../i2s/index.html
 
-use critical_section::CriticalSection;
 use portable_atomic::AtomicBool;
 
 use crate::{
@@ -180,31 +179,20 @@ crate::dma::impl_dma_eligible!([DMA_CRYPTO] AES => Aes);
 #[cfg(esp32s2)]
 crate::dma::impl_dma_eligible!([DMA_CRYPTO] SHA => Sha);
 
-pub(super) fn init_dma(_cs: CriticalSection<'_>) {
+pub(super) fn init_dma_racey() {
     #[cfg(esp32)]
     {
         // (only) on ESP32 we need to configure DPORT for the SPI DMA channels
-        // This assignes the DMA channels to the SPI peripherals, which is more
+        // This assigns the DMA channels to the SPI peripherals, which is more
         // restrictive than necessary but we currently support the same
         // number of SPI peripherals as SPI DMA channels so it's not a big
         // deal.
         use crate::peripherals::DPORT;
 
-        DPORT::regs()
-            .spi_dma_chan_sel()
-            .modify(|_, w| unsafe { w.spi2_dma_chan_sel().bits(1).spi3_dma_chan_sel().bits(2) });
-    }
-
-    #[cfg(esp32s2)]
-    {
-        // This is the only DMA channel on the S2 that needs to be enabled this way
-        // (using its own registers). Ideally this should be enabled only when
-        // the DMA channel is in use but we don't have a good mechanism for that
-        // yet. For now, we shall just turn in on forever once any DMA channel is used.
-
-        use crate::peripherals::DMA_COPY;
-
-        DMA_COPY::regs().conf().modify(|_, w| w.clk_en().set_bit());
+        DPORT::regs().spi_dma_chan_sel().modify(|_, w| unsafe {
+            w.spi2_dma_chan_sel().bits(1);
+            w.spi3_dma_chan_sel().bits(2)
+        });
     }
 }
 

@@ -1,14 +1,25 @@
 [package]
 name = "esp-bootloader-esp-idf"
-version = "0.2.0"
+version = "0.4.0"
 edition = "2024"
-rust-version = "1.86.0"
+rust-version = "1.88.0"
 description = "Functionality related to the esp-idf bootloader"
 documentation = "https://docs.espressif.com/projects/rust/esp-bootloader-esp-idf/latest/"
 keywords = ["esp32", "espressif", "no-std"]
 categories = ["embedded", "hardware-support", "no-std"]
 repository = "https://github.com/esp-rs/esp-hal"
 license = "MIT OR Apache-2.0"
+
+[package.metadata.espressif]
+doc-config = { features = ["defmt", "validation"] }
+check-configs = [
+    { features = [] },
+    { features = ["log-04"] },
+    { features = ["defmt", "validation"] },
+]
+clippy-configs = [
+    { features = ["defmt", "validation"] },
+]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
@@ -18,21 +29,27 @@ bench = false
 test  = true
 
 [dependencies]
-cfg-if = "1.0.0"
+cfg-if = "1"
 defmt = { version = "1.0.1", optional = true }
-document-features = "0.2.11"
-esp-config = { version = "0.5.0", path = "../esp-config" }
-esp-rom-sys = { version = "0.1.1", path = "../esp-rom-sys", optional = true }
+document-features = "0.2"
+esp-config = { version = "0.6.1", path = "../esp-config" }
+esp-hal-procmacros = { version = "0.21.0", path = "../esp-hal-procmacros", features = ["__esp_idf_bootloader"] }
+esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated" }
+esp-rom-sys = { version = "0.1.3", path = "../esp-rom-sys", optional = true }
 embedded-storage = "0.3.1"
-log-04 = { package = "log", version = "0.4.26", optional = true }
-strum = { version = "0.27.1", default-features = false, features = ["derive"] }
+log-04 = { package = "log", version = "0.4", optional = true }
+strum = { version = "0.27", default-features = false, features = ["derive"] }
 
 crc = { version = "3.3.0", optional = true }
 md-5 = { version = "0.10.6", default-features = false, optional = true }
 
 [build-dependencies]
 jiff       = { version = "0.2.13", default-features = false, features = ["std"] }
-esp-config = { version = "0.5.0", path = "../esp-config", features = ["build"] }
+esp-config = { version = "0.6.1", path = "../esp-config", features = ["build"] }
+
+# Make doctests & host-tests work together:
+[target.'cfg(any(target_arch = "riscv32", target_arch = "xtensa"))'.dev-dependencies]
+esp-hal = { version = "1.0.0", path = "../esp-hal" }
 
 [features]
 default = ["validation"]
@@ -52,19 +69,26 @@ std = ["dep:crc", "dep:md-5"]
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:
 
-# The following trailing spaces ("## ") are important to display the feature names.
+##
+esp32c2   = ["esp-rom-sys/esp32c2", "esp-metadata-generated/esp32c2", "esp-hal/esp32c2"]
+##
+esp32c3   = ["esp-rom-sys/esp32c3", "esp-metadata-generated/esp32c3", "esp-hal/esp32c3"]
+##
+esp32c6   = ["esp-rom-sys/esp32c6", "esp-metadata-generated/esp32c6", "esp-hal/esp32c6"]
+##
+esp32h2   = ["esp-rom-sys/esp32h2", "esp-metadata-generated/esp32h2", "esp-hal/esp32h2"]
+##
+esp32     = ["esp-rom-sys/esp32", "esp-metadata-generated/esp32", "esp-hal/esp32"]
+##
+esp32s2   = ["esp-rom-sys/esp32s2", "esp-metadata-generated/esp32s2", "esp-hal/esp32s2"]
+##
+esp32s3   = ["esp-rom-sys/esp32s3", "esp-metadata-generated/esp32s3", "esp-hal/esp32s3"]
 
-## 
-esp32c2   = ["esp-rom-sys/esp32c2"]
-## 
-esp32c3   = ["esp-rom-sys/esp32c3"]
-## 
-esp32c6   = ["esp-rom-sys/esp32c6"]
-## 
-esp32h2   = ["esp-rom-sys/esp32h2"]
-## 
-esp32     = ["esp-rom-sys/esp32"]
-## 
-esp32s2   = ["esp-rom-sys/esp32s2"]
-## 
-esp32s3   = ["esp-rom-sys/esp32s3"]
+# "md-5" is hidden behind `std` feature and `cargo machete` incorrectly marks it as unused.
+[package.metadata.cargo-machete]
+ignored = ["md-5", "esp-hal-procmacros"]
+
+[lints.rust]
+# Starting with 1.85.0, the test cfg is considered to be a "userspace" config despite being also set by rustc and should be managed by the build system itself.
+# CI started to fail with rustc 1.92.0-nightly (f04e3dfc8 2025-10-19), https://github.com/esp-rs/esp-hal/pull/4386#issuecomment-3491320175 
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(test)'] }

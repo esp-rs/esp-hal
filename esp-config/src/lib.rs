@@ -69,7 +69,7 @@ macro_rules! esp_config_int_parse {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     // We can only test success in the const context
     const _: () = {
         core::assert!(esp_config_int_parse!(i64, "-77777") == -77777);
