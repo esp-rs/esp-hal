@@ -28,13 +28,13 @@ pub(crate) use self::os_adapter::*;
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 use self::sniffer::Sniffer;
 #[cfg(feature = "wifi-eap")]
-use self::sta::eap::EapClientConfig;
+use self::sta::eap::EapStationConfig;
 pub use self::state::*;
 use self::{
     ap::{AccessPointConfig, AccessPointInfo, convert_ap_info},
     private::PacketBuffer,
     scan::{FreeApListOnDrop, ScanResults},
-    sta::ClientConfig,
+    sta::StationConfig,
 };
 #[cfg(feature = "csi")]
 #[instability::unstable]
@@ -243,14 +243,14 @@ pub enum ScanMethod {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum Capability {
-    /// The device operates as a client, connecting to an existing network.
-    Client,
+    /// The device operates as a station, connecting to an existing network.
+    Station,
 
     /// The device operates as an access point, allowing other devices to
     /// connect to it.
     AccessPoint,
 
-    /// The device can operate in both client and access point modes
+    /// The device can operate in both station and access point modes
     /// simultaneously.
     ApSta,
 }
@@ -265,34 +265,36 @@ pub enum ModeConfig {
     #[default]
     None,
 
-    /// Client-only configuration.
-    Client(ClientConfig),
+    /// Station-only configuration.
+    Station(StationConfig),
 
     /// Access point-only configuration.
     AccessPoint(AccessPointConfig),
 
-    /// Simultaneous client and access point configuration.
-    ApSta(ClientConfig, AccessPointConfig),
+    /// Simultaneous station and access point configuration.
+    ApSta(StationConfig, AccessPointConfig),
 
-    /// EAP client configuration for enterprise Wi-Fi.
+    /// EAP station configuration for enterprise Wi-Fi.
     #[cfg(feature = "wifi-eap")]
-    EapClient(EapClientConfig),
+    EapStation(EapStationConfig),
 }
 
 impl ModeConfig {
     fn validate(&self) -> Result<(), WifiError> {
         match self {
             ModeConfig::None => Ok(()),
-            ModeConfig::Client(client_configuration) => client_configuration.validate(),
+            ModeConfig::Station(station_configuration) => station_configuration.validate(),
             ModeConfig::AccessPoint(access_point_configuration) => {
                 access_point_configuration.validate()
             }
-            ModeConfig::ApSta(client_configuration, access_point_configuration) => {
-                client_configuration.validate()?;
+            ModeConfig::ApSta(station_configuration, access_point_configuration) => {
+                station_configuration.validate()?;
                 access_point_configuration.validate()
             }
             #[cfg(feature = "wifi-eap")]
-            ModeConfig::EapClient(eap_client_configuration) => eap_client_configuration.validate(),
+            ModeConfig::EapStation(eap_station_configuration) => {
+                eap_station_configuration.validate()
+            }
         }
     }
 }
@@ -384,7 +386,7 @@ impl WifiMode {
         Self::try_from(mode)
     }
 
-    /// Returns true if this mode works as a client
+    /// Returns true if this mode works as a station.
     pub fn is_sta(&self) -> bool {
         match self {
             Self::Sta | Self::ApSta => true,
@@ -409,10 +411,10 @@ impl TryFrom<&ModeConfig> for WifiMode {
         let mode = match config {
             ModeConfig::None => return Err(WifiError::UnknownWifiMode),
             ModeConfig::AccessPoint(_) => Self::Ap,
-            ModeConfig::Client(_) => Self::Sta,
+            ModeConfig::Station(_) => Self::Sta,
             ModeConfig::ApSta(_, _) => Self::ApSta,
             #[cfg(feature = "wifi-eap")]
-            ModeConfig::EapClient(_) => Self::Sta,
+            ModeConfig::EapStation(_) => Self::Sta,
         };
 
         Ok(mode)
@@ -2506,8 +2508,7 @@ impl WifiController<'_> {
 
     /// Get the supported capabilities of the controller.
     pub fn capabilities(&self) -> Result<EnumSet<crate::wifi::Capability>, WifiError> {
-        let caps =
-            enumset::enum_set! { Capability::Client | Capability::AccessPoint | Capability::ApSta };
+        let caps = enumset::enum_set! { Capability::Station | Capability::AccessPoint | Capability::ApSta };
 
         Ok(caps)
     }
@@ -2526,18 +2527,18 @@ impl WifiController<'_> {
 
         let mode = match conf {
             ModeConfig::None => wifi_mode_t_WIFI_MODE_NULL,
-            ModeConfig::Client(_) => wifi_mode_t_WIFI_MODE_STA,
+            ModeConfig::Station(_) => wifi_mode_t_WIFI_MODE_STA,
             ModeConfig::AccessPoint(_) => wifi_mode_t_WIFI_MODE_AP,
             ModeConfig::ApSta(_, _) => wifi_mode_t_WIFI_MODE_APSTA,
             #[cfg(feature = "wifi-eap")]
-            ModeConfig::EapClient(_) => wifi_mode_t_WIFI_MODE_STA,
+            ModeConfig::EapStation(_) => wifi_mode_t_WIFI_MODE_STA,
         };
 
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) })?;
 
         match conf {
             ModeConfig::None => Ok(()),
-            ModeConfig::Client(config) => {
+            ModeConfig::Station(config) => {
                 self.apply_sta_config(config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)
             }
@@ -2552,7 +2553,7 @@ impl WifiController<'_> {
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &sta_config.protocols)
             }
             #[cfg(feature = "wifi-eap")]
-            ModeConfig::EapClient(config) => {
+            ModeConfig::EapStation(config) => {
                 self.apply_sta_eap_config(config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)
             }
@@ -2817,7 +2818,7 @@ impl WifiController<'_> {
         }
     }
 
-    fn apply_sta_config(&mut self, config: &ClientConfig) -> Result<(), WifiError> {
+    fn apply_sta_config(&mut self, config: &StationConfig) -> Result<(), WifiError> {
         self.beacon_timeout = config.beacon_timeout;
 
         let mut cfg = wifi_config_t {
@@ -2864,7 +2865,7 @@ impl WifiController<'_> {
     }
 
     #[cfg(feature = "wifi-eap")]
-    fn apply_sta_eap_config(&mut self, config: &EapClientConfig) -> Result<(), WifiError> {
+    fn apply_sta_eap_config(&mut self, config: &EapStationConfig) -> Result<(), WifiError> {
         self.beacon_timeout = config.beacon_timeout;
 
         let mut cfg = wifi_config_t {

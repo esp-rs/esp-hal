@@ -31,7 +31,7 @@ use esp_radio::wifi::{
     WifiDevice,
     WifiEvent,
     WifiStaState,
-    sta::ClientConfig,
+    sta::StationConfig,
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -158,12 +158,12 @@ async fn connection(mut controller: WifiController<'static>) {
             _ => {}
         }
         if !matches!(controller.is_started(), Ok(true)) {
-            let client_config = ModeConfig::Client(
-                ClientConfig::default()
+            let station_config = ModeConfig::Station(
+                StationConfig::default()
                     .with_ssid(SSID.into())
                     .with_password(PASSWORD.into()),
             );
-            controller.set_config(&client_config).unwrap();
+            controller.set_config(&station_config).unwrap();
             println!("Starting wifi");
             controller.start_async().await.unwrap();
             println!("Wifi started!");

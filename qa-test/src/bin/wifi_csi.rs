@@ -23,7 +23,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{CsiConfig, ModeConfig, ScanConfig, sta::ClientConfig};
+use esp_radio::wifi::{CsiConfig, ModeConfig, ScanConfig, sta::StationConfig};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::DhcpOption,
@@ -66,12 +66,12 @@ fn main() -> ! {
     let now = || time::Instant::now().duration_since_epoch().as_millis();
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
-    let client_config = ModeConfig::Client(
-        ClientConfig::default()
+    let station_config = ModeConfig::Station(
+        StationConfig::default()
             .with_ssid(SSID.into())
             .with_password(PASSWORD.into()),
     );
-    let res = controller.set_config(&client_config);
+    let res = controller.set_config(&station_config);
     println!("wifi_set_configuration returned {:?}", res);
 
     controller.start().unwrap();

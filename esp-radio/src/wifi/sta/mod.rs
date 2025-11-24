@@ -12,13 +12,13 @@ use crate::WifiError;
 #[cfg(feature = "wifi-eap")]
 pub mod eap;
 
-/// Client configuration for a Wi-Fi connection.
+/// Station configuration for a Wi-Fi connection.
 #[derive(BuilderLite, Clone, Eq, PartialEq)]
-pub struct ClientConfig {
+pub struct StationConfig {
     /// The SSID of the Wi-Fi network.
     #[builder_lite(reference)]
     pub(crate) ssid: String,
-    /// The BSSID (MAC address) of the client.
+    /// The BSSID (MAC address) of the station.
     pub(crate) bssid: Option<[u8; 6]>,
     /// The authentication method for the Wi-Fi connection.
     pub(crate) auth_method: AuthMethod,
@@ -54,7 +54,7 @@ pub struct ClientConfig {
     pub(crate) scan_method: ScanMethod,
 }
 
-impl ClientConfig {
+impl StationConfig {
     pub(crate) fn validate(&self) -> Result<(), WifiError> {
         if self.ssid.len() > 32 {
             return Err(WifiError::InvalidArguments);
@@ -72,9 +72,9 @@ impl ClientConfig {
     }
 }
 
-impl Default for ClientConfig {
+impl Default for StationConfig {
     fn default() -> Self {
-        ClientConfig {
+        StationConfig {
             ssid: String::new(),
             bssid: None,
             auth_method: AuthMethod::Wpa2Personal,
@@ -89,9 +89,9 @@ impl Default for ClientConfig {
     }
 }
 
-impl fmt::Debug for ClientConfig {
+impl fmt::Debug for StationConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ClientConfig")
+        f.debug_struct("StationConfig")
             .field("ssid", &self.ssid)
             .field("bssid", &self.bssid)
             .field("auth_method", &self.auth_method)
@@ -107,11 +107,11 @@ impl fmt::Debug for ClientConfig {
 }
 
 #[cfg(feature = "defmt")]
-impl defmt::Format for ClientConfig {
+impl defmt::Format for StationConfig {
     fn format(&self, fmt: defmt::Formatter<'_>) {
         defmt::write!(
             fmt,
-            "ClientConfig {{\
+            "StationConfig {{\
             ssid: {}, \
             bssid: {:?}, \
             auth_method: {:?}, \

@@ -49,7 +49,7 @@ use esp_radio::wifi::{
     WifiDevice,
     WifiEvent,
     ap::AccessPointConfig,
-    sta::ClientConfig,
+    sta::StationConfig,
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -110,13 +110,13 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    let client_config = ModeConfig::ApSta(
-        ClientConfig::default()
+    let station_config = ModeConfig::ApSta(
+        StationConfig::default()
             .with_ssid(SSID.into())
             .with_password(PASSWORD.into()),
         AccessPointConfig::default().with_ssid("esp-radio".into()),
     );
-    controller.set_config(&client_config).unwrap();
+    controller.set_config(&station_config).unwrap();
 
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(ap_runner)).ok();
@@ -145,8 +145,8 @@ async fn main(spawner: Spawner) -> ! {
     let mut ap_server_tx_buffer = [0; 1536];
     let mut sta_server_rx_buffer = [0; 1536];
     let mut sta_server_tx_buffer = [0; 1536];
-    let mut sta_client_rx_buffer = [0; 1536];
-    let mut sta_client_tx_buffer = [0; 1536];
+    let mut sta_rx_buffer = [0; 1536];
+    let mut sta_tx_buffer = [0; 1536];
 
     let mut ap_server_socket =
         TcpSocket::new(ap_stack, &mut ap_server_rx_buffer, &mut ap_server_tx_buffer);
@@ -159,12 +159,8 @@ async fn main(spawner: Spawner) -> ! {
     );
     sta_server_socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
 
-    let mut sta_client_socket = TcpSocket::new(
-        sta_stack,
-        &mut sta_client_rx_buffer,
-        &mut sta_client_tx_buffer,
-    );
-    sta_client_socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
+    let mut sta_socket = TcpSocket::new(sta_stack, &mut sta_rx_buffer, &mut sta_tx_buffer);
+    sta_socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
 
     loop {
         println!("Wait for connection...");
@@ -224,14 +220,14 @@ async fn main(spawner: Spawner) -> ! {
         if sta_stack.is_link_up() {
             let remote_endpoint = (Ipv4Addr::new(142, 250, 185, 115), 80);
             println!("connecting...");
-            let r = sta_client_socket.connect(remote_endpoint).await;
+            let r = sta_socket.connect(remote_endpoint).await;
             if let Err(e) = r {
                 println!("STA connect error: {:?}", e);
                 continue;
             }
 
             use embedded_io_async::Write;
-            let r = sta_client_socket
+            let r = sta_socket
                 .write_all(b"GET / HTTP/1.0\r\nHost: www.mobile-j.de\r\n\r\n")
                 .await;
 
@@ -253,14 +249,14 @@ async fn main(spawner: Spawner) -> ! {
                     println!("AP write error: {:?}", e);
                 }
             } else {
-                let r = sta_client_socket.flush().await;
+                let r = sta_socket.flush().await;
                 if let Err(e) = r {
                     println!("STA flush error: {:?}", e);
                 } else {
                     println!("connected!");
                     let mut buf = [0; 1024];
                     loop {
-                        match sta_client_socket.read(&mut buf).await {
+                        match sta_socket.read(&mut buf).await {
                             Ok(0) => {
                                 println!("STA read EOF");
                                 break;
@@ -281,7 +277,7 @@ async fn main(spawner: Spawner) -> ! {
                 }
             }
 
-            sta_client_socket.close();
+            sta_socket.close();
         } else {
             let r = server_socket
                 .write_all(

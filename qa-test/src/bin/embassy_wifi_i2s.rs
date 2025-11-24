@@ -28,7 +28,7 @@ use esp_radio::wifi::{
     WifiDevice,
     WifiEvent,
     WifiStaState,
-    sta::ClientConfig,
+    sta::StationConfig,
     sta_state,
 };
 use static_cell::StaticCell;
@@ -65,12 +65,12 @@ async fn connection_manager(
     println!("📡 Starting WiFi connection manager");
 
     if !matches!(controller.is_started(), Ok(true)) {
-        let client_config = ModeConfig::Client(
-            ClientConfig::default()
+        let station_config = ModeConfig::Station(
+            StationConfig::default()
                 .with_ssid(SSID.into())
                 .with_password(PASSWORD.into()),
         );
-        controller.set_config(&client_config).unwrap();
+        controller.set_config(&station_config).unwrap();
         println!("🔄 Starting WiFi...");
         controller.start_async().await.unwrap();
         println!("✅ WiFi started");
