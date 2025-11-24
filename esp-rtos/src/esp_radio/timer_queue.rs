@@ -142,7 +142,7 @@ impl TimerQueue {
                 timers = props.next.take();
                 props.enqueued = false;
 
-                if !props.is_active || props.drop {
+                if !props.is_active {
                     trace!(
                         "Timer {:x} is inactive or dropped",
                         current_timer as *const _ as usize
@@ -175,7 +175,7 @@ impl TimerQueue {
             self.inner.with(|q| {
                 let props = current_timer.properties(q);
 
-                if props.is_active && !props.drop {
+                if props.is_active {
                     q.enqueue(current_timer);
                 } else {
                     trace!(
@@ -187,11 +187,12 @@ impl TimerQueue {
         }
 
         self.inner.with(|q| {
-            for timer in q.scheduled_for_drop.drain(..) {
+            while let Some(timer) = q.scheduled_for_drop.pop() {
                 debug!(
                     "Dropping timer {:x} (delayed)",
                     (&*timer) as *const _ as usize
                 );
+                q.dequeue(&timer);
                 core::mem::drop(timer);
             }
 
@@ -208,7 +209,6 @@ struct TimerProperties {
     next_due: u64,
     period: u64,
     periodic: bool,
-    drop: bool,
 
     enqueued: bool,
     next: Option<NonNull<Timer>>,
@@ -241,7 +241,6 @@ impl Timer {
                 next_due: 0,
                 period: 0,
                 periodic: false,
-                drop: false,
 
                 enqueued: false,
                 next: None,
@@ -308,33 +307,20 @@ impl TimerImplementation for Timer {
         debug!("Deleting timer: {:x}", timer.addr());
         TIMER_QUEUE.inner.with(|q| {
             let timer = unsafe { Box::from_raw(timer.cast::<Timer>().as_ptr()) };
+            timer.properties(q).is_active = false;
 
-            // There are multiple cases:
-            // - the queue is currently processing - mem-forget the timer and mark it to be dropped
-            //   later in during processing.
-            //
-            // - the queue is currently not processing
-            //      - we can dequeue the timer -> drop it
-            //      - we can't dequeue the timer (i.e. it's not in the queue) -> drop it
-            if q.processing {
-                timer.properties(q).drop = true;
+            // we don't drop the timer right now, since it might be
+            // processed currently
+            debug!("schedule timer for dropping after processing the queue");
+            q.scheduled_for_drop.push(timer);
 
-                if timer.properties(q).enqueued {
-                    // it's queued so process will make sure to drop it
-                    debug!("schedule timer for dropping after processing the queue");
-                    q.scheduled_for_drop.push(timer);
-                } else {
-                    // drop it since process won't do it for us
-                    debug!("dropping not enqueued timer while processing the queue");
-                    core::mem::drop(timer);
-                }
-            } else {
-                if q.dequeue(&timer) {
-                    debug!("dropping dequeued timer");
-                    core::mem::drop(timer);
-                } else {
-                    debug!("dropping timer not in queue, queue is not processing");
-                    core::mem::drop(timer);
+            // make sure the queue will get processed soon
+            // and cleanup will happen
+            if !q.processing && q.next_wakeup == u64::MAX {
+                q.next_wakeup = 0;
+
+                if let Some(task) = q.task {
+                    task.resume();
                 }
             }
         })
