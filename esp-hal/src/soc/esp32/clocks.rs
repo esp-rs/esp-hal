@@ -182,7 +182,7 @@ fn configure_xtl_clk_impl(_clocks: &mut ClockTree, config: XtlClkConfig) {
 
         // Copy the DISABLE_ROM_LOG bit
         let disable_rom_log_bit = r.bits() & DISABLE_ROM_LOG;
-        let half = (freq_mhz & 0xFFFF) | disable_rom_log_bit;
+        let half = (freq_mhz & (0xFFFF & !DISABLE_ROM_LOG)) | disable_rom_log_bit;
         w.data().bits(half | (half << 16))
     });
 }
