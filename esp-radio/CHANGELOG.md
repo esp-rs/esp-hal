@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp_radio::init()` is not public anymore (#4482)
 - `esp_radio::wifi::new` and `BleConnector::new` no longer take a `Controller` (#4482)
 - The `Client` and `Sta` are replaced with `Station`, `Ap` with `AccessPoint` and `ApSta` with `AccessPointStation` (#4546)
+- `WifiEvent` uses full names for events instead of acronyms (#4554)
 
 ### Fixed
 
