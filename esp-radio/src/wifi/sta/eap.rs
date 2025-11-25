@@ -66,11 +66,11 @@ impl TtlsPhase2Method {
 
 type CertificateAndKey = (&'static [u8], &'static [u8], Option<&'static [u8]>);
 
-/// Configuration for an EAP (Extensible Authentication Protocol) client.
+/// Configuration for an EAP (Extensible Authentication Protocol) station.
 #[derive(BuilderLite, Clone, PartialEq, Eq)]
 #[instability::unstable]
-pub struct EapClientConfig {
-    /// The SSID of the network the client is connecting to.
+pub struct EapStationConfig {
+    /// The SSID of the network the station is connecting to.
     #[builder_lite(reference)]
     pub(crate) ssid: String,
     /// The BSSID (MAC Address) of the specific access point.
@@ -102,7 +102,7 @@ pub struct EapClientConfig {
     /// A CA (Certificate Authority) certificate for validating the
     /// authentication server's certificate.
     pub(crate) ca_cert: Option<&'static [u8]>,
-    /// A tuple containing the client's certificate, private key, and an
+    /// A tuple containing the station's certificate, private key, and an
     /// intermediate certificate.
     pub(crate) certificate_and_key: Option<CertificateAndKey>,
     /// The Phase 2 authentication method used for EAP-TTLS.
@@ -112,23 +112,23 @@ pub struct EapClientConfig {
     pub(crate) channel: Option<u8>,
     /// The set of protocols supported by the access point.
     pub(crate) protocols: EnumSet<Protocol>,
-    /// Interval for station to listen to beacon from AP.
+    /// Interval for station to listen to beacon from access point.
     ///
     /// The unit of listen interval is one beacon interval.
     /// For example, if beacon interval is 100 ms and listen interval is 3,
     /// the interval for station to listen to beacon is 300 ms
     #[builder_lite(unstable)]
     pub(crate) listen_interval: u16,
-    /// Time to disconnect from AP if no data is received.
+    /// Time to disconnect from access point if no data is received.
     ///
     /// Must be between 6 and 31.
     #[builder_lite(unstable)]
     pub(crate) beacon_timeout: u16,
-    /// Number of connection retries station will do before moving to next AP.
+    /// Number of connection retries station will do before moving to next access point.
     ///
     /// `scan_method` should be set as [`ScanMethod::AllChannels`] to use this config.
     ///
-    /// Note: Enabling this may cause connection time to increase in case the best AP
+    /// Note: Enabling this may cause connection time to increase in case the best access point
     /// doesn't behave properly.
     #[builder_lite(unstable)]
     pub(crate) failure_retry_cnt: u8,
@@ -137,7 +137,7 @@ pub struct EapClientConfig {
     pub(crate) scan_method: ScanMethod,
 }
 
-impl EapClientConfig {
+impl EapStationConfig {
     pub(crate) fn validate(&self) -> Result<(), WifiError> {
         if self.ssid.len() > 32 {
             return Err(WifiError::InvalidArguments);
@@ -167,9 +167,9 @@ impl EapClientConfig {
     }
 }
 
-impl Default for EapClientConfig {
+impl Default for EapStationConfig {
     fn default() -> Self {
-        EapClientConfig {
+        EapStationConfig {
             ssid: String::new(),
             bssid: None,
             auth_method: AuthMethod::Wpa2Enterprise,
@@ -193,9 +193,9 @@ impl Default for EapClientConfig {
     }
 }
 
-impl fmt::Debug for EapClientConfig {
+impl fmt::Debug for EapStationConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("EapClientConfig")
+        f.debug_struct("EapStationConfig")
             .field("ssid", &self.ssid)
             .field("bssid", &self.bssid)
             .field("auth_method", &self.auth_method)
@@ -220,11 +220,11 @@ impl fmt::Debug for EapClientConfig {
 }
 
 #[cfg(feature = "defmt")]
-impl defmt::Format for EapClientConfig {
+impl defmt::Format for EapStationConfig {
     fn format(&self, fmt: defmt::Formatter<'_>) {
         defmt::write!(
             fmt,
-            "EapClientConfig {{\
+            "EapStationConfig {{\
             ssid: {}, \
             bssid: {:?}, \
             auth_method: {:?}, \

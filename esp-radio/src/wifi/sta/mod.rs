@@ -12,13 +12,13 @@ use crate::WifiError;
 #[cfg(feature = "wifi-eap")]
 pub mod eap;
 
-/// Client configuration for a Wi-Fi connection.
+/// Station configuration for a Wi-Fi connection.
 #[derive(BuilderLite, Clone, Eq, PartialEq)]
-pub struct ClientConfig {
+pub struct StationConfig {
     /// The SSID of the Wi-Fi network.
     #[builder_lite(reference)]
     pub(crate) ssid: String,
-    /// The BSSID (MAC address) of the client.
+    /// The BSSID (MAC address) of the station.
     pub(crate) bssid: Option<[u8; 6]>,
     /// The authentication method for the Wi-Fi connection.
     pub(crate) auth_method: AuthMethod,
@@ -29,23 +29,23 @@ pub struct ClientConfig {
     pub(crate) channel: Option<u8>,
     /// The set of protocols supported by the access point.
     pub(crate) protocols: EnumSet<Protocol>,
-    /// Interval for station to listen to beacon from AP.
+    /// Interval for station to listen to beacon from access point.
     ///
     /// The unit of listen interval is one beacon interval.
     /// For example, if beacon interval is 100 ms and listen interval is 3,
     /// the interval for station to listen to beacon is 300 ms
     #[builder_lite(unstable)]
     pub(crate) listen_interval: u16,
-    /// Time to disconnect from AP if no data is received.
+    /// Time to disconnect from access point if no data is received.
     ///
     /// Must be between 6 and 31.
     #[builder_lite(unstable)]
     pub(crate) beacon_timeout: u16,
-    /// Number of connection retries station will do before moving to next AP.
+    /// Number of connection retries station will do before moving to next access point.
     ///
     /// `scan_method` should be set as [`ScanMethod::AllChannels`] to use this config.
     ///
-    /// Note: Enabling this may cause connection time to increase in case the best AP
+    /// Note: Enabling this may cause connection time to increase in case the best access point
     /// doesn't behave properly.
     #[builder_lite(unstable)]
     pub(crate) failure_retry_cnt: u8,
@@ -54,7 +54,7 @@ pub struct ClientConfig {
     pub(crate) scan_method: ScanMethod,
 }
 
-impl ClientConfig {
+impl StationConfig {
     pub(crate) fn validate(&self) -> Result<(), WifiError> {
         if self.ssid.len() > 32 {
             return Err(WifiError::InvalidArguments);
@@ -72,9 +72,9 @@ impl ClientConfig {
     }
 }
 
-impl Default for ClientConfig {
+impl Default for StationConfig {
     fn default() -> Self {
-        ClientConfig {
+        StationConfig {
             ssid: String::new(),
             bssid: None,
             auth_method: AuthMethod::Wpa2Personal,
@@ -89,9 +89,9 @@ impl Default for ClientConfig {
     }
 }
 
-impl fmt::Debug for ClientConfig {
+impl fmt::Debug for StationConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ClientConfig")
+        f.debug_struct("StationConfig")
             .field("ssid", &self.ssid)
             .field("bssid", &self.bssid)
             .field("auth_method", &self.auth_method)
@@ -107,11 +107,11 @@ impl fmt::Debug for ClientConfig {
 }
 
 #[cfg(feature = "defmt")]
-impl defmt::Format for ClientConfig {
+impl defmt::Format for StationConfig {
     fn format(&self, fmt: defmt::Formatter<'_>) {
         defmt::write!(
             fmt,
-            "ClientConfig {{\
+            "StationConfig {{\
             ssid: {}, \
             bssid: {:?}, \
             auth_method: {:?}, \

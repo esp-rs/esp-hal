@@ -38,8 +38,8 @@ use esp_radio::wifi::{
     WifiController,
     WifiDevice,
     WifiEvent,
-    WifiStaState,
-    sta::ClientConfig,
+    WifiStationState,
+    sta::StationConfig,
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -88,7 +88,7 @@ async fn main(spawner: Spawner) -> ! {
     let (mut controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
-    let wifi_interface = interfaces.sta;
+    let wifi_interface = interfaces.station;
 
     controller
         .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
@@ -146,21 +146,23 @@ async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
     println!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        match esp_radio::wifi::sta_state() {
-            WifiStaState::Connected => {
+        match esp_radio::wifi::station_state() {
+            WifiStationState::Connected => {
                 // wait until we're no longer connected
-                controller.wait_for_event(WifiEvent::StaDisconnected).await;
+                controller
+                    .wait_for_event(WifiEvent::StationDisconnected)
+                    .await;
                 Timer::after(Duration::from_millis(5000)).await
             }
             _ => {}
         }
         if !matches!(controller.is_started(), Ok(true)) {
-            let client_config = ModeConfig::Client(
-                ClientConfig::default()
+            let station_config = ModeConfig::Station(
+                StationConfig::default()
                     .with_ssid(SSID.into())
                     .with_password(PASSWORD.into()),
             );
-            controller.set_config(&client_config).unwrap();
+            controller.set_config(&station_config).unwrap();
             println!("Starting wifi");
             controller.start_async().await.unwrap();
             println!("Wifi started!");

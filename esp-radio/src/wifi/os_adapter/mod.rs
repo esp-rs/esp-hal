@@ -688,11 +688,11 @@ pub unsafe extern "C" fn event_post(
     event.waker().wake();
 
     match event {
-        WifiEvent::StaConnected | WifiEvent::StaDisconnected => {
+        WifiEvent::StationConnected | WifiEvent::StationDisconnected => {
             crate::wifi::embassy::STA_LINK_STATE_WAKER.wake();
         }
 
-        WifiEvent::ApStart | WifiEvent::ApStop => {
+        WifiEvent::AccessPointStart | WifiEvent::AccessPointStop => {
             crate::wifi::embassy::AP_LINK_STATE_WAKER.wake();
         }
 

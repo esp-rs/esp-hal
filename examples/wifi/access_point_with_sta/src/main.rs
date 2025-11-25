@@ -29,7 +29,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_radio::wifi::{ModeConfig, ap::AccessPointConfig, sta::ClientConfig};
+use esp_radio::wifi::{ModeConfig, ap::AccessPointConfig, sta::StationConfig};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::IpAddress,
@@ -56,10 +56,10 @@ fn main() -> ! {
     let (mut controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
-    let mut ap_device = interfaces.ap;
+    let mut ap_device = interfaces.access_point;
     let ap_interface = create_interface(&mut ap_device);
 
-    let mut sta_device = interfaces.sta;
+    let mut sta_device = interfaces.station;
     let sta_interface = create_interface(&mut sta_device);
 
     let rng = Rng::new();
@@ -73,13 +73,13 @@ fn main() -> ! {
     sta_socket_set.add(smoltcp::socket::dhcpv4::Socket::new());
     let sta_stack = Stack::new(sta_interface, sta_device, sta_socket_set, now, rng.random());
 
-    let client_config = ModeConfig::ApSta(
-        ClientConfig::default()
+    let station_config = ModeConfig::AccessPointStation(
+        StationConfig::default()
             .with_ssid(SSID.into())
             .with_password(PASSWORD.into()),
         AccessPointConfig::default().with_ssid("esp-radio".into()),
     );
-    let res = controller.set_config(&client_config);
+    let res = controller.set_config(&station_config);
     println!("wifi_set_configuration returned {:?}", res);
 
     controller.start().unwrap();
@@ -107,7 +107,7 @@ fn main() -> ! {
 
     println!("wifi_connect {:?}", controller.connect());
 
-    // wait for STA getting an ip address
+    // wait for Station getting an ip address
     println!("Wait to get an ip address");
     loop {
         sta_stack.work();

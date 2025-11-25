@@ -44,12 +44,12 @@ use esp_hal::{
 use esp_println::{print, println};
 use esp_radio::wifi::{
     ModeConfig,
-    WifiApState,
+    WifiAccessPointState,
     WifiController,
     WifiDevice,
     WifiEvent,
     ap::AccessPointConfig,
-    sta::ClientConfig,
+    sta::StationConfig,
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -83,8 +83,8 @@ async fn main(spawner: Spawner) -> ! {
     let (mut controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
-    let wifi_ap_device = interfaces.ap;
-    let wifi_sta_device = interfaces.sta;
+    let wifi_ap_device = interfaces.access_point;
+    let wifi_sta_device = interfaces.station;
 
     let ap_config = embassy_net::Config::ipv4_static(StaticConfigV4 {
         address: Ipv4Cidr::new(Ipv4Addr::new(192, 168, 2, 1), 24),
@@ -110,13 +110,13 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    let client_config = ModeConfig::ApSta(
-        ClientConfig::default()
+    let station_config = ModeConfig::AccessPointStation(
+        StationConfig::default()
             .with_ssid(SSID.into())
             .with_password(PASSWORD.into()),
         AccessPointConfig::default().with_ssid("esp-radio".into()),
     );
-    controller.set_config(&client_config).unwrap();
+    controller.set_config(&station_config).unwrap();
 
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(ap_runner)).ok();
@@ -145,8 +145,8 @@ async fn main(spawner: Spawner) -> ! {
     let mut ap_server_tx_buffer = [0; 1536];
     let mut sta_server_rx_buffer = [0; 1536];
     let mut sta_server_tx_buffer = [0; 1536];
-    let mut sta_client_rx_buffer = [0; 1536];
-    let mut sta_client_tx_buffer = [0; 1536];
+    let mut sta_rx_buffer = [0; 1536];
+    let mut sta_tx_buffer = [0; 1536];
 
     let mut ap_server_socket =
         TcpSocket::new(ap_stack, &mut ap_server_rx_buffer, &mut ap_server_tx_buffer);
@@ -159,12 +159,8 @@ async fn main(spawner: Spawner) -> ! {
     );
     sta_server_socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
 
-    let mut sta_client_socket = TcpSocket::new(
-        sta_stack,
-        &mut sta_client_rx_buffer,
-        &mut sta_client_tx_buffer,
-    );
-    sta_client_socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
+    let mut sta_socket = TcpSocket::new(sta_stack, &mut sta_rx_buffer, &mut sta_tx_buffer);
+    sta_socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
 
     loop {
         println!("Wait for connection...");
@@ -224,26 +220,26 @@ async fn main(spawner: Spawner) -> ! {
         if sta_stack.is_link_up() {
             let remote_endpoint = (Ipv4Addr::new(142, 250, 185, 115), 80);
             println!("connecting...");
-            let r = sta_client_socket.connect(remote_endpoint).await;
+            let r = sta_socket.connect(remote_endpoint).await;
             if let Err(e) = r {
-                println!("STA connect error: {:?}", e);
+                println!("Station connect error: {:?}", e);
                 continue;
             }
 
             use embedded_io_async::Write;
-            let r = sta_client_socket
+            let r = sta_socket
                 .write_all(b"GET / HTTP/1.0\r\nHost: www.mobile-j.de\r\n\r\n")
                 .await;
 
             if let Err(e) = r {
-                println!("STA write error: {:?}", e);
+                println!("Station write error: {:?}", e);
 
                 let r = server_socket
                     .write_all(
                         b"HTTP/1.0 500 Internal Server Error\r\n\r\n\
                         <html>\
                             <body>\
-                                <h1>Hello Rust! Hello esp-radio! STA failed to send request.</h1>\
+                                <h1>Hello Rust! Hello esp-radio! Station failed to send request.</h1>\
                             </body>\
                         </html>\r\n\
                         ",
@@ -253,16 +249,16 @@ async fn main(spawner: Spawner) -> ! {
                     println!("AP write error: {:?}", e);
                 }
             } else {
-                let r = sta_client_socket.flush().await;
+                let r = sta_socket.flush().await;
                 if let Err(e) = r {
-                    println!("STA flush error: {:?}", e);
+                    println!("Station flush error: {:?}", e);
                 } else {
                     println!("connected!");
                     let mut buf = [0; 1024];
                     loop {
-                        match sta_client_socket.read(&mut buf).await {
+                        match sta_socket.read(&mut buf).await {
                             Ok(0) => {
-                                println!("STA read EOF");
+                                println!("Station read EOF");
                                 break;
                             }
                             Ok(n) => {
@@ -273,7 +269,7 @@ async fn main(spawner: Spawner) -> ! {
                                 }
                             }
                             Err(e) => {
-                                println!("STA read error: {:?}", e);
+                                println!("Station read error: {:?}", e);
                                 break;
                             }
                         }
@@ -281,14 +277,14 @@ async fn main(spawner: Spawner) -> ! {
                 }
             }
 
-            sta_client_socket.close();
+            sta_socket.close();
         } else {
             let r = server_socket
                 .write_all(
                     b"HTTP/1.0 200 OK\r\n\r\n\
                     <html>\
                         <body>\
-                            <h1>Hello Rust! Hello esp-radio! STA is not connected.</h1>\
+                            <h1>Hello Rust! Hello esp-radio! Station is not connected.</h1>\
                         </body>\
                     </html>\r\n\
                     ",
@@ -319,15 +315,17 @@ async fn connection(mut controller: WifiController<'static>) {
     println!("Wifi started!");
 
     loop {
-        match esp_radio::wifi::ap_state() {
-            WifiApState::Started => {
+        match esp_radio::wifi::access_point_state() {
+            WifiAccessPointState::Started => {
                 println!("About to connect...");
 
                 match controller.connect_async().await {
                     Ok(_) => {
                         // wait until we're no longer connected
-                        controller.wait_for_event(WifiEvent::StaDisconnected).await;
-                        println!("STA disconnected");
+                        controller
+                            .wait_for_event(WifiEvent::StationDisconnected)
+                            .await;
+                        println!("Station disconnected");
                     }
                     Err(e) => {
                         println!("Failed to connect to wifi: {e:?}");

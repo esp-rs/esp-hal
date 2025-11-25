@@ -51,15 +51,15 @@ fn main() -> ! {
 
     // Set event handlers for wifi before init to avoid missing any.
     let mut connections = 0u32;
-    _ = event::ApStart::replace_handler(|_| println!("ap start event"));
-    event::ApStaConnected::update_handler(move |event| {
+    _ = event::AccessPointStart::replace_handler(|_| println!("ap start event"));
+    event::AccessPointStationConnected::update_handler(move |event| {
         connections += 1;
         esp_println::println!("connected {}, mac: {:?}", connections, event.mac());
     });
-    event::ApStaConnected::update_handler(|event| {
+    event::AccessPointStationConnected::update_handler(|event| {
         esp_println::println!("connected aid: {}", event.aid());
     });
-    event::ApStaDisconnected::update_handler(|event| {
+    event::AccessPointStationDisconnected::update_handler(|event| {
         println!(
             "disconnected mac: {:?}, reason: {:?}",
             event.mac(),
@@ -70,7 +70,7 @@ fn main() -> ! {
     let (mut controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
-    let mut device = interfaces.ap;
+    let mut device = interfaces.access_point;
     let iface = create_interface(&mut device);
 
     let now = || time::Instant::now().duration_since_epoch().as_millis();

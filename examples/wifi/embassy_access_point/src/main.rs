@@ -36,7 +36,7 @@ use esp_hal::{
 use esp_println::{print, println};
 use esp_radio::wifi::{
     ModeConfig,
-    WifiApState,
+    WifiAccessPointState,
     WifiController,
     WifiDevice,
     WifiEvent,
@@ -73,7 +73,7 @@ async fn main(spawner: Spawner) -> ! {
     let (controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
-    let device = interfaces.ap;
+    let device = interfaces.access_point;
 
     let gw_ip_addr_str = GW_IP_ADDR_ENV.unwrap_or("192.168.2.1");
     let gw_ip_addr = Ipv4Addr::from_str(gw_ip_addr_str).expect("failed to parse gateway ip");
@@ -238,18 +238,18 @@ async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
     println!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        match esp_radio::wifi::ap_state() {
-            WifiApState::Started => {
+        match esp_radio::wifi::access_point_state() {
+            WifiAccessPointState::Started => {
                 // wait until we're no longer connected
-                controller.wait_for_event(WifiEvent::ApStop).await;
+                controller.wait_for_event(WifiEvent::AccessPointStop).await;
                 Timer::after(Duration::from_millis(5000)).await
             }
             _ => {}
         }
         if !matches!(controller.is_started(), Ok(true)) {
-            let client_config =
+            let station_config =
                 ModeConfig::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
-            controller.set_config(&client_config).unwrap();
+            controller.set_config(&station_config).unwrap();
             println!("Starting wifi");
             controller.start_async().await.unwrap();
             println!("Wifi started!");
