@@ -141,7 +141,9 @@ impl ClockTreeNodeType for Divider {
         let apply_fn_name = self.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
         quote! {
-            fn #hal_impl(_clocks: &mut ClockTree, _new_config: #ty_name) {}
+            fn #hal_impl(_clocks: &mut ClockTree, _new_config: #ty_name) {
+                todo!()
+            }
         }
     }
 

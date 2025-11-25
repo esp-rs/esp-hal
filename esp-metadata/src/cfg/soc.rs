@@ -170,7 +170,7 @@ impl SystemClocks {
         let mut clock_tree_refcount_fields = vec![];
         let mut configurables = vec![];
         let mut system_config_steps = HashMap::new();
-        let mut hal_enable_functions = vec![];
+        let mut provided_function_doclines = vec![];
         for (item, kind) in tree
             .classified_clocks
             .iter()
@@ -199,7 +199,24 @@ impl SystemClocks {
 
             let node_funcs = ClockTreeItem::node_functions(clock_item, tree);
             clock_tree_node_impls.push(node_funcs.implement_functions());
-            hal_enable_functions.extend_from_slice(&node_funcs.hal_functions);
+            if !node_funcs.hal_functions.is_empty() {
+                let header = format!(" // {}", clock_item.name_str());
+                provided_function_doclines.push(quote! {
+                    #[doc = ""]
+                    #[doc = #header]
+                    #[doc = ""]
+                });
+                for func in node_funcs.hal_functions.iter() {
+                    if func.is_empty() {
+                        continue;
+                    }
+                    let func = func.to_string();
+                    provided_function_doclines.push(quote! {
+                        #[doc = #func]
+                        #[doc = ""] // empty line between functions
+                    });
+                }
+            }
 
             if kind == ClockType::Configurable {
                 // Generate code for the global clock configuration
@@ -237,22 +254,11 @@ impl SystemClocks {
             .iter()
             .map(|node| system_config_steps.get(&node));
 
-        let funcs_to_provide = hal_enable_functions
-            .iter()
-            .filter_map(|f| {
-                if f.is_empty() {
-                    None
-                } else {
-                    Some(format!(" {}", f.to_string()))
-                }
-            })
-            .collect::<Vec<_>>();
-
         Ok(quote! {
             #[macro_export]
             /// ESP-HAL must provide implementation for the following functions:
             /// ```rust, no_run
-            #(#[doc = #funcs_to_provide])*
+            #(#provided_function_doclines)*
             /// ```
             macro_rules! define_clock_tree_types {
                 () => {

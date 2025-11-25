@@ -511,7 +511,9 @@ impl ClockTreeItem {
             hal_functions: vec![
                 if !always_on && (refcount_name.is_some() || properties.has_enable()) {
                     quote! {
-                        fn #enable_fn_impl_name(_clocks: &mut ClockTree, _en: bool) {}
+                        fn #enable_fn_impl_name(_clocks: &mut ClockTree, _en: bool) {
+                            todo!()
+                        }
                     }
                 } else {
                     quote! {}
