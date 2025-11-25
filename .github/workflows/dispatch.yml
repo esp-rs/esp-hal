@@ -331,39 +331,39 @@ jobs:
 
             // Try multiple times; keep the *last* matching run we see
             for (let attempt = 1; attempt <= 10; attempt++) {
-                const { data } = await github.rest.actions.listWorkflowRuns({
-                    owner,
-                    repo,
-                    workflow_id: 'hil.yml',
-                    event: 'workflow_dispatch',
-                    per_page: 50,
-                });
+              const { data } = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: 'hil.yml',
+                event: 'workflow_dispatch',
+                per_page: 50,
+              });
 
-                if (data.workflow_runs && data.workflow_runs.length > 0) {
-                    const candidate = data.workflow_runs.find(r =>
-                        (r.display_title && r.display_title.trim() === expectedTitle) ||
-                        (r.name && r.name.trim() === expectedTitle)
-                    );
-                    // Keep the *last* matching run we see across all attempts
-                    if (candidate) {
-                        run = candidate;
-                    }
+              if (data.workflow_runs && data.workflow_runs.length > 0) {
+                const candidate = data.workflow_runs.find(r =>
+                  (r.display_title && r.display_title.trim() === expectedTitle) ||
+                  (r.name && r.name.trim() === expectedTitle)
+                );
+                // Keep the *last* matching run we see across all attempts
+                if (candidate) {
+                  run = candidate;
                 }
+              }
 
-                await delay(3000);
+              await delay(3000);
             }
 
             let body = `Triggered **quick** HIL run for #${pr}.`;
             if (run && run.html_url) {
-                body += `\n\nRun: ${run.html_url}`;
+              body += `\n\nRun: ${run.html_url}`;
             } else {
-                body += `\n\nCould not determine run URL yet. Please check the **HIL** workflow runs manually.`;
+              body += `\n\nCould not determine run URL yet. Please check the **HIL** workflow runs manually.`;
             }
 
             if (run && run.id) {
-                core.setOutput('run_id', String(run.id));
+              core.setOutput('run_id', String(run.id));
             } else {
-                core.setOutput('run_id', '');
+              core.setOutput('run_id', '');
             }
 
             core.setOutput('body', body);
@@ -473,33 +473,33 @@ jobs:
 
             // Try multiple times; keep the *last* matching run we see
             for (let attempt = 1; attempt <= 10; attempt++) {
-                const { data } = await github.rest.actions.listWorkflowRuns({
-                    owner,
-                    repo,
-                    workflow_id: 'hil.yml',
-                    event: 'workflow_dispatch',
-                    per_page: 50,
-                });
+              const { data } = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: 'hil.yml',
+                event: 'workflow_dispatch',
+                per_page: 50,
+              });
 
               if (data.workflow_runs && data.workflow_runs.length > 0) {
                 const candidate = data.workflow_runs.find(r =>
-                    (r.display_title && r.display_title.trim() === expectedTitle) ||
-                    (r.name && r.name.trim() === expectedTitle)
+                  (r.display_title && r.display_title.trim() === expectedTitle) ||
+                  (r.name && r.name.trim() === expectedTitle)
                 );
                 // Keep the *last* matching run we see across all attempts
                 if (candidate) {
-                    run = candidate;
+                  run = candidate;
                 }
               }
 
-                await delay(3000);
+              await delay(3000);
             }
 
             let body = `Triggered **full** HIL run for #${pr}.`;
             if (run && run.html_url) {
-                body += `\n\nRun: ${run.html_url}`;
+              body += `\n\nRun: ${run.html_url}`;
             } else {
-                body += `\n\nCould not determine run URL yet. Please check the **HIL** workflow runs manually.`;
+              body += `\n\nCould not determine run URL yet. Please check the **HIL** workflow runs manually.`;
             }
 
             if (run && run.id) {
@@ -535,28 +535,28 @@ jobs:
 
             // Poll up to ~15 minutes (60 * 15s)
             for (let i = 0; i < 60; i++) {
-                const { data } = await github.rest.actions.getWorkflowRun({
-                  owner,
-                  repo,
-                  run_id: runId,
-                });
+              const { data } = await github.rest.actions.getWorkflowRun({
+                owner,
+                repo,
+                run_id: runId,
+              });
 
-                if (data.status === 'completed') {
-                    conclusion = data.conclusion;
-                    break;
-                }
-                await delay(15000);
+              if (data.status === 'completed') {
+                conclusion = data.conclusion;
+                break;
+              }
+              await delay(15000);
             }
 
             let suffix;
             if (!conclusion) {
-                suffix = `\n\n**Status update:** HIL (full) run is still in progress or status unknown._`;
+              suffix = `\n\n**Status update:** HIL (full) run is still in progress or status unknown._`;
             } else if (conclusion === 'success') {
-                suffix = `\n\n**Status update:** ✅ HIL (full) run **succeeded**.`;
+              suffix = `\n\n**Status update:** ✅ HIL (full) run **succeeded**.`;
             } else if (conclusion === 'cancelled') {
-                suffix = `\n\n**Status update:** ⚠️ HIL (full) run was **cancelled**.`;
+              suffix = `\n\n**Status update:** ⚠️ HIL (full) run was **cancelled**.`;
             } else {
-                suffix = `\n\n**Status update:** ❌ HIL (full) run **failed** (conclusion: ${conclusion}).`;
+              suffix = `\n\n**Status update:** ❌ HIL (full) run **failed** (conclusion: ${conclusion}).`;
             }
 
             // Fetch existing comment
@@ -613,11 +613,11 @@ jobs:
             ));
 
             if (!chips.length) {
-                const msg = 'No valid chips specified.\n\nAllowed chips are: ' + allowed.join(', ');
-                core.setOutput('chips', '');
-                core.setOutput('chips_label', '');
-                core.setOutput('error', msg);
-                return;
+              const msg = 'No valid chips specified.\n\nAllowed chips are: ' + allowed.join(', ');
+              core.setOutput('chips', '');
+              core.setOutput('chips_label', '');
+              core.setOutput('error', msg);
+              return;
             }
 
             core.setOutput('chips', chips.join(' '));
@@ -663,22 +663,22 @@ jobs:
 
             // Try multiple times; keep the *last* matching run we see
             for (let attempt = 1; attempt <= 10; attempt++) {
-                const { data } = await github.rest.actions.listWorkflowRuns({
-                    owner,
-                    repo,
-                    workflow_id: 'hil.yml',
-                    event: 'workflow_dispatch',
-                    per_page: 50,
+              const { data } = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: 'hil.yml',
+                event: 'workflow_dispatch',
+                per_page: 50,
               });
 
               if (data.workflow_runs && data.workflow_runs.length > 0) {
                 const candidate = data.workflow_runs.find(r =>
-                    (r.display_title && r.display_title.trim() === expectedTitle) ||
-                    (r.name && r.name.trim() === expectedTitle)
+                  (r.display_title && r.display_title.trim() === expectedTitle) ||
+                  (r.name && r.name.trim() === expectedTitle)
                 );
                 // Keep the *last* matching run we see across all attempts
                 if (candidate) {
-                    run = candidate;
+                  run = candidate;
                 }
               }
 
@@ -687,15 +687,15 @@ jobs:
 
             let body = `Triggered **HIL** run for #${pr} (chips: ${chips}).`;
             if (run && run.html_url) {
-                body += `\n\nRun: ${run.html_url}`;
+              body += `\n\nRun: ${run.html_url}`;
             } else {
-                body += `\n\nCould not determine run URL yet. Please check the **HIL** workflow runs manually.`;
+              body += `\n\nCould not determine run URL yet. Please check the **HIL** workflow runs manually.`;
             }
 
             if (run && run.id) {
-                core.setOutput('run_id', String(run.id));
+              core.setOutput('run_id', String(run.id));
             } else {
-                core.setOutput('run_id', '');
+              core.setOutput('run_id', '');
             }
 
             core.setOutput('body', body);
@@ -727,9 +727,9 @@ jobs:
             // Poll up to ~15 minutes (60 * 15s)
             for (let i = 0; i < 60; i++) {
               const { data } = await github.rest.actions.getWorkflowRun({
-                  owner,
-                  repo,
-                  run_id: runId,
+                owner,
+                repo,
+                run_id: runId,
               });
 
               if (data.status === 'completed') {
