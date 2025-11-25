@@ -45,6 +45,7 @@ pub(crate) enum CpuClock {
 impl CpuClock {
     pub(crate) fn configure(self) {
         // Resolve presets
+        // TODO: set some defaults to RTC clocks
         let mut config = match self {
             CpuClock::_80MHz => ClockConfig {
                 xtl_clk: None,
@@ -102,7 +103,7 @@ fn detect_xtal_freq(clocks: &mut ClockTree) -> XtlClkConfig {
 
     // Just an assumption for things to not panic.
     configure_xtl_clk(clocks, XtlClkConfig::_40);
-    configure_syscon_pre_div(clocks, SysconPreDivConfig(0));
+    configure_syscon_pre_div(clocks, SysconPreDivConfig::new(0));
     configure_cpu_clk(clocks, CpuClkConfig::Xtal);
 
     // Make sure the process doesn't time out due to some spooky configuration.
@@ -167,8 +168,23 @@ const BBPLL_BBADC_DSMP_VAL_480M: u8 = 0x74;
 
 // XTL_CLK
 
-fn configure_xtl_clk_impl(_clocks: &mut ClockTree, _config: XtlClkConfig) {
-    // Nothing to do, the stored configuration affects PLL settings instead.
+fn configure_xtl_clk_impl(_clocks: &mut ClockTree, config: XtlClkConfig) {
+    // The stored configuration affects PLL settings instead. We save the value in a register
+    // similar to ESP-IDF, just in case something relies on that, or, if we can in the future read
+    // back the value instead of wasting RAM on it.
+
+    const DISABLE_ROM_LOG: u32 = 1;
+
+    let freq_mhz = config.value() / 1_000_000;
+    LPWR::regs().store4().modify(|r, w| unsafe {
+        // The data is stored in two copies of 16-bit values. The first bit overwrites the LSB of
+        // the frequency value with DISABLE_ROM_LOG.
+
+        // Copy the DISABLE_ROM_LOG bit
+        let disable_rom_log_bit = r.bits() & DISABLE_ROM_LOG;
+        let half = (freq_mhz & 0xFFFF) | disable_rom_log_bit;
+        w.data().bits(half | (half << 16))
+    });
 }
 
 // PLL_CLK
@@ -493,10 +509,10 @@ fn configure_cpu_clk_impl(
     ets_update_cpu_frequency_rom(cpu_freq.as_mhz());
 
     let apb_freq = Rate::from_hz(apb_clk_frequency(clocks));
-    update_cpu_frequency(apb_freq);
+    update_apb_frequency(apb_freq);
 }
 
-fn update_cpu_frequency(freq: Rate) {
+fn update_apb_frequency(freq: Rate) {
     let freq_shifted = (freq.as_hz() >> 12) & 0xFFFF;
     let value = freq_shifted | (freq_shifted << 16);
     LPWR::regs()

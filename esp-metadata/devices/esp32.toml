@@ -247,6 +247,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "rst_field", value = "{{peripheral}}_rst" },
     # {{peripheral}} is derived automatically (e.g. SpiDma -> spi_dma)
 ], peripheral_clocks = [
+    # TODO: peripheral_clocks are implicit APB clock gates, we will need to tie them into the system to track APB use.
     { name = "Aes", template_params = { reg_group = "peri", peripheral = "crypto_aes" } },
     { name = "Rsa", template_params = { reg_group = "peri", peripheral = "crypto_rsa" } },
     { name = "Sha", template_params = { reg_group = "peri", peripheral = "crypto_sha" } },
