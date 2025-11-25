@@ -83,7 +83,8 @@ unsafe extern "C" fn __strcasecmp(
             let s1_i = s1.add(i);
             let s2_i = s2.add(i);
 
-            let val = (*s1_i).to_ascii_lowercase() as i32 - (*s2_i).to_ascii_lowercase() as i32;
+            #[allow(clippy::unnecessary_cast)]
+            let val = (*s1_i as u8).to_ascii_lowercase() as i32 - (*s2_i as u8).to_ascii_lowercase() as i32;
             if val != 0 || *s1_i == 0 {
                 return val;
             }
