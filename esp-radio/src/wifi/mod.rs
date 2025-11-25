@@ -265,10 +265,10 @@ pub enum ModeConfig {
     #[default]
     None,
 
-    /// Station-only configuration.
+    /// Station configuration.
     Station(StationConfig),
 
-    /// Access point-only configuration.
+    /// Access point configuration.
     AccessPoint(AccessPointConfig),
 
     /// Simultaneous station and access point configuration.
@@ -870,18 +870,18 @@ pub enum WifiEvent {
     /// Station disconnected from a network.
     StationDisconnected,
     /// Station authentication mode changed.
-    StationAuthmodeChange,
+    StationAuthenticationModeChange,
 
-    /// Station WPS succeeds in enrollee mode.
-    StationWpsErSuccess,
-    /// Station WPS fails in enrollee mode.
-    StationWpsErFailed,
-    /// Station WPS timeout in enrollee mode.
-    StationWpsErTimeout,
-    /// Station WPS pin code in enrollee mode.
-    StationWpsErPin,
-    /// Station WPS overlap in enrollee mode.
-    StationWpsErPbcOverlap,
+    /// Station WiFi-Protected-Status succeeds in enrollee mode.
+    StationWifiProtectedStatusEnrolleeSuccess,
+    /// Station WiFi-Protected-Status fails in enrollee mode.
+    StationWifiProtectedStatusEnrolleeFailed,
+    /// Station WiFi-Protected-Status timeout in enrollee mode.
+    StationWifiProtectedStatusEnrolleeTimeout,
+    /// Station WiFi-Protected-Status pin code in enrollee mode.
+    StationWifiProtectedStatusEnrolleePin,
+    /// Station WiFi-Protected-Status overlap in enrollee mode.
+    StationWifiProtectedStatusEnrolleePushButtonConfigurationOverlap,
 
     /// Soft-AccessPoint start.
     AccessPointStart,
@@ -892,17 +892,17 @@ pub enum WifiEvent {
     /// A station disconnected from Soft-AccessPoint.
     AccessPointStationDisconnected,
     /// Received probe request packet in Soft-AccessPoint interface.
-    AccessPointProbeReqReceived,
+    AccessPointProbeRequestReceived,
 
-    /// Received report of FTM procedure.
-    FtmReport,
+    /// Received report of Fine-Timing-Measurement procedure.
+    FineTimingMeasurementReport,
 
-    /// Station RSSI goes below the configured threshold.
-    StationBssRssiLow,
-    /// Status indication of Action Tx operation.
-    ActionTxStatus,
+    /// Station Receive-Signal-Strenght-Indicator goes below the configured threshold.
+    StationBasicServiceSetReceivedSignalStrengthIndicatorLow,
+    /// Status indication of Action Transmission operation.
+    ActionTransmissionStatus,
     /// Remain-on-Channel operation complete.
-    RocDone,
+    RemainOnChannelDone,
 
     /// Station beacon timeout.
     StationBeaconTimeout,
@@ -910,48 +910,49 @@ pub enum WifiEvent {
     /// Connectionless module wake interval has started.
     ConnectionlessModuleWakeIntervalStart,
 
-    /// Soft-AccessPoint WPS succeeded in registrar mode.
-    AccessPointWpsRgSuccess,
-    /// Soft-AccessPoint WPS failed in registrar mode.
-    AccessPointWpsRgFailed,
-    /// Soft-AccessPoint WPS timed out in registrar mode.
-    AccessPointWpsRgTimeout,
-    /// Soft-AccessPoint WPS pin code in registrar mode.
-    AccessPointWpsRgPin,
-    /// Soft-AccessPoint WPS overlap in registrar mode.
-    AccessPointWpsRgPbcOverlap,
+    /// Soft-AccessPoint WiFi-Protected-Status succeeded in registrar mode.
+    AccessPointWifiProtectedStatusRegistrarSuccess,
+    /// Soft-AccessPoint WiFi-Protected-Status failed in registrar mode.
+    AccessPointWifiProtectedStatusRegistrarFailed,
+    /// Soft-AccessPoint WiFi-Protected-Status timed out in registrar mode.
+    AccessPointWifiProtectedStatusRegistrarTimeout,
+    /// Soft-AccessPoint WiFi-Protected-Status pin code in registrar mode.
+    AccessPointWifiProtectedStatusRegistrarPin,
+    /// Soft-AccessPoint WiFi-Protected-Status overlap in registrar mode.
+    AccessPointWifiProtectedStatusRegistrarPushButtonConfigurationOverlap,
 
-    /// iTWT setup.
-    ItwtSetup,
-    /// iTWT teardown.
-    ItwtTeardown,
-    /// iTWT probe.
-    ItwtProbe,
-    /// iTWT suspended.
-    ItwtSuspend,
-    /// TWT wakeup event.
-    TwtWakeup,
-    /// bTWT setup.
-    BtwtSetup,
-    /// bTWT teardown.
-    BtwtTeardown,
+    /// Individual Target-Wake-Time setup.
+    IndividualTargetWakeTimeSetup,
+    /// Individual Target-Wake-Time teardown.
+    IndividualTargetWakeTimeTeardown,
+    /// Individual Target-Wake-Time probe.
+    IndividualTargetWakeTimeProbe,
+    /// Individual Target-Wake-Time suspended.
+    IndividualTargetWakeTimeSuspend,
+    /// Target-Wake-Wakeup event.
+    TargetWakeTimeWakeup,
+    /// Broadcast-Target-Wake-Time setup.
+    BroadcastTargetWakeTimeSetup,
+    /// Broadcast-Target-Wake-Time teardown.
+    BroadcastTargetWakeTimeTeardown,
 
-    /// NAN (Neighbor Awareness Networking) discovery has started.
-    NanStarted,
-    /// NAN discovery has stopped.
-    NanStopped,
-    /// NAN service discovery match found.
-    NanSvcMatch,
-    /// Replied to a NAN peer with service discovery match.
-    NanReplied,
-    /// Received a follow-up message in NAN.
-    NanReceive,
-    /// Received NDP (Neighbor Discovery Protocol) request from a NAN peer.
-    NdpIndication,
+    /// Neighbor-Awareness-Networking discovery has started.
+    NeighborAwarenessNetworkingStarted,
+    /// Neighbor-Awareness-Networking discovery has stopped.
+    NeighborAwarenessNetworkingStopped,
+    /// Neighbor-Awareness-Networking service discovery match found.
+    NeighborAwarenessNetworkingServiceMatch,
+    /// Replied to a Neighbor-Awareness-Networking peer with service discovery match.
+    NeighborAwarenessNetworkingReplied,
+    /// Received a follow-up message in Neighbor-Awareness-Networking.
+    NeighborAwarenessNetworkingReceive,
+    /// Received NDP (Neighbor Discovery Protocol) request from a Neighbor-Awareness-Networking
+    /// peer.
+    NeighborDiscoveryProtocolIndication,
     /// NDP confirm indication.
-    NdpConfirm,
-    /// NAN datapath terminated indication.
-    NdpTerminated,
+    NeighborDiscoveryProtocolConfirmation,
+    /// Neighbor-Awareness-Networking datapath terminated indication.
+    NeighborDiscoveryProtocolTerminated,
     /// Wi-Fi home channel change, doesn't occur when scanning.
     HomeChannelChange,
 

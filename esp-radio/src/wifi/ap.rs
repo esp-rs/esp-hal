@@ -63,7 +63,7 @@ pub struct AccessPointConfig {
     pub(crate) max_connections: u16,
     /// Dtim period of the access point (Range: 1 ~ 10).
     pub(crate) dtim_period: u8,
-    /// Time to force deauth the Station if the SoftAP doesn't receive any data.
+    /// Time to force deauth the station if the Soft-AccessPoint doesn't receive any data.
     #[builder_lite(unstable)]
     pub(crate) beacon_timeout: u16,
 }
