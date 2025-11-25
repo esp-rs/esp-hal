@@ -382,7 +382,7 @@ impl CompatTimerQueue {
             unsafe { queue_ptr.as_ref() }
         }
 
-        if let Some(queue) = NonNull::new(TIMER_QUEUE.load(Ordering::Relaxed)) {
+        if let Some(queue) = NonNull::new(TIMER_QUEUE.load(Ordering::Acquire)) {
             unsafe { queue.as_ref() }
         } else {
             initialize()
