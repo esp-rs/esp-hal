@@ -14,4 +14,10 @@ license       = "MIT OR Apache-2.0"
 check-configs = [{ features = [] }]
 clippy-configs = [{ features = [] }]
 
-[dependencies]
+[target."cfg(target_has_atomic = \"32\")".dependencies]
+portable-atomic = "1"
+
+# No atomic CAS
+
+[target."cfg(not(target_has_atomic = \"32\"))".dependencies]
+portable-atomic = { version = "1", features = ["unsafe-assume-single-core"] }

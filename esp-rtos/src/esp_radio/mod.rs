@@ -9,7 +9,9 @@ use esp_hal::{
 };
 use esp_radio_rtos_driver::{
     register_semaphore_implementation,
+    register_timer_implementation,
     semaphore::{SemaphoreImplementation, SemaphoreKind, SemaphorePtr},
+    timer::CompatTimer,
 };
 
 use crate::{
@@ -23,7 +25,6 @@ use crate::{
 };
 
 mod queue;
-mod timer_queue;
 
 impl esp_radio_rtos_driver::Scheduler for Scheduler {
     fn initialized(&self) -> bool {
@@ -179,3 +180,5 @@ impl SemaphoreImplementation for Semaphore {
 }
 
 register_semaphore_implementation!(Semaphore);
+
+register_timer_implementation!(CompatTimer);
