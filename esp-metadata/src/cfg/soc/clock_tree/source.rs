@@ -228,7 +228,12 @@ impl ClockTreeNodeType for Source {
  valid range ({min_readable} {min_unit} - {max_readable} {max_unit})."#)
                 .lines().map(|l| quote! { #[doc = #l] }).collect();
 
-                quote! { ::core::assert!(frequency >= #min && frequency <= #max, #assert_failed); }
+                // Frequency is unsigned, avoid generating `>= 0`.
+                if min == 0 {
+                    quote! { ::core::assert!(frequency <= #max, #assert_failed); }
+                } else {
+                    quote! { ::core::assert!(frequency >= #min && frequency <= #max, #assert_failed); }
+                }
             });
 
             Some(quote! {

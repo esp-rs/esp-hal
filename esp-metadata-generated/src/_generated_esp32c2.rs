@@ -495,7 +495,7 @@ macro_rules! define_clock_tree_types {
             /// valid range (0 ..= 1023).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
-                    divisor >= 0u32 && divisor <= 1023u32,
+                    divisor <= 1023u32,
                     "`SYSTEM_PRE_DIV` divisor value must be between 0 and 1023 (inclusive)."
                 );
                 Self(divisor)
@@ -583,7 +583,7 @@ macro_rules! define_clock_tree_types {
             /// valid range (0 ..= 3).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
-                    divisor >= 0u32 && divisor <= 3u32,
+                    divisor <= 3u32,
                     "`RC_FAST_CLK_DIV_N` divisor value must be between 0 and 3 (inclusive)."
                 );
                 Self(divisor)

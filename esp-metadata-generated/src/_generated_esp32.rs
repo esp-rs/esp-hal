@@ -644,7 +644,7 @@ macro_rules! define_clock_tree_types {
             /// valid range (0 ..= 1023).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
-                    divisor >= 0u32 && divisor <= 1023u32,
+                    divisor <= 1023u32,
                     "`SYSCON_PRE_DIV` divisor value must be between 0 and 1023 (inclusive)."
                 );
                 Self(divisor)
@@ -692,7 +692,7 @@ macro_rules! define_clock_tree_types {
             /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
-                    divisor >= 0u32 && divisor <= 255u32,
+                    divisor <= 255u32,
                     "`REF_TICK_XTAL` divisor value must be between 0 and 255 (inclusive)."
                 );
                 Self(divisor)
@@ -716,7 +716,7 @@ macro_rules! define_clock_tree_types {
             /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
-                    divisor >= 0u32 && divisor <= 255u32,
+                    divisor <= 255u32,
                     "`REF_TICK_FOSC` divisor value must be between 0 and 255 (inclusive)."
                 );
                 Self(divisor)
@@ -740,7 +740,7 @@ macro_rules! define_clock_tree_types {
             /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
-                    divisor >= 0u32 && divisor <= 255u32,
+                    divisor <= 255u32,
                     "`REF_TICK_APLL` divisor value must be between 0 and 255 (inclusive)."
                 );
                 Self(divisor)
@@ -764,7 +764,7 @@ macro_rules! define_clock_tree_types {
             /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
-                    divisor >= 0u32 && divisor <= 255u32,
+                    divisor <= 255u32,
                     "`REF_TICK_PLL` divisor value must be between 0 and 255 (inclusive)."
                 );
                 Self(divisor)

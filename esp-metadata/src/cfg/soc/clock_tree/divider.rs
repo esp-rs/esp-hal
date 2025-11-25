@@ -255,7 +255,12 @@ impl ClockTreeNodeType for Divider {
                 .map(|l| quote! { #[doc = #l] })
                 .collect();
 
-                quote! { ::core::assert!(divisor >= #min && divisor <= #max, #assert_failed); }
+                // Divisor is unsigned, avoid generating `>= 0`.
+                if min == 0 {
+                    quote! { ::core::assert!(divisor <= #max, #assert_failed); }
+                } else {
+                    quote! { ::core::assert!(divisor >= #min && divisor <= #max, #assert_failed); }
+                }
             });
 
             Some(quote! {
