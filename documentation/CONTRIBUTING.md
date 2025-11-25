@@ -40,6 +40,7 @@ Before adding or changing code, review the [esp-rs API guidelines].
 [GitHub Flow]: https://docs.github.com/en/get-started/quickstart/github-flow
 [Pull Requests]: https://docs.github.com/en/github/collaborating-with-pull-requests
 [esp-rs developer guidelines]: ./documentation/DEVELOPER-GUIDELINES.md
+[HIL guide]: https://github.com/esp-rs/esp-hal/blob/main/documentation/HIL-GUIDE.md
 
 ## Getting Started
 
@@ -87,6 +88,8 @@ Further steps that can (or should) be taken in testing:
 * Using [xtask], build examples for the specified chip.
 * Build the documentation and run the doctests if they have been modified using the `build-documentation` and  `run-doc-test` commands in [xtask].
 * Run the [HIL] tests locally if changes have been made to them.
+
+For detailed instructions on how to use our HIL tests with comment commands, see the [HIL guide].
 
 [xtask]: https://github.com/esp-rs/esp-hal/tree/main/xtask
 
