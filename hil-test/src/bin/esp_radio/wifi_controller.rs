@@ -28,7 +28,9 @@ mod tests {
         let (mut controller, _interfaces) =
             esp_radio::wifi::new(p.WIFI, Default::default()).unwrap();
 
-        controller.set_mode(esp_radio::wifi::WifiMode::Sta).unwrap();
+        controller
+            .set_mode(esp_radio::wifi::WifiMode::Station)
+            .unwrap();
         controller.start().unwrap();
 
         let scan_config = ScanConfig::default().with_max(1);
