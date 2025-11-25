@@ -165,9 +165,13 @@ const BBPLL_BBADC_DSMP_VAL_320M: u8 = 0x84;
 const BBPLL_ENDIV5_VAL_480M: u8 = 0xc3;
 const BBPLL_BBADC_DSMP_VAL_480M: u8 = 0x74;
 
+// XTL_CLK
+
 fn configure_xtl_clk_impl(_clocks: &mut ClockTree, _config: XtlClkConfig) {
     // Nothing to do, the stored configuration affects PLL settings instead.
 }
+
+// PLL_CLK
 
 fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
     // TODO: this should probably be refcounted with APLL, but ESP32 TRM states APLL_CLK is sourced
@@ -281,6 +285,8 @@ fn configure_pll_clk_impl(_clocks: &mut ClockTree, _config: PllClkConfig) {
     // `enable_pll_clk_impl`.
 }
 
+// APLL_CLK
+
 fn enable_apll_clk_impl(_clocks: &mut ClockTree, en: bool) {
     LPWR::regs().ana_conf().modify(|_, w| {
         w.plla_force_pd().bit(!en);
@@ -298,6 +304,8 @@ fn configure_apll_clk_impl(_clocks: &mut ClockTree, _config: ApllClkConfig) {
     // `enable_apll_clk_impl`.
 }
 
+// RC_FAST_CLK
+
 fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {
     const RTC_CNTL_CK8M_DFREQ_DEFAULT: u8 = 172;
     LPWR::regs().clk_conf().modify(|_, w| {
@@ -314,11 +322,14 @@ fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {
     });
 }
 
+// CPU_PLL_DIV_IN
+
 // Not an actual MUX, used to allow configuring the DIVA divider as one block.
 // Related to CPU clock source configuration.
 fn enable_cpu_pll_div_in_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
+
 fn configure_cpu_pll_div_in_impl(
     _clocks: &mut ClockTree,
     _old_selector: Option<CpuPllDivInConfig>,
@@ -327,18 +338,24 @@ fn configure_cpu_pll_div_in_impl(
     // Nothing to do.
 }
 
+// CPU_PLL_DIV
+
 fn enable_cpu_pll_div_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
+
 fn configure_cpu_pll_div_impl(_clocks: &mut ClockTree, _new_config: CpuPllDivConfig) {
     // Nothing to do.
 }
+
+// SYSCON_PRE_DIV_IN
 
 // Not an actual MUX, used to allow configuring the DIVB divider as one block.
 // Related to CPU clock source configuration.
 fn enable_syscon_pre_div_in_impl(_: &mut ClockTree, _: bool) {
     // Nothing to do.
 }
+
 fn configure_syscon_pre_div_in_impl(
     _clocks: &mut ClockTree,
     _old_selector: Option<SysconPreDivInConfig>,
@@ -347,18 +364,24 @@ fn configure_syscon_pre_div_in_impl(
     // Nothing to do.
 }
 
+// SYSCON_PRE_DIV
+
 fn enable_syscon_pre_div_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
+
 fn configure_syscon_pre_div_impl(_clocks: &mut ClockTree, new_config: SysconPreDivConfig) {
     APB_CTRL::regs()
         .sysclk_conf()
         .modify(|_, w| unsafe { w.pre_div_cnt().bits(new_config.value() as u16 & 0x3FF) });
 }
 
+// APB_CLK
+
 fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
+
 fn configure_apb_clk_impl(
     _clocks: &mut ClockTree,
     _old_selector: Option<ApbClkConfig>,
@@ -367,9 +390,12 @@ fn configure_apb_clk_impl(
     // Nothing to do.
 }
 
+// REF_TICK
+
 fn enable_ref_tick_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
+
 fn configure_ref_tick_impl(
     _clocks: &mut ClockTree,
     _old_selector: Option<RefTickConfig>,
@@ -378,41 +404,55 @@ fn configure_ref_tick_impl(
     // Nothing to do.
 }
 
+// REF_TICK_XTAL
+
 fn enable_ref_tick_xtal_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
+
 fn configure_ref_tick_xtal_impl(_clocks: &mut ClockTree, new_config: RefTickXtalConfig) {
     APB_CTRL::regs()
         .xtal_tick_conf()
         .write(|w| unsafe { w.xtal_tick_num().bits(new_config.value() as u8) });
 }
 
+// REF_TICK_FOSC
+
 fn enable_ref_tick_fosc_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
+
 fn configure_ref_tick_fosc_impl(_clocks: &mut ClockTree, new_config: RefTickFoscConfig) {
     APB_CTRL::regs()
         .ck8m_tick_conf()
         .write(|w| unsafe { w.ck8m_tick_num().bits(new_config.value() as u8) });
 }
 
+// REF_TICK_APLL
+
 fn enable_ref_tick_apll_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
+
 fn configure_ref_tick_apll_impl(_clocks: &mut ClockTree, new_config: RefTickApllConfig) {
     APB_CTRL::regs()
         .apll_tick_conf()
         .write(|w| unsafe { w.apll_tick_num().bits(new_config.value() as u8) });
 }
 
+// REF_TICK_PLL
+
 fn enable_ref_tick_pll_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
+
 fn configure_ref_tick_pll_impl(_clocks: &mut ClockTree, new_config: RefTickPllConfig) {
     APB_CTRL::regs()
         .pll_tick_conf()
         .write(|w| unsafe { w.pll_tick_num().bits(new_config.value() as u8) });
 }
+
+// CPU_CLK
 
 fn configure_cpu_clk_impl(
     clocks: &mut ClockTree,
@@ -464,13 +504,19 @@ fn update_cpu_frequency(freq: Rate) {
         .modify(|_, w| unsafe { w.data().bits(value) });
 }
 
+// APB_CLK_CPU_DIV2
+
 fn enable_apb_clk_cpu_div2_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
 
+// APB_CLK_80M
+
 fn enable_apb_clk_80m_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
+
+// XTAL32K_CLK
 
 fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
     // This bit only enables the clock for the digital core, what about RTC? Should we split the
@@ -507,6 +553,8 @@ fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
     });
 }
 
+// RC_SLOW_CLK
+
 fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // SCK_DCAP value controls tuning of 150k clock. The higher the value of DCAP, the lower the
     // frequency. There is no separate enable bit, just make sure the calibration value is set.
@@ -516,6 +564,8 @@ fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
         .modify(|_, w| unsafe { w.sck_dcap().bits(RTC_CNTL_SCK_DCAP_DEFAULT) });
 }
 
+// RC_FAST_DIV_CLK
+
 fn enable_rc_fast_div_clk_impl(_clocks: &mut ClockTree, en: bool) {
     LPWR::regs().clk_conf().modify(|_, w| {
         w.enb_ck8m_div().bit(en);
@@ -523,9 +573,13 @@ fn enable_rc_fast_div_clk_impl(_clocks: &mut ClockTree, en: bool) {
     });
 }
 
+// XTAL_DIV_CLK
+
 fn enable_xtal_div_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
+
+// RTC_SLOW_CLK
 
 fn enable_rtc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
@@ -543,6 +597,8 @@ fn configure_rtc_slow_clk_impl(
     });
 }
 
+// RTC_FAST_CLK
+
 fn enable_rtc_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
@@ -557,6 +613,8 @@ fn configure_rtc_fast_clk_impl(
         RtcFastClkConfig::Rc => w.fast_clk_rtc_sel().ck8m(),
     });
 }
+
+// TIMG0_CALIBRATION_CLOCK
 
 fn enable_timg0_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do, calibration clocks can only be selected. They are gated by the CALI_START bit,
@@ -582,6 +640,8 @@ fn configure_timg0_calibration_clock_impl(
         .rtccalicfg()
         .modify(|_, w| unsafe { w.rtc_cali_clk_sel().bits(new_selector.cali_clk_sel_bits()) });
 }
+
+// TIMG1_CALIBRATION_CLOCK
 
 fn enable_timg1_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do, calibration clocks can only be selected. They are gated by the CALI_START bit,
