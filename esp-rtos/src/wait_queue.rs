@@ -1,3 +1,10 @@
+#![cfg_attr(
+    not(feature = "esp-radio"),
+    expect(
+        dead_code,
+        reason = "WaitQueue is the foundation of IPC, it will be used in the future even without esp-radio"
+    )
+)]
 use core::ptr::NonNull;
 
 use esp_hal::{system::Cpu, time::Instant};

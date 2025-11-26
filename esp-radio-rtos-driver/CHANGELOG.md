@@ -13,9 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SemaphoreHandle::take_with_deadline` to take a semaphore with a deadline. (#4555)
 - `QueueHandle::{send_to_front_with_deadline, send_to_back_with_deadline, receive_with_deadline}` for queue operations with a deadline. (#4555)
 - `timer::CompatTimer` to simplify OS integration. (#4555)
+- The `ipc-implementations` feature, which enables `WaitQueueImplementation` and the `Compat*` types (#4559)
+- Chip-specific features required for the `ipc-implementations` feature (#4559)
 
 ### Changed
 
+- The `Scheduler` trait has been renamed to `SchedulerImplementation`. (#4559)
+- The `scheduler_impl!` macro has been renamed to `register_scheduler_implementation!`. (#4559)
 
 ### Fixed
 
