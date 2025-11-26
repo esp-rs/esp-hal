@@ -78,3 +78,15 @@ BLE initialization:
 +    let station_config = ModeConfig::Station(
 +        StationConfig::default()
 ```
+
+## `Wifi::Event` uses full names for events instead of acronyms
+
+```diff
+-    impl StationWpsErPin<'_> {
++    impl StationWifiProtectedStatusEnrolleePin<'_> {
+```
+
+```diff
+-    impl StationWpsErPin<'_> {
++    impl StationWifiProtectedStatusEnrolleePin<'_> {
+```

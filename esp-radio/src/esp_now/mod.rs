@@ -692,7 +692,7 @@ impl Drop for EspNowRc<'_> {
 /// protect the action frame for security. ESP-NOW is widely used in smart
 /// light, remote controlling, sensor, etc.
 ///
-/// For convenience, by default there will be a broadcast peer added on the Station
+/// For convenience, by default there will be a broadcast peer added on the station
 /// interface.
 #[instability::unstable]
 pub struct EspNow<'d> {
