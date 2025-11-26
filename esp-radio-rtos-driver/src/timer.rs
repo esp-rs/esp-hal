@@ -231,6 +231,7 @@ mod implementation {
         ptr::NonNull,
     };
 
+    use esp_sync::NonReentrantMutex;
     use portable_atomic::{AtomicPtr, Ordering};
 
     use super::*;
@@ -240,7 +241,7 @@ mod implementation {
         // A linked list of active timers
         head: Option<NonNull<CompatTimer>>,
         next_wakeup: u64,
-        semaphore: Option<SemaphorePtr>,
+        semaphore: SemaphorePtr,
         processing: bool,
         scheduled_for_drop: Vec<TimerPtr>,
     }
@@ -248,11 +249,23 @@ mod implementation {
     unsafe impl Send for TimerQueueInner {}
 
     impl TimerQueueInner {
-        const fn new() -> Self {
+        fn new() -> Self {
+            let semaphore =
+                SemaphoreHandle::new(SemaphoreKind::Counting { max: 1, initial: 0 }).leak();
+            unsafe {
+                crate::task_create(
+                    "timer",
+                    timer_task,
+                    semaphore.cast().as_ptr(),
+                    2,
+                    None,
+                    8192,
+                );
+            }
             Self {
                 head: None,
                 next_wakeup: 0,
-                semaphore: None,
+                semaphore,
                 processing: false,
                 scheduled_for_drop: Vec::new(),
             }
@@ -271,27 +284,9 @@ mod implementation {
                 self.head = Some(NonNull::from(timer));
             }
 
-            if let Some(semaphore) = self.semaphore {
-                if due < self.next_wakeup {
-                    self.next_wakeup = due;
-                    return Some(semaphore);
-                }
-            } else {
-                // create the timer task
-                let semaphore =
-                    SemaphoreHandle::new(SemaphoreKind::Counting { max: 1, initial: 0 }).leak();
-                unsafe {
-                    crate::task_create(
-                        "timer",
-                        timer_task,
-                        semaphore.as_ptr().cast(),
-                        2,
-                        None,
-                        8192,
-                    )
-                };
-                self.semaphore = Some(semaphore);
+            if due < self.next_wakeup {
                 self.next_wakeup = due;
+                return Some(self.semaphore);
             }
 
             None
@@ -328,18 +323,15 @@ mod implementation {
     }
 
     struct CompatTimerQueue {
-        inner: UnsafeCell<TimerQueueInner>,
-        mutex: SemaphoreHandle,
+        inner: NonReentrantMutex<TimerQueueInner>,
     }
 
     unsafe impl Send for CompatTimerQueue {}
 
     impl CompatTimerQueue {
         fn new() -> Self {
-            // TODO figure out how to make this work with a heap-allocated mutex
             Self {
-                inner: UnsafeCell::new(TimerQueueInner::new()),
-                mutex: SemaphoreHandle::new(SemaphoreKind::Mutex),
+                inner: NonReentrantMutex::new(TimerQueueInner::new()),
             }
         }
 
@@ -407,20 +399,7 @@ mod implementation {
         where
             F: FnOnce(&mut TimerQueueInner) -> R,
         {
-            struct DropGuard<'a> {
-                mutex: &'a SemaphoreHandle,
-            }
-
-            impl Drop for DropGuard<'_> {
-                fn drop(&mut self) {
-                    self.mutex.give();
-                }
-            }
-
-            self.mutex.take(None);
-            let _guard = DropGuard { mutex: &self.mutex };
-
-            unsafe { f(&mut *self.inner.get()) }
+            self.inner.with(f)
         }
 
         /// Trigger due timers.
@@ -611,7 +590,7 @@ mod implementation {
                 if !q.processing && q.next_wakeup == u64::MAX {
                     q.next_wakeup = 0;
 
-                    semaphore_to_give = q.semaphore;
+                    semaphore_to_give = Some(q.semaphore);
                 }
 
                 let timer = unsafe { CompatTimer::from_ptr(timer) };
