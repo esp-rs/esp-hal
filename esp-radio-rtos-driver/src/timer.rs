@@ -264,7 +264,7 @@ mod implementation {
             }
             Self {
                 head: None,
-                next_wakeup: 0,
+                next_wakeup: u64::MAX,
                 semaphore,
                 processing: false,
                 scheduled_for_drop: Vec::new(),
@@ -631,6 +631,10 @@ mod implementation {
     pub(crate) extern "C" fn timer_task(semaphore_ptr: *mut c_void) {
         let semaphore_ptr = NonNull::new(semaphore_ptr).unwrap().cast();
         let semaphore = unsafe { SemaphoreHandle::ref_from_ptr(&semaphore_ptr) };
+
+        // Wait for something to be enqueued before trying to take a reference to the queue. Doing
+        // this ensures we don't end up in infinitely recursive initialization.
+        semaphore.take(None);
 
         let queue = CompatTimerQueue::ensure_initialized();
 
