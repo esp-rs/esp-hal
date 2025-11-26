@@ -11,11 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Provide implementation for the `_getreent` syscall when the `alloc` feature is enabled (#4473)
 - Provide implementation for the `_malloc_r` and `_free_r` syscalls when the `alloc` feature is enabled (#4484)
+- `Semaphore::take_with_deadline` (#4555)
 
 ### Changed
 
 - `esp_rtos::start` now takes `SoftwareInterrupt<'static, 0>` for all CPUs (#4459)
 - `esp_rtos::start_second_core` no longer takes `SoftwareInterrupt<'static, 0>` (#4459)
+- `Semaphore::take` now uses `Option<Duration>` as the timeout (#4555)
 
 ### Fixed
 

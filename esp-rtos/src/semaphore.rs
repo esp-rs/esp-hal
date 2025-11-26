@@ -4,13 +4,17 @@
 
 use core::ptr::NonNull;
 
-use esp_hal::{system::Cpu, time::Instant};
+use esp_hal::{
+    system::Cpu,
+    time::{Duration, Instant},
+};
 use esp_sync::NonReentrantMutex;
 
 use crate::{
     SCHEDULER,
     run_queue::Priority,
     task::{TaskExt, TaskPtr},
+    timeout_to_deadline,
     wait_queue::WaitQueue,
 };
 
@@ -254,8 +258,18 @@ impl Semaphore {
     ///
     /// If the semaphore is already taken, the task will be blocked until the semaphore is released.
     /// Recursive mutexes can be locked multiple times by the mutex owner task.
-    pub fn take(&self, timeout_us: Option<u32>) -> bool {
-        if crate::with_deadline(timeout_us, |deadline| {
+    pub fn take(&self, timeout: Option<Duration>) -> bool {
+        self.take_with_deadline(timeout_to_deadline(timeout))
+    }
+
+    /// Take the semaphore.
+    ///
+    /// This is a blocking operation.
+    ///
+    /// If the semaphore is already taken, the task will be blocked until the semaphore is released.
+    /// Recursive mutexes can be locked multiple times by the mutex owner task.
+    pub fn take_with_deadline(&self, deadline_instant: Instant) -> bool {
+        if crate::with_deadline(deadline_instant, |deadline| {
             self.inner.with(|sem| {
                 if sem.try_take() {
                     true

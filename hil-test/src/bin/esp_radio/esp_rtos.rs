@@ -306,7 +306,7 @@ mod tests {
                 info!("Helper Task: try take mutex");
                 // Put the thread to sleep with a timeout. Waking this thread
                 // must not cause the timer to stop.
-                context.mutex.take(Some(10_000));
+                context.mutex.take(Some(Duration::from_millis(10)));
             }
         }
 
@@ -479,13 +479,13 @@ mod tests {
     #[test]
     async fn primitives_time_out() {
         let mutex = Semaphore::new_mutex(false);
-        let success = mutex.take(Some(0));
+        let success = mutex.take(Some(Duration::ZERO));
         hil_test::assert!(success); // mutex is originally untaken
-        let success = mutex.take(Some(0));
+        let success = mutex.take(Some(Duration::ZERO));
         hil_test::assert!(!success);
 
         let sem = Semaphore::new_counting(0, 1);
-        let success = sem.take(Some(0));
+        let success = sem.take(Some(Duration::ZERO));
         hil_test::assert!(!success);
 
         let q = QueueHandle::new(1, 1);
