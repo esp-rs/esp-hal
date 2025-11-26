@@ -806,6 +806,7 @@ jobs:
             - `/hil quick` — run a quick HIL matrix (only `ESP32-S3` (Xtensa) and `ESP32-C6` (RISC-V) tests)
             - `/hil full`  — run the full HIL matrix for all supported chips
             - `/hil <chip> [<chip> ...]` — run the full HIL tests **only** for the listed chips
+            - `/test-size` — run binary size analysis for this PR
             If you aren't a repository **member/owner**, you must be **trusted for this PR**.
             Maintainers can grant access with a `trusted-author` label or with:
             ```
