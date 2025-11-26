@@ -91,7 +91,14 @@ jobs:
         with:
           name: xtask-aarch64
           path: target/aarch64-unknown-linux-gnu/release/xtask
-
+  
+  # NOTE:
+  # There is also a dummy job named 'build-tests-full' in `ci.yml` which runs
+  # only on non-merge-group events to satisfy branch protection required
+  # checks on PRs.
+  #
+  # This job is the *real* HIL test-build job, used on merge_group and when
+  # triggered via `/hil full`.
   build-tests-full:
     if: >
       github.event_name == 'merge_group' ||
