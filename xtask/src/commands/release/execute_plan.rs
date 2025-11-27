@@ -168,7 +168,7 @@ pub(crate) fn make_git_changes(dry_run: bool, branch_name: &str, commit: &str) -
         jiff::Timestamp::now().strftime("%Y-%m-%d"),
     );
 
-    let upstream = get_remote_name_for("origin")?;
+    let upstream = get_remote_name_for("esp-rs/esp-hal")?;
 
     // Switch to the new branch
     if dry_run {
