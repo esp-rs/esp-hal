@@ -21,6 +21,9 @@
 
 #![no_std]
 
+// MUST be the first module
+mod fmt;
+
 pub mod queue;
 pub mod semaphore;
 pub mod timer;

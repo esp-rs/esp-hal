@@ -268,10 +268,13 @@ mod implementation {
             let due = props.next_due;
 
             if !props.enqueued {
+                trace!("Enqueueing timer {:x}", timer as *const _ as usize);
                 props.enqueued = true;
 
                 props.next = head;
                 self.head = Some(NonNull::from(timer));
+            } else {
+                trace!("Already enqueued timer {:x}", timer as *const _ as usize);
             }
 
             if let Some(semaphore) = self.semaphore {
@@ -353,6 +356,7 @@ mod implementation {
             #[cold]
             #[inline(never)]
             fn initialize<'a>() -> &'a CompatTimerQueue {
+                trace!("Trying to initialize timer queue");
                 let boxed = Box::new(CompatTimerQueue::new());
                 let queue_ptr = NonNull::from(boxed.as_ref());
 
@@ -366,6 +370,7 @@ mod implementation {
                     ) {
                         Ok(_) => {
                             // We're using our queue, forget it so we don't drop it.
+                            trace!("Successfully initialized timer queue");
                             forget = true;
                             break queue_ptr;
                         }
@@ -373,8 +378,10 @@ mod implementation {
                             // In case the queue is somehow still null, we will re-attempt storing
                             // our own pointer.
                             if let Some(queue_ptr) = NonNull::new(queue) {
+                                trace!("Timer queue already initialized");
                                 break queue_ptr;
                             }
+                            trace!("Retrying initialization");
                         }
                     }
                 };
@@ -431,6 +438,7 @@ mod implementation {
         /// The timer queue needs to be re-processed when a new timer is armed, because the new
         /// timer may need to be triggered before the next scheduled wakeup.
         fn process(&self, semaphore: &SemaphoreHandle) {
+            debug!("Processing timer queue");
             let mut timers = self.with(|q| {
                 q.processing = true;
                 q.next_wakeup = u64::MAX;
@@ -438,6 +446,7 @@ mod implementation {
             });
 
             while let Some(current) = timers {
+                trace!("Checking timer: {:x}", current.addr());
                 let current_timer = unsafe { current.as_ref() };
 
                 let run_callback = self.with(|q| {
@@ -448,11 +457,19 @@ mod implementation {
                     props.enqueued = false;
 
                     if !props.is_active {
+                        trace!(
+                            "Timer {:x} is inactive or dropped",
+                            current_timer as *const _ as usize
+                        );
                         return false;
                     }
 
                     if props.next_due > crate::now() {
                         // Not our time yet.
+                        trace!(
+                            "Timer {:x} is not due yet",
+                            current_timer as *const _ as usize
+                        );
                         return false;
                     }
 
@@ -465,6 +482,7 @@ mod implementation {
                 });
 
                 if run_callback {
+                    debug!("Triggering timer: {:x}", current_timer as *const _ as usize);
                     (current_timer.callback.borrow_mut())();
                 }
 
@@ -473,12 +491,15 @@ mod implementation {
 
                     if props.is_active {
                         q.enqueue(current_timer);
+                    } else {
+                        trace!("Timer {:x} inactive", current_timer as *const _ as usize);
                     }
                 });
             }
 
             let next_wakeup = self.with(|q| {
                 while let Some(timer) = q.scheduled_for_drop.pop() {
+                    trace!("Dropping timer {:x}", timer.as_ptr() as usize);
                     let timer = unsafe { Box::from_raw(timer.cast::<CompatTimer>().as_ptr()) };
                     q.dequeue(&timer);
                     core::mem::drop(timer);
@@ -488,6 +509,7 @@ mod implementation {
                 q.next_wakeup
             });
 
+            debug!("Timer queue next_wakeup: {}", next_wakeup);
             semaphore.take_with_deadline(Some(next_wakeup));
         }
     }
