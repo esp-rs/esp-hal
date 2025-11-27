@@ -10,7 +10,7 @@ use esp_hal::{
 use esp_radio_rtos_driver::{
     register_semaphore_implementation,
     register_timer_implementation,
-    semaphore::{SemaphoreImplementation, SemaphoreKind, SemaphorePtr},
+    semaphore::{SemaphoreHandle, SemaphoreImplementation, SemaphoreKind, SemaphorePtr},
     timer::CompatTimer,
 };
 
@@ -97,7 +97,11 @@ impl esp_radio_rtos_driver::Scheduler for Scheduler {
     }
 
     fn current_task_thread_semaphore(&self) -> SemaphorePtr {
-        task::with_current_task(|task| NonNull::from(&task.thread_local.thread_semaphore).cast())
+        task::with_current_task(|task| {
+            *task.thread_local.thread_semaphore.get_or_insert_with(|| {
+                SemaphoreHandle::new(SemaphoreKind::Counting { max: 1, initial: 0 }).leak()
+            })
+        })
     }
 
     fn usleep(&self, us: u32) {

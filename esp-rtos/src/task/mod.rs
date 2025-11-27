@@ -16,13 +16,13 @@ use esp_hal::{
     system::Cpu,
     time::{Duration, Instant},
 };
+#[cfg(feature = "esp-radio")]
+use esp_radio_rtos_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 #[cfg(feature = "rtos-trace")]
 use rtos_trace::TaskInfo;
 
 #[cfg(feature = "alloc")]
 use crate::InternalMemory;
-#[cfg(feature = "esp-radio")]
-use crate::semaphore::Semaphore;
 use crate::{
     SCHEDULER,
     run_queue::{Priority, RunQueue},
@@ -317,7 +317,7 @@ impl<E: TaskListElement> TaskQueue<E> {
 
 pub(crate) struct ThreadLocalData {
     #[cfg(feature = "esp-radio")]
-    pub thread_semaphore: Semaphore,
+    pub thread_semaphore: Option<SemaphorePtr>,
 
     // The _reent struct is rarely needed, but big. Let's heap-allocate it, to save a bit of RAM.
     #[cfg(feature = "alloc")]
@@ -327,10 +327,19 @@ impl ThreadLocalData {
     pub const fn new() -> Self {
         Self {
             #[cfg(feature = "esp-radio")]
-            thread_semaphore: Semaphore::new_counting(0, 1),
+            thread_semaphore: None,
 
             #[cfg(feature = "alloc")]
             reent: None,
+        }
+    }
+}
+
+impl Drop for ThreadLocalData {
+    fn drop(&mut self) {
+        #[cfg(feature = "esp-radio")]
+        if let Some(semaphore_ptr) = self.thread_semaphore.take() {
+            core::mem::drop(unsafe { SemaphoreHandle::from_ptr(semaphore_ptr) });
         }
     }
 }

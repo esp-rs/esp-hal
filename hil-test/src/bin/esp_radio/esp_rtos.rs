@@ -488,6 +488,11 @@ mod tests {
         let success = sem.take(Some(Duration::ZERO));
         hil_test::assert!(!success);
 
+        let sem_ptr = esp_radio_rtos_driver::current_task_thread_semaphore();
+        let sem = unsafe { SemaphoreHandle::ref_from_ptr(&sem_ptr) };
+        let success = sem.take(Some(0));
+        hil_test::assert!(!success);
+
         let q = QueueHandle::new(1, 1);
         let mut item = [0u8; 1];
         let success = unsafe { q.receive(item.as_mut_ptr(), Some(0)) };
