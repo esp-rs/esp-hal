@@ -26,7 +26,7 @@ use crate::{
 
 mod queue;
 
-impl esp_radio_rtos_driver::Scheduler for Scheduler {
+impl esp_radio_rtos_driver::SchedulerImplementation for Scheduler {
     fn initialized(&self) -> bool {
         self.with(|scheduler| {
             if scheduler.time_driver.is_none() {
@@ -105,7 +105,7 @@ impl esp_radio_rtos_driver::Scheduler for Scheduler {
     }
 
     fn usleep(&self, us: u32) {
-        SCHEDULER.sleep_until(Instant::now() + Duration::from_micros(us as u64));
+        self.usleep_until(crate::now() + us as u64);
     }
 
     fn usleep_until(&self, target: u64) {

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Renamed `Scheduler` to `SchedulerImplementation` and `scheduler_impl!` to `register_scheduler_implementation!` (#?)
 
 ### Fixed
 

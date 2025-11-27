@@ -491,7 +491,7 @@ impl Scheduler {
 }
 
 #[cfg(feature = "esp-radio")]
-esp_radio_rtos_driver::scheduler_impl!(pub(crate) static SCHEDULER: Scheduler = Scheduler::new());
+esp_radio_rtos_driver::register_scheduler_implementation!(pub(crate) static SCHEDULER: Scheduler = Scheduler::new());
 
 #[cfg(not(feature = "esp-radio"))]
 pub(crate) static SCHEDULER: Scheduler = Scheduler::new();

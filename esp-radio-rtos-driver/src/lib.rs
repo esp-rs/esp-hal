@@ -12,7 +12,7 @@
 //! This crate abstracts the capabilities of FreeRTOS. The scheduler must implement the following
 //! capabilities:
 //!
-//! - A preemptive task scheduler: [`Scheduler`]
+//! - A preemptive task scheduler: [`SchedulerImplementation`]
 //! - Semaphores: [`semaphore::SemaphoreImplementation`]
 //! - Queues: [`queue::QueueImplementation`]
 //! - Timers (functions that are executed at a specific time): [`timer::TimerImplementation`]
@@ -58,38 +58,38 @@ unsafe extern "Rust" {
 ///
 /// See the [module documentation][crate] for an example.
 #[macro_export]
-macro_rules! scheduler_impl {
+macro_rules! register_scheduler_implementation {
     ($vis:vis static $driver:ident: $t: ty = $val:expr) => {
         $vis static $driver: $t = $val;
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_rtos_initialized() -> bool {
-            <$t as $crate::Scheduler>::initialized(&$driver)
+            <$t as $crate::SchedulerImplementation>::initialized(&$driver)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_rtos_yield_task() {
-            <$t as $crate::Scheduler>::yield_task(&$driver)
+            <$t as $crate::SchedulerImplementation>::yield_task(&$driver)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_rtos_yield_task_from_isr() {
-            <$t as $crate::Scheduler>::yield_task_from_isr(&$driver)
+            <$t as $crate::SchedulerImplementation>::yield_task_from_isr(&$driver)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_rtos_current_task() -> *mut c_void {
-            <$t as $crate::Scheduler>::current_task(&$driver)
+            <$t as $crate::SchedulerImplementation>::current_task(&$driver)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_rtos_max_task_priority() -> u32 {
-            <$t as $crate::Scheduler>::max_task_priority(&$driver)
+            <$t as $crate::SchedulerImplementation>::max_task_priority(&$driver)
         }
 
         #[unsafe(no_mangle)]
@@ -102,7 +102,7 @@ macro_rules! scheduler_impl {
             core_id: Option<u32>,
             task_stack_size: usize,
         ) -> *mut c_void {
-            <$t as $crate::Scheduler>::task_create(
+            <$t as $crate::SchedulerImplementation>::task_create(
                 &$driver,
                 name,
                 task,
@@ -116,31 +116,31 @@ macro_rules! scheduler_impl {
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_rtos_schedule_task_deletion(task_handle: *mut c_void) {
-            <$t as $crate::Scheduler>::schedule_task_deletion(&$driver, task_handle)
+            <$t as $crate::SchedulerImplementation>::schedule_task_deletion(&$driver, task_handle)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_rtos_current_task_thread_semaphore() -> $crate::semaphore::SemaphorePtr {
-            <$t as $crate::Scheduler>::current_task_thread_semaphore(&$driver)
+            <$t as $crate::SchedulerImplementation>::current_task_thread_semaphore(&$driver)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_rtos_usleep(us: u32) {
-            <$t as $crate::Scheduler>::usleep(&$driver, us)
+            <$t as $crate::SchedulerImplementation>::usleep(&$driver, us)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_rtos_usleep_until(target: u64) {
-            <$t as $crate::Scheduler>::usleep_until(&$driver, target)
+            <$t as $crate::SchedulerImplementation>::usleep_until(&$driver, target)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_rtos_now() -> u64 {
-            <$t as $crate::Scheduler>::now(&$driver)
+            <$t as $crate::SchedulerImplementation>::now(&$driver)
         }
     };
 }
@@ -156,7 +156,7 @@ macro_rules! scheduler_impl {
 /// ```rust,no_run
 /// struct MyScheduler {}
 ///
-/// impl esp_radio_rtos_driver::Scheduler for MyScheduler {
+/// impl esp_radio_rtos_driver::SchedulerImplementation for MyScheduler {
 ///
 ///     fn initialized(&self) -> bool {
 ///         unimplemented!()
@@ -211,9 +211,9 @@ macro_rules! scheduler_impl {
 ///     }
 /// }
 ///
-/// esp_radio_rtos_driver::scheduler_impl!(static SCHEDULER: MyScheduler = MyScheduler {});
+/// esp_radio_rtos_driver::register_scheduler_implementation!(static SCHEDULER: MyScheduler = MyScheduler {});
 /// ```
-pub trait Scheduler: Send + Sync + 'static {
+pub trait SchedulerImplementation: Send + Sync + 'static {
     /// This function is called by `esp_radio::init` to verify that the scheduler is properly set
     /// up.
     fn initialized(&self) -> bool;
