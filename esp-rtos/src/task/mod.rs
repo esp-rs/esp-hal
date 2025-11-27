@@ -393,7 +393,7 @@ pub(crate) struct Task {
 #[cfg(feature = "esp-radio")]
 extern "C" fn task_wrapper(task_fn: extern "C" fn(*mut c_void), param: *mut c_void) {
     task_fn(param);
-    schedule_task_deletion(core::ptr::null_mut());
+    schedule_task_deletion(None);
 }
 
 impl Task {
@@ -637,7 +637,7 @@ impl CurrentThreadHandle {
 }
 
 #[cfg(feature = "esp-radio")]
-pub(super) fn schedule_task_deletion(task: *mut Task) {
+pub(super) fn schedule_task_deletion(task: Option<NonNull<Task>>) {
     trace!("schedule_task_deletion {:?}", task);
     if SCHEDULER.with(|scheduler| scheduler.schedule_task_deletion(task)) {
         loop {

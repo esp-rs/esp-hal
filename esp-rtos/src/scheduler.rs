@@ -341,10 +341,10 @@ impl SchedulerState {
     }
 
     #[cfg(feature = "esp-radio")]
-    pub(crate) fn schedule_task_deletion(&mut self, task_to_delete: *mut Task) -> bool {
+    pub(crate) fn schedule_task_deletion(&mut self, task_to_delete: Option<TaskPtr>) -> bool {
         let current_cpu = Cpu::current() as usize;
         let current_task = unwrap!(self.per_cpu[current_cpu].current_task);
-        let task_to_delete = NonNull::new(task_to_delete).unwrap_or(current_task);
+        let task_to_delete = task_to_delete.unwrap_or(current_task);
         let is_current = task_to_delete == current_task;
 
         self.remove_from_all_queues(task_to_delete);

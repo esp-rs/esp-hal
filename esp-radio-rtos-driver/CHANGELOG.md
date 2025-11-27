@@ -13,10 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SemaphoreHandle::take_with_deadline` to take a semaphore with a deadline. (#4555)
 - `QueueHandle::{send_to_front_with_deadline, send_to_back_with_deadline, receive_with_deadline}` for queue operations with a deadline. (#4555)
 - `timer::CompatTimer` to simplify OS integration. (#4555)
+- `ThreadPtr` (#?)
 
 ### Changed
 
 - Renamed `Scheduler` to `SchedulerImplementation` and `scheduler_impl!` to `register_scheduler_implementation!` (#?)
+- `current_task`, `task_create` and `schedule_task_deletion` functions now work with `ThreadPtr` instead of `*mut c_void` (#?)
+- `schedule_task_deletion` now takes an `Option` (#?)
 
 ### Fixed
 

@@ -8,6 +8,7 @@ use esp_hal::{
     time::{Duration, Instant},
 };
 use esp_radio_rtos_driver::{
+    ThreadPtr,
     register_semaphore_implementation,
     register_timer_implementation,
     semaphore::{SemaphoreHandle, SemaphoreImplementation, SemaphoreKind, SemaphorePtr},
@@ -67,7 +68,7 @@ impl esp_radio_rtos_driver::SchedulerImplementation for Scheduler {
         priority: u32,
         pin_to_core: Option<u32>,
         task_stack_size: usize,
-    ) -> *mut c_void {
+    ) -> ThreadPtr {
         self.create_task(
             name,
             task,
@@ -84,16 +85,15 @@ impl esp_radio_rtos_driver::SchedulerImplementation for Scheduler {
                 }
             }),
         )
-        .as_ptr()
         .cast()
     }
 
-    fn current_task(&self) -> *mut c_void {
-        self.current_task().as_ptr().cast()
+    fn current_task(&self) -> ThreadPtr {
+        self.current_task().cast()
     }
 
-    fn schedule_task_deletion(&self, task_handle: *mut c_void) {
-        task::schedule_task_deletion(task_handle as *mut Task)
+    fn schedule_task_deletion(&self, task_handle: Option<ThreadPtr>) {
+        task::schedule_task_deletion(task_handle.map(|t| t.cast::<Task>()))
     }
 
     fn current_task_thread_semaphore(&self) -> SemaphorePtr {

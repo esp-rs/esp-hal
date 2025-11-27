@@ -25,18 +25,20 @@ pub mod queue;
 pub mod semaphore;
 pub mod timer;
 
-use core::ffi::c_void;
+use core::{ffi::c_void, ptr::NonNull};
 
 // Timer callbacks need to be heap-allocated.
 extern crate alloc;
 
 use crate::semaphore::SemaphorePtr;
 
+pub type ThreadPtr = NonNull<()>;
+
 unsafe extern "Rust" {
     fn esp_rtos_initialized() -> bool;
     fn esp_rtos_yield_task();
     fn esp_rtos_yield_task_from_isr();
-    fn esp_rtos_current_task() -> *mut c_void;
+    fn esp_rtos_current_task() -> ThreadPtr;
     fn esp_rtos_max_task_priority() -> u32;
     fn esp_rtos_task_create(
         name: &str,
@@ -45,8 +47,8 @@ unsafe extern "Rust" {
         priority: u32,
         pin_to_core: Option<u32>,
         task_stack_size: usize,
-    ) -> *mut c_void;
-    fn esp_rtos_schedule_task_deletion(task_handle: *mut c_void);
+    ) -> ThreadPtr;
+    fn esp_rtos_schedule_task_deletion(task_handle: Option<ThreadPtr>);
     fn esp_rtos_current_task_thread_semaphore() -> SemaphorePtr;
 
     fn esp_rtos_usleep(us: u32);
@@ -82,7 +84,7 @@ macro_rules! register_scheduler_implementation {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_rtos_current_task() -> *mut c_void {
+        fn esp_rtos_current_task() -> $crate::ThreadPtr {
             <$t as $crate::SchedulerImplementation>::current_task(&$driver)
         }
 
@@ -101,7 +103,7 @@ macro_rules! register_scheduler_implementation {
             priority: u32,
             core_id: Option<u32>,
             task_stack_size: usize,
-        ) -> *mut c_void {
+        ) -> $crate::ThreadPtr {
             <$t as $crate::SchedulerImplementation>::task_create(
                 &$driver,
                 name,
@@ -115,7 +117,7 @@ macro_rules! register_scheduler_implementation {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_rtos_schedule_task_deletion(task_handle: *mut c_void) {
+        fn esp_rtos_schedule_task_deletion(task_handle: Option<$crate::ThreadPtr>) {
             <$t as $crate::SchedulerImplementation>::schedule_task_deletion(&$driver, task_handle)
         }
 
@@ -153,10 +155,11 @@ macro_rules! register_scheduler_implementation {
 /// The following snippet demonstrates the boilerplate necessary to implement a scheduler using the
 /// `Scheduler` trait:
 ///
-/// ```rust,no_run
+/// ```rust, no_run
+/// use esp_radio_rtos_driver::{ThreadPtr, SchedulerImplementation, register_scheduler_implementation};
 /// struct MyScheduler {}
 ///
-/// impl esp_radio_rtos_driver::SchedulerImplementation for MyScheduler {
+/// impl SchedulerImplementation for MyScheduler {
 ///
 ///     fn initialized(&self) -> bool {
 ///         unimplemented!()
@@ -182,15 +185,15 @@ macro_rules! register_scheduler_implementation {
 ///        priority: u32,
 ///        pin_to_core: Option<u32>,
 ///        task_stack_size: usize,
-///     ) -> *mut c_void {
+///     ) -> ThreadPtr {
 ///         unimplemented!()
 ///     }
 ///
-///     fn current_task(&self) -> *mut c_void {
+///     fn current_task(&self) -> ThreadPtr {
 ///         unimplemented!()
 ///     }
 ///
-///     fn schedule_task_deletion(&self, task_handle: *mut c_void) {
+///     fn schedule_task_deletion(&self, task_handle: Option<ThreadPtr>) {
 ///         unimplemented!()
 ///     }
 ///
@@ -211,7 +214,7 @@ macro_rules! register_scheduler_implementation {
 ///     }
 /// }
 ///
-/// esp_radio_rtos_driver::register_scheduler_implementation!(static SCHEDULER: MyScheduler = MyScheduler {});
+/// register_scheduler_implementation!(static SCHEDULER: MyScheduler = MyScheduler {});
 /// ```
 pub trait SchedulerImplementation: Send + Sync + 'static {
     /// This function is called by `esp_radio::init` to verify that the scheduler is properly set
@@ -225,7 +228,7 @@ pub trait SchedulerImplementation: Send + Sync + 'static {
     fn yield_task_from_isr(&self);
 
     /// This function is called by `esp_radio::init` to retrieve a pointer to the current task.
-    fn current_task(&self) -> *mut c_void;
+    fn current_task(&self) -> ThreadPtr;
 
     /// This function returns the maximum task priority level.
     /// Higher number is considered to be higher priority.
@@ -241,15 +244,15 @@ pub trait SchedulerImplementation: Send + Sync + 'static {
         priority: u32,
         core_id: Option<u32>,
         task_stack_size: usize,
-    ) -> *mut c_void;
+    ) -> ThreadPtr;
 
     /// This function is called to let the scheduler know this thread is not
     /// needed anymore and should be deleted. After this function is called,
     /// the thread should not be scheduled anymore. The thread stack can be
     /// free'ed.
     ///
-    /// Passing `null` as the task handle should delete the currently running task.
-    fn schedule_task_deletion(&self, task_handle: *mut c_void);
+    /// Passing `None` as the task handle should delete the currently running task.
+    fn schedule_task_deletion(&self, task_handle: Option<ThreadPtr>);
 
     /// This function should return an opaque per-thread pointer to an
     /// usize-sized memory location, which will be used to store a pointer
@@ -294,7 +297,7 @@ pub fn yield_task_from_isr() {
 
 /// Returns a pointer to the current task.
 #[inline]
-pub fn current_task() -> *mut c_void {
+pub fn current_task() -> ThreadPtr {
     unsafe { esp_rtos_current_task() }
 }
 
@@ -320,20 +323,20 @@ pub unsafe fn task_create(
     priority: u32,
     pin_to_core: Option<u32>,
     task_stack_size: usize,
-) -> *mut c_void {
+) -> ThreadPtr {
     unsafe { esp_rtos_task_create(name, task, param, priority, pin_to_core, task_stack_size) }
 }
 
 /// Schedules the given task for deletion.
 ///
-/// Passing `null` will schedule the current task to be deleted.
+/// Passing `None` will schedule the current task to be deleted.
 ///
 /// ## Safety
 ///
 /// The `task_handle` must be a pointer to a task, obtained either by calling [`task_create`] or
 /// [`current_task`].
 #[inline]
-pub unsafe fn schedule_task_deletion(task_handle: *mut c_void) {
+pub unsafe fn schedule_task_deletion(task_handle: Option<ThreadPtr>) {
     unsafe { esp_rtos_schedule_task_deletion(task_handle) }
 }
 

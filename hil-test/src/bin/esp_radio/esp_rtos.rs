@@ -252,7 +252,7 @@ mod tests {
             )
         };
 
-        unsafe { preempt::schedule_task_deletion(handle) };
+        unsafe { preempt::schedule_task_deletion(Some(handle)) };
         test_context.mutex.give();
 
         info!("Low: exiting");
