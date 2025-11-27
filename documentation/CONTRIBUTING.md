@@ -33,13 +33,13 @@ Welcome aboard! If you're new to `esp-hal` or open-source contribution, here are
 *   Workflow Insights: [GitHub Flow]
 *   Collaborating via [Pull Requests]
 
-Before adding or changing code, review the [esp-rs API guidelines].
+Before adding or changing code, review the [esp-rs developer guidelines].
 
 [GitHub's Guide]: https://docs.github.com/en/get-started/exploring-projects-on-github/finding-ways-to-contribute-to-open-source-on-github
 [Setting Up Git]: https://docs.github.com/en/get-started/quickstart/set-up-git
 [GitHub Flow]: https://docs.github.com/en/get-started/quickstart/github-flow
 [Pull Requests]: https://docs.github.com/en/github/collaborating-with-pull-requests
-[esp-rs developer guidelines]: ./documentation/DEVELOPER-GUIDELINES.md
+[esp-rs developer guidelines]: ./DEVELOPER-GUIDELINES.md
 [HIL guide]: https://github.com/esp-rs/esp-hal/blob/main/documentation/HIL-GUIDE.md
 
 ## Getting Started
