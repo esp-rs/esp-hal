@@ -200,13 +200,14 @@ impl<E: TaskListElement> TaskList<E> {
         if E::is_in_queue(task) == Some(false) {
             return;
         }
-        E::mark_in_queue(task, false);
 
         // TODO: maybe this (and TaskQueue::remove) may prove too expensive.
         let mut list = core::mem::take(self);
         while let Some(popped) = list.pop() {
             if popped != task {
                 self.push(popped);
+            } else {
+                E::mark_in_queue(task, false);
             }
         }
     }
@@ -278,7 +279,6 @@ impl<E: TaskListElement> TaskQueue<E> {
         popped
     }
 
-    #[cfg(multi_core)]
     pub fn pop_if(&mut self, cond: impl Fn(&Task) -> bool) -> Option<TaskPtr> {
         let mut popped = None;
 
@@ -300,14 +300,7 @@ impl<E: TaskListElement> TaskQueue<E> {
             return;
         }
 
-        let mut list = core::mem::take(self);
-        while let Some(popped) = list.pop() {
-            if popped == task {
-                E::mark_in_queue(task, false);
-            } else {
-                self.push(popped);
-            }
-        }
+        _ = self.pop_if(|t| NonNull::from(t) == task);
     }
 
     pub(crate) fn is_empty(&self) -> bool {
