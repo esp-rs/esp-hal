@@ -1,9 +1,8 @@
 use std::fs;
+use std::process::Command;
 
 use anyhow::{Context, Result};
 use semver::Version;
-
-use std::process::Command;
 
 use super::{PLACEHOLDER, Plan, execute_plan::make_git_changes};
 use crate::commands::comparison_url;
@@ -71,103 +70,68 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
                 migration_file_path.display()
             );
         }
-    }
 
-    for package_plan in plan.packages.iter() {
-        let package = package_plan.package;
+        // Create backport branch for this minor series if needed
+        if version.major >= 1 {
+            let branch_name = format!("{}-{}.{}.x", package, version.major, version.minor);
 
-        // Get the package's directory path and Cargo.toml
-        let package_path = workspace.join(package.to_string());
-        let cargo_toml_path = package_path.join("Cargo.toml");
+            // Check if branch already exists on origin
+            let branch_exists = Command::new("git")
+                .args(["ls-remote", "--exit-code", "--heads", "origin", &branch_name])
+                .current_dir(workspace)
+                .status()
+                .map(|status| status.success())
+                .unwrap_or(false);
 
-        // Read and parse Cargo.toml
-        let cargo_toml_content = fs::read_to_string(&cargo_toml_path)
-            .with_context(|| format!("Failed to read from {:?}", cargo_toml_path))?;
-        let cargo_toml = cargo_toml_content
-            .parse::<toml_edit::DocumentMut>()
-            .with_context(|| {
-                format!(
-                    "Failed to parse Cargo.toml at {}",
-                    cargo_toml_path.display()
-                )
-            })?;
+            if branch_exists {
+                log::info!(
+                    "Backport branch already exists on origin: {branch_name}, skipping creation"
+                );
+            } else {
+                // Create a local branch from current HEAD without switching branches
+                let create_status = Command::new("git")
+                    .arg("branch")
+                    .arg(&branch_name)
+                    .current_dir(workspace)
+                    .status()
+                    .with_context(|| format!("Failed to create backport branch {branch_name}"))?;
 
-        // Extract version
-        let version_str = cargo_toml["package"]["version"].as_str().ok_or_else(|| {
-            anyhow::anyhow!(
-                "Could not find version in Cargo.toml for package {:?}",
-                package
-            )
-        })?;
+                if !create_status.success() {
+                    return Err(anyhow::anyhow!(
+                        "`git branch {}` failed",
+                        branch_name
+                    ));
+                }
 
-        let version = Version::parse(version_str)
-            .with_context(|| format!("Failed to parse version {version_str:?}"))?;
+                // Push the new branch to origin
+                let push_status = Command::new("git")
+                    .arg("push")
+                    .arg("origin")
+                    .arg(&branch_name)
+                    .current_dir(workspace)
+                    .status()
+                    .with_context(|| format!("Failed to push backport branch {branch_name}"))?;
 
-        // Only create backport branches for major >= 1
-        if version.major < 1 {
+                if !push_status.success() {
+                    return Err(anyhow::anyhow!(
+                        "`git push origin {}` failed",
+                        branch_name
+                    ));
+                }
+
+                log::info!(
+                    "Created backport branch {branch_name} for {} v{}",
+                    package,
+                    version_str
+                );
+            }
+        } else {
             log::info!(
                 "Skipping backport branch creation for {} v{} (major < 1)",
                 package,
-                version
+                version_str
             );
-            continue;
         }
-
-        // {crate-major.minor.x}, e.g. esp-hal-1.2.x
-        let branch_name = format!("{}-{}.{}.x", package, version.major, version.minor);
-
-        // Check if branch already exists on origin
-        let branch_exists = Command::new("git")
-            .arg("-C")
-            .arg(workspace)
-            .arg("ls-remote")
-            .arg("--exit-code")
-            .arg("--heads")
-            .arg("origin")
-            .arg(&branch_name)
-            .status()
-            .map(|status| status.success())
-            .unwrap_or(false);
-
-        if branch_exists {
-            log::info!(
-                "Backport branch already exists on origin: {branch_name}, skipping creation"
-            );
-            continue;
-        }
-
-        // Create a local branch from current HEAD without switching branches
-        let create_status = Command::new("git")
-            .arg("-C")
-            .arg(workspace)
-            .arg("branch")
-            .arg(&branch_name)
-            .status()
-            .with_context(|| format!("Failed to create backport branch {branch_name}"))?;
-
-        if !create_status.success() {
-            anyhow::bail!("`git branch {branch_name}` failed");
-        }
-
-        // Push the new branch to origin
-        let push_status = Command::new("git")
-            .arg("-C")
-            .arg(workspace)
-            .arg("push")
-            .arg("origin")
-            .arg(&branch_name)
-            .status()
-            .with_context(|| format!("Failed to push backport branch {branch_name}"))?;
-
-        if !push_status.success() {
-            anyhow::bail!("`git push origin {branch_name}` failed");
-        }
-
-        log::info!(
-            "Created backport branch {branch_name} for {} v{}",
-            package,
-            version
-        );
     }
 
     let branch = make_git_changes(false, "post-release-branch", "Post release rollover")?;
