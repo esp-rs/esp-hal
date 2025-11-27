@@ -580,7 +580,12 @@ mod tests {
                 if i < 15 {
                     low_watermark = usize::min(low_watermark, esp_alloc::HEAP.free());
                 } else {
-                    assert!(esp_alloc::HEAP.free() >= low_watermark);
+                    hil_test::assert!(
+                        esp_alloc::HEAP.free() >= low_watermark,
+                        "Heap free space is less than expected: {} < {}",
+                        esp_alloc::HEAP.free(),
+                        low_watermark
+                    );
                 }
             }
         }
@@ -610,7 +615,12 @@ mod tests {
                 if i < 15 {
                     low_watermark = usize::min(low_watermark, esp_alloc::HEAP.free());
                 } else {
-                    assert!(esp_alloc::HEAP.free() >= low_watermark);
+                    hil_test::assert!(
+                        esp_alloc::HEAP.free() >= low_watermark,
+                        "Heap free space is less than expected: {} < {}",
+                        esp_alloc::HEAP.free(),
+                        low_watermark
+                    );
                 }
             }
         }

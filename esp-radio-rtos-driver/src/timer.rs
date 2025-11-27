@@ -243,7 +243,7 @@ mod implementation {
         // A linked list of active timers
         head: Option<NonNull<CompatTimer>>,
         next_wakeup: u64,
-        semaphore: Option<SemaphorePtr>,
+        semaphore: SemaphorePtr,
         processing: bool,
         scheduled_for_drop: Vec<TimerPtr>,
     }
@@ -251,11 +251,12 @@ mod implementation {
     unsafe impl Send for TimerQueueInner {}
 
     impl TimerQueueInner {
-        const fn new() -> Self {
+        fn new() -> Self {
             Self {
                 head: None,
-                next_wakeup: 0,
-                semaphore: None,
+                next_wakeup: u64::MAX,
+                semaphore: SemaphoreHandle::new(SemaphoreKind::Counting { max: 1, initial: 0 })
+                    .leak(),
                 processing: false,
                 scheduled_for_drop: Vec::new(),
             }
@@ -277,30 +278,14 @@ mod implementation {
                 trace!("Already enqueued timer {:x}", timer as *const _ as usize);
             }
 
-            if let Some(semaphore) = self.semaphore {
-                if due < self.next_wakeup {
-                    self.next_wakeup = due;
-                    return Some(semaphore);
-                }
-            } else {
-                // create the timer task
-                let semaphore =
-                    SemaphoreHandle::new(SemaphoreKind::Counting { max: 1, initial: 0 }).leak();
-                unsafe {
-                    crate::task_create(
-                        "timer",
-                        timer_task,
-                        semaphore.as_ptr().cast(),
-                        2,
-                        None,
-                        8192,
-                    )
-                };
-                self.semaphore = Some(semaphore);
+            // If the timer is due before the next wakeup, wake the thread so it can put itself back
+            // to sleep with the right deadline.
+            if due < self.next_wakeup {
                 self.next_wakeup = due;
+                Some(self.semaphore)
+            } else {
+                None
             }
-
-            None
         }
 
         fn dequeue(&mut self, timer: &CompatTimer) -> bool {
@@ -372,6 +357,22 @@ mod implementation {
                             // We're using our queue, forget it so we don't drop it.
                             trace!("Successfully initialized timer queue");
                             forget = true;
+
+                            // The winner also creates the timer task.
+                            let semaphore = boxed.with(|inner| inner.semaphore);
+                            unsafe {
+                                // It's okay to drop the thread pointer, the timer queue cannot be
+                                // stopped.
+                                crate::task_create(
+                                    "timer",
+                                    timer_task,
+                                    semaphore.as_ptr().cast(),
+                                    2,
+                                    None,
+                                    8192,
+                                );
+                            }
+
                             break queue_ptr;
                         }
                         Err(queue) => {
@@ -636,7 +637,7 @@ mod implementation {
                 if !q.processing && q.next_wakeup == u64::MAX {
                     q.next_wakeup = 0;
 
-                    semaphore_to_give = q.semaphore;
+                    semaphore_to_give = Some(q.semaphore);
                 }
 
                 let timer = unsafe { CompatTimer::from_ptr(timer) };
@@ -677,6 +678,9 @@ mod implementation {
     pub(crate) extern "C" fn timer_task(semaphore_ptr: *mut c_void) {
         let semaphore_ptr = NonNull::new(semaphore_ptr).unwrap().cast();
         let semaphore = unsafe { SemaphoreHandle::ref_from_ptr(&semaphore_ptr) };
+
+        // Wait for the semaphore to be signaled, there is nothing to do until then.
+        semaphore.take(None);
 
         let queue = CompatTimerQueue::ensure_initialized();
 
