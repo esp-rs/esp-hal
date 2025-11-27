@@ -22,5 +22,16 @@ portable-atomic = "1"
 [target."cfg(not(target_has_atomic = \"32\"))".dependencies]
 portable-atomic = { version = "1", features = ["unsafe-assume-single-core"] }
 
+[dependencies]
+esp-sync = { version = "0.1.1", path = "../esp-sync", optional = true }
+
 [features]
-ipc-implementations = []
+ipc-implementations = ["esp-sync"]
+# One of the following features must be enabled to select the target chip, if the `ipc-implementations` feature is enabled.
+esp32 = ["esp-sync?/esp32"]
+esp32c2 = ["esp-sync?/esp32c2"]
+esp32c3 = ["esp-sync?/esp32c3"]
+esp32c6 = ["esp-sync?/esp32c6"]
+esp32h2 = ["esp-sync?/esp32h2"]
+esp32s2 = ["esp-sync?/esp32s2"]
+esp32s3 = ["esp-sync?/esp32s3"]

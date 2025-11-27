@@ -650,7 +650,8 @@ impl Drop for QueueHandle {
 #[cfg(feature = "ipc-implementations")]
 mod implementation {
     use alloc::{boxed::Box, vec};
-    use core::cell::UnsafeCell;
+
+    use esp_sync::NonReentrantMutex;
 
     use super::*;
     use crate::{
@@ -752,11 +753,10 @@ mod implementation {
     /// ```
     pub struct CompatQueue {
         /// Allows interior mutability for the queue's inner state, when the mutex is held.
-        inner: UnsafeCell<QueueInner>,
+        inner: NonReentrantMutex<QueueInner>,
 
         semaphore_empty: SemaphoreHandle,
         semaphore_full: SemaphoreHandle,
-        mutex: SemaphoreHandle,
     }
 
     impl CompatQueue {
@@ -770,9 +770,8 @@ mod implementation {
                 max: capacity as u32,
                 initial: 0,
             });
-            let mutex = SemaphoreHandle::new(SemaphoreKind::Mutex);
             Self {
-                inner: UnsafeCell::new(QueueInner {
+                inner: NonReentrantMutex::new(QueueInner {
                     storage,
                     item_size,
                     capacity,
@@ -782,12 +781,15 @@ mod implementation {
                 }),
                 semaphore_empty,
                 semaphore_full,
-                mutex,
             }
         }
 
         unsafe fn from_ptr<'a>(ptr: QueuePtr) -> &'a Self {
             unsafe { ptr.cast::<Self>().as_ref() }
+        }
+
+        fn with<R>(&self, f: impl FnOnce(&mut QueueInner) -> R) -> R {
+            self.inner.with(f)
         }
     }
 
@@ -815,19 +817,9 @@ mod implementation {
             let queue = unsafe { CompatQueue::from_ptr(queue) };
 
             if queue.semaphore_empty.take_with_deadline(deadline_instant) {
-                // The inner mutex shouldn't be held for a long time, but we still shouldn't block
-                // indefinitely.
-                if queue.mutex.take_with_deadline(deadline_instant) {
-                    let inner = unsafe { &mut *queue.inner.get() };
-                    inner.send_to_front(item);
-
-                    queue.mutex.give();
-                    queue.semaphore_full.give();
-                    true
-                } else {
-                    queue.semaphore_empty.give();
-                    false
-                }
+                queue.with(|inner| inner.send_to_front(item));
+                queue.semaphore_full.give();
+                true
             } else {
                 false
             }
@@ -846,19 +838,9 @@ mod implementation {
             let queue = unsafe { CompatQueue::from_ptr(queue) };
 
             if queue.semaphore_empty.take_with_deadline(deadline_instant) {
-                // The inner mutex shouldn't be held for a long time, but we still shouldn't block
-                // indefinitely.
-                if queue.mutex.take_with_deadline(deadline_instant) {
-                    let inner = unsafe { &mut *queue.inner.get() };
-                    inner.send_to_back(item);
-
-                    queue.mutex.give();
-                    queue.semaphore_full.give();
-                    true
-                } else {
-                    queue.semaphore_empty.give();
-                    false
-                }
+                queue.with(|inner| inner.send_to_back(item));
+                queue.semaphore_full.give();
+                true
             } else {
                 false
             }
@@ -875,26 +857,11 @@ mod implementation {
                 .semaphore_empty
                 .try_take_from_isr(higher_prio_task_waken.as_deref_mut())
             {
-                if queue
-                    .mutex
-                    .try_take_from_isr(higher_prio_task_waken.as_deref_mut())
-                {
-                    let inner = unsafe { &mut *queue.inner.get() };
-                    inner.send_to_back(item);
-
-                    queue
-                        .mutex
-                        .try_give_from_isr(higher_prio_task_waken.as_deref_mut());
-                    queue
-                        .semaphore_full
-                        .try_give_from_isr(higher_prio_task_waken);
-                    true
-                } else {
-                    queue
-                        .semaphore_empty
-                        .try_give_from_isr(higher_prio_task_waken);
-                    false
-                }
+                queue.with(|inner| inner.send_to_back(item));
+                queue
+                    .semaphore_full
+                    .try_give_from_isr(higher_prio_task_waken);
+                true
             } else {
                 false
             }
@@ -913,17 +880,9 @@ mod implementation {
             let queue = unsafe { CompatQueue::from_ptr(queue) };
 
             if queue.semaphore_full.take_with_deadline(deadline_instant) {
-                if queue.mutex.take_with_deadline(deadline_instant) {
-                    let inner = unsafe { &mut *queue.inner.get() };
-                    inner.read_from_front(item);
-
-                    queue.mutex.give();
-                    queue.semaphore_empty.give();
-                    true
-                } else {
-                    queue.semaphore_full.give();
-                    false
-                }
+                queue.with(|inner| inner.read_from_front(item));
+                queue.semaphore_empty.give();
+                true
             } else {
                 false
             }
@@ -940,26 +899,11 @@ mod implementation {
                 .semaphore_full
                 .try_take_from_isr(higher_prio_task_waken.as_deref_mut())
             {
-                if queue
-                    .mutex
-                    .try_take_from_isr(higher_prio_task_waken.as_deref_mut())
-                {
-                    let inner = unsafe { &mut *queue.inner.get() };
-                    inner.read_from_front(item);
-
-                    queue
-                        .mutex
-                        .try_give_from_isr(higher_prio_task_waken.as_deref_mut());
-                    queue
-                        .semaphore_empty
-                        .try_give_from_isr(higher_prio_task_waken);
-                    true
-                } else {
-                    queue
-                        .semaphore_full
-                        .try_give_from_isr(higher_prio_task_waken);
-                    false
-                }
+                queue.with(|inner| inner.read_from_front(item));
+                queue
+                    .semaphore_empty
+                    .try_give_from_isr(higher_prio_task_waken);
+                true
             } else {
                 false
             }
@@ -969,12 +913,7 @@ mod implementation {
             let queue = unsafe { CompatQueue::from_ptr(queue) };
 
             if queue.semaphore_full.take(Some(0)) {
-                queue.mutex.take(None);
-
-                let inner = unsafe { &mut *queue.inner.get() };
-                let item_removed = inner.remove(item);
-
-                queue.mutex.give();
+                let item_removed = queue.with(|inner| inner.remove(item));
 
                 if item_removed {
                     queue.semaphore_empty.give();

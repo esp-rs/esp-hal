@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `timer::CompatTimer` to simplify OS integration. (#4555)
 - `ThreadPtr` (#?)
 - The `ipc-implementations` feature, which enables the `CompatQueue` type (#?)
+- Chip-specific features required for the `ipc-implementations` feature (#?)
 
 ### Changed
 
