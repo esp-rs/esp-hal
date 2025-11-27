@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `QueueHandle::{send_to_front_with_deadline, send_to_back_with_deadline, receive_with_deadline}` for queue operations with a deadline. (#4555)
 - `timer::CompatTimer` to simplify OS integration. (#4555)
 - `ThreadPtr` (#?)
-- The `ipc-implementations` feature, which enables the `CompatQueue` type (#?)
+- The `ipc-implementations` feature, which enables the `CompatQueue` and `CompatTimer` types (#?)
 - Chip-specific features required for the `ipc-implementations` feature (#?)
 
 ### Changed
