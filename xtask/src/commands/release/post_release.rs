@@ -71,7 +71,7 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
             );
         }
 
-        // Create backport branch for this minor series if needed
+        // Create backport branch for this minor patch if the package has already passed 1.0.0 release
         if version.major >= 1 {
             let branch_name = format!("{}-{}.{}.x", package, version.major, version.minor);
 
@@ -124,6 +124,50 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
                     package,
                     version_str
                 );
+            }
+
+            // If there was a previous minor branch (e.g. 1.1.x when creating 1.2.x),
+            // delete it on origin if it exists.
+            if version.minor > 0 {
+                let prev_branch_name =
+                    format!("{}-{}.{}.x", package, version.major, version.minor - 1);
+
+                let prev_exists = Command::new("git")
+                    .args([
+                        "ls-remote",
+                        "--exit-code",
+                        "--heads",
+                        "origin",
+                        &prev_branch_name,
+                    ])
+                    .current_dir(workspace)
+                    .status()
+                    .map(|status| status.success())
+                    .unwrap_or(false);
+
+                if prev_exists {
+                    let delete_status = Command::new("git")
+                        .arg("push")
+                        .arg("origin")
+                        .arg(format!(":{}", prev_branch_name))
+                        .current_dir(workspace)
+                        .status()
+                        .with_context(|| {
+                            format!(
+                                "Failed to delete previous backport branch {prev_branch_name}"
+                            )
+                        })?;
+
+                    if delete_status.success() {
+                        log::info!(
+                            "Deleted previous backport branch {prev_branch_name} on origin"
+                        );
+                    } else {
+                        log::warn!(
+                            "Failed to delete previous backport branch {prev_branch_name} on origin"
+                        );
+                    }
+                }
             }
         } else {
             log::info!(
