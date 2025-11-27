@@ -22,7 +22,7 @@ pub struct SemverCheckArgs {
     pub command: SemverCheckCmd,
 
     /// Package(s) to target.
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = vec![Package::EspHal])]
+    #[arg(long, value_enum, value_delimiter = ',', default_values_t = vec![Package::EspHal, Package::EspRomSys])]
     pub packages: Vec<Package>,
 
     /// Chip(s) to target.
@@ -200,9 +200,9 @@ pub mod checker {
 
             // Try to download from GitHub Actions artifacts
             // Note: Artifacts have a 90-day retention limit for public repositories
-            let baseline_sources = vec![BaselineSource::Artifact(
-                "api-baselines-esp-hal".to_string(),
-            )];
+            let artifact_name = format!("api-baselines-{}", package_name);
+
+            let baseline_sources = vec![BaselineSource::Artifact(artifact_name)];
 
             let mut downloaded = false;
             for baseline_source in baseline_sources {
