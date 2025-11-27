@@ -21,3 +21,6 @@ portable-atomic = "1"
 
 [target."cfg(not(target_has_atomic = \"32\"))".dependencies]
 portable-atomic = { version = "1", features = ["unsafe-assume-single-core"] }
+
+[features]
+ipc-implementations = []
