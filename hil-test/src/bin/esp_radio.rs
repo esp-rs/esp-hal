@@ -17,6 +17,8 @@
 use esp_hal::system::Stack;
 use hil_test as _;
 
+extern crate alloc;
+
 fn init_heap() {
     cfg_if::cfg_if! {
         if #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c2, esp32c6))] {

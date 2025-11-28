@@ -62,7 +62,6 @@ mod fmt;
 mod esp_radio;
 mod run_queue;
 mod scheduler;
-pub mod semaphore;
 mod syscall;
 mod task;
 mod timer;
@@ -449,35 +448,3 @@ pub(crate) fn now() -> u64 {
 
 #[cfg(feature = "embassy")]
 embassy_time_driver::time_driver_impl!(static TIMER_QUEUE: crate::timer::embassy::EmbassyTimeDriver = crate::timer::embassy::EmbassyTimeDriver);
-
-/// Waits for a condition to be met or a deadline to occur.
-///
-/// This function is meant to simplify implementation of blocking primitives. Upon failure the
-/// `attempt` function should enqueue the task in a wait queue and put the task to sleep.
-fn with_deadline(deadline: Instant, attempt: impl Fn(Instant) -> bool) -> bool {
-    while !attempt(deadline) {
-        // We are here because the operation failed. We've either timed out, or the operation is
-        // ready to be attempted again. However, any higher priority task can wake up and
-        // preempt us still. Let's just check for the timeout, and try the whole process
-        // again.
-
-        // Instant has wrapping semantics, but we need non-overflowing here. This comparison
-        // would fail if the difference is greater than half of the valid range because fugit would
-        // consider the clock to have wrapped around.
-        if deadline.duration_since_epoch().as_micros()
-            < Instant::now().duration_since_epoch().as_micros()
-        {
-            // We have a deadline and we've timed out.
-            return false;
-        }
-        // We can block more, so let's attempt the operation again.
-    }
-
-    true
-}
-
-fn timeout_to_deadline(timeout: Option<Duration>) -> Instant {
-    timeout
-        .map(|timeout| Instant::now() + timeout)
-        .unwrap_or(Instant::EPOCH + Duration::MAX)
-}

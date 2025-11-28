@@ -1,5 +1,6 @@
 #[embedded_test::tests(default_timeout = 3, executor = esp_rtos::embassy::Executor::new())]
 mod tests {
+    use alloc::boxed::Box;
     use core::ffi::c_void;
 
     use defmt::info;
@@ -16,8 +17,8 @@ mod tests {
         queue::QueueHandle,
         semaphore::{SemaphoreHandle, SemaphoreKind},
     };
-    use esp_rtos::{CurrentThreadHandle, semaphore::Semaphore};
-    use portable_atomic::{AtomicBool, AtomicUsize, Ordering};
+    use esp_rtos::CurrentThreadHandle;
+    use portable_atomic::{AtomicBool, AtomicPtr, AtomicUsize, Ordering};
 
     struct Context {
         #[cfg(multi_core)]
@@ -148,15 +149,15 @@ mod tests {
         // The medium priority task will assert that the high priority task has finished.
 
         struct TestContext {
-            ready_semaphore: Semaphore,
-            mutex: Semaphore,
+            ready_semaphore: SemaphoreHandle,
+            mutex: SemaphoreHandle,
             high_priority_task_finished: AtomicBool,
         }
         let mut test_context = TestContext {
             // This semaphore signals the end of the test
-            ready_semaphore: Semaphore::new_counting(0, 1),
+            ready_semaphore: SemaphoreHandle::new(SemaphoreKind::Counting { initial: 0, max: 1 }),
             // We'll use this mutex to test priority inheritance
-            mutex: Semaphore::new_mutex(false),
+            mutex: SemaphoreHandle::new(SemaphoreKind::Mutex),
             high_priority_task_finished: AtomicBool::new(false),
         };
 
@@ -231,10 +232,10 @@ mod tests {
         }
 
         struct TestContext {
-            mutex: Semaphore,
+            mutex: SemaphoreHandle,
         }
         let mut test_context = TestContext {
-            mutex: Semaphore::new_mutex(false),
+            mutex: SemaphoreHandle::new(SemaphoreKind::Mutex),
         };
 
         test_context.mutex.take(None);
@@ -264,10 +265,14 @@ mod tests {
         // low-priority interrupt, which sets the signal and exits the test. The test must not time
         // out.
 
-        static SEM: Semaphore = Semaphore::new_counting(0, 1);
+        static SEM: AtomicPtr<SemaphoreHandle> = AtomicPtr::new(core::ptr::null_mut());
+
+        let mut sem = SemaphoreHandle::new(SemaphoreKind::Counting { initial: 0, max: 1 });
+        SEM.store(&raw mut sem, Ordering::Relaxed);
 
         extern "C" fn helper_thread(_context: *mut c_void) {
-            SEM.take(None);
+            let sem = unsafe { &*SEM.load(Ordering::Relaxed) };
+            sem.take(None);
             // This thread must never be scheduled. Doing so may mean the interrupt handler never
             // completes.
             panic!();
@@ -287,7 +292,8 @@ mod tests {
         #[esp_hal::handler]
         fn sw_handler() {
             unsafe { SoftwareInterrupt::<'static, 2>::steal() }.reset();
-            SEM.give();
+            let sem = unsafe { &*SEM.load(Ordering::Relaxed) };
+            sem.give();
             embedded_test::export::check_outcome(());
         }
 
@@ -306,16 +312,17 @@ mod tests {
                 info!("Helper Task: try take mutex");
                 // Put the thread to sleep with a timeout. Waking this thread
                 // must not cause the timer to stop.
-                context.mutex.take(Some(Duration::from_millis(10)));
+                context.mutex.take(Some(10_000));
             }
         }
 
         struct TestContext {
-            mutex: Semaphore,
+            mutex: SemaphoreHandle,
         }
-        let mut test_context = TestContext {
-            mutex: Semaphore::new_mutex(false),
-        };
+        // Leak the context to prevent it from being dropped
+        let test_context = Box::leak(Box::new(TestContext {
+            mutex: SemaphoreHandle::new(SemaphoreKind::Mutex),
+        }));
 
         test_context.mutex.take(None);
 
@@ -323,7 +330,7 @@ mod tests {
             preempt::task_create(
                 "helper_thread",
                 helper_thread,
-                (&raw mut test_context).cast::<c_void>(),
+                (&raw mut *test_context).cast::<c_void>(),
                 1,
                 None,
                 4096,
@@ -353,12 +360,12 @@ mod tests {
         // increment a counter, if they are scheduled to run on their specific core.
 
         struct TestContext {
-            ready_semaphore: Semaphore,
+            ready_semaphore: SemaphoreHandle,
         }
         let test_context = TestContext {
             // This semaphore signals the end of the test. Each test case will give it once it is
             // done.
-            ready_semaphore: Semaphore::new_counting(0, 2),
+            ready_semaphore: SemaphoreHandle::new(SemaphoreKind::Counting { initial: 0, max: 2 }),
         };
 
         fn count_impl(context: &TestContext, core: Cpu) {
@@ -478,14 +485,14 @@ mod tests {
 
     #[test]
     async fn primitives_time_out() {
-        let mutex = Semaphore::new_mutex(false);
-        let success = mutex.take(Some(Duration::ZERO));
+        let mutex = SemaphoreHandle::new(SemaphoreKind::Mutex);
+        let success = mutex.take(Some(0));
         hil_test::assert!(success); // mutex is originally untaken
-        let success = mutex.take(Some(Duration::ZERO));
+        let success = mutex.take(Some(0));
         hil_test::assert!(!success);
 
-        let sem = Semaphore::new_counting(0, 1);
-        let success = sem.take(Some(Duration::ZERO));
+        let sem = SemaphoreHandle::new(SemaphoreKind::Counting { initial: 0, max: 1 });
+        let success = sem.take(Some(0));
         hil_test::assert!(!success);
 
         let sem_ptr = esp_radio_rtos_driver::current_task_thread_semaphore();
