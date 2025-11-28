@@ -13,19 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SemaphoreHandle::take_with_deadline` to take a semaphore with a deadline. (#4555)
 - `QueueHandle::{send_to_front_with_deadline, send_to_back_with_deadline, receive_with_deadline}` for queue operations with a deadline. (#4555)
 - `timer::CompatTimer` to simplify OS integration. (#4555)
-- `ThreadPtr` (#?)
-- The `ipc-implementations` feature, which enables the `CompatQueue` and `CompatTimer` types (#?)
-- Chip-specific features required for the `ipc-implementations` feature (#?)
+- `semaphore::CompatSemaphore` to simplify OS integration. (#4559)
+- `wait_queue::WaitQueueImplementation` as an alternative way to integrate with an OS. (#4559)
+- `ThreadPtr` (#4559)
+- The `ipc-implementations` feature, which enables the `CompatQueue`, `CompatSemaphore` and `CompatTimer` types (#4559)
+- Chip-specific features required for the `ipc-implementations` feature (#4559)
 
 ### Changed
 
-- Renamed `Scheduler` to `SchedulerImplementation` and `scheduler_impl!` to `register_scheduler_implementation!` (#?)
-- `current_task`, `task_create` and `schedule_task_deletion` functions now work with `ThreadPtr` instead of `*mut c_void` (#?)
-- `schedule_task_deletion` now takes an `Option` (#?)
+- Renamed `Scheduler` to `SchedulerImplementation` and `scheduler_impl!` to `register_scheduler_implementation!` (#4559)
+- `current_task`, `task_create` and `schedule_task_deletion` functions now work with `ThreadPtr` instead of `*mut c_void` (#4559)
+- `schedule_task_deletion` now takes an `Option` (#4559)
 
 ### Fixed
 
-- `register_queue_implementation` no longer requires `QueuePtr` to be in scope (#?)
+- `register_queue_implementation` no longer requires `QueuePtr` to be in scope (#4559)
 
 ### Removed
 
