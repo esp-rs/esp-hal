@@ -231,6 +231,7 @@ mod implementation {
         sync::atomic::Ordering,
     };
 
+    use esp_sync::NonReentrantMutex;
     use portable_atomic::AtomicPtr;
 
     use super::*;
@@ -319,21 +320,12 @@ mod implementation {
     }
 
     struct CompatTimerQueue {
-        inner: UnsafeCell<TimerQueueInner>,
-        mutex: SemaphoreHandle,
+        inner: NonReentrantMutex<TimerQueueInner>,
     }
 
     unsafe impl Send for CompatTimerQueue {}
 
     impl CompatTimerQueue {
-        fn new() -> Self {
-            // TODO figure out how to make this work with a heap-allocated mutex
-            Self {
-                inner: UnsafeCell::new(TimerQueueInner::new()),
-                mutex: SemaphoreHandle::new(SemaphoreKind::Mutex),
-            }
-        }
-
         /// Ensures that the timer queue is initialized, then provides a reference to it.
         fn ensure_initialized<'a>() -> &'a CompatTimerQueue {
             static TIMER_QUEUE: AtomicPtr<CompatTimerQueue> = AtomicPtr::new(core::ptr::null_mut());
@@ -342,7 +334,9 @@ mod implementation {
             #[inline(never)]
             fn initialize<'a>() -> &'a CompatTimerQueue {
                 trace!("Trying to initialize timer queue");
-                let boxed = Box::new(CompatTimerQueue::new());
+                let boxed = Box::new(CompatTimerQueue {
+                    inner: NonReentrantMutex::new(TimerQueueInner::new()),
+                });
                 let queue_ptr = NonNull::from(boxed.as_ref());
 
                 let mut forget = false;
@@ -418,20 +412,7 @@ mod implementation {
         where
             F: FnOnce(&mut TimerQueueInner) -> R,
         {
-            struct DropGuard<'a> {
-                mutex: &'a SemaphoreHandle,
-            }
-
-            impl Drop for DropGuard<'_> {
-                fn drop(&mut self) {
-                    self.mutex.give();
-                }
-            }
-
-            self.mutex.take(None);
-            let _guard = DropGuard { mutex: &self.mutex };
-
-            unsafe { f(&mut *self.inner.get()) }
+            self.inner.with(f)
         }
 
         /// Trigger due timers.
