@@ -83,13 +83,14 @@ use esp_hal::{
     Blocking,
     interrupt::software::SoftwareInterrupt,
     system::Cpu,
-    time::{Duration, Instant},
+    time::Instant,
     timer::{AnyTimer, OneShotTimer, any::Degrade},
 };
 #[cfg(multi_core)]
 use esp_hal::{
     peripherals::CPU_CTRL,
     system::{CpuControl, Stack},
+    time::Duration,
 };
 #[cfg(feature = "embassy")]
 #[cfg_attr(docsrs, doc(cfg(feature = "embassy")))]
