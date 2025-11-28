@@ -71,7 +71,8 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
             );
         }
 
-        // Backport branch management: only for minor/major bumps, and only for major >= 1
+        // Backport branch management: only for minor/major bumps on stable releases (**major** >= 1),
+        // we do not have and do not maintain backport branches for `0.{minor}.x` versions.
         match package_plan.bump {
             VersionBump::Minor | VersionBump::Major => {
                 if version.major >= 1 {
