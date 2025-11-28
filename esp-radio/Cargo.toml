@@ -134,6 +134,7 @@ sys-logs = [
 esp32 = [
   "esp-hal/esp32",
   "esp-rtos/esp32",
+  "esp-radio-rtos-driver/esp32",
   "esp-phy/esp32",
   "dep:esp-wifi-sys-esp32",
   "esp-metadata-generated/esp32",
@@ -143,6 +144,7 @@ esp32 = [
 esp32c2 = [
   "esp-hal/esp32c2",
   "esp-rtos/esp32c2",
+  "esp-radio-rtos-driver/esp32c2",
   "esp-phy/esp32c2",
   "dep:esp-wifi-sys-esp32c2",
   "esp-metadata-generated/esp32c2",
@@ -151,6 +153,7 @@ esp32c2 = [
 esp32c3 = [
   "esp-hal/esp32c3",
   "esp-rtos/esp32c3",
+  "esp-radio-rtos-driver/esp32c3",
   "esp-phy/esp32c3",
   "dep:esp-wifi-sys-esp32c3",
   "esp-metadata-generated/esp32c3",
@@ -159,6 +162,7 @@ esp32c3 = [
 esp32c6 = [
   "esp-hal/esp32c6",
   "esp-rtos/esp32c6",
+  "esp-radio-rtos-driver/esp32c6",
   "esp-phy/esp32c6",
   "dep:esp-wifi-sys-esp32c6",
   "esp-metadata-generated/esp32c6",
@@ -167,6 +171,7 @@ esp32c6 = [
 esp32h2 = [
   "esp-hal/esp32h2",
   "esp-rtos/esp32h2",
+  "esp-radio-rtos-driver/esp32h2",
   "esp-phy/esp32h2",
   "dep:esp-wifi-sys-esp32h2",
   "esp-metadata-generated/esp32h2",
@@ -175,6 +180,7 @@ esp32h2 = [
 esp32s2 = [
   "esp-hal/esp32s2",
   "esp-rtos/esp32s2",
+  "esp-radio-rtos-driver/esp32s2",
   "esp-phy/esp32s2",
   "dep:esp-wifi-sys-esp32s2",
   "esp-metadata-generated/esp32s2",
@@ -184,6 +190,7 @@ esp32s2 = [
 esp32s3 = [
   "esp-hal/esp32s3",
   "esp-rtos/esp32s3",
+  "esp-radio-rtos-driver/esp32s3",
   "esp-phy/esp32s3",
   "dep:esp-wifi-sys-esp32s3",
   "esp-metadata-generated/esp32s3",
