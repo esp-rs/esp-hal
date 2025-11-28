@@ -36,7 +36,7 @@ impl WaitQueue {
             if scheduler.sleep_task_until(task, deadline) {
                 self.waiting_tasks.push(task);
                 unsafe {
-                    task.as_mut().current_queue = Some(NonNull::from(self));
+                    task.as_mut().current_wait_queue = Some(NonNull::from(self));
                 }
                 crate::task::yield_task();
             }

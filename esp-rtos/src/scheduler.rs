@@ -77,13 +77,13 @@ impl CpuSchedulerState {
                 stack_guard: core::ptr::null_mut(),
                 #[cfg(sw_task_overflow_detection)]
                 stack_guard_value: 0,
-                current_queue: None,
+                current_wait_queue: None,
                 priority: Priority::ZERO,
                 #[cfg(multi_core)]
                 pinned_to: None,
 
                 wakeup_at: 0,
-                run_queued: false,
+                in_run_or_wait_queue: false,
                 timer_queued: false,
 
                 alloc_list_item: TaskListItem::None,
@@ -398,10 +398,32 @@ impl SchedulerState {
         self.all_tasks.remove(task);
         unwrap!(self.time_driver.as_mut()).timer_queue.remove(task);
 
-        if let Some(mut containing_queue) = unsafe { task.as_mut().current_queue.take() } {
+        if let Some(mut containing_queue) = unsafe { task.as_mut().current_wait_queue.take() } {
             unsafe { containing_queue.as_mut().remove(task) };
         } else {
             self.run_queue.remove(task);
+        }
+    }
+
+    pub(crate) fn set_priority(&mut self, mut task: TaskPtr, new_priority: Priority) {
+        // If the task is in a run queue, it needs to be moved to the new priority's run queue.
+        let task_in_run_queue = {
+            let task = unsafe { task.as_ref() };
+            task.in_run_or_wait_queue && task.current_wait_queue.is_none()
+        };
+
+        if task_in_run_queue {
+            self.run_queue.remove(task);
+        }
+
+        // Update priority.
+        {
+            let task = unsafe { task.as_mut() };
+            task.priority = new_priority;
+        }
+
+        if task_in_run_queue {
+            self.resume_task(task);
         }
     }
 }

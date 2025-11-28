@@ -168,7 +168,8 @@ impl RunQueue {
         let priority_n = priority.get();
 
         ready_task.set_state(TaskState::Ready);
-        if let Some(mut containing_queue) = unsafe { ready_task.as_mut().current_queue.take() } {
+        if let Some(mut containing_queue) = unsafe { ready_task.as_mut().current_wait_queue.take() }
+        {
             unsafe { containing_queue.as_mut().remove(ready_task) };
         }
         self.ready_tasks[priority_n].push(ready_task);

@@ -91,7 +91,11 @@ macro_rules! task_list_item {
     };
 }
 
-task_list_item!(TaskReadyQueueElement, ready_queue_item, run_queued);
+task_list_item!(
+    TaskReadyQueueElement,
+    ready_queue_item,
+    in_run_or_wait_queue
+);
 task_list_item!(TaskTimerQueueElement, timer_queue_item, timer_queued);
 // These aren't perf critical, no need to waste memory on caching list status:
 task_list_item!(TaskAllocListElement, alloc_list_item);
@@ -106,7 +110,6 @@ pub(crate) trait TaskExt {
     fn rtos_trace_info(self, run_queue: &mut RunQueue) -> TaskInfo;
 
     fn priority(self, _: &mut RunQueue) -> Priority;
-    fn set_priority(self, _: &mut RunQueue, new_pro: Priority);
     fn state(self) -> TaskState;
     fn set_state(self, state: TaskState);
 }
@@ -129,11 +132,6 @@ impl TaskExt for TaskPtr {
 
     fn priority(self, _: &mut RunQueue) -> Priority {
         unsafe { self.as_ref().priority }
-    }
-
-    fn set_priority(mut self, run_queue: &mut RunQueue, new_priority: Priority) {
-        run_queue.remove(self);
-        unsafe { self.as_mut().priority = new_priority };
     }
 
     fn state(self) -> TaskState {
@@ -358,12 +356,12 @@ pub(crate) struct Task {
     pub wakeup_at: u64,
 
     /// Whether the task is currently queued in the run queue.
-    pub run_queued: bool,
+    pub in_run_or_wait_queue: bool,
     /// Whether the task is currently queued in the timer queue.
     pub timer_queued: bool,
 
     /// The current wait queue this task is in.
-    pub(crate) current_queue: Option<NonNull<WaitQueue>>,
+    pub(crate) current_wait_queue: Option<NonNull<WaitQueue>>,
 
     // Lists a task can be in:
     /// The list of all allocated tasks
@@ -446,14 +444,14 @@ impl Task {
             stack_guard: stack_words.cast(),
             #[cfg(sw_task_overflow_detection)]
             stack_guard_value: 0,
-            current_queue: None,
+            current_wait_queue: None,
             priority: Priority::new(priority),
             #[cfg(multi_core)]
             pinned_to,
 
             wakeup_at: 0,
             timer_queued: false,
-            run_queued: false,
+            in_run_or_wait_queue: false,
 
             alloc_list_item: TaskListItem::None,
             ready_queue_item: TaskListItem::None,
@@ -543,7 +541,9 @@ pub(super) fn allocate_main_task(
     scheduler.per_cpu[current_cpu].main_task.priority = Priority::ZERO;
     scheduler.per_cpu[current_cpu].main_task.state = TaskState::Ready;
     scheduler.per_cpu[current_cpu].main_task.stack = stack;
-    scheduler.per_cpu[current_cpu].main_task.run_queued = false;
+    scheduler.per_cpu[current_cpu]
+        .main_task
+        .in_run_or_wait_queue = false;
     scheduler.per_cpu[current_cpu].main_task.timer_queued = false;
     #[cfg(multi_core)]
     {
@@ -616,9 +616,9 @@ impl CurrentThreadHandle {
     /// Sets the priority of the current task.
     pub fn set_priority(self, priority: usize) {
         let priority = Priority::new(priority);
-        SCHEDULER.with(|state| {
-            let old = self.task.priority(&mut state.run_queue);
-            self.task.set_priority(&mut state.run_queue, priority);
+        SCHEDULER.with(|scheduler| {
+            let old = self.task.priority(&mut scheduler.run_queue);
+            scheduler.set_priority(self.task, priority);
 
             // If we're dropping in priority, trigger a context switch in case another task can be
             // scheduled or time slicing needs to be started.

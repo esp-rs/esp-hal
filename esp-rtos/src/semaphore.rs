@@ -53,8 +53,8 @@ impl SemaphoreInner {
             } => {
                 SCHEDULER.with(|scheduler| {
                     let current = scheduler.current_task(Cpu::current());
-                    if let Some(owner) = owner {
-                        if *owner == current && *recursive {
+                    if let Some(owner) = *owner {
+                        if owner == current && *recursive {
                             *lock_counter += 1;
                             true
                         } else {
@@ -62,8 +62,7 @@ impl SemaphoreInner {
                             // priority to avoid priority inversion.
                             let current_priority = current.priority(&mut scheduler.run_queue);
                             if owner.priority(&mut scheduler.run_queue) < current_priority {
-                                owner.set_priority(&mut scheduler.run_queue, current_priority);
-                                scheduler.resume_task(*owner);
+                                scheduler.set_priority(owner, current_priority);
                             }
                             false
                         }
@@ -137,7 +136,7 @@ impl SemaphoreInner {
                     if *lock_counter == 0
                         && let Some(owner) = owner.take()
                     {
-                        owner.set_priority(&mut scheduler.run_queue, *original_priority);
+                        scheduler.set_priority(owner, *original_priority);
                     }
                     true
                 } else {
