@@ -9,13 +9,106 @@
 //!
 //! ## Implementing a scheduler driver
 //!
-//! This crate abstracts the capabilities of FreeRTOS. The scheduler must implement the following
-//! capabilities:
+//! This crate abstracts the capabilities of FreeRTOS. The implementor crate has two different
+//! possible ways to implement the required capabilities. The `SchedulerImplementation` trait must
+//! be implemented in both cases.
 //!
-//! - A preemptive task scheduler: [`SchedulerImplementation`]
-//! - Semaphores: [`semaphore::SemaphoreImplementation`]
-//! - Queues: [`queue::QueueImplementation`]
-//! - Timers (functions that are executed at a specific time): [`timer::TimerImplementation`]
+//! The implementation types must be registered using the respective `register_x_implementation`
+//! macros.
+//!
+//! ### Without `ipc-implementations`
+//!
+//! The implementor must implement the [`semaphore::SemaphoreImplementation`],
+//! [`queue::QueueImplementation`], and [`timer::TimerImplementation`] traits.
+//!
+//! ```rust
+//! use esp_radio_rtos_driver::{
+//!     SchedulerImplementation,
+//!     queue::QueueImplementation,
+//!     register_queue_implementation,
+//!     register_scheduler_implementation,
+//!     register_semaphore_implementation,
+//!     register_timer_implementation,
+//!     semaphore::SemaphoreImplementation,
+//!     timer::TimerImplementation,
+//! };
+//!
+//! struct MyScheduler {
+//!     // ...
+//! }
+//! impl SchedulerImplementation for MyScheduler {
+//!     // ...
+//! }
+//!
+//! struct MySemaphore {
+//!     // ...
+//! }
+//! impl SemaphoreImplementation for MySemaphore {
+//!     // ...
+//! }
+//!
+//! struct MyTimer {
+//!     // ...
+//! }
+//! impl TimerImplementation for MyTimer {
+//!     // ...
+//! }
+//!
+//! struct MyQueue {
+//!     // ...
+//! }
+//! impl QueueImplementation for MyQueue {
+//!     // ...
+//! }
+//!
+//! register_scheduler_implementation!(static SCHEDULER: MyScheduler = MyScheduler {});
+//! register_semaphore_implementation!(MySemaphore);
+//! register_timer_implementation!(MyTimer);
+//! register_queue_implementation!(MyQueue);
+//! ```
+//!
+//! ### Using `ipc-implementations`
+//!
+//! The implementor must implement the [`wait_queue::WaitQueueImplementation`] trait, and can use
+//! the various `Compat` types as the default implementations for the IPC types.
+//!
+//! You still have the option to provide custom implementations for the IPC types.
+//!
+//! ```rust, ignore
+//! use esp_radio_rtos_driver::{
+//!     SchedulerImplementation,
+//!     queue::CompatQueue,
+//!     register_queue_implementation,
+//!     register_scheduler_implementation,
+//!     register_semaphore_implementation,
+//!     register_timer_implementation,
+//!     register_wait_queue_implementation,
+//!     semaphore::CompatSemaphore,
+//!     timer::CompatTimer,
+//!     wait_queue::WaitQueueImplementation,
+//! };Expand commentComment on lines R78 to R89ResolvedCode has comments. Press enter to view.
+//!
+//! struct MyScheduler {
+//!     // ...
+//! }
+//! impl SchedulerImplementation for MyScheduler {
+//!     // ...
+//! }
+//!
+//! struct MyWaitQueue {
+//!     // ...
+//! }
+//! impl WaitQueueImplementation for MyWaitQueue {
+//!     // ...
+//! }
+//!
+//! register_scheduler_implementation!(static SCHEDULER: MyScheduler = MyScheduler {});
+//! register_wait_queue_implementation!(MyWaitQueue);
+//!
+//! register_semaphore_implementation!(CompatSemaphore);
+//! register_timer_implementation!(CompatTimer);
+//! register_queue_implementation!(CompatQueue);
+//! ```
 //!
 //! [`esp-rtos`]: https://crates.io/crates/esp-rtos
 
@@ -27,6 +120,8 @@ mod fmt;
 pub mod queue;
 pub mod semaphore;
 pub mod timer;
+#[cfg(feature = "ipc-implementations")]
+pub mod wait_queue;
 
 use core::{ffi::c_void, ptr::NonNull};
 
@@ -53,6 +148,10 @@ unsafe extern "Rust" {
     ) -> ThreadPtr;
     fn esp_rtos_schedule_task_deletion(task_handle: Option<ThreadPtr>);
     fn esp_rtos_current_task_thread_semaphore() -> SemaphorePtr;
+    #[cfg(feature = "ipc-implementations")]
+    fn esp_rtos_task_priority(task: ThreadPtr) -> u32;
+    #[cfg(feature = "ipc-implementations")]
+    fn esp_rtos_set_task_priority(task: ThreadPtr, priority: u32);
 
     fn esp_rtos_usleep(us: u32);
     fn esp_rtos_usleep_until(us: u64);
@@ -132,6 +231,18 @@ macro_rules! register_scheduler_implementation {
 
         #[unsafe(no_mangle)]
         #[inline]
+        fn esp_rtos_task_priority(task: $crate::ThreadPtr) -> u32 {
+            unsafe { <$t as $crate::SchedulerImplementation>::task_priority(&$driver, task) }
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_rtos_set_task_priority(task: $crate::ThreadPtr, priority: u32) {
+            unsafe { <$t as $crate::SchedulerImplementation>::set_task_priority(&$driver, task, priority) }
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
         fn esp_rtos_usleep(us: u32) {
             <$t as $crate::SchedulerImplementation>::usleep(&$driver, us)
         }
@@ -204,6 +315,14 @@ macro_rules! register_scheduler_implementation {
 ///         unimplemented!()
 ///     }
 ///
+///     fn task_priority(&self, task: ThreadPtr) -> u32 {
+///         unimplemented!()
+///     }
+///
+///     fn set_task_priority(&self, task: ThreadPtr, priority: u32) {
+///         unimplemented!()
+///     }
+///
 ///     fn usleep(&self, us: u32) {
 ///         unimplemented!()
 ///     }
@@ -261,6 +380,22 @@ pub trait SchedulerImplementation: Send + Sync + 'static {
     /// usize-sized memory location, which will be used to store a pointer
     /// to a semaphore for this thread.
     fn current_task_thread_semaphore(&self) -> SemaphorePtr;
+
+    /// This function returns the priority of the given task.
+    ///
+    /// # Safety
+    ///
+    /// The task pointer must be valid and point to a task that was created using
+    /// [`Self::task_create`].
+    unsafe fn task_priority(&self, task: ThreadPtr) -> u32;
+
+    /// This function sets the priority of the given task.
+    ///
+    /// # Safety
+    ///
+    /// The task pointer must be valid and point to a task that was created using
+    /// [`Self::task_create`].
+    unsafe fn set_task_priority(&self, task: ThreadPtr, priority: u32);
 
     /// This function is called by a task to sleep for the specified number of microseconds.
     fn usleep(&self, us: u32);
@@ -367,4 +502,16 @@ pub fn usleep_until(target: u64) {
 #[inline]
 pub fn now() -> u64 {
     unsafe { esp_rtos_now() }
+}
+
+#[inline]
+#[cfg(feature = "ipc-implementations")]
+unsafe fn task_priority(task: ThreadPtr) -> u32 {
+    unsafe { esp_rtos_task_priority(task) }
+}
+
+#[inline]
+#[cfg(feature = "ipc-implementations")]
+unsafe fn set_task_priority(task: ThreadPtr, priority: u32) {
+    unsafe { esp_rtos_set_task_priority(task, priority) }
 }

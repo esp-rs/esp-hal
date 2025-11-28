@@ -476,14 +476,6 @@ fn with_deadline(deadline: Instant, attempt: impl Fn(Instant) -> bool) -> bool {
     true
 }
 
-fn micros_to_timeout(us: Option<u32>) -> Option<Duration> {
-    us.map(|timeout| Duration::from_micros(timeout as u64))
-}
-
-fn micros_to_deadline(us: Option<u64>) -> Instant {
-    Instant::EPOCH + us.map(Duration::from_micros).unwrap_or(Duration::MAX)
-}
-
 fn timeout_to_deadline(timeout: Option<Duration>) -> Instant {
     timeout
         .map(|timeout| Instant::now() + timeout)
