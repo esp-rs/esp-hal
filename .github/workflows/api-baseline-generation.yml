@@ -21,6 +21,14 @@ on:
         required: false
         default: false
         type: boolean
+      tag_name:
+        description: "The Git tag to generate the baseline from"
+        required: false
+        default: ""
+      package_name:
+        description: "The package name"
+        required: true
+        default: "esp-hal"
 
 env:
   CARGO_TERM_COLOR: always
@@ -37,7 +45,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.source_branch || 'main' }}
+          ref: ${{ github.event.inputs.tag_name || github.event.inputs.source_branch || 'main' }}
           fetch-depth: 10
 
       - name: Set target repository
@@ -124,23 +132,24 @@ jobs:
         run: |
           echo "Starting API baseline generation..."
           echo "Trigger reason: ${{ steps.check-generation.outputs.trigger_reason }}"
-          cargo xcheck semver-check generate-baseline
+          cargo xcheck semver-check --packages ${{ github.event.inputs.package_name }} generate-baseline
           echo "API baseline generation completed"
 
       - name: Upload API baselines as artifact
         if: steps.check-generation.outputs.should_generate == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: api-baselines-esp-hal
-          path: esp-hal/api-baseline/
+          name: api-baselines-${{ github.event.inputs.package_name }}
+          path: ${{ github.event.inputs.package_name }}/api-baseline/
           retention-days: 90 # Maximum for public repos
 
       - name: Create baseline summary
         if: steps.check-generation.outputs.should_generate == 'true'
         shell: bash
         run: |
+          PACKAGE_NAME="${{ github.event.inputs.package_name }}"
           echo "Successfully generated and uploaded API baselines"
-          echo "Artifact name: api-baselines-esp-hal"
+          echo "Artifact name: api-baselines-$PACKAGE_NAME"
           echo "Retention: 90 days (expires on $(date -d '+90 days' '+%Y-%m-%d'))"
           echo "Source branch: ${{ github.event.inputs.source_branch || 'main' }}"
           echo "Commit: ${{ github.sha }}"
@@ -169,14 +178,14 @@ jobs:
 
           echo "- **Target Repository**: \`$GITHUB_REPOSITORY\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Source Branch**: \`${{ github.event.inputs.source_branch || 'main' }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Artifact Name**: \`api-baselines-esp-hal\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifact Name**: \`api-baselines-$PACKAGE_NAME\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Retention**: 90 days (expires $(date -d '+90 days' '+%Y-%m-%d'))" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Baseline Files Generated" >> $GITHUB_STEP_SUMMARY
           echo "| Chip | File Size |" >> $GITHUB_STEP_SUMMARY
           echo "|------|-----------|" >> $GITHUB_STEP_SUMMARY
 
-          cd esp-hal/api-baseline
+          cd "$PACKAGE_NAME/api-baseline"
           for file in *.json.gz; do
               if [ -f "$file" ]; then
                   chip=$(basename "$file" .json.gz)
