@@ -681,62 +681,6 @@ macro_rules! define_clock_tree_types {
             pub fn with<R>(f: impl FnOnce(&mut ClockTree) -> R) -> R {
                 CLOCK_TREE.with(f)
             }
-            /// Returns the current configuration of the XTL_CLK clock tree node
-            pub fn xtl_clk(&self) -> Option<XtlClkConfig> {
-                self.xtl_clk
-            }
-            /// Returns the current configuration of the SYSTEM_PRE_DIV_IN clock tree node
-            pub fn system_pre_div_in(&self) -> Option<SystemPreDivInConfig> {
-                self.system_pre_div_in
-            }
-            /// Returns the current configuration of the SYSTEM_PRE_DIV clock tree node
-            pub fn system_pre_div(&self) -> Option<SystemPreDivConfig> {
-                self.system_pre_div
-            }
-            /// Returns the current configuration of the CPU_PLL_DIV clock tree node
-            pub fn cpu_pll_div(&self) -> Option<CpuPllDivConfig> {
-                self.cpu_pll_div
-            }
-            /// Returns the current configuration of the APB_CLK clock tree node
-            pub fn apb_clk(&self) -> Option<ApbClkConfig> {
-                self.apb_clk
-            }
-            /// Returns the current configuration of the CRYPTO_CLK clock tree node
-            pub fn crypto_clk(&self) -> Option<CryptoClkConfig> {
-                self.crypto_clk
-            }
-            /// Returns the current configuration of the MSPI_CLK clock tree node
-            pub fn mspi_clk(&self) -> Option<MspiClkConfig> {
-                self.mspi_clk
-            }
-            /// Returns the current configuration of the CPU_CLK clock tree node
-            pub fn cpu_clk(&self) -> Option<CpuClkConfig> {
-                self.cpu_clk
-            }
-            /// Returns the current configuration of the RC_FAST_CLK_DIV_N clock tree node
-            pub fn rc_fast_clk_div_n(&self) -> Option<RcFastClkDivNConfig> {
-                self.rc_fast_clk_div_n
-            }
-            /// Returns the current configuration of the RTC_SLOW_CLK clock tree node
-            pub fn rtc_slow_clk(&self) -> Option<RtcSlowClkConfig> {
-                self.rtc_slow_clk
-            }
-            /// Returns the current configuration of the RTC_FAST_CLK clock tree node
-            pub fn rtc_fast_clk(&self) -> Option<RtcFastClkConfig> {
-                self.rtc_fast_clk
-            }
-            /// Returns the current configuration of the LOW_POWER_CLK clock tree node
-            pub fn low_power_clk(&self) -> Option<LowPowerClkConfig> {
-                self.low_power_clk
-            }
-            /// Returns the current configuration of the TIMG0_FUNCTION_CLOCK clock tree node
-            pub fn timg0_function_clock(&self) -> Option<Timg0FunctionClockConfig> {
-                self.timg0_function_clock
-            }
-            /// Returns the current configuration of the TIMG0_CALIBRATION_CLOCK clock tree node
-            pub fn timg0_calibration_clock(&self) -> Option<Timg0CalibrationClockConfig> {
-                self.timg0_calibration_clock
-            }
         }
         static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
             ::esp_sync::NonReentrantMutex::new(ClockTree {

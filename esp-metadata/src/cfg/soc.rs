@@ -165,7 +165,6 @@ impl SystemClocks {
     fn generate_macro(&self, tree: &ProcessedClockData) -> Result<TokenStream> {
         let mut clock_tree_node_defs = vec![];
         let mut clock_tree_node_impls = vec![];
-        let mut clock_tree_node_state_getter_doclines = vec![];
         let mut clock_tree_state_fields = vec![];
         let mut clock_tree_state_field_types = vec![];
         let mut clock_tree_refcount_fields = vec![];
@@ -193,10 +192,6 @@ impl SystemClocks {
             if let Some(type_name) = node_state.type_name() {
                 clock_tree_state_fields.push(node_state.field_name());
                 clock_tree_state_field_types.push(type_name);
-                clock_tree_node_state_getter_doclines.push(format!(
-                    "Returns the current configuration of the {} clock tree node",
-                    clock_item.name_str(),
-                ));
             }
             if let Some(refcount_field) = node_state.refcount_field_name() {
                 clock_tree_refcount_fields.push(refcount_field);
@@ -279,13 +274,6 @@ impl SystemClocks {
                         pub fn with<R>(f: impl FnOnce(&mut ClockTree) -> R) -> R {
                             CLOCK_TREE.with(f)
                         }
-
-                        #(
-                            #[doc = #clock_tree_node_state_getter_doclines]
-                            pub fn #clock_tree_state_fields(&self) -> Option<#clock_tree_state_field_types> {
-                                self.#clock_tree_state_fields
-                            }
-                        )*
                     }
 
                     static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
