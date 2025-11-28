@@ -44,7 +44,6 @@ use esp_hal::{
 use esp_println::{print, println};
 use esp_radio::wifi::{
     ModeConfig,
-    WifiAccessPointState,
     WifiController,
     WifiDevice,
     WifiEvent,
@@ -315,25 +314,24 @@ async fn connection(mut controller: WifiController<'static>) {
     println!("Wifi started!");
 
     loop {
-        match esp_radio::wifi::access_point_state() {
-            WifiAccessPointState::Started => {
-                println!("About to connect...");
+        if matches!(controller.is_started(), Ok(true)) {
+            println!("About to connect...");
 
-                match controller.connect_async().await {
-                    Ok(_) => {
-                        // wait until we're no longer connected
-                        controller
-                            .wait_for_event(WifiEvent::StationDisconnected)
-                            .await;
-                        println!("Station disconnected");
-                    }
-                    Err(e) => {
-                        println!("Failed to connect to wifi: {e:?}");
-                        Timer::after(Duration::from_millis(5000)).await
-                    }
+            match controller.connect_async().await {
+                Ok(_) => {
+                    // wait until we're no longer connected
+                    controller
+                        .wait_for_event(WifiEvent::StationDisconnected)
+                        .await;
+                    println!("Station disconnected");
+                }
+                Err(e) => {
+                    println!("Failed to connect to wifi: {e:?}");
+                    Timer::after(Duration::from_millis(5000)).await
                 }
             }
-            _ => return,
+        } else {
+            return;
         }
     }
 }
