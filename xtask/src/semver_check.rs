@@ -32,7 +32,7 @@ pub fn minimum_update(
     let baseline_path_gz =
         PathBuf::from(&package_path).join(format!("api-baseline/{}.json.gz", file_name));
     if !baseline_path_gz.exists() {
-        download_baselines(&package_path, vec![package])?;
+        download_baselines(&workspace, vec![package])?;
     }
     let baseline_path =
         temp_file::TempFile::new().with_context(|| format!("Failed to create a TempFile!"))?;
