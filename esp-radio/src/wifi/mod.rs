@@ -2574,6 +2574,7 @@ impl WifiController<'_> {
     /// Set the Wi-Fi mode.
     ///
     /// This will override the mode inferred by [`Self::set_config`].
+    #[instability::unstable]
     pub fn set_mode(&mut self, mode: WifiMode) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode.into()) })?;
         Ok(())
