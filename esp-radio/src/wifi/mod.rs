@@ -29,12 +29,12 @@ pub(crate) use self::os_adapter::*;
 use self::sniffer::Sniffer;
 #[cfg(feature = "wifi-eap")]
 use self::sta::eap::EapStationConfig;
-pub use self::state::*;
 use self::{
     ap::{AccessPointConfig, AccessPointInfo, convert_ap_info},
     private::PacketBuffer,
     scan::{FreeApListOnDrop, ScanResults},
     sta::StationConfig,
+    state::*,
 };
 #[cfg(feature = "csi")]
 #[instability::unstable]
@@ -2408,6 +2408,9 @@ impl WifiController<'_> {
     /// This method is not blocking. To check if the controller has started, use the
     /// [`Self::is_started`] method.
     pub fn start(&mut self) -> Result<(), WifiError> {
+        set_access_point_state(WifiAccessPointState::Starting);
+        set_station_state(WifiStationState::Starting);
+
         unsafe {
             esp_wifi_result!(esp_wifi_start())?;
 
@@ -2580,15 +2583,22 @@ impl WifiController<'_> {
     }
 
     fn stop_impl(&mut self) -> Result<(), WifiError> {
+        set_access_point_state(WifiAccessPointState::Stopping);
+        set_station_state(WifiStationState::Stopping);
+
         esp_wifi_result!(unsafe { esp_wifi_stop() })
     }
 
     fn connect_impl(&mut self) -> Result<(), WifiError> {
+        set_station_state(WifiStationState::Connecting);
+
         // TODO: implement ROAMING
         esp_wifi_result!(unsafe { esp_wifi_connect_internal() })
     }
 
     fn disconnect_impl(&mut self) -> Result<(), WifiError> {
+        set_station_state(WifiStationState::Disconnecting);
+
         // TODO: implement ROAMING
         esp_wifi_result!(unsafe { esp_wifi_disconnect_internal() })
     }
@@ -2700,9 +2710,6 @@ impl WifiController<'_> {
         self.stop_impl()?;
 
         self.wait_for_all_events(events, false).await;
-
-        reset_access_point_state();
-        reset_station_state();
 
         Ok(())
     }
