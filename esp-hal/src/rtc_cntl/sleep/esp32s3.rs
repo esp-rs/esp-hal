@@ -2,6 +2,7 @@ use super::{
     Ext0WakeupSource,
     Ext1WakeupSource,
     TimerWakeupSource,
+    UlpWakeupSource,
     WakeSource,
     WakeTriggers,
     WakeupLevel,
@@ -80,6 +81,13 @@ pub const DG_PERI_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
 pub const RTC_MEM_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
 /// RTC memory wait cycles.
 pub const RTC_MEM_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
+
+impl WakeSource for UlpWakeupSource {
+    fn apply(&self, _rtc: &Rtc<'_>, triggers: &mut WakeTriggers, _sleep_config: &mut RtcSleepConfig) {
+        triggers.set_ulp_fsm(true);
+        triggers.set_ulp_riscv(true);
+    }
+}
 
 impl WakeSource for TimerWakeupSource {
     fn apply(

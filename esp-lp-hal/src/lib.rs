@@ -65,6 +65,16 @@ pub fn wake_hp_core() {
         .write(|w| w.lp_trigger_hp().set_bit());
 }
 
+/// Wake up the HP core
+#[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
+#[unsafe(link_section = ".init.rust")]
+#[unsafe(no_mangle)]
+pub fn wake_hp_core() {
+    unsafe { &*pac::RTC_CNTL::PTR }
+        .rtc_state0()
+        .write(|w|w.rtc_sw_cpu_int().set_bit());
+}
+
 #[cfg(feature = "esp32c6")]
 global_asm!(
     r#"
