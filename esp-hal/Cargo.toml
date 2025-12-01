@@ -12,7 +12,7 @@ license       = "MIT OR Apache-2.0"
 exclude = [ "api-baseline", "MIGRATING-*", "CHANGELOG.md" ]
 
 [package.metadata.espressif]
-semver_checked = true
+semver-checked = true
 doc-config = { features = ["unstable", "rt"], append = [
     { if = 'chip_has("psram")', features = ["psram"] },
     { if = 'chip_has("soc_has_usb0")', features = ["__usb_otg"] },
