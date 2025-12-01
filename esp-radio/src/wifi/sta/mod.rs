@@ -6,7 +6,7 @@ use core::fmt;
 use enumset::EnumSet;
 use procmacros::BuilderLite;
 
-use super::{AuthMethod, Protocol, ScanMethod};
+use super::{AuthMethod, Protocol, scan::ScanMethod};
 use crate::WifiError;
 
 #[cfg(feature = "wifi-eap")]

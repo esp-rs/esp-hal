@@ -26,11 +26,11 @@ use esp_hal::{
 use esp_println::println;
 use esp_radio::wifi::{
     ModeConfig,
-    ScanConfig,
     WifiController,
     WifiDevice,
     WifiEvent,
     WifiStationState,
+    scan::ScanConfig,
     sta::StationConfig,
 };
 

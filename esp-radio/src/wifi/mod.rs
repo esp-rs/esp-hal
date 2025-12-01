@@ -26,7 +26,7 @@ pub use self::state::*;
 use self::{
     ap::{AccessPointConfig, AccessPointInfo, convert_ap_info},
     private::PacketBuffer,
-    scan::{FreeApListOnDrop, ScanResults},
+    scan::{FreeApListOnDrop, ScanConfig, ScanResults, ScanTypeConfig},
     sta::StationConfig,
 };
 #[cfg(feature = "csi")]
@@ -48,6 +48,7 @@ pub mod ap;
 #[cfg(feature = "csi")]
 pub mod csi;
 pub mod event;
+pub mod scan;
 #[cfg(all(feature = "sniffer", feature = "unstable"))]
 pub mod sniffer;
 pub mod sta;
@@ -56,7 +57,6 @@ pub(crate) mod os_adapter;
 pub(crate) mod state;
 
 mod internal;
-mod scan;
 
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
 
@@ -220,18 +220,6 @@ impl defmt::Format for Country {
     fn format(&self, fmt: defmt::Formatter<'_>) {
         self.country_code().format(fmt)
     }
-}
-
-/// Wi-Fi scan method.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[repr(u8)]
-#[instability::unstable]
-pub enum ScanMethod {
-    /// Fast scan.
-    Fast,
-    /// Scan all channels.
-    AllChannels,
 }
 
 /// Introduces Wi-Fi configuration options.
@@ -951,92 +939,6 @@ unsafe extern "C" fn esp_wifi_tx_done_cb(
     decrement_inflight_counter();
 
     embassy::TRANSMIT_WAKER.wake();
-}
-
-/// Configuration for active or passive scan.
-///
-/// # Comparison of active and passive scan
-///
-/// |                                      | **Active** | **Passive** |
-/// |--------------------------------------|------------|-------------|
-/// | **Power consumption**                |    High    |     Low     |
-/// | **Time required (typical behavior)** |     Low    |     High    |
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum ScanTypeConfig {
-    /// Active scan with min and max scan time per channel. This is the default
-    /// and recommended if you are unsure.
-    ///
-    /// # Procedure
-    /// 1. Send probe request on each channel.
-    /// 2. Wait for probe response. Wait at least `min` time, but if no response is received, wait
-    ///    up to `max` time.
-    /// 3. Switch channel.
-    /// 4. Repeat from 1.
-    Active {
-        /// Minimum scan time per channel. Defaults to 10ms.
-        min: Duration,
-        /// Maximum scan time per channel. Defaults to 20ms.
-        max: Duration,
-    },
-    /// Passive scan
-    ///
-    /// # Procedure
-    /// 1. Wait for beacon for given duration.
-    /// 2. Switch channel.
-    /// 3. Repeat from 1.
-    ///
-    /// # Note
-    /// It is recommended to avoid duration longer thean 1500ms, as it may cause
-    /// a station to disconnect from the Access Point.
-    Passive(Duration),
-}
-
-impl Default for ScanTypeConfig {
-    fn default() -> Self {
-        Self::Active {
-            min: Duration::from_millis(10),
-            max: Duration::from_millis(20),
-        }
-    }
-}
-
-impl ScanTypeConfig {
-    fn validate(&self) {
-        if matches!(self, Self::Passive(dur) if *dur > Duration::from_millis(1500)) {
-            warn!(
-                "Passive scan duration longer than 1500ms may cause a station to disconnect from the access point"
-            );
-        }
-    }
-}
-
-/// Scan configuration
-#[derive(Clone, Copy, Default, PartialEq, Eq, BuilderLite)]
-pub struct ScanConfig<'a> {
-    /// SSID to filter for.
-    /// If [`None`] is passed, all SSIDs will be returned.
-    /// If [`Some`] is passed, only the APs matching the given SSID will be
-    /// returned.
-    ssid: Option<&'a str>,
-    /// BSSID to filter for.
-    /// If [`None`] is passed, all BSSIDs will be returned.
-    /// If [`Some`] is passed, only the APs matching the given BSSID will be
-    /// returned.
-    bssid: Option<[u8; 6]>,
-    /// Channel to filter for.
-    /// If [`None`] is passed, all channels will be returned.
-    /// If [`Some`] is passed, only the APs on the given channel will be
-    /// returned.
-    channel: Option<u8>,
-    /// Whether to show hidden networks.
-    show_hidden: bool,
-    /// Scan type, active or passive.
-    scan_type: ScanTypeConfig,
-    /// The maximum number of networks to return when scanning.
-    /// If [`None`] is passed, all networks will be returned.
-    /// If [`Some`] is passed, the specified number of networks will be returned.
-    max: Option<usize>,
 }
 
 pub(crate) fn wifi_start_scan(

@@ -23,7 +23,13 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{Config, ModeConfig, ScanConfig, WifiMode, sta::StationConfig};
+use esp_radio::wifi::{
+    Config,
+    ModeConfig,
+    WifiMode,
+    scan::{ScanConfig, ScanTypeConfig},
+    sta::StationConfig,
+};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -68,12 +74,13 @@ async fn main(_spawner: Spawner) {
         println!("Wifi stack setup (STA)");
         controller.start_async().await.unwrap();
         println!("Connecting to WiFi SSID: {}", SSID);
-        let scan_config = ScanConfig::default().with_ssid(&SSID).with_scan_type(
-            esp_radio::wifi::ScanTypeConfig::Active {
-                min: esp_hal::time::Duration::from_millis(5),
-                max: esp_hal::time::Duration::from_millis(20),
-            },
-        );
+        let scan_config =
+            ScanConfig::default()
+                .with_ssid(&SSID)
+                .with_scan_type(ScanTypeConfig::Active {
+                    min: esp_hal::time::Duration::from_millis(5),
+                    max: esp_hal::time::Duration::from_millis(20),
+                });
         println!("Scanning for WiFi networks");
         let aps = controller
             .scan_with_config_async(scan_config)
