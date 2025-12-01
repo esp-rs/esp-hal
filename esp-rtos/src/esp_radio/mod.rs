@@ -152,7 +152,7 @@ impl WaitQueueImplementation for WaitQueue {
         wait_queue.wait_with_deadline(
             Instant::EPOCH
                 + deadline_instant
-                    .map(|deadline| Duration::from_micros(deadline))
+                    .map(Duration::from_micros)
                     .unwrap_or(Duration::MAX),
         )
     }
