@@ -85,8 +85,10 @@ pub(crate) fn new_task_context(
         A6: task_fn as usize as u32,
         A7: param as usize as u32,
 
-        // For windowed ABI set WOE and CALLINC (pretend task was 'call4'd)
-        PS: 0x00040000 | ((1 & 3) << 16),
+        // For windowed ABI set WOE, UM, EXCM and CALLINC1 (pretend task was 'call4'd)
+        // UM and EXCM are important, so that restoring context will correctly restore an exception
+        // context (where the context switch happens).
+        PS: 0x00050030,
 
         ..Default::default()
     }

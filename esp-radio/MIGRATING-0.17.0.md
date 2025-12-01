@@ -54,3 +54,39 @@ BLE initialization:
 -    let connector = BleConnector::new(radio, bluetooth, Default::default()).unwrap();
 +    let connector = BleConnector::new(bluetooth, Default::default()).unwrap();
 ```
+
+## The terms `Client`, `Sta`, `Ap` have been aligned to `Station` and `AccessPoint`
+
+```diff
+-    let mut ap_device = interfaces.ap;
++    let mut ap_device = interfaces.access_point;
+
+-    let mut sta_device = interfaces.sta;
++    let mut sta_device = interfaces.station;
+```
+
+```diff
+-    let client_config = ModeConfig::ApSta(
+-        ClientConfig::default()
++    let station_config = ModeConfig::AccessPointStation(
++        StationConfig::default()
+```
+
+```diff
+-    let client_config = ModeConfig::Client(
+-        ClientConfig::default()
++    let station_config = ModeConfig::Station(
++        StationConfig::default()
+```
+
+## `Wifi::Event` uses full names for events instead of acronyms
+
+```diff
+-    impl StationWpsErPin<'_> {
++    impl StationWifiProtectedStatusEnrolleePin<'_> {
+```
+
+```diff
+-    impl StationWpsErPin<'_> {
++    impl StationWifiProtectedStatusEnrolleePin<'_> {
+```

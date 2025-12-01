@@ -33,7 +33,9 @@ fn main() -> ! {
 
     let wifi = peripherals.WIFI;
     let (mut controller, interfaces) = esp_radio::wifi::new(wifi, Default::default()).unwrap();
-    controller.set_mode(esp_radio::wifi::WifiMode::Sta).unwrap();
+    controller
+        .set_mode(esp_radio::wifi::WifiMode::Station)
+        .unwrap();
     controller.start().unwrap();
 
     let mut esp_now = interfaces.esp_now;
@@ -52,7 +54,7 @@ fn main() -> ! {
                 if !esp_now.peer_exists(&r.info.src_address) {
                     esp_now
                         .add_peer(PeerInfo {
-                            interface: esp_radio::esp_now::EspNowWifiInterface::Sta,
+                            interface: esp_radio::esp_now::EspNowWifiInterface::Station,
                             peer_address: r.info.src_address,
                             lmk: None,
                             channel: None,

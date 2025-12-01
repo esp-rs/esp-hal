@@ -689,8 +689,6 @@ pub fn init(config: Config) -> Peripherals {
 
     Clocks::init(config.cpu_clock());
 
-    crate::rtc_cntl::rtc::configure_clock();
-
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.LPWR.reborrow());
 

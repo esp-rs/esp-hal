@@ -23,7 +23,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{Config, ModeConfig, ScanConfig, WifiMode, sta::ClientConfig};
+use esp_radio::wifi::{Config, ModeConfig, ScanConfig, WifiMode, sta::StationConfig};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -64,7 +64,7 @@ async fn main(_spawner: Spawner) {
             // Timer::after(Duration::from_secs(10)).await;
         }
 
-        controller.set_mode(WifiMode::Sta).unwrap();
+        controller.set_mode(WifiMode::Station).unwrap();
         println!("Wifi stack setup (STA)");
         controller.start_async().await.unwrap();
         println!("Connecting to WiFi SSID: {}", SSID);
@@ -98,15 +98,15 @@ async fn main(_spawner: Spawner) {
         println!("Best AP found: {:?}", best_one);
         println!("Connecting to WiFi SSID: {}", SSID);
 
-        let client_config = ModeConfig::Client(
-            ClientConfig::default()
+        let station_config = ModeConfig::Station(
+            StationConfig::default()
                 .with_ssid(best_one.ssid.clone())
                 .with_bssid(best_one.bssid)
                 .with_auth_method(best_one.auth_method.unwrap())
                 .with_password(PASSWORD.to_string())
                 .with_channel(best_one.channel),
         );
-        controller.set_config(&client_config).unwrap();
+        controller.set_config(&station_config).unwrap();
 
         let err = controller
             .connect_async()

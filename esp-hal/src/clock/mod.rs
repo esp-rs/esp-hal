@@ -432,7 +432,7 @@ impl RtcClock {
     }
 
     /// Select source for RTC_SLOW_CLK.
-    #[cfg(not(any(esp32c6, esp32h2)))]
+    #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
     pub(crate) fn set_slow_freq(slow_freq: RtcSlowClock) {
         LPWR::regs().clk_conf().modify(|_, w| {
             unsafe {
@@ -455,7 +455,7 @@ impl RtcClock {
     }
 
     /// Select source for RTC_FAST_CLK.
-    #[cfg(not(any(esp32c6, esp32h2)))]
+    #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
     pub(crate) fn set_fast_freq(fast_freq: RtcFastClock) {
         LPWR::regs().clk_conf().modify(|_, w| {
             w.fast_clk_rtc_sel().bit(match fast_freq {
@@ -1091,9 +1091,13 @@ impl Clocks {
             crate::rtc_cntl::rtc::init();
 
             let config = Self::configure(cpu_clock_speed);
+
+            // TODO: remove
             RtcClock::update_xtal_freq_mhz(config.xtal_clock.as_mhz());
             unsafe { ACTIVE_CLOCKS = Some(config) };
-        })
+        });
+
+        crate::rtc_cntl::rtc::configure_clock();
     }
 
     fn try_get<'a>() -> Option<&'a Clocks> {
@@ -1116,51 +1120,30 @@ impl Clocks {
     #[cfg(systimer)]
     #[inline]
     pub(crate) fn xtal_freq() -> Rate {
-        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto"
-            && let Some(clocks) = Self::try_get()
-        {
+        if let Some(clocks) = Self::try_get() {
             return clocks.xtal_clock;
         }
 
         Self::measure_xtal_frequency().frequency()
     }
 
-    #[cfg(not(esp32))] // unused
-    const fn xtal_frequency_from_config() -> Option<XtalClock> {
-        let frequency_conf = esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY");
-
-        for_each_soc_xtal_options!(
-            (all $( ($freq:literal) ),*) => {
-                paste::paste! {
-                    return match frequency_conf.as_bytes() {
-                        b"auto" => None,
-
-                        // If the frequency is a pre-set value for the chip, return the associated enum variant.
-                        $( _ if esp_config::esp_config_int_parse!(u32, frequency_conf) == $freq => Some(XtalClock::[<_ $freq M>]), )*
-
-                        _ => None,
-                    };
-                }
-            };
-        );
-    }
-
-    #[cfg(not(esp32))] // unused - the build-time config can be removed in favour of explicit configuration via esp_hal::init
+    #[cfg(not(esp32))]
     fn measure_xtal_frequency() -> XtalClock {
-        if let Some(clock) = const { Self::xtal_frequency_from_config() } {
-            // Use the configured frequency
-            clock
-        } else if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
-            // TODO: we should be able to read from a retention register, but probe-rs flashes a
-            // bootloader that assumes a frequency, instead of choosing a matching one.
-            let mhz = RtcClock::estimate_xtal_frequency();
+        cfg_if::cfg_if! {
+            if #[cfg(esp32h2)] {
+                XtalClock::_32M
+            } else if #[cfg(not(esp32c2))] {
+                XtalClock::_40M
+            } else {
+                // TODO: we should be able to read from a retention register, but probe-rs flashes a
+                // bootloader that assumes a frequency, instead of choosing a matching one.
+                let mhz = RtcClock::estimate_xtal_frequency();
 
-            debug!("Working with a {}MHz crystal", mhz);
+                debug!("Working with a {}MHz crystal", mhz);
 
-            // Try to guess the closest possible crystal value.
-            XtalClock::closest_from_mhz(mhz)
-        } else {
-            unreachable!("Invalid crystal frequency configured, this should not be possible.")
+                // Try to guess the closest possible crystal value.
+                XtalClock::closest_from_mhz(mhz)
+            }
         }
     }
 }
@@ -1199,32 +1182,25 @@ impl Clocks {
 impl Clocks {
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = Self::measure_xtal_frequency();
+        use crate::soc::clocks::{ClockTree, request_low_power_clk};
 
-        let apb_freq;
-        if cpu_clock_speed != CpuClock::default() {
-            let pll_freq = PllClock::Pll480MHz;
+        // TODO: expose the whole new enum for custom options
+        match cpu_clock_speed {
+            CpuClock::_80MHz => crate::soc::clocks::CpuClock::_80MHz,
+            CpuClock::_120MHz => crate::soc::clocks::CpuClock::_120MHz,
+        }
+        .configure();
 
-            if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
-                apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
-                clocks_ll::esp32c2_rtc_update_to_xtal(xtal_freq, 1);
-                clocks_ll::esp32c2_rtc_apb_freq_update(apb_freq);
-            } else {
-                apb_freq = ApbClock::ApbFreq40MHz;
-                clocks_ll::esp32c2_rtc_bbpll_enable();
-                clocks_ll::esp32c2_rtc_bbpll_configure(xtal_freq, pll_freq);
-                clocks_ll::esp32c2_rtc_freq_to_pll_mhz(cpu_clock_speed);
-                clocks_ll::esp32c2_rtc_apb_freq_update(apb_freq);
+        ClockTree::with(|clocks| {
+            // TODO: this should be managed by esp-radio. The actual clock is probably managed by
+            // the hardware, but we need to make sure the upstream clocks are running.
+            request_low_power_clk(clocks);
+            Self {
+                cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
+                apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
+                xtal_clock: Rate::from_hz(crate::soc::clocks::xtl_clk_frequency(clocks)),
             }
-        } else {
-            apb_freq = ApbClock::ApbFreq40MHz;
-        }
-
-        Self {
-            cpu_clock: cpu_clock_speed.frequency(),
-            apb_clock: apb_freq.frequency(),
-            xtal_clock: xtal_freq.frequency(),
-        }
+        })
     }
 }
 
@@ -1232,31 +1208,25 @@ impl Clocks {
 impl Clocks {
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = Self::measure_xtal_frequency();
+        use crate::soc::clocks::{ClockTree, request_low_power_clk};
 
-        let apb_freq;
-        if cpu_clock_speed != CpuClock::default() {
-            if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
-                apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
-                clocks_ll::esp32c3_rtc_update_to_xtal(xtal_freq, 1);
-                clocks_ll::esp32c3_rtc_apb_freq_update(apb_freq);
-            } else {
-                let pll_freq = PllClock::Pll480MHz;
-                apb_freq = ApbClock::ApbFreq80MHz;
-                clocks_ll::esp32c3_rtc_bbpll_enable();
-                clocks_ll::esp32c3_rtc_bbpll_configure(xtal_freq, pll_freq);
-                clocks_ll::esp32c3_rtc_freq_to_pll_mhz(cpu_clock_speed);
-                clocks_ll::esp32c3_rtc_apb_freq_update(apb_freq);
+        // TODO: expose the whole new enum for custom options
+        match cpu_clock_speed {
+            CpuClock::_80MHz => crate::soc::clocks::CpuClock::_80MHz,
+            CpuClock::_160MHz => crate::soc::clocks::CpuClock::_160MHz,
+        }
+        .configure();
+
+        ClockTree::with(|clocks| {
+            // TODO: this should be managed by esp-radio. The actual clock is probably managed by
+            // the hardware, but we need to make sure the upstream clocks are running.
+            request_low_power_clk(clocks);
+            Self {
+                cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
+                apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
+                xtal_clock: Rate::from_hz(crate::soc::clocks::xtl_clk_frequency(clocks)),
             }
-        } else {
-            apb_freq = ApbClock::ApbFreq80MHz;
-        }
-
-        Self {
-            cpu_clock: cpu_clock_speed.frequency(),
-            apb_clock: apb_freq.frequency(),
-            xtal_clock: xtal_freq.frequency(),
-        }
+        })
     }
 }
 
@@ -1264,32 +1234,21 @@ impl Clocks {
 impl Clocks {
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = Self::measure_xtal_frequency();
+        use crate::soc::clocks::ClockTree;
 
-        let apb_freq;
-        if cpu_clock_speed != CpuClock::default() {
-            if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
-                apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
-                clocks_ll::esp32c6_rtc_update_to_xtal(xtal_freq, 1);
-                clocks_ll::esp32c6_rtc_apb_freq_update(apb_freq);
-            } else {
-                let pll_freq = PllClock::Pll480MHz;
-                apb_freq = ApbClock::ApbFreq80MHz;
-                clocks_ll::esp32c6_rtc_bbpll_enable();
-                clocks_ll::esp32c6_rtc_bbpll_configure(xtal_freq, pll_freq);
-                clocks_ll::esp32c6_rtc_freq_to_pll_mhz(cpu_clock_speed);
-                clocks_ll::esp32c6_rtc_apb_freq_update(apb_freq);
-            }
-        } else {
-            apb_freq = ApbClock::ApbFreq80MHz;
+        // TODO: expose the whole new enum for custom options
+        match cpu_clock_speed {
+            CpuClock::_80MHz => crate::soc::clocks::CpuClock::_80MHz,
+            CpuClock::_160MHz => crate::soc::clocks::CpuClock::_160MHz,
         }
+        .configure();
 
-        Self {
-            cpu_clock: cpu_clock_speed.frequency(),
-            apb_clock: apb_freq.frequency(),
-            xtal_clock: xtal_freq.frequency(),
-            crypto_clock: Rate::from_mhz(160),
-        }
+        ClockTree::with(|clocks| Self {
+            cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
+            apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
+            xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
+            crypto_clock: Rate::from_hz(crate::soc::clocks::hp_root_clk_frequency(clocks)),
+        })
     }
 }
 

@@ -135,7 +135,7 @@ impl ProcessedClockData {
             .iter()
             .find(|item| item.name_str() == name)
             .map(|b| b.as_ref())
-            .unwrap()
+            .unwrap_or_else(|| panic!("Clock node {} not found", name))
     }
 
     fn properties(&self, node: &dyn ClockTreeNodeType) -> &ManagementProperties {
@@ -165,12 +165,13 @@ impl SystemClocks {
     fn generate_macro(&self, tree: &ProcessedClockData) -> Result<TokenStream> {
         let mut clock_tree_node_defs = vec![];
         let mut clock_tree_node_impls = vec![];
+        let mut clock_tree_node_state_getter_doclines = vec![];
         let mut clock_tree_state_fields = vec![];
         let mut clock_tree_state_field_types = vec![];
         let mut clock_tree_refcount_fields = vec![];
         let mut configurables = vec![];
         let mut system_config_steps = HashMap::new();
-        let mut hal_enable_functions = vec![];
+        let mut provided_function_doclines = vec![];
         for (item, kind) in tree
             .classified_clocks
             .iter()
@@ -192,6 +193,10 @@ impl SystemClocks {
             if let Some(type_name) = node_state.type_name() {
                 clock_tree_state_fields.push(node_state.field_name());
                 clock_tree_state_field_types.push(type_name);
+                clock_tree_node_state_getter_doclines.push(format!(
+                    "Returns the current configuration of the {} clock tree node",
+                    clock_item.name_str(),
+                ));
             }
             if let Some(refcount_field) = node_state.refcount_field_name() {
                 clock_tree_refcount_fields.push(refcount_field);
@@ -199,7 +204,24 @@ impl SystemClocks {
 
             let node_funcs = ClockTreeItem::node_functions(clock_item, tree);
             clock_tree_node_impls.push(node_funcs.implement_functions());
-            hal_enable_functions.extend_from_slice(&node_funcs.hal_functions);
+            if !node_funcs.hal_functions.is_empty() {
+                let header = format!(" // {}", clock_item.name_str());
+                provided_function_doclines.push(quote! {
+                    #[doc = ""]
+                    #[doc = #header]
+                    #[doc = ""]
+                });
+                for func in node_funcs.hal_functions.iter() {
+                    if func.is_empty() {
+                        continue;
+                    }
+                    let func = func.to_string();
+                    provided_function_doclines.push(quote! {
+                        #[doc = #func]
+                        #[doc = ""] // empty line between functions
+                    });
+                }
+            }
 
             if kind == ClockType::Configurable {
                 // Generate code for the global clock configuration
@@ -237,22 +259,11 @@ impl SystemClocks {
             .iter()
             .map(|node| system_config_steps.get(&node));
 
-        let funcs_to_provide = hal_enable_functions
-            .iter()
-            .filter_map(|f| {
-                if f.is_empty() {
-                    None
-                } else {
-                    Some(format!(" {}", f.to_string()))
-                }
-            })
-            .collect::<Vec<_>>();
-
         Ok(quote! {
             #[macro_export]
             /// ESP-HAL must provide implementation for the following functions:
             /// ```rust, no_run
-            #(#[doc = #funcs_to_provide])*
+            #(#provided_function_doclines)*
             /// ```
             macro_rules! define_clock_tree_types {
                 () => {
@@ -268,6 +279,13 @@ impl SystemClocks {
                         pub fn with<R>(f: impl FnOnce(&mut ClockTree) -> R) -> R {
                             CLOCK_TREE.with(f)
                         }
+
+                        #(
+                            #[doc = #clock_tree_node_state_getter_doclines]
+                            pub fn #clock_tree_state_fields(&self) -> Option<#clock_tree_state_field_types> {
+                                self.#clock_tree_state_fields
+                            }
+                        )*
                     }
 
                     static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
@@ -602,11 +620,6 @@ impl DeviceClocks {
             })
             .collect::<Vec<_>>();
 
-        // To compute refcount requirement and correct initialization order, we need to be able to
-        // access direct dependencies (downstream clocks). As it is simpler to define
-        // dependents (inputs), we have to do a bit of maths.
-        let dependency_graph = DependencyGraph::build_from(&clock_tree);
-
         let validation_context = ValidationContext {
             tree: self.system_clocks.clock_tree.as_slice(),
         };
@@ -656,6 +669,11 @@ impl DeviceClocks {
                 clock_tree.push(Box::new(node));
             }
         }
+
+        // To compute refcount requirement and correct initialization order, we need to be able to
+        // access direct dependencies (downstream clocks). As it is simpler to define
+        // dependents (inputs), we have to do a bit of maths.
+        let dependency_graph = DependencyGraph::build_from(&clock_tree);
 
         // Classify clock tree items
         for node in clock_tree.iter() {

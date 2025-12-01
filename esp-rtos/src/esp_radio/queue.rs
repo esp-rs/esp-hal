@@ -1,13 +1,14 @@
 use alloc::{boxed::Box, vec};
 use core::ptr::NonNull;
 
+use esp_hal::time::Instant;
 use esp_radio_rtos_driver::{
     queue::{QueueImplementation, QueuePtr},
     register_queue_implementation,
 };
 use esp_sync::NonReentrantMutex;
 
-use crate::wait_queue::WaitQueue;
+use crate::{micros_to_deadline, micros_to_timeout, timeout_to_deadline, wait_queue::WaitQueue};
 
 struct QueueInner {
     storage: Box<[u8]>,
@@ -145,8 +146,8 @@ impl Queue {
         unsafe { ptr.cast::<Self>().as_ref() }
     }
 
-    unsafe fn send_to_back(&self, item: *const u8, timeout_us: Option<u32>) -> bool {
-        if crate::with_deadline(timeout_us, |deadline| {
+    unsafe fn send_to_back_with_deadline(&self, item: *const u8, deadline: Instant) -> bool {
+        if crate::with_deadline(deadline, |deadline| {
             self.inner.with(|queue| {
                 if unsafe { queue.try_enqueue(item) } {
                     trace!("Queue - notify with item");
@@ -168,8 +169,8 @@ impl Queue {
         }
     }
 
-    unsafe fn send_to_front(&self, item: *const u8, timeout_us: Option<u32>) -> bool {
-        if crate::with_deadline(timeout_us, |deadline| {
+    unsafe fn send_to_front_with_deadline(&self, item: *const u8, deadline: Instant) -> bool {
+        if crate::with_deadline(deadline, |deadline| {
             self.inner.with(|queue| {
                 if unsafe { queue.try_enqueue_front(item) } {
                     trace!("Queue - notify with item");
@@ -202,8 +203,8 @@ impl Queue {
         })
     }
 
-    unsafe fn receive(&self, item: *mut u8, timeout_us: Option<u32>) -> bool {
-        if crate::with_deadline(timeout_us, |deadline| {
+    unsafe fn receive_with_deadline(&self, item: *mut u8, deadline: Instant) -> bool {
+        if crate::with_deadline(deadline, |deadline| {
             self.inner.with(|queue| {
                 if unsafe { queue.try_dequeue(item) } {
                     trace!("Queue - notify with space");
@@ -271,13 +272,43 @@ impl QueueImplementation for Queue {
     unsafe fn send_to_front(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool {
         let queue = unsafe { Queue::from_ptr(queue) };
 
-        unsafe { queue.send_to_front(item, timeout_us) }
+        unsafe {
+            queue.send_to_front_with_deadline(
+                item,
+                timeout_to_deadline(micros_to_timeout(timeout_us)),
+            )
+        }
+    }
+
+    unsafe fn send_to_front_with_deadline(
+        queue: QueuePtr,
+        item: *const u8,
+        deadline_instant: Option<u64>,
+    ) -> bool {
+        let queue = unsafe { Queue::from_ptr(queue) };
+
+        unsafe { queue.send_to_front_with_deadline(item, micros_to_deadline(deadline_instant)) }
     }
 
     unsafe fn send_to_back(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool {
         let queue = unsafe { Queue::from_ptr(queue) };
 
-        unsafe { queue.send_to_back(item, timeout_us) }
+        unsafe {
+            queue.send_to_back_with_deadline(
+                item,
+                timeout_to_deadline(micros_to_timeout(timeout_us)),
+            )
+        }
+    }
+
+    unsafe fn send_to_back_with_deadline(
+        queue: QueuePtr,
+        item: *const u8,
+        deadline_instant: Option<u64>,
+    ) -> bool {
+        let queue = unsafe { Queue::from_ptr(queue) };
+
+        unsafe { queue.send_to_back_with_deadline(item, micros_to_deadline(deadline_instant)) }
     }
 
     unsafe fn try_send_to_back_from_isr(
@@ -293,7 +324,19 @@ impl QueueImplementation for Queue {
     unsafe fn receive(queue: QueuePtr, item: *mut u8, timeout_us: Option<u32>) -> bool {
         let queue = unsafe { Queue::from_ptr(queue) };
 
-        unsafe { queue.receive(item, timeout_us) }
+        unsafe {
+            queue.receive_with_deadline(item, timeout_to_deadline(micros_to_timeout(timeout_us)))
+        }
+    }
+
+    unsafe fn receive_with_deadline(
+        queue: QueuePtr,
+        item: *mut u8,
+        deadline_instant: Option<u64>,
+    ) -> bool {
+        let queue = unsafe { Queue::from_ptr(queue) };
+
+        unsafe { queue.receive_with_deadline(item, micros_to_deadline(deadline_instant)) }
     }
 
     unsafe fn try_receive_from_isr(

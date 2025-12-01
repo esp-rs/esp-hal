@@ -8,15 +8,7 @@ use crate::{
         Rtc,
         RtcCalSel,
         RtcClock,
-        rtc::{
-            HpAnalog,
-            HpSysCntlReg,
-            HpSysPower,
-            LpAnalog,
-            LpSysPower,
-            SavedClockConfig,
-            rtc_clk_cpu_freq_set_xtal,
-        },
+        rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower, SavedClockConfig},
         sleep::{
             Ext1WakeupSource,
             TimerWakeupSource,
@@ -26,6 +18,7 @@ use crate::{
             WakeupLevel,
         },
     },
+    soc::clocks::ClockTree,
 };
 
 impl WakeSource for TimerWakeupSource {
@@ -957,8 +950,14 @@ impl RtcSleepConfig {
             wakeup_mask & reject_mask
         };
 
-        let cpu_freq_config = SavedClockConfig::save();
-        rtc_clk_cpu_freq_set_xtal();
+        let cpu_freq_config = ClockTree::with(|clocks| {
+            let cpu_freq_config = SavedClockConfig::save(clocks);
+            crate::soc::clocks::configure_soc_root_clk(
+                clocks,
+                crate::soc::clocks::SocRootClkConfig::Xtal,
+            );
+            cpu_freq_config
+        });
 
         // pmu_sleep_config_default + pmu_sleep_init.
 
@@ -1048,7 +1047,9 @@ impl RtcSleepConfig {
 
         // esp-idf returns if the sleep was rejected, we don't return anything
 
-        cpu_freq_config.restore();
+        ClockTree::with(|clocks| {
+            cpu_freq_config.restore(clocks);
+        });
     }
 
     /// Cleans up after sleep

@@ -136,14 +136,7 @@ extern crate alloc;
 // MUST be the first module
 mod fmt;
 
-use esp_hal::{
-    self as hal,
-
-    // We don't need any esp-radio specific init code, just working no-std scaffolding, so we can
-    // take the macros from esp-hal for doc_replace.
-    after_snippet,
-    before_snippet,
-};
+use esp_hal as hal;
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub use esp_phy::CalibrationResult;
@@ -153,6 +146,8 @@ use esp_radio_rtos_driver as preempt;
 use esp_sync::RawMutex;
 #[cfg(esp32)]
 use hal::analog::adc::{release_adc2, try_claim_adc2};
+#[cfg(feature = "wifi")]
+use hal::{after_snippet, before_snippet};
 use hal::{
     clock::{Clocks, init_radio_clocks},
     time::Rate,
@@ -365,6 +360,7 @@ impl Drop for RadioRefGuard {
 }
 
 /// Returns true if at least some interrupt levels are disabled.
+#[cfg(any(feature = "wifi", all(feature = "ble", bt_controller = "btdm")))]
 fn is_interrupts_disabled() -> bool {
     #[cfg(target_arch = "xtensa")]
     return hal::xtensa_lx::interrupt::get_level() != 0

@@ -54,7 +54,7 @@ fn main() -> ! {
     let (mut controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
-    controller.set_mode(wifi::WifiMode::Sta).unwrap();
+    controller.set_mode(wifi::WifiMode::Station).unwrap();
     controller.start().unwrap();
 
     let mut sniffer = interfaces.sniffer;

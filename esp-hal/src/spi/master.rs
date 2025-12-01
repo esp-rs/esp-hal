@@ -507,6 +507,11 @@ impl Config {
             if #[cfg(esp32h2)] {
                 // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
                 clocks.pll_48m_clock
+            } else if #[cfg(esp32c6)] {
+                // We select the 80MHz PLL as the clock source in the driver
+                // FIXME we state that the default clock source is APB, which just isn't true
+                let _clocks = clocks;
+                Rate::from_mhz(80)
             } else {
                 clocks.apb_clock
             }

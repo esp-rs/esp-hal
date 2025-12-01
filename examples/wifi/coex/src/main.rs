@@ -40,7 +40,7 @@ use esp_hal::{
 use esp_println::{print, println};
 use esp_radio::{
     ble::controller::BleConnector,
-    wifi::{ModeConfig, sta::ClientConfig},
+    wifi::{ModeConfig, sta::StationConfig},
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
@@ -102,7 +102,7 @@ fn main() -> ! {
     let (mut controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
-    let mut device = interfaces.sta;
+    let mut device = interfaces.station;
     let iface = create_interface(&mut device);
 
     controller
@@ -122,13 +122,13 @@ fn main() -> ! {
     let rng = Rng::new();
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
-    let client_config = ModeConfig::Client(
-        ClientConfig::default()
+    let station_config = ModeConfig::Station(
+        StationConfig::default()
             .with_ssid(SSID.into())
             .with_password(PASSWORD.into()),
     );
 
-    let res = controller.set_config(&client_config);
+    let res = controller.set_config(&station_config);
     println!("wifi_set_configuration returned {:?}", res);
 
     controller.start().unwrap();

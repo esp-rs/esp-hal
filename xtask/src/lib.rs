@@ -448,13 +448,13 @@ impl Package {
             return false;
         };
 
-        let Some(Item::Value(semver_checked)) = metadata.get("semver_checked") else {
+        let Some(Item::Value(semver_checked)) = metadata.get("semver-checked") else {
             return false;
         };
 
         semver_checked
             .as_bool()
-            .expect("semver_checked must be a boolean")
+            .expect("semver-checked must be a boolean")
     }
 }
 

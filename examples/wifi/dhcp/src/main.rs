@@ -26,7 +26,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_radio::wifi::{ModeConfig, ScanConfig, sta::ClientConfig};
+use esp_radio::wifi::{ModeConfig, ScanConfig, sta::StationConfig};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::{DhcpOption, IpAddress},
@@ -53,7 +53,7 @@ fn main() -> ! {
     let (mut controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
-    let mut device = interfaces.sta;
+    let mut device = interfaces.station;
     let iface = create_interface(&mut device);
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
@@ -74,12 +74,12 @@ fn main() -> ! {
         .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
         .unwrap();
 
-    let client_config = ModeConfig::Client(
-        ClientConfig::default()
+    let station_config = ModeConfig::Station(
+        StationConfig::default()
             .with_ssid(SSID.into())
             .with_password(PASSWORD.into()),
     );
-    let res = controller.set_config(&client_config);
+    let res = controller.set_config(&station_config);
     println!("wifi_set_configuration returned {:?}", res);
 
     controller.start().unwrap();

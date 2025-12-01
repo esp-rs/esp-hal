@@ -41,14 +41,14 @@ fn default_handler<Event: 'static>() -> Box<Handler<Event>> {
 /// ```rust, no_run
 /// # {before_snippet}
 /// use esp_radio::wifi::event::{self, EventExt};
-/// event::ApStaConnected::update_handler(|event| {
-///     // ... handle ApStaConnected event here
+/// event::AccessPointStationConnected::update_handler(|event| {
+///     // ... handle AccessPointStationConnected event here
 /// });
 /// # {after_snippet}
 /// ```
 // Implemented like this instead of free functions because the syntax would be
 // ```
-// event::update_handler::<event::ApStaConnected, _>(...)
+// event::update_handler::<event::AccessPointStationConnected, _>(...)
 // ```
 #[instability::unstable]
 pub trait EventExt: sealed::Event + Sized + 'static {
@@ -124,51 +124,90 @@ macro_rules! impl_wifi_event {
 
 impl_wifi_event!(WifiReady);
 impl_wifi_event!(ScanDone, wifi_event_sta_scan_done_t);
-impl_wifi_event!(StaStart);
-impl_wifi_event!(StaStop);
-impl_wifi_event!(StaConnected, wifi_event_sta_connected_t);
-impl_wifi_event!(StaDisconnected, wifi_event_sta_disconnected_t);
-impl_wifi_event!(StaAuthmodeChange, wifi_event_sta_authmode_change_t);
-impl_wifi_event!(StaWpsErSuccess, wifi_event_sta_wps_er_success_t);
-impl_wifi_event!(StaWpsErFailed);
-impl_wifi_event!(StaWpsErTimeout);
-impl_wifi_event!(StaWpsErPin, wifi_event_sta_wps_er_pin_t);
-impl_wifi_event!(StaWpsErPbcOverlap);
-impl_wifi_event!(ApStart);
-impl_wifi_event!(ApStop);
-impl_wifi_event!(ApStaConnected, wifi_event_ap_staconnected_t);
-impl_wifi_event!(ApStaDisconnected, wifi_event_ap_stadisconnected_t);
-impl_wifi_event!(ApProbeReqReceived, wifi_event_ap_probe_req_rx_t);
-impl_wifi_event!(FtmReport, wifi_event_ftm_report_t);
-impl_wifi_event!(StaBssRssiLow, wifi_event_bss_rssi_low_t);
-impl_wifi_event!(ActionTxStatus, wifi_event_action_tx_status_t);
-impl_wifi_event!(RocDone, wifi_event_roc_done_t);
-impl_wifi_event!(StaBeaconTimeout);
+impl_wifi_event!(StationStart);
+impl_wifi_event!(StationStop);
+impl_wifi_event!(StationConnected, wifi_event_sta_connected_t);
+impl_wifi_event!(StationDisconnected, wifi_event_sta_disconnected_t);
+impl_wifi_event!(
+    StationAuthenticationModeChange,
+    wifi_event_sta_authmode_change_t
+);
+impl_wifi_event!(
+    StationWifiProtectedStatusEnrolleeSuccess,
+    wifi_event_sta_wps_er_success_t
+);
+impl_wifi_event!(StationWifiProtectedStatusEnrolleeFailed);
+impl_wifi_event!(StationWifiProtectedStatusEnrolleeTimeout);
+impl_wifi_event!(
+    StationWifiProtectedStatusEnrolleePin,
+    wifi_event_sta_wps_er_pin_t
+);
+impl_wifi_event!(StationWifiProtectedStatusEnrolleePushButtonConfigurationOverlap);
+impl_wifi_event!(AccessPointStart);
+impl_wifi_event!(AccessPointStop);
+impl_wifi_event!(AccessPointStationConnected, wifi_event_ap_staconnected_t);
+impl_wifi_event!(
+    AccessPointStationDisconnected,
+    wifi_event_ap_stadisconnected_t
+);
+impl_wifi_event!(
+    AccessPointProbeRequestReceived,
+    wifi_event_ap_probe_req_rx_t
+);
+impl_wifi_event!(FineTimingMeasurementReport, wifi_event_ftm_report_t);
+impl_wifi_event!(
+    StationBasicServiceSetReceivedSignalStrengthIndicatorLow,
+    wifi_event_bss_rssi_low_t
+);
+impl_wifi_event!(ActionTransmissionStatus, wifi_event_action_tx_status_t);
+impl_wifi_event!(RemainOnChannelDone, wifi_event_roc_done_t);
+impl_wifi_event!(StationBeaconTimeout);
 impl_wifi_event!(ConnectionlessModuleWakeIntervalStart);
-impl_wifi_event!(ApWpsRgSuccess, wifi_event_ap_wps_rg_success_t);
-impl_wifi_event!(ApWpsRgFailed, wifi_event_ap_wps_rg_fail_reason_t);
-impl_wifi_event!(ApWpsRgTimeout);
-impl_wifi_event!(ApWpsRgPin, wifi_event_ap_wps_rg_pin_t);
-impl_wifi_event!(ApWpsRgPbcOverlap);
-impl_wifi_event!(ItwtSetup);
-impl_wifi_event!(ItwtTeardown);
-impl_wifi_event!(ItwtProbe);
-impl_wifi_event!(ItwtSuspend);
-impl_wifi_event!(TwtWakeup);
-impl_wifi_event!(BtwtSetup);
-impl_wifi_event!(BtwtTeardown);
-impl_wifi_event!(NanStarted);
-impl_wifi_event!(NanStopped);
-impl_wifi_event!(NanSvcMatch, wifi_event_nan_svc_match_t);
-impl_wifi_event!(NanReplied, wifi_event_nan_replied_t);
-impl_wifi_event!(NanReceive, wifi_event_nan_receive_t);
-impl_wifi_event!(NdpIndication, wifi_event_ndp_indication_t);
-impl_wifi_event!(NdpConfirm, wifi_event_ndp_confirm_t);
-impl_wifi_event!(NdpTerminated, wifi_event_ndp_terminated_t);
+impl_wifi_event!(
+    AccessPointWifiProtectedStatusRegistrarSuccess,
+    wifi_event_ap_wps_rg_success_t
+);
+impl_wifi_event!(
+    AccessPointWifiProtectedStatusRegistrarFailed,
+    wifi_event_ap_wps_rg_fail_reason_t
+);
+impl_wifi_event!(AccessPointWifiProtectedStatusRegistrarTimeout);
+impl_wifi_event!(
+    AccessPointWifiProtectedStatusRegistrarPin,
+    wifi_event_ap_wps_rg_pin_t
+);
+impl_wifi_event!(AccessPointWifiProtectedStatusRegistrarPushButtonConfigurationOverlap);
+impl_wifi_event!(IndividualTargetWakeTimeSetup);
+impl_wifi_event!(IndividualTargetWakeTimeTeardown);
+impl_wifi_event!(IndividualTargetWakeTimeProbe);
+impl_wifi_event!(IndividualTargetWakeTimeSuspend);
+impl_wifi_event!(TargetWakeTimeWakeup);
+impl_wifi_event!(BroadcastTargetWakeTimeSetup);
+impl_wifi_event!(BroadcastTargetWakeTimeTeardown);
+impl_wifi_event!(NeighborAwarenessNetworkingStarted);
+impl_wifi_event!(NeighborAwarenessNetworkingStopped);
+impl_wifi_event!(
+    NeighborAwarenessNetworkingServiceMatch,
+    wifi_event_nan_svc_match_t
+);
+impl_wifi_event!(NeighborAwarenessNetworkingReplied, wifi_event_nan_replied_t);
+impl_wifi_event!(NeighborAwarenessNetworkingReceive, wifi_event_nan_receive_t);
+impl_wifi_event!(
+    NeighborDiscoveryProtocolIndication,
+    wifi_event_ndp_indication_t
+);
+impl_wifi_event!(
+    NeighborDiscoveryProtocolConfirmation,
+    wifi_event_ndp_confirm_t
+);
+impl_wifi_event!(
+    NeighborDiscoveryProtocolTerminated,
+    wifi_event_ndp_terminated_t
+);
 impl_wifi_event!(HomeChannelChange, wifi_event_home_channel_change_t);
-impl_wifi_event!(StaNeighborRep, wifi_event_neighbor_report_t);
+impl_wifi_event!(StationNeighborRep, wifi_event_neighbor_report_t);
 
-impl ApStaConnected<'_> {
+impl AccessPointStationConnected<'_> {
     /// Get the MAC address of the connected station.
     pub fn mac(&self) -> &[u8] {
         &self.0.mac
@@ -185,7 +224,7 @@ impl ApStaConnected<'_> {
     }
 }
 
-impl ApStaDisconnected<'_> {
+impl AccessPointStationDisconnected<'_> {
     /// Get the MAC address of the disconnected station.
     pub fn mac(&self) -> &[u8] {
         &self.0.mac
@@ -196,7 +235,7 @@ impl ApStaDisconnected<'_> {
         self.0.reason
     }
 
-    /// AID that the Soft-AP assigned to the disconnected station.
+    /// AID that the Soft-AccessPoint assigned to the disconnected station.
     pub fn aid(&self) -> u8 {
         self.0.aid
     }
@@ -224,7 +263,7 @@ impl ScanDone<'_> {
     }
 }
 
-impl StaConnected<'_> {
+impl StationConnected<'_> {
     /// Get the SSID of the connected station.
     pub fn ssid(&self) -> &[u8] {
         &self.0.ssid
@@ -256,7 +295,7 @@ impl StaConnected<'_> {
     }
 }
 
-impl StaDisconnected<'_> {
+impl StationDisconnected<'_> {
     /// Get the SSID of the disconnected station.
     pub fn ssid(&self) -> &[u8] {
         &self.0.ssid
@@ -283,23 +322,23 @@ impl StaDisconnected<'_> {
     }
 }
 
-/// All AP credentials received from WPS handshake.
+/// All access point credentials received from WPS handshake.
 #[repr(transparent)]
-pub struct ApCredential(wifi_event_sta_wps_er_success_t__bindgen_ty_1);
+pub struct AccessPointCredential(wifi_event_sta_wps_er_success_t__bindgen_ty_1);
 
-impl ApCredential {
-    /// Get the SSID of an AP.
+impl AccessPointCredential {
+    /// Get the SSID of an access point.
     pub fn ssid(&self) -> &[u8] {
         &self.0.ssid
     }
 
-    /// Get passphrase for the AP.
+    /// Get passphrase for the access point.
     pub fn passphrase(&self) -> &[u8] {
         &self.0.passphrase
     }
 }
 
-impl StaAuthmodeChange<'_> {
+impl StationAuthenticationModeChange<'_> {
     /// Get the old authentication mode.
     pub fn old_mode(&self) -> u32 {
         self.0.old_mode
@@ -311,23 +350,23 @@ impl StaAuthmodeChange<'_> {
     }
 }
 
-impl StaWpsErSuccess<'_> {
-    /// Get number of AP credentials received.
-    pub fn ap_cred_cnt(&self) -> u8 {
+impl StationWifiProtectedStatusEnrolleeSuccess<'_> {
+    /// Get number of access point credentials received.
+    pub fn access_point_cred_cnt(&self) -> u8 {
         self.0.ap_cred_cnt
     }
 
-    /// Get all AP credentials received.
-    pub fn ap_cred(&self) -> &[ApCredential] {
-        let array_ref: &[ApCredential; 3] =
+    /// Get all access point credentials received.
+    pub fn access_point_cred(&self) -> &[AccessPointCredential] {
+        let array_ref: &[AccessPointCredential; 3] =
             // cast reference of fixed-size array to wrapper type
-            unsafe { &*(&self.0.ap_cred as *const _ as *const [ApCredential; 3]) };
+            unsafe { &*(&self.0.ap_cred as *const _ as *const [AccessPointCredential; 3]) };
 
         &array_ref[..]
     }
 }
 
-impl StaWpsErPin<'_> {
+impl StationWifiProtectedStatusEnrolleePin<'_> {
     /// Get the PIN code received from the WPS.
     pub fn pin(&self) -> &[u8] {
         &self.0.pin_code
@@ -336,9 +375,9 @@ impl StaWpsErPin<'_> {
 
 /// A safe, read-only wrapper for a single FTM report entry.
 #[repr(transparent)]
-pub struct FtmReportEntry<'a>(&'a wifi_ftm_report_entry_t);
+pub struct FineTimingMeasurementReportEntry<'a>(&'a wifi_ftm_report_entry_t);
 
-impl FtmReportEntry<'_> {
+impl FineTimingMeasurementReportEntry<'_> {
     /// Gets the Dialog Token of the FTM frame.
     pub fn dialog_token(&self) -> u8 {
         self.0.dlog_token
@@ -375,7 +414,7 @@ impl FtmReportEntry<'_> {
     }
 }
 
-impl FtmReport<'_> {
+impl FineTimingMeasurementReport<'_> {
     /// Get the MAC address of the FTM peer.
     pub fn peer_mac(&self) -> &[u8] {
         &self.0.peer_mac
@@ -407,7 +446,7 @@ impl FtmReport<'_> {
     }
 
     /// Returns an iterator over the detailed FTM report entries.
-    pub fn entries(&self) -> impl Iterator<Item = FtmReportEntry<'_>> + '_ {
+    pub fn entries(&self) -> impl Iterator<Item = FineTimingMeasurementReportEntry<'_>> + '_ {
         let ptr = self.0.ftm_report_data;
         let len = self.0.ftm_report_num_entries as usize;
 
@@ -420,11 +459,11 @@ impl FtmReport<'_> {
             unsafe { core::slice::from_raw_parts(ptr, len) }
         };
 
-        entries_slice.iter().map(FtmReportEntry)
+        entries_slice.iter().map(FineTimingMeasurementReportEntry)
     }
 }
 
-impl ApProbeReqReceived<'_> {
+impl AccessPointProbeRequestReceived<'_> {
     /// Get received probe request SSID.
     pub fn rssi(&self) -> i32 {
         self.0.rssi
@@ -436,14 +475,14 @@ impl ApProbeReqReceived<'_> {
     }
 }
 
-impl StaBssRssiLow<'_> {
+impl StationBasicServiceSetReceivedSignalStrengthIndicatorLow<'_> {
     /// Get received probe request SSID of bss.
     pub fn rssi(&self) -> i32 {
         self.0.rssi
     }
 }
 
-impl ActionTxStatus<'_> {
+impl ActionTransmissionStatus<'_> {
     /// Get Wi-Fi interface to send request to.
     pub fn ifx(&self) -> u32 {
         self.0.ifx
@@ -470,21 +509,21 @@ impl ActionTxStatus<'_> {
     }
 }
 
-impl RocDone<'_> {
+impl RemainOnChannelDone<'_> {
     /// Get context to identify the request.
     pub fn context(&self) -> u32 {
         self.0.context
     }
 }
 
-impl ApWpsRgSuccess<'_> {
+impl AccessPointWifiProtectedStatusRegistrarSuccess<'_> {
     /// Get enrollee mac address.
     pub fn peer_mac(&self) -> &[u8] {
         &self.0.peer_macaddr
     }
 }
 
-impl ApWpsRgFailed<'_> {
+impl AccessPointWifiProtectedStatusRegistrarFailed<'_> {
     /// Get WPS failure reason.
     pub fn reason(&self) -> u32 {
         self.0.reason
@@ -496,14 +535,14 @@ impl ApWpsRgFailed<'_> {
     }
 }
 
-impl ApWpsRgPin<'_> {
+impl AccessPointWifiProtectedStatusRegistrarPin<'_> {
     /// Get the PIN code of station in enrollee mode.
     pub fn pin_code(&self) -> &[u8] {
         &self.0.pin_code
     }
 }
 
-impl NanSvcMatch<'_> {
+impl NeighborAwarenessNetworkingServiceMatch<'_> {
     /// Get the Subscribe Service ID.
     pub fn subscribe_id(&self) -> u8 {
         self.0.subscribe_id
@@ -525,7 +564,7 @@ impl NanSvcMatch<'_> {
     }
 }
 
-impl NanReplied<'_> {
+impl NeighborAwarenessNetworkingReplied<'_> {
     /// Get the Subscribe Service ID.
     pub fn subscribe_id(&self) -> u8 {
         self.0.subscribe_id
@@ -542,7 +581,7 @@ impl NanReplied<'_> {
     }
 }
 
-impl NanReceive<'_> {
+impl NeighborAwarenessNetworkingReceive<'_> {
     /// Get Our Service Identifier.
     pub fn inst_id(&self) -> u8 {
         self.0.inst_id
@@ -564,7 +603,7 @@ impl NanReceive<'_> {
     }
 }
 
-impl NdpIndication<'_> {
+impl NeighborDiscoveryProtocolIndication<'_> {
     /// Get Publish ID for NAN Service.
     pub fn publish_id(&self) -> u8 {
         self.0.publish_id
@@ -591,7 +630,7 @@ impl NdpIndication<'_> {
     }
 }
 
-impl NdpConfirm<'_> {
+impl NeighborDiscoveryProtocolConfirmation<'_> {
     /// Get NDP status code.
     pub fn status(&self) -> u8 {
         self.0.status
@@ -623,7 +662,7 @@ impl NdpConfirm<'_> {
     }
 }
 
-impl NdpTerminated<'_> {
+impl NeighborDiscoveryProtocolTerminated<'_> {
     /// Get termination reason code.
     pub fn reason(&self) -> u8 {
         self.0.reason
@@ -662,8 +701,8 @@ impl HomeChannelChange<'_> {
     }
 }
 
-impl StaNeighborRep<'_> {
-    /// Get the Neighbor Report received from the AP.
+impl StationNeighborRep<'_> {
+    /// Get the Neighbor Report received from the access point.
     pub fn report(&self) -> &[u8] {
         &self.0.report[..self.0.report_len as usize]
     }
@@ -716,134 +755,134 @@ pub(crate) unsafe fn dispatch_event_handler(
         WifiEvent::ScanDone => {
             handle_raw::<ScanDone<'_>>(event_data, event_data_size)
         }
-        WifiEvent::StaStart => {
-            handle_raw::<StaStart>(event_data, event_data_size)
+        WifiEvent::StationStart => {
+            handle_raw::<StationStart>(event_data, event_data_size)
         }
-        WifiEvent::StaStop => {
-            handle_raw::<StaStop>(event_data, event_data_size)
+        WifiEvent::StationStop => {
+            handle_raw::<StationStop>(event_data, event_data_size)
         }
-        WifiEvent::StaConnected => {
-            handle_raw::<StaConnected<'_>>(event_data, event_data_size)
+        WifiEvent::StationConnected => {
+            handle_raw::<StationConnected<'_>>(event_data, event_data_size)
         }
-        WifiEvent::StaDisconnected => {
-            handle_raw::<StaDisconnected<'_>>(event_data, event_data_size)
+        WifiEvent::StationDisconnected => {
+            handle_raw::<StationDisconnected<'_>>(event_data, event_data_size)
         }
-        WifiEvent::StaAuthmodeChange => {
-            handle_raw::<StaAuthmodeChange<'_>>(event_data, event_data_size)
+        WifiEvent::StationAuthenticationModeChange => {
+            handle_raw::<StationAuthenticationModeChange<'_>>(event_data, event_data_size)
         }
-        WifiEvent::StaWpsErSuccess => {
-            handle_raw::<StaWpsErSuccess<'_>>(event_data, event_data_size)
+        WifiEvent::StationWifiProtectedStatusEnrolleeSuccess => {
+            handle_raw::<StationWifiProtectedStatusEnrolleeSuccess<'_>>(event_data, event_data_size)
         }
-        WifiEvent::StaWpsErFailed => {
-            handle_raw::<StaWpsErFailed>(event_data, event_data_size)
+        WifiEvent::StationWifiProtectedStatusEnrolleeFailed => {
+            handle_raw::<StationWifiProtectedStatusEnrolleeFailed>(event_data, event_data_size)
         }
-        WifiEvent::StaWpsErTimeout => {
-            handle_raw::<StaWpsErTimeout>(event_data, event_data_size)
+        WifiEvent::StationWifiProtectedStatusEnrolleeTimeout => {
+            handle_raw::<StationWifiProtectedStatusEnrolleeTimeout>(event_data, event_data_size)
         }
-        WifiEvent::StaWpsErPin => {
-            handle_raw::<StaWpsErPin<'_>>(event_data, event_data_size)
+        WifiEvent::StationWifiProtectedStatusEnrolleePin => {
+            handle_raw::<StationWifiProtectedStatusEnrolleePin<'_>>(event_data, event_data_size)
         }
-        WifiEvent::StaWpsErPbcOverlap => {
-            handle_raw::<StaWpsErPbcOverlap>(event_data, event_data_size)
+        WifiEvent::StationWifiProtectedStatusEnrolleePushButtonConfigurationOverlap => {
+            handle_raw::<StationWifiProtectedStatusEnrolleePushButtonConfigurationOverlap>(event_data, event_data_size)
         }
-        WifiEvent::ApStart => {
-            handle_raw::<ApStart>(event_data, event_data_size)
+        WifiEvent::AccessPointStart => {
+            handle_raw::<AccessPointStart>(event_data, event_data_size)
         }
-        WifiEvent::ApStop => {
-            handle_raw::<ApStop>(event_data, event_data_size)
+        WifiEvent::AccessPointStop => {
+            handle_raw::<AccessPointStop>(event_data, event_data_size)
         }
-        WifiEvent::ApStaConnected => {
-            handle_raw::<ApStaConnected<'_>>(event_data, event_data_size)
+        WifiEvent::AccessPointStationConnected => {
+            handle_raw::<AccessPointStationConnected<'_>>(event_data, event_data_size)
         }
-        WifiEvent::ApStaDisconnected => {
-            handle_raw::<ApStaDisconnected<'_>>(event_data, event_data_size)
+        WifiEvent::AccessPointStationDisconnected => {
+            handle_raw::<AccessPointStationDisconnected<'_>>(event_data, event_data_size)
         }
-        WifiEvent::ApProbeReqReceived => {
-            handle_raw::<ApProbeReqReceived<'_>>(event_data, event_data_size)
+        WifiEvent::AccessPointProbeRequestReceived => {
+            handle_raw::<AccessPointProbeRequestReceived<'_>>(event_data, event_data_size)
         }
-        WifiEvent::FtmReport => {
-            handle_raw::<FtmReport<'_>>(event_data, event_data_size)
+        WifiEvent::FineTimingMeasurementReport => {
+            handle_raw::<FineTimingMeasurementReport<'_>>(event_data, event_data_size)
         }
-        WifiEvent::StaBssRssiLow => {
-            handle_raw::<StaBssRssiLow<'_>>(event_data, event_data_size)
+        WifiEvent::StationBasicServiceSetReceivedSignalStrengthIndicatorLow => {
+            handle_raw::<StationBasicServiceSetReceivedSignalStrengthIndicatorLow<'_>>(event_data, event_data_size)
         }
-        WifiEvent::ActionTxStatus => {
-            handle_raw::<ActionTxStatus<'_>>(event_data, event_data_size)
+        WifiEvent::ActionTransmissionStatus => {
+            handle_raw::<ActionTransmissionStatus<'_>>(event_data, event_data_size)
         }
-        WifiEvent::RocDone => {
-            handle_raw::<RocDone<'_>>(event_data, event_data_size)
+        WifiEvent::RemainOnChannelDone => {
+            handle_raw::<RemainOnChannelDone<'_>>(event_data, event_data_size)
         }
-        WifiEvent::StaBeaconTimeout => {
-            handle_raw::<StaBeaconTimeout>(event_data, event_data_size)
+        WifiEvent::StationBeaconTimeout => {
+            handle_raw::<StationBeaconTimeout>(event_data, event_data_size)
         }
         WifiEvent::ConnectionlessModuleWakeIntervalStart => {
             handle_raw::<ConnectionlessModuleWakeIntervalStart>(event_data, event_data_size)
         }
-        WifiEvent::ApWpsRgSuccess => {
-            handle_raw::<ApWpsRgSuccess<'_>>(event_data, event_data_size)
+        WifiEvent::AccessPointWifiProtectedStatusRegistrarSuccess => {
+            handle_raw::<AccessPointWifiProtectedStatusRegistrarSuccess<'_>>(event_data, event_data_size)
         }
-        WifiEvent::ApWpsRgFailed => {
-            handle_raw::<ApWpsRgFailed<'_>>(event_data, event_data_size)
+        WifiEvent::AccessPointWifiProtectedStatusRegistrarFailed => {
+            handle_raw::<AccessPointWifiProtectedStatusRegistrarFailed<'_>>(event_data, event_data_size)
         }
-        WifiEvent::ApWpsRgTimeout => {
-            handle_raw::<ApWpsRgTimeout>(event_data, event_data_size)
+        WifiEvent::AccessPointWifiProtectedStatusRegistrarTimeout => {
+            handle_raw::<AccessPointWifiProtectedStatusRegistrarTimeout>(event_data, event_data_size)
         }
-        WifiEvent::ApWpsRgPin => {
-            handle_raw::<ApWpsRgPin<'_>>(event_data, event_data_size)
+        WifiEvent::AccessPointWifiProtectedStatusRegistrarPin => {
+            handle_raw::<AccessPointWifiProtectedStatusRegistrarPin<'_>>(event_data, event_data_size)
         }
-        WifiEvent::ApWpsRgPbcOverlap => {
-            handle_raw::<ApWpsRgPbcOverlap>(event_data, event_data_size)
+        WifiEvent::AccessPointWifiProtectedStatusRegistrarPushButtonConfigurationOverlap => {
+            handle_raw::<AccessPointWifiProtectedStatusRegistrarPushButtonConfigurationOverlap>(event_data, event_data_size)
         }
-        WifiEvent::ItwtSetup => {
-            handle_raw::<ItwtSetup>(event_data, event_data_size)
+        WifiEvent::IndividualTargetWakeTimeSetup => {
+            handle_raw::<IndividualTargetWakeTimeSetup>(event_data, event_data_size)
         }
-        WifiEvent::ItwtTeardown => {
-            handle_raw::<ItwtTeardown>(event_data, event_data_size)
+        WifiEvent::IndividualTargetWakeTimeTeardown => {
+            handle_raw::<IndividualTargetWakeTimeTeardown>(event_data, event_data_size)
         }
-        WifiEvent::ItwtProbe => {
-            handle_raw::<ItwtProbe>(event_data, event_data_size)
+        WifiEvent::IndividualTargetWakeTimeProbe => {
+            handle_raw::<IndividualTargetWakeTimeProbe>(event_data, event_data_size)
         }
-        WifiEvent::ItwtSuspend => {
-            handle_raw::<ItwtSuspend>(event_data, event_data_size)
+        WifiEvent::IndividualTargetWakeTimeSuspend => {
+            handle_raw::<IndividualTargetWakeTimeSuspend>(event_data, event_data_size)
         }
-        WifiEvent::TwtWakeup => {
-            handle_raw::<TwtWakeup>(event_data, event_data_size)
+        WifiEvent::TargetWakeTimeWakeup => {
+            handle_raw::<TargetWakeTimeWakeup>(event_data, event_data_size)
         }
-        WifiEvent::BtwtSetup => {
-            handle_raw::<BtwtSetup>(event_data, event_data_size)
+        WifiEvent::BroadcastTargetWakeTimeSetup => {
+            handle_raw::<BroadcastTargetWakeTimeSetup>(event_data, event_data_size)
         }
-        WifiEvent::BtwtTeardown => {
-            handle_raw::<BtwtTeardown>(event_data, event_data_size)
+        WifiEvent::BroadcastTargetWakeTimeTeardown => {
+            handle_raw::<BroadcastTargetWakeTimeTeardown>(event_data, event_data_size)
         }
-        WifiEvent::NanStarted => {
-            handle_raw::<NanStarted>(event_data, event_data_size)
+        WifiEvent::NeighborAwarenessNetworkingStarted => {
+            handle_raw::<NeighborAwarenessNetworkingStarted>(event_data, event_data_size)
         }
-        WifiEvent::NanStopped => {
-            handle_raw::<NanStopped>(event_data, event_data_size)
+        WifiEvent::NeighborAwarenessNetworkingStopped => {
+            handle_raw::<NeighborAwarenessNetworkingStopped>(event_data, event_data_size)
         }
-        WifiEvent::NanSvcMatch => {
-            handle_raw::<NanSvcMatch<'_>>(event_data, event_data_size)
+        WifiEvent::NeighborAwarenessNetworkingServiceMatch => {
+            handle_raw::<NeighborAwarenessNetworkingServiceMatch<'_>>(event_data, event_data_size)
         }
-        WifiEvent::NanReplied => {
-            handle_raw::<NanReplied<'_>>(event_data, event_data_size)
+        WifiEvent::NeighborAwarenessNetworkingReplied => {
+            handle_raw::<NeighborAwarenessNetworkingReplied<'_>>(event_data, event_data_size)
         }
-        WifiEvent::NanReceive => {
-            handle_raw::<NanReceive<'_>>(event_data, event_data_size)
+        WifiEvent::NeighborAwarenessNetworkingReceive => {
+            handle_raw::<NeighborAwarenessNetworkingReceive<'_>>(event_data, event_data_size)
         }
-        WifiEvent::NdpIndication => {
-            handle_raw::<NdpIndication<'_>>(event_data, event_data_size)
+        WifiEvent::NeighborDiscoveryProtocolIndication => {
+            handle_raw::<NeighborDiscoveryProtocolIndication<'_>>(event_data, event_data_size)
         }
-        WifiEvent::NdpConfirm => {
-            handle_raw::<NdpConfirm<'_>>(event_data, event_data_size)
+        WifiEvent::NeighborDiscoveryProtocolConfirmation => {
+            handle_raw::<NeighborDiscoveryProtocolConfirmation<'_>>(event_data, event_data_size)
         }
-        WifiEvent::NdpTerminated => {
-            handle_raw::<NdpTerminated<'_>>(event_data, event_data_size)
+        WifiEvent::NeighborDiscoveryProtocolTerminated => {
+            handle_raw::<NeighborDiscoveryProtocolTerminated<'_>>(event_data, event_data_size)
         }
         WifiEvent::HomeChannelChange => {
             handle_raw::<HomeChannelChange<'_>>(event_data, event_data_size)
         }
-        WifiEvent::StaNeighborRep => {
-            handle_raw::<StaNeighborRep<'_>>(event_data, event_data_size)
+        WifiEvent::StationNeighborRep => {
+            handle_raw::<StationNeighborRep<'_>>(event_data, event_data_size)
         }
     }
 }}

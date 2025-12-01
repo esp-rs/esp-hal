@@ -88,7 +88,9 @@ impl ClockTreeNodeType for Multiplexer {
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
 
         quote! {
-            fn #hal_impl(_clocks: &mut ClockTree, _old_selector: Option<#ty_name>, _new_selector: #ty_name) {}
+            fn #hal_impl(_clocks: &mut ClockTree, _old_selector: Option<#ty_name>, _new_selector: #ty_name) {
+                todo!()
+            }
         }
     }
 

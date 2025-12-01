@@ -27,9 +27,9 @@ use esp_radio::wifi::{
     WifiController,
     WifiDevice,
     WifiEvent,
-    WifiStaState,
-    sta::ClientConfig,
-    sta_state,
+    WifiStationState,
+    sta::StationConfig,
+    station_state,
 };
 use static_cell::StaticCell;
 
@@ -65,12 +65,12 @@ async fn connection_manager(
     println!("📡 Starting WiFi connection manager");
 
     if !matches!(controller.is_started(), Ok(true)) {
-        let client_config = ModeConfig::Client(
-            ClientConfig::default()
+        let station_config = ModeConfig::Station(
+            StationConfig::default()
                 .with_ssid(SSID.into())
                 .with_password(PASSWORD.into()),
         );
-        controller.set_config(&client_config).unwrap();
+        controller.set_config(&station_config).unwrap();
         println!("🔄 Starting WiFi...");
         controller.start_async().await.unwrap();
         println!("✅ WiFi started");
@@ -86,9 +86,11 @@ async fn connection_manager(
     }
 
     loop {
-        match sta_state() {
-            WifiStaState::Connected => {
-                controller.wait_for_event(WifiEvent::StaDisconnected).await;
+        match station_state() {
+            WifiStationState::Connected => {
+                controller
+                    .wait_for_event(WifiEvent::StationDisconnected)
+                    .await;
                 println!("📶 WiFi connection lost - attempting reconnection");
                 Timer::after(Duration::from_millis(2000)).await;
                 match controller.connect_async().await {
@@ -244,7 +246,7 @@ async fn main(spawner: Spawner) {
     // WiFi + network stack
     let (controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
-    let wifi_interface = interfaces.sta;
+    let wifi_interface = interfaces.station;
 
     let config = embassy_net::Config::dhcpv4(Default::default());
     let rng = Rng::new();
