@@ -392,10 +392,6 @@ unsafe extern "C" fn task_create(
     );
 
     unsafe {
-        *(task_handle as *mut usize) = 0;
-    } // we will run it in task 0
-
-    unsafe {
         let task_func = transmute::<*mut c_void, extern "C" fn(*mut c_void)>(task_func);
 
         let task = crate::preempt::task_create(
