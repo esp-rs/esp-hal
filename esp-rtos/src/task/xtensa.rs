@@ -88,7 +88,7 @@ pub(crate) fn new_task_context(
         // For windowed ABI set WOE, UM, EXCM and CALLINC1 (pretend task was 'call4'd)
         // UM and EXCM are important, so that restoring context will correctly restore an exception
         // context (where the context switch happens).
-        PS: 0x00060030,
+        PS: 0x00050030,
 
         ..Default::default()
     }
