@@ -73,7 +73,7 @@ The same configuration in VSCode is:
     "embassy",
     "esp-radio",
     "rtos-trace"
-  ],
+  ]
 }
 ```
 
