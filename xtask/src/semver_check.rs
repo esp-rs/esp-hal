@@ -7,6 +7,7 @@ use std::{
 use anyhow::{Context, Error};
 use cargo_semver_checks::{Check, GlobalConfig, ReleaseType, Rustdoc};
 use esp_metadata::{Chip, Config};
+use toml_edit::{Item, Value};
 
 use crate::{Package, cargo::CargoArgsBuilder, commands::checker::download_baselines};
 
@@ -52,7 +53,6 @@ pub fn minimum_update(
     let mut cfg = GlobalConfig::new();
     cfg.set_log_level(Some(log::Level::Info));
     let result = semver_check.check_release(&mut cfg)?;
-    log::info!("Result {:?}", result);
 
     let mut min_required_update = ReleaseType::Patch;
     for (_, report) in result.crate_reports() {
@@ -63,6 +63,28 @@ pub fn minimum_update(
                 min_required_update = required_bump;
             }
         }
+    }
+
+    let forever_unstable = package
+        .toml()
+        .espressif_metadata()
+        .and_then(|metadata| metadata.get("forever-unstable"))
+        .map(|item| match item {
+            Item::Value(Value::Boolean(b)) => *b.value(),
+            Item::Value(_) => {
+                log::warn!("Invalid value for 'forever-unstable' in metadata - must be a boolean");
+                true
+            }
+            _ => false,
+        })
+        .unwrap_or(false);
+
+    if forever_unstable && min_required_update == ReleaseType::Major {
+        log::warn!(
+            "Downgrading required bump from Minor to Patch for unstable package: {}",
+            package
+        );
+        min_required_update = ReleaseType::Minor;
     }
 
     Ok(min_required_update)
