@@ -1300,7 +1300,8 @@ where
     ///
     /// The UART hardware continuously receives bytes and stores them in the RX
     /// FIFO. This function reads the bytes from the RX FIFO and returns
-    /// them in the provided buffer, without blocking.
+    /// them in the provided buffer. If the hardware buffer is empty, this
+    /// function will block until data is available.
     ///
     /// The function returns the number of bytes read into the buffer. This may
     /// be less than the length of the buffer. This function only returns 0
@@ -1874,7 +1875,8 @@ where
     ///
     /// The UART hardware continuously receives bytes and stores them in the RX
     /// FIFO. This function reads the bytes from the RX FIFO and returns
-    /// them in the provided buffer, without blocking.
+    /// them in the provided buffer. If the hardware buffer is empty, this
+    /// function will block until data is available.
     ///
     /// The function returns the number of bytes read into the buffer. This may
     /// be less than the length of the buffer. This function only returns 0
