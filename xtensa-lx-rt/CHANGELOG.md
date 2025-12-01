@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed offset of `DoubleException` handler (#?)
+- Fixed offset of `DoubleException` handler (#4580)
 
 ### Removed
 
