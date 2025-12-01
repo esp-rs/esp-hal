@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue on ESP32 that prevented completing some interrupt handlers (#4459)
 - Fixed a possible deadlock on multi-core chips (#4478)
 - Fixed a memory leak of 48 bytes when deleting esp-radio timers (#4541)
+- Fixed a rare crash on Xtensa MCUs (#4580)
 
 ### Removed
 
