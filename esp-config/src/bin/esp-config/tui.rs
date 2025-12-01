@@ -99,18 +99,18 @@ impl Repository {
     }
 
     fn current_level(&self) -> Vec<Item> {
-        if self.current_crate.is_none() {
+        if let Some(crate_index) = self.current_crate {
+            Vec::from_iter(
+                self.configs[crate_index]
+                    .options
+                    .iter()
+                    .map(|option| Item::CrateLevel(option.clone())),
+            )
+        } else {
             Vec::from_iter(
                 self.configs
                     .iter()
                     .map(|config| Item::TopLevel(config.name.clone())),
-            )
-        } else {
-            Vec::from_iter(
-                self.configs[self.current_crate.unwrap()]
-                    .options
-                    .iter()
-                    .map(|option| Item::CrateLevel(option.clone())),
             )
         }
     }
