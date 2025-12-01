@@ -1,0 +1,72 @@
+name: Backport merged PR
+
+on:
+  pull_request_target: 
+    types: [closed]     # this workflow will act on closed PR - no sense in opening PR with unconfirmed changes
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  backport:
+    # only already merged PRs that have at least one "*-backport" label
+    if: >
+      github.event.pull_request.merged == true &&
+      contains(join(github.event.pull_request.labels.*.name, ' '), '-backport')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # for the benefit of backport-action, which relies on full history.
+
+      - name: Detect package and target backport branch
+        id: detect
+        run: |
+          labels=$(jq -r '.pull_request.labels[].name' "$GITHUB_EVENT_PATH" 2>/dev/null || true)
+
+          # first label ending in "-backport"
+          pkg_label=$(printf '%s\n' "$labels" | grep -- '-backport$' | head -n1 || true)
+
+          if [ -z "$pkg_label" ]; then
+            echo "No *-backport label found, nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          
+          # Strip the "-backport" suffix from the label:
+          pkg=${pkg_label%-backport}
+          echo "Detected package: $pkg"
+
+          # find backport branches (<pkg>-<major>.<minor>.x)
+          branches=$(git ls-remote --heads origin "${pkg}-*.x" | while read -r _ ref; do
+            # ref is like "refs/heads/esp-hal-1.2.x" -> strip "refs/heads/"
+            echo "${ref#refs/heads/}"
+          done)
+
+          if [ -z "$branches" ]; then
+            echo "No backport branches found for $pkg; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Found candidate backport branches"
+
+          # sort by version and pick the last (highest) one
+          target=$(printf '%s\n' "$branches" | sort -V | tail -n1)
+          echo "Using target backport branch: $target"
+          echo "target_branch=$target" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if nothing to do
+        if: steps.detect.outputs.skip == 'true'
+        run: echo "Skipping backport job."
+
+      - name: Create backport PR via backport-action
+        if: steps.detect.outputs.skip != 'true'
+        uses: korthout/backport-action@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          target_branches: ${{ steps.detect.outputs.target_branch }}
+          label_pattern: '.*-backport$'
