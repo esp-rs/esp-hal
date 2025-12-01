@@ -15,7 +15,7 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
 ### rust-analyzer
 
 The repository contains multiple crates, with support for multiple different devices. `rust-analyzer` is not able to handle the complete repository at once, so you will need to change configuration depending on what you work on.
-You will need to point `rust-analyzer` to one of the crates you want to work on, using `linked-projects`. While this option can be used to add multiple crates to the workspace, we often need to enable features
+You will need to point `rust-analyzer` to one of the crates you want to work on, using `linkedProjects`. While this option can be used to add multiple crates to the workspace, we often need to enable features
 on them which may only exist in one of the crates (e.g. `esp-radio`'s `wifi` feature). The recommendation is, therefore, to only enable a single crate at a time - ideally one that pulls in other crates as a dependency.
 
 Additionally, you will need to specify the target triple of your particular chip, enable the chip's Cargo feature, and select the `esp` toolchain if you are working with an Xtensa MCU.
