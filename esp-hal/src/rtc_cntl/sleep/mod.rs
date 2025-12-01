@@ -15,7 +15,7 @@
 //!    * `BT (Bluetooth) wake` - light sleep only
 
 use core::cell::RefCell;
-#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2))]
+#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2, esp32h2))]
 use core::time::Duration;
 
 #[cfg(any(esp32, esp32s2, esp32s3))]
@@ -30,6 +30,7 @@ use crate::rtc_cntl::Rtc;
 #[cfg_attr(esp32c3, path = "esp32c3.rs")]
 #[cfg_attr(esp32c6, path = "esp32c6.rs")]
 #[cfg_attr(esp32c2, path = "esp32c2.rs")]
+#[cfg_attr(esp32h2, path = "esp32h2.rs")]
 mod sleep_impl;
 
 pub use sleep_impl::*;
@@ -70,13 +71,13 @@ pub enum WakeupLevel {
 /// # {after_snippet}
 /// ```
 #[derive(Debug, Default, Clone, Copy)]
-#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2))]
+#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2, esp32h2))]
 pub struct TimerWakeupSource {
     /// The duration after which the wake-up event is triggered.
     duration: Duration,
 }
 
-#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2))]
+#[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2, esp32h2))]
 impl TimerWakeupSource {
     /// Creates a new timer wake-up source with the specified duration.
     pub fn new(duration: Duration) -> Self {

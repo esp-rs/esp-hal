@@ -164,7 +164,7 @@ pub(crate) fn esp32h2_rtc_apb_freq_update(apb_freq: ApbClock) {
         .modify(|_, w| unsafe { w.data().bits(value) });
 }
 
-fn clk_ll_cpu_set_divider(divider: u32) {
+pub(crate) fn clk_ll_cpu_set_divider(divider: u32) {
     assert!(divider >= 1);
 
     PCR::regs()
@@ -172,7 +172,7 @@ fn clk_ll_cpu_set_divider(divider: u32) {
         .modify(|_, w| unsafe { w.cpu_div_num().bits((divider - 1) as u8) });
 }
 
-fn clk_ll_ahb_set_divider(divider: u32) {
+pub(crate) fn clk_ll_ahb_set_divider(divider: u32) {
     assert!(divider >= 1);
 
     PCR::regs()
@@ -180,7 +180,7 @@ fn clk_ll_ahb_set_divider(divider: u32) {
         .modify(|_, w| unsafe { w.ahb_div_num().bits((divider - 1) as u8) });
 }
 
-fn clk_ll_bus_update() {
+pub(crate) fn clk_ll_bus_update() {
     PCR::regs()
         .bus_clk_update()
         .modify(|_, w| w.bus_clock_update().bit(true));

@@ -1,8 +1,19 @@
 use strum::FromRepr;
 
 use crate::{
-    clock::{RtcClock, RtcFastClock, RtcSlowClock, clocks_ll::regi2c_write_mask},
-    peripherals::{LP_AON, PMU},
+    clock::{
+        Clock,
+        RtcClock,
+        RtcFastClock,
+        RtcSlowClock,
+        clocks_ll::{
+            clk_ll_ahb_set_divider,
+            clk_ll_bus_update,
+            clk_ll_cpu_set_divider,
+            regi2c_write_mask,
+        },
+    },
+    peripherals::{LP_AON, PCR, PMU},
     rtc_cntl::RtcCalSel,
 };
 
@@ -36,6 +47,13 @@ const I2C_PMU_OR_XPD_DIG_REG_LSB: u8 = 5;
 const I2C_PMU_OR_XPD_TRX: u8 = 15;
 const I2C_PMU_OR_XPD_TRX_MSB: u8 = 2;
 const I2C_PMU_OR_XPD_TRX_LSB: u8 = 2;
+
+const I2C_BIAS: u8 = 0x6a;
+const I2C_BIAS_HOSTID: u8 = 0;
+
+const I2C_BIAS_DREG_0P8: u8 = 0;
+const I2C_BIAS_DREG_0P8_MSB: u8 = 7;
+const I2C_BIAS_DREG_0P8_LSB: u8 = 4;
 
 pub(crate) fn init() {
     // * No peripheral reg i2c power up required on the target */
@@ -95,6 +113,14 @@ pub(crate) fn init() {
         I2C_PMU_OR_XPD_TRX_LSB,
         0,
     );
+    regi2c_write_mask(
+        I2C_BIAS,
+        I2C_BIAS_HOSTID,
+        I2C_BIAS_DREG_0P8,
+        I2C_BIAS_DREG_0P8_MSB,
+        I2C_BIAS_DREG_0P8_LSB,
+        8,
+    );
 
     let pmu = PMU::regs();
     unsafe {
@@ -109,6 +135,43 @@ pub(crate) fn init() {
             .modify(|_, w| w.hp_active_hp_regulator_dbias().bits(25));
         pmu.hp_sleep_lp_regulator0()
             .modify(|_, w| w.hp_sleep_lp_regulator_dbias().bits(26));
+
+        pmu.hp_sleep_dig_power().modify(|_, w| {
+            w.hp_sleep_vdd_spi_pd_en()
+                .set_bit()
+                .hp_sleep_pd_hp_wifi_pd_en()
+                .set_bit()
+                .hp_sleep_pd_hp_cpu_pd_en()
+                .set_bit()
+                .hp_sleep_pd_top_pd_en()
+                .set_bit()
+        });
+
+        pmu.hp_active_hp_ck_power().modify(|_, w| {
+            w.hp_active_xpd_bbpll()
+                .set_bit()
+                .hp_active_xpd_bb_i2c()
+                .set_bit()
+                .hp_active_xpd_bbpll_i2c()
+                .set_bit()
+        });
+
+        pmu.hp_active_sysclk().modify(|_, w| {
+            w.hp_active_icg_sys_clock_en()
+                .set_bit()
+                .hp_active_sys_clk_slp_sel()
+                .clear_bit()
+                .hp_active_icg_slp_sel()
+                .clear_bit()
+        });
+        pmu.hp_sleep_sysclk().modify(|_, w| {
+            w.hp_sleep_icg_sys_clock_en()
+                .clear_bit()
+                .hp_sleep_sys_clk_slp_sel()
+                .set_bit()
+                .hp_sleep_icg_slp_sel()
+                .set_bit()
+        });
 
         pmu.slp_wakeup_cntl5()
             .modify(|_, w| w.lp_ana_wait_target().bits(15));
@@ -184,4 +247,131 @@ pub enum SocResetReason {
     CoreUsbJtag   = 0x16,
     /// Glitch on power resets the digital core
     CorePwrGlitch = 0x17,
+}
+
+bitfield::bitfield! {
+    /// Representation of `PMU_HP_{ACTIVE,SLEEP}_DIG_POWER_REG` registers.
+    #[derive(Clone, Copy, Default)]
+    pub struct HpDigPower(u32);
+
+    pub bool, vdd_spi_pd_en, set_vdd_spi_pd_en: 21;
+    pub bool, mem_dslp     , set_mem_dslp     : 22;
+    pub bool, modem_pd_en  , set_modem_pd_en  : 27;
+    pub bool, cpu_pd_en    , set_cpu_pd_en    : 29;
+    pub bool, top_pd_en    , set_top_pd_en    : 31;
+}
+
+bitfield::bitfield! {
+    /// Representation of `PMU_HP_{ACTIVE,SLEEP}_HP_CK_POWER_REG` registers.
+    #[derive(Clone, Copy, Default)]
+    pub struct HpClkPower(u32);
+
+    pub bool, xpd_bbpll    , set_xpd_bbpll    : 30;
+}
+
+bitfield::bitfield! {
+    /// Representation of `PMU_{HP_ACTIVE,HP_SLEEP,LP_SLEEP}_XTAL_REG` register.
+    #[derive(Clone, Copy, Default)]
+    pub struct XtalPower(u32);
+
+    pub bool, xpd_xtal     , set_xpd_xtal     : 31;
+}
+
+/// Combined HP system power settings.
+#[derive(Clone, Copy, Default)]
+pub struct HpSysPower {
+    pub dig_power: HpDigPower,
+    pub clk: HpClkPower,
+    pub xtal: XtalPower,
+}
+
+bitfield::bitfield! {
+    /// Representation of `PMU_{HP,LP}_SLEEP_LP_DIG_POWER_REG`.
+    #[derive(Clone, Copy, Default)]
+    pub struct LpDigPower(u32);
+
+    pub bool, bod_source_sel, set_bod_source_sel : 27;
+    pub u32, vddbat_mode, set_vddbat_mode : 29, 28;
+    pub u32, mem_dslp  , set_mem_dslp  : 30;
+
+}
+
+bitfield::bitfield! {
+    /// Representation of `PMU_{HP,LP}_SLEEP_LP_CK_POWER_REG`.
+    #[derive(Clone, Copy, Default)]
+    pub struct LpClkPower(u32);
+
+    pub u32, xpd_xtal32k, set_xpd_xtal32k: 28;
+    pub u32, xpd_fosc   , set_xpd_fosc   : 30;
+}
+
+/// Combined LP system power settings.
+#[derive(Clone, Copy, Default)]
+pub struct LpSysPower {
+    pub dig_power: LpDigPower,
+    pub clk_power: LpClkPower,
+    pub xtal: XtalPower,
+}
+
+bitfield::bitfield! {
+    /// Representation of `PMU_HP_{ACTIVE,SLEEP}_HP_SYS_CNTL_REG` register.
+    #[derive(Clone, Copy, Default)]
+    pub struct HpSysCntlReg(u32);
+
+    pub bool, uart_wakeup_en , set_uart_wakeup_en : 24;
+    pub bool, lp_pad_hold_all, set_lp_pad_hold_all: 25;
+    pub bool, hp_pad_hold_all, set_hp_pad_hold_all: 26;
+    pub bool, dig_pad_slp_sel, set_dig_pad_slp_sel: 27;
+    pub bool, dig_pause_wdt  , set_dig_pause_wdt  : 28;
+    pub bool, dig_cpu_stall  , set_dig_cpu_stall  : 29;
+}
+
+/// Representation of `PCR_SOC_CLK_SEL` values in `PCR_SYSCLK_CONF_REG` register.
+#[derive(Clone, Copy, PartialEq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(crate) enum CpuClockSource {
+    Xtal,
+    PllF96M,
+    RcFast,
+    PllF64M,
+}
+
+impl CpuClockSource {
+    fn current() -> Self {
+        match PCR::regs().sysclk_conf().read().soc_clk_sel().bits() {
+            0 => CpuClockSource::Xtal,
+            1 => CpuClockSource::PllF96M,
+            3 => CpuClockSource::PllF64M,
+            2 => CpuClockSource::RcFast,
+            _ => unreachable!("PCR_SOC_CLK_SEL is only 2 bits long"),
+        }
+    }
+
+    fn select(self) {
+        PCR::regs().sysclk_conf().modify(|_, w| unsafe {
+            w.soc_clk_sel().bits(match self {
+                CpuClockSource::Xtal => 0,
+                CpuClockSource::PllF96M => 1,
+                CpuClockSource::RcFast => 2,
+                CpuClockSource::PllF64M => 3,
+            })
+        });
+    }
+}
+
+fn rtc_clk_cpu_freq_to_xtal(freq_mhz: u32, div: u8) {
+    clk_ll_cpu_set_divider(div as u32);
+    clk_ll_ahb_set_divider(div as u32);
+
+    CpuClockSource::Xtal.select();
+    clk_ll_bus_update();
+
+    crate::rom::ets_update_cpu_frequency_rom(freq_mhz);
+}
+
+pub(crate) fn rtc_clk_cpu_freq_set_xtal() {
+    // rtc_clk_cpu_set_to_default_config
+    let freq = RtcClock::xtal_freq().mhz();
+
+    rtc_clk_cpu_freq_to_xtal(freq, 1);
 }
