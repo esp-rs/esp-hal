@@ -54,43 +54,43 @@ SECTIONS {
 
   .vectors :
   {
-    /* 
-      Each vector has 64 bytes that it must fit inside. For each vector we calculate the size of the previous one, 
+    /*
+      Each vector has 64 bytes that it must fit inside. For each vector we calculate the size of the previous one,
       and subtract that from 64 and start the new vector there.
     */
     _init_start = ABSOLUTE(.);
-    . = ALIGN(64);
+    . = 0x0;
     KEEP(*(.WindowOverflow4.text));
-    . = ALIGN(64);
+    . = 0x40;
     KEEP(*(.WindowUnderflow4.text));
-    . = ALIGN(64);
+    . = 0x80;
     KEEP(*(.WindowOverflow8.text));
-    . = ALIGN(64);
+    . = 0xC0;
     KEEP(*(.WindowUnderflow8.text));
-    . = ALIGN(64);
+    . = 0x100;
     KEEP(*(.WindowOverflow12.text));
-    . = ALIGN(64);
+    . = 0x140;
     KEEP(*(.WindowUnderflow12.text));
-    . = ALIGN(64);
+    . = 0x180;
     KEEP(*(.Level2InterruptVector.text));
-    . = ALIGN(64);
+    . = 0x1C0;
     KEEP(*(.Level3InterruptVector.text));
-    . = ALIGN(64);
+    . = 0x200;
     KEEP(*(.Level4InterruptVector.text));
-    . = ALIGN(64);
+    . = 0x240;
     KEEP(*(.Level5InterruptVector.text));
-    . = ALIGN(64);
+    . = 0x280;
     KEEP(*(.DebugExceptionVector.text));
-    . = ALIGN(64);
+    . = 0x2C0;
     KEEP(*(.NMIExceptionVector.text));
-    . = ALIGN(64);
+    . = 0x300;
     KEEP(*(.KernelExceptionVector.text));
-    . = ALIGN(64);
+    . = 0x340;
     KEEP(*(.UserExceptionVector.text));
-    . = ALIGN(128);
+    /* mind the gap */
+    . = 0x3C0;
     KEEP(*(.DoubleExceptionVector.text));
-    . = ALIGN(64);
-    . = ALIGN(0x400);
+    . = 0x400;
     _init_end = ABSOLUTE(.);
   } > vectors_seg
 }
