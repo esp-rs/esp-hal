@@ -3,22 +3,21 @@
 use alloc::boxed::Box;
 
 use super::{WifiError, c_types::c_void, esp_wifi_result};
+#[cfg(esp32c6)]
+use crate::sys::include::wifi_csi_acquire_config_t;
 use crate::sys::include::{
     esp_wifi_set_csi,
     esp_wifi_set_csi_config,
     esp_wifi_set_csi_rx_cb,
-    wifi_csi_acquire_config_t,
     wifi_csi_config_t,
+    wifi_csi_info_t,
 };
 
-pub(crate) trait CsiCallback: FnMut(crate::sys::include::wifi_csi_info_t) {}
+pub(crate) trait CsiCallback: FnMut(wifi_csi_info_t) {}
 
-impl<T> CsiCallback for T where T: FnMut(crate::sys::include::wifi_csi_info_t) {}
+impl<T> CsiCallback for T where T: FnMut(wifi_csi_info_t) {}
 
-unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
-    ctx: *mut c_void,
-    data: *mut crate::sys::include::wifi_csi_info_t,
-) {
+unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(ctx: *mut c_void, data: *mut wifi_csi_info_t) {
     unsafe {
         let csi_callback = &mut *(ctx as *mut C);
         csi_callback(*data);
