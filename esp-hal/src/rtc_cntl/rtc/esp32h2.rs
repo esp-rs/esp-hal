@@ -2,18 +2,13 @@ use strum::FromRepr;
 
 use crate::{
     clock::{
-        Clock,
         RtcClock,
         RtcFastClock,
         RtcSlowClock,
-        clocks_ll::{
-            clk_ll_ahb_set_divider,
-            clk_ll_bus_update,
-            clk_ll_cpu_set_divider,
-            regi2c_write_mask,
-        },
+        XtalClock,
+        clocks_ll::{esp32h2_rtc_update_to_xtal, regi2c_write_mask},
     },
-    peripherals::{LP_AON, PCR, PMU},
+    peripherals::{LP_AON, PMU},
     rtc_cntl::RtcCalSel,
 };
 
@@ -326,52 +321,7 @@ bitfield::bitfield! {
     pub bool, dig_cpu_stall  , set_dig_cpu_stall  : 29;
 }
 
-/// Representation of `PCR_SOC_CLK_SEL` values in `PCR_SYSCLK_CONF_REG` register.
-#[derive(Clone, Copy, PartialEq, Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub(crate) enum CpuClockSource {
-    Xtal,
-    PllF96M,
-    RcFast,
-    PllF64M,
-}
-
-impl CpuClockSource {
-    fn current() -> Self {
-        match PCR::regs().sysclk_conf().read().soc_clk_sel().bits() {
-            0 => CpuClockSource::Xtal,
-            1 => CpuClockSource::PllF96M,
-            3 => CpuClockSource::PllF64M,
-            2 => CpuClockSource::RcFast,
-            _ => unreachable!("PCR_SOC_CLK_SEL is only 2 bits long"),
-        }
-    }
-
-    fn select(self) {
-        PCR::regs().sysclk_conf().modify(|_, w| unsafe {
-            w.soc_clk_sel().bits(match self {
-                CpuClockSource::Xtal => 0,
-                CpuClockSource::PllF96M => 1,
-                CpuClockSource::RcFast => 2,
-                CpuClockSource::PllF64M => 3,
-            })
-        });
-    }
-}
-
-fn rtc_clk_cpu_freq_to_xtal(freq_mhz: u32, div: u8) {
-    clk_ll_cpu_set_divider(div as u32);
-    clk_ll_ahb_set_divider(div as u32);
-
-    CpuClockSource::Xtal.select();
-    clk_ll_bus_update();
-
-    crate::rom::ets_update_cpu_frequency_rom(freq_mhz);
-}
-
 pub(crate) fn rtc_clk_cpu_freq_set_xtal() {
     // rtc_clk_cpu_set_to_default_config
-    let freq = RtcClock::xtal_freq().mhz();
-
-    rtc_clk_cpu_freq_to_xtal(freq, 1);
+    esp32h2_rtc_update_to_xtal(XtalClock::_32M, 1);
 }

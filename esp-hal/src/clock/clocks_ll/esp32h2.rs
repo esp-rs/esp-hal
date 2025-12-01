@@ -124,11 +124,9 @@ pub(crate) fn esp32h2_rtc_update_to_xtal(freq: XtalClock, div: u8) {
     crate::rom::ets_update_cpu_frequency_rom(freq.mhz());
     // Set divider from XTAL to APB clock. Need to set divider to 1 (reg. value 0)
     // first.
+    clk_ll_cpu_set_divider(div as u32);
     clk_ll_ahb_set_divider(div as u32);
 
-    PCR::regs()
-        .cpu_freq_conf()
-        .modify(|_, w| unsafe { w.cpu_div_num().bits(div - 1) });
     // Switch clock source
     PCR::regs()
         .sysclk_conf()
@@ -164,7 +162,7 @@ pub(crate) fn esp32h2_rtc_apb_freq_update(apb_freq: ApbClock) {
         .modify(|_, w| unsafe { w.data().bits(value) });
 }
 
-pub(crate) fn clk_ll_cpu_set_divider(divider: u32) {
+fn clk_ll_cpu_set_divider(divider: u32) {
     assert!(divider >= 1);
 
     PCR::regs()
@@ -172,7 +170,7 @@ pub(crate) fn clk_ll_cpu_set_divider(divider: u32) {
         .modify(|_, w| unsafe { w.cpu_div_num().bits((divider - 1) as u8) });
 }
 
-pub(crate) fn clk_ll_ahb_set_divider(divider: u32) {
+fn clk_ll_ahb_set_divider(divider: u32) {
     assert!(divider >= 1);
 
     PCR::regs()
@@ -180,7 +178,7 @@ pub(crate) fn clk_ll_ahb_set_divider(divider: u32) {
         .modify(|_, w| unsafe { w.ahb_div_num().bits((divider - 1) as u8) });
 }
 
-pub(crate) fn clk_ll_bus_update() {
+fn clk_ll_bus_update() {
     PCR::regs()
         .bus_clk_update()
         .modify(|_, w| w.bus_clock_update().bit(true));

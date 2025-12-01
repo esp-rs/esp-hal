@@ -14,6 +14,7 @@
 //!    * `ULP (Ultra-Low Power)` wake
 //!    * `BT (Bluetooth) wake` - light sleep only
 
+#[cfg(not(esp32h2))]
 use core::cell::RefCell;
 #[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2, esp32h2))]
 use core::time::Duration;
