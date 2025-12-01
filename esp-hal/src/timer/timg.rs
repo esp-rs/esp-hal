@@ -82,7 +82,10 @@ use crate::{
     time::{Duration, Instant, Rate},
 };
 
-#[cfg(timergroup_default_clock_source_is_set)]
+#[cfg(all(
+    timergroup_default_clock_source_is_set,
+    not(soc_has_clock_node_timg0_function_clock)
+))]
 const DEFAULT_CLK_SRC: u8 = property!("timergroup.default_clock_source");
 #[cfg(timergroup_default_wdt_clock_source_is_set)]
 const DEFAULT_WDT_CLK_SRC: u8 = property!("timergroup.default_wdt_clock_source");
@@ -144,17 +147,16 @@ impl TimerGroupInstance for TIMG0<'_> {
     }
 
     fn configure_src_clk() {
-        #[cfg(soc_has_clock_node_timg0_function_clock)]
-        crate::soc::clocks::ClockTree::with(|clocks| {
-            crate::soc::clocks::configure_timg0_function_clock(
-                clocks,
-                crate::soc::clocks::Timg0FunctionClockConfig::default(),
-            );
-            crate::soc::clocks::request_timg0_function_clock(clocks);
-        });
-
         cfg_if::cfg_if! {
-            if #[cfg(not(timergroup_default_clock_source_is_set))] {
+            if #[cfg(soc_has_clock_node_timg0_function_clock)] {
+                crate::soc::clocks::ClockTree::with(|clocks| {
+                    crate::soc::clocks::configure_timg0_function_clock(
+                        clocks,
+                        crate::soc::clocks::Timg0FunctionClockConfig::default(),
+                    );
+                    crate::soc::clocks::request_timg0_function_clock(clocks);
+                });
+            } else if #[cfg(not(timergroup_default_clock_source_is_set))] {
                 // Clock source is not configurable
             } else if #[cfg(soc_has_pcr)] {
                 crate::peripherals::PCR::regs()
@@ -216,7 +218,15 @@ impl TimerGroupInstance for crate::peripherals::TIMG1<'_> {
 
     fn configure_src_clk() {
         cfg_if::cfg_if! {
-            if #[cfg(not(timergroup_default_clock_source_is_set))] {
+            if #[cfg(soc_has_clock_node_timg0_function_clock)] {
+                crate::soc::clocks::ClockTree::with(|clocks| {
+                    crate::soc::clocks::configure_timg1_function_clock(
+                        clocks,
+                        crate::soc::clocks::Timg0FunctionClockConfig::default(),
+                    );
+                    crate::soc::clocks::request_timg1_function_clock(clocks);
+                });
+            } else if #[cfg(not(timergroup_default_clock_source_is_set))] {
                 // Clock source is not configurable
             } else if #[cfg(soc_has_pcr)] {
                 crate::peripherals::PCR::regs()
@@ -503,7 +513,9 @@ impl Timer<'_> {
 
     fn load_value(&self, value: Duration) -> Result<(), Error> {
         cfg_if::cfg_if! {
-            if #[cfg(esp32h2)] {
+            if #[cfg(soc_has_clock_node_timg0_function_clock)] {
+                let clk_src = Clocks::get().xtal_clock;
+            } else if #[cfg(esp32h2)] {
                 // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
                 let clk_src = Clocks::get().pll_48m_clock;
             } else {
@@ -552,7 +564,9 @@ impl Timer<'_> {
 
         let ticks = (value_hi << 32) | value_lo;
         cfg_if::cfg_if! {
-            if #[cfg(esp32h2)] {
+            if #[cfg(soc_has_clock_node_timg0_function_clock)] {
+                let clk_src = Clocks::get().xtal_clock;
+            } else if #[cfg(esp32h2)] {
                 // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
                 let clk_src = Clocks::get().pll_48m_clock;
             } else {

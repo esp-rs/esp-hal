@@ -178,7 +178,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "ApbSarAdc", template_params = { peripheral = "apb_saradc" } },
     { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
     { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", default = "PLL_40M", variants = [
+        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL_CLK", variants = [
             { name = "XTAL_CLK", outputs = "XTL_CLK" },
             { name = "PLL_40M",  outputs = "PLL_40M" },
         ] },

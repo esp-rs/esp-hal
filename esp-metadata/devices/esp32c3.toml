@@ -188,7 +188,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Twai0", template_params = { peripheral = "twai" } },
     { name = "Timg1", template_params = { peripheral = "timergroup1" }, clocks = "Timg0" },
     { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", default = "APB_CLK", variants = [
+        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL_CLK", variants = [
             { name = "XTAL_CLK", outputs = "XTL_CLK" },
             { name = "APB_CLK",  outputs = "APB_CLK" },
         ] },
