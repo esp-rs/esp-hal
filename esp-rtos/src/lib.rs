@@ -65,6 +65,8 @@ mod scheduler;
 mod syscall;
 mod task;
 mod timer;
+// TODO: these esp-radio gates will need to be cleaned up once we re-introduce IPC objects.
+#[cfg(feature = "esp-radio")]
 mod wait_queue;
 
 #[cfg(feature = "embassy")]

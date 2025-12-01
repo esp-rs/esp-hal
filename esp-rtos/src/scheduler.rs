@@ -77,6 +77,7 @@ impl CpuSchedulerState {
                 stack_guard: core::ptr::null_mut(),
                 #[cfg(sw_task_overflow_detection)]
                 stack_guard_value: 0,
+                #[cfg(feature = "esp-radio")]
                 current_wait_queue: None,
                 priority: Priority::ZERO,
                 #[cfg(multi_core)]
@@ -409,7 +410,17 @@ impl SchedulerState {
         // If the task is in a run queue, it needs to be moved to the new priority's run queue.
         let task_in_run_queue = {
             let task = unsafe { task.as_ref() };
-            task.in_run_or_wait_queue && task.current_wait_queue.is_none()
+            let in_queue = task.in_run_or_wait_queue;
+
+            cfg_if::cfg_if! {
+                if #[cfg(feature = "esp-radio")] {
+                    let in_waitqueue = task.current_wait_queue.is_some();
+                } else {
+                    let in_waitqueue = false;
+                }
+            }
+
+            in_queue && !in_waitqueue
         };
 
         if task_in_run_queue {

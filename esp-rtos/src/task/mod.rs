@@ -23,11 +23,12 @@ use rtos_trace::TaskInfo;
 
 #[cfg(feature = "alloc")]
 use crate::InternalMemory;
+#[cfg(feature = "esp-radio")]
+use crate::wait_queue::WaitQueue;
 use crate::{
     SCHEDULER,
     run_queue::{Priority, RunQueue},
     scheduler::SchedulerState,
-    wait_queue::WaitQueue,
 };
 
 pub type IdleFn = extern "C" fn() -> !;
@@ -194,6 +195,7 @@ impl<E: TaskListElement> TaskList<E> {
         popped
     }
 
+    #[cfg(feature = "esp-radio")]
     pub fn remove(&mut self, task: TaskPtr) {
         if E::is_in_queue(task) == Some(false) {
             return;
@@ -361,6 +363,7 @@ pub(crate) struct Task {
     pub timer_queued: bool,
 
     /// The current wait queue this task is in.
+    #[cfg(feature = "esp-radio")]
     pub(crate) current_wait_queue: Option<NonNull<WaitQueue>>,
 
     // Lists a task can be in:
@@ -444,6 +447,7 @@ impl Task {
             stack_guard: stack_words.cast(),
             #[cfg(sw_task_overflow_detection)]
             stack_guard_value: 0,
+            #[cfg(feature = "esp-radio")]
             current_wait_queue: None,
             priority: Priority::new(priority),
             #[cfg(multi_core)]
