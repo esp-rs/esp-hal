@@ -18,6 +18,8 @@ on:
     branches-ignore:
       - "gh-readonly-queue/**"
       - "main"
+      - "backport-**"
+      - "release-branch-**"
   merge_group:
   workflow_dispatch:
 
