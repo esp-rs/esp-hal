@@ -10,6 +10,75 @@ This is a living document - make sure to check the latest version of this docume
 In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines) apply to all projects in the ESP-RS GitHub organization where possible.
   - Especially for public API but if possible also for internal APIs.
 
+## Working with the repository
+
+### rust-analyzer
+
+The repository contains multiple crates, with support for multiple different devices. `rust-analyzer` is not able to handle the complete repository at once, so you will need to change configuration depending on what you work on.
+You will need to point `rust-analyzer` to one of the crates you want to work on, using `linkedProjects`. While this option can be used to add multiple crates to the workspace, we often need to enable features
+on them which may only exist in one of the crates (e.g. `esp-radio`'s `wifi` feature). The recommendation is, therefore, to only enable a single crate at a time - ideally one that pulls in other crates as a dependency.
+
+Additionally, you will need to specify the target triple of your particular chip, enable the chip's Cargo feature, and select the `esp` toolchain if you are working with an Xtensa MCU.
+
+It is also recommended to directly configure `rustfmt` to use the config file in the repository root. This will
+prevent your editor from reformatting code in a way that CI would reject.
+
+An example configuration for the Zed editor may look like this:
+
+```json
+{
+  "lsp": {
+    "rust-analyzer": {
+      "initialization_options": {
+        "rustfmt": {
+          // note this needs to be an absolute path
+          "extraArgs": ["--config-path=<path to the repository>/rustfmt.toml"]
+        },
+        // Select esp-rtos, which also pulls in esp-hal
+        "linkedProjects": ["./esp-rtos/Cargo.toml"],
+        "cargo": {
+          // This must match the target MCU's target
+          "target": "xtensa-esp32s3-none-elf",
+          // Prevents rust-analyzer from blocking cargo
+          "targetDir": "target/rust-analyzer",
+          "extraEnv": {
+            // ESP32-S3 is an Xtensa MCU, we need to work with the esp toolchain
+            "RUSTUP_TOOLCHAIN": "esp"
+          },
+          // Enable device support and a wide set of features on the esp-rtos crate.
+          "features": ["esp32s3", "embassy", "esp-radio", "rtos-trace"]
+        }
+      }
+    }
+  }
+}
+```
+
+The same configuration in VSCode is:
+```json
+{
+  "rust-analyzer.rustfmt.extraArgs": [
+    "--config-path=<path to the repository>/rustfmt.toml"
+  ],
+  "rust-analyzer.cargo.target": "xtensa-esp32s3-none-elf",
+  "rust-analyzer.cargo.targetDir": "target/rust-analyzer",
+  "rust-analyzer.cargo.extraEnv": {
+    "RUSTUP_TOOLCHAIN": "esp"
+  },
+  "rust-analyzer.linkedProjects": [
+    "./esp-rtos/Cargo.toml"
+  ],
+  "rust-analyzer.cargo.features": [
+    "esp32s3",
+    "embassy",
+    "esp-radio",
+    "rtos-trace"
+  ]
+}
+```
+
+If you switch between crates and/or devices often, you may want to keep multiple sets of configurations commented in your config file, or as separate files as templates.
+
 ## Amendments to the Rust API Guidelines
 
 - `C-RW-VALUE` and `C-SERDE` do not apply.
