@@ -1804,9 +1804,31 @@ where
         self.tx.uart.info().regs()
     }
 
-    /// Returns whether the UART buffer is ready to accept more data.
+    #[procmacros::doc_replace]
+    /// Returns whether the UART TX buffer is ready to accept more data.
     ///
-    /// If this function returns `true`, [`Self::write`] will not block.
+    /// If this function returns `true`, [`Self::write`] and [`Self::write_async`]
+    /// will not block. Otherwise, the functions will not return until the buffer is
+    /// ready.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::uart::{Config, Uart};
+    /// let mut uart = Uart::new(peripherals.UART0, Config::default())?;
+    ///
+    /// if uart.write_ready() {
+    ///     // Because write_ready has returned true, the following call will immediately
+    ///     // copy some bytes into the FIFO and return a non-zero value.
+    ///     let written = uart.write(b"Hello")?;
+    ///     // ... handle written bytes
+    /// } else {
+    ///     // Calling write would have blocked, but here we can do something useful
+    ///     // instead of waiting for the buffer to become ready.
+    /// }
+    /// # {after_snippet}
+    /// ```
     #[instability::unstable]
     pub fn write_ready(&mut self) -> bool {
         self.tx.write_ready()
