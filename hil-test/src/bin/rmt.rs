@@ -36,6 +36,8 @@ use esp_hal::{
     peripherals::RMT,
     ram,
     rmt::{
+        BitOrder,
+        BytesEncoder,
         CHANNEL_RAM_SIZE,
         Channel,
         ConfigError,
@@ -44,6 +46,8 @@ use esp_hal::{
         HAS_RX_WRAP,
         IterEncoder,
         LoopMode,
+        LsbFirst,
+        MsbFirst,
         PulseCode,
         Rmt,
         Rx,
@@ -1254,5 +1258,75 @@ mod tests {
         };
 
         check_data_eq(&conf, &tx_data, &rx_data, rx_res);
+    }
+
+    fn rmt_bytes_encoder_impl<B: BitOrder>(ctx: &mut Context, bit_order: B) {
+        const LEN: usize = 4;
+        const RX_LEN: usize = const { LEN * 8 + 1 };
+        const PULSE_ONE: PulseCode = PulseCode::new(Level::High, 150, Level::Low, 50);
+        const PULSE_ZERO: PulseCode = PulseCode::new(Level::High, 300, Level::Low, 50);
+
+        // Ensure tx wraps, such that there are several calls to the encoder
+        let conf = LoopbackConfig {
+            tx_len: CHANNEL_RAM_SIZE * 3 / 2,
+            tx_memsize: 1,
+            rx_memsize: 2,
+            ..Default::default()
+        };
+
+        // Pulse that exceeds idle threshold + end marker in one PulseCode
+        let pulse_end = PulseCode::new(Level::High, 2 * conf.idle_threshold, Level::Low, 0);
+
+        let (tx_channel, rx_channel) = ctx.setup_loopback(&conf);
+
+        let tx_data: [u8; LEN] = [0xAA, 0x55, 0xC3, 0x3C];
+        let mut tx_enc = BytesEncoder::new(&tx_data, bit_order, PULSE_ONE, PULSE_ZERO, pulse_end);
+
+        let mut expected_rx_data: Vec<_> = tx_data
+            .iter()
+            .flat_map(|&byte| {
+                (0..8).map(move |i| {
+                    if B::get_bit(byte, i) {
+                        PULSE_ONE
+                    } else {
+                        PULSE_ZERO
+                    }
+                })
+            })
+            .collect();
+        expected_rx_data.push(pulse_end);
+
+        let mut rx_data = [PulseCode::default(); RX_LEN];
+
+        let rx_transaction = rx_channel.receive(&mut rx_data);
+        let mut tx_transaction = tx_channel.transmit(&mut tx_enc).unwrap();
+
+        let rx_res = match rx_transaction {
+            Ok(mut rx_transaction) => {
+                // ... poll them until completion.
+                loop {
+                    let tx_done = tx_transaction.poll();
+                    let rx_done = rx_transaction.poll();
+                    if tx_done && rx_done {
+                        break;
+                    }
+                }
+
+                tx_transaction.wait().unwrap();
+                match rx_transaction.wait() {
+                    Ok((rx_count, _channel)) => Ok(rx_count),
+                    Err((err, _channel)) => Err(err),
+                }
+            }
+            Err((e, _)) => Err(e),
+        };
+
+        check_data_eq(&conf, &expected_rx_data, &rx_data, rx_res);
+    }
+
+    #[test]
+    fn rmt_bytes_encoder(mut ctx: Context) {
+        rmt_bytes_encoder_impl(&mut ctx, MsbFirst);
+        rmt_bytes_encoder_impl(&mut ctx, LsbFirst);
     }
 }
