@@ -279,7 +279,7 @@ impl<'a> EncoderRef<'a> {
     #[inline]
     pub(super) fn new<E: Encoder>(enc: &'a mut E) -> Self {
         Self {
-            data: NonNull::from_mut(enc).cast(),
+            data: NonNull::from(enc).cast(),
             _phantom: PhantomData,
             func: encoder_write::<E>,
         }
