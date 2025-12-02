@@ -124,11 +124,9 @@ pub(crate) fn esp32h2_rtc_update_to_xtal(freq: XtalClock, div: u8) {
     crate::rom::ets_update_cpu_frequency_rom(freq.mhz());
     // Set divider from XTAL to APB clock. Need to set divider to 1 (reg. value 0)
     // first.
+    clk_ll_cpu_set_divider(div as u32);
     clk_ll_ahb_set_divider(div as u32);
 
-    PCR::regs()
-        .cpu_freq_conf()
-        .modify(|_, w| unsafe { w.cpu_div_num().bits(div - 1) });
     // Switch clock source
     PCR::regs()
         .sysclk_conf()
