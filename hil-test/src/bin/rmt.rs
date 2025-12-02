@@ -42,6 +42,7 @@ use esp_hal::{
         CopyEncoder,
         Error,
         HAS_RX_WRAP,
+        IterEncoder,
         LoopMode,
         PulseCode,
         Rmt,
@@ -1211,5 +1212,47 @@ mod tests {
             start.elapsed().as_micros() < 1000,
             "tx with loopcount 0 did not complete immediately"
         );
+    }
+
+    #[test]
+    fn rmt_iter_encoder(mut ctx: Context) {
+        // Ensure tx wraps, such that there are several calls to the encoder
+        let conf = LoopbackConfig {
+            tx_len: CHANNEL_RAM_SIZE * 3 / 2,
+            tx_memsize: 1,
+            rx_memsize: 2,
+            ..Default::default()
+        };
+
+        let (tx_channel, rx_channel) = ctx.setup_loopback(&conf);
+
+        let tx_data = generate_tx_data(&conf);
+        let mut rx_data = vec![PulseCode::default(); conf.tx_len];
+
+        let mut tx_enc = IterEncoder::new(tx_data.iter().copied());
+        let rx_transaction = rx_channel.receive(&mut rx_data);
+        let mut tx_transaction = tx_channel.transmit(&mut tx_enc).unwrap();
+
+        let rx_res = match rx_transaction {
+            Ok(mut rx_transaction) => {
+                // ... poll them until completion.
+                loop {
+                    let tx_done = tx_transaction.poll();
+                    let rx_done = rx_transaction.poll();
+                    if tx_done && rx_done {
+                        break;
+                    }
+                }
+
+                tx_transaction.wait().unwrap();
+                match rx_transaction.wait() {
+                    Ok((rx_count, _channel)) => Ok(rx_count),
+                    Err((err, _channel)) => Err(err),
+                }
+            }
+            Err((e, _)) => Err(e),
+        };
+
+        check_data_eq(&conf, &tx_data, &rx_data, rx_res);
     }
 }
