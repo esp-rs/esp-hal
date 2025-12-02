@@ -76,7 +76,7 @@ pub struct CsiConfig {
     /// HE-LTF1,  1- acquire the complete HE-LTF2, 2- sample evenly among the
     /// HE-LTF1 and HE-LTF2.
     pub acquire_csi_he_stbc: u32,
-    /// Vvalue 0-3.
+    /// Value 0-3.
     pub val_scale_cfg: u32,
     /// Enable to dump 802.11 ACK frame, default disabled.
     pub dump_ack_en: u32,

@@ -7,7 +7,7 @@ use core::{fmt::Debug, marker::PhantomData, mem::MaybeUninit, ptr::addr_of, task
 
 use enumset::{EnumSet, EnumSetType};
 use esp_config::esp_config_int;
-use esp_hal::{asynch::AtomicWaker, system::Cpu, time::Duration};
+use esp_hal::{asynch::AtomicWaker, system::Cpu};
 use esp_sync::NonReentrantMutex;
 use num_derive::FromPrimitive;
 use portable_atomic::{AtomicUsize, Ordering};
@@ -29,7 +29,7 @@ use self::{
     scan::{FreeApListOnDrop, ScanConfig, ScanResults, ScanTypeConfig},
     sta::StationConfig,
 };
-#[cfg(feature = "csi")]
+#[cfg(all(feature = "csi", feature = "unstable"))]
 #[instability::unstable]
 pub use crate::sys::include::wifi_csi_info_t; // FIXME
 use crate::{
@@ -45,7 +45,7 @@ use crate::{
 };
 
 pub mod ap;
-#[cfg(feature = "csi")]
+#[cfg(all(feature = "csi", feature = "unstable"))]
 pub mod csi;
 pub mod event;
 pub mod scan;
@@ -2006,7 +2006,7 @@ impl Drop for WifiController<'_> {
 
 impl WifiController<'_> {
     /// Set CSI configuration and register the receiving callback.
-    #[cfg(feature = "csi")]
+    #[cfg(all(feature = "csi", feature = "unstable"))]
     #[instability::unstable]
     pub fn set_csi(
         &mut self,

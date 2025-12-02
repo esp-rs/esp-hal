@@ -1,7 +1,8 @@
 //! Wi-Fi scanning.
 
-use core::{marker::PhantomData, mem::MaybeUninit, time::Duration};
+use core::{marker::PhantomData, mem::MaybeUninit};
 
+use esp_hal::time::Duration;
 use procmacros::BuilderLite;
 
 use crate::{
@@ -84,7 +85,7 @@ impl ScanTypeConfig {
     }
 }
 
-/// Scan configuration
+/// Scan configuration.
 #[derive(Clone, Copy, Default, PartialEq, Eq, BuilderLite)]
 pub struct ScanConfig<'a> {
     /// SSID to filter for.
