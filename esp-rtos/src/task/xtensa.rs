@@ -58,6 +58,7 @@ const PS_UM: u32 = 1 << 5;
 // Windowed mode.
 const PS_WOE: u32 = 1 << 18;
 // CALLINC field value for call4 instruction.
+#[cfg(feature = "esp-radio")]
 const PS_CALLINC_CALL4: u32 = 1 << 16;
 
 pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext, hook_fn: IdleFn) {
