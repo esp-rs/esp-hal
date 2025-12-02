@@ -7,6 +7,8 @@
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
 pub(crate) mod os_adapter_chip_specific;
 
+use core::ptr::NonNull;
+
 use allocator_api2::boxed::Box;
 use enumset::EnumSet;
 use esp_phy::PhyController;
@@ -439,7 +441,7 @@ fn common_task_create(
             core_id,
             stack_depth as usize,
         );
-        *(task_handle as *mut usize) = task as usize;
+        *(task_handle as *mut usize) = task.as_ptr() as usize;
 
         1
     }
@@ -534,7 +536,7 @@ pub unsafe extern "C" fn task_delete(task_handle: *mut c_void) {
     trace!("task delete called for {:?}", task_handle);
 
     unsafe {
-        crate::preempt::schedule_task_deletion(task_handle);
+        crate::preempt::schedule_task_deletion(NonNull::new(task_handle.cast::<()>()));
     }
 }
 
@@ -585,7 +587,7 @@ pub unsafe extern "C" fn task_ms_to_tick(ms: u32) -> i32 {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn task_get_current_task() -> *mut c_void {
-    let res = crate::preempt::current_task() as *mut c_void;
+    let res = crate::preempt::current_task().cast::<c_void>().as_ptr();
     trace!("task get current task - return {:?}", res);
 
     res

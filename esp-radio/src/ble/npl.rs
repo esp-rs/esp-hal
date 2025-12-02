@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use core::{
     mem::transmute,
-    ptr::{addr_of, addr_of_mut},
+    ptr::{NonNull, addr_of, addr_of_mut},
 };
 
 use esp_hal::time::Instant;
@@ -392,10 +392,6 @@ unsafe extern "C" fn task_create(
     );
 
     unsafe {
-        *(task_handle as *mut usize) = 0;
-    } // we will run it in task 0
-
-    unsafe {
         let task_func = transmute::<*mut c_void, extern "C" fn(*mut c_void)>(task_func);
 
         let task = crate::preempt::task_create(
@@ -406,7 +402,7 @@ unsafe extern "C" fn task_create(
             if core_id < 2 { Some(core_id) } else { None },
             stack_depth as usize,
         );
-        *(task_handle as *mut usize) = task as usize;
+        *(task_handle as *mut usize) = task.as_ptr() as usize;
     }
 
     1
@@ -416,7 +412,7 @@ unsafe extern "C" fn task_delete(task: *mut c_void) {
     trace!("task delete called for {:?}", task);
 
     unsafe {
-        crate::preempt::schedule_task_deletion(task);
+        crate::preempt::schedule_task_deletion(NonNull::new(task.cast::<()>()));
     }
 }
 

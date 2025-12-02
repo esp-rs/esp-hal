@@ -162,14 +162,20 @@ impl RunQueue {
     pub(crate) fn mark_task_ready(
         &mut self,
         _state: &[CpuSchedulerState; Cpu::COUNT],
-        mut ready_task: TaskPtr,
+        ready_task: TaskPtr,
     ) -> RunSchedulerOn {
         let priority = ready_task.priority(self);
         let priority_n = priority.get();
 
         ready_task.set_state(TaskState::Ready);
-        if let Some(mut containing_queue) = unsafe { ready_task.as_mut().current_queue.take() } {
-            unsafe { containing_queue.as_mut().remove(ready_task) };
+        #[cfg(feature = "esp-radio")]
+        {
+            let mut ready_task = ready_task;
+            if let Some(mut containing_queue) =
+                unsafe { ready_task.as_mut().current_wait_queue.take() }
+            {
+                unsafe { containing_queue.as_mut().remove(ready_task) };
+            }
         }
         self.ready_tasks[priority_n].push(ready_task);
 

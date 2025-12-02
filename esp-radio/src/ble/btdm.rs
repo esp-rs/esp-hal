@@ -1,5 +1,5 @@
 use alloc::boxed::Box;
-use core::ptr::{addr_of, addr_of_mut};
+use core::ptr::{NonNull, addr_of, addr_of_mut};
 
 use esp_phy::{PhyController, PhyInitGuard};
 use esp_sync::RawMutex;
@@ -175,7 +175,7 @@ unsafe extern "C" fn task_create(
             if core_id < 2 { Some(core_id) } else { None },
             stack_depth as usize,
         );
-        *(handle as *mut usize) = task as usize;
+        *(handle as *mut usize) = task.as_ptr() as usize;
     }
 
     1
@@ -185,7 +185,7 @@ unsafe extern "C" fn task_delete(task: *mut ()) {
     trace!("task delete called for {:?}", task);
 
     unsafe {
-        crate::preempt::schedule_task_deletion(task.cast());
+        crate::preempt::schedule_task_deletion(NonNull::new(task));
     }
 }
 

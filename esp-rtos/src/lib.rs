@@ -62,10 +62,11 @@ mod fmt;
 mod esp_radio;
 mod run_queue;
 mod scheduler;
-pub mod semaphore;
 mod syscall;
 mod task;
 mod timer;
+// TODO: these esp-radio gates will need to be cleaned up once we re-introduce IPC objects.
+#[cfg(feature = "esp-radio")]
 mod wait_queue;
 
 #[cfg(feature = "embassy")]
@@ -84,13 +85,14 @@ use esp_hal::{
     Blocking,
     interrupt::software::SoftwareInterrupt,
     system::Cpu,
-    time::{Duration, Instant},
+    time::Instant,
     timer::{AnyTimer, OneShotTimer, any::Degrade},
 };
 #[cfg(multi_core)]
 use esp_hal::{
     peripherals::CPU_CTRL,
     system::{CpuControl, Stack},
+    time::Duration,
 };
 #[cfg(feature = "embassy")]
 #[cfg_attr(docsrs, doc(cfg(feature = "embassy")))]
@@ -449,43 +451,3 @@ pub(crate) fn now() -> u64 {
 
 #[cfg(feature = "embassy")]
 embassy_time_driver::time_driver_impl!(static TIMER_QUEUE: crate::timer::embassy::EmbassyTimeDriver = crate::timer::embassy::EmbassyTimeDriver);
-
-/// Waits for a condition to be met or a deadline to occur.
-///
-/// This function is meant to simplify implementation of blocking primitives. Upon failure the
-/// `attempt` function should enqueue the task in a wait queue and put the task to sleep.
-fn with_deadline(deadline: Instant, attempt: impl Fn(Instant) -> bool) -> bool {
-    while !attempt(deadline) {
-        // We are here because the operation failed. We've either timed out, or the operation is
-        // ready to be attempted again. However, any higher priority task can wake up and
-        // preempt us still. Let's just check for the timeout, and try the whole process
-        // again.
-
-        // Instant has wrapping semantics, but we need non-overflowing here. This comparison
-        // would fail if the difference is greater than half of the valid range because fugit would
-        // consider the clock to have wrapped around.
-        if deadline.duration_since_epoch().as_micros()
-            < Instant::now().duration_since_epoch().as_micros()
-        {
-            // We have a deadline and we've timed out.
-            return false;
-        }
-        // We can block more, so let's attempt the operation again.
-    }
-
-    true
-}
-
-fn micros_to_timeout(us: Option<u32>) -> Option<Duration> {
-    us.map(|timeout| Duration::from_micros(timeout as u64))
-}
-
-fn micros_to_deadline(us: Option<u64>) -> Instant {
-    Instant::EPOCH + us.map(Duration::from_micros).unwrap_or(Duration::MAX)
-}
-
-fn timeout_to_deadline(timeout: Option<Duration>) -> Instant {
-    timeout
-        .map(|timeout| Instant::now() + timeout)
-        .unwrap_or(Instant::EPOCH + Duration::MAX)
-}

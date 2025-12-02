@@ -18,7 +18,7 @@
 //!
 //! > Note that the only expected user of this crate is esp-radio.
 
-use core::{cell::UnsafeCell, ptr::NonNull};
+use core::ptr::NonNull;
 
 /// Pointer to an opaque queue created by the driver implementation.
 pub type QueuePtr = NonNull<()>;
@@ -301,7 +301,7 @@ macro_rules! register_queue_implementation {
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_rtos_queue_send_to_front(
-            queue: QueuePtr,
+            queue: $crate::queue::QueuePtr,
             item: *const u8,
             timeout_us: Option<u32>,
         ) -> bool {
@@ -313,7 +313,7 @@ macro_rules! register_queue_implementation {
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_rtos_queue_send_to_front_with_deadline(
-            queue: QueuePtr,
+            queue: $crate::queue::QueuePtr,
             item: *const u8,
             deadline_instant: Option<u64>,
         ) -> bool {
@@ -329,7 +329,7 @@ macro_rules! register_queue_implementation {
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_rtos_queue_send_to_back(
-            queue: QueuePtr,
+            queue: $crate::queue::QueuePtr,
             item: *const u8,
             timeout_us: Option<u32>,
         ) -> bool {
@@ -341,7 +341,7 @@ macro_rules! register_queue_implementation {
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_rtos_queue_send_to_back_with_deadline(
-            queue: QueuePtr,
+            queue: $crate::queue::QueuePtr,
             item: *const u8,
             deadline_instant: Option<u64>,
         ) -> bool {
@@ -357,7 +357,7 @@ macro_rules! register_queue_implementation {
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_rtos_queue_try_send_to_back_from_isr(
-            queue: QueuePtr,
+            queue: $crate::queue::QueuePtr,
             item: *const u8,
             higher_prio_task_waken: Option<&mut bool>,
         ) -> bool {
@@ -372,14 +372,18 @@ macro_rules! register_queue_implementation {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_rtos_queue_receive(queue: QueuePtr, item: *mut u8, timeout_us: Option<u32>) -> bool {
+        fn esp_rtos_queue_receive(
+            queue: $crate::queue::QueuePtr,
+            item: *mut u8,
+            timeout_us: Option<u32>,
+        ) -> bool {
             unsafe { <$t as $crate::queue::QueueImplementation>::receive(queue, item, timeout_us) }
         }
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_rtos_queue_receive_with_deadline(
-            queue: QueuePtr,
+            queue: $crate::queue::QueuePtr,
             item: *mut u8,
             deadline_instant: Option<u64>,
         ) -> bool {
@@ -395,7 +399,7 @@ macro_rules! register_queue_implementation {
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_rtos_queue_try_receive_from_isr(
-            queue: QueuePtr,
+            queue: $crate::queue::QueuePtr,
             item: *mut u8,
             higher_prio_task_waken: Option<&mut bool>,
         ) -> bool {
@@ -410,13 +414,13 @@ macro_rules! register_queue_implementation {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_rtos_queue_remove(queue: QueuePtr, item: *mut u8) {
+        fn esp_rtos_queue_remove(queue: $crate::queue::QueuePtr, item: *mut u8) {
             unsafe { <$t as $crate::queue::QueueImplementation>::remove(queue, item) }
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_rtos_queue_messages_waiting(queue: QueuePtr) -> usize {
+        fn esp_rtos_queue_messages_waiting(queue: $crate::queue::QueuePtr) -> usize {
             unsafe { <$t as $crate::queue::QueueImplementation>::messages_waiting(queue) }
         }
     };
@@ -643,342 +647,289 @@ impl Drop for QueueHandle {
     }
 }
 
-use alloc::{boxed::Box, vec};
+#[cfg(feature = "ipc-implementations")]
+mod implementation {
+    use alloc::{boxed::Box, vec};
 
-use crate::{
-    now,
-    semaphore::{SemaphoreHandle, SemaphoreKind},
-};
+    use esp_sync::NonReentrantMutex;
 
-struct QueueInner {
-    storage: Box<[u8]>,
-    item_size: usize,
-    capacity: usize,
-    count: usize,
-    current_read: usize,
-    current_write: usize,
-}
+    use super::*;
+    use crate::{
+        now,
+        semaphore::{SemaphoreHandle, SemaphoreKind},
+    };
 
-impl QueueInner {
-    fn get(&self, index: usize) -> &[u8] {
-        let item_start = self.item_size * index;
-        &self.storage[item_start..][..self.item_size]
+    struct QueueInner {
+        storage: Box<[u8]>,
+        item_size: usize,
+        capacity: usize,
+        count: usize,
+        current_read: usize,
+        current_write: usize,
     }
 
-    fn get_mut(&mut self, index: usize) -> &mut [u8] {
-        let item_start = self.item_size * index;
-        &mut self.storage[item_start..][..self.item_size]
-    }
-
-    fn len(&self) -> usize {
-        self.count
-    }
-
-    fn send_to_back(&mut self, item: *const u8) {
-        let item = unsafe { core::slice::from_raw_parts(item, self.item_size) };
-
-        let dst = self.get_mut(self.current_write);
-        dst.copy_from_slice(item);
-
-        self.current_write = (self.current_write + 1) % self.capacity;
-        self.count += 1;
-    }
-
-    fn send_to_front(&mut self, item: *const u8) {
-        let item = unsafe { core::slice::from_raw_parts(item, self.item_size) };
-
-        self.current_read = (self.current_read + self.capacity - 1) % self.capacity;
-
-        let dst = self.get_mut(self.current_read);
-        dst.copy_from_slice(item);
-
-        self.count += 1;
-    }
-
-    fn read_from_front(&mut self, dst: *mut u8) {
-        let dst = unsafe { core::slice::from_raw_parts_mut(dst, self.item_size) };
-
-        let src = self.get(self.current_read);
-        dst.copy_from_slice(src);
-
-        self.current_read = (self.current_read + 1) % self.capacity;
-        self.count -= 1;
-    }
-
-    fn remove(&mut self, item: *const u8) -> bool {
-        let count = self.len();
-
-        if count == 0 {
-            return false;
+    impl QueueInner {
+        fn get(&self, index: usize) -> &[u8] {
+            let item_start = self.item_size * index;
+            &self.storage[item_start..][..self.item_size]
         }
 
-        let mut tmp_item = vec![0; self.item_size];
+        fn get_mut(&mut self, index: usize) -> &mut [u8] {
+            let item_start = self.item_size * index;
+            &mut self.storage[item_start..][..self.item_size]
+        }
 
-        let mut found = false;
-        let item_slice = unsafe { core::slice::from_raw_parts(item, self.item_size) };
-        for _ in 0..count {
-            self.read_from_front(tmp_item.as_mut_ptr().cast());
+        fn len(&self) -> usize {
+            self.count
+        }
 
-            if found || &tmp_item[..] != item_slice {
-                self.send_to_back(tmp_item.as_mut_ptr().cast());
-            } else {
-                found = true;
+        fn send_to_back(&mut self, item: *const u8) {
+            let item = unsafe { core::slice::from_raw_parts(item, self.item_size) };
+
+            let dst = self.get_mut(self.current_write);
+            dst.copy_from_slice(item);
+
+            self.current_write = (self.current_write + 1) % self.capacity;
+            self.count += 1;
+        }
+
+        fn send_to_front(&mut self, item: *const u8) {
+            let item = unsafe { core::slice::from_raw_parts(item, self.item_size) };
+
+            self.current_read = (self.current_read + self.capacity - 1) % self.capacity;
+
+            let dst = self.get_mut(self.current_read);
+            dst.copy_from_slice(item);
+
+            self.count += 1;
+        }
+
+        fn read_from_front(&mut self, dst: *mut u8) {
+            let dst = unsafe { core::slice::from_raw_parts_mut(dst, self.item_size) };
+
+            let src = self.get(self.current_read);
+            dst.copy_from_slice(src);
+
+            self.current_read = (self.current_read + 1) % self.capacity;
+            self.count -= 1;
+        }
+
+        fn remove(&mut self, item: *const u8) -> bool {
+            let count = self.len();
+
+            if count == 0 {
+                return false;
             }
 
-            // Note that even if we find our item, we'll need to keep cycling through everything to
-            // keep insertion order.
-        }
+            let mut tmp_item = vec![0; self.item_size];
 
-        found
-    }
-}
+            let mut found = false;
+            let item_slice = unsafe { core::slice::from_raw_parts(item, self.item_size) };
+            for _ in 0..count {
+                self.read_from_front(tmp_item.as_mut_ptr().cast());
 
-/// A suitable queue implementation that only requires semaphores from the OS.
-///
-/// Register in your OS implementation by adding the following code:
-///
-/// ```rust
-/// use esp_radio_rtos_driver::{queue::CompatQueue, register_queue_implementation};
-///
-/// register_queue_implementation!(CompatQueue);
-/// ```
-pub struct CompatQueue {
-    /// Allows interior mutability for the queue's inner state, when the mutex is held.
-    inner: UnsafeCell<QueueInner>,
+                if found || &tmp_item[..] != item_slice {
+                    self.send_to_back(tmp_item.as_mut_ptr().cast());
+                } else {
+                    found = true;
+                }
 
-    semaphore_empty: SemaphoreHandle,
-    semaphore_full: SemaphoreHandle,
-    mutex: SemaphoreHandle,
-}
+                // Note that even if we find our item, we'll need to keep cycling through everything
+                // to keep insertion order.
+            }
 
-impl CompatQueue {
-    fn new(capacity: usize, item_size: usize) -> Self {
-        let storage = vec![0; capacity * item_size].into_boxed_slice();
-        let semaphore_empty = SemaphoreHandle::new(SemaphoreKind::Counting {
-            max: capacity as u32,
-            initial: capacity as u32,
-        });
-        let semaphore_full = SemaphoreHandle::new(SemaphoreKind::Counting {
-            max: capacity as u32,
-            initial: 0,
-        });
-        let mutex = SemaphoreHandle::new(SemaphoreKind::Mutex);
-        Self {
-            inner: UnsafeCell::new(QueueInner {
-                storage,
-                item_size,
-                capacity,
-                count: 0,
-                current_read: 0,
-                current_write: 0,
-            }),
-            semaphore_empty,
-            semaphore_full,
-            mutex,
+            found
         }
     }
 
-    unsafe fn from_ptr<'a>(ptr: QueuePtr) -> &'a Self {
-        unsafe { ptr.cast::<Self>().as_ref() }
-    }
-}
+    /// A suitable queue implementation that only requires semaphores from the OS.
+    ///
+    /// Register in your OS implementation by adding the following code:
+    ///
+    /// ```rust
+    /// use esp_radio_rtos_driver::{queue::CompatQueue, register_queue_implementation};
+    ///
+    /// register_queue_implementation!(CompatQueue);
+    /// ```
+    pub struct CompatQueue {
+        /// Allows interior mutability for the queue's inner state, when the mutex is held.
+        inner: NonReentrantMutex<QueueInner>,
 
-impl QueueImplementation for CompatQueue {
-    fn create(capacity: usize, item_size: usize) -> QueuePtr {
-        let q = Box::new(CompatQueue::new(capacity, item_size));
-        NonNull::from(Box::leak(q)).cast()
-    }
-
-    unsafe fn delete(queue: QueuePtr) {
-        let q = unsafe { Box::from_raw(queue.cast::<CompatQueue>().as_ptr()) };
-        core::mem::drop(q);
-    }
-
-    unsafe fn send_to_front(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool {
-        let deadline_instant = timeout_us.map(|timeout| now() + timeout as u64);
-        unsafe { Self::send_to_front_with_deadline(queue, item, deadline_instant) }
+        semaphore_empty: SemaphoreHandle,
+        semaphore_full: SemaphoreHandle,
     }
 
-    unsafe fn send_to_front_with_deadline(
-        queue: QueuePtr,
-        item: *const u8,
-        deadline_instant: Option<u64>,
-    ) -> bool {
-        let queue = unsafe { CompatQueue::from_ptr(queue) };
+    impl CompatQueue {
+        fn new(capacity: usize, item_size: usize) -> Self {
+            let storage = vec![0; capacity * item_size].into_boxed_slice();
+            let semaphore_empty = SemaphoreHandle::new(SemaphoreKind::Counting {
+                max: capacity as u32,
+                initial: capacity as u32,
+            });
+            let semaphore_full = SemaphoreHandle::new(SemaphoreKind::Counting {
+                max: capacity as u32,
+                initial: 0,
+            });
+            Self {
+                inner: NonReentrantMutex::new(QueueInner {
+                    storage,
+                    item_size,
+                    capacity,
+                    count: 0,
+                    current_read: 0,
+                    current_write: 0,
+                }),
+                semaphore_empty,
+                semaphore_full,
+            }
+        }
 
-        if queue.semaphore_empty.take_with_deadline(deadline_instant) {
-            // The inner mutex shouldn't be held for a long time, but we still shouldn't block
-            // indefinitely.
-            if queue.mutex.take_with_deadline(deadline_instant) {
-                let inner = unsafe { &mut *queue.inner.get() };
-                inner.send_to_front(item);
+        unsafe fn from_ptr<'a>(ptr: QueuePtr) -> &'a Self {
+            unsafe { ptr.cast::<Self>().as_ref() }
+        }
 
-                queue.mutex.give();
+        fn with<R>(&self, f: impl FnOnce(&mut QueueInner) -> R) -> R {
+            self.inner.with(f)
+        }
+    }
+
+    impl QueueImplementation for CompatQueue {
+        fn create(capacity: usize, item_size: usize) -> QueuePtr {
+            let q = Box::new(CompatQueue::new(capacity, item_size));
+            NonNull::from(Box::leak(q)).cast()
+        }
+
+        unsafe fn delete(queue: QueuePtr) {
+            let q = unsafe { Box::from_raw(queue.cast::<CompatQueue>().as_ptr()) };
+            core::mem::drop(q);
+        }
+
+        unsafe fn send_to_front(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool {
+            let deadline_instant = timeout_us.map(|timeout| now() + timeout as u64);
+            unsafe { Self::send_to_front_with_deadline(queue, item, deadline_instant) }
+        }
+
+        unsafe fn send_to_front_with_deadline(
+            queue: QueuePtr,
+            item: *const u8,
+            deadline_instant: Option<u64>,
+        ) -> bool {
+            let queue = unsafe { CompatQueue::from_ptr(queue) };
+
+            if queue.semaphore_empty.take_with_deadline(deadline_instant) {
+                queue.with(|inner| inner.send_to_front(item));
                 queue.semaphore_full.give();
                 true
             } else {
-                queue.semaphore_empty.give();
                 false
             }
-        } else {
-            false
         }
-    }
 
-    unsafe fn send_to_back(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool {
-        let deadline_instant = timeout_us.map(|timeout| now() + timeout as u64);
-        unsafe { Self::send_to_back_with_deadline(queue, item, deadline_instant) }
-    }
+        unsafe fn send_to_back(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool {
+            let deadline_instant = timeout_us.map(|timeout| now() + timeout as u64);
+            unsafe { Self::send_to_back_with_deadline(queue, item, deadline_instant) }
+        }
 
-    unsafe fn send_to_back_with_deadline(
-        queue: QueuePtr,
-        item: *const u8,
-        deadline_instant: Option<u64>,
-    ) -> bool {
-        let queue = unsafe { CompatQueue::from_ptr(queue) };
+        unsafe fn send_to_back_with_deadline(
+            queue: QueuePtr,
+            item: *const u8,
+            deadline_instant: Option<u64>,
+        ) -> bool {
+            let queue = unsafe { CompatQueue::from_ptr(queue) };
 
-        if queue.semaphore_empty.take_with_deadline(deadline_instant) {
-            // The inner mutex shouldn't be held for a long time, but we still shouldn't block
-            // indefinitely.
-            if queue.mutex.take_with_deadline(deadline_instant) {
-                let inner = unsafe { &mut *queue.inner.get() };
-                inner.send_to_back(item);
-
-                queue.mutex.give();
+            if queue.semaphore_empty.take_with_deadline(deadline_instant) {
+                queue.with(|inner| inner.send_to_back(item));
                 queue.semaphore_full.give();
                 true
             } else {
-                queue.semaphore_empty.give();
                 false
             }
-        } else {
-            false
         }
-    }
 
-    unsafe fn try_send_to_back_from_isr(
-        queue: QueuePtr,
-        item: *const u8,
-        mut higher_prio_task_waken: Option<&mut bool>,
-    ) -> bool {
-        let queue = unsafe { CompatQueue::from_ptr(queue) };
+        unsafe fn try_send_to_back_from_isr(
+            queue: QueuePtr,
+            item: *const u8,
+            mut higher_prio_task_waken: Option<&mut bool>,
+        ) -> bool {
+            let queue = unsafe { CompatQueue::from_ptr(queue) };
 
-        if queue
-            .semaphore_empty
-            .try_take_from_isr(higher_prio_task_waken.as_deref_mut())
-        {
             if queue
-                .mutex
+                .semaphore_empty
                 .try_take_from_isr(higher_prio_task_waken.as_deref_mut())
             {
-                let inner = unsafe { &mut *queue.inner.get() };
-                inner.send_to_back(item);
-
-                queue
-                    .mutex
-                    .try_give_from_isr(higher_prio_task_waken.as_deref_mut());
+                queue.with(|inner| inner.send_to_back(item));
                 queue
                     .semaphore_full
                     .try_give_from_isr(higher_prio_task_waken);
                 true
             } else {
-                queue
-                    .semaphore_empty
-                    .try_give_from_isr(higher_prio_task_waken);
                 false
             }
-        } else {
-            false
         }
-    }
 
-    unsafe fn receive(queue: QueuePtr, item: *mut u8, timeout_us: Option<u32>) -> bool {
-        let deadline_instant = timeout_us.map(|timeout| now() + timeout as u64);
-        unsafe { Self::receive_with_deadline(queue, item, deadline_instant) }
-    }
+        unsafe fn receive(queue: QueuePtr, item: *mut u8, timeout_us: Option<u32>) -> bool {
+            let deadline_instant = timeout_us.map(|timeout| now() + timeout as u64);
+            unsafe { Self::receive_with_deadline(queue, item, deadline_instant) }
+        }
 
-    unsafe fn receive_with_deadline(
-        queue: QueuePtr,
-        item: *mut u8,
-        deadline_instant: Option<u64>,
-    ) -> bool {
-        let queue = unsafe { CompatQueue::from_ptr(queue) };
+        unsafe fn receive_with_deadline(
+            queue: QueuePtr,
+            item: *mut u8,
+            deadline_instant: Option<u64>,
+        ) -> bool {
+            let queue = unsafe { CompatQueue::from_ptr(queue) };
 
-        if queue.semaphore_full.take_with_deadline(deadline_instant) {
-            if queue.mutex.take_with_deadline(deadline_instant) {
-                let inner = unsafe { &mut *queue.inner.get() };
-                inner.read_from_front(item);
-
-                queue.mutex.give();
+            if queue.semaphore_full.take_with_deadline(deadline_instant) {
+                queue.with(|inner| inner.read_from_front(item));
                 queue.semaphore_empty.give();
                 true
             } else {
-                queue.semaphore_full.give();
                 false
             }
-        } else {
-            false
         }
-    }
 
-    unsafe fn try_receive_from_isr(
-        queue: QueuePtr,
-        item: *mut u8,
-        mut higher_prio_task_waken: Option<&mut bool>,
-    ) -> bool {
-        let queue = unsafe { CompatQueue::from_ptr(queue) };
+        unsafe fn try_receive_from_isr(
+            queue: QueuePtr,
+            item: *mut u8,
+            mut higher_prio_task_waken: Option<&mut bool>,
+        ) -> bool {
+            let queue = unsafe { CompatQueue::from_ptr(queue) };
 
-        if queue
-            .semaphore_full
-            .try_take_from_isr(higher_prio_task_waken.as_deref_mut())
-        {
             if queue
-                .mutex
+                .semaphore_full
                 .try_take_from_isr(higher_prio_task_waken.as_deref_mut())
             {
-                let inner = unsafe { &mut *queue.inner.get() };
-                inner.read_from_front(item);
-
-                queue
-                    .mutex
-                    .try_give_from_isr(higher_prio_task_waken.as_deref_mut());
+                queue.with(|inner| inner.read_from_front(item));
                 queue
                     .semaphore_empty
                     .try_give_from_isr(higher_prio_task_waken);
                 true
             } else {
-                queue
-                    .semaphore_full
-                    .try_give_from_isr(higher_prio_task_waken);
                 false
             }
-        } else {
-            false
         }
-    }
 
-    unsafe fn remove(queue: QueuePtr, item: *const u8) {
-        let queue = unsafe { CompatQueue::from_ptr(queue) };
+        unsafe fn remove(queue: QueuePtr, item: *const u8) {
+            let queue = unsafe { CompatQueue::from_ptr(queue) };
 
-        if queue.semaphore_full.take(Some(0)) {
-            queue.mutex.take(None);
+            if queue.semaphore_full.take(Some(0)) {
+                let item_removed = queue.with(|inner| inner.remove(item));
 
-            let inner = unsafe { &mut *queue.inner.get() };
-            let item_removed = inner.remove(item);
-
-            queue.mutex.give();
-
-            if item_removed {
-                queue.semaphore_empty.give();
-            } else {
-                queue.semaphore_full.give();
+                if item_removed {
+                    queue.semaphore_empty.give();
+                } else {
+                    queue.semaphore_full.give();
+                }
             }
         }
-    }
 
-    fn messages_waiting(queue: QueuePtr) -> usize {
-        let queue = unsafe { CompatQueue::from_ptr(queue) };
+        fn messages_waiting(queue: QueuePtr) -> usize {
+            let queue = unsafe { CompatQueue::from_ptr(queue) };
 
-        queue.semaphore_full.current_count() as usize
+            queue.semaphore_full.current_count() as usize
+        }
     }
 }
+
+#[cfg(feature = "ipc-implementations")]
+pub use implementation::CompatQueue;

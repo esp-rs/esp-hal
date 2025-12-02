@@ -8,25 +8,25 @@ use esp_hal::{
     time::{Duration, Instant},
 };
 use esp_radio_rtos_driver::{
+    ThreadPtr,
+    queue::CompatQueue,
+    register_queue_implementation,
     register_semaphore_implementation,
     register_timer_implementation,
-    semaphore::{SemaphoreImplementation, SemaphoreKind, SemaphorePtr},
+    register_wait_queue_implementation,
+    semaphore::{CompatSemaphore, SemaphoreHandle, SemaphoreKind, SemaphorePtr},
     timer::CompatTimer,
+    wait_queue::{WaitQueueImplementation, WaitQueuePtr},
 };
 
 use crate::{
-    SCHEDULER,
-    micros_to_deadline,
-    micros_to_timeout,
-    run_queue::MaxPriority,
+    run_queue::{MaxPriority, Priority},
     scheduler::Scheduler,
-    semaphore::Semaphore,
-    task::{self, Task},
+    task::{self, Task, TaskExt as _},
+    wait_queue::WaitQueue,
 };
 
-mod queue;
-
-impl esp_radio_rtos_driver::Scheduler for Scheduler {
+impl esp_radio_rtos_driver::SchedulerImplementation for Scheduler {
     fn initialized(&self) -> bool {
         self.with(|scheduler| {
             if scheduler.time_driver.is_none() {
@@ -67,7 +67,7 @@ impl esp_radio_rtos_driver::Scheduler for Scheduler {
         priority: u32,
         pin_to_core: Option<u32>,
         task_stack_size: usize,
-    ) -> *mut c_void {
+    ) -> ThreadPtr {
         self.create_task(
             name,
             task,
@@ -84,28 +84,41 @@ impl esp_radio_rtos_driver::Scheduler for Scheduler {
                 }
             }),
         )
-        .as_ptr()
         .cast()
     }
 
-    fn current_task(&self) -> *mut c_void {
-        self.current_task().as_ptr().cast()
+    fn current_task(&self) -> ThreadPtr {
+        self.current_task().cast()
     }
 
-    fn schedule_task_deletion(&self, task_handle: *mut c_void) {
-        task::schedule_task_deletion(task_handle as *mut Task)
+    fn schedule_task_deletion(&self, task_handle: Option<ThreadPtr>) {
+        task::schedule_task_deletion(task_handle.map(|t| t.cast::<Task>()))
     }
 
     fn current_task_thread_semaphore(&self) -> SemaphorePtr {
-        task::with_current_task(|task| NonNull::from(&task.thread_local.thread_semaphore).cast())
+        task::with_current_task(|task| {
+            *task.thread_local.thread_semaphore.get_or_insert_with(|| {
+                SemaphoreHandle::new(SemaphoreKind::Counting { max: 1, initial: 0 }).leak()
+            })
+        })
+    }
+
+    unsafe fn task_priority(&self, task: ThreadPtr) -> u32 {
+        self.with(|scheduler| task.cast::<Task>().priority(&mut scheduler.run_queue).get() as u32)
+    }
+
+    unsafe fn set_task_priority(&self, task: ThreadPtr, priority: u32) {
+        self.with(|scheduler| {
+            scheduler.set_priority(task.cast::<Task>(), Priority::new(priority as usize))
+        })
     }
 
     fn usleep(&self, us: u32) {
-        SCHEDULER.sleep_until(Instant::now() + Duration::from_micros(us as u64));
+        self.usleep_until(crate::now() + us as u64);
     }
 
     fn usleep_until(&self, target: u64) {
-        SCHEDULER.sleep_until(Instant::EPOCH + Duration::from_micros(target));
+        self.sleep_until(Instant::EPOCH + Duration::from_micros(target));
     }
 
     fn now(&self) -> u64 {
@@ -115,70 +128,47 @@ impl esp_radio_rtos_driver::Scheduler for Scheduler {
     }
 }
 
-impl Semaphore {
-    unsafe fn from_ptr<'a>(ptr: SemaphorePtr) -> &'a Self {
-        unsafe { ptr.cast::<Self>().as_ref() }
+impl WaitQueue {
+    unsafe fn from_ptr<'a>(ptr: WaitQueuePtr) -> &'a mut Self {
+        // This is fine because the methods will both hold a scheduler lock.
+        unsafe { ptr.cast::<Self>().as_mut() }
     }
 }
 
-impl SemaphoreImplementation for Semaphore {
-    fn create(kind: SemaphoreKind) -> SemaphorePtr {
-        let sem = Box::new(match kind {
-            SemaphoreKind::Counting { max, initial } => Semaphore::new_counting(initial, max),
-            SemaphoreKind::Mutex => Semaphore::new_mutex(false),
-            SemaphoreKind::RecursiveMutex => Semaphore::new_mutex(true),
-        });
-        NonNull::from(Box::leak(sem)).cast()
+impl WaitQueueImplementation for WaitQueue {
+    fn create() -> WaitQueuePtr {
+        let wait_queue = Box::new(WaitQueue::new());
+        NonNull::from(Box::leak(wait_queue)).cast()
     }
 
-    unsafe fn delete(semaphore: SemaphorePtr) {
-        let sem = unsafe { Box::from_raw(semaphore.cast::<Semaphore>().as_ptr()) };
-        core::mem::drop(sem);
+    unsafe fn delete(queue: WaitQueuePtr) {
+        let wait_queue = unsafe { Box::from_raw(queue.cast::<Self>().as_ptr()) };
+        core::mem::drop(wait_queue);
     }
 
-    unsafe fn take(semaphore: SemaphorePtr, timeout_us: Option<u32>) -> bool {
-        let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
+    unsafe fn wait_until(queue: WaitQueuePtr, deadline_instant: Option<u64>) {
+        let wait_queue = unsafe { Self::from_ptr(queue) };
 
-        semaphore.take(micros_to_timeout(timeout_us))
+        wait_queue.wait_with_deadline(
+            Instant::EPOCH
+                + deadline_instant
+                    .map(Duration::from_micros)
+                    .unwrap_or(Duration::MAX),
+        )
     }
 
-    unsafe fn take_with_deadline(semaphore: SemaphorePtr, deadline_instant: Option<u64>) -> bool {
-        let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
+    unsafe fn notify(queue: WaitQueuePtr) {
+        let wait_queue = unsafe { Self::from_ptr(queue) };
 
-        semaphore.take_with_deadline(micros_to_deadline(deadline_instant))
+        wait_queue.notify()
     }
 
-    unsafe fn give(semaphore: SemaphorePtr) -> bool {
-        let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
-
-        semaphore.give()
-    }
-
-    unsafe fn current_count(semaphore: SemaphorePtr) -> u32 {
-        let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
-
-        semaphore.current_count()
-    }
-
-    unsafe fn try_take(semaphore: SemaphorePtr) -> bool {
-        let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
-
-        semaphore.try_take()
-    }
-
-    unsafe fn try_give_from_isr(semaphore: SemaphorePtr, _hptw: Option<&mut bool>) -> bool {
-        let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
-
-        semaphore.try_give_from_isr()
-    }
-
-    unsafe fn try_take_from_isr(semaphore: SemaphorePtr, _hptw: Option<&mut bool>) -> bool {
-        let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
-
-        semaphore.try_take_from_isr()
+    unsafe fn notify_from_isr(queue: WaitQueuePtr, _higher_prio_task_waken: Option<&mut bool>) {
+        unsafe { <Self as WaitQueueImplementation>::notify(queue) };
     }
 }
 
-register_semaphore_implementation!(Semaphore);
-
+register_semaphore_implementation!(CompatSemaphore);
 register_timer_implementation!(CompatTimer);
+register_queue_implementation!(CompatQueue);
+register_wait_queue_implementation!(WaitQueue);

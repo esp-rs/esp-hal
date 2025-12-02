@@ -77,13 +77,14 @@ impl CpuSchedulerState {
                 stack_guard: core::ptr::null_mut(),
                 #[cfg(sw_task_overflow_detection)]
                 stack_guard_value: 0,
-                current_queue: None,
+                #[cfg(feature = "esp-radio")]
+                current_wait_queue: None,
                 priority: Priority::ZERO,
                 #[cfg(multi_core)]
                 pinned_to: None,
 
                 wakeup_at: 0,
-                run_queued: false,
+                in_run_or_wait_queue: false,
                 timer_queued: false,
 
                 alloc_list_item: TaskListItem::None,
@@ -341,10 +342,10 @@ impl SchedulerState {
     }
 
     #[cfg(feature = "esp-radio")]
-    pub(crate) fn schedule_task_deletion(&mut self, task_to_delete: *mut Task) -> bool {
+    pub(crate) fn schedule_task_deletion(&mut self, task_to_delete: Option<TaskPtr>) -> bool {
         let current_cpu = Cpu::current() as usize;
         let current_task = unwrap!(self.per_cpu[current_cpu].current_task);
-        let task_to_delete = NonNull::new(task_to_delete).unwrap_or(current_task);
+        let task_to_delete = task_to_delete.unwrap_or(current_task);
         let is_current = task_to_delete == current_task;
 
         self.remove_from_all_queues(task_to_delete);
@@ -398,10 +399,42 @@ impl SchedulerState {
         self.all_tasks.remove(task);
         unwrap!(self.time_driver.as_mut()).timer_queue.remove(task);
 
-        if let Some(mut containing_queue) = unsafe { task.as_mut().current_queue.take() } {
+        if let Some(mut containing_queue) = unsafe { task.as_mut().current_wait_queue.take() } {
             unsafe { containing_queue.as_mut().remove(task) };
         } else {
             self.run_queue.remove(task);
+        }
+    }
+
+    pub(crate) fn set_priority(&mut self, mut task: TaskPtr, new_priority: Priority) {
+        // If the task is in a run queue, it needs to be moved to the new priority's run queue.
+        let task_in_run_queue = {
+            let task = unsafe { task.as_ref() };
+            let in_queue = task.in_run_or_wait_queue;
+
+            cfg_if::cfg_if! {
+                if #[cfg(feature = "esp-radio")] {
+                    let in_waitqueue = task.current_wait_queue.is_some();
+                } else {
+                    let in_waitqueue = false;
+                }
+            }
+
+            in_queue && !in_waitqueue
+        };
+
+        if task_in_run_queue {
+            self.run_queue.remove(task);
+        }
+
+        // Update priority.
+        {
+            let task = unsafe { task.as_mut() };
+            task.priority = new_priority;
+        }
+
+        if task_in_run_queue {
+            self.resume_task(task);
         }
     }
 }
@@ -491,7 +524,7 @@ impl Scheduler {
 }
 
 #[cfg(feature = "esp-radio")]
-esp_radio_rtos_driver::scheduler_impl!(pub(crate) static SCHEDULER: Scheduler = Scheduler::new());
+esp_radio_rtos_driver::register_scheduler_implementation!(pub(crate) static SCHEDULER: Scheduler = Scheduler::new());
 
 #[cfg(not(feature = "esp-radio"))]
 pub(crate) static SCHEDULER: Scheduler = Scheduler::new();

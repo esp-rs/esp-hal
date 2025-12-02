@@ -16,18 +16,19 @@ use esp_hal::{
     system::Cpu,
     time::{Duration, Instant},
 };
+#[cfg(feature = "esp-radio")]
+use esp_radio_rtos_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 #[cfg(feature = "rtos-trace")]
 use rtos_trace::TaskInfo;
 
 #[cfg(feature = "alloc")]
 use crate::InternalMemory;
 #[cfg(feature = "esp-radio")]
-use crate::semaphore::Semaphore;
+use crate::wait_queue::WaitQueue;
 use crate::{
     SCHEDULER,
     run_queue::{Priority, RunQueue},
     scheduler::SchedulerState,
-    wait_queue::WaitQueue,
 };
 
 pub type IdleFn = extern "C" fn() -> !;
@@ -91,7 +92,11 @@ macro_rules! task_list_item {
     };
 }
 
-task_list_item!(TaskReadyQueueElement, ready_queue_item, run_queued);
+task_list_item!(
+    TaskReadyQueueElement,
+    ready_queue_item,
+    in_run_or_wait_queue
+);
 task_list_item!(TaskTimerQueueElement, timer_queue_item, timer_queued);
 // These aren't perf critical, no need to waste memory on caching list status:
 task_list_item!(TaskAllocListElement, alloc_list_item);
@@ -106,7 +111,6 @@ pub(crate) trait TaskExt {
     fn rtos_trace_info(self, run_queue: &mut RunQueue) -> TaskInfo;
 
     fn priority(self, _: &mut RunQueue) -> Priority;
-    fn set_priority(self, _: &mut RunQueue, new_pro: Priority);
     fn state(self) -> TaskState;
     fn set_state(self, state: TaskState);
 }
@@ -129,11 +133,6 @@ impl TaskExt for TaskPtr {
 
     fn priority(self, _: &mut RunQueue) -> Priority {
         unsafe { self.as_ref().priority }
-    }
-
-    fn set_priority(mut self, run_queue: &mut RunQueue, new_priority: Priority) {
-        run_queue.remove(self);
-        unsafe { self.as_mut().priority = new_priority };
     }
 
     fn state(self) -> TaskState {
@@ -196,17 +195,19 @@ impl<E: TaskListElement> TaskList<E> {
         popped
     }
 
+    #[cfg(feature = "esp-radio")]
     pub fn remove(&mut self, task: TaskPtr) {
         if E::is_in_queue(task) == Some(false) {
             return;
         }
-        E::mark_in_queue(task, false);
 
         // TODO: maybe this (and TaskQueue::remove) may prove too expensive.
         let mut list = core::mem::take(self);
         while let Some(popped) = list.pop() {
             if popped != task {
                 self.push(popped);
+            } else {
+                E::mark_in_queue(task, false);
             }
         }
     }
@@ -278,7 +279,6 @@ impl<E: TaskListElement> TaskQueue<E> {
         popped
     }
 
-    #[cfg(multi_core)]
     pub fn pop_if(&mut self, cond: impl Fn(&Task) -> bool) -> Option<TaskPtr> {
         let mut popped = None;
 
@@ -300,14 +300,7 @@ impl<E: TaskListElement> TaskQueue<E> {
             return;
         }
 
-        let mut list = core::mem::take(self);
-        while let Some(popped) = list.pop() {
-            if popped == task {
-                E::mark_in_queue(task, false);
-            } else {
-                self.push(popped);
-            }
-        }
+        _ = self.pop_if(|t| NonNull::from(t) == task);
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -317,7 +310,7 @@ impl<E: TaskListElement> TaskQueue<E> {
 
 pub(crate) struct ThreadLocalData {
     #[cfg(feature = "esp-radio")]
-    pub thread_semaphore: Semaphore,
+    pub thread_semaphore: Option<SemaphorePtr>,
 
     // The _reent struct is rarely needed, but big. Let's heap-allocate it, to save a bit of RAM.
     #[cfg(feature = "alloc")]
@@ -327,10 +320,19 @@ impl ThreadLocalData {
     pub const fn new() -> Self {
         Self {
             #[cfg(feature = "esp-radio")]
-            thread_semaphore: Semaphore::new_counting(0, 1),
+            thread_semaphore: None,
 
             #[cfg(feature = "alloc")]
             reent: None,
+        }
+    }
+}
+
+impl Drop for ThreadLocalData {
+    fn drop(&mut self) {
+        #[cfg(feature = "esp-radio")]
+        if let Some(semaphore_ptr) = self.thread_semaphore.take() {
+            core::mem::drop(unsafe { SemaphoreHandle::from_ptr(semaphore_ptr) });
         }
     }
 }
@@ -356,12 +358,13 @@ pub(crate) struct Task {
     pub wakeup_at: u64,
 
     /// Whether the task is currently queued in the run queue.
-    pub run_queued: bool,
+    pub in_run_or_wait_queue: bool,
     /// Whether the task is currently queued in the timer queue.
     pub timer_queued: bool,
 
     /// The current wait queue this task is in.
-    pub(crate) current_queue: Option<NonNull<WaitQueue>>,
+    #[cfg(feature = "esp-radio")]
+    pub(crate) current_wait_queue: Option<NonNull<WaitQueue>>,
 
     // Lists a task can be in:
     /// The list of all allocated tasks
@@ -384,7 +387,7 @@ pub(crate) struct Task {
 #[cfg(feature = "esp-radio")]
 extern "C" fn task_wrapper(task_fn: extern "C" fn(*mut c_void), param: *mut c_void) {
     task_fn(param);
-    schedule_task_deletion(core::ptr::null_mut());
+    schedule_task_deletion(None);
 }
 
 impl Task {
@@ -444,14 +447,15 @@ impl Task {
             stack_guard: stack_words.cast(),
             #[cfg(sw_task_overflow_detection)]
             stack_guard_value: 0,
-            current_queue: None,
+            #[cfg(feature = "esp-radio")]
+            current_wait_queue: None,
             priority: Priority::new(priority),
             #[cfg(multi_core)]
             pinned_to,
 
             wakeup_at: 0,
             timer_queued: false,
-            run_queued: false,
+            in_run_or_wait_queue: false,
 
             alloc_list_item: TaskListItem::None,
             ready_queue_item: TaskListItem::None,
@@ -541,7 +545,9 @@ pub(super) fn allocate_main_task(
     scheduler.per_cpu[current_cpu].main_task.priority = Priority::ZERO;
     scheduler.per_cpu[current_cpu].main_task.state = TaskState::Ready;
     scheduler.per_cpu[current_cpu].main_task.stack = stack;
-    scheduler.per_cpu[current_cpu].main_task.run_queued = false;
+    scheduler.per_cpu[current_cpu]
+        .main_task
+        .in_run_or_wait_queue = false;
     scheduler.per_cpu[current_cpu].main_task.timer_queued = false;
     #[cfg(multi_core)]
     {
@@ -614,9 +620,9 @@ impl CurrentThreadHandle {
     /// Sets the priority of the current task.
     pub fn set_priority(self, priority: usize) {
         let priority = Priority::new(priority);
-        SCHEDULER.with(|state| {
-            let old = self.task.priority(&mut state.run_queue);
-            self.task.set_priority(&mut state.run_queue, priority);
+        SCHEDULER.with(|scheduler| {
+            let old = self.task.priority(&mut scheduler.run_queue);
+            scheduler.set_priority(self.task, priority);
 
             // If we're dropping in priority, trigger a context switch in case another task can be
             // scheduled or time slicing needs to be started.
@@ -628,7 +634,7 @@ impl CurrentThreadHandle {
 }
 
 #[cfg(feature = "esp-radio")]
-pub(super) fn schedule_task_deletion(task: *mut Task) {
+pub(super) fn schedule_task_deletion(task: Option<NonNull<Task>>) {
     trace!("schedule_task_deletion {:?}", task);
     if SCHEDULER.with(|scheduler| scheduler.schedule_task_deletion(task)) {
         loop {
