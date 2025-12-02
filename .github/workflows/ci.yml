@@ -87,6 +87,8 @@ jobs:
         if: matrix.group == 'xtensa'
         shell: bash
         run: |
+          rustc +esp --version --verbose
+          rustdoc +esp --version
           # lints and docs are checked separately
           cargo xcheck ci esp32 --toolchain esp --no-lint --no-docs
           cargo xcheck ci esp32s2 --toolchain esp --no-lint --no-docs
