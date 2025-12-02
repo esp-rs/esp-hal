@@ -770,7 +770,7 @@ where
         cfg_if::cfg_if! {
             if #[cfg(esp32h2)] {
                 // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
-                let clk_src = Clocks::get().pll_48m_clock;
+                let clk_src = Rate::from_mhz(48);
             } else {
                 let clk_src = Clocks::get().apb_clock;
             }

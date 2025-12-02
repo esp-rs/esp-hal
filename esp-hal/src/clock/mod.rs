@@ -1073,14 +1073,6 @@ pub struct Clocks {
     /// Crypto clock frequency
     #[cfg(any(esp32c6, esp32h2))]
     pub crypto_clock: Rate,
-
-    /// PLL 48M clock frequency (fixed)
-    #[cfg(esp32h2)]
-    pub pll_48m_clock: Rate,
-
-    /// PLL 96M clock frequency (fixed)
-    #[cfg(esp32h2)]
-    pub pll_96m_clock: Rate,
 }
 
 static mut ACTIVE_CLOCKS: Option<Clocks> = None;
@@ -1256,34 +1248,20 @@ impl Clocks {
 impl Clocks {
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = Self::measure_xtal_frequency();
+        use crate::soc::clocks::ClockTree;
 
-        let apb_freq;
-        if cpu_clock_speed != CpuClock::default() {
-            if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
-                apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
-                clocks_ll::esp32h2_rtc_update_to_xtal(xtal_freq, 1);
-                clocks_ll::esp32h2_rtc_apb_freq_update(apb_freq);
-            } else {
-                let pll_freq = PllClock::Pll96MHz;
-                apb_freq = ApbClock::ApbFreq32MHz;
-                clocks_ll::esp32h2_rtc_bbpll_enable();
-                clocks_ll::esp32h2_rtc_bbpll_configure(xtal_freq, pll_freq);
-                clocks_ll::esp32h2_rtc_freq_to_pll_mhz(cpu_clock_speed);
-                clocks_ll::esp32h2_rtc_apb_freq_update(apb_freq);
-            }
-        } else {
-            apb_freq = ApbClock::ApbFreq32MHz;
+        // TODO: expose the whole new enum for custom options
+        match cpu_clock_speed {
+            CpuClock::_96MHz => crate::soc::clocks::CpuClock::_96MHz,
         }
+        .configure();
 
-        Self {
-            cpu_clock: cpu_clock_speed.frequency(),
-            apb_clock: apb_freq.frequency(),
-            xtal_clock: xtal_freq.frequency(),
-            pll_48m_clock: Rate::from_mhz(48),
-            crypto_clock: Rate::from_mhz(96),
-            pll_96m_clock: Rate::from_mhz(96),
-        }
+        ClockTree::with(|clocks| Self {
+            cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
+            apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
+            xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
+            crypto_clock: Rate::from_hz(crate::soc::clocks::hp_root_clk_frequency(clocks)),
+        })
     }
 }
 
