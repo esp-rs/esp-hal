@@ -36,7 +36,6 @@ use esp_radio::wifi::{
     WifiController,
     WifiDevice,
     WifiEvent,
-    WifiStationState,
     sta::StationConfig,
 };
 use log::{error, info};
@@ -209,13 +208,14 @@ async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
     println!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        if esp_radio::wifi::station_state() == WifiStationState::Connected {
+        if matches!(controller.is_connected(), Ok(true)) {
             // wait until we're no longer connected
             controller
                 .wait_for_event(WifiEvent::StationDisconnected)
                 .await;
             Timer::after(Duration::from_millis(5000)).await
         }
+
         if !matches!(controller.is_started(), Ok(true)) {
             let station_config = ModeConfig::Station(
                 StationConfig::default()
