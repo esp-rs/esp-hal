@@ -50,6 +50,17 @@ extern "C" fn idle_entry() -> ! {
     ", idle_hook_fn = sym IDLE_HOOK);
 }
 
+// Exception mode. Setting this bit prevents interrupts below EXCMLEVEL. Cleared by `rfe` at the end
+// of the Level 1 interrupt handler.
+const PS_EXCM: u32 = 1 << 4;
+// User mode. This bit doesn't matter for us yet, we don't have separate kernel mode exceptions.
+const PS_UM: u32 = 1 << 5;
+// Windowed mode.
+const PS_WOE: u32 = 1 << 18;
+// CALLINC field value for call4 instruction.
+#[cfg(feature = "esp-radio")]
+const PS_CALLINC_CALL4: u32 = 1 << 16;
+
 pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext, hook_fn: IdleFn) {
     IDLE_HOOK.store(hook_fn as *mut (), Ordering::Relaxed);
 
@@ -57,8 +68,8 @@ pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext, hook_fn: IdleFn
     // frame for the idle task on the main stack.
     idle_context.PC = idle_entry as usize as u32;
     // Set a valid processor status value, that will not end up spilling registers into the main
-    // task's stack.
-    idle_context.PS = 0x40020;
+    // task's stack. Here we jump to a naked function so we can omit the CALLINC bits.
+    idle_context.PS = PS_EXCM | PS_UM | PS_WOE;
 }
 
 #[cfg(feature = "esp-radio")]
@@ -85,10 +96,10 @@ pub(crate) fn new_task_context(
         A6: task_fn as usize as u32,
         A7: param as usize as u32,
 
-        // For windowed ABI set WOE, UM, EXCM and CALLINC1 (pretend task was 'call4'd)
+        // For windowed ABI set WOE, UM, EXCM and CALLINC = call4 (pretend task was 'call4'd)
         // UM and EXCM are important, so that restoring context will correctly restore an exception
         // context (where the context switch happens).
-        PS: 0x00050030,
+        PS: PS_EXCM | PS_UM | PS_WOE | PS_CALLINC_CALL4,
 
         ..Default::default()
     }
