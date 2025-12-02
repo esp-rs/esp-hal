@@ -1867,9 +1867,31 @@ where
         self.tx.send_break(bits)
     }
 
-    /// Returns whether the UART buffer has data.
+    #[procmacros::doc_replace]
+    /// Returns whether the UART receive buffer has at least one byte of data.
     ///
-    /// If this function returns `true`, [`Self::read`] will not block.
+    /// If this function returns `true`, [`Self::read`] and [`Self::read_async`]
+    /// will not block. Otherwise, they will not return until data is available.
+    ///
+    /// Data that does not get stored due to an error will be lost and does not count
+    /// towards the number of bytes in the receive buffer.
+    // TODO: once we add support for UART_ERR_WR_MASK it needs to be documented here.
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::uart::{Config, Uart};
+    /// let mut uart = Uart::new(peripherals.UART0, Config::default())?;
+    ///
+    /// while !uart.read_ready() {
+    ///     // Do something else while waiting for data to be available.
+    /// }
+    ///
+    /// let mut buf = [0u8; 32];
+    /// uart.read(&mut buf[..])?;
+    ///
+    /// # {after_snippet}
+    /// ```
     #[instability::unstable]
     pub fn read_ready(&mut self) -> bool {
         self.rx.read_ready()
@@ -1881,7 +1903,8 @@ where
     /// The UART hardware continuously receives bytes and stores them in the RX
     /// FIFO. This function reads the bytes from the RX FIFO and returns
     /// them in the provided buffer. If the hardware buffer is empty, this
-    /// function will block until data is available.
+    /// function will block until data is available. The [`Self::read_ready`]
+    /// function can be used to check if data is available without blocking.
     ///
     /// The function returns the number of bytes read into the buffer. This may
     /// be less than the length of the buffer. This function only returns 0
