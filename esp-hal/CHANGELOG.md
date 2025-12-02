@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unsafely expose GPIO pins that are only available on certain chip/module variants (#4520)
 - ESP32-H2: light sleep and deep sleep support with timer and EXT1 wakeup sources (#4587, #4641)
 - Unstable detailed clock configuration options (#4660, #4674)
+- RMT: Added the `Encoder` trait and `CopyEncoder`, `IterEncoder` and `BytesEncoder` implementations. (#4604)
 
 ### Changed
 
@@ -30,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: Support for `Into<PulseCode>` and `From<PulseCode>` has been removed from Tx and Rx methods, respectively, in favor of requiring `PulseCode` directly. (#4616)
 - RMT: Tx handling has been revised: Some errors will now be returned by `TxTransaction::wait()` instead of `Channel::transmit`. `Channel::transmit_continuously()` can now also report `Error::EndMarkerMissing`. (#4617)
 - `Rtc::time_since_boot()` has been renamed to `Rtc::time_since_power_up()` (#4630)
+- RMT: Tx methods now take data as `impl Encoder`. (#4604)
 
 ### Fixed
 

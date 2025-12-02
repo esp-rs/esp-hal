@@ -73,16 +73,28 @@ that are now part of `ConfigError` have been renamed.
 ### RMT data type changes
 
 Support for `Into<PulseCode>` and `From<PulseCode>` has been removed from Tx and Rx methods, respectively.
-Instead, buffers must now contain `PulseCode` directly.
 The corresponding generic argument has also been removed from `TxTransaction` and `RxTransaction`:
 
+For Rx methods, you need to provide a `PulseCode` buffer now:
+
 ```diff
--let tx_data: [u32; 8] = todo!();
 -let mut rx_data: [u32; 8] = [0u32; 8];
--let tx_transaction: TxTransaction<'_, '_, u32> = tx_channel.transmit(&tx_data)?;
--let rx_transaction: RxTransaction<'_, '_, u32> = rx_channel.receive(&mut rx_data)?;
-+let tx_data: [PulseCode; 8] = todo!();
 +let mut rx_data: [PulseCode; 8] = [PulseCode::default(); 8];
-+let tx_transaction: TxTransaction<'_, '_> = tx_channel.transmit(&tx_data)?;
+-let rx_transaction: RxTransaction<'_, '_, u32> = rx_channel.receive(&mut rx_data)?;
 +let rx_transaction: RxTransaction<'_, '_> = rx_channel.receive(&mut rx_data)?;
+```
+
+For Tx methods, data types now need to implement the `Encoder` trait.
+Transmitting slices of `PulseCode` is possible via the provided `CopyEncoder`
+type, but more sophisticated implementations are possible:
+
+```diff
+ let data: [PulseCode; 2] = [
+         PulseCode::new(Level::High, 42, Level::Low, 24),
+         PulseCode::end_marker(),
+ ];
+-tx_channel.transmit(&data)?;
++let mut encoder = CopyEncoder::new(&data);
+-let tx_transaction: TxTransaction<'_, '_, u32> = tx_channel.transmit(&encoder)?;
++let tx_transaction: TxTransaction<'_, '_> = tx_channel.transmit(&encoder)?;
 ```
