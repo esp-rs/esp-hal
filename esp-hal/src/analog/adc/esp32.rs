@@ -302,6 +302,9 @@ where
         // Do *not* invert the output
         // NOTE: This seems backwards, but was verified experimentally.
         sensors
+            .sar_read_ctrl()
+            .modify(|_, w| w.sar1_data_inv().set_bit());
+        sensors
             .sar_read_ctrl2()
             .modify(|_, w| w.sar2_data_inv().set_bit());
 
