@@ -5,7 +5,6 @@ mod tests {
     #[cfg(multi_core)]
     use esp_hal::system::CpuControl;
     use esp_hal::{
-        clock::CpuClock,
         interrupt::software::SoftwareInterruptControl,
         peripherals::Peripherals,
         timer::timg::TimerGroup,
@@ -23,7 +22,7 @@ mod tests {
     fn init() -> Peripherals {
         crate::init_heap();
 
-        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        let config = esp_hal::Config::default();
         esp_hal::init(config)
     }
 

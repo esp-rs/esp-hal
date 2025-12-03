@@ -1,6 +1,67 @@
 use crate::rom::regi2c::{RawRegI2cField, RegI2cMaster, RegI2cRegister, define_regi2c};
 
 define_regi2c! {
+    master: REGI2C_BBPLL(0x66, 1) {
+        reg: I2C_BBPLL_IR_CAL(0) {
+            field: I2C_BBPLL_IR_CAL_CK_DIV(7..4),
+            field: I2C_BBPLL_IR_CAL_DELAY(3..0)
+        }
+        reg: I2C_BBPLL_IR_CAL_EXT_REG(1) {
+            field: I2C_BBPLL_IR_CAL_UNSTOP(7..7),
+            field: I2C_BBPLL_IR_CAL_START(6..6),
+            field: I2C_BBPLL_IR_CAL_RSTB(5..5),
+            field: I2C_BBPLL_IR_CAL_ENX_CAP(4..4),
+            field: I2C_BBPLL_IR_CAL_EXT_CAP(3..0)
+        }
+        reg: I2C_BBPLL_OC_REF(2) {
+            field: I2C_BBPLL_OC_ENB_FCAL(7..7),
+            field: I2C_BBPLL_OC_DCHGP(6..4),
+            field: I2C_BBPLL_OC_REF_DIV(3..0)
+        }
+        reg: I2C_BBPLL_OC_DIV_REG(3) {
+            field: I2C_BBPLL_OC_DIV(7..0)
+        }
+        reg: I2C_BBPLL_REG4(4) {
+            field: I2C_BBPLL_OC_TSCHGP(7..7),
+            field: I2C_BBPLL_OC_ENB_VCON(6..6),
+            field: I2C_BBPLL_DIV_CPU(5..5),
+            field: I2C_BBPLL_DIV_DAC(4..4),
+            field: I2C_BBPLL_DIV_ADC(3..2),
+            field: I2C_BBPLL_MODE_HF(1..1),
+            field: I2C_BBPLL_RSTB_DIV_ADC(0..0)
+        }
+        reg: I2C_BBPLL_OC_DR(5) {
+            field: I2C_BBPLL_EN_USB(7..7),
+            field: I2C_BBPLL_OC_DR3(6..4),
+            field: I2C_BBPLL_OC_DR1(2..0)
+        }
+        reg: I2C_BBPLL_REG6(6) {
+            field: I2C_BBPLL_OC_DLREF_SEL(7..6),
+            field: I2C_BBPLL_OC_DHREF_SEL(5..4),
+            field: I2C_BBPLL_INC_CUR(3..3),
+            field: I2C_BBPLL_OC_DCUR(2..0)
+        }
+        reg: I2C_BBPLL_REG8(8) {
+            field: I2C_BBPLL_OR_LOCK(7..7),
+            field: I2C_BBPLL_OR_CAL_END(6..6),
+            field: I2C_BBPLL_OR_CAL_OVF(5..5),
+            field: I2C_BBPLL_OR_CAL_UDF(4..4),
+            field: I2C_BBPLL_OR_CAL_CAP(3..0)
+        }
+        reg: I2C_BBPLL_REG9(9) {
+            field: I2C_BBPLL_BBADC_DREF(7..6),
+            field: I2C_BBPLL_BBADC_DVDD(5..4),
+            field: I2C_BBPLL_BBADC_DELAY2(3..2),
+            field: I2C_BBPLL_OC_VCO_DBIAS(1..0)
+        }
+        reg: I2C_BBPLL_REG10(10) {
+            field: I2C_BBPLL_ENT_ADC(7..6),
+            field: I2C_BBPLL_DTEST(5..4),
+            field: I2C_BBPLL_ENT_PLL_MSB(3..3),
+            field: I2C_BBPLL_BBADC_INPUT_SHORT(2..2),
+            field: I2C_BBPLL_BBADC_DCUR(1..0)
+        }
+    }
     master: REGI2C_SAR_I2C(0x69, 1) {
         reg: I2C_SAR_REG0(0) {
             field: ADC_SAR1_INITIAL_CODE_LOW(7..0)

@@ -1,24 +1,4 @@
-use crate::{
-    clock::{Clock, CpuClock},
-    peripherals::{APB_CTRL, SYSTEM},
-    rom,
-};
-
-pub(crate) fn set_cpu_clock(cpu_clock_speed: CpuClock) {
-    SYSTEM::regs()
-        .sysclk_conf()
-        .modify(|_, w| unsafe { w.soc_clk_sel().bits(1) });
-    SYSTEM::regs().cpu_per_conf().modify(|_, w| unsafe {
-        w.pll_freq_sel().set_bit();
-        w.cpuperiod_sel().bits(match cpu_clock_speed {
-            CpuClock::_80MHz => 0,
-            CpuClock::_160MHz => 1,
-            CpuClock::_240MHz => 2,
-        })
-    });
-
-    rom::ets_update_cpu_frequency_rom(cpu_clock_speed.frequency().as_mhz());
-}
+use crate::peripherals::APB_CTRL;
 
 // Note: this comment has been copied from esp-idf, including the mistake.
 // Mask for clock bits used by both WIFI and Bluetooth, 0, 1, 2, 3, 7,
