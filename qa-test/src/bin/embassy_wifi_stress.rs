@@ -70,8 +70,8 @@ async fn main(_spawner: Spawner) {
         println!("Connecting to WiFi SSID: {}", SSID);
         let scan_config = ScanConfig::default().with_ssid(&SSID).with_scan_type(
             esp_radio::wifi::ScanTypeConfig::Active {
-                min: core::time::Duration::from_millis(5),
-                max: core::time::Duration::from_millis(20),
+                min: esp_hal::time::Duration::from_millis(5),
+                max: esp_hal::time::Duration::from_millis(20),
             },
         );
         println!("Scanning for WiFi networks");
