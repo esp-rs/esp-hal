@@ -1086,18 +1086,14 @@ impl<'d> UartRx<'d, Async> {
         let minimum = minimum.min(max_threshold);
 
         if self.uart.info().rx_fifo_count() < minimum {
-            let _guard = if current_threshold > max_threshold {
-                // We're ignoring the user configuration here to ensure that this is not waiting
-                // for more data than the buffer. We'll restore the original value after the
-                // future resolved.
-                let info = self.uart.info();
-                unwrap!(info.set_rx_fifo_full_threshold(max_threshold));
-                Some(OnDrop::new(|| {
-                    unwrap!(info.set_rx_fifo_full_threshold(current_threshold));
-                }))
-            } else {
-                None
-            };
+            // We're ignoring the user configuration here to ensure that this is not waiting
+            // for more data than the buffer. We'll restore the original value after the
+            // future resolved.
+            let info = self.uart.info();
+            unwrap!(info.set_rx_fifo_full_threshold(max_threshold));
+            let _guard = OnDrop::new(|| {
+                unwrap!(info.set_rx_fifo_full_threshold(current_threshold));
+            });
 
             // Wait for space or event
             let mut events = RxEvent::FifoFull
