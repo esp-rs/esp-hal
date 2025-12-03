@@ -1085,7 +1085,7 @@ impl<'d> UartRx<'d, Async> {
         // of returnable bytes.
         let minimum = minimum.min(max_threshold);
 
-        while self.uart.info().rx_fifo_count() < minimum {
+        if self.uart.info().rx_fifo_count() < minimum {
             let _guard = if current_threshold > max_threshold {
                 // We're ignoring the user configuration here to ensure that this is not waiting
                 // for more data than the buffer. We'll restore the original value after the
@@ -3717,6 +3717,9 @@ impl Info {
         for byte_into in buf[..to_read].iter_mut() {
             *byte_into = self.read_next_from_fifo();
         }
+
+        // This bit is not cleared until the FIFO actually drops below the threshold.
+        self.clear_rx_events(RxEvent::FifoFull);
 
         Ok(to_read)
     }
