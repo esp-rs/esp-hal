@@ -17,7 +17,7 @@ assignees: ''
 1. ...
 2. ...
 
-<!-- Please share the minimal repro of the issue where the bug can be reproduced. `documentation/REPRODUCERS.md` gives some hints how an ideal reproducer should look like. -->
+<!-- Please share a minimal reproducer which demonstrates the issue. `documentation/REPRODUCERS.md` gives some hints how an ideal reproducer should look like. -->
 
 <!-- Make sure you are able to reproduce the bug in the `main` branch, too. -->
 
