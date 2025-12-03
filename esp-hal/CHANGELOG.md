@@ -12,11 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- RMT: `SingleShotTxTransaction` has been renamed to `TxTransaction`. (#4302)
+- RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` now take the configuration by reference. (#4302)
+- RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` don't take a pin anymore, instead `Channel::with_pin` has been added. (#4302)
+- RMT: Configuration errors have been split out of `rmt::Error` into the new `rmt::ConfigError` enum. (#4494)
+- RMT: `Rmt::new()` now returns `Error::UnreachableTargetFrequency` instead of panicking when requesting 0 Hz. (#4509)
+
 
 ### Fixed
 
 - I2C: avoid potential infinite loop while checking for command completion (#4519)
 - ESP32: ADC1 readings are no longer inverted (#4423)
+- UART: correct documentation of `read` which incorrectly stated that it would never block (#4586)
 
 ### Removed
 
