@@ -666,6 +666,9 @@ impl DeviceClocks {
                     _ => anyhow::bail!("only muxes are supported as clock source data"),
                 };
 
+                node.validate_source_data(&validation_context)
+                    .with_context(|| format!("Invalid clock tree item: {}", node.name_str()))?;
+
                 clock_tree.push(Box::new(node));
             }
         }
