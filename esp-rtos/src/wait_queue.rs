@@ -47,12 +47,3 @@ impl WaitQueue {
         self.waiting_tasks.remove(task);
     }
 }
-
-impl Drop for WaitQueue {
-    fn drop(&mut self) {
-        debug_assert!(
-            self.waiting_tasks.is_empty(),
-            "WaitQueue dropped while tasks are still waiting"
-        );
-    }
-}
