@@ -34,7 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: When dropping a Tx channel, the driver now disconnects the output pin from the peripheral. (#4302)
 - I2C: avoid potential infinite loop while checking for command completion (#4519)
 - UART: correct documentation of `read` which incorrectly stated that it would never block (#4586)
-- UART: fixed an issue in `read_exact_async` which may cause `FifoOverflowed` to be returned unexpectedly. (#4586)
 
 ### Removed
 
