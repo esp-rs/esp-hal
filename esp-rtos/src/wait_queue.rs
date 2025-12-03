@@ -47,3 +47,14 @@ impl WaitQueue {
         self.waiting_tasks.remove(task);
     }
 }
+
+impl Drop for WaitQueue {
+    fn drop(&mut self) {
+        // Even though it is a potential bug that tasks may be registered in this queue,
+        // we need to remove them still. Otherwise, deleting those tasks would try to
+        // de-queue from an already dropped queue (this one).
+        while let Some(mut task) = self.waiting_tasks.pop() {
+            unsafe { task.as_mut() }.current_wait_queue = None;
+        }
+    }
+}
