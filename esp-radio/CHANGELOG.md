@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `ble::mac` to get the MAC address of the device (#4485)
 - `last_calibration_result` to get the result of the last calibration (#4479)
-- `BleInitError` for BLE init failures and `Internal`, `WrongClockConfig`, `SchedulerNotInitialized` and `Adc2IsUsed` variants to `WifiError (#4482) 
+- `BleInitError` for BLE init failures and `Internal`, `WrongClockConfig`, `SchedulerNotInitialized` and `Adc2IsUsed` variants to `WifiError (#4482)
 
 ### Changed
 
@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Client` and `Sta` are replaced with `Station`, `Ap` with `AccessPoint` and `ApSta` with `AccessPointStation` (#4546)
 - `WifiEvent` uses full names for events instead of acronyms (#4554)
 - `WifiController::set_mode` is now unstable (#4570)
+- `ScanTypeConfig` now uses `esp_hal::time::Duration` instead of `core::time::Duration` (#4609)
 
 ### Fixed
 
