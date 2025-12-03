@@ -1907,6 +1907,26 @@ impl Chip {
                     "soc_rc_fast_clk_default_is_set",
                     "soc_rc_slow_clock=\"136000\"",
                     "soc_rc_slow_clock_is_set",
+                    "soc_has_clock_node_xtal_clk",
+                    "soc_has_clock_node_pll_f96m_clk",
+                    "soc_has_clock_node_pll_f64m_clk",
+                    "soc_has_clock_node_pll_f48m_clk",
+                    "soc_has_clock_node_rc_fast_clk",
+                    "soc_has_clock_node_xtal32k_clk",
+                    "soc_has_clock_node_osc_slow_clk",
+                    "soc_has_clock_node_rc_slow_clk",
+                    "soc_has_clock_node_pll_lp_clk",
+                    "soc_has_clock_node_hp_root_clk",
+                    "soc_has_clock_node_cpu_clk",
+                    "soc_has_clock_node_ahb_clk",
+                    "soc_has_clock_node_apb_clk",
+                    "soc_has_clock_node_xtal_d2_clk",
+                    "soc_has_clock_node_lp_fast_clk",
+                    "soc_has_clock_node_lp_slow_clk",
+                    "soc_has_clock_node_timg0_function_clock",
+                    "soc_has_clock_node_timg0_calibration_clock",
+                    "soc_has_clock_node_timg1_function_clock",
+                    "soc_has_clock_node_timg1_calibration_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "soc_xtal_frequency=\"32\"",
@@ -2098,6 +2118,26 @@ impl Chip {
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_rc_slow_clock=\"136000\"",
                     "cargo:rustc-cfg=soc_rc_slow_clock_is_set",
+                    "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_pll_f96m_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_pll_f64m_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_pll_f48m_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_rc_fast_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_xtal32k_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_osc_slow_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_rc_slow_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_pll_lp_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_hp_root_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_cpu_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_ahb_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_apb_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_xtal_d2_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_lp_fast_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_lp_slow_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_timg0_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_timg0_calibration_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_timg1_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_timg1_calibration_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=soc_xtal_frequency=\"32\"",
@@ -3348,6 +3388,10 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(uart_peripheral_controls_mem_clk)");
     println!("cargo:rustc-check-cfg=cfg(wifi_has_wifi6)");
     println!("cargo:rustc-check-cfg=cfg(esp32h2)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f96m_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f64m_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f48m_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_lp_clk)");
     println!("cargo:rustc-check-cfg=cfg(esp32s2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dedicated_gpio)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_pms)");
