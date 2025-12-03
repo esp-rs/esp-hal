@@ -1242,6 +1242,11 @@ pub(crate) fn ble_deinit() {
         fn sync_stack_deinitEnv() -> i32;
     }
 
+    #[cfg(esp32c2)]
+    unsafe extern "C" {
+        fn ble_controller_disable();
+    }
+
     unsafe {
         // HCI deinit
         npl::r_ble_hci_trans_cfg_hs(None, core::ptr::null(), None, core::ptr::null());
@@ -1254,6 +1259,11 @@ pub(crate) fn ble_deinit() {
             extAdv_stack_deinitEnv();
             adv_stack_deinitEnv();
             base_stack_deinitEnv();
+        }
+
+        #[cfg(esp32c2)]
+        {
+            ble_controller_disable();
         }
 
         #[cfg(not(esp32c2))]

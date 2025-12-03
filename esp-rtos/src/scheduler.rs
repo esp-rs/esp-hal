@@ -349,13 +349,16 @@ impl SchedulerState {
         let is_current = task_to_delete == current_task;
 
         self.remove_from_all_queues(task_to_delete);
-        if task_to_delete.state() != TaskState::Deleted {
-            self.to_delete.push(task_to_delete);
-            task_to_delete.set_state(TaskState::Deleted);
-        }
 
         if is_current {
+            if task_to_delete.state() != TaskState::Deleted {
+                self.to_delete.push(task_to_delete);
+                task_to_delete.set_state(TaskState::Deleted);
+            }
+
             self.per_cpu[current_cpu].current_task = None;
+        } else {
+            self.delete_task(task_to_delete);
         }
 
         is_current
@@ -382,6 +385,7 @@ impl SchedulerState {
     fn delete_task(&mut self, mut to_delete: TaskPtr) {
         unsafe { to_delete.as_ref().ensure_no_stack_overflow() };
 
+        debug!("Dropping task: {:x}", to_delete.as_ptr() as usize);
         unsafe {
             #[cfg(feature = "alloc")]
             if to_delete.as_ref().heap_allocated {

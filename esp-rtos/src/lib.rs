@@ -160,6 +160,10 @@ mod esp_alloc {
 
                 let allocation = unsafe { malloc_internal(layout.size() + extra) };
 
+                if allocation.is_null() {
+                    return Err(AllocError);
+                }
+
                 // reserve at least 4 bytes for the prefix
                 let ptr = allocation.wrapping_add(4);
 
