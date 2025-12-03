@@ -1,1 +1,5 @@
 avoid-breaking-exported-api = false
+
+[[disallowed-types]]
+path = "core::time::Duration"
+reason = "Use `esp_hal::time::Duration` instead of `core::time::Duration`"
