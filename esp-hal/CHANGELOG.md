@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-H2: light sleep and deep sleep support with timer wakeup source (#4587)
 
 ### Changed
+
 - RMT: `SingleShotTxTransaction` has been renamed to `TxTransaction`. (#4302)
 - RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` now take the configuration by reference. (#4302)
 - RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` don't take a pin anymore, instead `Channel::with_pin` has been added. (#4302)
@@ -32,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: the `place_rmt_driver_in_ram` option now also places the async interrupt handler in RAM. (#4302)
 - RMT: When dropping a Tx channel, the driver now disconnects the output pin from the peripheral. (#4302)
 - I2C: avoid potential infinite loop while checking for command completion (#4519)
+- UART: correct documentation of `read` which incorrectly stated that it would never block (#4586)
 
 ### Removed
 
