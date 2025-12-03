@@ -1161,7 +1161,7 @@ impl Clocks {
                 cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
                 apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
                 // FIXME: this assumes there is a crystal
-                xtal_clock: Rate::from_hz(crate::soc::clocks::xtl_clk_frequency(clocks)),
+                xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
                 i2c_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
                 // TODO: model PLL_F160M
                 pwm_clock: Rate::from_mhz(160),
@@ -1190,7 +1190,7 @@ impl Clocks {
             Self {
                 cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
                 apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
-                xtal_clock: Rate::from_hz(crate::soc::clocks::xtl_clk_frequency(clocks)),
+                xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
             }
         })
     }
@@ -1216,7 +1216,7 @@ impl Clocks {
             Self {
                 cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
                 apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
-                xtal_clock: Rate::from_hz(crate::soc::clocks::xtl_clk_frequency(clocks)),
+                xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
             }
         })
     }

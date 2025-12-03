@@ -48,7 +48,7 @@ impl CpuClock {
         // TODO: set some defaults to RTC clocks
         let mut config = match self {
             CpuClock::_80MHz => ClockConfig {
-                xtl_clk: None,
+                xtal_clk: None,
                 pll_clk: Some(PllClkConfig::_320),
                 apll_clk: None,
                 cpu_pll_div: Some(CpuPllDivConfig::_4),
@@ -58,7 +58,7 @@ impl CpuClock {
                 rtc_fast_clk: None,
             },
             CpuClock::_160MHz => ClockConfig {
-                xtl_clk: None,
+                xtal_clk: None,
                 pll_clk: Some(PllClkConfig::_320),
                 apll_clk: None,
                 cpu_pll_div: Some(CpuPllDivConfig::_2),
@@ -68,7 +68,7 @@ impl CpuClock {
                 rtc_fast_clk: None,
             },
             CpuClock::_240MHz => ClockConfig {
-                xtl_clk: None,
+                xtal_clk: None,
                 pll_clk: Some(PllClkConfig::_480),
                 apll_clk: None,
                 cpu_pll_div: Some(CpuPllDivConfig::_2),
@@ -80,14 +80,14 @@ impl CpuClock {
             CpuClock::Custom(clock_config) => clock_config,
         };
 
-        // Detect XTL if unset.
+        // Detect XTAL if unset.
         // FIXME: this doesn't support running from RC_FAST_CLK. We should rework detection to only
-        // run when requesting XTL.
+        // run when requesting XTAL.
         ClockTree::with(|clocks| {
-            if config.xtl_clk.is_none() {
+            if config.xtal_clk.is_none() {
                 let xtal = detect_xtal_freq(clocks);
                 debug!("Auto-detected XTAL frequency: {}", xtal.value());
-                config.xtl_clk = Some(xtal);
+                config.xtal_clk = Some(xtal);
             }
         });
 
@@ -98,11 +98,11 @@ impl CpuClock {
 // TODO: this could be chip-independent
 // We're rather impolite in this function by not saving and restoring configuration, but this is
 // expected to run before configuring CPU clocks anyway.
-fn detect_xtal_freq(clocks: &mut ClockTree) -> XtlClkConfig {
+fn detect_xtal_freq(clocks: &mut ClockTree) -> XtalClkConfig {
     const SLOW_CLOCK_CYCLES: u32 = 100;
 
     // Just an assumption for things to not panic.
-    configure_xtl_clk(clocks, XtlClkConfig::_40);
+    configure_xtal_clk(clocks, XtalClkConfig::_40);
     configure_syscon_pre_div(clocks, SysconPreDivConfig::new(0));
     configure_cpu_clk(clocks, CpuClkConfig::Xtal);
 
@@ -146,9 +146,9 @@ fn detect_xtal_freq(clocks: &mut ClockTree) -> XtlClkConfig {
 
     let mhz = (cali_value * (calibration_clock_frequency / SLOW_CLOCK_CYCLES)) / 1_000_000;
     if mhz.abs_diff(40) < mhz.abs_diff(26) {
-        XtlClkConfig::_40
+        XtalClkConfig::_40
     } else {
-        XtlClkConfig::_26
+        XtalClkConfig::_26
     }
 }
 
@@ -166,9 +166,9 @@ const BBPLL_BBADC_DSMP_VAL_320M: u8 = 0x84;
 const BBPLL_ENDIV5_VAL_480M: u8 = 0xc3;
 const BBPLL_BBADC_DSMP_VAL_480M: u8 = 0x74;
 
-// XTL_CLK
+// XTAL_CLK
 
-fn configure_xtl_clk_impl(_clocks: &mut ClockTree, config: XtlClkConfig) {
+fn configure_xtal_clk_impl(_clocks: &mut ClockTree, config: XtalClkConfig) {
     // The stored configuration affects PLL settings instead. We save the value in a register
     // similar to ESP-IDF, just in case something relies on that, or, if we can in the future read
     // back the value instead of wasting RAM on it.
@@ -205,13 +205,13 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
         return;
     }
 
-    let xtal_cfg = unwrap!(clocks.xtl_clk);
+    let xtal_cfg = unwrap!(clocks.xtal_clk);
     let pll_cfg = unwrap!(clocks.pll_clk);
 
     // This classification is arbitrary based on variable names and what (PLL output or XTAL input)
     // affects the values.
     struct PllParams {
-        // The only parameter I could infer, it divides the reference clock (XTL).
+        // The only parameter I could infer, it divides the reference clock (XTAL).
         // We'll either use a reference of 40MHz or 2MHz (or maybe 20/1MHz).
         // The rest of the parameters somehow ensure this divided reference clock is multiplied to
         // the PLL target frequency.
@@ -262,7 +262,7 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
     };
 
     let pll_params = match xtal_cfg {
-        XtlClkConfig::_40 => PllParams {
+        XtalClkConfig::_40 => PllParams {
             div_ref: 0, // divided ref ~~ 40MHz
             lref: 0,
             dcur: 6,
@@ -274,7 +274,7 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
             },
         },
 
-        XtlClkConfig::_26 => PllParams {
+        XtalClkConfig::_26 => PllParams {
             div_ref: 12, // divided ref ~~ 2MHz
             lref: 1,
             dcur: 0,
