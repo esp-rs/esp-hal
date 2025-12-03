@@ -1174,6 +1174,14 @@ impl<'d> UartRx<'d, Async> {
     /// before it resolves, or if an error occurs during the read operation,
     /// previously read data may be lost.
     pub async fn read_exact_async(&mut self, mut buf: &mut [u8]) -> Result<(), RxError> {
+        if buf.is_empty() {
+            return Ok(());
+        }
+
+        // Drain the buffer first, there's no point in waiting for data we've already received.
+        let read = self.uart.info().read_buffered(buf)?;
+        buf = &mut buf[read..];
+
         while !buf.is_empty() {
             // No point in listening for timeouts, as we're waiting for an exact amount of
             // data. On ESP32 and S2, the timeout interrupt can't be cleared unless the FIFO
