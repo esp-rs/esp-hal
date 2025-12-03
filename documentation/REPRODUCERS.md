@@ -11,7 +11,7 @@ To be effective, your reproducer should adhere to the following principles:
 - Self-Contained and Buildable: The code must be a complete project (use `esp-generate` to create the skeleton) that can be built and run without any modifications by the person trying to reproduce the issue.
 - Minimal: It should contain only the code strictly necessary to demonstrate the issue. Remove any unrelated features, dependencies, or verbose logging that doesn't contribute to the problem.
 - No Unrelated Dependencies: Avoid including external crates or libraries unless they are directly necessary for the specific feature you are reporting a bug on.
-- Avoid referencing a crate modified by you - even if it's just added logging. Ideally reference the latest released version of a crate _or_ use a git-reference pointing to a specific (latest as of the time of writing) commit
+- Avoid referencing a crate modified by you - even if it's just added logging. Ideally reference the latest released version of a crate _or_ use a git-reference pointing to a specific commit (ideally the latest at the time of creating the reproducer)
 - External Hardware and Wiring: If the issue requires external components (e.g., an LED, an I2C sensor), explicitly state the required hardware and provide a clear, simple description or diagram of the wiring.
 
 ## Special Considerations for Connectivity Issues
