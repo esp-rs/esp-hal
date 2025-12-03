@@ -118,9 +118,9 @@ memory_map = { ranges = [
 #
 # `clocks` in a peripheral clock definition can either be a different `peripheral_clocks` entry (string), or a new definition (array) that uses the same syntax as `system_clocks` above.
 clocks = { system_clocks = { clock_tree = [
-    { name = "XTL_CLK",     type = "source",                    values = "26, 40",                     output = "VALUE * 1_000_000", always_on = true }, # 2-40MHz, always on? sw ability to measure using an internal RC clock
-    { name = "PLL_CLK",     type = "derived", from = "XTL_CLK", values = "320, 480",                   output = "VALUE * 1_000_000", reject = "VALUE == 480_000_000 && CPU_PLL_DIV == 4" },
-    { name = "APLL_CLK",    type = "derived", from = "PLL_CLK", values = "16_000_000 ..= 128_000_000", output = "VALUE" },
+    { name = "XTAL_CLK",     type = "source",                    values = "26, 40",                     output = "VALUE * 1_000_000", always_on = true }, # 2-40MHz, always on? sw ability to measure using an internal RC clock
+    { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", values = "320, 480",                   output = "VALUE * 1_000_000", reject = "VALUE == 480_000_000 && CPU_PLL_DIV == 4" },
+    { name = "APLL_CLK",    type = "derived", from = "PLL_CLK",  values = "16_000_000 ..= 128_000_000", output = "VALUE" },
     { name = "RC_FAST_CLK", type = "source",  output = "8_000_000" }, # this is supposed to be adjustable using RTC_CNTL_CK8M_DIV_SEL
 
     # CPU and related clocks
@@ -142,7 +142,7 @@ clocks = { system_clocks = { clock_tree = [
     # Each item may have a `reject` list of conditions to validate the clock tree config.
     #
     # Free parameters:
-    # - value of XTL_CLK (can be fixed or "measured")
+    # - value of XTAL_CLK (can be fixed or "measured")
     # - value of PLL_CLK (320/480)
     # - value of APLL_CLK (target frequency, maybe?)
     # - value of SYSCON_PRE_DIV (divisor)
@@ -177,7 +177,7 @@ clocks = { system_clocks = { clock_tree = [
 
     # DIVB Divisor for low-speed clock sources (XTAL, FOSC)
     { name = "SYSCON_PRE_DIV_IN", type = "mux", variants = [
-        { name = "XTAL",    outputs = "XTL_CLK" },
+        { name = "XTAL",    outputs = "XTAL_CLK" },
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
     ] },
     { name = "SYSCON_PRE_DIV", type = "divider", divisors = "0 .. 1024", output = "SYSCON_PRE_DIV_IN / (DIVISOR + 1)" },
@@ -216,7 +216,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "XTAL32K_CLK",     type = "source",  output = "32768" },
     { name = "RC_SLOW_CLK",     type = "source",  output = "150_000" },
     { name = "RC_FAST_DIV_CLK", type = "divider", output = "RC_FAST_CLK / 256" },
-    { name = "XTAL_DIV_CLK",    type = "divider", output = "XTL_CLK / 4" }, # source: esp-idf SOC_RTC_FAST_CLK_SRC_XTAL_D4
+    { name = "XTAL_DIV_CLK",    type = "divider", output = "XTAL_CLK / 4" }, # source: esp-idf SOC_RTC_FAST_CLK_SRC_XTAL_D4
 
     { name = "RTC_SLOW_CLK", type = "mux", variants = [
         { name = "XTAL",    outputs = "XTAL32K_CLK" },
@@ -229,7 +229,7 @@ clocks = { system_clocks = { clock_tree = [
     ] },
     # Wireless low-power clock. Unsure how to configure this or if it's needed at all, esp-idf does not seem to use this MUX.
     #{ name = "LOW_POWER_CLK", type = "mux", variants = [
-    #    { name = "XTAL",     outputs = "XTL_CLK" },
+    #    { name = "XTAL",     outputs = "XTAL_CLK" },
     #    { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
     #    { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
     #    { name = "RTC_SLOW", outputs = "RTC_SLOW_CLK" },

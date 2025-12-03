@@ -91,8 +91,8 @@ memory_map = { ranges = [
 
 clocks = { system_clocks = { clock_tree = [
     # High-speed clock sources
-    { name = "XTL_CLK",     type = "source",  values = "26, 40", output = "VALUE * 1_000_000", always_on = true },
-    { name = "PLL_CLK",     type = "derived", from = "XTL_CLK",  output = "480_000_000" },
+    { name = "XTAL_CLK",    type = "source",  values = "26, 40", output = "VALUE * 1_000_000", always_on = true },
+    { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", output = "480_000_000" },
     { name = "RC_FAST_CLK", type = "source",                     output = "17_500_000" },
 
     # Low-speed clocks
@@ -102,7 +102,7 @@ clocks = { system_clocks = { clock_tree = [
 
     # CPU clock source dividers
     { name = "SYSTEM_PRE_DIV_IN", type = "mux", variants = [
-        { name = "XTAL",    outputs = "XTL_CLK" },
+        { name = "XTAL",    outputs = "XTAL_CLK" },
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
     ] },
     { name = "SYSTEM_PRE_DIV", type = "divider", divisors = "0 .. 1024", output = "SYSTEM_PRE_DIV_IN / (DIVISOR + 1)" },
@@ -137,7 +137,7 @@ clocks = { system_clocks = { clock_tree = [
     
     # Low-power clocks
     { name = "RC_FAST_CLK_DIV_N", type = "divider", divisors = "0 ..= 3", output = "RC_FAST_CLK / (DIVISOR + 1)" }, # RC_DIV
-    { name = "XTAL_DIV_CLK",      type = "divider", output = "XTL_CLK / 2" }, # XTAL_DIV
+    { name = "XTAL_DIV_CLK",      type = "divider", output = "XTAL_CLK / 2" }, # XTAL_DIV
     { name = "RTC_SLOW_CLK", type = "mux", variants = [ # RTC_CNTL_ANA_CLK_RTC_SEL
         { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
         { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
@@ -150,7 +150,7 @@ clocks = { system_clocks = { clock_tree = [
     
     # Low-power wireless clock source
     { name = "LOW_POWER_CLK", type = "mux", variants = [
-        { name = "XTAL",     outputs = "XTL_CLK" },
+        { name = "XTAL",     outputs = "XTAL_CLK" },
         { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
         { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
         { name = "RTC_SLOW", outputs = "RTC_SLOW_CLK" },
@@ -179,7 +179,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
     { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true, clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL_CLK", variants = [
-            { name = "XTAL_CLK", outputs = "XTL_CLK" },
+            { name = "XTAL_CLK", outputs = "XTAL_CLK" },
             { name = "PLL_40M",  outputs = "PLL_40M" },
         ] },
         { name = "CALIBRATION_CLOCK", type = "mux", variants = [
