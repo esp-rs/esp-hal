@@ -8,8 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- It's now possible to obtain the access point info of the currently connected AP, by using `WifiController::ap_info(&self)` (#4405)
 
+- It's now possible to obtain the access point info of the currently connected AP, by using `WifiController::ap_info(&self)` (#4405)
 - `ble::mac` to get the MAC address of the device (#4485)
 - `last_calibration_result` to get the result of the last calibration (#4479)
 - `BleInitError` for BLE init failures and `Internal`, `WrongClockConfig`, `SchedulerNotInitialized` and `Adc2IsUsed` variants to `WifiError (#4482)
@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WifiEvent` uses full names for events instead of acronyms (#4554)
 - `WifiController::set_mode` is now unstable (#4570)
 - `ScanTypeConfig` now uses `esp_hal::time::Duration` instead of `core::time::Duration` (#4609)
+- The `CsiConfig` struct has been moved to the `wifi::csi` module (#4588)
+- The `ScanMethod`, `ScanTypeConfig`, and `ScanConfig` types have been moved to `wifi::scan` (#4588)
 
 ### Fixed
 

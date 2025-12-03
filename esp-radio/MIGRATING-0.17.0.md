@@ -34,12 +34,15 @@ impl From<ScanMethod> for esp_radio::wifi::ScanMethod {
 - `AccessPointInfo` and `AccessPointConfig` are now located in `wifi::ap`.
 - `ClientConfig` is now located in `wifi::sta`.
 - `EapFastConfig`, `TlsPhase2Method` and `EapClientConfig` are now located in `wifi::ap::eap`.
+- The `CsiConfig` struct is now located in `wifi::csi`.
+- The `ScanMethod`, `ScanTypeConfig`, and `ScanConfig` types are now located in `wifi::scan`.
 
 You will need to update any imports in your project accordingly.
 
 ## `esp_radio::init()` and `Controller` is no longer available
 
 WiFi initialization:
+
 ```diff
 -    let esp_radio_ctrl = esp_radio::init().unwrap();
 -    let (mut controller, interfaces) =

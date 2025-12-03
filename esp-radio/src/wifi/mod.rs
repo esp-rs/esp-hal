@@ -7,7 +7,7 @@ use core::{fmt::Debug, marker::PhantomData, mem::MaybeUninit, ptr::addr_of, task
 
 use enumset::{EnumSet, EnumSetType};
 use esp_config::esp_config_int;
-use esp_hal::{asynch::AtomicWaker, system::Cpu, time::Duration};
+use esp_hal::{asynch::AtomicWaker, system::Cpu};
 use esp_sync::NonReentrantMutex;
 use num_derive::FromPrimitive;
 use portable_atomic::{AtomicUsize, Ordering};
@@ -26,10 +26,10 @@ pub use self::state::*;
 use self::{
     ap::{AccessPointConfig, AccessPointInfo, convert_ap_info},
     private::PacketBuffer,
-    scan::{FreeApListOnDrop, ScanResults},
+    scan::{FreeApListOnDrop, ScanConfig, ScanResults, ScanTypeConfig},
     sta::StationConfig,
 };
-#[cfg(feature = "csi")]
+#[cfg(all(feature = "csi", feature = "unstable"))]
 #[instability::unstable]
 pub use crate::sys::include::wifi_csi_info_t; // FIXME
 use crate::{
@@ -45,7 +45,10 @@ use crate::{
 };
 
 pub mod ap;
+#[cfg(all(feature = "csi", feature = "unstable"))]
+pub mod csi;
 pub mod event;
+pub mod scan;
 #[cfg(all(feature = "sniffer", feature = "unstable"))]
 pub mod sniffer;
 pub mod sta;
@@ -54,7 +57,7 @@ pub(crate) mod os_adapter;
 pub(crate) mod state;
 
 mod internal;
-mod scan;
+
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
 
 /// Supported Wi-Fi authentication methods.
@@ -217,18 +220,6 @@ impl defmt::Format for Country {
     fn format(&self, fmt: defmt::Formatter<'_>) {
         self.country_code().format(fmt)
     }
-}
-
-/// Wi-Fi scan method.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[repr(u8)]
-#[instability::unstable]
-pub enum ScanMethod {
-    /// Fast scan.
-    Fast,
-    /// Scan all channels.
-    AllChannels,
 }
 
 /// Introduces Wi-Fi configuration options.
@@ -439,193 +430,6 @@ impl From<WifiMode> for wifi_mode_t {
             WifiMode::AccessPoint => wifi_mode_t_WIFI_MODE_AP,
             WifiMode::AccessPointStation => wifi_mode_t_WIFI_MODE_APSTA,
         }
-    }
-}
-
-#[cfg(feature = "csi")]
-pub(crate) trait CsiCallback: FnMut(crate::sys::include::wifi_csi_info_t) {}
-
-#[cfg(feature = "csi")]
-impl<T> CsiCallback for T where T: FnMut(crate::sys::include::wifi_csi_info_t) {}
-
-#[cfg(feature = "csi")]
-unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
-    ctx: *mut crate::wifi::c_types::c_void,
-    data: *mut crate::sys::include::wifi_csi_info_t,
-) {
-    unsafe {
-        let csi_callback = &mut *(ctx as *mut C);
-        csi_callback(*data);
-    }
-}
-
-/// Channel state information (CSI) configuration.
-#[derive(Clone, PartialEq, Eq)]
-#[cfg(all(not(esp32c6), feature = "csi"))]
-pub struct CsiConfig {
-    /// Enable to receive legacy long training field(lltf) data.
-    pub lltf_en: bool,
-    /// Enable to receive HT long training field(htltf) data.
-    pub htltf_en: bool,
-    /// Enable to receive space time block code HT long training
-    /// field(stbc-htltf2) data.
-    pub stbc_htltf2_en: bool,
-    /// Enable to generate htlft data by averaging lltf and ht_ltf data when
-    /// receiving HT packet. Otherwise, use ht_ltf data directly.
-    pub ltf_merge_en: bool,
-    /// Enable to turn on channel filter to smooth adjacent sub-carrier. Disable
-    /// it to keep independence of adjacent sub-carrier.
-    pub channel_filter_en: bool,
-    /// Manually scale the CSI data by left shifting or automatically scale the
-    /// CSI data. If set true, please set the shift bits. false: automatically.
-    /// true: manually.
-    pub manu_scale: bool,
-    /// Manually left shift bits of the scale of the CSI data. The range of the
-    /// left shift bits is 0~15.
-    pub shift: u8,
-    /// Enable to dump 802.11 ACK frame.
-    pub dump_ack_en: bool,
-}
-
-/// Channel state information (CSI) configuration.
-#[derive(Clone, PartialEq, Eq)]
-#[cfg(all(esp32c6, feature = "csi"))]
-pub struct CsiConfig {
-    /// Enable to acquire CSI.
-    pub enable: u32,
-    /// Enable to acquire L-LTF when receiving a 11g PPDU.
-    pub acquire_csi_legacy: u32,
-    /// Enable to acquire HT-LTF when receiving an HT20 PPDU.
-    pub acquire_csi_ht20: u32,
-    /// Enable to acquire HT-LTF when receiving an HT40 PPDU.
-    pub acquire_csi_ht40: u32,
-    /// Enable to acquire HE-LTF when receiving an HE20 SU PPDU.
-    pub acquire_csi_su: u32,
-    /// Enable to acquire HE-LTF when receiving an HE20 MU PPDU.
-    pub acquire_csi_mu: u32,
-    /// Enable to acquire HE-LTF when receiving an HE20 DCM applied PPDU.
-    pub acquire_csi_dcm: u32,
-    /// Enable to acquire HE-LTF when receiving an HE20 Beamformed applied PPDU.
-    pub acquire_csi_beamformed: u32,
-    /// When receiving an STBC applied HE PPDU, 0- acquire the complete
-    /// HE-LTF1,  1- acquire the complete HE-LTF2, 2- sample evenly among the
-    /// HE-LTF1 and HE-LTF2.
-    pub acquire_csi_he_stbc: u32,
-    /// Vvalue 0-3.
-    pub val_scale_cfg: u32,
-    /// Enable to dump 802.11 ACK frame, default disabled.
-    pub dump_ack_en: u32,
-    /// Reserved.
-    pub reserved: u32,
-}
-
-#[cfg(feature = "csi")]
-impl Default for CsiConfig {
-    #[cfg(not(esp32c6))]
-    fn default() -> Self {
-        Self {
-            lltf_en: true,
-            htltf_en: true,
-            stbc_htltf2_en: true,
-            ltf_merge_en: true,
-            channel_filter_en: true,
-            manu_scale: false,
-            shift: 0,
-            dump_ack_en: false,
-        }
-    }
-
-    #[cfg(esp32c6)]
-    fn default() -> Self {
-        // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi_he_types.h#L67-L82
-        Self {
-            enable: 1,
-            acquire_csi_legacy: 1,
-            acquire_csi_ht20: 1,
-            acquire_csi_ht40: 1,
-            acquire_csi_su: 1,
-            acquire_csi_mu: 1,
-            acquire_csi_dcm: 1,
-            acquire_csi_beamformed: 1,
-            acquire_csi_he_stbc: 2,
-            val_scale_cfg: 2,
-            dump_ack_en: 1,
-            reserved: 19,
-        }
-    }
-}
-
-#[doc(hidden)]
-#[cfg(feature = "csi")]
-impl From<CsiConfig> for wifi_csi_config_t {
-    fn from(config: CsiConfig) -> Self {
-        #[cfg(not(esp32c6))]
-        {
-            wifi_csi_config_t {
-                lltf_en: config.lltf_en,
-                htltf_en: config.htltf_en,
-                stbc_htltf2_en: config.stbc_htltf2_en,
-                ltf_merge_en: config.ltf_merge_en,
-                channel_filter_en: config.channel_filter_en,
-                manu_scale: config.manu_scale,
-                shift: config.shift,
-                dump_ack_en: config.dump_ack_en,
-            }
-        }
-        #[cfg(esp32c6)]
-        {
-            wifi_csi_acquire_config_t {
-                _bitfield_align_1: [0; 0],
-                _bitfield_1: wifi_csi_acquire_config_t::new_bitfield_1(
-                    config.enable,
-                    config.acquire_csi_legacy,
-                    config.acquire_csi_ht20,
-                    config.acquire_csi_ht40,
-                    config.acquire_csi_su,
-                    config.acquire_csi_mu,
-                    config.acquire_csi_dcm,
-                    config.acquire_csi_beamformed,
-                    config.acquire_csi_he_stbc,
-                    config.val_scale_cfg,
-                    config.dump_ack_en,
-                    config.reserved,
-                ),
-            }
-        }
-    }
-}
-
-#[cfg(feature = "csi")]
-impl CsiConfig {
-    /// Set CSI data configuration
-    pub(crate) fn apply_config(&self) -> Result<(), WifiError> {
-        let conf: wifi_csi_config_t = self.clone().into();
-
-        unsafe {
-            esp_wifi_result!(esp_wifi_set_csi_config(&conf))?;
-        }
-        Ok(())
-    }
-
-    /// Register the RX callback function of CSI data. Each time a CSI data is
-    /// received, the callback function will be called.
-    pub(crate) fn set_receive_cb<C: CsiCallback>(&mut self, cb: C) -> Result<(), WifiError> {
-        let cb = alloc::boxed::Box::new(cb);
-        let cb_ptr = alloc::boxed::Box::into_raw(cb) as *mut crate::wifi::c_types::c_void;
-
-        unsafe {
-            esp_wifi_result!(esp_wifi_set_csi_rx_cb(Some(csi_rx_cb::<C>), cb_ptr))?;
-        }
-        Ok(())
-    }
-
-    /// Enable or disable CSI
-    pub(crate) fn set_csi(&self, enable: bool) -> Result<(), WifiError> {
-        // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi.h#L1241
-        unsafe {
-            esp_wifi_result!(esp_wifi_set_csi(enable))?;
-        }
-        Ok(())
     }
 }
 
@@ -1135,92 +939,6 @@ unsafe extern "C" fn esp_wifi_tx_done_cb(
     decrement_inflight_counter();
 
     embassy::TRANSMIT_WAKER.wake();
-}
-
-/// Configuration for active or passive scan.
-///
-/// # Comparison of active and passive scan
-///
-/// |                                      | **Active** | **Passive** |
-/// |--------------------------------------|------------|-------------|
-/// | **Power consumption**                |    High    |     Low     |
-/// | **Time required (typical behavior)** |     Low    |     High    |
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum ScanTypeConfig {
-    /// Active scan with min and max scan time per channel. This is the default
-    /// and recommended if you are unsure.
-    ///
-    /// # Procedure
-    /// 1. Send probe request on each channel.
-    /// 2. Wait for probe response. Wait at least `min` time, but if no response is received, wait
-    ///    up to `max` time.
-    /// 3. Switch channel.
-    /// 4. Repeat from 1.
-    Active {
-        /// Minimum scan time per channel. Defaults to 10ms.
-        min: Duration,
-        /// Maximum scan time per channel. Defaults to 20ms.
-        max: Duration,
-    },
-    /// Passive scan
-    ///
-    /// # Procedure
-    /// 1. Wait for beacon for given duration.
-    /// 2. Switch channel.
-    /// 3. Repeat from 1.
-    ///
-    /// # Note
-    /// It is recommended to avoid duration longer thean 1500ms, as it may cause
-    /// a station to disconnect from the Access Point.
-    Passive(Duration),
-}
-
-impl Default for ScanTypeConfig {
-    fn default() -> Self {
-        Self::Active {
-            min: Duration::from_millis(10),
-            max: Duration::from_millis(20),
-        }
-    }
-}
-
-impl ScanTypeConfig {
-    fn validate(&self) {
-        if matches!(self, Self::Passive(dur) if *dur > Duration::from_millis(1500)) {
-            warn!(
-                "Passive scan duration longer than 1500ms may cause a station to disconnect from the access point"
-            );
-        }
-    }
-}
-
-/// Scan configuration
-#[derive(Clone, Copy, Default, PartialEq, Eq, BuilderLite)]
-pub struct ScanConfig<'a> {
-    /// SSID to filter for.
-    /// If [`None`] is passed, all SSIDs will be returned.
-    /// If [`Some`] is passed, only the APs matching the given SSID will be
-    /// returned.
-    ssid: Option<&'a str>,
-    /// BSSID to filter for.
-    /// If [`None`] is passed, all BSSIDs will be returned.
-    /// If [`Some`] is passed, only the APs matching the given BSSID will be
-    /// returned.
-    bssid: Option<[u8; 6]>,
-    /// Channel to filter for.
-    /// If [`None`] is passed, all channels will be returned.
-    /// If [`Some`] is passed, only the APs on the given channel will be
-    /// returned.
-    channel: Option<u8>,
-    /// Whether to show hidden networks.
-    show_hidden: bool,
-    /// Scan type, active or passive.
-    scan_type: ScanTypeConfig,
-    /// The maximum number of networks to return when scanning.
-    /// If [`None`] is passed, all networks will be returned.
-    /// If [`Some`] is passed, the specified number of networks will be returned.
-    max: Option<usize>,
 }
 
 pub(crate) fn wifi_start_scan(
@@ -2288,11 +2006,11 @@ impl Drop for WifiController<'_> {
 
 impl WifiController<'_> {
     /// Set CSI configuration and register the receiving callback.
-    #[cfg(feature = "csi")]
+    #[cfg(all(feature = "csi", feature = "unstable"))]
     #[instability::unstable]
     pub fn set_csi(
         &mut self,
-        mut csi: CsiConfig,
+        mut csi: csi::CsiConfig,
         cb: impl FnMut(crate::wifi::wifi_csi_info_t) + Send,
     ) -> Result<(), WifiError> {
         csi.apply_config()?;

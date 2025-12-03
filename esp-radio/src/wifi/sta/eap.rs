@@ -8,7 +8,7 @@ use procmacros::BuilderLite;
 
 use crate::{
     WifiError,
-    wifi::{AuthMethod, Protocol, ScanMethod},
+    wifi::{AuthMethod, Protocol, scan::ScanMethod},
 };
 
 /// Configuration for EAP-FAST authentication protocol.
