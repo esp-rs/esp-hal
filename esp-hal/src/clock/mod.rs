@@ -1269,17 +1269,21 @@ impl Clocks {
 impl Clocks {
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = Self::measure_xtal_frequency();
+        use crate::soc::clocks::ClockTree;
 
-        if cpu_clock_speed != CpuClock::default() {
-            clocks_ll::set_cpu_clock(cpu_clock_speed);
+        // TODO: expose the whole new enum for custom options
+        match cpu_clock_speed {
+            CpuClock::_80MHz => crate::soc::clocks::CpuClock::_80MHz,
+            CpuClock::_160MHz => crate::soc::clocks::CpuClock::_160MHz,
+            CpuClock::_240MHz => crate::soc::clocks::CpuClock::_240MHz,
         }
+        .configure();
 
-        Self {
-            cpu_clock: cpu_clock_speed.frequency(),
-            apb_clock: Rate::from_mhz(80),
-            xtal_clock: xtal_freq.frequency(),
-        }
+        ClockTree::with(|clocks| Self {
+            cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
+            apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
+            xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
+        })
     }
 }
 

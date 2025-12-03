@@ -111,7 +111,71 @@ memory_map = { ranges = [
     { name = "dram2_uninit", start = 0x3FFD_E000, end = 0x4000_0000 },
 ] }
 
-clocks = { peripheral_clocks = { templates = [
+clocks = { system_clocks = { clock_tree = [
+    { name = "XTAL_CLK",    type = "source",                     values = "40",                         output = "VALUE * 1_000_000", always_on = true },
+    { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", values = "320, 480",                   output = "VALUE * 1_000_000" }, # TODO reject = "VALUE == 320_000_000 && CPU_PLL_DIV_OUT == 240_000_000"
+    { name = "APLL_CLK",    type = "derived", from = "PLL_CLK",  values = "16_000_000 ..= 128_000_000", output = "VALUE" },
+    { name = "RC_FAST_CLK", type = "source",  output = "8_000_000" }, # this is supposed to be adjustable using RTC_CNTL_CK8M_DIV_SEL
+
+    # Represents SEL0 = 1, 3
+    { name = "CPU_PLL_DIV_IN", type = "mux", variants = [
+        { name = "PLL",  outputs = "PLL_CLK" },
+        { name = "APLL", outputs = "APLL_CLK" },
+    ] },
+    { name = "CPU_PLL_DIV", type = "divider", divisors = "2, 3, 4, 6", output = "CPU_PLL_DIV_IN / DIVISOR" }, # TODO reject = "PLL_CLK == 320_000_000 && DIVISOR % 3 == 0"
+
+    # Represents SEL0 = 0, 2
+    { name = "SYSTEM_PRE_DIV_IN", type = "mux", variants = [
+        { name = "XTAL",    outputs = "XTAL_CLK" },
+        { name = "RC_FAST", outputs = "RC_FAST_CLK" },
+    ] },
+    { name = "SYSTEM_PRE_DIV", type = "divider", divisors = "0 .. 1024", output = "SYSTEM_PRE_DIV_IN / (DIVISOR + 1)" },
+
+    # The meta-switch
+    { name = "CPU_CLK", type = "mux", always_on = true, variants = [
+        # source clock      CPU clock                   additional config (mux = variant name, divider = divisor expression)
+        { name = "XTAL",    outputs = "SYSTEM_PRE_DIV", configures = [ "SYSTEM_PRE_DIV_IN = XTAL",    "APB_CLK = XTAL",     "REF_TICK = XTAL",    "REF_TICK_XTAL = APB_CLK / 1_000_000 - 1" ] },
+        { name = "RC_FAST", outputs = "SYSTEM_PRE_DIV", configures = [ "SYSTEM_PRE_DIV_IN = RC_FAST", "APB_CLK = RC_FAST",  "REF_TICK = RC_FAST", "REF_TICK_CK8M = APB_CLK / 1_000_000 - 1" ] },
+        { name = "APLL",    outputs = "CPU_PLL_DIV",    configures = [ "CPU_PLL_DIV_IN = APLL",       "APB_CLK = APLL",     "REF_TICK = APLL",    "REF_TICK_XTAL = APB_CLK / 1_000_000 - 1" ] },
+        { name = "PLL",     outputs = "CPU_PLL_DIV",    configures = [ "CPU_PLL_DIV_IN = PLL",        "APB_CLK = PLL",      "REF_TICK = PLL",     "REF_TICK_XTAL = APB_CLK / 1_000_000 - 1" ] },
+    ] },
+
+    # APB options
+    { name = "APB_CLK_CPU_DIV2", type = "divider", output = "CPU_CLK / 2" },
+    { name = "APB_CLK_80M",      type = "derived", from = "CPU_CLK", output = "80_000_000" },
+    { name = "APB_CLK", type = "mux", variants = [
+        { name = "PLL",     outputs = "APB_CLK_80M" },
+        { name = "APLL",    outputs = "APB_CLK_CPU_DIV2" },
+        { name = "XTAL",    outputs = "CPU_CLK" },
+        { name = "RC_FAST", outputs = "CPU_CLK" },
+    ] },
+
+    # REF_TICK, configuring CPU clock needs to ensure this is 1MHz
+    { name = "REF_TICK_XTAL", type = "divider", divisors = "0 .. 256", output = "APB_CLK / (DIVISOR + 1)" },
+    { name = "REF_TICK_CK8M", type = "divider", divisors = "0 .. 256", output = "APB_CLK / (DIVISOR + 1)" },
+    { name = "REF_TICK", type = "mux", variants = [
+        { name = "PLL",     outputs = "REF_TICK_XTAL" },
+        { name = "APLL",    outputs = "REF_TICK_XTAL" },
+        { name = "XTAL",    outputs = "REF_TICK_XTAL" },
+        { name = "RC_FAST", outputs = "REF_TICK_CK8M" },
+    ] },
+
+    # Low-speed clocks
+    { name = "XTAL32K_CLK",     type = "source",  output = "32768" },
+    { name = "RC_SLOW_CLK",     type = "source",  output = "90_000", always_on = true },
+    { name = "RC_FAST_DIV_CLK", type = "divider", output = "RC_FAST_CLK / 256" },
+    { name = "XTAL_DIV_CLK",    type = "divider", output = "XTAL_CLK / 4" }, # source: esp-idf SOC_RTC_FAST_CLK_SRC_XTAL_D4
+
+    { name = "RTC_SLOW_CLK", type = "mux", variants = [
+        { name = "XTAL",    outputs = "XTAL32K_CLK" },
+        { name = "RC_SLOW", outputs = "RC_SLOW_CLK" },
+        { name = "RC_FAST", outputs = "RC_FAST_DIV_CLK" },
+    ] },
+    { name = "RTC_FAST_CLK", type = "mux", variants = [
+        { name = "XTAL", outputs = "XTAL_DIV_CLK" },
+        { name = "RC",   outputs = "RC_FAST_CLK" },
+    ] },
+] }, peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
     { name = "rst_template", value = "{{control}}::regs().{{rst_register}}().modify(|_, w| w.{{rst_field}}().bit(reset));" },
@@ -147,9 +211,19 @@ clocks = { peripheral_clocks = { templates = [
     { name = "I2cExt1" },
     { name = "Mcpwm0", template_params = { peripheral = "pwm0" } },
     { name = "Spi3" },
-    { name = "Timg1", template_params = { peripheral = "timergroup1" } },
+    { name = "Timg1", template_params = { peripheral = "timergroup1" }, clocks = "Timg0" },
     #{ name = "Efuse" },
-    { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true }, # used for clock calibration
+    { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true, clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL_CLK", variants = [
+            { name = "XTAL_CLK", outputs = "XTAL_CLK" },
+            { name = "APB_CLK",  outputs = "APB_CLK" },
+        ] },
+        { name = "CALIBRATION_CLOCK", type = "mux", default = "RTC_CLK", variants = [
+            { name = "RTC_CLK",         outputs = "RTC_SLOW_CLK" },
+            { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
+            { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
+        ] },
+    ] },
     { name = "Uhci1" },
     { name = "Ledc" },
     { name = "Pcnt" },

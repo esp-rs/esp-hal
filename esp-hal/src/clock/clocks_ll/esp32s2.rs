@@ -1,45 +1,4 @@
-use crate::{
-    clock::CpuClock,
-    peripherals::{LPWR, SYSCON, SYSTEM},
-};
-
-const MHZ: u32 = 1000000;
-const UINT16_MAX: u32 = 0xffff;
-
-const RTC_CNTL_DBIAS_1V25: u8 = 7;
-
-// when not running with 80MHz Flash frequency we could use RTC_CNTL_DBIAS_1V10
-// for DIG_DBIAS_80M_160M - but RTC_CNTL_DBIAS_1V25 shouldn't hurt
-const DIG_DBIAS_80M_160M: u8 = RTC_CNTL_DBIAS_1V25;
-const DIG_DBIAS_240M: u8 = RTC_CNTL_DBIAS_1V25;
-
-pub(crate) fn set_cpu_clock(cpu_clock_speed: CpuClock) {
-    SYSTEM::regs()
-        .sysclk_conf()
-        .modify(|_, w| unsafe { w.soc_clk_sel().bits(1) });
-    SYSTEM::regs().cpu_per_conf().modify(|_, w| unsafe {
-        w.pll_freq_sel().set_bit();
-        w.cpuperiod_sel().bits(match cpu_clock_speed {
-            CpuClock::_80MHz => 0,
-            CpuClock::_160MHz => 1,
-            CpuClock::_240MHz => 2,
-        })
-    });
-
-    LPWR::regs().reg().modify(|_, w| unsafe {
-        w.dig_reg_dbias_wak().bits(match cpu_clock_speed {
-            CpuClock::_80MHz => DIG_DBIAS_80M_160M,
-            CpuClock::_160MHz => DIG_DBIAS_80M_160M,
-            CpuClock::_240MHz => DIG_DBIAS_240M,
-        })
-    });
-
-    // FIXME untangle this
-    let value = (((80 * MHZ) >> 12) & UINT16_MAX) | ((((80 * MHZ) >> 12) & UINT16_MAX) << 16);
-    LPWR::regs()
-        .store5()
-        .modify(|_, w| unsafe { w.data().bits(value) });
-}
+use crate::peripherals::SYSCON;
 
 // Mask for clock bits used by both WIFI and Bluetooth, bit 0, 3, 6, 7, 8, 9
 const DPORT_WIFI_CLK_WIFI_BT_COMMON_M: u32 = 0x000003c9;
