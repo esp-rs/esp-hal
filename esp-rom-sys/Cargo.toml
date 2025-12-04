@@ -33,6 +33,8 @@ document-features   = "0.2"
 esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
+__internal_rom_symbols = []
+
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:
 
