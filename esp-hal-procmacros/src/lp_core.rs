@@ -255,7 +255,7 @@ pub fn load_lp_code(input: TokenStream, fs: impl Filesystem) -> TokenStream {
         0x0
     };
 
-    if sections.len() == 0 {
+    if sections.is_empty() {
         return Error::new(
             Span::call_site().into(),
             "Given file doesn't seem to have any allocatable sections.",
