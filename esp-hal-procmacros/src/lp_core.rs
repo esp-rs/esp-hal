@@ -264,7 +264,11 @@ pub fn load_lp_code(input: TokenStream, fs: impl Filesystem) -> TokenStream {
     } else if sections[0].address() < last_address {
         return Error::new(
             Span::call_site(),
-            "Given file doesn't seem to be a valid LP/ULP core application.",
+            format!(
+                "First section address is below expected base address (expected >= 0x{:x}, got 0x{:x})",
+                last_address,
+                sections[0].address()
+            ),
         )
         .to_compile_error();
     }
