@@ -83,6 +83,8 @@ struct LoopbackConfig {
     length1_base: u16,
     length1_step: u16,
     length2: u16,
+    sclk_div: u16, // 1 - 256
+    ch_div: u8,
 }
 
 impl Default for LoopbackConfig {
@@ -100,14 +102,20 @@ impl Default for LoopbackConfig {
             length1_base: 100,
             length1_step: 10,
             length2: 50,
+            sclk_div: 1,
+            ch_div: DIV,
         }
     }
 }
 
 impl LoopbackConfig {
+    fn sclk_freq(&self) -> Rate {
+        FREQ / self.sclk_div as u32
+    }
+
     fn tx_config(&self) -> TxChannelConfig {
         TxChannelConfig::default()
-            .with_clk_divider(DIV)
+            .with_clk_divider(self.ch_div)
             .with_idle_output(self.idle_output)
             .with_idle_output_level(Level::Low)
             .with_memsize(self.tx_memsize)
@@ -115,7 +123,7 @@ impl LoopbackConfig {
 
     fn rx_config(&self) -> RxChannelConfig {
         RxChannelConfig::default()
-            .with_clk_divider(DIV)
+            .with_clk_divider(self.ch_div)
             .with_idle_threshold(self.idle_threshold)
             .with_memsize(self.rx_memsize)
     }
@@ -284,10 +292,13 @@ fn check_data_eq(
 
 struct BitbangTransmitter {
     pin: Flex<'static>,
+    cycles_per_us: u32,
 }
 
 impl BitbangTransmitter {
-    fn new(pin: impl Pin + 'static) -> Self {
+    const SCALE: u32 = 1024;
+
+    fn new(pin: impl Pin + 'static, conf: &LoopbackConfig) -> Self {
         let mut pin = Flex::new(pin);
         pin.set_input_enable(true);
         pin.set_output_enable(true);
@@ -296,7 +307,10 @@ impl BitbangTransmitter {
 
         pin.set_low();
 
-        Self { pin }
+        Self {
+            pin,
+            cycles_per_us: conf.ch_div as u32 * 1000 * Self::SCALE / conf.sclk_freq().as_khz(),
+        }
     }
 
     fn rx_pin(&mut self) -> impl PeripheralInput<'static> {
@@ -304,8 +318,6 @@ impl BitbangTransmitter {
     }
 
     fn transmit(&mut self, tx_data: &[PulseCode]) {
-        let cycles_per_us = DIV as u32 / FREQ.as_mhz();
-
         let delay = Delay::new();
 
         for code in tx_data {
@@ -313,13 +325,13 @@ impl BitbangTransmitter {
                 break;
             }
             self.pin.set_level(code.level1());
-            delay.delay_micros(code.length1() as u32 * cycles_per_us);
+            delay.delay_micros(code.length1() as u32 * self.cycles_per_us / Self::SCALE);
 
             if code.length2() == 0 {
                 break;
             }
             self.pin.set_level(code.level2());
-            delay.delay_micros(code.length2() as u32 * cycles_per_us);
+            delay.delay_micros(code.length2() as u32 * self.cycles_per_us / Self::SCALE);
         }
     }
 }
@@ -482,7 +494,7 @@ impl Context {
         &mut self,
         conf: &LoopbackConfig,
     ) -> (Channel<'_, Blocking, Tx>, Channel<'_, Blocking, Rx>) {
-        let rmt = Rmt::new(self.rmt.reborrow(), FREQ).unwrap();
+        let rmt = Rmt::new(self.rmt.reborrow(), conf.sclk_freq()).unwrap();
         let (rx, tx) = pins!(self);
         Self::setup_impl(rmt, rx, tx, conf)
     }
@@ -491,7 +503,9 @@ impl Context {
         &mut self,
         conf: &LoopbackConfig,
     ) -> (Channel<'_, Async, Tx>, Channel<'_, Async, Rx>) {
-        let rmt = Rmt::new(self.rmt.reborrow(), FREQ).unwrap().into_async();
+        let rmt = Rmt::new(self.rmt.reborrow(), conf.sclk_freq())
+            .unwrap()
+            .into_async();
         let (rx, tx) = pins!(self);
         Self::setup_impl(rmt, rx, tx, conf)
     }
@@ -696,7 +710,7 @@ mod tests {
             let conf = LoopbackConfig::default();
 
             let (rx_pin, tx_pin) = pins!($ctx);
-            let mut rmt = Rmt::new($ctx.rmt.reborrow(), FREQ).unwrap();
+            let mut rmt = Rmt::new($ctx.rmt.reborrow(), conf.sclk_freq()).unwrap();
 
             let tx_channel = rmt
                 .$tx_channel
@@ -788,9 +802,9 @@ mod tests {
             ..Default::default()
         };
 
-        let rmt = Rmt::new(ctx.rmt, FREQ).unwrap();
+        let rmt = Rmt::new(ctx.rmt, conf.sclk_freq()).unwrap();
 
-        let mut bitbang_tx = BitbangTransmitter::new(ctx.pin);
+        let mut bitbang_tx = BitbangTransmitter::new(ctx.pin, &conf);
         let (_, rx_channel) = Context::setup_impl(rmt, bitbang_tx.rx_pin(), NoPin, &conf);
 
         let tx_data = generate_tx_data(&conf);
@@ -859,7 +873,7 @@ mod tests {
 
         // Test that dropping & recreating Rmt works
         for _ in 0..3 {
-            let mut rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap();
+            let mut rmt = Rmt::new(ctx.rmt.reborrow(), conf.sclk_freq()).unwrap();
 
             // Test that dropping & recreating ChannelCreator works
             for _ in 0..3 {
@@ -923,7 +937,9 @@ mod tests {
 
         // Test that dropping & recreating Rmt works
         for _ in 0..3 {
-            let mut rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap().into_async();
+            let mut rmt = Rmt::new(ctx.rmt.reborrow(), conf.sclk_freq())
+                .unwrap()
+                .into_async();
 
             // Test that dropping & recreating ChannelCreator works
             for _ in 0..3 {
@@ -1081,5 +1097,38 @@ mod tests {
             start.elapsed().as_micros() < 1000,
             "tx with loopcount 0 did not complete immediately"
         );
+    }
+
+    #[test]
+    fn rmt_dividers(mut ctx: Context) {
+        for sclk_div in [1, 16, 256] {
+            for ch_div in [1, 16, 255] {
+                let div = sclk_div as u32 * ch_div as u32;
+                // the stop code is sent with length 2 * idle_threshold = 40 * step, cf.
+                // generate_tx_data
+                let step = (32767 / (41 * div)).max(5) as u16;
+                let conf = LoopbackConfig {
+                    idle_output: true,
+                    // write_stop_code: false,
+                    sclk_div,
+                    ch_div,
+                    tx_len: 5,
+                    length1_base: 10 * step,
+                    length1_step: step,
+                    length2: 2 * step,
+                    idle_threshold: 20 * step,
+                    ..Default::default()
+                };
+                #[cfg(feature = "defmt")]
+                {
+                    defmt::info!("sclk_div: {}, ch_div: {}, step: {}", sclk_div, ch_div, step);
+                    defmt::flush();
+                }
+
+                let (tx_channel, rx_channel) = ctx.setup_loopback(&conf);
+
+                do_rmt_loopback_inner(&conf, tx_channel, rx_channel);
+            }
+        }
     }
 }
