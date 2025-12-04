@@ -200,7 +200,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 
 #[cfg(any(feature = "has-lp-core", feature = "has-ulp-core"))]
 pub fn load_lp_code(input: TokenStream, fs: impl Filesystem) -> TokenStream {
-    use object::{File, Object, ObjectSection, ObjectSymbol, Section, SectionKind};
+    use object::{File, Object, ObjectSection, ObjectSymbol, Section, SectionFlags};
     use parse::Error;
     use proc_macro_crate::{FoundCrate, crate_name};
     use proc_macro2::Span;
@@ -241,14 +241,9 @@ pub fn load_lp_code(input: TokenStream, fs: impl Filesystem) -> TokenStream {
 
     let mut sections: Vec<Section> = sections
         .into_iter()
-        .filter(|section| {
-            matches!(
-                section.kind(),
-                SectionKind::Text
-                    | SectionKind::ReadOnlyData
-                    | SectionKind::Data
-                    | SectionKind::UninitializedData
-            )
+        .filter(|section| match section.flags() {
+            SectionFlags::Elf { sh_flags: sh } => (sh & u64::from(object::elf::SHF_ALLOC)) != 0,
+            _ => false,
         })
         .collect();
     sections.sort_by(|a, b| a.address().partial_cmp(&b.address()).unwrap());
@@ -259,6 +254,24 @@ pub fn load_lp_code(input: TokenStream, fs: impl Filesystem) -> TokenStream {
     } else {
         0x0
     };
+
+    if sections.is_empty() {
+        return Error::new(
+            Span::call_site(),
+            "Given file doesn't seem to have any allocatable sections.",
+        )
+        .to_compile_error();
+    } else if sections[0].address() < last_address {
+        return Error::new(
+            Span::call_site(),
+            format!(
+                "First section address is below expected base address (expected >= 0x{:x}, got 0x{:x})",
+                last_address,
+                sections[0].address()
+            ),
+        )
+        .to_compile_error();
+    }
 
     for section in sections {
         if section.address() > last_address {
