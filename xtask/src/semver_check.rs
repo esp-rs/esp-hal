@@ -21,7 +21,13 @@ pub fn minimum_update(
 
     let package_name = package.to_string();
     let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+
+    package.prepare_semver_check(&package_path, &chip)?;
+
     let current_path = build_doc_json(package, &chip, &package_path)?;
+
+    let dest_path = workspace.join("esp-rom-sys/src/generated_rom_symbols.rs");
+    package.clean_semver_check(&dest_path)?;
 
     let file_name = if package.chip_features_matter() {
         chip.to_string()
@@ -88,6 +94,10 @@ pub(crate) fn build_doc_json(
 
     let semver_feature = package.semver_feature_rules(&chip_config);
     features.extend(semver_feature);
+
+    if package == Package::EspRomSys {
+        features.push("__internal_rom_symbols".to_string());
+    }
 
     log::info!(
         "Building doc json for {} with features: {:?}",

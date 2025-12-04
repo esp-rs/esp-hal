@@ -15,6 +15,8 @@ mod build;
 mod check_changelog;
 #[cfg(feature = "report")]
 pub mod generate_report;
+#[cfg(feature = "semver-checks")]
+pub(crate) mod generate_rom_symbols;
 mod release;
 mod run;
 
