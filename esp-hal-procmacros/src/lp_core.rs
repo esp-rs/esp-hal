@@ -257,18 +257,16 @@ pub fn load_lp_code(input: TokenStream, fs: impl Filesystem) -> TokenStream {
 
     if sections.is_empty() {
         return Error::new(
-            Span::call_site().into(),
+            Span::call_site(),
             "Given file doesn't seem to have any allocatable sections.",
         )
-        .to_compile_error()
-        .into();
+        .to_compile_error();
     } else if sections[0].address() < last_address {
         return Error::new(
-            Span::call_site().into(),
+            Span::call_site(),
             "Given file doesn't seem to be a valid LP/ULP core application.",
         )
-        .to_compile_error()
-        .into();
+        .to_compile_error();
     }
 
     for section in sections {
