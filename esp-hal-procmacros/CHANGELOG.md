@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Fixed
+- Fixed the logic for determining which sections should be loaded in `load_lp_code!` macro (#4612)
 
 
 ### Removed
