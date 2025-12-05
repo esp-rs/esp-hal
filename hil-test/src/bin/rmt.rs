@@ -13,7 +13,12 @@
 
 extern crate alloc;
 
+use core::task::Poll;
+
 use allocator_api2::{vec, vec::Vec};
+use embassy_futures::poll_once;
+#[cfg(not(esp32))]
+use esp_hal::rmt::LoopMode;
 use esp_hal::{
     Async,
     Blocking,
@@ -33,11 +38,17 @@ use esp_hal::{
     peripherals::RMT,
     ram,
     rmt::{
+        BitOrder,
+        BytesEncoder,
         CHANNEL_RAM_SIZE,
         Channel,
         ConfigError,
+        CopyEncoder,
         Error,
         HAS_RX_WRAP,
+        IterEncoder,
+        LsbFirst,
+        MsbFirst,
         PulseCode,
         Rmt,
         Rx,
@@ -330,10 +341,11 @@ fn do_rmt_loopback_inner(
     rx_channel: Channel<Blocking, Rx>,
 ) {
     let tx_data = generate_tx_data(conf);
-    let mut rcv_data = vec![PulseCode::default(); conf.tx_len];
+    let mut rx_data = vec![PulseCode::default(); conf.tx_len];
 
-    let rx_transaction = rx_channel.receive(&mut rcv_data);
-    let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
+    let mut tx_enc = CopyEncoder::new(&tx_data);
+    let rx_transaction = rx_channel.receive(&mut rx_data);
+    let mut tx_transaction = tx_channel.transmit(&mut tx_enc).unwrap();
 
     if conf.abort {
         // Start the transactions...
@@ -375,7 +387,7 @@ fn do_rmt_loopback_inner(
         };
         let rx_res = run();
 
-        check_data_eq(conf, &tx_data, &rcv_data, rx_res);
+        check_data_eq(conf, &tx_data, &rx_data, rx_res);
     }
 }
 
@@ -399,16 +411,17 @@ async fn do_rmt_loopback_async_inner(
     let mut rcv_data = vec![PulseCode::default(); conf.tx_len];
 
     // Start the transactions...
+    let mut tx_enc = CopyEncoder::new(&tx_data);
     let rx_fut = rx_channel.receive(&mut rcv_data);
-    let tx_fut = tx_channel.transmit(&tx_data);
+    let tx_fut = tx_channel.transmit(&mut tx_enc);
 
     if conf.abort {
         Delay.delay_ms(2).await;
 
         // ...poll them, but then drop them before completion...
         // (`poll_once` takes the future by value and drops it before returning)
-        let rx_poll = embassy_futures::poll_once(rx_fut);
-        let tx_poll = embassy_futures::poll_once(tx_fut);
+        let rx_poll = poll_once(rx_fut);
+        let tx_poll = poll_once(tx_fut);
 
         // The test should fail here when the the delay above is increased, e.g. to 100ms.
         assert!(rx_poll.is_pending());
@@ -609,21 +622,146 @@ mod tests {
         do_rmt_loopback_async(&mut ctx, &conf).await;
     }
 
+    // Test that errors on invalid data are returned as expected (in particular, checks that the
+    // methods don't hang executing a never-ending/never-started tranmission).
     #[test]
-    fn rmt_fails_without_end_marker(mut ctx: Context) {
+    fn rmt_tx_errors_blocking(mut ctx: Context) {
         let conf = LoopbackConfig {
             end_marker: EndMarkerConfig::None,
             ..Default::default()
         };
 
-        let (tx_channel, _) = ctx.setup_loopback(&conf);
+        let (mut tx_channel, _) = ctx.setup_loopback(&conf);
 
         let tx_data = generate_tx_data(&conf);
 
-        assert!(matches!(
-            tx_channel.transmit(&tx_data),
-            Err((Error::EndMarkerMissing, _))
-        ));
+        let mut tx_enc = CopyEncoder::new(&tx_data);
+
+        assert!(
+            matches!(
+                tx_channel.reborrow().transmit(&mut tx_enc),
+                Err((Error::EndMarkerMissing, _))
+            ),
+            "Expected transmit to return an error without end marker"
+        );
+
+        let mut tx_enc = CopyEncoder::new(&tx_data[..0]);
+
+        assert!(
+            matches!(
+                tx_channel.reborrow().transmit(&mut tx_enc),
+                Err((Error::InvalidArgument, _))
+            ),
+            "Expected transmit to return an error on empty data"
+        );
+
+        let mut tx_enc = CopyEncoder::new(&tx_data);
+
+        assert!(
+            matches!(
+                tx_channel
+                    .reborrow()
+                    .transmit_continuously(&mut tx_enc, LoopMode::Infinite),
+                Err((Error::EndMarkerMissing, _))
+            ),
+            "Expected transmit_continuously to return an error without end marker"
+        );
+
+        let mut tx_enc = CopyEncoder::new(&tx_data[..0]);
+
+        assert!(
+            matches!(
+                tx_channel
+                    .reborrow()
+                    .transmit_continuously(&mut tx_enc, LoopMode::Infinite),
+                Err((Error::InvalidArgument, _))
+            ),
+            "Expected transmit_continuously to return an error on empty data"
+        );
+
+        // Configuration that requires wrapping tx and is missing an end marker
+        let conf = LoopbackConfig {
+            tx_len: CHANNEL_RAM_SIZE * 3 / 2,
+            end_marker: EndMarkerConfig::None,
+            ..Default::default()
+        };
+        let tx_data = generate_tx_data(&conf);
+
+        let mut tx_enc = CopyEncoder::new(&tx_data);
+
+        // Most importantly, this should not hang indefinitely due to the missing end marker and
+        // re-transmitting the channel RAM content over and over again.
+        assert!(
+            matches!(
+                tx_channel.reborrow().transmit(&mut tx_enc).unwrap().wait(),
+                Err((Error::EndMarkerMissing, _))
+            ),
+            "Expected transmit to return an error without end marker when wrapping"
+        );
+
+        let mut tx_enc = CopyEncoder::new(&tx_data);
+
+        assert!(
+            matches!(
+                tx_channel
+                    .reborrow()
+                    .transmit_continuously(&mut tx_enc, LoopMode::Infinite),
+                Err((Error::Overflow, _))
+            ),
+            "Expected transmit_continuously to return an error on overflow"
+        );
+    }
+
+    #[test]
+    async fn rmt_tx_errors_async(mut ctx: Context) {
+        let conf = LoopbackConfig {
+            end_marker: EndMarkerConfig::None,
+            ..Default::default()
+        };
+
+        let (mut tx_channel, _) = ctx.setup_loopback_async(&conf);
+
+        let tx_data = generate_tx_data(&conf);
+
+        let mut tx_enc = CopyEncoder::new(&tx_data);
+
+        assert!(
+            matches!(
+                poll_once(tx_channel.transmit(&mut tx_enc)),
+                Poll::Ready(Err(Error::EndMarkerMissing))
+            ),
+            "Expected transmit to return an error without end marker"
+        );
+
+        let mut tx_enc = CopyEncoder::new(&tx_data[..0]);
+
+        assert!(
+            matches!(
+                poll_once(tx_channel.transmit(&mut tx_enc)),
+                Poll::Ready(Err(Error::InvalidArgument))
+            ),
+            "Expected transmit to return an error on empty data"
+        );
+
+        // Configuration that requires wrapping tx and is missing an end marker
+        let conf = LoopbackConfig {
+            tx_len: CHANNEL_RAM_SIZE * 3 / 2,
+            end_marker: EndMarkerConfig::None,
+            ..Default::default()
+        };
+        let tx_data = generate_tx_data(&conf);
+
+        let mut tx_enc = CopyEncoder::new(&tx_data);
+
+        // Most importantly, this should not hang indefinitely due to the missing end marker and
+        // re-transmitting the channel RAM content over and over again.
+        assert!(
+            matches!(
+                tx_channel.transmit(&mut tx_enc).await,
+                Err(Error::EndMarkerMissing)
+            ),
+            "Expected transmit to return an error without end marker when wrapping"
+        );
     }
 
     #[test]
@@ -821,8 +959,9 @@ mod tests {
                 .unwrap();
 
             let tx_data = generate_tx_data(&conf);
+            let mut tx_enc = CopyEncoder::new(&tx_data);
 
-            ch0.transmit(&tx_data).await.unwrap();
+            ch0.transmit(&mut tx_enc).await.unwrap();
         }
     }
 
@@ -952,8 +1091,6 @@ mod tests {
 
     #[cfg(not(esp32))]
     fn rmt_loopback_continuous_tx_impl(mut ctx: Context, use_autostop: bool) {
-        use esp_hal::rmt::LoopMode;
-
         const TX_COUNT: usize = 10;
         const MAX_LOOP_COUNT: usize = 3;
         const MAX_RX_LEN: usize = (MAX_LOOP_COUNT + 1) * TX_COUNT;
@@ -979,11 +1116,13 @@ mod tests {
             if use_autostop {
                 loopmode = LoopMode::Finite(loopcount as u16);
             };
+
+            let mut tx_enc = CopyEncoder::new(&tx_data);
             rx_data.fill(PulseCode::default());
             let rx_transaction = rx_channel.reborrow().receive(&mut rx_data).unwrap();
             let tx_transaction = tx_channel
                 .reborrow()
-                .transmit_continuously(&tx_data, loopmode)
+                .transmit_continuously(&mut tx_enc, loopmode)
                 .unwrap();
 
             // All data is small enough to fit a single hardware buffer, so we don't need to poll
@@ -1046,7 +1185,7 @@ mod tests {
     #[cfg(any(esp32c6, esp32h2, esp32s3))]
     #[test]
     fn rmt_continuous_tx_zero_loopcount(mut ctx: Context) {
-        use esp_hal::{rmt::LoopMode, time::Instant};
+        use esp_hal::time::Instant;
 
         let conf = LoopbackConfig {
             idle_output: true,
@@ -1063,12 +1202,13 @@ mod tests {
             PulseCode::new(Level::High, 10_000, Level::Low, 10_000),
             PulseCode::end_marker(),
         ];
+        let mut tx_enc = CopyEncoder::new(&tx_data);
 
         let start = Instant::now();
 
         let tx_transaction = tx_channel
             .reborrow()
-            .transmit_continuously(&tx_data, LoopMode::Finite(0))
+            .transmit_continuously(&mut tx_enc, LoopMode::Finite(0))
             .unwrap();
 
         while !tx_transaction.is_loopcount_interrupt_set() {}
@@ -1081,5 +1221,116 @@ mod tests {
             start.elapsed().as_micros() < 1000,
             "tx with loopcount 0 did not complete immediately"
         );
+    }
+
+    #[test]
+    fn rmt_iter_encoder(mut ctx: Context) {
+        // Ensure tx wraps, such that there are several calls to the encoder
+        let conf = LoopbackConfig {
+            tx_len: CHANNEL_RAM_SIZE * 3 / 2,
+            tx_memsize: 1,
+            rx_memsize: 2,
+            ..Default::default()
+        };
+
+        let (tx_channel, rx_channel) = ctx.setup_loopback(&conf);
+
+        let tx_data = generate_tx_data(&conf);
+        let mut rx_data = vec![PulseCode::default(); conf.tx_len];
+
+        let mut tx_enc = IterEncoder::new(tx_data.iter().copied());
+        let rx_transaction = rx_channel.receive(&mut rx_data);
+        let mut tx_transaction = tx_channel.transmit(&mut tx_enc).unwrap();
+
+        let rx_res = match rx_transaction {
+            Ok(mut rx_transaction) => {
+                // ... poll them until completion.
+                loop {
+                    let tx_done = tx_transaction.poll();
+                    let rx_done = rx_transaction.poll();
+                    if tx_done && rx_done {
+                        break;
+                    }
+                }
+
+                tx_transaction.wait().unwrap();
+                match rx_transaction.wait() {
+                    Ok((rx_count, _channel)) => Ok(rx_count),
+                    Err((err, _channel)) => Err(err),
+                }
+            }
+            Err((e, _)) => Err(e),
+        };
+
+        check_data_eq(&conf, &tx_data, &rx_data, rx_res);
+    }
+
+    fn rmt_bytes_encoder_impl<B: BitOrder>(ctx: &mut Context, bit_order: B) {
+        const LEN: usize = 4;
+        const PULSE_ONE: PulseCode = PulseCode::new(Level::High, 150, Level::Low, 50);
+        const PULSE_ZERO: PulseCode = PulseCode::new(Level::High, 300, Level::Low, 50);
+
+        // Ensure tx wraps, such that there are several calls to the encoder
+        let conf = LoopbackConfig {
+            tx_len: CHANNEL_RAM_SIZE * 3 / 2,
+            tx_memsize: 1,
+            rx_memsize: 2,
+            ..Default::default()
+        };
+
+        // Pulse that exceeds idle threshold + end marker in one PulseCode
+        let pulse_end = PulseCode::new(Level::High, 2 * conf.idle_threshold, Level::Low, 0);
+
+        let (tx_channel, rx_channel) = ctx.setup_loopback(&conf);
+
+        let tx_data: [u8; LEN] = [0xAA, 0x55, 0xC3, 0x3C];
+        let mut tx_enc = BytesEncoder::new(&tx_data, bit_order, PULSE_ONE, PULSE_ZERO, pulse_end);
+
+        let mut expected_rx_data: Vec<_> = tx_data
+            .iter()
+            .flat_map(|&byte| {
+                (0..8).map(move |i| {
+                    if B::get_bit(byte, i) {
+                        PULSE_ONE
+                    } else {
+                        PULSE_ZERO
+                    }
+                })
+            })
+            .collect();
+        expected_rx_data.push(pulse_end);
+
+        let mut rx_data = [PulseCode::default(); const { LEN * 8 + 1 }];
+
+        let rx_transaction = rx_channel.receive(&mut rx_data);
+        let mut tx_transaction = tx_channel.transmit(&mut tx_enc).unwrap();
+
+        let rx_res = match rx_transaction {
+            Ok(mut rx_transaction) => {
+                // ... poll them until completion.
+                loop {
+                    let tx_done = tx_transaction.poll();
+                    let rx_done = rx_transaction.poll();
+                    if tx_done && rx_done {
+                        break;
+                    }
+                }
+
+                tx_transaction.wait().unwrap();
+                match rx_transaction.wait() {
+                    Ok((rx_count, _channel)) => Ok(rx_count),
+                    Err((err, _channel)) => Err(err),
+                }
+            }
+            Err((e, _)) => Err(e),
+        };
+
+        check_data_eq(&conf, &expected_rx_data, &rx_data, rx_res);
+    }
+
+    #[test]
+    fn rmt_bytes_encoder(mut ctx: Context) {
+        rmt_bytes_encoder_impl(&mut ctx, MsbFirst);
+        rmt_bytes_encoder_impl(&mut ctx, LsbFirst);
     }
 }
