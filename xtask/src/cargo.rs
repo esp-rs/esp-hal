@@ -714,18 +714,20 @@ impl CargoToml {
             match &mut table[&package_name] {
                 Item::Value(Value::String(table)) => {
                     // package = "version"
-                    *table = Formatted::new(version.to_string());
+                    *table = Formatted::new(format_dependency_version(table.value(), version));
                     changed = true;
                 }
                 Item::Table(table) if table.contains_key("version") => {
                     // [package]
                     // version = "version"
-                    table["version"] = toml_edit::value(version.to_string());
+                    let old = table["version"].as_str().unwrap_or_default();
+                    table["version"] = toml_edit::value(format_dependency_version(old, version));
                     changed = true;
                 }
                 Item::Value(Value::InlineTable(table)) if table.contains_key("version") => {
                     // package = { version = "version" }
-                    table["version"] = version.to_string().into();
+                    let old = table["version"].as_str().unwrap_or_default();
+                    table["version"] = format_dependency_version(old, version).into();
                     changed = true;
                 }
                 Item::None => {
@@ -746,7 +748,9 @@ impl CargoToml {
                     });
 
                     if let Some(dependency_name) = update_renamed_dep {
-                        table[&dependency_name]["version"] = version.to_string().into();
+                        let old = table[&dependency_name]["version"].as_str().unwrap_or_default();
+                        table[&dependency_name]["version"] =
+                            format_dependency_version(old, version).into();
                         changed = true;
                     }
                 }
@@ -755,6 +759,35 @@ impl CargoToml {
         });
 
         changed
+    }
+}
+
+fn format_dependency_version(previous: &str, new: &semver::Version) -> String {
+    // we can expect the version specified in a TOML to be valid
+    let previous = semver::VersionReq::parse(previous).unwrap();
+
+    if previous.comparators.len() > 1
+        || previous.comparators.is_empty()
+        || (previous.comparators[0].op != semver::Op::Exact
+            && previous.comparators[0].op != semver::Op::Tilde)
+        || !previous.comparators[0].pre.is_empty()
+    {
+        return new.to_string();
+    }
+
+    let comp = &previous.comparators[0];
+    if comp.op == semver::Op::Exact {
+        new.to_string()
+    } else if comp.op == semver::Op::Tilde {
+        if comp.patch.is_some() {
+            format!("~{}.{}.{}", new.major, new.minor, new.patch)
+        } else if comp.minor.is_some() {
+            format!("~{}.{}", new.major, new.minor)
+        } else {
+            format!("~{}", new.major)
+        }
+    } else {
+        new.to_string()
     }
 }
 
