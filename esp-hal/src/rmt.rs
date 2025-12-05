@@ -1431,10 +1431,7 @@ impl Drop for RxGuard {
 #[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct TxTransaction<'ch, 'data, T>
-where
-    T: Into<PulseCode> + Copy,
-{
+pub struct TxTransaction<'ch, 'data> {
     // This must go first such that it is dropped before the channel (which might disable the
     // peripheral on drop)!
     _guard: TxGuard,
@@ -1444,13 +1441,10 @@ where
     writer: RmtWriter,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    remaining_data: &'data [T],
+    remaining_data: &'data [PulseCode],
 }
 
-impl<'ch, T> TxTransaction<'ch, '_, T>
-where
-    T: Into<PulseCode> + Copy,
-{
+impl<'ch> TxTransaction<'ch, '_> {
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll_internal(&mut self) -> Option<Event> {
         let raw = self.channel.raw;
@@ -1709,19 +1703,16 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
     /// the transaction to complete and get back the channel for further
     /// use.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit<'data, T>(
+    pub fn transmit<'data>(
         self,
-        mut data: &'data [T],
-    ) -> Result<TxTransaction<'ch, 'data, T>, (Error, Self)>
-    where
-        T: Into<PulseCode> + Copy,
-    {
+        mut data: &'data [PulseCode],
+    ) -> Result<TxTransaction<'ch, 'data>, (Error, Self)> {
         let raw = self.raw;
         let memsize = raw.memsize();
 
         match data.last() {
             None => return Err((Error::InvalidArgument, self)),
-            Some(&code) if code.into().is_end_marker() => (),
+            Some(&code) if code.is_end_marker() => (),
             Some(_) => return Err((Error::EndMarkerMissing, self)),
         }
 
@@ -1752,14 +1743,11 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
     )]
     /// The length of `data` cannot exceed the size of the allocated RMT RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit_continuously<T>(
+    pub fn transmit_continuously(
         self,
-        mut data: &[T],
+        mut data: &[PulseCode],
         mode: LoopMode,
-    ) -> Result<ContinuousTxTransaction<'ch>, (Error, Self)>
-    where
-        T: Into<PulseCode> + Copy,
-    {
+    ) -> Result<ContinuousTxTransaction<'ch>, (Error, Self)> {
         let raw = self.raw;
         let memsize = raw.memsize();
 
@@ -1799,10 +1787,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
 #[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct RxTransaction<'ch, 'data, T>
-where
-    T: From<PulseCode>,
-{
+pub struct RxTransaction<'ch, 'data> {
     // This must go first such that it is dropped before the channel (which might disable the
     // peripheral on drop)!
     _guard: RxGuard,
@@ -1811,13 +1796,10 @@ where
 
     reader: RmtReader,
 
-    data: &'data mut [T],
+    data: &'data mut [PulseCode],
 }
 
-impl<'ch, T> RxTransaction<'ch, '_, T>
-where
-    T: From<PulseCode>,
-{
+impl<'ch> RxTransaction<'ch, '_> {
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll_internal(&mut self) -> Option<Event> {
         let raw = self.channel.raw;
@@ -1893,13 +1875,10 @@ impl<'ch> Channel<'ch, Blocking, Rx> {
     ///
     /// # {rx_size_limit}
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn receive<'data, T>(
+    pub fn receive<'data>(
         self,
-        data: &'data mut [T],
-    ) -> Result<RxTransaction<'ch, 'data, T>, (Error, Self)>
-    where
-        T: From<PulseCode>,
-    {
+        data: &'data mut [PulseCode],
+    ) -> Result<RxTransaction<'ch, 'data>, (Error, Self)> {
         let raw = self.raw;
         let memsize = raw.memsize();
 
@@ -1927,24 +1906,18 @@ static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_C
 static RMT_LOCK: RawMutex = RawMutex::new();
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct TxFuture<'a, T>
-where
-    T: Into<PulseCode> + Copy,
-{
+struct TxFuture<'a> {
     raw: DynChannelAccess<Tx>,
     _phantom: PhantomData<Channel<'a, Async, Tx>>,
     writer: RmtWriter,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    data: &'a [T],
+    data: &'a [PulseCode],
 
     _guard: TxGuard,
 }
 
-impl<T> core::future::Future for TxFuture<'_, T>
-where
-    T: Into<PulseCode> + Copy,
-{
+impl core::future::Future for TxFuture<'_> {
     type Output = Result<(), Error>;
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
@@ -1992,10 +1965,7 @@ where
 impl Channel<'_, Async, Tx> {
     /// Start transmitting the given pulse code sequence.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit<T>(&mut self, mut data: &[T]) -> impl Future<Output = Result<(), Error>>
-    where
-        T: Into<PulseCode> + Copy,
-    {
+    pub fn transmit(&mut self, mut data: &[PulseCode]) -> impl Future<Output = Result<(), Error>> {
         let raw = self.raw;
         let memsize = raw.memsize();
 
@@ -2005,7 +1975,7 @@ impl Channel<'_, Async, Tx> {
             None => {
                 writer.state = WriterState::Error(Error::InvalidArgument);
             }
-            Some(&code) if code.into().is_end_marker() => (),
+            Some(&code) if code.is_end_marker() => (),
             Some(_) => {
                 writer.state = WriterState::Error(Error::EndMarkerMissing);
             }
@@ -2044,21 +2014,15 @@ impl Channel<'_, Async, Tx> {
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RxFuture<'a, T>
-where
-    T: From<PulseCode> + Unpin,
-{
+struct RxFuture<'a> {
     raw: DynChannelAccess<Rx>,
     _phantom: PhantomData<Channel<'a, Async, Rx>>,
     reader: RmtReader,
-    data: &'a mut [T],
+    data: &'a mut [PulseCode],
     _guard: RxGuard,
 }
 
-impl<T> core::future::Future for RxFuture<'_, T>
-where
-    T: From<PulseCode> + Unpin,
-{
+impl core::future::Future for RxFuture<'_> {
     type Output = Result<usize, Error>;
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
@@ -2114,10 +2078,10 @@ impl Channel<'_, Async, Rx> {
     ///
     /// # {rx_size_limit}
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn receive<T>(&mut self, data: &mut [T]) -> impl Future<Output = Result<usize, Error>>
-    where
-        T: From<PulseCode> + Unpin,
-    {
+    pub fn receive(
+        &mut self,
+        data: &mut [PulseCode],
+    ) -> impl Future<Output = Result<usize, Error>> {
         let raw = self.raw;
         let memsize = raw.memsize();
 
