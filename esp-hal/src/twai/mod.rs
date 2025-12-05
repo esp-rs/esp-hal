@@ -583,7 +583,7 @@ pub enum BaudRate {
 
 impl BaudRate {
     /// Convert the BaudRate into the timings that the peripheral needs.
-    // See: https://github.com/espressif/esp-idf/tree/master/components/hal/include/hal/twai_types.h
+    // See: https://github.com/espressif/esp-idf/tree/ab4200e/components/esp_hal_twai/include/hal/twai_types.h
     const fn timing(self) -> TimingConfig {
         #[cfg(not(esp32h2))]
         let timing = match self {
