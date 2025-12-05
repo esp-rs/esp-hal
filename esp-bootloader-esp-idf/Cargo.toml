@@ -49,7 +49,7 @@ esp-config = { version = "0.6.1", path = "../esp-config", features = ["build"] }
 
 # Make doctests & host-tests work together:
 [target.'cfg(any(target_arch = "riscv32", target_arch = "xtensa"))'.dev-dependencies]
-esp-hal = { version = "1.0.0", path = "../esp-hal" }
+esp-hal = { version = "~1.0", path = "../esp-hal" }
 
 [features]
 default = ["validation"]
