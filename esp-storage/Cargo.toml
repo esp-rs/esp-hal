@@ -29,7 +29,7 @@ bench = false
 [dependencies]
 embedded-storage = "0.3.1"
 procmacros       = { version = "0.21.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
-esp-hal = { version = "1.0.0", path = "../esp-hal", default-features = false, optional = true}
+esp-hal = { version = "~1.0", path = "../esp-hal", default-features = false, optional = true}
 
 # Optional dependencies
 esp-sync         = { version = "0.1.1", path = "../esp-sync", optional = true }

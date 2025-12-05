@@ -29,7 +29,7 @@ bench = false
 cfg-if = "1"
 
 document-features = "0.2"
-esp-hal = { version = "1.0.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
+esp-hal = { version = "~1.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
 esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated" }
 esp-sync = { version = "0.1.1", path = "../esp-sync" }
 # Make sure these are aligned with esp-radio's dependencies, too!
