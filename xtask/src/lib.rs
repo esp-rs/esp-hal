@@ -265,6 +265,49 @@ impl Package {
         Some(features)
     }
 
+    /// Common function to get feature rules from metadata.
+    fn feature_rules_from_metadata(
+        &self,
+        config: &Config,
+        metadata_key: &str,
+        is_array: bool,
+    ) -> Option<Vec<Vec<String>>> {
+        let toml = self.toml();
+        let mut cases = Vec::new();
+
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(config_meta) = metadata.get(metadata_key)
+        {
+            if is_array {
+                let Item::Value(Value::Array(tables)) = config_meta else {
+                    panic!(
+                        "'{}' must be an array of tables. {:?}",
+                        metadata_key, config_meta
+                    );
+                };
+
+                for table in tables {
+                    let Value::InlineTable(table) = table else {
+                        panic!("'{}' items must be inline tables.", metadata_key);
+                    };
+                    if let Some(features) = Self::parse_feature_set(table, config) {
+                        cases.push(features);
+                    }
+                }
+            } else {
+                let Item::Value(Value::InlineTable(table)) = config_meta else {
+                    panic!("'{}' must be an inline table.", metadata_key);
+                };
+
+                if let Some(features) = Self::parse_feature_set(table, config) {
+                    cases.push(features);
+                }
+            }
+        }
+
+        if cases.is_empty() { None } else { Some(cases) }
+    }
+
     /// Given a device config, return the features which should be enabled for
     /// this package.
     ///
@@ -275,56 +318,40 @@ impl Package {
     // TODO: perhaps we should use the docs.rs metadata for doc features for packages that have no
     // chip-specific features.
     pub fn doc_feature_rules(&self, config: &Config) -> Option<Vec<String>> {
-        let mut features = None;
-
         if *self == Self::Examples {
             return None;
         }
 
-        let toml = self.toml();
-        if let Some(metadata) = toml.espressif_metadata()
-            && let Some(config_meta) = metadata.get("doc-config")
-        {
-            let Item::Value(Value::InlineTable(table)) = config_meta else {
-                panic!("doc-config must be inline tables.");
-            };
-
-            if let Some(fs) = Self::parse_feature_set(table, config) {
-                features = Some(fs);
-            }
-        } else {
-            // Nothing
-        }
+        let features = self
+            .feature_rules_from_metadata(config, "doc-config", false)
+            .and_then(|mut vec_of_vecs| vec_of_vecs.pop());
 
         log::debug!("Doc features for package '{}': {:?}", self, features);
         features
     }
 
+    /// Given a device config, return the features which should be enabled for
+    /// semver checking of this package.
+    #[cfg(feature = "semver-checks")]
+    pub fn semver_feature_rules(&self, config: &Config) -> Vec<String> {
+        let feature_sets = self
+            .feature_rules_from_metadata(config, "semver-configs", false)
+            .unwrap_or_default();
+
+        let features: Vec<String> = feature_sets.into_iter().flatten().collect();
+
+        log::debug!("Semver features for package '{}': {:?}", self, features);
+        features
+    }
+
     /// Additional feature rules to test subsets of features for a package.
     pub fn check_feature_rules(&self, config: &Config) -> Vec<Vec<String>> {
-        let mut cases = vec![];
+        let mut cases = self
+            .feature_rules_from_metadata(config, "check-configs", true)
+            .unwrap_or_default();
 
-        let toml = self.toml();
-        if let Some(metadata) = toml.espressif_metadata()
-            && let Some(config_meta) = metadata.get("check-configs")
-        {
-            let Item::Value(Value::Array(tables)) = config_meta else {
-                panic!(
-                    "check-configs must be an array of tables. {:?}",
-                    config_meta
-                );
-            };
-
-            for table in tables {
-                let Value::InlineTable(table) = table else {
-                    panic!("check-configs items must be inline tables.");
-                };
-                if let Some(features) = Self::parse_feature_set(table, config) {
-                    cases.push(features);
-                }
-            }
-        } else {
-            // Nothing specified, just test no features
+        // Add the default "no features" case if nothing was specified
+        if cases.is_empty() {
             cases.push(vec![]);
         }
 
@@ -334,28 +361,9 @@ impl Package {
 
     /// Additional feature rules to test subsets of features for a package.
     pub fn lint_feature_rules(&self, config: &Config) -> Vec<Vec<String>> {
-        let mut cases = vec![];
-
-        let toml = self.toml();
-        if let Some(metadata) = toml.espressif_metadata()
-            && let Some(config_meta) = metadata.get("clippy-configs")
-        {
-            let Item::Value(Value::Array(tables)) = config_meta else {
-                panic!(
-                    "clippy-configs must be an array of tables. {:?}",
-                    config_meta
-                );
-            };
-
-            for table in tables {
-                let Value::InlineTable(table) = table else {
-                    panic!("clippy-configs items must be inline tables.");
-                };
-                if let Some(features) = Self::parse_feature_set(table, config) {
-                    cases.push(features);
-                }
-            }
-        }
+        let cases = self
+            .feature_rules_from_metadata(config, "clippy-configs", true)
+            .unwrap_or_default();
 
         log::debug!("Check features for package '{}': {:?}", self, cases);
         cases
