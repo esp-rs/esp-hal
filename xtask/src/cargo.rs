@@ -748,7 +748,9 @@ impl CargoToml {
                     });
 
                     if let Some(dependency_name) = update_renamed_dep {
-                        let old = table[&dependency_name]["version"].as_str().unwrap_or_default();
+                        let old = table[&dependency_name]["version"]
+                            .as_str()
+                            .unwrap_or_default();
                         table[&dependency_name]["version"] =
                             format_dependency_version(old, version).into();
                         changed = true;
@@ -765,28 +767,42 @@ impl CargoToml {
 fn format_dependency_version(previous: &str, new: &semver::Version) -> String {
     // we can expect the version specified in a TOML to be valid
     let previous = semver::VersionReq::parse(previous).unwrap();
+    let comp = &previous.comparators[0];
 
-    if previous.comparators.len() > 1
-        || previous.comparators.is_empty()
-        || (previous.comparators[0].op != semver::Op::Exact
-            && previous.comparators[0].op != semver::Op::Tilde)
-        || !previous.comparators[0].pre.is_empty()
-    {
-        return new.to_string();
+    if previous.comparators.len() > 1 {
+        log::info!(
+            "We don't support more complex version specifiers. ({:?}). Just using the new version as is.",
+            previous
+        );
     }
 
-    let comp = &previous.comparators[0];
-    if comp.op == semver::Op::Exact {
-        new.to_string()
-    } else if comp.op == semver::Op::Tilde {
+    fn format_version_string(
+        comp: &semver::Comparator,
+        new: &semver::Version,
+        prefix: &str,
+    ) -> String {
         if comp.patch.is_some() {
-            format!("~{}.{}.{}", new.major, new.minor, new.patch)
+            format!("{}{}.{}.{}", prefix, new.major, new.minor, new.patch)
         } else if comp.minor.is_some() {
-            format!("~{}.{}", new.major, new.minor)
+            format!("{}{}.{}", prefix, new.major, new.minor)
         } else {
-            format!("~{}", new.major)
+            format!("{}{}", prefix, new.major)
         }
+    }
+    eprintln!("{:?}", comp);
+    if comp.op == semver::Op::Tilde {
+        format_version_string(comp, new, "~")
+    } else if comp.op == semver::Op::Exact {
+        eprintln!("here");
+        format_version_string(comp, new, "=")
+    } else if comp.op == semver::Op::Caret {
+        eprintln!("here");
+        format_version_string(comp, new, "")
     } else {
+        log::info!(
+            "We don't support comparators other than ~, = and ^ (default). ({:?}). Just using the new version as is.",
+            previous
+        );
         new.to_string()
     }
 }
@@ -794,6 +810,39 @@ fn format_dependency_version(previous: &str, new: &semver::Version) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_format_dependency_version() {
+        assert_eq!(
+            format_dependency_version("0.1.0", &semver::Version::parse("0.2.0").unwrap()),
+            "0.2.0"
+        );
+
+        assert_eq!(
+            format_dependency_version("^0.1.0", &semver::Version::parse("0.2.0").unwrap()),
+            "0.2.0"
+        );
+
+        assert_eq!(
+            format_dependency_version("~1.0", &semver::Version::parse("1.2.3").unwrap()),
+            "~1.2"
+        );
+
+        assert_eq!(
+            format_dependency_version("~1", &semver::Version::parse("2.5.1").unwrap()),
+            "~2"
+        );
+
+        assert_eq!(
+            format_dependency_version("=1.1.5", &semver::Version::parse("1.1.8").unwrap()),
+            "=1.1.8"
+        );
+
+        assert_eq!(
+            format_dependency_version("=1.1.5", &semver::Version::parse("1.8.3").unwrap()),
+            "=1.8.3"
+        );
+    }
 
     #[test]
     fn test_bump_version() {
