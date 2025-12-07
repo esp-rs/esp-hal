@@ -69,3 +69,30 @@ Configuration methods
 now return `ConfigError` instead of `Error`.
 Corresponding enum variants have been removed from `Error`, and some variants
 that are now part of `ConfigError` have been renamed.
+
+### RMT data type changes
+
+Support for `Into<PulseCode>` and `From<PulseCode>` has been removed from Tx and Rx methods, respectively.
+
+For Rx methods, you need to provide a `PulseCode` buffer now:
+
+```diff
+-let mut data: [u32; 8] = [0u32; 8];
++let mut data: [PulseCode; 8] = [PulseCode::default(); 8];
+ rx_channel.receive(&mut data);
+```
+
+For Tx methods, data types now need to implement the `Encoder` trait.
+Transmitting slices of `PulseCode` is possible via the provided `CopyEncoder`
+type, but more sophisticated implementations are possible:
+
+```diff
+ let data: [PulseCode; 2] = [
+         PulseCode::new(Level::High, 42, Level::Low, 24),
+         PulseCode::end_marker(),
+ ];
+-tx_channel.transmit(&data)?;
++let mut encoder = CopyEncoder::new(&data);
++tx_channel.transmit(&mut encoder)?;
+```
+
