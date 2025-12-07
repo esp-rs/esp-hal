@@ -167,7 +167,7 @@ clocks = { peripheral_clocks = { templates = [
     #{ name = "Cache" },
     #{ name = "ModemApb" },
     #{ name = "Timeout" },
-    
+
     # Radio clocks not modeled here.
 ] } }
 
@@ -205,15 +205,15 @@ pins = [
     { pin =  3, functions = { 0 = "MTDI", 2 = "FSPIHD"  }, analog = { 1 = "ADC1_CH2" } },
     { pin =  4, functions = { 0 = "MTCK", 2 = "FSPICLK" }, analog = { 1 = "ADC1_CH3" } },
     { pin =  5, functions = { 0 = "MTDO", 2 = "FSPID"   }, analog = { 1 = "ADC1_CH4" } },
-    { pin =  6, limited = true },
-    { pin =  7, limited = true },
-    { pin =  8 },
-    { pin =  9 },
-    { pin = 10, analog = { 0 = "ZCD0" } },
-    { pin = 11, analog = { 0 = "ZCD1" } },
-    { pin = 12 },
-    { pin = 13, analog = { 0 = "XTAL_32K_P" } },
-    { pin = 14, analog = { 0 = "XTAL_32K_N" } },
+    { pin =  6,                          limited = true },
+    { pin =  7, lp = { 0 = "LP_GPIO0" }, limited = true },
+    { pin =  8, lp = { 0 = "LP_GPIO1" } },
+    { pin =  9, lp = { 0 = "LP_GPIO2" } },
+    { pin = 10, lp = { 0 = "LP_GPIO3" },                   analog = { 0 = "ZCD0" } },
+    { pin = 11, lp = { 0 = "LP_GPIO4" },                   analog = { 0 = "ZCD1" } },
+    { pin = 12, lp = { 0 = "LP_GPIO5" } },
+    { pin = 13, lp = { 0 = "LP_GPIO6" },                   analog = { 0 = "XTAL_32K_P" } },
+    { pin = 14, lp = { 0 = "LP_GPIO7" },                   analog = { 0 = "XTAL_32K_N" } },
     { pin = 22 },
     { pin = 23, functions = { 0 = "U0RXD", 2 = "FSPICS1" } },
     { pin = 24, functions = { 0 = "U0TXD", 2 = "FSPICS2" } },
