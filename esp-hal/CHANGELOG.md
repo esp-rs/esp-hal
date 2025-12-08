@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: `Rmt::new()` now returns `Error::UnreachableTargetFrequency` instead of panicking when requesting 0 Hz. (#4509)
 - Internal clock configuration rework (#4501)
 - RMT: Support for `Into<PulseCode>` and `From<PulseCode>` has been removed from Tx and Rx methods, respectively, in favor of requiring `PulseCode` directly. (#4616)
+- `Rtc::time_since_boot()` has been renamed to `Rtc::time_since_power_up()` (#4630)
 
 ### Fixed
 
