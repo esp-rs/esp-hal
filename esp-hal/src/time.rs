@@ -747,22 +747,25 @@ fn now() -> Instant {
     Instant::from_ticks(ticks / div)
 }
 
-#[cfg(all(esp32, feature = "rt"))]
+#[cfg(feature = "rt")]
 pub(crate) fn time_init() {
-    let apb = crate::Clocks::get().apb_clock.as_hz();
+    #[cfg(esp32)]
+    {
+        let apb = crate::Clocks::get().apb_clock.as_hz();
 
-    let tg0 = TIMG0::regs();
+        let tg0 = TIMG0::regs();
 
-    tg0.lactconfig().write(|w| unsafe { w.bits(0) });
-    tg0.lactalarmhi().write(|w| unsafe { w.bits(u32::MAX) });
-    tg0.lactalarmlo().write(|w| unsafe { w.bits(u32::MAX) });
-    tg0.lactload().write(|w| unsafe { w.load().bits(1) });
+        tg0.lactconfig().write(|w| unsafe { w.bits(0) });
+        tg0.lactalarmhi().write(|w| unsafe { w.bits(u32::MAX) });
+        tg0.lactalarmlo().write(|w| unsafe { w.bits(u32::MAX) });
+        tg0.lactload().write(|w| unsafe { w.load().bits(1) });
 
-    // 16 MHz counter
-    tg0.lactconfig().write(|w| {
-        unsafe { w.divider().bits((apb / 16_000_000u32) as u16) };
-        w.increase().bit(true);
-        w.autoreload().bit(true);
-        w.en().bit(true)
-    });
+        // 16 MHz counter
+        tg0.lactconfig().write(|w| {
+            unsafe { w.divider().bits((apb / 16_000_000u32) as u16) };
+            w.increase().bit(true);
+            w.autoreload().bit(true);
+            w.en().bit(true)
+        });
+    }
 }
