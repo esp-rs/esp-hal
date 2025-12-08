@@ -17,7 +17,7 @@
 //! [`PeriodicTimer`](super::PeriodicTimer). Using the System timer directly is
 //! only possible through the low level [`Timer`](crate::timer::Timer) trait.
 
-use core::{fmt::Debug, marker::PhantomData};
+use core::{fmt::Debug, marker::PhantomData, num::NonZeroU32};
 
 use esp_sync::RawMutex;
 
@@ -26,9 +26,49 @@ use crate::{
     asynch::AtomicWaker,
     interrupt::{self, InterruptHandler},
     peripherals::{Interrupt, SYSTIMER},
+    soc::clocks::ClockTree,
     system::{Cpu, Peripheral as PeripheralEnable, PeripheralClockControl},
     time::{Duration, Instant},
 };
+
+// System Timer is only clocked by XTAL divided by 2 or 2.5 (or RC_FAST_CLK which is not supported
+// yet). Some XTAL options (most, in fact) divided by this value may not be an integer multiple of
+// 1_000_000. Because the timer API works with microseconds, we need to correct for this. To avoid
+// u64 division as much as possible, we use the two highest bits of the divisor to determine the
+// division method.
+// - If these flags are 0b00, we divide by the divisor.
+// - If these flags are 0b01, we multiply by a constant before dividing by the divisor to improve
+//   accuracy.
+// - If these flags are 0b10, we shift the timestamp by the lower bits.
+//
+// Apart from the S2, the System Timer clock divider outputs a 16MHz timer clock when using
+// the "default" XTAL configuration, so this method will commonly use the shifting based
+// division.
+//
+// On a 26MHz C2, the divider outputs 10.4MHz. On a 32MHz C3, the divider outputs 12.8MHz.
+//
+// Time is unreliable before `init_timestamp_scaler` is called.
+//
+// Because a single crate version can have "rt" enabled, `ESP_HAL_SYSTIMER_CORRECTION` needs
+// to be shared between versions. This aspect of this driver must be therefore kept stable.
+#[unsafe(no_mangle)]
+#[cfg(feature = "rt")]
+static mut ESP_HAL_SYSTIMER_CORRECTION: NonZeroU32 = NonZeroU32::new(SHIFT_TIMESTAMP_FLAG).unwrap(); // Shift-by-0 = no-op
+
+#[cfg(not(feature = "rt"))]
+unsafe extern "Rust" {
+    static mut ESP_HAL_SYSTIMER_CORRECTION: NonZeroU32;
+}
+
+const SHIFT_TIMESTAMP_FLAG: u32 = 0x8000_0000;
+const SHIFT_MASK: u32 = 0x0000_FFFF;
+// If the tick rate is not an integer number of microseconds: Since the divider is 2.5,
+// and we assume XTAL is an integer number of MHz, we can multiply by 5, then divide by
+// 5 to improve accuracy. On H2 the divider is 2, so we can multiply by 2, then divide by
+// 2.
+const UNEVEN_DIVIDER_FLAG: u32 = 0x4000_0000;
+const UNEVEN_MULTIPLIER: u32 = if cfg!(esp32h2) { 2 } else { 5 };
+const UNEVEN_DIVIDER_MASK: u32 = 0x0000_FFFF;
 
 /// The configuration of a unit.
 #[derive(Copy, Clone)]
@@ -70,29 +110,107 @@ impl<'d> SystemTimer<'d> {
         }
     }
 
+    /// One-time initialization for the timestamp conversion/scaling.
+    #[cfg(feature = "rt")]
+    pub(crate) fn init_timestamp_scaler() {
+        // Maximum tick rate is 80MHz (S2), which fits in a u32, so let's narrow the type.
+        let systimer_rate = Self::ticks_per_second();
+
+        // Select the optimal way to divide timestamps.
+        let packed_rate_and_method = if systimer_rate.is_multiple_of(1_000_000) {
+            let ticks_per_us = systimer_rate as u32 / 1_000_000;
+            if ticks_per_us.is_power_of_two() {
+                // Turn the division into a shift
+                SHIFT_TIMESTAMP_FLAG | (ticks_per_us.ilog2() & SHIFT_MASK)
+            } else {
+                // We need to divide by an integer :(
+                ticks_per_us
+            }
+        } else {
+            // The rate is not a multiple of 1 MHz, we need to scale it up to prevent precision
+            // loss.
+            let multiplied_ticks_per_us = (systimer_rate * UNEVEN_MULTIPLIER as u64) / 1_000_000;
+            UNEVEN_DIVIDER_FLAG | (multiplied_ticks_per_us as u32)
+        };
+
+        // Safety: we only ever write ESP_HAL_SYSTIMER_CORRECTION in `init_timestamp_scaler`, which
+        // is called once and only once during startup, from `time_init`.
+        unsafe {
+            let correction_ptr = &raw mut ESP_HAL_SYSTIMER_CORRECTION;
+            *correction_ptr = unwrap!(NonZeroU32::new(packed_rate_and_method));
+        }
+    }
+
+    #[inline]
+    pub(crate) fn ticks_to_us(ticks: u64) -> u64 {
+        // Safety: we only ever write ESP_HAL_SYSTIMER_CORRECTION in `init_timestamp_scaler`, which
+        // is called once and only once during startup.
+        let correction = unsafe { ESP_HAL_SYSTIMER_CORRECTION };
+
+        let correction = correction.get();
+        match correction & (SHIFT_TIMESTAMP_FLAG | UNEVEN_DIVIDER_FLAG) {
+            v if v == SHIFT_TIMESTAMP_FLAG => ticks >> (correction & SHIFT_MASK),
+            v if v == UNEVEN_DIVIDER_FLAG => {
+                // Not only that, but we need to multiply the timestamp first otherwise
+                // we'd count slower than the timer.
+                let multiplied = if UNEVEN_MULTIPLIER.is_power_of_two() {
+                    ticks << UNEVEN_MULTIPLIER.ilog2()
+                } else {
+                    ticks * UNEVEN_MULTIPLIER as u64
+                };
+
+                let divider = correction & UNEVEN_DIVIDER_MASK;
+                multiplied / divider as u64
+            }
+            _ => ticks / correction as u64,
+        }
+    }
+
+    #[inline]
+    fn us_to_ticks(us: u64) -> u64 {
+        // Safety: we only ever write ESP_HAL_SYSTIMER_CORRECTION in `init_timestamp_scaler`, which
+        // is called once and only once during startup.
+        let correction = unsafe { ESP_HAL_SYSTIMER_CORRECTION };
+
+        let correction = correction.get();
+        match correction & (SHIFT_TIMESTAMP_FLAG | UNEVEN_DIVIDER_FLAG) {
+            v if v == SHIFT_TIMESTAMP_FLAG => us << (correction & SHIFT_MASK),
+            v if v == UNEVEN_DIVIDER_FLAG => {
+                let multiplier = correction & UNEVEN_DIVIDER_MASK;
+                let multiplied = us * multiplier as u64;
+
+                // Not only that, but we need to divide the timestamp first otherwise
+                // we'd return a slightly too-big value.
+                if UNEVEN_MULTIPLIER.is_power_of_two() {
+                    multiplied >> UNEVEN_MULTIPLIER.ilog2()
+                } else {
+                    multiplied / UNEVEN_MULTIPLIER as u64
+                }
+            }
+            _ => us * correction as u64,
+        }
+    }
+
     /// Returns the tick frequency of the underlying timer unit.
     #[inline]
     pub fn ticks_per_second() -> u64 {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
-                const MULTIPLIER: u32 = 2;
-                const DIVIDER: u32 = 1;
-            } else if #[cfg(esp32h2)] {
-                // The counters and comparators are driven using `XTAL_CLK`.
-                // The average clock frequency is fXTAL_CLK/2, which is 16 MHz.
-                // The timer counting is incremented by 1/16 μs on each `CNT_CLK` cycle.
-                const MULTIPLIER: u32 = 1;
-                const DIVIDER: u32 = 2;
-            } else {
-                // The counters and comparators are driven using `XTAL_CLK`.
-                // The average clock frequency is fXTAL_CLK/2.5, which is 16 MHz.
-                // The timer counting is incremented by 1/16 μs on each `CNT_CLK` cycle.
-                const MULTIPLIER: u32 = 4;
-                const DIVIDER: u32 = 10;
+        // FIXME: this requires a critical section. We can probably do better, if we can formulate
+        // invariants well.
+        ClockTree::with(|clocks| {
+            cfg_if::cfg_if! {
+                if #[cfg(esp32s2)] {
+                    crate::soc::clocks::apb_clk_frequency(clocks) as u64
+                } else if #[cfg(esp32h2)] {
+                    // The counters and comparators are driven using `XTAL_CLK`.
+                    // The average clock frequency is fXTAL_CLK/2, (16 MHz for XTAL = 32 MHz)
+                    (crate::soc::clocks::xtal_clk_frequency(clocks) / 2) as u64
+                } else {
+                    // The counters and comparators are driven using `XTAL_CLK`.
+                    // The average clock frequency is fXTAL_CLK/2.5 (16 MHz for XTAL = 40 MHz)
+                    (crate::soc::clocks::xtal_clk_frequency(clocks) * 10 / 25) as u64
+                }
             }
-        }
-        let xtal_freq_mhz = crate::clock::Clocks::xtal_freq().as_hz();
-        ((xtal_freq_mhz * MULTIPLIER) / DIVIDER) as u64
+        })
     }
 
     /// Create a new instance.
@@ -519,7 +637,7 @@ impl super::Timer for Alarm<'_> {
 
         let ticks = self.unit.read_count();
 
-        let us = ticks / (SystemTimer::ticks_per_second() / 1_000_000);
+        let us = SystemTimer::ticks_to_us(ticks);
 
         Instant::from_ticks(us)
     }
@@ -528,7 +646,7 @@ impl super::Timer for Alarm<'_> {
         let mode = self.mode();
 
         let us = value.as_micros();
-        let ticks = us * (SystemTimer::ticks_per_second() / 1_000_000);
+        let ticks = SystemTimer::us_to_ticks(us);
 
         if matches!(mode, ComparatorMode::Period) {
             // Period mode
