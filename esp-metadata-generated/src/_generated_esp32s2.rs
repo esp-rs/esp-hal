@@ -437,6 +437,10 @@ macro_rules! for_each_soc_xtal_options {
 ///
 /// // RC_SLOW_CLK
 ///
+/// fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
 /// // RC_FAST_DIV_CLK
 ///
 /// fn enable_rc_fast_div_clk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -1340,8 +1344,12 @@ macro_rules! define_clock_tree_types {
         pub fn xtal32k_clk_frequency(clocks: &mut ClockTree) -> u32 {
             32768
         }
-        fn request_rc_slow_clk(_clocks: &mut ClockTree) {}
-        fn release_rc_slow_clk(_clocks: &mut ClockTree) {}
+        pub fn request_rc_slow_clk(clocks: &mut ClockTree) {
+            enable_rc_slow_clk_impl(clocks, true);
+        }
+        pub fn release_rc_slow_clk(clocks: &mut ClockTree) {
+            enable_rc_slow_clk_impl(clocks, false);
+        }
         pub fn rc_slow_clk_frequency(clocks: &mut ClockTree) -> u32 {
             90000
         }

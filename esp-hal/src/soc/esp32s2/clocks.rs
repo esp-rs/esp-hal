@@ -442,9 +442,43 @@ fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
     });
 
     // TODO: external oscillator may need different settings
+
+    // Enable for digital part
+    LPWR::regs()
+        .clk_conf()
+        .modify(|_, w| w.dig_xtal32k_en().bit(en));
 }
 
 // RC_SLOW_CLK
+
+fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    if en {
+        // SCK_DCAP value controls tuning of the 90k clock. The higher the value of DCAP, the lower
+        // the frequency. There is no separate enable bit, just make sure the calibration
+        // value is set.
+        const RTC_CNTL_SCK_DCAP_DEFAULT: u8 = 255;
+        LPWR::regs()
+            .reg()
+            .modify(|_, w| unsafe { w.sck_dcap().bits(RTC_CNTL_SCK_DCAP_DEFAULT) });
+
+        // Also configure the divider here to its usual value of 1.
+
+        // Updating the divider should be part of the RC_SLOW_CLK divider config:
+        let slow_clk_conf = LPWR::regs().slow_clk_conf();
+        // Invalidate
+        let new_value = slow_clk_conf.modify(|_, w| w.ana_clk_div_vld().clear_bit());
+        // Update divider
+        let new_value = slow_clk_conf.write(|w| unsafe {
+            w.bits(new_value);
+            w.ana_clk_div().bits(0)
+        });
+        // Re-synchronize
+        slow_clk_conf.write(|w| {
+            unsafe { w.bits(new_value) };
+            w.ana_clk_div_vld().set_bit()
+        });
+    }
+}
 
 // RC_FAST_DIV_CLK
 

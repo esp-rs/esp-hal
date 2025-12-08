@@ -162,7 +162,7 @@ clocks = { system_clocks = { clock_tree = [
 
     # Low-speed clocks
     { name = "XTAL32K_CLK",     type = "source",  output = "32768" },
-    { name = "RC_SLOW_CLK",     type = "source",  output = "90_000", always_on = true },
+    { name = "RC_SLOW_CLK",     type = "source",  output = "90_000" },
     { name = "RC_FAST_DIV_CLK", type = "divider", output = "RC_FAST_CLK / 256" },
     { name = "XTAL_DIV_CLK",    type = "divider", output = "XTAL_CLK / 4" }, # source: esp-idf SOC_RTC_FAST_CLK_SRC_XTAL_D4
 

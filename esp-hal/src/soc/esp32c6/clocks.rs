@@ -213,6 +213,8 @@ fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
     PMU::regs()
         .hp_sleep_lp_ck_power()
         .modify(|_, w| w.hp_sleep_xpd_xtal32k().bit(en));
+
+    // Enable for digital part
     // TODO: Should the digital clock gate be a different clock node?
     LP_CLKRST::regs()
         .clk_to_hp()
@@ -233,9 +235,21 @@ fn enable_osc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
 // RC_SLOW_CLK
 
 fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    if en {
+        // SCK_DCAP value controls tuning of 136k clock. The higher the value of DCAP, the lower the
+        // frequency. There is no separate enable bit, just make sure the calibration value is set.
+        const RTC_CNTL_SCK_DCAP_DEFAULT: u8 = 128;
+        crate::soc::regi2c::I2C_DIG_REG_SCK_DCAP.write_reg(RTC_CNTL_SCK_DCAP_DEFAULT);
+    }
+
     PMU::regs()
         .hp_sleep_lp_ck_power()
         .modify(|_, w| w.hp_sleep_xpd_rc32k().bit(en));
+
+    // Enable for digital part
+    LP_CLKRST::regs()
+        .clk_to_hp()
+        .modify(|_, w| w.icg_hp_osc32k().bit(en));
 }
 
 // HP_ROOT_CLK
