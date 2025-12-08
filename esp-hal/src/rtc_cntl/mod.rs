@@ -287,8 +287,11 @@ impl<'d> Rtc<'d> {
         ((h as u64) << 32) | (l as u64)
     }
 
-    /// Get the time since boot.
-    pub fn time_since_boot(&self) -> Duration {
+    /// Get the time elapsed since the last power-on reset.
+    ///
+    /// It should be noted that any reset or sleep, other than a power-up reset, will not stop or
+    /// reset the RTC timer.
+    pub fn time_since_power_up(&self) -> Duration {
         Duration::from_micros(
             self.time_since_boot_raw() * 1_000_000
                 / RtcClock::slow_freq().frequency().as_hz() as u64,
@@ -363,7 +366,7 @@ impl<'d> Rtc<'d> {
     pub fn current_time_us(&self) -> u64 {
         // Current time is boot time + time since boot
 
-        let rtc_time_us = self.time_since_boot().as_micros();
+        let rtc_time_us = self.time_since_power_up().as_micros();
         let boot_time_us = self.boot_time_us();
         let wrapped_boot_time_us = u64::MAX - boot_time_us;
 
@@ -382,7 +385,7 @@ impl<'d> Rtc<'d> {
         // Current time is boot time + time since boot (rtc time)
         // So boot time = current time - time since boot (rtc time)
 
-        let rtc_time_us = self.time_since_boot().as_micros();
+        let rtc_time_us = self.time_since_power_up().as_micros();
         if current_time_us < rtc_time_us {
             // An overflow would happen if we subtracted rtc_time_us from current_time_us.
             // To work around this, we can wrap around u64::MAX by subtracting the
