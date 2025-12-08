@@ -1310,7 +1310,8 @@ where
     /// The UART hardware continuously receives bytes and stores them in the RX
     /// FIFO. This function reads the bytes from the RX FIFO and returns
     /// them in the provided buffer. If the hardware buffer is empty, this
-    /// function will block until data is available.
+    /// function will block until data is available. The [`Self::read_ready`]
+    /// function can be used to check if data is available without blocking.
     ///
     /// The function returns the number of bytes read into the buffer. This may
     /// be less than the length of the buffer. This function only returns 0
@@ -1833,7 +1834,6 @@ where
     /// }
     /// # {after_snippet}
     /// ```
-    #[instability::unstable]
     pub fn write_ready(&mut self) -> bool {
         self.tx.write_ready()
     }
@@ -1918,7 +1918,6 @@ where
     ///
     /// # {after_snippet}
     /// ```
-    #[instability::unstable]
     pub fn read_ready(&mut self) -> bool {
         self.rx.read_ready()
     }
