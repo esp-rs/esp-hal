@@ -7,7 +7,6 @@ use std::{
 use anyhow::{Context, Error};
 use cargo_semver_checks::{Check, GlobalConfig, ReleaseType, Rustdoc};
 use esp_metadata::{Chip, Config};
-use toml_edit::{Item, Value};
 
 use crate::{Package, cargo::CargoArgsBuilder, commands::checker::download_baselines};
 
@@ -53,40 +52,15 @@ pub fn minimum_update(
     let mut cfg = GlobalConfig::new();
     cfg.set_log_level(Some(log::Level::Info));
     let result = semver_check.check_release(&mut cfg)?;
+    log::info!("Result {:?}", result);
 
-    let mut min_required_update = ReleaseType::Patch;
-    for (_, report) in result.crate_reports() {
-        if let Some(required_bump) = report.required_bump() {
-            let required_is_stricter = (min_required_update == ReleaseType::Patch)
-                || (required_bump == ReleaseType::Major);
-            if required_is_stricter {
-                min_required_update = required_bump;
-            }
-        }
-    }
+    let required_bumps: Vec<ReleaseType> = result
+        .crate_reports()
+        .into_iter()
+        .filter_map(|(_, report)| report.required_bump())
+        .collect();
 
-    let forever_unstable = package
-        .toml()
-        .espressif_metadata()
-        .and_then(|metadata| metadata.get("forever-unstable"))
-        .map(|item| match item {
-            Item::Value(Value::Boolean(b)) => *b.value(),
-            Item::Value(_) => {
-                log::warn!("Invalid value for 'forever-unstable' in metadata - must be a boolean");
-                true
-            }
-            _ => false,
-        })
-        .unwrap_or(false);
-
-    if forever_unstable && min_required_update == ReleaseType::Major {
-        log::warn!(
-            "Downgrading required bump from Minor to Patch for unstable package: {}",
-            package
-        );
-        min_required_update = ReleaseType::Minor;
-    }
-
+    let min_required_update = required_bump(&required_bumps, package.is_forever_unstable());
     Ok(min_required_update)
 }
 
@@ -147,4 +121,81 @@ pub(crate) fn build_doc_json(
     crate::cargo::run_with_env(&cargo_args, package_path, envs, false)
         .with_context(|| format!("Failed to run `cargo rustdoc` with {cargo_args:?}",))?;
     Ok(current_path)
+}
+
+fn required_bump(required_bumps: &[ReleaseType], forever_unstable: bool) -> ReleaseType {
+    let mut min_required_update = ReleaseType::Patch;
+
+    for &required_bump in required_bumps {
+        let required_is_stricter =
+            (min_required_update == ReleaseType::Patch) || (required_bump == ReleaseType::Major);
+
+        if required_is_stricter {
+            min_required_update = required_bump;
+        }
+    }
+
+    if forever_unstable && min_required_update == ReleaseType::Major {
+        log::warn!("Downgrading required bump from Minor to Patch for unstable package",);
+        min_required_update = ReleaseType::Minor;
+    }
+
+    min_required_update
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    // Semver-check requiring a major bump for a 0.x crate
+    fn major_bump_from_0x_to_0x_plus_1() {
+        let bumps = [ReleaseType::Major];
+
+        let result = required_bump(&bumps, false);
+
+        assert_eq!(result, ReleaseType::Major);
+    }
+
+    #[test]
+    // For crates >= 1.0.0, Major is still Major
+    fn major_bump_from_1x_to_2x() {
+        let bumps = [ReleaseType::Major];
+
+        let result = required_bump(&bumps, false);
+
+        assert_eq!(result, ReleaseType::Major);
+    }
+
+    #[test]
+    fn forever_unstable_downgrades_major_to_minor() {
+        let bumps = [ReleaseType::Major];
+
+        let result = required_bump(&bumps, true);
+
+        assert_eq!(
+            result,
+            ReleaseType::Minor,
+            "forever-unstable packages must never require a major bump"
+        );
+    }
+
+    #[test]
+    fn minor_stays_minor() {
+        let bumps = [ReleaseType::Minor];
+
+        let result = required_bump(&bumps, false);
+
+        assert_eq!(result, ReleaseType::Minor);
+    }
+
+    #[test]
+    fn multiple_bumps_select_major() {
+        let bumps = [ReleaseType::Patch, ReleaseType::Minor, ReleaseType::Major];
+
+        let result = required_bump(&bumps, false);
+
+        assert_eq!(result, ReleaseType::Major);
+    }
 }

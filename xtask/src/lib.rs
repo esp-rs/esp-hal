@@ -490,6 +490,19 @@ impl Package {
             crate::commands::generate_rom_symbols::generate_rom_symbols(&package_path, chip)?;
         }
         Ok(())
+    fn is_forever_unstable(&self) -> bool {
+        match self
+            .toml()
+            .espressif_metadata()
+            .and_then(|m| m.get("forever-unstable"))
+        {
+            Some(Item::Value(Value::Boolean(b))) => *b.value(),
+            Some(Item::Value(_)) => {
+                log::warn!("Invalid value for 'forever-unstable' in metadata - must be a boolean");
+                true
+            }
+            _ => false,
+        }
     }
 }
 
