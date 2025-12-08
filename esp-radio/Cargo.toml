@@ -12,7 +12,7 @@ license = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
 doc-config = { features = ["esp-hal/unstable", "esp-hal/rt", "defmt"], append = [
-    { if = 'chip_has("wifi")', features = ["wifi", "wifi-eap", "esp-now", "sniffer", "smoltcp/proto-ipv4", "smoltcp/proto-ipv6"] },
+    { if = 'chip_has("wifi")', features = ["wifi", "wifi-eap", "csi", "esp-now", "sniffer", "smoltcp/proto-ipv4", "smoltcp/proto-ipv6"] },
     { if = 'chip_has("bt")', features = ["ble"] },
     { if = 'chip_has("ieee802154")', features = ["ieee802154", "__docs_build"] },
     { if = 'chip_has("wifi") && chip_has("bt")', features = ["coex"] },
@@ -41,7 +41,7 @@ test  = false
 
 [dependencies]
 cfg-if  = "1"
-esp-hal = { version = "1.0.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
+esp-hal = { version = "~1.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
 portable-atomic = { version = "1.11", default-features = false }
 enumset = { version = "1.1", default-features = false, optional = true }
 critical-section = { version = "1", default-features = false }

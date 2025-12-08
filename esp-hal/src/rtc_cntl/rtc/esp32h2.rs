@@ -1,121 +1,22 @@
 use strum::FromRepr;
 
 use crate::{
-    clock::{
-        RtcClock,
-        RtcFastClock,
-        RtcSlowClock,
-        XtalClock,
-        clocks_ll::{esp32h2_rtc_update_to_xtal, regi2c_write_mask},
-    },
+    clock::{RtcClock, RtcFastClock, RtcSlowClock},
     peripherals::{LP_AON, PMU},
     rtc_cntl::RtcCalSel,
+    soc::regi2c,
 };
-
-const I2C_PMU: u8 = 0x6d;
-const I2C_PMU_HOSTID: u8 = 0;
-
-const I2C_PMU_EN_I2C_RTC_DREG: u8 = 8;
-const I2C_PMU_EN_I2C_RTC_DREG_MSB: u8 = 0;
-const I2C_PMU_EN_I2C_RTC_DREG_LSB: u8 = 0;
-
-const I2C_PMU_EN_I2C_DIG_DREG: u8 = 8;
-const I2C_PMU_EN_I2C_DIG_DREG_MSB: u8 = 1;
-const I2C_PMU_EN_I2C_DIG_DREG_LSB: u8 = 1;
-
-const I2C_PMU_EN_I2C_RTC_DREG_SLP: u8 = 8;
-const I2C_PMU_EN_I2C_RTC_DREG_SLP_MSB: u8 = 2;
-const I2C_PMU_EN_I2C_RTC_DREG_SLP_LSB: u8 = 2;
-
-const I2C_PMU_EN_I2C_DIG_DREG_SLP: u8 = 8;
-const I2C_PMU_EN_I2C_DIG_DREG_SLP_MSB: u8 = 3;
-const I2C_PMU_EN_I2C_DIG_DREG_SLP_LSB: u8 = 3;
-
-const I2C_PMU_OR_XPD_RTC_REG: u8 = 8;
-const I2C_PMU_OR_XPD_RTC_REG_MSB: u8 = 4;
-const I2C_PMU_OR_XPD_RTC_REG_LSB: u8 = 4;
-
-const I2C_PMU_OR_XPD_DIG_REG: u8 = 8;
-const I2C_PMU_OR_XPD_DIG_REG_MSB: u8 = 5;
-const I2C_PMU_OR_XPD_DIG_REG_LSB: u8 = 5;
-
-const I2C_PMU_OR_XPD_TRX: u8 = 15;
-const I2C_PMU_OR_XPD_TRX_MSB: u8 = 2;
-const I2C_PMU_OR_XPD_TRX_LSB: u8 = 2;
-
-const I2C_BIAS: u8 = 0x6a;
-const I2C_BIAS_HOSTID: u8 = 0;
-
-const I2C_BIAS_DREG_0P8: u8 = 0;
-const I2C_BIAS_DREG_0P8_MSB: u8 = 7;
-const I2C_BIAS_DREG_0P8_LSB: u8 = 4;
 
 pub(crate) fn init() {
     // * No peripheral reg i2c power up required on the target */
-    regi2c_write_mask(
-        I2C_PMU,
-        I2C_PMU_HOSTID,
-        I2C_PMU_EN_I2C_RTC_DREG,
-        I2C_PMU_EN_I2C_RTC_DREG_MSB,
-        I2C_PMU_EN_I2C_RTC_DREG_LSB,
-        0,
-    );
-    regi2c_write_mask(
-        I2C_PMU,
-        I2C_PMU_HOSTID,
-        I2C_PMU_EN_I2C_DIG_DREG,
-        I2C_PMU_EN_I2C_DIG_DREG_MSB,
-        I2C_PMU_EN_I2C_DIG_DREG_LSB,
-        0,
-    );
-    regi2c_write_mask(
-        I2C_PMU,
-        I2C_PMU_HOSTID,
-        I2C_PMU_EN_I2C_RTC_DREG_SLP,
-        I2C_PMU_EN_I2C_RTC_DREG_SLP_MSB,
-        I2C_PMU_EN_I2C_RTC_DREG_SLP_LSB,
-        0,
-    );
-    regi2c_write_mask(
-        I2C_PMU,
-        I2C_PMU_HOSTID,
-        I2C_PMU_EN_I2C_DIG_DREG_SLP,
-        I2C_PMU_EN_I2C_DIG_DREG_SLP_MSB,
-        I2C_PMU_EN_I2C_DIG_DREG_SLP_LSB,
-        0,
-    );
-    regi2c_write_mask(
-        I2C_PMU,
-        I2C_PMU_HOSTID,
-        I2C_PMU_OR_XPD_RTC_REG,
-        I2C_PMU_OR_XPD_RTC_REG_MSB,
-        I2C_PMU_OR_XPD_RTC_REG_LSB,
-        0,
-    );
-    regi2c_write_mask(
-        I2C_PMU,
-        I2C_PMU_HOSTID,
-        I2C_PMU_OR_XPD_DIG_REG,
-        I2C_PMU_OR_XPD_DIG_REG_MSB,
-        I2C_PMU_OR_XPD_DIG_REG_LSB,
-        0,
-    );
-    regi2c_write_mask(
-        I2C_PMU,
-        I2C_PMU_HOSTID,
-        I2C_PMU_OR_XPD_TRX,
-        I2C_PMU_OR_XPD_TRX_MSB,
-        I2C_PMU_OR_XPD_TRX_LSB,
-        0,
-    );
-    regi2c_write_mask(
-        I2C_BIAS,
-        I2C_BIAS_HOSTID,
-        I2C_BIAS_DREG_0P8,
-        I2C_BIAS_DREG_0P8_MSB,
-        I2C_BIAS_DREG_0P8_LSB,
-        8,
-    );
+    regi2c::I2C_PMU_EN_I2C_RTC_DREG.write_field(0);
+    regi2c::I2C_PMU_EN_I2C_DIG_DREG.write_field(0);
+    regi2c::I2C_PMU_EN_I2C_RTC_DREG_SLP.write_field(0);
+    regi2c::I2C_PMU_EN_I2C_DIG_DREG_SLP.write_field(0);
+    regi2c::I2C_PMU_OR_XPD_RTC_REG.write_field(0);
+    regi2c::I2C_PMU_OR_XPD_DIG_REG.write_field(0);
+    regi2c::I2C_PMU_OR_XPD_TRX.write_field(0);
+    regi2c::I2C_BIAS_DREG_0P8.write_field(8);
 
     let pmu = PMU::regs();
     unsafe {
@@ -319,9 +220,4 @@ bitfield::bitfield! {
     pub bool, dig_pad_slp_sel, set_dig_pad_slp_sel: 27;
     pub bool, dig_pause_wdt  , set_dig_pause_wdt  : 28;
     pub bool, dig_cpu_stall  , set_dig_cpu_stall  : 29;
-}
-
-pub(crate) fn rtc_clk_cpu_freq_set_xtal() {
-    // rtc_clk_cpu_set_to_default_config
-    esp32h2_rtc_update_to_xtal(XtalClock::_32M, 1);
 }

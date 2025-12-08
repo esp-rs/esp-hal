@@ -40,10 +40,12 @@ impl RmtReader {
     // If `final_` is set, read a full buffer length, potentially wrapping around. Otherwise, fetch
     // half the buffer's length.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub(super) fn read<T>(&mut self, data: &mut &mut [T], raw: DynChannelAccess<Rx>, final_: bool)
-    where
-        T: From<PulseCode>,
-    {
+    pub(super) fn read(
+        &mut self,
+        data: &mut &mut [PulseCode],
+        raw: DynChannelAccess<Rx>,
+        final_: bool,
+    ) {
         if self.state != ReaderState::Active {
             return;
         }
@@ -97,7 +99,7 @@ impl RmtReader {
                 // `data.len()` such that incrementing both pointers cannot advance them beyond
                 // their allocation's end.
                 unsafe {
-                    data_ptr.write(ram_ptr.read_volatile().into());
+                    data_ptr.write(ram_ptr.read_volatile());
                     ram_ptr = ram_ptr.add(1);
                     data_ptr = data_ptr.add(1);
                 }

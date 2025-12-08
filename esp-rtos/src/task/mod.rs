@@ -419,10 +419,11 @@ impl Task {
         let task_stack_size = task_stack_size + extra_stack;
 
         // Make sure stack size is also aligned to 16 bytes.
-        let task_stack_size = (task_stack_size & !0xF) + 16;
+        const MIN_STACK_ALIGNMENT: usize = 16;
+        let task_stack_size = (task_stack_size & !(MIN_STACK_ALIGNMENT - 1)) + MIN_STACK_ALIGNMENT;
 
         let stack = unwrap!(
-            Layout::from_size_align(task_stack_size, 16)
+            Layout::from_size_align(task_stack_size, MIN_STACK_ALIGNMENT)
                 .ok()
                 .and_then(|layout| InternalMemory.allocate(layout).ok()),
             "Failed to allocate stack",

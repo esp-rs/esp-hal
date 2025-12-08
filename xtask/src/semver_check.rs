@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::{Context, Error};
 use cargo_semver_checks::{Check, GlobalConfig, ReleaseType, Rustdoc};
-use esp_metadata::Chip;
+use esp_metadata::{Chip, Config};
 
 use crate::{Package, cargo::CargoArgsBuilder, commands::checker::download_baselines};
 
@@ -80,11 +80,14 @@ pub(crate) fn build_doc_json(
         .join(format!("{}.json", package.to_string().replace("-", "_")));
 
     std::fs::remove_file(&current_path).ok();
-    let features = if package.chip_features_matter() {
-        vec![chip.to_string()]
-    } else {
-        vec![]
-    };
+
+    let mut features = vec![];
+    features.push(chip.to_string());
+
+    let chip_config = Config::for_chip(chip);
+
+    let semver_feature = package.semver_feature_rules(&chip_config);
+    features.extend(semver_feature);
 
     log::info!(
         "Building doc json for {} with features: {:?}",

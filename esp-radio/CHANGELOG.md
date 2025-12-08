@@ -8,11 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- It's now possible to obtain the access point info of the currently connected AP, by using `WifiController::ap_info(&self)` (#4405)
 
+- It's now possible to obtain the access point info of the currently connected AP, by using `WifiController::ap_info(&self)` (#4405)
 - `ble::mac` to get the MAC address of the device (#4485)
 - `last_calibration_result` to get the result of the last calibration (#4479)
-- `BleInitError` for BLE init failures and `Internal`, `WrongClockConfig`, `SchedulerNotInitialized` and `Adc2IsUsed` variants to `WifiError (#4482) 
+- `BleInitError` for BLE init failures and `Internal`, `WrongClockConfig`, `SchedulerNotInitialized` and `Adc2IsUsed` variants to `WifiError (#4482)
 
 ### Changed
 
@@ -26,12 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Client` and `Sta` are replaced with `Station`, `Ap` with `AccessPoint` and `ApSta` with `AccessPointStation` (#4546)
 - `WifiEvent` uses full names for events instead of acronyms (#4554)
 - `WifiController::set_mode` is now unstable (#4570)
+- `ScanTypeConfig` now uses `esp_hal::time::Duration` instead of `core::time::Duration` (#4609)
+- The `CsiConfig` struct has been moved to the `wifi::csi` module (#4588)
+- The `ScanMethod`, `ScanTypeConfig`, and `ScanConfig` types have been moved to `wifi::scan` (#4588)
 
 ### Fixed
 
 - Avoid panicking in WiFi scan if an access point with using an unmapped auth-method is found (#4458)
 - Fixed a linker error (about missing symbols) when the `wifi` feature is selected but the code doesn't use it (#4513)
 - `Controller::stop_async()` now returns `WifiError::NotStarted` when the `Controller` has not been started (#4504)
+- ESP32-C2: Disable BLE controller before deinitializing the stack (#4606)
 
 ### Removed
 

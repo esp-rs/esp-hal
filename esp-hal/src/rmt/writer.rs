@@ -37,10 +37,12 @@ impl RmtWriter {
     // If `initial` is set, fill the entire buffer. Otherwise, append half the buffer's length from
     // `data`.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub(super) fn write<T>(&mut self, data: &mut &[T], raw: DynChannelAccess<Tx>, initial: bool)
-    where
-        T: Into<PulseCode> + Copy,
-    {
+    pub(super) fn write(
+        &mut self,
+        data: &mut &[PulseCode],
+        raw: DynChannelAccess<Tx>,
+        initial: bool,
+    ) {
         if self.state != WriterState::Active {
             return;
         }
@@ -62,7 +64,7 @@ impl RmtWriter {
             // SAFETY: The iteration `count` is smaller than both `max_count` and `data.len()` such
             // that incrementing both pointers cannot advance them beyond their allocation's end.
             unsafe {
-                ram_ptr.write_volatile(data_ptr.read().into());
+                ram_ptr.write_volatile(data_ptr.read());
                 ram_ptr = ram_ptr.add(1);
                 data_ptr = data_ptr.add(1);
             }

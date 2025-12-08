@@ -22,7 +22,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_radio::wifi::{ModeConfig, ScanConfig, sta::StationConfig};
+use esp_radio::wifi::{ModeConfig, scan::ScanConfig, sta::StationConfig};
 use smoltcp::iface::{SocketSet, SocketStorage};
 
 esp_bootloader_esp_idf::esp_app_desc!();

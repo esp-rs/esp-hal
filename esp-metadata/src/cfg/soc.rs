@@ -127,7 +127,7 @@ pub(crate) struct ProcessedClockData {
 }
 
 impl ProcessedClockData {
-    /// Returns a node by its name (e.g. `XTL_CLK`).
+    /// Returns a node by its name (e.g. `XTAL_CLK`).
     ///
     /// As the clock tree is stored as a vector, this method performs a linear search.
     fn node(&self, name: &str) -> &dyn ClockTreeNodeType {
@@ -299,8 +299,8 @@ impl SystemClocks {
                     /// Clock tree configuration.
                     ///
                     /// The fields of this struct are optional, with the following caveats:
-                    /// - If `XTL_CLK` is not specified, the crystal frequency will be automatically detected if
-                    ///   possible.
+                    /// - If `XTAL_CLK` is not specified, the crystal frequency will be automatically detected
+                    ///   if possible.
                     /// - The CPU and its upstream clock nodes will be set to a default configuration.
                     /// - Other unspecified clock sources will not be useable by peripherals.
                     #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -665,6 +665,9 @@ impl DeviceClocks {
                     },
                     _ => anyhow::bail!("only muxes are supported as clock source data"),
                 };
+
+                node.validate_source_data(&validation_context)
+                    .with_context(|| format!("Invalid clock tree item: {}", node.name_str()))?;
 
                 clock_tree.push(Box::new(node));
             }

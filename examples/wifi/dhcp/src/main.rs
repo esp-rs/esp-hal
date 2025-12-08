@@ -26,7 +26,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_radio::wifi::{ModeConfig, ScanConfig, sta::StationConfig};
+use esp_radio::wifi::{ModeConfig, scan::ScanConfig, sta::StationConfig};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::{DhcpOption, IpAddress},

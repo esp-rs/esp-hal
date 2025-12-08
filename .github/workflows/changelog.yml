@@ -11,12 +11,12 @@ on:
       - "/xtask/"
     # Run on labeled/unlabeled in addition to defaults to detect
     # adding/removing skip-changelog labels.
-    types: [opened, reopened, labeled, unlabeled, synchronize]
+    types: [opened, reopened, labeled, unlabeled, synchronize, ready_for_review]
 
 jobs:
   changelog:
+    if: github.event.pull_request.draft == false # don't bother checking the changelog for draft PRs
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4

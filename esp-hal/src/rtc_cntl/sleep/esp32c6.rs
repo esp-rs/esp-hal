@@ -1025,8 +1025,7 @@ impl RtcSleepConfig {
             // TODO: IDF-7370
             #[cfg(not(soc_has_pmu))]
             if !(self.deep && wakeup_triggers.touch) {
-                let saradc = &*esp32c6::APB_SARADC::ptr();
-                saradc
+                APB_SARADC::regs()
                     .ctrl()
                     .modify(|_, w| w.saradc2_pwdet_drv().bit(false));
             }

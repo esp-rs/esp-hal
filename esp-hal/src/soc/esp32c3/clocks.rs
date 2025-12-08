@@ -47,7 +47,7 @@ impl CpuClock {
         // with, and changing it breaks USB Serial/JTAG.
         let mut config = match self {
             CpuClock::_80MHz => ClockConfig {
-                xtl_clk: None,
+                xtal_clk: None,
                 system_pre_div: None,
                 pll_clk: Some(PllClkConfig::_480),
                 cpu_pll_div_out: Some(CpuPllDivOutConfig::_80),
@@ -58,7 +58,7 @@ impl CpuClock {
                 low_power_clk: Some(LowPowerClkConfig::RtcSlow),
             },
             CpuClock::_160MHz => ClockConfig {
-                xtl_clk: None,
+                xtal_clk: None,
                 system_pre_div: None,
                 pll_clk: Some(PllClkConfig::_480),
                 cpu_pll_div_out: Some(CpuPllDivOutConfig::_160),
@@ -71,18 +71,18 @@ impl CpuClock {
             CpuClock::Custom(clock_config) => clock_config,
         };
 
-        if config.xtl_clk.is_none() {
+        if config.xtal_clk.is_none() {
             // TODO: support multiple crystal frequencies (esp-idf supports 32M).
-            config.xtl_clk = Some(XtlClkConfig::_40);
+            config.xtal_clk = Some(XtalClkConfig::_40);
         }
 
         config.apply();
     }
 }
 
-// XTL_CLK
+// XTAL_CLK
 
-fn configure_xtl_clk_impl(_clocks: &mut ClockTree, config: XtlClkConfig) {
+fn configure_xtal_clk_impl(_clocks: &mut ClockTree, config: XtalClkConfig) {
     // The stored configuration affects PLL settings instead. We save the value in a register
     // similar to ESP-IDF, just in case something relies on that, or, if we can in the future read
     // back the value instead of wasting RAM on it.
@@ -122,7 +122,7 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
 
     // Digital part
     let pll_freq = unwrap!(clocks.pll_clk);
-    let xtal_freq = unwrap!(clocks.xtl_clk);
+    let xtal_freq = unwrap!(clocks.xtal_clk);
     SYSTEM::regs()
         .cpu_per_conf()
         .modify(|_, w| w.pll_freq_sel().bit(pll_freq == PllClkConfig::_480));
@@ -146,7 +146,7 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
         PllClkConfig::_480 => {
             // Configure 480M PLL
             match xtal_freq {
-                XtlClkConfig::_40 => {
+                XtalClkConfig::_40 => {
                     div_ref = 0;
                     // Will multiply by 8 + 4 = 12
                     div7_0 = 8;
@@ -164,7 +164,7 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
         PllClkConfig::_320 => {
             // Configure 320M PLL
             match xtal_freq {
-                XtlClkConfig::_40 => {
+                XtalClkConfig::_40 => {
                     div_ref = 0;
                     // Will multiply by 4 + 4 = 8
                     div7_0 = 4;
