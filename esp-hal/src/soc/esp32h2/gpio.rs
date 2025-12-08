@@ -49,5 +49,7 @@ for_each_lp_function! {
                 }
             }
         }
+        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+        impl $crate::gpio::RtcPinWithResistors for $crate::peripherals::$gpio<'_> {}
     };
 }

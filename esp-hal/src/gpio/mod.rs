@@ -387,12 +387,13 @@ pub trait RtcPin: Pin {
 /// Trait implemented by RTC pins which supporting internal pull-up / pull-down
 /// resistors.
 #[instability::unstable]
-#[cfg(not(esp32h2))]
 pub trait RtcPinWithResistors: RtcPin {
     /// Enable/disable the internal pull-up resistor
+    #[cfg(not(esp32h2))]
     #[doc(hidden)]
     fn rtcio_pullup(&self, enable: bool);
     /// Enable/disable the internal pull-down resistor
+    #[cfg(not(esp32h2))]
     #[doc(hidden)]
     fn rtcio_pulldown(&self, enable: bool);
 }
@@ -2285,14 +2286,15 @@ impl RtcPin for AnyPin<'_> {
     }
 }
 
-#[cfg(not(esp32h2))]
 impl RtcPinWithResistors for AnyPin<'_> {
+    #[cfg(not(esp32h2))]
     fn rtcio_pullup(&self, enable: bool) {
         for_each_rtcio_output_pin! {
             (self, target) => { RtcPinWithResistors::rtcio_pullup(&target, enable) };
         }
     }
 
+    #[cfg(not(esp32h2))]
     fn rtcio_pulldown(&self, enable: bool) {
         for_each_rtcio_output_pin! {
             (self, target) => { RtcPinWithResistors::rtcio_pulldown(&target, enable) };
