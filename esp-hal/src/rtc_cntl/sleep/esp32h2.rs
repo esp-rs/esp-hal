@@ -705,8 +705,7 @@ impl RtcSleepConfig {
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_rc_fast(true);
             self.pd_flags.set_pd_xtal32k(true);
-        }
-        else if self.need_pd_top {
+        } else if self.need_pd_top {
             self.pd_flags.set_pd_top(false);
         }
     }
