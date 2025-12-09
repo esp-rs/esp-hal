@@ -642,15 +642,15 @@ mod tests {
             "Expected transmit to return an error on empty data"
         );
 
-        // assert!(
-        //     matches!(
-        //         tx_channel
-        //             .reborrow()
-        //             .transmit_continuously(&tx_data, LoopMode::Infinite),
-        //         Err((Error::EndMarkerMissing, _))
-        //     ),
-        //     "Expected transmit_continuously to return an error without end marker"
-        // );
+        assert!(
+            matches!(
+                tx_channel
+                    .reborrow()
+                    .transmit_continuously(&tx_data, LoopMode::Infinite),
+                Err((Error::EndMarkerMissing, _))
+            ),
+            "Expected transmit_continuously to return an error without end marker"
+        );
 
         assert!(
             matches!(
