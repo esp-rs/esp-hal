@@ -62,7 +62,7 @@ async fn connection_manager(
     mut controller: WifiController<'static>,
     connected_signal: &'static Signal<NoopRawMutex, bool>,
 ) {
-    println!("📡 Starting WiFi connection manager");
+    println!("Starting WiFi connection manager");
 
     if !matches!(controller.is_started(), Ok(true)) {
         let station_config = ModeConfig::Station(
@@ -71,18 +71,18 @@ async fn connection_manager(
                 .with_password(PASSWORD.into()),
         );
         controller.set_config(&station_config).unwrap();
-        println!("🔄 Starting WiFi...");
+        println!("Starting WiFi...");
         controller.start_async().await.unwrap();
-        println!("✅ WiFi started");
+        println!("WiFi started");
     }
 
-    println!("🔗 Connecting to WiFi network");
+    println!("Connecting to WiFi network");
     match controller.connect_async().await {
         Ok(_) => {
-            println!("✅ WiFi connected!");
+            println!("WiFi connected!");
             connected_signal.signal(true);
         }
-        Err(e) => println!("❌ Initial WiFi connection failed: {:?}", e),
+        Err(e) => println!("Initial WiFi connection failed: {:?}", e),
     }
 
     loop {
@@ -91,28 +91,28 @@ async fn connection_manager(
                 controller
                     .wait_for_event(WifiEvent::StationDisconnected)
                     .await;
-                println!("📶 WiFi connection lost - attempting reconnection");
+                println!("WiFi connection lost - attempting reconnection");
                 Timer::after(Duration::from_millis(2000)).await;
                 match controller.connect_async().await {
                     Ok(_) => {
-                        println!("✅ WiFi reconnected!");
+                        println!("WiFi reconnected!");
                         connected_signal.signal(true);
                     }
                     Err(e) => {
-                        println!("❌ WiFi reconnection failed: {:?}", e);
+                        println!("WiFi reconnection failed: {:?}", e);
                         Timer::after(Duration::from_millis(5000)).await;
                     }
                 }
             }
             _ => {
-                println!("🔗 Reconnecting to WiFi network: {}", SSID);
+                println!("Reconnecting to WiFi network: {}", SSID);
                 match controller.connect_async().await {
                     Ok(_) => {
-                        println!("✅ WiFi connected!");
+                        println!("WiFi connected!");
                         connected_signal.signal(true);
                     }
                     Err(e) => {
-                        println!("❌ WiFi connection failed: {:?}", e);
+                        println!("WiFi connection failed: {:?}", e);
                         Timer::after(Duration::from_millis(5000)).await;
                     }
                 }
@@ -140,7 +140,7 @@ async fn i2s_dma_drain(
     let mut transaction = match i2s_rx.read_dma_circular_async(buffer) {
         Ok(t) => t,
         Err(e) => {
-            println!("❌ Failed to start I2S DMA: {:?}", e);
+            println!("Failed to start I2S DMA: {:?}", e);
             return;
         }
     };
@@ -150,7 +150,7 @@ async fn i2s_dma_drain(
     let start = Instant::now();
 
     // Start continuous draining to prevent DmaError(Late)
-    println!("🧹 Starting continuous buffer drain to keep DMA synchronized...");
+    println!("Starting continuous buffer drain to keep DMA synchronized...");
     while !connected_signal.signaled() {
         // Check for available data and drain it
         match transaction.pop(i2s_data).await {
@@ -163,13 +163,13 @@ async fn i2s_dma_drain(
                     esp_hal::i2s::master::Error::DmaError(esp_hal::dma::DmaError::Late)
                 ) {
                     println!(
-                        "🧹 Late error during drain - (waiting connection signal) {:?}",
+                        "Late error during drain - (waiting connection signal) {:?}",
                         esp_hal::system::Cpu::current()
                     );
                     late_errors += 1;
                 } else {
                     println!(
-                        "⚠️ Error during continuous drain: {:?}  {:?}",
+                        "Error during continuous drain: {:?}  {:?}",
                         e,
                         esp_hal::system::Cpu::current()
                     );
@@ -181,23 +181,23 @@ async fn i2s_dma_drain(
         Timer::after(Duration::from_millis(1)).await;
     }
     println!(
-        "📊 Drained: {} bytes | Late errors: {} | uptime: {} ms",
+        "Drained: {} bytes | Late errors: {} | uptime: {} ms",
         total_drained,
         late_errors,
         start.elapsed().as_millis()
     );
     match transaction.pop(i2s_data).await {
         Ok(bytes) => {
-            println!("🧹 Final drained {} bytes total", bytes);
+            println!("Final drained {} bytes total", bytes);
         }
         Err(e) => {
             if matches!(
                 e,
                 esp_hal::i2s::master::Error::DmaError(esp_hal::dma::DmaError::Late)
             ) {
-                println!("🧹 Late error during drain -  (final drain)");
+                println!("Late error during drain -  (final drain)");
             } else {
-                println!("⚠️ Error during final drain: {:?}", e);
+                println!("Error during final drain: {:?}", e);
             }
         }
     }

@@ -58,15 +58,18 @@ impl RestoreState {
         Self(0, PhantomData)
     }
 
+    #[inline]
     fn mark_reentry(&mut self) {
         self.0 |= Self::REENTRY_FLAG;
     }
 
+    #[inline]
     fn is_reentry(self) -> bool {
         self.0 & Self::REENTRY_FLAG != 0
     }
 
     /// Returns the raw value used to create this RestoreState.
+    #[inline]
     pub fn inner(self) -> u32 {
         self.0
     }
@@ -88,6 +91,7 @@ mod single_core {
             }
         }
 
+        #[inline]
         pub fn lock(&self, lock: &impl crate::RawLock) -> crate::RestoreState {
             let mut tkn = unsafe { lock.enter() };
             let was_locked = self.locked.replace(true);
@@ -101,6 +105,7 @@ mod single_core {
         ///
         /// This function must only be called if the lock was acquired by the
         /// current thread.
+        #[inline]
         pub unsafe fn unlock(&self) {
             self.locked.set(false)
         }
@@ -240,6 +245,7 @@ impl<L: RawLock> GenericRawMutex<L> {
     /// - Each release call must be paired with an acquire call.
     /// - The returned token must be passed to the corresponding `release` call.
     /// - The caller must ensure to release the locks in the reverse order they were acquired.
+    #[inline]
     unsafe fn acquire(&self) -> RestoreState {
         self.inner.lock(&self.lock)
     }
@@ -251,6 +257,7 @@ impl<L: RawLock> GenericRawMutex<L> {
     /// - This function must only be called if the lock was acquired by the current thread.
     /// - The caller must ensure to release the locks in the reverse order they were acquired.
     /// - Each release call must be paired with an acquire call.
+    #[inline]
     unsafe fn release(&self, token: RestoreState) {
         if !token.is_reentry() {
             unsafe {
@@ -265,12 +272,14 @@ impl<L: RawLock> GenericRawMutex<L> {
     ///
     /// Note that this function is not reentrant, calling it reentrantly will
     /// panic.
+    #[inline]
     pub fn lock_non_reentrant<R>(&self, f: impl FnOnce() -> R) -> R {
         let _token = LockGuard::new_non_reentrant(self);
         f()
     }
 
     /// Runs the callback with this lock locked.
+    #[inline]
     pub fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
         let _token = LockGuard::new_reentrant(self);
         f()
@@ -290,6 +299,7 @@ pub struct RawMutex {
 }
 
 impl Default for RawMutex {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -297,6 +307,7 @@ impl Default for RawMutex {
 
 impl RawMutex {
     /// Create a new lock.
+    #[inline]
     pub const fn new() -> Self {
         Self {
             inner: GenericRawMutex::new(SingleCoreInterruptLock),
@@ -310,6 +321,7 @@ impl RawMutex {
     /// - Each release call must be paired with an acquire call.
     /// - The returned token must be passed to the corresponding `release` call.
     /// - The caller must ensure to release the locks in the reverse order they were acquired.
+    #[inline]
     pub unsafe fn acquire(&self) -> RestoreState {
         unsafe { self.inner.acquire() }
     }
@@ -321,6 +333,7 @@ impl RawMutex {
     /// - This function must only be called if the lock was acquired by the current thread.
     /// - The caller must ensure to release the locks in the reverse order they were acquired.
     /// - Each release call must be paired with an acquire call.
+    #[inline]
     pub unsafe fn release(&self, token: RestoreState) {
         unsafe {
             self.inner.release(token);
@@ -331,11 +344,13 @@ impl RawMutex {
     ///
     /// Note that this function is not reentrant, calling it reentrantly will
     /// panic.
+    #[inline]
     pub fn lock_non_reentrant<R>(&self, f: impl FnOnce() -> R) -> R {
         self.inner.lock_non_reentrant(f)
     }
 
     /// Runs the callback with this lock locked.
+    #[inline]
     pub fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
         self.inner.lock(f)
     }
@@ -395,6 +410,7 @@ struct LockGuard<'a, L: RawLock> {
 }
 
 impl<'a, L: RawLock> LockGuard<'a, L> {
+    #[inline]
     fn new_non_reentrant(lock: &'a GenericRawMutex<L>) -> Self {
         let this = Self::new_reentrant(lock);
         if this.token.is_reentry() {
@@ -403,6 +419,7 @@ impl<'a, L: RawLock> LockGuard<'a, L> {
         this
     }
 
+    #[inline]
     fn new_reentrant(lock: &'a GenericRawMutex<L>) -> Self {
         let token = unsafe {
             // SAFETY: the same lock will be released when dropping the guard.

@@ -18,12 +18,15 @@ impl AtomicWaker {
         }
     }
 
-    delegate::delegate! {
-        to self.waker {
-            /// Register a waker. Overwrites the previous waker, if any.
-            pub fn register(&self, w: &Waker);
-            /// Wake the registered waker, if any.
-            pub fn wake(&self);
-        }
+    /// Register a waker. Overwrites the previous waker, if any.
+    #[inline]
+    pub fn register(&self, w: &Waker) {
+        self.waker.register(w);
+    }
+
+    /// Wake the registered waker, if any.
+    #[crate::ram]
+    pub fn wake(&self) {
+        self.waker.wake();
     }
 }
