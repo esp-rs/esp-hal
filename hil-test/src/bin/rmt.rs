@@ -136,17 +136,21 @@ impl LoopbackConfig {
 // buffer in loopback tests with buffer wrapping. If we did, that might hide bugs.
 // FIXME: Make a method on LoopbackConfig?
 fn generate_tx_data(conf: &LoopbackConfig) -> Vec<PulseCode> {
+    const WRAP_COUNT: u16 = 23;
+
     let mut tx_data: Vec<_> = (0..)
         .take(conf.tx_len)
         .map(|i| {
-            PulseCode::new(
+            PulseCode::try_new(
                 Level::High,
-                conf.length1_base + conf.length1_step * (i % 23),
+                conf.length1_base + conf.length1_step * (i % WRAP_COUNT),
                 Level::Low,
                 conf.length2,
             )
+            .expect("pulse code length out of range")
         })
         .collect();
+    let mut i_max = WRAP_COUNT.min(conf.tx_len as u16);
 
     let mut pos = conf.tx_len - 1;
     match conf.end_marker {
@@ -154,19 +158,25 @@ fn generate_tx_data(conf: &LoopbackConfig) -> Vec<PulseCode> {
         EndMarkerConfig::Field1 => {
             tx_data[pos] = PulseCode::end_marker();
             pos -= 1;
+            i_max -= 1;
         }
         EndMarkerConfig::Field2 => {
             tx_data[pos] = tx_data[pos].with_length2(0).unwrap();
             pos -= 1;
+            i_max -= 1;
         }
     }
     if conf.write_stop_code {
-        tx_data[pos] = PulseCode::new(
+        i_max -= 1;
+        assert!(conf.length1_base + i_max * conf.length1_step + conf.length2 < conf.idle_threshold);
+
+        tx_data[pos] = PulseCode::try_new(
             Level::High,
             2 * conf.idle_threshold,
             Level::Low,
             conf.length2,
-        );
+        )
+        .expect("idle_threshold out of range");
     }
 
     tx_data
