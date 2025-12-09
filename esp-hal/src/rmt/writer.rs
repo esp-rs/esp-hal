@@ -9,7 +9,7 @@ pub(super) enum WriterState {
     // There's still data left to write
     Active,
 
-    // An error occured, and either
+    // An error occurred, and either
     // - no data was written (and transmission was never started), or
     // - some data was written and the last code written is an end marker, such that transmission
     //   will eventually stop
@@ -143,9 +143,9 @@ impl RmtWriter {
                     unsafe { ram_ptr.write_volatile(PulseCode::end_marker()) };
                     WriterState::Error(Error::EndMarkerMissing)
                 } else {
-                    // The buffer is full, and we can't easily writen an end marker. (Short of
+                    // The buffer is full, and we can't easily write an end marker. (Short of
                     // overwriting some other code, which might be ok since hitting this error case
-                    // always indicates a bu in user code.)
+                    // always indicates a bug in user code.)
                     // Thus, remain in Active state. On the next Event::Threshold, this function
                     // will be called again, with data already exhausted, and hit the other arm of
                     // this conditional.
