@@ -1481,15 +1481,7 @@ impl<'ch> TxTransaction<'ch, '_> {
         let result = loop {
             match self.poll_internal() {
                 Some(Event::Error) => break Err(Error::TransmissionError),
-                Some(Event::End) => {
-                    if !self.remaining_data.is_empty() {
-                        // Unexpectedly done, even though we have data left: For example, this could
-                        // happen if there is a stop code inside the data and not just at the end.
-                        break Err(Error::TransmissionError);
-                    } else {
-                        break Ok(());
-                    }
-                }
+                Some(Event::End) => break self.writer.state().to_result(),
                 _ => continue,
             }
         };
@@ -1710,14 +1702,12 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         let raw = self.raw;
         let memsize = raw.memsize();
 
-        match data.last() {
-            None => return Err((Error::InvalidArgument, self)),
-            Some(&code) if code.is_end_marker() => (),
-            Some(_) => return Err((Error::EndMarkerMissing, self)),
-        }
-
         let mut writer = RmtWriter::new();
         writer.write(&mut data, raw, true);
+
+        if let WriterState::Error(e) = writer.state() {
+            return Err((e, self));
+        }
 
         raw.clear_tx_interrupts(EnumSet::all());
         raw.start_send(None, memsize);
@@ -1756,10 +1746,13 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
             return Err((Error::InvalidArgument, self));
         }
 
-        if data.is_empty() {
-            return Err((Error::InvalidArgument, self));
-        } else if data.len() > memsize.codes() {
-            return Err((Error::Overflow, self));
+        let mut writer = RmtWriter::new();
+        writer.write(&mut data, raw, true);
+
+        match writer.state() {
+            WriterState::Error(e) => return Err((e, self)),
+            WriterState::Active => return Err((Error::Overflow, self)),
+            WriterState::Done => (),
         }
 
         let mut _guard = TxGuard::new(raw);
@@ -1769,9 +1762,6 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         }
 
         if _guard.is_active() {
-            let mut writer = RmtWriter::new();
-            writer.write(&mut data, raw, true);
-
             raw.clear_tx_interrupts(EnumSet::all());
             raw.start_send(Some(mode), memsize);
         }
@@ -1925,7 +1915,7 @@ impl core::future::Future for TxFuture<'_> {
         let this = self.get_mut();
         let raw = this.raw;
 
-        if let WriterState::Error(err) = this.writer.state {
+        if let WriterState::Error(err) = this.writer.state() {
             return Poll::Ready(Err(err));
         }
 
@@ -1933,20 +1923,13 @@ impl core::future::Future for TxFuture<'_> {
 
         let result = match raw.get_tx_status() {
             Some(Event::Error) => Err(Error::TransmissionError),
-            Some(Event::End) => {
-                if this.writer.state == WriterState::Active {
-                    // Unexpectedly done, even though we have data left.
-                    Err(Error::TransmissionError)
-                } else {
-                    Ok(())
-                }
-            }
+            Some(Event::End) => this.writer.state().to_result(),
             Some(Event::Threshold) => {
                 raw.clear_tx_interrupts(Event::Threshold);
 
                 this.writer.write(&mut this.data, raw, false);
 
-                if this.writer.state == WriterState::Active {
+                if this.writer.state() == WriterState::Active {
                     raw.listen_tx_interrupt(Event::Threshold);
                 }
 
@@ -1970,21 +1953,10 @@ impl Channel<'_, Async, Tx> {
         let memsize = raw.memsize();
 
         let mut writer = RmtWriter::new();
+        writer.write(&mut data, raw, true);
 
-        match data.last() {
-            None => {
-                writer.state = WriterState::Error(Error::InvalidArgument);
-            }
-            Some(&code) if code.is_end_marker() => (),
-            Some(_) => {
-                writer.state = WriterState::Error(Error::EndMarkerMissing);
-            }
-        }
-
-        let _guard = if !matches!(writer.state, WriterState::Error(_)) {
-            writer.write(&mut data, raw, true);
-
-            let wrap = match writer.state {
+        let _guard = if writer.state().is_ok() {
+            let wrap = match writer.state() {
                 WriterState::Error(_) => false,
                 WriterState::Active => true,
                 WriterState::Done => false,
