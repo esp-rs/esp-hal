@@ -188,22 +188,20 @@ pub struct PeripheralClockConfig {
 }
 
 impl PeripheralClockConfig {
-    fn source_clock() -> u32 {
+    fn source_clock() -> Rate {
         let clocks = Clocks::get();
 
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
-                let source_clock = clocks.pwm_clock;
+                clocks.pwm_clock
             } else if #[cfg(esp32c6)] {
-                let source_clock = clocks.crypto_clock;
+                clocks.crypto_clock
             } else if #[cfg(esp32s3)] {
-                let source_clock = clocks.crypto_pwm_clock;
+                clocks.crypto_pwm_clock
             } else if #[cfg(esp32h2)] {
-                let source_clock = clocks.xtal_clock;
+                clocks.xtal_clock
             }
         }
-
-        source_clock
     }
 
     /// Get a clock configuration with the given prescaler.

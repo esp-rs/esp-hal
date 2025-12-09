@@ -285,6 +285,7 @@ impl Chip {
                     "soc_has_clock_node_pll_clk",
                     "soc_has_clock_node_apll_clk",
                     "soc_has_clock_node_rc_fast_clk",
+                    "soc_has_clock_node_pll_f160m_clk",
                     "soc_has_clock_node_cpu_pll_div_in",
                     "soc_has_clock_node_cpu_pll_div",
                     "soc_has_clock_node_syscon_pre_div_in",
@@ -473,6 +474,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_apll_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_rc_fast_clk",
+                    "cargo:rustc-cfg=soc_has_clock_node_pll_f160m_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_cpu_pll_div_in",
                     "cargo:rustc-cfg=soc_has_clock_node_cpu_pll_div",
                     "cargo:rustc-cfg=soc_has_clock_node_syscon_pre_div_in",
@@ -3287,6 +3289,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_apll_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_rc_fast_clk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f160m_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpu_pll_div_in)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpu_pll_div)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_syscon_pre_div_in)");

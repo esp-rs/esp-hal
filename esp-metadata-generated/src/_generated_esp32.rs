@@ -306,6 +306,12 @@ macro_rules! for_each_soc_xtal_options {
 ///     todo!()
 /// }
 ///
+/// // PLL_F160M_CLK
+///
+/// fn enable_pll_f160m_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
 /// // CPU_PLL_DIV_IN
 ///
 /// fn enable_cpu_pll_div_in_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -840,6 +846,7 @@ macro_rules! define_clock_tree_types {
             timg1_calibration_clock: Option<Timg0CalibrationClockConfig>,
             pll_clk_refcount: u32,
             rc_fast_clk_refcount: u32,
+            pll_f160m_clk_refcount: u32,
             apb_clk_refcount: u32,
             ref_tick_refcount: u32,
             xtal32k_clk_refcount: u32,
@@ -950,6 +957,7 @@ macro_rules! define_clock_tree_types {
                 timg1_calibration_clock: None,
                 pll_clk_refcount: 0,
                 rc_fast_clk_refcount: 0,
+                pll_f160m_clk_refcount: 0,
                 apb_clk_refcount: 0,
                 ref_tick_refcount: 0,
                 xtal32k_clk_refcount: 0,
@@ -1018,6 +1026,21 @@ macro_rules! define_clock_tree_types {
         }
         pub fn rc_fast_clk_frequency(clocks: &mut ClockTree) -> u32 {
             8000000
+        }
+        pub fn request_pll_f160m_clk(clocks: &mut ClockTree) {
+            if increment_reference_count(&mut clocks.pll_f160m_clk_refcount) {
+                request_pll_clk(clocks);
+                enable_pll_f160m_clk_impl(clocks, true);
+            }
+        }
+        pub fn release_pll_f160m_clk(clocks: &mut ClockTree) {
+            if decrement_reference_count(&mut clocks.pll_f160m_clk_refcount) {
+                enable_pll_f160m_clk_impl(clocks, false);
+                release_pll_clk(clocks);
+            }
+        }
+        pub fn pll_f160m_clk_frequency(clocks: &mut ClockTree) -> u32 {
+            160000000
         }
         pub fn configure_cpu_pll_div_in(clocks: &mut ClockTree, new_selector: CpuPllDivInConfig) {
             let old_selector = clocks.cpu_pll_div_in.replace(new_selector);
