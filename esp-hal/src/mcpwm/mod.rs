@@ -188,15 +188,9 @@ pub struct PeripheralClockConfig {
 }
 
 impl PeripheralClockConfig {
-    /// Get a clock configuration with the given prescaler.
-    ///
-    /// With standard system clock configurations the input clock to the MCPWM
-    /// peripheral is `160 MHz`.
-    ///
-    /// The peripheral clock frequency is calculated as:
-    /// `peripheral_clock = input_clock / (prescaler + 1)`
-    pub fn with_prescaler(prescaler: u8) -> Self {
+    fn source_clock() -> u32 {
         let clocks = Clocks::get();
+
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 let source_clock = clocks.pwm_clock;
@@ -208,6 +202,19 @@ impl PeripheralClockConfig {
                 let source_clock = clocks.xtal_clock;
             }
         }
+
+        source_clock
+    }
+
+    /// Get a clock configuration with the given prescaler.
+    ///
+    /// With standard system clock configurations the input clock to the MCPWM
+    /// peripheral is `160 MHz`.
+    ///
+    /// The peripheral clock frequency is calculated as:
+    /// `peripheral_clock = input_clock / (prescaler + 1)`
+    pub fn with_prescaler(prescaler: u8) -> Self {
+        let source_clock = Self::source_clock();
 
         Self {
             frequency: source_clock / (prescaler as u32 + 1),
@@ -230,18 +237,7 @@ impl PeripheralClockConfig {
     /// `160 Mhz / 256`) are representable exactly. Other target frequencies
     /// will be rounded up to the next divisor.
     pub fn with_frequency(target_freq: Rate) -> Result<Self, FrequencyError> {
-        let clocks = Clocks::get();
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                let source_clock = clocks.pwm_clock;
-            } else if #[cfg(esp32c6)] {
-                let source_clock = clocks.crypto_clock;
-            } else if #[cfg(esp32s3)] {
-                let source_clock = clocks.crypto_pwm_clock;
-            } else if #[cfg(esp32h2)] {
-                let source_clock = clocks.xtal_clock;
-            }
-        }
+        let source_clock = Self::source_clock();
 
         if target_freq.as_hz() == 0 || target_freq > source_clock {
             return Err(FrequencyError);
