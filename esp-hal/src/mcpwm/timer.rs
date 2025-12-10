@@ -8,7 +8,7 @@ use core::marker::PhantomData;
 
 use super::PeripheralGuard;
 use crate::{
-    mcpwm::{FrequencyError, PeripheralClockConfig, PwmPeripheral},
+    mcpwm::{FrequencyError, PeripheralClockConfig, PwmClockGuard, PwmPeripheral},
     pac,
     time::Rate,
 };
@@ -21,14 +21,15 @@ use crate::{
 pub struct Timer<const TIM: u8, PWM> {
     pub(super) phantom: PhantomData<PWM>,
     _guard: PeripheralGuard,
+    _pwm_clock_guard: PwmClockGuard,
 }
 
 impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
-    pub(super) fn new() -> Self {
-        let guard = PeripheralGuard::new(PWM::peripheral());
+    pub(super) fn new(guard: PeripheralGuard) -> Self {
         Timer {
             phantom: PhantomData,
             _guard: guard,
+            _pwm_clock_guard: PwmClockGuard::new::<PWM>(),
         }
     }
 

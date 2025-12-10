@@ -70,6 +70,16 @@ impl PeripheralGuard {
     }
 }
 
+impl Clone for PeripheralGuard {
+    fn clone(&self) -> Self {
+        Self::new(self.peripheral)
+    }
+
+    fn clone_from(&mut self, _source: &Self) {
+        // This is a no-op since the ref count for P remains the same.
+    }
+}
+
 impl Drop for PeripheralGuard {
     fn drop(&mut self) {
         PeripheralClockControl::disable(self.peripheral);

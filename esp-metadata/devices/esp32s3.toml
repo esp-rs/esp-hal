@@ -182,7 +182,7 @@ clocks = { system_clocks = { clock_tree = [
         { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
         { name = "XTAL32K",  outputs = "XTAL32K_CLK" },
         { name = "RTC_SLOW", outputs = "RTC_SLOW_CLK" },
-    ] }
+    ] },
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
@@ -213,10 +213,14 @@ clocks = { system_clocks = { clock_tree = [
     { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
     { name = "Usb" },
     { name = "I2s1" },
-    { name = "Mcpwm1", template_params = { peripheral = "pwm1" } },
+    { name = "Mcpwm1", template_params = { peripheral = "pwm1" }, clocks = "Mcpwm0" },
     { name = "Twai0", template_params = { peripheral = "twai" } },
     { name = "I2cExt1" },
-    { name = "Mcpwm0", template_params = { peripheral = "pwm0" } },
+    { name = "Mcpwm0", template_params = { peripheral = "pwm0" }, clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", default = "CRYPTO_PWM_CLK", variants = [
+            { name = "CRYPTO_PWM_CLK", outputs = "CRYPTO_PWM_CLK" }
+        ] }
+    ] },
     { name = "Spi3" },
     { name = "Timg1", template_params = { peripheral = "timergroup1" }, clocks = "Timg0" },
     { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true, clocks = [

@@ -14,7 +14,7 @@ use core::marker::PhantomData;
 use super::PeripheralGuard;
 use crate::{
     gpio::interconnect::{OutputSignal, PeripheralOutput},
-    mcpwm::{PwmPeripheral, timer::Timer},
+    mcpwm::{PwmClockGuard, PwmPeripheral, timer::Timer},
     pac,
 };
 
@@ -170,12 +170,11 @@ impl DeadTimeCfg {
 pub struct Operator<'d, const OP: u8, PWM> {
     phantom: PhantomData<&'d PWM>,
     _guard: PeripheralGuard,
+    _pwm_clock_guard: PwmClockGuard,
 }
 
 impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
-    pub(super) fn new() -> Self {
-        let guard = PeripheralGuard::new(PWM::peripheral());
-
+    pub(super) fn new(guard: PeripheralGuard) -> Self {
         // Side note:
         // It would have been nice to deselect any timer reference on peripheral
         // initialization.
@@ -185,6 +184,7 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
         Operator {
             phantom: PhantomData,
             _guard: guard,
+            _pwm_clock_guard: PwmClockGuard::new::<PWM>(),
         }
     }
 
