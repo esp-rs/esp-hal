@@ -470,6 +470,12 @@ macro_rules! for_each_soc_xtal_options {
 ///     todo!()
 /// }
 ///
+/// // MCPWM_CLK
+///
+/// fn enable_mcpwm_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
 /// // TIMG0_FUNCTION_CLOCK
 ///
 /// fn enable_timg0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -743,10 +749,10 @@ macro_rules! define_clock_tree_types {
             rc_slow_clk_refcount: u32,
             rc_fast_div_clk_refcount: u32,
             apb_clk_refcount: u32,
-            crypto_pwm_clk_refcount: u32,
             pll_d2_refcount: u32,
             rtc_fast_clk_refcount: u32,
             low_power_clk_refcount: u32,
+            mcpwm_clk_refcount: u32,
             timg0_function_clock_refcount: u32,
             timg0_calibration_clock_refcount: u32,
             timg1_function_clock_refcount: u32,
@@ -846,10 +852,10 @@ macro_rules! define_clock_tree_types {
                 rc_slow_clk_refcount: 0,
                 rc_fast_div_clk_refcount: 0,
                 apb_clk_refcount: 0,
-                crypto_pwm_clk_refcount: 0,
                 pll_d2_refcount: 0,
                 rtc_fast_clk_refcount: 0,
                 low_power_clk_refcount: 0,
+                mcpwm_clk_refcount: 0,
                 timg0_function_clock_refcount: 0,
                 timg0_calibration_clock_refcount: 0,
                 timg1_function_clock_refcount: 0,
@@ -1054,38 +1060,30 @@ macro_rules! define_clock_tree_types {
         }
         pub fn configure_crypto_pwm_clk(clocks: &mut ClockTree, new_selector: CryptoPwmClkConfig) {
             let old_selector = clocks.crypto_pwm_clk.replace(new_selector);
-            if clocks.crypto_pwm_clk_refcount > 0 {
-                match new_selector {
-                    CryptoPwmClkConfig::Pll => request_pll_160m(clocks),
-                    CryptoPwmClkConfig::Cpu => request_cpu_clk(clocks),
-                }
-                configure_crypto_pwm_clk_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        CryptoPwmClkConfig::Pll => release_pll_160m(clocks),
-                        CryptoPwmClkConfig::Cpu => release_cpu_clk(clocks),
-                    }
-                }
-            } else {
-                configure_crypto_pwm_clk_impl(clocks, old_selector, new_selector);
+            match new_selector {
+                CryptoPwmClkConfig::Pll => request_pll_160m(clocks),
+                CryptoPwmClkConfig::Cpu => request_cpu_clk(clocks),
             }
-        }
-        pub fn request_crypto_pwm_clk(clocks: &mut ClockTree) {
-            if increment_reference_count(&mut clocks.crypto_pwm_clk_refcount) {
-                match unwrap!(clocks.crypto_pwm_clk) {
-                    CryptoPwmClkConfig::Pll => request_pll_160m(clocks),
-                    CryptoPwmClkConfig::Cpu => request_cpu_clk(clocks),
-                }
-                enable_crypto_pwm_clk_impl(clocks, true);
-            }
-        }
-        pub fn release_crypto_pwm_clk(clocks: &mut ClockTree) {
-            if decrement_reference_count(&mut clocks.crypto_pwm_clk_refcount) {
-                enable_crypto_pwm_clk_impl(clocks, false);
-                match unwrap!(clocks.crypto_pwm_clk) {
+            configure_crypto_pwm_clk_impl(clocks, old_selector, new_selector);
+            if let Some(old_selector) = old_selector {
+                match old_selector {
                     CryptoPwmClkConfig::Pll => release_pll_160m(clocks),
                     CryptoPwmClkConfig::Cpu => release_cpu_clk(clocks),
                 }
+            }
+        }
+        pub fn request_crypto_pwm_clk(clocks: &mut ClockTree) {
+            match unwrap!(clocks.crypto_pwm_clk) {
+                CryptoPwmClkConfig::Pll => request_pll_160m(clocks),
+                CryptoPwmClkConfig::Cpu => request_cpu_clk(clocks),
+            }
+            enable_crypto_pwm_clk_impl(clocks, true);
+        }
+        pub fn release_crypto_pwm_clk(clocks: &mut ClockTree) {
+            enable_crypto_pwm_clk_impl(clocks, false);
+            match unwrap!(clocks.crypto_pwm_clk) {
+                CryptoPwmClkConfig::Pll => release_pll_160m(clocks),
+                CryptoPwmClkConfig::Cpu => release_cpu_clk(clocks),
             }
         }
         pub fn crypto_pwm_clk_frequency(clocks: &mut ClockTree) -> u32 {
@@ -1330,6 +1328,21 @@ macro_rules! define_clock_tree_types {
                 LowPowerClkConfig::Xtal32k => xtal32k_clk_frequency(clocks),
                 LowPowerClkConfig::RtcSlow => rtc_slow_clk_frequency(clocks),
             }
+        }
+        pub fn request_mcpwm_clk(clocks: &mut ClockTree) {
+            if increment_reference_count(&mut clocks.mcpwm_clk_refcount) {
+                request_crypto_pwm_clk(clocks);
+                enable_mcpwm_clk_impl(clocks, true);
+            }
+        }
+        pub fn release_mcpwm_clk(clocks: &mut ClockTree) {
+            if decrement_reference_count(&mut clocks.mcpwm_clk_refcount) {
+                enable_mcpwm_clk_impl(clocks, false);
+                release_crypto_pwm_clk(clocks);
+            }
+        }
+        pub fn mcpwm_clk_frequency(clocks: &mut ClockTree) -> u32 {
+            crypto_pwm_clk_frequency(clocks)
         }
         pub fn configure_timg0_function_clock(
             clocks: &mut ClockTree,

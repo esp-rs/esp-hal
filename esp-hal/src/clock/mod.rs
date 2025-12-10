@@ -1058,17 +1058,9 @@ pub struct Clocks {
     /// XTAL clock frequency
     pub xtal_clock: Rate,
 
-    /// PWM clock frequency
-    #[cfg(esp32)]
-    pub pwm_clock: Rate,
-
     /// Crypto PWM  clock frequency
     #[cfg(esp32s3)]
     pub crypto_pwm_clock: Rate,
-
-    /// Crypto clock frequency
-    #[cfg(any(esp32c6, esp32h2))]
-    pub crypto_clock: Rate,
 }
 
 static mut ACTIVE_CLOCKS: Option<Clocks> = None;
@@ -1158,7 +1150,6 @@ impl Clocks {
                 apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
                 // FIXME: this assumes there is a crystal
                 xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
-                pwm_clock: Rate::from_hz(crate::soc::clocks::pll_f160m_clk_frequency(clocks)),
             }
         })
     }
@@ -1233,7 +1224,6 @@ impl Clocks {
             cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
             apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
             xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
-            crypto_clock: Rate::from_hz(crate::soc::clocks::hp_root_clk_frequency(clocks)),
         })
     }
 }
@@ -1254,7 +1244,6 @@ impl Clocks {
             cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
             apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
             xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
-            crypto_clock: Rate::from_hz(crate::soc::clocks::hp_root_clk_frequency(clocks)),
         })
     }
 }

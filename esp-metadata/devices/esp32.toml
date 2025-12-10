@@ -235,6 +235,12 @@ clocks = { system_clocks = { clock_tree = [
     #    { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
     #    { name = "RTC_SLOW", outputs = "RTC_SLOW_CLK" },
     #] }
+
+    # Peripheral root clocks
+    # LEDC_SCLK: The TRM is slightly confusing, there is a single mux in the peripheral selecting between APB and RTC_FAST.
+    { name = "MCPWM_CLK", type = "mux", default = "PLL_F160M", variants = [
+        { name = "PLL_F160M", outputs = "PLL_F160M_CLK" }
+    ] }
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },

@@ -411,6 +411,20 @@ macro_rules! for_each_soc_xtal_options {
 ///     todo!()
 /// }
 ///
+/// // MCPWM_CLK
+///
+/// fn enable_mcpwm_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_mcpwm_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<McpwmClkConfig>,
+///     _new_selector: McpwmClkConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // TIMG0_FUNCTION_CLOCK
 ///
 /// fn enable_timg0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -572,6 +586,17 @@ macro_rules! define_clock_tree_types {
             /// Selects `OSC_SLOW_CLK`.
             OscSlow,
         }
+        /// The list of clock signals that the `MCPWM_CLK` multiplexer can output.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum McpwmClkConfig {
+            /// Selects `PLL_F96M_CLK`.
+            PllF96m,
+            /// Selects `RC_FAST_CLK`.
+            RcFastClk,
+            /// Selects `XTAL_CLK`.
+            XtalClk,
+        }
         /// The list of clock signals that the `TIMG0_FUNCTION_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -604,6 +629,7 @@ macro_rules! define_clock_tree_types {
             apb_clk: Option<ApbClkConfig>,
             lp_fast_clk: Option<LpFastClkConfig>,
             lp_slow_clk: Option<LpSlowClkConfig>,
+            mcpwm_clk: Option<McpwmClkConfig>,
             timg0_function_clock: Option<Timg0FunctionClockConfig>,
             timg0_calibration_clock: Option<Timg0CalibrationClockConfig>,
             timg1_function_clock: Option<Timg0FunctionClockConfig>,
@@ -617,6 +643,7 @@ macro_rules! define_clock_tree_types {
             apb_clk_refcount: u32,
             lp_fast_clk_refcount: u32,
             lp_slow_clk_refcount: u32,
+            mcpwm_clk_refcount: u32,
             timg0_function_clock_refcount: u32,
             timg0_calibration_clock_refcount: u32,
             timg1_function_clock_refcount: u32,
@@ -655,6 +682,10 @@ macro_rules! define_clock_tree_types {
             pub fn lp_slow_clk(&self) -> Option<LpSlowClkConfig> {
                 self.lp_slow_clk
             }
+            /// Returns the current configuration of the MCPWM_CLK clock tree node
+            pub fn mcpwm_clk(&self) -> Option<McpwmClkConfig> {
+                self.mcpwm_clk
+            }
             /// Returns the current configuration of the TIMG0_FUNCTION_CLOCK clock tree node
             pub fn timg0_function_clock(&self) -> Option<Timg0FunctionClockConfig> {
                 self.timg0_function_clock
@@ -681,6 +712,7 @@ macro_rules! define_clock_tree_types {
                 apb_clk: None,
                 lp_fast_clk: None,
                 lp_slow_clk: None,
+                mcpwm_clk: None,
                 timg0_function_clock: None,
                 timg0_calibration_clock: None,
                 timg1_function_clock: None,
@@ -694,6 +726,7 @@ macro_rules! define_clock_tree_types {
                 apb_clk_refcount: 0,
                 lp_fast_clk_refcount: 0,
                 lp_slow_clk_refcount: 0,
+                mcpwm_clk_refcount: 0,
                 timg0_function_clock_refcount: 0,
                 timg0_calibration_clock_refcount: 0,
                 timg1_function_clock_refcount: 0,
@@ -1014,6 +1047,53 @@ macro_rules! define_clock_tree_types {
                 LpSlowClkConfig::OscSlow => osc_slow_clk_frequency(clocks),
             }
         }
+        pub fn configure_mcpwm_clk(clocks: &mut ClockTree, new_selector: McpwmClkConfig) {
+            let old_selector = clocks.mcpwm_clk.replace(new_selector);
+            if clocks.mcpwm_clk_refcount > 0 {
+                match new_selector {
+                    McpwmClkConfig::PllF96m => request_pll_f96m_clk(clocks),
+                    McpwmClkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    McpwmClkConfig::XtalClk => request_xtal_clk(clocks),
+                }
+                configure_mcpwm_clk_impl(clocks, old_selector, new_selector);
+                if let Some(old_selector) = old_selector {
+                    match old_selector {
+                        McpwmClkConfig::PllF96m => release_pll_f96m_clk(clocks),
+                        McpwmClkConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        McpwmClkConfig::XtalClk => release_xtal_clk(clocks),
+                    }
+                }
+            } else {
+                configure_mcpwm_clk_impl(clocks, old_selector, new_selector);
+            }
+        }
+        pub fn request_mcpwm_clk(clocks: &mut ClockTree) {
+            if increment_reference_count(&mut clocks.mcpwm_clk_refcount) {
+                match unwrap!(clocks.mcpwm_clk) {
+                    McpwmClkConfig::PllF96m => request_pll_f96m_clk(clocks),
+                    McpwmClkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    McpwmClkConfig::XtalClk => request_xtal_clk(clocks),
+                }
+                enable_mcpwm_clk_impl(clocks, true);
+            }
+        }
+        pub fn release_mcpwm_clk(clocks: &mut ClockTree) {
+            if decrement_reference_count(&mut clocks.mcpwm_clk_refcount) {
+                enable_mcpwm_clk_impl(clocks, false);
+                match unwrap!(clocks.mcpwm_clk) {
+                    McpwmClkConfig::PllF96m => release_pll_f96m_clk(clocks),
+                    McpwmClkConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    McpwmClkConfig::XtalClk => release_xtal_clk(clocks),
+                }
+            }
+        }
+        pub fn mcpwm_clk_frequency(clocks: &mut ClockTree) -> u32 {
+            match unwrap!(clocks.mcpwm_clk) {
+                McpwmClkConfig::PllF96m => pll_f96m_clk_frequency(clocks),
+                McpwmClkConfig::RcFastClk => rc_fast_clk_frequency(clocks),
+                McpwmClkConfig::XtalClk => xtal_clk_frequency(clocks),
+            }
+        }
         pub fn configure_timg0_function_clock(
             clocks: &mut ClockTree,
             new_selector: Timg0FunctionClockConfig,
@@ -1238,6 +1318,8 @@ macro_rules! define_clock_tree_types {
             pub lp_fast_clk: Option<LpFastClkConfig>,
             /// `LP_SLOW_CLK` configuration.
             pub lp_slow_clk: Option<LpSlowClkConfig>,
+            /// `MCPWM_CLK` configuration.
+            pub mcpwm_clk: Option<McpwmClkConfig>,
         }
         impl ClockConfig {
             fn apply(&self) {
@@ -1262,6 +1344,9 @@ macro_rules! define_clock_tree_types {
                     }
                     if let Some(config) = self.lp_slow_clk {
                         configure_lp_slow_clk(clocks, config);
+                    }
+                    if let Some(config) = self.mcpwm_clk {
+                        configure_mcpwm_clk(clocks, config);
                     }
                 });
             }

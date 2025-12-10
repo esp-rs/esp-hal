@@ -502,6 +502,12 @@ macro_rules! for_each_soc_xtal_options {
 ///     todo!()
 /// }
 ///
+/// // MCPWM_CLK
+///
+/// fn enable_mcpwm_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
 /// // TIMG0_CALIBRATION_CLOCK
 ///
 /// fn enable_timg0_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -846,7 +852,6 @@ macro_rules! define_clock_tree_types {
             timg1_calibration_clock: Option<Timg0CalibrationClockConfig>,
             pll_clk_refcount: u32,
             rc_fast_clk_refcount: u32,
-            pll_f160m_clk_refcount: u32,
             apb_clk_refcount: u32,
             ref_tick_refcount: u32,
             xtal32k_clk_refcount: u32,
@@ -854,6 +859,7 @@ macro_rules! define_clock_tree_types {
             rc_fast_div_clk_refcount: u32,
             rtc_slow_clk_refcount: u32,
             rtc_fast_clk_refcount: u32,
+            mcpwm_clk_refcount: u32,
             timg0_calibration_clock_refcount: u32,
             timg1_calibration_clock_refcount: u32,
         }
@@ -957,7 +963,6 @@ macro_rules! define_clock_tree_types {
                 timg1_calibration_clock: None,
                 pll_clk_refcount: 0,
                 rc_fast_clk_refcount: 0,
-                pll_f160m_clk_refcount: 0,
                 apb_clk_refcount: 0,
                 ref_tick_refcount: 0,
                 xtal32k_clk_refcount: 0,
@@ -965,6 +970,7 @@ macro_rules! define_clock_tree_types {
                 rc_fast_div_clk_refcount: 0,
                 rtc_slow_clk_refcount: 0,
                 rtc_fast_clk_refcount: 0,
+                mcpwm_clk_refcount: 0,
                 timg0_calibration_clock_refcount: 0,
                 timg1_calibration_clock_refcount: 0,
             });
@@ -1028,16 +1034,12 @@ macro_rules! define_clock_tree_types {
             8000000
         }
         pub fn request_pll_f160m_clk(clocks: &mut ClockTree) {
-            if increment_reference_count(&mut clocks.pll_f160m_clk_refcount) {
-                request_pll_clk(clocks);
-                enable_pll_f160m_clk_impl(clocks, true);
-            }
+            request_pll_clk(clocks);
+            enable_pll_f160m_clk_impl(clocks, true);
         }
         pub fn release_pll_f160m_clk(clocks: &mut ClockTree) {
-            if decrement_reference_count(&mut clocks.pll_f160m_clk_refcount) {
-                enable_pll_f160m_clk_impl(clocks, false);
-                release_pll_clk(clocks);
-            }
+            enable_pll_f160m_clk_impl(clocks, false);
+            release_pll_clk(clocks);
         }
         pub fn pll_f160m_clk_frequency(clocks: &mut ClockTree) -> u32 {
             160000000
@@ -1529,6 +1531,21 @@ macro_rules! define_clock_tree_types {
                 RtcFastClkConfig::Xtal => xtal_div_clk_frequency(clocks),
                 RtcFastClkConfig::Rc => rc_fast_clk_frequency(clocks),
             }
+        }
+        pub fn request_mcpwm_clk(clocks: &mut ClockTree) {
+            if increment_reference_count(&mut clocks.mcpwm_clk_refcount) {
+                request_pll_f160m_clk(clocks);
+                enable_mcpwm_clk_impl(clocks, true);
+            }
+        }
+        pub fn release_mcpwm_clk(clocks: &mut ClockTree) {
+            if decrement_reference_count(&mut clocks.mcpwm_clk_refcount) {
+                enable_mcpwm_clk_impl(clocks, false);
+                release_pll_f160m_clk(clocks);
+            }
+        }
+        pub fn mcpwm_clk_frequency(clocks: &mut ClockTree) -> u32 {
+            pll_f160m_clk_frequency(clocks)
         }
         pub fn configure_timg0_calibration_clock(
             clocks: &mut ClockTree,

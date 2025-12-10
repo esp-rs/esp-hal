@@ -636,6 +636,12 @@ fn configure_rtc_fast_clk_impl(
     });
 }
 
+// MCPWM_CLK
+
+fn enable_mcpwm_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
 // TIMG0_CALIBRATION_CLOCK
 
 fn enable_timg0_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
