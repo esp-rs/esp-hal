@@ -2,8 +2,9 @@
 name: Feature request
 about: Suggest an idea for this project
 title: ''
-labels: ['feature request', 'bug jury']
+labels: ["feature request", "bug jury"]
 assignees: ''
+
 ---
 
 ## Motivations
