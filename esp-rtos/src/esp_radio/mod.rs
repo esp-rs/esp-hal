@@ -96,10 +96,9 @@ impl esp_radio_rtos_driver::SchedulerImplementation for Scheduler {
     }
 
     fn current_task_thread_semaphore(&self) -> SemaphorePtr {
-        task::with_current_task(|task| {
-            *task.thread_local.thread_semaphore.get_or_insert_with(|| {
-                SemaphoreHandle::new(SemaphoreKind::Counting { max: 1, initial: 0 }).leak()
-            })
+        let task = unsafe { self.current_task().as_mut() };
+        *task.thread_local.thread_semaphore.get_or_insert_with(|| {
+            SemaphoreHandle::new(SemaphoreKind::Counting { max: 1, initial: 0 }).leak()
         })
     }
 

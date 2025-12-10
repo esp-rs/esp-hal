@@ -1,7 +1,7 @@
 use esp_hal::system::Cpu;
 
 use crate::{
-    scheduler::CpuSchedulerState,
+    scheduler::CpuState,
     task::{TaskExt, TaskPtr, TaskQueue, TaskReadyQueueElement, TaskState},
 };
 
@@ -161,7 +161,7 @@ impl RunQueue {
     #[esp_hal::ram]
     pub(crate) fn mark_task_ready(
         &mut self,
-        _state: &[CpuSchedulerState; Cpu::COUNT],
+        _state: &[CpuState; Cpu::COUNT],
         ready_task: TaskPtr,
     ) -> RunSchedulerOn {
         let priority = ready_task.priority(self);
@@ -182,7 +182,7 @@ impl RunQueue {
         cfg_if::cfg_if! {
             if #[cfg(multi_core)] {
                 let run_on = if _state[1].initialized {
-                    self.select_scheduler_trigger_multi_core(_state, ready_task)
+                    self.select_scheduler_trigger_multi_core(ready_task)
                 } else {
                     self.select_scheduler_trigger_single_core(priority_n)
                 };
@@ -205,28 +205,27 @@ impl RunQueue {
 
     #[cfg(multi_core)]
     #[esp_hal::ram]
-    fn select_scheduler_trigger_multi_core(
-        &mut self,
-        state: &[CpuSchedulerState; Cpu::COUNT],
-        task: TaskPtr,
-    ) -> RunSchedulerOn {
+    fn select_scheduler_trigger_multi_core(&mut self, task: TaskPtr) -> RunSchedulerOn {
+        use crate::scheduler::SchedulerState;
+
         // We're running both schedulers, try to figure out where to schedule the context switch.
         let task_ref = unsafe { task.as_ref() };
         let ready_task_prio = task_ref.priority;
 
         let (target_cpu, target_cpu_prio) = if let Some(pinned_to) = task_ref.pinned_to {
             // Task is pinned, we have no choice in our target
-            let cpu = pinned_to as usize;
-            (cpu, state[cpu].current_priority())
+            let target_cpu = pinned_to as usize;
+            (
+                target_cpu,
+                SchedulerState::priority_of_core(self, target_cpu),
+            )
         } else {
             // Task is not pinned, pick the core that runs the lower priority task.
-
-            // Written like this because `state.iter()` leaves an unnecessary panic in the code.
-            let mut target = (0, state[0].current_priority());
-            #[allow(clippy::needless_range_loop)]
+            let mut target = (0, SchedulerState::priority_of_core(self, 0));
             for i in 1..Cpu::COUNT {
-                if state[i].current_priority() < target.1 {
-                    target = (i, state[i].current_priority());
+                let core_prio = SchedulerState::priority_of_core(self, i);
+                if core_prio < target.1 {
+                    target = (i, core_prio);
                 }
             }
             target
