@@ -534,12 +534,6 @@ fn enable_apb_clk_80m_impl(_clocks: &mut ClockTree, _en: bool) {
 // XTAL32K_CLK
 
 fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
-    // This bit only enables the clock for the digital core, what about RTC? Should we split the
-    // clock node in two?
-    LPWR::regs()
-        .clk_conf()
-        .modify(|_, w| w.dig_xtal32k_en().bit(en));
-
     // RTCIO could be configured to allow an external oscillator to be used. We could model this
     // with a MUX, probably, but this is omitted for now for simplicity.
 
@@ -566,17 +560,24 @@ fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
         w.x32p_mux_sel().bit(en);
         w.xpd_xtal_32k().bit(en)
     });
+
+    // Enable for digital part
+    LPWR::regs()
+        .clk_conf()
+        .modify(|_, w| w.dig_xtal32k_en().bit(en));
 }
 
 // RC_SLOW_CLK
 
-fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // SCK_DCAP value controls tuning of 150k clock. The higher the value of DCAP, the lower the
-    // frequency. There is no separate enable bit, just make sure the calibration value is set.
-    const RTC_CNTL_SCK_DCAP_DEFAULT: u8 = 255;
-    LPWR::regs()
-        .reg()
-        .modify(|_, w| unsafe { w.sck_dcap().bits(RTC_CNTL_SCK_DCAP_DEFAULT) });
+fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    if en {
+        // SCK_DCAP value controls tuning of 150k clock. The higher the value of DCAP, the lower the
+        // frequency. There is no separate enable bit, just make sure the calibration value is set.
+        const RTC_CNTL_SCK_DCAP_DEFAULT: u8 = 255;
+        LPWR::regs()
+            .reg()
+            .modify(|_, w| unsafe { w.sck_dcap().bits(RTC_CNTL_SCK_DCAP_DEFAULT) });
+    }
 }
 
 // RC_FAST_DIV_CLK

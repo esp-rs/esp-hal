@@ -248,6 +248,11 @@ fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
 
         w.xpd_xtal_32k().bit(en)
     });
+
+    // Enable for digital part
+    LPWR::regs()
+        .clk_conf()
+        .modify(|_, w| w.dig_xtal32k_en().bit(en));
 }
 
 // RC_SLOW_CLK
