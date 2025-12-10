@@ -509,6 +509,13 @@ fn search_nearest(v: i32, k: i32, max: i32) -> u8 {
     31
 }
 
+/// Returns whether the eFuse data contains values for PVT (Process/Voltage/Temperature)
+/// calibration.
+///
+/// The calibration is meant to widen the range of conditions under which the
+/// chip can operate reliably. Based on factory calibration, it implements linear
+/// search for `dbias` values which produce the closest minimum voltage applied to the RTC
+/// and digital power domains.
 fn pvt_supported() -> bool {
     let (blk_major, blk_minor) = Efuse::block_version();
 
