@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ble::mac` to get the MAC address of the device (#4485)
 - `last_calibration_result` to get the result of the last calibration (#4479)
 - `BleInitError` for BLE init failures and `Internal`, `WrongClockConfig`, `SchedulerNotInitialized` and `Adc2IsUsed` variants to `WifiError (#4482)
+- `wifi::csi::WifiCsiInfo` wraps `wifi::wifi_csi_info_t` (#4643)
 
 ### Changed
 
@@ -41,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `serde` feature has been removed (#4435)
 - `Controller` struct and `InitializationError::InterruptsDisabled` enum variant have been removed (#4482)
+- `wifi::wifi_csi_info_t` is no longer exposed to the public API (#4643)
 
 ## [v0.17.0] - 2025-10-30
 
