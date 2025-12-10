@@ -2,7 +2,7 @@
 name: Bug report
 about: Create a report to help us improve
 title: ''
-labels: ["bug", "status:needs-attention"]
+labels: ["bug", "bug jury"]
 assignees: ''
 
 ---
@@ -28,4 +28,4 @@ assignees: ''
 ## Environment
 
 - Target device: [e.g. ESP32-S3] <!-- Use `espflash board-info` to get the target device iformation. -->
-- Crate name and version: [e.g. esp-hal 0.20.0]
+- Crate name and version: [e.g. esp-hal 1.0.0]
