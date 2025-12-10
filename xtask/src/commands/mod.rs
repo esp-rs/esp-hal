@@ -19,6 +19,8 @@ pub mod generate_report;
 pub(crate) mod generate_rom_symbols;
 mod release;
 mod run;
+#[cfg(feature = "rel-check")]
+pub mod relcheck;
 
 // ----------------------------------------------------------------------------
 // Subcommand Arguments

@@ -29,4 +29,6 @@ exclude  = [
     "xtensa-lx",
     "xtensa-lx-rt",
     "xtensa-lx-rt-proc-macros",
+
+    "compile-tests",
 ]
