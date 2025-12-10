@@ -57,6 +57,10 @@ enum Cli {
     #[cfg(feature = "report")]
     /// Generate reports from CI data.
     GenerateReport(generate_report::ReportArgs),
+    /// Tasks for checking compile tests with a local registry.
+    #[cfg(feature = "rel-check")]
+    #[clap(subcommand)]
+    RelCheck(relcheck::RelCheckCmds),
 }
 
 #[derive(Debug, Args)]
@@ -224,6 +228,8 @@ fn main() -> Result<()> {
         Cli::CheckGlobalSymbols(args) => check_global_symbols(&args.chips),
         #[cfg(feature = "report")]
         Cli::GenerateReport(args) => generate_report::generate_report(&workspace, args),
+        #[cfg(feature = "rel-check")]
+        Cli::RelCheck(relcheck) => relcheck::run_rel_check(relcheck),
     }
 }
 

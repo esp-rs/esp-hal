@@ -17,6 +17,8 @@ mod check_changelog;
 pub mod generate_report;
 mod release;
 mod run;
+#[cfg(feature = "rel-check")]
+pub mod relcheck;
 
 // ----------------------------------------------------------------------------
 // Subcommand Arguments
