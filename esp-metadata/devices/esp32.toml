@@ -118,10 +118,11 @@ memory_map = { ranges = [
 #
 # `clocks` in a peripheral clock definition can either be a different `peripheral_clocks` entry (string), or a new definition (array) that uses the same syntax as `system_clocks` above.
 clocks = { system_clocks = { clock_tree = [
-    { name = "XTAL_CLK",     type = "source",                    values = "26, 40",                     output = "VALUE * 1_000_000", always_on = true }, # 2-40MHz, always on? sw ability to measure using an internal RC clock
-    { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", values = "320, 480",                   output = "VALUE * 1_000_000", reject = "VALUE == 480_000_000 && CPU_PLL_DIV == 4" },
-    { name = "APLL_CLK",    type = "derived", from = "PLL_CLK",  values = "16_000_000 ..= 128_000_000", output = "VALUE" },
-    { name = "RC_FAST_CLK", type = "source",  output = "8_000_000" }, # this is supposed to be adjustable using RTC_CNTL_CK8M_DIV_SEL
+    { name = "XTAL_CLK",      type = "source",                     values = "26, 40",                     output = "VALUE * 1_000_000", always_on = true }, # 2-40MHz, always on? sw ability to measure using an internal RC clock
+    { name = "PLL_CLK",       type = "derived", from = "XTAL_CLK", values = "320, 480",                   output = "VALUE * 1_000_000", reject = "VALUE == 480_000_000 && CPU_PLL_DIV == 4" },
+    { name = "APLL_CLK",      type = "derived", from = "PLL_CLK",  values = "16_000_000 ..= 128_000_000", output = "VALUE" },
+    { name = "RC_FAST_CLK",   type = "source",  output = "8_000_000" }, # this is supposed to be adjustable using RTC_CNTL_CK8M_DIV_SEL
+    { name = "PLL_F160M_CLK", type = "derived", from = "PLL_CLK", output = "160_000_000" },
 
     # CPU and related clocks
     #
@@ -234,6 +235,12 @@ clocks = { system_clocks = { clock_tree = [
     #    { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
     #    { name = "RTC_SLOW", outputs = "RTC_SLOW_CLK" },
     #] }
+
+    # Peripheral root clocks
+    # LEDC_SCLK: The TRM is slightly confusing, there is a single mux in the peripheral selecting between APB and RTC_FAST.
+    { name = "MCPWM_CLK", type = "mux", default = "PLL_F160M", variants = [
+        { name = "PLL_F160M", outputs = "PLL_F160M_CLK" }
+    ] }
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },

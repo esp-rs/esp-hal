@@ -182,6 +182,11 @@ clocks = { system_clocks = { clock_tree = [
         { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
         { name = "XTAL32K",  outputs = "XTAL32K_CLK" },
         { name = "RTC_SLOW", outputs = "RTC_SLOW_CLK" },
+    ] },
+
+    # Peripheral root clocks
+    { name = "MCPWM_CLK", type = "mux", default = "CRYPTO_PWM_CLK", variants = [
+        { name = "CRYPTO_PWM_CLK", outputs = "CRYPTO_PWM_CLK" }
     ] }
 ] }, peripheral_clocks = { templates = [
     # templates

@@ -128,7 +128,6 @@ use crate::{
     Blocking,
     DriverMode,
     asynch::AtomicWaker,
-    clock::Clocks,
     gpio::{
         DriveMode,
         InputSignal,
@@ -1784,8 +1783,10 @@ impl Driver<'_> {
     fn set_frequency(&self, clock_config: &Config) -> Result<(), ConfigError> {
         let timeout = clock_config.timeout;
 
-        let clocks = Clocks::get();
-        let source_clk = clocks.i2c_clock.as_hz();
+        let source_clk = crate::soc::clocks::ClockTree::with(|clocks| {
+            crate::soc::clocks::apb_clk_frequency(clocks)
+        });
+
         let bus_freq = clock_config.frequency.as_hz();
 
         let half_cycle: u32 = source_clk / bus_freq / 2;
@@ -1860,8 +1861,11 @@ impl Driver<'_> {
     fn set_frequency(&self, clock_config: &Config) -> Result<(), ConfigError> {
         let timeout = clock_config.timeout;
 
-        let clocks = Clocks::get();
-        let source_clk = clocks.apb_clock.as_hz();
+        // TODO: could be REF_TICK
+        let source_clk = crate::soc::clocks::ClockTree::with(|clocks| {
+            crate::soc::clocks::apb_clk_frequency(clocks)
+        });
+
         let bus_freq = clock_config.frequency.as_hz();
 
         let half_cycle: u32 = source_clk / bus_freq / 2;
@@ -1915,8 +1919,10 @@ impl Driver<'_> {
     fn set_frequency(&self, clock_config: &Config) -> Result<(), ConfigError> {
         let timeout = clock_config.timeout;
 
-        let clocks = Clocks::get();
-        let source_clk = clocks.xtal_clock.as_hz();
+        let source_clk = crate::soc::clocks::ClockTree::with(|clocks| {
+            crate::soc::clocks::xtal_clk_frequency(clocks)
+        });
+
         let bus_freq = clock_config.frequency.as_hz();
 
         let clkm_div: u32 = source_clk / (bus_freq * 1024) + 1;

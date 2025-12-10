@@ -192,13 +192,6 @@ clocks = { system_clocks = { clock_tree = [
         { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
     ] },
 
-    # TODO: MCPWM divider
-    { name = "MCPWM_CLK", type = "mux", variants = [
-        { name = "PLL_F160M",   outputs = "PLL_F160M" },
-        { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
-        { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
-    ] },
-
     # LP clocks
     { name = "XTAL_D2_CLK", type = "divider", output = "XTAL_CLK / 2" },
     { name = "LP_FAST_CLK", type = "mux", variants = [
@@ -212,6 +205,14 @@ clocks = { system_clocks = { clock_tree = [
     ] },
     # LP_DYN_SLOW_CLK is LP_SLOW_CLK
     # LP_DYN_FAST_CLK is automatically managed based on power mode. Not sure how to model it, some LP peripherals need it.
+
+    # Peripheral root clocks
+    # TODO: MCPWM divider?
+    { name = "MCPWM_CLK", type = "mux", variants = [
+        { name = "PLL_F160M",   outputs = "PLL_F160M" },
+        { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+        { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+    ] },
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "default_clk_en_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },

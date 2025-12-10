@@ -47,6 +47,7 @@ impl CpuClock {
                 apb_clk: Some(ApbClkConfig::new(0)),
                 lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
                 lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+                mcpwm_clk: Some(McpwmClkConfig::PllF96m),
             },
             CpuClock::Custom(clock_config) => clock_config,
         };
@@ -340,6 +341,28 @@ fn configure_lp_slow_clk_impl(
             LpSlowClkConfig::RcSlow => 0,
             LpSlowClkConfig::Xtal32kClk => 1,
             LpSlowClkConfig::OscSlow => 2,
+        })
+    });
+}
+
+// MCPWM_CLK
+
+fn enable_mcpwm_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    PCR::regs()
+        .pwm_clk_conf()
+        .modify(|_, w| w.pwm_clkm_en().bit(en));
+}
+
+fn configure_mcpwm_clk_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<McpwmClkConfig>,
+    new_selector: McpwmClkConfig,
+) {
+    PCR::regs().pwm_clk_conf().modify(|_, w| unsafe {
+        w.pwm_clkm_sel().bits(match new_selector {
+            McpwmClkConfig::XtalClk => 0,
+            McpwmClkConfig::RcFastClk => 1,
+            McpwmClkConfig::PllF96m => 2,
         })
     });
 }

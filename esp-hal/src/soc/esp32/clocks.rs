@@ -337,6 +337,12 @@ fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {
     });
 }
 
+// PLL_F160M_CLK
+
+fn enable_pll_f160m_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
 // CPU_PLL_DIV_IN
 
 // Not an actual MUX, used to allow configuring the DIVA divider as one block.
@@ -628,6 +634,12 @@ fn configure_rtc_fast_clk_impl(
         RtcFastClkConfig::Xtal => w.fast_clk_rtc_sel().xtal_div_4(),
         RtcFastClkConfig::Rc => w.fast_clk_rtc_sel().ck8m(),
     });
+}
+
+// MCPWM_CLK
+
+fn enable_mcpwm_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
 }
 
 // TIMG0_CALIBRATION_CLOCK

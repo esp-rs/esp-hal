@@ -692,6 +692,12 @@ fn configure_low_power_clk_impl(
     });
 }
 
+// MCPWM_CLK
+
+fn enable_mcpwm_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
 // TIMG0_FUNCTION_CLOCK
 
 // Note that the function clock is a pre-requisite of the timer, but does not enable the counter.
