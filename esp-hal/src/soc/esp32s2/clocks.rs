@@ -340,6 +340,7 @@ fn configure_cpu_clk_impl(
         CpuClkConfig::Apll => 3,
         CpuClkConfig::Pll => 1,
     };
+    let clock_source_sel1_bit = clocks.pll_clk == Some(PllClkConfig::_480);
     let clock_source_sel2_bit = match (clocks.pll_clk, clocks.cpu_pll_div) {
         (Some(PllClkConfig::_480), Some(CpuPllDivConfig::_6)) => 0,
         (Some(PllClkConfig::_480), Some(CpuPllDivConfig::_3)) => 1,
@@ -355,11 +356,12 @@ fn configure_cpu_clk_impl(
 
     ensure_voltage_raised(clocks);
 
-    SYSTEM::regs().cpu_per_conf().modify(|_, w| {
-        unsafe { w.cpuperiod_sel().bits(clock_source_sel2_bit) };
-        w.pll_freq_sel()
-            .bit(clocks.pll_clk == Some(PllClkConfig::_480))
-    });
+    if new_selector == CpuClkConfig::Pll {
+        SYSTEM::regs().cpu_per_conf().modify(|_, w| {
+            unsafe { w.cpuperiod_sel().bits(clock_source_sel2_bit) };
+            w.pll_freq_sel().bit(clock_source_sel1_bit)
+        });
+    }
 
     SYSTEM::regs()
         .sysclk_conf()
@@ -504,8 +506,10 @@ fn configure_rtc_fast_clk_impl(
 
 // TIMG0_FUNCTION_CLOCK
 
-fn enable_timg0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do, timer clocks are enabled per channel separately.
+// Note that the function clock is a pre-requisite of the timer, but does not enable the counter.
+
+fn enable_timg0_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
+    TIMG0::regs().regclk().modify(|_, w| w.clk_en().bit(en));
 }
 
 fn configure_timg0_function_clock_impl(
@@ -552,8 +556,8 @@ fn configure_timg0_calibration_clock_impl(
 
 // TIMG1_FUNCTION_CLOCK
 
-fn enable_timg1_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do, timer clocks are enabled per channel separately.
+fn enable_timg1_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
+    TIMG1::regs().regclk().modify(|_, w| w.clk_en().bit(en));
 }
 
 fn configure_timg1_function_clock_impl(

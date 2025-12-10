@@ -1,4 +1,4 @@
-//! Clock tree definitions and implementations for ESP32-C3.
+//! Clock tree definitions and implementations for ESP32-S3.
 //!
 //! Remarks:
 //! - Enabling a clock node assumes it has first been configured. Some fixed clock nodes don't need
@@ -16,7 +16,7 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
-    peripherals::{APB_CTRL, I2C_ANA_MST, LPWR, SYSTEM, TIMG0, TIMG1},
+    peripherals::{I2C_ANA_MST, LPWR, SYSTEM, TIMG0, TIMG1},
     soc::regi2c,
     time::Rate,
 };
@@ -36,6 +36,7 @@ pub(crate) enum CpuClock {
     #[default]
     _80MHz,
     _160MHz,
+    _240MHz,
     Custom(ClockConfig),
 }
 
@@ -62,6 +63,17 @@ impl CpuClock {
                 system_pre_div: None,
                 pll_clk: Some(PllClkConfig::_480),
                 cpu_pll_div_out: Some(CpuPllDivOutConfig::_160),
+                cpu_clk: Some(CpuClkConfig::Pll),
+                rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
+                rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+                rtc_fast_clk: Some(RtcFastClkConfig::Rc),
+                low_power_clk: Some(LowPowerClkConfig::RtcSlow),
+            },
+            CpuClock::_240MHz => ClockConfig {
+                xtal_clk: None,
+                system_pre_div: None,
+                pll_clk: Some(PllClkConfig::_480),
+                cpu_pll_div_out: Some(CpuPllDivOutConfig::_240),
                 cpu_clk: Some(CpuClkConfig::Pll),
                 rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
                 rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
@@ -120,20 +132,11 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
         return;
     }
 
-    // Digital part
-    let pll_freq = unwrap!(clocks.pll_clk);
-    let xtal_freq = unwrap!(clocks.xtal_clk);
-    SYSTEM::regs()
-        .cpu_per_conf()
-        .modify(|_, w| w.pll_freq_sel().bit(pll_freq == PllClkConfig::_480));
+    ensure_voltage_raised(clocks);
 
     // Analog part
-
-    // Start BBPLL self-calibration
-    I2C_ANA_MST::regs().ana_conf0().modify(|_, w| {
-        w.bbpll_stop_force_high().clear_bit();
-        w.bbpll_stop_force_low().set_bit()
-    });
+    let pll_freq = unwrap!(clocks.pll_clk);
+    let xtal_freq = unwrap!(clocks.xtal_clk);
 
     let div_ref: u8;
     let div7_0: u8;
@@ -141,7 +144,7 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
     let dr3: u8;
     let dchgp: u8;
     let dcur: u8;
-    let dbias: u8;
+    let dbias = 3;
     match pll_freq {
         PllClkConfig::_480 => {
             // Configure 480M PLL
@@ -154,7 +157,6 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
                     dr3 = 0;
                     dchgp = 5;
                     dcur = 3;
-                    dbias = 2;
                 }
             }
 
@@ -172,7 +174,6 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
                     dr3 = 0;
                     dchgp = 5;
                     dcur = 3;
-                    dbias = 2;
                 }
             }
 
@@ -187,9 +188,8 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
 
     let i2c_bbpll_lref = (dchgp << I2C_BBPLL_OC_DCHGP_LSB) | div_ref;
 
-    // Weird, that the last two writes flip these values...
     let i2c_bbpll_dcur =
-        (2 << I2C_BBPLL_OC_DLREF_SEL_LSB) | (1 << I2C_BBPLL_OC_DHREF_SEL_LSB) | dcur;
+        (1 << I2C_BBPLL_OC_DLREF_SEL_LSB) | (3 << I2C_BBPLL_OC_DHREF_SEL_LSB) | dcur;
 
     regi2c::I2C_BBPLL_OC_REF.write_reg(i2c_bbpll_lref);
     regi2c::I2C_BBPLL_OC_DIV_REG.write_reg(div7_0);
@@ -197,8 +197,31 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
     regi2c::I2C_BBPLL_OC_DR3.write_field(dr3);
     regi2c::I2C_BBPLL_REG6.write_reg(i2c_bbpll_dcur);
     regi2c::I2C_BBPLL_OC_VCO_DBIAS.write_field(dbias);
-    regi2c::I2C_BBPLL_OC_DHREF_SEL.write_field(2);
-    regi2c::I2C_BBPLL_OC_DLREF_SEL.write_field(1);
+
+    // Start BBPLL self-calibration
+    I2C_ANA_MST::regs().ana_conf0().modify(|_, w| {
+        w.bbpll_stop_force_high().clear_bit();
+        w.bbpll_stop_force_low().set_bit()
+    });
+
+    // WAIT CALIBRATION DONE
+    while I2C_ANA_MST::regs()
+        .ana_conf0()
+        .read()
+        .bbpll_cal_done()
+        .bit_is_clear()
+    {}
+
+    // workaround bbpll calibration might stop early
+    crate::rom::ets_delay_us(10);
+
+    // BBPLL CALIBRATION STOP
+    I2C_ANA_MST::regs().ana_conf0().modify(|_, w| {
+        w.bbpll_stop_force_high().set_bit();
+        w.bbpll_stop_force_low().clear_bit()
+    });
+
+    ensure_voltage_minimal(clocks);
 }
 
 fn configure_pll_clk_impl(_clocks: &mut ClockTree, _config: PllClkConfig) {
@@ -210,7 +233,7 @@ fn configure_pll_clk_impl(_clocks: &mut ClockTree, _config: PllClkConfig) {
 
 fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {
     // XPD_RC_OSCILLATOR exists but we'll manage that separately
-    const RTC_CNTL_FOSC_DFREQ_DEFAULT: u8 = 172;
+    const RTC_CNTL_FOSC_DFREQ_DEFAULT: u8 = 100;
     LPWR::regs().clk_conf().modify(|_, w| {
         // Confusing CK8M naming inherited from ESP32?
 
@@ -248,6 +271,9 @@ fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
 
         w.xpd_xtal_32k().bit(en)
     });
+    LPWR::regs()
+        .clk_conf()
+        .modify(|_, w| w.dig_xtal32k_en().bit(en));
 }
 
 // RC_SLOW_CLK
@@ -258,7 +284,7 @@ fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, en: bool) {
         // frequency. There is no separate enable bit, just make sure the calibration value is set.
         const RTC_CNTL_SCK_DCAP_DEFAULT: u8 = 255;
         LPWR::regs()
-            .rtc_cntl()
+            .rtc()
             .modify(|_, w| unsafe { w.sck_dcap().bits(RTC_CNTL_SCK_DCAP_DEFAULT) });
 
         // Also configure the divider here to its usual value of 1.
@@ -309,7 +335,7 @@ fn enable_system_pre_div_impl(_clocks: &mut ClockTree, _en: bool) {
 }
 
 fn configure_system_pre_div_impl(_clocks: &mut ClockTree, new_config: SystemPreDivConfig) {
-    APB_CTRL::regs()
+    SYSTEM::regs()
         .sysclk_conf()
         .modify(|_, w| unsafe { w.pre_div_cnt().bits(new_config.value() as u16 & 0x3FF) });
 }
@@ -338,16 +364,16 @@ fn configure_apb_clk_impl(
     // Nothing to do.
 }
 
-// CRYPTO_CLK
+// CRYPTO_PWM_CLK
 
-fn enable_crypto_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+fn enable_crypto_pwm_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
 
-fn configure_crypto_clk_impl(
+fn configure_crypto_pwm_clk_impl(
     _clocks: &mut ClockTree,
-    _old_selector: Option<CryptoClkConfig>,
-    _new_selector: CryptoClkConfig,
+    _old_selector: Option<CryptoPwmClkConfig>,
+    _new_selector: CryptoPwmClkConfig,
 ) {
     // Nothing to do.
 }
@@ -359,50 +385,218 @@ fn configure_cpu_clk_impl(
     _old_selector: Option<CpuClkConfig>,
     new_selector: CpuClkConfig,
 ) {
-    // Based on TRM Table 6.2-2
+    // Based on TRM Table 7.2-2
+    let clock_source_sel0_bit = match new_selector {
+        CpuClkConfig::Xtal => 0,
+        CpuClkConfig::RcFast => 2,
+        CpuClkConfig::Pll => 1,
+    };
+    let clock_source_sel1_bit = clocks.pll_clk == Some(PllClkConfig::_480);
+    let clock_source_sel2_bit = match (clocks.pll_clk, clocks.cpu_pll_div_out) {
+        (Some(_), Some(CpuPllDivOutConfig::_80)) => 0,
+        (Some(_), Some(CpuPllDivOutConfig::_160)) => 1,
+        (Some(PllClkConfig::_480), Some(CpuPllDivOutConfig::_240)) => 2,
+
+        // don't care
+        _ => 0,
+    };
+
+    ensure_voltage_raised(clocks);
     if new_selector == CpuClkConfig::Pll {
-        SYSTEM::regs().cpu_per_conf().modify(|_, w| unsafe {
-            w.cpuperiod_sel()
-                .bits(match unwrap!(clocks.cpu_pll_div_out) {
-                    CpuPllDivOutConfig::_80 => 0,
-                    CpuPllDivOutConfig::_160 => 1,
-                })
+        SYSTEM::regs().cpu_per_conf().modify(|_, w| {
+            unsafe { w.cpuperiod_sel().bits(clock_source_sel2_bit) };
+            w.pll_freq_sel().bit(clock_source_sel1_bit)
         });
     }
 
     SYSTEM::regs().sysclk_conf().modify(|_, w| unsafe {
         w.pre_div_cnt().bits(0);
-        w.soc_clk_sel().bits(match new_selector {
-            CpuClkConfig::Xtal => 0,
-            CpuClkConfig::RcFast => 2,
-            CpuClkConfig::Pll => 1,
-        })
+        w.soc_clk_sel().bits(clock_source_sel0_bit)
     });
-
-    let apb_freq = Rate::from_hz(apb_clk_frequency(clocks));
-    update_apb_frequency(apb_freq);
 
     let cpu_freq = Rate::from_hz(cpu_clk_frequency(clocks));
     ets_update_cpu_frequency_rom(cpu_freq.as_mhz());
+
+    ensure_voltage_minimal(clocks);
 }
 
-fn update_apb_frequency(freq: Rate) {
-    let freq_shifted = (freq.as_hz() >> 12) & 0xFFFF;
-    let value = freq_shifted | (freq_shifted << 16);
+// There are totally 6 LDO slaves(all on by default). At the moment of switching LDO slave, LDO
+// voltage will also change instantaneously. LDO slave can reduce the voltage change caused
+// by switching frequency. CPU frequency <= 40M : just open 3 LDO slaves; CPU frequency =
+// 80M : open 4 LDO slaves; CPU frequency = 160M : open 5 LDO slaves; CPU frequency = 240M :
+// open 6 LDO slaves;
+//
+// LDO voltage will decrease at the moment of switching from low frequency to high frequency;
+// otherwise, LDO voltage will increase. In order to reduce LDO voltage drop, LDO voltage
+// should rise first then fall.
+
+const RTC_CNTL_DBIAS_1V10: u8 = 4;
+const RTC_CNTL_DBIAS_1V25: u8 = 7;
+
+const V_RTC_MID_MUL10000: i32 = 10181;
+const V_DIG_MID_MUL10000: i32 = 10841;
+const K_RTC_MID_MUL10000: i32 = 198;
+const K_DIG_MID_MUL10000: i32 = 211;
+
+use crate::efuse::{self, Efuse};
+
+const fn sign_extend(value: u8, bits: u8) -> i32 {
+    let sign_bit = 1 << (bits - 1);
+    let mask = !(sign_bit as u32 - 1);
+
+    if value & sign_bit != 0 {
+        (value as i32) | mask as i32
+    } else {
+        value as i32
+    }
+}
+
+fn dig_dbias_v1() -> u8 {
+    Efuse::read_field_le(efuse::DIG_DBIAS_HVT)
+}
+fn rtc_dbias_v1(dig_dbias: u8) -> u8 {
+    // 7-bit two's complement
+    let k_rtc_ldo = Efuse::read_field_le::<u8>(efuse::K_RTC_LDO);
+    let k_dig_ldo = Efuse::read_field_le::<u8>(efuse::K_DIG_LDO);
+    // 8-bit two's complement
+    let v_rtc_bias20 = Efuse::read_field_le::<u8>(efuse::V_RTC_DBIAS20);
+    let v_dig_bias20 = Efuse::read_field_le::<u8>(efuse::V_DIG_DBIAS20);
+
+    // Sign extend values:
+    let k_rtc_ldo = sign_extend(k_rtc_ldo, 7);
+    let k_dig_ldo = sign_extend(k_dig_ldo, 7);
+    let v_rtc_bias20 = sign_extend(v_rtc_bias20, 8);
+    let v_dig_bias20 = sign_extend(v_dig_bias20, 8);
+
+    let v_rtc_dbias20_real_mul10000 = V_RTC_MID_MUL10000 + v_rtc_bias20 * 10000 / 500;
+    let v_dig_dbias20_real_mul10000 = V_DIG_MID_MUL10000 + v_dig_bias20 * 10000 / 500;
+    let k_rtc_ldo_real_mul10000 = K_RTC_MID_MUL10000 + k_rtc_ldo;
+    let k_dig_ldo_real_mul10000 = K_DIG_MID_MUL10000 + k_dig_ldo;
+
+    let v_dig_nearest_1v15_mul10000 =
+        v_dig_dbias20_real_mul10000 + k_dig_ldo_real_mul10000 * (dig_dbias as i32 - 20);
+
+    search_nearest(
+        v_rtc_dbias20_real_mul10000,
+        k_rtc_ldo_real_mul10000,
+        v_dig_nearest_1v15_mul10000 - 250,
+    )
+}
+fn dig1v3_dbias_v1() -> u8 {
+    // 7-bit two's complement
+    let k_dig_ldo = Efuse::read_field_le::<u8>(efuse::K_DIG_LDO);
+    // 8-bit two's complement
+    let v_dig_bias20 = Efuse::read_field_le::<u8>(efuse::V_DIG_DBIAS20);
+
+    // Sign extend values:
+    let k_dig_ldo = sign_extend(k_dig_ldo, 7);
+    let v_dig_bias20 = sign_extend(v_dig_bias20, 8);
+
+    let v_dig_dbias20_real_mul10000 = V_DIG_MID_MUL10000 + v_dig_bias20 * 10000 / 500;
+    let k_dig_ldo_real_mul10000 = K_DIG_MID_MUL10000 + k_dig_ldo;
+
+    search_nearest(v_dig_dbias20_real_mul10000, k_dig_ldo_real_mul10000, 13000)
+}
+
+fn search_nearest(v: i32, k: i32, max: i32) -> u8 {
+    for dbias in 15..31 {
+        let nearest = v + k * (dbias as i32 - 20);
+        if nearest >= max {
+            return dbias;
+        }
+    }
+
+    31
+}
+
+/// Returns whether the eFuse data contains values for PVT (Process/Voltage/Temperature)
+/// calibration.
+///
+/// The calibration is meant to widen the range of conditions under which the
+/// chip can operate reliably. Based on factory calibration, it implements linear
+/// search for `dbias` values which produce the closest minimum voltage applied to the RTC
+/// and digital power domains.
+fn pvt_supported() -> bool {
+    let (blk_major, blk_minor) = Efuse::block_version();
+
+    // Block version was introduced at v1.2, above which the PVT are all supported.
+    // Before that, blk1_ver (a.k.a. blk_minor now) == 1 indicates the support of PVT.
+    (blk_major == 0 && blk_minor == 1) || (blk_major == 1 && blk_minor >= 2) || blk_major > 1
+}
+
+fn ensure_voltage_raised(clocks: &mut ClockTree) {
+    let cpu_freq = cpu_clk_frequency(clocks);
+    let pd_slave = cpu_freq / 80_000_000;
+
+    if cpu_freq == 240_000_000 {
+        let mut rtc_dbias_pvt_240m = 28;
+        let mut dig_dbias_pvt_240m = 28;
+
+        if pvt_supported() {
+            let dig_dbias = dig_dbias_v1();
+            if dig_dbias != 0 {
+                let dig1v3_dbias = dig1v3_dbias_v1();
+
+                dig_dbias_pvt_240m = dig1v3_dbias.min(dig_dbias + 3);
+                rtc_dbias_pvt_240m = rtc_dbias_v1(dig_dbias_pvt_240m);
+            }
+        }
+
+        regi2c::I2C_DIG_REG_EXT_RTC_DREG.write_field(rtc_dbias_pvt_240m);
+        regi2c::I2C_DIG_REG_EXT_DIG_DREG.write_field(dig_dbias_pvt_240m);
+
+        ets_delay_us(40);
+    }
+
     LPWR::regs()
-        .store5()
-        .modify(|_, w| unsafe { w.data().bits(value) });
+        .date()
+        .modify(|_, w| unsafe { w.ldo_slave().bits(0x7 >> pd_slave) });
 }
 
-// PLL_80M
+fn ensure_voltage_minimal(clocks: &mut ClockTree) {
+    let cpu_freq = cpu_clk_frequency(clocks);
+    let pd_slave = cpu_freq / 80_000_000;
 
-fn enable_pll_80m_impl(_clocks: &mut ClockTree, _en: bool) {
+    if cpu_freq < 240_000_000 {
+        let mut rtc_dbias_pvt_non_240m = 27;
+        let mut dig_dbias_pvt_non_240m = 27;
+
+        if pvt_supported() {
+            let dig_dbias = dig_dbias_v1();
+            if dig_dbias != 0 {
+                let dig1v3_dbias = dig1v3_dbias_v1();
+
+                dig_dbias_pvt_non_240m = dig1v3_dbias.min(dig_dbias + 2);
+                rtc_dbias_pvt_non_240m = rtc_dbias_v1(dig_dbias_pvt_non_240m);
+            }
+        }
+
+        regi2c::I2C_DIG_REG_EXT_RTC_DREG.write_field(rtc_dbias_pvt_non_240m);
+        regi2c::I2C_DIG_REG_EXT_DIG_DREG.write_field(dig_dbias_pvt_non_240m);
+
+        ets_delay_us(40);
+    }
+
+    LPWR::regs()
+        .date()
+        .modify(|_, w| unsafe { w.ldo_slave().bits(0x7 >> pd_slave) });
+}
+
+// PLL_D2
+
+fn enable_pll_d2_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
 
 // PLL_160M
 
 fn enable_pll_160m_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+// APB_80M
+
+fn enable_apb_80m_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
 
@@ -479,9 +673,6 @@ fn configure_rtc_fast_clk_impl(
 
 fn enable_low_power_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing in esp-idf does this - is this managed by hardware, or the radio blobs?
-    // SYSTEM::regs()
-    //     .bt_lpck_div_frac()
-    //     .modify(|_, w| w.lpclk_rtc_en().bit(en));
 }
 
 fn configure_low_power_clk_impl(
@@ -507,10 +698,7 @@ fn configure_low_power_clk_impl(
 
 fn enable_timg0_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
     // TODO: should we model T0_DIVIDER, too?
-    TIMG0::regs().regclk().modify(|_, w| {
-        w.timer_clk_is_active().bit(en);
-        w.clk_en().bit(en)
-    });
+    TIMG0::regs().regclk().modify(|_, w| w.clk_en().bit(en));
 }
 
 fn configure_timg0_function_clock_impl(
@@ -519,6 +707,10 @@ fn configure_timg0_function_clock_impl(
     new_selector: Timg0FunctionClockConfig,
 ) {
     TIMG0::regs().t(0).config().modify(|_, w| {
+        w.use_xtal()
+            .bit(new_selector == Timg0FunctionClockConfig::XtalClk)
+    });
+    TIMG0::regs().t(1).config().modify(|_, w| {
         w.use_xtal()
             .bit(new_selector == Timg0FunctionClockConfig::XtalClk)
     });
@@ -548,10 +740,7 @@ fn configure_timg0_calibration_clock_impl(
 // TIMG1_FUNCTION_CLOCK
 
 fn enable_timg1_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
-    TIMG1::regs().regclk().modify(|_, w| {
-        w.timer_clk_is_active().bit(en);
-        w.clk_en().bit(en)
-    });
+    TIMG1::regs().regclk().modify(|_, w| w.clk_en().bit(en));
 }
 
 fn configure_timg1_function_clock_impl(
@@ -560,6 +749,10 @@ fn configure_timg1_function_clock_impl(
     new_selector: Timg0FunctionClockConfig,
 ) {
     TIMG1::regs().t(0).config().modify(|_, w| {
+        w.use_xtal()
+            .bit(new_selector == Timg0FunctionClockConfig::XtalClk)
+    });
+    TIMG1::regs().t(1).config().modify(|_, w| {
         w.use_xtal()
             .bit(new_selector == Timg0FunctionClockConfig::XtalClk)
     });
