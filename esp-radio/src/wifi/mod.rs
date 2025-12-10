@@ -2008,7 +2008,7 @@ impl WifiController<'_> {
     pub fn set_csi(
         &mut self,
         mut csi: csi::CsiConfig,
-        cb: impl FnMut(crate::wifi::csi::CWifiCsiInfo) + Send,
+        cb: impl FnMut(crate::wifi::csi::WifiCsiInfo<'_>) + Send,
     ) -> Result<(), WifiError> {
         csi.apply_config()?;
         csi.set_receive_cb(cb)?;
