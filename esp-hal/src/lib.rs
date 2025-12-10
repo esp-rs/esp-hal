@@ -692,7 +692,6 @@ pub fn init(config: Config) -> Peripherals {
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.LPWR.reborrow());
 
-    #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2))]
     crate::rtc_cntl::sleep::RtcSleepConfig::base_settings(&rtc);
 
     // Disable watchdog timers

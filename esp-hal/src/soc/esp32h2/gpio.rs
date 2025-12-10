@@ -25,3 +25,31 @@
 //! This trait provides functions to read the interrupt status and NMI status
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.
+
+for_each_lp_function! {
+    (($_rtc:ident, LP_GPIOn, $n:literal), $gpio:ident) => {
+        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+        impl $crate::gpio::RtcPin for $crate::peripherals::$gpio<'_> {
+            fn rtc_number(&self) -> u8 {
+                $n
+            }
+
+            fn rtcio_pad_hold(&self, enable: bool) {
+                let mask = 1 << $n;
+                unsafe {
+                    let lp_aon = $crate::peripherals::LP_AON::regs();
+
+                    lp_aon.gpio_hold0().modify(|r, w| {
+                        if enable {
+                            w.gpio_hold0().bits(r.gpio_hold0().bits() | mask)
+                        } else {
+                            w.gpio_hold0().bits(r.gpio_hold0().bits() & !mask)
+                        }
+                    });
+                }
+            }
+        }
+        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+        impl $crate::gpio::RtcPinWithResistors for $crate::peripherals::$gpio<'_> {}
+    };
+}

@@ -361,10 +361,9 @@ pub enum RtcFunction {
 
 /// Trait implemented by RTC pins
 #[instability::unstable]
-#[cfg(not(esp32h2))] // H2 has no low-power mux, but it's not currently encoded in metadata.
 pub trait RtcPin: Pin {
     /// RTC number of the pin
-    #[cfg(xtensa)]
+    #[cfg(any(xtensa, esp32h2))]
     fn rtc_number(&self) -> u8;
 
     /// Configure the pin
@@ -388,12 +387,13 @@ pub trait RtcPin: Pin {
 /// Trait implemented by RTC pins which supporting internal pull-up / pull-down
 /// resistors.
 #[instability::unstable]
-#[cfg(not(esp32h2))]
 pub trait RtcPinWithResistors: RtcPin {
     /// Enable/disable the internal pull-up resistor
+    #[cfg(not(esp32h2))]
     #[doc(hidden)]
     fn rtcio_pullup(&self, enable: bool);
     /// Enable/disable the internal pull-down resistor
+    #[cfg(not(esp32h2))]
     #[doc(hidden)]
     fn rtcio_pulldown(&self, enable: bool);
 }
@@ -2203,7 +2203,6 @@ fn pin_does_not_support_function(pin: u8, function: &str) {
     panic!("Pin {} is not an {}", pin, function)
 }
 
-#[cfg(not(esp32h2))]
 macro_rules! for_each_rtcio_pin {
     (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt) => {
         if $ident.number() == $crate::peripherals::$gpio::NUMBER {
@@ -2258,9 +2257,8 @@ macro_rules! for_each_rtcio_output_pin {
     };
 }
 
-#[cfg(not(esp32h2))]
 impl RtcPin for AnyPin<'_> {
-    #[cfg(xtensa)]
+    #[cfg(any(xtensa, esp32h2))]
     fn rtc_number(&self) -> u8 {
         for_each_rtcio_pin! {
             (self, target) => { RtcPin::rtc_number(&target) };
@@ -2288,14 +2286,15 @@ impl RtcPin for AnyPin<'_> {
     }
 }
 
-#[cfg(not(esp32h2))]
 impl RtcPinWithResistors for AnyPin<'_> {
+    #[cfg(not(esp32h2))]
     fn rtcio_pullup(&self, enable: bool) {
         for_each_rtcio_output_pin! {
             (self, target) => { RtcPinWithResistors::rtcio_pullup(&target, enable) };
         }
     }
 
+    #[cfg(not(esp32h2))]
     fn rtcio_pulldown(&self, enable: bool) {
         for_each_rtcio_output_pin! {
             (self, target) => { RtcPinWithResistors::rtcio_pulldown(&target, enable) };
