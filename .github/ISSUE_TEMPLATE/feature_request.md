@@ -2,9 +2,8 @@
 name: Feature request
 about: Suggest an idea for this project
 title: ''
-labels: ["enhancement", "status:needs-attention"]
+labels: ['feature request', 'bug jury']
 assignees: ''
-
 ---
 
 ## Motivations
