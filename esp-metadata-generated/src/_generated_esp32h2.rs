@@ -807,43 +807,45 @@ macro_rules! define_clock_tree_types {
         pub fn configure_hp_root_clk(clocks: &mut ClockTree, new_selector: HpRootClkConfig) {
             let old_selector = clocks.hp_root_clk.replace(new_selector);
             if clocks.hp_root_clk_refcount > 0 {
-                hp_root_clk_request_upstream(clocks, new_selector);
+                match new_selector {
+                    HpRootClkConfig::Pll96 => request_pll_f96m_clk(clocks),
+                    HpRootClkConfig::Pll64 => request_pll_f64m_clk(clocks),
+                    HpRootClkConfig::Xtal => request_xtal_clk(clocks),
+                    HpRootClkConfig::RcFast => request_rc_fast_clk(clocks),
+                }
                 configure_hp_root_clk_impl(clocks, old_selector, new_selector);
                 if let Some(old_selector) = old_selector {
-                    hp_root_clk_release_upstream(clocks, old_selector);
+                    match old_selector {
+                        HpRootClkConfig::Pll96 => release_pll_f96m_clk(clocks),
+                        HpRootClkConfig::Pll64 => release_pll_f64m_clk(clocks),
+                        HpRootClkConfig::Xtal => release_xtal_clk(clocks),
+                        HpRootClkConfig::RcFast => release_rc_fast_clk(clocks),
+                    }
                 }
             } else {
                 configure_hp_root_clk_impl(clocks, old_selector, new_selector);
             }
         }
-        fn hp_root_clk_request_upstream(clocks: &mut ClockTree, selector: HpRootClkConfig) {
-            match selector {
-                HpRootClkConfig::Pll96 => request_pll_f96m_clk(clocks),
-                HpRootClkConfig::Pll64 => request_pll_f64m_clk(clocks),
-                HpRootClkConfig::Xtal => request_xtal_clk(clocks),
-                HpRootClkConfig::RcFast => request_rc_fast_clk(clocks),
-            }
-        }
-        fn hp_root_clk_release_upstream(clocks: &mut ClockTree, selector: HpRootClkConfig) {
-            match selector {
-                HpRootClkConfig::Pll96 => release_pll_f96m_clk(clocks),
-                HpRootClkConfig::Pll64 => release_pll_f64m_clk(clocks),
-                HpRootClkConfig::Xtal => release_xtal_clk(clocks),
-                HpRootClkConfig::RcFast => release_rc_fast_clk(clocks),
-            }
-        }
         pub fn request_hp_root_clk(clocks: &mut ClockTree) {
             if increment_reference_count(&mut clocks.hp_root_clk_refcount) {
-                let selector = unwrap!(clocks.hp_root_clk);
-                hp_root_clk_request_upstream(clocks, selector);
+                match unwrap!(clocks.hp_root_clk) {
+                    HpRootClkConfig::Pll96 => request_pll_f96m_clk(clocks),
+                    HpRootClkConfig::Pll64 => request_pll_f64m_clk(clocks),
+                    HpRootClkConfig::Xtal => request_xtal_clk(clocks),
+                    HpRootClkConfig::RcFast => request_rc_fast_clk(clocks),
+                }
                 enable_hp_root_clk_impl(clocks, true);
             }
         }
         pub fn release_hp_root_clk(clocks: &mut ClockTree) {
             if decrement_reference_count(&mut clocks.hp_root_clk_refcount) {
                 enable_hp_root_clk_impl(clocks, false);
-                let selector = unwrap!(clocks.hp_root_clk);
-                hp_root_clk_release_upstream(clocks, selector);
+                match unwrap!(clocks.hp_root_clk) {
+                    HpRootClkConfig::Pll96 => release_pll_f96m_clk(clocks),
+                    HpRootClkConfig::Pll64 => release_pll_f64m_clk(clocks),
+                    HpRootClkConfig::Xtal => release_xtal_clk(clocks),
+                    HpRootClkConfig::RcFast => release_rc_fast_clk(clocks),
+                }
             }
         }
         pub fn hp_root_clk_frequency(clocks: &mut ClockTree) -> u32 {
@@ -921,41 +923,41 @@ macro_rules! define_clock_tree_types {
         pub fn configure_lp_fast_clk(clocks: &mut ClockTree, new_selector: LpFastClkConfig) {
             let old_selector = clocks.lp_fast_clk.replace(new_selector);
             if clocks.lp_fast_clk_refcount > 0 {
-                lp_fast_clk_request_upstream(clocks, new_selector);
+                match new_selector {
+                    LpFastClkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    LpFastClkConfig::PllLpClk => request_pll_lp_clk(clocks),
+                    LpFastClkConfig::XtalD2Clk => request_xtal_d2_clk(clocks),
+                }
                 configure_lp_fast_clk_impl(clocks, old_selector, new_selector);
                 if let Some(old_selector) = old_selector {
-                    lp_fast_clk_release_upstream(clocks, old_selector);
+                    match old_selector {
+                        LpFastClkConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        LpFastClkConfig::PllLpClk => release_pll_lp_clk(clocks),
+                        LpFastClkConfig::XtalD2Clk => release_xtal_d2_clk(clocks),
+                    }
                 }
             } else {
                 configure_lp_fast_clk_impl(clocks, old_selector, new_selector);
             }
         }
-        fn lp_fast_clk_request_upstream(clocks: &mut ClockTree, selector: LpFastClkConfig) {
-            match selector {
-                LpFastClkConfig::RcFastClk => request_rc_fast_clk(clocks),
-                LpFastClkConfig::PllLpClk => request_pll_lp_clk(clocks),
-                LpFastClkConfig::XtalD2Clk => request_xtal_d2_clk(clocks),
-            }
-        }
-        fn lp_fast_clk_release_upstream(clocks: &mut ClockTree, selector: LpFastClkConfig) {
-            match selector {
-                LpFastClkConfig::RcFastClk => release_rc_fast_clk(clocks),
-                LpFastClkConfig::PllLpClk => release_pll_lp_clk(clocks),
-                LpFastClkConfig::XtalD2Clk => release_xtal_d2_clk(clocks),
-            }
-        }
         pub fn request_lp_fast_clk(clocks: &mut ClockTree) {
             if increment_reference_count(&mut clocks.lp_fast_clk_refcount) {
-                let selector = unwrap!(clocks.lp_fast_clk);
-                lp_fast_clk_request_upstream(clocks, selector);
+                match unwrap!(clocks.lp_fast_clk) {
+                    LpFastClkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    LpFastClkConfig::PllLpClk => request_pll_lp_clk(clocks),
+                    LpFastClkConfig::XtalD2Clk => request_xtal_d2_clk(clocks),
+                }
                 enable_lp_fast_clk_impl(clocks, true);
             }
         }
         pub fn release_lp_fast_clk(clocks: &mut ClockTree) {
             if decrement_reference_count(&mut clocks.lp_fast_clk_refcount) {
                 enable_lp_fast_clk_impl(clocks, false);
-                let selector = unwrap!(clocks.lp_fast_clk);
-                lp_fast_clk_release_upstream(clocks, selector);
+                match unwrap!(clocks.lp_fast_clk) {
+                    LpFastClkConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    LpFastClkConfig::PllLpClk => release_pll_lp_clk(clocks),
+                    LpFastClkConfig::XtalD2Clk => release_xtal_d2_clk(clocks),
+                }
             }
         }
         pub fn lp_fast_clk_frequency(clocks: &mut ClockTree) -> u32 {
@@ -968,41 +970,41 @@ macro_rules! define_clock_tree_types {
         pub fn configure_lp_slow_clk(clocks: &mut ClockTree, new_selector: LpSlowClkConfig) {
             let old_selector = clocks.lp_slow_clk.replace(new_selector);
             if clocks.lp_slow_clk_refcount > 0 {
-                lp_slow_clk_request_upstream(clocks, new_selector);
+                match new_selector {
+                    LpSlowClkConfig::Xtal32kClk => request_xtal32k_clk(clocks),
+                    LpSlowClkConfig::RcSlow => request_rc_slow_clk(clocks),
+                    LpSlowClkConfig::OscSlow => request_osc_slow_clk(clocks),
+                }
                 configure_lp_slow_clk_impl(clocks, old_selector, new_selector);
                 if let Some(old_selector) = old_selector {
-                    lp_slow_clk_release_upstream(clocks, old_selector);
+                    match old_selector {
+                        LpSlowClkConfig::Xtal32kClk => release_xtal32k_clk(clocks),
+                        LpSlowClkConfig::RcSlow => release_rc_slow_clk(clocks),
+                        LpSlowClkConfig::OscSlow => release_osc_slow_clk(clocks),
+                    }
                 }
             } else {
                 configure_lp_slow_clk_impl(clocks, old_selector, new_selector);
             }
         }
-        fn lp_slow_clk_request_upstream(clocks: &mut ClockTree, selector: LpSlowClkConfig) {
-            match selector {
-                LpSlowClkConfig::Xtal32kClk => request_xtal32k_clk(clocks),
-                LpSlowClkConfig::RcSlow => request_rc_slow_clk(clocks),
-                LpSlowClkConfig::OscSlow => request_osc_slow_clk(clocks),
-            }
-        }
-        fn lp_slow_clk_release_upstream(clocks: &mut ClockTree, selector: LpSlowClkConfig) {
-            match selector {
-                LpSlowClkConfig::Xtal32kClk => release_xtal32k_clk(clocks),
-                LpSlowClkConfig::RcSlow => release_rc_slow_clk(clocks),
-                LpSlowClkConfig::OscSlow => release_osc_slow_clk(clocks),
-            }
-        }
         pub fn request_lp_slow_clk(clocks: &mut ClockTree) {
             if increment_reference_count(&mut clocks.lp_slow_clk_refcount) {
-                let selector = unwrap!(clocks.lp_slow_clk);
-                lp_slow_clk_request_upstream(clocks, selector);
+                match unwrap!(clocks.lp_slow_clk) {
+                    LpSlowClkConfig::Xtal32kClk => request_xtal32k_clk(clocks),
+                    LpSlowClkConfig::RcSlow => request_rc_slow_clk(clocks),
+                    LpSlowClkConfig::OscSlow => request_osc_slow_clk(clocks),
+                }
                 enable_lp_slow_clk_impl(clocks, true);
             }
         }
         pub fn release_lp_slow_clk(clocks: &mut ClockTree) {
             if decrement_reference_count(&mut clocks.lp_slow_clk_refcount) {
                 enable_lp_slow_clk_impl(clocks, false);
-                let selector = unwrap!(clocks.lp_slow_clk);
-                lp_slow_clk_release_upstream(clocks, selector);
+                match unwrap!(clocks.lp_slow_clk) {
+                    LpSlowClkConfig::Xtal32kClk => release_xtal32k_clk(clocks),
+                    LpSlowClkConfig::RcSlow => release_rc_slow_clk(clocks),
+                    LpSlowClkConfig::OscSlow => release_osc_slow_clk(clocks),
+                }
             }
         }
         pub fn lp_slow_clk_frequency(clocks: &mut ClockTree) -> u32 {
@@ -1018,47 +1020,41 @@ macro_rules! define_clock_tree_types {
         ) {
             let old_selector = clocks.timg0_function_clock.replace(new_selector);
             if clocks.timg0_function_clock_refcount > 0 {
-                timg0_function_clock_request_upstream(clocks, new_selector);
+                match new_selector {
+                    Timg0FunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+                    Timg0FunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    Timg0FunctionClockConfig::PllF48m => request_pll_f48m_clk(clocks),
+                }
                 configure_timg0_function_clock_impl(clocks, old_selector, new_selector);
                 if let Some(old_selector) = old_selector {
-                    timg0_function_clock_release_upstream(clocks, old_selector);
+                    match old_selector {
+                        Timg0FunctionClockConfig::XtalClk => release_xtal_clk(clocks),
+                        Timg0FunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        Timg0FunctionClockConfig::PllF48m => release_pll_f48m_clk(clocks),
+                    }
                 }
             } else {
                 configure_timg0_function_clock_impl(clocks, old_selector, new_selector);
             }
         }
-        fn timg0_function_clock_request_upstream(
-            clocks: &mut ClockTree,
-            selector: Timg0FunctionClockConfig,
-        ) {
-            match selector {
-                Timg0FunctionClockConfig::XtalClk => request_xtal_clk(clocks),
-                Timg0FunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                Timg0FunctionClockConfig::PllF48m => request_pll_f48m_clk(clocks),
-            }
-        }
-        fn timg0_function_clock_release_upstream(
-            clocks: &mut ClockTree,
-            selector: Timg0FunctionClockConfig,
-        ) {
-            match selector {
-                Timg0FunctionClockConfig::XtalClk => release_xtal_clk(clocks),
-                Timg0FunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                Timg0FunctionClockConfig::PllF48m => release_pll_f48m_clk(clocks),
-            }
-        }
         pub fn request_timg0_function_clock(clocks: &mut ClockTree) {
             if increment_reference_count(&mut clocks.timg0_function_clock_refcount) {
-                let selector = unwrap!(clocks.timg0_function_clock);
-                timg0_function_clock_request_upstream(clocks, selector);
+                match unwrap!(clocks.timg0_function_clock) {
+                    Timg0FunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+                    Timg0FunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    Timg0FunctionClockConfig::PllF48m => request_pll_f48m_clk(clocks),
+                }
                 enable_timg0_function_clock_impl(clocks, true);
             }
         }
         pub fn release_timg0_function_clock(clocks: &mut ClockTree) {
             if decrement_reference_count(&mut clocks.timg0_function_clock_refcount) {
                 enable_timg0_function_clock_impl(clocks, false);
-                let selector = unwrap!(clocks.timg0_function_clock);
-                timg0_function_clock_release_upstream(clocks, selector);
+                match unwrap!(clocks.timg0_function_clock) {
+                    Timg0FunctionClockConfig::XtalClk => release_xtal_clk(clocks),
+                    Timg0FunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    Timg0FunctionClockConfig::PllF48m => release_pll_f48m_clk(clocks),
+                }
             }
         }
         pub fn timg0_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
@@ -1074,47 +1070,41 @@ macro_rules! define_clock_tree_types {
         ) {
             let old_selector = clocks.timg0_calibration_clock.replace(new_selector);
             if clocks.timg0_calibration_clock_refcount > 0 {
-                timg0_calibration_clock_request_upstream(clocks, new_selector);
+                match new_selector {
+                    Timg0CalibrationClockConfig::RtcSlowClk => request_lp_slow_clk(clocks),
+                    Timg0CalibrationClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    Timg0CalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
+                }
                 configure_timg0_calibration_clock_impl(clocks, old_selector, new_selector);
                 if let Some(old_selector) = old_selector {
-                    timg0_calibration_clock_release_upstream(clocks, old_selector);
+                    match old_selector {
+                        Timg0CalibrationClockConfig::RtcSlowClk => release_lp_slow_clk(clocks),
+                        Timg0CalibrationClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        Timg0CalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
+                    }
                 }
             } else {
                 configure_timg0_calibration_clock_impl(clocks, old_selector, new_selector);
             }
         }
-        fn timg0_calibration_clock_request_upstream(
-            clocks: &mut ClockTree,
-            selector: Timg0CalibrationClockConfig,
-        ) {
-            match selector {
-                Timg0CalibrationClockConfig::RtcSlowClk => request_lp_slow_clk(clocks),
-                Timg0CalibrationClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                Timg0CalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
-            }
-        }
-        fn timg0_calibration_clock_release_upstream(
-            clocks: &mut ClockTree,
-            selector: Timg0CalibrationClockConfig,
-        ) {
-            match selector {
-                Timg0CalibrationClockConfig::RtcSlowClk => release_lp_slow_clk(clocks),
-                Timg0CalibrationClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                Timg0CalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
-            }
-        }
         pub fn request_timg0_calibration_clock(clocks: &mut ClockTree) {
             if increment_reference_count(&mut clocks.timg0_calibration_clock_refcount) {
-                let selector = unwrap!(clocks.timg0_calibration_clock);
-                timg0_calibration_clock_request_upstream(clocks, selector);
+                match unwrap!(clocks.timg0_calibration_clock) {
+                    Timg0CalibrationClockConfig::RtcSlowClk => request_lp_slow_clk(clocks),
+                    Timg0CalibrationClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    Timg0CalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
+                }
                 enable_timg0_calibration_clock_impl(clocks, true);
             }
         }
         pub fn release_timg0_calibration_clock(clocks: &mut ClockTree) {
             if decrement_reference_count(&mut clocks.timg0_calibration_clock_refcount) {
                 enable_timg0_calibration_clock_impl(clocks, false);
-                let selector = unwrap!(clocks.timg0_calibration_clock);
-                timg0_calibration_clock_release_upstream(clocks, selector);
+                match unwrap!(clocks.timg0_calibration_clock) {
+                    Timg0CalibrationClockConfig::RtcSlowClk => release_lp_slow_clk(clocks),
+                    Timg0CalibrationClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    Timg0CalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
+                }
             }
         }
         pub fn timg0_calibration_clock_frequency(clocks: &mut ClockTree) -> u32 {
@@ -1130,47 +1120,41 @@ macro_rules! define_clock_tree_types {
         ) {
             let old_selector = clocks.timg1_function_clock.replace(new_selector);
             if clocks.timg1_function_clock_refcount > 0 {
-                timg1_function_clock_request_upstream(clocks, new_selector);
+                match new_selector {
+                    Timg0FunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+                    Timg0FunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    Timg0FunctionClockConfig::PllF48m => request_pll_f48m_clk(clocks),
+                }
                 configure_timg1_function_clock_impl(clocks, old_selector, new_selector);
                 if let Some(old_selector) = old_selector {
-                    timg1_function_clock_release_upstream(clocks, old_selector);
+                    match old_selector {
+                        Timg0FunctionClockConfig::XtalClk => release_xtal_clk(clocks),
+                        Timg0FunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        Timg0FunctionClockConfig::PllF48m => release_pll_f48m_clk(clocks),
+                    }
                 }
             } else {
                 configure_timg1_function_clock_impl(clocks, old_selector, new_selector);
             }
         }
-        fn timg1_function_clock_request_upstream(
-            clocks: &mut ClockTree,
-            selector: Timg0FunctionClockConfig,
-        ) {
-            match selector {
-                Timg0FunctionClockConfig::XtalClk => request_xtal_clk(clocks),
-                Timg0FunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                Timg0FunctionClockConfig::PllF48m => request_pll_f48m_clk(clocks),
-            }
-        }
-        fn timg1_function_clock_release_upstream(
-            clocks: &mut ClockTree,
-            selector: Timg0FunctionClockConfig,
-        ) {
-            match selector {
-                Timg0FunctionClockConfig::XtalClk => release_xtal_clk(clocks),
-                Timg0FunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                Timg0FunctionClockConfig::PllF48m => release_pll_f48m_clk(clocks),
-            }
-        }
         pub fn request_timg1_function_clock(clocks: &mut ClockTree) {
             if increment_reference_count(&mut clocks.timg1_function_clock_refcount) {
-                let selector = unwrap!(clocks.timg1_function_clock);
-                timg1_function_clock_request_upstream(clocks, selector);
+                match unwrap!(clocks.timg1_function_clock) {
+                    Timg0FunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+                    Timg0FunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    Timg0FunctionClockConfig::PllF48m => request_pll_f48m_clk(clocks),
+                }
                 enable_timg1_function_clock_impl(clocks, true);
             }
         }
         pub fn release_timg1_function_clock(clocks: &mut ClockTree) {
             if decrement_reference_count(&mut clocks.timg1_function_clock_refcount) {
                 enable_timg1_function_clock_impl(clocks, false);
-                let selector = unwrap!(clocks.timg1_function_clock);
-                timg1_function_clock_release_upstream(clocks, selector);
+                match unwrap!(clocks.timg1_function_clock) {
+                    Timg0FunctionClockConfig::XtalClk => release_xtal_clk(clocks),
+                    Timg0FunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    Timg0FunctionClockConfig::PllF48m => release_pll_f48m_clk(clocks),
+                }
             }
         }
         pub fn timg1_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
@@ -1186,47 +1170,41 @@ macro_rules! define_clock_tree_types {
         ) {
             let old_selector = clocks.timg1_calibration_clock.replace(new_selector);
             if clocks.timg1_calibration_clock_refcount > 0 {
-                timg1_calibration_clock_request_upstream(clocks, new_selector);
+                match new_selector {
+                    Timg0CalibrationClockConfig::RtcSlowClk => request_lp_slow_clk(clocks),
+                    Timg0CalibrationClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    Timg0CalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
+                }
                 configure_timg1_calibration_clock_impl(clocks, old_selector, new_selector);
                 if let Some(old_selector) = old_selector {
-                    timg1_calibration_clock_release_upstream(clocks, old_selector);
+                    match old_selector {
+                        Timg0CalibrationClockConfig::RtcSlowClk => release_lp_slow_clk(clocks),
+                        Timg0CalibrationClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        Timg0CalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
+                    }
                 }
             } else {
                 configure_timg1_calibration_clock_impl(clocks, old_selector, new_selector);
             }
         }
-        fn timg1_calibration_clock_request_upstream(
-            clocks: &mut ClockTree,
-            selector: Timg0CalibrationClockConfig,
-        ) {
-            match selector {
-                Timg0CalibrationClockConfig::RtcSlowClk => request_lp_slow_clk(clocks),
-                Timg0CalibrationClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                Timg0CalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
-            }
-        }
-        fn timg1_calibration_clock_release_upstream(
-            clocks: &mut ClockTree,
-            selector: Timg0CalibrationClockConfig,
-        ) {
-            match selector {
-                Timg0CalibrationClockConfig::RtcSlowClk => release_lp_slow_clk(clocks),
-                Timg0CalibrationClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                Timg0CalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
-            }
-        }
         pub fn request_timg1_calibration_clock(clocks: &mut ClockTree) {
             if increment_reference_count(&mut clocks.timg1_calibration_clock_refcount) {
-                let selector = unwrap!(clocks.timg1_calibration_clock);
-                timg1_calibration_clock_request_upstream(clocks, selector);
+                match unwrap!(clocks.timg1_calibration_clock) {
+                    Timg0CalibrationClockConfig::RtcSlowClk => request_lp_slow_clk(clocks),
+                    Timg0CalibrationClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    Timg0CalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
+                }
                 enable_timg1_calibration_clock_impl(clocks, true);
             }
         }
         pub fn release_timg1_calibration_clock(clocks: &mut ClockTree) {
             if decrement_reference_count(&mut clocks.timg1_calibration_clock_refcount) {
                 enable_timg1_calibration_clock_impl(clocks, false);
-                let selector = unwrap!(clocks.timg1_calibration_clock);
-                timg1_calibration_clock_release_upstream(clocks, selector);
+                match unwrap!(clocks.timg1_calibration_clock) {
+                    Timg0CalibrationClockConfig::RtcSlowClk => release_lp_slow_clk(clocks),
+                    Timg0CalibrationClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    Timg0CalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
+                }
             }
         }
         pub fn timg1_calibration_clock_frequency(clocks: &mut ClockTree) -> u32 {
