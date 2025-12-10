@@ -1,6 +1,7 @@
 //! Wi-Fi Channel State Information (CSI).
 
 use alloc::boxed::Box;
+use core::marker::PhantomData;
 
 use super::{WifiError, c_types::c_void, esp_wifi_result};
 #[cfg(esp32c6)]
@@ -16,51 +17,57 @@ use crate::{
     wifi::wifi_pkt_rx_ctrl_t,
 };
 
-/// Wrapper around the C `wifi_csi_info_t` struct.
+/// CSI (Channel State Information) packet metadata and associated packet details.
+///
+/// This structure contains the raw CSI data, along with necessary metadata
+/// from the received WiFi packet (MAC addresses, sequence number, packet headers).
 #[repr(transparent)]
-pub struct CWifiCsiInfo(wifi_csi_info_t);
+pub struct WifiCsiInfo<'a> {
+    inner: wifi_csi_info_t,
+    _lt: PhantomData<&'a ()>,
+}
 
-impl CWifiCsiInfo {
-    /// Get metadata header for the CSI data of a received packet.
+impl WifiCsiInfo<'_> {
+    /// Metadata header for the CSI data of a received packet.
     pub fn rx_ctrl(&self) -> &wifi_pkt_rx_ctrl_t {
-        &self.0.rx_ctrl
+        &self.inner.rx_ctrl
     }
 
     /// Source MAC address of the CSI data.
     pub fn mac(&self) -> &[u8; 6] {
-        &self.0.mac
+        &self.inner.mac
     }
 
     /// Destination MAC address of the CSI data.
-    pub fn dmac(&self) -> &[u8; 6] {
-        &self.0.dmac
+    pub fn destination_mac(&self) -> &[u8; 6] {
+        &self.inner.dmac
     }
 
     /// First four bytes of the CSI data is invalid or not, true indicates the first four bytes is
     /// invalid due to hardware limitation.
     pub fn first_word_invalid(&self) -> bool {
-        self.0.first_word_invalid
+        self.inner.first_word_invalid
     }
 
     /// Valid buffer of CSI data.
     pub fn buf(&self) -> &[i8] {
         unsafe {
-            if self.0.buf.is_null() || self.0.len == 0 {
+            if self.inner.buf.is_null() || self.inner.len == 0 {
                 &[]
             } else {
-                core::slice::from_raw_parts(self.0.buf, self.0.len as usize)
+                core::slice::from_raw_parts(self.inner.buf, self.inner.len as usize)
             }
         }
     }
 
     /// Header of the wifi packet.
-    pub fn hdr(&self) -> &[u8] {
+    pub fn header(&self) -> &[u8] {
         unsafe {
-            if self.0.hdr.is_null() {
+            if self.inner.hdr.is_null() {
                 &[]
             } else {
-                // what is the length of hdr?
-                core::slice::from_raw_parts(self.0.hdr, 30 as usize)
+                const HDR_LEN: usize = 24;
+                core::slice::from_raw_parts(self.inner.hdr, HDR_LEN)
             }
         }
     }
@@ -68,29 +75,32 @@ impl CWifiCsiInfo {
     /// Payload of the wifi packet.
     pub fn payload(&self) -> &[u8] {
         unsafe {
-            if self.0.payload.is_null() || self.0.payload_len == 0 {
+            if self.inner.payload.is_null() || self.inner.payload_len == 0 {
                 &[]
             } else {
-                core::slice::from_raw_parts(self.0.payload, self.0.payload_len as usize)
+                core::slice::from_raw_parts(self.inner.payload, self.inner.payload_len as usize)
             }
         }
     }
 
     /// Rx sequence number of the wifi packet.
-    pub fn rx_seq(&self) -> u16 {
-        self.0.rx_seq
+    pub fn rx_sequence(&self) -> u16 {
+        self.inner.rx_seq
     }
 }
 
-pub(crate) trait CsiCallback: FnMut(CWifiCsiInfo) {}
+pub(crate) trait CsiCallback: FnMut(WifiCsiInfo<'_>) {}
 
-impl<T> CsiCallback for T where T: FnMut(CWifiCsiInfo) {}
+impl<T> CsiCallback for T where T: FnMut(WifiCsiInfo<'_>) {}
 
 unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(ctx: *mut c_void, data: *mut wifi_csi_info_t) {
     unsafe {
         let csi_callback = &mut *(ctx as *mut C);
 
-        let data = CWifiCsiInfo(*data);
+        let data = WifiCsiInfo {
+            inner: *data,
+            _lt: PhantomData,
+        };
         csi_callback(data);
     }
 }

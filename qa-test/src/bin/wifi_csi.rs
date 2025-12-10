@@ -79,7 +79,7 @@ fn main() -> ! {
 
     let csi = CsiConfig::default();
     controller
-        .set_csi(csi, |data: esp_radio::wifi::csi::CWifiCsiInfo| {
+        .set_csi(csi, |data: esp_radio::wifi::csi::WifiCsiInfo| {
             let rx_ctrl = data.rx_ctrl();
             // Signed bitfields are broken in rust-bingen, see https://github.com/esp-rs/esp-wifi-sys/issues/482
             let rssi = if rx_ctrl.rssi() > 127 {
