@@ -3,13 +3,14 @@ use core::ops::Not;
 use crate::{
     clock::Clock,
     efuse::Efuse,
+    gpio::{AnyPin, Input, InputConfig, Pull, RtcPin},
     peripherals::APB_SARADC,
     rtc_cntl::{
         Rtc,
         RtcCalSel,
         RtcClock,
         rtc::{HpSysCntlReg, HpSysPower, LpSysPower},
-        sleep::{TimerWakeupSource, WakeSource, WakeTriggers},
+        sleep::{Ext1WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel},
     },
     soc::clocks::{ClockTree, CpuClkConfig, HpRootClkConfig},
 };
@@ -47,6 +48,89 @@ impl WakeSource for TimerWakeupSource {
             lp_timer
                 .tar0_high()
                 .modify(|_, w| w.main_timer_tar_en0().set_bit());
+        }
+    }
+}
+
+impl Ext1WakeupSource<'_, '_> {
+    /// Returns the currently configured wakeup pins.
+    fn wakeup_pins() -> u8 {
+        unsafe { lp_aon().ext_wakeup_cntl().read().ext_wakeup_sel().bits() }
+    }
+
+    /// Resets the pins that had been configured as wakeup trigger to their default state.
+    fn wake_io_reset() {
+        fn uninit_pin(pin: impl RtcPin, wakeup_pins: u8) {
+            if wakeup_pins & (1 << pin.rtc_number()) != 0 {
+                pin.rtcio_pad_hold(false);
+                pin.degrade().init_gpio();
+            }
+        }
+
+        let wakeup_pins = Ext1WakeupSource::wakeup_pins();
+        for_each_lp_function! {
+            (($_rtc:ident, LP_GPIOn, $n:literal), $gpio:ident) => {
+                uninit_pin(unsafe { $crate::peripherals::$gpio::steal() }, wakeup_pins);
+            };
+        }
+    }
+}
+
+impl WakeSource for Ext1WakeupSource<'_, '_> {
+    fn apply(
+        &self,
+        _rtc: &Rtc<'_>,
+        triggers: &mut WakeTriggers,
+        sleep_config: &mut RtcSleepConfig,
+    ) {
+        triggers.set_ext1(true);
+        sleep_config.need_pd_top = true;
+
+        // ext1_wakeup_prepare
+        let mut pins = self.pins.borrow_mut();
+        let mut pin_mask = 0u8;
+        let mut level_mask = 0u8;
+        for (pin, level) in pins.iter_mut() {
+            pin_mask |= 1 << pin.rtc_number();
+            level_mask |= match level {
+                WakeupLevel::High => 1 << pin.rtc_number(),
+                WakeupLevel::Low => 0,
+            };
+
+            pin.rtcio_pad_hold(true);
+            Input::new(
+                unsafe { AnyPin::steal(pin.number()) },
+                InputConfig::default().with_pull(match level {
+                    WakeupLevel::High => Pull::Down,
+                    WakeupLevel::Low => Pull::Up,
+                }),
+            );
+        }
+
+        unsafe {
+            // clear previous wakeup status
+            lp_aon()
+                .ext_wakeup_cntl()
+                .modify(|_, w| w.ext_wakeup_status_clr().set_bit());
+
+            // set pin + level register fields
+            lp_aon().ext_wakeup_cntl().modify(|r, w| {
+                w.ext_wakeup_sel()
+                    .bits(r.ext_wakeup_sel().bits() | pin_mask)
+                    .ext_wakeup_lv()
+                    .bits(r.ext_wakeup_lv().bits() & !pin_mask | level_mask)
+            });
+        }
+    }
+}
+
+impl Drop for Ext1WakeupSource<'_, '_> {
+    fn drop(&mut self) {
+        // reset GPIOs to default state
+        let mut pins = self.pins.borrow_mut();
+        for (pin, _level) in pins.iter_mut() {
+            pin.rtcio_pad_hold(false);
+            unsafe { AnyPin::steal(pin.number()) }.init_gpio();
         }
     }
 }
@@ -521,6 +605,8 @@ pub struct RtcSleepConfig {
     pub deep: bool,
     /// Power Down flags
     pub pd_flags: PowerDownFlags,
+    /// Indicates whether the top power domain should remain enabled during sleep.
+    need_pd_top: bool,
 }
 
 impl Default for RtcSleepConfig {
@@ -531,6 +617,7 @@ impl Default for RtcSleepConfig {
         Self {
             deep: false,
             pd_flags: PowerDownFlags(0),
+            need_pd_top: false,
         }
     }
 }
@@ -599,17 +686,27 @@ impl RtcSleepConfig {
         }
     }
 
+    pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
+        Self::wake_io_reset();
+    }
+
+    fn wake_io_reset() {
+        Ext1WakeupSource::wake_io_reset();
+    }
+
     /// Finalize power-down flags, apply configuration based on the flags.
     pub(crate) fn apply(&mut self) {
         if self.deep {
             // force-disable certain power domains
-            self.pd_flags.set_pd_top(true);
+            self.pd_flags.set_pd_top(self.need_pd_top.not());
             self.pd_flags.set_pd_vddsdio(true);
             self.pd_flags.set_pd_modem(true);
             self.pd_flags.set_pd_cpu(true);
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_rc_fast(true);
             self.pd_flags.set_pd_xtal32k(true);
+        } else if self.need_pd_top {
+            self.pd_flags.set_pd_top(false);
         }
     }
 
@@ -732,7 +829,9 @@ impl RtcSleepConfig {
     }
 
     /// Cleans up after sleep
-    pub(crate) fn finish_sleep(&self) {}
+    pub(crate) fn finish_sleep(&self) {
+        Self::wake_io_reset();
+    }
 }
 
 #[derive(Clone, Copy)]

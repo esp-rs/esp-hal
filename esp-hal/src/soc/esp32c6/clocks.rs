@@ -49,7 +49,8 @@ impl CpuClock {
                 cpu_ls_div: None, // Unused when root clock is PLL
                 ahb_hs_div: Some(AhbHsDivConfig::_3),
                 ahb_ls_div: None, // Unused when root clock is PLL
-                mspi_fast_hs_clk: Some(MspiFastHsClkConfig::_3),
+                // Configures 80MHz MSPI clock
+                mspi_fast_hs_clk: Some(MspiFastHsClkConfig::_5),
                 mspi_fast_ls_clk: None, // Unused when root clock is PLL
                 apb_clk: Some(ApbClkConfig::new(0)),
                 ledc_sclk: Some(LedcSclkConfig::PllF80m),
@@ -64,7 +65,8 @@ impl CpuClock {
                 cpu_ls_div: None, // Unused when root clock is PLL
                 ahb_hs_div: Some(AhbHsDivConfig::_3),
                 ahb_ls_div: None, // Unused when root clock is PLL
-                mspi_fast_hs_clk: Some(MspiFastHsClkConfig::_3),
+                // Configures 80MHz MSPI clock
+                mspi_fast_hs_clk: Some(MspiFastHsClkConfig::_5),
                 mspi_fast_ls_clk: None, // Unused when root clock is PLL
                 apb_clk: Some(ApbClkConfig::new(0)),
                 ledc_sclk: Some(LedcSclkConfig::PllF80m),
@@ -78,6 +80,12 @@ impl CpuClock {
         if config.xtal_clk.is_none() {
             config.xtal_clk = Some(XtalClkConfig::_40);
         }
+
+        // On ESP32C6, MSPI source clock's default HS divider leads to 120MHz, which is unusable
+        // before calibration. Therefore, before switching SOC_ROOT_CLK to HS, we need to set
+        // MSPI source clock HS divider to make it run at 80MHz after the switch.
+        // PLL = 480MHz, so divider is 6.
+        ClockTree::with(|clocks| configure_mspi_fast_hs_clk(clocks, MspiFastHsClkConfig::_5));
 
         config.apply();
     }

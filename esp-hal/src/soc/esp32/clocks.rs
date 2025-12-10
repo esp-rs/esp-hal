@@ -45,7 +45,6 @@ pub(crate) enum CpuClock {
 impl CpuClock {
     pub(crate) fn configure(self) {
         // Resolve presets
-        // TODO: set some defaults to RTC clocks
         let mut config = match self {
             CpuClock::_80MHz => ClockConfig {
                 xtal_clk: None,
@@ -54,8 +53,8 @@ impl CpuClock {
                 cpu_pll_div: Some(CpuPllDivConfig::_4),
                 syscon_pre_div: None,
                 cpu_clk: Some(CpuClkConfig::Pll),
-                rtc_slow_clk: None,
-                rtc_fast_clk: None,
+                rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+                rtc_fast_clk: Some(RtcFastClkConfig::Rc),
             },
             CpuClock::_160MHz => ClockConfig {
                 xtal_clk: None,
@@ -64,8 +63,8 @@ impl CpuClock {
                 cpu_pll_div: Some(CpuPllDivConfig::_2),
                 syscon_pre_div: None,
                 cpu_clk: Some(CpuClkConfig::Pll),
-                rtc_slow_clk: None,
-                rtc_fast_clk: None,
+                rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+                rtc_fast_clk: Some(RtcFastClkConfig::Rc),
             },
             CpuClock::_240MHz => ClockConfig {
                 xtal_clk: None,
@@ -74,8 +73,8 @@ impl CpuClock {
                 cpu_pll_div: Some(CpuPllDivConfig::_2),
                 syscon_pre_div: None,
                 cpu_clk: Some(CpuClkConfig::Pll),
-                rtc_slow_clk: None,
-                rtc_fast_clk: None,
+                rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+                rtc_fast_clk: Some(RtcFastClkConfig::Rc),
             },
             CpuClock::Custom(clock_config) => clock_config,
         };

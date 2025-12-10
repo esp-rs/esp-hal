@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added blocking `send_break`, `wait_for_break` and `wait_for_break_with_timeout` for sending and detecting software breaks with the UART driver (#4284)
 - Added support for `RxBreakDetected` interrupt and `wait_for_break_async` for detecting software breaks asynchronously to the UART driver (#4284)
 - Unsafely expose GPIO pins that are only available on certain chip/module variants (#4520)
-- ESP32-H2: light sleep and deep sleep support with timer wakeup source (#4587)
+- ESP32-H2: light sleep and deep sleep support with timer and EXT1 wakeup sources (#4587, #4641)
 
 ### Changed
 
@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Internal clock configuration rework (#4501)
 - RMT: Support for `Into<PulseCode>` and `From<PulseCode>` has been removed from Tx and Rx methods, respectively, in favor of requiring `PulseCode` directly. (#4616)
 - RMT: Tx handling has been revised: Some errors will now be returned by `TxTransaction::wait()` instead of `Channel::transmit`. `Channel::transmit_continuously()` can now also report `Error::EndMarkerMissing`. (#4617)
+- `Rtc::time_since_boot()` has been renamed to `Rtc::time_since_power_up()` (#4630)
 
 ### Fixed
 

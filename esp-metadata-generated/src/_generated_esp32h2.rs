@@ -2387,7 +2387,22 @@ macro_rules! for_each_analog_function {
 macro_rules! for_each_lp_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
-        _for_each_inner!((all)); _for_each_inner!((all_expanded));
+        _for_each_inner!((LP_GPIO0, GPIO7)); _for_each_inner!((LP_GPIO1, GPIO8));
+        _for_each_inner!((LP_GPIO2, GPIO9)); _for_each_inner!((LP_GPIO3, GPIO10));
+        _for_each_inner!((LP_GPIO4, GPIO11)); _for_each_inner!((LP_GPIO5, GPIO12));
+        _for_each_inner!((LP_GPIO6, GPIO13)); _for_each_inner!((LP_GPIO7, GPIO14));
+        _for_each_inner!(((LP_GPIO0, LP_GPIOn, 0), GPIO7)); _for_each_inner!(((LP_GPIO1,
+        LP_GPIOn, 1), GPIO8)); _for_each_inner!(((LP_GPIO2, LP_GPIOn, 2), GPIO9));
+        _for_each_inner!(((LP_GPIO3, LP_GPIOn, 3), GPIO10)); _for_each_inner!(((LP_GPIO4,
+        LP_GPIOn, 4), GPIO11)); _for_each_inner!(((LP_GPIO5, LP_GPIOn, 5), GPIO12));
+        _for_each_inner!(((LP_GPIO6, LP_GPIOn, 6), GPIO13)); _for_each_inner!(((LP_GPIO7,
+        LP_GPIOn, 7), GPIO14)); _for_each_inner!((all(LP_GPIO0, GPIO7), (LP_GPIO1,
+        GPIO8), (LP_GPIO2, GPIO9), (LP_GPIO3, GPIO10), (LP_GPIO4, GPIO11), (LP_GPIO5,
+        GPIO12), (LP_GPIO6, GPIO13), (LP_GPIO7, GPIO14)));
+        _for_each_inner!((all_expanded((LP_GPIO0, LP_GPIOn, 0), GPIO7), ((LP_GPIO1,
+        LP_GPIOn, 1), GPIO8), ((LP_GPIO2, LP_GPIOn, 2), GPIO9), ((LP_GPIO3, LP_GPIOn, 3),
+        GPIO10), ((LP_GPIO4, LP_GPIOn, 4), GPIO11), ((LP_GPIO5, LP_GPIOn, 5), GPIO12),
+        ((LP_GPIO6, LP_GPIOn, 6), GPIO13), ((LP_GPIO7, LP_GPIOn, 7), GPIO14)));
     };
 }
 /// Defines the `InputSignal` and `OutputSignal` enums.
