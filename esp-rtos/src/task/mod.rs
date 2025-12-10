@@ -574,23 +574,10 @@ pub(super) fn allocate_main_task(
 
     // The main task is already running, no need to add it to the ready queue.
     scheduler.all_tasks.push(main_task_ptr);
-    scheduler.per_cpu[current_cpu].current_task = Some(main_task_ptr);
+    scheduler.set_current_task(cpu, Some(main_task_ptr));
     scheduler
         .run_queue
         .mark_task_ready(&scheduler.per_cpu, main_task_ptr);
-}
-
-pub(super) fn with_current_task<R>(mut cb: impl FnMut(&mut Task) -> R) -> R {
-    SCHEDULER.with(|state| {
-        cb(unsafe {
-            let current_cpu = Cpu::current() as usize;
-            unwrap!(state.per_cpu[current_cpu].current_task).as_mut()
-        })
-    })
-}
-
-pub(super) fn current_task() -> TaskPtr {
-    with_current_task(|task| NonNull::from(task))
 }
 
 /// A handle to the current thread.
@@ -604,7 +591,7 @@ impl CurrentThreadHandle {
     /// Retrieves a handle to the current task.
     pub fn get() -> Self {
         Self {
-            task: current_task(),
+            task: SCHEDULER.current_task(),
         }
     }
 
@@ -628,7 +615,7 @@ impl CurrentThreadHandle {
             // If we're dropping in priority, trigger a context switch in case another task can be
             // scheduled or time slicing needs to be started.
             if old > priority {
-                crate::task::yield_task();
+                yield_task();
             }
         });
     }

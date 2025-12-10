@@ -69,12 +69,12 @@ struct ThreadFlag {
 impl ThreadFlag {
     fn new() -> Self {
         let owner = SCHEDULER.with(|scheduler| {
-            let current_cpu = Cpu::current() as usize;
-            if let Some(current_task) = scheduler.per_cpu[current_cpu].current_task {
+            let current_cpu = Cpu::current();
+            if let Some(current_task) = scheduler.try_get_current_task(current_cpu) {
                 current_task
             } else {
                 // We're cheating, the task hasn't been initialized yet.
-                NonNull::from(&scheduler.per_cpu[current_cpu].main_task)
+                NonNull::from(&scheduler.per_cpu[current_cpu as usize].main_task)
             }
         });
         Self {
