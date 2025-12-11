@@ -23,39 +23,42 @@ use crate::{
 /// from the received WiFi packet (MAC addresses, sequence number, packet headers).
 #[repr(transparent)]
 pub struct WifiCsiInfo<'a> {
-    inner: wifi_csi_info_t,
+    inner: *const wifi_csi_info_t,
     _lt: PhantomData<&'a ()>,
 }
 
-impl WifiCsiInfo<'_> {
+impl<'a> WifiCsiInfo<'_> {
     /// Metadata header for the CSI data of a received packet.
-    pub fn rx_ctrl(&self) -> &wifi_pkt_rx_ctrl_t {
-        &self.inner.rx_ctrl
+    pub fn rx_ctrl(&self) -> WifiPktRxCtrl<'a> {
+        WifiPktRxCtrl {
+            inner: unsafe { &(*self.inner).rx_ctrl },
+            _lt: PhantomData,
+        }
     }
 
     /// Source MAC address of the CSI data.
     pub fn mac(&self) -> &[u8; 6] {
-        &self.inner.mac
+        unsafe { &(*self.inner).mac }
     }
 
     /// Destination MAC address of the CSI data.
     pub fn destination_mac(&self) -> &[u8; 6] {
-        &self.inner.dmac
+        unsafe { &(*self.inner).dmac }
     }
 
     /// First four bytes of the CSI data is invalid or not, true indicates the first four bytes is
     /// invalid due to hardware limitation.
     pub fn first_word_invalid(&self) -> bool {
-        self.inner.first_word_invalid
+        unsafe { (*self.inner).first_word_invalid }
     }
 
     /// Valid buffer of CSI data.
     pub fn buf(&self) -> &[i8] {
         unsafe {
-            if self.inner.buf.is_null() || self.inner.len == 0 {
+            if (*self.inner).buf.is_null() || (*self.inner).len == 0 {
                 &[]
             } else {
-                core::slice::from_raw_parts(self.inner.buf, self.inner.len as usize)
+                core::slice::from_raw_parts((*self.inner).buf, (*self.inner).len as usize)
             }
         }
     }
@@ -63,11 +66,11 @@ impl WifiCsiInfo<'_> {
     /// Header of the wifi packet.
     pub fn header(&self) -> &[u8] {
         unsafe {
-            if self.inner.hdr.is_null() {
+            if (*self.inner).hdr.is_null() {
                 &[]
             } else {
                 const HDR_LEN: usize = 24;
-                core::slice::from_raw_parts(self.inner.hdr, HDR_LEN)
+                core::slice::from_raw_parts((*self.inner).hdr, HDR_LEN)
             }
         }
     }
@@ -75,17 +78,248 @@ impl WifiCsiInfo<'_> {
     /// Payload of the wifi packet.
     pub fn payload(&self) -> &[u8] {
         unsafe {
-            if self.inner.payload.is_null() || self.inner.payload_len == 0 {
+            if (*self.inner).payload.is_null() || (*self.inner).payload_len == 0 {
                 &[]
             } else {
-                core::slice::from_raw_parts(self.inner.payload, self.inner.payload_len as usize)
+                core::slice::from_raw_parts(
+                    (*self.inner).payload,
+                    (*self.inner).payload_len as usize,
+                )
             }
         }
     }
 
     /// Rx sequence number of the wifi packet.
     pub fn rx_sequence(&self) -> u16 {
-        self.inner.rx_seq
+        unsafe { (*self.inner).rx_seq }
+    }
+}
+
+/// Received packet radio metadata header.
+#[repr(transparent)]
+pub struct WifiPktRxCtrl<'a> {
+    inner: *const wifi_pkt_rx_ctrl_t,
+    _lt: PhantomData<&'a ()>,
+}
+#[cfg(not(esp32c6))]
+impl WifiPktRxCtrl<'_> {
+    /// Received Signal Strength Indicator (RSSI) of the packet.
+    pub fn rssi(&self) -> i8 {
+        unsafe { (*self.inner).rssi() as i8 }
+    }
+
+    /// Data rate of the packet.
+    pub fn rate(&self) -> u8 {
+        unsafe { (*self.inner).rate() as u8 }
+    }
+
+    /// Protocol of the received packet, 0: non HT(11bg) packet; 1: HT(11n) packet; 3: VHT(11ac)
+    /// packet.
+    pub fn packet_mode(&self) -> u8 {
+        unsafe { (*self.inner).sig_mode() as u8 }
+    }
+
+    /// Modulation Coding Scheme. If is HT(11n) packet, shows the modulation, range from 0 to
+    /// 76(MSC0 ~ MCS76).
+    pub fn modulation_coding_scheme(&self) -> u8 {
+        unsafe { (*self.inner).mcs() as u8 }
+    }
+
+    /// Channel Bandwidth of the packet. 0: 20MHz; 1: 40MHz.
+    pub fn cwb(&self) -> bool {
+        unsafe { (*self.inner).cwb() != 0 }
+    }
+
+    /// Set to 1 indicates that channel estimate smoothing is recommended.
+    /// Set to 0 indicates that only per-carrier independent (unsmoothed) channel estimate is
+    /// recommended.
+    pub fn smoothing(&self) -> bool {
+        unsafe { (*self.inner).smoothing() != 0 }
+    }
+
+    /// Set to 1 indicates that the PPDU is not a sounding PPDU.
+    /// Set to 0 indicates that PPDU is a sounding PPDU.
+    pub fn not_sounding(&self) -> bool {
+        unsafe { (*self.inner).not_sounding() != 0 }
+    }
+
+    /// Aggregation. 0: MPDU packet; 1: AMPDU packet
+    pub fn aggregation(&self) -> bool {
+        unsafe { (*self.inner).aggregation() != 0 }
+    }
+
+    /// Space Time Block Code(STBC). 0: non STBC packet; 1: STBC packet
+    pub fn space_time_block_code(&self) -> u8 {
+        unsafe { (*self.inner).stbc() as u8 }
+    }
+
+    /// Forward Error Correction(FEC). Flag is set for 11n packets which are LDPC
+    pub fn forward_error_correction_coding(&self) -> bool {
+        unsafe { (*self.inner).fec_coding() != 0 }
+    }
+
+    /// Short Guide Interval(SGI). 0: Long GI; 1: Short GI.
+    pub fn short_guide_interval(&self) -> bool {
+        unsafe { (*self.inner).sgi() != 0 }
+    }
+
+    /// Noise floor in dBm of Radio Frequency Module(RF).
+    pub fn noise_floor(&self) -> i8 {
+        unsafe { (*self.inner).noise_floor() as i8 }
+    }
+
+    /// The number of subframes aggregated in AMPDU.
+    pub fn ampdu_count(&self) -> u8 {
+        unsafe { (*self.inner).ampdu_cnt() as u8 }
+    }
+
+    /// Primary channel on which this packet is received.
+    pub fn channel(&self) -> u8 {
+        unsafe { (*self.inner).channel() as u8 }
+    }
+
+    /// Secondary channel on which this packet is received.
+    /// 0: none; 1: above; 2: below.
+    pub fn secondary_channel(&self) -> u8 {
+        unsafe { (*self.inner).secondary_channel() as u8 }
+    }
+
+    /// The local time in microseconds when this packet is received. It is precise only if modem
+    /// sleep or light sleep is not enabled.
+    pub fn timestamp(&self) -> u32 {
+        unsafe { (*self.inner).timestamp() as u32 }
+    }
+
+    /// antenna number from which this packet is received.
+    /// 0: WiFi antenna 0; 1: WiFi antenna 1
+    pub fn antenna(&self) -> u8 {
+        unsafe { (*self.inner).ant() as u8 }
+    }
+
+    /// Length of packet including Frame Check Sequence(FCS).
+    pub fn signal_length(&self) -> u16 {
+        unsafe { (*self.inner).sig_len() as u16 }
+    }
+
+    /// State of the packet.
+    /// 0: no error; others: failure.
+    pub fn rx_state(&self) -> u8 {
+        unsafe { (*self.inner).rx_state() as u8 }
+    }
+}
+
+#[cfg(esp32c6)]
+impl WifiPktRxCtrl<'_> {
+    /// Received Signal Strength Indicator (RSSI) of the packet.
+    pub fn rssi(&self) -> i8 {
+        unsafe { (*self.inner).rssi() as i8 }
+    }
+
+    /// Data rate of the packet.
+    pub fn rate(&self) -> u8 {
+        unsafe { (*self.inner).rate() as u8 }
+    }
+
+    /// Indicate whether the reception frame is from interface 0.
+    pub fn rxmatch0(&self) -> bool {
+        unsafe { (*self.inner).rxmatch0() != 0 }
+    }
+
+    /// Indicate whether the reception frame is from interface 1.
+    pub fn rxmatch1(&self) -> bool {
+        unsafe { (*self.inner).rxmatch1() != 0 }
+    }
+
+    /// Indicate whether the reception frame is from interface 2.
+    pub fn rxmatch2(&self) -> bool {
+        unsafe { (*self.inner).rxmatch2() != 0 }
+    }
+
+    /// Indicate whether the reception frame is from interface 3.
+    pub fn rxmatch3(&self) -> bool {
+        unsafe { (*self.inner).rxmatch3() != 0 }
+    }
+
+    /// HE-SIGA1 or HT-SIG.
+    pub fn he_siga1(&self) -> u32 {
+        unsafe { (*self.inner).he_siga1 }
+    }
+
+    /// Reception state, 0: successful, others: failure.
+    pub fn rxend_state(&self) -> u8 {
+        unsafe { (*self.inner).rxend_state() as u8 }
+    }
+
+    /// HE-SIGA2.
+    pub fn he_siga2(&self) -> u16 {
+        unsafe { (*self.inner).he_siga2 }
+    }
+
+    /// Indicate whether the reception is a group addressed frame.
+    pub fn is_group(&self) -> bool {
+        unsafe { (*self.inner).is_group() != 0 }
+    }
+
+    /// The local time in microseconds when this packet is received. It is precise only if modem
+    /// sleep or light sleep is not enabled.
+    pub fn timestamp(&self) -> u32 {
+        unsafe { (*self.inner).timestamp() }
+    }
+
+    /// Noise floor in dBm of Radio Frequency Module(RF).
+    pub fn noise_floor(&self) -> i8 {
+        unsafe { (*self.inner).noise_floor() as i8 }
+    }
+
+    /// Primary channel on which this packet is received.
+    pub fn channel(&self) -> u8 {
+        unsafe { (*self.inner).channel() as u8 }
+    }
+
+    /// Secondary channel if in HT40 on which this packet is received.
+    pub fn secondary_channel(&self) -> u8 {
+        unsafe { (*self.inner).second() as u8 }
+    }
+
+    /// The length of the channel information.
+    pub fn rx_channel_estimate_length(&self) -> u32 {
+        unsafe { (*self.inner).rx_channel_estimate_len() }
+    }
+
+    /// Indicate the channel information is valid.
+    pub fn rx_channel_estimate_info_valid(&self) -> bool {
+        unsafe { (*self.inner).rx_channel_estimate_info_vld() != 0 }
+    }
+
+    /// The format of the reception frame.
+    pub fn cur_bb_format(&self) -> u8 {
+        unsafe { (*self.inner).cur_bb_format() as u8 }
+    }
+
+    /// Indicate whether the reception MPDU is a S-MPDU.
+    pub fn cur_single_mpdu(&self) -> bool {
+        unsafe { (*self.inner).cur_single_mpdu() != 0 }
+    }
+
+    /// The length of HE-SIGB.
+    pub fn he_sigb_length(&self) -> u8 {
+        unsafe { (*self.inner).he_sigb_len() as u8 }
+    }
+
+    /// The length of the reception MPDU.
+    pub fn signal_length(&self) -> u32 {
+        unsafe { (*self.inner).sig_len() }
+    }
+
+    /// The length of the reception MPDU excluding the FCS.
+    pub fn dump_length(&self) -> u32 {
+        unsafe { (*self.inner).dump_len() }
+    }
+
+    /// State of the packet.
+    /// 0: no error; others: failure.
+    pub fn rx_state(&self) -> u8 {
+        unsafe { (*self.inner).rx_state() as u8 }
     }
 }
 
@@ -98,7 +332,7 @@ unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(ctx: *mut c_void, data: *mut wifi
         let csi_callback = &mut *(ctx as *mut C);
 
         let data = WifiCsiInfo {
-            inner: *data,
+            inner: data,
             _lt: PhantomData,
         };
         csi_callback(data);
