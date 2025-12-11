@@ -1058,10 +1058,6 @@ pub struct Clocks {
     /// XTAL clock frequency
     pub xtal_clock: Rate,
 
-    /// I2C clock frequency
-    #[cfg(esp32)]
-    pub i2c_clock: Rate,
-
     /// PWM clock frequency
     #[cfg(esp32)]
     pub pwm_clock: Rate,
@@ -1162,9 +1158,7 @@ impl Clocks {
                 apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
                 // FIXME: this assumes there is a crystal
                 xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
-                i2c_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
-                // TODO: model PLL_F160M
-                pwm_clock: Rate::from_mhz(160),
+                pwm_clock: Rate::from_hz(crate::soc::clocks::pll_f160m_clk_frequency(clocks)),
             }
         })
     }
