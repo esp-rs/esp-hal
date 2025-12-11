@@ -21,8 +21,7 @@ pub(crate) fn generate_rom_symbols(workspace: &Path, target_chip: &Chip) -> Resu
 
     let dest_path = workspace.join("src/generated_rom_symbols.rs");
 
-    let current_chip_module_content =
-        generate_module_content(&rom_ld_dir, &chip_name, &target_chip)?;
+    let content = generate_module_content(&rom_ld_dir, &target_chip)?;
 
     let mut out_file = OpenOptions::new()
         .create(true)
@@ -34,7 +33,7 @@ pub(crate) fn generate_rom_symbols(workspace: &Path, target_chip: &Chip) -> Resu
             dest_path.display()
         ))?;
 
-    writeln!(out_file, "{}", current_chip_module_content).context(format!(
+    writeln!(out_file, "{}", content).context(format!(
         "Failed to write module content for chip {} to generated_rom_symbols.rs",
         chip_name
     ))?;
@@ -43,11 +42,7 @@ pub(crate) fn generate_rom_symbols(workspace: &Path, target_chip: &Chip) -> Resu
 }
 
 // Helper function to handle the parsing and content generation.
-fn generate_module_content(
-    rom_ld_dir: &Path,
-    chip_name: &str,
-    _target_chip: &Chip,
-) -> Result<String, Error> {
+fn generate_module_content(rom_ld_dir: &Path, _target_chip: &Chip) -> Result<String, Error> {
     let mut content = String::new();
 
     let linker_scripts: Vec<PathBuf> = fs::read_dir(rom_ld_dir)?
@@ -61,14 +56,11 @@ fn generate_module_content(
         })
         .collect();
 
-    content.push_str(&format!(
-            "#[cfg(all(feature = \"{chip}\", feature = \"__internal_rom_symbols\"))]\npub mod rom_symbols {{\n",
-            chip = chip_name
-    ));
+    content.push_str(&format!("pub mod rom_symbols {{\n"));
 
     let mut generated_symbols: HashSet<String> = HashSet::new();
 
-    let assignment_re = Regex::new(r"^\s*([_a-zA-Z][_a-zA-Z0-9]*)\s*[=:]\s*(.*?);")?;
+    let assignment_re = Regex::new(r"^\s*([_a-zA-Z][_a-zA-Z0-9]*)\s*[=]\s*(.*?);")?;
     let provide_re = Regex::new(r"PROVIDE\s*\(\s*([_a-zA-Z][_a-zA-Z0-9]*)\s*=\s*(.*?)\);")?;
 
     for script_path in linker_scripts {
@@ -110,4 +102,69 @@ fn generate_module_content(
     content.push_str("}\n");
 
     Ok(content)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs::File, io::Write, path::Path};
+
+    use tempfile::TempDir;
+
+    use super::*;
+
+    // Helper to create a temporary .ld file
+    fn create_test_file(dir: &Path) -> Result<(), Error> {
+        let test_file_path = dir.join("tmp_rom.ld");
+        let mut file = File::create(&test_file_path)?;
+
+        let content = r#"
+memset = 0x40000488;
+PROVIDE( abs = 0x40000558 );
+EXTERN(__mktime);
+PROVIDE ( mktime = __mktime );
+syscall_table_ptr = 0x3fcdffd8;
+
+PROVIDE ( esp_rom_crc32_le = crc32_le );
+
+PROVIDE( tlsf_create = 0x400002dc );
+PROVIDE( tlsf_create_with_pool = 0x400002e0 );
+
+PROVIDE( heap_tlsf_table_ptr = 0x3fcdffec );
+
+mz_adler32 = 0x400000bc;
+__absvsi2 = 0x400008ac;
+_rom_chip_id = 0x40000010;
+"#;
+
+        file.write_all(content.as_bytes())?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_generate_module_content() -> Result<(), Error> {
+        let temp_dir = TempDir::new().expect("failed to create temporary directory");
+        let dir_path = temp_dir.path();
+
+        create_test_file(dir_path)?;
+
+        let generated = generate_module_content(dir_path, &Chip::Esp32)?;
+
+        // Check that generated Rust module starts correctly
+        assert!(generated.contains("pub mod rom_symbols"));
+
+        // Check expected parsed symbols
+        assert!(generated.contains("pub fn memset()"));
+        assert!(generated.contains("pub fn abs()"));
+        assert!(generated.contains("pub fn mktime()"));
+        assert!(generated.contains("pub fn syscall_table_ptr()"));
+        assert!(generated.contains("pub fn esp_rom_crc32_le()"));
+        assert!(generated.contains("pub fn tlsf_create()"));
+        assert!(generated.contains("pub fn tlsf_create_with_pool()"));
+        assert!(generated.contains("pub fn heap_tlsf_table_ptr()"));
+        assert!(generated.contains("pub fn mz_adler32()"));
+        assert!(generated.contains("pub fn absvsi2()"));
+        assert!(generated.contains("pub fn rom_chip_id()"));
+
+        Ok(())
+    }
 }

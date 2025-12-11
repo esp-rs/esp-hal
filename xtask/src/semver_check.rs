@@ -95,10 +95,6 @@ pub(crate) fn build_doc_json(
     let semver_feature = package.semver_feature_rules(&chip_config);
     features.extend(semver_feature);
 
-    if package == Package::EspRomSys {
-        features.push("__internal_rom_symbols".to_string());
-    }
-
     log::info!(
         "Building doc json for {} with features: {:?}",
         package,

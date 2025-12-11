@@ -178,9 +178,6 @@ pub mod checker {
         }
 
         if !semver_incompatible_packages.is_empty() {
-            // let dest_path = workspace.join("esp-rom-sys/src/generated_rom_symbols.rs");
-            // clean_symbols_file(&dest_path)?;
-
             Err(anyhow::anyhow!(
                 "Semver check failed - needs a major bump: {}",
                 semver_incompatible_packages.join(", ")
