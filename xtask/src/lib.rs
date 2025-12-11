@@ -335,7 +335,7 @@ impl Package {
     #[cfg(feature = "semver-checks")]
     pub fn semver_feature_rules(&self, config: &Config) -> Vec<String> {
         let feature_sets = self
-            .feature_rules_from_metadata(config, "semver-configs", false)
+            .feature_rules_from_metadata(config, "semver-config", false)
             .unwrap_or_default();
 
         let features: Vec<String> = feature_sets.into_iter().flatten().collect();

@@ -16,6 +16,7 @@ links         = "esp_rom_sys"
 forever-unstable = true
 check-configs = [{ features = [] }]
 clippy-configs = [{ features = [] }]
+semver-config = { features = ["__internal_rom_symbols"]}
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
