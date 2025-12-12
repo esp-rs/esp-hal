@@ -105,6 +105,9 @@ pub struct WifiPktRxCtrl<'a> {
 impl WifiPktRxCtrl<'_> {
     /// Received Signal Strength Indicator (RSSI) of the packet.
     pub fn rssi(&self) -> i8 {
+        // Signed bitfields are broken in rust-bingen, see https://github.com/esp-rs/esp-wifi-sys/issues/482
+        // Hard-casting it from C-signed to i8 gives correct values, so no need for workaround
+        // here.
         unsafe { (*self.inner).rssi() as i8 }
     }
 
