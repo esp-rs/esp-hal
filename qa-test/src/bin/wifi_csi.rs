@@ -80,8 +80,7 @@ fn main() -> ! {
     let csi = CsiConfig::default();
     controller
         .set_csi(csi, |data: esp_radio::wifi::csi::WifiCsiInfo| {
-            let rx_ctrl = data.rx_ctrl();
-            println!("rssi: {:?} rate: {}", rx_ctrl.rssi(), rx_ctrl.rate());
+            println!("rssi: {:?} rate: {}", data.rssi(), data.rate());
         })
         .unwrap();
 
