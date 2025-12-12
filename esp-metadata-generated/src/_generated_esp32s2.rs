@@ -1249,7 +1249,7 @@ macro_rules! define_clock_tree_types {
                     configure_apb_clk(clocks, ApbClkConfig::Xtal);
                     configure_ref_tick(clocks, RefTickConfig::Xtal);
                     let config_value =
-                        RefTickXtalConfig::new(((apb_clk_frequency(clocks) / 1000000) - 1));
+                        RefTickXtalConfig::new(((xtal_clk_frequency(clocks) / 1000000) - 1));
                     configure_ref_tick_xtal(clocks, config_value);
                 }
                 CpuClkConfig::RcFast => {
@@ -1257,7 +1257,7 @@ macro_rules! define_clock_tree_types {
                     configure_apb_clk(clocks, ApbClkConfig::RcFast);
                     configure_ref_tick(clocks, RefTickConfig::RcFast);
                     let config_value =
-                        RefTickCk8mConfig::new(((apb_clk_frequency(clocks) / 1000000) - 1));
+                        RefTickCk8mConfig::new(((rc_fast_clk_frequency(clocks) / 1000000) - 1));
                     configure_ref_tick_ck8m(clocks, config_value);
                 }
                 CpuClkConfig::Apll => {
@@ -1265,7 +1265,7 @@ macro_rules! define_clock_tree_types {
                     configure_apb_clk(clocks, ApbClkConfig::Apll);
                     configure_ref_tick(clocks, RefTickConfig::Apll);
                     let config_value =
-                        RefTickXtalConfig::new(((apb_clk_frequency(clocks) / 1000000) - 1));
+                        RefTickXtalConfig::new(((xtal_clk_frequency(clocks) / 1000000) - 1));
                     configure_ref_tick_xtal(clocks, config_value);
                 }
                 CpuClkConfig::Pll => {
@@ -1273,7 +1273,7 @@ macro_rules! define_clock_tree_types {
                     configure_apb_clk(clocks, ApbClkConfig::Pll);
                     configure_ref_tick(clocks, RefTickConfig::Pll);
                     let config_value =
-                        RefTickXtalConfig::new(((apb_clk_frequency(clocks) / 1000000) - 1));
+                        RefTickXtalConfig::new(((xtal_clk_frequency(clocks) / 1000000) - 1));
                     configure_ref_tick_xtal(clocks, config_value);
                 }
             }
