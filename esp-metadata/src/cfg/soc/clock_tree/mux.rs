@@ -121,12 +121,7 @@ impl ClockTreeNodeType for Multiplexer {
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let state_field = tree.properties(node).field_name();
-        let request_upstream_fn =
-            format_ident!("{}_request_upstream", node.name().to_case(Case::Snake));
-        quote! {
-            let selector = unwrap!(clocks.#state_field);
-            #request_upstream_fn(clocks, selector);
-        }
+        self.impl_request_upstream(node, tree, quote! { unwrap!(clocks.#state_field) })
     }
 
     fn release_direct_dependencies(
@@ -135,12 +130,7 @@ impl ClockTreeNodeType for Multiplexer {
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let state_field = tree.properties(node).field_name();
-        let release_upstream_fn =
-            format_ident!("{}_release_upstream", node.name().to_case(Case::Snake));
-        quote! {
-            let selector = unwrap!(clocks.#state_field);
-            #release_upstream_fn(clocks, selector);
-        }
+        self.impl_release_upstream(node, tree, quote! { unwrap!(clocks.#state_field) })
     }
 }
 
@@ -194,27 +184,8 @@ impl Multiplexer {
         let state = tree.properties(node).field_name();
         let refcount_field = tree.properties(node).refcount_field_name();
 
-        let request_upstream_fn =
-            format_ident!("{}_request_upstream", node.name().to_case(Case::Snake));
-        let release_upstream_fn =
-            format_ident!("{}_release_upstream", node.name().to_case(Case::Snake));
-
-        let variants = self.variants.iter();
-
-        let request_upstream_branches = variants.clone().map(|variant| {
-            let match_arm = variant.config_enum_variant_name();
-            let function = tree.node(&variant.outputs).request_fn_name();
-            quote! {
-                #ty_name::#match_arm => #function(clocks)
-            }
-        });
-        let release_upstream_branches = variants.clone().map(|variant| {
-            let match_arm = variant.config_enum_variant_name();
-            let function = tree.node(&variant.outputs).release_fn_name();
-            quote! {
-                #ty_name::#match_arm => #function(clocks)
-            }
-        });
+        let request_upstream = self.impl_request_upstream(node, tree, quote! { new_selector });
+        let release_upstream = self.impl_release_upstream(node, tree, quote! { old_selector });
 
         let cfgs = self
             .variants
@@ -257,10 +228,10 @@ impl Multiplexer {
         };
 
         let apply_and_switch_input = quote! {
-            #request_upstream_fn(clocks, new_selector);
+            #request_upstream
             #hal_impl(clocks, old_selector, new_selector);
             if let Some(old_selector) = old_selector {
-                #release_upstream_fn(clocks, old_selector);
+                #release_upstream
             }
         };
         let apply_impl = if refcount_field.is_some() {
@@ -282,18 +253,6 @@ impl Multiplexer {
                 #configures
 
                 #apply_impl
-            }
-
-            fn #request_upstream_fn(clocks: &mut ClockTree, selector: #ty_name) {
-                match selector {
-                    #(#request_upstream_branches,)*
-                }
-            }
-
-            fn #release_upstream_fn(clocks: &mut ClockTree, selector: #ty_name) {
-                match selector {
-                    #(#release_upstream_branches,)*
-                }
             }
         }
     }
@@ -336,6 +295,73 @@ impl Multiplexer {
             let variant_frequency = variant_frequencies.first().unwrap();
             quote! {
                 #variant_frequency
+            }
+        }
+    }
+
+    fn impl_request_upstream(
+        &self,
+        node: &dyn ClockTreeNodeType,
+        tree: &ProcessedClockData,
+        config_var: TokenStream,
+    ) -> TokenStream {
+        if self.variants.len() > 1 {
+            let ty_name = node.config_type_name().unwrap();
+            let request_upstream_branches = self.variants.iter().map(|variant| {
+                let match_arm = variant.config_enum_variant_name();
+                let function = tree.node(&variant.outputs).request_fn_name();
+                quote! {
+                    #ty_name::#match_arm => #function(clocks)
+                }
+            });
+
+            quote! {
+                match #config_var {
+                    #(#request_upstream_branches,)*
+                }
+            }
+        } else {
+            let function = self
+                .variants
+                .first()
+                .map(|variant| tree.node(&variant.outputs).request_fn_name())
+                .into_iter();
+
+            quote! {
+                #(#function(clocks);)*
+            }
+        }
+    }
+
+    fn impl_release_upstream(
+        &self,
+        node: &dyn ClockTreeNodeType,
+        tree: &ProcessedClockData,
+        config_var: TokenStream,
+    ) -> TokenStream {
+        if self.variants.len() > 1 {
+            let ty_name = node.config_type_name().unwrap();
+            let release_upstream_branches = self.variants.iter().map(|variant| {
+                let match_arm = variant.config_enum_variant_name();
+                let function = tree.node(&variant.outputs).release_fn_name();
+                quote! {
+                    #ty_name::#match_arm => #function(clocks)
+                }
+            });
+            quote! {
+                match #config_var {
+                    #(#release_upstream_branches,)*
+                }
+            }
+        } else {
+            let function = self
+                .variants
+                .first()
+                .map(|variant| tree.node(&variant.outputs).release_fn_name())
+                .into_iter();
+
+            quote! {
+                #(#function(clocks);)*
             }
         }
     }
