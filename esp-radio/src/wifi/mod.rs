@@ -29,9 +29,6 @@ use self::{
     scan::{FreeApListOnDrop, ScanConfig, ScanResults, ScanTypeConfig},
     sta::StationConfig,
 };
-#[cfg(all(feature = "csi", feature = "unstable"))]
-#[instability::unstable]
-pub use crate::sys::include::wifi_csi_info_t; // FIXME
 use crate::{
     InitializationError,
     RadioRefGuard,
@@ -2011,7 +2008,7 @@ impl WifiController<'_> {
     pub fn set_csi(
         &mut self,
         mut csi: csi::CsiConfig,
-        cb: impl FnMut(crate::wifi::wifi_csi_info_t) + Send,
+        cb: impl FnMut(crate::wifi::csi::WifiCsiInfo<'_>) + Send,
     ) -> Result<(), WifiError> {
         csi.apply_config()?;
         csi.set_receive_cb(cb)?;
