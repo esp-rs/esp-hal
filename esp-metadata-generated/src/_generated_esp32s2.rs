@@ -699,7 +699,7 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `REF_TICK_XTAL` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = APB_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = XTAL_CLK / (DIVISOR + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct RefTickXtalConfig(u32);
@@ -723,7 +723,7 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `REF_TICK_CK8M` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = APB_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = RC_FAST_CLK / (DIVISOR + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct RefTickCk8mConfig(u32);
@@ -1210,30 +1210,30 @@ macro_rules! define_clock_tree_types {
             configure_ref_tick_xtal_impl(clocks, config);
         }
         pub fn request_ref_tick_xtal(clocks: &mut ClockTree) {
-            request_apb_clk(clocks);
+            request_xtal_clk(clocks);
             enable_ref_tick_xtal_impl(clocks, true);
         }
         pub fn release_ref_tick_xtal(clocks: &mut ClockTree) {
             enable_ref_tick_xtal_impl(clocks, false);
-            release_apb_clk(clocks);
+            release_xtal_clk(clocks);
         }
         pub fn ref_tick_xtal_frequency(clocks: &mut ClockTree) -> u32 {
-            (apb_clk_frequency(clocks) / (unwrap!(clocks.ref_tick_xtal).value() + 1))
+            (xtal_clk_frequency(clocks) / (unwrap!(clocks.ref_tick_xtal).value() + 1))
         }
         pub fn configure_ref_tick_ck8m(clocks: &mut ClockTree, config: RefTickCk8mConfig) {
             clocks.ref_tick_ck8m = Some(config);
             configure_ref_tick_ck8m_impl(clocks, config);
         }
         pub fn request_ref_tick_ck8m(clocks: &mut ClockTree) {
-            request_apb_clk(clocks);
+            request_rc_fast_clk(clocks);
             enable_ref_tick_ck8m_impl(clocks, true);
         }
         pub fn release_ref_tick_ck8m(clocks: &mut ClockTree) {
             enable_ref_tick_ck8m_impl(clocks, false);
-            release_apb_clk(clocks);
+            release_rc_fast_clk(clocks);
         }
         pub fn ref_tick_ck8m_frequency(clocks: &mut ClockTree) -> u32 {
-            (apb_clk_frequency(clocks) / (unwrap!(clocks.ref_tick_ck8m).value() + 1))
+            (rc_fast_clk_frequency(clocks) / (unwrap!(clocks.ref_tick_ck8m).value() + 1))
         }
         pub fn configure_cpu_clk(clocks: &mut ClockTree, new_selector: CpuClkConfig) {
             let old_selector = clocks.cpu_clk.replace(new_selector);
@@ -1243,7 +1243,7 @@ macro_rules! define_clock_tree_types {
                     configure_apb_clk(clocks, ApbClkConfig::Xtal);
                     configure_ref_tick(clocks, RefTickConfig::Xtal);
                     let config_value =
-                        RefTickXtalConfig::new(((apb_clk_frequency(clocks) / 1000000) - 1));
+                        RefTickXtalConfig::new(((xtal_clk_frequency(clocks) / 1000000) - 1));
                     configure_ref_tick_xtal(clocks, config_value);
                 }
                 CpuClkConfig::RcFast => {
@@ -1251,7 +1251,7 @@ macro_rules! define_clock_tree_types {
                     configure_apb_clk(clocks, ApbClkConfig::RcFast);
                     configure_ref_tick(clocks, RefTickConfig::RcFast);
                     let config_value =
-                        RefTickCk8mConfig::new(((apb_clk_frequency(clocks) / 1000000) - 1));
+                        RefTickCk8mConfig::new(((rc_fast_clk_frequency(clocks) / 1000000) - 1));
                     configure_ref_tick_ck8m(clocks, config_value);
                 }
                 CpuClkConfig::Apll => {
@@ -1259,7 +1259,7 @@ macro_rules! define_clock_tree_types {
                     configure_apb_clk(clocks, ApbClkConfig::Apll);
                     configure_ref_tick(clocks, RefTickConfig::Apll);
                     let config_value =
-                        RefTickXtalConfig::new(((apb_clk_frequency(clocks) / 1000000) - 1));
+                        RefTickXtalConfig::new(((xtal_clk_frequency(clocks) / 1000000) - 1));
                     configure_ref_tick_xtal(clocks, config_value);
                 }
                 CpuClkConfig::Pll => {
@@ -1267,7 +1267,7 @@ macro_rules! define_clock_tree_types {
                     configure_apb_clk(clocks, ApbClkConfig::Pll);
                     configure_ref_tick(clocks, RefTickConfig::Pll);
                     let config_value =
-                        RefTickXtalConfig::new(((apb_clk_frequency(clocks) / 1000000) - 1));
+                        RefTickXtalConfig::new(((xtal_clk_frequency(clocks) / 1000000) - 1));
                     configure_ref_tick_xtal(clocks, config_value);
                 }
             }

@@ -320,7 +320,7 @@ fn enable_ref_tick_xtal_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_ref_tick_xtal_impl(_clocks: &mut ClockTree, new_config: RefTickXtalConfig) {
     SYSCON::regs()
         .tick_conf()
-        .write(|w| unsafe { w.xtal_tick_num().bits(new_config.value() as u8) });
+        .modify(|_, w| unsafe { w.xtal_tick_num().bits(new_config.value() as u8) });
 }
 
 // REF_TICK_CK8M
@@ -332,7 +332,7 @@ fn enable_ref_tick_ck8m_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_ref_tick_ck8m_impl(_clocks: &mut ClockTree, new_config: RefTickCk8mConfig) {
     SYSCON::regs()
         .tick_conf()
-        .write(|w| unsafe { w.ck8m_tick_num().bits(new_config.value() as u8) });
+        .modify(|_, w| unsafe { w.ck8m_tick_num().bits(new_config.value() as u8) });
 }
 
 // CPU_CLK
