@@ -63,6 +63,7 @@ pub mod checker {
         path::{Path, PathBuf},
     };
 
+    use anyhow::Context;
     use cargo_semver_checks::ReleaseType;
     use esp_metadata::Chip;
 
@@ -85,7 +86,12 @@ pub mod checker {
                 let package_name = package.to_string();
                 let package_path = crate::windows_safe_path(&workspace.join(&package_name));
 
+                package.prepare_semver_check(&package_path, chip)?;
+
                 let current_path = build_doc_json(package, chip, &package_path)?;
+
+                let dest_path = workspace.join("esp-rom-sys/src/generated_rom_symbols.rs");
+                package.clean_semver_check(&dest_path)?;
 
                 let file_name = if package.chip_features_matter() {
                     chip.to_string()
@@ -102,7 +108,9 @@ pub mod checker {
                     fs::File::create(to_path)?,
                     flate2::Compression::default(),
                 );
-                encoder.write_all(&std::fs::read(current_path)?)?;
+                encoder
+                    .write_all(&std::fs::read(current_path)?)
+                    .context("Failed to read or write doc json for baseline generation.")?;
 
                 if !package.chip_features_matter() {
                     break;

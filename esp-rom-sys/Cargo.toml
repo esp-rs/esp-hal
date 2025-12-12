@@ -16,6 +16,7 @@ links         = "esp_rom_sys"
 forever-unstable = true
 check-configs = [{ features = [] }]
 clippy-configs = [{ features = [] }]
+semver-config = { features = ["__internal_rom_symbols"]}
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
@@ -33,6 +34,8 @@ document-features   = "0.2"
 esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
+__internal_rom_symbols = []
+
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:
 
