@@ -64,12 +64,6 @@ impl RmtWriter {
         self.state
     }
 
-    #[allow(unused)]
-    #[inline]
-    pub(super) fn written(&self) -> usize {
-        self.written
-    }
-
     // Copy from `data` to the hardware buffer, advancing the `data` slice accordingly.
     //
     // If `initial` is set, fill the entire buffer. Otherwise, append half the buffer's length from
@@ -132,10 +126,10 @@ impl RmtWriter {
             self.state = if self.written == 0 {
                 // data was empty
                 WriterState::Error(Error::InvalidArgument)
-            // Do not check for end markers in the inner loop above since this would substantially
-            // increase the instruction count there. Instead, only check the last code to report on
-            // error.
             } else if last_code.is_end_marker() {
+                // Do not check for end markers in the inner loop above since this would
+                // substantially increase the instruction count there. Instead, only check the last
+                // code to report on error.
                 WriterState::Done
             } else {
                 // Write an extra end marker to prevent looping forever with wrapping tx.
