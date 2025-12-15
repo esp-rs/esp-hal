@@ -2,8 +2,6 @@
 
 Hardware-in-loop testing for `esp-hal`.
 
-[open an issue]: https://github.com/esp-rs/esp-hal/issues/new
-
 ## Quickstart
 
 We use [embedded-test] as our testing framework. This allows us to write unit and integration tests much in the same way you would for a normal Rust project, when the standard library is available, and to execute them using Cargo's built-in test runner.
