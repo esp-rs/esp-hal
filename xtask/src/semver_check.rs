@@ -135,9 +135,11 @@ fn required_bump(required_bumps: &[ReleaseType], forever_unstable: bool) -> Rele
         }
     }
 
-    if forever_unstable && min_required_update == ReleaseType::Major {
-        log::warn!("Downgrading required bump from Minor to Patch for unstable package",);
-        min_required_update = ReleaseType::Minor;
+    if forever_unstable && min_required_update != ReleaseType::Patch {
+        panic!(
+            "Forever-unstable package can only receive a patch release but received {:?}!",
+            min_required_update
+        );
     }
 
     min_required_update
@@ -169,16 +171,23 @@ mod tests {
     }
 
     #[test]
-    fn forever_unstable_downgrades_major_to_minor() {
+    #[should_panic(
+        expected = "Forever-unstable package can only receive a patch release but received Major"
+    )]
+    fn forever_unstable_downgrades_major_to_patch() {
         let bumps = [ReleaseType::Major];
 
         let result = required_bump(&bumps, true);
+    }
 
-        assert_eq!(
-            result,
-            ReleaseType::Minor,
-            "forever-unstable packages must never require a major bump"
-        );
+    #[test]
+    #[should_panic(
+        expected = "Forever-unstable package can only receive a patch release but received Minor"
+    )]
+    fn forever_unstable_downgrades_minor_to_patch() {
+        let bumps = [ReleaseType::Minor];
+
+        let result = required_bump(&bumps, true);
     }
 
     #[test]
