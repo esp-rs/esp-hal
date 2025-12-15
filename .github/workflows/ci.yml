@@ -67,7 +67,7 @@ jobs:
       - uses: esp-rs/xtensa-toolchain@v1.6
         if: matrix.group == 'xtensa'
         with:
-          version: 1.90.0.0
+          version: 1.92.0.0
 
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
