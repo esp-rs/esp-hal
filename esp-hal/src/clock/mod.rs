@@ -101,38 +101,7 @@ pub trait Clock {
     }
 }
 
-/// CPU clock speed
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(
-    clippy::enum_variant_names,
-    reason = "MHz suffix indicates physical unit."
-)]
-#[non_exhaustive]
-pub enum CpuClock {
-    /// 80MHz CPU clock
-    #[cfg(not(esp32h2))]
-    #[default]
-    // FIXME: I don't think this is correct in general?
-    _80MHz  = 80,
-
-    /// 96MHz CPU clock
-    #[cfg(esp32h2)]
-    #[default]
-    _96MHz  = 96,
-
-    /// 120MHz CPU clock
-    #[cfg(esp32c2)]
-    _120MHz = 120,
-
-    /// 160MHz CPU clock
-    #[cfg(not(any(esp32c2, esp32h2)))]
-    _160MHz = 160,
-
-    /// 240MHz CPU clock
-    #[cfg(xtensa)]
-    _240MHz = 240,
-}
+pub use crate::soc::clocks::CpuClock;
 
 impl CpuClock {
     #[procmacros::doc_replace]
@@ -159,12 +128,6 @@ impl CpuClock {
                 Self::_240MHz
             }
         }
-    }
-}
-
-impl Clock for CpuClock {
-    fn frequency(&self) -> Rate {
-        Rate::from_mhz(*self as u32)
     }
 }
 
@@ -1064,13 +1027,7 @@ impl Clocks {
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
         use crate::soc::clocks::ClockTree;
 
-        // TODO: expose the whole new enum for custom options
-        match cpu_clock_speed {
-            CpuClock::_80MHz => crate::soc::clocks::CpuClock::_80MHz,
-            CpuClock::_160MHz => crate::soc::clocks::CpuClock::_160MHz,
-            CpuClock::_240MHz => crate::soc::clocks::CpuClock::_240MHz,
-        }
-        .configure();
+        cpu_clock_speed.configure();
 
         ClockTree::with(|clocks| {
             // TODO: this struct can be removed once everything uses the new internal clock tree
@@ -1092,12 +1049,7 @@ impl Clocks {
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
         use crate::soc::clocks::{ClockTree, request_low_power_clk};
 
-        // TODO: expose the whole new enum for custom options
-        match cpu_clock_speed {
-            CpuClock::_80MHz => crate::soc::clocks::CpuClock::_80MHz,
-            CpuClock::_120MHz => crate::soc::clocks::CpuClock::_120MHz,
-        }
-        .configure();
+        cpu_clock_speed.configure();
 
         ClockTree::with(|clocks| {
             // TODO: this should be managed by esp-radio. The actual clock is probably managed by
@@ -1118,12 +1070,7 @@ impl Clocks {
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
         use crate::soc::clocks::{ClockTree, request_low_power_clk};
 
-        // TODO: expose the whole new enum for custom options
-        match cpu_clock_speed {
-            CpuClock::_80MHz => crate::soc::clocks::CpuClock::_80MHz,
-            CpuClock::_160MHz => crate::soc::clocks::CpuClock::_160MHz,
-        }
-        .configure();
+        cpu_clock_speed.configure();
 
         ClockTree::with(|clocks| {
             // TODO: this should be managed by esp-radio. The actual clock is probably managed by
@@ -1144,12 +1091,7 @@ impl Clocks {
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
         use crate::soc::clocks::ClockTree;
 
-        // TODO: expose the whole new enum for custom options
-        match cpu_clock_speed {
-            CpuClock::_80MHz => crate::soc::clocks::CpuClock::_80MHz,
-            CpuClock::_160MHz => crate::soc::clocks::CpuClock::_160MHz,
-        }
-        .configure();
+        cpu_clock_speed.configure();
 
         ClockTree::with(|clocks| Self {
             cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
@@ -1166,11 +1108,7 @@ impl Clocks {
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
         use crate::soc::clocks::ClockTree;
 
-        // TODO: expose the whole new enum for custom options
-        match cpu_clock_speed {
-            CpuClock::_96MHz => crate::soc::clocks::CpuClock::_96MHz,
-        }
-        .configure();
+        cpu_clock_speed.configure();
 
         ClockTree::with(|clocks| Self {
             cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
@@ -1187,13 +1125,7 @@ impl Clocks {
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
         use crate::soc::clocks::ClockTree;
 
-        // TODO: expose the whole new enum for custom options
-        match cpu_clock_speed {
-            CpuClock::_80MHz => crate::soc::clocks::CpuClock::_80MHz,
-            CpuClock::_160MHz => crate::soc::clocks::CpuClock::_160MHz,
-            CpuClock::_240MHz => crate::soc::clocks::CpuClock::_240MHz,
-        }
-        .configure();
+        cpu_clock_speed.configure();
 
         ClockTree::with(|clocks| Self {
             cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
@@ -1209,13 +1141,7 @@ impl Clocks {
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
         use crate::soc::clocks::ClockTree;
 
-        // TODO: expose the whole new enum for custom options
-        match cpu_clock_speed {
-            CpuClock::_80MHz => crate::soc::clocks::CpuClock::_80MHz,
-            CpuClock::_160MHz => crate::soc::clocks::CpuClock::_160MHz,
-            CpuClock::_240MHz => crate::soc::clocks::CpuClock::_240MHz,
-        }
-        .configure();
+        cpu_clock_speed.configure();
 
         ClockTree::with(|clocks| Self {
             cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),

@@ -11,9 +11,9 @@
 //!    * I2S_SCLK: 96_000_000 - I2S clock frequency
 
 crate::unstable_module! {
+    pub mod clocks;
     pub mod trng;
 }
-pub mod clocks;
 pub mod gpio;
 pub(crate) mod regi2c;
 
