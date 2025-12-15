@@ -195,8 +195,14 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Ledc" },
     { name = "I2cExt0" },
     { name = "Spi2" },
-    { name = "Uart1" },
-    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
+    { name = "Uart1", clocks = "Uart0" },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true, clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [ # UART_SCLK
+            { name = "PLL_F40M", outputs = "PLL_40M" },
+            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
+            { name = "XTAL",     outputs = "XTAL_CLK" },
+        ] }
+    ] },
     #{ name = "Spi01" },
     #{ name = "Timers" },
     

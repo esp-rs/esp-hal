@@ -260,7 +260,7 @@ clocks = { system_clocks = { clock_tree = [
     #{ name = "SdioSlave", template_params = { reg_group = "wifi_clk" } },
 
     { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
-    { name = "Uart2" },
+    { name = "Uart2", clocks = "Uart0" },
     { name = "SpiDma" },
     { name = "I2s1" },
     { name = "Mcpwm1", template_params = { peripheral = "pwm1" }, clocks = "Mcpwm0" },
@@ -288,9 +288,14 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Uhci0" },
     { name = "I2cExt0" },
     { name = "Spi2" },
-    { name = "Uart1" },
+    { name = "Uart1", clocks = "Uart0" },
     { name = "I2s0" },
-    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true, clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", default = "APB", variants = [
+            { name = "APB",      outputs = "APB_CLK" },
+            { name = "REF_TICK", outputs = "REF_TICK" }
+        ] }
+    ] },
     #{ name = "Spi01" },
 
     # Radio clocks not modeled here.

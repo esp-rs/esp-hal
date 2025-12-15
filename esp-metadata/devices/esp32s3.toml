@@ -204,7 +204,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Dma", template_params = { reg_group = "en1" } },
     { name = "SdioHost", template_params = { reg_group = "en1" } },
     { name = "LcdCam", template_params = { reg_group = "en1" } },
-    { name = "Uart2", template_params = { reg_group = "en1" } },
+    { name = "Uart2", template_params = { reg_group = "en1" }, clocks = "Uart0" },
     { name = "UsbDevice", template_params = { reg_group = "en1" }, keep_enabled = true },
     { name = "DedicatedGpio", template_params = { clk_en_register = "cpu_peri_clk_en", rst_register = "cpu_peri_rst_en" } },
 
@@ -241,9 +241,15 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Uhci0" },
     { name = "I2cExt0" },
     { name = "Spi2" },
-    { name = "Uart1" },
+    { name = "Uart1", clocks = "Uart0" },
     { name = "I2s0" },
-    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true, clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [ # UART_SCLK
+            { name = "APB",      outputs = "APB_CLK" },
+            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
+            { name = "XTAL",     outputs = "XTAL_CLK" },
+        ] }
+    ] },
     #{ name = "Spi01" },
     #{ name = "Timers" },
     

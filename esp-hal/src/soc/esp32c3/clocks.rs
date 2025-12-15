@@ -16,7 +16,7 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
-    peripherals::{APB_CTRL, I2C_ANA_MST, LPWR, SYSTEM, TIMG0, TIMG1},
+    peripherals::{APB_CTRL, I2C_ANA_MST, LPWR, SYSTEM, TIMG0, TIMG1, UART0, UART1},
     soc::regi2c,
     time::Rate,
 };
@@ -628,5 +628,45 @@ fn configure_timg1_wdt_clock_impl(
     TIMG1::regs().wdtconfig0().modify(|_, w| {
         w.wdt_use_xtal()
             .bit(new_selector == Timg0WdtClockConfig::XtalClk)
+    });
+}
+
+// UART0_FUNCTION_CLOCK
+
+fn enable_uart0_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
+    UART0::regs().clk_conf().modify(|_, w| w.sclk_en().bit(en));
+}
+
+fn configure_uart0_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0FunctionClockConfig>,
+    new_selector: Uart0FunctionClockConfig,
+) {
+    UART0::regs().clk_conf().modify(|_, w| unsafe {
+        w.sclk_sel().bits(match new_selector {
+            Uart0FunctionClockConfig::Apb => 1,
+            Uart0FunctionClockConfig::RcFast => 2,
+            Uart0FunctionClockConfig::Xtal => 3,
+        })
+    });
+}
+
+// UART1_FUNCTION_CLOCK
+
+fn enable_uart1_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
+    UART1::regs().clk_conf().modify(|_, w| w.sclk_en().bit(en));
+}
+
+fn configure_uart1_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0FunctionClockConfig>,
+    new_selector: Uart0FunctionClockConfig,
+) {
+    UART1::regs().clk_conf().modify(|_, w| unsafe {
+        w.sclk_sel().bits(match new_selector {
+            Uart0FunctionClockConfig::Apb => 1,
+            Uart0FunctionClockConfig::RcFast => 2,
+            Uart0FunctionClockConfig::Xtal => 3,
+        })
     });
 }
