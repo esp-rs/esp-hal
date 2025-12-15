@@ -384,7 +384,6 @@ instances = [
 support_status = "partial"
 instances = [{ name = "timg0" }]
 timg_has_divcnt_rst = true
-default_clock_source = 0 # use_xtal = false
 default_wdt_clock_source = 0 # use_wdt_xtal = false
 
 [device.uart]

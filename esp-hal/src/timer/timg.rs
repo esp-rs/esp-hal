@@ -82,11 +82,6 @@ use crate::{
     time::{Duration, Instant, Rate},
 };
 
-#[cfg(all(
-    timergroup_default_clock_source_is_set,
-    not(soc_has_clock_node_timg0_function_clock)
-))]
-const DEFAULT_CLK_SRC: u8 = property!("timergroup.default_clock_source");
 #[cfg(timergroup_default_wdt_clock_source_is_set)]
 const DEFAULT_WDT_CLK_SRC: u8 = property!("timergroup.default_wdt_clock_source");
 const NUM_TIMG: usize = 1 + cfg!(timergroup_timg1) as usize;
@@ -156,19 +151,8 @@ impl TimerGroupInstance for TIMG0<'_> {
                     );
                     crate::soc::clocks::request_timg0_function_clock(clocks);
                 });
-            } else if #[cfg(not(timergroup_default_clock_source_is_set))] {
+            } else  {
                 // Clock source is not configurable
-            } else if #[cfg(soc_has_pcr)] {
-                crate::peripherals::PCR::regs()
-                    .timergroup0_timer_clk_conf()
-                    .modify(|_, w| unsafe { w.tg0_timer_clk_sel().bits(DEFAULT_CLK_SRC) });
-            } else {
-                unsafe {
-                    (*<Self as TimerGroupInstance>::register_block())
-                        .t(0)
-                        .config()
-                        .modify(|_, w| w.use_xtal().bit(DEFAULT_CLK_SRC == 1));
-                }
             }
         }
     }
@@ -218,7 +202,7 @@ impl TimerGroupInstance for crate::peripherals::TIMG1<'_> {
 
     fn configure_src_clk() {
         cfg_if::cfg_if! {
-            if #[cfg(soc_has_clock_node_timg0_function_clock)] {
+            if #[cfg(soc_has_clock_node_timg1_function_clock)] {
                 crate::soc::clocks::ClockTree::with(|clocks| {
                     crate::soc::clocks::configure_timg1_function_clock(
                         clocks,
@@ -226,24 +210,8 @@ impl TimerGroupInstance for crate::peripherals::TIMG1<'_> {
                     );
                     crate::soc::clocks::request_timg1_function_clock(clocks);
                 });
-            } else if #[cfg(not(timergroup_default_clock_source_is_set))] {
-                // Clock source is not configurable
-            } else if #[cfg(soc_has_pcr)] {
-                crate::peripherals::PCR::regs()
-                    .timergroup1_timer_clk_conf()
-                    .modify(|_, w| unsafe { w.tg1_timer_clk_sel().bits(DEFAULT_CLK_SRC) });
             } else {
-                unsafe {
-                    (*<Self as TimerGroupInstance>::register_block())
-                        .t(0)
-                        .config()
-                        .modify(|_, w| w.use_xtal().bit(DEFAULT_CLK_SRC == 1));
-                    #[cfg(timergroup_timg_has_timer1)]
-                    (*<Self as TimerGroupInstance>::register_block())
-                        .t(1)
-                        .config()
-                        .modify(|_, w| w.use_xtal().bit(DEFAULT_CLK_SRC == 1));
-                }
+                // Clock source is not configurable
             }
         }
     }

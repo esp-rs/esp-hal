@@ -578,8 +578,6 @@ driver_configs![
             #[serde(default)]
             timg_has_divcnt_rst: bool,
             #[serde(default)]
-            default_clock_source: Option<u32>,
-            #[serde(default)]
             default_wdt_clock_source: Option<u32>,
         }
     },
