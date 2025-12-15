@@ -165,6 +165,7 @@ jobs:
 
   report-results:
     needs: [binary_size]
+    if: always()
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write

@@ -20,9 +20,6 @@ pub struct ReportArgs {
 /// Generate a combined binary size report from individual reports in the specified directory.
 pub fn generate_report(workspace: &Path, args: ReportArgs) -> Result<()> {
     let input_dir = &args.input;
-    if !input_dir.is_dir() {
-        anyhow::bail!("Expected a directory, got: {:?}", input_dir);
-    }
 
     let combined_path = workspace.join("report.txt");
     let mut combined = File::create(&combined_path)
@@ -36,7 +33,8 @@ pub fn generate_report(workspace: &Path, args: ReportArgs) -> Result<()> {
     let leading_ws_re = Regex::new(r"^[ \t]+").unwrap();
 
     // Iterate through files like ./results/result-pr-*.txt
-    let mut entries: Vec<_> = fs::read_dir(input_dir)?
+    let mut entries: Vec<_> = fs::read_dir(input_dir)
+        .context("Couldn't open input file for reading!")?
         .filter_map(|e| e.ok())
         .filter(|e| {
             e.path()
