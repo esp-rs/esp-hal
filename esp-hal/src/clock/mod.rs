@@ -1021,7 +1021,6 @@ impl Clocks {
     }
 }
 
-#[cfg(esp32)]
 impl Clocks {
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
@@ -1037,117 +1036,15 @@ impl Clocks {
                 apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
                 // FIXME: this assumes there is a crystal
                 xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
+                #[cfg(esp32)]
                 pwm_clock: Rate::from_hz(crate::soc::clocks::pll_f160m_clk_frequency(clocks)),
+                #[cfg(any(esp32c6, esp32h2))]
+                crypto_clock: Rate::from_hz(crate::soc::clocks::hp_root_clk_frequency(clocks)),
+                #[cfg(esp32s3)]
+                crypto_pwm_clock: Rate::from_hz(crate::soc::clocks::crypto_pwm_clk_frequency(
+                    clocks,
+                )),
             }
-        })
-    }
-}
-
-#[cfg(esp32c2)]
-impl Clocks {
-    /// Configure the CPU clock speed.
-    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        use crate::soc::clocks::{ClockTree, request_low_power_clk};
-
-        cpu_clock_speed.configure();
-
-        ClockTree::with(|clocks| {
-            // TODO: this should be managed by esp-radio. The actual clock is probably managed by
-            // the hardware, but we need to make sure the upstream clocks are running.
-            request_low_power_clk(clocks);
-            Self {
-                cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
-                apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
-                xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
-            }
-        })
-    }
-}
-
-#[cfg(esp32c3)]
-impl Clocks {
-    /// Configure the CPU clock speed.
-    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        use crate::soc::clocks::{ClockTree, request_low_power_clk};
-
-        cpu_clock_speed.configure();
-
-        ClockTree::with(|clocks| {
-            // TODO: this should be managed by esp-radio. The actual clock is probably managed by
-            // the hardware, but we need to make sure the upstream clocks are running.
-            request_low_power_clk(clocks);
-            Self {
-                cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
-                apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
-                xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
-            }
-        })
-    }
-}
-
-#[cfg(esp32c6)]
-impl Clocks {
-    /// Configure the CPU clock speed.
-    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        use crate::soc::clocks::ClockTree;
-
-        cpu_clock_speed.configure();
-
-        ClockTree::with(|clocks| Self {
-            cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
-            apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
-            xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
-            crypto_clock: Rate::from_hz(crate::soc::clocks::hp_root_clk_frequency(clocks)),
-        })
-    }
-}
-
-#[cfg(esp32h2)]
-impl Clocks {
-    /// Configure the CPU clock speed.
-    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        use crate::soc::clocks::ClockTree;
-
-        cpu_clock_speed.configure();
-
-        ClockTree::with(|clocks| Self {
-            cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
-            apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
-            xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
-            crypto_clock: Rate::from_hz(crate::soc::clocks::hp_root_clk_frequency(clocks)),
-        })
-    }
-}
-
-#[cfg(esp32s2)]
-impl Clocks {
-    /// Configure the CPU clock speed.
-    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        use crate::soc::clocks::ClockTree;
-
-        cpu_clock_speed.configure();
-
-        ClockTree::with(|clocks| Self {
-            cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
-            apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
-            xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
-        })
-    }
-}
-
-#[cfg(esp32s3)]
-impl Clocks {
-    /// Configure the CPU clock speed.
-    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        use crate::soc::clocks::ClockTree;
-
-        cpu_clock_speed.configure();
-
-        ClockTree::with(|clocks| Self {
-            cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
-            apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
-            xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
-            crypto_pwm_clock: Rate::from_hz(crate::soc::clocks::crypto_pwm_clk_frequency(clocks)),
         })
     }
 }
