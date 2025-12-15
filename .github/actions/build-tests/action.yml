@@ -38,7 +38,7 @@ runs:
       with:
         buildtargets: ${{ inputs.soc }}
         default: true
-        version: 1.90.0.0
+        version: 1.92.0.0
 
     - name: Build tests
       shell: bash
