@@ -1,6 +1,10 @@
-use core::cell::{RefCell, RefMut};
 #[cfg(feature = "esp-radio")]
-use core::{ffi::c_void, ptr::NonNull};
+use core::ffi::c_void;
+use core::{
+    cell::{RefCell, RefMut},
+    ptr::NonNull,
+    sync::atomic::Ordering,
+};
 
 #[cfg(feature = "alloc")]
 use allocator_api2::boxed::Box;
@@ -8,6 +12,7 @@ use embassy_sync::blocking_mutex::Mutex;
 use esp_hal::{system::Cpu, time::Instant};
 use esp_sync::RawMutex;
 use macros::ram;
+use portable_atomic::AtomicPtr;
 
 #[cfg(feature = "alloc")]
 use crate::InternalMemory;
@@ -46,13 +51,11 @@ pub(crate) struct SchedulerState {
 
     pub(crate) time_driver: Option<TimeDriver>,
 
-    pub(crate) per_cpu: [CpuSchedulerState; Cpu::COUNT],
+    pub(crate) per_cpu: [CpuState; Cpu::COUNT],
 }
 
-pub(crate) struct CpuSchedulerState {
+pub(crate) struct CpuState {
     pub(crate) initialized: bool,
-    /// Pointer to the current task.
-    pub(crate) current_task: Option<TaskPtr>,
     idle_context: CpuContext,
 
     // This context will be filled out by the first context switch.
@@ -61,11 +64,10 @@ pub(crate) struct CpuSchedulerState {
     pub(crate) main_task: Task,
 }
 
-impl CpuSchedulerState {
+impl CpuState {
     const fn new() -> Self {
         Self {
             initialized: false,
-            current_task: None,
             idle_context: CpuContext::new(),
 
             main_task: Task {
@@ -97,13 +99,6 @@ impl CpuSchedulerState {
             },
         }
     }
-
-    #[cfg(multi_core)]
-    pub fn current_priority(&self) -> Priority {
-        self.current_task
-            .map(|task| unsafe { (*task.as_ptr()).priority })
-            .unwrap_or(Priority::ZERO)
-    }
 }
 
 unsafe impl Send for SchedulerState {}
@@ -117,15 +112,44 @@ impl SchedulerState {
 
             time_driver: None,
 
-            per_cpu: [const { CpuSchedulerState::new() }; Cpu::COUNT],
+            per_cpu: [const { CpuState::new() }; Cpu::COUNT],
         }
     }
 
+    #[cfg(multi_core)]
+    pub(crate) fn priority_of_core(_rq: &RunQueue, core: usize) -> Priority {
+        // Because RunQueue is accessible only through a mutex, there is no need to disable
+        // interrupts here.
+        let current_task_on_cpu = SCHEDULER.current_task[core].load(Ordering::Relaxed);
+        unsafe { current_task_on_cpu.as_ref() }
+            .map(|task| task.priority)
+            .unwrap_or(Priority::ZERO)
+    }
+
+    #[inline]
+    pub(crate) fn set_current_task(&mut self, cpu: Cpu, task: Option<TaskPtr>) {
+        // Because SchedulerState is accessible only through a mutex, there is no need to disable
+        // interrupts here.
+        SCHEDULER.current_task[cpu as usize].store(
+            task.map(|task| task.as_ptr()).unwrap_or_default(),
+            Ordering::Relaxed,
+        );
+    }
+
+    #[inline]
     pub(crate) fn current_task(&self, cpu: Cpu) -> TaskPtr {
         unwrap!(
-            self.per_cpu[cpu as usize].current_task,
+            self.try_get_current_task(cpu),
             "The scheduler is not running on the current CPU. Make sure you start the scheduler before calling OS functions."
         )
+    }
+
+    #[inline]
+    pub(crate) fn try_get_current_task(&self, cpu: Cpu) -> Option<TaskPtr> {
+        // Because SchedulerState is accessible only through a mutex, there is no need to disable
+        // interrupts here.
+        let task_ptr = SCHEDULER.current_task[cpu as usize].load(Ordering::Relaxed);
+        NonNull::new(task_ptr)
     }
 
     pub(crate) fn setup(&mut self, time_driver: TimeDriver, idle_hook: IdleFn) {
@@ -181,17 +205,18 @@ impl SchedulerState {
 
     #[cold]
     #[inline(never)]
-    fn delete_marked_tasks(&mut self, cpu: Cpu) {
-        let current_cpu = cpu as usize;
+    fn delete_marked_tasks(&mut self) {
         let mut to_delete = core::mem::take(&mut self.to_delete);
         'outer: while let Some(task_ptr) = to_delete.pop() {
             assert!(task_ptr.state() == TaskState::Deleted);
-            for cpu in 0..Cpu::COUNT {
-                if cpu != current_cpu && Some(task_ptr) == self.per_cpu[cpu].current_task {
-                    // We can't delete a task that is currently running on another CPU.
-                    self.to_delete.push(task_ptr);
-                    continue 'outer;
-                }
+
+            if Cpu::other()
+                .filter_map(|cpu| self.try_get_current_task(cpu))
+                .any(|task| task == task_ptr)
+            {
+                // We can't delete a task that is currently running on another CPU.
+                self.to_delete.push(task_ptr);
+                continue 'outer;
             }
 
             trace!("delete_marked_tasks {:?}", task_ptr);
@@ -203,14 +228,14 @@ impl SchedulerState {
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::marker_begin(TraceEvents::RunSchedule as u32);
 
+        if !self.to_delete.is_empty() {
+            self.delete_marked_tasks();
+        }
+
         let cpu = Cpu::current();
         let current_cpu = cpu as usize;
 
-        if !self.to_delete.is_empty() {
-            self.delete_marked_tasks(cpu);
-        }
-
-        let current_task = self.per_cpu[current_cpu].current_task;
+        let current_task = self.try_get_current_task(cpu);
         if let Some(current_task) = current_task {
             unsafe { current_task.as_ref().ensure_no_stack_overflow() };
 
@@ -239,7 +264,8 @@ impl SchedulerState {
                 let current_ref = unsafe { current.as_ref() };
                 #[cfg(multi_core)]
                 if current_ref.pinned_to.is_none()
-                    && current_ref.priority >= self.per_cpu[1 - current_cpu].current_priority()
+                    && current_ref.priority
+                        >= Self::priority_of_core(&self.run_queue, 1 - current_cpu)
                 {
                     task::schedule_other_core();
                 }
@@ -314,7 +340,7 @@ impl SchedulerState {
             task_switch(current_context, next_context);
 
             // If we went to idle, this will be None and we won't mess up the main task's stack.
-            self.per_cpu[current_cpu].current_task = next_task;
+            self.set_current_task(cpu, next_task);
         }
 
         let time_driver = unwrap!(self.time_driver.as_mut());
@@ -343,8 +369,8 @@ impl SchedulerState {
 
     #[cfg(feature = "esp-radio")]
     pub(crate) fn schedule_task_deletion(&mut self, task_to_delete: Option<TaskPtr>) -> bool {
-        let current_cpu = Cpu::current() as usize;
-        let current_task = unwrap!(self.per_cpu[current_cpu].current_task);
+        let cpu = Cpu::current();
+        let current_task = self.current_task(cpu);
         let task_to_delete = task_to_delete.unwrap_or(current_task);
         let is_current = task_to_delete == current_task;
 
@@ -356,7 +382,7 @@ impl SchedulerState {
                 task_to_delete.set_state(TaskState::Deleted);
             }
 
-            self.per_cpu[current_cpu].current_task = None;
+            self.set_current_task(cpu, None);
         } else {
             self.delete_task(task_to_delete);
         }
@@ -470,12 +496,24 @@ impl GlobalState {
 
 pub(crate) struct Scheduler {
     inner: Mutex<RawMutex, GlobalState>,
+
+    // Accessing the current task does not require locking the scheduler's mutex. The task pointer
+    // will never change in the context of the current task. What CAN change is the core that
+    // the task is running on, but only a non-running task can be swapped out. Accessing the
+    // current core's task pointer in an interrupt-free context is safe. Accessing the current
+    // task pointers while the scheduler is locked is also safe as the pointer can not change from
+    // the outside.
+    // The current CPU core can read its own task pointer with relaxed ordering. Cross-core access
+    // may require different memory ordering, but practically it is always done in the scheduler's
+    // critical section.
+    pub(crate) current_task: [AtomicPtr<Task>; Cpu::COUNT],
 }
 
 impl Scheduler {
     const fn new() -> Self {
         Self {
             inner: Mutex::new(GlobalState::new()),
+            current_task: [const { AtomicPtr::new(core::ptr::null_mut()) }; Cpu::COUNT],
         }
     }
 
@@ -487,9 +525,29 @@ impl Scheduler {
         self.inner.lock(cb)
     }
 
-    #[cfg(feature = "esp-radio")]
     pub(crate) fn current_task(&self) -> TaskPtr {
-        task::current_task()
+        // While the pointer itself can't change (it's the current task after all), the task can
+        // still be swapped out by the scheduler for the other CPU. Checking for it costs time and
+        // needs the task pointer anyway, so to prevent that problem, we just read the
+        // pointer in an interrupt-free context, which ensures we read the right core's current task
+        // pointer.
+        #[cfg(all(multi_core, riscv))]
+        use riscv::interrupt::free;
+        #[cfg(all(multi_core, xtensa))]
+        use xtensa_lx::interrupt::free;
+
+        // On single core, there is no need to disable interrupts.
+        #[cfg(single_core)]
+        fn free<R>(f: impl FnOnce() -> R) -> R {
+            f()
+        }
+
+        let task_ptr = free(|| self.current_task[Cpu::current() as usize].load(Ordering::Relaxed));
+
+        unwrap!(
+            NonNull::new(task_ptr),
+            "The scheduler is not running on the current CPU. Make sure you start the scheduler before calling OS functions."
+        )
     }
 
     #[cfg(feature = "esp-radio")]
