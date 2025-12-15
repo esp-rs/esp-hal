@@ -22,7 +22,7 @@ Bare-metal (`no_std`) hardware abstraction layer for Espressif devices. Currentl
 
 Additionally provides support for programming the low-power RISC-V cores found on the _ESP32-C6_, _ESP32-S2_, and _ESP32-S3_ via the [esp-lp-hal] package.
 
-For additional information regarding any of the crates in this repository, please refer to the relevant crate's `README.md` file. If you have any questions, comments, or concerns, please [open an issue], [start a new discussion], or join us on [Matrix].
+For additional information regarding any of the crates in this repository, please refer to the relevant crate's `README.md` file. If you have any questions, comments, or concerns, please [open an issue], or join us on [Matrix].
 
 If you are currently using (or considering using) `esp-hal` in a production environment and have any feedback or require support, please feel free to contact us at <rust.support@espressif.com>.
 
@@ -33,7 +33,6 @@ If you are currently using (or considering using) `esp-hal` in a production envi
 [esp-lp-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp-lp-hal
 [esp-idf-svc]: https://github.com/esp-rs/esp-idf-svc
 [open an issue]: https://github.com/esp-rs/esp-hal/issues/new
-[start a new discussion]: https://github.com/esp-rs/esp-hal/discussions/new
 [matrix]: https://matrix.to/#/#esp-rs:matrix.org
 
 ## Getting Started
