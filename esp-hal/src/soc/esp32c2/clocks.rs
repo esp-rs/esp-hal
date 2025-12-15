@@ -660,3 +660,31 @@ fn configure_timg0_wdt_clock_impl(
             .bit(new_selector == Timg0WdtClockConfig::XtalClk)
     });
 }
+
+// UART0_FUNCTION_CLOCK
+
+fn enable_uart0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    todo!()
+}
+
+fn configure_uart0_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0FunctionClockConfig>,
+    _new_selector: Uart0FunctionClockConfig,
+) {
+    todo!()
+}
+
+// UART1_FUNCTION_CLOCK
+
+fn enable_uart1_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    todo!()
+}
+
+fn configure_uart1_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0FunctionClockConfig>,
+    _new_selector: Uart0FunctionClockConfig,
+) {
+    todo!()
+}
