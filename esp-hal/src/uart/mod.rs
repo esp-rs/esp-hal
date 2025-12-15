@@ -57,7 +57,6 @@ use crate::{
     Blocking,
     DriverMode,
     asynch::AtomicWaker,
-    clock::Clocks,
     gpio::{
         InputConfig,
         InputSignal,
@@ -70,6 +69,7 @@ use crate::{
     interrupt::InterruptHandler,
     pac::uart0::RegisterBlock,
     private::OnDrop,
+    soc::clocks::ClockTree,
     system::PeripheralGuard,
 };
 
@@ -160,26 +160,11 @@ impl embedded_io_07::Error for TxError {
     }
 }
 
-/// UART clock source
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-#[instability::unstable]
-pub enum ClockSource {
-    /// APB_CLK clock source
-    #[cfg_attr(not(any(esp32c6, esp32h2, soc_has_lp_uart)), default)]
-    Apb,
-    /// RC_FAST_CLK clock source (17.5 MHz)
-    #[cfg(not(any(esp32, esp32s2)))]
-    RcFast,
-    /// XTAL_CLK clock source
-    #[cfg(not(any(esp32, esp32s2)))]
-    #[cfg_attr(any(esp32c6, esp32h2, soc_has_lp_uart), default)]
-    Xtal,
-    /// REF_TICK clock source (derived from XTAL or RC_FAST, 1MHz)
-    #[cfg(any(esp32, esp32s2))]
-    RefTick,
-}
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+pub use crate::soc::clocks::Uart0FunctionClockConfig as ClockSource;
+#[cfg(not(feature = "unstable"))]
+use crate::soc::clocks::Uart0FunctionClockConfig as ClockSource;
 
 /// Number of data bits
 ///
@@ -2716,24 +2701,63 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
 pub mod lp_uart {
     use crate::{
         gpio::lp_io::{LowPowerInput, LowPowerOutput},
-        peripherals::{LP_AON, LP_IO, LP_UART, LPWR},
-        uart::{Config, DataBits, Parity, StopBits},
+        peripherals::{LP_AON, LP_CLKRST, LP_IO, LP_UART, LPWR},
+        soc::clocks::ClockTree,
+        uart::{DataBits, Parity, StopBits},
     };
+
+    /// LP-UART Configuration
+    #[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[non_exhaustive]
+    pub struct Config {
+        /// The baud rate (speed) of the UART communication in bits per second
+        /// (bps).
+        baudrate: u32,
+        /// Number of data bits in each frame (5, 6, 7, or 8 bits).
+        data_bits: DataBits,
+        /// Parity setting (None, Even, or Odd).
+        parity: Parity,
+        /// Number of stop bits in each frame (1, 1.5, or 2 bits).
+        stop_bits: StopBits,
+        /// Clock source used by the UART peripheral.
+        #[builder_lite(unstable)]
+        clock_source: ClockSource,
+    }
+
+    impl Default for Config {
+        fn default() -> Config {
+            Config {
+                baudrate: 115_200,
+                data_bits: Default::default(),
+                parity: Default::default(),
+                stop_bits: Default::default(),
+                clock_source: Default::default(),
+            }
+        }
+    }
+
+    /// LP-UART clock source
+    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[non_exhaustive]
+    #[instability::unstable]
+    pub enum ClockSource {
+        /// RC_FAST_CLK clock source
+        RcFast,
+
+        /// XTAL_D2 clock source
+        #[default]
+        Xtal,
+    }
+
     /// LP-UART driver
-    ///
-    /// The driver uses XTAL as clock source.
     pub struct LpUart {
         uart: LP_UART<'static>,
     }
 
     impl LpUart {
         /// Initialize the UART driver using the provided configuration
-        ///
-        /// # Panics
-        ///
-        /// [`Apb`] is a wrong clock source for LP_UART
-        ///
-        /// [`Apb`]: super::ClockSource::Apb
         // TODO: CTS and RTS pins
         pub fn new(
             uart: LP_UART<'static>,
@@ -2839,24 +2863,22 @@ pub mod lp_uart {
         }
 
         fn change_baud_internal(&mut self, config: &Config) {
-            // TODO: Currently it's not possible to use XtalD2Clk
-            let clk = 16_000_000_u32;
-            let max_div = 0b1111_1111_1111 - 1;
-            let clk_div = clk.div_ceil(max_div * config.baudrate);
-
-            self.uart.register_block().clk_conf().modify(|_, w| unsafe {
-                w.sclk_div_a().bits(0);
-                w.sclk_div_b().bits(0);
-                w.sclk_div_num().bits(clk_div as u8 - 1);
-                w.sclk_sel().bits(match config.clock_source {
-                    super::ClockSource::Xtal => 3,
-                    super::ClockSource::RcFast => 2,
-                    super::ClockSource::Apb => panic!("Wrong clock source for LP_UART"),
-                });
-                w.sclk_en().set_bit()
+            let clk = ClockTree::with(|clocks| match config.clock_source {
+                ClockSource::RcFast => crate::soc::clocks::rc_fast_clk_frequency(clocks),
+                ClockSource::Xtal => crate::soc::clocks::xtal_d2_clk_frequency(clocks),
             });
 
-            let clk = clk / clk_div;
+            LP_CLKRST::regs().lpperi().modify(|_, w| {
+                w.lp_uart_clk_sel().bit(match config.clock_source {
+                    ClockSource::RcFast => false,
+                    ClockSource::Xtal => true,
+                })
+            });
+            self.uart.register_block().clk_conf().modify(|_, w| {
+                w.rx_sclk_en().set_bit();
+                w.tx_sclk_en().set_bit()
+            });
+
             let divider = clk / config.baudrate;
             let divider = divider as u16;
 
@@ -2869,12 +2891,6 @@ pub mod lp_uart {
         }
 
         /// Modify UART baud rate and reset TX/RX fifo.
-        ///
-        /// # Panics
-        ///
-        /// [`Apb`] is a wrong clock source for LP_UART
-        ///
-        /// [`Apb`]: super::ClockSource::Apb
         pub fn change_baud(&mut self, config: &Config) {
             self.change_baud_internal(config);
             self.txfifo_reset();
@@ -2980,6 +2996,11 @@ pub struct Info {
 
     /// RTS (Request to Send) pin
     pub rts_signal: OutputSignal,
+
+    pub request_sclk: fn(&mut ClockTree),
+    pub release_sclk: fn(&mut ClockTree),
+    pub configure_sclk: fn(&mut ClockTree, ClockSource),
+    pub sclk_frequency: fn(&mut ClockTree) -> u32,
 }
 
 /// Peripheral state for a UART instance.
@@ -3311,84 +3332,73 @@ impl Info {
     }
 
     fn change_baud(&self, config: &Config) -> Result<(), ConfigError> {
-        let clocks = Clocks::get();
-        let clk = match config.clock_source {
-            ClockSource::Apb => clocks.apb_clock.as_hz(),
-            #[cfg(not(any(esp32, esp32s2)))]
-            ClockSource::Xtal => clocks.xtal_clock.as_hz(),
-            #[cfg(not(any(esp32, esp32s2)))]
-            ClockSource::RcFast => property!("soc.rc_fast_clk_default"), // TODO: adjustable
-            #[cfg(soc_ref_tick_hz_is_set)]
-            ClockSource::RefTick => property!("soc.ref_tick_hz"),
-        };
+        ClockTree::with(|clocks| {
+            (self.configure_sclk)(clocks, config.clock_source);
+            let clk = (self.sclk_frequency)(clocks);
 
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3, esp32s3, esp32c6, esp32h2))] {
+            cfg_if::cfg_if! {
+                if #[cfg(any(esp32c2, esp32c3, esp32s3, esp32c6, esp32h2))] {
 
-                const MAX_DIV: u32 = 0b1111_1111_1111 - 1;
-                let clk_div = (clk.div_ceil(MAX_DIV)).div_ceil(config.baudrate);
+                    const MAX_DIV: u32 = 0b1111_1111_1111 - 1;
+                    let clk_div = (clk.div_ceil(MAX_DIV)).div_ceil(config.baudrate);
 
-                // define `conf` in scope for modification below
-                cfg_if::cfg_if! {
-                    if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
-                        if matches!(config.clock_source, ClockSource::RcFast) {
-                            crate::peripherals::LPWR::regs()
-                                .clk_conf()
-                                .modify(|_, w| w.dig_clk8m_en().variant(true));
-                            // small delay whilst the clock source changes (SOC_DELAY_RC_FAST_DIGI_SWITCH from esp-idf)
-                            crate::rom::ets_delay_us(5);
-                        }
+                    // define `conf` in scope for modification below
+                    cfg_if::cfg_if! {
+                        if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
+                            if matches!(config.clock_source, ClockSource::RcFast) {
+                                crate::peripherals::LPWR::regs()
+                                    .clk_conf()
+                                    .modify(|_, w| w.dig_clk8m_en().variant(true));
+                                // small delay whilst the clock source changes (SOC_DELAY_RC_FAST_DIGI_SWITCH from esp-idf)
+                                crate::rom::ets_delay_us(5);
+                            }
 
-                        let conf = self.regs().clk_conf();
-                    } else {
-                        // UART clocks are configured via PCR
-                        let pcr = crate::peripherals::PCR::regs();
-                        let conf = if self.is_instance(unsafe { crate::peripherals::UART0::steal() }) {
-                            pcr.uart(0).clk_conf()
+                            let conf = self.regs().clk_conf();
                         } else {
-                            pcr.uart(1).clk_conf()
-                        };
-                    }
-                };
+                            // UART clocks are configured via PCR
+                            let pcr = crate::peripherals::PCR::regs();
+                            let conf = if self.is_instance(unsafe { crate::peripherals::UART0::steal() }) {
+                                pcr.uart(0).clk_conf()
+                            } else {
+                                pcr.uart(1).clk_conf()
+                            };
+                        }
+                    };
 
-                conf.write(|w| unsafe {
-                    w.sclk_sel().bits(match config.clock_source {
-                        ClockSource::Apb => 1,
-                        ClockSource::RcFast => 2,
-                        ClockSource::Xtal => 3,
+                    conf.modify(|_, w| unsafe {
+                        w.sclk_div_a().bits(0);
+                        w.sclk_div_b().bits(0);
+                        w.sclk_div_num().bits(clk_div as u8 - 1)
                     });
-                    w.sclk_div_a().bits(0);
-                    w.sclk_div_b().bits(0);
-                    w.sclk_div_num().bits(clk_div as u8 - 1)
-                });
 
-                let divider = (clk << 4) / (config.baudrate * clk_div);
-            } else {
-                self.regs().conf0().modify(|_, w| {
-                    w.tick_ref_always_on()
-                        .bit(config.clock_source == ClockSource::Apb)
-                });
+                    let divider = (clk << 4) / (config.baudrate * clk_div);
+                } else {
+                    self.regs().conf0().modify(|_, w| {
+                        w.tick_ref_always_on()
+                            .bit(config.clock_source == ClockSource::Apb)
+                    });
 
-                let divider = (clk << 4) / config.baudrate;
+                    let divider = (clk << 4) / config.baudrate;
+                }
             }
-        }
 
-        let divider_integer = divider >> 4;
-        let divider_frag = (divider & 0xf) as u8;
+            let divider_integer = divider >> 4;
+            let divider_frag = (divider & 0xf) as u8;
 
-        self.regs().clkdiv().write(|w| unsafe {
-            w.clkdiv()
-                .bits(divider_integer as _)
-                .frag()
-                .bits(divider_frag)
-        });
+            self.regs().clkdiv().write(|w| unsafe {
+                w.clkdiv()
+                    .bits(divider_integer as _)
+                    .frag()
+                    .bits(divider_frag)
+            });
 
-        self.sync_regs();
+            self.sync_regs();
 
-        #[cfg(feature = "unstable")]
-        self.verify_baudrate(clk, config)?;
+            #[cfg(feature = "unstable")]
+            self.verify_baudrate(clk, config)?;
 
-        Ok(())
+            Ok(())
+        })
     }
 
     fn change_data_bits(&self, data_bits: DataBits) {
@@ -3762,6 +3772,10 @@ for_each_uart! {
                     rx_signal: InputSignal::$rxd,
                     cts_signal: InputSignal::$cts,
                     rts_signal: OutputSignal::$rts,
+                    request_sclk: paste::paste!(crate::soc::clocks:: [< request_ $inst:lower _function_clock >]),
+                    release_sclk: paste::paste!(crate::soc::clocks:: [< release_ $inst:lower _function_clock >]),
+                    configure_sclk: paste::paste!(crate::soc::clocks:: [< configure_ $inst:lower _function_clock >]),
+                    sclk_frequency: paste::paste!(crate::soc::clocks:: [< $inst:lower _function_clock_frequency >]),
                 };
                 (&PERIPHERAL, &STATE)
             }
