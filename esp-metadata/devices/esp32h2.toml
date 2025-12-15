@@ -190,7 +190,11 @@ clocks = { system_clocks = { clock_tree = [
             { name = "RC_FAST_CLK",  outputs = "RC_FAST_CLK" },
             { name = "XTAL32K_CLK",  outputs = "XTAL32K_CLK" },
         ] },
-        # TODO: WDT clocks
+        { name = "WDT_CLOCK", type = "mux", default = "XTAL_CLK", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "PLL_F48M",    outputs = "PLL_F48M_CLK" },
+        ] },
     ] },
     { name = "Timg1", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup1_conf", peripheral = "tg1", peri_clk_template = "{{control}}::regs().timergroup1_timer_clk_conf().modify(|_, w| w.tg1_timer_clk_en().bit(enable));" }, clocks = "Timg0" },
     { name = "Systimer", keep_enabled = true },
@@ -531,7 +535,6 @@ instances = [
 support_status = "partial"
 instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_divcnt_rst = true
-default_wdt_clock_source = 2
 
 [device.uart]
 support_status = "supported"

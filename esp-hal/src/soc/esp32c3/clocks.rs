@@ -571,6 +571,23 @@ fn configure_timg0_calibration_clock_impl(
     });
 }
 
+// TIMG0_WDT_CLOCK
+
+fn enable_timg0_wdt_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // No separate clock control enable bit.
+}
+
+fn configure_timg0_wdt_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Timg0WdtClockConfig>,
+    new_selector: Timg0WdtClockConfig,
+) {
+    TIMG0::regs().wdtconfig0().modify(|_, w| {
+        w.wdt_use_xtal()
+            .bit(new_selector == Timg0WdtClockConfig::XtalClk)
+    });
+}
+
 // TIMG1_FUNCTION_CLOCK
 
 fn enable_timg1_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
@@ -609,5 +626,22 @@ fn configure_timg1_calibration_clock_impl(
             Timg0CalibrationClockConfig::RcFastDivClk => 1,
             Timg0CalibrationClockConfig::Xtal32kClk => 2,
         })
+    });
+}
+
+// TIMG1_WDT_CLOCK
+
+fn enable_timg1_wdt_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // No separate clock control enable bit.
+}
+
+fn configure_timg1_wdt_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Timg0WdtClockConfig>,
+    new_selector: Timg0WdtClockConfig,
+) {
+    TIMG1::regs().wdtconfig0().modify(|_, w| {
+        w.wdt_use_xtal()
+            .bit(new_selector == Timg0WdtClockConfig::XtalClk)
     });
 }

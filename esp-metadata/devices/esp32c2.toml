@@ -187,6 +187,10 @@ clocks = { system_clocks = { clock_tree = [
             { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
             { name = "OSC32K_CLK",     outputs = "OSC_SLOW_CLK" },
         ] },
+        { name = "WDT_CLOCK", type = "mux", default = "PLL_40M", variants = [
+            { name = "PLL_40M",  outputs = "PLL_40M" },
+            { name = "XTAL_CLK", outputs = "XTAL_CLK" },
+        ] },
     ] },
     { name = "Ledc" },
     { name = "I2cExt0" },
@@ -384,7 +388,6 @@ instances = [
 support_status = "partial"
 instances = [{ name = "timg0" }]
 timg_has_divcnt_rst = true
-default_wdt_clock_source = 0 # use_wdt_xtal = false
 
 [device.uart]
 support_status = "supported"

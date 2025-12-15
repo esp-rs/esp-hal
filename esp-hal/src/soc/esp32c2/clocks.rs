@@ -643,3 +643,20 @@ fn configure_timg0_calibration_clock_impl(
         })
     });
 }
+
+// TIMG0_WDT_CLOCK
+
+fn enable_timg0_wdt_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // No separate clock control enable bit.
+}
+
+fn configure_timg0_wdt_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Timg0WdtClockConfig>,
+    new_selector: Timg0WdtClockConfig,
+) {
+    TIMG0::regs().wdtconfig0().modify(|_, w| {
+        w.wdt_use_xtal()
+            .bit(new_selector == Timg0WdtClockConfig::XtalClk)
+    });
+}
