@@ -56,7 +56,6 @@ use core::{
 
 use crate::{
     Blocking,
-    clock::Clocks,
     dma::{ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer, PeripheralRxChannel, RxChannelFor},
     gpio::{
         InputConfig,
@@ -68,6 +67,7 @@ use crate::{
     lcd_cam::{BitOrder, ByteOrder, ClockError, calculate_clkm},
     pac,
     peripherals::LCD_CAM,
+    soc::clocks::ClockTree,
     system::{self, GenericPeripheralGuard},
     time::Rate,
 };
@@ -178,15 +178,16 @@ impl<'d> Camera<'d> {
     /// [`ConfigError::Clock`] will be returned if the frequency passed in
     /// `Config` is too low.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        let clocks = Clocks::get();
-        let (i, divider) = calculate_clkm(
-            config.frequency.as_hz() as _,
-            &[
-                clocks.xtal_clock.as_hz() as _,
-                clocks.cpu_clock.as_hz() as _,
-                clocks.crypto_pwm_clock.as_hz() as _,
-            ],
-        )
+        let (i, divider) = ClockTree::with(|clocks| {
+            calculate_clkm(
+                config.frequency.as_hz() as _,
+                &[
+                    crate::soc::clocks::xtal_clk_frequency(clocks) as usize,
+                    crate::soc::clocks::pll_d2_frequency(clocks) as usize,
+                    crate::soc::clocks::crypto_pwm_clk_frequency(clocks) as usize,
+                ],
+            )
+        })
         .map_err(ConfigError::Clock)?;
 
         if let Some(value) = config.line_interrupt
