@@ -44,6 +44,7 @@ pub enum CpuClock {
 
     /// Custom clock tree configuration.
     #[cfg(feature = "unstable")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     Custom(ClockConfig),
 }
 

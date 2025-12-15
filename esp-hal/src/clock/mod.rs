@@ -101,6 +101,9 @@ pub trait Clock {
     }
 }
 
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+pub use crate::soc::clocks::ClockConfig;
 pub use crate::soc::clocks::CpuClock;
 
 impl CpuClock {
