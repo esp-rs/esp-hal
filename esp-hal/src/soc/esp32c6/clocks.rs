@@ -587,6 +587,30 @@ fn configure_timg0_calibration_clock_impl(
     });
 }
 
+// TIMG0_WDT_CLOCK
+
+fn enable_timg0_wdt_clock_impl(_clocks: &mut ClockTree, en: bool) {
+    PCR::regs()
+        .timergroup0_wdt_clk_conf()
+        .modify(|_, w| w.tg0_wdt_clk_en().bit(en));
+}
+
+fn configure_timg0_wdt_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Timg0WdtClockConfig>,
+    new_selector: Timg0WdtClockConfig,
+) {
+    PCR::regs()
+        .timergroup0_wdt_clk_conf()
+        .modify(|_, w| unsafe {
+            w.tg0_wdt_clk_sel().bits(match new_selector {
+                Timg0WdtClockConfig::XtalClk => 0,
+                Timg0WdtClockConfig::PllF80m => 1,
+                Timg0WdtClockConfig::RcFastClk => 2,
+            })
+        });
+}
+
 // TIMG1_FUNCTION_CLOCK
 
 fn enable_timg1_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
@@ -631,4 +655,28 @@ fn configure_timg1_calibration_clock_impl(
             Timg0CalibrationClockConfig::Xtal32kClk => 2,
         })
     });
+}
+
+// TIMG1_WDT_CLOCK
+
+fn enable_timg1_wdt_clock_impl(_clocks: &mut ClockTree, en: bool) {
+    PCR::regs()
+        .timergroup1_wdt_clk_conf()
+        .modify(|_, w| w.tg1_wdt_clk_en().bit(en));
+}
+
+fn configure_timg1_wdt_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Timg0WdtClockConfig>,
+    new_selector: Timg0WdtClockConfig,
+) {
+    PCR::regs()
+        .timergroup1_wdt_clk_conf()
+        .modify(|_, w| unsafe {
+            w.tg1_wdt_clk_sel().bits(match new_selector {
+                Timg0WdtClockConfig::XtalClk => 0,
+                Timg0WdtClockConfig::PllF80m => 1,
+                Timg0WdtClockConfig::RcFastClk => 2,
+            })
+        });
 }
