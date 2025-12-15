@@ -177,12 +177,6 @@ macro_rules! property {
     ("timergroup.timg_has_divcnt_rst") => {
         true
     };
-    ("timergroup.default_clock_source") => {
-        0
-    };
-    ("timergroup.default_clock_source", str) => {
-        stringify!(0)
-    };
     ("timergroup.default_wdt_clock_source") => {
         0
     };
