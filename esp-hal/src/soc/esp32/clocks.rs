@@ -18,7 +18,7 @@ use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
     efuse::{Efuse, VOL_LEVEL_HP_INV},
-    peripherals::{APB_CTRL, DPORT, LPWR, RTC_IO, TIMG0, TIMG1},
+    peripherals::{APB_CTRL, DPORT, LPWR, RTC_IO, TIMG0, TIMG1, UART0, UART1, UART2},
     soc::regi2c,
     time::Rate,
 };
@@ -662,6 +662,34 @@ fn configure_rtc_fast_clk_impl(
     });
 }
 
+// MCPWM0_FUNCTION_CLOCK
+
+fn enable_mcpwm0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_mcpwm0_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Mcpwm0FunctionClockConfig>,
+    _new_selector: Mcpwm0FunctionClockConfig,
+) {
+    // Nothing to do.
+}
+
+// MCPWM1_FUNCTION_CLOCK
+
+fn enable_mcpwm1_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_mcpwm1_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Mcpwm0FunctionClockConfig>,
+    _new_selector: Mcpwm0FunctionClockConfig,
+) {
+    // Nothing to do.
+}
+
 // TIMG0_CALIBRATION_CLOCK
 
 fn enable_timg0_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -704,4 +732,55 @@ fn configure_timg1_calibration_clock_impl(
     TIMG1::regs()
         .rtccalicfg()
         .modify(|_, w| unsafe { w.rtc_cali_clk_sel().bits(new_selector.cali_clk_sel_bits()) });
+}
+
+// UART0_FUNCTION_CLOCK
+
+fn enable_uart0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do
+}
+
+fn configure_uart0_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0FunctionClockConfig>,
+    new_selector: Uart0FunctionClockConfig,
+) {
+    UART0::regs().conf0().modify(|_, w| {
+        w.tick_ref_always_on()
+            .bit(new_selector == Uart0FunctionClockConfig::Apb)
+    });
+}
+
+// UART1_FUNCTION_CLOCK
+
+fn enable_uart1_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do
+}
+
+fn configure_uart1_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0FunctionClockConfig>,
+    new_selector: Uart0FunctionClockConfig,
+) {
+    UART1::regs().conf0().modify(|_, w| {
+        w.tick_ref_always_on()
+            .bit(new_selector == Uart0FunctionClockConfig::Apb)
+    });
+}
+
+// UART2_FUNCTION_CLOCK
+
+fn enable_uart2_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do
+}
+
+fn configure_uart2_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0FunctionClockConfig>,
+    new_selector: Uart0FunctionClockConfig,
+) {
+    UART2::regs().conf0().modify(|_, w| {
+        w.tick_ref_always_on()
+            .bit(new_selector == Uart0FunctionClockConfig::Apb)
+    });
 }

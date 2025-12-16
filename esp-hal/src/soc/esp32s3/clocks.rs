@@ -16,7 +16,7 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
-    peripherals::{I2C_ANA_MST, LPWR, SYSTEM, TIMG0, TIMG1},
+    peripherals::{I2C_ANA_MST, LPWR, SYSTEM, TIMG0, TIMG1, UART0, UART1, UART2},
     soc::regi2c,
     time::Rate,
 };
@@ -717,6 +717,34 @@ fn configure_low_power_clk_impl(
     });
 }
 
+// MCPWM0_FUNCTION_CLOCK
+
+fn enable_mcpwm0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_mcpwm0_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Mcpwm0FunctionClockConfig>,
+    _new_selector: Mcpwm0FunctionClockConfig,
+) {
+    // Nothing to do.
+}
+
+// MCPWM1_FUNCTION_CLOCK
+
+fn enable_mcpwm1_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_mcpwm1_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Mcpwm0FunctionClockConfig>,
+    _new_selector: Mcpwm0FunctionClockConfig,
+) {
+    // Nothing to do.
+}
+
 // TIMG0_FUNCTION_CLOCK
 
 // Note that the function clock is a pre-requisite of the timer, but does not enable the counter.
@@ -800,6 +828,66 @@ fn configure_timg1_calibration_clock_impl(
             Timg0CalibrationClockConfig::RcSlowClk => 0,
             Timg0CalibrationClockConfig::RcFastDivClk => 1,
             Timg0CalibrationClockConfig::Xtal32kClk => 2,
+        })
+    });
+}
+
+// UART0_FUNCTION_CLOCK
+
+fn enable_uart0_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
+    UART0::regs().clk_conf().modify(|_, w| w.sclk_en().bit(en));
+}
+
+fn configure_uart0_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0FunctionClockConfig>,
+    new_selector: Uart0FunctionClockConfig,
+) {
+    UART0::regs().clk_conf().modify(|_, w| unsafe {
+        w.sclk_sel().bits(match new_selector {
+            Uart0FunctionClockConfig::Apb => 1,
+            Uart0FunctionClockConfig::RcFast => 2,
+            Uart0FunctionClockConfig::Xtal => 3,
+        })
+    });
+}
+
+// UART1_FUNCTION_CLOCK
+
+fn enable_uart1_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
+    UART1::regs().clk_conf().modify(|_, w| w.sclk_en().bit(en));
+}
+
+fn configure_uart1_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0FunctionClockConfig>,
+    new_selector: Uart0FunctionClockConfig,
+) {
+    UART1::regs().clk_conf().modify(|_, w| unsafe {
+        w.sclk_sel().bits(match new_selector {
+            Uart0FunctionClockConfig::Apb => 1,
+            Uart0FunctionClockConfig::RcFast => 2,
+            Uart0FunctionClockConfig::Xtal => 3,
+        })
+    });
+}
+
+// UART2_FUNCTION_CLOCK
+
+fn enable_uart2_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
+    UART2::regs().clk_conf().modify(|_, w| w.sclk_en().bit(en));
+}
+
+fn configure_uart2_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0FunctionClockConfig>,
+    new_selector: Uart0FunctionClockConfig,
+) {
+    UART2::regs().clk_conf().modify(|_, w| unsafe {
+        w.sclk_sel().bits(match new_selector {
+            Uart0FunctionClockConfig::Apb => 1,
+            Uart0FunctionClockConfig::RcFast => 2,
+            Uart0FunctionClockConfig::Xtal => 3,
         })
     });
 }

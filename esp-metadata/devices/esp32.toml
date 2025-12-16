@@ -235,6 +235,9 @@ clocks = { system_clocks = { clock_tree = [
     #    { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
     #    { name = "RTC_SLOW", outputs = "RTC_SLOW_CLK" },
     #] }
+
+    # Peripheral root clocks
+    # LEDC_SCLK: The TRM is slightly confusing, there is a single mux in the peripheral selecting between APB and RTC_FAST.
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
@@ -258,13 +261,17 @@ clocks = { system_clocks = { clock_tree = [
     #{ name = "SdioSlave", template_params = { reg_group = "wifi_clk" } },
 
     { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
-    { name = "Uart2" },
+    { name = "Uart2", clocks = "Uart0" },
     { name = "SpiDma" },
     { name = "I2s1" },
-    { name = "Mcpwm1", template_params = { peripheral = "pwm1" } },
+    { name = "Mcpwm1", template_params = { peripheral = "pwm1" }, clocks = "Mcpwm0" },
     { name = "Twai0", template_params = { peripheral = "twai" } },
     { name = "I2cExt1" },
-    { name = "Mcpwm0", template_params = { peripheral = "pwm0" } },
+    { name = "Mcpwm0", template_params = { peripheral = "pwm0" }, clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", default = "PLL_F160M", variants = [
+            { name = "PLL_F160M", outputs = "PLL_F160M_CLK" }
+        ] }
+    ] },
     { name = "Spi3" },
     { name = "Timg1", template_params = { peripheral = "timergroup1" }, clocks = "Timg0" }, # same clock options, but different instance
     #{ name = "Efuse" },
@@ -282,9 +289,14 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Uhci0" },
     { name = "I2cExt0" },
     { name = "Spi2" },
-    { name = "Uart1" },
+    { name = "Uart1", clocks = "Uart0" },
     { name = "I2s0" },
-    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true, clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", default = "APB", variants = [
+            { name = "APB",      outputs = "APB_CLK" },
+            { name = "REF_TICK", outputs = "REF_TICK" }
+        ] }
+    ] },
     #{ name = "Spi01" },
 
     # Radio clocks not modeled here.
