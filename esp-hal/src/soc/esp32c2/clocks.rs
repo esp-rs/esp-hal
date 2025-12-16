@@ -73,6 +73,12 @@ impl From<CpuClock> for ClockConfig {
     }
 }
 
+impl Default for ClockConfig {
+    fn default() -> Self {
+        Self::from(CpuClock::default())
+    }
+}
+
 impl ClockConfig {
     pub(crate) fn try_get_preset(self) -> Option<CpuClock> {
         match self {
