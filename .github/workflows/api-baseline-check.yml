@@ -1,8 +1,9 @@
 name: API Baseline Check
 
 on:
-    pull_request:
-        types: [opened, synchronize, reopened, labeled, unlabeled]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  merge_group:
 
 env:
     CARGO_TERM_COLOR: always
