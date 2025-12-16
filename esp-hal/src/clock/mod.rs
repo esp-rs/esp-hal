@@ -104,6 +104,8 @@ pub trait Clock {
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub use crate::soc::clocks::ClockConfig;
+#[cfg(not(feature = "unstable"))]
+pub(crate) use crate::soc::clocks::ClockConfig;
 pub use crate::soc::clocks::CpuClock;
 
 impl CpuClock {
@@ -962,11 +964,11 @@ pub struct Clocks {
 static mut ACTIVE_CLOCKS: Option<Clocks> = None;
 
 impl Clocks {
-    pub(crate) fn init(cpu_clock_speed: CpuClock) {
+    pub(crate) fn init(cpu_clock_config: ClockConfig) {
         ESP_HAL_LOCK.lock(|| {
             crate::rtc_cntl::rtc::init();
 
-            let config = Self::configure(cpu_clock_speed);
+            let config = Self::configure(cpu_clock_config);
 
             // TODO: remove
             RtcClock::update_xtal_freq_mhz(config.xtal_clock.as_mhz());
@@ -1026,10 +1028,10 @@ impl Clocks {
 
 impl Clocks {
     /// Configure the CPU clock speed.
-    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
+    pub(crate) fn configure(clock_config: ClockConfig) -> Self {
         use crate::soc::clocks::ClockTree;
 
-        cpu_clock_speed.configure();
+        clock_config.configure();
 
         ClockTree::with(|clocks| {
             // TODO: this struct can be removed once everything uses the new internal clock tree

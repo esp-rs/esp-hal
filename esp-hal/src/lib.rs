@@ -614,7 +614,7 @@ pub mod __macro_implementation {
     pub use xtensa_lx_rt::entry as __entry;
 }
 
-use crate::clock::CpuClock;
+use crate::clock::{ClockConfig, CpuClock};
 #[cfg(feature = "rt")]
 use crate::{clock::Clocks, peripherals::Peripherals};
 
@@ -651,7 +651,8 @@ pub(crate) static ESP_HAL_LOCK: RawMutex = RawMutex::new();
 #[derive(Default, Clone, Copy, procmacros::BuilderLite)]
 pub struct Config {
     /// The CPU clock configuration.
-    cpu_clock: CpuClock,
+    #[builder_lite(skip)]
+    cpu_clock: ClockConfig,
 
     /// PSRAM configuration.
     #[cfg(feature = "unstable")]
@@ -659,6 +660,53 @@ pub struct Config {
     #[cfg(feature = "psram")]
     #[builder_lite(unstable)]
     psram: psram::PsramConfig,
+}
+
+impl Config {
+    /// Apply a clock configuration.
+    #[cfg_attr(
+        feature = "unstable",
+        doc = r"
+
+With the `unstable` feature enabled, this function accepts both [`ClockConfig`] and [`CpuClock`].
+"
+    )]
+    #[cfg(feature = "unstable")]
+    pub fn with_cpu_clock(self, cpu_clock: impl Into<ClockConfig>) -> Self {
+        Self {
+            cpu_clock: cpu_clock.into(),
+            ..self
+        }
+    }
+
+    /// Apply a clock configuration.
+    #[cfg(not(feature = "unstable"))]
+    pub fn with_cpu_clock(self, cpu_clock: CpuClock) -> Self {
+        Self {
+            cpu_clock: cpu_clock.into(),
+            ..self
+        }
+    }
+
+    /// The CPU clock configuration preset.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the CPU clock configuration is not **exactly** one of the
+    /// [`CpuClock`] presets.
+    #[cfg_attr(feature = "unstable", deprecated(note = "Use `clock_config` instead."))] // TODO: mention ClockTree APIs once they are exposed to the user.
+    pub fn cpu_clock(&self) -> CpuClock {
+        unwrap!(
+            self.cpu_clock.try_get_preset(),
+            "CPU clock configuration is not a preset"
+        )
+    }
+
+    /// The CPU clock configuration.
+    #[instability::unstable]
+    pub fn clock_config(&self) -> ClockConfig {
+        self.cpu_clock
+    }
 }
 
 #[procmacros::doc_replace]
@@ -687,7 +735,7 @@ pub fn init(config: Config) -> Peripherals {
 
     let mut peripherals = Peripherals::take();
 
-    Clocks::init(config.cpu_clock());
+    Clocks::init(config.clock_config());
 
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.LPWR.reborrow());

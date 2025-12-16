@@ -303,7 +303,7 @@ impl SystemClocks {
                     ///   if possible.
                     /// - The CPU and its upstream clock nodes will be set to a default configuration.
                     /// - Other unspecified clock sources will not be useable by peripherals.
-                    #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+                    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
                     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
                     #[instability::unstable]
                     pub struct ClockConfig {
