@@ -35,60 +35,69 @@ define_clock_tree_types!();
 pub enum CpuClock {
     /// 80 MHz CPU clock
     #[default]
-    _80MHz,
+    _80MHz  = 80,
 
     /// 120 MHz CPU clock
-    _120MHz,
-
-    /// Custom clock tree configuration.
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    Custom(ClockConfig),
+    _120MHz = 120,
 }
 
 impl CpuClock {
-    pub(crate) fn configure(self) {
-        // Resolve presets
-        let mut config = match self {
-            CpuClock::_80MHz => ClockConfig {
-                xtal_clk: None,
-                system_pre_div: None,
-                cpu_pll_div: Some(CpuPllDivConfig::_6),
-                cpu_clk: Some(CpuClkConfig::Pll),
-                rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
-                rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
-                rtc_fast_clk: Some(RtcFastClkConfig::Rc),
-                low_power_clk: Some(LowPowerClkConfig::RtcSlow),
-            },
-            CpuClock::_120MHz => ClockConfig {
-                xtal_clk: None,
-                system_pre_div: None,
-                cpu_pll_div: Some(CpuPllDivConfig::_4),
-                cpu_clk: Some(CpuClkConfig::Pll),
-                rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
-                rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
-                rtc_fast_clk: Some(RtcFastClkConfig::Rc),
-                low_power_clk: Some(LowPowerClkConfig::RtcSlow),
-            },
-            #[cfg(feature = "unstable")]
-            CpuClock::Custom(clock_config) => clock_config,
-        };
+    const PRESET_80: ClockConfig = ClockConfig {
+        xtal_clk: None,
+        system_pre_div: None,
+        cpu_pll_div: Some(CpuPllDivConfig::_6),
+        cpu_clk: Some(CpuClkConfig::Pll),
+        rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
+        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_fast_clk: Some(RtcFastClkConfig::Rc),
+        low_power_clk: Some(LowPowerClkConfig::RtcSlow),
+    };
+    const PRESET_120: ClockConfig = ClockConfig {
+        xtal_clk: None,
+        system_pre_div: None,
+        cpu_pll_div: Some(CpuPllDivConfig::_4),
+        cpu_clk: Some(CpuClkConfig::Pll),
+        rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
+        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_fast_clk: Some(RtcFastClkConfig::Rc),
+        low_power_clk: Some(LowPowerClkConfig::RtcSlow),
+    };
+}
 
+impl From<CpuClock> for ClockConfig {
+    fn from(value: CpuClock) -> ClockConfig {
+        match value {
+            CpuClock::_80MHz => CpuClock::PRESET_80,
+            CpuClock::_120MHz => CpuClock::PRESET_120,
+        }
+    }
+}
+
+impl ClockConfig {
+    pub(crate) fn try_get_preset(self) -> Option<CpuClock> {
+        match self {
+            v if v == CpuClock::PRESET_80 => Some(CpuClock::_80MHz),
+            v if v == CpuClock::PRESET_120 => Some(CpuClock::_120MHz),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn configure(mut self) {
         // Detect XTAL if unset.
         // FIXME: this doesn't support running from RC_FAST_CLK. We should rework detection to only
         // run when requesting XTAL.
         ClockTree::with(|clocks| {
-            if config.xtal_clk.is_none() {
+            if self.xtal_clk.is_none() {
                 // While the bootloader stores a crystal frequency in a retention register,
                 // that comes from a constant that we should not trust. If the user did not
                 // provide a crystal frequency, we should detect it.
                 let xtal = detect_xtal_freq(clocks);
                 debug!("Auto-detected XTAL frequency: {}", xtal.value());
-                config.xtal_clk = Some(xtal);
+                self.xtal_clk = Some(xtal);
             }
         });
 
-        config.apply();
+        self.apply();
     }
 }
 

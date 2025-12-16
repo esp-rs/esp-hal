@@ -29,23 +29,13 @@ static mut COUNTER: u32 = 0;
 static mut T2_COUNTER: u32 = 0;
 static mut T3_COUNTER: u32 = 0;
 
+const CLOCK: CpuClock = CpuClock::max();
 const TEST_MILLIS: u64 = 500;
 
 #[handler]
 fn timer_handler() {
     let c = unsafe { COUNTER } as u64;
-
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32c2")] {
-            let cpu_clock = 120_000_000;
-        } else if #[cfg(any(feature = "esp32c3", feature = "esp32c6"))] {
-            let cpu_clock = 160_000_000;
-        } else if #[cfg(feature = "esp32h2")] {
-            let cpu_clock = 96_000_000;
-        } else {
-            let cpu_clock = 240_000_000;
-        }
-    }
+    let cpu_clock = CLOCK as u64 * 1_000_000;
 
     let timer_ticks_per_second = SystemTimer::ticks_per_second();
     let cpu_cycles_per_timer_ticks = cpu_clock / timer_ticks_per_second;

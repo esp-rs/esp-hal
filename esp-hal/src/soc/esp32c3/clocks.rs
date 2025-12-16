@@ -34,56 +34,64 @@ define_clock_tree_types!();
 pub enum CpuClock {
     /// 80 MHz CPU clock
     #[default]
-    _80MHz,
+    _80MHz  = 80,
 
     /// 160 MHz CPU clock
-    _160MHz,
-
-    /// Custom clock tree configuration.
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    Custom(ClockConfig),
+    _160MHz = 160,
 }
 
 impl CpuClock {
-    pub(crate) fn configure(self) {
-        // Resolve presets
-        //
-        // The presets use 480MHz PLL by default, because that is the default value the chip boots
-        // with, and changing it breaks USB Serial/JTAG.
-        let mut config = match self {
-            CpuClock::_80MHz => ClockConfig {
-                xtal_clk: None,
-                system_pre_div: None,
-                pll_clk: Some(PllClkConfig::_480),
-                cpu_pll_div_out: Some(CpuPllDivOutConfig::_80),
-                cpu_clk: Some(CpuClkConfig::Pll),
-                rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
-                rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
-                rtc_fast_clk: Some(RtcFastClkConfig::Rc),
-                low_power_clk: Some(LowPowerClkConfig::RtcSlow),
-            },
-            CpuClock::_160MHz => ClockConfig {
-                xtal_clk: None,
-                system_pre_div: None,
-                pll_clk: Some(PllClkConfig::_480),
-                cpu_pll_div_out: Some(CpuPllDivOutConfig::_160),
-                cpu_clk: Some(CpuClkConfig::Pll),
-                rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
-                rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
-                rtc_fast_clk: Some(RtcFastClkConfig::Rc),
-                low_power_clk: Some(LowPowerClkConfig::RtcSlow),
-            },
-            #[cfg(feature = "unstable")]
-            CpuClock::Custom(clock_config) => clock_config,
-        };
+    // The presets use 480MHz PLL by default, because that is the default value the chip boots
+    // with, and changing it breaks USB Serial/JTAG.
+    const PRESET_80: ClockConfig = ClockConfig {
+        xtal_clk: None,
+        system_pre_div: None,
+        pll_clk: Some(PllClkConfig::_480),
+        cpu_pll_div_out: Some(CpuPllDivOutConfig::_80),
+        cpu_clk: Some(CpuClkConfig::Pll),
+        rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
+        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_fast_clk: Some(RtcFastClkConfig::Rc),
+        low_power_clk: Some(LowPowerClkConfig::RtcSlow),
+    };
+    const PRESET_160: ClockConfig = ClockConfig {
+        xtal_clk: None,
+        system_pre_div: None,
+        pll_clk: Some(PllClkConfig::_480),
+        cpu_pll_div_out: Some(CpuPllDivOutConfig::_160),
+        cpu_clk: Some(CpuClkConfig::Pll),
+        rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
+        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_fast_clk: Some(RtcFastClkConfig::Rc),
+        low_power_clk: Some(LowPowerClkConfig::RtcSlow),
+    };
+}
 
-        if config.xtal_clk.is_none() {
+impl From<CpuClock> for ClockConfig {
+    fn from(value: CpuClock) -> ClockConfig {
+        match value {
+            CpuClock::_80MHz => CpuClock::PRESET_80,
+            CpuClock::_160MHz => CpuClock::PRESET_160,
+        }
+    }
+}
+
+impl ClockConfig {
+    pub(crate) fn try_get_preset(self) -> Option<CpuClock> {
+        match self {
+            v if v == CpuClock::PRESET_80 => Some(CpuClock::_80MHz),
+            v if v == CpuClock::PRESET_160 => Some(CpuClock::_160MHz),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn configure(mut self) {
+        if self.xtal_clk.is_none() {
             // TODO: support multiple crystal frequencies (esp-idf supports 32M).
-            config.xtal_clk = Some(XtalClkConfig::_40);
+            self.xtal_clk = Some(XtalClkConfig::_40);
         }
 
-        config.apply();
+        self.apply();
     }
 }
 

@@ -31,36 +31,43 @@ define_clock_tree_types!();
 pub enum CpuClock {
     /// 96 MHz CPU clock
     #[default]
-    _96MHz,
-
-    /// Custom clock tree configuration.
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    Custom(ClockConfig),
+    _96MHz = 96,
 }
 
 impl CpuClock {
-    pub(crate) fn configure(self) {
-        // Resolve presets
-        let mut config = match self {
-            CpuClock::_96MHz => ClockConfig {
-                xtal_clk: None,
-                hp_root_clk: Some(HpRootClkConfig::Pll96),
-                cpu_clk: Some(CpuClkConfig::new(0)),
-                ahb_clk: Some(AhbClkConfig::new(0)),
-                apb_clk: Some(ApbClkConfig::new(0)),
-                lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
-                lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
-            },
-            #[cfg(feature = "unstable")]
-            CpuClock::Custom(clock_config) => clock_config,
-        };
+    const PRESET_96: ClockConfig = ClockConfig {
+        xtal_clk: None,
+        hp_root_clk: Some(HpRootClkConfig::Pll96),
+        cpu_clk: Some(CpuClkConfig::new(0)),
+        ahb_clk: Some(AhbClkConfig::new(0)),
+        apb_clk: Some(ApbClkConfig::new(0)),
+        lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
+        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+    };
+}
 
-        if config.xtal_clk.is_none() {
-            config.xtal_clk = Some(XtalClkConfig::_32);
+impl From<CpuClock> for ClockConfig {
+    fn from(value: CpuClock) -> ClockConfig {
+        match value {
+            CpuClock::_96MHz => CpuClock::PRESET_96,
+        }
+    }
+}
+
+impl ClockConfig {
+    pub(crate) fn try_get_preset(self) -> Option<CpuClock> {
+        match self {
+            v if v == CpuClock::PRESET_96 => Some(CpuClock::_96MHz),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn configure(mut self) {
+        if self.xtal_clk.is_none() {
+            self.xtal_clk = Some(XtalClkConfig::_32);
         }
 
-        config.apply();
+        self.apply();
     }
 }
 
