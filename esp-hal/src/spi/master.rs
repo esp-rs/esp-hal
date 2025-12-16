@@ -1578,11 +1578,15 @@ mod dma {
             }
 
             struct Fut(Driver);
+            impl Fut {
+                const DONE_EVENTS: EnumSet<SpiInterrupt> =
+                    enumset::enum_set!(SpiInterrupt::TransferDone);
+            }
             impl Future for Fut {
                 type Output = ();
 
                 fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                    if self.0.interrupts().contains(SpiInterrupt::TransferDone) {
+                    if !self.0.interrupts().is_disjoint(Self::DONE_EVENTS) {
                         #[cfg(any(esp32, esp32s2))]
                         // Need to poll for done-ness even after interrupt fires.
                         if self.0.busy() {
@@ -1590,20 +1594,18 @@ mod dma {
                             return Poll::Pending;
                         }
 
-                        self.0.clear_interrupts(SpiInterrupt::TransferDone.into());
+                        self.0.clear_interrupts(Self::DONE_EVENTS);
                         return Poll::Ready(());
                     }
 
                     self.0.state.waker.register(cx.waker());
-                    self.0
-                        .enable_listen(SpiInterrupt::TransferDone.into(), true);
+                    self.0.enable_listen(Self::DONE_EVENTS, true);
                     Poll::Pending
                 }
             }
             impl Drop for Fut {
                 fn drop(&mut self) {
-                    self.0
-                        .enable_listen(SpiInterrupt::TransferDone.into(), false);
+                    self.0.enable_listen(Self::DONE_EVENTS, false);
                 }
             }
 
