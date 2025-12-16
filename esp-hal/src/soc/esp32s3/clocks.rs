@@ -23,8 +23,7 @@ use crate::{
 
 define_clock_tree_types!();
 
-// TODO: this should replace the current CpuClock enum. CpuClock is a bit of a misleading
-// name as this will configure multiple things.
+/// Clock configuration options.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[allow(
@@ -32,11 +31,20 @@ define_clock_tree_types!();
     reason = "MHz suffix indicates physical unit."
 )]
 #[non_exhaustive]
-pub(crate) enum CpuClock {
+pub enum CpuClock {
+    /// 80 MHz CPU clock
     #[default]
     _80MHz,
+
+    /// 160 MHz CPU clock
     _160MHz,
+
+    /// 240 MHz CPU clock
     _240MHz,
+
+    /// Custom clock tree configuration.
+    #[cfg(feature = "unstable")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     Custom(ClockConfig),
 }
 
@@ -80,6 +88,7 @@ impl CpuClock {
                 rtc_fast_clk: Some(RtcFastClkConfig::Rc),
                 low_power_clk: Some(LowPowerClkConfig::RtcSlow),
             },
+            #[cfg(feature = "unstable")]
             CpuClock::Custom(clock_config) => clock_config,
         };
 
