@@ -61,6 +61,7 @@ pub mod checker {
         fs,
         io::Write,
         path::{Path, PathBuf},
+        str::FromStr,
     };
 
     use cargo_semver_checks::ReleaseType;
@@ -325,132 +326,147 @@ pub mod checker {
             return Ok(false);
         }
 
-        // Try each matching artifact until download and extraction succeeds
-        for artifact in artifacts {
-            let name_matches = artifact
-                .get("name")
-                .and_then(|v| v.as_str())
-                .map(|n| n == artifact_name)
-                .unwrap_or(false);
-            if !name_matches {
+        // Find the latest, non-expired artifact
+        let latest_artifact = artifacts
+            .iter()
+            .filter(|artifact| {
+                let name_matches = artifact
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .map(|n| n == artifact_name)
+                    .unwrap_or(false);
+
+                let expired = artifact
+                    .get("expired")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+
+                name_matches && !expired
+            })
+            .max_by_key(|artifact| {
+                artifact
+                    .get("created_at")
+                    .and_then(|v| v.as_str())
+                    .map(|s| jiff::Timestamp::from_str(s).expect("Invalid timestamp"))
+            });
+
+        let Some(artifact) = latest_artifact else {
+            log::debug!(
+                "No valid (non-expired) artifacts found for {}",
+                artifact_name
+            );
+            return Ok(false);
+        };
+
+        let id = match artifact.get("id").and_then(|v| v.as_u64()) {
+            Some(id) => id.to_string(),
+            None => {
+                log::debug!("Artifact missing ID field");
+                return Ok(false);
+            }
+        };
+
+        log::debug!("Downloading artifact id {} (name: {})", id, artifact_name);
+
+        // Download the artifact ZIP (API returns a redirect to the ZIP)
+        let download = Command::new("gh")
+            .args([
+                "api",
+                "-H",
+                "Accept: application/vnd.github+json",
+                "-H",
+                "X-GitHub-Api-Version: 2022-11-28",
+                &format!("/repos/{}/actions/artifacts/{}/zip", repo, id),
+            ])
+            .output();
+
+        let Ok(result) = download else {
+            log::debug!("Error invoking gh api to download artifact id {}", id);
+            return Ok(false);
+        };
+
+        if !result.status.success() {
+            let stderr = String::from_utf8_lossy(&result.stderr);
+            log::debug!(
+                "Failed to download artifact id {} (name: {}). stderr: {}",
+                id,
+                artifact_name,
+                stderr
+            );
+            return Ok(false);
+        }
+
+        let baseline_dir = package_path.join("api-baseline");
+        std::fs::create_dir_all(&baseline_dir)?;
+
+        let mut archive = match ZipArchive::new(Cursor::new(&result.stdout)) {
+            Ok(arc) => arc,
+            Err(e) => {
+                log::debug!("Failed to open ZIP archive for artifact id {}: {}", id, e);
+                return Ok(false);
+            }
+        };
+
+        // Extract only *.json.gz files into api-baseline/
+        // https://github.com/zip-rs/zip2/blob/master/examples/extract.rs
+        for i in 0..archive.len() {
+            let mut file = match archive.by_index(i) {
+                Ok(f) => f,
+                Err(e) => {
+                    log::debug!("Failed to access ZIP entry {}: {}", i, e);
+                    continue;
+                }
+            };
+
+            if !file.is_file() {
                 continue;
             }
 
-            let expired = artifact
-                .get("expired")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-            if expired {
-                log::debug!("Skipping expired artifact: {}", artifact_name);
+            // Sanitize internal path
+            let Some(safe_path) = file.enclosed_name() else {
+                continue;
+            };
+
+            // We only want files like "<anything>.json.gz"
+            if !(safe_path.extension().and_then(|e| e.to_str()) == Some("gz")
+                && safe_path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .map(|s| s.ends_with(".json"))
+                    .unwrap_or(false))
+            {
                 continue;
             }
 
-            let id = match artifact.get("id").and_then(|v| v.as_u64()) {
-                Some(id) => id.to_string(),
+            // Flatten to just the filename
+            let out_path = match safe_path.file_name() {
+                Some(name) => baseline_dir.join(name),
                 None => continue,
             };
 
-            log::debug!("Downloading artifact id {} (name: {})", id, artifact_name);
-
-            // Download the artifact ZIP (API returns a redirect to the ZIP)
-            let download = Command::new("gh")
-                .args([
-                    "api",
-                    "-H",
-                    "Accept: application/vnd.github+json",
-                    "-H",
-                    "X-GitHub-Api-Version: 2022-11-28",
-                    &format!("/repos/{}/actions/artifacts/{}/zip", repo, id),
-                ])
-                .output();
-
-            let Ok(result) = download else {
-                log::debug!("Error invoking gh api to download artifact id {}", id);
-                continue;
-            };
-
-            if !result.status.success() {
-                let stderr = String::from_utf8_lossy(&result.stderr);
-                log::debug!(
-                    "Failed to download artifact id {} (name: {}). stderr: {}",
-                    id,
-                    artifact_name,
-                    stderr
-                );
-                continue;
-            }
-
-            let baseline_dir = package_path.join("api-baseline");
-            std::fs::create_dir_all(&baseline_dir)?;
-
-            let mut archive = match ZipArchive::new(Cursor::new(&result.stdout)) {
-                Ok(arc) => arc,
-                Err(e) => {
-                    log::debug!("Failed to open ZIP archive for artifact id {}: {}", id, e);
-                    continue;
-                }
-            };
-
-            // Extract only *.json.gz files into api-baseline/
-            // https://github.com/zip-rs/zip2/blob/master/examples/extract.rs
-            for i in 0..archive.len() {
-                let mut file = match archive.by_index(i) {
-                    Ok(f) => f,
-                    Err(e) => {
-                        log::debug!("Failed to access ZIP entry {}: {}", i, e);
+            match std::fs::File::create(&out_path) {
+                Ok(mut out) => {
+                    if let Err(e) = std::io::copy(&mut file, &mut out) {
+                        log::warn!("Failed to write {}: {}", out_path.display(), e);
                         continue;
                     }
-                };
-
-                if !file.is_file() {
-                    continue;
+                    log::debug!("Extracted {}", out_path.display());
                 }
+                Err(e) => log::warn!("Failed to create {}: {}", out_path.display(), e),
+            }
+        }
 
-                // Sanitize internal path
-                let Some(safe_path) = file.enclosed_name() else {
-                    continue;
-                };
-
-                // We only want files like "<anything>.json.gz"
-                if !(safe_path.extension().and_then(|e| e.to_str()) == Some("gz")
-                    && safe_path
-                        .file_stem()
+        // Check if artifact produced any baselines
+        if let Ok(entries) = std::fs::read_dir(&baseline_dir) {
+            if entries.flatten().any(|e| {
+                let p = e.path();
+                p.extension().and_then(|s| s.to_str()) == Some("gz")
+                    && p.file_stem()
                         .and_then(|s| s.to_str())
                         .map(|s| s.ends_with(".json"))
-                        .unwrap_or(false))
-                {
-                    continue;
-                }
-
-                // Flatten to just the filename
-                let out_path = match safe_path.file_name() {
-                    Some(name) => baseline_dir.join(name),
-                    None => continue,
-                };
-
-                match std::fs::File::create(&out_path) {
-                    Ok(mut out) => {
-                        if let Err(e) = std::io::copy(&mut file, &mut out) {
-                            log::warn!("Failed to write {}: {}", out_path.display(), e);
-                            continue;
-                        }
-                        log::debug!("Extracted {}", out_path.display());
-                    }
-                    Err(e) => log::warn!("Failed to create {}: {}", out_path.display(), e),
-                }
-            }
-            // successfully return if artifact produced any baselines
-            if let Ok(entries) = std::fs::read_dir(&baseline_dir) {
-                if entries.flatten().any(|e| {
-                    let p = e.path();
-                    p.extension().and_then(|s| s.to_str()) == Some("gz")
-                        && p.file_stem()
-                            .and_then(|s| s.to_str())
-                            .map(|s| s.ends_with(".json"))
-                            .unwrap_or(false)
-                }) {
-                    return Ok(true);
-                }
+                        .unwrap_or(false)
+            }) {
+                return Ok(true);
             }
         }
         log::debug!("No downloadable artifacts found for {}", artifact_name);

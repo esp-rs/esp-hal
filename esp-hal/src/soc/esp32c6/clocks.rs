@@ -33,59 +33,74 @@ define_clock_tree_types!();
 pub enum CpuClock {
     /// 80 MHz CPU clock
     #[default]
-    _80MHz,
+    _80MHz  = 80,
 
     /// 160 MHz CPU clock
-    _160MHz,
-
-    /// Custom clock tree configuration.
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    Custom(ClockConfig),
+    _160MHz = 160,
 }
 
 impl CpuClock {
-    pub(crate) fn configure(self) {
-        // Resolve presets
-        let mut config = match self {
-            CpuClock::_80MHz => ClockConfig {
-                xtal_clk: None,
-                soc_root_clk: Some(SocRootClkConfig::Pll),
-                cpu_hs_div: Some(CpuHsDivConfig::_1),
-                cpu_ls_div: None, // Unused when root clock is PLL
-                ahb_hs_div: Some(AhbHsDivConfig::_3),
-                ahb_ls_div: None, // Unused when root clock is PLL
-                // Configures 80MHz MSPI clock
-                mspi_fast_hs_clk: Some(MspiFastHsClkConfig::_5),
-                mspi_fast_ls_clk: None, // Unused when root clock is PLL
-                apb_clk: Some(ApbClkConfig::new(0)),
-                ledc_sclk: Some(LedcSclkConfig::PllF80m),
-                mcpwm_clk: Some(McpwmClkConfig::PllF160m),
-                lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
-                lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
-            },
-            CpuClock::_160MHz => ClockConfig {
-                xtal_clk: None,
-                soc_root_clk: Some(SocRootClkConfig::Pll),
-                cpu_hs_div: Some(CpuHsDivConfig::_0),
-                cpu_ls_div: None, // Unused when root clock is PLL
-                ahb_hs_div: Some(AhbHsDivConfig::_3),
-                ahb_ls_div: None, // Unused when root clock is PLL
-                // Configures 80MHz MSPI clock
-                mspi_fast_hs_clk: Some(MspiFastHsClkConfig::_5),
-                mspi_fast_ls_clk: None, // Unused when root clock is PLL
-                apb_clk: Some(ApbClkConfig::new(0)),
-                ledc_sclk: Some(LedcSclkConfig::PllF80m),
-                mcpwm_clk: Some(McpwmClkConfig::PllF160m),
-                lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
-                lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
-            },
-            #[cfg(feature = "unstable")]
-            CpuClock::Custom(clock_config) => clock_config,
-        };
+    const PRESET_80: ClockConfig = ClockConfig {
+        xtal_clk: None,
+        soc_root_clk: Some(SocRootClkConfig::Pll),
+        cpu_hs_div: Some(CpuHsDivConfig::_1),
+        cpu_ls_div: None, // Unused when root clock is PLL
+        ahb_hs_div: Some(AhbHsDivConfig::_3),
+        ahb_ls_div: None, // Unused when root clock is PLL
+        // Configures 80MHz MSPI clock
+        mspi_fast_hs_clk: Some(MspiFastHsClkConfig::_5),
+        mspi_fast_ls_clk: None, // Unused when root clock is PLL
+        apb_clk: Some(ApbClkConfig::new(0)),
+        ledc_sclk: Some(LedcSclkConfig::PllF80m),
+        mcpwm_clk: Some(McpwmClkConfig::PllF160m),
+        lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
+        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+    };
+    const PRESET_160: ClockConfig = ClockConfig {
+        xtal_clk: None,
+        soc_root_clk: Some(SocRootClkConfig::Pll),
+        cpu_hs_div: Some(CpuHsDivConfig::_0),
+        cpu_ls_div: None, // Unused when root clock is PLL
+        ahb_hs_div: Some(AhbHsDivConfig::_3),
+        ahb_ls_div: None, // Unused when root clock is PLL
+        // Configures 80MHz MSPI clock
+        mspi_fast_hs_clk: Some(MspiFastHsClkConfig::_5),
+        mspi_fast_ls_clk: None, // Unused when root clock is PLL
+        apb_clk: Some(ApbClkConfig::new(0)),
+        ledc_sclk: Some(LedcSclkConfig::PllF80m),
+        mcpwm_clk: Some(McpwmClkConfig::PllF160m),
+        lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
+        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+    };
+}
 
-        if config.xtal_clk.is_none() {
-            config.xtal_clk = Some(XtalClkConfig::_40);
+impl From<CpuClock> for ClockConfig {
+    fn from(value: CpuClock) -> ClockConfig {
+        match value {
+            CpuClock::_80MHz => CpuClock::PRESET_80,
+            CpuClock::_160MHz => CpuClock::PRESET_160,
+        }
+    }
+}
+
+impl Default for ClockConfig {
+    fn default() -> Self {
+        Self::from(CpuClock::default())
+    }
+}
+
+impl ClockConfig {
+    pub(crate) fn try_get_preset(self) -> Option<CpuClock> {
+        match self {
+            v if v == CpuClock::PRESET_80 => Some(CpuClock::_80MHz),
+            v if v == CpuClock::PRESET_160 => Some(CpuClock::_160MHz),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn configure(mut self) {
+        if self.xtal_clk.is_none() {
+            self.xtal_clk = Some(XtalClkConfig::_40);
         }
 
         // On ESP32C6, MSPI source clock's default HS divider leads to 120MHz, which is unusable
@@ -94,7 +109,7 @@ impl CpuClock {
         // PLL = 480MHz, so divider is 6.
         ClockTree::with(|clocks| configure_mspi_fast_hs_clk(clocks, MspiFastHsClkConfig::_5));
 
-        config.apply();
+        self.apply();
     }
 }
 
