@@ -329,6 +329,7 @@ impl InterruptExecutorStorage {
     /// # Safety:
     ///
     /// The caller must ensure `set` has been called before.
+    #[inline(always)]
     unsafe fn get(&self) -> &raw::Executor {
         unsafe { &*self.raw_executor.load(Ordering::Relaxed) }
     }

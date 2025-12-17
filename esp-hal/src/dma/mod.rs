@@ -2838,6 +2838,8 @@ where
 pub(crate) mod asynch {
     use core::task::Poll;
 
+    use enumset::enum_set;
+
     use super::*;
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -2852,6 +2854,10 @@ pub(crate) mod asynch {
     where
         CH: DmaTxChannel,
     {
+        const SUCCESS_INTERRUPTS: EnumSet<DmaTxInterrupt> = enum_set!(DmaTxInterrupt::TotalEof);
+        const FAILURE_INTERRUPTS: EnumSet<DmaTxInterrupt> =
+            enum_set!(DmaTxInterrupt::DescriptorError);
+
         #[cfg_attr(esp32c2, allow(dead_code))]
         pub fn new(tx: &'a mut ChannelTx<Async, CH>) -> Self {
             Self { tx }
@@ -2868,22 +2874,26 @@ pub(crate) mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
-            if self.tx.is_done() {
-                self.tx.clear_interrupts();
-                Poll::Ready(Ok(()))
-            } else if self
-                .tx
-                .pending_out_interrupts()
-                .contains(DmaTxInterrupt::DescriptorError)
-            {
-                self.tx.clear_interrupts();
-                Poll::Ready(Err(DmaError::DescriptorError))
+            let interrupts = self.tx.pending_out_interrupts();
+            let result = if !interrupts.is_disjoint(Self::SUCCESS_INTERRUPTS) {
+                Ok(())
+            } else if !interrupts.is_disjoint(Self::FAILURE_INTERRUPTS) {
+                Err(DmaError::DescriptorError)
             } else {
+                // The interrupt may become pending before we register the waker and start
+                // listening, but that should just trigger the interrupt handler. The only
+                // constraint we have is that the waker must be registered before we start
+                // listening.
                 self.tx.waker().register(cx.waker());
                 self.tx
-                    .listen_out(DmaTxInterrupt::TotalEof | DmaTxInterrupt::DescriptorError);
-                Poll::Pending
-            }
+                    .listen_out(Self::SUCCESS_INTERRUPTS | Self::FAILURE_INTERRUPTS);
+
+                return Poll::Pending;
+            };
+
+            self.tx.clear_interrupts();
+
+            Poll::Ready(result)
         }
     }
 
@@ -2893,7 +2903,7 @@ pub(crate) mod asynch {
     {
         fn drop(&mut self) {
             self.tx
-                .unlisten_out(DmaTxInterrupt::TotalEof | DmaTxInterrupt::DescriptorError);
+                .unlisten_out(Self::SUCCESS_INTERRUPTS | Self::FAILURE_INTERRUPTS);
         }
     }
 
@@ -2909,6 +2919,14 @@ pub(crate) mod asynch {
     where
         CH: DmaRxChannel,
     {
+        const SUCCESS_INTERRUPTS: EnumSet<DmaRxInterrupt> =
+            enum_set!(DmaRxInterrupt::SuccessfulEof);
+        const FAILURE_INTERRUPTS: EnumSet<DmaRxInterrupt> = enum_set!(
+            DmaRxInterrupt::DescriptorError
+                | DmaRxInterrupt::DescriptorEmpty
+                | DmaRxInterrupt::ErrorEof
+        );
+
         pub fn new(rx: &'a mut ChannelRx<Async, CH>) -> Self {
             Self { rx }
         }
@@ -2924,26 +2942,26 @@ pub(crate) mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
-            if self.rx.is_done() {
-                self.rx.clear_interrupts();
-                Poll::Ready(Ok(()))
-            } else if !self.rx.pending_in_interrupts().is_disjoint(
-                DmaRxInterrupt::DescriptorError
-                    | DmaRxInterrupt::DescriptorEmpty
-                    | DmaRxInterrupt::ErrorEof,
-            ) {
-                self.rx.clear_interrupts();
-                Poll::Ready(Err(DmaError::DescriptorError))
+            let interrupts = self.rx.pending_in_interrupts();
+            let result = if !interrupts.is_disjoint(Self::SUCCESS_INTERRUPTS) {
+                Ok(())
+            } else if !interrupts.is_disjoint(Self::FAILURE_INTERRUPTS) {
+                Err(DmaError::DescriptorError)
             } else {
+                // The interrupt may become pending before we register the waker and start
+                // listening, but that should just trigger the interrupt handler. The only
+                // constraint we have is that the waker must be registered before we start
+                // listening.
                 self.rx.waker().register(cx.waker());
-                self.rx.listen_in(
-                    DmaRxInterrupt::SuccessfulEof
-                        | DmaRxInterrupt::DescriptorError
-                        | DmaRxInterrupt::DescriptorEmpty
-                        | DmaRxInterrupt::ErrorEof,
-                );
-                Poll::Pending
-            }
+                self.rx
+                    .listen_in(Self::SUCCESS_INTERRUPTS | Self::FAILURE_INTERRUPTS);
+
+                return Poll::Pending;
+            };
+
+            self.rx.clear_interrupts();
+
+            Poll::Ready(result)
         }
     }
 
@@ -2952,11 +2970,8 @@ pub(crate) mod asynch {
         CH: DmaRxChannel,
     {
         fn drop(&mut self) {
-            self.rx.unlisten_in(
-                DmaRxInterrupt::DescriptorError
-                    | DmaRxInterrupt::DescriptorEmpty
-                    | DmaRxInterrupt::ErrorEof,
-            );
+            self.rx
+                .unlisten_in(Self::SUCCESS_INTERRUPTS | Self::FAILURE_INTERRUPTS);
         }
     }
 

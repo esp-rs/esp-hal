@@ -36,70 +36,87 @@ define_clock_tree_types!();
 pub enum CpuClock {
     /// 80 MHz CPU clock
     #[default]
-    _80MHz,
+    _80MHz  = 80,
 
     /// 160 MHz CPU clock
-    _160MHz,
+    _160MHz = 160,
 
     /// 240 MHz CPU clock
-    _240MHz,
-
-    /// Custom clock tree configuration.
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    Custom(ClockConfig),
+    _240MHz = 240,
 }
 
 impl CpuClock {
-    pub(crate) fn configure(self) {
-        // Resolve presets
-        let mut config = match self {
-            CpuClock::_80MHz => ClockConfig {
-                xtal_clk: None,
-                pll_clk: Some(PllClkConfig::_320),
-                apll_clk: None,
-                cpu_pll_div: Some(CpuPllDivConfig::_4),
-                syscon_pre_div: None,
-                cpu_clk: Some(CpuClkConfig::Pll),
-                rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
-                rtc_fast_clk: Some(RtcFastClkConfig::Rc),
-            },
-            CpuClock::_160MHz => ClockConfig {
-                xtal_clk: None,
-                pll_clk: Some(PllClkConfig::_320),
-                apll_clk: None,
-                cpu_pll_div: Some(CpuPllDivConfig::_2),
-                syscon_pre_div: None,
-                cpu_clk: Some(CpuClkConfig::Pll),
-                rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
-                rtc_fast_clk: Some(RtcFastClkConfig::Rc),
-            },
-            CpuClock::_240MHz => ClockConfig {
-                xtal_clk: None,
-                pll_clk: Some(PllClkConfig::_480),
-                apll_clk: None,
-                cpu_pll_div: Some(CpuPllDivConfig::_2),
-                syscon_pre_div: None,
-                cpu_clk: Some(CpuClkConfig::Pll),
-                rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
-                rtc_fast_clk: Some(RtcFastClkConfig::Rc),
-            },
-            #[cfg(feature = "unstable")]
-            CpuClock::Custom(clock_config) => clock_config,
-        };
+    const PRESET_80: ClockConfig = ClockConfig {
+        xtal_clk: None,
+        pll_clk: Some(PllClkConfig::_320),
+        apll_clk: None,
+        cpu_pll_div: Some(CpuPllDivConfig::_4),
+        syscon_pre_div: None,
+        cpu_clk: Some(CpuClkConfig::Pll),
+        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_fast_clk: Some(RtcFastClkConfig::Rc),
+    };
+    const PRESET_160: ClockConfig = ClockConfig {
+        xtal_clk: None,
+        pll_clk: Some(PllClkConfig::_320),
+        apll_clk: None,
+        cpu_pll_div: Some(CpuPllDivConfig::_2),
+        syscon_pre_div: None,
+        cpu_clk: Some(CpuClkConfig::Pll),
+        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_fast_clk: Some(RtcFastClkConfig::Rc),
+    };
+    const PRESET_240: ClockConfig = ClockConfig {
+        xtal_clk: None,
+        pll_clk: Some(PllClkConfig::_480),
+        apll_clk: None,
+        cpu_pll_div: Some(CpuPllDivConfig::_2),
+        syscon_pre_div: None,
+        cpu_clk: Some(CpuClkConfig::Pll),
+        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_fast_clk: Some(RtcFastClkConfig::Rc),
+    };
+}
 
+impl From<CpuClock> for ClockConfig {
+    fn from(value: CpuClock) -> ClockConfig {
+        match value {
+            CpuClock::_80MHz => CpuClock::PRESET_80,
+            CpuClock::_160MHz => CpuClock::PRESET_160,
+            CpuClock::_240MHz => CpuClock::PRESET_240,
+        }
+    }
+}
+
+impl Default for ClockConfig {
+    fn default() -> Self {
+        Self::from(CpuClock::default())
+    }
+}
+
+impl ClockConfig {
+    pub(crate) fn try_get_preset(self) -> Option<CpuClock> {
+        match self {
+            v if v == CpuClock::PRESET_80 => Some(CpuClock::_80MHz),
+            v if v == CpuClock::PRESET_160 => Some(CpuClock::_160MHz),
+            v if v == CpuClock::PRESET_240 => Some(CpuClock::_240MHz),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn configure(mut self) {
         // Detect XTAL if unset.
         // FIXME: this doesn't support running from RC_FAST_CLK. We should rework detection to only
         // run when requesting XTAL.
         ClockTree::with(|clocks| {
-            if config.xtal_clk.is_none() {
+            if self.xtal_clk.is_none() {
                 let xtal = detect_xtal_freq(clocks);
                 debug!("Auto-detected XTAL frequency: {}", xtal.value());
-                config.xtal_clk = Some(xtal);
+                self.xtal_clk = Some(xtal);
             }
         });
 
-        config.apply();
+        self.apply();
     }
 }
 

@@ -134,10 +134,10 @@ clocks = { system_clocks = { clock_tree = [
     # The meta-switch
     { name = "CPU_CLK", type = "mux", always_on = true, variants = [
         # source clock      CPU clock                   additional config (mux = variant name, divider = divisor expression)
-        { name = "XTAL",    outputs = "SYSTEM_PRE_DIV", configures = [ "SYSTEM_PRE_DIV_IN = XTAL",    "APB_CLK = XTAL",     "REF_TICK = XTAL",    "REF_TICK_XTAL = APB_CLK / 1_000_000 - 1" ] },
-        { name = "RC_FAST", outputs = "SYSTEM_PRE_DIV", configures = [ "SYSTEM_PRE_DIV_IN = RC_FAST", "APB_CLK = RC_FAST",  "REF_TICK = RC_FAST", "REF_TICK_CK8M = APB_CLK / 1_000_000 - 1" ] },
-        { name = "APLL",    outputs = "CPU_PLL_DIV",    configures = [ "CPU_PLL_DIV_IN = APLL",       "APB_CLK = APLL",     "REF_TICK = APLL",    "REF_TICK_XTAL = APB_CLK / 1_000_000 - 1" ] },
-        { name = "PLL",     outputs = "CPU_PLL_DIV",    configures = [ "CPU_PLL_DIV_IN = PLL",        "APB_CLK = PLL",      "REF_TICK = PLL",     "REF_TICK_XTAL = APB_CLK / 1_000_000 - 1" ] },
+        { name = "XTAL",    outputs = "SYSTEM_PRE_DIV", configures = [ "SYSTEM_PRE_DIV_IN = XTAL",    "APB_CLK = XTAL",     "REF_TICK = XTAL",    "REF_TICK_XTAL = XTAL_CLK / 1_000_000 - 1" ] },
+        { name = "RC_FAST", outputs = "SYSTEM_PRE_DIV", configures = [ "SYSTEM_PRE_DIV_IN = RC_FAST", "APB_CLK = RC_FAST",  "REF_TICK = RC_FAST", "REF_TICK_CK8M = RC_FAST_CLK / 1_000_000 - 1" ] },
+        { name = "APLL",    outputs = "CPU_PLL_DIV",    configures = [ "CPU_PLL_DIV_IN = APLL",       "APB_CLK = APLL",     "REF_TICK = APLL",    "REF_TICK_XTAL = XTAL_CLK / 1_000_000 - 1" ] },
+        { name = "PLL",     outputs = "CPU_PLL_DIV",    configures = [ "CPU_PLL_DIV_IN = PLL",        "APB_CLK = PLL",      "REF_TICK = PLL",     "REF_TICK_XTAL = XTAL_CLK / 1_000_000 - 1" ] },
     ] },
 
     # APB options
@@ -151,8 +151,8 @@ clocks = { system_clocks = { clock_tree = [
     ] },
 
     # REF_TICK, configuring CPU clock needs to ensure this is 1MHz
-    { name = "REF_TICK_XTAL", type = "divider", divisors = "0 .. 256", output = "APB_CLK / (DIVISOR + 1)" },
-    { name = "REF_TICK_CK8M", type = "divider", divisors = "0 .. 256", output = "APB_CLK / (DIVISOR + 1)" },
+    { name = "REF_TICK_XTAL", type = "divider", divisors = "0 .. 256", output = "XTAL_CLK / (DIVISOR + 1)" },
+    { name = "REF_TICK_CK8M", type = "divider", divisors = "0 .. 256", output = "RC_FAST_CLK / (DIVISOR + 1)" },
     { name = "REF_TICK", type = "mux", variants = [
         { name = "PLL",     outputs = "REF_TICK_XTAL" },
         { name = "APLL",    outputs = "REF_TICK_XTAL" },
