@@ -47,7 +47,15 @@ use crate::{
 pub mod ap;
 #[cfg(all(feature = "csi", feature = "unstable"))]
 pub mod csi;
+
+#[cfg(any(doc, feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[cfg(feature = "unstable")]
 pub mod event;
+#[cfg(not(any(doc, feature = "unstable")))]
+#[allow(dead_code)]
+#[cfg(not(feature = "unstable"))]
+pub(crate) mod event;
 pub mod scan;
 #[cfg(all(feature = "sniffer", feature = "unstable"))]
 pub mod sniffer;
@@ -653,6 +661,7 @@ impl From<InitializationError> for WifiError {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 #[repr(i32)]
+#[instability::unstable]
 pub enum WifiEvent {
     /// Wi-Fi is ready for operation.
     WifiReady = 0,
@@ -2470,6 +2479,7 @@ impl WifiController<'_> {
     }
 
     /// Wait for one [`WifiEvent`].
+    #[instability::unstable]
     pub async fn wait_for_event(&mut self, event: WifiEvent) {
         Self::clear_events(event);
         WifiEventFuture::new(event).await
@@ -2477,6 +2487,7 @@ impl WifiController<'_> {
 
     /// Wait for one of multiple [`WifiEvent`]s. Returns the events that
     /// occurred while waiting.
+    #[instability::unstable]
     pub async fn wait_for_events(
         &mut self,
         events: EnumSet<WifiEvent>,
@@ -2489,6 +2500,7 @@ impl WifiController<'_> {
     }
 
     /// Wait for multiple [`WifiEvent`]s.
+    #[instability::unstable]
     pub async fn wait_for_all_events(
         &mut self,
         mut events: EnumSet<WifiEvent>,
@@ -2502,6 +2514,16 @@ impl WifiController<'_> {
             let fired = MultiWifiEventFuture::new(events).await;
             events -= fired;
         }
+    }
+
+    /// Wait for the station to disconnect.
+    pub async fn wait_for_station_disconnect(&mut self) {
+        self.wait_for_event(WifiEvent::StationDisconnected).await;
+    }
+
+    /// Wait for the access point to stop.
+    pub async fn wait_for_access_point_stopped(&mut self) {
+        self.wait_for_event(WifiEvent::AccessPointStop).await;
     }
 
     fn apply_ap_config(&mut self, config: &AccessPointConfig) -> Result<(), WifiError> {

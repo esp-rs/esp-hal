@@ -46,7 +46,6 @@ use esp_radio::wifi::{
     ModeConfig,
     WifiController,
     WifiDevice,
-    WifiEvent,
     ap::AccessPointConfig,
     sta::StationConfig,
 };
@@ -320,9 +319,7 @@ async fn connection(mut controller: WifiController<'static>) {
             match controller.connect_async().await {
                 Ok(_) => {
                     // wait until we're no longer connected
-                    controller
-                        .wait_for_event(WifiEvent::StationDisconnected)
-                        .await;
+                    controller.wait_for_station_disconnect().await;
                     println!("Station disconnected");
                 }
                 Err(e) => {

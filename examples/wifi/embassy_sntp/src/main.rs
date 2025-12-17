@@ -34,7 +34,6 @@ use esp_radio::wifi::{
     ModeConfig,
     WifiController,
     WifiDevice,
-    WifiEvent,
     scan::ScanConfig,
     sta::StationConfig,
 };
@@ -207,42 +206,41 @@ async fn main(spawner: Spawner) -> ! {
 async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
     println!("Device capabilities: {:?}", controller.capabilities());
+
+    let station_config = ModeConfig::Station(
+        StationConfig::default()
+            .with_ssid(SSID.into())
+            .with_password(PASSWORD.into()),
+    );
+    controller.set_config(&station_config).unwrap();
+    println!("Starting wifi");
+    controller.start_async().await.unwrap();
+    println!("Wifi started!");
+
+    println!("Scan");
+    let scan_config = ScanConfig::default().with_max(10);
+    let result = controller
+        .scan_with_config_async(scan_config)
+        .await
+        .unwrap();
+    for ap in result {
+        println!("{:?}", ap);
+    }
+
     loop {
-        if matches!(controller.is_connected(), Ok(true)) {
-            // wait until we're no longer connected
-            controller
-                .wait_for_event(WifiEvent::StationDisconnected)
-                .await;
-            Timer::after(Duration::from_millis(5000)).await
-        }
-
-        if !matches!(controller.is_started(), Ok(true)) {
-            let station_config = ModeConfig::Station(
-                StationConfig::default()
-                    .with_ssid(SSID.into())
-                    .with_password(PASSWORD.into()),
-            );
-            controller.set_config(&station_config).unwrap();
-            println!("Starting wifi");
-            controller.start_async().await.unwrap();
-            println!("Wifi started!");
-
-            println!("Scan");
-            let scan_config = ScanConfig::default().with_max(10);
-            let result = controller
-                .scan_with_config_async(scan_config)
-                .await
-                .unwrap();
-            for ap in result {
-                println!("{:?}", ap);
-            }
-        }
         println!("About to connect...");
 
         match controller.connect_async().await {
-            Ok(_) => println!("Wifi connected!"),
+            Ok(_) => {
+                println!("Wifi connected!");
+
+                // wait for disconnect
+                controller.wait_for_station_disconnect().await;
+                println!("Trying to reconnecting in 5 seconds");
+                Timer::after(Duration::from_millis(5000)).await
+            }
             Err(e) => {
-                println!("Failed to connect to wifi: {e:?}");
+                println!("Failed to connect to wifi: {e:?}, retry in 5 seconds");
                 Timer::after(Duration::from_millis(5000)).await
             }
         }
