@@ -30,8 +30,8 @@ mod private {
         Stopping,
         /// Station stopped
         Stopped,
-        /// Invalid state.
-        Invalid,
+        /// Uninitialized state.
+        Uninitialized,
     }
 
     /// Wi-Fi interface for access point state.
@@ -48,8 +48,8 @@ mod private {
         Stopping,
         /// Access point stopped.
         Stopped,
-        /// Invalid state.
-        Invalid,
+        /// Uninitialized state.
+        Uninitialized,
     }
 }
 
@@ -60,7 +60,7 @@ impl From<WifiEvent> for WifiStationState {
             WifiEvent::StationConnected => WifiStationState::Connected,
             WifiEvent::StationDisconnected => WifiStationState::Disconnected,
             WifiEvent::StationStop => WifiStationState::Stopped,
-            _ => WifiStationState::Invalid,
+            _ => WifiStationState::Uninitialized,
         }
     }
 }
@@ -70,15 +70,15 @@ impl From<WifiEvent> for WifiAccessPointState {
         match event {
             WifiEvent::AccessPointStart => WifiAccessPointState::Started,
             WifiEvent::AccessPointStop => WifiAccessPointState::Stopped,
-            _ => WifiAccessPointState::Invalid,
+            _ => WifiAccessPointState::Uninitialized,
         }
     }
 }
 
 pub(crate) static STATION_STATE: AtomicWifiStationState =
-    AtomicWifiStationState::new(WifiStationState::Invalid);
+    AtomicWifiStationState::new(WifiStationState::Uninitialized);
 pub(crate) static ACCESS_POINT_STATE: AtomicWifiAccessPointState =
-    AtomicWifiAccessPointState::new(WifiAccessPointState::Invalid);
+    AtomicWifiAccessPointState::new(WifiAccessPointState::Uninitialized);
 
 /// Get the current state of the access point.
 pub(crate) fn access_point_state() -> WifiAccessPointState {
