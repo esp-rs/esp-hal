@@ -54,7 +54,6 @@ use core::{
 use crate::{
     Blocking,
     DriverMode,
-    clock::Clocks,
     dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, TxChannelFor},
     gpio::{OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
@@ -69,6 +68,7 @@ use crate::{
     },
     pac,
     peripherals::LCD_CAM,
+    soc::clocks::ClockTree,
     system::{self, GenericPeripheralGuard},
     time::Rate,
 };
@@ -124,18 +124,19 @@ where
     /// [`ConfigError::Clock`] variant will be returned if the frequency passed
     /// in `Config` is too low.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        let clocks = Clocks::get();
         // Due to https://www.espressif.com/sites/default/files/documentation/esp32-s3_errata_en.pdf
         // the LCD_PCLK divider must be at least 2. To make up for this the user
         // provided frequency is doubled to match.
-        let (i, divider) = calculate_clkm(
-            (config.frequency.as_hz() * 2) as _,
-            &[
-                clocks.xtal_clock.as_hz() as _,
-                clocks.cpu_clock.as_hz() as _,
-                clocks.crypto_pwm_clock.as_hz() as _,
-            ],
-        )
+        let (i, divider) = ClockTree::with(|clocks| {
+            calculate_clkm(
+                (config.frequency.as_hz() * 2) as _,
+                &[
+                    crate::soc::clocks::xtal_clk_frequency(clocks) as usize,
+                    crate::soc::clocks::pll_d2_frequency(clocks) as usize,
+                    crate::soc::clocks::crypto_pwm_clk_frequency(clocks) as usize,
+                ],
+            )
+        })
         .map_err(ConfigError::Clock)?;
 
         self.regs().lcd_clock().write(|w| unsafe {
