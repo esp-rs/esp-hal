@@ -208,7 +208,7 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
     }
 }
 
-/// Execute the given action on the specified doctests.
+/// Execute the given action on the specified HIL tests.
 pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<()> {
     let (test_arg, filter) = if let Some(test_arg) = args.test.as_deref() {
         match test_arg.split_once("::") {
