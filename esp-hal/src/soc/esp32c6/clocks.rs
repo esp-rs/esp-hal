@@ -52,7 +52,6 @@ impl CpuClock {
         mspi_fast_ls_clk: None, // Unused when root clock is PLL
         apb_clk: Some(ApbClkConfig::new(0)),
         ledc_sclk: Some(LedcSclkConfig::PllF80m),
-        mcpwm_clk: Some(McpwmClkConfig::PllF160m),
         lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
     };
@@ -68,7 +67,6 @@ impl CpuClock {
         mspi_fast_ls_clk: None, // Unused when root clock is PLL
         apb_clk: Some(ApbClkConfig::new(0)),
         ledc_sclk: Some(LedcSclkConfig::PllF80m),
-        mcpwm_clk: Some(McpwmClkConfig::PllF160m),
         lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
     };
@@ -476,28 +474,6 @@ fn configure_ledc_sclk_impl(
     });
 }
 
-// MCPWM_CLK
-
-fn enable_mcpwm_clk_impl(_clocks: &mut ClockTree, en: bool) {
-    PCR::regs()
-        .pwm_clk_conf()
-        .modify(|_, w| w.pwm_clkm_en().bit(en));
-}
-
-fn configure_mcpwm_clk_impl(
-    _clocks: &mut ClockTree,
-    _old_selector: Option<McpwmClkConfig>,
-    new_selector: McpwmClkConfig,
-) {
-    PCR::regs().pwm_clk_conf().modify(|_, w| unsafe {
-        w.pwm_clkm_sel().bits(match new_selector {
-            McpwmClkConfig::PllF160m => 1,
-            McpwmClkConfig::XtalClk => 2,
-            McpwmClkConfig::RcFastClk => 3,
-        })
-    });
-}
-
 // XTAL_D2_CLK
 
 fn enable_xtal_d2_clk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -539,6 +515,28 @@ fn configure_lp_slow_clk_impl(
             LpSlowClkConfig::Xtal32kClk => 1,
             LpSlowClkConfig::RcSlow => 0,
             LpSlowClkConfig::OscSlow => 2,
+        })
+    });
+}
+
+// MCPWM0_FUNCTION_CLOCK
+
+fn enable_mcpwm0_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
+    PCR::regs()
+        .pwm_clk_conf()
+        .modify(|_, w| w.pwm_clkm_en().bit(en));
+}
+
+fn configure_mcpwm0_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Mcpwm0FunctionClockConfig>,
+    new_selector: Mcpwm0FunctionClockConfig,
+) {
+    PCR::regs().pwm_clk_conf().modify(|_, w| unsafe {
+        w.pwm_clkm_sel().bits(match new_selector {
+            Mcpwm0FunctionClockConfig::PllF160m => 1,
+            Mcpwm0FunctionClockConfig::XtalClk => 2,
+            Mcpwm0FunctionClockConfig::RcFastClk => 3,
         })
     });
 }

@@ -470,6 +470,34 @@ macro_rules! for_each_soc_xtal_options {
 ///     todo!()
 /// }
 ///
+/// // MCPWM0_FUNCTION_CLOCK
+///
+/// fn enable_mcpwm0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_mcpwm0_function_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<Mcpwm0FunctionClockConfig>,
+///     _new_selector: Mcpwm0FunctionClockConfig,
+/// ) {
+///     todo!()
+/// }
+///
+/// // MCPWM1_FUNCTION_CLOCK
+///
+/// fn enable_mcpwm1_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_mcpwm1_function_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<Mcpwm0FunctionClockConfig>,
+///     _new_selector: Mcpwm0FunctionClockConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // TIMG0_FUNCTION_CLOCK
 ///
 /// fn enable_timg0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -698,6 +726,14 @@ macro_rules! define_clock_tree_types {
             /// Selects `RTC_SLOW_CLK`.
             RtcSlow,
         }
+        /// The list of clock signals that the `MCPWM0_FUNCTION_CLOCK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum Mcpwm0FunctionClockConfig {
+            #[default]
+            /// Selects `CRYPTO_PWM_CLK`.
+            CryptoPwmClk,
+        }
         /// The list of clock signals that the `TIMG0_FUNCTION_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -733,6 +769,8 @@ macro_rules! define_clock_tree_types {
             rtc_slow_clk: Option<RtcSlowClkConfig>,
             rtc_fast_clk: Option<RtcFastClkConfig>,
             low_power_clk: Option<LowPowerClkConfig>,
+            mcpwm0_function_clock: Option<Mcpwm0FunctionClockConfig>,
+            mcpwm1_function_clock: Option<Mcpwm0FunctionClockConfig>,
             timg0_function_clock: Option<Timg0FunctionClockConfig>,
             timg0_calibration_clock: Option<Timg0CalibrationClockConfig>,
             timg1_function_clock: Option<Timg0FunctionClockConfig>,
@@ -747,6 +785,8 @@ macro_rules! define_clock_tree_types {
             pll_d2_refcount: u32,
             rtc_fast_clk_refcount: u32,
             low_power_clk_refcount: u32,
+            mcpwm0_function_clock_refcount: u32,
+            mcpwm1_function_clock_refcount: u32,
             timg0_function_clock_refcount: u32,
             timg0_calibration_clock_refcount: u32,
             timg1_function_clock_refcount: u32,
@@ -805,6 +845,14 @@ macro_rules! define_clock_tree_types {
             pub fn low_power_clk(&self) -> Option<LowPowerClkConfig> {
                 self.low_power_clk
             }
+            /// Returns the current configuration of the MCPWM0_FUNCTION_CLOCK clock tree node
+            pub fn mcpwm0_function_clock(&self) -> Option<Mcpwm0FunctionClockConfig> {
+                self.mcpwm0_function_clock
+            }
+            /// Returns the current configuration of the MCPWM1_FUNCTION_CLOCK clock tree node
+            pub fn mcpwm1_function_clock(&self) -> Option<Mcpwm0FunctionClockConfig> {
+                self.mcpwm1_function_clock
+            }
             /// Returns the current configuration of the TIMG0_FUNCTION_CLOCK clock tree node
             pub fn timg0_function_clock(&self) -> Option<Timg0FunctionClockConfig> {
                 self.timg0_function_clock
@@ -836,6 +884,8 @@ macro_rules! define_clock_tree_types {
                 rtc_slow_clk: None,
                 rtc_fast_clk: None,
                 low_power_clk: None,
+                mcpwm0_function_clock: None,
+                mcpwm1_function_clock: None,
                 timg0_function_clock: None,
                 timg0_calibration_clock: None,
                 timg1_function_clock: None,
@@ -850,6 +900,8 @@ macro_rules! define_clock_tree_types {
                 pll_d2_refcount: 0,
                 rtc_fast_clk_refcount: 0,
                 low_power_clk_refcount: 0,
+                mcpwm0_function_clock_refcount: 0,
+                mcpwm1_function_clock_refcount: 0,
                 timg0_function_clock_refcount: 0,
                 timg0_calibration_clock_refcount: 0,
                 timg1_function_clock_refcount: 0,
@@ -1330,6 +1382,66 @@ macro_rules! define_clock_tree_types {
                 LowPowerClkConfig::Xtal32k => xtal32k_clk_frequency(clocks),
                 LowPowerClkConfig::RtcSlow => rtc_slow_clk_frequency(clocks),
             }
+        }
+        pub fn configure_mcpwm0_function_clock(
+            clocks: &mut ClockTree,
+            new_selector: Mcpwm0FunctionClockConfig,
+        ) {
+            let old_selector = clocks.mcpwm0_function_clock.replace(new_selector);
+            if clocks.mcpwm0_function_clock_refcount > 0 {
+                request_crypto_pwm_clk(clocks);
+                configure_mcpwm0_function_clock_impl(clocks, old_selector, new_selector);
+                if let Some(old_selector) = old_selector {
+                    release_crypto_pwm_clk(clocks);
+                }
+            } else {
+                configure_mcpwm0_function_clock_impl(clocks, old_selector, new_selector);
+            }
+        }
+        pub fn request_mcpwm0_function_clock(clocks: &mut ClockTree) {
+            if increment_reference_count(&mut clocks.mcpwm0_function_clock_refcount) {
+                request_crypto_pwm_clk(clocks);
+                enable_mcpwm0_function_clock_impl(clocks, true);
+            }
+        }
+        pub fn release_mcpwm0_function_clock(clocks: &mut ClockTree) {
+            if decrement_reference_count(&mut clocks.mcpwm0_function_clock_refcount) {
+                enable_mcpwm0_function_clock_impl(clocks, false);
+                release_crypto_pwm_clk(clocks);
+            }
+        }
+        pub fn mcpwm0_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
+            crypto_pwm_clk_frequency(clocks)
+        }
+        pub fn configure_mcpwm1_function_clock(
+            clocks: &mut ClockTree,
+            new_selector: Mcpwm0FunctionClockConfig,
+        ) {
+            let old_selector = clocks.mcpwm1_function_clock.replace(new_selector);
+            if clocks.mcpwm1_function_clock_refcount > 0 {
+                request_crypto_pwm_clk(clocks);
+                configure_mcpwm1_function_clock_impl(clocks, old_selector, new_selector);
+                if let Some(old_selector) = old_selector {
+                    release_crypto_pwm_clk(clocks);
+                }
+            } else {
+                configure_mcpwm1_function_clock_impl(clocks, old_selector, new_selector);
+            }
+        }
+        pub fn request_mcpwm1_function_clock(clocks: &mut ClockTree) {
+            if increment_reference_count(&mut clocks.mcpwm1_function_clock_refcount) {
+                request_crypto_pwm_clk(clocks);
+                enable_mcpwm1_function_clock_impl(clocks, true);
+            }
+        }
+        pub fn release_mcpwm1_function_clock(clocks: &mut ClockTree) {
+            if decrement_reference_count(&mut clocks.mcpwm1_function_clock_refcount) {
+                enable_mcpwm1_function_clock_impl(clocks, false);
+                release_crypto_pwm_clk(clocks);
+            }
+        }
+        pub fn mcpwm1_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
+            crypto_pwm_clk_frequency(clocks)
         }
         pub fn configure_timg0_function_clock(
             clocks: &mut ClockTree,
