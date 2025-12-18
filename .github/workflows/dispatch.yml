@@ -872,7 +872,7 @@ jobs:
             - `/hil full`  — run the full HIL matrix for all supported chips
             - `/hil <chip> [<chip> ...]` — run the full HIL tests **only** for the listed chips
             - `/test-size` — run binary size analysis for this PR
-            - You can optionally append `--tests <name>[,<name>...]` to any `/hil` command to only run selected tests (ELF basenames).
+            - You can optionally append `--tests <name>[,<name>...]` to any `/hil` command to only run selected tests.
             If you aren't a repository **member/owner**, you must be **trusted for this PR**.
             Maintainers can grant access with a `trusted-author` label or with:
             ```
