@@ -58,7 +58,7 @@ pub struct DocTestArgs {
     pub chip: Chip,
 }
 
-/// for `value_parser`
+/// For `value_parser` to have protection against `--test ""`/`--test " "`.
 fn non_empty(s: &str) -> Result<String, String> {
     if s.trim().is_empty() {
         Err("empty test selector is not allowed".into())
