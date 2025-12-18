@@ -88,6 +88,7 @@ jobs:
               echo "should_generate=true" >> $GITHUB_OUTPUT
               echo "trigger_reason=manual" >> $GITHUB_OUTPUT
             fi
+            echo "packages=${{ github.event.inputs.package_name }}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -107,24 +108,27 @@ jobs:
           if [ -n "$PR_NUMBER" ]; then
             echo "Found PR number: $PR_NUMBER"
 
-            # Check if the PR had the breaking-change-esp-hal label
-            LABELS=$(gh pr view $PR_NUMBER --json labels --jq '.labels[].name' 2>/dev/null || echo "")
-            echo "PR labels: $LABELS"
+            LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' 2>/dev/null || true)
+            echo "PR labels:"
+            echo "$LABELS"
 
-            if echo "$LABELS" | grep -q "breaking-change-esp-hal"; then
-              echo "Breaking change detected in PR #$PR_NUMBER"
-              echo "should_generate=true" >> $GITHUB_OUTPUT
-              echo "trigger_reason=breaking_change" >> $GITHUB_OUTPUT
+            # Extract packages from "breaking-change-" labels
+            PACKAGES=$(echo "$LABELS" \
+              | grep -E '^breaking-change-[a-z0-9-]+$' \
+              | sed 's/^breaking-change-//' \
+              | tr '\n' ',' \
+              | sed 's/,$//')
+
+            if [ -n "$PACKAGES" ]; then
+              echo "Breaking change detected for package(s): $PACKAGES"
+              echo "should_generate=true" >> "$GITHUB_OUTPUT"
+              echo "trigger_reason=breaking_change" >> "$GITHUB_OUTPUT"
+              echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
             else
-              echo "No breaking change label found in PR #$PR_NUMBER"
-              echo "should_generate=false" >> $GITHUB_OUTPUT
-              echo "trigger_reason=none" >> $GITHUB_OUTPUT
+              echo "No breaking-change-* labels found"
+              echo "should_generate=false" >> "$GITHUB_OUTPUT"
+              echo "trigger_reason=none" >> "$GITHUB_OUTPUT"
             fi
-          else
-            echo "No PR number found in commit message"
-            echo "should_generate=false" >> $GITHUB_OUTPUT
-            echo "trigger_reason=none" >> $GITHUB_OUTPUT
-          fi
 
       - name: Generate API baselines
         if: steps.check-generation.outputs.should_generate == 'true'
@@ -132,7 +136,10 @@ jobs:
         run: |
           echo "Starting API baseline generation..."
           echo "Trigger reason: ${{ steps.check-generation.outputs.trigger_reason }}"
-          cargo xcheck semver-check --packages ${{ github.event.inputs.package_name }} generate-baseline
+          echo "Packages: ${{ steps.check-generation.outputs.packages }}"
+
+          cargo xcheck semver-check --packages "${{ steps.check-generation.outputs.packages }}" generate-baseline
+
           echo "API baseline generation completed"
 
       - name: Upload API baselines as artifact
