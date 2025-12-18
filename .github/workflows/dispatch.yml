@@ -736,11 +736,10 @@ jobs:
             const pr = context.payload.issue.number;
             const chips = '${{ steps.parse.outputs.chips }}';
             const tests = '${{ steps.parse-tests.outputs.tests }}';
-            const expectedTitle = `HIL for PR #${pr} (${chips})`;
 
             let expectedTitle;
             if (tests && tests.trim() !== '') {
-              expectedTitle = `HIL for PR #${pr} (${chips}); tests: ${tests})`;
+              expectedTitle = `HIL for PR #${pr} (${chips}; tests: ${tests})`;
             } else {
               expectedTitle = `HIL for PR #${pr} (${chips})`;
             }
