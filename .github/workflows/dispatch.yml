@@ -345,7 +345,14 @@ jobs:
             const { owner, repo } = context.repo;
             const pr = context.payload.issue.number;
             const matrix = 'quick';
-            const expectedTitle = `HIL for PR #${pr} (${matrix})`;
+            const tests = '${{ steps.parse-tests.outputs.tests }}';
+            
+            let expectedTitle;
+            if (tests && tests.trim() !== '') {
+              expectedTitle = `HIL for PR #${pr} (${matrix}; tests: ${tests})`;
+            } else {
+              expectedTitle = `HIL for PR #${pr} (${matrix})`;
+            }
 
             const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
             let run = null;
@@ -508,7 +515,14 @@ jobs:
             const { owner, repo } = context.repo;
             const pr = context.payload.issue.number;
             const matrix = 'full';
-            const expectedTitle = `HIL for PR #${pr} (${matrix})`;
+            const tests = '${{ steps.parse-tests.outputs.tests }}';
+            
+            let expectedTitle;
+            if (tests && tests.trim() !== '') {
+              expectedTitle = `HIL for PR #${pr} (${matrix}; tests: ${tests})`;
+            } else {
+              expectedTitle = `HIL for PR #${pr} (${matrix})`;
+            }
 
             const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
             let run = null;
@@ -721,7 +735,15 @@ jobs:
             const { owner, repo } = context.repo;
             const pr = context.payload.issue.number;
             const chips = '${{ steps.parse.outputs.chips }}';
+            const tests = '${{ steps.parse-tests.outputs.tests }}';
             const expectedTitle = `HIL for PR #${pr} (${chips})`;
+
+            let expectedTitle;
+            if (tests && tests.trim() !== '') {
+              expectedTitle = `HIL for PR #${pr} (${chips}); tests: ${tests})`;
+            } else {
+              expectedTitle = `HIL for PR #${pr} (${chips})`;
+            }
 
             const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
             let run = null;
