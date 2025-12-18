@@ -6,6 +6,7 @@ inputs:
   branch:          { description: branch/tag to checkout if no SHA, required: true }
   soc:             { description: SoC (e.g. esp32c3), required: true }
   rust_target:     { description: rust target triple, required: true }
+  tests:           { description: "Optional comma-separated test names", required: false, default: "" }
 
 runs:
   using: composite
@@ -42,7 +43,14 @@ runs:
 
     - name: Build tests
       shell: bash
-      run: cargo xtask build tests ${{ inputs.soc }}
+      run: |
+        if [ -n "${{ inputs.tests }}" ]; then
+          echo "Building selected tests for ${{ inputs.soc }}: ${{ inputs.tests }}"
+          cargo xtask build tests ${{ inputs.soc }} --tests "${{ inputs.tests }}"
+        else
+          echo "Building ALL tests for ${{ inputs.soc }}"
+          cargo xtask build tests ${{ inputs.soc }}
+        fi
 
     - uses: actions/upload-artifact@v4
       with:

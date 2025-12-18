@@ -302,6 +302,26 @@ jobs:
       run_id: ${{ steps.find-run.outputs.run_id }}
       comment_id: ${{ steps.comment.outputs.comment-id }}
     steps:
+      - name: Parse tests
+        id: parse-tests
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = (context.payload.comment.body || '').trim();
+            const m = body.match(/--tests\s+(.+)$/i);
+            if (!m) {
+              core.setOutput('tests', '');
+              return;
+            }
+
+            const tail = m[1].trim();
+            const parts = tail
+              .split(/[,\s]+/)
+              .map(s => s.trim())
+              .filter(Boolean);
+
+            core.setOutput('tests', parts.join(','));
+
       - name: Dispatch HIL (quick)
         uses: benc-uk/workflow-dispatch@v1
         with:
@@ -313,7 +333,8 @@ jobs:
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
               "matrix": "quick",
               "pr_number": "${{ github.event.issue.number }}",
-              "chips": ""
+              "chips": "",
+              "tests": "${{ steps.parse-tests.outputs.tests }}"
             }
 
       - name: Find HIL run URL (quick)
@@ -444,6 +465,26 @@ jobs:
       run_id: ${{ steps.find-run.outputs.run_id }}
       comment_id: ${{ steps.comment.outputs.comment-id }}
     steps:
+      - name: Parse tests
+        id: parse-tests
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = (context.payload.comment.body || '').trim();
+            const m = body.match(/--tests\s+(.+)$/i);
+            if (!m) {
+              core.setOutput('tests', '');
+              return;
+            }
+
+            const tail = m[1].trim();
+            const parts = tail
+              .split(/[,\s]+/)
+              .map(s => s.trim())
+              .filter(Boolean);
+
+            core.setOutput('tests', parts.join(','));
+
       - name: Dispatch HIL (full)
         uses: benc-uk/workflow-dispatch@v1
         with:
@@ -455,7 +496,8 @@ jobs:
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
               "matrix": "full",
               "pr_number": "${{ github.event.issue.number }}",
-              "chips": ""
+              "chips": "",
+              "tests": "${{ steps.parse-tests.outputs.tests }}"
             }
 
       - name: Find HIL run URL (full)
@@ -576,7 +618,7 @@ jobs:
             });
 
   # ---------------------------------------------------------------------------
-  # PER-CHIP HIL: /hil esp32c3 [esp32s3 ...]
+  # PER-CHIP HIL: /hil esp32c3 [esp32s3 ...] [--tests ...]
   # ---------------------------------------------------------------------------
 
   hil-chips:
@@ -605,7 +647,9 @@ jobs:
             // Split on commas and/or whitespace, normalize and dedupe
             const parts = withoutCmd
               .split(/[,\s]+/)
-              .map(s => s.toLowerCase())
+              .map(s =>
+                s.toLowerCase().replace(/[,]+$/,'')
+              )
               .filter(Boolean);
 
             const chips = Array.from(new Set(
@@ -623,6 +667,26 @@ jobs:
             core.setOutput('chips', chips.join(' '));
             core.setOutput('chips_label', chips.join(', '));
             core.setOutput('error', '');
+
+      - name: Parse tests
+        id: parse-tests
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = (context.payload.comment.body || '').trim();
+            const m = body.match(/--tests\s+(.+)$/i);
+            if (!m) {
+              core.setOutput('tests', '');
+              return;
+            }
+
+            const tail = m[1].trim();
+            const parts = tail
+              .split(/[,\s]+/)
+              .map(s => s.trim())
+              .filter(Boolean);
+
+            core.setOutput('tests', parts.join(','));
 
       - name: Report invalid chips
         if: steps.parse.outputs.chips == '' && steps.parse.outputs.error != ''
@@ -644,7 +708,8 @@ jobs:
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
               "matrix": "chips",
               "pr_number": "${{ github.event.issue.number }}",
-              "chips": "${{ steps.parse.outputs.chips }}"
+              "chips": "${{ steps.parse.outputs.chips }}",
+              "tests": "${{ steps.parse-tests.outputs.tests }}"
             }
 
       - name: Find HIL run URL (per-chip)
@@ -807,6 +872,7 @@ jobs:
             - `/hil full`  — run the full HIL matrix for all supported chips
             - `/hil <chip> [<chip> ...]` — run the full HIL tests **only** for the listed chips
             - `/test-size` — run binary size analysis for this PR
+            - You can optionally append `--tests <name>[,<name>...]` to any `/hil` command to only run selected tests (ELF basenames).
             If you aren't a repository **member/owner**, you must be **trusted for this PR**.
             Maintainers can grant access with a `trusted-author` label or with:
             ```
