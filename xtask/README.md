@@ -155,7 +155,7 @@ parameters match multiple files, they will be built or executed in sucession.
 
 For example, running `cargo xtask run tests esp32 embassy_test` will run both
 `embassy_test_single_integrated` and `embassy_test_multiple_integrated`, but you can also
-run `cargo xtask run-tests esp32 embassy_test_multiple_integrated` to select only one.
+run `cargo xtask run tests esp32 embassy_test_multiple_integrated` to select only one.
 
 In this example, running the `cargo xtask build tests esp32 embassy_test` command creates an
 `embassy_test_single_integrated` and an `embassy_test_multiple_integrated` binary.
