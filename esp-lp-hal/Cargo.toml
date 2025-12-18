@@ -90,7 +90,7 @@ required-features = ["esp32c6"]
 
 [[example]]
 name              = "i2c_sht30"
-required_features = ["esp32c6"]
+required-features = ["esp32c6"]
 
 [[example]]
 name              = "uart"
