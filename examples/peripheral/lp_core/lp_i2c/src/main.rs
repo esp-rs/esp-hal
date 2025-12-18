@@ -3,7 +3,7 @@
 //! Code on LP core reads humidity and temperature from an SHT30 sensor via I2C.
 //! The current value is printed by the HP core.
 //!
-//! ⚠️ Make sure to first compile the `esp-lp-hal/examples/b2c_sht30.rs` example ⚠️
+//! ⚠️ Make sure to first compile the `esp-lp-hal/examples/i2c_sht30.rs` example ⚠️
 //!
 //! The following wiring is assumed:
 //! - SDA => GPIO6
