@@ -1,17 +1,17 @@
 [package]
-name    = "lp-core"
+name    = "lp-core-i2c"
 version = "0.0.0"
 edition = "2024"
 publish = false
 
 [dependencies]
-esp-backtrace = { path = "../../../esp-backtrace", features = [
+esp-backtrace = { path = "../../../../esp-backtrace", features = [
     "panic-handler",
     "println",
 ] }
-esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
-esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
-esp-println = { path = "../../../esp-println", features = ["log-04"] }
+esp-bootloader-esp-idf = { path = "../../../../esp-bootloader-esp-idf" }
+esp-hal = { path = "../../../../esp-hal", features = ["log-04", "unstable"] }
+esp-println = { path = "../../../../esp-println", features = ["log-04"] }
 
 [features]
 esp32c6 = [

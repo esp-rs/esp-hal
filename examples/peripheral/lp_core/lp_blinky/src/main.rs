@@ -37,7 +37,7 @@ fn main() -> ! {
 
     // load code to LP core
     let lp_core_code = load_lp_code!(
-        "../../../esp-lp-hal/target/riscv32imac-unknown-none-elf/release/examples/blinky"
+        "../../../../esp-lp-hal/target/riscv32imac-unknown-none-elf/release/examples/blinky"
     );
 
     // start LP core
