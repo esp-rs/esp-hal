@@ -58,15 +58,6 @@ pub struct DocTestArgs {
     pub chip: Chip,
 }
 
-/// For `value_parser` to have protection against `--test ""`/`--test " "`.
-fn non_empty(s: &str) -> Result<String, String> {
-    if s.trim().is_empty() {
-        Err("empty test selector is not allowed".into())
-    } else {
-        Ok(s.trim().to_string())
-    }
-}
-
 /// Arguments common to commands which act on tests.
 #[derive(Debug, Args)]
 pub struct TestsArgs {
@@ -82,7 +73,7 @@ pub struct TestsArgs {
     /// Multiple tests may be selected via a comma-separated list, e.g. `--test rmt,i2c,uart`.
     /// The `test_suite::test_name` syntax allows selecting a specific test (and may be combined
     /// with commas).
-    #[arg(long, short = 't', alias = "tests", value_delimiter = ',', value_parser = non_empty)]
+    #[arg(long, short = 't', alias = "tests", value_delimiter = ',', num_args = 1..)]
     pub test: Option<Vec<String>>,
 
     /// The toolchain used to build the tests
@@ -249,9 +240,16 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     // Execute the specified action:
     // If user sets some specific test(s)
     if let Some(test_arg) = args.test.as_deref() {
+        let trimmed: Vec<&str> = test_arg.iter().map(|s| s.trim()).collect();
+
+        // Reject `--test ""` / `--test " "`
+        if trimmed.iter().all(|s| s.is_empty()) {
+            bail!("Empty test selector is not allowed.");
+        }
+
         let mut selected_failed: Vec<String> = Vec::new();
 
-        for selected in test_arg.iter().map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        for selected in trimmed.into_iter().filter(|s| !s.is_empty()) {
             let (test_arg, filter) = match selected.split_once("::") {
                 Some((test, filter)) => (Some(test), Some(filter)),
                 None => (Some(selected), None),
