@@ -302,6 +302,26 @@ jobs:
       run_id: ${{ steps.find-run.outputs.run_id }}
       comment_id: ${{ steps.comment.outputs.comment-id }}
     steps:
+      - name: Parse tests
+        id: parse-tests
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = (context.payload.comment.body || '').trim();
+            const m = body.match(/--tests\s+(.+)$/i);
+            if (!m) {
+              core.setOutput('tests', '');
+              return;
+            }
+
+            const tail = m[1].trim();
+            const parts = tail
+              .split(/[,\s]+/)
+              .map(s => s.trim())
+              .filter(Boolean);
+
+            core.setOutput('tests', parts.join(','));
+
       - name: Dispatch HIL (quick)
         uses: benc-uk/workflow-dispatch@v1
         with:
@@ -313,7 +333,8 @@ jobs:
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
               "matrix": "quick",
               "pr_number": "${{ github.event.issue.number }}",
-              "chips": ""
+              "chips": "",
+              "tests": "${{ steps.parse-tests.outputs.tests }}"
             }
 
       - name: Find HIL run URL (quick)
@@ -324,7 +345,14 @@ jobs:
             const { owner, repo } = context.repo;
             const pr = context.payload.issue.number;
             const matrix = 'quick';
-            const expectedTitle = `HIL for PR #${pr} (${matrix})`;
+            const tests = '${{ steps.parse-tests.outputs.tests }}';
+            
+            let expectedTitle;
+            if (tests && tests.trim() !== '') {
+              expectedTitle = `HIL for PR #${pr} (${matrix}; tests: ${tests})`;
+            } else {
+              expectedTitle = `HIL for PR #${pr} (${matrix})`;
+            }
 
             const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
             let run = null;
@@ -444,6 +472,26 @@ jobs:
       run_id: ${{ steps.find-run.outputs.run_id }}
       comment_id: ${{ steps.comment.outputs.comment-id }}
     steps:
+      - name: Parse tests
+        id: parse-tests
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = (context.payload.comment.body || '').trim();
+            const m = body.match(/--tests\s+(.+)$/i);
+            if (!m) {
+              core.setOutput('tests', '');
+              return;
+            }
+
+            const tail = m[1].trim();
+            const parts = tail
+              .split(/[,\s]+/)
+              .map(s => s.trim())
+              .filter(Boolean);
+
+            core.setOutput('tests', parts.join(','));
+
       - name: Dispatch HIL (full)
         uses: benc-uk/workflow-dispatch@v1
         with:
@@ -455,7 +503,8 @@ jobs:
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
               "matrix": "full",
               "pr_number": "${{ github.event.issue.number }}",
-              "chips": ""
+              "chips": "",
+              "tests": "${{ steps.parse-tests.outputs.tests }}"
             }
 
       - name: Find HIL run URL (full)
@@ -466,7 +515,14 @@ jobs:
             const { owner, repo } = context.repo;
             const pr = context.payload.issue.number;
             const matrix = 'full';
-            const expectedTitle = `HIL for PR #${pr} (${matrix})`;
+            const tests = '${{ steps.parse-tests.outputs.tests }}';
+            
+            let expectedTitle;
+            if (tests && tests.trim() !== '') {
+              expectedTitle = `HIL for PR #${pr} (${matrix}; tests: ${tests})`;
+            } else {
+              expectedTitle = `HIL for PR #${pr} (${matrix})`;
+            }
 
             const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
             let run = null;
@@ -576,7 +632,7 @@ jobs:
             });
 
   # ---------------------------------------------------------------------------
-  # PER-CHIP HIL: /hil esp32c3 [esp32s3 ...]
+  # PER-CHIP HIL: /hil esp32c3 [esp32s3 ...] [--tests ...]
   # ---------------------------------------------------------------------------
 
   hil-chips:
@@ -605,7 +661,9 @@ jobs:
             // Split on commas and/or whitespace, normalize and dedupe
             const parts = withoutCmd
               .split(/[,\s]+/)
-              .map(s => s.toLowerCase())
+              .map(s =>
+                s.toLowerCase().replace(/[,]+$/,'')
+              )
               .filter(Boolean);
 
             const chips = Array.from(new Set(
@@ -623,6 +681,26 @@ jobs:
             core.setOutput('chips', chips.join(' '));
             core.setOutput('chips_label', chips.join(', '));
             core.setOutput('error', '');
+
+      - name: Parse tests
+        id: parse-tests
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = (context.payload.comment.body || '').trim();
+            const m = body.match(/--tests\s+(.+)$/i);
+            if (!m) {
+              core.setOutput('tests', '');
+              return;
+            }
+
+            const tail = m[1].trim();
+            const parts = tail
+              .split(/[,\s]+/)
+              .map(s => s.trim())
+              .filter(Boolean);
+
+            core.setOutput('tests', parts.join(','));
 
       - name: Report invalid chips
         if: steps.parse.outputs.chips == '' && steps.parse.outputs.error != ''
@@ -644,7 +722,8 @@ jobs:
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
               "matrix": "chips",
               "pr_number": "${{ github.event.issue.number }}",
-              "chips": "${{ steps.parse.outputs.chips }}"
+              "chips": "${{ steps.parse.outputs.chips }}",
+              "tests": "${{ steps.parse-tests.outputs.tests }}"
             }
 
       - name: Find HIL run URL (per-chip)
@@ -656,7 +735,14 @@ jobs:
             const { owner, repo } = context.repo;
             const pr = context.payload.issue.number;
             const chips = '${{ steps.parse.outputs.chips }}';
-            const expectedTitle = `HIL for PR #${pr} (${chips})`;
+            const tests = '${{ steps.parse-tests.outputs.tests }}';
+
+            let expectedTitle;
+            if (tests && tests.trim() !== '') {
+              expectedTitle = `HIL for PR #${pr} (${chips}; tests: ${tests})`;
+            } else {
+              expectedTitle = `HIL for PR #${pr} (${chips})`;
+            }
 
             const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
             let run = null;
@@ -807,6 +893,7 @@ jobs:
             - `/hil full`  — run the full HIL matrix for all supported chips
             - `/hil <chip> [<chip> ...]` — run the full HIL tests **only** for the listed chips
             - `/test-size` — run binary size analysis for this PR
+            - You can optionally append `--tests <name>[,<name>...]` to any `/hil` command to only run selected tests.
             If you aren't a repository **member/owner**, you must be **trusted for this PR**.
             Maintainers can grant access with a `trusted-author` label or with:
             ```

@@ -41,6 +41,9 @@ pub struct RunElfsArgs {
     pub chip: Chip,
     /// Path to the ELFs.
     pub path: PathBuf,
+    /// Optional list of elfs to execute
+    #[arg(long, value_delimiter = ',')]
+    pub elfs: Vec<String>,
 }
 
 // ----------------------------------------------------------------------------
@@ -124,15 +127,29 @@ pub fn run_doc_tests_for_package(workspace: &Path, package: Package, chip: Chip)
     Ok(success)
 }
 
-/// Run all ELFs in the specified folder using `probe-rs`.
+/// Run all (or filtered) ELFs in the specified folder using `probe-rs`.
 pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
     let mut failed: Vec<String> = Vec::new();
+
+    // Pre-normalize filters: lowercase and trim
+    let filters: Vec<String> = args
+        .elfs
+        .iter()
+        .map(|s| s.trim().to_lowercase())
+        .filter(|s| !s.is_empty())
+        .collect();
+
     for elf in fs::read_dir(&args.path)
         .with_context(|| format!("Failed to read {}", args.path.display()))?
     {
         let entry = elf?;
 
         let elf_path = entry.path();
+
+        if !elf_path.is_file() {
+            continue;
+        }
+
         let elf_name = elf_path
             .with_extension("")
             .file_name()
@@ -140,11 +157,26 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
             .to_string_lossy()
             .to_string();
 
+        // If filters were provided, only run tests whose name contains
+        // at least one of the filter tokens (case-insensitive).
+        if !filters.is_empty()
+            && !filters
+                .iter()
+                .any(|f| elf_name.to_lowercase().contains(f))
+        {
+            log::info!(
+                "Skipping test '{}' for '{}' (does not match filters: {:?})",
+                elf_name,
+                args.chip,
+                filters,
+            );
+            continue;
+        }
+
         log::info!("Running test '{}' for '{}'", elf_name, args.chip);
 
         let mut command = Command::new("probe-rs");
-        command.arg("run").arg(elf_path);
-
+        command.arg("run").arg(&elf_path);
         command.arg("--verify");
 
         let mut command = command.spawn().context("Failed to execute probe-rs")?;
