@@ -766,18 +766,58 @@ pub(crate) enum WifiEvent {
     StationNeighborRep,
 }
 
+/// Data which can be polled via [WifiController::try_poll]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum PolledData {
+    /// Data polled for access point station connected
+    AccessPointStationConnected {
+        /// MAC address
+        mac: [u8; 6],
+        /// AID
+        aid: u8,
+        /// If it's a mesh child
+        is_mesh_child: bool,
+    },
+
+    /// Data polled for access point station disconnected
+    AccessPointStationDisconnected {
+        /// MAC address
+        mac: [u8; 6],
+        /// AID
+        aid: u8,
+        /// If it's a mesh child
+        is_mesh_child: bool,
+        /// Raw disconnect reason
+        reason: u16,
+    },
+}
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum WifiEventData {
     StationConnected {
         /// ssid
         ssid: alloc::string::String,
+        /// bssid
+        bssid: [u8; 6usize],
+        /// Channel
+        channel: u8,
+        /// Authmode
+        authmode: AuthMethod,
+        /// AID
+        aid: u16,
     },
     StationDisconnected {
         /// raw reason
         reason: u8,
         /// ssid
         ssid: alloc::string::String,
+        /// BSSID
+        bssid: [u8; 6usize],
+        /// RSSI
+        rssi: i8,
     },
 
     ScanDone {
@@ -788,6 +828,19 @@ pub(crate) enum WifiEventData {
     AccessPointStop,
 
     StationStart,
+
+    AccessPointStationConnected {
+        mac: [u8; 6],
+        aid: u8,
+        is_mesh_child: bool,
+    },
+
+    AccessPointStationDisconnected {
+        mac: [u8; 6],
+        aid: u8,
+        is_mesh_child: bool,
+        reason: u16,
+    },
 }
 
 impl WifiEventData {
@@ -819,6 +872,10 @@ impl WifiEventData {
                     ssid: core::str::from_utf8(&data.ssid[..data.ssid_len as usize])
                         .unwrap_or_default()
                         .to_string(),
+                    bssid: data.bssid,
+                    channel: data.channel,
+                    authmode: AuthMethod::from_raw(data.authmode),
+                    aid: data.aid,
                 })
             }
             event
@@ -831,6 +888,30 @@ impl WifiEventData {
                     ssid: core::str::from_utf8(&data.ssid[..data.ssid_len as usize])
                         .unwrap_or_default()
                         .to_string(),
+                    bssid: data.bssid,
+                    rssi: data.rssi,
+                })
+            }
+            event
+                if event == crate::sys::include::wifi_event_t_WIFI_EVENT_AP_STACONNECTED as i32 =>
+            {
+                let data = unsafe { &*(event_data as *const wifi_event_ap_staconnected_t) };
+                Some(WifiEventData::AccessPointStationConnected {
+                    mac: data.mac,
+                    aid: data.aid,
+                    is_mesh_child: data.is_mesh_child,
+                })
+            }
+            event
+                if event
+                    == crate::sys::include::wifi_event_t_WIFI_EVENT_AP_STADISCONNECTED as i32 =>
+            {
+                let data = unsafe { &*(event_data as *const wifi_event_ap_stadisconnected_t) };
+                Some(WifiEventData::AccessPointStationDisconnected {
+                    mac: data.mac,
+                    aid: data.aid,
+                    is_mesh_child: data.is_mesh_child,
+                    reason: data.reason,
                 })
             }
             _ => {
@@ -844,6 +925,7 @@ impl WifiEventData {
 static SUBSCRIBED_EVENTS: NonReentrantMutex<alloc::vec::Vec<WifiEvent>> =
     NonReentrantMutex::new(alloc::vec::Vec::new());
 
+// we probably want to have CAP and SUBS configurable
 static WIFI_EVENTS: PubSubChannel<esp_sync::RawMutex, WifiEventData, 4, 4, 1> =
     PubSubChannel::new();
 
@@ -2459,7 +2541,8 @@ impl WifiController<'_> {
                 &[WifiEvent::ScanDone],
                 |_| esp_wifi_result!(wifi_start_scan(false, config)),
                 |event| {
-                    if let WifiEventData::ScanDone { number: _ } = event {
+                    if let WifiEventData::ScanDone { number } = event {
+                        info!("Scan done with {} results", number);
                         Some(Ok(()))
                     } else {
                         None
@@ -2560,7 +2643,9 @@ impl WifiController<'_> {
     /// Async version of [`Self::connect`].
     ///
     /// This function will wait for the connection to be established before returning.
-    pub async fn connect_async(&mut self) -> Result<(), WifiError> {
+    pub async fn connect_async(
+        &mut self,
+    ) -> Result<(alloc::string::String, [u8; 6], u8, AuthMethod, u16), WifiError> {
         let events = &[WifiEvent::StationConnected, WifiEvent::StationDisconnected];
 
         let res = self
@@ -2568,10 +2653,23 @@ impl WifiController<'_> {
                 events,
                 |this| this.connect_impl(),
                 |event| {
-                    if let WifiEventData::StationConnected { ssid: _ } = event {
-                        Some(Ok(()))
-                    } else if let WifiEventData::StationDisconnected { reason: _, ssid: _ } = event
+                    if let WifiEventData::StationConnected {
+                        ssid,
+                        bssid,
+                        channel,
+                        authmode,
+                        aid,
+                    } = event
                     {
+                        Some(Ok((ssid, bssid, channel, authmode, aid)))
+                    } else if let WifiEventData::StationDisconnected {
+                        reason: _,
+                        ssid: _,
+                        bssid: _,
+                        rssi: _,
+                    } = event
+                    {
+                        // the error should contain the information we can get
                         Some(Err(WifiError::Disconnected))
                     } else {
                         None
@@ -2586,20 +2684,29 @@ impl WifiController<'_> {
     /// Async version of [`Self::disconnect`].
     ///
     /// This function will wait for the connection to be closed before returning.
-    pub async fn disconnect_async(&mut self) -> Result<(), WifiError> {
+    /// WE PROBABLY WANT TO DEFINE A STRUCT FOR THE RESULT
+    pub async fn disconnect_async(
+        &mut self,
+    ) -> Result<(u8, alloc::string::String, [u8; 6], i8), WifiError> {
         // If not connected, this will do nothing.
         // It will also wait forever for a `StationDisconnected` event that will never come.
         // Return early instead of hanging.
         if !matches!(self.is_connected(), Ok(true)) {
-            return Ok(());
+            return Err(WifiError::NotConnected);
         }
 
         self.handle_events_async(
             &[WifiEvent::StationDisconnected],
             |this| this.disconnect_impl(),
             |event| {
-                if let WifiEventData::StationDisconnected { reason: _, ssid: _ } = event {
-                    Some(Ok(()))
+                if let WifiEventData::StationDisconnected {
+                    reason,
+                    ssid,
+                    bssid,
+                    rssi,
+                } = event
+                {
+                    Some(Ok((reason, ssid, bssid, rssi)))
                 } else {
                     None
                 }
@@ -2609,15 +2716,22 @@ impl WifiController<'_> {
     }
 
     /// Wait for the station to disconnect.
+    /// WE PROBABLY WANT TO DEFINE A STRUCT FOR THE RESULT
     pub async fn wait_for_station_disconnect(
         &mut self,
-    ) -> Result<(u8, alloc::string::String), WifiError> {
+    ) -> Result<(u8, alloc::string::String, [u8; 6], i8), WifiError> {
         self.handle_events_async(
             &[WifiEvent::StationDisconnected],
             |_| Ok(()),
             |event| {
-                if let WifiEventData::StationDisconnected { reason, ssid } = event {
-                    Some(Ok((reason, ssid)))
+                if let WifiEventData::StationDisconnected {
+                    reason,
+                    ssid,
+                    bssid,
+                    rssi,
+                } = event
+                {
+                    Some(Ok((reason, ssid, bssid, rssi)))
                 } else {
                     None
                 }
@@ -2627,6 +2741,7 @@ impl WifiController<'_> {
     }
 
     /// Wait for the access point to stop.
+    /// This is most likely nothing we need - it's here for now because our examples includes it
     pub async fn wait_for_access_point_stopped(&mut self) {
         let _ = self
             .handle_events_async(
@@ -2870,6 +2985,104 @@ impl WifiController<'_> {
 
             Ok(())
         }
+    }
+
+    /// Subscribe to the access point station connected event.
+    pub fn subscribe_access_point_station_connected(&mut self) {
+        SUBSCRIBED_EVENTS.with(|subscribed| {
+            subscribed.push(WifiEvent::AccessPointStationConnected);
+        });
+    }
+
+    /// Subscribe to the access point station disconnected event.
+    pub fn subscribe_access_point_station_disconnected(&mut self) {
+        SUBSCRIBED_EVENTS.with(|subscribed| {
+            subscribed.push(WifiEvent::AccessPointStationDisconnected);
+        });
+    }
+
+    /// Try to poll data from the enabled events.
+    ///
+    /// NOT sure we want to offer something like this at all (at least not make it stable) - it's
+    /// still dealing with events (but a curated list of events).
+    ///
+    /// We should identify the use-cases for this and offer something more high level.
+    ///
+    /// e.g. in the case which is already covered we could also maintain a list of connected-APs
+    /// and have a way to query it.
+    pub fn try_poll(&mut self) -> Option<PolledData> {
+        if let Ok(Some(event)) = self.poll_event() {
+            match event {
+                WifiEventData::AccessPointStationConnected {
+                    mac,
+                    aid,
+                    is_mesh_child,
+                } => Some(PolledData::AccessPointStationConnected {
+                    mac,
+                    aid,
+                    is_mesh_child,
+                }),
+                WifiEventData::AccessPointStationDisconnected {
+                    mac,
+                    aid,
+                    is_mesh_child,
+                    reason,
+                } => Some(PolledData::AccessPointStationDisconnected {
+                    mac,
+                    aid,
+                    is_mesh_child,
+                    reason,
+                }),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    fn poll_event(&mut self) -> Result<Option<WifiEventData>, WifiError> {
+        static SUBSCRIBER: NonReentrantMutex<
+            Option<
+                embassy_sync::pubsub::subscriber::Subscriber<
+                    'static,
+                    esp_sync::RawMutex,
+                    WifiEventData,
+                    4,
+                    4,
+                    1,
+                >,
+            >,
+        > = NonReentrantMutex::new(None);
+
+        let res = SUBSCRIBER.with(|subscriber| {
+            if subscriber.is_none() {
+                subscriber.replace(
+                    WIFI_EVENTS
+                        .subscriber()
+                        .expect("Unable to subscribe to events"),
+                );
+            }
+
+            if let Some(subscriber) = subscriber.as_mut() {
+                match subscriber.try_next_message() {
+                    Some(res) => match res {
+                        embassy_sync::pubsub::WaitResult::Lagged(lagged) => {
+                            warn!("Lagged events {}", lagged);
+                            None
+                        }
+                        embassy_sync::pubsub::WaitResult::Message(event) => {
+                            info!("polled {:?}", event);
+                            Some(event)
+                        }
+                    },
+                    None => None,
+                }
+            } else {
+                None
+            }
+        });
+
+        Ok(res)
     }
 
     async fn handle_events_async<T>(

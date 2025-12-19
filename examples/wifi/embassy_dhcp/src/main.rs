@@ -171,8 +171,8 @@ async fn connection(mut controller: WifiController<'static>) {
         println!("About to connect...");
 
         match controller.connect_async().await {
-            Ok(_) => {
-                println!("Wifi connected!");
+            Ok(res) => {
+                println!("Wifi connected! {:?}", res);
 
                 // wait for disconnect
                 let res = controller.wait_for_station_disconnect().await;

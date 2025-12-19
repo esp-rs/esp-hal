@@ -665,14 +665,14 @@ pub unsafe extern "C" fn event_post(
     event_data_size: usize,
     ticks_to_wait: u32,
 ) -> i32 {
-    info!(
+    trace!(
         "event_post {:?} {} {:?} {} {:?}",
         event_base, event_id, event_data, event_data_size, ticks_to_wait
     );
     use num_traits::FromPrimitive;
 
     let event = unwrap!(WifiEvent::from_i32(event_id));
-    info!("EVENT: {:?}", event);
+    trace!("EVENT: {:?}", event);
 
     if crate::wifi::SUBSCRIBED_EVENTS.with(|events| events.contains(&event)) {
         if let Ok(publisher) = crate::wifi::WIFI_EVENTS.publisher() {

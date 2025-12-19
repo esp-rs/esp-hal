@@ -29,6 +29,7 @@ use esp_hal::{
 use esp_println::{print, println};
 use esp_radio::wifi::{
     ModeConfig,
+    PolledData,
     ap::AccessPointConfig,
     event::{self, EventExt},
 };
@@ -49,26 +50,11 @@ fn main() -> ! {
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    // Set event handlers for wifi before init to avoid missing any.
-    let mut connections = 0u32;
-    _ = event::AccessPointStart::replace_handler(|_| println!("ap start event"));
-    event::AccessPointStationConnected::update_handler(move |event| {
-        connections += 1;
-        esp_println::println!("connected {}, mac: {:?}", connections, event.mac());
-    });
-    event::AccessPointStationConnected::update_handler(|event| {
-        esp_println::println!("connected aid: {}", event.aid());
-    });
-    event::AccessPointStationDisconnected::update_handler(|event| {
-        println!(
-            "disconnected mac: {:?}, reason: {:?}",
-            event.mac(),
-            event.reason()
-        );
-    });
-
     let (mut controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
+
+    controller.subscribe_access_point_station_connected();
+    controller.subscribe_access_point_station_disconnected();
 
     let mut device = interfaces.access_point;
     let iface = create_interface(&mut device);
@@ -117,9 +103,34 @@ fn main() -> ! {
     let mut tx_buffer = [0u8; 1536];
     let mut socket = stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
-    socket.listen(8080).unwrap();
+    socket.listen_unblocking(8080).unwrap();
 
     loop {
+        match controller.try_poll() {
+            Some(PolledData::AccessPointStationConnected {
+                mac,
+                aid,
+                is_mesh_child,
+            }) => {
+                println!(
+                    "Connected MAC={:02x?}, AID={}, is_mesh_child={}",
+                    mac, aid, is_mesh_child
+                );
+            }
+            Some(PolledData::AccessPointStationDisconnected {
+                mac,
+                aid,
+                is_mesh_child,
+                reason,
+            }) => {
+                println!(
+                    "Disconnected MAC={:02x?}, AID={}, is_mesh_child={}, disconnect reason = {}",
+                    mac, aid, is_mesh_child, reason
+                );
+            }
+            _ => (),
+        }
+
         socket.work();
 
         if !socket.is_open() {
