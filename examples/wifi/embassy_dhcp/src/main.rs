@@ -175,7 +175,8 @@ async fn connection(mut controller: WifiController<'static>) {
                 println!("Wifi connected!");
 
                 // wait for disconnect
-                controller.wait_for_station_disconnect().await;
+                let res = controller.wait_for_station_disconnect().await;
+                println!("Station disconnected: {:?}", res);
                 println!("Trying to reconnecting in 5 seconds");
                 Timer::after(Duration::from_millis(5000)).await
             }

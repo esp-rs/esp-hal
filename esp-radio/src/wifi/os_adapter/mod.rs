@@ -10,9 +10,8 @@ pub(crate) mod os_adapter_chip_specific;
 use core::ptr::NonNull;
 
 use allocator_api2::boxed::Box;
-use enumset::EnumSet;
 use esp_phy::PhyController;
-use esp_sync::{NonReentrantMutex, RawMutex};
+use esp_sync::RawMutex;
 
 use super::WifiEvent;
 use crate::{
@@ -27,11 +26,6 @@ use crate::{
 };
 
 static WIFI_LOCK: RawMutex = RawMutex::new();
-
-// useful for waiting for events - clear and wait for the event bit to be set
-// again
-pub(crate) static WIFI_EVENTS: NonReentrantMutex<EnumSet<WifiEvent>> =
-    NonReentrantMutex::new(enumset::enum_set!());
 
 /// **************************************************************************
 /// Name: wifi_env_is_chip
@@ -671,23 +665,33 @@ pub unsafe extern "C" fn event_post(
     event_data_size: usize,
     ticks_to_wait: u32,
 ) -> i32 {
-    trace!(
+    info!(
         "event_post {:?} {} {:?} {} {:?}",
         event_base, event_id, event_data, event_data_size, ticks_to_wait
     );
     use num_traits::FromPrimitive;
 
     let event = unwrap!(WifiEvent::from_i32(event_id));
-    trace!("EVENT: {:?}", event);
+    info!("EVENT: {:?}", event);
 
-    WIFI_EVENTS.with(|events| events.insert(event));
+    if crate::wifi::SUBSCRIBED_EVENTS.with(|events| events.contains(&event)) {
+        if let Ok(publisher) = crate::wifi::WIFI_EVENTS.publisher() {
+            if let Some(event) = unsafe {
+                crate::wifi::WifiEventData::try_from_raw(event_id, event_data, event_data_size)
+            } {
+                publisher.publish_immediate(event);
+            }
+        } else {
+            error!("Unable to publish event");
+        }
+    }
 
     let handled =
         unsafe { super::event::dispatch_event_handler(event, event_data, event_data_size) };
 
     super::state::update_state(event, handled);
 
-    event.waker().wake();
+    // event.waker().wake();
 
     match event {
         WifiEvent::StationConnected | WifiEvent::StationDisconnected => {

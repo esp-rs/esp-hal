@@ -46,6 +46,7 @@ portable-atomic = { version = "1.11", default-features = false }
 enumset = { version = "1.1", default-features = false, optional = true }
 critical-section = { version = "1", default-features = false }
 
+
 # ⚠️ Unstable dependencies
 esp-radio-rtos-driver = { version = "0.2.0", path = "../esp-radio-rtos-driver" }
 instability = "0.3.9"
@@ -53,6 +54,7 @@ instability = "0.3.9"
 # Unstable dependencies that are not (strictly) part of the public API
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
 document-features  = "0.2"
+embassy-sync = { version = "0.7.1" }
 esp-alloc = { version = "0.9.0", path = "../esp-alloc", optional = true }
 esp-config = { version = "0.6.1", path = "../esp-config" }
 esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated" }
