@@ -490,6 +490,9 @@ impl Package {
             crate::commands::generate_rom_symbols::generate_rom_symbols(&package_path, chip)?;
         }
         Ok(())
+    }
+
+    #[cfg(feature = "semver-checks")]
     fn is_forever_unstable(&self) -> bool {
         match self
             .toml()
