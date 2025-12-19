@@ -202,7 +202,14 @@ clocks = { system_clocks = { clock_tree = [
     # { name = "Intmtx" },
     { name = "Pcnt" },
     { name = "Etm" },
-    { name = "Mcpwm0", template_params = { peripheral = "pwm" } },
+    { name = "Mcpwm0", template_params = { peripheral = "pwm" }, clocks = [
+        # TODO: MCPWM divider?
+        { name = "FUNCTION_CLOCK", type = "mux", default = "PLL_F96M", variants = [
+            { name = "PLL_F96M",    outputs = "PLL_F96M_CLK" },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+        ] },
+    ] },
     { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" } },
     { name = "Dma", template_params = { peripheral = "gdma" } },
     { name = "Spi2" },

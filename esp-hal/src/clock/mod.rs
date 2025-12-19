@@ -948,17 +948,9 @@ pub struct Clocks {
     /// XTAL clock frequency
     pub xtal_clock: Rate,
 
-    /// PWM clock frequency
-    #[cfg(esp32)]
-    pub pwm_clock: Rate,
-
     /// Crypto PWM  clock frequency
     #[cfg(esp32s3)]
     pub crypto_pwm_clock: Rate,
-
-    /// Crypto clock frequency
-    #[cfg(any(esp32c6, esp32h2))]
-    pub crypto_clock: Rate,
 }
 
 static mut ACTIVE_CLOCKS: Option<Clocks> = None;
@@ -1034,6 +1026,15 @@ impl Clocks {
         clock_config.configure();
 
         ClockTree::with(|clocks| {
+            // FIXME: MCPWM clock configuration needs to know about the active clock source
+            // frequency. In the future, we should turn the MCPWM config structs into
+            // plain old data structures and remove this pre-configuration, otherwise we will not be
+            // able to select a different clock source.
+            #[cfg(soc_has_clock_node_mcpwm0_function_clock)]
+            crate::soc::clocks::configure_mcpwm0_function_clock(clocks, Default::default());
+            #[cfg(soc_has_clock_node_mcpwm1_function_clock)]
+            crate::soc::clocks::configure_mcpwm1_function_clock(clocks, Default::default());
+
             // TODO: this struct can be removed once everything uses the new internal clock tree
             // code
             Self {
@@ -1041,10 +1042,6 @@ impl Clocks {
                 apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
                 // FIXME: this assumes there is a crystal
                 xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
-                #[cfg(esp32)]
-                pwm_clock: Rate::from_hz(crate::soc::clocks::pll_f160m_clk_frequency(clocks)),
-                #[cfg(any(esp32c6, esp32h2))]
-                crypto_clock: Rate::from_hz(crate::soc::clocks::hp_root_clk_frequency(clocks)),
                 #[cfg(esp32s3)]
                 crypto_pwm_clock: Rate::from_hz(crate::soc::clocks::crypto_pwm_clk_frequency(
                     clocks,
