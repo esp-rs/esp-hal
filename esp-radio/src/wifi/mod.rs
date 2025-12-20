@@ -662,7 +662,9 @@ impl From<InitializationError> for WifiError {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 #[repr(i32)]
-pub(crate) enum WifiEvent {
+// without the `event` module this could be private
+#[instability::unstable]
+pub enum WifiEvent {
     /// Wi-Fi is ready for operation.
     WifiReady = 0,
     /// Scan operation has completed.
@@ -799,6 +801,7 @@ pub enum PolledData {
 pub(crate) enum WifiEventData {
     StationConnected {
         /// ssid
+        #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
         ssid: alloc::string::String,
         /// bssid
         bssid: [u8; 6usize],
@@ -813,6 +816,7 @@ pub(crate) enum WifiEventData {
         /// raw reason
         reason: u8,
         /// ssid
+        #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
         ssid: alloc::string::String,
         /// BSSID
         bssid: [u8; 6usize],
@@ -2552,7 +2556,7 @@ impl WifiController<'_> {
             .await;
         guard.defuse();
 
-        Ok(self.scan_results(config.max.unwrap_or(usize::MAX))?)
+        self.scan_results(config.max.unwrap_or(usize::MAX))
     }
 
     /// Async version of [`Self::start`].
@@ -2648,37 +2652,34 @@ impl WifiController<'_> {
     ) -> Result<(alloc::string::String, [u8; 6], u8, AuthMethod, u16), WifiError> {
         let events = &[WifiEvent::StationConnected, WifiEvent::StationDisconnected];
 
-        let res = self
-            .handle_events_async(
-                events,
-                |this| this.connect_impl(),
-                |event| {
-                    if let WifiEventData::StationConnected {
-                        ssid,
-                        bssid,
-                        channel,
-                        authmode,
-                        aid,
-                    } = event
-                    {
-                        Some(Ok((ssid, bssid, channel, authmode, aid)))
-                    } else if let WifiEventData::StationDisconnected {
-                        reason: _,
-                        ssid: _,
-                        bssid: _,
-                        rssi: _,
-                    } = event
-                    {
-                        // the error should contain the information we can get
-                        Some(Err(WifiError::Disconnected))
-                    } else {
-                        None
-                    }
-                },
-            )
-            .await;
-
-        res
+        self.handle_events_async(
+            events,
+            |this| this.connect_impl(),
+            |event| {
+                if let WifiEventData::StationConnected {
+                    ssid,
+                    bssid,
+                    channel,
+                    authmode,
+                    aid,
+                } = event
+                {
+                    Some(Ok((ssid, bssid, channel, authmode, aid)))
+                } else if let WifiEventData::StationDisconnected {
+                    reason: _,
+                    ssid: _,
+                    bssid: _,
+                    rssi: _,
+                } = event
+                {
+                    // the error should contain the information we can get
+                    Some(Err(WifiError::Disconnected))
+                } else {
+                    None
+                }
+            },
+        )
+        .await
     }
 
     /// Async version of [`Self::disconnect`].
