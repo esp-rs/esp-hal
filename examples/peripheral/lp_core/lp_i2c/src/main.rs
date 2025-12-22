@@ -61,7 +61,7 @@ fn main() -> ! {
 
     // start LP core
     lp_core_code.run(&mut lp_core, LpCoreWakeupSource::HpCpu, i2c);
-    println!("lpcore run");
+    println!("lp core run");
 
     let temp = TEMP_ADDRESS as *mut f32;
     let humid = HUMID_ADDRESS as *mut f32;
