@@ -58,7 +58,7 @@ fn main() -> ! {
     let humid = HUMID_ADDRESS as *mut f32;
     loop {
         print!(
-            "Current {:.2}C {:.2}%           \u{000d}",
+            "Current {:.2} C {:.2} %           \u{000d}",
             unsafe { temp.read_volatile() },
             unsafe { humid.read_volatile() }
         );
