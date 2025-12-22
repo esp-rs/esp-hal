@@ -25,6 +25,15 @@ use esp_println::{print, println};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
+// Shared-memory locations used for communication with the LP core firmware.
+// The `esp-lp-hal` example `i2c_sht30.rs` running on the LP core writes the
+// latest temperature and humidity readings as `f32` values to these addresses:
+// - TEMP_ADDRESS: 4-byte `f32` at 0x5000_2000
+// - HUMID_ADDRESS: 4-byte `f32` at 0x5000_2004 (immediately after temperature)
+//
+// These addresses must match the memory layout used by the LP core code; if you
+// change them here, you must also update the corresponding addresses in the LP
+// core example so both cores agree on the shared memory region.
 const TEMP_ADDRESS: u32 = 0x5000_2000;
 const HUMID_ADDRESS: u32 = 0x5000_2004;
 
