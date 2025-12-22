@@ -20,6 +20,12 @@ use esp_lp_hal::{
 };
 use panic_halt as _;
 
+// LP SRAM addresses used as a simple shared-memory interface between the LP and HP cores.
+// These addresses must match the locations that the HP core expects to read from.
+//  - 0x5000_2000: f32 temperature value
+//  - 0x5000_2004: f32 humidity value (4 bytes after temperature to hold a second f32)
+// Adjust with care: changing these requires updating the corresponding HP-core code and
+// ensuring the chosen addresses stay within a valid, reserved LP memory region.
 const TEMP_ADDRESS: u32 = 0x5000_2000;
 const HUMID_ADDRESS: u32 = 0x5000_2004;
 
