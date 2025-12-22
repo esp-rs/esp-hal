@@ -7,6 +7,9 @@
 
 use core::ffi::c_char;
 
+#[cfg(feature = "__internal_rom_symbols")]
+pub mod generated_rom_symbols;
+
 #[doc(hidden)]
 /// Helper macro for checking doctest code snippets
 #[macro_export]

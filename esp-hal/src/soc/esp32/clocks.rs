@@ -662,6 +662,34 @@ fn configure_rtc_fast_clk_impl(
     });
 }
 
+// MCPWM0_FUNCTION_CLOCK
+
+fn enable_mcpwm0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_mcpwm0_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Mcpwm0FunctionClockConfig>,
+    _new_selector: Mcpwm0FunctionClockConfig,
+) {
+    // Nothing to do.
+}
+
+// MCPWM1_FUNCTION_CLOCK
+
+fn enable_mcpwm1_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_mcpwm1_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Mcpwm0FunctionClockConfig>,
+    _new_selector: Mcpwm0FunctionClockConfig,
+) {
+    // Nothing to do.
+}
+
 // TIMG0_CALIBRATION_CLOCK
 
 fn enable_timg0_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {

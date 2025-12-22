@@ -15,6 +15,8 @@ mod build;
 mod check_changelog;
 #[cfg(feature = "report")]
 pub mod generate_report;
+#[cfg(feature = "semver-checks")]
+pub(crate) mod generate_rom_symbols;
 mod release;
 mod run;
 
@@ -68,9 +70,11 @@ pub struct TestsArgs {
     pub repeat: usize,
     /// Optional test to act on (all tests used if omitted).
     ///
-    /// The `test_suite::test_name` syntax allows running a single specific test.
-    #[arg(long, short = 't')]
-    pub test: Option<String>,
+    /// Multiple tests may be selected via a comma-separated list, e.g. `--test rmt,i2c,uart`.
+    /// The `test_suite::test_name` syntax allows selecting a specific test (and may be combined
+    /// with commas).
+    #[arg(long, short = 't', alias = "tests", value_delimiter = ',', num_args = 1..)]
+    pub test: Option<Vec<String>>,
 
     /// The toolchain used to build the tests
     #[arg(long)]
@@ -210,15 +214,6 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
 
 /// Execute the given action on the specified HIL tests.
 pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<()> {
-    let (test_arg, filter) = if let Some(test_arg) = args.test.as_deref() {
-        match test_arg.split_once("::") {
-            Some((test, filter)) => (Some(test), Some(filter)),
-            None => (Some(test_arg), None),
-        }
-    } else {
-        (None, None)
-    };
-
     // Absolute path of the 'hil-test' package's root:
     let package_path = crate::windows_safe_path(&workspace.join("hil-test"));
 
@@ -234,11 +229,6 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     // Sort all tests by name:
     tests.sort_by_key(|a| a.binary_name());
 
-    let run_test_extra_args = (action == CargoAction::Run)
-        .then(|| filter.as_ref().map(|f| std::slice::from_ref(f)))
-        .flatten()
-        .unwrap_or(&[]);
-
     if let CargoAction::Build(Some(out_dir)) = &action {
         // Make sure the tmp directory has no garbage for us.
         let tmp_dir = out_dir.join("tmp");
@@ -248,26 +238,59 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
 
     let mut commands = CargoCommandBatcher::new();
     // Execute the specified action:
-    if tests.iter().any(|test| test.matches(test_arg.as_deref())) {
-        for test in tests
-            .iter()
-            .filter(|test| test.matches(test_arg.as_deref()))
-        {
-            let command = crate::generate_build_command(
-                &package_path,
-                args.chip,
-                &target,
-                &test,
-                action.clone(),
-                false,
-                args.toolchain.as_deref(),
-                args.timings,
-                run_test_extra_args,
-            )?;
-            commands.push(command);
+    // If user sets some specific test(s)
+    if let Some(test_arg) = args.test.as_deref() {
+        let trimmed: Vec<&str> = test_arg.iter().map(|s| s.trim()).collect();
+
+        // Reject `--test ""` / `--test " "`
+        if trimmed.iter().all(|s| s.is_empty()) {
+            bail!("Empty test selector is not allowed.");
         }
-    } else if test_arg.is_some() {
-        bail!("Test not found or unsupported for the given chip")
+
+        let mut selected_failed: Vec<String> = Vec::new();
+
+        for selected in trimmed.into_iter().filter(|s| !s.is_empty()) {
+            let (test_arg, filter) = match selected.split_once("::") {
+                Some((test, filter)) => (Some(test), Some(filter)),
+                None => (Some(selected), None),
+            };
+
+            let run_test_extra_args = (action == CargoAction::Run)
+                .then(|| filter.as_ref().map(|f| std::slice::from_ref(f)))
+                .flatten()
+                .unwrap_or(&[]);
+
+            let matched: Vec<_> = tests
+                .iter()
+                .filter(|t| t.matches(test_arg.as_deref()))
+                .collect();
+
+            if matched.is_empty() {
+                selected_failed.push(selected.to_string());
+            } else {
+                for test in matched {
+                    let command = crate::generate_build_command(
+                        &package_path,
+                        args.chip,
+                        &target,
+                        test,
+                        action.clone(),
+                        false,
+                        args.toolchain.as_deref(),
+                        args.timings,
+                        run_test_extra_args,
+                    )?;
+                    commands.push(command);
+                }
+            }
+        }
+
+        if !selected_failed.is_empty() {
+            bail!(
+                "Test not found or unsupported for the given chip: {}",
+                selected_failed.join(", ")
+            )
+        }
     } else {
         for test in tests {
             let command = crate::generate_build_command(
@@ -279,11 +302,12 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 false,
                 args.toolchain.as_deref(),
                 args.timings,
-                run_test_extra_args,
+                &[],
             )?;
             commands.push(command);
         }
     }
+
     let mut failed = Vec::new();
 
     for c in commands.build(false) {

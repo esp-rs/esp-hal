@@ -1,15 +1,23 @@
 name: HIL
 
 run-name: >
-  ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.pr_number != '' &&
-      (github.event.inputs.chips != '' &&
-        format('HIL for PR #{0} ({1})', github.event.inputs.pr_number, github.event.inputs.chips) ||
-        format('HIL for PR #{0} ({1})', github.event.inputs.pr_number, github.event.inputs.matrix)) ||
-      github.event_name == 'workflow_dispatch' &&
-      (github.event.inputs.chips != '' &&
-        format('HIL (manual dispatch, {0})', github.event.inputs.chips) ||
-        format('HIL (manual dispatch, {0})', github.event.inputs.matrix)) ||
-      'HIL (merge queue)' }}
+  ${{ github.event_name == 'merge_group' && 'HIL (merge queue)' ||
+
+      github.event.inputs.pr_number != '' &&
+      format(
+        'HIL for PR #{0} ({1}{2})',
+        github.event.inputs.pr_number,
+        github.event.inputs.chips != '' && github.event.inputs.chips || github.event.inputs.matrix,
+        github.event.inputs.tests != '' && format('; tests: {0}', github.event.inputs.tests) || ''
+      ) ||
+
+      format(
+        'HIL (manual dispatch, {0}{1})',
+        github.event.inputs.chips != '' && github.event.inputs.chips || github.event.inputs.matrix,
+        github.event.inputs.tests != '' && format('; tests: {0}', github.event.inputs.tests) || ''
+      )
+  }}
+
 
 on:
   # No automatic PR runs; we'll trigger via slash/label + keep merge queue
@@ -35,6 +43,10 @@ on:
         default: ""
       chips:
         description: "Space-separated list of SoCs to test (for per-chip runs)"
+        required: false
+        default: ""
+      tests:
+        description: "Optional list of test names to run (ELF basenames)"
         required: false
         default: ""
 
@@ -91,7 +103,7 @@ jobs:
         with:
           name: xtask-aarch64
           path: target/aarch64-unknown-linux-gnu/release/xtask
-  
+
   # NOTE:
   # There is also a dummy job named 'build-tests-full' in `ci.yml` which runs
   # only on non-merge-group events to satisfy branch protection required
@@ -147,6 +159,7 @@ jobs:
           branch: ${{ github.event.inputs.branch || 'main' }}
           soc: ${{ matrix.target.soc }}
           rust_target: ${{ matrix.target.rust-target }}
+          tests: ${{ github.event.inputs.tests || '' }}
 
   build-tests-quick:
     if: >
@@ -175,7 +188,7 @@ jobs:
           branch: ${{ github.event.inputs.branch || 'main' }}
           soc: ${{ matrix.target.soc }}
           rust_target: ${{ matrix.target.rust-target }}
-
+          tests: ${{ github.event.inputs.tests || '' }}
 
   build-tests-chips:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.chips != ''
@@ -240,6 +253,7 @@ jobs:
           branch: ${{ github.event.inputs.branch || 'main' }}
           soc: ${{ matrix.target.soc }}
           rust_target: ${{ matrix.target.rust-target }}
+          tests: ${{ github.event.inputs.tests || '' }}
 
   hil-quick:
     if: >
@@ -281,6 +295,16 @@ jobs:
             echo "No tests for ${{ matrix.target.soc }} in this run; skipping."
           fi
 
+      - name: Compute tests arg
+        if: steps.guard.outputs.skip != 'true'
+        id: tests
+        run: |
+          if [ -n "${{ github.event.inputs.tests || '' }}" ]; then
+            echo "value=--elfs ${{ github.event.inputs.tests }}" >> $GITHUB_OUTPUT
+          else
+            echo "value=" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run Tests
         if: steps.guard.outputs.skip != 'true'
         id: run-tests
@@ -289,7 +313,7 @@ jobs:
 
           export PATH=$PATH:/home/espressif/.cargo/bin
           chmod +x xtask
-          ./xtask run elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
+          ./xtask run elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }} ${{ steps.tests.outputs.value }}
 
       - name: Clean up
         if: always()
@@ -357,6 +381,16 @@ jobs:
             echo "No tests for ${{ matrix.target.soc }} in this run; skipping."
           fi
 
+      - name: Compute tests arg
+        if: steps.guard.outputs.skip != 'true'
+        id: tests
+        run: |
+          if [ -n "${{ github.event.inputs.tests || '' }}" ]; then
+            echo "value=--elfs ${{ github.event.inputs.tests }}" >> $GITHUB_OUTPUT
+          else
+            echo "value=" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run Tests
         if: steps.guard.outputs.skip != 'true'
         id: run-tests
@@ -365,7 +399,7 @@ jobs:
 
           export PATH=$PATH:/home/espressif/.cargo/bin
           chmod +x xtask
-          ./xtask run elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
+          ./xtask run elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }} ${{ steps.tests.outputs.value }}
 
       - name: Clean up
         if: always()
@@ -429,6 +463,16 @@ jobs:
             echo "No tests for ${{ matrix.target.soc }} in this per-chip run; skipping."
           fi
 
+      - name: Compute tests arg
+        if: steps.guard.outputs.skip != 'true'
+        id: tests
+        run: |
+          if [ -n "${{ github.event.inputs.tests || '' }}" ]; then
+            echo "value=--elfs ${{ github.event.inputs.tests }}" >> $GITHUB_OUTPUT
+          else
+            echo "value=" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run Tests
         if: steps.guard.outputs.skip != 'true'
         id: run-tests
@@ -437,7 +481,7 @@ jobs:
 
           export PATH=$PATH:/home/espressif/.cargo/bin
           chmod +x xtask
-          ./xtask run elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
+          ./xtask run elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }} ${{ steps.tests.outputs.value }}
 
       - name: Clean up
         if: always()

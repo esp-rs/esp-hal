@@ -335,7 +335,7 @@ impl Package {
     #[cfg(feature = "semver-checks")]
     pub fn semver_feature_rules(&self, config: &Config) -> Vec<String> {
         let feature_sets = self
-            .feature_rules_from_metadata(config, "semver-configs", false)
+            .feature_rules_from_metadata(config, "semver-config", false)
             .unwrap_or_default();
 
         let features: Vec<String> = feature_sets.into_iter().flatten().collect();
@@ -463,6 +463,33 @@ impl Package {
         semver_checked
             .as_bool()
             .expect("semver-checked must be a boolean")
+    }
+
+    #[cfg(feature = "semver-checks")]
+    pub(crate) fn clean_semver_check(&self, dest_path: &Path) -> anyhow::Result<()> {
+        if self == &Package::EspRomSys && dest_path.exists() {
+            fs::remove_file(dest_path)
+                .context("Failed to remove existing generated_rom_symbols.rs")?;
+
+            // Create new file with placeholder content
+            fs::write(dest_path, "// Do not delete - placeholder for fmt!\n")
+                .context("Failed to create new generated_rom_symbols.rs placeholder")?;
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "semver-checks")]
+    pub(crate) fn prepare_semver_check(
+        &self,
+        package_path: &Path,
+        chip: &Chip,
+    ) -> anyhow::Result<()> {
+        if self == &Package::EspRomSys {
+            log::info!("Generating ROM symbol markers for chip: {}", chip);
+            crate::commands::generate_rom_symbols::generate_rom_symbols(&package_path, chip)?;
+        }
+        Ok(())
     }
 }
 

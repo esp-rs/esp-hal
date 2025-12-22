@@ -4,10 +4,10 @@
         cfg(esp32h2) => "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(32))?;"
     },
     "clock_src" => {
-        cfg(esp32) => "Clock source is PWM_CLOCK",
-        cfg(esp32s3) => "Clock source is CRYPTO_PWM_CLOCK",
-        cfg(esp32c6) => "Clock source is CRYPTO_CLOCK",
-        cfg(esp32h2) => "Clock source is XTAL",
+        cfg(esp32) => "Clock source is PLL_F160M (160 MHz) by default.",
+        cfg(esp32s3) => "Clock source is CRYPTO_PWM_CLK (160 MHz) by default.",
+        cfg(esp32c6) => "Clock source is PLL_F160M (160 MHz) by default.",
+        cfg(esp32h2) => "Clock source is PLL_F96M_CLK (96 MHz) by default.",
     }
 ))]
 //! # Motor Control Pulse Width Modulator (MCPWM)
@@ -87,10 +87,11 @@ use operator::Operator;
 use timer::Timer;
 
 use crate::{
-    clock::Clocks,
     gpio::OutputSignal,
     pac,
-    system::{self, PeripheralGuard},
+    private::OnDrop,
+    soc::clocks::{self, ClockTree},
+    system::{self, Peripheral, PeripheralGuard},
     time::Rate,
 };
 
@@ -100,6 +101,29 @@ pub mod operator;
 pub mod timer;
 
 type RegisterBlock = pac::mcpwm0::RegisterBlock;
+
+#[allow(dead_code)] // Field is seemingly unused but we rely on its Drop impl
+struct PwmClockGuard(OnDrop<fn()>);
+
+impl PwmClockGuard {
+    pub fn new<PWM: PwmPeripheral>() -> Self {
+        if PWM::peripheral() == Peripheral::Mcpwm0 {
+            ClockTree::with(clocks::request_mcpwm0_function_clock);
+        } else {
+            #[cfg(soc_has_mcpwm1)]
+            ClockTree::with(clocks::request_mcpwm1_function_clock);
+        }
+
+        Self(OnDrop::new(|| {
+            if PWM::peripheral() == Peripheral::Mcpwm0 {
+                ClockTree::with(clocks::release_mcpwm0_function_clock);
+            } else {
+                #[cfg(soc_has_mcpwm1)]
+                ClockTree::with(clocks::release_mcpwm1_function_clock);
+            }
+        }))
+    }
+}
 
 /// The MCPWM peripheral
 #[non_exhaustive]
@@ -117,65 +141,31 @@ pub struct McPwm<'d, PWM> {
     pub operator1: Operator<'d, 1, PWM>,
     /// Operator2
     pub operator2: Operator<'d, 2, PWM>,
-    _guard: PeripheralGuard,
 }
 
 impl<'d, PWM: PwmPeripheral + 'd> McPwm<'d, PWM> {
     /// `pwm_clk = clocks.crypto_pwm_clock / (prescaler + 1)`
-    // clocks.crypto_pwm_clock normally is 160 MHz
     pub fn new(peripheral: PWM, peripheral_clock: PeripheralClockConfig) -> Self {
         let guard = PeripheralGuard::new(PWM::peripheral());
 
-        #[cfg(not(esp32c6))]
-        {
-            let register_block = unsafe { &*PWM::block() };
+        let register_block = unsafe { &*PWM::block() };
 
-            // set prescaler
-            register_block
-                .clk_cfg()
-                .write(|w| unsafe { w.clk_prescale().bits(peripheral_clock.prescaler) });
+        // set prescaler
+        register_block
+            .clk_cfg()
+            .write(|w| unsafe { w.clk_prescale().bits(peripheral_clock.prescaler) });
 
-            // enable clock
-            register_block.clk().write(|w| w.en().set_bit());
-        }
-
-        #[cfg(esp32c6)]
-        {
-            crate::peripherals::PCR::regs()
-                .pwm_clk_conf()
-                .modify(|_, w| unsafe {
-                    w.pwm_div_num()
-                        .bits(peripheral_clock.prescaler)
-                        .pwm_clkm_en()
-                        .set_bit()
-                        .pwm_clkm_sel()
-                        .bits(1)
-                });
-        }
-
-        #[cfg(esp32h2)]
-        {
-            crate::peripherals::PCR::regs()
-                .pwm_clk_conf()
-                .modify(|_, w| unsafe {
-                    w.pwm_div_num()
-                        .bits(peripheral_clock.prescaler)
-                        .pwm_clkm_en()
-                        .set_bit()
-                        .pwm_clkm_sel()
-                        .bits(0)
-                });
-        }
+        // enable clock
+        register_block.clk().write(|w| w.en().set_bit());
 
         Self {
             _inner: peripheral,
-            timer0: Timer::new(),
-            timer1: Timer::new(),
-            timer2: Timer::new(),
-            operator0: Operator::new(),
-            operator1: Operator::new(),
-            operator2: Operator::new(),
-            _guard: guard,
+            timer0: Timer::new(guard.clone()),
+            timer1: Timer::new(guard.clone()),
+            timer2: Timer::new(guard.clone()),
+            operator0: Operator::new(guard.clone()),
+            operator1: Operator::new(guard.clone()),
+            operator2: Operator::new(guard),
         }
     }
 }
@@ -189,19 +179,9 @@ pub struct PeripheralClockConfig {
 
 impl PeripheralClockConfig {
     fn source_clock() -> Rate {
-        let clocks = Clocks::get();
-
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                clocks.pwm_clock
-            } else if #[cfg(esp32c6)] {
-                clocks.crypto_clock
-            } else if #[cfg(esp32s3)] {
-                clocks.crypto_pwm_clock
-            } else if #[cfg(esp32h2)] {
-                clocks.xtal_clock
-            }
-        }
+        // FIXME: this works right now because we configure the default clock source during startup.
+        // Needs to be revisited when refactoring the MCPWM driver before stabilization.
+        ClockTree::with(|clocks| Rate::from_hz(clocks::mcpwm0_function_clock_frequency(clocks)))
     }
 
     /// Get a clock configuration with the given prescaler.

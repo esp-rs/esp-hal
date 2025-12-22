@@ -192,13 +192,6 @@ clocks = { system_clocks = { clock_tree = [
         { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
     ] },
 
-    # TODO: MCPWM divider
-    { name = "MCPWM_CLK", type = "mux", variants = [
-        { name = "PLL_F160M",   outputs = "PLL_F160M" },
-        { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
-        { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
-    ] },
-
     # LP clocks
     { name = "XTAL_D2_CLK", type = "divider", output = "XTAL_CLK / 2" },
     { name = "LP_FAST_CLK", type = "mux", variants = [
@@ -255,7 +248,14 @@ clocks = { system_clocks = { clock_tree = [
     # { name = "Intmtx" },
     { name = "Pcnt" },
     { name = "Etm" },
-    { name = "Mcpwm0", template_params = { peripheral = "pwm" } },
+    { name = "Mcpwm0", template_params = { peripheral = "pwm" }, clocks = [
+        # TODO: MCPWM divider?
+        { name = "FUNCTION_CLOCK", type = "mux", default = "PLL_F160M", variants = [
+            { name = "PLL_F160M",   outputs = "PLL_F160M" },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+        ] },
+    ] },
     { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" } },
     { name = "SdioSlave" },
     { name = "Dma", template_params = { peripheral = "gdma" } },
