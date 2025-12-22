@@ -52,12 +52,12 @@ fn read_temp_humid(i2c: &mut LpI2c) -> Result<(f32, f32), Error> {
 #[entry]
 fn main(mut i2c: LpI2c) -> ! {
     let temp_ptr = TEMP_ADDRESS as *mut f32;
-    let humid_ptr = HUMID_ADDRESS as *mut f32;
+    let hum_ptr = HUMID_ADDRESS as *mut f32;
     loop {
         let (temp, humid) = read_temp_humid(&mut i2c).unwrap_or((f32::NAN, f32::NAN));
         unsafe {
             temp_ptr.write_volatile(temp);
-            humid_ptr.write_volatile(humid);
+            hum_ptr.write_volatile(humid);
         }
         Delay.delay_ms(1000);
     }
