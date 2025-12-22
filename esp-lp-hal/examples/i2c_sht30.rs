@@ -23,7 +23,9 @@ use panic_halt as _;
 const TEMP_ADDRESS: u32 = 0x5000_2000;
 const HUMID_ADDRESS: u32 = 0x5000_2004;
 
+// I2C address of the SHT30 temperature and humidity sensor.
 const DEV_ADDR: u8 = 0x44;
+// SHT30 command for single-shot measurement, clock stretching disabled, high repeatability.
 const CMD_READ_ONESHOT: [u8; 2] = [0x2C, 0x06];
 
 fn read_temp_humid(i2c: &mut LpI2c) -> Result<(f32, f32), Error> {
