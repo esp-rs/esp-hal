@@ -30,7 +30,12 @@ const CMD_READ_ONESHOT: [u8; 2] = [0x2C, 0x06];
 
 fn read_temp_humid(i2c: &mut LpI2c) -> Result<(f32, f32), Error> {
     let mut buffer = [0u8; 6];
-    i2c.write_read(DEV_ADDR, &CMD_READ_ONESHOT, &mut buffer)?;
+    // Send single-shot measurement command.
+    i2c.write(DEV_ADDR, &CMD_READ_ONESHOT)?;
+    // Wait for the measurement to complete (up to 15 ms per datasheet).
+    Delay.delay_ms(15);
+    // Read measurement results.
+    i2c.read(DEV_ADDR, &mut buffer)?;
     let temp_raw = u16::from_be_bytes([buffer[0], buffer[1]]);
     let hum_raw = u16::from_be_bytes([buffer[3], buffer[4]]);
     let temperature = -45.0 + (175.0 * (temp_raw as f32) / 65535.0);
