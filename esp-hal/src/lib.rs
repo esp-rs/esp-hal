@@ -754,8 +754,7 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(timergroup_timg1)]
     crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new().disable();
 
-    #[cfg(esp32)]
-    crate::time::time_init();
+    crate::time::implem::time_init();
 
     crate::gpio::interrupt::bind_default_interrupt_handler();
 

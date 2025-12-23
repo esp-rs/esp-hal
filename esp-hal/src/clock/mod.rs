@@ -982,40 +982,6 @@ impl Clocks {
     pub fn get<'a>() -> &'a Clocks {
         unwrap!(Self::try_get())
     }
-
-    /// Returns the xtal frequency.
-    ///
-    /// This function will run the frequency estimation if called before
-    /// [`crate::init()`].
-    #[cfg(systimer)]
-    #[inline]
-    pub(crate) fn xtal_freq() -> Rate {
-        if let Some(clocks) = Self::try_get() {
-            return clocks.xtal_clock;
-        }
-
-        Self::measure_xtal_frequency().frequency()
-    }
-
-    #[cfg(not(esp32))]
-    fn measure_xtal_frequency() -> XtalClock {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32h2)] {
-                XtalClock::_32M
-            } else if #[cfg(not(esp32c2))] {
-                XtalClock::_40M
-            } else {
-                // TODO: we should be able to read from a retention register, but probe-rs flashes a
-                // bootloader that assumes a frequency, instead of choosing a matching one.
-                let mhz = RtcClock::estimate_xtal_frequency();
-
-                debug!("Working with a {}MHz crystal", mhz);
-
-                // Try to guess the closest possible crystal value.
-                XtalClock::closest_from_mhz(mhz)
-            }
-        }
-    }
 }
 
 impl Clocks {
