@@ -1,0 +1,27 @@
+[package]
+name    = "lp-core-blinky"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+esp-backtrace = { path = "../../../../esp-backtrace", features = [
+    "panic-handler",
+    "println",
+] }
+esp-bootloader-esp-idf = { path = "../../../../esp-bootloader-esp-idf" }
+esp-hal = { path = "../../../../esp-hal", features = ["log-04", "unstable"] }
+esp-println = { path = "../../../../esp-println", features = ["log-04"] }
+
+[features]
+esp32c6 = [
+    "esp-backtrace/esp32c6",
+    "esp-bootloader-esp-idf/esp32c6",
+    "esp-hal/esp32c6",
+]
+
+[profile.release]
+debug            = true
+debug-assertions = true
+lto              = "fat"
+codegen-units    = 1
