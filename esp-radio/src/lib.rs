@@ -375,6 +375,7 @@ fn is_interrupts_disabled() -> bool {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Error which can be returned during radio initialization.
 #[non_exhaustive]
+#[instability::unstable]
 pub enum InitializationError {
     /// An error from the Wi-Fi driver.
     #[cfg(feature = "wifi")]
