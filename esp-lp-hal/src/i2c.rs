@@ -227,11 +227,7 @@ impl LpI2c {
         let mut fifo_available = LP_I2C_FIFO_LEN - 1;
 
         while remaining_bytes > 0 {
-            let fifo_size = if remaining_bytes < fifo_available {
-                remaining_bytes
-            } else {
-                fifo_available
-            };
+            let fifo_size = remaining_bytes.min(fifo_available);
             remaining_bytes -= fifo_size;
 
             // Write data to the FIFO
@@ -258,6 +254,7 @@ impl LpI2c {
 
             // Add the Stop/End command
             self.add_cmd_lp(&mut cmd_iterator, cmd)?;
+            cmd_iterator = CommandRegister::COMD0;
 
             // Start the I2C transaction
             self.lp_i2c_update();
@@ -305,11 +302,7 @@ impl LpI2c {
         let mut remaining_bytes = buffer.len();
 
         while remaining_bytes > 0 {
-            let fifo_size = if remaining_bytes < LP_I2C_FIFO_LEN as usize {
-                remaining_bytes
-            } else {
-                LP_I2C_FIFO_LEN as usize
-            };
+            let fifo_size = remaining_bytes.min(LP_I2C_FIFO_LEN as usize);
             remaining_bytes -= fifo_size;
 
             if fifo_size == 1 {
@@ -355,6 +348,7 @@ impl LpI2c {
                 )?;
                 // Send END command signaling more data to come
                 self.add_cmd_lp(&mut cmd_iterator, Command::End)?;
+                cmd_iterator = CommandRegister::COMD0;
             }
 
             self.lp_i2c_update();
