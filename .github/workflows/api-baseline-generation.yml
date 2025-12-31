@@ -129,6 +129,11 @@ jobs:
               echo "should_generate=false" >> "$GITHUB_OUTPUT"
               echo "trigger_reason=none" >> "$GITHUB_OUTPUT"
             fi
+          else
+            echo "No PR number found in commit message"
+            echo "should_generate=false" >> "$GITHUB_OUTPUT"
+            echo "trigger_reason=no_pr" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Generate API baselines
         if: steps.check-generation.outputs.should_generate == 'true'
