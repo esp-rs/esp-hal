@@ -13,7 +13,10 @@
 
 extern crate alloc;
 
+use core::task::Poll;
+
 use allocator_api2::{vec, vec::Vec};
+use embassy_futures::poll_once;
 use esp_hal::{
     Async,
     Blocking,
@@ -38,6 +41,7 @@ use esp_hal::{
         ConfigError,
         Error,
         HAS_RX_WRAP,
+        LoopMode,
         PulseCode,
         Rmt,
         Rx,
@@ -407,8 +411,8 @@ async fn do_rmt_loopback_async_inner(
 
         // ...poll them, but then drop them before completion...
         // (`poll_once` takes the future by value and drops it before returning)
-        let rx_poll = embassy_futures::poll_once(rx_fut);
-        let tx_poll = embassy_futures::poll_once(tx_fut);
+        let rx_poll = poll_once(rx_fut);
+        let tx_poll = poll_once(tx_fut);
 
         // The test should fail here when the the delay above is increased, e.g. to 100ms.
         assert!(rx_poll.is_pending());
@@ -609,21 +613,133 @@ mod tests {
         do_rmt_loopback_async(&mut ctx, &conf).await;
     }
 
+    // Test that errors on invalid data are returned as expected (in particular, checks that the
+    // methods don't hang executing a never-ending/never-started tranmission).
     #[test]
-    fn rmt_fails_without_end_marker(mut ctx: Context) {
+    fn rmt_tx_errors_blocking(mut ctx: Context) {
         let conf = LoopbackConfig {
             end_marker: EndMarkerConfig::None,
             ..Default::default()
         };
 
-        let (tx_channel, _) = ctx.setup_loopback(&conf);
+        let (mut tx_channel, _) = ctx.setup_loopback(&conf);
 
         let tx_data = generate_tx_data(&conf);
 
-        assert!(matches!(
-            tx_channel.transmit(&tx_data),
-            Err((Error::EndMarkerMissing, _))
-        ));
+        assert!(
+            matches!(
+                tx_channel.reborrow().transmit(&tx_data),
+                Err((Error::EndMarkerMissing, _))
+            ),
+            "Expected transmit to return an error without end marker"
+        );
+
+        assert!(
+            matches!(
+                tx_channel.reborrow().transmit(&tx_data[..0]),
+                Err((Error::InvalidArgument, _))
+            ),
+            "Expected transmit to return an error on empty data"
+        );
+
+        assert!(
+            matches!(
+                tx_channel
+                    .reborrow()
+                    .transmit_continuously(&tx_data, LoopMode::Infinite),
+                Err((Error::EndMarkerMissing, _))
+            ),
+            "Expected transmit_continuously to return an error without end marker"
+        );
+
+        assert!(
+            matches!(
+                tx_channel
+                    .reborrow()
+                    .transmit_continuously(&tx_data[..0], LoopMode::Infinite),
+                Err((Error::InvalidArgument, _))
+            ),
+            "Expected transmit_continuously to return an error on empty data"
+        );
+
+        // Configuration that requires wrapping tx and is missing an end marker
+        let conf = LoopbackConfig {
+            tx_len: CHANNEL_RAM_SIZE * 3 / 2,
+            end_marker: EndMarkerConfig::None,
+            ..Default::default()
+        };
+
+        let tx_data = generate_tx_data(&conf);
+
+        // Most importantly, this should not hang indefinitely due to the missing end marker and
+        // re-transmitting the channel RAM content over and over again.
+        assert!(
+            matches!(
+                tx_channel
+                    .reborrow()
+                    .transmit(&tx_data)
+                    .map(|t| t.wait())
+                    .flatten(),
+                Err((Error::EndMarkerMissing, _))
+            ),
+            "Expected transmit to return an error without end marker when wrapping"
+        );
+
+        assert!(
+            matches!(
+                tx_channel
+                    .reborrow()
+                    .transmit_continuously(&tx_data, LoopMode::Infinite),
+                Err((Error::Overflow, _))
+            ),
+            "Expected transmit_continuously to return an error on overflow"
+        );
+    }
+
+    #[test]
+    async fn rmt_tx_errors_async(mut ctx: Context) {
+        let conf = LoopbackConfig {
+            end_marker: EndMarkerConfig::None,
+            ..Default::default()
+        };
+
+        let (mut tx_channel, _) = ctx.setup_loopback_async(&conf);
+
+        let tx_data = generate_tx_data(&conf);
+
+        assert!(
+            matches!(
+                poll_once(tx_channel.transmit(&tx_data)),
+                Poll::Ready(Err(Error::EndMarkerMissing))
+            ),
+            "Expected transmit to return an error without end marker"
+        );
+
+        assert!(
+            matches!(
+                poll_once(tx_channel.transmit(&tx_data[..0])),
+                Poll::Ready(Err(Error::InvalidArgument))
+            ),
+            "Expected transmit to return an error on empty data"
+        );
+
+        // Configuration that requires wrapping tx and is missing an end marker
+        let conf = LoopbackConfig {
+            tx_len: CHANNEL_RAM_SIZE * 3 / 2,
+            end_marker: EndMarkerConfig::None,
+            ..Default::default()
+        };
+        let tx_data = generate_tx_data(&conf);
+
+        // Most importantly, this should not hang indefinitely due to the missing end marker and
+        // re-transmitting the channel RAM content over and over again.
+        assert!(
+            matches!(
+                tx_channel.transmit(&tx_data).await,
+                Err(Error::EndMarkerMissing)
+            ),
+            "Expected transmit to return an error without end marker when wrapping"
+        );
     }
 
     #[test]
@@ -952,8 +1068,6 @@ mod tests {
 
     #[cfg(not(esp32))]
     fn rmt_loopback_continuous_tx_impl(mut ctx: Context, use_autostop: bool) {
-        use esp_hal::rmt::LoopMode;
-
         const TX_COUNT: usize = 10;
         const MAX_LOOP_COUNT: usize = 3;
         const MAX_RX_LEN: usize = (MAX_LOOP_COUNT + 1) * TX_COUNT;
@@ -1046,7 +1160,7 @@ mod tests {
     #[cfg(any(esp32c6, esp32h2, esp32s3))]
     #[test]
     fn rmt_continuous_tx_zero_loopcount(mut ctx: Context) {
-        use esp_hal::{rmt::LoopMode, time::Instant};
+        use esp_hal::time::Instant;
 
         let conf = LoopbackConfig {
             idle_output: true,
