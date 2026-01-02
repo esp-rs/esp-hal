@@ -1,6 +1,6 @@
 # Tests to check if "released" crates work
 
-This folder in special in a couple of ways.
+This folder is special in a couple of ways.
 
 It's meant to check that released crates work well together. Especially it's meant to "simulate" a release
 by using a private registry (i.e. a local registry).
@@ -23,7 +23,7 @@ This just tries to build every project in the `compile-tests` folder.
 Please note that we remove `Cargo.lock` files before the build if they are present.
 If the local registry is initialized this will use it.
 
-To test how a version bump affects the test projects let's bump `esp-backtrace` to e.g. `0.999.0`. (manually)
+To test how a version bump affects the test projects let's manually bump `esp-backtrace` to e.g. `0.999.0`. (You should bump the version of `esp-backtrace` in its `Cargo.toml` and the version used in the `compile-test` project)
 
 `cargo xrel-check update esp-backtrace`
 
@@ -48,4 +48,4 @@ Bump the patch version of `esp-rom-sys` and change the name of the `init_syscall
 `cargo xrel-check check` should fail now because the test project will pickup the problematic patch release of `esp-rom-sys`.
 Even without changing anything anything in the test project.
 
-When done: `cargo xtask rel-check deinit` and revert local changes
+When done: `cargo xrel-check deinit` and revert local changes
