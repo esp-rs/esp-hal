@@ -40,7 +40,7 @@ pub fn run_rel_check(args: RelCheckCmds) -> Result<()> {
     match args {
         RelCheckCmds::Init => init_rel_check()?,
         RelCheckCmds::Deinit => deinit_rel_check()?,
-        RelCheckCmds::Check => check()?,
+        RelCheckCmds::Check => ensure_cargo_lock()?,
         RelCheckCmds::Update(args) => update(args)?,
         RelCheckCmds::YoloBump => yolo_bump()?,
         RelCheckCmds::ScrapPathDeps => scrap_path_deps()?,
@@ -120,7 +120,7 @@ fn init_rel_check() -> Result<()> {
     deinit_rel_check()?;
 
     // make sure we have `Cargo.lock` files
-    check()?;
+    ensure_cargo_lock()?;
 
     // add all dependencies referenced by the lock files
     let mut projects = std::fs::read_dir("compile-tests")?
@@ -199,7 +199,7 @@ fn init_rel_check() -> Result<()> {
     Ok(())
 }
 
-fn check() -> Result<()> {
+fn ensure_cargo_lock() -> Result<()> {
     let mut projects = std::fs::read_dir("compile-tests")?
         .map(|res| res.map(|e| e.path()))
         .collect::<Result<Vec<_>, std::io::Error>>()?;
@@ -212,8 +212,10 @@ fn check() -> Result<()> {
 
         let status = std::process::Command::new("cargo")
             .arg(format!("+{}", toolchain()))
-            .arg("build")
+            .arg("metadata")
+            .arg("--format-version=1")
             .current_dir(&project)
+            .stdout(std::process::Stdio::null())
             .status()?;
 
         if !status.success() {
