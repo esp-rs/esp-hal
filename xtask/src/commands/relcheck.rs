@@ -206,11 +206,6 @@ fn check() -> Result<()> {
 
     projects.retain(|p| p.is_dir() && p.file_name().unwrap() != ".cargo");
 
-    // hack for running the builds detached from the workspace
-    std::fs::rename("Cargo.toml", "Cargo.toml$")?;
-    std::fs::rename("Cargo.lock", "Cargo.lock$")?;
-    std::fs::rename(".cargo", ".cargo$")?;
-
     for project in projects {
         log::info!("building");
         let _ = std::fs::remove_file(project.join("Cargo.lock"));
@@ -226,10 +221,6 @@ fn check() -> Result<()> {
         }
     }
 
-    // revert the hack
-    std::fs::rename("Cargo.toml$", "Cargo.toml")?;
-    std::fs::rename("Cargo.lock$", "Cargo.lock")?;
-    std::fs::rename(".cargo$", ".cargo")?;
     Ok(())
 }
 
