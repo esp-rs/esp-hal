@@ -588,6 +588,7 @@ impl Chip {
                     "soc_has_adc1",
                     "soc_has_bt",
                     "soc_has_flash",
+                    "soc_has_gpio_dedicated",
                     "soc_has_sw_interrupt",
                     "soc_has_wifi",
                     "soc_has_mem2mem1",
@@ -614,6 +615,7 @@ impl Chip {
                     "dma",
                     "ecc",
                     "gpio",
+                    "dedicated_gpio",
                     "i2c_master",
                     "interrupts",
                     "io_mux",
@@ -731,6 +733,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_adc1",
                     "cargo:rustc-cfg=soc_has_bt",
                     "cargo:rustc-cfg=soc_has_flash",
+                    "cargo:rustc-cfg=soc_has_gpio_dedicated",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_wifi",
                     "cargo:rustc-cfg=soc_has_mem2mem1",
@@ -757,6 +760,7 @@ impl Chip {
                     "cargo:rustc-cfg=dma",
                     "cargo:rustc-cfg=ecc",
                     "cargo:rustc-cfg=gpio",
+                    "cargo:rustc-cfg=dedicated_gpio",
                     "cargo:rustc-cfg=i2c_master",
                     "cargo:rustc-cfg=interrupts",
                     "cargo:rustc-cfg=io_mux",
@@ -909,6 +913,7 @@ impl Chip {
                     "soc_has_adc2",
                     "soc_has_bt",
                     "soc_has_flash",
+                    "soc_has_gpio_dedicated",
                     "soc_has_sw_interrupt",
                     "soc_has_tsens",
                     "soc_has_wifi",
@@ -928,6 +933,7 @@ impl Chip {
                     "assist_debug",
                     "dma",
                     "gpio",
+                    "dedicated_gpio",
                     "hmac",
                     "i2c_master",
                     "i2s",
@@ -1093,6 +1099,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_adc2",
                     "cargo:rustc-cfg=soc_has_bt",
                     "cargo:rustc-cfg=soc_has_flash",
+                    "cargo:rustc-cfg=soc_has_gpio_dedicated",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_tsens",
                     "cargo:rustc-cfg=soc_has_wifi",
@@ -1112,6 +1119,7 @@ impl Chip {
                     "cargo:rustc-cfg=assist_debug",
                     "cargo:rustc-cfg=dma",
                     "cargo:rustc-cfg=gpio",
+                    "cargo:rustc-cfg=dedicated_gpio",
                     "cargo:rustc-cfg=hmac",
                     "cargo:rustc-cfg=i2c_master",
                     "cargo:rustc-cfg=i2s",
@@ -1325,6 +1333,7 @@ impl Chip {
                     "soc_has_adc1",
                     "soc_has_bt",
                     "soc_has_flash",
+                    "soc_has_gpio_dedicated",
                     "soc_has_lp_core",
                     "soc_has_sw_interrupt",
                     "soc_has_tsens",
@@ -1360,6 +1369,7 @@ impl Chip {
                     "ecc",
                     "etm",
                     "gpio",
+                    "dedicated_gpio",
                     "hmac",
                     "i2c_master",
                     "lp_i2c_master",
@@ -1574,6 +1584,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_adc1",
                     "cargo:rustc-cfg=soc_has_bt",
                     "cargo:rustc-cfg=soc_has_flash",
+                    "cargo:rustc-cfg=soc_has_gpio_dedicated",
                     "cargo:rustc-cfg=soc_has_lp_core",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_tsens",
@@ -1609,6 +1620,7 @@ impl Chip {
                     "cargo:rustc-cfg=ecc",
                     "cargo:rustc-cfg=etm",
                     "cargo:rustc-cfg=gpio",
+                    "cargo:rustc-cfg=dedicated_gpio",
                     "cargo:rustc-cfg=hmac",
                     "cargo:rustc-cfg=i2c_master",
                     "cargo:rustc-cfg=lp_i2c_master",
@@ -1834,6 +1846,7 @@ impl Chip {
                     "soc_has_adc1",
                     "soc_has_bt",
                     "soc_has_flash",
+                    "soc_has_gpio_dedicated",
                     "soc_has_sw_interrupt",
                     "soc_has_mem2mem1",
                     "soc_has_mem2mem4",
@@ -1859,6 +1872,7 @@ impl Chip {
                     "ecc",
                     "etm",
                     "gpio",
+                    "dedicated_gpio",
                     "hmac",
                     "i2c_master",
                     "i2s",
@@ -2044,6 +2058,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_adc1",
                     "cargo:rustc-cfg=soc_has_bt",
                     "cargo:rustc-cfg=soc_has_flash",
+                    "cargo:rustc-cfg=soc_has_gpio_dedicated",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_mem2mem1",
                     "cargo:rustc-cfg=soc_has_mem2mem4",
@@ -2069,6 +2084,7 @@ impl Chip {
                     "cargo:rustc-cfg=ecc",
                     "cargo:rustc-cfg=etm",
                     "cargo:rustc-cfg=gpio",
+                    "cargo:rustc-cfg=dedicated_gpio",
                     "cargo:rustc-cfg=hmac",
                     "cargo:rustc-cfg=i2c_master",
                     "cargo:rustc-cfg=i2s",
@@ -2264,6 +2280,7 @@ impl Chip {
                     "soc_has_dac1",
                     "soc_has_dac2",
                     "soc_has_flash",
+                    "soc_has_gpio_dedicated",
                     "soc_has_psram",
                     "soc_has_sw_interrupt",
                     "soc_has_ulp_riscv_core",
@@ -2289,6 +2306,7 @@ impl Chip {
                     "dac",
                     "dma",
                     "gpio",
+                    "dedicated_gpio",
                     "hmac",
                     "i2c_master",
                     "i2s",
@@ -2379,6 +2397,7 @@ impl Chip {
                     "gpio_func_in_sel_offset=\"0\"",
                     "gpio_input_signal_max=\"242\"",
                     "gpio_output_signal_max=\"256\"",
+                    "dedicated_gpio_needs_initialization",
                     "i2c_master_has_bus_timeout_enable",
                     "i2c_master_separate_filter_config_registers",
                     "i2c_master_has_arbitration_en",
@@ -2466,6 +2485,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_dac1",
                     "cargo:rustc-cfg=soc_has_dac2",
                     "cargo:rustc-cfg=soc_has_flash",
+                    "cargo:rustc-cfg=soc_has_gpio_dedicated",
                     "cargo:rustc-cfg=soc_has_psram",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_ulp_riscv_core",
@@ -2491,6 +2511,7 @@ impl Chip {
                     "cargo:rustc-cfg=dac",
                     "cargo:rustc-cfg=dma",
                     "cargo:rustc-cfg=gpio",
+                    "cargo:rustc-cfg=dedicated_gpio",
                     "cargo:rustc-cfg=hmac",
                     "cargo:rustc-cfg=i2c_master",
                     "cargo:rustc-cfg=i2s",
@@ -2581,6 +2602,7 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_func_in_sel_offset=\"0\"",
                     "cargo:rustc-cfg=gpio_input_signal_max=\"242\"",
                     "cargo:rustc-cfg=gpio_output_signal_max=\"256\"",
+                    "cargo:rustc-cfg=dedicated_gpio_needs_initialization",
                     "cargo:rustc-cfg=i2c_master_has_bus_timeout_enable",
                     "cargo:rustc-cfg=i2c_master_separate_filter_config_registers",
                     "cargo:rustc-cfg=i2c_master_has_arbitration_en",
@@ -2696,6 +2718,7 @@ impl Chip {
                     "soc_has_bt",
                     "soc_has_cpu_ctrl",
                     "soc_has_flash",
+                    "soc_has_gpio_dedicated",
                     "soc_has_psram",
                     "soc_has_sw_interrupt",
                     "soc_has_ulp_riscv_core",
@@ -2724,6 +2747,7 @@ impl Chip {
                     "assist_debug",
                     "dma",
                     "gpio",
+                    "dedicated_gpio",
                     "hmac",
                     "i2c_master",
                     "i2s",
@@ -2817,6 +2841,7 @@ impl Chip {
                     "gpio_func_in_sel_offset=\"0\"",
                     "gpio_input_signal_max=\"255\"",
                     "gpio_output_signal_max=\"256\"",
+                    "dedicated_gpio_needs_initialization",
                     "i2c_master_has_fsm_timeouts",
                     "i2c_master_has_bus_timeout_enable",
                     "i2c_master_can_estimate_nack_reason",
@@ -2922,6 +2947,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_bt",
                     "cargo:rustc-cfg=soc_has_cpu_ctrl",
                     "cargo:rustc-cfg=soc_has_flash",
+                    "cargo:rustc-cfg=soc_has_gpio_dedicated",
                     "cargo:rustc-cfg=soc_has_psram",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_ulp_riscv_core",
@@ -2950,6 +2976,7 @@ impl Chip {
                     "cargo:rustc-cfg=assist_debug",
                     "cargo:rustc-cfg=dma",
                     "cargo:rustc-cfg=gpio",
+                    "cargo:rustc-cfg=dedicated_gpio",
                     "cargo:rustc-cfg=hmac",
                     "cargo:rustc-cfg=i2c_master",
                     "cargo:rustc-cfg=i2s",
@@ -3043,6 +3070,7 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_func_in_sel_offset=\"0\"",
                     "cargo:rustc-cfg=gpio_input_signal_max=\"255\"",
                     "cargo:rustc-cfg=gpio_output_signal_max=\"256\"",
+                    "cargo:rustc-cfg=dedicated_gpio_needs_initialization",
                     "cargo:rustc-cfg=i2c_master_has_fsm_timeouts",
                     "cargo:rustc-cfg=i2c_master_has_bus_timeout_enable",
                     "cargo:rustc-cfg=i2c_master_can_estimate_nack_reason",
@@ -3325,6 +3353,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_systimer)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_xts_aes)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch0)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_gpio_dedicated)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem1)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem3)");
@@ -3342,6 +3371,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(gpio_support_deepsleep_wakeup)");
     println!("cargo:rustc-check-cfg=cfg(assist_debug)");
     println!("cargo:rustc-check-cfg=cfg(ecc)");
+    println!("cargo:rustc-check-cfg=cfg(dedicated_gpio)");
     println!("cargo:rustc-check-cfg=cfg(systimer)");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_has_csr_pc)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_osc_slow_clk)");
@@ -3496,6 +3526,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(usb_otg)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ref_tick_ck8m)");
     println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_gcm)");
+    println!("cargo:rustc-check-cfg=cfg(dedicated_gpio_needs_initialization)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_has_octal)");
     println!("cargo:rustc-check-cfg=cfg(esp32s3)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_interrupt_core1)");

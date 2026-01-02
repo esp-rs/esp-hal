@@ -379,6 +379,16 @@ driver_configs![
             pins_and_signals: GpioPinsAndSignals,
         }
     },
+    DedicatedGpioProperties {
+        driver: dedicated_gpio,
+        name: "Dedicated GPIO",
+        properties: {
+            #[serde(default)]
+            needs_initialization: bool,
+            #[serde(flatten)]
+            channel_properties: DedicatedGpioChannels,
+        }
+    },
     HmacProperties {
         driver: hmac,
         name: "HMAC",

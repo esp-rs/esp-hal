@@ -117,6 +117,15 @@ macro_rules! property {
     ("gpio.output_signal_max", str) => {
         stringify!(256)
     };
+    ("dedicated_gpio.needs_initialization") => {
+        true
+    };
+    ("dedicated_gpio.channel_count") => {
+        8
+    };
+    ("dedicated_gpio.channel_count", str) => {
+        stringify!(8)
+    };
     ("i2c_master.has_fsm_timeouts") => {
         false
     };
@@ -1734,6 +1743,8 @@ macro_rules! implement_peripheral_clocks {
             CopyDma,
             /// CRYPTO_DMA peripheral clock signal
             CryptoDma,
+            /// DEDICATED_GPIO peripheral clock signal
+            DedicatedGpio,
             /// DS peripheral clock signal
             Ds,
             /// HMAC peripheral clock signal
@@ -1798,6 +1809,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::ApbSarAdc,
                 Self::CopyDma,
                 Self::CryptoDma,
+                Self::DedicatedGpio,
                 Self::Ds,
                 Self::Hmac,
                 Self::I2cExt0,
@@ -1848,6 +1860,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .perip_clk_en1()
                         .modify(|_, w| w.crypto_dma_clk_en().bit(enable));
+                }
+                Peripheral::DedicatedGpio => {
+                    crate::peripherals::SYSTEM::regs()
+                        .cpu_peri_clk_en()
+                        .modify(|_, w| w.dedicated_gpio_clk_en().bit(enable));
                 }
                 Peripheral::Ds => {
                     crate::peripherals::SYSTEM::regs()
@@ -2014,6 +2031,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .perip_rst_en1()
                         .modify(|_, w| w.crypto_dma_rst().bit(reset));
+                }
+                Peripheral::DedicatedGpio => {
+                    crate::peripherals::SYSTEM::regs()
+                        .cpu_peri_rst_en()
+                        .modify(|_, w| w.dedicated_gpio_rst().bit(reset));
                 }
                 Peripheral::Ds => {
                     crate::peripherals::SYSTEM::regs()
@@ -2186,6 +2208,24 @@ macro_rules! for_each_aes_key_length {
         _for_each_inner!((128, 0, 4)); _for_each_inner!((192, 1, 5));
         _for_each_inner!((256, 2, 6)); _for_each_inner!((bits(128), (192), (256)));
         _for_each_inner!((modes(128, 0, 4), (192, 1, 5), (256, 2, 6)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_dedicated_gpio {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((0)); _for_each_inner!((1)); _for_each_inner!((2));
+        _for_each_inner!((3)); _for_each_inner!((4)); _for_each_inner!((5));
+        _for_each_inner!((6)); _for_each_inner!((7)); _for_each_inner!((0, 0,
+        PRO_ALONEGPIO0)); _for_each_inner!((0, 1, PRO_ALONEGPIO1)); _for_each_inner!((0,
+        2, PRO_ALONEGPIO2)); _for_each_inner!((0, 3, PRO_ALONEGPIO3));
+        _for_each_inner!((0, 4, PRO_ALONEGPIO4)); _for_each_inner!((0, 5,
+        PRO_ALONEGPIO5)); _for_each_inner!((0, 6, PRO_ALONEGPIO6)); _for_each_inner!((0,
+        7, PRO_ALONEGPIO7)); _for_each_inner!((channels(0), (1), (2), (3), (4), (5), (6),
+        (7))); _for_each_inner!((signals(0, 0, PRO_ALONEGPIO0), (0, 1, PRO_ALONEGPIO1),
+        (0, 2, PRO_ALONEGPIO2), (0, 3, PRO_ALONEGPIO3), (0, 4, PRO_ALONEGPIO4), (0, 5,
+        PRO_ALONEGPIO5), (0, 6, PRO_ALONEGPIO6), (0, 7, PRO_ALONEGPIO7)));
     };
 }
 #[macro_export]
@@ -2584,6 +2624,7 @@ macro_rules! for_each_peripheral {
         peri_type ADC2 <= virtual() (unstable))); _for_each_inner!((@ peri_type DAC1 <=
         virtual() (unstable))); _for_each_inner!((@ peri_type DAC2 <= virtual()
         (unstable))); _for_each_inner!((@ peri_type FLASH <= virtual() (unstable)));
+        _for_each_inner!((@ peri_type GPIO_DEDICATED <= virtual() (unstable)));
         _for_each_inner!((@ peri_type PSRAM <= virtual() (unstable)));
         _for_each_inner!((@ peri_type SW_INTERRUPT <= virtual() (unstable)));
         _for_each_inner!((@ peri_type ULP_RISCV_CORE <= virtual() (unstable)));
@@ -2633,6 +2674,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((DMA_COPY(unstable))); _for_each_inner!((ADC1(unstable)));
         _for_each_inner!((ADC2(unstable))); _for_each_inner!((DAC1(unstable)));
         _for_each_inner!((DAC2(unstable))); _for_each_inner!((FLASH(unstable)));
+        _for_each_inner!((GPIO_DEDICATED(unstable)));
         _for_each_inner!((PSRAM(unstable))); _for_each_inner!((SW_INTERRUPT(unstable)));
         _for_each_inner!((ULP_RISCV_CORE(unstable))); _for_each_inner!((all(@ peri_type
         GPIO0 <= virtual()), (@ peri_type GPIO1 <= virtual()), (@ peri_type GPIO2 <=
@@ -2697,29 +2739,31 @@ macro_rules! for_each_peripheral {
         (unstable)), (@ peri_type DMA_COPY <= COPY_DMA() (unstable)), (@ peri_type ADC1
         <= virtual() (unstable)), (@ peri_type ADC2 <= virtual() (unstable)), (@
         peri_type DAC1 <= virtual() (unstable)), (@ peri_type DAC2 <= virtual()
-        (unstable)), (@ peri_type FLASH <= virtual() (unstable)), (@ peri_type PSRAM <=
-        virtual() (unstable)), (@ peri_type SW_INTERRUPT <= virtual() (unstable)), (@
-        peri_type ULP_RISCV_CORE <= virtual() (unstable))));
-        _for_each_inner!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3), (GPIO4), (GPIO5),
-        (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11), (GPIO12), (GPIO13),
-        (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19), (GPIO20), (GPIO21),
-        (GPIO33), (GPIO34), (GPIO35), (GPIO36), (GPIO37), (GPIO38), (GPIO39), (GPIO40),
-        (GPIO41), (GPIO42), (GPIO43), (GPIO44), (GPIO45), (GPIO46), (AES(unstable)),
-        (APB_SARADC(unstable)), (DEDICATED_GPIO(unstable)), (DS(unstable)),
-        (EFUSE(unstable)), (EXTMEM(unstable)), (FE(unstable)), (FE2(unstable)),
-        (GPIO(unstable)), (GPIO_SD(unstable)), (HMAC(unstable)), (I2C_ANA_MST(unstable)),
-        (I2C0), (I2C1), (I2S0(unstable)), (INTERRUPT_CORE0(unstable)),
-        (IO_MUX(unstable)), (LEDC(unstable)), (NRX(unstable)), (PCNT(unstable)),
-        (PMS(unstable)), (RMT(unstable)), (RNG(unstable)), (RSA(unstable)),
-        (LPWR(unstable)), (RTC_I2C(unstable)), (RTC_IO(unstable)), (SENS(unstable)),
-        (SHA(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3),
-        (SYSCON(unstable)), (SYSTEM(unstable)), (SYSTIMER(unstable)), (TIMG0(unstable)),
-        (TIMG1(unstable)), (TWAI0(unstable)), (UART0), (UART1), (UHCI0(unstable)),
-        (USB0(unstable)), (USB_WRAP(unstable)), (XTS_AES(unstable)), (WIFI(unstable)),
+        (unstable)), (@ peri_type FLASH <= virtual() (unstable)), (@ peri_type
+        GPIO_DEDICATED <= virtual() (unstable)), (@ peri_type PSRAM <= virtual()
+        (unstable)), (@ peri_type SW_INTERRUPT <= virtual() (unstable)), (@ peri_type
+        ULP_RISCV_CORE <= virtual() (unstable)))); _for_each_inner!((singletons(GPIO0),
+        (GPIO1), (GPIO2), (GPIO3), (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9),
+        (GPIO10), (GPIO11), (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17),
+        (GPIO18), (GPIO19), (GPIO20), (GPIO21), (GPIO33), (GPIO34), (GPIO35), (GPIO36),
+        (GPIO37), (GPIO38), (GPIO39), (GPIO40), (GPIO41), (GPIO42), (GPIO43), (GPIO44),
+        (GPIO45), (GPIO46), (AES(unstable)), (APB_SARADC(unstable)),
+        (DEDICATED_GPIO(unstable)), (DS(unstable)), (EFUSE(unstable)),
+        (EXTMEM(unstable)), (FE(unstable)), (FE2(unstable)), (GPIO(unstable)),
+        (GPIO_SD(unstable)), (HMAC(unstable)), (I2C_ANA_MST(unstable)), (I2C0), (I2C1),
+        (I2S0(unstable)), (INTERRUPT_CORE0(unstable)), (IO_MUX(unstable)),
+        (LEDC(unstable)), (NRX(unstable)), (PCNT(unstable)), (PMS(unstable)),
+        (RMT(unstable)), (RNG(unstable)), (RSA(unstable)), (LPWR(unstable)),
+        (RTC_I2C(unstable)), (RTC_IO(unstable)), (SENS(unstable)), (SHA(unstable)),
+        (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3), (SYSCON(unstable)),
+        (SYSTEM(unstable)), (SYSTIMER(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
+        (TWAI0(unstable)), (UART0), (UART1), (UHCI0(unstable)), (USB0(unstable)),
+        (USB_WRAP(unstable)), (XTS_AES(unstable)), (WIFI(unstable)),
         (DMA_SPI2(unstable)), (DMA_SPI3(unstable)), (DMA_I2S0(unstable)),
         (DMA_CRYPTO(unstable)), (DMA_COPY(unstable)), (ADC1(unstable)), (ADC2(unstable)),
-        (DAC1(unstable)), (DAC2(unstable)), (FLASH(unstable)), (PSRAM(unstable)),
-        (SW_INTERRUPT(unstable)), (ULP_RISCV_CORE(unstable))));
+        (DAC1(unstable)), (DAC2(unstable)), (FLASH(unstable)),
+        (GPIO_DEDICATED(unstable)), (PSRAM(unstable)), (SW_INTERRUPT(unstable)),
+        (ULP_RISCV_CORE(unstable))));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.
@@ -3118,14 +3162,14 @@ macro_rules! define_io_mux_signals {
             SUBSPIDQS         = 171,
             PCMFSYNC          = 203,
             PCMCLK            = 204,
-            PRO_ALONEGPIO_IN0 = 235,
-            PRO_ALONEGPIO_IN1 = 236,
-            PRO_ALONEGPIO_IN2 = 237,
-            PRO_ALONEGPIO_IN3 = 238,
-            PRO_ALONEGPIO_IN4 = 239,
-            PRO_ALONEGPIO_IN5 = 240,
-            PRO_ALONEGPIO_IN6 = 241,
-            PRO_ALONEGPIO_IN7 = 242,
+            PRO_ALONEGPIO0    = 235,
+            PRO_ALONEGPIO1    = 236,
+            PRO_ALONEGPIO2    = 237,
+            PRO_ALONEGPIO3    = 238,
+            PRO_ALONEGPIO4    = 239,
+            PRO_ALONEGPIO5    = 240,
+            PRO_ALONEGPIO6    = 241,
+            PRO_ALONEGPIO7    = 242,
             MTDI,
             MTCK,
             MTMS,
@@ -3135,111 +3179,111 @@ macro_rules! define_io_mux_signals {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         #[doc(hidden)]
         pub enum OutputSignal {
-            SPIQ               = 0,
-            SPID               = 1,
-            SPIHD              = 2,
-            SPIWP              = 3,
-            SPICLK             = 4,
-            SPICS0             = 5,
-            SPICS1             = 6,
-            SPID4              = 7,
-            SPID5              = 8,
-            SPID6              = 9,
-            SPID7              = 10,
-            SPIDQS             = 11,
-            U0TXD              = 14,
-            U0RTS              = 15,
-            U0DTR              = 16,
-            U1TXD              = 17,
-            U1RTS              = 18,
-            U1DTR              = 21,
-            I2S0O_BCK          = 23,
-            I2S0O_WS           = 25,
-            I2S0I_BCK          = 27,
-            I2S0I_WS           = 28,
-            I2CEXT0_SCL        = 29,
-            I2CEXT0_SDA        = 30,
-            SDIO_TOHOST_INT    = 31,
-            USB_EXTPHY_OEN     = 61,
-            USB_EXTPHY_VPO     = 63,
-            USB_EXTPHY_VMO     = 64,
-            SPI3_CLK           = 72,
-            SPI3_Q             = 73,
-            SPI3_D             = 74,
-            SPI3_HD            = 75,
-            SPI3_CS0           = 76,
-            SPI3_CS1           = 77,
-            SPI3_CS2           = 78,
-            LEDC_LS_SIG0       = 79,
-            LEDC_LS_SIG1       = 80,
-            LEDC_LS_SIG2       = 81,
-            LEDC_LS_SIG3       = 82,
-            LEDC_LS_SIG4       = 83,
-            LEDC_LS_SIG5       = 84,
-            LEDC_LS_SIG6       = 85,
-            LEDC_LS_SIG7       = 86,
-            RMT_SIG_0          = 87,
-            RMT_SIG_1          = 88,
-            RMT_SIG_2          = 89,
-            RMT_SIG_3          = 90,
-            I2CEXT1_SCL        = 95,
-            I2CEXT1_SDA        = 96,
-            GPIO_SD0           = 100,
-            GPIO_SD1           = 101,
-            GPIO_SD2           = 102,
-            GPIO_SD3           = 103,
-            GPIO_SD4           = 104,
-            GPIO_SD5           = 105,
-            GPIO_SD6           = 106,
-            GPIO_SD7           = 107,
-            FSPICLK            = 108,
-            FSPIQ              = 109,
-            FSPID              = 110,
-            FSPIHD             = 111,
-            FSPIWP             = 112,
-            FSPIIO4            = 113,
-            FSPIIO5            = 114,
-            FSPIIO6            = 115,
-            FSPIIO7            = 116,
-            FSPICS0            = 117,
-            FSPICS1            = 118,
-            FSPICS2            = 119,
-            FSPICS3            = 120,
-            FSPICS4            = 121,
-            FSPICS5            = 122,
-            TWAI_TX            = 123,
-            SUBSPICLK          = 126,
-            SUBSPIQ            = 127,
-            SUBSPID            = 128,
-            SUBSPIHD           = 129,
-            SUBSPIWP           = 130,
-            SUBSPICS0          = 131,
-            SUBSPICS1          = 132,
-            FSPIDQS            = 133,
-            FSPI_HSYNC         = 134,
-            FSPI_VSYNC         = 135,
-            FSPI_DE            = 136,
-            FSPICD             = 137,
-            SPI3_CD            = 139,
-            SPI3_DQS           = 140,
-            I2S0O_DATA_OUT23   = 166,
-            SUBSPID4           = 167,
-            SUBSPID5           = 168,
-            SUBSPID6           = 169,
-            SUBSPID7           = 170,
-            SUBSPIDQS          = 171,
-            PCMFSYNC           = 209,
-            PCMCLK             = 210,
-            PRO_ALONEGPIO_OUT0 = 235,
-            PRO_ALONEGPIO_OUT1 = 236,
-            PRO_ALONEGPIO_OUT2 = 237,
-            PRO_ALONEGPIO_OUT3 = 238,
-            PRO_ALONEGPIO_OUT4 = 239,
-            PRO_ALONEGPIO_OUT5 = 240,
-            PRO_ALONEGPIO_OUT6 = 241,
-            PRO_ALONEGPIO_OUT7 = 242,
-            CLK_I2S            = 251,
-            GPIO               = 256,
+            SPIQ             = 0,
+            SPID             = 1,
+            SPIHD            = 2,
+            SPIWP            = 3,
+            SPICLK           = 4,
+            SPICS0           = 5,
+            SPICS1           = 6,
+            SPID4            = 7,
+            SPID5            = 8,
+            SPID6            = 9,
+            SPID7            = 10,
+            SPIDQS           = 11,
+            U0TXD            = 14,
+            U0RTS            = 15,
+            U0DTR            = 16,
+            U1TXD            = 17,
+            U1RTS            = 18,
+            U1DTR            = 21,
+            I2S0O_BCK        = 23,
+            I2S0O_WS         = 25,
+            I2S0I_BCK        = 27,
+            I2S0I_WS         = 28,
+            I2CEXT0_SCL      = 29,
+            I2CEXT0_SDA      = 30,
+            SDIO_TOHOST_INT  = 31,
+            USB_EXTPHY_OEN   = 61,
+            USB_EXTPHY_VPO   = 63,
+            USB_EXTPHY_VMO   = 64,
+            SPI3_CLK         = 72,
+            SPI3_Q           = 73,
+            SPI3_D           = 74,
+            SPI3_HD          = 75,
+            SPI3_CS0         = 76,
+            SPI3_CS1         = 77,
+            SPI3_CS2         = 78,
+            LEDC_LS_SIG0     = 79,
+            LEDC_LS_SIG1     = 80,
+            LEDC_LS_SIG2     = 81,
+            LEDC_LS_SIG3     = 82,
+            LEDC_LS_SIG4     = 83,
+            LEDC_LS_SIG5     = 84,
+            LEDC_LS_SIG6     = 85,
+            LEDC_LS_SIG7     = 86,
+            RMT_SIG_0        = 87,
+            RMT_SIG_1        = 88,
+            RMT_SIG_2        = 89,
+            RMT_SIG_3        = 90,
+            I2CEXT1_SCL      = 95,
+            I2CEXT1_SDA      = 96,
+            GPIO_SD0         = 100,
+            GPIO_SD1         = 101,
+            GPIO_SD2         = 102,
+            GPIO_SD3         = 103,
+            GPIO_SD4         = 104,
+            GPIO_SD5         = 105,
+            GPIO_SD6         = 106,
+            GPIO_SD7         = 107,
+            FSPICLK          = 108,
+            FSPIQ            = 109,
+            FSPID            = 110,
+            FSPIHD           = 111,
+            FSPIWP           = 112,
+            FSPIIO4          = 113,
+            FSPIIO5          = 114,
+            FSPIIO6          = 115,
+            FSPIIO7          = 116,
+            FSPICS0          = 117,
+            FSPICS1          = 118,
+            FSPICS2          = 119,
+            FSPICS3          = 120,
+            FSPICS4          = 121,
+            FSPICS5          = 122,
+            TWAI_TX          = 123,
+            SUBSPICLK        = 126,
+            SUBSPIQ          = 127,
+            SUBSPID          = 128,
+            SUBSPIHD         = 129,
+            SUBSPIWP         = 130,
+            SUBSPICS0        = 131,
+            SUBSPICS1        = 132,
+            FSPIDQS          = 133,
+            FSPI_HSYNC       = 134,
+            FSPI_VSYNC       = 135,
+            FSPI_DE          = 136,
+            FSPICD           = 137,
+            SPI3_CD          = 139,
+            SPI3_DQS         = 140,
+            I2S0O_DATA_OUT23 = 166,
+            SUBSPID4         = 167,
+            SUBSPID5         = 168,
+            SUBSPID6         = 169,
+            SUBSPID7         = 170,
+            SUBSPIDQS        = 171,
+            PCMFSYNC         = 209,
+            PCMCLK           = 210,
+            PRO_ALONEGPIO0   = 235,
+            PRO_ALONEGPIO1   = 236,
+            PRO_ALONEGPIO2   = 237,
+            PRO_ALONEGPIO3   = 238,
+            PRO_ALONEGPIO4   = 239,
+            PRO_ALONEGPIO5   = 240,
+            PRO_ALONEGPIO6   = 241,
+            PRO_ALONEGPIO7   = 242,
+            CLK_I2S          = 251,
+            GPIO             = 256,
             CLK_OUT1,
             CLK_OUT2,
             CLK_OUT3,

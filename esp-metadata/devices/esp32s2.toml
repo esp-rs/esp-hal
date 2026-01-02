@@ -71,6 +71,7 @@ peripherals = [
     { name = "DAC1", virtual = true },
     { name = "DAC2", virtual = true },
     { name = "FLASH", virtual = true },
+    { name = "GPIO_DEDICATED", virtual = true },
     { name = "PSRAM", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "ULP_RISCV_CORE", virtual = true },
@@ -196,6 +197,7 @@ clocks = { system_clocks = { clock_tree = [
     
     # The exception: CopyDma needs to be enabled in its own register space and its reset is a bit gnarly
     { name = "CopyDma", template_params = { clk_en_template = "crate::peripherals::DMA_COPY::regs().conf().modify(|_, w| w.clk_en().bit(enable));", rst_template = "crate::peripherals::DMA_COPY::regs().conf().modify(|_, w| { w.in_rst().bit(reset).out_rst().bit(reset).cmdfifo_rst().bit(reset).fifo_rst().bit(reset) });" } },
+    { name = "DedicatedGpio", template_params = { clk_en_register = "cpu_peri_clk_en", rst_register = "cpu_peri_rst_en" } },
 
     #{ name = "Adc2Arb" },
     { name = "Systimer", keep_enabled = true },
@@ -402,14 +404,14 @@ input_signals = [
     { name = "PCMFSYNC",          id = 203 },
     { name = "PCMCLK",            id = 204 },
 
-    { name = "PRO_ALONEGPIO_IN0", id = 235 },
-    { name = "PRO_ALONEGPIO_IN1", id = 236 },
-    { name = "PRO_ALONEGPIO_IN2", id = 237 },
-    { name = "PRO_ALONEGPIO_IN3", id = 238 },
-    { name = "PRO_ALONEGPIO_IN4", id = 239 },
-    { name = "PRO_ALONEGPIO_IN5", id = 240 },
-    { name = "PRO_ALONEGPIO_IN6", id = 241 },
-    { name = "PRO_ALONEGPIO_IN7", id = 242 },
+    { name = "PRO_ALONEGPIO0",    id = 235 },
+    { name = "PRO_ALONEGPIO1",    id = 236 },
+    { name = "PRO_ALONEGPIO2",    id = 237 },
+    { name = "PRO_ALONEGPIO3",    id = 238 },
+    { name = "PRO_ALONEGPIO4",    id = 239 },
+    { name = "PRO_ALONEGPIO5",    id = 240 },
+    { name = "PRO_ALONEGPIO6",    id = 241 },
+    { name = "PRO_ALONEGPIO7",    id = 242 },
 
     { name = "MTDI" },
     { name = "MTCK" },
@@ -512,14 +514,14 @@ output_signals = [
     { name = "PCMFSYNC",         id = 209 },
     { name = "PCMCLK",           id = 210 },
 
-    { name = "PRO_ALONEGPIO_OUT0", id = 235 },
-    { name = "PRO_ALONEGPIO_OUT1", id = 236 },
-    { name = "PRO_ALONEGPIO_OUT2", id = 237 },
-    { name = "PRO_ALONEGPIO_OUT3", id = 238 },
-    { name = "PRO_ALONEGPIO_OUT4", id = 239 },
-    { name = "PRO_ALONEGPIO_OUT5", id = 240 },
-    { name = "PRO_ALONEGPIO_OUT6", id = 241 },
-    { name = "PRO_ALONEGPIO_OUT7", id = 242 },
+    { name = "PRO_ALONEGPIO0",   id = 235 },
+    { name = "PRO_ALONEGPIO1",   id = 236 },
+    { name = "PRO_ALONEGPIO2",   id = 237 },
+    { name = "PRO_ALONEGPIO3",   id = 238 },
+    { name = "PRO_ALONEGPIO4",   id = 239 },
+    { name = "PRO_ALONEGPIO5",   id = 240 },
+    { name = "PRO_ALONEGPIO6",   id = 241 },
+    { name = "PRO_ALONEGPIO7",   id = 242 },
 
     { name = "CLK_I2S",          id = 251 },
 
@@ -531,6 +533,12 @@ output_signals = [
 
     { name = "MTDO" },
 ]
+
+[device.dedicated_gpio]
+support_status = "partial"
+channels = [["PRO_ALONEGPIO0", "PRO_ALONEGPIO1", "PRO_ALONEGPIO2", "PRO_ALONEGPIO3", "PRO_ALONEGPIO4", "PRO_ALONEGPIO5", "PRO_ALONEGPIO6", "PRO_ALONEGPIO7"]]
+needs_initialization = true
+
 [device.i2c_master]
 support_status = "supported"
 instances = [
