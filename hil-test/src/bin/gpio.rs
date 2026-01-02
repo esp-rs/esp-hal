@@ -6,6 +6,7 @@
 
 #![no_std]
 #![no_main]
+#![feature(asm_experimental_arch)]
 
 use esp_hal::gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pin, Pull};
 use hil_test as _;
@@ -35,6 +36,9 @@ cfg_if::cfg_if! {
     }
 }
 
+#[cfg(all(dedicated_gpio, feature = "unstable"))]
+use esp_hal::gpio::dedicated::DedicatedGpio;
+
 struct Context {
     test_gpio1: AnyPin<'static>,
     test_gpio2: AnyPin<'static>,
@@ -42,6 +46,8 @@ struct Context {
     delay: Delay,
     #[cfg(feature = "unstable")]
     io: Io<'static>,
+    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    dedicated_gpio: DedicatedGpio<'static>,
 }
 
 #[cfg_attr(feature = "unstable", handler)]
@@ -145,6 +151,9 @@ mod tests {
             esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
         }
 
+        #[cfg(all(dedicated_gpio, feature = "unstable"))]
+        let dedicated_gpio = DedicatedGpio::new(peripherals.GPIO_DEDICATED);
+
         Context {
             test_gpio1: gpio1.degrade(),
             test_gpio2: gpio2.degrade(),
@@ -152,6 +161,8 @@ mod tests {
             delay,
             #[cfg(feature = "unstable")]
             io,
+            #[cfg(all(dedicated_gpio, feature = "unstable"))]
+            dedicated_gpio,
         }
     }
 
@@ -606,5 +617,29 @@ mod tests {
             // Park the second core, we don't need it anymore
             CpuControl::new(CPU_CTRL::steal()).park_core(Cpu::AppCpu);
         }
+    }
+
+    #[test]
+    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    fn dedicated_gpios(ctx: Context) {
+        use esp_hal::gpio::dedicated::{DedicatedGpioInput, DedicatedGpioOutput};
+
+        let input = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
+        let output = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
+
+        let mut input_dedicated = DedicatedGpioInput::new(ctx.dedicated_gpio.channel0.input, input);
+        let mut output_dedicated =
+            DedicatedGpioOutput::new(ctx.dedicated_gpio.channel0.output).with_pin(output);
+
+        assert_eq!(input_dedicated.level(), Level::Low);
+        output_dedicated.set_level(Level::High);
+        #[cfg(esp32s2)]
+        unsafe {
+            core::arch::asm!("nop");
+            core::arch::asm!("nop");
+            core::arch::asm!("nop");
+            core::arch::asm!("nop");
+        }
+        assert_eq!(input_dedicated.level(), Level::High);
     }
 }

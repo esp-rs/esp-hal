@@ -63,6 +63,9 @@ crate::unstable_module! {
 
     #[cfg(all(soc_has_rtc_io, not(esp32)))]
     pub mod rtc_io;
+
+    #[cfg(dedicated_gpio)]
+    pub mod dedicated;
 }
 use interconnect::PeripheralOutput;
 
