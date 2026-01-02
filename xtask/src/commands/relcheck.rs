@@ -333,7 +333,7 @@ fn update(args: UpdateArgs) -> Result<()> {
             .arg("--no-verify")
             .arg("--verbose")
             .arg("--allow-dirty")
-            .arg("--index=http://my-crates.io")
+            .arg("--index=http://crates.io")
             .arg("--target-dir=../target")
             .current_dir(package.toml().package_path())
             .env_clear()
