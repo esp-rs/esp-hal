@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unsafely expose GPIO pins that are only available on certain chip/module variants (#4520)
 - ESP32-H2: light sleep and deep sleep support with timer and EXT1 wakeup sources (#4587, #4641)
 - Unstable detailed clock configuration options (#4660, #4674)
+- Dedicated GPIO implementation (#4699)
 
 ### Changed
 
