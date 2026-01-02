@@ -24,7 +24,8 @@ pub enum RelCheckCmds {
     /// registry
     YoloBump,
 
-    /// Remove the path-dependencies from examples.
+    /// Remove the path-dependencies from examples and make sure the dependencies are available in
+    /// the local registry.
     ScrapPathDeps,
 }
 
@@ -40,7 +41,7 @@ pub fn run_rel_check(args: RelCheckCmds) -> Result<()> {
     match args {
         RelCheckCmds::Init => init_rel_check()?,
         RelCheckCmds::Deinit => deinit_rel_check()?,
-        RelCheckCmds::Check => ensure_cargo_lock()?,
+        RelCheckCmds::Check => check()?,
         RelCheckCmds::Update(args) => update(args)?,
         RelCheckCmds::YoloBump => yolo_bump()?,
         RelCheckCmds::ScrapPathDeps => scrap_path_deps()?,
@@ -120,7 +121,7 @@ fn init_rel_check() -> Result<()> {
     deinit_rel_check()?;
 
     // make sure we have `Cargo.lock` files
-    ensure_cargo_lock()?;
+    check()?;
 
     // add all dependencies referenced by the lock files
     let mut projects = std::fs::read_dir("compile-tests")?
@@ -196,10 +197,52 @@ fn init_rel_check() -> Result<()> {
     log::info!("{:?}", cmd);
     cmd.status()?;
 
+    // "for reasons" (e.g. running examples later via the "normal" xtask) also do it for other
+    // toolchains
+    let mut cmd = std::process::Command::new("cargo");
+    cmd.arg("local-registry");
+    cmd.arg("--no-delete");
+    cmd.arg("--sync");
+    cmd.arg(format!(
+        "{}/lib/rustlib/src/rust/library/Cargo.lock",
+        toolchain_folder("nightly")?.display()
+    ));
+    cmd.arg("target/local-registry");
+    cmd.stdout(std::process::Stdio::null());
+    cmd.env_clear();
+    cmd.envs(
+        std::env::vars()
+            .into_iter()
+            .filter(|(k, _)| !k.starts_with("CARGO")),
+    );
+
+    log::info!("{:?}", cmd);
+    cmd.status()?;
+
+    let mut cmd = std::process::Command::new("cargo");
+    cmd.arg("local-registry");
+    cmd.arg("--no-delete");
+    cmd.arg("--sync");
+    cmd.arg(format!(
+        "{}/lib/rustlib/src/rust/library/Cargo.lock",
+        toolchain_folder("stable")?.display()
+    ));
+    cmd.arg("target/local-registry");
+    cmd.stdout(std::process::Stdio::null());
+    cmd.env_clear();
+    cmd.envs(
+        std::env::vars()
+            .into_iter()
+            .filter(|(k, _)| !k.starts_with("CARGO")),
+    );
+
+    log::info!("{:?}", cmd);
+    cmd.status()?;
+
     Ok(())
 }
 
-fn ensure_cargo_lock() -> Result<()> {
+fn check() -> Result<()> {
     let mut projects = std::fs::read_dir("compile-tests")?
         .map(|res| res.map(|e| e.path()))
         .collect::<Result<Vec<_>, std::io::Error>>()?;
@@ -212,8 +255,7 @@ fn ensure_cargo_lock() -> Result<()> {
 
         let status = std::process::Command::new("cargo")
             .arg(format!("+{}", toolchain()))
-            .arg("metadata")
-            .arg("--format-version=1")
+            .arg("check")
             .current_dir(&project)
             .stdout(std::process::Stdio::null())
             .status()?;
@@ -530,6 +572,43 @@ fn scrap_path_deps() -> Result<()> {
             };
 
             for manifest_path in manifest_paths {
+                // make sure we have a lock file
+                std::fs::remove_file(manifest_path.join("Cargo.lock")).ok();
+                let status = std::process::Command::new("cargo")
+                    .arg(format!("+{}", toolchain()))
+                    .arg("metadata")
+                    .arg("--format-version=1")
+                    .current_dir(&manifest_path)
+                    .stdout(std::process::Stdio::null())
+                    .status()?;
+
+                if !status.success() {
+                    log::warn!("Failed");
+                }
+
+                // add dependencies to the local registry
+                let mut cmd = std::process::Command::new("cargo");
+                cmd.arg("local-registry");
+                cmd.arg("--no-delete");
+                cmd.arg("--sync");
+                cmd.arg("Cargo.lock");
+                cmd.arg(windows_safe_path(
+                    &std::path::PathBuf::from("target/local-registry")
+                        .canonicalize()
+                        .unwrap(),
+                ));
+                cmd.stdout(std::process::Stdio::null());
+                cmd.env_clear();
+                cmd.envs(
+                    std::env::vars()
+                        .into_iter()
+                        .filter(|(k, _)| !k.starts_with("CARGO")),
+                );
+                cmd.current_dir(&manifest_path);
+
+                log::info!("{:?}", cmd);
+                cmd.status()?;
+
                 // scrap the path dependencies, use version from local registry
                 let manifest_file = manifest_path.join("Cargo.toml");
                 let contents = std::fs::read_to_string(&manifest_file)?;
@@ -587,6 +666,9 @@ local-registry = '{}'
         }
     }
 
+    println!(
+        "This made changes which are NOT REVERTED by `deinit` - make sure to NOT COMMIT these changes!"
+    );
     Ok(())
 }
 
