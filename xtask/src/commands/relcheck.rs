@@ -132,6 +132,7 @@ fn init_rel_check() -> Result<()> {
         cmd.arg("--sync");
         cmd.arg("Cargo.lock");
         cmd.arg("../../target/local-registry");
+        cmd.stdout(std::process::Stdio::null());
         cmd.env_clear();
         cmd.envs(
             std::env::vars()
@@ -180,6 +181,7 @@ fn init_rel_check() -> Result<()> {
         toolchain_folder(&toolchain())?.display()
     ));
     cmd.arg("target/local-registry");
+    cmd.stdout(std::process::Stdio::null());
     cmd.env_clear();
     cmd.envs(
         std::env::vars()
@@ -291,6 +293,7 @@ fn update(args: UpdateArgs) -> Result<()> {
         cmd.arg("--sync");
         cmd.arg("Cargo.lock");
         cmd.arg("../target/local-registry");
+        cmd.stdout(std::process::Stdio::null());
         cmd.env_clear();
         cmd.envs(
             std::env::vars()
