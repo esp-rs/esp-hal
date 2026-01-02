@@ -471,6 +471,7 @@ where
 
         let rts_pin = PinGuard::new_unconnected();
         let tx_pin = PinGuard::new_unconnected();
+        let dtr_pin = PinGuard::new_unconnected();
 
         let mut serial = Uart {
             rx: UartRx {
@@ -486,6 +487,7 @@ where
                 mem_guard,
                 rts_pin,
                 tx_pin,
+                dtr_pin,
                 baudrate: config.baudrate,
             },
         };
@@ -524,6 +526,7 @@ pub struct UartTx<'d, Dm: DriverMode> {
     mem_guard: MemoryGuard<'d>,
     rts_pin: PinGuard,
     tx_pin: PinGuard,
+    dtr_pin: PinGuard,
     baudrate: u32,
 }
 
@@ -670,6 +673,7 @@ impl<'d> UartTx<'d, Blocking> {
             mem_guard: self.mem_guard,
             rts_pin: self.rts_pin,
             tx_pin: self.tx_pin,
+            dtr_pin: self.dtr_pin,
             baudrate: self.baudrate,
         }
     }
@@ -694,6 +698,7 @@ impl<'d> UartTx<'d, Async> {
             mem_guard: self.mem_guard,
             rts_pin: self.rts_pin,
             tx_pin: self.tx_pin,
+            dtr_pin: self.dtr_pin,
             baudrate: self.baudrate,
         }
     }
@@ -775,6 +780,25 @@ where
 
         self.rts_pin = rts.connect_with_guard(self.uart.info().rts_signal);
 
+        self
+    }
+
+    /// Configure DTR pin
+    #[instability::unstable]
+    pub fn with_dtr(mut self, dtr: impl PeripheralOutput<'d>) -> Self {
+        let dtr = dtr.into();
+
+        dtr.apply_output_config(&OutputConfig::default());
+        dtr.set_output_enable(true);
+
+        self.dtr_pin = dtr.connect_with_guard(self.uart.info().dtr_signal);
+
+        self
+    }
+
+    /// Enable RS485 mode
+    pub fn with_rs485(self) -> Self {
+        self.regs().rs485_conf().write(|w| w.rs485_en().set_bit());
         self
     }
 
@@ -1268,6 +1292,18 @@ where
 
         #[cfg(any(esp32c6, esp32h2))]
         sync_regs(self.regs());
+    }
+
+    /// Inverts polarity of RX signal if `invertedd`
+    #[instability::unstable]
+    pub fn with_polarity(self, inverted: bool) -> Self {
+        self.uart
+            .info()
+            .regs()
+            .conf0()
+            .modify(|_, w| w.rxd_inv().bit(inverted));
+
+        self
     }
 
     /// Change the configuration.
@@ -1801,6 +1837,20 @@ where
     /// ```
     pub fn with_rts(mut self, rts: impl PeripheralOutput<'d>) -> Self {
         self.tx = self.tx.with_rts(rts);
+        self
+    }
+
+    /// Configure DTR pin
+    #[instability::unstable]
+    pub fn with_dtr(mut self, dtr: impl PeripheralOutput<'d>) -> Self {
+        self.tx = self.tx.with_dtr(dtr);
+        self
+    }
+
+    /// Enable RS485 mode
+    #[instability::unstable]
+    pub fn with_rs485(mut self) -> Self {
+        self.tx = self.tx.with_rs485();
         self
     }
 
@@ -2980,6 +3030,9 @@ pub struct Info {
 
     /// RTS (Request to Send) pin
     pub rts_signal: OutputSignal,
+
+    /// DTR (Data Terminal Ready) pin
+    pub dtr_signal: OutputSignal,
 }
 
 /// Peripheral state for a UART instance.
@@ -3737,7 +3790,7 @@ impl PartialEq for Info {
 unsafe impl Sync for Info {}
 
 for_each_uart! {
-    ($inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
+    ($inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, $dtr:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&'static Info, &'static State) {
                 #[crate::handler]
@@ -3762,6 +3815,7 @@ for_each_uart! {
                     rx_signal: InputSignal::$rxd,
                     cts_signal: InputSignal::$cts,
                     rts_signal: OutputSignal::$rts,
+                    dtr_signal: OutputSignal::$dtr,
                 };
                 (&PERIPHERAL, &STATE)
             }
