@@ -215,10 +215,6 @@ fn check() -> Result<()> {
         log::info!("building");
         let _ = std::fs::remove_file(project.join("Cargo.lock"));
 
-        // only works for `+stable` - otherwise we get
-        // "no matching package named `rustc-literal-escaper` found"
-        // with the local registry - not really clear why
-        // since the lib is available for other toolchains, too.
         let status = std::process::Command::new("cargo")
             .arg(format!("+{}", toolchain()))
             .arg("build")
