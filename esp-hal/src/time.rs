@@ -251,6 +251,10 @@ impl Instant {
     /// The timer has a 1 microsecond resolution and will wrap after
     /// # {wrap_after}
     ///
+    /// <section class="warning">
+    /// Note that this function returns an unreliable value before <code>esp_hal::init()</code> is
+    /// called. </section>
+    ///
     /// ## Example
     ///
     /// ```rust, no_run
