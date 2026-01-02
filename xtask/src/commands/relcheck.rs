@@ -23,6 +23,9 @@ pub enum RelCheckCmds {
     /// Bump all dependencies in `compile-tests` to the latest version available in the local
     /// registry
     YoloBump,
+
+    /// Remove the path-dependencies from examples.
+    ScrapPathDeps,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -40,6 +43,7 @@ pub fn run_rel_check(args: RelCheckCmds) -> Result<()> {
         RelCheckCmds::Check => check()?,
         RelCheckCmds::Update(args) => update(args)?,
         RelCheckCmds::YoloBump => yolo_bump()?,
+        RelCheckCmds::ScrapPathDeps => scrap_path_deps()?,
     }
 
     Ok(())
@@ -511,6 +515,86 @@ fn ensure_cargo_local_registry() -> Result<()> {
                 .arg("install")
                 .arg("cargo-local-registry")
                 .output()?;
+        }
+    }
+
+    Ok(())
+}
+
+fn scrap_path_deps() -> Result<()> {
+    if !std::fs::exists("target/local-registry")? {
+        bail!("Cannot scrap path dependencies - run `init` first.");
+    }
+
+    let pkgs = [
+        crate::Package::Examples.to_string(),
+        crate::Package::HilTest.to_string(),
+        crate::Package::QaTest.to_string(),
+    ];
+
+    for pkg in pkgs {
+        if let Ok(manifest_paths) = crate::find_packages(Path::new(&pkg)) {
+            let manifest_paths = if !manifest_paths.is_empty() {
+                manifest_paths
+            } else {
+                vec![PathBuf::from(&pkg)]
+            };
+
+            for manifest_path in manifest_paths {
+                // scrap the path dependencies, use version from local registry
+                let manifest_file = manifest_path.join("Cargo.toml");
+                let contents = std::fs::read_to_string(&manifest_file)?;
+                let mut toml = contents.parse::<toml_edit::DocumentMut>()?;
+                for dep in toml["dependencies"].as_table_mut().unwrap().iter_mut() {
+                    let krate = dep.0.get();
+
+                    if krate.starts_with("esp-") {
+                        let latest = latest_version_of_crate(krate)?;
+                        dep.1.as_table_like_mut().and_then(|table| {
+                            table.remove("path");
+                            table.insert(
+                                "version",
+                                toml_edit::Item::Value(toml_edit::Value::String(
+                                    toml_edit::Formatted::new(latest),
+                                )),
+                            );
+                            Some(table)
+                        });
+                    }
+                }
+
+                let processed = format!("#{}{}\n{}", "STOP", "SHIP", toml.to_string());
+                std::fs::write(&manifest_file, processed)?;
+
+                // add the local registry to the config.toml
+                let config = std::fs::read_to_string(manifest_path.join(".cargo/config.toml"))?;
+                if !config.contains("local-registry") {
+                    std::fs::write(
+                        manifest_path.join(".cargo/config.toml"),
+                        format!(
+                            r#"{}
+
+# {}{}
+[source.crates-io]
+registry = 'sparse+https://index.crates.io/'
+replace-with = 'local-registry'
+
+[source.local-registry]
+local-registry = '{}'
+"#,
+                            config,
+                            "STOP",
+                            "SHIP",
+                            windows_safe_path(
+                                &std::path::PathBuf::from("target/local-registry")
+                                    .canonicalize()
+                                    .unwrap()
+                            )
+                            .display()
+                        ),
+                    )?;
+                }
+            }
         }
     }
 
