@@ -16,6 +16,9 @@ esp-rtos = { version = "0.2.0", features = [
 ] }
 
 esp-bootloader-esp-idf = { version = "0.4.0", features = ["esp32c6", "log-04"] }
+
+esp-storage = { version = "0.8.1", features = ["esp32c6"]}
+
 log                    = "0.4.27"
 
 embassy-net = { version = "0.7.1", features = [
