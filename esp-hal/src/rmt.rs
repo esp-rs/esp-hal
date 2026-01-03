@@ -2146,9 +2146,7 @@ impl DynChannelAccess<Tx> {
         #[cfg(rmt_has_tx_loop_count)]
         self.set_loopmode(loopmode);
         self.set_tx_wrap_mode(loopmode.is_none());
-        self.update();
         self.start_tx();
-        self.update();
     }
 
     #[inline(always)]
@@ -2174,11 +2172,9 @@ impl DynChannelAccess<Rx> {
         {
             self.set_rx_threshold((_memsize.codes() / 2) as u16);
             self.set_rx_wrap_mode(_wrap);
-            self.update();
         }
 
         self.start_rx();
-        self.update();
     }
 
     #[inline(always)]
@@ -2541,9 +2537,15 @@ mod chip_specific {
 
             rmt.ch_tx_conf0(ch_idx).modify(|_, w| {
                 w.mem_rd_rst().set_bit();
-                w.apb_mem_rst().set_bit();
-                w.tx_start().set_bit()
+                w.apb_mem_rst().set_bit()
             });
+            self.update();
+            // Wait for configuration/data to be effective - there seem to be undocumented timing
+            // constraints when sclk_div is large. 4us corresponds to ~1 SCLK cycle when using the
+            // APB SCLK.
+            crate::rom::ets_delay_us(4);
+            rmt.ch_tx_conf0(self.channel().into())
+                .modify(|_, w| w.tx_start().set_bit());
         }
 
         // Return the first flag that is set of, in order of decreasing priority,
@@ -2686,9 +2688,13 @@ mod chip_specific {
             rmt.ch_rx_conf1(ch_idx.into()).modify(|_, w| {
                 w.mem_owner().set_bit();
                 w.mem_wr_rst().set_bit();
-                w.apb_mem_rst().set_bit();
-                w.rx_en().set_bit()
+                w.apb_mem_rst().set_bit()
             });
+            self.update();
+            crate::rom::ets_delay_us(4);
+            rmt.ch_rx_conf1(ch_idx.into())
+                .modify(|_, w| w.rx_en().set_bit());
+            self.update();
         }
 
         // Return the first flag that is set of, in order of decreasing priority,
