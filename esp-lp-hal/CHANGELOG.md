@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix panic when handling buffers larger than 7 bytes in `LpI2c.write` and `LpI2c.read` (#4694)
 
 ### Removed
 
