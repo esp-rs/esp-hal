@@ -572,12 +572,13 @@ impl Drop for DedicatedGpioOutput<'_> {
         #[cfg(all(debug_assertions, multi_core))]
         debug_assert_eq!(self.core, Cpu::current());
         // Set the contained GPIOs back to GPIO mode.
-        for mut pins in self.contained_gpios {
+        for (bank, mut pins) in self.contained_gpios.into_iter().enumerate() {
+            let bank_offset = bank as u8 * 32;
             while pins != 0 {
                 let pin = pins.trailing_zeros() as u8;
                 pins &= !(1 << pin);
 
-                let gpio = unsafe { AnyPin::steal(pin) };
+                let gpio = unsafe { AnyPin::steal(bank_offset + pin) };
                 gpio.disconnect_from_peripheral_output();
                 gpio.connect_peripheral_to_output(OutputSignal::GPIO);
             }
