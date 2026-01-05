@@ -398,7 +398,7 @@ another core, either directly, or indirectly via a thread that is not pinned to 
 ///     dedicated::{DedicatedGpio, DedicatedGpioInput},
 /// };
 ///
-/// // Create an input pin drivers:
+/// // Create an input pin driver:
 /// let input = Input::new(peripherals.GPIO0, InputConfig::default());
 ///
 /// // Create a dedicated GPIO driver:
@@ -460,7 +460,7 @@ impl embedded_hal::digital::InputPin for DedicatedGpioInput<'_> {
 }
 
 #[doc_replace]
-/// A dedicated GPIO input driver.
+/// A dedicated GPIO output driver.
 ///
 /// Due to how the hardware works, [`DedicatedGpioOutput`] can drive any number of GPIO pins. To
 /// create a driver, you can use the [`DedicatedGpioOutput::new`] method, then
@@ -510,7 +510,7 @@ pub struct DedicatedGpioOutput<'lt> {
 }
 
 impl<'lt> DedicatedGpioOutput<'lt> {
-    /// Creates a new dedicated GPIO input driver.
+    /// Creates a new dedicated GPIO output driver.
     ///
     /// This function returns an empty driver. You will need to add output drivers to it using the
     /// [`Self::with_pin`] method.
@@ -558,7 +558,7 @@ impl<'lt> DedicatedGpioOutput<'lt> {
 
     /// Returns the current output state of the GPIO pins.
     ///
-    /// Returns `true` if any of the GPIO pins are set high, otherwise `false`.
+    /// Returns [`Level::High`] if any of the GPIO pins are set high, otherwise [`Level::Low`].
     #[inline(always)]
     pub fn output_level(&mut self) -> Level {
         #[cfg(all(debug_assertions, multi_core))]
@@ -634,7 +634,7 @@ another core, either directly, or indirectly via a thread that is not pinned to 
 ///     dedicated::{DedicatedGpio, DedicatedGpioFlex},
 /// };
 ///
-/// // Create an input pin drivers:
+/// // Create a pin driver:
 /// let flex = Flex::new(peripherals.GPIO0);
 ///
 /// // Create a dedicated GPIO driver:
