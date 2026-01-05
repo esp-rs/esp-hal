@@ -177,6 +177,17 @@ pub enum SecondaryChannel {
     Below,
 }
 
+impl From<u32> for SecondaryChannel {
+    fn from(value: u32) -> Self {
+        match value {
+            0 => SecondaryChannel::None,
+            1 => SecondaryChannel::Above,
+            2 => SecondaryChannel::Below,
+            _ => panic!("Invalid secondary channel value: {}", value),
+        }
+    }
+}
+
 /// Access point country information.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Country([u8; 2]);
@@ -1167,6 +1178,34 @@ impl WifiDevice<'_> {
     #[cfg(not(feature = "smoltcp"))]
     pub fn transmit(&mut self) -> Option<WifiTxToken> {
         self.mode.tx_token()
+    }
+}
+
+/// Wi-Fi bandwidth options.
+#[derive(Debug, Clone, Copy)]
+pub enum Bandwidth {
+    /// 20 MHz bandwidth.
+    _20,
+    /// 40 MHz bandwidth.
+    _40,
+    /// 80 MHz bandwidth.
+    _80,
+    /// 160 MHz bandwidth.
+    _160,
+    /// 80+80 MHz bandwidth.
+    _80_80,
+}
+
+impl From<u32> for Bandwidth {
+    fn from(value: u32) -> Self {
+        match value {
+            1 => Bandwidth::_20,
+            2 => Bandwidth::_40,
+            3 => Bandwidth::_80,
+            4 => Bandwidth::_160,
+            5 => Bandwidth::_80_80,
+            _ => panic!("Invalid bandwidth value: {}", value),
+        }
     }
 }
 
@@ -2285,6 +2324,67 @@ impl WifiController<'_> {
     #[instability::unstable]
     pub fn set_mode(&mut self, mode: WifiMode) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode.into()) })?;
+
+        Ok(())
+    }
+
+    /// Set the bandwidth of specified interface.
+    #[instability::unstable]
+    pub fn set_bandwidth(&mut self, bandwidth: Bandwidth) -> Result<(), WifiError> {
+        let mode = self.mode()?;
+        if mode.is_station() {
+            esp_wifi_result!(unsafe {
+                esp_wifi_set_bandwidth(wifi_interface_t_WIFI_IF_STA, bandwidth as u32)
+            })?;
+        }
+        if mode.is_access_point() {
+            esp_wifi_result!(unsafe {
+                esp_wifi_set_bandwidth(wifi_interface_t_WIFI_IF_AP, bandwidth as u32)
+            })?;
+        }
+
+        Ok(())
+    }
+
+    #[instability::unstable]
+    /// Get the bandwidth of specified interface.
+    pub fn bandwidth(&self) -> Result<Bandwidth, WifiError> {
+        let mut bw = 0;
+
+        let mode = self.mode()?;
+        if mode.is_station() {
+            esp_wifi_result!(unsafe {
+                esp_wifi_get_bandwidth(wifi_interface_t_WIFI_IF_STA, &mut bw)
+            })?;
+        }
+        if mode.is_access_point() {
+            esp_wifi_result!(unsafe {
+                esp_wifi_get_bandwidth(wifi_interface_t_WIFI_IF_AP, &mut bw)
+            })?;
+        }
+
+        Ok(Bandwidth::from(bw))
+    }
+
+    #[instability::unstable]
+    pub fn channel(&self) -> Result<(u8, SecondaryChannel), WifiError> {
+        let mut primary = 0;
+        let mut secondary = 0;
+
+        esp_wifi_result!(unsafe { esp_wifi_get_channel(&mut primary, &mut secondary) })?;
+
+        Ok((primary, SecondaryChannel::from(secondary)))
+    }
+
+    /// Set primary/secondary channel of device.
+    #[instability::unstable]
+    pub fn set_channel(
+        &mut self,
+        primary: u8,
+        secondary: SecondaryChannel,
+    ) -> Result<(), WifiError> {
+        esp_wifi_result!(unsafe { esp_wifi_set_channel(primary, secondary as u32) })?;
+
         Ok(())
     }
 
