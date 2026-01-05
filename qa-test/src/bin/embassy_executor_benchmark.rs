@@ -36,15 +36,16 @@ const TEST_MILLIS: u64 = 500;
 fn timer_handler() {
     let c = unsafe { COUNTER } as u64;
     let cpu_clock = CLOCK as u64 * 1_000_000;
-
-    let timer_ticks_per_second = SystemTimer::ticks_per_second();
-    let cpu_cycles_per_timer_ticks = cpu_clock / timer_ticks_per_second;
     println!("task2 count={}", unsafe { T2_COUNTER });
     println!("task3 count={}", unsafe { T3_COUNTER });
+    let total_test_cpu_cycles = cpu_clock * TEST_MILLIS / 1000;
+    // Average cycles per task execution, with a precision of 2 decimal places.
+    let centicycles = (100 * total_test_cpu_cycles) / c;
     println!(
-        "Test OK, count={}, cycles={}/100",
+        "Test OK, count={}, cycles={}.{}",
         c,
-        (100 * timer_ticks_per_second * cpu_cycles_per_timer_ticks * TEST_MILLIS / 1000) / c
+        centicycles / 100,
+        centicycles % 100
     );
     loop {}
 }
