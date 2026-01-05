@@ -43,7 +43,7 @@ rlsf = { version = "0.2", features = ["unstable"] }
 esp-config   = { version = "0.6.1", path = "../esp-config", features = ["build"] }
 
 [features]
-default = ["compat"]
+default = ["compat", "global-allocator"]
 
 ## Enable nightly rustc-only features, like `feature(allocator_api)`.
 nightly = []
@@ -62,6 +62,8 @@ internal-heap-stats = []
 ## Provide C-compatibility functions (malloc, free, ...)
 compat = []
 
+## Enable the `#[global_allocator]` attribute for `EspHeap`.
+global-allocator = []
 
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:

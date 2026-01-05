@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `global-allocator` Cargo feature to opt in to the `#[global_allocator]`, this feature is enabled by default. (#4703)
 
 ### Changed
 
