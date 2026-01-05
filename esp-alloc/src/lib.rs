@@ -161,7 +161,7 @@ use esp_sync::NonReentrantMutex;
 use crate::heap::Heap;
 
 /// The global allocator instance
-#[global_allocator]
+#[cfg_attr(feature = "global-allocator", global_allocator)]
 pub static HEAP: EspHeap = EspHeap::empty();
 
 const BAR_WIDTH: usize = 35;
