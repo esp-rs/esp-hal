@@ -287,6 +287,23 @@ pub struct DedicatedGpioChannel<'lt, const CH: u8> {
     pub output: DedicatedGpioOutputChannel<'lt, CH>,
 }
 
+impl<const CH: u8> DedicatedGpioChannel<'_, CH> {
+    /// Conjures a new dedicated GPIO channel out of thin air.
+    ///
+    /// # Safety
+    ///
+    /// The [`DedicatedGpio`] struct must be initialized before this function is called. There
+    /// should only be one reference to the channel in use at one time.
+    pub unsafe fn steal() -> Self {
+        unsafe {
+            Self {
+                input: DedicatedGpioInputChannel::steal(),
+                output: DedicatedGpioOutputChannel::steal(),
+            }
+        }
+    }
+}
+
 impl<const CH: u8> InputChannel for DedicatedGpioChannel<'_, CH> {
     const CH: u8 = CH;
 }
@@ -308,6 +325,20 @@ pub struct DedicatedGpioInputChannel<'lt, const CH: u8> {
     _marker: PhantomData<&'lt mut ()>,
 }
 
+impl<const CH: u8> DedicatedGpioInputChannel<'_, CH> {
+    /// Conjures a new dedicated GPIO input channel out of thin air.
+    ///
+    /// # Safety
+    ///
+    /// The [`DedicatedGpio`] struct must be initialized before this function is called. There
+    /// should only be one reference to the channel in use at one time.
+    pub unsafe fn steal() -> Self {
+        Self {
+            _marker: PhantomData,
+        }
+    }
+}
+
 impl<const CH: u8> InputChannel for DedicatedGpioInputChannel<'_, CH> {
     const CH: u8 = CH;
 }
@@ -319,6 +350,20 @@ impl<const CH: u8> InputChannel for &mut DedicatedGpioInputChannel<'_, CH> {
 /// A single dedicated GPIO output channel.
 pub struct DedicatedGpioOutputChannel<'lt, const CH: u8> {
     _marker: PhantomData<&'lt mut ()>,
+}
+
+impl<const CH: u8> DedicatedGpioOutputChannel<'_, CH> {
+    /// Conjures a new dedicated GPIO output channel out of thin air.
+    ///
+    /// # Safety
+    ///
+    /// The [`DedicatedGpio`] struct must be initialized before this function is called. There
+    /// should only be one reference to the channel in use at one time.
+    pub unsafe fn steal() -> Self {
+        Self {
+            _marker: PhantomData,
+        }
+    }
 }
 
 impl<const CH: u8> OutputChannel for DedicatedGpioOutputChannel<'_, CH> {
