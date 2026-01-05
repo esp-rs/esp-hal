@@ -112,13 +112,18 @@ fn deinit_rel_check() -> Result<()> {
     if std::fs::exists("target/local-registry")? {
         std::fs::remove_dir_all("target/local-registry")?;
     }
+    revert_scrap_path_deps()?;
 
     Ok(())
 }
 
 fn init_rel_check() -> Result<()> {
     // cleanup
-    deinit_rel_check()?;
+    let _ = std::fs::remove_dir_all("compile-tests/.cargo");
+
+    if std::fs::exists("target/local-registry")? {
+        std::fs::remove_dir_all("target/local-registry")?;
+    }
 
     // make sure we have `Cargo.lock` files
     check()?;
@@ -552,6 +557,44 @@ fn ensure_cargo_local_registry() -> Result<()> {
     Ok(())
 }
 
+fn revert_scrap_path_deps() -> Result<()> {
+    let pkgs = [
+        crate::Package::Examples.to_string(),
+        crate::Package::HilTest.to_string(),
+        crate::Package::QaTest.to_string(),
+    ];
+
+    for pkg in pkgs {
+        if let Ok(manifest_paths) = crate::find_packages(Path::new(&pkg)) {
+            let manifest_paths = if !manifest_paths.is_empty() {
+                manifest_paths
+            } else {
+                vec![PathBuf::from(&pkg)]
+            };
+
+            for manifest_path in manifest_paths {
+                if std::fs::exists(manifest_path.join("Cargo.toml$"))? {
+                    std::fs::remove_file(manifest_path.join("Cargo.toml"))?;
+                    std::fs::rename(
+                        manifest_path.join("Cargo.toml$"),
+                        manifest_path.join("Cargo.toml"),
+                    )?;
+                }
+
+                if std::fs::exists(manifest_path.join(".cargo/config.toml$"))? {
+                    std::fs::remove_file(manifest_path.join(".cargo/config.toml"))?;
+                    std::fs::rename(
+                        manifest_path.join(".cargo/config.toml$"),
+                        manifest_path.join(".cargo/config.toml"),
+                    )?;
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn scrap_path_deps() -> Result<()> {
     if !std::fs::exists("target/local-registry")? {
         bail!("Cannot scrap path dependencies - run `init` first.");
@@ -609,9 +652,20 @@ fn scrap_path_deps() -> Result<()> {
                 log::info!("{:?}", cmd);
                 cmd.status()?;
 
+                // rename files we are going to change
+                std::fs::rename(
+                    manifest_path.join("Cargo.toml"),
+                    manifest_path.join("Cargo.toml$"),
+                )?;
+                if std::fs::exists(manifest_path.join(".cargo/config.toml"))? {
+                    std::fs::rename(
+                        manifest_path.join(".cargo/config.toml"),
+                        manifest_path.join(".cargo/config.toml$"),
+                    )?;
+                }
+
                 // scrap the path dependencies, use version from local registry
-                let manifest_file = manifest_path.join("Cargo.toml");
-                let contents = std::fs::read_to_string(&manifest_file)?;
+                let contents = std::fs::read_to_string(manifest_path.join("Cargo.toml$"))?;
                 let mut toml = contents.parse::<toml_edit::DocumentMut>()?;
                 for dep in toml["dependencies"].as_table_mut().unwrap().iter_mut() {
                     let krate = dep.0.get();
@@ -632,10 +686,10 @@ fn scrap_path_deps() -> Result<()> {
                 }
 
                 let processed = format!("#{}{}\n{}", "STOP", "SHIP", toml.to_string());
-                std::fs::write(&manifest_file, processed)?;
+                std::fs::write(manifest_path.join("Cargo.toml"), processed)?;
 
                 // add the local registry to the config.toml
-                let config = std::fs::read_to_string(manifest_path.join(".cargo/config.toml"))?;
+                let config = std::fs::read_to_string(manifest_path.join(".cargo/config.toml$"))?;
                 if !config.contains("local-registry") {
                     std::fs::write(
                         manifest_path.join(".cargo/config.toml"),
@@ -666,9 +720,6 @@ local-registry = '{}'
         }
     }
 
-    println!(
-        "This made changes which are NOT REVERTED by `deinit` - make sure to NOT COMMIT these changes!"
-    );
     Ok(())
 }
 
