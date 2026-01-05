@@ -947,10 +947,6 @@ pub struct Clocks {
 
     /// XTAL clock frequency
     pub xtal_clock: Rate,
-
-    /// Crypto PWM  clock frequency
-    #[cfg(esp32s3)]
-    pub crypto_pwm_clock: Rate,
 }
 
 static mut ACTIVE_CLOCKS: Option<Clocks> = None;
@@ -1008,10 +1004,6 @@ impl Clocks {
                 apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
                 // FIXME: this assumes there is a crystal
                 xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
-                #[cfg(esp32s3)]
-                crypto_pwm_clock: Rate::from_hz(crate::soc::clocks::crypto_pwm_clk_frequency(
-                    clocks,
-                )),
             }
         })
     }
