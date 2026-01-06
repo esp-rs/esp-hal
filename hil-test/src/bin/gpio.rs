@@ -440,6 +440,9 @@ mod tests {
         assert_eq!(test_gpio1.is_high(), false);
         assert_eq!(test_gpio2.is_set_high(), false);
 
+        // avoid a short circuit - gpio1 would drive low, but gpio2 would drive high after the next
+        // set_high call
+        test_gpio1.set_output_enable(false);
         test_gpio2.set_high();
         ctx.delay.delay_millis(1);
 
