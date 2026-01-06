@@ -322,11 +322,11 @@ impl SystemClocks {
                     fn increment_reference_count(refcount: &mut u32) -> bool {
                         let first = *refcount == 0;
                         // CLOCK_BITMAP.fetch_or(!clock_id, Ordering::Relaxed);
-                        *refcount += 1;
+                        *refcount = unwrap!(refcount.checked_add(1), "Reference count overflow");
                         first
                     }
                     fn decrement_reference_count(refcount: &mut u32) -> bool {
-                        *refcount -= 1;
+                        *refcount = refcount.saturating_sub(1);
                         let last = *refcount == 0;
                         // CLOCK_BITMAP.fetch_and(!clock_id, Ordering::Relaxed);
                         last
