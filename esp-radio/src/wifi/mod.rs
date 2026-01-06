@@ -177,13 +177,17 @@ pub enum SecondaryChannel {
     Below,
 }
 
-impl From<u32> for SecondaryChannel {
-    fn from(value: u32) -> Self {
-        match value {
+trait SecondaryChannelExt {
+    fn from_raw(raw: u32) -> Self;
+}
+
+impl SecondaryChannelExt for SecondaryChannel {
+    fn from_raw(raw: u32) -> Self {
+        match raw {
             0 => SecondaryChannel::None,
             1 => SecondaryChannel::Above,
             2 => SecondaryChannel::Below,
-            _ => panic!("Invalid secondary channel value: {}", value),
+            _ => panic!("Invalid secondary channel value: {}", raw),
         }
     }
 }
@@ -1199,19 +1203,6 @@ pub enum Bandwidth {
     _160MHz,
     /// 80+80 MHz bandwidth.
     _80_80MHz,
-}
-
-impl From<u32> for Bandwidth {
-    fn from(value: u32) -> Self {
-        match value {
-            1 => Bandwidth::_20MHz,
-            2 => Bandwidth::_40MHz,
-            3 => Bandwidth::_80MHz,
-            4 => Bandwidth::_160MHz,
-            5 => Bandwidth::_80_80MHz,
-            _ => panic!("Invalid bandwidth value: {}", value),
-        }
-    }
 }
 
 /// The radio metadata header of the received packet, which is the common header
@@ -2377,7 +2368,14 @@ impl WifiController<'_> {
             })?;
         }
 
-        Ok(Bandwidth::from(bw))
+        match bw {
+            1 => Ok(Bandwidth::_20MHz),
+            2 => Ok(Bandwidth::_40MHz),
+            3 => Ok(Bandwidth::_80MHz),
+            4 => Ok(Bandwidth::_160MHz),
+            5 => Ok(Bandwidth::_80_80MHz),
+            _ => panic!("Invalid bandwidth value: {}", bw),
+        }
     }
 
     /// Returns the current Wi-Fi channel configuration.
@@ -2388,7 +2386,7 @@ impl WifiController<'_> {
 
         esp_wifi_result!(unsafe { esp_wifi_get_channel(&mut primary, &mut secondary) })?;
 
-        Ok((primary, SecondaryChannel::from(secondary)))
+        Ok((primary, SecondaryChannel::from_raw(secondary)))
     }
 
     /// Sets the primary and secondary Wi-Fi channel.

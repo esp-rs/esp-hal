@@ -7,7 +7,7 @@ use enumset::EnumSet;
 use procmacros::BuilderLite;
 
 use super::{AuthMethod, AuthMethodExt as _, Country, Protocol, SecondaryChannel};
-use crate::{WifiError, sys::include::wifi_ap_record_t};
+use crate::{WifiError, sys::include::wifi_ap_record_t, wifi::SecondaryChannelExt};
 
 /// Information about a detected Wi-Fi access point.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -155,7 +155,7 @@ pub(crate) fn convert_ap_info(record: &wifi_ap_record_t) -> AccessPointInfo {
         ssid,
         bssid: record.bssid,
         channel: record.primary,
-        secondary_channel: SecondaryChannel::from(record.second),
+        secondary_channel: SecondaryChannel::from_raw(record.second),
         signal_strength: record.rssi,
         auth_method: Some(AuthMethod::from_raw(record.authmode)),
         country: Country::try_from_c(&record.country),
