@@ -451,6 +451,18 @@ pub(crate) struct WorkItem<T: Sync + Send> {
     waker: WakerRegistration,
 }
 
+impl<T: Sync + Send + Clone> Clone for WorkItem<T> {
+    fn clone(&self) -> Self {
+        Self {
+            // A work item can only be cloned when it's not in a queue.
+            next: None,
+            status: Poll::Pending(false),
+            data: self.data.clone(),
+            waker: WakerRegistration::new(),
+        }
+    }
+}
+
 impl<T: Sync + Send> WorkItem<T> {
     /// Completes the work item.
     ///
@@ -687,6 +699,7 @@ where
 }
 
 /// Used by work queue clients, allows hiding WorkItem.
+#[derive(Clone)]
 pub(crate) struct WorkQueueFrontend<T: Sync + Send> {
     work_item: WorkItem<T>,
 }
@@ -716,5 +729,3 @@ impl<T: Sync + Send> WorkQueueFrontend<T> {
         Handle::from_completed_work_item(queue, &mut self.work_item)
     }
 }
-
-// TODO: implement individual algo context wrappers

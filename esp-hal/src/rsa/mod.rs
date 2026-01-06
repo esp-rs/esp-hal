@@ -1060,6 +1060,7 @@ impl<'t, 'd> RsaWorkQueueDriver<'t, 'd> {
     }
 }
 
+#[derive(Clone)]
 struct RsaWorkItem {
     // Acceleration options
     #[cfg(not(esp32))]
@@ -1075,6 +1076,7 @@ struct RsaWorkItem {
 unsafe impl Sync for RsaWorkItem {}
 unsafe impl Send for RsaWorkItem {}
 
+#[derive(Clone)]
 enum RsaOperation {
     // Z = X * Y
     // len(Z) = len(X) + len(Y)
@@ -1128,6 +1130,7 @@ fn rsa_work_queue_handler() {
     options using [enable_search_acceleration][Self::enable_search_acceleration] and
     [enable_acceleration][Self::enable_acceleration] when appropriate."
 )]
+#[derive(Clone)]
 pub struct RsaContext {
     frontend: WorkQueueFrontend<RsaWorkItem>,
 }

@@ -1319,6 +1319,17 @@ struct AesOperation {
     key: Key,
 }
 
+impl Clone for AesOperation {
+    fn clone(&self) -> Self {
+        Self {
+            mode: self.mode,
+            cipher_mode: self.cipher_mode,
+            buffers: self.buffers,
+            key: self.key.copy(),
+        }
+    }
+}
+
 // Safety: AesOperation is safe to share between threads, in the context of a WorkQueue. The
 // WorkQueue ensures that only a single location can access the data. All the internals, except
 // for the pointers, are Sync. The pointers are safe to share because they point at data that the
@@ -1487,6 +1498,7 @@ impl<'t, 'd> AesWorkQueueDriver<'t, 'd> {
 }
 
 /// An AES work queue user.
+#[derive(Clone)]
 pub struct AesContext {
     cipher_mode: CipherState,
     frontend: WorkQueueFrontend<AesOperation>,

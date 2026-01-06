@@ -1665,6 +1665,30 @@ mod sha_tests {
         hil_test::assert_eq!(empty_result, repeated_result);
     }
 
+    #[test]
+    #[cfg(not(esp32))]
+    fn test_clone_separates_state(_ctx: Context) {
+        use esp_hal::sha::Sha1Context;
+
+        let mut sha_backend = ShaBackend::new(unsafe { esp_hal::peripherals::SHA::steal() });
+        let _sha_driver = sha_backend.start();
+
+        let mut sha1 = Sha1Context::new();
+
+        let mut hash_result = [0; 20];
+        let mut cloned_result = [0; 20];
+
+        Sha1Context::update(&mut sha1, &SOURCE_DATA).wait_blocking();
+
+        let mut sha1_clone = sha1.clone();
+
+        Sha1Context::finalize(&mut sha1, &mut hash_result).wait_blocking();
+        Sha1Context::finalize(&mut sha1_clone, &mut cloned_result).wait_blocking();
+
+        assert_sw_hash::<sha1::Sha1>("SHA-1", &SOURCE_DATA, &hash_result);
+        hil_test::assert_eq!(hash_result, cloned_result);
+    }
+
     /// A rolling test that loops between hasher for every step to test
     /// interleaving. This specifically tests the SHA backend implementation
     #[test]
