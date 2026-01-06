@@ -71,24 +71,21 @@ use core::marker::PhantomData;
 use super::Error;
 #[cfg(timergroup_timg1)]
 use crate::peripherals::TIMG1;
+#[cfg(soc_has_clock_node_timg0_function_clock)]
+use crate::soc::clocks::Timg0FunctionClockConfig;
+#[cfg(soc_has_clock_node_timg0_wdt_clock)]
+use crate::soc::clocks::Timg0WdtClockConfig;
 use crate::{
     asynch::AtomicWaker,
-    clock::Clocks,
     interrupt::{self, InterruptConfigurable, InterruptHandler},
     pac::timg0::RegisterBlock,
     peripherals::{Interrupt, TIMG0},
     private::Sealed,
+    soc::clocks::ClockTree,
     system::PeripheralClockControl,
     time::{Duration, Instant, Rate},
 };
 
-#[cfg(all(
-    timergroup_default_clock_source_is_set,
-    not(soc_has_clock_node_timg0_function_clock)
-))]
-const DEFAULT_CLK_SRC: u8 = property!("timergroup.default_clock_source");
-#[cfg(timergroup_default_wdt_clock_source_is_set)]
-const DEFAULT_WDT_CLK_SRC: u8 = property!("timergroup.default_wdt_clock_source");
 const NUM_TIMG: usize = 1 + cfg!(timergroup_timg1) as usize;
 
 cfg_if::cfg_if! {
@@ -128,10 +125,15 @@ where
 pub trait TimerGroupInstance {
     fn id() -> u8;
     fn register_block() -> *const RegisterBlock;
-    fn configure_src_clk();
+    #[cfg(soc_has_clock_node_timg0_function_clock)]
+    fn configure_src_clk(src: Timg0FunctionClockConfig);
     fn enable_peripheral();
     fn reset_peripheral();
-    fn configure_wdt_src_clk();
+    #[cfg(soc_has_clock_node_timg0_wdt_clock)]
+    fn configure_wdt_src_clk(src: Timg0WdtClockConfig);
+    #[cfg(soc_has_clock_node_timg0_wdt_clock)]
+    fn gate_wdt_src_clk(enable: bool);
+    fn wdt_src_frequency() -> Rate;
     fn wdt_interrupt() -> Interrupt;
 }
 
@@ -146,31 +148,12 @@ impl TimerGroupInstance for TIMG0<'_> {
         Self::regs()
     }
 
-    fn configure_src_clk() {
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_clock_node_timg0_function_clock)] {
-                crate::soc::clocks::ClockTree::with(|clocks| {
-                    crate::soc::clocks::configure_timg0_function_clock(
-                        clocks,
-                        crate::soc::clocks::Timg0FunctionClockConfig::default(),
-                    );
-                    crate::soc::clocks::request_timg0_function_clock(clocks);
-                });
-            } else if #[cfg(not(timergroup_default_clock_source_is_set))] {
-                // Clock source is not configurable
-            } else if #[cfg(soc_has_pcr)] {
-                crate::peripherals::PCR::regs()
-                    .timergroup0_timer_clk_conf()
-                    .modify(|_, w| unsafe { w.tg0_timer_clk_sel().bits(DEFAULT_CLK_SRC) });
-            } else {
-                unsafe {
-                    (*<Self as TimerGroupInstance>::register_block())
-                        .t(0)
-                        .config()
-                        .modify(|_, w| w.use_xtal().bit(DEFAULT_CLK_SRC == 1));
-                }
-            }
-        }
+    #[cfg(soc_has_clock_node_timg0_function_clock)]
+    fn configure_src_clk(src: Timg0FunctionClockConfig) {
+        crate::soc::clocks::ClockTree::with(|clocks| {
+            crate::soc::clocks::configure_timg0_function_clock(clocks, src);
+            crate::soc::clocks::request_timg0_function_clock(clocks);
+        });
     }
 
     fn enable_peripheral() {
@@ -182,22 +165,34 @@ impl TimerGroupInstance for TIMG0<'_> {
         // `time::Instant::now`
     }
 
-    fn configure_wdt_src_clk() {
-        cfg_if::cfg_if! {
-            if #[cfg(not(timergroup_default_wdt_clock_source_is_set))] {
-                // Clock source is not configurable
-            } else if #[cfg(soc_has_pcr)] {
-                crate::peripherals::PCR::regs()
-                    .timergroup0_wdt_clk_conf()
-                    .modify(|_, w| unsafe { w.tg0_wdt_clk_sel().bits(DEFAULT_WDT_CLK_SRC) });
+    #[cfg(soc_has_clock_node_timg0_wdt_clock)]
+    fn configure_wdt_src_clk(src: Timg0WdtClockConfig) {
+        crate::soc::clocks::ClockTree::with(|clocks| {
+            crate::soc::clocks::configure_timg0_wdt_clock(clocks, src)
+        });
+    }
+
+    #[cfg(soc_has_clock_node_timg0_wdt_clock)]
+    fn gate_wdt_src_clk(enable: bool) {
+        crate::soc::clocks::ClockTree::with(|clocks| {
+            if enable {
+                crate::soc::clocks::request_timg0_wdt_clock(clocks)
             } else {
-                unsafe {
-                    (*<Self as TimerGroupInstance>::register_block())
-                        .wdtconfig0()
-                        .modify(|_, w| w.wdt_use_xtal().bit(DEFAULT_WDT_CLK_SRC == 1));
+                crate::soc::clocks::release_timg0_wdt_clock(clocks)
+            }
+        });
+    }
+
+    fn wdt_src_frequency() -> Rate {
+        crate::soc::clocks::ClockTree::with(|clocks| {
+            cfg_if::cfg_if! {
+                if #[cfg(soc_has_clock_node_timg0_wdt_clock)] {
+                    Rate::from_hz(crate::soc::clocks::timg0_wdt_clock_frequency(clocks))
+                } else {
+                    Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks))
                 }
             }
-        }
+        })
     }
 
     fn wdt_interrupt() -> Interrupt {
@@ -216,36 +211,12 @@ impl TimerGroupInstance for crate::peripherals::TIMG1<'_> {
         Self::regs()
     }
 
-    fn configure_src_clk() {
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_clock_node_timg0_function_clock)] {
-                crate::soc::clocks::ClockTree::with(|clocks| {
-                    crate::soc::clocks::configure_timg1_function_clock(
-                        clocks,
-                        crate::soc::clocks::Timg0FunctionClockConfig::default(),
-                    );
-                    crate::soc::clocks::request_timg1_function_clock(clocks);
-                });
-            } else if #[cfg(not(timergroup_default_clock_source_is_set))] {
-                // Clock source is not configurable
-            } else if #[cfg(soc_has_pcr)] {
-                crate::peripherals::PCR::regs()
-                    .timergroup1_timer_clk_conf()
-                    .modify(|_, w| unsafe { w.tg1_timer_clk_sel().bits(DEFAULT_CLK_SRC) });
-            } else {
-                unsafe {
-                    (*<Self as TimerGroupInstance>::register_block())
-                        .t(0)
-                        .config()
-                        .modify(|_, w| w.use_xtal().bit(DEFAULT_CLK_SRC == 1));
-                    #[cfg(timergroup_timg_has_timer1)]
-                    (*<Self as TimerGroupInstance>::register_block())
-                        .t(1)
-                        .config()
-                        .modify(|_, w| w.use_xtal().bit(DEFAULT_CLK_SRC == 1));
-                }
-            }
-        }
+    #[cfg(soc_has_clock_node_timg0_function_clock)]
+    fn configure_src_clk(src: Timg0FunctionClockConfig) {
+        crate::soc::clocks::ClockTree::with(|clocks| {
+            crate::soc::clocks::configure_timg1_function_clock(clocks, src);
+            crate::soc::clocks::request_timg1_function_clock(clocks);
+        });
     }
 
     fn enable_peripheral() {
@@ -253,25 +224,37 @@ impl TimerGroupInstance for crate::peripherals::TIMG1<'_> {
     }
 
     fn reset_peripheral() {
-        PeripheralClockControl::reset(crate::system::Peripheral::Timg1)
+        PeripheralClockControl::reset(crate::system::Peripheral::Timg1);
     }
 
-    fn configure_wdt_src_clk() {
-        cfg_if::cfg_if! {
-            if #[cfg(not(timergroup_default_wdt_clock_source_is_set))] {
-                // Clock source is not configurable
-            } else if #[cfg(soc_has_pcr)] {
-                crate::peripherals::PCR::regs()
-                    .timergroup1_wdt_clk_conf()
-                    .modify(|_, w| unsafe { w.tg1_wdt_clk_sel().bits(DEFAULT_WDT_CLK_SRC) });
+    #[cfg(soc_has_clock_node_timg0_wdt_clock)]
+    fn configure_wdt_src_clk(src: Timg0WdtClockConfig) {
+        crate::soc::clocks::ClockTree::with(|clocks| {
+            crate::soc::clocks::configure_timg1_wdt_clock(clocks, src)
+        });
+    }
+
+    #[cfg(soc_has_clock_node_timg0_wdt_clock)]
+    fn gate_wdt_src_clk(enable: bool) {
+        crate::soc::clocks::ClockTree::with(|clocks| {
+            if enable {
+                crate::soc::clocks::request_timg1_wdt_clock(clocks)
             } else {
-                unsafe {
-                    (*<Self as TimerGroupInstance>::register_block())
-                        .wdtconfig0()
-                        .modify(|_, w| w.wdt_use_xtal().bit(DEFAULT_WDT_CLK_SRC == 1));
+                crate::soc::clocks::release_timg1_wdt_clock(clocks)
+            }
+        });
+    }
+
+    fn wdt_src_frequency() -> Rate {
+        crate::soc::clocks::ClockTree::with(|clocks| {
+            cfg_if::cfg_if! {
+                if #[cfg(soc_has_clock_node_timg1_wdt_clock)] {
+                    Rate::from_hz(crate::soc::clocks::timg1_wdt_clock_frequency(clocks))
+                } else {
+                    Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks))
                 }
             }
-        }
+        })
     }
 
     fn wdt_interrupt() -> Interrupt {
@@ -288,7 +271,8 @@ where
         T::reset_peripheral();
         T::enable_peripheral();
 
-        T::configure_src_clk();
+        #[cfg(soc_has_clock_node_timg0_function_clock)]
+        T::configure_src_clk(Timg0FunctionClockConfig::default());
 
         Self {
             _timer_group: PhantomData,
@@ -511,17 +495,26 @@ impl Timer<'_> {
         self.t().config().modify(|_, w| w.alarm_en().bit(state));
     }
 
-    fn load_value(&self, value: Duration) -> Result<(), Error> {
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_clock_node_timg0_function_clock)] {
-                let clk_src = Clocks::get().xtal_clock;
-            } else if #[cfg(esp32h2)] {
-                // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
-                let clk_src = Clocks::get().pll_48m_clock;
-            } else {
-                let clk_src = Clocks::get().apb_clock;
+    fn source_frequency(&self) -> Rate {
+        let hz = ClockTree::with(|clocks| {
+            cfg_if::cfg_if! {
+                if #[cfg(soc_has_clock_node_timg0_function_clock)] {
+                    match self.timer_group() {
+                        0 => crate::soc::clocks::timg0_function_clock_frequency(clocks),
+                        #[cfg(soc_has_clock_node_timg1_function_clock)]
+                        1 => crate::soc::clocks::timg1_function_clock_frequency(clocks),
+                        _ => unreachable!()
+                    }
+                } else {
+                    crate::soc::clocks::apb_clk_frequency(clocks)
+                }
             }
-        }
+        });
+        Rate::from_hz(hz)
+    }
+
+    fn load_value(&self, value: Duration) -> Result<(), Error> {
+        let clk_src = self.source_frequency();
         let Some(ticks) = timeout_to_ticks(value, clk_src, self.divider()) else {
             return Err(Error::InvalidTimeout);
         };
@@ -563,16 +556,7 @@ impl Timer<'_> {
         let value_hi = t.hi().read().bits() as u64;
 
         let ticks = (value_hi << 32) | value_lo;
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_clock_node_timg0_function_clock)] {
-                let clk_src = Clocks::get().xtal_clock;
-            } else if #[cfg(esp32h2)] {
-                // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
-                let clk_src = Clocks::get().pll_48m_clock;
-            } else {
-                let clk_src = Clocks::get().apb_clock;
-            }
-        }
+        let clk_src = self.source_frequency();
         let micros = ticks_to_timeout(ticks, clk_src, self.divider());
 
         Instant::from_ticks(micros)
@@ -682,11 +666,16 @@ where
 {
     /// Construct a new instance of [`Wdt`]
     pub fn new() -> Self {
-        TG::configure_wdt_src_clk();
-
-        Self {
+        let mut this = Self {
             phantom: PhantomData,
-        }
+        };
+
+        this.set_write_protection(false);
+        #[cfg(soc_has_clock_node_timg0_wdt_clock)]
+        TG::configure_wdt_src_clk(Timg0WdtClockConfig::default());
+        this.set_write_protection(true);
+
+        this
     }
 
     /// Enable the watchdog timer instance
@@ -715,18 +704,17 @@ where
 
         self.set_write_protection(false);
 
-        if !enabled {
-            reg_block.wdtconfig0().write(|w| unsafe { w.bits(0) });
-        } else {
-            reg_block.wdtconfig0().write(|w| w.wdt_en().bit(true));
+        #[cfg(soc_has_clock_node_timg0_wdt_clock)]
+        if enabled {
+            TG::gate_wdt_src_clk(true);
+        }
 
-            reg_block
-                .wdtconfig0()
-                .write(|w| w.wdt_flashboot_mod_en().bit(false));
-
-            #[cfg_attr(esp32, allow(unused_unsafe))]
-            reg_block.wdtconfig0().write(|w| unsafe {
-                w.wdt_en().bit(true);
+        reg_block
+            .wdtconfig0()
+            .modify(|_, w| w.wdt_en().bit(enabled));
+        if enabled {
+            reg_block.wdtconfig0().modify(|_, w| unsafe {
+                w.wdt_flashboot_mod_en().bit(false);
                 w.wdt_stg0().bits(MwdtStageAction::ResetSystem as u8);
                 w.wdt_cpu_reset_length().bits(7);
                 w.wdt_sys_reset_length().bits(7);
@@ -739,6 +727,11 @@ where
             reg_block
                 .wdtconfig0()
                 .modify(|_, w| w.wdt_conf_update_en().set_bit());
+        }
+
+        #[cfg(soc_has_clock_node_timg0_wdt_clock)]
+        if !enabled {
+            TG::gate_wdt_src_clk(false);
         }
 
         self.set_write_protection(true);
@@ -767,14 +760,7 @@ where
 
     /// Set the timeout, in microseconds, of the watchdog timer
     pub fn set_timeout(&mut self, stage: MwdtStage, timeout: Duration) {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32h2)] {
-                // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
-                let clk_src = Rate::from_mhz(48);
-            } else {
-                let clk_src = Clocks::get().apb_clock;
-            }
-        }
+        let clk_src = TG::wdt_src_frequency();
         let timeout_ticks = timeout.as_micros() * clk_src.as_mhz() as u64;
 
         let reg_block = unsafe { &*TG::register_block() };

@@ -666,6 +666,7 @@ impl Chip {
                     "soc_has_clock_node_low_power_clk",
                     "soc_has_clock_node_timg0_function_clock",
                     "soc_has_clock_node_timg0_calibration_clock",
+                    "soc_has_clock_node_timg0_wdt_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "soc_has_multiple_xtal_options",
@@ -690,10 +691,6 @@ impl Chip {
                     "rng_apb_cycle_wait_num=\"16\"",
                     "sha_dma",
                     "timergroup_timg_has_divcnt_rst",
-                    "timergroup_default_clock_source=\"0\"",
-                    "timergroup_default_clock_source_is_set",
-                    "timergroup_default_wdt_clock_source=\"0\"",
-                    "timergroup_default_wdt_clock_source_is_set",
                     "uart_ram_size=\"128\"",
                     "bt_controller=\"npl\"",
                     "phy_combo_module",
@@ -812,6 +809,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_low_power_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_calibration_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_timg0_wdt_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=soc_has_multiple_xtal_options",
@@ -836,10 +834,6 @@ impl Chip {
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
-                    "cargo:rustc-cfg=timergroup_default_clock_source=\"0\"",
-                    "cargo:rustc-cfg=timergroup_default_clock_source_is_set",
-                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source=\"0\"",
-                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=bt_controller=\"npl\"",
                     "cargo:rustc-cfg=phy_combo_module",
@@ -991,8 +985,10 @@ impl Chip {
                     "soc_has_clock_node_low_power_clk",
                     "soc_has_clock_node_timg0_function_clock",
                     "soc_has_clock_node_timg0_calibration_clock",
+                    "soc_has_clock_node_timg0_wdt_clock",
                     "soc_has_clock_node_timg1_function_clock",
                     "soc_has_clock_node_timg1_calibration_clock",
+                    "soc_has_clock_node_timg1_wdt_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "soc_xtal_frequency=\"40\"",
@@ -1040,10 +1036,6 @@ impl Chip {
                     "rsa_memory_size_bytes=\"384\"",
                     "sha_dma",
                     "timergroup_timg_has_divcnt_rst",
-                    "timergroup_default_clock_source=\"0\"",
-                    "timergroup_default_clock_source_is_set",
-                    "timergroup_default_wdt_clock_source=\"0\"",
-                    "timergroup_default_wdt_clock_source_is_set",
                     "uart_ram_size=\"128\"",
                     "bt_controller=\"btdm\"",
                     "phy_combo_module",
@@ -1177,8 +1169,10 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_low_power_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_calibration_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_timg0_wdt_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_calibration_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_timg1_wdt_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=soc_xtal_frequency=\"40\"",
@@ -1226,10 +1220,6 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
                     "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
-                    "cargo:rustc-cfg=timergroup_default_clock_source=\"0\"",
-                    "cargo:rustc-cfg=timergroup_default_clock_source_is_set",
-                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source=\"0\"",
-                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=bt_controller=\"btdm\"",
                     "cargo:rustc-cfg=phy_combo_module",
@@ -1443,8 +1433,10 @@ impl Chip {
                     "soc_has_clock_node_mcpwm0_function_clock",
                     "soc_has_clock_node_timg0_function_clock",
                     "soc_has_clock_node_timg0_calibration_clock",
+                    "soc_has_clock_node_timg0_wdt_clock",
                     "soc_has_clock_node_timg1_function_clock",
                     "soc_has_clock_node_timg1_calibration_clock",
+                    "soc_has_clock_node_timg1_wdt_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "soc_xtal_frequency=\"40\"",
@@ -1496,10 +1488,6 @@ impl Chip {
                     "rsa_memory_size_bytes=\"384\"",
                     "sha_dma",
                     "timergroup_timg_has_divcnt_rst",
-                    "timergroup_default_clock_source=\"1\"",
-                    "timergroup_default_clock_source_is_set",
-                    "timergroup_default_wdt_clock_source=\"1\"",
-                    "timergroup_default_wdt_clock_source_is_set",
                     "uart_ram_size=\"128\"",
                     "uart_peripheral_controls_mem_clk",
                     "lp_uart_ram_size=\"32\"",
@@ -1694,8 +1682,10 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_mcpwm0_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_calibration_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_timg0_wdt_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_calibration_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_timg1_wdt_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=soc_xtal_frequency=\"40\"",
@@ -1747,10 +1737,6 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
                     "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
-                    "cargo:rustc-cfg=timergroup_default_clock_source=\"1\"",
-                    "cargo:rustc-cfg=timergroup_default_clock_source_is_set",
-                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source=\"1\"",
-                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
@@ -1932,8 +1918,10 @@ impl Chip {
                     "soc_has_clock_node_mcpwm0_function_clock",
                     "soc_has_clock_node_timg0_function_clock",
                     "soc_has_clock_node_timg0_calibration_clock",
+                    "soc_has_clock_node_timg0_wdt_clock",
                     "soc_has_clock_node_timg1_function_clock",
                     "soc_has_clock_node_timg1_calibration_clock",
+                    "soc_has_clock_node_timg1_wdt_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "soc_xtal_frequency=\"32\"",
@@ -1982,10 +1970,6 @@ impl Chip {
                     "rsa_memory_size_bytes=\"384\"",
                     "sha_dma",
                     "timergroup_timg_has_divcnt_rst",
-                    "timergroup_default_clock_source=\"2\"",
-                    "timergroup_default_clock_source_is_set",
-                    "timergroup_default_wdt_clock_source=\"2\"",
-                    "timergroup_default_wdt_clock_source_is_set",
                     "uart_ram_size=\"128\"",
                     "uart_peripheral_controls_mem_clk",
                     "bt_controller=\"npl\"",
@@ -2144,8 +2128,10 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_mcpwm0_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_calibration_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_timg0_wdt_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_calibration_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_timg1_wdt_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=soc_xtal_frequency=\"32\"",
@@ -2194,10 +2180,6 @@ impl Chip {
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
                     "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
-                    "cargo:rustc-cfg=timergroup_default_clock_source=\"2\"",
-                    "cargo:rustc-cfg=timergroup_default_clock_source_is_set",
-                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source=\"2\"",
-                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
                     "cargo:rustc-cfg=bt_controller=\"npl\"",
@@ -2422,8 +2404,6 @@ impl Chip {
                     "sha_dma",
                     "spi_master_has_octal",
                     "timergroup_timg_has_timer1",
-                    "timergroup_default_clock_source=\"0\"",
-                    "timergroup_default_clock_source_is_set",
                     "uart_ram_size=\"128\"",
                 ],
                 cfgs: &[
@@ -2626,8 +2606,6 @@ impl Chip {
                     "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=spi_master_has_octal",
                     "cargo:rustc-cfg=timergroup_timg_has_timer1",
-                    "cargo:rustc-cfg=timergroup_default_clock_source=\"0\"",
-                    "cargo:rustc-cfg=timergroup_default_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                 ],
                 memory_layout: &MemoryLayout {
@@ -2870,8 +2848,6 @@ impl Chip {
                     "sha_dma",
                     "spi_master_has_octal",
                     "timergroup_timg_has_timer1",
-                    "timergroup_default_clock_source=\"0\"",
-                    "timergroup_default_clock_source_is_set",
                     "uart_ram_size=\"128\"",
                     "bt_controller=\"btdm\"",
                     "phy_combo_module",
@@ -3098,8 +3074,6 @@ impl Chip {
                     "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=spi_master_has_octal",
                     "cargo:rustc-cfg=timergroup_timg_has_timer1",
-                    "cargo:rustc-cfg=timergroup_default_clock_source=\"0\"",
-                    "cargo:rustc-cfg=timergroup_default_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=bt_controller=\"btdm\"",
                     "cargo:rustc-cfg=phy_combo_module",
@@ -3382,6 +3356,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_rc_fast_clk_div_n)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_low_power_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg0_function_clock)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg0_wdt_clock)");
     println!("cargo:rustc-check-cfg=cfg(assist_debug_has_sp_monitor)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_fsm_timeouts)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_hw_bus_clear)");
@@ -3392,8 +3367,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(i2c_master_bus_timeout_is_exponential)");
     println!("cargo:rustc-check-cfg=cfg(sha_dma)");
     println!("cargo:rustc-check-cfg=cfg(timergroup_timg_has_divcnt_rst)");
-    println!("cargo:rustc-check-cfg=cfg(timergroup_default_clock_source_is_set)");
-    println!("cargo:rustc-check-cfg=cfg(timergroup_default_wdt_clock_source_is_set)");
     println!("cargo:rustc-check-cfg=cfg(esp32c3)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ds)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_fe)");
@@ -3408,6 +3381,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpu_pll_div_out)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_160m)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg1_function_clock)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg1_wdt_clock)");
     println!("cargo:rustc-check-cfg=cfg(aes_dma)");
     println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_ecb)");
     println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_cbc)");
@@ -3575,12 +3549,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(rsa_memory_size_bytes, values(\"512\",\"384\"))");
     println!("cargo:rustc-check-cfg=cfg(uart_ram_size, values(\"128\"))");
     println!("cargo:rustc-check-cfg=cfg(bt_controller, values(\"btdm\",\"npl\"))");
-    println!(
-        "cargo:rustc-check-cfg=cfg(timergroup_default_clock_source, values(\"0\",\"1\",\"2\"))"
-    );
-    println!(
-        "cargo:rustc-check-cfg=cfg(timergroup_default_wdt_clock_source, values(\"0\",\"1\",\"2\"))"
-    );
     println!("cargo:rustc-check-cfg=cfg(soc_xtal_frequency, values(\"40\",\"32\"))");
     println!("cargo:rustc-check-cfg=cfg(phy_backed_up_digital_register_count, values(\"21\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_fifo_size, values(\"16\"))");

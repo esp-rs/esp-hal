@@ -581,10 +581,6 @@ driver_configs![
             timg_has_timer1: bool,
             #[serde(default)]
             timg_has_divcnt_rst: bool,
-            #[serde(default)]
-            default_clock_source: Option<u32>,
-            #[serde(default)]
-            default_wdt_clock_source: Option<u32>,
         }
     },
     TouchProperties {

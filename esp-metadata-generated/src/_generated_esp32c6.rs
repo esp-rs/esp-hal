@@ -246,18 +246,6 @@ macro_rules! property {
     ("timergroup.timg_has_divcnt_rst") => {
         true
     };
-    ("timergroup.default_clock_source") => {
-        1
-    };
-    ("timergroup.default_clock_source", str) => {
-        stringify!(1)
-    };
-    ("timergroup.default_wdt_clock_source") => {
-        1
-    };
-    ("timergroup.default_wdt_clock_source", str) => {
-        stringify!(1)
-    };
     ("uart.ram_size") => {
         128
     };
@@ -572,6 +560,20 @@ macro_rules! for_each_soc_xtal_options {
 ///     todo!()
 /// }
 ///
+/// // TIMG0_WDT_CLOCK
+///
+/// fn enable_timg0_wdt_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_timg0_wdt_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<Timg0WdtClockConfig>,
+///     _new_selector: Timg0WdtClockConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // TIMG1_FUNCTION_CLOCK
 ///
 /// fn enable_timg1_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -596,6 +598,20 @@ macro_rules! for_each_soc_xtal_options {
 ///     _clocks: &mut ClockTree,
 ///     _old_selector: Option<Timg0CalibrationClockConfig>,
 ///     _new_selector: Timg0CalibrationClockConfig,
+/// ) {
+///     todo!()
+/// }
+///
+/// // TIMG1_WDT_CLOCK
+///
+/// fn enable_timg1_wdt_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_timg1_wdt_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<Timg0WdtClockConfig>,
+///     _new_selector: Timg0WdtClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -980,6 +996,18 @@ macro_rules! define_clock_tree_types {
             /// Selects `XTAL32K_CLK`.
             Xtal32kClk,
         }
+        /// The list of clock signals that the `TIMG0_WDT_CLOCK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum Timg0WdtClockConfig {
+            #[default]
+            /// Selects `XTAL_CLK`.
+            XtalClk,
+            /// Selects `PLL_F80M`.
+            PllF80m,
+            /// Selects `RC_FAST_CLK`.
+            RcFastClk,
+        }
         /// Represents the device's clock tree.
         pub struct ClockTree {
             xtal_clk: Option<XtalClkConfig>,
@@ -1001,8 +1029,10 @@ macro_rules! define_clock_tree_types {
             mcpwm0_function_clock: Option<Mcpwm0FunctionClockConfig>,
             timg0_function_clock: Option<Timg0FunctionClockConfig>,
             timg0_calibration_clock: Option<Timg0CalibrationClockConfig>,
+            timg0_wdt_clock: Option<Timg0WdtClockConfig>,
             timg1_function_clock: Option<Timg0FunctionClockConfig>,
             timg1_calibration_clock: Option<Timg0CalibrationClockConfig>,
+            timg1_wdt_clock: Option<Timg0WdtClockConfig>,
             pll_clk_refcount: u32,
             rc_fast_clk_refcount: u32,
             xtal32k_clk_refcount: u32,
@@ -1018,8 +1048,10 @@ macro_rules! define_clock_tree_types {
             mcpwm0_function_clock_refcount: u32,
             timg0_function_clock_refcount: u32,
             timg0_calibration_clock_refcount: u32,
+            timg0_wdt_clock_refcount: u32,
             timg1_function_clock_refcount: u32,
             timg1_calibration_clock_refcount: u32,
+            timg1_wdt_clock_refcount: u32,
         }
         impl ClockTree {
             /// Locks the clock tree for exclusive access.
@@ -1102,6 +1134,10 @@ macro_rules! define_clock_tree_types {
             pub fn timg0_calibration_clock(&self) -> Option<Timg0CalibrationClockConfig> {
                 self.timg0_calibration_clock
             }
+            /// Returns the current configuration of the TIMG0_WDT_CLOCK clock tree node
+            pub fn timg0_wdt_clock(&self) -> Option<Timg0WdtClockConfig> {
+                self.timg0_wdt_clock
+            }
             /// Returns the current configuration of the TIMG1_FUNCTION_CLOCK clock tree node
             pub fn timg1_function_clock(&self) -> Option<Timg0FunctionClockConfig> {
                 self.timg1_function_clock
@@ -1109,6 +1145,10 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the TIMG1_CALIBRATION_CLOCK clock tree node
             pub fn timg1_calibration_clock(&self) -> Option<Timg0CalibrationClockConfig> {
                 self.timg1_calibration_clock
+            }
+            /// Returns the current configuration of the TIMG1_WDT_CLOCK clock tree node
+            pub fn timg1_wdt_clock(&self) -> Option<Timg0WdtClockConfig> {
+                self.timg1_wdt_clock
             }
         }
         static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
@@ -1132,8 +1172,10 @@ macro_rules! define_clock_tree_types {
                 mcpwm0_function_clock: None,
                 timg0_function_clock: None,
                 timg0_calibration_clock: None,
+                timg0_wdt_clock: None,
                 timg1_function_clock: None,
                 timg1_calibration_clock: None,
+                timg1_wdt_clock: None,
                 pll_clk_refcount: 0,
                 rc_fast_clk_refcount: 0,
                 xtal32k_clk_refcount: 0,
@@ -1149,8 +1191,10 @@ macro_rules! define_clock_tree_types {
                 mcpwm0_function_clock_refcount: 0,
                 timg0_function_clock_refcount: 0,
                 timg0_calibration_clock_refcount: 0,
+                timg0_wdt_clock_refcount: 0,
                 timg1_function_clock_refcount: 0,
                 timg1_calibration_clock_refcount: 0,
+                timg1_wdt_clock_refcount: 0,
             });
         pub fn configure_xtal_clk(clocks: &mut ClockTree, config: XtalClkConfig) {
             clocks.xtal_clk = Some(config);
@@ -1849,6 +1893,56 @@ macro_rules! define_clock_tree_types {
                 Timg0CalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(clocks),
             }
         }
+        pub fn configure_timg0_wdt_clock(
+            clocks: &mut ClockTree,
+            new_selector: Timg0WdtClockConfig,
+        ) {
+            let old_selector = clocks.timg0_wdt_clock.replace(new_selector);
+            if clocks.timg0_wdt_clock_refcount > 0 {
+                match new_selector {
+                    Timg0WdtClockConfig::XtalClk => request_xtal_clk(clocks),
+                    Timg0WdtClockConfig::PllF80m => request_pll_f80m(clocks),
+                    Timg0WdtClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                }
+                configure_timg0_wdt_clock_impl(clocks, old_selector, new_selector);
+                if let Some(old_selector) = old_selector {
+                    match old_selector {
+                        Timg0WdtClockConfig::XtalClk => release_xtal_clk(clocks),
+                        Timg0WdtClockConfig::PllF80m => release_pll_f80m(clocks),
+                        Timg0WdtClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    }
+                }
+            } else {
+                configure_timg0_wdt_clock_impl(clocks, old_selector, new_selector);
+            }
+        }
+        pub fn request_timg0_wdt_clock(clocks: &mut ClockTree) {
+            if increment_reference_count(&mut clocks.timg0_wdt_clock_refcount) {
+                match unwrap!(clocks.timg0_wdt_clock) {
+                    Timg0WdtClockConfig::XtalClk => request_xtal_clk(clocks),
+                    Timg0WdtClockConfig::PllF80m => request_pll_f80m(clocks),
+                    Timg0WdtClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                }
+                enable_timg0_wdt_clock_impl(clocks, true);
+            }
+        }
+        pub fn release_timg0_wdt_clock(clocks: &mut ClockTree) {
+            if decrement_reference_count(&mut clocks.timg0_wdt_clock_refcount) {
+                enable_timg0_wdt_clock_impl(clocks, false);
+                match unwrap!(clocks.timg0_wdt_clock) {
+                    Timg0WdtClockConfig::XtalClk => release_xtal_clk(clocks),
+                    Timg0WdtClockConfig::PllF80m => release_pll_f80m(clocks),
+                    Timg0WdtClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                }
+            }
+        }
+        pub fn timg0_wdt_clock_frequency(clocks: &mut ClockTree) -> u32 {
+            match unwrap!(clocks.timg0_wdt_clock) {
+                Timg0WdtClockConfig::XtalClk => xtal_clk_frequency(clocks),
+                Timg0WdtClockConfig::PllF80m => pll_f80m_frequency(clocks),
+                Timg0WdtClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
+            }
+        }
         pub fn configure_timg1_function_clock(
             clocks: &mut ClockTree,
             new_selector: Timg0FunctionClockConfig,
@@ -1947,6 +2041,56 @@ macro_rules! define_clock_tree_types {
                 Timg0CalibrationClockConfig::RtcSlowClk => lp_slow_clk_frequency(clocks),
                 Timg0CalibrationClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
                 Timg0CalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(clocks),
+            }
+        }
+        pub fn configure_timg1_wdt_clock(
+            clocks: &mut ClockTree,
+            new_selector: Timg0WdtClockConfig,
+        ) {
+            let old_selector = clocks.timg1_wdt_clock.replace(new_selector);
+            if clocks.timg1_wdt_clock_refcount > 0 {
+                match new_selector {
+                    Timg0WdtClockConfig::XtalClk => request_xtal_clk(clocks),
+                    Timg0WdtClockConfig::PllF80m => request_pll_f80m(clocks),
+                    Timg0WdtClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                }
+                configure_timg1_wdt_clock_impl(clocks, old_selector, new_selector);
+                if let Some(old_selector) = old_selector {
+                    match old_selector {
+                        Timg0WdtClockConfig::XtalClk => release_xtal_clk(clocks),
+                        Timg0WdtClockConfig::PllF80m => release_pll_f80m(clocks),
+                        Timg0WdtClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    }
+                }
+            } else {
+                configure_timg1_wdt_clock_impl(clocks, old_selector, new_selector);
+            }
+        }
+        pub fn request_timg1_wdt_clock(clocks: &mut ClockTree) {
+            if increment_reference_count(&mut clocks.timg1_wdt_clock_refcount) {
+                match unwrap!(clocks.timg1_wdt_clock) {
+                    Timg0WdtClockConfig::XtalClk => request_xtal_clk(clocks),
+                    Timg0WdtClockConfig::PllF80m => request_pll_f80m(clocks),
+                    Timg0WdtClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                }
+                enable_timg1_wdt_clock_impl(clocks, true);
+            }
+        }
+        pub fn release_timg1_wdt_clock(clocks: &mut ClockTree) {
+            if decrement_reference_count(&mut clocks.timg1_wdt_clock_refcount) {
+                enable_timg1_wdt_clock_impl(clocks, false);
+                match unwrap!(clocks.timg1_wdt_clock) {
+                    Timg0WdtClockConfig::XtalClk => release_xtal_clk(clocks),
+                    Timg0WdtClockConfig::PllF80m => release_pll_f80m(clocks),
+                    Timg0WdtClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                }
+            }
+        }
+        pub fn timg1_wdt_clock_frequency(clocks: &mut ClockTree) -> u32 {
+            match unwrap!(clocks.timg1_wdt_clock) {
+                Timg0WdtClockConfig::XtalClk => xtal_clk_frequency(clocks),
+                Timg0WdtClockConfig::PllF80m => pll_f80m_frequency(clocks),
+                Timg0WdtClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
             }
         }
         /// Clock tree configuration.
