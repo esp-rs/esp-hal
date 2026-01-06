@@ -24,7 +24,8 @@ const IEEE802154_MULTIPAN_0: u8 = 0;
 const IEEE802154_MULTIPAN_MAX: usize = 4;
 
 /// Frame pending mode
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PendingMode {
     /// Frame pending bit always set to 1 in the ack to Data Request
     #[default]
@@ -40,7 +41,8 @@ pub enum PendingMode {
 }
 
 /// CCA mode
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum CcaMode {
     /// Carrier only
     #[default]
@@ -53,7 +55,8 @@ pub enum CcaMode {
     CarrierAndEd = 0x03,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 struct Pib {
     auto_ack_tx: bool,
     auto_ack_rx: bool,

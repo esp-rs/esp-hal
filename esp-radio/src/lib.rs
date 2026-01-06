@@ -316,6 +316,7 @@ pub(crate) fn deinit() {
 /// Management of the global reference count
 /// and conditional hardware initialization/deinitialization.
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) struct RadioRefGuard;
 
 impl RadioRefGuard {
@@ -371,7 +372,7 @@ fn is_interrupts_disabled() -> bool {
         || hal::interrupt::current_runlevel() >= hal::interrupt::Priority::Priority1;
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Error which can be returned during radio initialization.
 #[non_exhaustive]

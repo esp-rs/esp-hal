@@ -5,7 +5,8 @@ use esp_hal::peripherals::IEEE802154;
 use super::{IEEE802154_FRAME_EXT_ADDR_SIZE, pib::CcaMode};
 
 #[allow(unused)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum Event {
     TxDone          = 1 << 0,
     RxDone          = 1 << 1,
@@ -52,7 +53,8 @@ impl BitOr<Event> for u16 {
 }
 
 #[allow(unused)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum TxAbortReason {
     RxAckStop       = 1,
     RxAckSfdTimeout = 2,
@@ -94,7 +96,8 @@ impl BitOr<TxAbortReason> for u32 {
 }
 
 #[allow(unused)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum RxAbortReason {
     RxStop              = 1,
     SfdTimeout          = 2,
@@ -137,14 +140,16 @@ impl BitOr<RxAbortReason> for u32 {
 }
 
 #[allow(unused)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum EdSampleMode {
     Max = 0,
     Avg = 1,
 }
 
 #[allow(unused)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum Command {
     TxStart     = 0x41,
     RxStart     = 0x42,
@@ -160,7 +165,8 @@ pub(crate) enum Command {
     Timer1Stop  = 0x4F,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum MultipanIndex {
     Multipan0 = 0,
     Multipan1 = 1,

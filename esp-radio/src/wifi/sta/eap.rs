@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// Configuration for EAP-FAST authentication protocol.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub struct EapFastConfig {
@@ -25,7 +25,7 @@ pub struct EapFastConfig {
 }
 
 /// Phase 2 authentication methods
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum TtlsPhase2Method {
@@ -43,7 +43,7 @@ pub enum TtlsPhase2Method {
 
 impl TtlsPhase2Method {
     /// Maps the phase 2 method to a raw `u32` representation.
-    pub(crate) fn to_raw(&self) -> u32 {
+    pub(crate) fn to_raw(self) -> u32 {
         match self {
             TtlsPhase2Method::Eap => {
                 crate::sys::include::esp_eap_ttls_phase2_types_ESP_EAP_TTLS_PHASE2_EAP
@@ -67,7 +67,7 @@ impl TtlsPhase2Method {
 type CertificateAndKey = (&'static [u8], &'static [u8], Option<&'static [u8]>);
 
 /// Configuration for an EAP (Extensible Authentication Protocol) station.
-#[derive(BuilderLite, Clone, PartialEq, Eq)]
+#[derive(BuilderLite, Clone, PartialEq, Eq, Hash)]
 #[instability::unstable]
 pub struct EapStationConfig {
     /// The SSID of the network the station is connecting to.

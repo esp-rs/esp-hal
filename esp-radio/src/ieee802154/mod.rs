@@ -39,6 +39,7 @@ mod raw;
 
 /// IEEE 802.15.4 errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     /// The requested data is bigger than available range, and/or the offset is
     /// invalid.
@@ -70,6 +71,7 @@ impl From<byte::Error> for Error {
 
 /// IEEE 802.15.4 driver configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
     pub auto_ack_tx: bool,
     pub auto_ack_rx: bool,
@@ -110,6 +112,7 @@ impl Default for Config {
 
 /// IEEE 802.15.4 driver
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Ieee802154<'a> {
     _align: u32,
     transmit_buffer: [u8; FRAME_SIZE],

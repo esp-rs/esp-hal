@@ -53,7 +53,8 @@ unsafe extern "C" {
     fn esp_coex_ieee802154_txrx_pti_set(event: ieee802154_coex_event_t); // from ???
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 enum Ieee802154State {
     Idle,
     Receive,
@@ -62,7 +63,8 @@ enum Ieee802154State {
 }
 
 #[allow(unused)]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 enum Ieee802154TxRxScene {
     Idle,
     Tx,
@@ -72,7 +74,8 @@ enum Ieee802154TxRxScene {
 }
 
 /// A raw payload received on some channel
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RawReceived {
     /// Payload
     pub data: [u8; FRAME_SIZE],

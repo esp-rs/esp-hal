@@ -272,8 +272,17 @@ macro_rules! unwrap {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct NoneError;
+
+impl Display for NoneError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "NoneError")
+    }
+}
+
+impl core::error::Error for NoneError {}
 
 pub trait Try {
     type Ok;

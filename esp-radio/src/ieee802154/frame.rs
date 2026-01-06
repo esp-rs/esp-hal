@@ -24,8 +24,23 @@ pub struct Frame {
     pub footer: [u8; 2],
 }
 
+#[cfg(feature = "defmt")]
+impl defmt::Format for Frame {
+    fn format(&self, f: defmt::Formatter<'_>) {
+        defmt::write!(
+            f,
+            "Frame {{ header: {}, content: {}, payload: {:?}, footer: {:?} }}",
+            self.header,
+            self.content,
+            self.payload.as_slice(),
+            self.footer
+        );
+    }
+}
+
 /// IEEE 802.15.4 MAC frame which has been received
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ReceivedFrame {
     /// Frame
     pub frame: Frame,

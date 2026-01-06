@@ -17,7 +17,7 @@ use crate::{
     ble::{Config, InvalidConfigError, have_hci_read_data, read_hci, read_next, send_hci},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Error enum for BLE initialization failures.
 pub enum BleInitError {
@@ -27,6 +27,17 @@ pub enum BleInitError {
     /// Failure during the acquisition or initialization of the global radio hardware.
     RadioInit(InitializationError),
 }
+
+impl core::fmt::Display for BleInitError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            BleInitError::Config(e) => write!(f, "BLE configuration error: {e}"),
+            BleInitError::RadioInit(e) => write!(f, "Radio initialization error: {e}"),
+        }
+    }
+}
+
+impl core::error::Error for BleInitError {}
 
 // Implement the From trait for cleaner error mapping
 impl From<InvalidConfigError> for BleInitError {
@@ -112,7 +123,7 @@ impl<'d> BleConnector<'d> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Error type for the BLE connector.
 #[instability::unstable]

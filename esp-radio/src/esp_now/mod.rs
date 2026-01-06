@@ -81,7 +81,7 @@ macro_rules! check_error_expect {
 
 /// Internal errors that can occur with ESP-NOW.
 #[repr(u32)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum Error {
@@ -156,7 +156,7 @@ impl core::fmt::Display for Error {
 impl core::error::Error for Error {}
 
 /// Common errors that can occur while using ESP-NOW driver.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum EspNowError {
@@ -192,7 +192,7 @@ impl From<WifiError> for EspNowError {
 }
 
 /// Holds the count of peers in an ESP-NOW communication context.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub struct PeerCount {
@@ -205,6 +205,7 @@ pub struct PeerCount {
 
 /// ESP-NOW rate of specified interface.
 #[repr(u32)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum WifiPhyRate {
@@ -279,7 +280,7 @@ pub enum WifiPhyRate {
 }
 
 /// ESP-NOW peer information parameters.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub struct PeerInfo {
@@ -302,7 +303,7 @@ pub struct PeerInfo {
 }
 
 /// Information about a received packet.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub struct ReceiveInfo {
@@ -351,7 +352,7 @@ impl Debug for ReceivedData {
 }
 
 /// The interface to use for this peer
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum EspNowWifiInterface {
