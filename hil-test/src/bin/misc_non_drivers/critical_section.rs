@@ -1,7 +1,7 @@
 #[embedded_test::tests(default_timeout = 3)]
 mod tests {
     use esp_hal::{
-        delay::Delay,
+        clock::CpuClock,
         interrupt::{
             InterruptHandler,
             Priority,
@@ -32,9 +32,36 @@ mod tests {
         loop {}
     }
 
+    fn software_interrupt_fires_before_returning(p: Peripherals) {
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+
+        extern "C" fn increment<const INT: u8>() {
+            unsafe { SoftwareInterrupt::<INT>::steal().reset() };
+            COUNTER.fetch_add(1, Ordering::AcqRel);
+        }
+
+        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+
+        let mut interrupt = sw_ints.software_interrupt0;
+        interrupt.set_interrupt_handler(InterruptHandler::new(increment::<0>, Priority::Priority1));
+
+        const ITERATIONS: u32 = 100;
+
+        for _ in 0..ITERATIONS {
+            interrupt.raise();
+            interrupt.raise();
+        }
+
+        hil_test::assert_eq!(COUNTER.load(Ordering::Relaxed), ITERATIONS * 2);
+    }
+
     #[init]
     fn init() -> Peripherals {
         esp_hal::init(esp_hal::Config::default())
+    }
+
+    fn init_max_cpu_speed() -> Peripherals {
+        esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()))
     }
 
     #[test]
@@ -95,31 +122,22 @@ mod tests {
 
         let lock = RawPriorityLimitedMutex::new(Priority::Priority1);
 
-        let delay = Delay::new();
-
         // Lock does nothing unless taken
 
         prio_1_interrupt.raise();
-        // Software interrupts may not trigger immediately and there may be some
-        // instructions executed after `raise`. We need to wait a short while
-        // to ensure that the interrupt has been serviced before reading the counter.
-        delay.delay_millis(1);
         assert_eq!(COUNTER.load(Ordering::Acquire), 1);
 
         // Taking the lock masks the lower priority interrupt
         lock.lock(|| {
             prio_1_interrupt.raise();
-            delay.delay_millis(1);
             assert_eq!(COUNTER.load(Ordering::Acquire), 1); // not incremented
 
             // Taken lock does not mask higher priority interrupts
             prio_2_interrupt.raise();
-            delay.delay_millis(1);
             assert_eq!(COUNTER.load(Ordering::Acquire), 2);
         });
 
         // Releasing the lock unmasks the lower priority interrupt
-        delay.delay_millis(1);
         assert_eq!(COUNTER.load(Ordering::Acquire), 3);
     }
 
@@ -150,17 +168,13 @@ mod tests {
 
         let lock = RawPriorityLimitedMutex::new(Priority::max());
 
-        let delay = Delay::new();
-
         // Taking the lock masks the lower priority interrupt
         lock.lock(|| {
             interrupt.raise();
-            delay.delay_millis(1);
             assert_eq!(COUNTER.load(Ordering::Acquire), 0); // not incremented
         });
 
         // Releasing the lock unmasks the lower priority interrupt
-        delay.delay_millis(1);
         assert_eq!(COUNTER.load(Ordering::Acquire), 1);
     }
 
@@ -211,5 +225,15 @@ mod tests {
             let data_ref = COUNTER.borrow(cs);
             assert_eq!(data_ref.get(), 3000);
         });
+    }
+
+    #[test]
+    fn software_interrupts_fire_immediately(p: Peripherals) {
+        software_interrupt_fires_before_returning(p);
+    }
+
+    #[test(init = init_max_cpu_speed)]
+    fn software_interrupts_fire_immediately_max_speed(p: Peripherals) {
+        software_interrupt_fires_before_returning(p);
     }
 }

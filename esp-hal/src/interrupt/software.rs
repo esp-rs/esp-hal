@@ -48,7 +48,11 @@
 
 use core::marker::PhantomData;
 
-use crate::interrupt::{InterruptConfigurable, InterruptHandler};
+use crate::{
+    interrupt::{self, InterruptConfigurable, InterruptHandler},
+    peripherals::Interrupt,
+    system::Cpu,
+};
 
 /// A software interrupt can be triggered by software.
 #[non_exhaustive]
@@ -85,59 +89,70 @@ impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
     /// Sets the interrupt handler for this software-interrupt
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        let interrupt = match NUM {
-            0 => crate::peripherals::Interrupt::FROM_CPU_INTR0,
-            1 => crate::peripherals::Interrupt::FROM_CPU_INTR1,
-            2 => crate::peripherals::Interrupt::FROM_CPU_INTR2,
-            3 => crate::peripherals::Interrupt::FROM_CPU_INTR3,
-            _ => unreachable!(),
-        };
+        let interrupt;
 
-        for core in crate::system::Cpu::other() {
-            crate::interrupt::disable(core, interrupt);
+        for_each_sw_interrupt! {
+            (all $( ($n:literal, $interrupt_name:ident, $f:ident) ),*) => {
+                interrupt = match NUM {
+                    $($n => Interrupt::$interrupt_name,)*
+                    _ => unreachable!(),
+                };
+            };
         }
-        unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
-        unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
+
+        for core in Cpu::other() {
+            interrupt::disable(core, interrupt);
+        }
+        unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
+        unwrap!(interrupt::enable(interrupt, handler.priority()));
     }
 
     /// Trigger this software-interrupt
     pub fn raise(&self) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c6, esp32h2))] {
-                let system = crate::peripherals::INTPRI::regs();
+                let regs = crate::peripherals::INTPRI::regs();
             } else {
-                let system = crate::peripherals::SYSTEM::regs();
+                let regs = crate::peripherals::SYSTEM::regs();
             }
         }
+        let reg;
 
-        let reg = match NUM {
-            0 => system.cpu_intr_from_cpu(0),
-            1 => system.cpu_intr_from_cpu(1),
-            2 => system.cpu_intr_from_cpu(2),
-            3 => system.cpu_intr_from_cpu(3),
-            _ => unreachable!(),
-        };
+        for_each_sw_interrupt! {
+            (all $( ($n:literal, $i:ident, $f:ident) ),*) => {
+                reg = match NUM {
+                    $($n => regs.cpu_intr_from_cpu($n),)*
+                    _ => unreachable!(),
+                };
+            };
+        }
 
         reg.write(|w| w.cpu_intr().set_bit());
+        _ = reg.read(); // Read back to ensure the write is completed.
+
+        // Insert enough delay to ensure the interrupt is fired before returning.
+        sw_interrupt_delay!();
     }
 
     /// Resets this software-interrupt
     pub fn reset(&self) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c6, esp32h2))] {
-                let system = crate::peripherals::INTPRI::regs();
+                let regs = crate::peripherals::INTPRI::regs();
             } else {
-                let system = crate::peripherals::SYSTEM::regs();
+                let regs = crate::peripherals::SYSTEM::regs();
             }
         }
+        let reg;
 
-        let reg = match NUM {
-            0 => system.cpu_intr_from_cpu(0),
-            1 => system.cpu_intr_from_cpu(1),
-            2 => system.cpu_intr_from_cpu(2),
-            3 => system.cpu_intr_from_cpu(3),
-            _ => unreachable!(),
-        };
+        for_each_sw_interrupt! {
+            (all $( ($n:literal, $i:ident, $f:ident) ),*) => {
+                reg = match NUM {
+                    $($n => regs.cpu_intr_from_cpu($n),)*
+                    _ => unreachable!(),
+                };
+            };
+        }
 
         reg.write(|w| w.cpu_intr().clear_bit());
     }
@@ -146,44 +161,36 @@ impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
 impl<const NUM: u8> crate::private::Sealed for SoftwareInterrupt<'_, NUM> {}
 
 impl<const NUM: u8> InterruptConfigurable for SoftwareInterrupt<'_, NUM> {
-    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+    fn set_interrupt_handler(&mut self, handler: interrupt::InterruptHandler) {
         SoftwareInterrupt::set_interrupt_handler(self, handler);
     }
 }
 
-/// This gives access to the available software interrupts.
-///
-/// This struct contains several instances of software interrupts that can be
-/// used for signaling between different parts of a program or system. Each
-/// interrupt is identified by an index (0 to 3).
-#[non_exhaustive]
-pub struct SoftwareInterruptControl<'d> {
-    /// Software interrupt 0.
-    pub software_interrupt0: SoftwareInterrupt<'d, 0>,
-    /// Software interrupt 1.
-    pub software_interrupt1: SoftwareInterrupt<'d, 1>,
-    /// Software interrupt 2.
-    pub software_interrupt2: SoftwareInterrupt<'d, 2>,
-    /// Software interrupt 3.
-    pub software_interrupt3: SoftwareInterrupt<'d, 3>,
-}
-
-impl<'d> SoftwareInterruptControl<'d> {
-    /// Create a new instance of the software interrupt control.
-    pub fn new(_peripheral: crate::peripherals::SW_INTERRUPT<'d>) -> Self {
-        SoftwareInterruptControl {
-            software_interrupt0: SoftwareInterrupt {
-                _lifetime: PhantomData,
-            },
-            software_interrupt1: SoftwareInterrupt {
-                _lifetime: PhantomData,
-            },
-            software_interrupt2: SoftwareInterrupt {
-                _lifetime: PhantomData,
-            },
-            software_interrupt3: SoftwareInterrupt {
-                _lifetime: PhantomData,
-            },
+for_each_sw_interrupt! {
+    (all $( ($n:literal, $i:ident, $field:ident) ),*) => {
+        /// This gives access to the available software interrupts.
+        ///
+        /// This struct contains several instances of software interrupts that can be
+        /// used for signaling between different parts of a program or system.
+        #[non_exhaustive]
+        pub struct SoftwareInterruptControl<'d> {
+            $(
+                #[doc = concat!("Software interrupt ", stringify!($n), ".")]
+                pub $field: SoftwareInterrupt<'d, $n>,
+            )*
         }
-    }
+
+        impl<'d> SoftwareInterruptControl<'d> {
+            /// Create a new instance of the software interrupt control.
+            pub fn new(_peripheral: crate::peripherals::SW_INTERRUPT<'d>) -> Self {
+                SoftwareInterruptControl {
+                    $(
+                        $field: SoftwareInterrupt {
+                            _lifetime: PhantomData,
+                        },
+                    )*
+                }
+            }
+        }
+    };
 }

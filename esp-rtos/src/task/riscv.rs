@@ -332,10 +332,4 @@ pub(crate) fn yield_task() {
         #[cfg(multi_core)]
         Cpu::AppCpu => unsafe { SoftwareInterrupt::<'static, 1>::steal() }.raise(),
     }
-
-    // It takes a bit for the software interrupt to be serviced.
-    esp_hal::riscv::asm::nop();
-    esp_hal::riscv::asm::nop();
-    esp_hal::riscv::asm::nop();
-    esp_hal::riscv::asm::nop();
 }
