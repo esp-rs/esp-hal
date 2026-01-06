@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UART: correct documentation of `read` which incorrectly stated that it would never block (#4586)
 - Fixed System Timer timestamp inaccuracy when using uncommon crystal frequencies (#4634)
 - `SystemTimer::ticks_per_second()` now correctly returns the number of ticks per second. (#4634)
+- The interrupt request set by `SoftwareInterrupt::raise()` should now take effect before returning. (#4706)
 
 ### Removed
 

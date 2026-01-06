@@ -362,6 +362,8 @@ bus_timeout_is_exponential = true
 [device.interrupts]
 support_status = "partial"
 status_registers = 2
+software_interrupt_count = 4
+software_interrupt_delay = 5
 
 [device.sha]
 support_status = "partial"

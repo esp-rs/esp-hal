@@ -174,19 +174,9 @@ pub(crate) fn yield_task() {
     }
 
     #[cfg(esp32)]
-    {
-        match Cpu::current() {
-            Cpu::ProCpu => unsafe { SoftwareInterrupt::<'static, 0>::steal() }.raise(),
-            Cpu::AppCpu => unsafe { SoftwareInterrupt::<'static, 1>::steal() }.raise(),
-        }
-
-        // It takes a bit for the software interrupt to be serviced.
-        unsafe {
-            core::arch::asm!("nop");
-            core::arch::asm!("nop");
-            core::arch::asm!("nop");
-            core::arch::asm!("nop");
-        }
+    match Cpu::current() {
+        Cpu::ProCpu => unsafe { SoftwareInterrupt::<'static, 0>::steal() }.raise(),
+        Cpu::AppCpu => unsafe { SoftwareInterrupt::<'static, 1>::steal() }.raise(),
     }
 }
 
