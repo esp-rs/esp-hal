@@ -750,6 +750,7 @@ fn m_mem(sha: &crate::peripherals::SHA<'_>, index: usize) -> *mut u32 {
     }
 }
 
+#[derive(Clone)]
 struct ShaOperation {
     operation: ShaOperationKind,
     // Buffer containing pieced-together message bytes, not necessarily a complete block. Not a fat
@@ -1095,6 +1096,7 @@ enum SoftwareHasher {
 }
 
 // Common implementation, to be hidden behind algo-dependent contexts.
+#[cfg_attr(not(esp32), derive(Clone))]
 struct ShaContext<const CHUNK_BYTES: usize, const DIGEST_WORDS: usize> {
     frontend: WorkQueueFrontend<ShaOperation>,
     buffer: [u8; CHUNK_BYTES],
@@ -1312,6 +1314,7 @@ pub enum FinalizeError {
 macro_rules! impl_worker_context {
     ($name:ident, $full_name:literal, $algo:expr, $digest_len:literal ) => {
         #[doc = concat!("A ", $full_name, " context.")]
+        #[cfg_attr(not(esp32), derive(Clone))]
         pub struct $name(ShaContext<{ $algo.chunk_length() }, { $algo.digest_length() / 4 }>);
 
         impl $name {
