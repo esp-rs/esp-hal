@@ -177,11 +177,7 @@ pub enum SecondaryChannel {
     Below,
 }
 
-trait SecondaryChannelExt {
-    fn from_raw(raw: u32) -> Self;
-}
-
-impl SecondaryChannelExt for SecondaryChannel {
+impl SecondaryChannel {
     fn from_raw(raw: u32) -> Self {
         match raw {
             0 => SecondaryChannel::None,
@@ -295,13 +291,8 @@ impl ModeConfig {
     }
 }
 
-trait AuthMethodExt {
-    fn to_raw(&self) -> wifi_auth_mode_t;
-    fn from_raw(raw: wifi_auth_mode_t) -> Self;
-}
-
-impl AuthMethodExt for AuthMethod {
-    fn to_raw(&self) -> wifi_auth_mode_t {
+impl AuthMethod {
+    fn to_raw(self) -> wifi_auth_mode_t {
         match self {
             AuthMethod::None => include::wifi_auth_mode_t_WIFI_AUTH_OPEN,
             AuthMethod::Wep => include::wifi_auth_mode_t_WIFI_AUTH_WEP,

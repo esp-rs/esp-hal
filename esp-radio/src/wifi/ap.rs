@@ -6,8 +6,8 @@ use core::fmt;
 use enumset::EnumSet;
 use procmacros::BuilderLite;
 
-use super::{AuthMethod, AuthMethodExt as _, Country, Protocol, SecondaryChannel};
-use crate::{WifiError, sys::include::wifi_ap_record_t, wifi::SecondaryChannelExt};
+use super::{AuthMethod, Country, Protocol, SecondaryChannel};
+use crate::{WifiError, sys::include::wifi_ap_record_t};
 
 /// Information about a detected Wi-Fi access point.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
