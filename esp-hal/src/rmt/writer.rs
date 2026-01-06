@@ -1,7 +1,188 @@
+use core::{marker::PhantomData, ops::ControlFlow, ptr::NonNull};
+
 #[cfg(place_rmt_driver_in_ram)]
 use procmacros::ram;
 
 use super::{DynChannelAccess, Error, PulseCode, Tx};
+
+/// Access to a free slot in an RMT channel hardware buffer.
+///
+/// An `RmtSlot` indicates a guarantee that there's a free slot in memory
+/// that can immediately be written to. If this slot isn't used, the
+/// next call to `RmtWriter.next` will use the same slot again (i.e.
+/// there will be no garbage data due to skipping unused slots).
+///
+/// See [`Encoder::encode`] and [`RmtWriter::next`] for more details.
+#[derive(Debug)]
+pub struct RmtSlot<'a> {
+    writer: &'a mut RmtWriter,
+}
+
+impl<'a> RmtSlot<'a> {
+    /// Append a `PulseCode` to the RMT hardware buffer.
+    #[inline(always)]
+    pub fn write(self, code: PulseCode) {
+        let writer = self.writer;
+
+        debug_assert!(writer.ptr < writer.end);
+
+        unsafe { writer.ptr.write_volatile(code) }
+
+        writer.ptr = unsafe { writer.ptr.add(1) };
+        writer.last_code = code;
+    }
+}
+
+/// Provides methods to fill (part of) the RMT channel hardware buffer.
+///
+/// An `RmtWriter` is provided to [`Encoder::encode`], see there for more details.
+pub struct RmtWriter {
+    // Most recently written PulseCode
+    last_code: PulseCode,
+    // Current write pointer
+    ptr: *mut PulseCode,
+    // Start of the slice to be written
+    start: *mut PulseCode,
+    // End of the slice to be written
+    end: *mut PulseCode,
+}
+
+// Given a pointer to RMT RAM, return the channel it belongs to
+fn get_ch(ptr: *mut PulseCode) -> i32 {
+    let diff = unsafe { ptr.offset_from(property!("rmt.ram_start") as *mut PulseCode) };
+    (diff / property!("rmt.channel_ram_size")) as i32
+}
+
+// Given a pointer to RMT RAM, return the offset relative to start of the channel's RAM
+fn get_offset(ptr: *mut PulseCode) -> i32 {
+    let diff = unsafe { ptr.offset_from(property!("rmt.ram_start") as *mut PulseCode) };
+    (diff % property!("rmt.channel_ram_size")) as i32
+}
+
+impl core::fmt::Debug for RmtWriter {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "RmtWriter {{ last_code: {:?}, ptr: CH{} + {:#x}, start: CH{} + {:#x}, end: CH{} + {:#x} }}",
+            self.last_code,
+            get_ch(self.ptr),
+            get_offset(self.ptr),
+            get_ch(self.start),
+            get_offset(self.start),
+            get_ch(self.end),
+            get_offset(self.end),
+        )
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for RmtWriter {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        defmt::write!(
+            fmt,
+            "RmtWriter {{ last_code: {:?}, ptr: CH{} + {:#x}, start: CH{} + {:#x}, end: CH{} + {:#x} }}",
+            self.last_code,
+            get_ch(self.ptr),
+            get_offset(self.ptr),
+            get_ch(self.start),
+            get_offset(self.start),
+            get_ch(self.end),
+            get_offset(self.end),
+        )
+    }
+}
+
+impl RmtWriter {
+    /// Try to obtain a slot in the channel's hardware buffer.
+    ///
+    /// Returns `None` if the buffer is full; in this case [`Encoder::encode`] must return.
+    #[inline(always)]
+    pub fn next<'s>(&'s mut self) -> Option<RmtSlot<'s>> {
+        if self.ptr >= self.end {
+            return None;
+        }
+
+        Some(RmtSlot { writer: self })
+    }
+
+    /// Write several pulse codes to the channel's hardware buffer.
+    ///
+    /// `f` will be called up to `count` times to obtain pulse codes. Returns the actual number of
+    /// codes written. If less than `count`, the buffer is full and [`Encoder::encode`] must
+    /// return.
+    ///
+    /// This explicitly supports `count = 0`, thus callers can avoid to check for that condition.
+    ///
+    /// This can lead to more efficient code compared to repeated use of [`RmtWriter::next`] when
+    /// the caller can provide an infallible function that yields `count` pulse codes.
+    #[inline(always)]
+    pub fn write_many<F>(&mut self, count: usize, mut f: F) -> usize
+    where
+        F: FnMut() -> PulseCode,
+    {
+        let count = count.min(unsafe { self.end.offset_from(self.ptr) } as usize);
+
+        let mut last_code = self.last_code;
+        let mut ptr = self.ptr;
+        let end = unsafe { self.ptr.add(count) };
+
+        while ptr < end {
+            last_code = f();
+            unsafe { ptr.write_volatile(last_code) };
+            ptr = unsafe { ptr.add(1) };
+        }
+
+        debug_assert!(self.ptr <= self.end);
+
+        self.ptr = ptr;
+        self.last_code = last_code;
+
+        count
+    }
+}
+
+/// A trait to convert arbitrary data to RMT [`PulseCode`]s.
+///
+/// Implementations need to provide the single `encode` method, which transmit methods will
+/// (potentially repeatedly) call to obtain pulse codes.
+pub trait Encoder {
+    /// (Re)Fill an RMT channel hardware buffer.
+    ///
+    /// Implementations can provide arbitrary conversions of data types, which will be performed
+    /// just before writing to the hardware, without intermediate buffering of `PulseCode`s.
+    /// This should mainly be used for low-cost operations (e.g. simple state machines and shift
+    /// out bits), since it needs to be fast enough to refill hardware buffers before transmission
+    /// exhausts them. If this cannot be guaranteed reliably, consider performing conversion to
+    /// `PulseCode`s upfront, before calling the channel's transmit methods.
+    ///
+    /// This function must write pulse codes via the `writer` until the latter indicates that the
+    /// buffer is full. Otherwise, the `writer` will consider the `Encoder` to be exhausted and not
+    /// call it again to check for more data. Upon exhaustion of the `Encoder` the last pulse code
+    /// written should contain an end marker. If the `Encoder` fails to provide one, the driver
+    /// will still ensure that transmission is never started or eventually stops, and return
+    /// `Error::EndMarkerMissing` from the transmit method. However, there are no further
+    /// guarantees: In particular, the current driver code might lead to truncated transmission in
+    /// this error case.
+    ///
+    /// In addition to writing less codes than the `writer` would allow for, implementations can
+    /// indicate that they have completed by returning `ControlFlow::Break`. This leads to a slight
+    /// optimization in case that the encoding ended just at the end of the hardware buffer, and
+    /// would otherwise only be detected when the subsequent call to `encode` would write zero
+    /// symbols.
+    ///
+    /// While this will presently not be called again after being exhausted, implementations must
+    /// not rely on this for safety or correctness. Rather, they should return without writing any
+    /// pulse codes in that case.
+    ///
+    /// For best performance, this should be inlined. It is likely that the compiler does so
+    /// automatically (since the driver has only a single, non-generic function that calls this
+    /// method). To be extra sure, consider marking your implementation of this method as
+    /// `#[inline(always)]`. This also applies when you're using the `PLACE_RMT_DRIVER_IN_RAM`
+    /// configuration: `encode` will be inlined in a driver-internal function, which in turn will
+    /// be placed in RAM. Annotating this method with `#[ram]` would prevent inlining and likely
+    /// impair performance.
+    fn encode(&mut self, writer: &mut RmtWriter) -> ControlFlow<()>;
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -36,7 +217,7 @@ impl WriterState {
 
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub(super) struct RmtWriter {
+pub(super) struct WriterContext {
     // The position in channel RAM to continue writing at; must be either
     // 0 or half the available RAM size if there's further data.
     // The position may be invalid if there's no data left.
@@ -49,7 +230,8 @@ pub(super) struct RmtWriter {
     state: WriterState,
 }
 
-impl RmtWriter {
+impl WriterContext {
+    #[inline]
     pub(super) fn new() -> Self {
         Self {
             offset: 0,
@@ -63,91 +245,379 @@ impl RmtWriter {
     pub(super) fn state(&self) -> WriterState {
         self.state
     }
+}
 
-    // Copy from `data` to the hardware buffer, advancing the `data` slice accordingly.
-    //
-    // If `initial` is set, fill the entire buffer. Otherwise, append half the buffer's length from
-    // `data`.
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+// This is a bespoke `&'a dyn mut EncoderExt`, which optimizes for the case of not owning the
+// `Encoder` and using only a single method, where
+//
+// pub(super) trait EncoderExt {
+//     fn write(&mut self, writer: &mut WriterContext, raw: DynChannelAccess<Tx>, initial: bool) {
+//         // ...
+//     }
+// }
+//
+// impl<E: Encoder> EncoderExt for E {}
+//
+// Thus, we only need the data pointer and a single function pointer, rather than the indirection
+// via a vtable (which will likely be in flash).
+pub(super) struct EncoderRef<'a> {
+    // Pointer to the Encoder instance, and a PhantomData to hold onto its lifetime.
+    data: NonNull<()>,
+    _phantom: PhantomData<&'a mut ()>,
+
+    // Function pointer to encoder_write specialized for the type stored in data.
+    func: unsafe fn(NonNull<()>, &mut WriterContext, DynChannelAccess<Tx>, bool),
+}
+
+impl<'a> EncoderRef<'a> {
+    #[inline]
+    pub(super) fn new<E: Encoder>(enc: &'a mut E) -> Self {
+        Self {
+            data: NonNull::from(enc).cast(),
+            _phantom: PhantomData,
+            func: encoder_write::<E>,
+        }
+    }
+
+    // Safety: E must be the same this was built with
+    #[allow(unused)]
+    #[inline]
+    pub(super) unsafe fn reconstruct<E: Encoder>(self) -> &'a mut E {
+        unsafe { self.data.cast().as_mut() }
+    }
+
+    // Safety: The only way to construct this is via Self::new, which ensures that self.data and
+    // self.func correspond
+    #[inline]
     pub(super) fn write(
         &mut self,
-        data: &mut &[PulseCode],
+        writer: &mut WriterContext,
         raw: DynChannelAccess<Tx>,
         initial: bool,
     ) {
-        if self.state != WriterState::Active {
-            return;
+        // SAFETY: The caller holds a mutable reference of self, which in turn keeps the borrow
+        // taken in `new()` alive. Thus, we have exclusive access to the encoder.
+        unsafe { (self.func)(self.data, writer, raw, initial) }
+    }
+}
+
+// Copy from `data` to the hardware buffer, advancing the `data` slice accordingly.
+//
+// If `initial` is set, fill the entire buffer. Otherwise, append half the buffer's length from
+// `data`.
+#[cfg_attr(place_rmt_driver_in_ram, ram)]
+#[cfg_attr(not(place_rmt_driver_in_ram), inline(never))]
+unsafe fn encoder_write<'a, E: Encoder + 'a>(
+    encoder: NonNull<()>,
+    context: &mut WriterContext,
+    raw: DynChannelAccess<Tx>,
+    initial: bool,
+) {
+    let encoder: &'a mut E = unsafe { encoder.cast().as_mut() };
+
+    if context.state != WriterState::Active {
+        return;
+    }
+
+    debug_assert!(!initial || context.offset == 0);
+
+    let ram_start = raw.channel_ram_start();
+    let memsize = raw.memsize().codes();
+
+    let max_count = if initial { memsize } else { memsize / 2 };
+
+    let start = unsafe { ram_start.add(context.offset as usize) };
+    let mut writer = RmtWriter {
+        last_code: context.last_code,
+        ptr: start,
+        start,
+        end: unsafe { start.add(max_count) },
+    };
+
+    let done = encoder.encode(&mut writer);
+    context.last_code = writer.last_code;
+    context.written += unsafe { writer.ptr.offset_from(writer.start) } as usize;
+
+    debug_assert!(writer.ptr.addr() >= writer.start.addr());
+    debug_assert!(writer.ptr.addr() <= writer.end.addr());
+
+    // If the input data was not exhausted, update offset as
+    //
+    // | initial | offset      | max_count   | new offset  |
+    // | ------- + ----------- + ----------- + ----------- |
+    // | true    | 0           | memsize     | 0           |
+    // | false   | 0           | memsize / 2 | memsize / 2 |
+    // | false   | memsize / 2 | memsize / 2 | 0           |
+    //
+    // Otherwise, the new position is invalid but the new slice is empty and we won't use the
+    // offset again. In either case, the unsigned subtraction will not underflow.
+    context.offset = memsize as u16 - max_count as u16 - context.offset;
+
+    if writer.ptr < writer.end || done.is_break() {
+        context.state = if context.written == 0 {
+            // The encoder was empty
+            WriterState::Error(Error::InvalidArgument)
+        } else if writer.last_code.is_end_marker() {
+            // Do not check for end markers in the inner loop in Encoder::encode() since this
+            // would substantially increase the instruction count there. Instead, only check
+            // the last code to report on error.
+            WriterState::Done
+        } else {
+            // Write an extra end marker to prevent looping forever with wrapping tx.
+            if writer.ptr < writer.end {
+                unsafe { writer.ptr.write_volatile(PulseCode::end_marker()) };
+                WriterState::Error(Error::EndMarkerMissing)
+            } else {
+                // // The buffer is full, and we would need to wait for the next Event::Threshold
+                // // before writing an end marker. However, the data was invalid by missing an end
+                // // marker, and the only guarantee that we provide is that transmission will
+                // // eventually stop and return an error. Thus, to avoid the logic to implement
+                // // this, simply modify the last code that was written to
+                // // contain an end marker.
+                // unsafe {
+                //     writer
+                //         .ptr
+                //         .sub(1)
+                //         .write_volatile(writer.last_code.with_length2(0).unwrap())
+                // };
+
+                // The buffer is full, and we can't easily write an end marker. (Short of
+                // overwriting some other code, which might be ok since hitting this error case
+                // always indicates a bu in user code.)
+                // Thus, remain in Active state. On the next Event::Threshold, this function
+                // will be called again, with data already exhausted, and hit the other arm of
+                // this conditional.
+                WriterState::Active
+            }
+        };
+    }
+
+    debug_assert!(context.offset == 0 || context.offset as usize == memsize / 2);
+}
+
+/// An [`Encoder`] that simply copies a slice of `PulseCode`s to the hardware.
+#[derive(Clone, Debug)]
+pub struct CopyEncoder<'a> {
+    data: &'a [PulseCode],
+}
+
+impl<'a> CopyEncoder<'a> {
+    /// Create a new instance that transmits the provided `data`.
+    pub fn new(data: &'a [PulseCode]) -> Self {
+        Self { data }
+    }
+}
+
+impl<'a> Encoder for CopyEncoder<'a> {
+    #[inline(always)]
+    fn encode(&mut self, writer: &mut RmtWriter) -> ControlFlow<()> {
+        let len = self.data.len();
+        let mut ptr = self.data.as_ptr();
+        let end = unsafe { ptr.add(len) };
+
+        let written = writer.write_many(len, || {
+            // SAFETY: write_many() guarantees that this will be called at most
+            // `len` times, such the pointer will remain in-bounds.
+            // FIXME: Check whether we can use safe indexing here and the compiler is smart enough
+            // to optimize the bounds check.
+            let code = unsafe { ptr.read() };
+            ptr = unsafe { ptr.add(1) };
+            code
+        });
+
+        debug_assert!(ptr <= end);
+
+        self.data.split_off(..written).unwrap();
+
+        if self.data.is_empty() {
+            ControlFlow::Break(())
+        } else {
+            ControlFlow::Continue(())
         }
+    }
+}
 
-        debug_assert!(!initial || self.offset == 0);
+/// An [`Encoder`] that writes `PulseCode`s from an iterator to the hardware.
+#[derive(Clone, Debug)]
+pub struct IterEncoder<D>
+where
+    D: Iterator<Item = PulseCode>,
+{
+    data: D,
+}
 
-        let ram_start = raw.channel_ram_start();
-        let memsize = raw.memsize().codes();
-        let ram_end = unsafe { ram_start.add(memsize) };
+impl<D> IterEncoder<D>
+where
+    D: Iterator<Item = PulseCode>,
+{
+    /// Create a new instance that transmits the provided `data`.
+    pub fn new(data: impl IntoIterator<IntoIter = D>) -> Self {
+        Self {
+            data: data.into_iter(),
+        }
+    }
+}
 
-        let max_count = if initial { memsize } else { memsize / 2 };
-        let count = data.len().min(max_count);
-
-        let mut ram_ptr = unsafe { ram_start.add(self.offset as usize) };
-
-        let mut data_ptr = data.as_ptr();
-        let data_end = unsafe { data_ptr.add(count) };
-
-        let mut last_code = self.last_code;
-        while data_ptr < data_end {
-            // SAFETY: The iteration `count` is smaller than both `max_count` and `data.len()` such
-            // that incrementing both pointers cannot advance them beyond their allocation's end.
-            unsafe {
-                last_code = data_ptr.read();
-                ram_ptr.write_volatile(last_code);
-                ram_ptr = ram_ptr.add(1);
-                data_ptr = data_ptr.add(1);
+impl<D> Encoder for IterEncoder<D>
+where
+    D: Iterator<Item = PulseCode>,
+{
+    #[inline(always)]
+    fn encode(&mut self, writer: &mut RmtWriter) -> ControlFlow<()> {
+        while let Some(slot) = writer.next() {
+            if let Some(code) = self.data.next() {
+                slot.write(code);
+            } else {
+                return ControlFlow::Break(());
             }
         }
 
-        self.last_code = last_code;
-        self.written += count;
+        ControlFlow::Continue(())
+    }
+}
 
-        // If the input data was not exhausted, update offset as
-        //
-        // | initial | offset      | max_count   | new offset  |
-        // | ------- + ----------- + ----------- + ----------- |
-        // | true    | 0           | memsize     | 0           |
-        // | false   | 0           | memsize / 2 | memsize / 2 |
-        // | false   | memsize / 2 | memsize / 2 | 0           |
-        //
-        // Otherwise, the new position is invalid but the new slice is empty and we won't use the
-        // offset again. In either case, the unsigned subtraction will not underflow.
-        self.offset = memsize as u16 - max_count as u16 - self.offset;
+/// A trait implemented by bit orders [`MsbFirst`] and [`LsbFirst`].
+// Use marker types that implement this trait rather than a BitOrder enum such that
+// BytesEncoder::encode can be specialized depending on the bit order.
+pub trait BitOrder: crate::private::Sealed {
+    #[doc(hidden)]
+    fn shift(value: u8, shift: usize) -> u8;
 
-        // The panic can never trigger since count <= data.len()!
-        data.split_off(..count).unwrap();
-        if data.is_empty() {
-            self.state = if self.written == 0 {
-                // data was empty
-                WriterState::Error(Error::InvalidArgument)
-            } else if last_code.is_end_marker() {
-                // Do not check for end markers in the inner loop above since this would
-                // substantially increase the instruction count there. Instead, only check the last
-                // code to report on error.
-                WriterState::Done
-            } else {
-                // Write an extra end marker to prevent looping forever with wrapping tx.
-                if ram_ptr < ram_end {
-                    unsafe { ram_ptr.write_volatile(PulseCode::end_marker()) };
-                    WriterState::Error(Error::EndMarkerMissing)
-                } else {
-                    // The buffer is full, and we can't easily write an end marker. (Short of
-                    // overwriting some other code, which might be ok since hitting this error case
-                    // always indicates a bug in user code.)
-                    // Thus, remain in Active state. On the next Event::Threshold, this function
-                    // will be called again, with data already exhausted, and hit the other arm of
-                    // this conditional.
-                    WriterState::Active
-                }
-            };
+    #[doc(hidden)]
+    fn get_bit(value: u8, bit: usize) -> bool;
+}
+
+/// Marker for MSB-first transmission
+pub struct MsbFirst;
+
+/// Marker for LSB-first transmission
+pub struct LsbFirst;
+
+impl crate::private::Sealed for MsbFirst {}
+
+impl crate::private::Sealed for LsbFirst {}
+
+impl BitOrder for MsbFirst {
+    #[inline(always)]
+    fn shift(value: u8, shift: usize) -> u8 {
+        value << shift
+    }
+
+    #[inline(always)]
+    fn get_bit(value: u8, bit: usize) -> bool {
+        debug_assert!((bit as u32) < u8::BITS);
+        (value >> (7 - bit)) & 1 != 0
+    }
+}
+
+impl BitOrder for LsbFirst {
+    #[inline(always)]
+    fn shift(value: u8, shift: usize) -> u8 {
+        value >> shift
+    }
+
+    #[inline(always)]
+    fn get_bit(value: u8, bit: usize) -> bool {
+        debug_assert!((bit as u32) < u8::BITS);
+        (value >> bit) & 1 != 0
+    }
+}
+
+/// An [`Encoder`] that writes `PulseCode`s for each bit of the data to the hardware.
+#[derive(Clone, Copy, Debug)]
+pub struct BytesEncoder<'a, B>
+where
+    B: BitOrder,
+{
+    // remaining data
+    data: &'a [u8],
+
+    // number of bits left in the first item in the data
+    bits: u8,
+
+    // bit ordering when transmitting data
+    _bit_order: PhantomData<B>,
+
+    // the PulseCode for 0 bits
+    pulse_zero: PulseCode,
+
+    // the PulseCode for 1 bits
+    pulse_one: PulseCode,
+
+    // the final PulseCode
+    pulse_end: PulseCode,
+}
+
+impl<'a, B> BytesEncoder<'a, B>
+where
+    B: BitOrder,
+{
+    /// Create a new instance that transmits the provided `data`.
+    ///
+    /// For each 0 and 1 bit in `data`, `pulse_zero` and `pulse_one` will be sent, respectively.
+    /// After the data is exhausted, one copy of `pulse_end` will be sent. This should usually be
+    /// an end marker.
+    pub fn new(
+        data: &'a [u8],
+        bit_order: B,
+        pulse_one: PulseCode,
+        pulse_zero: PulseCode,
+        pulse_end: PulseCode,
+    ) -> Self {
+        let _ = bit_order;
+        Self {
+            data,
+            _bit_order: PhantomData,
+            bits: 8,
+            pulse_zero,
+            pulse_one,
+            pulse_end,
         }
+    }
+}
 
-        debug_assert!(self.offset == 0 || self.offset as usize == memsize / 2);
+impl<B> Encoder for BytesEncoder<'_, B>
+where
+    B: BitOrder,
+{
+    #[inline(always)]
+    fn encode(&mut self, writer: &mut RmtWriter) -> ControlFlow<()> {
+        let mut data = self.data;
+        let mut bits = self.bits as usize;
+
+        let result = 'outer: {
+            while let Some(&byte) = data.first() {
+                let mut byte = B::shift(byte, u8::BITS as usize - bits);
+
+                let written = writer.write_many(bits, || {
+                    // MSB first for now
+                    let bit = B::get_bit(byte, 0);
+                    byte = B::shift(byte, 1);
+                    core::hint::select_unpredictable(bit, self.pulse_one, self.pulse_zero)
+                });
+
+                bits -= written;
+
+                if bits > 0 {
+                    // buffer is full
+                    break 'outer ControlFlow::Continue(());
+                }
+
+                let _ = data.split_off_first().unwrap();
+                bits = 8;
+            }
+
+            if let Some(slot) = writer.next() {
+                slot.write(self.pulse_end);
+            } else {
+                break 'outer ControlFlow::Continue(());
+            }
+
+            ControlFlow::Break(())
+        };
+
+        self.data = data;
+        self.bits = bits as u8;
+        result
     }
 }

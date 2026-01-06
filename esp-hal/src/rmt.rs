@@ -49,6 +49,13 @@
 //! channels are indicated by n which is used as a placeholder for the channel
 //! number, and by m for RX channels.
 //!
+//! ## Encoders
+//!
+//! Conversion of the data to be sent to [`PulseCode`]s is handled by the [`Encoder`] trait.
+//! Conceptually, this trait is similar to `Iterator<Item = PulseCode>`, but the specific details
+//! of its methods enable generation of more performant code.
+//! `esp-hal` provides [`CopyEncoder`], [`IterEncoder`] and [`BytesEncoder`].
+//!
 //! ## Examples
 //!
 //! ### Initialization
@@ -83,7 +90,7 @@
 //! # {before_snippet}
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::gpio::Level;
-//! # use esp_hal::rmt::{PulseCode, Rmt, TxChannelConfig, TxChannelCreator};
+//! # use esp_hal::rmt::{CopyEncoder, PulseCode, Rmt, TxChannelConfig, TxChannelCreator};
 //!
 //! // Configure frequency based on chip type
 //! # {freq}
@@ -103,7 +110,8 @@
 //! data[data.len() - 1] = PulseCode::end_marker();
 //!
 //! loop {
-//!     let transaction = channel.transmit(&data)?;
+//!     let mut encoder = CopyEncoder::new(&data);
+//!     let transaction = channel.transmit(&mut encoder)?;
 //!     channel = transaction.wait()?;
 //!     delay.delay_millis(500);
 //! }
@@ -239,7 +247,18 @@ use crate::{
 mod reader;
 use reader::{ReaderState, RmtReader};
 mod writer;
-use writer::{RmtWriter, WriterState};
+pub use writer::{
+    BitOrder,
+    BytesEncoder,
+    CopyEncoder,
+    Encoder,
+    IterEncoder,
+    LsbFirst,
+    MsbFirst,
+    RmtSlot,
+    RmtWriter,
+};
+use writer::{EncoderRef, WriterContext, WriterState};
 
 /// A configuration error
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1429,7 +1448,6 @@ impl Drop for RxGuard {
 /// `.wait()` needs to be called before the entire buffer has been sent to avoid
 /// underruns.
 #[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
-#[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct TxTransaction<'ch, 'data> {
     // This must go first such that it is dropped before the channel (which might disable the
@@ -1438,10 +1456,20 @@ pub struct TxTransaction<'ch, 'data> {
 
     channel: Channel<'ch, Blocking, Tx>,
 
-    writer: RmtWriter,
+    writer: WriterContext,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    remaining_data: &'data [PulseCode],
+    data: EncoderRef<'data>,
+}
+
+impl core::fmt::Debug for TxTransaction<'_, '_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("TxTransaction")
+            .field("channel", &self.channel)
+            .field("writer", &self.writer)
+            // Skip self.data since we don't want to require it to impl Debug
+            .finish_non_exhaustive()
+    }
 }
 
 impl<'ch> TxTransaction<'ch, '_> {
@@ -1453,9 +1481,9 @@ impl<'ch> TxTransaction<'ch, '_> {
         if status == Some(Event::Threshold) {
             raw.clear_tx_interrupts(Event::Threshold);
 
-            // `RmtWriter::write()` is safe to call even if `poll_internal` is called repeatedly
+            // `WriterContext::write()` is safe to call even if `poll_internal` is called repeatedly
             // after the data is exhausted since it returns immediately if already done.
-            self.writer.write(&mut self.remaining_data, raw, false);
+            self.data.write(&mut self.writer, raw, false);
         }
 
         status
@@ -1694,16 +1722,25 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
     /// This returns a [`TxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    #[inline]
     pub fn transmit<'data>(
         self,
-        mut data: &'data [PulseCode],
+        data: &'data mut impl Encoder,
+    ) -> Result<TxTransaction<'ch, 'data>, (Error, Self)> {
+        let data = EncoderRef::new(data);
+        self.transmit_impl(data)
+    }
+
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    fn transmit_impl<'data>(
+        self,
+        mut data: EncoderRef<'data>,
     ) -> Result<TxTransaction<'ch, 'data>, (Error, Self)> {
         let raw = self.raw;
         let memsize = raw.memsize();
 
-        let mut writer = RmtWriter::new();
-        writer.write(&mut data, raw, true);
+        let mut writer = WriterContext::new();
+        data.write(&mut writer, raw, true);
 
         if let WriterState::Error(e) = writer.state() {
             return Err((e, self));
@@ -1715,7 +1752,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         Ok(TxTransaction {
             channel: self,
             writer,
-            remaining_data: data,
+            data,
             _guard: TxGuard::new(raw),
         })
     }
@@ -1732,10 +1769,20 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         doc = "When using a loop `mode` other than [`LoopMode::Infinite`], [`ContinuousTxTransaction::is_loopcount_interrupt_set`] can be used to check if the loop count is reached."
     )]
     /// The length of `data` cannot exceed the size of the allocated RMT RAM.
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    #[inline]
     pub fn transmit_continuously(
         self,
-        mut data: &[PulseCode],
+        data: &mut impl Encoder,
+        mode: LoopMode,
+    ) -> Result<ContinuousTxTransaction<'ch>, (Error, Self)> {
+        let data = EncoderRef::new(data);
+        self.transmit_continuously_impl(data, mode)
+    }
+
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    fn transmit_continuously_impl(
+        self,
+        mut data: EncoderRef<'_>,
         mode: LoopMode,
     ) -> Result<ContinuousTxTransaction<'ch>, (Error, Self)> {
         let raw = self.raw;
@@ -1746,8 +1793,8 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
             return Err((Error::InvalidArgument, self));
         }
 
-        let mut writer = RmtWriter::new();
-        writer.write(&mut data, raw, true);
+        let mut writer = WriterContext::new();
+        data.write(&mut writer, raw, true);
 
         match writer.state() {
             WriterState::Error(e) => return Err((e, self)),
@@ -1899,10 +1946,10 @@ static RMT_LOCK: RawMutex = RawMutex::new();
 struct TxFuture<'a> {
     raw: DynChannelAccess<Tx>,
     _phantom: PhantomData<Channel<'a, Async, Tx>>,
-    writer: RmtWriter,
+    writer: WriterContext,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    data: &'a [PulseCode],
+    data: EncoderRef<'a>,
 
     _guard: TxGuard,
 }
@@ -1927,7 +1974,7 @@ impl core::future::Future for TxFuture<'_> {
             Some(Event::Threshold) => {
                 raw.clear_tx_interrupts(Event::Threshold);
 
-                this.writer.write(&mut this.data, raw, false);
+                this.data.write(&mut this.writer, raw, false);
 
                 if this.writer.state() == WriterState::Active {
                     raw.listen_tx_interrupt(Event::Threshold);
@@ -1947,13 +1994,22 @@ impl core::future::Future for TxFuture<'_> {
 /// TX channel in async mode
 impl Channel<'_, Async, Tx> {
     /// Start transmitting the given pulse code sequence.
+    #[inline]
+    pub fn transmit(&mut self, data: &mut impl Encoder) -> impl Future<Output = Result<(), Error>> {
+        let data = EncoderRef::new(data);
+        self.transmit_impl(data)
+    }
+
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit(&mut self, mut data: &[PulseCode]) -> impl Future<Output = Result<(), Error>> {
+    fn transmit_impl(
+        &mut self,
+        mut data: EncoderRef<'_>,
+    ) -> impl Future<Output = Result<(), Error>> {
         let raw = self.raw;
         let memsize = raw.memsize();
 
-        let mut writer = RmtWriter::new();
-        writer.write(&mut data, raw, true);
+        let mut writer = WriterContext::new();
+        data.write(&mut writer, raw, true);
 
         let _guard = if writer.state().is_ok() {
             let wrap = match writer.state() {
