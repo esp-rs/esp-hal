@@ -1183,27 +1183,32 @@ impl WifiDevice<'_> {
 
 /// Wi-Fi bandwidth options.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(
+    clippy::enum_variant_names,
+    reason = "MHz suffix indicates physical unit."
+)]
 pub enum Bandwidth {
     /// 20 MHz bandwidth.
-    _20,
+    _20MHz,
     /// 40 MHz bandwidth.
-    _40,
+    _40MHz,
     /// 80 MHz bandwidth.
-    _80,
+    _80MHz,
     /// 160 MHz bandwidth.
-    _160,
+    _160MHz,
     /// 80+80 MHz bandwidth.
-    _80_80,
+    _80_80MHz,
 }
 
 impl From<u32> for Bandwidth {
     fn from(value: u32) -> Self {
         match value {
-            1 => Bandwidth::_20,
-            2 => Bandwidth::_40,
-            3 => Bandwidth::_80,
-            4 => Bandwidth::_160,
-            5 => Bandwidth::_80_80,
+            1 => Bandwidth::_20MHz,
+            2 => Bandwidth::_40MHz,
+            3 => Bandwidth::_80MHz,
+            4 => Bandwidth::_160MHz,
+            5 => Bandwidth::_80_80MHz,
             _ => panic!("Invalid bandwidth value: {}", value),
         }
     }
@@ -2328,7 +2333,11 @@ impl WifiController<'_> {
         Ok(())
     }
 
-    /// Set the bandwidth of specified interface.
+    /// Sets the Wi-Fi channel bandwidth for the currently active interface(s).
+    ///
+    /// If the device is operating in station mode, the bandwidth is applied to the
+    /// Station interface. If operating in access point mode, it is applied to the Access Point
+    /// interface. In Station+Access Point mode, the bandwidth is set for both interfaces.
     #[instability::unstable]
     pub fn set_bandwidth(&mut self, bandwidth: Bandwidth) -> Result<(), WifiError> {
         let mode = self.mode()?;
@@ -2346,8 +2355,13 @@ impl WifiController<'_> {
         Ok(())
     }
 
+    /// Returns the Wi-Fi channel bandwidth of the active interface.
+    ///
+    /// If the device is operating in station mode, the bandwidth of the Station
+    /// interface is returned. If operating in access point mode, the bandwidth
+    /// of the Access Point interface is returned. In Station+Access Point mode, the bandwidth of
+    /// the Access Point interface is returned.
     #[instability::unstable]
-    /// Get the bandwidth of specified interface.
     pub fn bandwidth(&self) -> Result<Bandwidth, WifiError> {
         let mut bw = 0;
 
@@ -2366,6 +2380,7 @@ impl WifiController<'_> {
         Ok(Bandwidth::from(bw))
     }
 
+    /// Returns the current Wi-Fi channel configuration.
     #[instability::unstable]
     pub fn channel(&self) -> Result<(u8, SecondaryChannel), WifiError> {
         let mut primary = 0;
@@ -2376,7 +2391,7 @@ impl WifiController<'_> {
         Ok((primary, SecondaryChannel::from(secondary)))
     }
 
-    /// Set primary/secondary channel of device.
+    /// Sets the primary and secondary Wi-Fi channel.
     #[instability::unstable]
     pub fn set_channel(
         &mut self,
