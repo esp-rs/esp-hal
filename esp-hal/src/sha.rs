@@ -920,8 +920,8 @@ impl<'d> ShaBackend<'d> {
         }
     }
 
+    #[cfg(not(esp32))]
     fn restore_state(driver: &mut Sha<'_>, item: &ShaOperation) {
-        #[cfg(not(esp32))]
         driver
             .sha
             .register_block()
@@ -930,7 +930,6 @@ impl<'d> ShaBackend<'d> {
 
         // Restore previously saved hash. Don't bother on first_run, the start operation will
         // use a hard-coded initial hash.
-        #[cfg(not(esp32))]
         if !item.state.first_run {
             for (i, reg) in driver.sha.register_block().h_mem_iter().enumerate() {
                 reg.write(|w| unsafe { w.bits(item.hw_state.as_ref()[i]) });
@@ -952,6 +951,7 @@ impl<'d> ShaBackend<'d> {
                 message_bytes_processed: 0,
             };
 
+            #[cfg(not(esp32))]
             Self::restore_state(driver, item);
 
             let buffered = unsafe {
@@ -1042,6 +1042,7 @@ impl<'d> ShaBackend<'d> {
             // written the buffered data. `process_finalize` ignores `message_bytes_processed`.
             self.processing_state.message_partially_processed = true;
 
+            #[cfg(not(esp32))]
             Self::restore_state(driver, item);
 
             let buffered = unsafe { item.message.as_ref() };
