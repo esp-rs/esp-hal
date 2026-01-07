@@ -51,6 +51,7 @@ use crate::{
         interconnect::{PeripheralOutput, PeripheralSignal},
     },
     peripherals::GPIO_DEDICATED,
+    private::Sealed,
     system::Cpu,
 };
 
@@ -104,7 +105,7 @@ impl DedicatedGpio<'_> {
 // channels for inputs/outputs instead of 8+8.
 
 /// Marker trait for dedicated GPIO input channels.
-pub trait InputChannel {
+pub trait InputChannel: Sealed {
     #[doc(hidden)]
     const CH: u8;
 
@@ -134,7 +135,7 @@ pub trait InputChannel {
 }
 
 /// Marker trait for dedicated GPIO output channels.
-pub trait OutputChannel {
+pub trait OutputChannel: Sealed {
     #[doc(hidden)]
     const CH: u8;
 
@@ -170,7 +171,7 @@ pub trait OutputChannel {
 // We can't use the interconnect traits, because we want them to be implemented for references, too.
 
 /// Marker trait for GPIO input drivers.
-pub trait InputDriver {
+pub trait InputDriver: Sealed {
     #[doc(hidden)]
     fn pin(&self) -> u8;
 
@@ -224,7 +225,7 @@ impl InputDriver for &mut super::Flex<'_> {
 }
 
 /// Marker trait for GPIO output drivers.
-pub trait OutputDriver {
+pub trait OutputDriver: Sealed {
     #[doc(hidden)]
     fn pin(&self) -> u8;
 
@@ -287,6 +288,9 @@ pub struct DedicatedGpioChannel<'lt, const CH: u8> {
     pub output: DedicatedGpioOutputChannel<'lt, CH>,
 }
 
+impl<const CH: u8> Sealed for DedicatedGpioChannel<'_, CH> {}
+impl<const CH: u8> Sealed for &mut DedicatedGpioChannel<'_, CH> {}
+
 impl<const CH: u8> DedicatedGpioChannel<'_, CH> {
     /// Conjures a new dedicated GPIO channel out of thin air.
     ///
@@ -325,6 +329,9 @@ pub struct DedicatedGpioInputChannel<'lt, const CH: u8> {
     _marker: PhantomData<&'lt mut ()>,
 }
 
+impl<const CH: u8> Sealed for DedicatedGpioInputChannel<'_, CH> {}
+impl<const CH: u8> Sealed for &mut DedicatedGpioInputChannel<'_, CH> {}
+
 impl<const CH: u8> DedicatedGpioInputChannel<'_, CH> {
     /// Conjures a new dedicated GPIO input channel out of thin air.
     ///
@@ -351,6 +358,9 @@ impl<const CH: u8> InputChannel for &mut DedicatedGpioInputChannel<'_, CH> {
 pub struct DedicatedGpioOutputChannel<'lt, const CH: u8> {
     _marker: PhantomData<&'lt mut ()>,
 }
+
+impl<const CH: u8> Sealed for DedicatedGpioOutputChannel<'_, CH> {}
+impl<const CH: u8> Sealed for &mut DedicatedGpioOutputChannel<'_, CH> {}
 
 impl<const CH: u8> DedicatedGpioOutputChannel<'_, CH> {
     /// Conjures a new dedicated GPIO output channel out of thin air.
