@@ -231,6 +231,7 @@ impl Display for RegionStats {
 }
 
 #[cfg(feature = "defmt")]
+#[allow(clippy::if_same_then_else)]
 impl defmt::Format for RegionStats {
     fn format(&self, fmt: defmt::Formatter<'_>) {
         let usage_percent = self.used * 100 / self.size;
