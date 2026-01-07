@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ScanTypeConfig` now uses `esp_hal::time::Duration` instead of `core::time::Duration` (#4609)
 - The `CsiConfig` struct has been moved to the `wifi::csi` module (#4588)
 - The `ScanMethod`, `ScanTypeConfig`, and `ScanConfig` types have been moved to `wifi::scan` (#4588)
+- `esp-alloc` dependency no longer enables default features (#4721)
 
 ### Fixed
 
