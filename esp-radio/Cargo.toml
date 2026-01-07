@@ -11,7 +11,7 @@ repository = "https://github.com/esp-rs/esp-hal"
 license = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
-doc-config = { features = ["esp-hal/unstable", "esp-hal/rt", "defmt"], append = [
+doc-config = { features = ["esp-hal/unstable", "esp-hal/rt", "esp-alloc/global-allocator", "defmt"], append = [
     { if = 'chip_has("wifi")', features = ["wifi", "wifi-eap", "csi", "esp-now", "sniffer", "smoltcp/proto-ipv4", "smoltcp/proto-ipv6"] },
     { if = 'chip_has("bt")', features = ["ble"] },
     { if = 'chip_has("ieee802154")', features = ["ieee802154", "__docs_build"] },
@@ -53,7 +53,7 @@ instability = "0.3.9"
 # Unstable dependencies that are not (strictly) part of the public API
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
 document-features  = "0.2"
-esp-alloc = { version = "0.9.0", path = "../esp-alloc", optional = true }
+esp-alloc = { version = "0.9.0", path = "../esp-alloc", optional = true, default-features = false }
 esp-config = { version = "0.6.1", path = "../esp-config" }
 esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated" }
 esp-sync = { version = "0.1.1", path = "../esp-sync" }
