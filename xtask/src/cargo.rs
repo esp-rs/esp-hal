@@ -373,6 +373,9 @@ impl CargoCommandBatcher {
             // Windows be Windows, it has a command length limit.
             let limit = if cfg!(target_os = "windows") {
                 Some(8191)
+            } else if std::env::var("CI").is_ok() {
+                // FIXME: Temporarily limit batch size on CI to try to avoid segmentation faults.
+                Some(1200)
             } else {
                 None
             };
