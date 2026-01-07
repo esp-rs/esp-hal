@@ -920,6 +920,23 @@ impl<'d> ShaBackend<'d> {
         }
     }
 
+    #[cfg(not(esp32))]
+    fn restore_state(driver: &mut Sha<'_>, item: &ShaOperation) {
+        driver
+            .sha
+            .register_block()
+            .mode()
+            .write(|w| unsafe { w.mode().bits(item.state.algorithm.mode_bits()) });
+
+        // Restore previously saved hash. Don't bother on first_run, the start operation will
+        // use a hard-coded initial hash.
+        if !item.state.first_run {
+            for (i, reg) in driver.sha.register_block().h_mem_iter().enumerate() {
+                reg.write(|w| unsafe { w.bits(item.hw_state.as_ref()[i]) });
+            }
+        }
+    }
+
     fn process_update(&mut self, item: &mut ShaOperation) -> Poll {
         let driver = if let DriverState::Initialized(sha) = &mut self.driver {
             sha
@@ -935,28 +952,20 @@ impl<'d> ShaBackend<'d> {
             };
 
             #[cfg(not(esp32))]
-            driver
-                .sha
-                .register_block()
-                .mode()
-                .write(|w| unsafe { w.mode().bits(item.state.algorithm.mode_bits()) });
+            Self::restore_state(driver, item);
 
-            // Restore previously saved hash. Don't bother on first_run, the start operation will
-            // use a hard-coded initial hash.
-            #[cfg(not(esp32))]
-            if !item.state.first_run {
-                for (i, reg) in driver.sha.register_block().h_mem_iter().enumerate() {
-                    reg.write(|w| unsafe { w.bits(item.hw_state.as_ref()[i]) });
-                }
-            }
-
-            // Write the buffered bytes. This is less than a block, and we don't count these bytes
-            // in the message.
+            let buffered = unsafe {
+                core::slice::from_raw_parts(item.buffer.as_ptr(), item.buffered_bytes as usize)
+            };
+            debug!(
+                "update: restored state with {} buffered bytes",
+                buffered.len()
+            );
 
             // This is never supposed to block or even start processing, we're writing an incomplete
             // block into idle hardware.
-            let buffered = NonNull::slice_from_raw_parts(item.buffer, item.buffered_bytes as usize);
-            nb::block!(driver.write_data(&mut item.state, unsafe { buffered.as_ref() })).unwrap();
+            debug_assert!(buffered.len() < item.state.algorithm.chunk_length());
+            nb::block!(driver.write_data(&mut item.state, buffered)).unwrap();
         }
 
         let remaining_message =
@@ -1000,15 +1009,22 @@ impl<'d> ShaBackend<'d> {
 
         // We can only process complete blocks before finalization. Write back the unprocessed bytes
         // to the item's buffer.
-        unsafe {
-            // Safety: the frontend ensures that the buffer is large enough to hold the remaining
-            // message.
-            core::ptr::copy_nonoverlapping(
-                remaining_message.as_ptr(),
-                item.buffer.as_ptr(),
-                remaining_message.len(),
+        if !remaining_message.is_empty() {
+            debug!(
+                "Writing back {} unprocessed bytes to buffer",
+                remaining_message.len()
             );
+            unsafe {
+                // Safety: the frontend ensures that the buffer is large enough to hold the
+                // remaining message.
+                core::ptr::copy_nonoverlapping(
+                    remaining_message.as_ptr(),
+                    item.buffer.as_ptr(),
+                    remaining_message.len(),
+                );
+            }
         }
+        item.buffered_bytes = remaining_message.len() as u8;
         self.processing_state.message_partially_processed = false;
 
         Poll::Ready(Status::Completed)
@@ -1023,29 +1039,23 @@ impl<'d> ShaBackend<'d> {
 
         if !self.processing_state.message_partially_processed {
             // We don't need to track the byte count here, just that we've restored the hash and
-            // written the buffered data.
+            // written the buffered data. `process_finalize` ignores `message_bytes_processed`.
             self.processing_state.message_partially_processed = true;
 
             #[cfg(not(esp32))]
-            driver
-                .sha
-                .register_block()
-                .mode()
-                .write(|w| unsafe { w.mode().bits(item.state.algorithm.mode_bits()) });
+            Self::restore_state(driver, item);
 
-            // Restore previously saved hash. Don't bother on first_run, the start operation will
-            // use a hard-coded initial hash.
-            #[cfg(not(esp32))]
-            if !item.state.first_run {
-                for (i, reg) in driver.sha.register_block().h_mem_iter().enumerate() {
-                    reg.write(|w| unsafe { w.bits(item.hw_state.as_ref()[i]) });
-                }
-            }
+            let buffered = unsafe { item.message.as_ref() };
+            debug!(
+                "finalize: restored state with {} buffered bytes",
+                buffered.len()
+            );
 
             // This is never supposed to block or even start processing, we're writing an incomplete
             // block into idle hardware.
-            nb::block!(driver.write_data(&mut item.state, unsafe { item.message.as_ref() }))
-                .unwrap();
+            debug_assert!(buffered.len() < item.state.algorithm.chunk_length());
+
+            nb::block!(driver.write_data(&mut item.state, buffered)).unwrap();
         }
 
         // Safety: caller must ensure that result buffer is large enough.
@@ -1157,6 +1167,11 @@ impl<const CHUNK_BYTES: usize, const DIGEST_WORDS: usize> ShaContext<CHUNK_BYTES
     }
 
     fn update<'t>(&'t mut self, data: &'t [u8]) -> ShaHandle<'t> {
+        debug!(
+            "Update {:?} with {} bytes",
+            self.frontend.data_mut().state.algorithm,
+            data.len()
+        );
         #[cfg(esp32)]
         if let Some(hasher) = self.use_software.as_mut() {
             Self::update_using_software(hasher, data);
@@ -1203,6 +1218,11 @@ impl<const CHUNK_BYTES: usize, const DIGEST_WORDS: usize> ShaContext<CHUNK_BYTES
     }
 
     fn finalize<'t>(&'t mut self, result: &mut [u8]) -> ShaHandle<'t> {
+        debug!(
+            "Finalize {:?} into buffer of {} bytes",
+            self.frontend.data_mut().state.algorithm,
+            result.len()
+        );
         #[cfg(esp32)]
         if let Some(hasher) = self.use_software.as_mut() {
             Self::finalize_using_software(hasher, result);
