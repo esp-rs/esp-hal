@@ -1391,7 +1391,8 @@ mod sha_tests {
             (&[u8], &mut [u8]),
         ),
     ) {
-        const BUFFER_LEN: usize = 256;
+        // Make sure this is not a multiple of the block size
+        const BUFFER_LEN: usize = 264;
 
         let mut sha1_random = [0u8; BUFFER_LEN];
         let mut sha224_random = [0u8; BUFFER_LEN];
@@ -1411,7 +1412,7 @@ mod sha_tests {
         #[cfg(any(esp32, esp32s2, esp32s3))]
         rng.read(&mut sha512_random);
 
-        for size in [1, 64, 128, 256] {
+        for size in [1, 64, 128, 256, BUFFER_LEN] {
             let mut sha1_output = [0u8; 20];
             let mut sha224_output = [0u8; 28];
             let mut sha256_output = [0u8; 32];
