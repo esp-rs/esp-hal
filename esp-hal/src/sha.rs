@@ -920,6 +920,24 @@ impl<'d> ShaBackend<'d> {
         }
     }
 
+    fn restore_state(driver: &mut Sha<'_>, item: &ShaOperation) {
+        #[cfg(not(esp32))]
+        driver
+            .sha
+            .register_block()
+            .mode()
+            .write(|w| unsafe { w.mode().bits(item.state.algorithm.mode_bits()) });
+
+        // Restore previously saved hash. Don't bother on first_run, the start operation will
+        // use a hard-coded initial hash.
+        #[cfg(not(esp32))]
+        if !item.state.first_run {
+            for (i, reg) in driver.sha.register_block().h_mem_iter().enumerate() {
+                reg.write(|w| unsafe { w.bits(item.hw_state.as_ref()[i]) });
+            }
+        }
+    }
+
     fn process_update(&mut self, item: &mut ShaOperation) -> Poll {
         let driver = if let DriverState::Initialized(sha) = &mut self.driver {
             sha
@@ -934,29 +952,16 @@ impl<'d> ShaBackend<'d> {
                 message_bytes_processed: 0,
             };
 
-            #[cfg(not(esp32))]
-            driver
-                .sha
-                .register_block()
-                .mode()
-                .write(|w| unsafe { w.mode().bits(item.state.algorithm.mode_bits()) });
+            Self::restore_state(driver, item);
 
-            // Restore previously saved hash. Don't bother on first_run, the start operation will
-            // use a hard-coded initial hash.
-            #[cfg(not(esp32))]
-            if !item.state.first_run {
-                for (i, reg) in driver.sha.register_block().h_mem_iter().enumerate() {
-                    reg.write(|w| unsafe { w.bits(item.hw_state.as_ref()[i]) });
-                }
-            }
-
-            // Write the buffered bytes. This is less than a block, and we don't count these bytes
-            // in the message.
+            let buffered = unsafe {
+                core::slice::from_raw_parts(item.buffer.as_ptr(), item.buffered_bytes as usize)
+            };
 
             // This is never supposed to block or even start processing, we're writing an incomplete
             // block into idle hardware.
-            let buffered = NonNull::slice_from_raw_parts(item.buffer, item.buffered_bytes as usize);
-            nb::block!(driver.write_data(&mut item.state, unsafe { buffered.as_ref() })).unwrap();
+            debug_assert!(buffered.len() < item.state.algorithm.chunk_length());
+            nb::block!(driver.write_data(&mut item.state, buffered)).unwrap();
         }
 
         let remaining_message =
@@ -1023,29 +1028,18 @@ impl<'d> ShaBackend<'d> {
 
         if !self.processing_state.message_partially_processed {
             // We don't need to track the byte count here, just that we've restored the hash and
-            // written the buffered data.
+            // written the buffered data. `process_finalize` ignores `message_bytes_processed`.
             self.processing_state.message_partially_processed = true;
 
-            #[cfg(not(esp32))]
-            driver
-                .sha
-                .register_block()
-                .mode()
-                .write(|w| unsafe { w.mode().bits(item.state.algorithm.mode_bits()) });
+            Self::restore_state(driver, item);
 
-            // Restore previously saved hash. Don't bother on first_run, the start operation will
-            // use a hard-coded initial hash.
-            #[cfg(not(esp32))]
-            if !item.state.first_run {
-                for (i, reg) in driver.sha.register_block().h_mem_iter().enumerate() {
-                    reg.write(|w| unsafe { w.bits(item.hw_state.as_ref()[i]) });
-                }
-            }
+            let buffered = unsafe { item.message.as_ref() };
 
             // This is never supposed to block or even start processing, we're writing an incomplete
             // block into idle hardware.
-            nb::block!(driver.write_data(&mut item.state, unsafe { item.message.as_ref() }))
-                .unwrap();
+            debug_assert!(buffered.len() < item.state.algorithm.chunk_length());
+
+            nb::block!(driver.write_data(&mut item.state, buffered)).unwrap();
         }
 
         // Safety: caller must ensure that result buffer is large enough.
