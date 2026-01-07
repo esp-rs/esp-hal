@@ -311,7 +311,6 @@ impl Chip {
                     "soc_has_clock_node_timg1_calibration_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
-                    "soc_has_multiple_xtal_options",
                     "aes_endianness_configurable",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"2\"",
@@ -502,7 +501,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_calibration_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
-                    "cargo:rustc-cfg=soc_has_multiple_xtal_options",
                     "cargo:rustc-cfg=aes_endianness_configurable",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"2\"",
@@ -669,7 +667,6 @@ impl Chip {
                     "soc_has_clock_node_timg0_wdt_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
-                    "soc_has_multiple_xtal_options",
                     "assist_debug_has_sp_monitor",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"31\"",
@@ -812,7 +809,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_wdt_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
-                    "cargo:rustc-cfg=soc_has_multiple_xtal_options",
                     "cargo:rustc-cfg=assist_debug_has_sp_monitor",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"31\"",
@@ -991,7 +987,6 @@ impl Chip {
                     "soc_has_clock_node_timg1_wdt_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
-                    "soc_xtal_frequency=\"40\"",
                     "aes_dma",
                     "aes_dma_mode_ecb",
                     "aes_dma_mode_cbc",
@@ -1175,7 +1170,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_wdt_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
-                    "cargo:rustc-cfg=soc_xtal_frequency=\"40\"",
                     "cargo:rustc-cfg=aes_dma",
                     "cargo:rustc-cfg=aes_dma_mode_ecb",
                     "cargo:rustc-cfg=aes_dma_mode_cbc",
@@ -1439,7 +1433,6 @@ impl Chip {
                     "soc_has_clock_node_timg1_wdt_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
-                    "soc_xtal_frequency=\"40\"",
                     "aes_dma",
                     "aes_dma_mode_ecb",
                     "aes_dma_mode_cbc",
@@ -1688,7 +1681,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_wdt_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
-                    "cargo:rustc-cfg=soc_xtal_frequency=\"40\"",
                     "cargo:rustc-cfg=aes_dma",
                     "cargo:rustc-cfg=aes_dma_mode_ecb",
                     "cargo:rustc-cfg=aes_dma_mode_cbc",
@@ -1924,7 +1916,6 @@ impl Chip {
                     "soc_has_clock_node_timg1_wdt_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
-                    "soc_xtal_frequency=\"32\"",
                     "aes_dma",
                     "aes_dma_mode_ecb",
                     "aes_dma_mode_cbc",
@@ -2134,7 +2125,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_wdt_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
-                    "cargo:rustc-cfg=soc_xtal_frequency=\"32\"",
                     "cargo:rustc-cfg=aes_dma",
                     "cargo:rustc-cfg=aes_dma_mode_ecb",
                     "cargo:rustc-cfg=aes_dma_mode_cbc",
@@ -2361,7 +2351,6 @@ impl Chip {
                     "soc_has_clock_node_timg1_calibration_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
-                    "soc_xtal_frequency=\"40\"",
                     "aes_dma",
                     "aes_dma_mode_ecb",
                     "aes_dma_mode_cbc",
@@ -2563,7 +2552,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_calibration_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
-                    "cargo:rustc-cfg=soc_xtal_frequency=\"40\"",
                     "cargo:rustc-cfg=aes_dma",
                     "cargo:rustc-cfg=aes_dma_mode_ecb",
                     "cargo:rustc-cfg=aes_dma_mode_cbc",
@@ -2800,7 +2788,6 @@ impl Chip {
                     "soc_has_clock_node_timg1_calibration_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
-                    "soc_xtal_frequency=\"40\"",
                     "aes_dma",
                     "aes_dma_mode_ecb",
                     "aes_dma_mode_cbc",
@@ -3026,7 +3013,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_calibration_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
-                    "cargo:rustc-cfg=soc_xtal_frequency=\"40\"",
                     "cargo:rustc-cfg=aes_dma",
                     "cargo:rustc-cfg=aes_dma_mode_ecb",
                     "cargo:rustc-cfg=aes_dma_mode_cbc",
@@ -3299,7 +3285,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg1_calibration_clock)");
     println!("cargo:rustc-check-cfg=cfg(has_dram_region)");
     println!("cargo:rustc-check-cfg=cfg(has_dram2_uninit_region)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_multiple_xtal_options)");
     println!("cargo:rustc-check-cfg=cfg(aes_endianness_configurable)");
     println!("cargo:rustc-check-cfg=cfg(gpio_has_bank_1)");
     println!("cargo:rustc-check-cfg=cfg(gpio_remap_iomux_pin_registers)");
@@ -3549,7 +3534,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(rsa_memory_size_bytes, values(\"512\",\"384\"))");
     println!("cargo:rustc-check-cfg=cfg(uart_ram_size, values(\"128\"))");
     println!("cargo:rustc-check-cfg=cfg(bt_controller, values(\"btdm\",\"npl\"))");
-    println!("cargo:rustc-check-cfg=cfg(soc_xtal_frequency, values(\"40\",\"32\"))");
     println!("cargo:rustc-check-cfg=cfg(phy_backed_up_digital_register_count, values(\"21\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_fifo_size, values(\"16\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_uart_ram_size, values(\"32\"))");

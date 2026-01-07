@@ -103,23 +103,8 @@ impl ClockConfig {
 
 // XTAL_CLK
 
-fn configure_xtal_clk_impl(_clocks: &mut ClockTree, config: XtalClkConfig) {
-    // The stored configuration affects PLL settings instead. We save the value in a register
-    // similar to ESP-IDF, just in case something relies on that, or, if we can in the future read
-    // back the value instead of wasting RAM on it.
-
-    const DISABLE_ROM_LOG: u32 = 1;
-
-    let freq_mhz = config.value() / 1_000_000;
-    LPWR::regs().store4().modify(|r, w| unsafe {
-        // The data is stored in two copies of 16-bit values. The first bit overwrites the LSB of
-        // the frequency value with DISABLE_ROM_LOG.
-
-        // Copy the DISABLE_ROM_LOG bit
-        let disable_rom_log_bit = r.bits() & DISABLE_ROM_LOG;
-        let half = (freq_mhz & (0xFFFF & !DISABLE_ROM_LOG)) | disable_rom_log_bit;
-        w.data().bits(half | (half << 16))
-    });
+fn configure_xtal_clk_impl(_clocks: &mut ClockTree, _config: XtalClkConfig) {
+    // The stored configuration affects PLL settings instead.
 }
 
 // PLL_CLK

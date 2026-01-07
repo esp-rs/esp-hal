@@ -95,8 +95,8 @@ extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
         } else if #[cfg(esp32c2)] {
             // the ROM function returns 40 also for a 26 MHz xtal
             // just rely on RTC_CNTL_STORE4
-            let rtc_cntl_store4: *const u32 = 0x600080AC  as *const u32;
-            ((unsafe { rtc_cntl_store4.read_volatile() })  & 0xff) as i32
+            let rtc_cntl_store4: *const u32 = 0x600080AC as *const u32;
+            ((unsafe { rtc_cntl_store4.read_volatile() }) & 0xff) as i32
         } else {
             compile_error!("rtc_clk_xtal_freq_get not implemented for this chip");
         }

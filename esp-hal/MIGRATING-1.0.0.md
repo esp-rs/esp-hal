@@ -86,3 +86,11 @@ The corresponding generic argument has also been removed from `TxTransaction` an
 +let tx_transaction: TxTransaction<'_, '_> = tx_channel.transmit(&tx_data)?;
 +let rx_transaction: RxTransaction<'_, '_> = rx_channel.receive(&mut rx_data)?;
 ```
+
+## Clock changes
+
+The `RtcClock::xtal_freq()` function and the `XtalClock` enum have been removed. The currently recommended way to access the crystal clock frequency is through the `Clocks` struct, which returns a `Rate` value:
+
+```rust
+let xtal_clock = esp_hal::clock::Clocks::get().xtal_clock;
+```

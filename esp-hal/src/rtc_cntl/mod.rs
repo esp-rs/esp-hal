@@ -442,7 +442,6 @@ impl<'d> Rtc<'d> {
     ///
     /// If you need to permanently disable the ROM bootloader messages, you'll
     /// need to set the corresponding eFuse.
-    #[cfg(any(esp32s3, esp32h2))]
     pub fn disable_rom_message_printing(&self) {
         // Corresponding documentation:
         // ESP32-S3: TRM v1.5 chapter 8.3
