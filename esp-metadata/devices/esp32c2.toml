@@ -47,6 +47,7 @@ peripherals = [
     { name = "ADC1", virtual = true },
     { name = "BT", virtual = true },
     { name = "FLASH", virtual = true },
+    { name = "GPIO_DEDICATED", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "WIFI", virtual = true },
     { name = "MEM2MEM1", virtual = true },
@@ -346,6 +347,10 @@ output_signals = [
 
     { name = "MTDO" },
 ]
+
+[device.dedicated_gpio]
+support_status = "partial"
+channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4", "CPU_GPIO_5", "CPU_GPIO_6", "CPU_GPIO_7"]]
 
 [device.i2c_master]
 support_status = "supported"

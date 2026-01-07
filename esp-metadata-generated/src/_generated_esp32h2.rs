@@ -117,6 +117,15 @@ macro_rules! property {
     ("gpio.output_signal_max", str) => {
         stringify!(128)
     };
+    ("dedicated_gpio.needs_initialization") => {
+        false
+    };
+    ("dedicated_gpio.channel_count") => {
+        8
+    };
+    ("dedicated_gpio.channel_count", str) => {
+        stringify!(8)
+    };
     ("i2c_master.has_fsm_timeouts") => {
         true
     };
@@ -1962,6 +1971,24 @@ macro_rules! for_each_aes_key_length {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_dedicated_gpio {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((0)); _for_each_inner!((1)); _for_each_inner!((2));
+        _for_each_inner!((3)); _for_each_inner!((4)); _for_each_inner!((5));
+        _for_each_inner!((6)); _for_each_inner!((7)); _for_each_inner!((0, 0,
+        CPU_GPIO_0)); _for_each_inner!((0, 1, CPU_GPIO_1)); _for_each_inner!((0, 2,
+        CPU_GPIO_2)); _for_each_inner!((0, 3, CPU_GPIO_3)); _for_each_inner!((0, 4,
+        CPU_GPIO_4)); _for_each_inner!((0, 5, CPU_GPIO_5)); _for_each_inner!((0, 6,
+        CPU_GPIO_6)); _for_each_inner!((0, 7, CPU_GPIO_7));
+        _for_each_inner!((channels(0), (1), (2), (3), (4), (5), (6), (7)));
+        _for_each_inner!((signals(0, 0, CPU_GPIO_0), (0, 1, CPU_GPIO_1), (0, 2,
+        CPU_GPIO_2), (0, 3, CPU_GPIO_3), (0, 4, CPU_GPIO_4), (0, 5, CPU_GPIO_5), (0, 6,
+        CPU_GPIO_6), (0, 7, CPU_GPIO_7)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_sw_interrupt {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
@@ -2320,7 +2347,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((@ peri_type DMA_CH2 <= virtual() (unstable)));
         _for_each_inner!((@ peri_type ADC1 <= virtual() (unstable))); _for_each_inner!((@
         peri_type BT <= virtual() (unstable))); _for_each_inner!((@ peri_type FLASH <=
-        virtual() (unstable))); _for_each_inner!((@ peri_type SW_INTERRUPT <= virtual()
+        virtual() (unstable))); _for_each_inner!((@ peri_type GPIO_DEDICATED <= virtual()
+        (unstable))); _for_each_inner!((@ peri_type SW_INTERRUPT <= virtual()
         (unstable))); _for_each_inner!((@ peri_type MEM2MEM1 <= virtual() (unstable)));
         _for_each_inner!((@ peri_type MEM2MEM4 <= virtual() (unstable)));
         _for_each_inner!((@ peri_type MEM2MEM5 <= virtual() (unstable)));
@@ -2373,6 +2401,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((DMA_CH0(unstable))); _for_each_inner!((DMA_CH1(unstable)));
         _for_each_inner!((DMA_CH2(unstable))); _for_each_inner!((ADC1(unstable)));
         _for_each_inner!((BT(unstable))); _for_each_inner!((FLASH(unstable)));
+        _for_each_inner!((GPIO_DEDICATED(unstable)));
         _for_each_inner!((SW_INTERRUPT(unstable)));
         _for_each_inner!((MEM2MEM1(unstable))); _for_each_inner!((MEM2MEM4(unstable)));
         _for_each_inner!((MEM2MEM5(unstable))); _for_each_inner!((MEM2MEM10(unstable)));
@@ -2438,23 +2467,23 @@ macro_rules! for_each_peripheral {
         (unstable)), (@ peri_type DMA_CH1 <= virtual() (unstable)), (@ peri_type DMA_CH2
         <= virtual() (unstable)), (@ peri_type ADC1 <= virtual() (unstable)), (@
         peri_type BT <= virtual() (unstable)), (@ peri_type FLASH <= virtual()
-        (unstable)), (@ peri_type SW_INTERRUPT <= virtual() (unstable)), (@ peri_type
-        MEM2MEM1 <= virtual() (unstable)), (@ peri_type MEM2MEM4 <= virtual()
-        (unstable)), (@ peri_type MEM2MEM5 <= virtual() (unstable)), (@ peri_type
-        MEM2MEM10 <= virtual() (unstable)), (@ peri_type MEM2MEM11 <= virtual()
-        (unstable)), (@ peri_type MEM2MEM12 <= virtual() (unstable)), (@ peri_type
-        MEM2MEM13 <= virtual() (unstable)), (@ peri_type MEM2MEM14 <= virtual()
-        (unstable)), (@ peri_type MEM2MEM15 <= virtual() (unstable))));
-        _for_each_inner!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3), (GPIO4), (GPIO5),
-        (GPIO8), (GPIO9), (GPIO10), (GPIO11), (GPIO12), (GPIO13), (GPIO14), (GPIO22),
-        (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27), (AES(unstable)),
-        (APB_SARADC(unstable)), (ASSIST_DEBUG(unstable)), (DMA(unstable)),
-        (DS(unstable)), (ECC(unstable)), (EFUSE(unstable)), (GPIO(unstable)),
-        (GPIO_SD(unstable)), (HMAC(unstable)), (HP_APM(unstable)), (HP_SYS(unstable)),
-        (I2C_ANA_MST(unstable)), (I2C0), (I2C1), (I2S0(unstable)),
-        (IEEE802154(unstable)), (INTERRUPT_CORE0(unstable)), (INTPRI(unstable)),
-        (IO_MUX(unstable)), (LEDC(unstable)), (LPWR(unstable)), (LP_ANA(unstable)),
-        (LP_AON(unstable)), (LP_APM(unstable)), (LP_APM0(unstable)),
+        (unstable)), (@ peri_type GPIO_DEDICATED <= virtual() (unstable)), (@ peri_type
+        SW_INTERRUPT <= virtual() (unstable)), (@ peri_type MEM2MEM1 <= virtual()
+        (unstable)), (@ peri_type MEM2MEM4 <= virtual() (unstable)), (@ peri_type
+        MEM2MEM5 <= virtual() (unstable)), (@ peri_type MEM2MEM10 <= virtual()
+        (unstable)), (@ peri_type MEM2MEM11 <= virtual() (unstable)), (@ peri_type
+        MEM2MEM12 <= virtual() (unstable)), (@ peri_type MEM2MEM13 <= virtual()
+        (unstable)), (@ peri_type MEM2MEM14 <= virtual() (unstable)), (@ peri_type
+        MEM2MEM15 <= virtual() (unstable)))); _for_each_inner!((singletons(GPIO0),
+        (GPIO1), (GPIO2), (GPIO3), (GPIO4), (GPIO5), (GPIO8), (GPIO9), (GPIO10),
+        (GPIO11), (GPIO12), (GPIO13), (GPIO14), (GPIO22), (GPIO23), (GPIO24), (GPIO25),
+        (GPIO26), (GPIO27), (AES(unstable)), (APB_SARADC(unstable)),
+        (ASSIST_DEBUG(unstable)), (DMA(unstable)), (DS(unstable)), (ECC(unstable)),
+        (EFUSE(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)), (HMAC(unstable)),
+        (HP_APM(unstable)), (HP_SYS(unstable)), (I2C_ANA_MST(unstable)), (I2C0), (I2C1),
+        (I2S0(unstable)), (IEEE802154(unstable)), (INTERRUPT_CORE0(unstable)),
+        (INTPRI(unstable)), (IO_MUX(unstable)), (LEDC(unstable)), (LPWR(unstable)),
+        (LP_ANA(unstable)), (LP_AON(unstable)), (LP_APM(unstable)), (LP_APM0(unstable)),
         (LP_CLKRST(unstable)), (LP_PERI(unstable)), (LP_TIMER(unstable)),
         (LP_WDT(unstable)), (MCPWM0(unstable)), (MEM_MONITOR(unstable)),
         (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)), (OTP_DEBUG(unstable)),
@@ -2465,10 +2494,11 @@ macro_rules! for_each_peripheral {
         (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)), (TRACE0(unstable)),
         (TWAI0(unstable)), (UART0), (UART1), (UHCI0(unstable)), (USB_DEVICE(unstable)),
         (DMA_CH0(unstable)), (DMA_CH1(unstable)), (DMA_CH2(unstable)), (ADC1(unstable)),
-        (BT(unstable)), (FLASH(unstable)), (SW_INTERRUPT(unstable)),
-        (MEM2MEM1(unstable)), (MEM2MEM4(unstable)), (MEM2MEM5(unstable)),
-        (MEM2MEM10(unstable)), (MEM2MEM11(unstable)), (MEM2MEM12(unstable)),
-        (MEM2MEM13(unstable)), (MEM2MEM14(unstable)), (MEM2MEM15(unstable))));
+        (BT(unstable)), (FLASH(unstable)), (GPIO_DEDICATED(unstable)),
+        (SW_INTERRUPT(unstable)), (MEM2MEM1(unstable)), (MEM2MEM4(unstable)),
+        (MEM2MEM5(unstable)), (MEM2MEM10(unstable)), (MEM2MEM11(unstable)),
+        (MEM2MEM12(unstable)), (MEM2MEM13(unstable)), (MEM2MEM14(unstable)),
+        (MEM2MEM15(unstable))));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.
@@ -2663,14 +2693,14 @@ macro_rules! define_io_mux_signals {
             I2SI_BCK            = 16,
             I2SI_WS             = 17,
             USB_JTAG_TDO_BRIDGE = 19,
-            CPU_GPIO0           = 28,
-            CPU_GPIO1           = 29,
-            CPU_GPIO2           = 30,
-            CPU_GPIO3           = 31,
-            CPU_GPIO4           = 32,
-            CPU_GPIO5           = 33,
-            CPU_GPIO6           = 34,
-            CPU_GPIO7           = 35,
+            CPU_GPIO_0          = 28,
+            CPU_GPIO_1          = 29,
+            CPU_GPIO_2          = 30,
+            CPU_GPIO_3          = 31,
+            CPU_GPIO_4          = 32,
+            CPU_GPIO_5          = 33,
+            CPU_GPIO_6          = 34,
+            CPU_GPIO_7          = 35,
             I2CEXT0_SCL         = 45,
             I2CEXT0_SDA         = 46,
             PARL_RX_DATA0       = 47,
@@ -2756,14 +2786,14 @@ macro_rules! define_io_mux_signals {
             I2SI_WS          = 17,
             I2SO_SD1         = 18,
             USB_JTAG_TRST    = 19,
-            CPU_GPIO_OUT0    = 28,
-            CPU_GPIO_OUT1    = 29,
-            CPU_GPIO_OUT2    = 30,
-            CPU_GPIO_OUT3    = 31,
-            CPU_GPIO_OUT4    = 32,
-            CPU_GPIO_OUT5    = 33,
-            CPU_GPIO_OUT6    = 34,
-            CPU_GPIO_OUT7    = 35,
+            CPU_GPIO_0       = 28,
+            CPU_GPIO_1       = 29,
+            CPU_GPIO_2       = 30,
+            CPU_GPIO_3       = 31,
+            CPU_GPIO_4       = 32,
+            CPU_GPIO_5       = 33,
+            CPU_GPIO_6       = 34,
+            CPU_GPIO_7       = 35,
             I2CEXT0_SCL      = 45,
             I2CEXT0_SDA      = 46,
             PARL_TX_DATA0    = 47,

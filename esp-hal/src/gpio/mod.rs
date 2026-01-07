@@ -63,6 +63,9 @@ crate::unstable_module! {
 
     #[cfg(all(soc_has_rtc_io, not(esp32)))]
     pub mod rtc_io;
+
+    #[cfg(dedicated_gpio)]
+    pub mod dedicated;
 }
 use interconnect::PeripheralOutput;
 
@@ -784,6 +787,7 @@ pub struct Output<'d> {
 }
 
 impl private::Sealed for Output<'_> {}
+impl private::Sealed for &mut Output<'_> {}
 
 impl<'d> Output<'d> {
     #[procmacros::doc_replace]
@@ -1048,6 +1052,7 @@ pub struct Input<'d> {
 }
 
 impl private::Sealed for Input<'_> {}
+impl private::Sealed for &mut Input<'_> {}
 
 impl<'d> Input<'d> {
     #[procmacros::doc_replace]
@@ -1335,6 +1340,7 @@ pub struct Flex<'d> {
 }
 
 impl private::Sealed for Flex<'_> {}
+impl private::Sealed for &mut Flex<'_> {}
 
 impl<'d> Flex<'d> {
     /// Create flexible pin driver for a [Pin].

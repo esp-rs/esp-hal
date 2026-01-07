@@ -105,6 +105,15 @@ macro_rules! property {
     ("gpio.output_signal_max", str) => {
         stringify!(128)
     };
+    ("dedicated_gpio.needs_initialization") => {
+        false
+    };
+    ("dedicated_gpio.channel_count") => {
+        8
+    };
+    ("dedicated_gpio.channel_count", str) => {
+        stringify!(8)
+    };
     ("i2c_master.has_fsm_timeouts") => {
         true
     };
@@ -1746,6 +1755,24 @@ macro_rules! memory_range {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_dedicated_gpio {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((0)); _for_each_inner!((1)); _for_each_inner!((2));
+        _for_each_inner!((3)); _for_each_inner!((4)); _for_each_inner!((5));
+        _for_each_inner!((6)); _for_each_inner!((7)); _for_each_inner!((0, 0,
+        CPU_GPIO_0)); _for_each_inner!((0, 1, CPU_GPIO_1)); _for_each_inner!((0, 2,
+        CPU_GPIO_2)); _for_each_inner!((0, 3, CPU_GPIO_3)); _for_each_inner!((0, 4,
+        CPU_GPIO_4)); _for_each_inner!((0, 5, CPU_GPIO_5)); _for_each_inner!((0, 6,
+        CPU_GPIO_6)); _for_each_inner!((0, 7, CPU_GPIO_7));
+        _for_each_inner!((channels(0), (1), (2), (3), (4), (5), (6), (7)));
+        _for_each_inner!((signals(0, 0, CPU_GPIO_0), (0, 1, CPU_GPIO_1), (0, 2,
+        CPU_GPIO_2), (0, 3, CPU_GPIO_3), (0, 4, CPU_GPIO_4), (0, 5, CPU_GPIO_5), (0, 6,
+        CPU_GPIO_6), (0, 7, CPU_GPIO_7)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_sw_interrupt {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
@@ -1945,7 +1972,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((@ peri_type DMA_CH0 <= virtual() (unstable)));
         _for_each_inner!((@ peri_type ADC1 <= virtual() (unstable))); _for_each_inner!((@
         peri_type BT <= virtual() (unstable))); _for_each_inner!((@ peri_type FLASH <=
-        virtual() (unstable))); _for_each_inner!((@ peri_type SW_INTERRUPT <= virtual()
+        virtual() (unstable))); _for_each_inner!((@ peri_type GPIO_DEDICATED <= virtual()
+        (unstable))); _for_each_inner!((@ peri_type SW_INTERRUPT <= virtual()
         (unstable))); _for_each_inner!((@ peri_type WIFI <= virtual() (unstable)));
         _for_each_inner!((@ peri_type MEM2MEM1 <= virtual() (unstable)));
         _for_each_inner!((@ peri_type MEM2MEM2 <= virtual() (unstable)));
@@ -1977,62 +2005,65 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((UART0)); _for_each_inner!((UART1));
         _for_each_inner!((XTS_AES(unstable))); _for_each_inner!((DMA_CH0(unstable)));
         _for_each_inner!((ADC1(unstable))); _for_each_inner!((BT(unstable)));
-        _for_each_inner!((FLASH(unstable))); _for_each_inner!((SW_INTERRUPT(unstable)));
-        _for_each_inner!((WIFI(unstable))); _for_each_inner!((MEM2MEM1(unstable)));
-        _for_each_inner!((MEM2MEM2(unstable))); _for_each_inner!((MEM2MEM3(unstable)));
-        _for_each_inner!((MEM2MEM4(unstable))); _for_each_inner!((MEM2MEM5(unstable)));
-        _for_each_inner!((MEM2MEM6(unstable))); _for_each_inner!((MEM2MEM7(unstable)));
-        _for_each_inner!((MEM2MEM8(unstable))); _for_each_inner!((all(@ peri_type GPIO0
-        <= virtual()), (@ peri_type GPIO1 <= virtual()), (@ peri_type GPIO2 <=
-        virtual()), (@ peri_type GPIO3 <= virtual()), (@ peri_type GPIO4 <= virtual()),
-        (@ peri_type GPIO5 <= virtual()), (@ peri_type GPIO6 <= virtual()), (@ peri_type
-        GPIO7 <= virtual()), (@ peri_type GPIO8 <= virtual()), (@ peri_type GPIO9 <=
-        virtual()), (@ peri_type GPIO10 <= virtual()), (@ peri_type GPIO11 <= virtual()),
-        (@ peri_type GPIO12 <= virtual()), (@ peri_type GPIO13 <= virtual()), (@
-        peri_type GPIO14 <= virtual()), (@ peri_type GPIO15 <= virtual()), (@ peri_type
-        GPIO16 <= virtual()), (@ peri_type GPIO17 <= virtual()), (@ peri_type GPIO18 <=
-        virtual()), (@ peri_type GPIO19 <= virtual()), (@ peri_type GPIO20 <= virtual()),
-        (@ peri_type APB_CTRL <= APB_CTRL() (unstable)), (@ peri_type APB_SARADC <=
-        APB_SARADC() (unstable)), (@ peri_type BB <= BB() (unstable)), (@ peri_type
-        ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)), (@ peri_type DMA <= DMA()
-        (unstable)), (@ peri_type ECC <= ECC() (unstable)), (@ peri_type EFUSE <= EFUSE()
-        (unstable)), (@ peri_type EXTMEM <= EXTMEM() (unstable)), (@ peri_type GPIO <=
-        GPIO() (unstable)), (@ peri_type I2C_ANA_MST <= I2C_ANA_MST() (unstable)), (@
-        peri_type I2C0 <= I2C0(I2C_EXT0 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt })), (@ peri_type INTERRUPT_CORE0 <= INTERRUPT_CORE0()
-        (unstable)), (@ peri_type IO_MUX <= IO_MUX() (unstable)), (@ peri_type LEDC <=
-        LEDC() (unstable)), (@ peri_type RNG <= RNG() (unstable)), (@ peri_type LPWR <=
-        RTC_CNTL() (unstable)), (@ peri_type MODEM_CLKRST <= MODEM_CLKRST() (unstable)),
-        (@ peri_type SENSITIVE <= SENSITIVE() (unstable)), (@ peri_type SHA <= SHA(SHA :
-        { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable)), (@ peri_type SPI0 <= SPI0() (unstable)), (@ peri_type SPI1 <= SPI1()
-        (unstable)), (@ peri_type SPI2 <= SPI2(SPI2 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt })), (@ peri_type SYSTEM <=
-        SYSTEM() (unstable)), (@ peri_type SYSTIMER <= SYSTIMER() (unstable)), (@
-        peri_type TIMG0 <= TIMG0() (unstable)), (@ peri_type UART0 <= UART0(UART0 : {
+        _for_each_inner!((FLASH(unstable)));
+        _for_each_inner!((GPIO_DEDICATED(unstable)));
+        _for_each_inner!((SW_INTERRUPT(unstable))); _for_each_inner!((WIFI(unstable)));
+        _for_each_inner!((MEM2MEM1(unstable))); _for_each_inner!((MEM2MEM2(unstable)));
+        _for_each_inner!((MEM2MEM3(unstable))); _for_each_inner!((MEM2MEM4(unstable)));
+        _for_each_inner!((MEM2MEM5(unstable))); _for_each_inner!((MEM2MEM6(unstable)));
+        _for_each_inner!((MEM2MEM7(unstable))); _for_each_inner!((MEM2MEM8(unstable)));
+        _for_each_inner!((all(@ peri_type GPIO0 <= virtual()), (@ peri_type GPIO1 <=
+        virtual()), (@ peri_type GPIO2 <= virtual()), (@ peri_type GPIO3 <= virtual()),
+        (@ peri_type GPIO4 <= virtual()), (@ peri_type GPIO5 <= virtual()), (@ peri_type
+        GPIO6 <= virtual()), (@ peri_type GPIO7 <= virtual()), (@ peri_type GPIO8 <=
+        virtual()), (@ peri_type GPIO9 <= virtual()), (@ peri_type GPIO10 <= virtual()),
+        (@ peri_type GPIO11 <= virtual()), (@ peri_type GPIO12 <= virtual()), (@
+        peri_type GPIO13 <= virtual()), (@ peri_type GPIO14 <= virtual()), (@ peri_type
+        GPIO15 <= virtual()), (@ peri_type GPIO16 <= virtual()), (@ peri_type GPIO17 <=
+        virtual()), (@ peri_type GPIO18 <= virtual()), (@ peri_type GPIO19 <= virtual()),
+        (@ peri_type GPIO20 <= virtual()), (@ peri_type APB_CTRL <= APB_CTRL()
+        (unstable)), (@ peri_type APB_SARADC <= APB_SARADC() (unstable)), (@ peri_type BB
+        <= BB() (unstable)), (@ peri_type ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)), (@
+        peri_type DMA <= DMA() (unstable)), (@ peri_type ECC <= ECC() (unstable)), (@
+        peri_type EFUSE <= EFUSE() (unstable)), (@ peri_type EXTMEM <= EXTMEM()
+        (unstable)), (@ peri_type GPIO <= GPIO() (unstable)), (@ peri_type I2C_ANA_MST <=
+        I2C_ANA_MST() (unstable)), (@ peri_type I2C0 <= I2C0(I2C_EXT0 : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
-        peri_type UART1 <= UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
+        peri_type INTERRUPT_CORE0 <= INTERRUPT_CORE0() (unstable)), (@ peri_type IO_MUX
+        <= IO_MUX() (unstable)), (@ peri_type LEDC <= LEDC() (unstable)), (@ peri_type
+        RNG <= RNG() (unstable)), (@ peri_type LPWR <= RTC_CNTL() (unstable)), (@
+        peri_type MODEM_CLKRST <= MODEM_CLKRST() (unstable)), (@ peri_type SENSITIVE <=
+        SENSITIVE() (unstable)), (@ peri_type SHA <= SHA(SHA : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type SPI0
+        <= SPI0() (unstable)), (@ peri_type SPI1 <= SPI1() (unstable)), (@ peri_type SPI2
+        <= SPI2(SPI2 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt })), (@ peri_type SYSTEM <= SYSTEM() (unstable)), (@
+        peri_type SYSTIMER <= SYSTIMER() (unstable)), (@ peri_type TIMG0 <= TIMG0()
+        (unstable)), (@ peri_type UART0 <= UART0(UART0 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt })), (@ peri_type UART1 <=
+        UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt })), (@ peri_type XTS_AES <= XTS_AES() (unstable)), (@
         peri_type DMA_CH0 <= virtual() (unstable)), (@ peri_type ADC1 <= virtual()
         (unstable)), (@ peri_type BT <= virtual() (unstable)), (@ peri_type FLASH <=
-        virtual() (unstable)), (@ peri_type SW_INTERRUPT <= virtual() (unstable)), (@
-        peri_type WIFI <= virtual() (unstable)), (@ peri_type MEM2MEM1 <= virtual()
-        (unstable)), (@ peri_type MEM2MEM2 <= virtual() (unstable)), (@ peri_type
-        MEM2MEM3 <= virtual() (unstable)), (@ peri_type MEM2MEM4 <= virtual()
-        (unstable)), (@ peri_type MEM2MEM5 <= virtual() (unstable)), (@ peri_type
-        MEM2MEM6 <= virtual() (unstable)), (@ peri_type MEM2MEM7 <= virtual()
-        (unstable)), (@ peri_type MEM2MEM8 <= virtual() (unstable))));
-        _for_each_inner!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3), (GPIO4), (GPIO5),
-        (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO18), (GPIO19), (GPIO20),
-        (APB_CTRL(unstable)), (APB_SARADC(unstable)), (BB(unstable)),
-        (ASSIST_DEBUG(unstable)), (DMA(unstable)), (ECC(unstable)), (EFUSE(unstable)),
-        (EXTMEM(unstable)), (GPIO(unstable)), (I2C_ANA_MST(unstable)), (I2C0),
-        (INTERRUPT_CORE0(unstable)), (IO_MUX(unstable)), (LEDC(unstable)),
-        (RNG(unstable)), (LPWR(unstable)), (MODEM_CLKRST(unstable)),
-        (SENSITIVE(unstable)), (SHA(unstable)), (SPI0(unstable)), (SPI1(unstable)),
-        (SPI2), (SYSTEM(unstable)), (SYSTIMER(unstable)), (TIMG0(unstable)), (UART0),
-        (UART1), (XTS_AES(unstable)), (DMA_CH0(unstable)), (ADC1(unstable)),
-        (BT(unstable)), (FLASH(unstable)), (SW_INTERRUPT(unstable)), (WIFI(unstable)),
+        virtual() (unstable)), (@ peri_type GPIO_DEDICATED <= virtual() (unstable)), (@
+        peri_type SW_INTERRUPT <= virtual() (unstable)), (@ peri_type WIFI <= virtual()
+        (unstable)), (@ peri_type MEM2MEM1 <= virtual() (unstable)), (@ peri_type
+        MEM2MEM2 <= virtual() (unstable)), (@ peri_type MEM2MEM3 <= virtual()
+        (unstable)), (@ peri_type MEM2MEM4 <= virtual() (unstable)), (@ peri_type
+        MEM2MEM5 <= virtual() (unstable)), (@ peri_type MEM2MEM6 <= virtual()
+        (unstable)), (@ peri_type MEM2MEM7 <= virtual() (unstable)), (@ peri_type
+        MEM2MEM8 <= virtual() (unstable)))); _for_each_inner!((singletons(GPIO0),
+        (GPIO1), (GPIO2), (GPIO3), (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9),
+        (GPIO10), (GPIO18), (GPIO19), (GPIO20), (APB_CTRL(unstable)),
+        (APB_SARADC(unstable)), (BB(unstable)), (ASSIST_DEBUG(unstable)),
+        (DMA(unstable)), (ECC(unstable)), (EFUSE(unstable)), (EXTMEM(unstable)),
+        (GPIO(unstable)), (I2C_ANA_MST(unstable)), (I2C0), (INTERRUPT_CORE0(unstable)),
+        (IO_MUX(unstable)), (LEDC(unstable)), (RNG(unstable)), (LPWR(unstable)),
+        (MODEM_CLKRST(unstable)), (SENSITIVE(unstable)), (SHA(unstable)),
+        (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SYSTEM(unstable)),
+        (SYSTIMER(unstable)), (TIMG0(unstable)), (UART0), (UART1), (XTS_AES(unstable)),
+        (DMA_CH0(unstable)), (ADC1(unstable)), (BT(unstable)), (FLASH(unstable)),
+        (GPIO_DEDICATED(unstable)), (SW_INTERRUPT(unstable)), (WIFI(unstable)),
         (MEM2MEM1(unstable)), (MEM2MEM2(unstable)), (MEM2MEM3(unstable)),
         (MEM2MEM4(unstable)), (MEM2MEM5(unstable)), (MEM2MEM6(unstable)),
         (MEM2MEM7(unstable)), (MEM2MEM8(unstable))));

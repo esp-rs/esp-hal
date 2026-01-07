@@ -589,3 +589,61 @@ fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
         }
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize)]
+pub struct DedicatedGpioChannels {
+    // Cpu -> list of Signals
+    channels: Vec<Vec<String>>,
+}
+
+impl DedicatedGpioChannels {
+    fn channel_count(&self) -> usize {
+        assert!(
+            self.channels
+                .iter()
+                .all(|channel| channel.len() == self.channels[0].len()),
+            "All cores must have the same number of dedicated GPIO channels"
+        );
+        self.channels[0].len()
+    }
+}
+
+impl GenericProperty for DedicatedGpioChannels {
+    fn macros(&self) -> Option<proc_macro2::TokenStream> {
+        let channel_count = self.channel_count();
+        let channel_branches = (0..channel_count).map(number).collect::<Vec<_>>();
+        let signal_branches = self
+            .channels
+            .iter()
+            .enumerate()
+            .flat_map(|(core, channels)| {
+                channels.iter().enumerate().map(move |(channel, signal)| {
+                    let signal = format_ident!("{signal}");
+                    let core = number(core);
+                    let channel = number(channel);
+                    quote! { #core, #channel, #signal }
+                })
+            })
+            .collect::<Vec<_>>();
+
+        Some(generate_for_each_macro(
+            "dedicated_gpio",
+            &[
+                ("channels", &channel_branches),
+                ("signals", &signal_branches),
+            ],
+        ))
+    }
+
+    fn property_macro_branches(&self) -> proc_macro2::TokenStream {
+        let channel_count = number(self.channel_count());
+        quote::quote! {
+            ("dedicated_gpio.channel_count") => {
+                #channel_count
+            };
+            ("dedicated_gpio.channel_count", str) => {
+                stringify!(#channel_count)
+            };
+        }
+    }
+}

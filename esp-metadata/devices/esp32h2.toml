@@ -81,6 +81,7 @@ peripherals = [
     { name = "ADC1", virtual = true },
     { name = "BT", virtual = true },
     { name = "FLASH", virtual = true },
+    { name = "GPIO_DEDICATED", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "MEM2MEM1", virtual = true },
     { name = "MEM2MEM4", virtual = true },
@@ -300,14 +301,14 @@ input_signals = [
     { name = "I2SI_BCK",            id = 16 },
     { name = "I2SI_WS",             id = 17 },
     { name = "USB_JTAG_TDO_BRIDGE", id = 19 },
-    { name = "CPU_GPIO0",           id = 28 },
-    { name = "CPU_GPIO1",           id = 29 },
-    { name = "CPU_GPIO2",           id = 30 },
-    { name = "CPU_GPIO3",           id = 31 },
-    { name = "CPU_GPIO4",           id = 32 },
-    { name = "CPU_GPIO5",           id = 33 },
-    { name = "CPU_GPIO6",           id = 34 },
-    { name = "CPU_GPIO7",           id = 35 },
+    { name = "CPU_GPIO_0",          id = 28 },
+    { name = "CPU_GPIO_1",          id = 29 },
+    { name = "CPU_GPIO_2",          id = 30 },
+    { name = "CPU_GPIO_3",          id = 31 },
+    { name = "CPU_GPIO_4",          id = 32 },
+    { name = "CPU_GPIO_5",          id = 33 },
+    { name = "CPU_GPIO_6",          id = 34 },
+    { name = "CPU_GPIO_7",          id = 35 },
     { name = "I2CEXT0_SCL",         id = 45 },
     { name = "I2CEXT0_SDA",         id = 46 },
     { name = "PARL_RX_DATA0",       id = 47 },
@@ -390,14 +391,14 @@ output_signals = [
     { name = "I2SI_WS",          id = 17 },
     { name = "I2SO_SD1",         id = 18 },
     { name = "USB_JTAG_TRST",    id = 19 },
-    { name = "CPU_GPIO_OUT0",    id = 28 },
-    { name = "CPU_GPIO_OUT1",    id = 29 },
-    { name = "CPU_GPIO_OUT2",    id = 30 },
-    { name = "CPU_GPIO_OUT3",    id = 31 },
-    { name = "CPU_GPIO_OUT4",    id = 32 },
-    { name = "CPU_GPIO_OUT5",    id = 33 },
-    { name = "CPU_GPIO_OUT6",    id = 34 },
-    { name = "CPU_GPIO_OUT7",    id = 35 },
+    { name = "CPU_GPIO_0",       id = 28 },
+    { name = "CPU_GPIO_1",       id = 29 },
+    { name = "CPU_GPIO_2",       id = 30 },
+    { name = "CPU_GPIO_3",       id = 31 },
+    { name = "CPU_GPIO_4",       id = 32 },
+    { name = "CPU_GPIO_5",       id = 33 },
+    { name = "CPU_GPIO_6",       id = 34 },
+    { name = "CPU_GPIO_7",       id = 35 },
     { name = "I2CEXT0_SCL",      id = 45 },
     { name = "I2CEXT0_SDA",      id = 46 },
     { name = "PARL_TX_DATA0",    id = 47 },
@@ -466,6 +467,10 @@ output_signals = [
 
     { name = "MTDO" }
 ]
+
+[device.dedicated_gpio]
+support_status = "partial"
+channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4", "CPU_GPIO_5", "CPU_GPIO_6", "CPU_GPIO_7"]]
 
 [device.i2c_master]
 support_status = "supported"
