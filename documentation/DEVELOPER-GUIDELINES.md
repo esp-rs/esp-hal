@@ -237,7 +237,7 @@ Modules should have the following documentation format:
 
 ## Breaking changes
 
-We check our stable API surface using semver-checks. To facilitate these checks, we do a number of preprocessing steps to ensure we're only checking _our_ stable API. Therefore the API baseline is stored in `$krate/api-baseline/`. We may want to allow breaking changes, in the case of fixing soundness issues etc. In this case, all that is required is to simply run `cargo xcheck semver-check generate-baseline`.
+We check our stable API surface using semver-checks. To facilitate these checks, we do a number of preprocessing steps to ensure we're only checking _our_ stable API. We may want to allow breaking changes, in the case of fixing soundness issues etc. In this case, all that is required is to add the `breaking-change-<crate-name>` label to the PR making the change.
 
 ### Compiler updates
 
