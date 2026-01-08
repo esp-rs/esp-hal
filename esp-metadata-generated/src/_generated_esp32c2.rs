@@ -1975,14 +1975,17 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((GPIO3)); _for_each_inner!((GPIO4)); _for_each_inner!((GPIO5));
         _for_each_inner!((GPIO6)); _for_each_inner!((GPIO7)); _for_each_inner!((GPIO8));
         _for_each_inner!((GPIO9)); _for_each_inner!((GPIO10));
-        _for_each_inner!((GPIO18)); _for_each_inner!((GPIO19));
-        _for_each_inner!((GPIO20)); _for_each_inner!((APB_CTRL(unstable)));
-        _for_each_inner!((APB_SARADC(unstable))); _for_each_inner!((BB(unstable)));
-        _for_each_inner!((ASSIST_DEBUG(unstable))); _for_each_inner!((DMA(unstable)));
-        _for_each_inner!((ECC(unstable))); _for_each_inner!((EFUSE(unstable)));
-        _for_each_inner!((EXTMEM(unstable))); _for_each_inner!((GPIO(unstable)));
-        _for_each_inner!((I2C_ANA_MST(unstable))); _for_each_inner!((I2C0));
-        _for_each_inner!((INTERRUPT_CORE0(unstable)));
+        _for_each_inner!((GPIO11)); _for_each_inner!((GPIO12));
+        _for_each_inner!((GPIO13)); _for_each_inner!((GPIO14));
+        _for_each_inner!((GPIO15)); _for_each_inner!((GPIO16));
+        _for_each_inner!((GPIO17)); _for_each_inner!((GPIO18));
+        _for_each_inner!((GPIO19)); _for_each_inner!((GPIO20));
+        _for_each_inner!((APB_CTRL(unstable))); _for_each_inner!((APB_SARADC(unstable)));
+        _for_each_inner!((BB(unstable))); _for_each_inner!((ASSIST_DEBUG(unstable)));
+        _for_each_inner!((DMA(unstable))); _for_each_inner!((ECC(unstable)));
+        _for_each_inner!((EFUSE(unstable))); _for_each_inner!((EXTMEM(unstable)));
+        _for_each_inner!((GPIO(unstable))); _for_each_inner!((I2C_ANA_MST(unstable)));
+        _for_each_inner!((I2C0)); _for_each_inner!((INTERRUPT_CORE0(unstable)));
         _for_each_inner!((IO_MUX(unstable))); _for_each_inner!((LEDC(unstable)));
         _for_each_inner!((RNG(unstable))); _for_each_inner!((LPWR(unstable)));
         _for_each_inner!((MODEM_CLKRST(unstable)));
@@ -2042,19 +2045,20 @@ macro_rules! for_each_peripheral {
         (unstable)), (@ peri_type MEM2MEM7 <= virtual() (unstable)), (@ peri_type
         MEM2MEM8 <= virtual() (unstable)))); _for_each_inner!((singletons(GPIO0),
         (GPIO1), (GPIO2), (GPIO3), (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9),
-        (GPIO10), (GPIO18), (GPIO19), (GPIO20), (APB_CTRL(unstable)),
-        (APB_SARADC(unstable)), (BB(unstable)), (ASSIST_DEBUG(unstable)),
-        (DMA(unstable)), (ECC(unstable)), (EFUSE(unstable)), (EXTMEM(unstable)),
-        (GPIO(unstable)), (I2C_ANA_MST(unstable)), (I2C0), (INTERRUPT_CORE0(unstable)),
-        (IO_MUX(unstable)), (LEDC(unstable)), (RNG(unstable)), (LPWR(unstable)),
-        (MODEM_CLKRST(unstable)), (SENSITIVE(unstable)), (SHA(unstable)),
-        (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SYSTEM(unstable)),
-        (SYSTIMER(unstable)), (TIMG0(unstable)), (UART0), (UART1), (XTS_AES(unstable)),
-        (DMA_CH0(unstable)), (ADC1(unstable)), (BT(unstable)), (FLASH(unstable)),
-        (GPIO_DEDICATED(unstable)), (SW_INTERRUPT(unstable)), (WIFI(unstable)),
-        (MEM2MEM1(unstable)), (MEM2MEM2(unstable)), (MEM2MEM3(unstable)),
-        (MEM2MEM4(unstable)), (MEM2MEM5(unstable)), (MEM2MEM6(unstable)),
-        (MEM2MEM7(unstable)), (MEM2MEM8(unstable))));
+        (GPIO10), (GPIO11), (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17),
+        (GPIO18), (GPIO19), (GPIO20), (APB_CTRL(unstable)), (APB_SARADC(unstable)),
+        (BB(unstable)), (ASSIST_DEBUG(unstable)), (DMA(unstable)), (ECC(unstable)),
+        (EFUSE(unstable)), (EXTMEM(unstable)), (GPIO(unstable)), (I2C_ANA_MST(unstable)),
+        (I2C0), (INTERRUPT_CORE0(unstable)), (IO_MUX(unstable)), (LEDC(unstable)),
+        (RNG(unstable)), (LPWR(unstable)), (MODEM_CLKRST(unstable)),
+        (SENSITIVE(unstable)), (SHA(unstable)), (SPI0(unstable)), (SPI1(unstable)),
+        (SPI2), (SYSTEM(unstable)), (SYSTIMER(unstable)), (TIMG0(unstable)), (UART0),
+        (UART1), (XTS_AES(unstable)), (DMA_CH0(unstable)), (ADC1(unstable)),
+        (BT(unstable)), (FLASH(unstable)), (GPIO_DEDICATED(unstable)),
+        (SW_INTERRUPT(unstable)), (WIFI(unstable)), (MEM2MEM1(unstable)),
+        (MEM2MEM2(unstable)), (MEM2MEM3(unstable)), (MEM2MEM4(unstable)),
+        (MEM2MEM5(unstable)), (MEM2MEM6(unstable)), (MEM2MEM7(unstable)),
+        (MEM2MEM8(unstable))));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

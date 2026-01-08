@@ -2413,10 +2413,13 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((GPIO3)); _for_each_inner!((GPIO4)); _for_each_inner!((GPIO5));
         _for_each_inner!((GPIO6)); _for_each_inner!((GPIO7)); _for_each_inner!((GPIO8));
         _for_each_inner!((GPIO9)); _for_each_inner!((GPIO10));
-        _for_each_inner!((GPIO18)); _for_each_inner!((GPIO19));
-        _for_each_inner!((GPIO20)); _for_each_inner!((GPIO21));
-        _for_each_inner!((AES(unstable))); _for_each_inner!((APB_CTRL(unstable)));
-        _for_each_inner!((APB_SARADC(unstable)));
+        _for_each_inner!((GPIO11)); _for_each_inner!((GPIO12));
+        _for_each_inner!((GPIO13)); _for_each_inner!((GPIO14));
+        _for_each_inner!((GPIO15)); _for_each_inner!((GPIO16));
+        _for_each_inner!((GPIO17)); _for_each_inner!((GPIO18));
+        _for_each_inner!((GPIO19)); _for_each_inner!((GPIO20));
+        _for_each_inner!((GPIO21)); _for_each_inner!((AES(unstable)));
+        _for_each_inner!((APB_CTRL(unstable))); _for_each_inner!((APB_SARADC(unstable)));
         _for_each_inner!((ASSIST_DEBUG(unstable))); _for_each_inner!((BB(unstable)));
         _for_each_inner!((DMA(unstable))); _for_each_inner!((DS(unstable)));
         _for_each_inner!((EFUSE(unstable))); _for_each_inner!((EXTMEM(unstable)));
@@ -2492,8 +2495,9 @@ macro_rules! for_each_peripheral {
         (unstable)), (@ peri_type SW_INTERRUPT <= virtual() (unstable)), (@ peri_type
         TSENS <= virtual() (unstable)), (@ peri_type WIFI <= virtual() (unstable))));
         _for_each_inner!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3), (GPIO4), (GPIO5),
-        (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO18), (GPIO19), (GPIO20),
-        (GPIO21), (AES(unstable)), (APB_CTRL(unstable)), (APB_SARADC(unstable)),
+        (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11), (GPIO12), (GPIO13),
+        (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19), (GPIO20), (GPIO21),
+        (AES(unstable)), (APB_CTRL(unstable)), (APB_SARADC(unstable)),
         (ASSIST_DEBUG(unstable)), (BB(unstable)), (DMA(unstable)), (DS(unstable)),
         (EFUSE(unstable)), (EXTMEM(unstable)), (FE(unstable)), (FE2(unstable)),
         (GPIO(unstable)), (GPIO_SD(unstable)), (HMAC(unstable)), (I2C_ANA_MST(unstable)),

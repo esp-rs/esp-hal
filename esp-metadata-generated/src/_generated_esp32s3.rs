@@ -2646,16 +2646,20 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((GPIO15)); _for_each_inner!((GPIO16));
         _for_each_inner!((GPIO17)); _for_each_inner!((GPIO18));
         _for_each_inner!((GPIO19)); _for_each_inner!((GPIO20));
-        _for_each_inner!((GPIO21)); _for_each_inner!((GPIO33));
-        _for_each_inner!((GPIO34)); _for_each_inner!((GPIO35));
-        _for_each_inner!((GPIO36)); _for_each_inner!((GPIO37));
-        _for_each_inner!((GPIO38)); _for_each_inner!((GPIO39));
-        _for_each_inner!((GPIO40)); _for_each_inner!((GPIO41));
-        _for_each_inner!((GPIO42)); _for_each_inner!((GPIO43));
-        _for_each_inner!((GPIO44)); _for_each_inner!((GPIO45));
-        _for_each_inner!((GPIO46)); _for_each_inner!((GPIO47));
-        _for_each_inner!((GPIO48)); _for_each_inner!((AES(unstable)));
-        _for_each_inner!((APB_CTRL(unstable))); _for_each_inner!((APB_SARADC(unstable)));
+        _for_each_inner!((GPIO21)); _for_each_inner!((GPIO26));
+        _for_each_inner!((GPIO27)); _for_each_inner!((GPIO28));
+        _for_each_inner!((GPIO29)); _for_each_inner!((GPIO30));
+        _for_each_inner!((GPIO31)); _for_each_inner!((GPIO32));
+        _for_each_inner!((GPIO33)); _for_each_inner!((GPIO34));
+        _for_each_inner!((GPIO35)); _for_each_inner!((GPIO36));
+        _for_each_inner!((GPIO37)); _for_each_inner!((GPIO38));
+        _for_each_inner!((GPIO39)); _for_each_inner!((GPIO40));
+        _for_each_inner!((GPIO41)); _for_each_inner!((GPIO42));
+        _for_each_inner!((GPIO43)); _for_each_inner!((GPIO44));
+        _for_each_inner!((GPIO45)); _for_each_inner!((GPIO46));
+        _for_each_inner!((GPIO47)); _for_each_inner!((GPIO48));
+        _for_each_inner!((AES(unstable))); _for_each_inner!((APB_CTRL(unstable)));
+        _for_each_inner!((APB_SARADC(unstable)));
         _for_each_inner!((ASSIST_DEBUG(unstable))); _for_each_inner!((DMA(unstable)));
         _for_each_inner!((DS(unstable))); _for_each_inner!((EFUSE(unstable)));
         _for_each_inner!((EXTMEM(unstable))); _for_each_inner!((GPIO(unstable)));
@@ -2768,9 +2772,10 @@ macro_rules! for_each_peripheral {
         peri_type WIFI <= virtual() (unstable)))); _for_each_inner!((singletons(GPIO0),
         (GPIO1), (GPIO2), (GPIO3), (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9),
         (GPIO10), (GPIO11), (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17),
-        (GPIO18), (GPIO19), (GPIO20), (GPIO21), (GPIO33), (GPIO34), (GPIO35), (GPIO36),
-        (GPIO37), (GPIO38), (GPIO39), (GPIO40), (GPIO41), (GPIO42), (GPIO43), (GPIO44),
-        (GPIO45), (GPIO46), (GPIO47), (GPIO48), (AES(unstable)), (APB_CTRL(unstable)),
+        (GPIO18), (GPIO19), (GPIO20), (GPIO21), (GPIO26), (GPIO27), (GPIO28), (GPIO29),
+        (GPIO30), (GPIO31), (GPIO32), (GPIO33), (GPIO34), (GPIO35), (GPIO36), (GPIO37),
+        (GPIO38), (GPIO39), (GPIO40), (GPIO41), (GPIO42), (GPIO43), (GPIO44), (GPIO45),
+        (GPIO46), (GPIO47), (GPIO48), (AES(unstable)), (APB_CTRL(unstable)),
         (APB_SARADC(unstable)), (ASSIST_DEBUG(unstable)), (DMA(unstable)),
         (DS(unstable)), (EFUSE(unstable)), (EXTMEM(unstable)), (GPIO(unstable)),
         (GPIO_SD(unstable)), (HMAC(unstable)), (I2C_ANA_MST(unstable)), (I2C0), (I2C1),

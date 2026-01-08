@@ -2346,7 +2346,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((@ peri_type MEM2MEM15 <= virtual() (unstable)));
         _for_each_inner!((GPIO0)); _for_each_inner!((GPIO1)); _for_each_inner!((GPIO2));
         _for_each_inner!((GPIO3)); _for_each_inner!((GPIO4)); _for_each_inner!((GPIO5));
-        _for_each_inner!((GPIO8)); _for_each_inner!((GPIO9)); _for_each_inner!((GPIO10));
+        _for_each_inner!((GPIO6)); _for_each_inner!((GPIO7)); _for_each_inner!((GPIO8));
+        _for_each_inner!((GPIO9)); _for_each_inner!((GPIO10));
         _for_each_inner!((GPIO11)); _for_each_inner!((GPIO12));
         _for_each_inner!((GPIO13)); _for_each_inner!((GPIO14));
         _for_each_inner!((GPIO22)); _for_each_inner!((GPIO23));
@@ -2461,9 +2462,9 @@ macro_rules! for_each_peripheral {
         MEM2MEM12 <= virtual() (unstable)), (@ peri_type MEM2MEM13 <= virtual()
         (unstable)), (@ peri_type MEM2MEM14 <= virtual() (unstable)), (@ peri_type
         MEM2MEM15 <= virtual() (unstable)))); _for_each_inner!((singletons(GPIO0),
-        (GPIO1), (GPIO2), (GPIO3), (GPIO4), (GPIO5), (GPIO8), (GPIO9), (GPIO10),
-        (GPIO11), (GPIO12), (GPIO13), (GPIO14), (GPIO22), (GPIO23), (GPIO24), (GPIO25),
-        (GPIO26), (GPIO27), (AES(unstable)), (APB_SARADC(unstable)),
+        (GPIO1), (GPIO2), (GPIO3), (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9),
+        (GPIO10), (GPIO11), (GPIO12), (GPIO13), (GPIO14), (GPIO22), (GPIO23), (GPIO24),
+        (GPIO25), (GPIO26), (GPIO27), (AES(unstable)), (APB_SARADC(unstable)),
         (ASSIST_DEBUG(unstable)), (DMA(unstable)), (DS(unstable)), (ECC(unstable)),
         (EFUSE(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)), (HMAC(unstable)),
         (HP_APM(unstable)), (HP_SYS(unstable)), (I2C_ANA_MST(unstable)), (I2C0), (I2C1),

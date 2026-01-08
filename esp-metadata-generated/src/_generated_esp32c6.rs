@@ -3060,7 +3060,10 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((GPIO17)); _for_each_inner!((GPIO18));
         _for_each_inner!((GPIO19)); _for_each_inner!((GPIO20));
         _for_each_inner!((GPIO21)); _for_each_inner!((GPIO22));
-        _for_each_inner!((GPIO23)); _for_each_inner!((GPIO27));
+        _for_each_inner!((GPIO23)); _for_each_inner!((GPIO24));
+        _for_each_inner!((GPIO25)); _for_each_inner!((GPIO26));
+        _for_each_inner!((GPIO27)); _for_each_inner!((GPIO28));
+        _for_each_inner!((GPIO29)); _for_each_inner!((GPIO30));
         _for_each_inner!((AES(unstable))); _for_each_inner!((APB_SARADC(unstable)));
         _for_each_inner!((ASSIST_DEBUG(unstable))); _for_each_inner!((ATOMIC(unstable)));
         _for_each_inner!((DMA(unstable))); _for_each_inner!((DS(unstable)));
@@ -3189,18 +3192,18 @@ macro_rules! for_each_peripheral {
         (unstable)))); _for_each_inner!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
         (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11),
         (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19),
-        (GPIO20), (GPIO21), (GPIO22), (GPIO23), (GPIO27), (AES(unstable)),
-        (APB_SARADC(unstable)), (ASSIST_DEBUG(unstable)), (ATOMIC(unstable)),
-        (DMA(unstable)), (DS(unstable)), (ECC(unstable)), (EFUSE(unstable)),
-        (EXTMEM(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)), (HINF(unstable)),
-        (HMAC(unstable)), (HP_APM(unstable)), (HP_SYS(unstable)),
-        (I2C_ANA_MST(unstable)), (I2C0), (I2S0(unstable)), (IEEE802154(unstable)),
-        (INTERRUPT_CORE0(unstable)), (INTPRI(unstable)), (IO_MUX(unstable)),
-        (LEDC(unstable)), (LP_ANA(unstable)), (LP_AON(unstable)), (LP_APM(unstable)),
-        (LP_APM0(unstable)), (LP_CLKRST(unstable)), (LP_I2C0(unstable)),
-        (LP_I2C_ANA_MST(unstable)), (LP_IO(unstable)), (LP_PERI(unstable)),
-        (LP_TEE(unstable)), (LP_TIMER(unstable)), (LP_UART(unstable)),
-        (LP_WDT(unstable)), (LPWR(unstable)), (MCPWM0(unstable)),
+        (GPIO20), (GPIO21), (GPIO22), (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27),
+        (GPIO28), (GPIO29), (GPIO30), (AES(unstable)), (APB_SARADC(unstable)),
+        (ASSIST_DEBUG(unstable)), (ATOMIC(unstable)), (DMA(unstable)), (DS(unstable)),
+        (ECC(unstable)), (EFUSE(unstable)), (EXTMEM(unstable)), (GPIO(unstable)),
+        (GPIO_SD(unstable)), (HINF(unstable)), (HMAC(unstable)), (HP_APM(unstable)),
+        (HP_SYS(unstable)), (I2C_ANA_MST(unstable)), (I2C0), (I2S0(unstable)),
+        (IEEE802154(unstable)), (INTERRUPT_CORE0(unstable)), (INTPRI(unstable)),
+        (IO_MUX(unstable)), (LEDC(unstable)), (LP_ANA(unstable)), (LP_AON(unstable)),
+        (LP_APM(unstable)), (LP_APM0(unstable)), (LP_CLKRST(unstable)),
+        (LP_I2C0(unstable)), (LP_I2C_ANA_MST(unstable)), (LP_IO(unstable)),
+        (LP_PERI(unstable)), (LP_TEE(unstable)), (LP_TIMER(unstable)),
+        (LP_UART(unstable)), (LP_WDT(unstable)), (LPWR(unstable)), (MCPWM0(unstable)),
         (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)),
         (OTP_DEBUG(unstable)), (PARL_IO(unstable)), (PAU(unstable)), (PCNT(unstable)),
         (PCR(unstable)), (PLIC_MX(unstable)), (PMU(unstable)), (RMT(unstable)),

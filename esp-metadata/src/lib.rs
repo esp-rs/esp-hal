@@ -591,9 +591,7 @@ impl Config {
                     #pin <= virtual ()
                 };
                 all_peripherals.push(quote! { @peri_type #tokens });
-                if !gpio.limited {
-                    singleton_peripherals.push(quote! { #pin });
-                }
+                singleton_peripherals.push(quote! { #pin });
                 stable.push(tokens);
             }
         }

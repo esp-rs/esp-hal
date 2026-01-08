@@ -2496,10 +2496,13 @@ macro_rules! for_each_peripheral {
         (unstable))); _for_each_inner!((@ peri_type TOUCH <= virtual() (unstable)));
         _for_each_inner!((GPIO0)); _for_each_inner!((GPIO1)); _for_each_inner!((GPIO2));
         _for_each_inner!((GPIO3)); _for_each_inner!((GPIO4)); _for_each_inner!((GPIO5));
-        _for_each_inner!((GPIO12)); _for_each_inner!((GPIO13));
-        _for_each_inner!((GPIO14)); _for_each_inner!((GPIO15));
-        _for_each_inner!((GPIO16)); _for_each_inner!((GPIO17));
-        _for_each_inner!((GPIO18)); _for_each_inner!((GPIO19));
+        _for_each_inner!((GPIO6)); _for_each_inner!((GPIO7)); _for_each_inner!((GPIO8));
+        _for_each_inner!((GPIO9)); _for_each_inner!((GPIO10));
+        _for_each_inner!((GPIO11)); _for_each_inner!((GPIO12));
+        _for_each_inner!((GPIO13)); _for_each_inner!((GPIO14));
+        _for_each_inner!((GPIO15)); _for_each_inner!((GPIO16));
+        _for_each_inner!((GPIO17)); _for_each_inner!((GPIO18));
+        _for_each_inner!((GPIO19)); _for_each_inner!((GPIO20));
         _for_each_inner!((GPIO21)); _for_each_inner!((GPIO22));
         _for_each_inner!((GPIO23)); _for_each_inner!((GPIO25));
         _for_each_inner!((GPIO26)); _for_each_inner!((GPIO27));
@@ -2602,9 +2605,10 @@ macro_rules! for_each_peripheral {
         virtual() (unstable)), (@ peri_type PSRAM <= virtual() (unstable)), (@ peri_type
         SW_INTERRUPT <= virtual() (unstable)), (@ peri_type TOUCH <= virtual()
         (unstable)))); _for_each_inner!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
-        (GPIO4), (GPIO5), (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17),
-        (GPIO18), (GPIO19), (GPIO21), (GPIO22), (GPIO23), (GPIO25), (GPIO26), (GPIO27),
-        (GPIO32), (GPIO33), (GPIO34), (GPIO35), (GPIO36), (GPIO37), (GPIO38), (GPIO39),
+        (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11),
+        (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19),
+        (GPIO20), (GPIO21), (GPIO22), (GPIO23), (GPIO25), (GPIO26), (GPIO27), (GPIO32),
+        (GPIO33), (GPIO34), (GPIO35), (GPIO36), (GPIO37), (GPIO38), (GPIO39),
         (AES(unstable)), (APB_CTRL(unstable)), (BB(unstable)), (DPORT(unstable)),
         (SYSTEM(unstable)), (EFUSE(unstable)), (EMAC_DMA(unstable)),
         (EMAC_EXT(unstable)), (EMAC_MAC(unstable)), (FLASH_ENCRYPTION(unstable)),
