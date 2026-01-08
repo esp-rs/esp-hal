@@ -234,5 +234,54 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
         println!("{open_pr_url}");
     }
 
+    run_baseline_workflow(&plan)?;
+
+    Ok(())
+}
+
+/// Trigger the `api-baseline-generation.yml` workflow for API baseline generation.
+fn run_baseline_workflow(plan: &Plan) -> Result<()> {
+    // Only include packages where semver_checked is true, convert to kebab-case
+    let checked_package_names: Vec<&str> = plan
+        .packages
+        .iter()
+        .filter(|p| p.semver_checked)
+        .map(|p| p.package.as_ref())
+        .collect();
+
+    if checked_package_names.is_empty() {
+        log::info!("No packages with semver_checked = true. Skipping workflow dispatch.");
+        return Ok(());
+    }
+
+    // Check if GitHub CLI is available
+    let gh_check = Command::new("gh").arg("--version").output();
+    if gh_check.is_err() {
+        log::error!("GitHub CLI (gh) not available. Skipping workflow dispatch.");
+        return Ok(());
+    }
+
+    let mut cmd = Command::new("gh");
+    cmd.arg("workflow")
+        .arg("run")
+        .arg("api-baseline-generation.yml")
+        .arg("-R")
+        .arg("esp-rs/esp-hal")
+        .arg("--ref")
+        .arg("post-release-branch");
+
+    // Pass each package as a workflow input
+    for package in checked_package_names {
+        cmd.arg("-f").arg(format!("package_name={package}"));
+    }
+
+    let status = cmd.status().context("Failed to run gh workflow")?;
+
+    if !status.success() {
+        anyhow::bail!(
+            "gh workflow run failed - manual trigger of `API Baseline Generation` is required!"
+        );
+    }
+
     Ok(())
 }

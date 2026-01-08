@@ -60,7 +60,7 @@ jobs:
             echo "Using current repository: $TARGET_REPO"
           fi
           echo "GITHUB_REPOSITORY=$TARGET_REPO" >> $GITHUB_ENV
-          echo "📦 Target repository for baselines: $TARGET_REPO"
+          echo "Target repository for baselines: $TARGET_REPO"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
