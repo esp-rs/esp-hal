@@ -550,6 +550,25 @@ fn configure_rtc_fast_clk_impl(
     ets_delay_us(3);
 }
 
+// UART_MEM_CLK
+
+fn enable_uart_mem_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    // TODO: these functions (peripheral bus clock control) should be generated,
+    // replacing current PeripheralClockControl code.
+    // Enabling clock should probably not reset the peripheral.
+    let regs = SYSTEM::regs();
+
+    if en {
+        regs.perip_rst_en0()
+            .modify(|_, w| w.uart_mem_rst().bit(true));
+        regs.perip_rst_en0()
+            .modify(|_, w| w.uart_mem_rst().bit(false));
+    }
+
+    regs.perip_clk_en0()
+        .modify(|_, w| w.uart_mem_clk_en().bit(en));
+}
+
 // TIMG0_FUNCTION_CLOCK
 
 // Note that the function clock is a pre-requisite of the timer, but does not enable the counter.
@@ -638,6 +657,20 @@ fn configure_timg1_calibration_clock_impl(
         .modify(|_, w| unsafe { w.rtc_cali_clk_sel().bits(new_selector.cali_clk_sel_bits()) });
 }
 
+// UART0_MEM_CLOCK
+
+fn enable_uart0_mem_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_uart0_mem_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0MemClockConfig>,
+    _new_selector: Uart0MemClockConfig,
+) {
+    // Nothing to do.
+}
+
 // UART0_FUNCTION_CLOCK
 
 fn enable_uart0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -653,6 +686,20 @@ fn configure_uart0_function_clock_impl(
         w.tick_ref_always_on()
             .bit(new_selector == Uart0FunctionClockConfig::Apb)
     });
+}
+
+// UART1_MEM_CLOCK
+
+fn enable_uart1_mem_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_uart1_mem_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0MemClockConfig>,
+    _new_selector: Uart0MemClockConfig,
+) {
+    // Nothing to do.
 }
 
 // UART1_FUNCTION_CLOCK

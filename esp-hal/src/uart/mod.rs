@@ -69,7 +69,7 @@ use crate::{
     interrupt::InterruptHandler,
     pac::uart0::RegisterBlock,
     private::OnDrop,
-    soc::clocks::ClockTree,
+    soc::clocks::{self, ClockTree},
     system::PeripheralGuard,
 };
 
@@ -452,7 +452,7 @@ where
         let rx_guard = PeripheralGuard::new(self.uart.info().peripheral);
         let tx_guard = PeripheralGuard::new(self.uart.info().peripheral);
 
-        let mem_guard = create_mem_guard(unsafe { self.uart.clone_unchecked() });
+        let peri_clock_guard = UartClockGuard::new(unsafe { self.uart.clone_unchecked() });
 
         let rts_pin = PinGuard::new_unconnected();
         let tx_pin = PinGuard::new_unconnected();
@@ -462,13 +462,13 @@ where
                 uart: unsafe { self.uart.clone_unchecked() },
                 phantom: PhantomData,
                 guard: rx_guard,
-                mem_guard: mem_guard.clone(),
+                peri_clock_guard: peri_clock_guard.clone(),
             },
             tx: UartTx {
                 uart: self.uart,
                 phantom: PhantomData,
                 guard: tx_guard,
-                mem_guard,
+                peri_clock_guard,
                 rts_pin,
                 tx_pin,
                 baudrate: config.baudrate,
@@ -506,7 +506,7 @@ pub struct UartTx<'d, Dm: DriverMode> {
     uart: AnyUart<'d>,
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
-    mem_guard: MemoryGuard<'d>,
+    peri_clock_guard: UartClockGuard<'d>,
     rts_pin: PinGuard,
     tx_pin: PinGuard,
     baudrate: u32,
@@ -518,7 +518,7 @@ pub struct UartRx<'d, Dm: DriverMode> {
     uart: AnyUart<'d>,
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
-    mem_guard: MemoryGuard<'d>,
+    peri_clock_guard: UartClockGuard<'d>,
 }
 
 /// A configuration error.
@@ -652,7 +652,7 @@ impl<'d> UartTx<'d, Blocking> {
             uart: self.uart,
             phantom: PhantomData,
             guard: self.guard,
-            mem_guard: self.mem_guard,
+            peri_clock_guard: self.peri_clock_guard,
             rts_pin: self.rts_pin,
             tx_pin: self.tx_pin,
             baudrate: self.baudrate,
@@ -676,7 +676,7 @@ impl<'d> UartTx<'d, Async> {
             uart: self.uart,
             phantom: PhantomData,
             guard: self.guard,
-            mem_guard: self.mem_guard,
+            peri_clock_guard: self.peri_clock_guard,
             rts_pin: self.rts_pin,
             tx_pin: self.tx_pin,
             baudrate: self.baudrate,
@@ -1029,7 +1029,7 @@ impl<'d> UartRx<'d, Blocking> {
             uart: self.uart,
             phantom: PhantomData,
             guard: self.guard,
-            mem_guard: self.mem_guard,
+            peri_clock_guard: self.peri_clock_guard,
         }
     }
 }
@@ -1050,7 +1050,7 @@ impl<'d> UartRx<'d, Async> {
             uart: self.uart,
             phantom: PhantomData,
             guard: self.guard,
-            mem_guard: self.mem_guard,
+            peri_clock_guard: self.peri_clock_guard,
         }
     }
 
@@ -2997,8 +2997,8 @@ pub struct Info {
     /// RTS (Request to Send) pin
     pub rts_signal: OutputSignal,
 
-    pub request_sclk: fn(&mut ClockTree),
-    pub release_sclk: fn(&mut ClockTree),
+    pub request_uart_clks: fn(&mut ClockTree),
+    pub release_uart_clks: fn(&mut ClockTree),
     pub configure_sclk: fn(&mut ClockTree, ClockSource),
     pub sclk_frequency: fn(&mut ClockTree) -> u32,
 }
@@ -3018,10 +3018,6 @@ pub struct State {
 
     /// Stores whether the RX half is configured for async operation.
     pub is_tx_async: AtomicBool,
-
-    /// Reference count for memory clock control.
-    #[cfg(uart_peripheral_controls_mem_clk)]
-    pub mem_ref_count: AtomicUsize,
 }
 
 impl Info {
@@ -3760,9 +3756,23 @@ for_each_uart! {
                     rx_waker: AtomicWaker::new(),
                     is_rx_async: AtomicBool::new(false),
                     is_tx_async: AtomicBool::new(false),
-                    #[cfg(uart_peripheral_controls_mem_clk)]
-                    mem_ref_count: AtomicUsize::new(0),
                 };
+
+                fn request_uart_clks(clocks: &mut ClockTree) {
+                    paste::paste! {
+                        clocks:: [< request_ $inst:lower _function_clock >](clocks);
+                        #[cfg(soc_has_clock_node_uart0_mem_clock)]
+                        clocks:: [< request_ $inst:lower _mem_clock >](clocks);
+                    }
+                }
+
+                fn release_uart_clks(clocks: &mut ClockTree) {
+                    paste::paste! {
+                        #[cfg(soc_has_clock_node_uart0_mem_clock)]
+                        clocks:: [< release_ $inst:lower _mem_clock >](clocks);
+                        clocks:: [< release_ $inst:lower _function_clock >](clocks);
+                    }
+                }
 
                 static PERIPHERAL: Info = Info {
                     register_block: crate::peripherals::$inst::ptr(),
@@ -3772,10 +3782,10 @@ for_each_uart! {
                     rx_signal: InputSignal::$rxd,
                     cts_signal: InputSignal::$cts,
                     rts_signal: OutputSignal::$rts,
-                    request_sclk: paste::paste!(crate::soc::clocks:: [< request_ $inst:lower _function_clock >]),
-                    release_sclk: paste::paste!(crate::soc::clocks:: [< release_ $inst:lower _function_clock >]),
-                    configure_sclk: paste::paste!(crate::soc::clocks:: [< configure_ $inst:lower _function_clock >]),
-                    sclk_frequency: paste::paste!(crate::soc::clocks:: [< $inst:lower _function_clock_frequency >]),
+                    request_uart_clks,
+                    release_uart_clks,
+                    configure_sclk: paste::paste!(clocks:: [< configure_ $inst:lower _function_clock >]),
+                    sclk_frequency: paste::paste!(clocks:: [< $inst:lower _function_clock_frequency >]),
                 };
                 (&PERIPHERAL, &STATE)
             }
@@ -3826,67 +3836,29 @@ impl AnyUart<'_> {
     }
 }
 
-// UART memory can be powered down separately from the peripheral. Different devices do this in
-// different ways:
-// - For some, a shared clock enable bit is available, similar to peripheral clock enable bits. For
-//   these devices, we rely on the Peripheral enum and the standard peripheral clock control.
-// - For others, a bit exists in each peripheral's control register. For these devices, we implement
-//   reference counting in this driver.
-cfg_if::cfg_if! {
-    if #[cfg(uart_peripheral_controls_mem_clk)] {
-        // For these devices the memory clock is controlled by the UART peripheral.
-        use portable_atomic::AtomicUsize;
+struct UartClockGuard<'t> {
+    uart: AnyUart<'t>,
+}
 
-        struct MemoryGuard<'t> {
-            uart: AnyUart<'t>
-        }
+impl<'t> UartClockGuard<'t> {
+    fn new(uart: AnyUart<'t>) -> Self {
+        ClockTree::with(|clocks| {
+            (uart.info().configure_sclk)(clocks, Default::default());
+            (uart.info().request_uart_clks)(clocks);
+        });
 
-        impl<'t> MemoryGuard<'t> {
-            fn new(uart: AnyUart<'t>) -> Self {
-                let this = Self { uart };
+        Self { uart }
+    }
+}
 
-                if this.refcount().fetch_add(1, Ordering::SeqCst) == 0 {
-                    this.enable_memory_clk(true);
-                }
+impl Clone for UartClockGuard<'_> {
+    fn clone(&self) -> Self {
+        Self::new(unsafe { self.uart.clone_unchecked() })
+    }
+}
 
-                this
-            }
-
-            fn enable_memory_clk(&self, clk: bool) {
-                self.uart.info().regs().conf0().modify(|_, w| w.mem_clk_en().bit(clk));
-            }
-
-            fn refcount(&self) -> &AtomicUsize {
-                &self.uart.state().mem_ref_count
-            }
-        }
-
-        impl Clone for MemoryGuard<'_> {
-            fn clone(&self) -> Self {
-                self.refcount().fetch_add(1, Ordering::SeqCst);
-
-                Self { uart: unsafe { self.uart.clone_unchecked() } }
-            }
-        }
-
-        impl Drop for MemoryGuard<'_> {
-            fn drop(&mut self) {
-                if self.refcount().fetch_sub(1, Ordering::SeqCst) == 1 {
-                    self.enable_memory_clk(false);
-                }
-            }
-        }
-
-        fn create_mem_guard(uart: AnyUart<'_>) -> MemoryGuard<'_> {
-            MemoryGuard::new(uart)
-        }
-    } else {
-        // For these devices, the memory clock is a separate peripheral clock.
-        use crate::system::{Peripheral, GenericPeripheralGuard};
-        type MemoryGuard<'t> = GenericPeripheralGuard<{ Peripheral::UartMem as u8 }>;
-
-        fn create_mem_guard(_uart: AnyUart<'_>) -> MemoryGuard<'_> {
-            MemoryGuard::new()
-        }
+impl Drop for UartClockGuard<'_> {
+    fn drop(&mut self) {
+        ClockTree::with(self.uart.info().release_uart_clks);
     }
 }

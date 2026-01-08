@@ -223,7 +223,7 @@ clocks = { system_clocks = { clock_tree = [
             { name = "PLL_F80M", outputs = "PLL_F80M" },
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
             { name = "XTAL",     outputs = "XTAL_CLK" },
-        ] }
+        ] },
     ] },
     { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, clocks = "Uart0" },
     { name = "I2cExt0", template_params = { peripheral = "i2c0" } },

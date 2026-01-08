@@ -18,7 +18,7 @@ use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
     efuse::{Efuse, VOL_LEVEL_HP_INV},
-    peripherals::{APB_CTRL, DPORT, LPWR, RTC_IO, TIMG0, TIMG1, UART0, UART1, UART2},
+    peripherals::{APB_CTRL, LPWR, RTC_IO, SYSTEM, TIMG0, TIMG1, UART0, UART1, UART2},
     rtc_cntl::Rtc,
     soc::regi2c,
     time::Rate,
@@ -524,7 +524,7 @@ fn configure_cpu_clk_impl(
         _ => 0, // divide-by-4 or don't care
     };
 
-    DPORT::regs()
+    SYSTEM::regs()
         .cpu_per_conf()
         .modify(|_, w| unsafe { w.cpuperiod_sel().bits(clock_source_sel1_bit) });
 
@@ -662,6 +662,25 @@ fn configure_rtc_fast_clk_impl(
     });
 }
 
+// UART_MEM_CLK
+
+fn enable_uart_mem_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    // TODO: these functions (peripheral bus clock control) should be generated,
+    // replacing current PeripheralClockControl code.
+    // Enabling clock should probably not reset the peripheral.
+    let regs = SYSTEM::regs();
+
+    if en {
+        regs.perip_rst_en()
+            .modify(|_, w| w.uart_mem_rst().bit(true));
+        regs.perip_rst_en()
+            .modify(|_, w| w.uart_mem_rst().bit(false));
+    }
+
+    regs.perip_clk_en()
+        .modify(|_, w| w.uart_mem_clk_en().bit(en));
+}
+
 // MCPWM0_FUNCTION_CLOCK
 
 fn enable_mcpwm0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -734,6 +753,20 @@ fn configure_timg1_calibration_clock_impl(
         .modify(|_, w| unsafe { w.rtc_cali_clk_sel().bits(new_selector.cali_clk_sel_bits()) });
 }
 
+// UART0_MEM_CLOCK
+
+fn enable_uart0_mem_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_uart0_mem_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0MemClockConfig>,
+    _new_selector: Uart0MemClockConfig,
+) {
+    // Nothing to do.
+}
+
 // UART0_FUNCTION_CLOCK
 
 fn enable_uart0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -751,6 +784,20 @@ fn configure_uart0_function_clock_impl(
     });
 }
 
+// UART1_MEM_CLOCK
+
+fn enable_uart1_mem_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_uart1_mem_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0MemClockConfig>,
+    _new_selector: Uart0MemClockConfig,
+) {
+    // Nothing to do.
+}
+
 // UART1_FUNCTION_CLOCK
 
 fn enable_uart1_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -766,6 +813,20 @@ fn configure_uart1_function_clock_impl(
         w.tick_ref_always_on()
             .bit(new_selector == Uart0FunctionClockConfig::Apb)
     });
+}
+
+// UART2_MEM_CLOCK
+
+fn enable_uart2_mem_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_uart2_mem_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0MemClockConfig>,
+    _new_selector: Uart0MemClockConfig,
+) {
+    // Nothing to do.
 }
 
 // UART2_FUNCTION_CLOCK

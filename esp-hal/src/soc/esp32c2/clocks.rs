@@ -605,6 +605,27 @@ fn configure_low_power_clk_impl(
     });
 }
 
+// UART_MEM_CLK
+
+fn enable_uart_mem_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    // TODO: these functions (peripheral bus clock control) should be generated,
+    // replacing current PeripheralClockControl code.
+    // Enabling clock should probably not reset the peripheral.
+    let regs = SYSTEM::regs();
+
+    if en {
+        regs.perip_rst_en0()
+            .modify(|_, w| w.uart_mem_rst().bit(true));
+        regs.perip_rst_en0()
+            .modify(|_, w| w.uart_mem_rst().bit(false));
+    }
+
+    regs.perip_clk_en0()
+        .modify(|_, w| w.uart_mem_clk_en().bit(en));
+}
+
+// TIMG0_FUNCTION_CLOCK
+
 fn enable_timg0_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
     // TODO: should we model T0_DIVIDER, too?
     TIMG0::regs()
@@ -661,6 +682,20 @@ fn configure_timg0_wdt_clock_impl(
     });
 }
 
+// UART0_MEM_CLOCK
+
+fn enable_uart0_mem_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_uart0_mem_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0MemClockConfig>,
+    _new_selector: Uart0MemClockConfig,
+) {
+    // Nothing to do.
+}
+
 // UART0_FUNCTION_CLOCK
 
 fn enable_uart0_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
@@ -679,6 +714,20 @@ fn configure_uart0_function_clock_impl(
             Uart0FunctionClockConfig::Xtal => 3,
         })
     });
+}
+
+// UART1_MEM_CLOCK
+
+fn enable_uart1_mem_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_uart1_mem_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0MemClockConfig>,
+    _new_selector: Uart0MemClockConfig,
+) {
+    // Nothing to do.
 }
 
 // UART1_FUNCTION_CLOCK
