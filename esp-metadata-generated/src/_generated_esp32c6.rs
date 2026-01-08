@@ -2990,9 +2990,14 @@ macro_rules! for_each_peripheral {
         "Please check the documentation for your specific device."] #[doc =
         "Using a reserved pin may result in unexpected behavior."] #[doc = "</section>"]
         GPIO26 <= virtual())); _for_each_inner!((@ peri_type #[doc =
-        "GPIO27 peripheral singleton"] GPIO27 <= virtual())); _for_each_inner!((@
-        peri_type #[doc = "GPIO28 peripheral singleton (Potentially reserved)"] #[doc =
-        ""] #[doc = "<section class=\"warning\">"] #[doc =
+        "GPIO27 peripheral singleton (Potentially reserved)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "On some chip variants or modules, this pin may be reserved."] #[doc =
+        "Please check the documentation for your specific device."] #[doc =
+        "Using a reserved pin may result in unexpected behavior."] #[doc = "</section>"]
+        GPIO27 <= virtual())); _for_each_inner!((@ peri_type #[doc =
+        "GPIO28 peripheral singleton (Potentially reserved)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
         "On some chip variants or modules, this pin may be reserved."] #[doc =
         "Please check the documentation for your specific device."] #[doc =
         "Using a reserved pin may result in unexpected behavior."] #[doc = "</section>"]
@@ -3251,8 +3256,13 @@ macro_rules! for_each_peripheral {
         "On some chip variants or modules, this pin may be reserved."] #[doc =
         "Please check the documentation for your specific device."] #[doc =
         "Using a reserved pin may result in unexpected behavior."] #[doc = "</section>"]
-        GPIO26 <= virtual()), (@ peri_type #[doc = "GPIO27 peripheral singleton"] GPIO27
-        <= virtual()), (@ peri_type #[doc =
+        GPIO26 <= virtual()), (@ peri_type #[doc =
+        "GPIO27 peripheral singleton (Potentially reserved)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "On some chip variants or modules, this pin may be reserved."] #[doc =
+        "Please check the documentation for your specific device."] #[doc =
+        "Using a reserved pin may result in unexpected behavior."] #[doc = "</section>"]
+        GPIO27 <= virtual()), (@ peri_type #[doc =
         "GPIO28 peripheral singleton (Potentially reserved)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
         "On some chip variants or modules, this pin may be reserved."] #[doc =
