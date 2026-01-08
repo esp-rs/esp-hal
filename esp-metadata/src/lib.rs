@@ -565,8 +565,6 @@ impl Config {
     }
 
     fn generate_peripherals_macro(&self) -> TokenStream {
-        let mut stable = vec![];
-        let mut unstable = vec![];
         let mut all_peripherals = vec![];
         let mut singleton_peripherals = vec![];
 
@@ -607,7 +605,6 @@ Using a reserved pin may result in unexpected behavior.
                 };
                 all_peripherals.push(quote! { @peri_type #tokens });
                 singleton_peripherals.push(quote! { #pin });
-                stable.push(tokens);
             }
         }
 
@@ -638,11 +635,9 @@ Using a reserved pin may result in unexpected behavior.
             {
                 all_peripherals.push(quote! { @peri_type #tokens });
                 singleton_peripherals.push(quote! { #hal });
-                stable.push(tokens);
             } else {
                 all_peripherals.push(quote! { @peri_type #tokens (unstable) });
                 singleton_peripherals.push(quote! { #hal (unstable) });
-                unstable.push(tokens);
             }
         }
 
