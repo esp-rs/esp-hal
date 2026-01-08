@@ -16,13 +16,12 @@ pub(crate) use crate::soc::pac;
 
 /// Macro to create a peripheral structure.
 macro_rules! create_peripheral {
-    ($(#[$attr:meta])? $name:ident <= virtual ($($interrupt:ident: { $bind:ident, $enable:ident, $disable:ident }),*)) => {
-        $(#[$attr])?
+    ($(#[$attr:meta])* $name:ident <= virtual ($($interrupt:ident: { $bind:ident, $enable:ident, $disable:ident }),*)) => {
         #[derive(Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         #[non_exhaustive]
         #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-        #[doc = concat!(stringify!($name), " peripheral singleton")]
+        $(#[$attr])*
         pub struct $name<'a> {
             _marker: core::marker::PhantomData<&'a mut ()>,
         }
@@ -87,8 +86,8 @@ macro_rules! create_peripheral {
         impl $crate::private::Sealed for $name<'_> {}
     };
 
-    ($(#[$attr:meta])? $name:ident <= $base:ident $interrupts:tt) => {
-        create_peripheral!($(#[$attr])? $name <= virtual $interrupts);
+    ($(#[$attr:meta])* $name:ident <= $base:ident $interrupts:tt) => {
+        create_peripheral!($(#[$attr])* $name <= virtual $interrupts);
 
         impl $name<'_> {
             #[doc = r"Pointer to the register block"]
@@ -121,13 +120,13 @@ macro_rules! create_peripheral {
 
 for_each_peripheral! {
     // Define stable peripheral singletons
-    (@peri_type $name:ident <= $from_pac:tt $interrupts:tt) => {
-        create_peripheral!($name <= $from_pac $interrupts);
+    (@peri_type $(#[$meta:meta])* $name:ident <= $from_pac:tt $interrupts:tt) => {
+        create_peripheral!( $(#[$meta])* $name <= $from_pac $interrupts);
     };
 
     // Define unstable peripheral singletons
-    (@peri_type $name:ident <= $from_pac:tt $interrupts:tt (unstable)) => {
-        create_peripheral!(#[instability::unstable] $name <= $from_pac $interrupts);
+    (@peri_type $(#[$meta:meta])* $name:ident <= $from_pac:tt $interrupts:tt (unstable)) => {
+        create_peripheral!(#[instability::unstable] $(#[$meta])* $name <= $from_pac $interrupts);
     };
 
     // Define the Peripherals struct

@@ -587,8 +587,23 @@ impl Config {
         if let Some(gpio) = self.device.peri_config.gpio.as_ref() {
             for gpio in gpio.pins_and_signals.pins.iter() {
                 let pin = format_ident!("GPIO{}", gpio.pin);
+                let mut docs = format!("GPIO{} peripheral singleton", gpio.pin);
+                if gpio.limited {
+                    // TODO: tailor this warning by _what_ the pin may be used for.
+                    // Append a marker and an explanation to the short description
+                    docs.push_str(
+                        r#" (Potentially reserved)
+
+<section class="warning">
+On some chip variants or modules, this pin may be reserved.
+Please check the documentation for your specific device.
+Using a reserved pin may result in unexpected behavior.
+</section>"#,
+                    );
+                }
+                let docs = docs.lines();
                 let tokens = quote! {
-                    #pin <= virtual ()
+                    #(#[doc = #docs])* #pin <= virtual ()
                 };
                 all_peripherals.push(quote! { @peri_type #tokens });
                 singleton_peripherals.push(quote! { #pin });
@@ -613,8 +628,9 @@ impl Config {
                 let disable = format_ident!("disable_{k}_interrupt");
                 quote! { #pac_interrupt_name: { #bind, #enable, #disable } }
             });
+            let singleton_doc = format!("{} peripheral singleton", peri.name);
             let tokens = quote! {
-                #hal <= #pac ( #(#interrupts),* )
+                #[doc = #singleton_doc] #hal <= #pac ( #(#interrupts),* )
             };
             if stable_peris
                 .iter()
