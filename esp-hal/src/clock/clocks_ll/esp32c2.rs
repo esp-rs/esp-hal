@@ -1,5 +1,5 @@
 use crate::{
-    clock::{RtcClock, XtalClock},
+    clock::Clocks,
     peripherals::{APB_CTRL, MODEM_CLKRST},
 };
 
@@ -61,14 +61,17 @@ pub(super) fn ble_rtc_clk_init() {
         w.lp_timer_sel_rtc_slow().clear_bit()
     });
 
-    let divider = match RtcClock::xtal_freq() {
-        XtalClock::_26M => 129,
-        XtalClock::_40M => 249,
+    let xtal_frequency = Clocks::get().xtal_clock;
+    let bt_lpclk_target = match xtal_frequency.as_mhz() {
+        26 => 40000,
+        // 40MHz
+        _ => 32000,
     };
+    let divider = xtal_frequency.as_hz() / (5 * bt_lpclk_target) - 1;
 
     MODEM_CLKRST::regs()
         .modem_lp_timer_conf()
-        .modify(|_, w| unsafe { w.lp_timer_clk_div_num().bits(divider) });
+        .modify(|_, w| unsafe { w.lp_timer_clk_div_num().bits(divider as u8) });
 
     MODEM_CLKRST::regs().etm_clk_conf().modify(|_, w| {
         w.etm_clk_active().set_bit();

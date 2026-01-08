@@ -283,7 +283,6 @@ driver_configs![
         driver: soc,
         name: "SOC",
         hide_from_peri_table: true,
-        has_computed_properties: true,
         properties: {
             #[serde(default)]
             cpu_has_csr_pc: bool,
@@ -295,7 +294,6 @@ driver_configs![
             rc_fast_clk_default: Option<u32>,
             #[serde(default)]
             rc_slow_clock: Option<u32>,
-            xtal_options: Vec<u32>,
             #[serde(default)]
             clocks: DeviceClocks,
             memory_map: MemoryMap,

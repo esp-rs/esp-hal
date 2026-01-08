@@ -54,12 +54,6 @@ macro_rules! property {
     ("soc.rc_slow_clock", str) => {
         stringify!(136000)
     };
-    ("soc.xtal_frequency") => {
-        40
-    };
-    ("soc.xtal_frequency", str) => {
-        stringify!(40)
-    };
     ("aes.dma") => {
         true
     };
@@ -278,14 +272,6 @@ macro_rules! property {
     };
     ("phy.combo_module") => {
         true
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_soc_xtal_options {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
-        _for_each_inner!((40)); _for_each_inner!((all(40)));
     };
 }
 #[macro_export]
