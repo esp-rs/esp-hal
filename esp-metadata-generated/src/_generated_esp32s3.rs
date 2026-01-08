@@ -2603,38 +2603,61 @@ macro_rules! for_each_peripheral {
         "Please check the documentation for your specific device."] #[doc =
         "Using a reserved pin may result in unexpected behavior."] #[doc = "</section>"]
         GPIO32 <= virtual())); _for_each_inner!((@ peri_type #[doc =
-        "GPIO33 peripheral singleton"] GPIO33 <= virtual())); _for_each_inner!((@
-        peri_type #[doc = "GPIO34 peripheral singleton"] GPIO34 <= virtual()));
-        _for_each_inner!((@ peri_type #[doc = "GPIO35 peripheral singleton"] GPIO35 <=
-        virtual())); _for_each_inner!((@ peri_type #[doc = "GPIO36 peripheral singleton"]
+        "GPIO33 peripheral singleton (Potentially reserved)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "On some chip variants or modules, this pin may be reserved."] #[doc =
+        "Please check the documentation for your specific device."] #[doc =
+        "Using a reserved pin may result in unexpected behavior."] #[doc = "</section>"]
+        GPIO33 <= virtual())); _for_each_inner!((@ peri_type #[doc =
+        "GPIO34 peripheral singleton (Potentially reserved)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "On some chip variants or modules, this pin may be reserved."] #[doc =
+        "Please check the documentation for your specific device."] #[doc =
+        "Using a reserved pin may result in unexpected behavior."] #[doc = "</section>"]
+        GPIO34 <= virtual())); _for_each_inner!((@ peri_type #[doc =
+        "GPIO35 peripheral singleton (Potentially reserved)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "On some chip variants or modules, this pin may be reserved."] #[doc =
+        "Please check the documentation for your specific device."] #[doc =
+        "Using a reserved pin may result in unexpected behavior."] #[doc = "</section>"]
+        GPIO35 <= virtual())); _for_each_inner!((@ peri_type #[doc =
+        "GPIO36 peripheral singleton (Potentially reserved)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "On some chip variants or modules, this pin may be reserved."] #[doc =
+        "Please check the documentation for your specific device."] #[doc =
+        "Using a reserved pin may result in unexpected behavior."] #[doc = "</section>"]
         GPIO36 <= virtual())); _for_each_inner!((@ peri_type #[doc =
-        "GPIO37 peripheral singleton"] GPIO37 <= virtual())); _for_each_inner!((@
-        peri_type #[doc = "GPIO38 peripheral singleton"] GPIO38 <= virtual()));
-        _for_each_inner!((@ peri_type #[doc = "GPIO39 peripheral singleton"] GPIO39 <=
-        virtual())); _for_each_inner!((@ peri_type #[doc = "GPIO40 peripheral singleton"]
-        GPIO40 <= virtual())); _for_each_inner!((@ peri_type #[doc =
-        "GPIO41 peripheral singleton"] GPIO41 <= virtual())); _for_each_inner!((@
-        peri_type #[doc = "GPIO42 peripheral singleton"] GPIO42 <= virtual()));
-        _for_each_inner!((@ peri_type #[doc = "GPIO43 peripheral singleton"] GPIO43 <=
-        virtual())); _for_each_inner!((@ peri_type #[doc = "GPIO44 peripheral singleton"]
-        GPIO44 <= virtual())); _for_each_inner!((@ peri_type #[doc =
-        "GPIO45 peripheral singleton"] GPIO45 <= virtual())); _for_each_inner!((@
-        peri_type #[doc = "GPIO46 peripheral singleton"] GPIO46 <= virtual()));
-        _for_each_inner!((@ peri_type #[doc = "GPIO47 peripheral singleton"] GPIO47 <=
-        virtual())); _for_each_inner!((@ peri_type #[doc = "GPIO48 peripheral singleton"]
-        GPIO48 <= virtual())); _for_each_inner!((@ peri_type #[doc =
-        "AES peripheral singleton"] AES <= AES(AES : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "APB_CTRL peripheral singleton"] APB_CTRL
-        <= APB_CTRL() (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "APB_SARADC peripheral singleton"] APB_SARADC <= APB_SARADC() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "ASSIST_DEBUG peripheral singleton"]
-        ASSIST_DEBUG <= ASSIST_DEBUG() (unstable))); _for_each_inner!((@ peri_type #[doc
-        = "DMA peripheral singleton"] DMA <= DMA() (unstable))); _for_each_inner!((@
-        peri_type #[doc = "DS peripheral singleton"] DS <= DS() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "EFUSE peripheral singleton"] EFUSE <=
-        EFUSE() (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "EXTMEM peripheral singleton"] EXTMEM <= EXTMEM() (unstable)));
+        "GPIO37 peripheral singleton (Potentially reserved)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "On some chip variants or modules, this pin may be reserved."] #[doc =
+        "Please check the documentation for your specific device."] #[doc =
+        "Using a reserved pin may result in unexpected behavior."] #[doc = "</section>"]
+        GPIO37 <= virtual())); _for_each_inner!((@ peri_type #[doc =
+        "GPIO38 peripheral singleton"] GPIO38 <= virtual())); _for_each_inner!((@
+        peri_type #[doc = "GPIO39 peripheral singleton"] GPIO39 <= virtual()));
+        _for_each_inner!((@ peri_type #[doc = "GPIO40 peripheral singleton"] GPIO40 <=
+        virtual())); _for_each_inner!((@ peri_type #[doc = "GPIO41 peripheral singleton"]
+        GPIO41 <= virtual())); _for_each_inner!((@ peri_type #[doc =
+        "GPIO42 peripheral singleton"] GPIO42 <= virtual())); _for_each_inner!((@
+        peri_type #[doc = "GPIO43 peripheral singleton"] GPIO43 <= virtual()));
+        _for_each_inner!((@ peri_type #[doc = "GPIO44 peripheral singleton"] GPIO44 <=
+        virtual())); _for_each_inner!((@ peri_type #[doc = "GPIO45 peripheral singleton"]
+        GPIO45 <= virtual())); _for_each_inner!((@ peri_type #[doc =
+        "GPIO46 peripheral singleton"] GPIO46 <= virtual())); _for_each_inner!((@
+        peri_type #[doc = "GPIO47 peripheral singleton"] GPIO47 <= virtual()));
+        _for_each_inner!((@ peri_type #[doc = "GPIO48 peripheral singleton"] GPIO48 <=
+        virtual())); _for_each_inner!((@ peri_type #[doc = "AES peripheral singleton"]
+        AES <= AES(AES : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner!((@ peri_type #[doc =
+        "APB_CTRL peripheral singleton"] APB_CTRL <= APB_CTRL() (unstable)));
+        _for_each_inner!((@ peri_type #[doc = "APB_SARADC peripheral singleton"]
+        APB_SARADC <= APB_SARADC() (unstable))); _for_each_inner!((@ peri_type #[doc =
+        "ASSIST_DEBUG peripheral singleton"] ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)));
+        _for_each_inner!((@ peri_type #[doc = "DMA peripheral singleton"] DMA <= DMA()
+        (unstable))); _for_each_inner!((@ peri_type #[doc = "DS peripheral singleton"] DS
+        <= DS() (unstable))); _for_each_inner!((@ peri_type #[doc =
+        "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable))); _for_each_inner!((@
+        peri_type #[doc = "EXTMEM peripheral singleton"] EXTMEM <= EXTMEM() (unstable)));
         _for_each_inner!((@ peri_type #[doc = "GPIO peripheral singleton"] GPIO <= GPIO()
         (unstable))); _for_each_inner!((@ peri_type #[doc =
         "GPIO_SD peripheral singleton"] GPIO_SD <= GPIO_SD() (unstable)));
@@ -2857,13 +2880,38 @@ macro_rules! for_each_peripheral {
         "On some chip variants or modules, this pin may be reserved."] #[doc =
         "Please check the documentation for your specific device."] #[doc =
         "Using a reserved pin may result in unexpected behavior."] #[doc = "</section>"]
-        GPIO32 <= virtual()), (@ peri_type #[doc = "GPIO33 peripheral singleton"] GPIO33
-        <= virtual()), (@ peri_type #[doc = "GPIO34 peripheral singleton"] GPIO34 <=
-        virtual()), (@ peri_type #[doc = "GPIO35 peripheral singleton"] GPIO35 <=
-        virtual()), (@ peri_type #[doc = "GPIO36 peripheral singleton"] GPIO36 <=
-        virtual()), (@ peri_type #[doc = "GPIO37 peripheral singleton"] GPIO37 <=
-        virtual()), (@ peri_type #[doc = "GPIO38 peripheral singleton"] GPIO38 <=
-        virtual()), (@ peri_type #[doc = "GPIO39 peripheral singleton"] GPIO39 <=
+        GPIO32 <= virtual()), (@ peri_type #[doc =
+        "GPIO33 peripheral singleton (Potentially reserved)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "On some chip variants or modules, this pin may be reserved."] #[doc =
+        "Please check the documentation for your specific device."] #[doc =
+        "Using a reserved pin may result in unexpected behavior."] #[doc = "</section>"]
+        GPIO33 <= virtual()), (@ peri_type #[doc =
+        "GPIO34 peripheral singleton (Potentially reserved)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "On some chip variants or modules, this pin may be reserved."] #[doc =
+        "Please check the documentation for your specific device."] #[doc =
+        "Using a reserved pin may result in unexpected behavior."] #[doc = "</section>"]
+        GPIO34 <= virtual()), (@ peri_type #[doc =
+        "GPIO35 peripheral singleton (Potentially reserved)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "On some chip variants or modules, this pin may be reserved."] #[doc =
+        "Please check the documentation for your specific device."] #[doc =
+        "Using a reserved pin may result in unexpected behavior."] #[doc = "</section>"]
+        GPIO35 <= virtual()), (@ peri_type #[doc =
+        "GPIO36 peripheral singleton (Potentially reserved)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "On some chip variants or modules, this pin may be reserved."] #[doc =
+        "Please check the documentation for your specific device."] #[doc =
+        "Using a reserved pin may result in unexpected behavior."] #[doc = "</section>"]
+        GPIO36 <= virtual()), (@ peri_type #[doc =
+        "GPIO37 peripheral singleton (Potentially reserved)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "On some chip variants or modules, this pin may be reserved."] #[doc =
+        "Please check the documentation for your specific device."] #[doc =
+        "Using a reserved pin may result in unexpected behavior."] #[doc = "</section>"]
+        GPIO37 <= virtual()), (@ peri_type #[doc = "GPIO38 peripheral singleton"] GPIO38
+        <= virtual()), (@ peri_type #[doc = "GPIO39 peripheral singleton"] GPIO39 <=
         virtual()), (@ peri_type #[doc = "GPIO40 peripheral singleton"] GPIO40 <=
         virtual()), (@ peri_type #[doc = "GPIO41 peripheral singleton"] GPIO41 <=
         virtual()), (@ peri_type #[doc = "GPIO42 peripheral singleton"] GPIO42 <=
