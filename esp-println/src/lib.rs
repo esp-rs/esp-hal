@@ -42,7 +42,7 @@ macro_rules! println {
         $crate::Printer::write_bytes(&[b'\n']);
     }};
     ($($arg:tt)*) => {{
-        fn _do_print(args: core::fmt::Arguments<'_>) -> Result<(), core::fmt::Error> {
+        fn _do_print(args: ::core::fmt::Arguments<'_>) -> ::core::result::Result<(), ::core::fmt::Error> {
             $crate::with(|_| {
                 use ::core::fmt::Write;
                 ($crate::Printer).write_fmt(args)?;
@@ -59,7 +59,7 @@ macro_rules! println {
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => {{
-        fn _do_print(args: core::fmt::Arguments<'_>) -> Result<(), core::fmt::Error> {
+        fn _do_print(args: ::core::fmt::Arguments<'_>) -> ::core::result::Result<(), ::core::fmt::Error> {
             $crate::with(|_| {
                 use ::core::fmt::Write;
                 ($crate::Printer).write_fmt(args)
