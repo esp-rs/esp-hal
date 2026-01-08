@@ -52,7 +52,7 @@ pub fn minimum_update(
     let mut cfg = GlobalConfig::new();
     cfg.set_log_level(Some(log::Level::Info));
     let result = semver_check.check_release(&mut cfg)?;
-    log::info!("Result {:?}", result);
+    log::trace!("Result {:?}", result);
 
     let mut min_required_update = ReleaseType::Patch;
     for (_, report) in result.crate_reports() {
