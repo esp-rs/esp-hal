@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SystemTimer::ticks_per_second()` now correctly returns the number of ticks per second. (#4634)
 - The interrupt request set by `SoftwareInterrupt::raise()` should now take effect before returning. (#4706)
 - Fixed an issue in `ShaBackend` that resulted in incorrect hash calculation (#4722)
+- The `Peripherals` struct is now marked as `#[non_exhaustive]`. This is a breaking change. (#4729)
 
 ### Removed
 

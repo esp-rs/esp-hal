@@ -138,6 +138,7 @@ for_each_peripheral! {
 
         /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip.
         #[allow(non_snake_case)]
+        #[non_exhaustive]
         pub struct Peripherals {
             $(
                 // This is a bit hairy, but non-macro attributes are not allowed on struct fields. We work
