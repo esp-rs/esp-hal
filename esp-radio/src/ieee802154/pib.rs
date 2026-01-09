@@ -55,8 +55,7 @@ pub enum CcaMode {
     CarrierAndEd = 0x03,
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Default, Clone, Copy)]
 struct Pib {
     auto_ack_tx: bool,
     auto_ack_rx: bool,

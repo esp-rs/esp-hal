@@ -69,8 +69,7 @@ static BT_STATE: NonReentrantMutex<BleState> = NonReentrantMutex::new(BleState {
 
 static mut HCI_OUT_COLLECTOR: MaybeUninit<HciOutCollector> = MaybeUninit::uninit();
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(PartialEq, Debug)]
 enum HciOutType {
     Unknown,
     Acl,

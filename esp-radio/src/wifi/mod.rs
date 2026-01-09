@@ -1044,7 +1044,7 @@ mod private {
 }
 
 /// Wi-Fi device operational modes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 enum WifiDeviceMode {
     /// Station mode.
