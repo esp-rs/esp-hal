@@ -5,7 +5,7 @@
 //% CHIPS(no_ble): esp32s2
 //% CHIPS(has_wifi_ble): esp32 esp32c2 esp32c3 esp32c6 esp32s3
 
-//% FEATURES: unstable esp-radio esp-alloc esp-radio/unstable embassy
+//% FEATURES: unstable esp-radio esp-alloc esp-radio/unstable embassy defmt
 //% FEATURES(no_ble): esp-radio/wifi
 //% FEATURES(no_wifi): esp-radio/ble
 //% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble

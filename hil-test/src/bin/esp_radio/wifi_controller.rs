@@ -45,6 +45,7 @@ mod tests {
         for _ in 0..ITERATIONS {
             let _ = controller.scan_with_config(scan_config).unwrap();
             let free = esp_alloc::HEAP.free();
+            defmt::info!("free: {}", free);
 
             if free <= min_free {
                 min_free = free;
