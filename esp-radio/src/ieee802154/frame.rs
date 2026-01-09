@@ -24,6 +24,7 @@ pub struct Frame {
     pub footer: [u8; 2],
 }
 
+// FIXME: Remove and use derive when defmt 1.0.2 is released (we need https://github.com/knurling-rs/defmt/pull/955)
 #[cfg(feature = "defmt")]
 impl defmt::Format for Frame {
     fn format(&self, f: defmt::Formatter<'_>) {
