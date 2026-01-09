@@ -27,19 +27,68 @@ jobs:
         steps:
             - uses: actions/checkout@v4
 
+            - name: Detect label in merge queue
+              if: github.event_name == 'merge_group'
+              id: skip_in_merge_queue
+              run: |
+                  COMMIT_MSG=$(git log -1 --pretty=%B)
+                  echo "Last commit message: $COMMIT_MSG"
+
+                  # Extract PR number from commit message if it follows conventional format
+                  PR_NUMBER=""
+                  if echo "$COMMIT_MSG" | grep -q "#"; then
+                    PR_NUMBER=$(echo "$COMMIT_MSG" | grep -o "#[0-9]*" | grep -o "[0-9]*")
+                  fi
+
+                  if [ -n "$PR_NUMBER" ]; then
+                    echo "Found PR number: $PR_NUMBER"
+
+                    LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' 2>/dev/null || true)
+                    echo "PR labels:"
+                    echo "$LABELS"
+
+                    # Extract packages from "breaking-change-" labels
+                    PACKAGES=""
+                    if [ -n "$LABELS" ]; then
+                      PACKAGES=$(echo "$LABELS" \
+                        | grep -E '^breaking-change-[a-z0-9-]+$' || true \
+                        | sed 's/^breaking-change-//' \
+                        | tr '\n' ',' \
+                        | sed 's/,$//')
+
+                      if [ -n "$PACKAGES" ]; then
+                        # TODO: skip only specific packages, not the whole check
+                        echo "Breaking change made for package(s): $PACKAGES"
+                        echo "skip_check=true" >> "$GITHUB_OUTPUT"
+                      else
+                        echo "No breaking-change-* labels found"
+                        echo "skip_check=false" >> "$GITHUB_OUTPUT"
+                      fi
+                    else
+                      echo "No labels found in commit message"
+                      echo "skip_check=false" >> "$GITHUB_OUTPUT"
+                    fi
+                  else
+                    echo "No PR number found in commit message"
+                    echo "skip_check=false" >> "$GITHUB_OUTPUT"
+                  fi
+
             # Install the Rust toolchain for Xtensa devices:
             - uses: esp-rs/xtensa-toolchain@v1.6
+              if: github.event_name != 'merge_group' || steps.skip_in_merge_queue.outputs.skip_check != 'true'
               with:
                   version: 1.92.0.0
 
             # Install the Rust stable toolchain for RISC-V devices:
             - uses: dtolnay/rust-toolchain@v1
+              if: github.event_name != 'merge_group' || steps.skip_in_merge_queue.outputs.skip_check != 'true'
               with:
                   target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
                   toolchain: stable
                   components: rust-src
 
             - name: Semver-Check
+              if: github.event_name != 'merge_group' || steps.skip_in_merge_queue.outputs.skip_check != 'true'
               shell: bash
               run: |
                   cargo xcheck semver-check download-baselines
