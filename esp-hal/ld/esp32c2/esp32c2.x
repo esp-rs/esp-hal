@@ -16,7 +16,7 @@ SECTIONS {
 
     /* Create an empty gap as big as .text section */
 
-    . = . + SIZEOF(.rodata_desc);
+    . = . + SIZEOF(.flash.app_desc);
     . = . + SIZEOF(.rodata);
     . = . + SIZEOF(.rodata.wifi);
 
