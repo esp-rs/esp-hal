@@ -15,6 +15,8 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
     let plan = Plan::from_path(&plan_path)
         .with_context(|| format!("Failed to read release plan from {}", plan_path.display()))?;
 
+    run_baseline_workflow(&plan)?;
+
     // Process packages from the plan that have migration guides
     for package_plan in plan.packages.iter() {
         let package = package_plan.package;
@@ -234,8 +236,6 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
         println!("{open_pr_url}");
     }
 
-    run_baseline_workflow(&plan)?;
-
     Ok(())
 }
 
@@ -261,14 +261,14 @@ fn run_baseline_workflow(plan: &Plan) -> Result<()> {
         return Ok(());
     }
 
+    log::info!("Triggering API Baseline Generation workflow from main branch.");
+
     let mut cmd = Command::new("gh");
     cmd.arg("workflow")
         .arg("run")
         .arg("api-baseline-generation.yml")
         .arg("-R")
-        .arg("esp-rs/esp-hal")
-        .arg("--ref")
-        .arg("post-release-branch");
+        .arg("esp-rs/esp-hal");
 
     // Pass each package as a workflow input
     for package in checked_package_names {
@@ -282,6 +282,8 @@ fn run_baseline_workflow(plan: &Plan) -> Result<()> {
             "gh workflow run failed - manual trigger of `API Baseline Generation` is required!"
         );
     }
+
+    log::info!("Workflow triggered successfully.");
 
     Ok(())
 }
