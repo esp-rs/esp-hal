@@ -46,7 +46,6 @@ SECTIONS {
   INCLUDE "rwtext.x"
   INCLUDE "rwdata.x"
 }
-INCLUDE "flash.x"
 INCLUDE "rodata.x"
 INCLUDE "text.x"
 INCLUDE "stack.x"

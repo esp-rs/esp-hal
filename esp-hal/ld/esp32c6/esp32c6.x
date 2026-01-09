@@ -25,7 +25,6 @@ INSERT BEFORE .text;
 /* end of esp32c6 fixups */
 
 /* Shared sections #2 - ordering matters */
-INCLUDE "flash.x"
 INCLUDE "rodata.x"
 INCLUDE "text.x"
 INCLUDE "rtc_fast.x"
