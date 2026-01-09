@@ -34,19 +34,23 @@ mod tests {
         controller.start().unwrap();
 
         let scan_config = ScanConfig::default().with_max(1);
+        for _ in 0..5 {
+            let _res = controller.scan_with_config(scan_config).unwrap();
+        }
 
         let mut min_free = usize::MAX;
-        for _ in 0..30 {
+        for _ in 0..25 {
             let _res = controller.scan_with_config(scan_config).unwrap();
             min_free = usize::min(min_free, esp_alloc::HEAP.free());
         }
 
         for _ in 0..10 {
             let _res = controller.scan_with_config(scan_config).unwrap();
+            let free = esp_alloc::HEAP.free();
             assert!(
-                esp_alloc::HEAP.free() < min_free,
+                free >= min_free,
                 "current free: {}, min free: {}",
-                esp_alloc::HEAP.free(),
+                free,
                 min_free
             );
         }

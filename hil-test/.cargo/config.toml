@@ -21,7 +21,7 @@ rustflags = [
 ]
 
 [env]
-DEFMT_LOG = "info,embedded_test=warn,esp_rtos=trace"
+DEFMT_LOG = "info"
 
 [unstable]
 build-std = ["core", "alloc"]
