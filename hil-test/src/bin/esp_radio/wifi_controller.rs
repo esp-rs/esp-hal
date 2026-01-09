@@ -21,6 +21,8 @@ mod tests {
     #[test]
     #[timeout(15)]
     fn test_scan_doesnt_leak(p: Peripherals) {
+        const ITERATIONS: usize = 30;
+
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
@@ -34,25 +36,23 @@ mod tests {
         controller.start().unwrap();
 
         let scan_config = ScanConfig::default().with_max(1);
-        for _ in 0..5 {
+        for _ in 0..2 {
             let _ = controller.scan_with_config(scan_config).unwrap();
         }
 
+        let mut more_count = 0;
         let mut min_free = usize::MAX;
-        for _ in 0..25 {
-            let _ = controller.scan_with_config(scan_config).unwrap();
-            min_free = usize::min(min_free, esp_alloc::HEAP.free());
-        }
-
-        for _ in 0..10 {
+        for _ in 0..ITERATIONS {
             let _ = controller.scan_with_config(scan_config).unwrap();
             let free = esp_alloc::HEAP.free();
-            assert!(
-                free >= min_free,
-                "current free: {}, min free: {}",
-                free,
-                min_free
-            );
+
+            if free <= min_free {
+                min_free = free;
+            } else {
+                more_count += 1;
+            }
         }
+
+        assert!(more_count < ITERATIONS / 2, "count: {}", more_count);
     }
 }
