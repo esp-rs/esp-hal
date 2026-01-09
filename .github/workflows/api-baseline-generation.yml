@@ -115,11 +115,13 @@ jobs:
             # Extract packages from "breaking-change-" labels
             PACKAGES=""
             if [ -n "$LABELS" ]; then
-              PACKAGES=$(echo "$LABELS" \
-                | grep -E '^breaking-change-[a-z0-9-]+$' || true \
-                | sed 's/^breaking-change-//' \
-                | tr '\n' ',' \
-                | sed 's/,$//')
+              PACKAGES=$(echo "$LABELS" | \
+                tr ',' '\n' | \
+                sed 's/ //g' | \
+                grep "^breaking-change-" | \
+                sed 's/breaking-change-//g' | \
+                tr '\n' ',' | \
+                sed 's/,$//') || PACKAGES=""
             fi
 
             if [ -n "$PACKAGES" ]; then
