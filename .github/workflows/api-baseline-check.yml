@@ -50,9 +50,11 @@ jobs:
                     # Extract packages from "breaking-change-" labels
                     PACKAGES=""
                     if [ -n "$LABELS" ]; then
+                      # -o: only output matches, not rows
+                      # -P: Perl-compatible regular expressions
+                      # `(?<=)`: look-behind: match only if this is present, but do not make this part of the match
                       PACKAGES=$(echo "$LABELS" \
-                        | grep -E '^breaking-change-[a-z0-9-]+$' || true \
-                        | sed 's/^breaking-change-//' \
+                        | grep -oP '(?<=^breaking-change-)[a-z0-9-]+$' || true \
                         | tr '\n' ',' \
                         | sed 's/,$//')
 
