@@ -11,9 +11,9 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       if: ${{ inputs.event_name == 'merge_group' }}
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       if: ${{ inputs.event_name == 'workflow_dispatch' }}
       with:
         repository: ${{ inputs.repository }}
@@ -52,7 +52,7 @@ runs:
           cargo xtask build tests ${{ inputs.soc }}
         fi
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v6
       with:
         name: tests-${{ inputs.soc }}
         path: ${{ github.workspace }}/target/tests/${{ inputs.soc }}
