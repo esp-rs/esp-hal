@@ -11,7 +11,7 @@ pub use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use strum::IntoEnumIterator;
 
-use crate::cfg::{SupportItem, SupportStatus, Value};
+use crate::cfg::{PinLimitation, SupportItem, SupportStatus, Value};
 
 macro_rules! include_toml {
     (Config, $file:expr) => {{
@@ -586,18 +586,45 @@ impl Config {
             for gpio in gpio.pins_and_signals.pins.iter() {
                 let pin = format_ident!("GPIO{}", gpio.pin);
                 let mut docs = format!("GPIO{} peripheral singleton", gpio.pin);
-                if gpio.limited {
-                    // TODO: tailor this warning by _what_ the pin may be used for.
+
+                let mut limitations = gpio.limitations.clone();
+
+                // Resolve implicit limitations - based on pin alternate functions
+                let implicit: &[(&[&str], PinLimitation)] = &[
+                    (&["MTMS", "MTCK", "MTDO", "MTDI"], PinLimitation::Jtag),
+                    (&["USB_DP", "USB_DM"], PinLimitation::UsbJtag),
+                    (&["U0TXD", "U0RXD"], PinLimitation::BootloaderUart),
+                ];
+
+                for i in 0..6 {
+                    if let Some(func) = gpio.functions.get(i) {
+                        for (pins, limitation) in implicit.iter() {
+                            if pins.contains(&func) {
+                                limitations.push(*limitation);
+                            }
+                        }
+                    }
+                }
+
+                if !limitations.is_empty() {
                     // Append a marker and an explanation to the short description
-                    docs.push_str(
-                        r#" (Potentially reserved)
+                    let limitations = limitations
+                        .iter()
+                        .map(|limitation| format!("<li>{}</li>", limitation))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    write!(
+                        &mut docs,
+                        r#" (Limitations exist)
 
 <section class="warning">
-On some chip variants or modules, this pin may be reserved.
-Please check the documentation for your specific device.
-Using a reserved pin may result in unexpected behavior.
+This pin may be available with certain limitations. Check your hardware to make sure whether you can use it.
+<ul>
+{limitations}
+</ul>
 </section>"#,
-                    );
+                    )
+                    .unwrap();
                 }
                 let docs = docs.lines();
                 let tokens = quote! {
