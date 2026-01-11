@@ -86,7 +86,7 @@ Ensuring the quality and reliability of `esp-hal` is a shared responsibility, an
 Further steps that can (or should) be taken in testing:
 
 * Using [xtask], build examples for the specified chip.
-* Build the documentation and run the doctests if they have been modified using the `build-documentation` and  `run-doc-test` commands in [xtask].
+* When documentation or doctests change, run `cargo xtask build documentation` and `cargo xtask run doc-tests <CHIP>` to build the documentation and run the doctests. To reduce build/test time, use `--packages` to specify the package and `--chips` (for documentation builds) to specify the target chip.
 * Run the [HIL] tests locally if changes have been made to them.
 
 For detailed instructions on how to use our HIL tests with comment commands, see the [HIL guide].
