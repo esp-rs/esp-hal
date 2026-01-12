@@ -23,6 +23,7 @@
   *( .wifirxiram  .wifirxiram.*)
   *( .wifislprxiram  .wifislprxiram.*)
   *( .wifislpiram  .wifislpiram.*)
+  *( .wifiorslpiram  .wifiorslpiram.*)
   *( .phyiram  .phyiram.*)
   *( .iram1  .iram1.*)
   *( .wifiextrairam.* )
