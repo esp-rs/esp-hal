@@ -22,15 +22,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{
-    ModeConfig,
-    WifiController,
-    WifiDevice,
-    WifiEvent,
-    WifiStationState,
-    sta::StationConfig,
-    station_state,
-};
+use esp_radio::wifi::{ModeConfig, WifiController, WifiDevice, WifiEvent, sta::StationConfig};
 use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -86,8 +78,8 @@ async fn connection_manager(
     }
 
     loop {
-        match station_state() {
-            WifiStationState::Connected => {
+        match controller.is_connected() {
+            Ok(true) => {
                 controller
                     .wait_for_event(WifiEvent::StationDisconnected)
                     .await;

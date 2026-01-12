@@ -93,3 +93,12 @@ BLE initialization:
 -    impl StationWpsErPin<'_> {
 +    impl StationWifiProtectedStatusEnrolleePin<'_> {
 ```
+
+## `ap_state` and `sta_state` are removed (together with the `WifiApState`/`WifiStaState`)
+
+Use `WifiController::is_started` and `WifiController::is_connected` instead.
+
+```diff
+-      if esp_radio::wifi::station_state() == WifiStationState::Connected {
++      if matches!(controller.is_connected(), Ok(true)) {
+```
