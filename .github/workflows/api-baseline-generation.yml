@@ -43,7 +43,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.inputs.tag_name || github.event.inputs.source_branch || 'main' }}
           fetch-depth: 10
@@ -154,7 +154,7 @@ jobs:
 
       - name: Upload API baselines as artifact
         if: steps.check-generation.outputs.should_generate == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: api-baselines-${{ github.event.inputs.package_name }}
           path: ${{ github.event.inputs.package_name }}/api-baseline/

@@ -44,7 +44,7 @@ jobs:
       # make sure that we take advantage of any subsequent updates to
       # the xtask which may have happened after a release was tagged.
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: esp-rs/esp-hal
       - name: Build xtask
@@ -53,7 +53,7 @@ jobs:
           cp target/debug/xtask ~/.cargo/bin/hal-xtask
 
       - name: Cache xtask for all jobs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: xtask
           path: target/debug/xtask
@@ -85,7 +85,7 @@ jobs:
         packages: ${{ fromJson(needs.setup.outputs.packages) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: esp-rs/xtensa-toolchain@v1.6
         with:
           default: true
@@ -97,7 +97,7 @@ jobs:
 
       # Checkout the tag we need to start building the docs
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         if: ${{ github.event_name == 'workflow_dispatch' }}
         with:
           repository: esp-rs/esp-hal
@@ -105,7 +105,7 @@ jobs:
 
       # If running a release PR, we want to build docs for the latest commit on the released branch.
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         if: ${{ github.event_name != 'workflow_dispatch' }}
         with:
           repository: esp-rs/esp-hal
@@ -126,7 +126,7 @@ jobs:
         run: find docs -name ".lock" -exec rm -f {} \;
 
       - name: Upload docs for ${{ matrix.packages.name }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.packages.name }}
           path: "docs/${{ matrix.packages.name }}"
@@ -138,7 +138,7 @@ jobs:
 
     steps:
       # Check out the sources, the xtask reads package versions from the Cargo.toml files
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download all docs and xtask
         uses: actions/download-artifact@v4
@@ -184,7 +184,7 @@ jobs:
         with:
           toolchain: nightly
           targets: riscv32imac-unknown-none-elf
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           repository: esp-rs/esp-hal
 

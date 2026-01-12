@@ -18,7 +18,6 @@ run-name: >
       )
   }}
 
-
 on:
   # No automatic PR runs; we'll trigger via slash/label + keep merge queue
   merge_group:
@@ -69,23 +68,26 @@ jobs:
 
     steps:
       # merge_group checks out the merge commit implicitly
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         if: github.event_name == 'merge_group'
       # workflow_dispatch: checkout requested repo+ref (prefer SHA when given)
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         if: github.event_name == 'workflow_dispatch'
         with:
           repository: ${{ github.event.inputs.repository }}
           ref: ${{ github.event.inputs.branch }}
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-          components: rust-src
-
+      - name: Install target for cross-compilation
+        run: |
+          rustup target add aarch64-unknown-linux-gnu
+          rustup target add armv7-unknown-linux-gnueabihf
       - name: Install cross
-        run: cargo install cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Cache Dependencies
+        uses: Swatinem/rust-cache@v2
 
       - name: Build xtasks
         run: |
@@ -93,13 +95,13 @@ jobs:
           cross build --release --target aarch64-unknown-linux-gnu -p xtask
 
       - name: Upload artifact | armv7-unknown-linux-gnueabihf
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: xtask-armv7
           path: target/armv7-unknown-linux-gnueabihf/release/xtask
 
       - name: Upload artifact | aarch64-unknown-linux-gnu
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: xtask-aarch64
           path: target/aarch64-unknown-linux-gnu/release/xtask
@@ -122,36 +124,36 @@ jobs:
       fail-fast: false
       matrix:
         target:
-        - soc: esp32c2
-          rust-target: riscv32imc-unknown-none-elf
-          runner: esp32c2-jtag
-          host: aarch64
-        - soc: esp32c3
-          rust-target: riscv32imc-unknown-none-elf
-          runner: esp32c3-usb
-          host: armv7
-        - soc: esp32c6
-          rust-target: riscv32imac-unknown-none-elf
-          runner: esp32c6-usb
-          host: armv7
-        - soc: esp32h2
-          rust-target: riscv32imac-unknown-none-elf
-          runner: esp32h2-usb
-          host: armv7
-        - soc: esp32
-          rust-target: xtensa-esp32-none-elf
-          runner: esp32-jtag
-          host: aarch64
-        - soc: esp32s2
-          rust-target: xtensa-esp32s2-none-elf
-          runner: esp32s2-jtag
-          host: armv7
-        - soc: esp32s3
-          rust-target: xtensa-esp32s3-none-elf
-          runner: esp32s3-usb
-          host: armv7
+          - soc: esp32c2
+            rust-target: riscv32imc-unknown-none-elf
+            runner: esp32c2-jtag
+            host: aarch64
+          - soc: esp32c3
+            rust-target: riscv32imc-unknown-none-elf
+            runner: esp32c3-usb
+            host: armv7
+          - soc: esp32c6
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32c6-usb
+            host: armv7
+          - soc: esp32h2
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32h2-usb
+            host: armv7
+          - soc: esp32
+            rust-target: xtensa-esp32-none-elf
+            runner: esp32-jtag
+            host: aarch64
+          - soc: esp32s2
+            rust-target: xtensa-esp32s2-none-elf
+            runner: esp32s2-jtag
+            host: armv7
+          - soc: esp32s3
+            rust-target: xtensa-esp32s3-none-elf
+            runner: esp32s3-usb
+            host: armv7
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/build-tests
         with:
           event_name: ${{ github.event_name }}
@@ -180,7 +182,7 @@ jobs:
             runner: esp32s3-usb
             host: armv7
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/build-tests
         with:
           event_name: ${{ github.event_name }}
@@ -197,37 +199,37 @@ jobs:
       fail-fast: false
       matrix:
         target:
-        - soc: esp32c2
-          rust-target: riscv32imc-unknown-none-elf
-          runner: esp32c2-jtag
-          host: aarch64
-        - soc: esp32c3
-          rust-target: riscv32imc-unknown-none-elf
-          runner: esp32c3-usb
-          host: armv7
-        - soc: esp32c6
-          rust-target: riscv32imac-unknown-none-elf
-          runner: esp32c6-usb
-          host: armv7
-        - soc: esp32h2
-          rust-target: riscv32imac-unknown-none-elf
-          runner: esp32h2-usb
-          host: armv7
-        - soc: esp32
-          rust-target: xtensa-esp32-none-elf
-          runner: esp32-jtag
-          host: aarch64
-        - soc: esp32s2
-          rust-target: xtensa-esp32s2-none-elf
-          runner: esp32s2-jtag
-          host: armv7
-        - soc: esp32s3
-          rust-target: xtensa-esp32s3-none-elf
-          runner: esp32s3-usb
-          host: armv7
-    
+          - soc: esp32c2
+            rust-target: riscv32imc-unknown-none-elf
+            runner: esp32c2-jtag
+            host: aarch64
+          - soc: esp32c3
+            rust-target: riscv32imc-unknown-none-elf
+            runner: esp32c3-usb
+            host: armv7
+          - soc: esp32c6
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32c6-usb
+            host: armv7
+          - soc: esp32h2
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32h2-usb
+            host: armv7
+          - soc: esp32
+            rust-target: xtensa-esp32-none-elf
+            runner: esp32-jtag
+            host: aarch64
+          - soc: esp32s2
+            rust-target: xtensa-esp32s2-none-elf
+            runner: esp32s2-jtag
+            host: armv7
+          - soc: esp32s3
+            rust-target: xtensa-esp32s3-none-elf
+            runner: esp32s3-usb
+            host: armv7
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           repository: ${{ github.event.inputs.repository || github.repository }}
           ref: ${{ github.event.inputs.branch || 'main' }}
@@ -334,34 +336,34 @@ jobs:
       fail-fast: false
       matrix:
         target:
-        - soc: esp32c2
-          rust-target: riscv32imc-unknown-none-elf
-          runner: esp32c2-jtag
-          host: aarch64
-        - soc: esp32c3
-          rust-target: riscv32imc-unknown-none-elf
-          runner: esp32c3-usb
-          host: armv7
-        - soc: esp32c6
-          rust-target: riscv32imac-unknown-none-elf
-          runner: esp32c6-usb
-          host: armv7
-        - soc: esp32h2
-          rust-target: riscv32imac-unknown-none-elf
-          runner: esp32h2-usb
-          host: armv7
-        - soc: esp32
-          rust-target: xtensa-esp32-none-elf
-          runner: esp32-jtag
-          host: aarch64
-        - soc: esp32s2
-          rust-target: xtensa-esp32s2-none-elf
-          runner: esp32s2-jtag
-          host: armv7
-        - soc: esp32s3
-          rust-target: xtensa-esp32s3-none-elf
-          runner: esp32s3-usb
-          host: armv7
+          - soc: esp32c2
+            rust-target: riscv32imc-unknown-none-elf
+            runner: esp32c2-jtag
+            host: aarch64
+          - soc: esp32c3
+            rust-target: riscv32imc-unknown-none-elf
+            runner: esp32c3-usb
+            host: armv7
+          - soc: esp32c6
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32c6-usb
+            host: armv7
+          - soc: esp32h2
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32h2-usb
+            host: armv7
+          - soc: esp32
+            rust-target: xtensa-esp32-none-elf
+            runner: esp32-jtag
+            host: aarch64
+          - soc: esp32s2
+            rust-target: xtensa-esp32s2-none-elf
+            runner: esp32s2-jtag
+            host: armv7
+          - soc: esp32s3
+            rust-target: xtensa-esp32s3-none-elf
+            runner: esp32s3-usb
+            host: armv7
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -416,34 +418,34 @@ jobs:
       fail-fast: false
       matrix:
         target:
-        - soc: esp32c2
-          rust-target: riscv32imc-unknown-none-elf
-          runner: esp32c2-jtag
-          host: aarch64
-        - soc: esp32c3
-          rust-target: riscv32imc-unknown-none-elf
-          runner: esp32c3-usb
-          host: armv7
-        - soc: esp32c6
-          rust-target: riscv32imac-unknown-none-elf
-          runner: esp32c6-usb
-          host: armv7
-        - soc: esp32h2
-          rust-target: riscv32imac-unknown-none-elf
-          runner: esp32h2-usb
-          host: armv7
-        - soc: esp32
-          rust-target: xtensa-esp32-none-elf
-          runner: esp32-jtag
-          host: aarch64
-        - soc: esp32s2
-          rust-target: xtensa-esp32s2-none-elf
-          runner: esp32s2-jtag
-          host: armv7
-        - soc: esp32s3
-          rust-target: xtensa-esp32s3-none-elf
-          runner: esp32s3-usb
-          host: armv7
+          - soc: esp32c2
+            rust-target: riscv32imc-unknown-none-elf
+            runner: esp32c2-jtag
+            host: aarch64
+          - soc: esp32c3
+            rust-target: riscv32imc-unknown-none-elf
+            runner: esp32c3-usb
+            host: armv7
+          - soc: esp32c6
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32c6-usb
+            host: armv7
+          - soc: esp32h2
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32h2-usb
+            host: armv7
+          - soc: esp32
+            rust-target: xtensa-esp32-none-elf
+            runner: esp32-jtag
+            host: aarch64
+          - soc: esp32s2
+            rust-target: xtensa-esp32s2-none-elf
+            runner: esp32s2-jtag
+            host: armv7
+          - soc: esp32s3
+            rust-target: xtensa-esp32s3-none-elf
+            runner: esp32s3-usb
+            host: armv7
     steps:
       - uses: actions/download-artifact@v4
         with:

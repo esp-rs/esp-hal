@@ -20,7 +20,7 @@ jobs:
 
   label-trusted-author:
     if: github.event_name == 'pull_request_target' &&
-        github.event.label.name == 'trusted-author'
+      github.event.label.name == 'trusted-author'
     runs-on: ubuntu-latest
     steps:
       - name: Get PR author login
@@ -295,8 +295,8 @@ jobs:
   hil-quick:
     needs: auth
     if: github.event_name == 'issue_comment' &&
-        needs.auth.outputs.allowed == 'true' &&
-        startsWith(github.event.comment.body, '/hil quick')
+      needs.auth.outputs.allowed == 'true' &&
+      startsWith(github.event.comment.body, '/hil quick')
     runs-on: ubuntu-latest
     outputs:
       run_id: ${{ steps.find-run.outputs.run_id }}
@@ -346,7 +346,7 @@ jobs:
             const pr = context.payload.issue.number;
             const matrix = 'quick';
             const tests = '${{ steps.parse-tests.outputs.tests }}';
-            
+
             let expectedTitle;
             if (tests && tests.trim() !== '') {
               expectedTitle = `HIL for PR #${pr} (${matrix}; tests: ${tests})`;
@@ -465,8 +465,8 @@ jobs:
   hil-full:
     needs: auth
     if: github.event_name == 'issue_comment' &&
-        needs.auth.outputs.allowed == 'true' &&
-        startsWith(github.event.comment.body, '/hil full')
+      needs.auth.outputs.allowed == 'true' &&
+      startsWith(github.event.comment.body, '/hil full')
     runs-on: ubuntu-latest
     outputs:
       run_id: ${{ steps.find-run.outputs.run_id }}
@@ -516,7 +516,7 @@ jobs:
             const pr = context.payload.issue.number;
             const matrix = 'full';
             const tests = '${{ steps.parse-tests.outputs.tests }}';
-            
+
             let expectedTitle;
             if (tests && tests.trim() !== '') {
               expectedTitle = `HIL for PR #${pr} (${matrix}; tests: ${tests})`;
@@ -638,10 +638,10 @@ jobs:
   hil-chips:
     needs: auth
     if: github.event_name == 'issue_comment' &&
-        needs.auth.outputs.allowed == 'true' &&
-        startsWith(github.event.comment.body, '/hil ') &&
-        !startsWith(github.event.comment.body, '/hil quick') &&
-        !startsWith(github.event.comment.body, '/hil full')
+      needs.auth.outputs.allowed == 'true' &&
+      startsWith(github.event.comment.body, '/hil ') &&
+      !startsWith(github.event.comment.body, '/hil quick') &&
+      !startsWith(github.event.comment.body, '/hil full')
     runs-on: ubuntu-latest
     outputs:
       run_id: ${{ steps.find-run.outputs.run_id }}
@@ -855,11 +855,12 @@ jobs:
 
   hil-deny:
     needs: auth
-    if: github.event_name == 'issue_comment' && needs.auth.outputs.allowed != 'true' &&
-        (startsWith(github.event.comment.body, '/hil quick') ||
-         startsWith(github.event.comment.body, '/hil full')  ||
-         startsWith(github.event.comment.body, '/hil ')      ||
-         startsWith(github.event.comment.body, '/test-size'))
+    if:
+      github.event_name == 'issue_comment' && needs.auth.outputs.allowed != 'true' &&
+      (startsWith(github.event.comment.body, '/hil quick') ||
+      startsWith(github.event.comment.body, '/hil full')  ||
+      startsWith(github.event.comment.body, '/hil ')      ||
+      startsWith(github.event.comment.body, '/test-size'))
     runs-on: ubuntu-latest
     steps:
       - name: Inform not allowed
@@ -876,11 +877,11 @@ jobs:
 
   hil-help:
     if: github.event_name == 'issue_comment' &&
-        github.event.issue.pull_request &&
-        startsWith(github.event.comment.body, '/hil') &&
-        !startsWith(github.event.comment.body, '/hil quick') &&
-        !startsWith(github.event.comment.body, '/hil full') &&
-        !contains(github.event.comment.body, 'esp32')
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/hil') &&
+      !startsWith(github.event.comment.body, '/hil quick') &&
+      !startsWith(github.event.comment.body, '/hil full') &&
+      !contains(github.event.comment.body, 'esp32')
     runs-on: ubuntu-latest
     steps:
       - name: Explain usage
@@ -907,8 +908,8 @@ jobs:
   binary-size:
     needs: auth
     if: github.event_name == 'issue_comment' &&
-        needs.auth.outputs.allowed == 'true' &&
-        startsWith(github.event.comment.body, '/test-size')
+      needs.auth.outputs.allowed == 'true' &&
+      startsWith(github.event.comment.body, '/test-size')
     runs-on: ubuntu-latest
     steps:
       - name: Dispatch Binary Size Analysis
