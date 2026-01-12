@@ -899,6 +899,10 @@ impl Clocks {
             #[cfg(soc_has_clock_node_mcpwm1_function_clock)]
             crate::soc::clocks::configure_mcpwm1_function_clock(clocks, Default::default());
 
+            // Until we have every clock consumer modelled, we should manually keep clocks alive
+            #[cfg(soc_has_clock_node_rc_fast_clk)]
+            crate::soc::clocks::request_rc_fast_clk(clocks);
+
             // TODO: this struct can be removed once everything uses the new internal clock tree
             // code
             Self {
