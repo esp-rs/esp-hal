@@ -511,11 +511,8 @@ fn configure_timg1_wdt_clock_impl(
 
 // UART0_FUNCTION_CLOCK
 
-fn enable_uart0_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
-    PCR::regs()
-        .uart(0)
-        .clk_conf()
-        .modify(|_, w| w.sclk_en().bit(en));
+fn enable_uart0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // At least on revision 0.1 switching SCLK off causes the chip to no longer boot.
 }
 
 fn configure_uart0_function_clock_impl(
