@@ -911,10 +911,14 @@ macro_rules! define_clock_tree_types {
             unwrap!(clocks.xtal_clk).value()
         }
         pub fn request_pll_clk(clocks: &mut ClockTree) {
+            trace!("Requesting PLL_CLK");
+            trace!("Enabling PLL_CLK");
             request_xtal_clk(clocks);
             enable_pll_clk_impl(clocks, true);
         }
         pub fn release_pll_clk(clocks: &mut ClockTree) {
+            trace!("Releasing PLL_CLK");
+            trace!("Disabling PLL_CLK");
             enable_pll_clk_impl(clocks, false);
             release_xtal_clk(clocks);
         }
@@ -922,12 +926,16 @@ macro_rules! define_clock_tree_types {
             480000000
         }
         pub fn request_rc_fast_clk(clocks: &mut ClockTree) {
+            trace!("Requesting RC_FAST_CLK");
             if increment_reference_count(&mut clocks.rc_fast_clk_refcount) {
+                trace!("Enabling RC_FAST_CLK");
                 enable_rc_fast_clk_impl(clocks, true);
             }
         }
         pub fn release_rc_fast_clk(clocks: &mut ClockTree) {
+            trace!("Releasing RC_FAST_CLK");
             if decrement_reference_count(&mut clocks.rc_fast_clk_refcount) {
+                trace!("Disabling RC_FAST_CLK");
                 enable_rc_fast_clk_impl(clocks, false);
             }
         }
@@ -935,12 +943,16 @@ macro_rules! define_clock_tree_types {
             17500000
         }
         pub fn request_osc_slow_clk(clocks: &mut ClockTree) {
+            trace!("Requesting OSC_SLOW_CLK");
             if increment_reference_count(&mut clocks.osc_slow_clk_refcount) {
+                trace!("Enabling OSC_SLOW_CLK");
                 enable_osc_slow_clk_impl(clocks, true);
             }
         }
         pub fn release_osc_slow_clk(clocks: &mut ClockTree) {
+            trace!("Releasing OSC_SLOW_CLK");
             if decrement_reference_count(&mut clocks.osc_slow_clk_refcount) {
+                trace!("Disabling OSC_SLOW_CLK");
                 enable_osc_slow_clk_impl(clocks, false);
             }
         }
@@ -948,12 +960,16 @@ macro_rules! define_clock_tree_types {
             32768
         }
         pub fn request_rc_slow_clk(clocks: &mut ClockTree) {
+            trace!("Requesting RC_SLOW_CLK");
             if increment_reference_count(&mut clocks.rc_slow_clk_refcount) {
+                trace!("Enabling RC_SLOW_CLK");
                 enable_rc_slow_clk_impl(clocks, true);
             }
         }
         pub fn release_rc_slow_clk(clocks: &mut ClockTree) {
+            trace!("Releasing RC_SLOW_CLK");
             if decrement_reference_count(&mut clocks.rc_slow_clk_refcount) {
+                trace!("Disabling RC_SLOW_CLK");
                 enable_rc_slow_clk_impl(clocks, false);
             }
         }
@@ -961,13 +977,17 @@ macro_rules! define_clock_tree_types {
             136000
         }
         pub fn request_rc_fast_div_clk(clocks: &mut ClockTree) {
+            trace!("Requesting RC_FAST_DIV_CLK");
             if increment_reference_count(&mut clocks.rc_fast_div_clk_refcount) {
+                trace!("Enabling RC_FAST_DIV_CLK");
                 request_rc_fast_clk(clocks);
                 enable_rc_fast_div_clk_impl(clocks, true);
             }
         }
         pub fn release_rc_fast_div_clk(clocks: &mut ClockTree) {
+            trace!("Releasing RC_FAST_DIV_CLK");
             if decrement_reference_count(&mut clocks.rc_fast_div_clk_refcount) {
+                trace!("Disabling RC_FAST_DIV_CLK");
                 enable_rc_fast_div_clk_impl(clocks, false);
                 release_rc_fast_clk(clocks);
             }
@@ -993,6 +1013,8 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn request_system_pre_div_in(clocks: &mut ClockTree) {
+            trace!("Requesting SYSTEM_PRE_DIV_IN");
+            trace!("Enabling SYSTEM_PRE_DIV_IN");
             match unwrap!(clocks.system_pre_div_in) {
                 SystemPreDivInConfig::Xtal => request_xtal_clk(clocks),
                 SystemPreDivInConfig::RcFast => request_rc_fast_clk(clocks),
@@ -1000,6 +1022,8 @@ macro_rules! define_clock_tree_types {
             enable_system_pre_div_in_impl(clocks, true);
         }
         pub fn release_system_pre_div_in(clocks: &mut ClockTree) {
+            trace!("Releasing SYSTEM_PRE_DIV_IN");
+            trace!("Disabling SYSTEM_PRE_DIV_IN");
             enable_system_pre_div_in_impl(clocks, false);
             match unwrap!(clocks.system_pre_div_in) {
                 SystemPreDivInConfig::Xtal => release_xtal_clk(clocks),
@@ -1017,10 +1041,14 @@ macro_rules! define_clock_tree_types {
             configure_system_pre_div_impl(clocks, config);
         }
         pub fn request_system_pre_div(clocks: &mut ClockTree) {
+            trace!("Requesting SYSTEM_PRE_DIV");
+            trace!("Enabling SYSTEM_PRE_DIV");
             request_system_pre_div_in(clocks);
             enable_system_pre_div_impl(clocks, true);
         }
         pub fn release_system_pre_div(clocks: &mut ClockTree) {
+            trace!("Releasing SYSTEM_PRE_DIV");
+            trace!("Disabling SYSTEM_PRE_DIV");
             enable_system_pre_div_impl(clocks, false);
             release_system_pre_div_in(clocks);
         }
@@ -1032,10 +1060,14 @@ macro_rules! define_clock_tree_types {
             configure_cpu_pll_div_impl(clocks, config);
         }
         pub fn request_cpu_pll_div(clocks: &mut ClockTree) {
+            trace!("Requesting CPU_PLL_DIV");
+            trace!("Enabling CPU_PLL_DIV");
             request_pll_clk(clocks);
             enable_cpu_pll_div_impl(clocks, true);
         }
         pub fn release_cpu_pll_div(clocks: &mut ClockTree) {
+            trace!("Releasing CPU_PLL_DIV");
+            trace!("Disabling CPU_PLL_DIV");
             enable_cpu_pll_div_impl(clocks, false);
             release_pll_clk(clocks);
         }
@@ -1061,7 +1093,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn request_apb_clk(clocks: &mut ClockTree) {
+            trace!("Requesting APB_CLK");
             if increment_reference_count(&mut clocks.apb_clk_refcount) {
+                trace!("Enabling APB_CLK");
                 match unwrap!(clocks.apb_clk) {
                     ApbClkConfig::Pll40m => request_pll_40m(clocks),
                     ApbClkConfig::Cpu => request_cpu_clk(clocks),
@@ -1070,7 +1104,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn release_apb_clk(clocks: &mut ClockTree) {
+            trace!("Releasing APB_CLK");
             if decrement_reference_count(&mut clocks.apb_clk_refcount) {
+                trace!("Disabling APB_CLK");
                 enable_apb_clk_impl(clocks, false);
                 match unwrap!(clocks.apb_clk) {
                     ApbClkConfig::Pll40m => release_pll_40m(clocks),
@@ -1103,7 +1139,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn request_crypto_clk(clocks: &mut ClockTree) {
+            trace!("Requesting CRYPTO_CLK");
             if increment_reference_count(&mut clocks.crypto_clk_refcount) {
+                trace!("Enabling CRYPTO_CLK");
                 match unwrap!(clocks.crypto_clk) {
                     CryptoClkConfig::Pll80m => request_pll_80m(clocks),
                     CryptoClkConfig::Cpu => request_cpu_clk(clocks),
@@ -1112,7 +1150,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn release_crypto_clk(clocks: &mut ClockTree) {
+            trace!("Releasing CRYPTO_CLK");
             if decrement_reference_count(&mut clocks.crypto_clk_refcount) {
+                trace!("Disabling CRYPTO_CLK");
                 enable_crypto_clk_impl(clocks, false);
                 match unwrap!(clocks.crypto_clk) {
                     CryptoClkConfig::Pll80m => release_pll_80m(clocks),
@@ -1145,7 +1185,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn request_mspi_clk(clocks: &mut ClockTree) {
+            trace!("Requesting MSPI_CLK");
             if increment_reference_count(&mut clocks.mspi_clk_refcount) {
+                trace!("Enabling MSPI_CLK");
                 match unwrap!(clocks.mspi_clk) {
                     MspiClkConfig::CpuDiv2 => request_cpu_div2(clocks),
                     MspiClkConfig::Cpu => request_cpu_clk(clocks),
@@ -1154,7 +1196,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn release_mspi_clk(clocks: &mut ClockTree) {
+            trace!("Releasing MSPI_CLK");
             if decrement_reference_count(&mut clocks.mspi_clk_refcount) {
+                trace!("Disabling MSPI_CLK");
                 enable_mspi_clk_impl(clocks, false);
                 match unwrap!(clocks.mspi_clk) {
                     MspiClkConfig::CpuDiv2 => release_cpu_div2(clocks),
@@ -1213,13 +1257,17 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn request_pll_40m(clocks: &mut ClockTree) {
+            trace!("Requesting PLL_40M");
             if increment_reference_count(&mut clocks.pll_40m_refcount) {
+                trace!("Enabling PLL_40M");
                 request_cpu_clk(clocks);
                 enable_pll_40m_impl(clocks, true);
             }
         }
         pub fn release_pll_40m(clocks: &mut ClockTree) {
+            trace!("Releasing PLL_40M");
             if decrement_reference_count(&mut clocks.pll_40m_refcount) {
+                trace!("Disabling PLL_40M");
                 enable_pll_40m_impl(clocks, false);
                 release_cpu_clk(clocks);
             }
@@ -1228,13 +1276,17 @@ macro_rules! define_clock_tree_types {
             40000000
         }
         pub fn request_pll_60m(clocks: &mut ClockTree) {
+            trace!("Requesting PLL_60M");
             if increment_reference_count(&mut clocks.pll_60m_refcount) {
+                trace!("Enabling PLL_60M");
                 request_cpu_clk(clocks);
                 enable_pll_60m_impl(clocks, true);
             }
         }
         pub fn release_pll_60m(clocks: &mut ClockTree) {
+            trace!("Releasing PLL_60M");
             if decrement_reference_count(&mut clocks.pll_60m_refcount) {
+                trace!("Disabling PLL_60M");
                 enable_pll_60m_impl(clocks, false);
                 release_cpu_clk(clocks);
             }
@@ -1243,10 +1295,14 @@ macro_rules! define_clock_tree_types {
             60000000
         }
         pub fn request_pll_80m(clocks: &mut ClockTree) {
+            trace!("Requesting PLL_80M");
+            trace!("Enabling PLL_80M");
             request_cpu_clk(clocks);
             enable_pll_80m_impl(clocks, true);
         }
         pub fn release_pll_80m(clocks: &mut ClockTree) {
+            trace!("Releasing PLL_80M");
+            trace!("Disabling PLL_80M");
             enable_pll_80m_impl(clocks, false);
             release_cpu_clk(clocks);
         }
@@ -1254,10 +1310,14 @@ macro_rules! define_clock_tree_types {
             80000000
         }
         pub fn request_cpu_div2(clocks: &mut ClockTree) {
+            trace!("Requesting CPU_DIV2");
+            trace!("Enabling CPU_DIV2");
             request_cpu_clk(clocks);
             enable_cpu_div2_impl(clocks, true);
         }
         pub fn release_cpu_div2(clocks: &mut ClockTree) {
+            trace!("Releasing CPU_DIV2");
+            trace!("Disabling CPU_DIV2");
             enable_cpu_div2_impl(clocks, false);
             release_cpu_clk(clocks);
         }
@@ -1269,10 +1329,14 @@ macro_rules! define_clock_tree_types {
             configure_rc_fast_clk_div_n_impl(clocks, config);
         }
         pub fn request_rc_fast_clk_div_n(clocks: &mut ClockTree) {
+            trace!("Requesting RC_FAST_CLK_DIV_N");
+            trace!("Enabling RC_FAST_CLK_DIV_N");
             request_rc_fast_clk(clocks);
             enable_rc_fast_clk_div_n_impl(clocks, true);
         }
         pub fn release_rc_fast_clk_div_n(clocks: &mut ClockTree) {
+            trace!("Releasing RC_FAST_CLK_DIV_N");
+            trace!("Disabling RC_FAST_CLK_DIV_N");
             enable_rc_fast_clk_div_n_impl(clocks, false);
             release_rc_fast_clk(clocks);
         }
@@ -1280,10 +1344,14 @@ macro_rules! define_clock_tree_types {
             (rc_fast_clk_frequency(clocks) / (unwrap!(clocks.rc_fast_clk_div_n).value() + 1))
         }
         pub fn request_xtal_div_clk(clocks: &mut ClockTree) {
+            trace!("Requesting XTAL_DIV_CLK");
+            trace!("Enabling XTAL_DIV_CLK");
             request_xtal_clk(clocks);
             enable_xtal_div_clk_impl(clocks, true);
         }
         pub fn release_xtal_div_clk(clocks: &mut ClockTree) {
+            trace!("Releasing XTAL_DIV_CLK");
+            trace!("Disabling XTAL_DIV_CLK");
             enable_xtal_div_clk_impl(clocks, false);
             release_xtal_clk(clocks);
         }
@@ -1307,6 +1375,8 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn request_rtc_slow_clk(clocks: &mut ClockTree) {
+            trace!("Requesting RTC_SLOW_CLK");
+            trace!("Enabling RTC_SLOW_CLK");
             match unwrap!(clocks.rtc_slow_clk) {
                 RtcSlowClkConfig::OscSlow => request_osc_slow_clk(clocks),
                 RtcSlowClkConfig::RcSlow => request_rc_slow_clk(clocks),
@@ -1315,6 +1385,8 @@ macro_rules! define_clock_tree_types {
             enable_rtc_slow_clk_impl(clocks, true);
         }
         pub fn release_rtc_slow_clk(clocks: &mut ClockTree) {
+            trace!("Releasing RTC_SLOW_CLK");
+            trace!("Disabling RTC_SLOW_CLK");
             enable_rtc_slow_clk_impl(clocks, false);
             match unwrap!(clocks.rtc_slow_clk) {
                 RtcSlowClkConfig::OscSlow => release_osc_slow_clk(clocks),
@@ -1348,7 +1420,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn request_rtc_fast_clk(clocks: &mut ClockTree) {
+            trace!("Requesting RTC_FAST_CLK");
             if increment_reference_count(&mut clocks.rtc_fast_clk_refcount) {
+                trace!("Enabling RTC_FAST_CLK");
                 match unwrap!(clocks.rtc_fast_clk) {
                     RtcFastClkConfig::Xtal => request_xtal_div_clk(clocks),
                     RtcFastClkConfig::Rc => request_rc_fast_clk_div_n(clocks),
@@ -1357,7 +1431,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn release_rtc_fast_clk(clocks: &mut ClockTree) {
+            trace!("Releasing RTC_FAST_CLK");
             if decrement_reference_count(&mut clocks.rtc_fast_clk_refcount) {
+                trace!("Disabling RTC_FAST_CLK");
                 enable_rtc_fast_clk_impl(clocks, false);
                 match unwrap!(clocks.rtc_fast_clk) {
                     RtcFastClkConfig::Xtal => release_xtal_div_clk(clocks),
@@ -1394,7 +1470,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn request_low_power_clk(clocks: &mut ClockTree) {
+            trace!("Requesting LOW_POWER_CLK");
             if increment_reference_count(&mut clocks.low_power_clk_refcount) {
+                trace!("Enabling LOW_POWER_CLK");
                 match unwrap!(clocks.low_power_clk) {
                     LowPowerClkConfig::Xtal => request_xtal_clk(clocks),
                     LowPowerClkConfig::RcFast => request_rc_fast_clk(clocks),
@@ -1405,7 +1483,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn release_low_power_clk(clocks: &mut ClockTree) {
+            trace!("Releasing LOW_POWER_CLK");
             if decrement_reference_count(&mut clocks.low_power_clk_refcount) {
+                trace!("Disabling LOW_POWER_CLK");
                 enable_low_power_clk_impl(clocks, false);
                 match unwrap!(clocks.low_power_clk) {
                     LowPowerClkConfig::Xtal => release_xtal_clk(clocks),
@@ -1424,13 +1504,17 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn request_uart_mem_clk(clocks: &mut ClockTree) {
+            trace!("Requesting UART_MEM_CLK");
             if increment_reference_count(&mut clocks.uart_mem_clk_refcount) {
+                trace!("Enabling UART_MEM_CLK");
                 request_xtal_clk(clocks);
                 enable_uart_mem_clk_impl(clocks, true);
             }
         }
         pub fn release_uart_mem_clk(clocks: &mut ClockTree) {
+            trace!("Releasing UART_MEM_CLK");
             if decrement_reference_count(&mut clocks.uart_mem_clk_refcount) {
+                trace!("Disabling UART_MEM_CLK");
                 enable_uart_mem_clk_impl(clocks, false);
                 release_xtal_clk(clocks);
             }
@@ -1460,7 +1544,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn request_timg0_function_clock(clocks: &mut ClockTree) {
+            trace!("Requesting TIMG0_FUNCTION_CLOCK");
             if increment_reference_count(&mut clocks.timg0_function_clock_refcount) {
+                trace!("Enabling TIMG0_FUNCTION_CLOCK");
                 match unwrap!(clocks.timg0_function_clock) {
                     Timg0FunctionClockConfig::XtalClk => request_xtal_clk(clocks),
                     Timg0FunctionClockConfig::Pll40m => request_pll_40m(clocks),
@@ -1469,7 +1555,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn release_timg0_function_clock(clocks: &mut ClockTree) {
+            trace!("Releasing TIMG0_FUNCTION_CLOCK");
             if decrement_reference_count(&mut clocks.timg0_function_clock_refcount) {
+                trace!("Disabling TIMG0_FUNCTION_CLOCK");
                 enable_timg0_function_clock_impl(clocks, false);
                 match unwrap!(clocks.timg0_function_clock) {
                     Timg0FunctionClockConfig::XtalClk => release_xtal_clk(clocks),
@@ -1509,7 +1597,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn request_timg0_calibration_clock(clocks: &mut ClockTree) {
+            trace!("Requesting TIMG0_CALIBRATION_CLOCK");
             if increment_reference_count(&mut clocks.timg0_calibration_clock_refcount) {
+                trace!("Enabling TIMG0_CALIBRATION_CLOCK");
                 match unwrap!(clocks.timg0_calibration_clock) {
                     Timg0CalibrationClockConfig::RcSlowClk => request_rc_slow_clk(clocks),
                     Timg0CalibrationClockConfig::RcFastDivClk => request_rc_fast_div_clk(clocks),
@@ -1519,7 +1609,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn release_timg0_calibration_clock(clocks: &mut ClockTree) {
+            trace!("Releasing TIMG0_CALIBRATION_CLOCK");
             if decrement_reference_count(&mut clocks.timg0_calibration_clock_refcount) {
+                trace!("Disabling TIMG0_CALIBRATION_CLOCK");
                 enable_timg0_calibration_clock_impl(clocks, false);
                 match unwrap!(clocks.timg0_calibration_clock) {
                     Timg0CalibrationClockConfig::RcSlowClk => release_rc_slow_clk(clocks),
@@ -1557,7 +1649,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn request_timg0_wdt_clock(clocks: &mut ClockTree) {
+            trace!("Requesting TIMG0_WDT_CLOCK");
             if increment_reference_count(&mut clocks.timg0_wdt_clock_refcount) {
+                trace!("Enabling TIMG0_WDT_CLOCK");
                 match unwrap!(clocks.timg0_wdt_clock) {
                     Timg0WdtClockConfig::Pll40m => request_pll_40m(clocks),
                     Timg0WdtClockConfig::XtalClk => request_xtal_clk(clocks),
@@ -1566,7 +1660,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn release_timg0_wdt_clock(clocks: &mut ClockTree) {
+            trace!("Releasing TIMG0_WDT_CLOCK");
             if decrement_reference_count(&mut clocks.timg0_wdt_clock_refcount) {
+                trace!("Disabling TIMG0_WDT_CLOCK");
                 enable_timg0_wdt_clock_impl(clocks, false);
                 match unwrap!(clocks.timg0_wdt_clock) {
                     Timg0WdtClockConfig::Pll40m => release_pll_40m(clocks),
@@ -1604,7 +1700,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn request_uart0_function_clock(clocks: &mut ClockTree) {
+            trace!("Requesting UART0_FUNCTION_CLOCK");
             if increment_reference_count(&mut clocks.uart0_function_clock_refcount) {
+                trace!("Enabling UART0_FUNCTION_CLOCK");
                 match unwrap!(clocks.uart0_function_clock) {
                     Uart0FunctionClockConfig::PllF40m => request_pll_40m(clocks),
                     Uart0FunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
@@ -1614,7 +1712,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn release_uart0_function_clock(clocks: &mut ClockTree) {
+            trace!("Releasing UART0_FUNCTION_CLOCK");
             if decrement_reference_count(&mut clocks.uart0_function_clock_refcount) {
+                trace!("Disabling UART0_FUNCTION_CLOCK");
                 enable_uart0_function_clock_impl(clocks, false);
                 match unwrap!(clocks.uart0_function_clock) {
                     Uart0FunctionClockConfig::PllF40m => release_pll_40m(clocks),
@@ -1646,13 +1746,17 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn request_uart0_mem_clock(clocks: &mut ClockTree) {
+            trace!("Requesting UART0_MEM_CLOCK");
             if increment_reference_count(&mut clocks.uart0_mem_clock_refcount) {
+                trace!("Enabling UART0_MEM_CLOCK");
                 request_uart_mem_clk(clocks);
                 enable_uart0_mem_clock_impl(clocks, true);
             }
         }
         pub fn release_uart0_mem_clock(clocks: &mut ClockTree) {
+            trace!("Releasing UART0_MEM_CLOCK");
             if decrement_reference_count(&mut clocks.uart0_mem_clock_refcount) {
+                trace!("Disabling UART0_MEM_CLOCK");
                 enable_uart0_mem_clock_impl(clocks, false);
                 release_uart_mem_clk(clocks);
             }
@@ -1684,7 +1788,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn request_uart1_function_clock(clocks: &mut ClockTree) {
+            trace!("Requesting UART1_FUNCTION_CLOCK");
             if increment_reference_count(&mut clocks.uart1_function_clock_refcount) {
+                trace!("Enabling UART1_FUNCTION_CLOCK");
                 match unwrap!(clocks.uart1_function_clock) {
                     Uart0FunctionClockConfig::PllF40m => request_pll_40m(clocks),
                     Uart0FunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
@@ -1694,7 +1800,9 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn release_uart1_function_clock(clocks: &mut ClockTree) {
+            trace!("Releasing UART1_FUNCTION_CLOCK");
             if decrement_reference_count(&mut clocks.uart1_function_clock_refcount) {
+                trace!("Disabling UART1_FUNCTION_CLOCK");
                 enable_uart1_function_clock_impl(clocks, false);
                 match unwrap!(clocks.uart1_function_clock) {
                     Uart0FunctionClockConfig::PllF40m => release_pll_40m(clocks),
@@ -1726,13 +1834,17 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn request_uart1_mem_clock(clocks: &mut ClockTree) {
+            trace!("Requesting UART1_MEM_CLOCK");
             if increment_reference_count(&mut clocks.uart1_mem_clock_refcount) {
+                trace!("Enabling UART1_MEM_CLOCK");
                 request_uart_mem_clk(clocks);
                 enable_uart1_mem_clock_impl(clocks, true);
             }
         }
         pub fn release_uart1_mem_clock(clocks: &mut ClockTree) {
+            trace!("Releasing UART1_MEM_CLOCK");
             if decrement_reference_count(&mut clocks.uart1_mem_clock_refcount) {
+                trace!("Disabling UART1_MEM_CLOCK");
                 enable_uart1_mem_clock_impl(clocks, false);
                 release_uart_mem_clk(clocks);
             }
