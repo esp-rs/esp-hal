@@ -11,7 +11,7 @@ pub use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use strum::IntoEnumIterator;
 
-use crate::cfg::{SupportItem, SupportStatus, Value};
+use crate::cfg::{PinLimitation, SupportItem, SupportStatus, Value};
 
 macro_rules! include_toml {
     (Config, $file:expr) => {{
@@ -565,8 +565,6 @@ impl Config {
     }
 
     fn generate_peripherals_macro(&self) -> TokenStream {
-        let mut stable = vec![];
-        let mut unstable = vec![];
         let mut all_peripherals = vec![];
         let mut singleton_peripherals = vec![];
 
@@ -587,14 +585,53 @@ impl Config {
         if let Some(gpio) = self.device.peri_config.gpio.as_ref() {
             for gpio in gpio.pins_and_signals.pins.iter() {
                 let pin = format_ident!("GPIO{}", gpio.pin);
+                let mut docs = format!("GPIO{} peripheral singleton", gpio.pin);
+
+                let mut limitations = gpio.limitations.clone();
+
+                // Resolve implicit limitations - based on pin alternate functions
+                let implicit: &[(&[&str], PinLimitation)] = &[
+                    (&["MTMS", "MTCK", "MTDO", "MTDI"], PinLimitation::Jtag),
+                    (&["USB_DP", "USB_DM"], PinLimitation::UsbJtag),
+                    (&["U0TXD", "U0RXD"], PinLimitation::BootloaderUart),
+                ];
+
+                for i in 0..6 {
+                    if let Some(func) = gpio.functions.get(i) {
+                        for (pins, limitation) in implicit.iter() {
+                            if pins.contains(&func) {
+                                limitations.push(*limitation);
+                            }
+                        }
+                    }
+                }
+
+                if !limitations.is_empty() {
+                    // Append a marker and an explanation to the short description
+                    let limitations = limitations
+                        .iter()
+                        .map(|limitation| format!("<li>{}</li>", limitation))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    write!(
+                        &mut docs,
+                        r#" (Limitations exist)
+
+<section class="warning">
+This pin may be available with certain limitations. Check your hardware to make sure whether you can use it.
+<ul>
+{limitations}
+</ul>
+</section>"#,
+                    )
+                    .unwrap();
+                }
+                let docs = docs.lines();
                 let tokens = quote! {
-                    #pin <= virtual ()
+                    #(#[doc = #docs])* #pin <= virtual ()
                 };
                 all_peripherals.push(quote! { @peri_type #tokens });
-                if !gpio.limited {
-                    singleton_peripherals.push(quote! { #pin });
-                }
-                stable.push(tokens);
+                singleton_peripherals.push(quote! { #pin });
             }
         }
 
@@ -615,8 +652,9 @@ impl Config {
                 let disable = format_ident!("disable_{k}_interrupt");
                 quote! { #pac_interrupt_name: { #bind, #enable, #disable } }
             });
+            let singleton_doc = format!("{} peripheral singleton", peri.name);
             let tokens = quote! {
-                #hal <= #pac ( #(#interrupts),* )
+                #[doc = #singleton_doc] #hal <= #pac ( #(#interrupts),* )
             };
             if stable_peris
                 .iter()
@@ -624,11 +662,9 @@ impl Config {
             {
                 all_peripherals.push(quote! { @peri_type #tokens });
                 singleton_peripherals.push(quote! { #hal });
-                stable.push(tokens);
             } else {
                 all_peripherals.push(quote! { @peri_type #tokens (unstable) });
                 singleton_peripherals.push(quote! { #hal (unstable) });
-                unstable.push(tokens);
             }
         }
 
