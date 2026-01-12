@@ -15,6 +15,11 @@ pub use ble::ble_os_adapter_chip_specific::Config;
 pub(crate) use ble::{ble_deinit, ble_init, send_hci};
 use esp_sync::NonReentrantMutex;
 
+#[cfg(any(esp32c3, esp32s3))]
+pub use crate::ble::btdm::ble_os_adapter_chip_specific::TxPower;
+#[cfg(any(esp32c2, esp32c6, esp32h2))]
+pub use crate::ble::npl::ble_os_adapter_chip_specific::TxPower;
+
 /// An error that is returned when the configuration is invalid.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
