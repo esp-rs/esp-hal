@@ -11,11 +11,10 @@ on:
         required: true
         default: "main"
         type: string
-      target_repository:
-        description: "Target repository for baseline storage (owner/repo)"
-        required: false
-        default: ""
-        type: string
+      package_name:
+        description: "The package name"
+        required: true
+        default: "esp-hal"
       force_regeneration:
         description: "Force baseline regeneration even without breaking change"
         required: false
@@ -25,10 +24,11 @@ on:
         description: "The Git tag to generate the baseline from"
         required: false
         default: ""
-      package_name:
-        description: "The package name"
-        required: true
-        default: "esp-hal"
+      target_repository:
+        description: "Target repository for baseline storage (owner/repo)"
+        required: false
+        default: ""
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
