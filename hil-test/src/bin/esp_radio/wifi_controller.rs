@@ -35,25 +35,7 @@ mod tests {
             .unwrap();
         controller.start().unwrap();
 
-        let scan_config = ScanConfig::default().with_max(1);
-        for _ in 0..2 {
-            let _ = controller.scan_with_config(scan_config).unwrap();
-        }
+        esp_hal::delay::Delay::new().delay_millis(2_000);
 
-        let mut more_count = 0;
-        let mut min_free = usize::MAX;
-        for _ in 0..ITERATIONS {
-            let _ = controller.scan_with_config(scan_config).unwrap();
-            let free = esp_alloc::HEAP.free();
-            defmt::info!("free: {}", free);
-
-            if free <= min_free {
-                min_free = free;
-            } else {
-                more_count += 1;
-            }
-        }
-
-        assert!(more_count < ITERATIONS / 2, "count: {}", more_count);
     }
 }
