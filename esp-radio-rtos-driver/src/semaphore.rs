@@ -446,6 +446,8 @@ impl Drop for SemaphoreHandle {
     }
 }
 
+unsafe impl Send for SemaphoreHandle {}
+
 #[cfg(feature = "ipc-implementations")]
 mod implementation {
     use alloc::boxed::Box;

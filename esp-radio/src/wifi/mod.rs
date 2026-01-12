@@ -1025,6 +1025,20 @@ impl WifiDeviceMode {
         }
 
         if self.can_send() {
+            // even checking for !Uninitialized would be enough to not crash
+            match self {
+                WifiDeviceMode::Station => {
+                    if !matches!(station_state(), WifiStationState::Connected) {
+                        return None;
+                    }
+                }
+                WifiDeviceMode::AccessPoint => {
+                    if !matches!(access_point_state(), WifiAccessPointState::Started) {
+                        return None;
+                    }
+                }
+            }
+
             Some(WifiTxToken { mode: *self })
         } else {
             None
@@ -1436,19 +1450,34 @@ impl TxToken for WifiTxToken {
 // though in reality `esp_wifi_internal_tx` copies the buffer into its own
 // memory and does not modify
 pub(crate) fn esp_wifi_send_data(interface: wifi_interface_t, data: &mut [u8]) {
-    trace!("sending... {} bytes", data.len());
-    dump_packet_info(data);
+    // `esp_wifi_internal_tx` will crash if wifi is uninitialized or de-inited
 
-    let len = data.len() as u16;
-    let ptr = data.as_mut_ptr().cast();
+    state::locked(|| {
+        // even checking for !Uninitialized would be enough to not crash
+        if interface == wifi_interface_t_WIFI_IF_STA
+            && !matches!(station_state(), WifiStationState::Connected)
+        {
+            return;
+        } else if interface == wifi_interface_t_WIFI_IF_AP
+            && !matches!(access_point_state(), WifiAccessPointState::Started)
+        {
+            return;
+        }
 
-    let res = unsafe { esp_wifi_result!(esp_wifi_internal_tx(interface, ptr, len)) };
+        trace!("sending... {} bytes", data.len());
+        dump_packet_info(data);
 
-    if res.is_err() {
-        decrement_inflight_counter();
-    } else {
-        trace!("esp_wifi_internal_tx ok");
-    }
+        let len = data.len() as u16;
+        let ptr = data.as_mut_ptr().cast();
+
+        let res = unsafe { esp_wifi_result!(esp_wifi_internal_tx(interface, ptr, len)) };
+
+        if res.is_err() {
+            decrement_inflight_counter();
+        } else {
+            trace!("esp_wifi_internal_tx ok");
+        }
+    })
 }
 
 fn dump_packet_info(_buffer: &mut [u8]) {
@@ -1960,16 +1989,18 @@ pub struct WifiController<'d> {
 
 impl Drop for WifiController<'_> {
     fn drop(&mut self) {
-        if let Err(e) = crate::wifi::wifi_deinit() {
-            warn!("Failed to cleanly deinit wifi: {:?}", e);
-        }
+        state::locked(|| {
+            if let Err(e) = crate::wifi::wifi_deinit() {
+                warn!("Failed to cleanly deinit wifi: {:?}", e);
+            }
 
-        set_access_point_state(WifiAccessPointState::Uninitialized);
-        set_station_state(WifiStationState::Uninitialized);
+            set_access_point_state(WifiAccessPointState::Uninitialized);
+            set_station_state(WifiStationState::Uninitialized);
 
-        esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
-            esp_hal::Internal::conjure()
-        });
+            esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
+                esp_hal::Internal::conjure()
+            });
+        })
     }
 }
 
