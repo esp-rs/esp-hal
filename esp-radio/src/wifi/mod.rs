@@ -1405,8 +1405,7 @@ impl Device for WifiDevice<'_> {
 }
 
 #[doc(hidden)]
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+// These token doesn't need the debug trait, they aren't needed publicly.
 pub struct WifiRxToken {
     mode: WifiDeviceMode,
 }
@@ -1450,8 +1449,7 @@ impl RxToken for WifiRxToken {
 }
 
 #[doc(hidden)]
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+// These token doesn't need the debug trait, they aren't needed publicly.
 pub struct WifiTxToken {
     mode: WifiDeviceMode,
 }
