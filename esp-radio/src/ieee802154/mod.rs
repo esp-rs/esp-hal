@@ -16,6 +16,7 @@
 //! [esp-openthread]: https://github.com/esp-rs/esp-openthread
 
 use byte::{BytesExt, TryRead};
+use docsplay::Display;
 use esp_hal::{clock::PhyClockGuard, peripherals::IEEE802154};
 use esp_phy::PhyInitGuard;
 use esp_sync::NonReentrantMutex;
@@ -31,14 +32,13 @@ pub use self::{
     pib::{CcaMode, PendingMode},
     raw::RawReceived,
 };
-
 mod frame;
 mod hal;
 mod pib;
 mod raw;
 
 /// IEEE 802.15.4 errors
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Display, Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     /// The requested data is bigger than available range, and/or the offset is
@@ -47,15 +47,6 @@ pub enum Error {
 
     /// The requested data content is invalid.
     BadInput,
-}
-
-impl core::fmt::Display for Error {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Error::Incomplete => write!(f, "Incomplete data."),
-            Error::BadInput => write!(f, "Bad input data."),
-        }
-    }
 }
 
 impl core::error::Error for Error {}

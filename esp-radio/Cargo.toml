@@ -52,6 +52,7 @@ instability = "0.3.9"
 
 # Unstable dependencies that are not (strictly) part of the public API
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
+docsplay = { version = "0.1", default-features = false }
 document-features  = "0.2"
 esp-alloc = { version = "0.9.0", path = "../esp-alloc", optional = true, default-features = false }
 esp-config = { version = "0.6.1", path = "../esp-config" }

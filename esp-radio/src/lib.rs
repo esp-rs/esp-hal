@@ -136,6 +136,7 @@ extern crate alloc;
 // MUST be the first module
 mod fmt;
 
+use docsplay::Display;
 use esp_hal as hal;
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
@@ -153,7 +154,6 @@ use hal::{
     time::Rate,
 };
 use sys::include::esp_phy_calibration_data_t;
-
 pub(crate) mod sys {
     #[cfg(esp32)]
     pub use esp_wifi_sys_esp32::*;
@@ -371,12 +371,12 @@ fn is_interrupts_disabled() -> bool {
         || hal::interrupt::current_runlevel() >= hal::interrupt::Priority::Priority1;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Error which can be returned during radio initialization.
 #[non_exhaustive]
 pub enum InitializationError {
-    /// An error from the Wi-Fi driver.
+    /// An error from the Wi-Fi driver: {0}.
     #[cfg(feature = "wifi")]
     WifiError(WifiError),
     /// The current CPU clock frequency is too low.
@@ -389,28 +389,6 @@ pub enum InitializationError {
 }
 
 impl core::error::Error for InitializationError {}
-
-impl core::fmt::Display for InitializationError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            #[cfg(feature = "wifi")]
-            InitializationError::WifiError(e) => {
-                write!(f, "Wi-Fi driver related error occurred: {e}")
-            }
-            InitializationError::WrongClockConfig => {
-                write!(f, "The current CPU clock frequency is too low")
-            }
-            InitializationError::SchedulerNotInitialized => {
-                write!(f, "The scheduler is not initialized")
-            }
-            #[cfg(esp32)]
-            InitializationError::Adc2IsUsed => write!(
-                f,
-                "ADC2 cannot be used with `radio` functionality on `esp32`"
-            ),
-        }
-    }
-}
 
 #[cfg(feature = "wifi")]
 impl From<WifiError> for InitializationError {

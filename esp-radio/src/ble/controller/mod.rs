@@ -8,6 +8,7 @@ use bt_hci::{
     WriteHci,
     transport::{Transport, WithIndicator},
 };
+use docsplay::Display;
 use esp_hal::asynch::AtomicWaker;
 use esp_phy::PhyInitGuard;
 
@@ -17,24 +18,15 @@ use crate::{
     ble::{Config, InvalidConfigError, have_hci_read_data, read_hci, read_next, send_hci},
 };
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Display, Debug, Copy, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Error enum for BLE initialization failures.
 pub enum BleInitError {
-    /// Failure during initial validation of the provided configuration.
+    /// Failure during initial validation of the provided configuration: {0}.
     Config(InvalidConfigError),
 
-    /// Failure during the acquisition or initialization of the global radio hardware.
+    /// Failure during the acquisition or initialization of the global radio hardware: {0}.
     RadioInit(InitializationError),
-}
-
-impl core::fmt::Display for BleInitError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            BleInitError::Config(e) => write!(f, "BLE configuration error: {e}"),
-            BleInitError::RadioInit(e) => write!(f, "Radio initialization error: {e}"),
-        }
-    }
 }
 
 impl core::error::Error for BleInitError {}
@@ -123,11 +115,12 @@ impl<'d> BleConnector<'d> {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Display, Debug, Copy, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Error type for the BLE connector.
 #[instability::unstable]
 pub enum BleConnectorError {
+    /// Unknown BLE error occured.
     Unknown,
 }
 
@@ -144,14 +137,6 @@ impl embedded_io_07::Error for BleConnectorError {
 }
 
 impl core::error::Error for BleConnectorError {}
-
-impl core::fmt::Display for BleConnectorError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            BleConnectorError::Unknown => write!(f, "Unknown BLE error occured"),
-        }
-    }
-}
 
 impl embedded_io_06::ErrorType for BleConnector<'_> {
     type Error = BleConnectorError;

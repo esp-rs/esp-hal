@@ -12,6 +12,7 @@ use alloc::{boxed::Box, collections::vec_deque::VecDeque, vec::Vec};
 use core::mem::MaybeUninit;
 
 pub(crate) use ble::{ble_deinit, ble_init, send_hci};
+use docsplay::Display;
 use esp_sync::NonReentrantMutex;
 
 /// An error that is returned when the configuration is invalid.
