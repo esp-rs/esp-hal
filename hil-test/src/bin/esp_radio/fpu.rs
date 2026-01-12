@@ -2,14 +2,9 @@
 
 #[embedded_test::tests(default_timeout = 3)]
 mod tests {
+    use esp_hal::peripherals::Peripherals;
     #[cfg(multi_core)]
     use esp_hal::system::CpuControl;
-    use esp_hal::{
-        interrupt::software::SoftwareInterruptControl,
-        peripherals::Peripherals,
-        timer::timg::TimerGroup,
-    };
-    use esp_radio_rtos_driver as preempt;
 
     #[inline(never)]
     fn run_float_calc(x: f32) -> f32 {
@@ -68,6 +63,8 @@ mod tests {
     fn fpu_is_enabled_on_core1_with_preempt(p: Peripherals) {
         use core::sync::atomic::{AtomicBool, Ordering};
 
+        use esp_hal::{interrupt::software::SoftwareInterruptControl, timer::timg::TimerGroup};
+
         static DONE: AtomicBool = AtomicBool::new(false);
 
         let timg0 = TimerGroup::new(p.TIMG0);
@@ -82,7 +79,7 @@ mod tests {
                 &mut crate::APP_CORE_STACK
             },
             || {
-                preempt::usleep(10);
+                esp_radio_rtos_driver::usleep(10);
 
                 let result = run_float_calc(2.0);
                 assert_eq!(result, 4.0);
