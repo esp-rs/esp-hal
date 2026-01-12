@@ -1970,6 +1970,7 @@ where
         // Must apply the common settings first, as `rx.apply_config` reads back symbol
         // size.
         self.rx.uart.info().apply_config(config)?;
+
         self.rx.apply_config(config)?;
         self.tx.apply_config(config)?;
         Ok(())
@@ -3099,6 +3100,9 @@ impl Info {
         self.change_parity(config.parity);
         self.change_stop_bits(config.stop_bits);
         self.change_flow_control(config.sw_flow_ctrl, config.hw_flow_ctrl);
+
+        // Avoid glitch interrupts.
+        self.regs().int_clr().write(|w| unsafe { w.bits(u32::MAX) });
 
         Ok(())
     }
