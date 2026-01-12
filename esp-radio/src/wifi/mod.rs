@@ -162,7 +162,7 @@ impl Protocol {
 }
 
 /// Secondary Wi-Fi channels.
-#[derive(Clone, Debug, Default, Eq, PartialEq, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, PartialOrd, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SecondaryChannel {
     // TODO: Need to extend that for 5GHz
@@ -189,7 +189,7 @@ impl SecondaryChannel {
 }
 
 /// Access point country information.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Country([u8; 2]);
 
 impl Country {
