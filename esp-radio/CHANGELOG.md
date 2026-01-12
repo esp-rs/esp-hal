@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `last_calibration_result` to get the result of the last calibration (#4479)
 - `BleInitError` for BLE init failures and `Internal`, `WrongClockConfig`, `SchedulerNotInitialized` and `Adc2IsUsed` variants to `WifiError (#4482)
 - `wifi::csi::WifiCsiInfo` wraps `wifi::wifi_csi_info_t` (#4643)
+- `WifiController::set_channel()`, `WifiController::channel()` `WifiController::set_bandwidth()`, `WifiController::bandwidth()` methods and `Bandwidth` enum (#4705)
 
 ### Changed
 
