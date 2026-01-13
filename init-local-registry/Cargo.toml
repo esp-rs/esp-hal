@@ -1,0 +1,22 @@
+[package]
+edition = "2024"
+name = "basic-c6"
+rust-version = "1.88"
+version = "0.1.0"
+
+[dependencies]
+esp-hal = "*"
+
+esp-rtos = "*"
+
+esp-bootloader-esp-idf = "*"
+
+esp-storage = "*"
+
+esp-alloc = "*"
+
+esp-backtrace = "*"
+
+esp-println = "*"
+
+esp-radio = "*"

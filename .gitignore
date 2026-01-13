@@ -29,6 +29,3 @@ release_plan.jsonc
 
 # Ignore the generated semver baselines
 api-baseline/
-
-# This is created for testing with a local registry
-compile-tests/.cargo/**

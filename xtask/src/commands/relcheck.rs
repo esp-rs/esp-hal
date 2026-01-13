@@ -14,15 +14,12 @@ use crate::{Package, cargo::CargoToml, windows_safe_path};
 pub enum RelCheckCmds {
     /// Initialize the local registry
     Init,
+
     /// Deinitialize the local registry
     Deinit,
-    /// Try to compile checks in `compile-tests`
-    Check,
+
     /// Update the local registry from the crates in this repository
     Update(UpdateArgs),
-    /// Bump all dependencies in `compile-tests` to the latest version available in the local
-    /// registry
-    YoloBump,
 
     /// Remove the path-dependencies from examples and make sure the dependencies are available in
     /// the local registry.
@@ -41,9 +38,7 @@ pub fn run_rel_check(args: RelCheckCmds) -> Result<()> {
     match args {
         RelCheckCmds::Init => init_rel_check()?,
         RelCheckCmds::Deinit => deinit_rel_check()?,
-        RelCheckCmds::Check => check()?,
         RelCheckCmds::Update(args) => update(args)?,
-        RelCheckCmds::YoloBump => yolo_bump()?,
         RelCheckCmds::ScrapPathDeps => scrap_path_deps()?,
     }
 
@@ -119,67 +114,49 @@ fn deinit_rel_check() -> Result<()> {
 
 fn init_rel_check() -> Result<()> {
     // cleanup
-    let _ = std::fs::remove_dir_all("compile-tests/.cargo");
-
     if std::fs::exists("target/local-registry")? {
         std::fs::remove_dir_all("target/local-registry")?;
     }
+    std::fs::create_dir("target/local-registry")?;
 
-    // make sure we have `Cargo.lock` files
-    check()?;
+    // make sure we have the `Cargo.lock` file
+    let project = Path::new("init-local-registry");
+    let _ = std::fs::remove_file(project.join("Cargo.lock"));
 
-    // add all dependencies referenced by the lock files
-    let mut projects = std::fs::read_dir("compile-tests")?
-        .map(|res| res.map(|e| e.path()))
-        .collect::<Result<Vec<_>, std::io::Error>>()?;
+    let status = std::process::Command::new("cargo")
+        .arg(format!("+{}", toolchain()))
+        .arg("metadata")
+        .arg("--format-version=1")
+        .current_dir(&project)
+        .stdout(std::process::Stdio::null())
+        .status()?;
 
-    projects.retain(|p| p.is_dir());
-
-    for project in projects {
-        let mut cmd = std::process::Command::new("cargo");
-        cmd.arg("local-registry");
-        cmd.arg("--no-delete");
-        cmd.arg("--sync");
-        cmd.arg("Cargo.lock");
-        cmd.arg("../../target/local-registry");
-        cmd.stdout(std::process::Stdio::null());
-        cmd.env_clear();
-        cmd.envs(
-            std::env::vars()
-                .into_iter()
-                .filter(|(k, _)| !k.starts_with("CARGO")),
-        );
-        cmd.current_dir(&project);
-
-        log::info!("{:?}", cmd);
-        cmd.status()?;
+    if !status.success() {
+        log::warn!("Failed");
     }
 
-    // use the new registry
-    let _ = std::fs::create_dir("compile-tests/.cargo");
+    // add all dependencies referenced by the lock file
+    let mut cmd = std::process::Command::new("cargo");
+    cmd.arg("local-registry");
+    cmd.arg("--no-delete");
+    cmd.arg("--sync");
+    cmd.arg("Cargo.lock");
+    cmd.arg(windows_safe_path(
+        &std::path::PathBuf::from("target/local-registry")
+            .canonicalize()
+            .unwrap(),
+    ));
+    cmd.stdout(std::process::Stdio::null());
+    cmd.env_clear();
+    cmd.envs(
+        std::env::vars()
+            .into_iter()
+            .filter(|(k, _)| !k.starts_with("CARGO")),
+    );
+    cmd.current_dir(&project);
 
-    std::fs::write(
-        "compile-tests/.cargo/config.toml",
-        format!(
-            r#"
-    # {}{}
-    [source.crates-io]
-    registry = 'sparse+https://index.crates.io/'
-    replace-with = 'local-registry'
-
-    [source.local-registry]
-    local-registry = '{}'
-"#,
-            "STOP",
-            "SHIP",
-            windows_safe_path(
-                &std::path::PathBuf::from("target/local-registry")
-                    .canonicalize()
-                    .unwrap()
-            )
-            .display()
-        ),
-    )?;
+    log::info!("{:?}", cmd);
+    cmd.status()?;
 
     // install dependencies needed for build-std
     let mut cmd = std::process::Command::new("cargo");
@@ -243,32 +220,6 @@ fn init_rel_check() -> Result<()> {
 
     log::info!("{:?}", cmd);
     cmd.status()?;
-
-    Ok(())
-}
-
-fn check() -> Result<()> {
-    let mut projects = std::fs::read_dir("compile-tests")?
-        .map(|res| res.map(|e| e.path()))
-        .collect::<Result<Vec<_>, std::io::Error>>()?;
-
-    projects.retain(|p| p.is_dir() && p.file_name().unwrap() != ".cargo");
-
-    for project in projects {
-        log::info!("building");
-        let _ = std::fs::remove_file(project.join("Cargo.lock"));
-
-        let status = std::process::Command::new("cargo")
-            .arg(format!("+{}", toolchain()))
-            .arg("check")
-            .current_dir(&project)
-            .stdout(std::process::Stdio::null())
-            .status()?;
-
-        if !status.success() {
-            log::warn!("Failed");
-        }
-    }
 
     Ok(())
 }
@@ -451,46 +402,6 @@ fn update(args: UpdateArgs) -> Result<()> {
                 &index_file,
             )?;
         }
-    }
-
-    Ok(())
-}
-
-fn yolo_bump() -> Result<()> {
-    if !std::fs::exists("target/local-registry")? {
-        bail!("Cannot update - run `init` first.");
-    }
-
-    let mut projects = std::fs::read_dir("compile-tests")?
-        .map(|res| res.map(|e| e.path()))
-        .collect::<Result<Vec<_>, std::io::Error>>()?;
-
-    projects.retain(|p| p.is_dir() && p.file_name().unwrap() != ".cargo");
-
-    for project in projects {
-        log::info!("Processing {:?}", project);
-
-        let mut toml: toml_edit::DocumentMut = std::fs::read_to_string(project.join("Cargo.toml"))?
-            .parse()
-            .unwrap();
-        for dep in toml["dependencies"].as_table_mut().unwrap().iter_mut() {
-            let name = dep.0.to_string();
-            let latest_avail = latest_version_of_crate(&name)?;
-
-            log::debug!("Dependency = {:?}  => {:?}", name, latest_avail);
-
-            match dep.1 {
-                toml_edit::Item::Value(toml_edit::Value::InlineTable(table)) => {
-                    table["version"] = latest_avail.into();
-                }
-                toml_edit::Item::Value(toml_edit::Value::String(value)) => {
-                    *value = toml_edit::Formatted::new(latest_avail);
-                }
-                _ => bail!("Unsupported"),
-            }
-        }
-
-        std::fs::write(project.join("Cargo.toml"), toml.to_string())?;
     }
 
     Ok(())
