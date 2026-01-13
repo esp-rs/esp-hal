@@ -1,29 +1,19 @@
-//! WiFi and BLE COEXistence example
+//! DHCP Example
 //!
-//! - set SSID and PASSWORD env variable
-//! - gets an ip address via DHCP
-//! - performs an HTTP get request to some "random" server
-//! - does BLE advertising (you cannot connect to it - it's just not implemented in the example)
+//! Set SSID and PASSWORD env variable before running this example.
 //!
-//! Note: On ESP32-C2 and ESP32-C3 you need a wifi-heap size of 70000, on
-//! ESP32-C6 you need 80000 and a tx_queue_size of 10
+//! This gets an ip address via DHCP then performs an HTTP get request to some
+//! "random" server
+
+//% FEATURES: esp-radio esp-radio/wifi esp-radio/smoltcp
+//% FEATURES: esp-radio/unstable esp-hal/unstable
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
 
 use core::net::Ipv4Addr;
 
-use bleps::{
-    Ble,
-    HciConnector,
-    ad_structure::{
-        AdStructure,
-        BR_EDR_NOT_SUPPORTED,
-        LE_GENERAL_DISCOVERABLE,
-        create_advertising_data,
-    },
-    att::Uuid,
-};
 use blocking_network_stack::Stack;
 use embedded_io::*;
 use esp_alloc as _;
@@ -38,10 +28,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_radio::{
-    ble::controller::BleConnector,
-    wifi::{ModeConfig, sta::StationConfig},
-};
+use esp_radio::wifi::{ModeConfig, scan::ScanConfig, sta::StationConfig};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::{DhcpOption, IpAddress},
@@ -58,56 +45,18 @@ fn main() -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    // COEX needs more RAM - add some more
-    #[cfg(feature = "esp32")]
-    {
-        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 96 * 1024);
-        esp_alloc::heap_allocator!(size: 24 * 1024);
-    }
-    #[cfg(not(feature = "esp32"))]
-    {
-        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
-        esp_alloc::heap_allocator!(size: 64 * 1024);
-    }
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
-
-    let now = || time::Instant::now().duration_since_epoch().as_millis();
-
-    // initializing Bluetooth first results in a more stable WiFi connection on
-    // ESP32
-    let connector = BleConnector::new(peripherals.BT, Default::default()).unwrap();
-    let hci = HciConnector::new(connector, now);
-    let mut ble = Ble::new(&hci);
-
-    println!("{:?}", ble.init());
-    println!("{:?}", ble.cmd_set_le_advertising_parameters());
-    println!(
-        "{:?}",
-        ble.cmd_set_le_advertising_data(
-            create_advertising_data(&[
-                AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
-                AdStructure::ServiceUuids16(&[Uuid::Uuid16(0x1809)]),
-                AdStructure::CompleteLocalName(esp_hal::chip!()),
-            ])
-            .unwrap()
-        )
-    );
-    println!("{:?}", ble.cmd_set_le_advertise_enable(true));
-
-    println!("started advertising");
 
     let (mut controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
     let mut device = interfaces.station;
     let iface = create_interface(&mut device);
-
-    controller
-        .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
-        .unwrap();
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let mut socket_set = SocketSet::new(&mut socket_set_entries[..]);
@@ -120,19 +69,31 @@ fn main() -> ! {
     socket_set.add(dhcp_socket);
 
     let rng = Rng::new();
+    let now = || time::Instant::now().duration_since_epoch().as_millis();
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
+
+    controller
+        .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
+        .unwrap();
 
     let station_config = ModeConfig::Station(
         StationConfig::default()
             .with_ssid(SSID.into())
             .with_password(PASSWORD.into()),
     );
-
     let res = controller.set_config(&station_config);
     println!("wifi_set_configuration returned {:?}", res);
 
     controller.start().unwrap();
     println!("is wifi started: {:?}", controller.is_started());
+
+    println!("Start Wifi Scan");
+    let scan_config = ScanConfig::default().with_max(10);
+    let res = controller.scan_with_config(scan_config).unwrap();
+    for ap in res {
+        println!("{:?}", ap);
+    }
+
     println!("{:?}", controller.capabilities());
     println!("wifi_connect {:?}", controller.connect());
 
@@ -163,8 +124,8 @@ fn main() -> ! {
 
     println!("Start busy loop on main");
 
-    let mut rx_buffer = [0u8; 128];
-    let mut tx_buffer = [0u8; 128];
+    let mut rx_buffer = [0u8; 1536];
+    let mut tx_buffer = [0u8; 1536];
     let mut socket = stack.get_socket(&mut rx_buffer, &mut tx_buffer);
 
     loop {
@@ -181,7 +142,7 @@ fn main() -> ! {
         socket.flush().unwrap();
 
         let deadline = time::Instant::now() + Duration::from_secs(20);
-        let mut buffer = [0u8; 128];
+        let mut buffer = [0u8; 512];
         while let Ok(len) = socket.read(&mut buffer) {
             let to_print = unsafe { core::str::from_utf8_unchecked(&buffer[..len]) };
             print!("{}", to_print);
