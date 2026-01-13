@@ -11,20 +11,17 @@ pub(crate) mod npl;
 use alloc::{boxed::Box, collections::vec_deque::VecDeque, vec::Vec};
 use core::mem::MaybeUninit;
 
-pub use ble::ble_os_adapter_chip_specific::Config;
 pub(crate) use ble::{ble_deinit, ble_init, send_hci};
 use esp_sync::NonReentrantMutex;
-
-#[cfg(all(bt_controller = "btdm", not(esp32)))]
-pub use crate::ble::btdm::ble_os_adapter_chip_specific::TxPower;
-#[cfg(bt_controller = "npl")]
-pub use crate::ble::npl::ble_os_adapter_chip_specific::TxPower;
 
 /// An error that is returned when the configuration is invalid.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct InvalidConfigError;
+
+// Expose chip-specific configuration types
+pub use ble::ble_os_adapter_chip_specific::*;
 
 #[cfg(bt_controller = "btdm")]
 use self::btdm as ble;
