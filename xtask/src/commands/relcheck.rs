@@ -265,6 +265,19 @@ fn update(args: UpdateArgs) -> Result<()> {
     for package in sorted.iter() {
         log::info!("Package = {}", package);
 
+        let toml = package.toml();
+        let version = toml.version();
+
+        if std::fs::exists(format!(
+            "target/local-registry/{}-{}.crate",
+            package, version
+        ))? {
+            log::warn!("Already exists as version {version}");
+            continue;
+        }
+        core::mem::drop(toml);
+        log::info!("Updating...");
+
         // make sure we have a lock file
         std::process::Command::new("cargo")
             .arg("update")
