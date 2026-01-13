@@ -1454,12 +1454,10 @@ pub(crate) fn esp_wifi_send_data(interface: wifi_interface_t, data: &mut [u8]) {
 
     state::locked(|| {
         // even checking for !Uninitialized would be enough to not crash
-        if interface == wifi_interface_t_WIFI_IF_STA
-            && !matches!(station_state(), WifiStationState::Connected)
-        {
-            return;
-        } else if interface == wifi_interface_t_WIFI_IF_AP
-            && !matches!(access_point_state(), WifiAccessPointState::Started)
+        if (interface == wifi_interface_t_WIFI_IF_STA
+            && !matches!(station_state(), WifiStationState::Connected))
+            || (interface == wifi_interface_t_WIFI_IF_AP
+                && !matches!(access_point_state(), WifiAccessPointState::Started))
         {
             return;
         }
