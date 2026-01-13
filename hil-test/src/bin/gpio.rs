@@ -6,7 +6,7 @@
 
 #![no_std]
 #![no_main]
-#![feature(asm_experimental_arch)]
+#![cfg_attr(xtensa, feature(asm_experimental_arch))]
 
 use esp_hal::gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pin, Pull};
 use hil_test as _;
