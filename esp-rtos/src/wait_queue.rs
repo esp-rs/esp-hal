@@ -1,6 +1,6 @@
 use core::ptr::NonNull;
 
-use esp_hal::{system::Cpu, time::Instant};
+use esp_hal::time::Instant;
 
 use crate::{
     SCHEDULER,
@@ -32,7 +32,7 @@ impl WaitQueue {
 
     pub(crate) fn wait_with_deadline(&mut self, deadline: Instant) {
         SCHEDULER.with(|scheduler| {
-            let mut task = scheduler.current_task(Cpu::current());
+            let mut task = SCHEDULER.current_task();
             if scheduler.sleep_task_until(task, deadline) {
                 self.waiting_tasks.push(task);
                 unsafe {

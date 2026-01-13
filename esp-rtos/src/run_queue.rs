@@ -182,7 +182,7 @@ impl RunQueue {
         cfg_if::cfg_if! {
             if #[cfg(multi_core)] {
                 let run_on = if _state[1].initialized {
-                    self.select_scheduler_trigger_multi_core(ready_task)
+                    self.select_scheduler_trigger_multi_core(_state, ready_task)
                 } else {
                     self.select_scheduler_trigger_single_core(priority_n)
                 };
@@ -205,7 +205,11 @@ impl RunQueue {
 
     #[cfg(multi_core)]
     #[esp_hal::ram]
-    fn select_scheduler_trigger_multi_core(&mut self, task: TaskPtr) -> RunSchedulerOn {
+    fn select_scheduler_trigger_multi_core(
+        &mut self,
+        per_cpu: &[CpuState],
+        task: TaskPtr,
+    ) -> RunSchedulerOn {
         use crate::scheduler::SchedulerState;
 
         // We're running both schedulers, try to figure out where to schedule the context switch.
@@ -217,13 +221,13 @@ impl RunQueue {
             let target_cpu = pinned_to as usize;
             (
                 target_cpu,
-                SchedulerState::priority_of_core(self, target_cpu),
+                SchedulerState::priority_of_core(per_cpu, target_cpu),
             )
         } else {
             // Task is not pinned, pick the core that runs the lower priority task.
-            let mut target = (0, SchedulerState::priority_of_core(self, 0));
+            let mut target = (0, SchedulerState::priority_of_core(per_cpu, 0));
             for i in 1..Cpu::COUNT {
-                let core_prio = SchedulerState::priority_of_core(self, i);
+                let core_prio = SchedulerState::priority_of_core(per_cpu, i);
                 if core_prio < target.1 {
                     target = (i, core_prio);
                 }
