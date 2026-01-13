@@ -13,7 +13,7 @@ use crate::WifiError;
 pub mod eap;
 
 /// Station configuration for a Wi-Fi connection.
-#[derive(BuilderLite, Clone, Eq, PartialEq)]
+#[derive(BuilderLite, Clone, Eq, PartialEq, Hash)]
 pub struct StationConfig {
     /// The SSID of the Wi-Fi network.
     #[builder_lite(reference)]

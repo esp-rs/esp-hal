@@ -16,6 +16,7 @@ use core::{
     task::{Context, Poll},
 };
 
+use docsplay::Display;
 use esp_hal::asynch::AtomicWaker;
 use esp_sync::NonReentrantMutex;
 use portable_atomic::{AtomicBool, AtomicU8, Ordering};
@@ -81,7 +82,7 @@ macro_rules! check_error_expect {
 
 /// Internal errors that can occur with ESP-NOW.
 #[repr(u32)]
-#[derive(Debug)]
+#[derive(Display, Debug, Copy, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum Error {
@@ -110,7 +111,7 @@ pub enum Error {
     InterfaceMismatch = 12396,
 
     /// Represents any other error not covered by the above variants, with an
-    /// associated error code.
+    /// associated error code: {0}.
     Other(u32),
 }
 
@@ -132,55 +133,21 @@ impl Error {
     }
 }
 
-impl core::fmt::Display for Error {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Error::NotInitialized => write!(f, "ESP-NOW is not initialized."),
-            Error::InvalidArgument => write!(f, "Invalid argument."),
-            Error::OutOfMemory => write!(f, "Insufficient memory to complete the operation."),
-            Error::PeerListFull => write!(f, "ESP-NOW peer list is full."),
-            Error::NotFound => write!(f, "ESP-NOW peer is not found."),
-            Error::Internal => write!(f, "Internal error."),
-            Error::PeerExists => write!(f, "ESP-NOW peer already exists."),
-            Error::InterfaceMismatch => {
-                write!(
-                    f,
-                    "The Wi-Fi interface used for ESP-NOW doesn't match the expected one for the peer."
-                )
-            }
-            Error::Other(code) => write!(f, "Unknown error with code: {code}."),
-        }
-    }
-}
-
 impl core::error::Error for Error {}
 
 /// Common errors that can occur while using ESP-NOW driver.
-#[derive(Debug)]
+#[derive(Display, Debug, Copy, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum EspNowError {
-    /// Internal Error.
+    /// Internal Error: {0}.
     Error(Error),
     /// Failed to send an ESP-NOW message.
     SendFailed,
     /// Attempt to create `EspNow` instance twice.
     DuplicateInstance,
-    /// Initialization error
+    /// Initialization error: {0}.
     Initialization(WifiError),
-}
-
-impl core::fmt::Display for EspNowError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            EspNowError::Error(e) => write!(f, "Internal error: {e}."),
-            EspNowError::SendFailed => write!(f, "Failed to send an ESP-NOW message."),
-            EspNowError::DuplicateInstance => {
-                write!(f, "Attempt to create `EspNow` instance twice.")
-            }
-            EspNowError::Initialization(e) => write!(f, "Initialization error: {e}."),
-        }
-    }
 }
 
 impl core::error::Error for EspNowError {}
@@ -192,7 +159,7 @@ impl From<WifiError> for EspNowError {
 }
 
 /// Holds the count of peers in an ESP-NOW communication context.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub struct PeerCount {
@@ -205,6 +172,7 @@ pub struct PeerCount {
 
 /// ESP-NOW rate of specified interface.
 #[repr(u32)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum WifiPhyRate {
@@ -279,7 +247,7 @@ pub enum WifiPhyRate {
 }
 
 /// ESP-NOW peer information parameters.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub struct PeerInfo {
@@ -302,7 +270,7 @@ pub struct PeerInfo {
 }
 
 /// Information about a received packet.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub struct ReceiveInfo {
@@ -351,7 +319,7 @@ impl Debug for ReceivedData {
 }
 
 /// The interface to use for this peer
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum EspNowWifiInterface {

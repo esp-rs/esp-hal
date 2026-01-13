@@ -5,6 +5,7 @@
 use alloc::{collections::vec_deque::VecDeque, vec::Vec};
 use core::{fmt::Debug, marker::PhantomData, mem::MaybeUninit, ptr::addr_of, task::Poll};
 
+use docsplay::Display;
 use enumset::{EnumSet, EnumSetType};
 use esp_config::esp_config_int;
 use esp_hal::{asynch::AtomicWaker, system::Cpu};
@@ -40,7 +41,6 @@ use crate::{
         include::{self, *},
     },
 };
-
 pub mod ap;
 #[cfg(all(feature = "csi", feature = "unstable"))]
 pub mod csi;
@@ -58,7 +58,7 @@ mod internal;
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
 
 /// Supported Wi-Fi authentication methods.
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, PartialOrd, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum AuthMethod {
@@ -120,7 +120,7 @@ pub enum AuthMethod {
 }
 
 /// Supported Wi-Fi protocols.
-#[derive(Debug, Default, PartialOrd, EnumSetType)]
+#[derive(Debug, Default, PartialOrd, Hash, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum Protocol {
@@ -162,7 +162,7 @@ impl Protocol {
 }
 
 /// Secondary Wi-Fi channels.
-#[derive(Clone, Debug, Default, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, PartialOrd, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SecondaryChannel {
     // TODO: Need to extend that for 5GHz
@@ -189,7 +189,7 @@ impl SecondaryChannel {
 }
 
 /// Access point country information.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Country([u8; 2]);
 
 impl Country {
@@ -231,7 +231,7 @@ impl defmt::Format for Country {
 }
 
 /// Introduces Wi-Fi configuration options.
-#[derive(EnumSetType, Debug, PartialOrd)]
+#[derive(EnumSetType, Debug, PartialOrd, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum Capability {
@@ -249,7 +249,7 @@ pub enum Capability {
 
 /// Configuration of Wi-Fi operation mode.
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ModeConfig {
@@ -353,7 +353,7 @@ impl AuthMethod {
 }
 
 /// Wi-Fi Mode (Station and/or AccessPoint).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum WifiMode {
@@ -446,7 +446,7 @@ pub(crate) static DATA_QUEUE_RX_STA: NonReentrantMutex<VecDeque<PacketBuffer>> =
     NonReentrantMutex::new(VecDeque::new());
 
 /// Common errors.
-#[derive(Debug, Clone, Copy)]
+#[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum WifiError {
@@ -462,73 +462,73 @@ pub enum WifiError {
     /// Passed arguments are invalid.
     InvalidArguments,
 
-    /// Generic failure - not further specified
+    /// Generic failure - not further specified.
     Failed,
 
-    /// Out of memory
+    /// Out of memory.
     OutOfMemory,
 
-    /// Wi-Fi driver was not initialized
+    /// Wi-Fi driver was not initialized or not initialized for `Wi-Fi` operations.
     NotInitialized,
 
-    /// Wi-Fi driver was not started by [esp_wifi_start]
+    /// Wi-Fi driver was not started by [esp_wifi_start].
     NotStarted,
 
-    /// Wi-Fi driver was not stopped by [esp_wifi_stop]
+    /// Wi-Fi driver was not stopped by [esp_wifi_stop].
     NotStopped,
 
-    /// Wi-Fi interface error
+    /// Wi-Fi interface error.
     Interface,
 
-    /// Wi-Fi mode error
+    /// Wi-Fi mode error.
     Mode,
 
-    /// Wi-Fi internal state error
+    /// Wi-Fi internal state error.
     State,
 
-    /// Wi-Fi internal control block of station or soft-AccessPoint error
+    /// Wi-Fi internal control block of station or soft-AccessPoint error.
     ControlBlock,
 
-    /// Wi-Fi internal NVS module error
+    /// Wi-Fi internal NVS module error.
     Nvs,
 
-    /// MAC address is invalid
+    /// MAC address is invalid.
     InvalidMac,
 
-    /// SSID is invalid
+    /// SSID is invalid.
     InvalidSsid,
 
-    /// Password is invalid
+    /// Password is invalid.
     InvalidPassword,
 
-    /// Timeout error
+    /// Timeout error.
     Timeout,
 
-    /// Wi-Fi is in sleep state (RF closed) and wakeup failed
+    /// Wi-Fi is in sleep state (RF closed) and wakeup failed.
     WakeFailed,
 
-    /// The operation would block
+    /// The operation would block.
     WouldBlock,
 
-    /// Station still in disconnect status
+    /// Station still in disconnect status.
     NotConnected,
 
-    /// Failed to post the event to Wi-Fi task
+    /// Failed to post the event to Wi-Fi task.
     PostFail,
 
-    /// Invalid Wi-Fi state when init/deinit is called
+    /// Invalid Wi-Fi state when init/deinit is called.
     InvalidInitState,
 
-    /// Returned when Wi-Fi is stopping
+    /// Returned when Wi-Fi is stopping.
     StopState,
 
-    /// The Wi-Fi connection is not associated
+    /// The Wi-Fi connection is not associated.
     NotAssociated,
 
-    /// The Wi-Fi TX is disallowed
+    /// The Wi-Fi TX is disallowed.
     TxDisallowed,
 
-    /// An unknown error was reported by the Wi-Fi driver.
+    /// An unknown error was reported by the Wi-Fi driver: {0}.
     // This is here just in case we encounter an unmapped error - there doesn't seem to be a
     // definitive and exhausting list of errors we should expect and panicking because of an
     // unmapped error.
@@ -579,64 +579,6 @@ impl WifiError {
     }
 }
 
-/// Events generated by the Wi-Fi driver.
-impl core::fmt::Display for WifiError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            WifiError::Disconnected => write!(f, "Wi-Fi disconnected."),
-            WifiError::UnknownWifiMode => write!(f, "Unknown Wi-Fi mode."),
-            WifiError::Unsupported => write!(f, "Unsupported operation or mode."),
-            WifiError::InvalidArguments => write!(f, "Invalid arguments."),
-            WifiError::Failed => write!(f, "Generic unspecified failure."),
-            WifiError::NotInitialized => write!(
-                f,
-                "Wi-Fi module is not initialized or not initialized for `Wi-Fi` operations."
-            ),
-            WifiError::OutOfMemory => write!(f, "Out of memory."),
-            WifiError::NotStarted => write!(f, "Wi-Fi driver was not started."),
-            WifiError::NotStopped => write!(f, "Wi-Fi driver was not stopped."),
-            WifiError::Interface => write!(f, "Wi-Fi interface error."),
-            WifiError::Mode => write!(f, "Wi-Fi mode error."),
-            WifiError::State => write!(f, "Wi-Fi internal state error."),
-            WifiError::ControlBlock => write!(
-                f,
-                "Wi-Fi internal control block of station or soft-AccessPoint error."
-            ),
-            WifiError::Nvs => write!(f, "Wi-Fi internal NVS module error."),
-            WifiError::InvalidMac => write!(f, "MAC address is invalid."),
-            WifiError::InvalidSsid => write!(f, "SSID is invalid."),
-            WifiError::InvalidPassword => write!(f, "Password is invalid."),
-            WifiError::Timeout => write!(f, "Timeout error."),
-            WifiError::WakeFailed => {
-                write!(f, "Wi-Fi is in sleep state (RF closed) and wakeup failed.")
-            }
-            WifiError::WouldBlock => write!(f, "The operation would block."),
-            WifiError::NotConnected => write!(f, "Station still in disconnect status."),
-            WifiError::PostFail => write!(f, "Failed to post the event to Wi-Fi task."),
-            WifiError::InvalidInitState => {
-                write!(f, "Invalid Wi-Fi state when init/deinit is called.")
-            }
-            WifiError::StopState => write!(f, "Returned when Wi-Fi is stopping."),
-            WifiError::NotAssociated => write!(f, "The Wi-Fi connection is not associated."),
-            WifiError::TxDisallowed => write!(f, "The Wi-Fi TX is disallowed."),
-            WifiError::Unknown(_) => {
-                write!(f, "An unknown error was reported by the Wi-Fi driver.")
-            }
-            WifiError::WrongClockConfig => {
-                write!(f, "The current CPU clock frequency is too low")
-            }
-            WifiError::SchedulerNotInitialized => {
-                write!(f, "The scheduler is not initialized")
-            }
-            #[cfg(esp32)]
-            WifiError::Adc2IsUsed => write!(
-                f,
-                "ADC2 cannot be used with `radio` functionality on `esp32`"
-            ),
-        }
-    }
-}
-
 impl core::error::Error for WifiError {}
 
 impl From<InitializationError> for WifiError {
@@ -652,7 +594,7 @@ impl From<InitializationError> for WifiError {
 }
 
 /// Events generated by the Wi-Fi driver.
-#[derive(Debug, FromPrimitive, EnumSetType)]
+#[derive(Debug, Hash, FromPrimitive, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 #[repr(i32)]
@@ -1045,6 +987,7 @@ mod private {
 
 /// Wi-Fi device operational modes.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 enum WifiDeviceMode {
     /// Station mode.
     Station,
@@ -1199,7 +1142,7 @@ pub enum Bandwidth {
 /// The radio metadata header of the received packet, which is the common header
 /// at the beginning of all RX callback buffers in promiscuous mode.
 #[cfg(not(esp32c6))]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
 pub struct RxControlInfo {
@@ -1257,7 +1200,7 @@ pub struct RxControlInfo {
 /// The radio metadata header of the received packet, which is the common header
 /// at the beginning of all RX callback buffers in promiscuous mode.
 #[cfg(esp32c6)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
 pub struct RxControlInfo {
@@ -1404,7 +1347,7 @@ impl Device for WifiDevice<'_> {
 }
 
 #[doc(hidden)]
-#[derive(Debug)]
+// These token doesn't need the debug trait, they aren't needed publicly.
 pub struct WifiRxToken {
     mode: WifiDeviceMode,
 }
@@ -1448,7 +1391,7 @@ impl RxToken for WifiRxToken {
 }
 
 #[doc(hidden)]
-#[derive(Debug)]
+// These token doesn't need the debug trait, they aren't needed publicly.
 pub struct WifiTxToken {
     mode: WifiDeviceMode,
 }
@@ -1625,7 +1568,7 @@ pub(crate) mod embassy {
 
 /// Power saving mode settings for the modem.
 #[non_exhaustive]
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PowerSaveMode {
     /// No power saving.
@@ -1771,7 +1714,7 @@ impl CountryInfo {
 }
 
 /// Wi-Fi configuration.
-#[derive(Clone, Copy, BuilderLite, Debug)]
+#[derive(Clone, Copy, BuilderLite, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
     /// Power save mode.
