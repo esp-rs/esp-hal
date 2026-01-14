@@ -6,7 +6,11 @@ mod tests {
     use defmt::info;
     use esp_hal::{
         clock::CpuClock,
-        interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl},
+        interrupt::{
+            Priority,
+            software::{SoftwareInterrupt, SoftwareInterruptControl},
+        },
+        peripherals::TIMG0,
         time::{Duration, Instant},
         timer::timg::TimerGroup,
     };
@@ -17,8 +21,9 @@ mod tests {
         queue::QueueHandle,
         semaphore::{SemaphoreHandle, SemaphoreKind},
     };
-    use esp_rtos::CurrentThreadHandle;
+    use esp_rtos::{CurrentThreadHandle, embassy::InterruptExecutor};
     use portable_atomic::{AtomicBool, AtomicPtr, AtomicUsize, Ordering};
+    use static_cell::StaticCell;
 
     struct Context {
         #[cfg(multi_core)]
@@ -53,6 +58,33 @@ mod tests {
             #[cfg(multi_core)]
             cpu_cntl: p.CPU_CTRL,
         }
+    }
+
+    fn no_init() {}
+
+    #[test(init = no_init)]
+    #[should_panic]
+    fn panics_in_interrupt_context() {
+        #[embassy_executor::task]
+        async fn try_init(timer: TIMG0<'static>, sw_int0: SoftwareInterrupt<'static, 0>) {
+            let timg0 = TimerGroup::new(timer);
+            esp_rtos::start(timg0.timer0, sw_int0);
+        }
+
+        crate::init_heap();
+
+        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        let p = esp_hal::init(config);
+
+        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+
+        static EXECUTOR_CORE_0: StaticCell<InterruptExecutor<1>> = StaticCell::new();
+        let executor_core0 = InterruptExecutor::new(sw_ints.software_interrupt1);
+        let executor_core0 = EXECUTOR_CORE_0.init(executor_core0);
+
+        let spawner = executor_core0.start(Priority::Priority1);
+
+        spawner.must_spawn(try_init(p.TIMG0, sw_ints.software_interrupt0));
     }
 
     #[test]

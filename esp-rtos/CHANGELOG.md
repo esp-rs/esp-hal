@@ -15,8 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `esp_rtos::start` now takes `SoftwareInterrupt<'static, 0>` for all CPUs (#4459)
+- `esp_rtos::start` can no longer be called from an interrupt handler (#4766)
 - `esp_rtos::start_second_core` no longer takes `SoftwareInterrupt<'static, 0>` (#4459)
 - `esp-alloc` dependency no longer enables default features (#4721)
+- Place the pointer to the current thread in the thread pointer registers (#4766)
 
 ### Fixed
 

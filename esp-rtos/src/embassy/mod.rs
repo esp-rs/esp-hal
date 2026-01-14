@@ -11,7 +11,11 @@ use esp_hal::{
 use macros::ram;
 use portable_atomic::AtomicPtr;
 
-use crate::{SCHEDULER, scheduler::SchedulerState, task::TaskPtr};
+use crate::{
+    SCHEDULER,
+    scheduler::SchedulerState,
+    task::{TaskPtr, read_thread_pointer},
+};
 
 /// A zero-overhead lock that allows mutable access to the contained value through the scheduler.
 struct SchedulerLocked<T> {
@@ -69,11 +73,11 @@ struct ThreadFlag {
 impl ThreadFlag {
     fn new() -> Self {
         let owner = SCHEDULER.with(|scheduler| {
-            let current_cpu = Cpu::current();
-            if let Some(current_task) = scheduler.try_get_current_task(current_cpu) {
+            if let Some(current_task) = NonNull::new(read_thread_pointer()) {
                 current_task
             } else {
                 // We're cheating, the task hasn't been initialized yet.
+                let current_cpu = Cpu::current();
                 NonNull::from(&scheduler.per_cpu[current_cpu as usize].main_task)
             }
         });
