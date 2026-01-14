@@ -8,8 +8,10 @@ use anyhow::{Context, Result, anyhow};
 use cargo::CargoAction;
 use esp_metadata::{Chip, Config, TokenStream};
 use parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
+use pretty_yaml::{config::FormatOptions, format_text};
 use serde::{Deserialize, Serialize};
 use toml_edit::{InlineTable, Item, Value};
+use walkdir::WalkDir;
 
 use crate::{
     cargo::{CargoArgsBuilder, CargoCommandBatcher, CargoToml},
@@ -875,6 +877,28 @@ fn format_package_path(
     log::debug!("{cargo_args:#?}");
 
     cargo::run(&cargo_args, &package_path)
+}
+
+/// Recursively format all `.yml` files in the `.github/` directory.
+pub fn format_yml() -> Result<()> {
+    WalkDir::new("./.github")
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "yml"))
+        .try_for_each(|entry| -> Result<()> {
+            let path = entry.path();
+            log::info!("Formatting: {:?}", path);
+            let content = fs::read_to_string(path)?;
+
+            let formatted = format_text(&content, &FormatOptions::default())
+                .context("Failed to format yml!")?;
+
+            fs::write(path, formatted)?;
+
+            Ok(())
+        })?;
+
+    Ok(())
 }
 
 /// Update the metadata and chip support table in the esp-hal README.
