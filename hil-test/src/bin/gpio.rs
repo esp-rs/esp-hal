@@ -649,8 +649,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(esp32s3))]
-    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    #[cfg(all(dedicated_gpio, feature = "unstable", not(esp32s3)))]
     fn dedicated_gpios_output_levels(ctx: Context) {
         use esp_hal::gpio::dedicated::DedicatedGpioOutput;
 
@@ -676,9 +675,9 @@ mod tests {
         let input = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
         let output = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
 
-        let mut input_dedicated = DedicatedGpioInput::new(ctx.dedicated_gpio.channel0.input, input);
-        let mut output_dedicated =
-            DedicatedGpioOutput::new(ctx.dedicated_gpio.channel1.output).with_pin(output);
+        let input_dedicated = DedicatedGpioInput::new(ctx.dedicated_gpio.channel0.input, input);
+        let output_dedicated =
+            DedicatedGpioOutput::new(ctx.dedicated_gpio.channel0.output).with_pin(output);
 
         assert_eq!(input_dedicated.level(), Level::Low);
 
@@ -688,10 +687,10 @@ mod tests {
         let mut input_bundle = DedicatedGpioInputBundle::new();
         input_bundle.with_input(&input_dedicated);
 
-        output_bundle.set_high(1 << 1);
+        output_bundle.set_high(1);
         assert_eq!(input_dedicated.level(), Level::High);
         #[cfg(not(esp32s3))]
-        assert_eq!(output_bundle.output_levels(), 1 << 1);
+        assert_eq!(output_bundle.output_levels(), 1);
         assert_eq!(input_bundle.levels(), 1);
     }
 }
