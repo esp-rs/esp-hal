@@ -61,7 +61,7 @@ const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, PartialOrd, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub enum AuthMethod {
+pub enum AuthenticationMethod {
     /// No authentication (open network).
     None,
 
@@ -96,14 +96,14 @@ pub enum AuthMethod {
     /// WPA3 Enterprise Suite B 192-bit Encryption
     Wpa3EntSuiteB192Bit,
 
-    /// This authentication mode will yield same result as [AuthMethod::Wpa3Personal] and is not
-    /// recommended to be used. It will be deprecated in future, please use
-    /// [AuthMethod::Wpa3Personal] instead.
+    /// This authentication mode will yield same result as [AuthenticationMethod::Wpa3Personal] and
+    /// is not recommended to be used. It will be deprecated in future, please use
+    /// [AuthenticationMethod::Wpa3Personal] instead.
     Wpa3ExtPsk,
 
-    /// This authentication mode will yield same result as [AuthMethod::Wpa3Personal] and is not
-    /// recommended to be used. It will be deprecated in future, please use
-    /// [AuthMethod::Wpa3Personal] instead.
+    /// This authentication mode will yield same result as [AuthenticationMethod::Wpa3Personal] and
+    /// is not recommended to be used. It will be deprecated in future, please use
+    /// [AuthenticationMethod::Wpa3Personal] instead.
     Wpa3ExtPskMixed,
 
     /// WiFi DPP / Wi-Fi Easy Connect
@@ -291,63 +291,87 @@ impl ModeConfig {
     }
 }
 
-impl AuthMethod {
+impl AuthenticationMethod {
     fn to_raw(self) -> wifi_auth_mode_t {
         match self {
-            AuthMethod::None => include::wifi_auth_mode_t_WIFI_AUTH_OPEN,
-            AuthMethod::Wep => include::wifi_auth_mode_t_WIFI_AUTH_WEP,
-            AuthMethod::Wpa => include::wifi_auth_mode_t_WIFI_AUTH_WPA_PSK,
-            AuthMethod::Wpa2Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA2_PSK,
-            AuthMethod::WpaWpa2Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA_WPA2_PSK,
-            AuthMethod::Wpa2Enterprise => include::wifi_auth_mode_t_WIFI_AUTH_WPA2_ENTERPRISE,
-            AuthMethod::Wpa3Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK,
-            AuthMethod::Wpa2Wpa3Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK,
-            AuthMethod::WapiPersonal => include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK,
-            AuthMethod::Owe => include::wifi_auth_mode_t_WIFI_AUTH_OWE,
-            AuthMethod::Wpa3EntSuiteB192Bit => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192,
-            AuthMethod::Wpa3ExtPsk => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK,
-            AuthMethod::Wpa3ExtPskMixed => {
+            AuthenticationMethod::None => include::wifi_auth_mode_t_WIFI_AUTH_OPEN,
+            AuthenticationMethod::Wep => include::wifi_auth_mode_t_WIFI_AUTH_WEP,
+            AuthenticationMethod::Wpa => include::wifi_auth_mode_t_WIFI_AUTH_WPA_PSK,
+            AuthenticationMethod::Wpa2Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA2_PSK,
+            AuthenticationMethod::WpaWpa2Personal => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA_WPA2_PSK
+            }
+            AuthenticationMethod::Wpa2Enterprise => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA2_ENTERPRISE
+            }
+            AuthenticationMethod::Wpa3Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK,
+            AuthenticationMethod::Wpa2Wpa3Personal => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK
+            }
+            AuthenticationMethod::WapiPersonal => include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK,
+            AuthenticationMethod::Owe => include::wifi_auth_mode_t_WIFI_AUTH_OWE,
+            AuthenticationMethod::Wpa3EntSuiteB192Bit => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192
+            }
+            AuthenticationMethod::Wpa3ExtPsk => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK,
+            AuthenticationMethod::Wpa3ExtPskMixed => {
                 include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK_MIXED_MODE
             }
-            AuthMethod::Dpp => include::wifi_auth_mode_t_WIFI_AUTH_DPP,
-            AuthMethod::Wpa3Enterprise => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENTERPRISE,
-            AuthMethod::Wpa2Wpa3Enterprise => {
+            AuthenticationMethod::Dpp => include::wifi_auth_mode_t_WIFI_AUTH_DPP,
+            AuthenticationMethod::Wpa3Enterprise => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENTERPRISE
+            }
+            AuthenticationMethod::Wpa2Wpa3Enterprise => {
                 include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_ENTERPRISE
             }
-            AuthMethod::WpaEnterprise => include::wifi_auth_mode_t_WIFI_AUTH_WPA_ENTERPRISE,
+            AuthenticationMethod::WpaEnterprise => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA_ENTERPRISE
+            }
         }
     }
 
     fn from_raw(raw: wifi_auth_mode_t) -> Self {
         match raw {
-            include::wifi_auth_mode_t_WIFI_AUTH_OPEN => AuthMethod::None,
-            include::wifi_auth_mode_t_WIFI_AUTH_WEP => AuthMethod::Wep,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA_PSK => AuthMethod::Wpa,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_PSK => AuthMethod::Wpa2Personal,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA_WPA2_PSK => AuthMethod::WpaWpa2Personal,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_ENTERPRISE => AuthMethod::Wpa2Enterprise,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK => AuthMethod::Wpa3Personal,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK => AuthMethod::Wpa2Wpa3Personal,
-            include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK => AuthMethod::WapiPersonal,
-            include::wifi_auth_mode_t_WIFI_AUTH_OWE => AuthMethod::Owe,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192 => AuthMethod::Wpa3EntSuiteB192Bit,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK => AuthMethod::Wpa3ExtPsk,
+            include::wifi_auth_mode_t_WIFI_AUTH_OPEN => AuthenticationMethod::None,
+            include::wifi_auth_mode_t_WIFI_AUTH_WEP => AuthenticationMethod::Wep,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA_PSK => AuthenticationMethod::Wpa,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_PSK => AuthenticationMethod::Wpa2Personal,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA_WPA2_PSK => {
+                AuthenticationMethod::WpaWpa2Personal
+            }
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_ENTERPRISE => {
+                AuthenticationMethod::Wpa2Enterprise
+            }
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK => AuthenticationMethod::Wpa3Personal,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK => {
+                AuthenticationMethod::Wpa2Wpa3Personal
+            }
+            include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK => AuthenticationMethod::WapiPersonal,
+            include::wifi_auth_mode_t_WIFI_AUTH_OWE => AuthenticationMethod::Owe,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192 => {
+                AuthenticationMethod::Wpa3EntSuiteB192Bit
+            }
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK => AuthenticationMethod::Wpa3ExtPsk,
             include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK_MIXED_MODE => {
-                AuthMethod::Wpa3ExtPskMixed
+                AuthenticationMethod::Wpa3ExtPskMixed
             }
-            include::wifi_auth_mode_t_WIFI_AUTH_DPP => AuthMethod::Dpp,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENTERPRISE => AuthMethod::Wpa3Enterprise,
+            include::wifi_auth_mode_t_WIFI_AUTH_DPP => AuthenticationMethod::Dpp,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENTERPRISE => {
+                AuthenticationMethod::Wpa3Enterprise
+            }
             include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_ENTERPRISE => {
-                AuthMethod::Wpa2Wpa3Enterprise
+                AuthenticationMethod::Wpa2Wpa3Enterprise
             }
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA_ENTERPRISE => AuthMethod::WpaEnterprise,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA_ENTERPRISE => {
+                AuthenticationMethod::WpaEnterprise
+            }
             // we const-assert we know all the auth-methods the wifi driver knows and it shouldn't
             // return anything else.
             //
             // In fact from observation the drivers will return
             // `wifi_auth_mode_t_WIFI_AUTH_OPEN` if the method is unsupported (e.g. any WPA3 in our
             // case, since the supplicant isn't compiled to support it)
-            _ => AuthMethod::None,
+            _ => AuthenticationMethod::None,
         }
     }
 }
@@ -2580,7 +2604,7 @@ impl WifiController<'_> {
             },
         };
 
-        if config.auth_method == AuthMethod::None && !config.password.is_empty() {
+        if config.auth_method == AuthenticationMethod::None && !config.password.is_empty() {
             return Err(WifiError::InvalidArguments);
         }
 
@@ -2626,7 +2650,7 @@ impl WifiController<'_> {
             },
         };
 
-        if config.auth_method == AuthMethod::None && !config.password.is_empty() {
+        if config.auth_method == AuthenticationMethod::None && !config.password.is_empty() {
             return Err(WifiError::InvalidArguments);
         }
 
