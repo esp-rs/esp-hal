@@ -6,7 +6,7 @@
 
 #![no_std]
 #![no_main]
-#![feature(asm_experimental_arch)]
+#![cfg_attr(any(esp32s2, esp32s3), feature(asm_experimental_arch))]
 
 use esp_hal::gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pin, Pull};
 use hil_test as _;
@@ -631,7 +631,10 @@ mod tests {
         let mut output_dedicated =
             DedicatedGpioOutput::new(ctx.dedicated_gpio.channel0.output).with_pin(output);
 
+        // output_dedicated.set_level(Level::Low);
         assert_eq!(input_dedicated.level(), Level::Low);
+        #[cfg(not(esp32s3))]
+        assert_eq!(output_dedicated.output_level(), Level::Low);
         output_dedicated.set_level(Level::High);
         #[cfg(esp32s2)]
         unsafe {
@@ -641,5 +644,56 @@ mod tests {
             core::arch::asm!("nop");
         }
         assert_eq!(input_dedicated.level(), Level::High);
+        #[cfg(not(esp32s3))]
+        assert_eq!(output_dedicated.output_level(), Level::High);
+    }
+
+    #[test]
+    #[cfg(not(esp32s3))]
+    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    fn dedicated_gpios_output_levels(ctx: Context) {
+        use esp_hal::gpio::dedicated::DedicatedGpioOutput;
+
+        let output = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
+        let mut output_dedicated =
+            DedicatedGpioOutput::new(ctx.dedicated_gpio.channel0.output).with_pin(output);
+
+        output_dedicated.set_level(Level::Low);
+        assert_eq!(output_dedicated.output_level(), Level::Low);
+        output_dedicated.set_level(Level::High);
+        assert_eq!(output_dedicated.output_level(), Level::High);
+    }
+
+    #[test]
+    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    fn dedicated_gpio_bundles(ctx: Context) {
+        use esp_hal::gpio::dedicated::{
+            DedicatedGpioInput,
+            DedicatedGpioInputBundle,
+            DedicatedGpioOutput,
+            DedicatedGpioOutputBundle,
+        };
+        let input = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
+        let output = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
+
+        let mut input_dedicated = DedicatedGpioInput::new(ctx.dedicated_gpio.channel0.input, input);
+        let mut output_dedicated =
+            DedicatedGpioOutput::new(ctx.dedicated_gpio.channel1.output).with_pin(output);
+
+        assert_eq!(input_dedicated.level(), Level::Low);
+
+        let mut output_bundle = DedicatedGpioOutputBundle::new();
+        output_bundle.with_output(&output_dedicated);
+
+        let mut input_bundle = DedicatedGpioInputBundle::new();
+        input_bundle.with_input(&input_dedicated);
+
+        output_bundle.set_high(1 << 1);
+        assert_eq!(input_dedicated.level(), Level::High);
+        #[cfg(not(esp32s3))]
+        assert_eq!(output_bundle.output_levels(), 1 << 1);
+        defmt::println!("current input bundle level: {}", input_bundle.levels());
+        // ask why this doesn't gets printed
+        assert_eq!(input_bundle.levels(), 1);
     }
 }

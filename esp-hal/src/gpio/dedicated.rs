@@ -444,8 +444,9 @@ impl<'lt> DedicatedGpioInput<'lt> {
     }
 
     /// Read the current state of the GPIO pins.
-    #[inline(always)]
-    pub fn level(&mut self) -> Level {
+    // TODO: change all read methods to immutable borrows
+    #[inline(always)]   
+    pub fn level(&self) -> Level {
         #[cfg(all(debug_assertions, multi_core))]
         debug_assert_eq!(self.core, Cpu::current());
         let bits = ll::read_in();
@@ -569,6 +570,7 @@ impl<'lt> DedicatedGpioOutput<'lt> {
     /// Returns the current output state of the GPIO pins.
     ///
     /// Returns [`Level::High`] if any of the GPIO pins are set high, otherwise [`Level::Low`].
+    #[cfg(not(esp32s3))]
     #[inline(always)]
     pub fn output_level(&mut self) -> Level {
         #[cfg(all(debug_assertions, multi_core))]
@@ -704,6 +706,7 @@ impl<'lt> DedicatedGpioFlex<'lt> {
     }
 
     /// Returns the current output state of the GPIO pin.
+    #[cfg(not(esp32s3))]
     #[inline(always)]
     pub fn output_level(&mut self) -> Level {
         #[cfg(all(debug_assertions, multi_core))]
@@ -810,6 +813,231 @@ pub fn read_all_ll() -> u32 {
 //     - It should be possible to attach a Flex driver to input and output bundles
 //   - A bundle needs to precompute its mask
 
+/// test doc
+pub struct DedicatedGpioOutputBundle<'lt> {
+    _marker: PhantomData<&'lt ()>,
+    mask: u32,
+    #[cfg(all(debug_assertions, multi_core))]
+    core: Cpu,
+}
+
+impl<'lt> DedicatedGpioOutputBundle<'lt> {
+    /// Creates a new, empty dedicated GPIO output bundle.
+    ///
+    /// This function returns an empty bundle. You will need to add output drivers
+    /// ([`DedicatedGpioOutput`]) to it using the
+    pub fn new() -> Self {
+        Self {
+            _marker: PhantomData,
+            mask: 0,
+            #[cfg(all(debug_assertions, multi_core))]
+            core: Cpu::current(),
+        }
+    }
+
+    /// Attaches an already-configured dedicated output driver to this bundle.
+    ///
+    /// This method logically borrows the provided [`DedicatedGpioOutput`] for the lifetime `'lt`.
+    /// Multiple bundles may borrow the same output driver at the same time.
+    ///
+    /// ## Notes
+    ///
+    /// - The referenced output driver must outlive this bundle (`'lt`), since dropping the output
+    ///   driver would release its GPIO pins back to normal GPIO mode.
+    /// - This function does not change any GPIO output state.
+    pub fn with_output<'d>(&mut self, out: &'lt DedicatedGpioOutput<'d>) -> &mut Self {
+        self.mask |= out.mask;
+        self
+    }
+
+    /// test
+    pub fn remove_output<'d>(&mut self, out: &'lt DedicatedGpioOutput<'d>) -> &mut Self {
+        self.mask &= !out.mask;
+        self
+    }
+
+    /// test
+    #[inline(always)]
+    pub fn set_high(&mut self, bits: u32) {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert!(
+            bits & !self.mask == 0,
+            "Trying to set bits outside of the bundle mask"
+        );
+        ll::write(bits, bits); // or ll::write(self.mask, bits); 
+    }
+
+    /// test
+    #[inline(always)]
+    pub fn set_low(&mut self, bits: u32) {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert!(
+            bits & !self.mask == 0,
+            "Trying to clear bits outside of the bundle mask"
+        );
+        ll::write(bits, 0); // or ll::write(bits & self.mask, 0); the latter is safer but slower
+    }
+
+    /// test
+    #[inline(always)]
+    pub fn write_bits(&mut self, bits: u32) {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert!(
+            bits & !self.mask == 0,
+            "Trying to write bits outside of the bundle mask"
+        );
+        ll::write(self.mask, bits);
+    }
+
+    /// test
+    #[cfg(not(esp32s3))]
+    #[inline(always)]
+    pub fn output_levels(&mut self) -> u32 {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(self.core, Cpu::current());
+        ll::read_out() & self.mask
+    }
+}
+
+/// test doc 
+pub struct DedicatedGpioInputBundle<'lt> {
+    _marker: PhantomData<&'lt ()>,
+    mask: u32,
+    #[cfg(all(debug_assertions, multi_core))]
+    core: Cpu,
+}
+
+impl<'lt> DedicatedGpioInputBundle<'lt> {
+    /// Creates a new, empty dedicated GPIO input bundle.
+    ///
+    /// This function returns an empty bundle. You will need to add input drivers
+    /// ([`DedicatedGpioInput`]) to it using the
+    pub fn new() -> Self {
+        Self {
+            _marker: PhantomData,
+            mask: 0,
+            #[cfg(all(debug_assertions, multi_core))]
+            core: Cpu::current(),
+        }
+    }
+
+    /// Attaches an already-configured dedicated input driver to this bundle.
+    ///
+    /// This method logically borrows the provided [`DedicatedGpioInput`] for the lifetime `'lt`.
+    /// Multiple bundles may borrow the same input driver at the same time.
+    ///
+    /// ## Notes
+    ///
+    /// - The referenced input driver must outlive this bundle (`'lt`), since dropping the input
+    ///   driver would release its GPIO pins back to normal GPIO mode.
+    pub fn with_input<'d>(&mut self, inp: &'lt DedicatedGpioInput<'d>) -> &mut Self {
+        self.mask |= inp.mask;
+        self
+    }
+
+    /// test doc
+    pub fn remove_input<'d>(&mut self, inp: &'lt DedicatedGpioInput<'d>) -> &mut Self {
+        self.mask &= !inp.mask;
+        self
+    }
+
+    /// test
+    #[inline(always)]
+    pub fn levels(&mut self) -> u32 {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(self.core, Cpu::current());
+        ll::read_in() & self.mask
+    }
+}
+
+
+/// test doc
+pub struct DedicatedGpioFlexBundle<'lt> {
+    _marker: PhantomData<&'lt ()>,
+    mask: u32,
+    #[cfg(all(debug_assertions, multi_core))]
+    core: Cpu,
+}
+
+impl<'lt> DedicatedGpioFlexBundle<'lt> {
+    /// test doc
+    pub fn new() -> Self {
+        Self {
+            _marker: PhantomData,
+            mask: 0,
+            #[cfg(all(debug_assertions, multi_core))]
+            core: Cpu::current(),
+        }
+    }
+
+    /// test doc 
+    pub fn with_flex<'d>(&mut self, flex: &'lt DedicatedGpioFlex<'d>) -> &mut Self {
+        self.mask |= flex.mask;
+        self
+    }
+
+    /// test doc
+    pub fn remove_flex<'d>(&mut self, flex: &'lt DedicatedGpioFlex<'d>) -> &mut Self {
+        self.mask &= !flex.mask;
+        self
+    }
+
+    /// test
+    #[inline(always)]
+    pub fn set_high(&mut self, bits: u32) {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert!(
+            bits & !self.mask == 0,
+            "Trying to set bits outside of the bundle mask"
+        );
+        ll::write(bits, bits); // or ll::write(self.mask, bits); 
+    }
+    /// test
+    #[inline(always)]
+    pub fn set_low(&mut self, bits: u32) {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert!(
+            bits & !self.mask == 0,
+            "Trying to clear bits outside of the bundle mask"
+        );
+        ll::write(bits, 0); // or ll::write(bits & self.mask, 0); the latter is safer but slower
+    }
+
+    /// test
+    #[inline(always)]
+    pub fn write_bits(&mut self, bits: u32) {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert!(
+            bits & !self.mask == 0,
+            "Trying to write bits outside of the bundle mask"
+        );
+        ll::write(self.mask, bits);
+    }
+
+    
+    #[cfg(not(esp32s3))]
+    #[inline(always)]
+    pub fn output_levels(&mut self) -> u32 {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(self.core, Cpu::current());
+        ll::read_out() & self.mask
+    }
+
+    /// test doc
+    #[inline(always)]
+    pub fn read_levels(&mut self) -> u32 {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(self.core, Cpu::current());
+        ll::read_in() & self.mask
+    }
+}
+
 #[cfg(esp32s2)]
 mod ll {
     #[inline(always)]
@@ -851,6 +1079,7 @@ mod ll {
         val
     }
 
+    #[cfg(not(esp32s3))]
     #[inline(always)]
     pub(super) fn read_out() -> u32 {
         let val;
