@@ -3363,6 +3363,10 @@ impl Info {
                         }
                     };
 
+                    // TODO: we should consider a solution that can write this register fully in one go
+                    // as part of the UART_SCLK configuration. Currently this may cause unexpected waveform
+                    // changes in the transmitted data if the clock source is changed, even if the baud
+                    // rate can be kept the same.
                     conf.modify(|_, w| unsafe {
                         w.sclk_div_a().bits(0);
                         w.sclk_div_b().bits(0);
