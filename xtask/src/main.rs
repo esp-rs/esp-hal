@@ -238,6 +238,9 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
         xtask::format_package(workspace, package, args.check, None)?;
     }
 
+    // format ymls in .github/
+    xtask::format_yml(args.check)?;
+
     Ok(())
 }
 

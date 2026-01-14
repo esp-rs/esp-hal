@@ -40,7 +40,6 @@ concurrency:
 jobs:
   # --------------------------------------------------------------------------
   # Build Packages
-
   esp-hal:
     runs-on: macos-m1-self-hosted
     env:

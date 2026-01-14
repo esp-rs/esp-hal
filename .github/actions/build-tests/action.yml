@@ -1,12 +1,30 @@
 name: Build HIL tests (composite)
 description: Checkout, install toolchains, build tests for a SoC, upload artifact
 inputs:
-  event_name:      { description: github.event_name, required: true }
-  repository:      { description: owner/repo for workflow_dispatch, required: true }
-  branch:          { description: branch/tag to checkout if no SHA, required: true }
-  soc:             { description: SoC (e.g. esp32c3), required: true }
-  rust_target:     { description: rust target triple, required: true }
-  tests:           { description: "Optional comma-separated test names", required: false, default: "" }
+  event_name:
+    description: github.event_name
+    required: true
+
+  repository:
+    description: owner/repo for workflow_dispatch
+    required: true
+
+  branch:
+    description: branch/tag to checkout if no SHA
+    required: true
+
+  soc:
+    description: SoC (e.g. esp32c3)
+    required: true
+
+  rust_target:
+    description: rust target triple
+    required: true
+
+  tests:
+    description: Optional comma-separated test names
+    required: false
+    default: ""
 
 runs:
   using: composite
