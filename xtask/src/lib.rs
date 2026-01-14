@@ -880,20 +880,26 @@ fn format_package_path(
 }
 
 /// Recursively format all `.yml` files in the `.github/` directory.
-pub fn format_yml() -> Result<()> {
+pub fn format_yml(check: bool) -> Result<()> {
     WalkDir::new("./.github")
         .into_iter()
         .filter_map(Result::ok)
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "yml"))
         .try_for_each(|entry| -> Result<()> {
             let path = entry.path();
-            log::info!("Formatting: {:?}", path);
             let content = fs::read_to_string(path)?;
 
             let formatted = format_text(&content, &FormatOptions::default())
                 .context("Failed to format yml!")?;
 
-            fs::write(path, formatted)?;
+            if content != formatted {
+                if check {
+                    anyhow::bail!("File not formatted: {:?}", path);
+                }
+
+                log::info!("Fixing format: {:?}", path);
+                fs::write(path, formatted)?;
+            }
 
             Ok(())
         })?;
