@@ -218,8 +218,14 @@ clocks = { system_clocks = { clock_tree = [
     # {{peripheral}} is derived automatically (e.g. SpiDma -> spi_dma)
 ], peripheral_clocks = [
     # This list is based on TRM (v1.1) - 8.4.1 PCR Registers
-    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
-    { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
+    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true, clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [ # UART_SCLK
+            { name = "PLL_F80M", outputs = "PLL_F80M" },
+            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
+            { name = "XTAL",     outputs = "XTAL_CLK" },
+        ] },
+    ] },
+    { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, clocks = "Uart0" },
     { name = "I2cExt0", template_params = { peripheral = "i2c0" } },
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
     { name = "Rmt" },

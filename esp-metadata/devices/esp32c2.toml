@@ -134,7 +134,7 @@ clocks = { system_clocks = { clock_tree = [
         { name = "CPU_DIV2", outputs = "CPU_DIV2" },
         { name = "CPU",      outputs = "CPU_CLK" },
     ] },
-    
+
     # Low-power clocks
     { name = "RC_FAST_CLK_DIV_N", type = "divider", divisors = "0 ..= 3", output = "RC_FAST_CLK / (DIVISOR + 1)" }, # RC_DIV
     { name = "XTAL_DIV_CLK",      type = "divider", output = "XTAL_CLK / 2" }, # XTAL_DIV
@@ -147,14 +147,20 @@ clocks = { system_clocks = { clock_tree = [
         { name = "XTAL", outputs = "XTAL_DIV_CLK" },
         { name = "RC",   outputs = "RC_FAST_CLK_DIV_N" },
     ] },
-    
+
     # Low-power wireless clock source
     { name = "LOW_POWER_CLK", type = "mux", variants = [
         { name = "XTAL",     outputs = "XTAL_CLK" },
         { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
         { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
         { name = "RTC_SLOW", outputs = "RTC_SLOW_CLK" },
-    ] }
+    ] },
+
+    # System-wide peripheral clocks
+    { name = "UART_MEM_CLK", type = "mux", default = "XTAL", variants = [
+        # The actual source clock is unknown, but it also doesn't matter.
+        { name = "XTAL", outputs = "XTAL_CLK" },
+    ] },
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
@@ -195,8 +201,17 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Ledc" },
     { name = "I2cExt0" },
     { name = "Spi2" },
-    { name = "Uart1" },
-    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
+    { name = "Uart1", clocks = "Uart0" },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true, clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [ # UART_SCLK
+            { name = "PLL_F40M", outputs = "PLL_40M" },
+            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
+            { name = "XTAL",     outputs = "XTAL_CLK" },
+        ] },
+        { name = "MEM_CLOCK", type = "mux", default = "MEM", variants = [
+            { name = "MEM", outputs = "UART_MEM_CLK" },
+        ] },
+    ] },
     #{ name = "Spi01" },
     #{ name = "Timers" },
     

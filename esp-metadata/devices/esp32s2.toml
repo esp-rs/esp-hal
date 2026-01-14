@@ -175,6 +175,12 @@ clocks = { system_clocks = { clock_tree = [
         { name = "XTAL", outputs = "XTAL_DIV_CLK" },
         { name = "RC",   outputs = "RC_FAST_CLK" },
     ] },
+
+    # System-wide peripheral clocks
+    { name = "UART_MEM_CLK", type = "mux", default = "XTAL", variants = [
+        # The actual source clock is unknown, but it also doesn't matter.
+        { name = "XTAL", outputs = "XTAL_CLK" },
+    ] },
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
@@ -232,10 +238,18 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Uhci0" },
     { name = "I2cExt0" },
     { name = "Spi2" },
-    { name = "Uart1" },
+    { name = "Uart1", clocks = "Uart0" },
     { name = "I2s0" },
     { name = "Wdg" },
-    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true, clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", default = "APB", variants = [
+            { name = "APB",      outputs = "APB_CLK" },
+            { name = "REF_TICK", outputs = "REF_TICK" }
+        ] },
+        { name = "MEM_CLOCK", type = "mux", default = "MEM", variants = [
+            { name = "MEM", outputs = "UART_MEM_CLK" },
+        ] },
+    ] },
     #{ name = "Spi01" },
     #{ name = "Timers" },
     

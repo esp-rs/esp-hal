@@ -432,6 +432,12 @@ impl ClockTreeItem {
         let frequency_function_impl = node.node_frequency_impl(tree);
         let frequency_function_name = node.frequency_function_name();
 
+        let enable_trace = format!("Enabling {}", node.name_str());
+        let disable_trace = format!("Disabling {}", node.name_str());
+
+        let request_trace = format!("Requesting {}", node.name_str());
+        let release_trace = format!("Releasing {}", node.name_str());
+
         ClockNodeFunctions {
             request: Function {
                 _name: request_fn_name.to_string(),
@@ -442,7 +448,9 @@ impl ClockTreeItem {
                 } else if refcount_name.is_some() {
                     quote! {
                         pub fn #request_fn_name(clocks: &mut ClockTree) {
+                            trace!(#request_trace);
                             if increment_reference_count(&mut clocks.#refcount_name) {
+                                trace!(#enable_trace);
                                 #request_direct_dependencies
                                 #enable_fn_impl_name(clocks, true);
                             }
@@ -451,6 +459,8 @@ impl ClockTreeItem {
                 } else if properties.has_enable() {
                     quote! {
                         pub fn #request_fn_name(clocks: &mut ClockTree) {
+                            trace!(#request_trace);
+                            trace!(#enable_trace);
                             #request_direct_dependencies
                             #enable_fn_impl_name(clocks, true);
                         }
@@ -458,6 +468,7 @@ impl ClockTreeItem {
                 } else {
                     quote! {
                         pub fn #request_fn_name(clocks: &mut ClockTree) {
+                            trace!(#request_trace);
                             #request_direct_dependencies
                         }
                     }
@@ -472,7 +483,9 @@ impl ClockTreeItem {
                 } else if refcount_name.is_some() {
                     quote! {
                         pub fn #release_fn_name(clocks: &mut ClockTree) {
+                            trace!(#release_trace);
                             if decrement_reference_count(&mut clocks.#refcount_name) {
+                                trace!(#disable_trace);
                                 #enable_fn_impl_name(clocks, false);
                                 #release_direct_dependencies
                             }
@@ -481,6 +494,8 @@ impl ClockTreeItem {
                 } else if properties.has_enable() {
                     quote! {
                         pub fn #release_fn_name(clocks: &mut ClockTree) {
+                            trace!(#release_trace);
+                            trace!(#disable_trace);
                             #enable_fn_impl_name(clocks, false);
                             #release_direct_dependencies
                         }
@@ -488,6 +503,7 @@ impl ClockTreeItem {
                 } else {
                     quote! {
                         pub fn #release_fn_name(clocks: &mut ClockTree) {
+                            trace!(#release_trace);
                             #release_direct_dependencies
                         }
                     }
