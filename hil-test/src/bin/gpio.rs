@@ -692,8 +692,6 @@ mod tests {
         assert_eq!(input_dedicated.level(), Level::High);
         #[cfg(not(esp32s3))]
         assert_eq!(output_bundle.output_levels(), 1 << 1);
-        defmt::println!("current input bundle level: {}", input_bundle.levels());
-        // ask why this doesn't gets printed
         assert_eq!(input_bundle.levels(), 1);
     }
 }
