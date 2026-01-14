@@ -847,6 +847,11 @@ support_status = "partial"
 support_status = "partial"
 apb_cycle_wait_num = 16 # TODO
 
+[device.sleep]
+support_status = "partial"
+light_sleep = true
+deep_sleep = true
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Interfaces
@@ -864,7 +869,6 @@ apb_cycle_wait_num = 16 # TODO
 [device.io_mux]
 [device.psram]
 [device.temp_sensor]
-[device.sleep]
 
 [device.ulp_fsm]
 

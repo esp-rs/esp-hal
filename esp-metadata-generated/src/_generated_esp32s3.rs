@@ -231,6 +231,12 @@ macro_rules! property {
     ("rsa.memory_size_bytes", str) => {
         stringify!(512)
     };
+    ("sleep.light_sleep") => {
+        true
+    };
+    ("sleep.deep_sleep") => {
+        true
+    };
     ("sha.dma") => {
         true
     };

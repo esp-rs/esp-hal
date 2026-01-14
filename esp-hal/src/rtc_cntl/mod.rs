@@ -406,7 +406,7 @@ impl<'d> Rtc<'d> {
     ///
     /// You can use the [`#[esp_hal::ram(persistent)]`][procmacros::ram]
     /// attribute to persist a variable though deep sleep.
-    #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2, esp32h2))]
+    #[cfg(sleep_deep_sleep)]
     pub fn sleep_deep(&mut self, wake_sources: &[&dyn WakeSource]) -> ! {
         let config = RtcSleepConfig::deep();
         self.sleep(&config, wake_sources);
@@ -414,7 +414,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// Enter light sleep and wake with the provided `wake_sources`.
-    #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2, esp32h2))]
+    #[cfg(sleep_light_sleep)]
     pub fn sleep_light(&mut self, wake_sources: &[&dyn WakeSource]) {
         let config = RtcSleepConfig::default();
         self.sleep(&config, wake_sources);
@@ -422,7 +422,7 @@ impl<'d> Rtc<'d> {
 
     /// Enter sleep with the provided `config` and wake with the provided
     /// `wake_sources`.
-    #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2, esp32h2))]
+    #[cfg(sleep)]
     pub fn sleep(&mut self, config: &RtcSleepConfig, wake_sources: &[&dyn WakeSource]) {
         let mut config = *config;
         let mut wakeup_triggers = WakeTriggers::default();
