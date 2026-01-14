@@ -716,7 +716,7 @@ impl<'lt> DedicatedGpioFlex<'lt> {
 
     /// Read the current state of the GPIO pins.
     #[inline(always)]
-    pub fn level(&mut self) -> Level {
+    pub fn level(&self) -> Level {
         #[cfg(all(debug_assertions, multi_core))]
         debug_assert_eq!(self.core, Cpu::current());
         let bits = ll::read_in();
@@ -946,7 +946,7 @@ impl<'lt> DedicatedGpioInputBundle<'lt> {
 
     /// test
     #[inline(always)]
-    pub fn levels(&mut self) -> u32 {
+    pub fn levels(&self) -> u32 {
         #[cfg(all(debug_assertions, multi_core))]
         debug_assert_eq!(self.core, Cpu::current());
         ll::read_in() & self.mask
@@ -1031,7 +1031,7 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
 
     /// test doc
     #[inline(always)]
-    pub fn read_levels(&mut self) -> u32 {
+    pub fn levels(&self) -> u32 {
         #[cfg(all(debug_assertions, multi_core))]
         debug_assert_eq!(self.core, Cpu::current());
         ll::read_in() & self.mask
