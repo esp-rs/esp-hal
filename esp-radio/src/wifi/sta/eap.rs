@@ -8,7 +8,7 @@ use procmacros::BuilderLite;
 
 use crate::{
     WifiError,
-    wifi::{AuthMethod, Protocol, scan::ScanMethod},
+    wifi::{AuthenticationMethod, Protocol, scan::ScanMethod},
 };
 
 /// Configuration for EAP-FAST authentication protocol.
@@ -76,7 +76,7 @@ pub struct EapStationConfig {
     /// The BSSID (MAC Address) of the specific access point.
     pub(crate) bssid: Option<[u8; 6]>,
     /// The authentication method used for EAP.
-    pub(crate) auth_method: AuthMethod,
+    pub(crate) auth_method: AuthenticationMethod,
     /// The identity used during authentication.
     #[builder_lite(reference)]
     pub(crate) identity: Option<String>,
@@ -172,7 +172,7 @@ impl Default for EapStationConfig {
         EapStationConfig {
             ssid: String::new(),
             bssid: None,
-            auth_method: AuthMethod::Wpa2Enterprise,
+            auth_method: AuthenticationMethod::Wpa2Enterprise,
             identity: None,
             username: None,
             password: None,
