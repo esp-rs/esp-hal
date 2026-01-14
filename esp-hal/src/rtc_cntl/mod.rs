@@ -113,7 +113,7 @@
 pub use self::rtc::SocResetReason;
 #[cfg(not(esp32))]
 use crate::efuse::Efuse;
-#[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2, esp32h2))]
+#[cfg(sleep)]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::{Clock, RtcClock},
@@ -123,7 +123,7 @@ use crate::{
     time::Duration,
 };
 // only include sleep where it's been implemented
-#[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2, esp32h2))]
+#[cfg(sleep)]
 pub mod sleep;
 
 #[cfg_attr(esp32, path = "rtc/esp32.rs")]
