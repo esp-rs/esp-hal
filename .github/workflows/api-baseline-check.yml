@@ -19,8 +19,12 @@ concurrency:
 
 jobs:
   baseline-check:
+    if: ${{ github.event_name != 'pull_request' ||
+      (
+      !contains(github.event.pull_request.labels.*.name, 'skip-ci-non-code-change') &&
+      !contains(github.event.pull_request.labels.*.name, 'breaking-change-esp-hal')
+      ) }}
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'breaking-change-esp-hal') }}
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
 

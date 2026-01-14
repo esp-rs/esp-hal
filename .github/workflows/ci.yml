@@ -13,7 +13,7 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches-ignore:
       - "gh-readonly-queue/**"
@@ -41,6 +41,8 @@ jobs:
   # --------------------------------------------------------------------------
   # Build Packages
   esp-hal:
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(github.event.pull_request.labels.*.name, 'skip-ci-non-code-change') }}
     runs-on: macos-m1-self-hosted
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
@@ -102,6 +104,8 @@ jobs:
           cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
 
   detect-extras-runner:
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(github.event.pull_request.labels.*.name, 'skip-ci-non-code-change') }}
     uses: ./.github/workflows/check_runner.yml
     with:
       primary-runner: macos-m1-self-hosted
@@ -109,6 +113,8 @@ jobs:
 
   extras:
     needs: detect-extras-runner
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(github.event.pull_request.labels.*.name, 'skip-ci-non-code-change') }}
     runs-on: ${{ needs.detect-extras-runner.outputs.selected-runner }}
     steps:
       - uses: actions/checkout@v6
@@ -129,6 +135,8 @@ jobs:
         run: cd extras/ieee802154-sniffer && cargo build
 
   docs:
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(github.event.pull_request.labels.*.name, 'skip-ci-non-code-change') }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -173,6 +181,8 @@ jobs:
   # MSRV
 
   msrv:
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(github.event.pull_request.labels.*.name, 'skip-ci-non-code-change') }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -219,6 +229,8 @@ jobs:
   # host tests
 
   detect-host-tests-runner:
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(github.event.pull_request.labels.*.name, 'skip-ci-non-code-change') }}
     uses: ./.github/workflows/check_runner.yml
     with:
       primary-runner: macos-m1-self-hosted
@@ -226,6 +238,8 @@ jobs:
 
   host-tests:
     needs: detect-host-tests-runner
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(github.event.pull_request.labels.*.name, 'skip-ci-non-code-change') }}
     runs-on: ${{ needs.detect-host-tests-runner.outputs.selected-runner }}
     steps:
       - uses: actions/checkout@v6
@@ -253,6 +267,8 @@ jobs:
   # Check links in .rs, .md, and .toml files
 
   link-check:
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(github.event.pull_request.labels.*.name, 'skip-ci-non-code-change') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -284,7 +300,11 @@ jobs:
   #
   # For a reference, check out this GH discussion: https://github.com/orgs/community/discussions/102764
   build-tests-full:
-    if: github.event_name != 'merge_group'
+    if: ${{
+      (github.event_name != 'pull_request' ||
+      !contains(github.event.pull_request.labels.*.name, 'skip-ci-non-code-change')) &&
+      (github.event_name != 'merge_group')
+      }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
