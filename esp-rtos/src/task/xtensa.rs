@@ -36,12 +36,6 @@ use crate::{
 
 static IDLE_HOOK: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
 
-pub(crate) extern "C" fn idle_hook() -> ! {
-    loop {
-        unsafe { core::arch::asm!("waiti 0") };
-    }
-}
-
 #[unsafe(naked)]
 extern "C" fn idle_entry() -> ! {
     core::arch::naked_asm!("
