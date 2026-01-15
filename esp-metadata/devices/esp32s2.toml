@@ -675,3 +675,10 @@ deep_sleep = true
 ## Radio
 [device.wifi]
 [device.phy]
+
+[device.modules]
+modules = [
+    { name = "esp32s2-wroom", display_name = "ESP32-S2-WROOM (4MB flash)" },
+    { name = "esp32s2-wrover", display_name = "ESP32-S2-WROVER (2MB PSRAM)" },
+    { name = "esp32s2-mini-1", display_name = "ESP32-S2-MINI-1 (4MB flash)" },
+]

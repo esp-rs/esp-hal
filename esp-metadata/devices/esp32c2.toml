@@ -451,3 +451,8 @@ controller = "npl"
 
 [device.phy]
 combo_module = true
+
+[device.modules]
+modules = [
+    { name = "esp32c2-mini-1", display_name = "ESP32-C2-MINI-1 (2/4MB flash)" },
+]

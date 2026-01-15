@@ -280,6 +280,9 @@ struct Device {
     peripherals: Vec<PeripheralDef>,
     symbols: Vec<String>,
 
+    #[serde(default)]
+    modules: cfg::Modules,
+
     // Peripheral driver configuration:
     #[serde(flatten)]
     peri_config: PeriConfig,
@@ -327,6 +330,7 @@ impl Config {
                 trm: String::new(),
                 peripherals: Vec::new(),
                 symbols: Vec::new(),
+                modules: cfg::Modules::default(),
                 peri_config: PeriConfig::default(),
             },
             all_symbols: OnceLock::new(),
@@ -371,6 +375,11 @@ impl Config {
     /// The peripherals of the device.
     pub fn peripherals(&self) -> &[PeripheralDef] {
         &self.device.peripherals
+    }
+
+    /// The modules (SoMs) available for this chip.
+    pub fn modules(&self) -> &[cfg::Module] {
+        &self.device.modules.modules
     }
 
     /// User-defined symbols for the device.
@@ -775,6 +784,20 @@ pub fn generate_build_script_utils() -> TokenStream {
                 })
             }
         });
+        let modules = config.modules().iter().map(|m| {
+            let mod_name = m.name.as_str();
+            let display_name = m.display_name.as_str();
+            let reserved_gpios = &m.reserved_gpios;
+            let octal_psram = m.octal_psram;
+            quote! {
+                Module {
+                    name: #mod_name,
+                    display_name: #display_name,
+                    reserved_gpios: &[#(#reserved_gpios),*],
+                    octal_psram: #octal_psram,
+                }
+            }
+        });
         quote! {
             Config {
                 architecture: #arch,
@@ -790,6 +813,9 @@ pub fn generate_build_script_utils() -> TokenStream {
                         #(#memory_regions,)*
                     ],
                 },
+                modules: &[
+                    #(#modules,)*
+                ],
             }
         }
     });
@@ -910,6 +936,11 @@ pub fn generate_build_script_utils() -> TokenStream {
                 self.config().memory_layout
             }
 
+            /// Returns the modules (SoMs) available for this chip.
+            pub fn modules(&self) -> &'static [Module] {
+                self.config().modules
+            }
+
             /// Returns an iterator over all chips.
             ///
             /// ## Example
@@ -959,12 +990,26 @@ pub fn generate_build_script_utils() -> TokenStream {
             }
         }
 
+        /// ESP module (SoM) definition.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        pub struct Module {
+            /// Module identifier (e.g., "esp32c6-wroom-1").
+            pub name: &'static str,
+            /// Human-readable name (e.g., "ESP32-C6-WROOM-1 (4MB flash)").
+            pub display_name: &'static str,
+            /// GPIO pins reserved by this module.
+            pub reserved_gpios: &'static [u8],
+            /// Whether this module uses octal PSRAM.
+            pub octal_psram: bool,
+        }
+
         struct Config {
             architecture: &'static str,
             target: &'static str,
             symbols: &'static [&'static str],
             cfgs: &'static [&'static str],
             memory_layout: &'static MemoryLayout,
+            modules: &'static [Module],
         }
 
         impl Config {

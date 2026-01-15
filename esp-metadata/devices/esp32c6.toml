@@ -717,3 +717,10 @@ controller = "npl"
 
 [device.phy]
 combo_module = true
+
+[device.modules]
+modules = [
+    { name = "esp32c6-wroom-1", display_name = "ESP32-C6-WROOM-1 (4MB flash)" },
+    { name = "esp32c6-wroom-1u", display_name = "ESP32-C6-WROOM-1U (4MB flash, U.FL)" },
+    { name = "esp32c6-mini-1", display_name = "ESP32-C6-MINI-1 (4/8MB flash)" },
+]

@@ -126,6 +126,10 @@ impl Chip {
     pub fn memory_layout(&self) -> &'static MemoryLayout {
         self.config().memory_layout
     }
+    /// Returns the modules (SoMs) available for this chip.
+    pub fn modules(&self) -> &'static [Module] {
+        self.config().modules
+    }
     /// Returns an iterator over all chips.
     ///
     /// ## Example
@@ -564,6 +568,32 @@ impl Chip {
                         ),
                     ],
                 },
+                modules: &[
+                    Module {
+                        name: "esp32-wroom-32e",
+                        display_name: "ESP32-WROOM-32E (4/8/16MB flash)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                    Module {
+                        name: "esp32-wroom-32ue",
+                        display_name: "ESP32-WROOM-32UE (4/8/16MB flash, U.FL)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                    Module {
+                        name: "esp32-wrover-e",
+                        display_name: "ESP32-WROVER-E (8MB PSRAM)",
+                        reserved_gpios: &[16u8, 17u8],
+                        octal_psram: false,
+                    },
+                    Module {
+                        name: "esp32-mini-1",
+                        display_name: "ESP32-MINI-1 (4MB flash)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                ],
             },
             Self::Esp32c2 => Config {
                 architecture: "riscv",
@@ -886,6 +916,12 @@ impl Chip {
                         ),
                     ],
                 },
+                modules: &[Module {
+                    name: "esp32c2-mini-1",
+                    display_name: "ESP32-C2-MINI-1 (2/4MB flash)",
+                    reserved_gpios: &[],
+                    octal_psram: false,
+                }],
             },
             Self::Esp32c3 => Config {
                 architecture: "riscv",
@@ -1290,6 +1326,26 @@ impl Chip {
                         ),
                     ],
                 },
+                modules: &[
+                    Module {
+                        name: "esp32c3-wroom-02",
+                        display_name: "ESP32-C3-WROOM-02 (4MB flash)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                    Module {
+                        name: "esp32c3-wroom-02u",
+                        display_name: "ESP32-C3-WROOM-02U (4MB flash, U.FL)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                    Module {
+                        name: "esp32c3-mini-1",
+                        display_name: "ESP32-C3-MINI-1 (4MB flash)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                ],
             },
             Self::Esp32c6 => Config {
                 architecture: "riscv",
@@ -1818,6 +1874,26 @@ impl Chip {
                         ),
                     ],
                 },
+                modules: &[
+                    Module {
+                        name: "esp32c6-wroom-1",
+                        display_name: "ESP32-C6-WROOM-1 (4MB flash)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                    Module {
+                        name: "esp32c6-wroom-1u",
+                        display_name: "ESP32-C6-WROOM-1U (4MB flash, U.FL)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                    Module {
+                        name: "esp32c6-mini-1",
+                        display_name: "ESP32-C6-MINI-1 (4/8MB flash)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                ],
             },
             Self::Esp32h2 => Config {
                 architecture: "riscv",
@@ -2268,6 +2344,20 @@ impl Chip {
                         ),
                     ],
                 },
+                modules: &[
+                    Module {
+                        name: "esp32h2-wroom-02",
+                        display_name: "ESP32-H2-WROOM-02 (4MB flash)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                    Module {
+                        name: "esp32h2-mini-1",
+                        display_name: "ESP32-H2-MINI-1 (4MB flash)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                ],
             },
             Self::Esp32s2 => Config {
                 architecture: "xtensa",
@@ -2710,6 +2800,26 @@ impl Chip {
                         ),
                     ],
                 },
+                modules: &[
+                    Module {
+                        name: "esp32s2-wroom",
+                        display_name: "ESP32-S2-WROOM (4MB flash)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                    Module {
+                        name: "esp32s2-wrover",
+                        display_name: "ESP32-S2-WROVER (2MB PSRAM)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                    Module {
+                        name: "esp32s2-mini-1",
+                        display_name: "ESP32-S2-MINI-1 (4MB flash)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                ],
             },
             Self::Esp32s3 => Config {
                 architecture: "xtensa",
@@ -3204,6 +3314,38 @@ impl Chip {
                         ),
                     ],
                 },
+                modules: &[
+                    Module {
+                        name: "esp32s3-wroom-1",
+                        display_name: "ESP32-S3-WROOM-1 (quad flash/PSRAM)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                    Module {
+                        name: "esp32s3-wroom-1u",
+                        display_name: "ESP32-S3-WROOM-1U (quad flash/PSRAM, U.FL)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                    Module {
+                        name: "esp32s3-wroom-2",
+                        display_name: "ESP32-S3-WROOM-2 (octal flash/PSRAM)",
+                        reserved_gpios: &[33u8, 34u8, 35u8, 36u8, 37u8],
+                        octal_psram: true,
+                    },
+                    Module {
+                        name: "esp32s3-mini-1",
+                        display_name: "ESP32-S3-MINI-1 (quad flash/PSRAM)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                    Module {
+                        name: "esp32s3-mini-1u",
+                        display_name: "ESP32-S3-MINI-1U (quad flash/PSRAM, U.FL)",
+                        reserved_gpios: &[],
+                        octal_psram: false,
+                    },
+                ],
             },
         }
     }
@@ -3234,12 +3376,25 @@ impl MemoryLayout {
             .find_map(|(n, r)| if *n == name { Some(r) } else { None })
     }
 }
+/// ESP module (SoM) definition.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Module {
+    /// Module identifier (e.g., "esp32c6-wroom-1").
+    pub name: &'static str,
+    /// Human-readable name (e.g., "ESP32-C6-WROOM-1 (4MB flash)").
+    pub display_name: &'static str,
+    /// GPIO pins reserved by this module.
+    pub reserved_gpios: &'static [u8],
+    /// Whether this module uses octal PSRAM.
+    pub octal_psram: bool,
+}
 struct Config {
     architecture: &'static str,
     target: &'static str,
     symbols: &'static [&'static str],
     cfgs: &'static [&'static str],
     memory_layout: &'static MemoryLayout,
+    modules: &'static [Module],
 }
 impl Config {
     fn define_cfgs(&self) {

@@ -530,3 +530,10 @@ controller = "btdm"
 [device.phy]
 combo_module = true
 backed_up_digital_register_count = 21
+
+[device.modules]
+modules = [
+    { name = "esp32c3-wroom-02", display_name = "ESP32-C3-WROOM-02 (4MB flash)" },
+    { name = "esp32c3-wroom-02u", display_name = "ESP32-C3-WROOM-02U (4MB flash, U.FL)" },
+    { name = "esp32c3-mini-1", display_name = "ESP32-C3-MINI-1 (4MB flash)" },
+]

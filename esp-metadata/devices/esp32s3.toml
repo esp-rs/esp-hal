@@ -865,3 +865,12 @@ controller = "btdm"
 [device.phy]
 combo_module = true
 backed_up_digital_register_count = 21
+
+[device.modules]
+modules = [
+    { name = "esp32s3-wroom-1", display_name = "ESP32-S3-WROOM-1 (quad flash/PSRAM)" },
+    { name = "esp32s3-wroom-1u", display_name = "ESP32-S3-WROOM-1U (quad flash/PSRAM, U.FL)" },
+    { name = "esp32s3-wroom-2", display_name = "ESP32-S3-WROOM-2 (octal flash/PSRAM)", reserved_gpios = [33, 34, 35, 36, 37], octal_psram = true },
+    { name = "esp32s3-mini-1", display_name = "ESP32-S3-MINI-1 (quad flash/PSRAM)" },
+    { name = "esp32s3-mini-1u", display_name = "ESP32-S3-MINI-1U (quad flash/PSRAM, U.FL)" },
+]

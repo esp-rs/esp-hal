@@ -893,3 +893,11 @@ controller = "btdm"
 
 [device.phy]
 combo_module = true
+
+[device.modules]
+modules = [
+    { name = "esp32-wroom-32e", display_name = "ESP32-WROOM-32E (4/8/16MB flash)" },
+    { name = "esp32-wroom-32ue", display_name = "ESP32-WROOM-32UE (4/8/16MB flash, U.FL)" },
+    { name = "esp32-wrover-e", display_name = "ESP32-WROVER-E (8MB PSRAM)", reserved_gpios = [16, 17] },
+    { name = "esp32-mini-1", display_name = "ESP32-MINI-1 (4MB flash)" },
+]

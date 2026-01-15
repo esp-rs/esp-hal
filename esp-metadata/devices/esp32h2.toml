@@ -599,3 +599,9 @@ controller = "npl"
 [device.ieee802154]
 
 [device.phy]
+
+[device.modules]
+modules = [
+    { name = "esp32h2-wroom-02", display_name = "ESP32-H2-WROOM-02 (4MB flash)" },
+    { name = "esp32h2-mini-1", display_name = "ESP32-H2-MINI-1 (4MB flash)" },
+]
