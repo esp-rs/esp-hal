@@ -374,6 +374,39 @@ pub(crate) fn bound_cpu_interrupt_for(_cpu: Cpu, interrupt: Interrupt) -> Option
     unsafe { assigned_cpu_interrupt(interrupt) }
 }
 
+fn cpu_wait_mode_on() -> bool {
+    cfg_if::cfg_if! {
+        if #[cfg(soc_has_pcr)] {
+            crate::peripherals::PCR::regs().cpu_waiti_conf().read().cpu_wait_mode_force_on().bit_is_set()
+        } else {
+            crate::peripherals::SYSTEM::regs()
+                .cpu_per_conf()
+                .read()
+                .cpu_wait_mode_force_on()
+                .bit_is_set()
+        }
+    }
+}
+
+/// Wait for an interrupt to occur.
+///
+/// This function causes the current CPU core to execute its Wait For Interrupt
+/// (WFI or equivalent) instruction. After executing this function, the CPU core
+/// will stop execution until an interrupt occurs.
+///
+/// This function will return immediately when a debugger is attached, so it is intended to be
+/// called in a loop.
+#[inline(always)]
+pub fn wait_for_interrupt() {
+    if crate::debugger::debugger_connected() && !cpu_wait_mode_on() {
+        // when SYSTEM_CPU_WAIT_MODE_FORCE_ON is disabled in WFI mode SBA access to memory does not
+        // work for debugger, so do not enter that mode when debugger is connected.
+        // https://github.com/espressif/esp-idf/blob/b9a308a47ca4128d018495662b009a7c461b6780/components/esp_hw_support/cpu.c#L57-L60
+        return;
+    }
+    unsafe { core::arch::asm!("wfi") };
+}
+
 mod vectored {
     use super::*;
     use crate::interrupt::IsrCallback;

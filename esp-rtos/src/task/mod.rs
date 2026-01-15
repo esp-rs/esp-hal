@@ -29,6 +29,12 @@ use crate::{
 
 pub type IdleFn = extern "C" fn() -> !;
 
+pub(crate) extern "C" fn idle_hook() -> ! {
+    loop {
+        esp_hal::interrupt::wait_for_interrupt();
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum TaskState {

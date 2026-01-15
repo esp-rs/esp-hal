@@ -109,6 +109,7 @@ impl CpuContext {
     }
 }
 
+<<<<<<< HEAD
 pub(crate) extern "C" fn idle_hook() -> ! {
     loop {
         unsafe { core::arch::asm!("wfi") };
@@ -116,6 +117,9 @@ pub(crate) extern "C" fn idle_hook() -> ! {
 }
 
 pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext, hook_fn: super::IdleFn) {
+=======
+pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext, hook_fn: IdleFn) {
+>>>>>>> 3d68e274 (Do not enter wfi when SBA access would not work (#4782))
     // Point idle context PC at the assembly that calls the idle hook. We need a new stack
     // frame for the idle task on the main stack.
     idle_context.pc = hook_fn as usize;
