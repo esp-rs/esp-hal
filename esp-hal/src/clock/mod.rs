@@ -25,7 +25,7 @@
 #![cfg_attr(esp32h2, doc = "* 96MHz")]
 #![cfg_attr(esp32c2, doc = "* 120MHz")]
 #![cfg_attr(not(any(esp32c2, esp32h2)), doc = "* 160MHz")]
-#![cfg_attr(xtensa, doc = "* 240MHz")]
+#![cfg_attr(any(esp32c5, xtensa), doc = "* 240MHz")]
 //! ### Frozen Clock Frequencies
 //!
 //! Once the clock configuration is applied, the clock frequencies become
@@ -76,6 +76,7 @@ use crate::{
 #[cfg_attr(esp32, path = "clocks_ll/esp32.rs")]
 #[cfg_attr(esp32c2, path = "clocks_ll/esp32c2.rs")]
 #[cfg_attr(esp32c3, path = "clocks_ll/esp32c3.rs")]
+#[cfg_attr(esp32c5, path = "clocks_ll/esp32c5.rs")]
 #[cfg_attr(esp32c6, path = "clocks_ll/esp32c6.rs")]
 #[cfg_attr(esp32h2, path = "clocks_ll/esp32h2.rs")]
 #[cfg_attr(esp32s2, path = "clocks_ll/esp32s2.rs")]
