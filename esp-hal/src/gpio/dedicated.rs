@@ -813,7 +813,71 @@ pub fn read_all_ll() -> u32 {
 //     - It should be possible to attach a Flex driver to input and output bundles
 //   - A bundle needs to precompute its mask
 
-/// test doc
+/// A bundle of dedicated GPIO *output* drivers.
+///
+/// An output bundle precomputes a channel mask from one or more
+/// [`DedicatedGpioOutput`] drivers. This lets you update multiple dedicated output
+/// channels with a single low-level write.
+///
+/// Attaching a driver does **not** change any output state. Dropping the output
+/// drivers still controls when the underlying GPIO pins are released back to
+/// normal GPIO mode.
+///
+/// ## Relationship to pins
+///
+/// Dedicated output channels can be connected to multiple GPIO pins via
+/// [`DedicatedGpioOutput::with_pin`]. The bundle operates on *channels*, not
+/// individual pins: writing channel bits affects every pin connected to that
+/// channel.
+///
+/// ## Examples
+///
+/// ```rust, no_run
+/// # {before_snippet}
+/// #
+/// use esp_hal::gpio::{
+///     Level,
+///     Output,
+///     OutputConfig,
+///     dedicated::{
+///         DedicatedGpio,
+///         DedicatedGpioOutput,
+///         DedicatedGpioOutputBundle,
+///     },
+/// };
+///
+/// // Create channels:
+/// let channels = DedicatedGpio::new(peripherals.GPIO_DEDICATED);
+///
+/// // Create output drivers for three channels:
+/// let out0 = DedicatedGpioOutput::new(channels.channel0);
+/// let out1 = DedicatedGpioOutput::new(channels.channel1);
+/// let out2 = DedicatedGpioOutput::new(channels.channel2);
+///
+/// // Attach GPIO pins to the dedicated outputs (any number of pins per channel):
+/// let p0 = Output::new(peripherals.GPIO0, Level::Low, OutputConfig::default());
+/// let p1 = Output::new(peripherals.GPIO1, Level::Low, OutputConfig::default());
+/// let p2 = Output::new(peripherals.GPIO2, Level::Low, OutputConfig::default());
+///
+/// let out0 = out0.with_pin(p0);
+/// let out1 = out1.with_pin(p1);
+/// let out2 = out2.with_pin(p2);
+///
+/// // Build a bundle that controls channels 0..=2:
+/// let mut bundle = DedicatedGpioOutputBundle::new();
+/// bundle.with_output(&out0).with_output(&out1).with_output(&out2);
+///
+/// // Set channel 0 and 2 high, keep channel 1 unchanged:
+/// bundle.set_high(0b101);
+///
+/// // Now drive all channels in the bundle at once:
+/// // - ch0 = 0
+/// // - ch1 = 1
+/// // - ch2 = 0
+/// bundle.write_bits(0b010);
+/// #
+/// # {after_snippet}
+/// ```
 pub struct DedicatedGpioOutputBundle<'lt> {
     _marker: PhantomData<&'lt ()>,
     mask: u32,
