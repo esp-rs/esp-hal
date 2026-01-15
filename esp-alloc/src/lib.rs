@@ -336,11 +336,11 @@ pub struct HeapStats {
 
     /// Estimation of the total allocated bytes since initialization.
     #[cfg(feature = "internal-heap-stats")]
-    pub total_allocated: usize,
+    pub total_allocated: u64,
 
     /// Estimation of the total freed bytes since initialization.
     #[cfg(feature = "internal-heap-stats")]
-    pub total_freed: usize,
+    pub total_freed: u64,
 }
 
 impl Display for HeapStats {
@@ -390,8 +390,8 @@ impl defmt::Format for HeapStats {
 #[cfg(feature = "internal-heap-stats")]
 struct InternalHeapStats {
     max_usage: usize,
-    total_allocated: usize,
-    total_freed: usize,
+    total_allocated: u64,
+    total_freed: u64,
 }
 
 struct EspHeapInner {
@@ -546,7 +546,10 @@ impl EspHeapInner {
             // so we cannot use the size provided by the layout.
             let used = self.used();
 
-            self.internal_heap_stats.total_allocated += used - before;
+            self.internal_heap_stats.total_allocated = self
+                .internal_heap_stats
+                .total_allocated
+                .saturating_add((used - before) as u64);
             self.internal_heap_stats.max_usage =
                 core::cmp::max(self.internal_heap_stats.max_usage, used);
         }
@@ -668,7 +671,10 @@ unsafe impl GlobalAlloc for EspHeap {
                 // We need to call `used()` because [linked_list_allocator::Heap] does internal
                 // size alignment so we cannot use the size provided by the
                 // layout.
-                this.internal_heap_stats.total_freed += before - this.used();
+                this.internal_heap_stats.total_freed = this
+                    .internal_heap_stats
+                    .total_freed
+                    .saturating_add((before - this.used()) as u64);
             }
         })
     }

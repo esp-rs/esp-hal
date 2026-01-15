@@ -14,10 +14,12 @@ license       = "MIT OR Apache-2.0"
 doc-config = { features = ["defmt"] }
 check-configs = [
     { features = [] },
-    { features = ["defmt"] }
+    { features = ["defmt"] },
+    { features = ["internal-heap-stats"] },
+    { features = ["defmt", "internal-heap-stats"] },
 ]
 clippy-configs = [
-    { features = ["defmt"] },
+    { features = ["defmt", "internal-heap-stats"] },
 ]
 
 [package.metadata.docs.rs]

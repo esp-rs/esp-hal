@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed arithmetic overflow in tracking total amount of allocated/freed memory (#4783)
 
 ### Removed
 
