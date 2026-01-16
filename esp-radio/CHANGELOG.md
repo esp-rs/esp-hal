@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp-alloc` dependency no longer enables default features (#4721)
 - `sys-logs` feature has been renamed to `print-logs-from-driver` and has been marked unstable (#4810)
 - Unstable features now require the `unstable` feature flag to be enabled (#4810)
+- `RxControlInfo` is unstable, `RxControlInfo::from_raw()` is no longer public (#4811)
+- `event`, `sniffer`, and `csi` modules are marked unstable (#4811)
 
 ### Fixed
 
