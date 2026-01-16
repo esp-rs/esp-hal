@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue in `ShaBackend` that resulted in incorrect hash calculation (#4722)
 - The `Peripherals` struct is now marked as `#[non_exhaustive]`. This is a breaking change. (#4729)
 - All GPIOs are now available without unsafe code. The potentially reserved GPIOs are now documented. (#4728)
+- Make sure we added all relevant section to `.rwtext.wifi` (#4808)
 
 ### Removed
 
