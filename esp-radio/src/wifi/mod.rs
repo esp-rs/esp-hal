@@ -188,48 +188,6 @@ impl SecondaryChannel {
     }
 }
 
-/// Access point country information.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct Country([u8; 2]);
-
-impl Country {
-    fn try_from_c(info: &wifi_country_t) -> Option<Self> {
-        // Find the null terminator or end of array
-        let cc_len = info
-            .cc
-            .iter()
-            .position(|&b| b == 0)
-            .unwrap_or(info.cc.len());
-
-        if cc_len < 2 {
-            return None;
-        }
-
-        // Validate that we have at least 2 valid ASCII characters
-        let cc_slice = &info.cc[..cc_len.min(2)];
-        if cc_slice.iter().all(|&b| b.is_ascii_uppercase()) {
-            Some(Self([cc_slice[0], cc_slice[1]]))
-        } else {
-            None
-        }
-    }
-
-    /// Returns the country code as a string slice.
-    pub fn country_code(&self) -> &str {
-        unsafe {
-            // SAFETY: we have verified in the constructor that the bytes are upper-case ASCII.
-            core::str::from_utf8_unchecked(&self.0)
-        }
-    }
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for Country {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        self.country_code().format(fmt)
-    }
-}
-
 /// Introduces Wi-Fi configuration options.
 #[derive(EnumSetType, Debug, PartialOrd, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1678,6 +1636,16 @@ impl OperatingClass {
             OperatingClass::Repr(code) => code,
         }
     }
+
+    fn from_code(code: u8) -> Option<Self> {
+        match code {
+            b' ' => Some(OperatingClass::AllEnvironments),
+            b'O' => Some(OperatingClass::Outdoors),
+            b'I' => Some(OperatingClass::Indoors),
+            b'X' => Some(OperatingClass::NonCountryEntity),
+            code => Some(OperatingClass::Repr(code)),
+        }
+    }
 }
 
 #[procmacros::doc_replace]
@@ -1734,6 +1702,16 @@ impl CountryInfo {
             max_tx_power: 20,
             policy: wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
         }
+    }
+
+    fn try_from_c(info: &wifi_country_t) -> Option<Self> {
+        let cc = &info.cc;
+        let operating_class = OperatingClass::from_code(cc[2])?;
+
+        Some(Self {
+            country: [cc[0], cc[1]],
+            operating_class,
+        })
     }
 }
 

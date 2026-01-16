@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Controller` struct and `InitializationError::InterruptsDisabled` enum variant have been removed (#4482)
 - `wifi::wifi_csi_info_t` is no longer exposed to the public API (#4643)
 - the free standing `xxx_state()` functions have been removed together with their return types `WifiApState`/`WifiStaState` (#4571)
+- `wifi::Country` has been replaced by `wifi::CountryInfo` (#4788)
 
 ## [v0.17.0] - 2025-10-30
 

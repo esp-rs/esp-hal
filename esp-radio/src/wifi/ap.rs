@@ -6,7 +6,7 @@ use core::fmt;
 use enumset::EnumSet;
 use procmacros::BuilderLite;
 
-use super::{AuthenticationMethod, Country, Protocol, SecondaryChannel};
+use super::{AuthenticationMethod, CountryInfo, Protocol, SecondaryChannel};
 use crate::{WifiError, sys::include::wifi_ap_record_t};
 
 /// Information about a detected Wi-Fi access point.
@@ -29,7 +29,7 @@ pub struct AccessPointInfo {
     /// The authentication method used by the access point.
     pub auth_method: Option<AuthenticationMethod>,
     /// The country information of the access point (if available from beacon frames).
-    pub country: Option<Country>,
+    pub country: Option<CountryInfo>,
 }
 
 /// Configuration for a Wi-Fi access point.
@@ -158,6 +158,6 @@ pub(crate) fn convert_ap_info(record: &wifi_ap_record_t) -> AccessPointInfo {
         secondary_channel: SecondaryChannel::from_raw(record.second),
         signal_strength: record.rssi,
         auth_method: Some(AuthenticationMethod::from_raw(record.authmode)),
-        country: Country::try_from_c(&record.country),
+        country: CountryInfo::try_from_c(&record.country),
     }
 }
