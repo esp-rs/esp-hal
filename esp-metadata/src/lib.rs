@@ -789,7 +789,7 @@ pub fn generate_build_script_utils() -> TokenStream {
                         let limitations = pin.limitations.iter().map(|limitation| {
                             TokenStream::from_str(
                                 &basic_toml::to_string(&limitation)
-                                    .expect("Serializing limitatons should be infallible"),
+                                    .expect("Serializing limitations should be infallible"),
                             )
                             .expect("Valid TOML string can be re-parsed as Rust strings")
                         });
