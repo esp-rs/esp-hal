@@ -9,8 +9,10 @@ use procmacros::BuilderLite;
 use super::{AuthenticationMethod, Protocol, scan::ScanMethod};
 use crate::WifiError;
 
-#[cfg(feature = "wifi-eap")]
-pub mod eap;
+unstable_module!(
+    #[cfg(feature = "wifi-eap")]
+    pub mod eap;
+);
 
 /// Station configuration for a Wi-Fi connection.
 #[derive(BuilderLite, Clone, Eq, PartialEq, Hash)]
