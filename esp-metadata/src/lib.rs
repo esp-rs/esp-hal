@@ -775,6 +775,34 @@ pub fn generate_build_script_utils() -> TokenStream {
                 })
             }
         });
+        let pins = config
+            .device
+            .peri_config
+            .gpio
+            .as_ref()
+            .map(|gpio| {
+                gpio.pins_and_signals
+                    .pins
+                    .iter()
+                    .map(|pin| {
+                        let num = number(pin.pin);
+                        let limitations = pin.limitations.iter().map(|limitation| {
+                            TokenStream::from_str(
+                                &basic_toml::to_string(&limitation)
+                                    .expect("Serializing limitatons should be infallible"),
+                            )
+                            .expect("Valid TOML string can be re-parsed as Rust strings")
+                        });
+                        quote! {
+                            PinInfo {
+                                pin: #num,
+                                limitations: &[#(#limitations,)*],
+                            }
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
         quote! {
             Config {
                 architecture: #arch,
@@ -790,6 +818,9 @@ pub fn generate_build_script_utils() -> TokenStream {
                         #(#memory_regions,)*
                     ],
                 },
+                pins: &[
+                    #(#pins,)*
+                ]
             }
         }
     });
@@ -910,6 +941,11 @@ pub fn generate_build_script_utils() -> TokenStream {
                 self.config().memory_layout
             }
 
+            /// Returns information about all pins.
+            pub fn pins(&self) -> &'static [PinInfo] {
+                self.config().pins
+            }
+
             /// Returns an iterator over all chips.
             ///
             /// ## Example
@@ -959,12 +995,25 @@ pub fn generate_build_script_utils() -> TokenStream {
             }
         }
 
+        /// Information about a specific pin.
+        #[non_exhaustive]
+        pub struct PinInfo {
+            /// The pin number.
+            pub pin: usize,
+
+            /// The list of possible restriction categories for this pin.
+            ///
+            /// This can include "strapping", "spi_psram", etc.
+            pub limitations: &'static [&'static str],
+        }
+
         struct Config {
             architecture: &'static str,
             target: &'static str,
             symbols: &'static [&'static str],
             cfgs: &'static [&'static str],
             memory_layout: &'static MemoryLayout,
+            pins: &'static [PinInfo],
         }
 
         impl Config {
