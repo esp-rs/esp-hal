@@ -35,10 +35,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // If some library required unstable make sure unstable is actually enabled.
-    if !suppress_panics && cfg!(feature = "requires-unstable") && !cfg!(feature = "unstable") {
-        panic!(
-            "\n\nThe `unstable` feature is required by a dependent crate but is not enabled.\n\n"
-        );
+    if !suppress_panics {
+        if cfg!(feature = "requires-unstable") && !cfg!(feature = "unstable") {
+            panic!(
+                "\n\nThe `unstable` feature is required by a dependent crate but is not enabled.\n\n"
+            );
+        }
+
+        if cfg!(feature = "__has_unstable_feature_enabled") && !cfg!(feature = "unstable") {
+            panic!(
+                "\n\nA feature flag which is considered unstable has been enabled, but the `unstable` feature is not selected.\n\n"
+            );
+        }
     }
 
     // Log and defmt are mutually exclusive features. The main technical reason is

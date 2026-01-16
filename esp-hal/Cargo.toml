@@ -141,6 +141,7 @@ __usb_otg = [
     "esp-synopsys-usb-otg/esp32sx",
     "esp-synopsys-usb-otg/fs",
 ]
+__has_unstable_feature_enabled = []
 
 #! ### Runtime support
 #! These features are meant to be enabled by firmware projects. If you are writing a library that
@@ -173,8 +174,8 @@ exception-handler = []
 ##
 ## Note that this feature is only effective on ESP32 and ESP32-S3. Other chips don't have a hardware floating-point coprocessor.
 ##
-## ⚠️ This feature is considered unstable.
-float-save-restore = ["xtensa-lx-rt/float-save-restore"]
+## ⚠️ This feature is considered unstable and requires the `unstable` feature flag to be enabled.
+float-save-restore = ["xtensa-lx-rt/float-save-restore", "__has_unstable_feature_enabled"]
 
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:
