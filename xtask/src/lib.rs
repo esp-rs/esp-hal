@@ -890,7 +890,7 @@ pub fn format_yml(check: bool) -> Result<()> {
             let content = fs::read_to_string(path)?;
 
             let formatted = format_text(&content, &FormatOptions::default())
-                .context("Failed to format yml!")?;
+                .context(format!("Failed to format {:?} yml!", path))?;
 
             if content != formatted {
                 if check {
