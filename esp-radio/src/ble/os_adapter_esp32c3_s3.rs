@@ -374,7 +374,7 @@ impl TxPower {
 pub enum CcaMode {
     /// Disabled
     #[default]
-    Disabled          = 0,
+    Disabled = 0,
     /// Hardware Triggered
     HardwareTriggered = 1,
     /// Software Triggered (experimental)
@@ -597,8 +597,16 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         connect_en: config.connection,
         scan_en: config.scan,
         ble_aa_check: config.verify_access_address,
-        ble_log_mode_en: if cfg!(feature = "sys-logs") { 4095 } else { 0 },
-        ble_log_level: if cfg!(feature = "sys-logs") { 5 } else { 0 },
+        ble_log_mode_en: if cfg!(feature = "print-logs-from-driver") {
+            4095
+        } else {
+            0
+        },
+        ble_log_level: if cfg!(feature = "print-logs-from-driver") {
+            5
+        } else {
+            0
+        },
         adv_en: config.adv,
         magic: ESP_BT_CTRL_CONFIG_MAGIC_VAL,
     }

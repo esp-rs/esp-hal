@@ -8,8 +8,7 @@ use portable_atomic::{AtomicBool, Ordering};
 use super::{Config, ReceivedPacket};
 use crate::{
     ble::{
-        HCI_OUT_COLLECTOR,
-        HciOutCollector,
+        HCI_OUT_COLLECTOR, HciOutCollector,
         btdm::ble_os_adapter_chip_specific::{G_OSI_FUNCS, osi_funcs_s},
     },
     compat::common::str_from_c,
@@ -307,7 +306,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         (*addr_of_mut!(HCI_OUT_COLLECTOR)).write(HciOutCollector::new());
         // turn on logging
         #[allow(static_mut_refs)]
-        #[cfg(feature = "sys-logs")]
+        #[cfg(feature = "print-logs-from-driver")]
         {
             unsafe extern "C" {
                 static mut g_bt_plf_log_level: u32;
