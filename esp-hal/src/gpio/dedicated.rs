@@ -445,10 +445,15 @@ impl<'lt> DedicatedGpioInput<'lt> {
 
     /// Read the current state of the GPIO pins.
     // TODO: change all read methods to immutable borrows
-    #[inline(always)]   
+    #[inline(always)]
     pub fn level(&self) -> Level {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
         let bits = ll::read_in();
         Level::from(bits & self.mask != 0)
     }
@@ -476,6 +481,16 @@ impl embedded_hal::digital::InputPin for DedicatedGpioInput<'_> {
 /// Due to how the hardware works, [`DedicatedGpioOutput`] can drive any number of GPIO pins. To
 /// create a driver, you can use the [`DedicatedGpioOutput::new`] method, then
 /// [`DedicatedGpioOutput::with_pin`] to add output drivers.
+#[cfg_attr(
+    esp32s3,
+    doc = r#"
+
+<section class="warning">
+The method <code>output_level</code> is currently not available on ESP32-S3 due to 
+an LLVM bug. See <a href=https://github.com/espressif/llvm-project/issues/120>https://github.com/espressif/llvm-project/issues/120</a> for details.
+</section>
+"#
+)]
 #[cfg_attr(
     multi_core,
     doc = r#"
@@ -559,7 +574,12 @@ impl<'lt> DedicatedGpioOutput<'lt> {
     #[inline(always)]
     pub fn set_level(&mut self, level: Level) {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
         if level == Level::High {
             ll::write(self.mask, self.mask);
         } else {
@@ -574,7 +594,12 @@ impl<'lt> DedicatedGpioOutput<'lt> {
     #[inline(always)]
     pub fn output_level(&mut self) -> Level {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
         Level::from(ll::read_out() & self.mask != 0)
     }
 }
@@ -582,7 +607,12 @@ impl<'lt> DedicatedGpioOutput<'lt> {
 impl Drop for DedicatedGpioOutput<'_> {
     fn drop(&mut self) {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
         // Set the contained GPIOs back to GPIO mode.
         for (bank, mut pins) in self.contained_gpios.into_iter().enumerate() {
             let bank_offset = bank as u8 * 32;
@@ -689,7 +719,12 @@ impl<'lt> DedicatedGpioFlex<'lt> {
     #[cfg(riscv)] // Xtensas always have the output enabled.
     pub fn set_output_enabled(&mut self, enabled: bool) {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
         ll::set_output_enabled(self.mask, enabled);
     }
 
@@ -697,7 +732,12 @@ impl<'lt> DedicatedGpioFlex<'lt> {
     #[inline(always)]
     pub fn set_level(&mut self, level: Level) {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
         if level == Level::High {
             ll::write(self.mask, self.mask);
         } else {
@@ -710,7 +750,12 @@ impl<'lt> DedicatedGpioFlex<'lt> {
     #[inline(always)]
     pub fn output_level(&mut self) -> Level {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
         Level::from(ll::read_out() & self.mask != 0)
     }
 
@@ -718,7 +763,12 @@ impl<'lt> DedicatedGpioFlex<'lt> {
     #[inline(always)]
     pub fn level(&self) -> Level {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
         let bits = ll::read_in();
         Level::from(bits & self.mask != 0)
     }
@@ -727,7 +777,11 @@ impl<'lt> DedicatedGpioFlex<'lt> {
 impl Drop for DedicatedGpioFlex<'_> {
     fn drop(&mut self) {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
 
         let gpio = unsafe { AnyPin::steal(self.pin) };
         gpio.disconnect_from_peripheral_output();
@@ -835,7 +889,26 @@ pub fn output_levels_ll() -> u32 {
 /// [`DedicatedGpioOutput::with_pin`]. The bundle operates on *channels*, not
 /// individual pins: writing channel bits affects every pin connected to that
 /// channel.
-///
+#[cfg_attr(
+    esp32s3,
+    doc = r#"
+
+<section class="warning">
+The method <code>output_level</code> is currently not available on ESP32-S3 due to 
+an LLVM bug. See <a href=https://github.com/espressif/llvm-project/issues/120>https://github.com/espressif/llvm-project/issues/120</a> for details.
+</section>
+"#
+)]
+#[cfg_attr(
+    multi_core,
+    doc = r#"
+
+<section class="warning">
+Dedicated GPIO channels are tied to CPU cores. All output drivers attached to a bundle must be
+configured on the current and same core, and the bundle must only be used on the core that created it.
+</section>
+"#
+)]
 /// ## Examples
 ///
 /// ```rust, no_run
@@ -845,11 +918,7 @@ pub fn output_levels_ll() -> u32 {
 ///     Level,
 ///     Output,
 ///     OutputConfig,
-///     dedicated::{
-///         DedicatedGpio,
-///         DedicatedGpioOutput,
-///         DedicatedGpioOutputBundle,
-///     },
+///     dedicated::{DedicatedGpio, DedicatedGpioOutput, DedicatedGpioOutputBundle},
 /// };
 ///
 /// // Create channels:
@@ -871,7 +940,10 @@ pub fn output_levels_ll() -> u32 {
 ///
 /// // Build a bundle that controls channels 0..=2:
 /// let mut bundle = DedicatedGpioOutputBundle::new();
-/// bundle.with_output(&out0).with_output(&out1).with_output(&out2);
+/// bundle
+///     .with_output(&out0)
+///     .with_output(&out1)
+///     .with_output(&out2);
 ///
 /// // Set channel 0 and 2 high, keep channel 1 unchanged:
 /// bundle.set_high(0b101);
@@ -894,8 +966,18 @@ pub struct DedicatedGpioOutputBundle<'lt> {
 impl<'lt> DedicatedGpioOutputBundle<'lt> {
     /// Creates a new, empty dedicated GPIO output bundle.
     ///
-    /// This function returns an empty bundle. You will need to add output drivers
-    /// ([`DedicatedGpioOutput`]) to it using the
+    /// A bundle is a *logical* grouping of one or more [`DedicatedGpioOutput`] drivers.
+    /// Internally, it stores a precomputed channel mask (see [`Self::mask`]) which allows
+    /// writing multiple dedicated GPIO channels efficiently.
+    ///
+    /// The returned bundle initially contains no channels. Add outputs using
+    /// [`Self::with_output`].
+    ///
+    /// ## Notes
+    ///
+    /// - Creating a bundle does **not** configure any hardware by itself.
+    /// - Attaching outputs only updates the bundle’s internal mask; it does not change any output
+    ///   state.
     pub fn new() -> Self {
         Self {
             _marker: PhantomData,
@@ -905,13 +987,25 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
         }
     }
 
-    /// Return the mask of this bundle
-    /// 
-    /// All channels included by the bundle are set to 1. For example, dedicated 
-    /// output driver of channel 1, 3, 5 were added to the bundle by `bundle.with_output`
-    /// then the mask would be `0b0010_1010`
+    /// Returns the channel mask of this bundle.
+    ///
+    /// Each bit corresponds to one dedicated GPIO channel:
+    /// - bit 0 -> channel 0
+    /// - bit 1 -> channel 1
+    /// - ...
+    ///
+    /// A bit is set to 1 if that channel is currently included in the bundle.
+    ///
+    /// ## Example
+    ///
+    /// If the bundle contains channels 1, 3, and 5 (added via [`Self::with_output`]),
+    /// then the mask is:
+    ///
+    /// ```text
+    /// 0b0010_1010
+    /// ```
     #[inline(always)]
-    pub fn mask(&self) -> u32{
+    pub fn mask(&self) -> u32 {
         self.mask
     }
 
@@ -925,43 +1019,93 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
     /// - The referenced output driver must outlive this bundle (`'lt`), since dropping the output
     ///   driver would release its GPIO pins back to normal GPIO mode.
     /// - This function does not change any GPIO output state.
+    #[cfg_attr(
+        multi_core,
+        doc = r#"
+<section class="warning">
+All dedicated GPIO output drivers in a bundle must be configured on the same core as the bundle itself
+</section>
+"#
+    )]
     pub fn with_output<'d>(&mut self, out: &'lt DedicatedGpioOutput<'d>) -> &mut Self {
+        #[cfg(all(debug_assertions, multi_core))]
+        {
+            debug_assert_eq!(
+                self.core,
+                Cpu::current(),
+                "Dedicated GPIO used on a different CPU core than it was created on"
+            );
+
+            debug_assert_eq!(
+                out.core, self.core,
+                "All dedicated GPIO output drivers in a bundle must be configured on the same core as the bundle itself."
+            );
+        }
         self.mask |= out.mask;
         self
     }
 
-    /// Removes a dedicated output driver from this bundle. 
-    /// 
+    /// Removes a dedicated output driver from this bundle.
+    ///
     /// This method simply removes the corresponding channel from the internal mask,
     /// which means that the removed dedicated output driver is still logically borrowed
     /// by this bunle. And you'll not be able to write to the corresponding pin
-    /// through the removed dedicated output driver 
+    /// through the removed dedicated output driver
+    #[cfg_attr(
+        multi_core,
+        doc = r#"
+            <section class="warning">
+            All dedicated GPIO output drivers in a bundle must be configured on the same core as the bundle itself
+            </section>
+            "#
+    )]
     pub fn remove_output<'d>(&mut self, out: &'lt DedicatedGpioOutput<'d>) -> &mut Self {
+        #[cfg(all(debug_assertions, multi_core))]
+        {
+            debug_assert_eq!(
+                self.core,
+                Cpu::current(),
+                "Dedicated GPIO used on a different CPU core than it was created on"
+            );
+
+            debug_assert_eq!(
+                out.core, self.core,
+                "All dedicated GPIO output drivers in a bundle must be configured on the same core as the bundle itself."
+            );
+        }
         self.mask &= !out.mask;
         self
     }
 
-    /// Set channels to high if the corresponding bit in `bits` is 1
-    /// 
-    /// For example, `bundle.set_high(0b1011_0001)` will set channel 0, 4, 5, and 7
-    /// to high. 
-    /// 
+    /// Sets selected channels **high**.
+    ///
+    /// For every bit set to 1 in `bits`, the corresponding dedicated output channel is driven
+    /// high. Bits set to 0 are left unchanged.
+    ///
+    /// ## Example
+    ///
+    /// `bundle.set_high(0b1011_0001)` sets channels 0, 4, 5, and 7 high.
+    ///
     /// <section class="warning">
-    /// 
-    /// The caller of this function needs to ensure that the modified channel is 
-    /// included by the bundle. For example, if you used `with_output` to add dedicated output
-    /// driver of channel 0, 1, and 3 to an output bundle. Bit other than 0, 1, 3 of variable `bits`
-    /// should not be set to 1. You will otherwise accidentally change the state of channels outside
-    /// of this bundle.
-    /// 
-    /// If you turn on `debug-assertions` in compilation profile, then runtime check
-    /// of `bits` will be enabled.
+    ///
+    /// The caller must ensure that `bits` only contains channels included in this bundle,
+    /// i.e. `bits & !self.mask() == 0`.
+    ///
+    /// For example, if the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then `bits`
+    /// must not set bit 2 (e.g. `0b0000_0100`), or you would modify channel 2 outside the bundle.
+    ///
+    /// When compiled with `debug-assertions`, this condition is checked at runtime.
     /// </section>
     #[inline(always)]
     pub fn set_high(&mut self, bits: u32) {
         // TODO: question: should bits be u8
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
         debug_assert!(
             bits & !self.mask == 0,
             "Trying to set bits outside of the bundle mask"
@@ -969,63 +1113,97 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
         ll::write(bits, bits); // or ll::write(self.mask, bits); 
     }
 
-    /// Set channels to low if the corresponding bit in `bits` is 1
-    /// 
-    /// For example, `bundle.set_low(0b1011_0001)` will set channel 0, 4, 5, and 7
-    /// to low. 
-    /// 
+    /// Sets selected channels **low**.
+    ///
+    /// For every bit set to 1 in `bits`, the corresponding dedicated output channel is driven
+    /// low. Bits set to 0 are left unchanged.
+    ///
+    /// ## Example
+    ///
+    /// `bundle.set_low(0b1011_0001)` sets channels 0, 4, 5, and 7 low.
+    ///
     /// <section class="warning">
-    /// 
-    /// The caller of this function needs to ensure that the modified channel is 
-    /// included by the bundle. For example, if you used `with_output` to add dedicated output
-    /// driver of channel 0, 1, and 3 to an output bundle. Bit other than 0, 1, 3 of variable `bits`
-    /// should not be set to 1. You will otherwise accidentally change the state of channels outside
-    /// of this bundle.
-    /// 
-    /// If you turn on `debug-assertions` in compilation profile, then runtime check
-    /// of `bits` will be enabled.
+    ///
+    /// The caller must ensure that `bits` only contains channels included in this bundle,
+    /// i.e. `bits & !self.mask() == 0`.
+    ///
+    /// For example, if the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then `bits`
+    /// must not set bit 7 (e.g. `0b1000_0000`), or you would clear channel 7 outside the bundle.
+    ///
+    /// When compiled with `debug-assertions`, this condition is checked at runtime.
     /// </section>
     #[inline(always)]
     pub fn set_low(&mut self, bits: u32) {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
         debug_assert!(
             bits & !self.mask == 0,
             "Trying to clear bits outside of the bundle mask"
         );
-        ll::write(bits, 0); 
-        // or ll::write(bits & self.mask, 0); 
+        ll::write(bits, 0);
+        // or ll::write(bits & self.mask, 0);
         // the latter is safer (preventing writing to channels outside of the bundle) but slower
     }
 
-    /// Change the state of the dedicated output channels included by this bundle
-    /// 
-    /// For example, if the mask (see [`DedicatedGpioOutputBundle::mask()`]) is `0b1111_0000` 
-    /// the current state of the dedicated output channels is `0b1111_1111`, then calling `bundle.write_bits(0b0000_0000)`
-    /// will change the output channel state to `0b0000_1111`. Note that the state of channel 3..=0 is not changed. Because
-    /// the corresponding mask bits are 0.
+    /// Writes output levels for **all channels included by this bundle**.
+    ///
+    /// This method updates the output state of every channel whose bit is set in
+    /// [`Self::mask`]. Channels not included in the bundle are not modified.
+    ///
+    /// `bits` provides the level for each channel in the bundle:
+    /// - bit = 0 -> low
+    /// - bit = 1 -> high
+    ///
+    /// ## Example
+    ///
+    /// If `self.mask()` is `0b1111_0000` (bundle contains channels 4..=7), then
+    /// `bundle.write_bits(0b0001_0000)` sets channel 4 high and channels 5..=7 low,
+    /// while leaving channels 0..=3 unchanged.
+    ///
+    /// <section class="warning">
+    ///
+    /// This function only writes channels selected by [`Self::mask`]. It will **not**
+    /// change channels outside the mask, even if `bits` contains 1s there.
+    ///
+    /// Make sure this "masked write" behavior matches what you intend.
+    ///
+    /// </section>
     #[inline(always)]
     pub fn write_bits(&mut self, bits: u32) {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
-        debug_assert!(
-            bits & !self.mask == 0,
-            "Trying to write bits outside of the bundle mask"
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
         );
+
         ll::write(self.mask, bits);
     }
 
-    /// Returns the current output state of the channels
+    /// Returns the current output levels of the channels included by this bundle.
+    ///
+    /// The return value is a bitmask where bit *n* represents the output level of channel *n*
+    /// (1 = high, 0 = low)
     #[cfg(not(esp32s3))]
     #[inline(always)]
     pub fn output_levels(&mut self) -> u32 {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
-        ll::read_out() & self.mask
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
+        ll::read_out()
     }
 }
 
-/// test doc 
+/// test doc
 pub struct DedicatedGpioInputBundle<'lt> {
     _marker: PhantomData<&'lt ()>,
     mask: u32,
@@ -1057,6 +1235,19 @@ impl<'lt> DedicatedGpioInputBundle<'lt> {
     /// - The referenced input driver must outlive this bundle (`'lt`), since dropping the input
     ///   driver would release its GPIO pins back to normal GPIO mode.
     pub fn with_input<'d>(&mut self, inp: &'lt DedicatedGpioInput<'d>) -> &mut Self {
+        #[cfg(all(debug_assertions, multi_core))]
+        {
+            debug_assert_eq!(
+                self.core,
+                Cpu::current(),
+                "Dedicated GPIO used on a different CPU core than it was created on"
+            );
+
+            debug_assert_eq!(
+                inp.core, self.core,
+                "All dedicated GPIO input drivers in a bundle must be configured on the same core as the bundle itself."
+            );
+        }
         self.mask |= inp.mask;
         self
     }
@@ -1071,11 +1262,15 @@ impl<'lt> DedicatedGpioInputBundle<'lt> {
     #[inline(always)]
     pub fn levels(&self) -> u32 {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
         ll::read_in() & self.mask
     }
 }
-
 
 /// test doc
 pub struct DedicatedGpioFlexBundle<'lt> {
@@ -1096,8 +1291,13 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
         }
     }
 
-    /// test doc 
+    /// test doc
     pub fn with_flex<'d>(&mut self, flex: &'lt DedicatedGpioFlex<'d>) -> &mut Self {
+        #[cfg(all(multi_core))]
+        debug_assert!(
+            flex.core == self.core,
+            "All dedicated GPIO flex drivers in a bundle must be configured on the same core as the bundle itself."
+        );
         self.mask |= flex.mask;
         self
     }
@@ -1112,7 +1312,12 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
     #[inline(always)]
     pub fn set_high(&mut self, bits: u32) {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
         debug_assert!(
             bits & !self.mask == 0,
             "Trying to set bits outside of the bundle mask"
@@ -1123,7 +1328,12 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
     #[inline(always)]
     pub fn set_low(&mut self, bits: u32) {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
         debug_assert!(
             bits & !self.mask == 0,
             "Trying to clear bits outside of the bundle mask"
@@ -1135,7 +1345,12 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
     #[inline(always)]
     pub fn write_bits(&mut self, bits: u32) {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
         debug_assert!(
             bits & !self.mask == 0,
             "Trying to write bits outside of the bundle mask"
@@ -1143,12 +1358,16 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
         ll::write(self.mask, bits);
     }
 
-    
     #[cfg(not(esp32s3))]
     #[inline(always)]
     pub fn output_levels(&mut self) -> u32 {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
         ll::read_out() & self.mask
     }
 
@@ -1156,7 +1375,12 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
     #[inline(always)]
     pub fn levels(&self) -> u32 {
         #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(self.core, Cpu::current());
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
         ll::read_in() & self.mask
     }
 }
