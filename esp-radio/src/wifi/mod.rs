@@ -188,23 +188,6 @@ impl SecondaryChannel {
     }
 }
 
-/// Introduces Wi-Fi configuration options.
-#[derive(EnumSetType, Debug, PartialOrd, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub enum Capability {
-    /// The device operates as a station, connecting to an existing network.
-    Station,
-
-    /// The device operates as an access point, allowing other devices to
-    /// connect to it.
-    AccessPoint,
-
-    /// The device can operate in both station and access point modes
-    /// simultaneously.
-    AccessPointStation,
-}
-
 /// Configuration of Wi-Fi operation mode.
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Eq, Default, Hash)]
@@ -1108,6 +1091,7 @@ impl WifiDevice<'_> {
     clippy::enum_variant_names,
     reason = "MHz suffix indicates physical unit."
 )]
+#[non_exhaustive]
 pub enum Bandwidth {
     /// 20 MHz bandwidth.
     _20MHz,
@@ -2192,13 +2176,6 @@ impl WifiController<'_> {
         } else {
             Err(WifiError::Unsupported)
         }
-    }
-
-    /// Get the supported capabilities of the controller.
-    pub fn capabilities(&self) -> Result<EnumSet<crate::wifi::Capability>, WifiError> {
-        let caps = enumset::enum_set! { Capability::Station | Capability::AccessPoint | Capability::AccessPointStation };
-
-        Ok(caps)
     }
 
     /// Set the configuration.

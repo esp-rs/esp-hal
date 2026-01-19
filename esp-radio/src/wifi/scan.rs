@@ -168,7 +168,7 @@ impl Iterator for ScanResults<'_> {
 }
 
 /// AP list on-drop guard.
-pub struct FreeApListOnDrop;
+pub(super) struct FreeApListOnDrop;
 
 impl FreeApListOnDrop {
     /// Do not automatically free the AP list when the guard is dropped.
