@@ -148,29 +148,29 @@ mod xtensa {
     extern "C" fn post_init() {
         naked_asm!(
             "
-            entry a1, 0
+            entry  a1, 0x10                            // 4 words for callx4 spill area
 
-            l32r   a6, sym_xtensa_lx_rt_zero_fill      // Pre-load address of zero-fill function
+            l32r   a2, sym_xtensa_lx_rt_zero_fill      // Pre-load address of zero-fill function
 
-            l32r   a10, sym_rtc_fast_bss_start         // Set input range to .rtc_fast.bss
-            l32r   a11, sym_rtc_fast_bss_end           //
-            callx8 a6                                  // Zero-fill
+            l32r   a6, sym_rtc_fast_bss_start          // Set input range to .rtc_fast.bss
+            l32r   a7, sym_rtc_fast_bss_end            //
+            callx4 a2                                  // Zero-fill
 
-            l32r   a10, sym_rtc_slow_bss_start         // Set input range to .rtc_slow.bss
-            l32r   a11, sym_rtc_slow_bss_end           //
-            callx8 a6                                  // Zero-fill
+            l32r   a6, sym_rtc_slow_bss_start          // Set input range to .rtc_slow.bss
+            l32r   a7, sym_rtc_slow_bss_end            //
+            callx4 a2                                  // Zero-fill
 
-            l32r   a5,  sym_init_persistent            // Do we need to initialize persistent data?
-            callx8 a5
-            beqz   a10, .Lpost_init_return             // If not, skip initialization
+            l32r   a3, sym_init_persistent             // Do we need to initialize persistent data?
+            callx4 a3
+            beqz   a6, .Lpost_init_return              // If not, skip initialization
 
-            l32r   a10, sym_rtc_fast_persistent_start  // Set input range to .rtc_fast.persistent
-            l32r   a11, sym_rtc_fast_persistent_end    //
-            callx8 a6                                  // Zero-fill
+            l32r   a6, sym_rtc_fast_persistent_start   // Set input range to .rtc_fast.persistent
+            l32r   a7, sym_rtc_fast_persistent_end     //
+            callx4 a2                                  // Zero-fill
 
-            l32r   a10, sym_rtc_slow_persistent_start  // Set input range to .rtc_slow.persistent
-            l32r   a11, sym_rtc_slow_persistent_end    //
-            callx8 a6                                  // Zero-fill
+            l32r   a6, sym_rtc_slow_persistent_start   // Set input range to .rtc_slow.persistent
+            l32r   a7, sym_rtc_slow_persistent_end     //
+            callx4 a2                                  // Zero-fill
 
         .Lpost_init_return:
             retw.n
@@ -184,12 +184,14 @@ mod xtensa {
         "
         .literal sym_stack_chk_guard, {__stack_chk_guard}
         .literal stack_guard_value, {stack_guard_value}
+        .literal sym_esp32_init, {__esp32_init}
         ",
         __stack_chk_guard = sym __stack_chk_guard,
         stack_guard_value = const esp_config::esp_config_int!(
             u32,
             "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
-        )
+        ),
+        __esp32_init = sym esp32_init,
     );
 
     #[cfg_attr(esp32s3, unsafe(link_section = ".rwtext"))]
@@ -199,18 +201,18 @@ mod xtensa {
         // Set up stack protector value before jumping to a rust function
         naked_asm! {
             "
-            entry a1, 0x20
+            entry a1, 0x10 // 4 words for callx4 spill area
 
             // Set up the stack protector value
             l32r   a2, sym_stack_chk_guard
             l32r   a3, stack_guard_value
             s32i.n a3, a2, 0
 
-            call8 {esp32_init}
+            l32r   a2, sym_esp32_init
+            callx4 a2
 
             retw.n
-            ",
-            esp32_init = sym esp32_init
+            "
         }
     }
 

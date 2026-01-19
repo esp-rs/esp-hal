@@ -88,7 +88,7 @@ global_asm!(
     .p2align 2
     .type _xtensa_lx_rt_zero_fill,@function
 _xtensa_lx_rt_zero_fill:
-    entry a1, 0
+    entry  a1, 0                  // Leaf function, no need to reserve stack
     bgeu   a2, a3, .Lfill_done    // If start >= end, skip zeroing
     movi.n a5, 0
 
@@ -111,7 +111,7 @@ _xtensa_lx_rt_zero_fill:
     .p2align 2
     .type _xtensa_lx_rt_copy,@function
 _xtensa_lx_rt_copy:
-    entry a1, 0
+    entry  a1, 0                 // Leaf function, no need to reserve stack
     bgeu   a3, a4, .Lcopy_done   // If start >= end, skip copying
 .Lcopy_loop:
     l32i.n a5, a2, 0             // Load word from source pointer
@@ -127,35 +127,35 @@ _xtensa_lx_rt_copy:
     .p2align 2
     .type Reset,@function
 Reset:
-    entry  a1, 0
+    entry  a1, 0x10                 // We're using call4/callx4, reserve 16 bytes for register spill area
     movi   a0, 0                    // Trash the return address. Debuggers may use this to stop unwinding.
 
     wsr.intenable a0                // Disable interrupts
 
-    l32r   a5, sym_stack_start_cpu0 // a5 is our temporary value register
-    mov    sp, a5                   // Set the stack pointer.
+    l32r   a2, sym_stack_start_cpu0 // a2 is our temporary value register
+    mov    sp, a2                   // Set the stack pointer.
 
-    l32r   a5, sym__pre_init
-    callx8 a5                       // Call the pre-initialization function.
+    l32r   a2, sym__pre_init
+    callx4 a2                       // Call the pre-initialization function.
 
 .Linit_bss:
-    l32r   a5, sym__zero_bss        // Do we need to zero-initialize memory?
-    callx8 a5
-    beqz   a10, .Linit_data         // No -> skip to copying initialized data
+    l32r   a2, sym__zero_bss        // Do we need to zero-initialize memory?
+    callx4 a2
+    beqz   a6, .Linit_data          // No -> skip to copying initialized data
 
-    l32r   a10, sym_bss_start        // Set input range to .bss
-    l32r   a11, sym_bss_end          //
-    call8  _xtensa_lx_rt_zero_fill  // Zero-fill
+    l32r   a6, sym_bss_start        // Set input range to .bss
+    l32r   a7, sym_bss_end          //
+    call4  _xtensa_lx_rt_zero_fill  // Zero-fill
 
 .Linit_data:
-    l32r   a5, sym__init_data       // Do we need to initialize data sections?
-    callx8 a5
-    beqz   a10, .Linit_data_done    // If not, skip initialization
+    l32r   a2, sym__init_data       // Do we need to initialize data sections?
+    callx4 a2
+    beqz   a6, .Linit_data_done     // If not, skip initialization
 
-    l32r   a10, sym_sidata           // Arguments - source data pointer
-    l32r   a11, sym_data_start       //           - destination pointer
-    l32r   a12, sym_data_end         //           - destination end pointer
-    call8  _xtensa_lx_rt_copy       // Copy .data section
+    l32r   a6, sym_sidata           // Arguments - source data pointer
+    l32r   a7, sym_data_start       //           - destination pointer
+    l32r   a8, sym_data_end         //           - destination end pointer
+    call4  _xtensa_lx_rt_copy       // Copy .data section
 
 .Linit_data_done:
     memw    // Make sure all writes are completed before proceeding. At this point, all static variables have been initialized.
@@ -184,14 +184,14 @@ cfg_global_asm!(
 
 global_asm!(
     "
-    l32r   a5, sym_init_start // vector table address
-    wsr.vecbase a5
+    l32r   a2, sym_init_start // vector table address
+    wsr.vecbase a2
 
-    l32r   a5, sym__post_init
-    callx8 a5
+    l32r   a2, sym__post_init
+    callx4 a2
 
-    l32r   a5, sym_main       // program entry point
-    callx8 a5
+    l32r   a2, sym_main       // program entry point
+    callx4 a2
     ",
 );
 
