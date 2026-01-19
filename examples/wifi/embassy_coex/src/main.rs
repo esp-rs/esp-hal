@@ -193,7 +193,7 @@ pub async fn ble_task(controller: ExternalController<BleConnector<'static>, 1>) 
         let _advertiser = peripheral
             .advertise(
                 &params,
-                Advertisement::NonconnectableScannableUndirected {
+                Advertisement::ConnectableScannableUndirected {
                     adv_data: &adv_data[..adv_len],
                     scan_data: &[],
                 },
