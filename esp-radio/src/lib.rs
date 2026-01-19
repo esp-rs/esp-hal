@@ -38,7 +38,7 @@
 //! [dependencies.esp-alloc]
 #![doc = concat!(r#"features = [""#, chip!(), r#""]"#)]
 //! ```
-//!
+//! 
 //! ### Optimization Level
 //!
 //! It is necessary to build with optimization level 2 or 3 since otherwise, it
@@ -404,7 +404,8 @@ pub fn wifi_set_log_verbose() {
     #[cfg(all(feature = "print-logs-from-driver", not(esp32h2)))]
     unsafe {
         use crate::sys::include::{
-            esp_wifi_internal_set_log_level, wifi_log_level_t_WIFI_LOG_VERBOSE,
+            esp_wifi_internal_set_log_level,
+            wifi_log_level_t_WIFI_LOG_VERBOSE,
         };
 
         esp_wifi_internal_set_log_level(wifi_log_level_t_WIFI_LOG_VERBOSE);

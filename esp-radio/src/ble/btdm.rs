@@ -8,7 +8,8 @@ use portable_atomic::{AtomicBool, Ordering};
 use super::{Config, ReceivedPacket};
 use crate::{
     ble::{
-        HCI_OUT_COLLECTOR, HciOutCollector,
+        HCI_OUT_COLLECTOR,
+        HciOutCollector,
         btdm::ble_os_adapter_chip_specific::{G_OSI_FUNCS, osi_funcs_s},
     },
     compat::common::str_from_c,

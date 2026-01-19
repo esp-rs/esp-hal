@@ -374,7 +374,7 @@ impl TxPower {
 pub enum CcaMode {
     /// Disabled
     #[default]
-    Disabled = 0,
+    Disabled          = 0,
     /// Hardware Triggered
     HardwareTriggered = 1,
     /// Software Triggered (experimental)

@@ -2,7 +2,9 @@ use super::os_adapter::{self, *};
 use crate::{
     common_adapter::*,
     sys::include::{
-        ESP_WIFI_OS_ADAPTER_MAGIC, ESP_WIFI_OS_ADAPTER_VERSION, wifi_init_config_t,
+        ESP_WIFI_OS_ADAPTER_MAGIC,
+        ESP_WIFI_OS_ADAPTER_VERSION,
+        wifi_init_config_t,
         wifi_osi_funcs_t,
     },
 };
