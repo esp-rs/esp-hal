@@ -11,6 +11,7 @@ use crate::WifiError;
 
 unstable_module!(
     #[cfg(feature = "wifi-eap")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "wifi-eap")))]
     pub mod eap;
 );
 
