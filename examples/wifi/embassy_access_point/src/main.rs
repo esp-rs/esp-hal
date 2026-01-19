@@ -229,7 +229,6 @@ async fn run_dhcp(stack: Stack<'static>, gw_ip_addr: &'static str) {
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
-    println!("Device capabilities: {:?}", controller.capabilities());
     loop {
         if !matches!(controller.is_started(), Ok(true)) {
             let station_config =

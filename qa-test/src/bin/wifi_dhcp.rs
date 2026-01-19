@@ -94,7 +94,6 @@ fn main() -> ! {
         println!("{:?}", ap);
     }
 
-    println!("{:?}", controller.capabilities());
     println!("wifi_connect {:?}", controller.connect());
 
     // wait to get connected
