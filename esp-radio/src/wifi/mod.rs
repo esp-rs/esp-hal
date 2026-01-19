@@ -45,9 +45,11 @@ pub mod ap;
 
 unstable_module!(
     #[cfg(feature = "csi")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "csi")))]
     pub mod csi;
     pub mod event;
     #[cfg(feature = "sniffer")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sniffer")))]
     pub mod sniffer;
 );
 
