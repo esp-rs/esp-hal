@@ -88,7 +88,7 @@ global_asm!(
     .p2align 2
     .type _xtensa_lx_rt_zero_fill,@function
 _xtensa_lx_rt_zero_fill:
-    entry a1, 0
+    entry  a1, 0
     bgeu   a2, a3, .Lfill_done    // If start >= end, skip zeroing
     movi.n a5, 0
 

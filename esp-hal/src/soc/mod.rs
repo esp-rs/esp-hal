@@ -184,12 +184,14 @@ mod xtensa {
         "
         .literal sym_stack_chk_guard, {__stack_chk_guard}
         .literal stack_guard_value, {stack_guard_value}
+        .literal sym_esp32_init, {__esp32_init}
         ",
         __stack_chk_guard = sym __stack_chk_guard,
         stack_guard_value = const esp_config::esp_config_int!(
             u32,
             "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
-        )
+        ),
+        __esp32_init = sym esp32_init,
     );
 
     #[cfg_attr(esp32s3, unsafe(link_section = ".rwtext"))]
@@ -199,18 +201,18 @@ mod xtensa {
         // Set up stack protector value before jumping to a rust function
         naked_asm! {
             "
-            entry a1, 0x20
+            entry a1, 0
 
             // Set up the stack protector value
             l32r   a2, sym_stack_chk_guard
             l32r   a3, stack_guard_value
             s32i.n a3, a2, 0
 
-            call8 {esp32_init}
+            l32r   a2, sym_esp32_init
+            callx4 a2
 
             retw.n
-            ",
-            esp32_init = sym esp32_init
+            "
         }
     }
 
