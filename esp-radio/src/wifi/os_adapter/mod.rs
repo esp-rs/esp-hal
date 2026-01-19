@@ -1217,7 +1217,7 @@ pub unsafe extern "C" fn get_time(_t: *mut c_void) -> c_int {
 ///   None
 ///
 /// *************************************************************************
-#[cfg(feature = "sys-logs")]
+#[cfg(feature = "print-logs-from-driver")]
 pub unsafe extern "C" fn log_write(
     level: u32,
     _tag: *const c_char,
@@ -1245,7 +1245,7 @@ pub unsafe extern "C" fn log_write(
 ///   None
 ///
 /// *************************************************************************
-#[cfg(feature = "sys-logs")]
+#[cfg(feature = "print-logs-from-driver")]
 #[allow(improper_ctypes_definitions)]
 pub unsafe extern "C" fn log_writev(
     level: u32,

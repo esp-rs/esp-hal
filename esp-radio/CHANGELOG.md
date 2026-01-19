@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `CsiConfig` struct has been moved to the `wifi::csi` module (#4588)
 - The `ScanMethod`, `ScanTypeConfig`, and `ScanConfig` types have been moved to `wifi::scan` (#4588)
 - `esp-alloc` dependency no longer enables default features (#4721)
+- `sys-logs` feature has been renamed to `print-logs-from-driver` and has been marked unstable (#4810)
+- Unstable features now require the `unstable` feature flag to be enabled (#4810)
 
 ### Fixed
 

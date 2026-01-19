@@ -14,7 +14,7 @@ pub(crate) const OSI_FUNCS_TIME_BLOCKING: u32 = u32::MAX;
 
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __esp_radio_putchar(_c: u8) {
-    #[cfg(feature = "sys-logs")]
+    #[cfg(feature = "print-logs-from-driver")]
     {
         static mut BUFFER: [u8; 256] = [0u8; 256];
         static mut IDX: usize = 0;
