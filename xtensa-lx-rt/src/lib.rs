@@ -88,7 +88,7 @@ global_asm!(
     .p2align 2
     .type _xtensa_lx_rt_zero_fill,@function
 _xtensa_lx_rt_zero_fill:
-    entry  a1, 0
+    entry  a1, 0x20
     bgeu   a2, a3, .Lfill_done    // If start >= end, skip zeroing
     movi.n a5, 0
 
@@ -111,7 +111,7 @@ _xtensa_lx_rt_zero_fill:
     .p2align 2
     .type _xtensa_lx_rt_copy,@function
 _xtensa_lx_rt_copy:
-    entry a1, 0
+    entry  a1, 0x20
     bgeu   a3, a4, .Lcopy_done   // If start >= end, skip copying
 .Lcopy_loop:
     l32i.n a5, a2, 0             // Load word from source pointer
@@ -127,7 +127,7 @@ _xtensa_lx_rt_copy:
     .p2align 2
     .type Reset,@function
 Reset:
-    entry  a1, 0
+    entry  a1, 0x20
     movi   a0, 0                    // Trash the return address. Debuggers may use this to stop unwinding.
 
     wsr.intenable a0                // Disable interrupts

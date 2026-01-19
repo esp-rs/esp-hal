@@ -148,7 +148,7 @@ mod xtensa {
     extern "C" fn post_init() {
         naked_asm!(
             "
-            entry a1, 0
+            entry a1, 0x20
 
             l32r   a6, sym_xtensa_lx_rt_zero_fill      // Pre-load address of zero-fill function
 
@@ -201,7 +201,7 @@ mod xtensa {
         // Set up stack protector value before jumping to a rust function
         naked_asm! {
             "
-            entry a1, 0
+            entry a1, 0x20
 
             // Set up the stack protector value
             l32r   a2, sym_stack_chk_guard
