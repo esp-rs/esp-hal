@@ -123,7 +123,7 @@ __has_unstable_feature_enabled = []
 ## Note that the untyped nature of the allocator functions means that esp-alloc is likely the more memory efficient option.
 esp-alloc = ["dep:esp-alloc"]
 
-## Outputs logs from the pre-compiled Wi-Fi blobs at info level.
+## Outputs logs from the pre-compiled Wi-Fi and BLE driver blobs at info level.
 ## 
 ## This feature needs a nightly compiler.
 ##
