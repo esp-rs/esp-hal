@@ -126,6 +126,10 @@ impl Chip {
     pub fn memory_layout(&self) -> &'static MemoryLayout {
         self.config().memory_layout
     }
+    /// Returns information about all pins.
+    pub fn pins(&self) -> &'static [PinInfo] {
+        self.config().pins
+    }
     /// Returns an iterator over all chips.
     ///
     /// ## Example
@@ -564,6 +568,148 @@ impl Chip {
                         ),
                     ],
                 },
+                pins: &[
+                    PinInfo {
+                        pin: 0,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 1,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 2,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 3,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 4,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 5,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 6,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 7,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 8,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 9,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 10,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 11,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 12,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 13,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 14,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 15,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 16,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 17,
+                        limitations: &["spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 18,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 19,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 20,
+                        limitations: &["esp32_pico_v3"],
+                    },
+                    PinInfo {
+                        pin: 21,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 22,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 23,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 25,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 26,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 27,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 32,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 33,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 34,
+                        limitations: &["input_only"],
+                    },
+                    PinInfo {
+                        pin: 35,
+                        limitations: &["input_only"],
+                    },
+                    PinInfo {
+                        pin: 36,
+                        limitations: &["input_only"],
+                    },
+                    PinInfo {
+                        pin: 37,
+                        limitations: &["input_only"],
+                    },
+                    PinInfo {
+                        pin: 38,
+                        limitations: &["input_only"],
+                    },
+                    PinInfo {
+                        pin: 39,
+                        limitations: &["input_only"],
+                    },
+                ],
             },
             Self::Esp32c2 => Config {
                 architecture: "riscv",
@@ -886,6 +1032,92 @@ impl Chip {
                         ),
                     ],
                 },
+                pins: &[
+                    PinInfo {
+                        pin: 0,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 1,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 2,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 3,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 4,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 5,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 6,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 7,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 8,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 9,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 10,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 11,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 12,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 13,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 14,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 15,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 16,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 17,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 18,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 19,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 20,
+                        limitations: &[],
+                    },
+                ],
             },
             Self::Esp32c3 => Config {
                 architecture: "riscv",
@@ -1290,6 +1522,96 @@ impl Chip {
                         ),
                     ],
                 },
+                pins: &[
+                    PinInfo {
+                        pin: 0,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 1,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 2,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 3,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 4,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 5,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 6,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 7,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 8,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 9,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 10,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 11,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 12,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 13,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 14,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 15,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 16,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 17,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 18,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 19,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 20,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 21,
+                        limitations: &[],
+                    },
+                ],
             },
             Self::Esp32c6 => Config {
                 architecture: "riscv",
@@ -1818,6 +2140,132 @@ impl Chip {
                         ),
                     ],
                 },
+                pins: &[
+                    PinInfo {
+                        pin: 0,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 1,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 2,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 3,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 4,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 5,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 6,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 7,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 8,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 9,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 10,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 11,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 12,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 13,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 14,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 15,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 16,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 17,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 18,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 19,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 20,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 21,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 22,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 23,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 24,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 25,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 26,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 27,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 28,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 29,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 30,
+                        limitations: &["spi_flash"],
+                    },
+                ],
             },
             Self::Esp32h2 => Config {
                 architecture: "riscv",
@@ -2268,6 +2716,92 @@ impl Chip {
                         ),
                     ],
                 },
+                pins: &[
+                    PinInfo {
+                        pin: 0,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 1,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 2,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 3,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 4,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 5,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 6,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 7,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 8,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 9,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 10,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 11,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 12,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 13,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 14,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 22,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 23,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 24,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 25,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 26,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 27,
+                        limitations: &[],
+                    },
+                ],
             },
             Self::Esp32s2 => Config {
                 architecture: "xtensa",
@@ -2710,6 +3244,180 @@ impl Chip {
                         ),
                     ],
                 },
+                pins: &[
+                    PinInfo {
+                        pin: 0,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 1,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 2,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 3,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 4,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 5,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 6,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 7,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 8,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 9,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 10,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 11,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 12,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 13,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 14,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 15,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 16,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 17,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 18,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 19,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 20,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 21,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 26,
+                        limitations: &["spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 27,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 28,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 29,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 30,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 31,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 32,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 33,
+                        limitations: &["octal_flash", "octal_psram"],
+                    },
+                    PinInfo {
+                        pin: 34,
+                        limitations: &["octal_flash", "octal_psram"],
+                    },
+                    PinInfo {
+                        pin: 35,
+                        limitations: &["octal_flash", "octal_psram"],
+                    },
+                    PinInfo {
+                        pin: 36,
+                        limitations: &["octal_flash", "octal_psram"],
+                    },
+                    PinInfo {
+                        pin: 37,
+                        limitations: &["octal_flash", "octal_psram"],
+                    },
+                    PinInfo {
+                        pin: 38,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 39,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 40,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 41,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 42,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 43,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 44,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 45,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 46,
+                        limitations: &["strapping"],
+                    },
+                ],
             },
             Self::Esp32s3 => Config {
                 architecture: "xtensa",
@@ -3204,6 +3912,188 @@ impl Chip {
                         ),
                     ],
                 },
+                pins: &[
+                    PinInfo {
+                        pin: 0,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 1,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 2,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 3,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 4,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 5,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 6,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 7,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 8,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 9,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 10,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 11,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 12,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 13,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 14,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 15,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 16,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 17,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 18,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 19,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 20,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 21,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 26,
+                        limitations: &["spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 27,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 28,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 29,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 30,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 31,
+                        limitations: &["spi_flash", "spi_psram"],
+                    },
+                    PinInfo {
+                        pin: 32,
+                        limitations: &["spi_flash"],
+                    },
+                    PinInfo {
+                        pin: 33,
+                        limitations: &["octal_flash", "octal_psram"],
+                    },
+                    PinInfo {
+                        pin: 34,
+                        limitations: &["octal_flash", "octal_psram"],
+                    },
+                    PinInfo {
+                        pin: 35,
+                        limitations: &["octal_flash", "octal_psram"],
+                    },
+                    PinInfo {
+                        pin: 36,
+                        limitations: &["octal_flash", "octal_psram"],
+                    },
+                    PinInfo {
+                        pin: 37,
+                        limitations: &["octal_flash", "octal_psram"],
+                    },
+                    PinInfo {
+                        pin: 38,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 39,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 40,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 41,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 42,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 43,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 44,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 45,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 46,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 47,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 48,
+                        limitations: &[],
+                    },
+                ],
             },
         }
     }
@@ -3234,12 +4124,23 @@ impl MemoryLayout {
             .find_map(|(n, r)| if *n == name { Some(r) } else { None })
     }
 }
+/// Information about a specific pin.
+#[non_exhaustive]
+pub struct PinInfo {
+    /// The pin number.
+    pub pin: usize,
+    /// The list of possible restriction categories for this pin.
+    ///
+    /// This can include "strapping", "spi_psram", etc.
+    pub limitations: &'static [&'static str],
+}
 struct Config {
     architecture: &'static str,
     target: &'static str,
     symbols: &'static [&'static str],
     cfgs: &'static [&'static str],
     memory_layout: &'static MemoryLayout,
+    pins: &'static [PinInfo],
 }
 impl Config {
     fn define_cfgs(&self) {
