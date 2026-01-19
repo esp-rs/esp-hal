@@ -803,6 +803,12 @@ pub fn read_all_ll() -> u32 {
     ll::read_in()
 }
 
+#[cfg(not(esp32s3))]
+#[inline(always)]
+pub fn output_levels_ll() -> u32 {
+    ll::output_levels()
+}
+
 // TODO: bundle drivers
 // - Bundles should support short-lived operations as well as longer bundling
 //   - A pin may belong to multiple bundles at the same time
@@ -899,6 +905,16 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
         }
     }
 
+    /// Return the mask of this bundle
+    /// 
+    /// All channels included by the bundle are set to 1. For example, dedicated 
+    /// output driver of channel 1, 3, 5 were added to the bundle by `bundle.with_output`
+    /// then the mask would be `0b0010_1010`
+    #[inline(always)]
+    pub fn mask(&self) -> u32{
+        self.mask
+    }
+
     /// Attaches an already-configured dedicated output driver to this bundle.
     ///
     /// This method logically borrows the provided [`DedicatedGpioOutput`] for the lifetime `'lt`.
@@ -914,15 +930,36 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
         self
     }
 
-    /// test
+    /// Removes a dedicated output driver from this bundle. 
+    /// 
+    /// This method simply removes the corresponding channel from the internal mask,
+    /// which means that the removed dedicated output driver is still logically borrowed
+    /// by this bunle. And you'll not be able to write to the corresponding pin
+    /// through the removed dedicated output driver 
     pub fn remove_output<'d>(&mut self, out: &'lt DedicatedGpioOutput<'d>) -> &mut Self {
         self.mask &= !out.mask;
         self
     }
 
-    /// test
+    /// Set channels to high if the corresponding bit in `bits` is 1
+    /// 
+    /// For example, `bundle.set_high(0b1011_0001)` will set channel 0, 4, 5, and 7
+    /// to high. 
+    /// 
+    /// <section class="warning">
+    /// 
+    /// The caller of this function needs to ensure that the modified channel is 
+    /// included by the bundle. For example, if you used `with_output` to add dedicated output
+    /// driver of channel 0, 1, and 3 to an output bundle. Bit other than 0, 1, 3 of variable `bits`
+    /// should not be set to 1. You will otherwise accidentally change the state of channels outside
+    /// of this bundle.
+    /// 
+    /// If you turn on `debug-assertions` in compilation profile, then runtime check
+    /// of `bits` will be enabled.
+    /// </section>
     #[inline(always)]
     pub fn set_high(&mut self, bits: u32) {
+        // TODO: question: should bits be u8
         #[cfg(all(debug_assertions, multi_core))]
         debug_assert_eq!(self.core, Cpu::current());
         debug_assert!(
@@ -932,7 +969,22 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
         ll::write(bits, bits); // or ll::write(self.mask, bits); 
     }
 
-    /// test
+    /// Set channels to low if the corresponding bit in `bits` is 1
+    /// 
+    /// For example, `bundle.set_low(0b1011_0001)` will set channel 0, 4, 5, and 7
+    /// to low. 
+    /// 
+    /// <section class="warning">
+    /// 
+    /// The caller of this function needs to ensure that the modified channel is 
+    /// included by the bundle. For example, if you used `with_output` to add dedicated output
+    /// driver of channel 0, 1, and 3 to an output bundle. Bit other than 0, 1, 3 of variable `bits`
+    /// should not be set to 1. You will otherwise accidentally change the state of channels outside
+    /// of this bundle.
+    /// 
+    /// If you turn on `debug-assertions` in compilation profile, then runtime check
+    /// of `bits` will be enabled.
+    /// </section>
     #[inline(always)]
     pub fn set_low(&mut self, bits: u32) {
         #[cfg(all(debug_assertions, multi_core))]
@@ -941,10 +993,17 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
             bits & !self.mask == 0,
             "Trying to clear bits outside of the bundle mask"
         );
-        ll::write(bits, 0); // or ll::write(bits & self.mask, 0); the latter is safer but slower
+        ll::write(bits, 0); 
+        // or ll::write(bits & self.mask, 0); 
+        // the latter is safer (preventing writing to channels outside of the bundle) but slower
     }
 
-    /// test
+    /// Change the state of the dedicated output channels included by this bundle
+    /// 
+    /// For example, if the mask (see [`DedicatedGpioOutputBundle::mask()`]) is `0b1111_0000` 
+    /// the current state of the dedicated output channels is `0b1111_1111`, then calling `bundle.write_bits(0b0000_0000)`
+    /// will change the output channel state to `0b0000_1111`. Note that the state of channel 3..=0 is not changed. Because
+    /// the corresponding mask bits are 0.
     #[inline(always)]
     pub fn write_bits(&mut self, bits: u32) {
         #[cfg(all(debug_assertions, multi_core))]
@@ -956,7 +1015,7 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
         ll::write(self.mask, bits);
     }
 
-    /// test
+    /// Returns the current output state of the channels
     #[cfg(not(esp32s3))]
     #[inline(always)]
     pub fn output_levels(&mut self) -> u32 {
