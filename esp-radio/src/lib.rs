@@ -154,6 +154,11 @@ use hal::{
     time::Rate,
 };
 use sys::include::esp_phy_calibration_data_t;
+
+#[cfg(feature = "ble")]
+pub use crate::private::InitializationError;
+#[cfg(not(feature = "ble"))]
+use crate::private::InitializationError;
 pub(crate) mod sys {
     #[cfg(esp32)]
     pub use esp_wifi_sys_esp32::*;
@@ -371,32 +376,6 @@ fn is_interrupts_disabled() -> bool {
         || hal::interrupt::current_runlevel() >= hal::interrupt::Priority::Priority1;
 }
 
-#[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-/// Error which can be returned during radio initialization.
-#[non_exhaustive]
-pub enum InitializationError {
-    /// An error from the Wi-Fi driver: {0}.
-    #[cfg(feature = "wifi")]
-    WifiError(WifiError),
-    /// The current CPU clock frequency is too low.
-    WrongClockConfig,
-    /// The scheduler is not initialized.
-    SchedulerNotInitialized,
-    #[cfg(esp32)]
-    /// ADC2 is required by esp-radio, but it is in use by esp-hal.
-    Adc2IsUsed,
-}
-
-impl core::error::Error for InitializationError {}
-
-#[cfg(feature = "wifi")]
-impl From<WifiError> for InitializationError {
-    fn from(value: WifiError) -> Self {
-        InitializationError::WifiError(value)
-    }
-}
-
 /// Enable verbose logging within the Wi-Fi driver
 /// Does nothing unless the `print-logs-from-driver` feature is enabled.
 #[instability::unstable]
@@ -440,4 +419,35 @@ pub fn set_phy_calibration_data(data: &[u8; core::mem::size_of::<esp_phy_calibra
 #[instability::unstable]
 pub fn last_calibration_result() -> Option<CalibrationResult> {
     esp_phy::last_calibration_result()
+}
+
+mod private {
+    use super::Display;
+    #[cfg(feature = "wifi")]
+    use crate::wifi::WifiError;
+    #[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    /// Error which can be returned during radio initialization.
+    #[non_exhaustive]
+    pub enum InitializationError {
+        /// An error from the Wi-Fi driver: {0}.
+        #[cfg(feature = "wifi")]
+        WifiError(WifiError),
+        /// The current CPU clock frequency is too low.
+        WrongClockConfig,
+        /// The scheduler is not initialized.
+        SchedulerNotInitialized,
+        #[cfg(esp32)]
+        /// ADC2 is required by esp-radio, but it is in use by esp-hal.
+        Adc2IsUsed,
+    }
+
+    impl core::error::Error for InitializationError {}
+
+    #[cfg(feature = "wifi")]
+    impl From<WifiError> for InitializationError {
+        fn from(value: WifiError) -> Self {
+            InitializationError::WifiError(value)
+        }
+    }
 }
