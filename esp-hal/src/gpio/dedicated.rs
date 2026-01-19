@@ -894,7 +894,7 @@ pub fn output_levels_ll() -> u32 {
     doc = r#"
 
 <section class="warning">
-The method <code>output_level</code> is currently not available on ESP32-S3 due to 
+The method <code>output_levels</code> is currently not available on ESP32-S3 due to 
 an LLVM bug. See <a href=https://github.com/espressif/llvm-project/issues/120>https://github.com/espressif/llvm-project/issues/120</a> for details.
 </section>
 "#
@@ -1047,17 +1047,22 @@ All dedicated GPIO output drivers in a bundle must be configured on the same cor
 
     /// Removes a dedicated output driver from this bundle.
     ///
-    /// This method simply removes the corresponding channel from the internal mask,
-    /// which means that the removed dedicated output driver is still logically borrowed
-    /// by this bunle. And you'll not be able to write to the corresponding pin
-    /// through the removed dedicated output driver
+    /// This updates the internal mask by clearing the channel bit(s) of `out`.
+    ///
+    /// ## Notes
+    ///
+    /// - This does **not** affect `out` itself. It only changes which channels future *bundle*
+    ///   operations will touch.
+    /// - After removal, `out` remains usable as before (e.g. you can still call
+    ///   [`DedicatedGpioOutput::set_level`] if you have `out` mutably).
     #[cfg_attr(
         multi_core,
-        doc = r#"
-            <section class="warning">
-            All dedicated GPIO output drivers in a bundle must be configured on the same core as the bundle itself
-            </section>
-            "#
+        doc = 
+r#"
+<section class="warning">
+All dedicated GPIO output drivers in a bundle must be configured on the same core as the bundle itself
+</section>
+"#
     )]
     pub fn remove_output<'d>(&mut self, out: &'lt DedicatedGpioOutput<'d>) -> &mut Self {
         #[cfg(all(debug_assertions, multi_core))]
@@ -1429,6 +1434,7 @@ mod ll {
     #[cfg(not(esp32s3))]
     #[inline(always)]
     pub(super) fn read_out() -> u32 {
+        // currently unavailable due to an LLVM bug, see https://github.com/espressif/llvm-project/issues/120
         let val;
         unsafe { core::arch::asm!("rur.gpio_out {0}", out(reg) val) };
         val
