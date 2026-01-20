@@ -918,7 +918,7 @@ pub fn output_levels_ll() -> u32 {
     doc = r#"
 
 <section class="warning">
-The method <code>output_levels</code> is currently not available on ESP32-S3 due to 
+The method <code>output_levels</code> is currently not available on ESP32-S3 due to
 an LLVM bug. See <a href=https://github.com/espressif/llvm-project/issues/120>https://github.com/espressif/llvm-project/issues/120</a> for details.
 </section>
 "#
