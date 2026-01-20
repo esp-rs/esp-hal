@@ -56,6 +56,11 @@ struct Context {
     io: Io<'static>,
     #[cfg(all(dedicated_gpio, feature = "unstable"))]
     dedicated_gpio: DedicatedGpio<'static>,
+    #[cfg(all(dedicated_gpio, multi_core, feature = "unstable"))]
+    int1: esp_hal::interrupt::software::SoftwareInterrupt<'static, 1>,
+    #[cfg(all(dedicated_gpio, multi_core, feature = "unstable"))]
+    cpu_ctrl: esp_hal::peripherals::CPU_CTRL<'static>,
+
 }
 
 #[cfg_attr(feature = "unstable", handler)]
@@ -150,17 +155,24 @@ mod tests {
         let io = Io::new(peripherals.IO_MUX);
 
         #[cfg(feature = "unstable")]
+        let int1 = 
         {
             let sw_int = esp_hal::interrupt::software::SoftwareInterruptControl::new(
                 peripherals.SW_INTERRUPT,
             );
             // Timers are unstable
             let timg0 = TimerGroup::new(peripherals.TIMG0);
-            esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
-        }
+            let int0 = sw_int.software_interrupt0;
+            let int1 = sw_int.software_interrupt1;
+            esp_rtos::start(timg0.timer0, int0);
+            int1
+        };
+
 
         #[cfg(all(dedicated_gpio, feature = "unstable"))]
         let dedicated_gpio = DedicatedGpio::new(peripherals.GPIO_DEDICATED);
+        #[cfg(all(dedicated_gpio, multi_core, feature = "unstable"))]
+        let cpu_ctrl = peripherals.CPU_CTRL;
 
         Context {
             test_gpio1: gpio1.degrade(),
@@ -171,6 +183,10 @@ mod tests {
             io,
             #[cfg(all(dedicated_gpio, feature = "unstable"))]
             dedicated_gpio,
+            #[cfg(all(dedicated_gpio, multi_core, feature = "unstable"))]
+            int1,
+            #[cfg(all(dedicated_gpio, multi_core, feature = "unstable"))]
+            cpu_ctrl,
         }
     }
 
@@ -665,6 +681,33 @@ mod tests {
         assert_eq!(output_dedicated.output_level(), Level::Low);
         output_dedicated.set_level(Level::High);
         assert_eq!(output_dedicated.output_level(), Level::High);
+    }
+
+    #[test]
+    #[ignore]
+    #[should_panic]
+    #[cfg(all(dedicated_gpio, multi_core, feature = "unstable"))]
+    // TODO: this somehow will not panic as expected, even directly assesrt!(false)
+    // so added ignore as for now
+    // maybe panics are not detected on core1?
+    fn dedicated_gpio_different_cores_panics(ctx: Context) {
+        use hil_test::mk_static;
+        use esp_hal::system::Stack;
+        let input = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
+        let input_dedicated = DedicatedGpioInput::new(ctx.dedicated_gpio.channel1.input, input);
+
+        let app_core_stack = mk_static!(Stack<4096>, Stack::new());
+        // create on core0 and then use on core1.
+        // this should panic
+        esp_rtos::start_second_core(
+            ctx.cpu_ctrl,   
+            ctx.int1,
+            app_core_stack,
+            move || {
+                let _level = input_dedicated.level();
+            },
+        );
+        loop {}
     }
 
     #[cfg(all(dedicated_gpio, feature = "unstable"))]

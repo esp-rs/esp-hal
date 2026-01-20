@@ -889,16 +889,6 @@ pub fn output_levels_ll() -> u32 {
     ll::read_out()
 }
 
-// TODO: bundle drivers
-// - Bundles should support short-lived operations as well as longer bundling
-//   - A pin may belong to multiple bundles at the same time
-//   - A bundle should be easy to create from drivers of different lifetimes
-//     - A bundle should have an empty constructor and `.with_` functions to attach drivers
-//       - `.with_` functions shall take drivers by shared? reference.
-//         - data races are not a worry
-//     - It should be possible to attach a Flex driver to input and output bundles
-//   - A bundle needs to precompute its mask
-
 /// A bundle of dedicated GPIO output drivers.
 ///
 /// An output bundle precomputes a channel mask from one or more
@@ -1134,7 +1124,6 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
     /// </section>
     #[inline(always)]
     pub fn set_high(&mut self, bits: u32) {
-        // TODO: question: should bits be u8
         #[cfg(all(debug_assertions, multi_core))]
         debug_assert_eq!(
             self.core,
