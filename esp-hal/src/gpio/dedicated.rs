@@ -1030,12 +1030,6 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
     /// ```
     #[inline(always)]
     pub fn mask(&self) -> u32 {
-        #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(
-            self.core,
-            Cpu::current(),
-            "Dedicated GPIO used on a different CPU core than it was created on"
-        );
         self.mask
     }
 
@@ -1350,13 +1344,8 @@ impl<'lt> DedicatedGpioInputBundle<'lt> {
     /// ```text
     /// 0b0010_1010
     /// ```
+    #[inline(always)]
     pub fn mask(&self) -> u32 {
-        #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(
-            self.core,
-            Cpu::current(),
-            "Dedicated GPIO used on a different CPU core than it was created on"
-        );
         self.mask
     }
 
@@ -1566,13 +1555,8 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
     /// ```text
     /// 0b0010_1010
     /// ```
+    #[inline(always)]
     pub fn mask(&self) -> u32 {
-        #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(
-            self.core,
-            Cpu::current(),
-            "Dedicated GPIO used on a different CPU core than it was created on"
-        );
         self.mask
     }
 
