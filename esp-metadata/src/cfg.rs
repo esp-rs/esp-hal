@@ -1,7 +1,6 @@
 pub(crate) mod aes;
 pub(crate) mod gpio;
 pub(crate) mod i2c_master;
-pub(crate) mod interrupt;
 pub(crate) mod rmt;
 pub(crate) mod rsa;
 pub(crate) mod sha;
@@ -13,7 +12,6 @@ pub(crate) mod uart;
 pub(crate) use aes::*;
 pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
-pub(crate) use interrupt::*;
 pub(crate) use rmt::*;
 pub(crate) use sha::*;
 pub(crate) use soc::*;
@@ -445,8 +443,6 @@ driver_configs![
         name: "Interrupts",
         properties: {
             status_registers: u32,
-            #[serde(flatten)]
-            software_interrupt_properties: SoftwareInterruptProperties,
         }
     },
     IoMuxProperties {
