@@ -414,6 +414,8 @@ impl Clocks {
             clocks::request_pll_clk(clocks);
             #[cfg(soc_has_clock_node_pll_f96m_clk)]
             clocks::request_pll_f96m_clk(clocks);
+            #[cfg(soc_has_clock_node_rc_fast_div_clk)]
+            clocks::request_rc_fast_div_clk(clocks);
 
             // TODO: this struct can be removed once everything uses the new internal clock tree
             // code
