@@ -25,7 +25,7 @@
 //! if you plan on reusing them again, after dropping the dedicated driver.
 //!
 //! Due to how the hardware works, [`DedicatedGpioOutput`] can drive any number of GPIO pins.
-//! 
+//!
 //! ## Bundles
 //!
 //! If you need to read or update multiple channels together, you can use the bundle helpers:
@@ -35,15 +35,20 @@
 //!
 //! Bundles are lightweight objects that precompute a channel mask from one or more drivers,
 //! allowing multi-channel operations with a single low-level read/write.
-//! 
+//!
 //! ## Low-level functions
 //!
 //! This module also exposes low-level helpers for direct, channel-bitmask-based access:
 //! - [`write_ll`]: write output levels for a selected set of channels in one operation
 //! - [`read_all_ll`]: read the current input levels of all channels
-#![cfg_attr(not(esp32s3), doc = r#"- [`output_levels_ll`]: read the current output levels of all channels"#)]
-#![cfg_attr(esp32s3, doc = r#"- `output_levels_ll`: read the current output levels of all channels (not available on ESP32-S3 due to an LLVM bug, see <https://github.com/espressif/llvm-project/issues/120>)"#)]
-//!
+#![cfg_attr(
+    not(esp32s3),
+    doc = r#"- [`output_levels_ll`]: read the current output levels of all channels"#
+)]
+#![cfg_attr(
+    esp32s3,
+    doc = r#"- `output_levels_ll`: read the current output levels of all channels (not available on ESP32-S3 due to an LLVM bug, see <https://github.com/espressif/llvm-project/issues/120>)"#
+)]
 //! These functions operate purely on channel bitmasks (bit 0 -> channel 0, bit 1 -> channel 1, ...)
 //! and do not track pin configuration. Prefer the higher-level drivers and bundles unless you
 //! specifically need the lowest overhead.
@@ -1248,7 +1253,8 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
 ///
 /// An input bundle precomputes a channel mask from one or more [`DedicatedGpioInput`]
 /// drivers. This lets you read multiple dedicated input channels with a single
-/// low-level read (see [`DedicatedGpioInputBundle::all_levels`] and [`DedicatedGpioInputBundle::masked_levels`]).
+/// low-level read (see [`DedicatedGpioInputBundle::all_levels`] and
+/// [`DedicatedGpioInputBundle::masked_levels`]).
 ///
 /// Attaching a driver does **not** change any pin state. The bundle only stores a
 /// channel mask; it does not own pins or remember which GPIOs were connected.
@@ -1331,7 +1337,6 @@ impl<'lt> DedicatedGpioInputBundle<'lt> {
             core: Cpu::current(),
         }
     }
-
 
     /// Returns the channel mask of this bundle.
     ///
@@ -1444,7 +1449,7 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
 
-        ll::read_in() 
+        ll::read_in()
     }
 
     /// Reads the current state of the channels included by this bundle.
@@ -1600,7 +1605,7 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
 <section class="warning">
 All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself.
 </section>
-"#    
+"#
     )]
     pub fn with_flex<'d>(&mut self, flex: &'lt DedicatedGpioFlex<'d>) -> &mut Self {
         #[cfg(all(debug_assertions, multi_core))]
@@ -1634,7 +1639,7 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
 <section class="warning">
 All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself.
 </section>
-"#    
+"#
     )]
     pub fn remove_flex<'d>(&mut self, flex: &'lt DedicatedGpioFlex<'d>) -> &mut Self {
         #[cfg(all(debug_assertions, multi_core))]

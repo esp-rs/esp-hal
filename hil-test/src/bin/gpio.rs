@@ -60,7 +60,6 @@ struct Context {
     int1: esp_hal::interrupt::software::SoftwareInterrupt<'static, 1>,
     #[cfg(all(dedicated_gpio, multi_core, feature = "unstable"))]
     cpu_ctrl: esp_hal::peripherals::CPU_CTRL<'static>,
-
 }
 
 #[cfg_attr(feature = "unstable", handler)]
@@ -155,8 +154,7 @@ mod tests {
         let io = Io::new(peripherals.IO_MUX);
 
         #[cfg(feature = "unstable")]
-        let int1 = 
-        {
+        let int1 = {
             let sw_int = esp_hal::interrupt::software::SoftwareInterruptControl::new(
                 peripherals.SW_INTERRUPT,
             );
@@ -167,7 +165,6 @@ mod tests {
             esp_rtos::start(timg0.timer0, int0);
             int1
         };
-
 
         #[cfg(all(dedicated_gpio, feature = "unstable"))]
         let dedicated_gpio = DedicatedGpio::new(peripherals.GPIO_DEDICATED);
@@ -691,22 +688,17 @@ mod tests {
     // so added ignore as for now
     // maybe panics are not detected on core1?
     fn dedicated_gpio_different_cores_panics(ctx: Context) {
-        use hil_test::mk_static;
         use esp_hal::system::Stack;
+        use hil_test::mk_static;
         let input = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
         let input_dedicated = DedicatedGpioInput::new(ctx.dedicated_gpio.channel1.input, input);
 
         let app_core_stack = mk_static!(Stack<4096>, Stack::new());
         // create on core0 and then use on core1.
         // this should panic
-        esp_rtos::start_second_core(
-            ctx.cpu_ctrl,   
-            ctx.int1,
-            app_core_stack,
-            move || {
-                let _level = input_dedicated.level();
-            },
-        );
+        esp_rtos::start_second_core(ctx.cpu_ctrl, ctx.int1, app_core_stack, move || {
+            let _level = input_dedicated.level();
+        });
         loop {}
     }
 
@@ -774,7 +766,7 @@ mod tests {
             output_bundle,
         );
         output_bundle.set_high(0b10); // should panic, only channel0 is configured
-    }   
+    }
 
     #[test]
     #[should_panic]
@@ -791,5 +783,5 @@ mod tests {
             output_bundle,
         );
         output_bundle.set_low(0b10); // should panic, only channel0 is configured
-    }   
+    }
 }
