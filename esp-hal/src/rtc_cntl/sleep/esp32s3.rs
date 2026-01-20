@@ -675,7 +675,15 @@ impl RtcSleepConfig {
                 .dig_pwc()
                 .modify(|_, w| w.wifi_force_pu().clear_bit().wifi_pd_en().set_bit());
         } else {
-            rtc_cntl.dig_pwc().modify(|_, w| w.wifi_pd_en().clear_bit());
+            rtc_cntl.options0().modify(|_, w| {
+                w.bbpll_force_pu().set_bit();
+                w.bbpll_i2c_force_pu().set_bit();
+                w.bb_i2c_force_pu().set_bit()
+            });
+
+            rtc_cntl
+                .dig_pwc()
+                .modify(|_, w| w.wifi_force_pu().set_bit().wifi_pd_en().clear_bit());
         }
 
         if self.cpu_pd_en() {
