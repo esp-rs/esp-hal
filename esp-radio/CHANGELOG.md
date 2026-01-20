@@ -51,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the free standing `xxx_state()` functions have been removed together with their return types `WifiApState`/`WifiStaState` (#4571)
 - `wifi::Country` has been replaced by `wifi::CountryInfo` (#4788)
 - `InitializationError` is no longer `pub` for `wifi` (#4809)
+- `wifi::Capability` and `WifiController::capabilities()` no longer available (#4816)
+- `FreeApListOnDrop` is no longer available (#4816)
 
 ## [v0.17.0] - 2025-10-30
 
@@ -108,6 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Set `ble_ll_sync_cnt` to 0 on C6, C2 and H2 as in esp-idf Kconfig default (#4241)
 - `esp_radio::wifi::WifiController::scan_with_config_sync` has been renamed to `scan_with_config` (#4294)
 - `wifi::AuthMethod` has been renamed to `wifi::AuthenticationMethod` (#4778)
+- `wifi::Bandwidth` is now `#[non_exhaustive]` (#4816)
 
 ### Fixed
 

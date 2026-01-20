@@ -295,7 +295,6 @@ async fn gatt_events_task<P: PacketPool>(
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
-    println!("Device capabilities: {:?}", controller.capabilities());
     loop {
         if matches!(controller.is_connected(), Ok(true)) {
             // wait until we're no longer connected
