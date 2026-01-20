@@ -1728,7 +1728,7 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
         );
 
         debug_assert!(
-            bits & !self.mask == 0,
+            (bits & !self.mask) == 0,
             "Trying to clear bits outside of the bundle mask"
         );
         ll::write(bits, 0); // or ll::write(bits & self.mask, 0); the latter is safer but slower
