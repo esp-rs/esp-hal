@@ -1357,8 +1357,6 @@ impl<'lt> DedicatedGpioInputBundle<'lt> {
     /// ## Notes
     ///
     /// - This function does not change any input state.
-    /// - The bundle does not store references, only a mask. The lifetime `'lt` ensures the bundle
-    ///   cannot outlive the drivers it was built from.
     #[cfg_attr(
         multi_core,
         doc = r#"
@@ -1568,8 +1566,6 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
     /// ## Notes
     ///
     /// - This function does not change any input/output state.
-    /// - The bundle does not store references, only a mask. The lifetime `'lt` ensures the bundle
-    ///   cannot outlive the drivers it was built from.
     #[cfg_attr(
         multi_core,
         doc = r#"
