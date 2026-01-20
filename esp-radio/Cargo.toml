@@ -22,6 +22,8 @@ check-configs = [
     { features = ["esp-hal/unstable", "esp-hal/rt"] },
     { features = ["esp-hal/unstable", "esp-hal/rt", "defmt"] },
     { features = ["esp-hal/unstable", "esp-hal/rt", "wifi"], if = 'chip_has("wifi")' },
+    # feature(c_variadic) requires nightly compiler, but we can't configure the toolchain here. Only check xtensa chips, where the compiler has nightly features enabled.
+    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi", "print-logs-from-driver", "unstable"], if = 'chip_has("wifi") && chip_has("xtensa")' },
     { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer", "smoltcp/proto-ipv4", "smoltcp/proto-ipv6"], if = 'chip_has("wifi")' },
     { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ble"], if = 'chip_has("bt")' },
     { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ieee802154"], if = 'chip_has("ieee802154")' },
@@ -52,6 +54,7 @@ instability = "0.3.9"
 
 # Unstable dependencies that are not (strictly) part of the public API
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
+docsplay = { version = "0.1", default-features = false }
 document-features  = "0.2"
 esp-alloc = { version = "0.9.0", path = "../esp-alloc", optional = true, default-features = false }
 esp-config = { version = "0.6.1", path = "../esp-config" }
@@ -101,6 +104,10 @@ esp-rtos = { version = "0.2.0", path = "../esp-rtos" }
 [features]
 default = ["esp-alloc"]
 
+# These features are considered private and unstable. They are not covered by
+# semver guarantees and may change or be removed without notice.
+__has_unstable_feature_enabled = []
+
 ## Use `esp-alloc` with the `compat` feature for dynamic allocations.
 ##
 ## If you opt-out, you need to provide implementations for the following functions:
@@ -116,8 +123,13 @@ default = ["esp-alloc"]
 ## Note that the untyped nature of the allocator functions means that esp-alloc is likely the more memory efficient option.
 esp-alloc = ["dep:esp-alloc"]
 
-## Logs the Wi-Fi logs from the driver at log level info (needs a nightly-compiler)
-sys-logs = [
+## Outputs logs from the pre-compiled Wi-Fi and BLE driver blobs at info level.
+## 
+## This feature needs a nightly compiler.
+##
+## ⚠️ This feature is considered unstable.
+print-logs-from-driver = [
+    "__has_unstable_feature_enabled",
     "esp-wifi-sys-esp32/sys-logs",
     "esp-wifi-sys-esp32c2/sys-logs",
     "esp-wifi-sys-esp32c3/sys-logs",
@@ -205,46 +217,46 @@ wifi = ["dep:enumset", "dep:embassy-net-driver"]
 ## Enable Wi-Fi Enterprise Authentication Protocol (EAP) support.
 ##
 ## ⚠️ This feature is considered unstable.
-wifi-eap = ["wifi"]
+wifi-eap = ["wifi", "__has_unstable_feature_enabled"]
 
 ## Enable ESP-NOW support.
 ##
 ## ⚠️ This feature is considered unstable.
-esp-now = ["wifi"]
+esp-now = ["wifi", "__has_unstable_feature_enabled"]
 
 ## Enable sniffer mode support for Wi-Fi.
 ##
 ## ⚠️ This feature is considered unstable.
-sniffer = ["wifi"]
+sniffer = ["wifi", "__has_unstable_feature_enabled"]
 
 ## Enable BLE support.
 ##
 ## ⚠️ This feature is considered unstable.
-ble = ["esp-hal/__bluetooth", "dep:bt-hci"]
+ble = ["esp-hal/__bluetooth", "dep:bt-hci", "__has_unstable_feature_enabled"]
 
 ## Software controls Wi-Fi/Bluetooth coexistence.
 ## See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/kconfig-reference.html#config-esp-coex-sw-coexist-enable) for details.
 ##
 ## ⚠️ This feature is considered unstable.
-coex = []
+coex = ["__has_unstable_feature_enabled"]
 
 ## Enable Wi-Fi channel state information. See [Wi-Fi Driver](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/wifi.html#wi-fi-channel-state-information).
 ##
 ## ⚠️ This feature is considered unstable.
-csi = []
+csi = ["__has_unstable_feature_enabled"]
 
 ## Enable IEEE 802.15.4.
 ## Cannot be used together with Wi-Fi.
 ##
 ## ⚠️ This feature is considered unstable.
-ieee802154 = ["dep:byte", "dep:ieee802154"]
+ieee802154 = ["dep:byte", "dep:ieee802154", "__has_unstable_feature_enabled"]
 
 #! ### Ecosystem Feature Flags
 
 ## Provide implementations of smoltcp traits.
 ##
 ## ⚠️ This feature is considered unstable.
-smoltcp = ["dep:smoltcp"]
+smoltcp = ["dep:smoltcp", "__has_unstable_feature_enabled"]
 
 #! ### Logging Feature Flags
 ## Enable logging output using version 0.4 of the `log` crate.
@@ -278,6 +290,7 @@ defmt = [
     "heapless/defmt",
     "esp-sync/defmt",
     "esp-phy/defmt",
+    "ieee802154?/defmt",
 ]
 
 #! ### Unstable APIs
@@ -309,6 +322,7 @@ features = [
   "wifi",
   "ble",
   "coex",
+  "unstable",
   "esp-hal/default",
 ]
 default-target = "riscv32imac-unknown-none-elf"

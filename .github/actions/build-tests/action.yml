@@ -1,19 +1,37 @@
 name: Build HIL tests (composite)
 description: Checkout, install toolchains, build tests for a SoC, upload artifact
 inputs:
-  event_name:      { description: github.event_name, required: true }
-  repository:      { description: owner/repo for workflow_dispatch, required: true }
-  branch:          { description: branch/tag to checkout if no SHA, required: true }
-  soc:             { description: SoC (e.g. esp32c3), required: true }
-  rust_target:     { description: rust target triple, required: true }
-  tests:           { description: "Optional comma-separated test names", required: false, default: "" }
+  event_name:
+    description: github.event_name
+    required: true
+
+  repository:
+    description: owner/repo for workflow_dispatch
+    required: true
+
+  branch:
+    description: branch/tag to checkout if no SHA
+    required: true
+
+  soc:
+    description: SoC (e.g. esp32c3)
+    required: true
+
+  rust_target:
+    description: rust target triple
+    required: true
+
+  tests:
+    description: Optional comma-separated test names
+    required: false
+    default: ""
 
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       if: ${{ inputs.event_name == 'merge_group' }}
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       if: ${{ inputs.event_name == 'workflow_dispatch' }}
       with:
         repository: ${{ inputs.repository }}
@@ -52,7 +70,7 @@ runs:
           cargo xtask build tests ${{ inputs.soc }}
         fi
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v6
       with:
         name: tests-${{ inputs.soc }}
         path: ${{ github.workspace }}/target/tests/${{ inputs.soc }}

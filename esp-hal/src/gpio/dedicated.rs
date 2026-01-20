@@ -424,6 +424,7 @@ another core, either directly, or indirectly via a thread that is not pinned to 
 </section>
 "#
 )]
+#[doc = ""]
 /// ## Examples
 ///
 /// ```rust, no_run
@@ -528,6 +529,7 @@ another core, either directly, or indirectly via a thread that is not pinned to 
 </section>
 "#
 )]
+#[doc = ""]
 /// ## Examples
 ///
 /// ```rust, no_run
@@ -692,6 +694,7 @@ another core, either directly, or indirectly via a thread that is not pinned to 
 </section>
 "#
 )]
+#[doc = ""]
 /// ## Examples
 ///
 /// ```rust, no_run

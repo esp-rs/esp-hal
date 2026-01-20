@@ -11,15 +11,20 @@ pub(crate) mod npl;
 use alloc::{boxed::Box, collections::vec_deque::VecDeque, vec::Vec};
 use core::mem::MaybeUninit;
 
-pub use ble::ble_os_adapter_chip_specific::Config;
 pub(crate) use ble::{ble_deinit, ble_init, send_hci};
+use docsplay::Display;
 use esp_sync::NonReentrantMutex;
 
 /// An error that is returned when the configuration is invalid.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct InvalidConfigError;
+
+impl core::error::Error for InvalidConfigError {}
+
+// Expose chip-specific configuration types
+pub use ble::ble_os_adapter_chip_specific::*;
 
 #[cfg(bt_controller = "btdm")]
 use self::btdm as ble;
@@ -130,7 +135,7 @@ impl HciOutCollector {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// Represents a received BLE packet.
 #[instability::unstable]
 pub struct ReceivedPacket {

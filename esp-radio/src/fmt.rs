@@ -1,7 +1,9 @@
 #![macro_use]
 #![allow(unused_macros)]
 
-use core::fmt::{Debug, Display, LowerHex};
+use core::fmt::{Debug, LowerHex};
+
+use docsplay::Display;
 
 #[collapse_debuginfo(yes)]
 macro_rules! assert {
@@ -272,8 +274,12 @@ macro_rules! unwrap {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Display, Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+/// None Error.
 pub struct NoneError;
+
+impl core::error::Error for NoneError {}
 
 pub trait Try {
     type Ok;
@@ -304,15 +310,11 @@ impl<T, E> Try for Result<T, E> {
 
 /// A way to `{:x?}` format a byte slice which is compatible with `defmt`
 #[allow(unused)]
+#[derive(Display)]
+#[display("{0:#02x?}")]
 pub(crate) struct Bytes<'a>(pub &'a [u8]);
 
 impl Debug for Bytes<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:#02x?}", self.0)
-    }
-}
-
-impl Display for Bytes<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:#02x?}", self.0)
     }

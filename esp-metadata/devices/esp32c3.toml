@@ -156,7 +156,13 @@ clocks = { system_clocks = { clock_tree = [
         { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
         { name = "XTAL32K",  outputs = "XTAL32K_CLK" },
         { name = "RTC_SLOW", outputs = "RTC_SLOW_CLK" },
-    ] }
+    ] },
+
+    # System-wide peripheral clocks
+    { name = "UART_MEM_CLK", type = "mux", default = "XTAL", variants = [
+        # The actual source clock is unknown, but it also doesn't matter.
+        { name = "XTAL", outputs = "XTAL_CLK" },
+    ] },
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
@@ -207,8 +213,17 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Uhci0" },
     { name = "I2cExt0" },
     { name = "Spi2" },
-    { name = "Uart1" },
-    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
+    { name = "Uart1", clocks = "Uart0" },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true, clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [ # UART_SCLK
+            { name = "APB",      outputs = "APB_CLK" },
+            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
+            { name = "XTAL",     outputs = "XTAL_CLK" },
+        ] },
+        { name = "MEM_CLOCK", type = "mux", default = "MEM", variants = [
+            { name = "MEM", outputs = "UART_MEM_CLK" },
+        ] },
+    ] },
     #{ name = "Spi01" },
     
     # Radio clocks not modeled here.
@@ -243,24 +258,24 @@ gpio_function = 1
 constant_0_input = 0x1f
 constant_1_input = 0x1e
 pins = [
-    { pin =  0,                                           analog = { 1 = "ADC1_CH0" }, rtc = { 0 = "RTC_GPIO0" } },
-    { pin =  1,                                           analog = { 1 = "ADC1_CH1" }, rtc = { 0 = "RTC_GPIO1" } },
-    { pin =  2, functions = { 2 = "FSPIQ" },              analog = { 1 = "ADC1_CH2" }, rtc = { 0 = "RTC_GPIO2" } },
-    { pin =  3,                                           analog = { 1 = "ADC1_CH3" }, rtc = { 0 = "RTC_GPIO3" } },
-    { pin =  4, functions = { 0 = "MTMS", 2 = "FSPIHD" }, analog = { 1 = "ADC1_CH4" }, rtc = { 0 = "RTC_GPIO4" } },
-    { pin =  5, functions = { 0 = "MTDI", 2 = "FSPIWP" }, analog = { 1 = "ADC2_CH0" }, rtc = { 0 = "RTC_GPIO5" } },
+    { pin =  0,                                                           analog = { 1 = "ADC1_CH0" }, rtc = { 0 = "RTC_GPIO0" } },
+    { pin =  1,                                                           analog = { 1 = "ADC1_CH1" }, rtc = { 0 = "RTC_GPIO1" } },
+    { pin =  2, functions = { 2 = "FSPIQ" }, limitations = ["strapping"], analog = { 1 = "ADC1_CH2" }, rtc = { 0 = "RTC_GPIO2" } },
+    { pin =  3,                                                           analog = { 1 = "ADC1_CH3" }, rtc = { 0 = "RTC_GPIO3" } },
+    { pin =  4, functions = { 0 = "MTMS", 2 = "FSPIHD"  },                analog = { 1 = "ADC1_CH4" }, rtc = { 0 = "RTC_GPIO4" } },
+    { pin =  5, functions = { 0 = "MTDI", 2 = "FSPIWP"  },                analog = { 1 = "ADC2_CH0" }, rtc = { 0 = "RTC_GPIO5" } },
     { pin =  6, functions = { 0 = "MTCK", 2 = "FSPICLK" } },
-    { pin =  7, functions = { 0 = "MTDO", 2 = "FSPID" } },
-    { pin =  8 },
-    { pin =  9 },
+    { pin =  7, functions = { 0 = "MTDO", 2 = "FSPID"   } },
+    { pin =  8,                                            limitations = ["strapping"] },
+    { pin =  9,                                            limitations = ["strapping"] },
     { pin = 10, functions = { 2 = "FSPICS0" } },
-    { pin = 11, limited = true },
-    { pin = 12, functions = { 0 = "SPIHD" }, limited = true },
-    { pin = 13, functions = { 0 = "SPIWP" }, limited = true },
-    { pin = 14, functions = { 0 = "SPICS0" }, limited = true },
-    { pin = 15, functions = { 0 = "SPICLK" }, limited = true },
-    { pin = 16, functions = { 0 = "SPID" }, limited = true },
-    { pin = 17, functions = { 0 = "SPIQ" }, limited = true },
+    { pin = 11,                               limitations = ["spi_flash"] },
+    { pin = 12, functions = { 0 = "SPIHD" },  limitations = ["spi_flash"] },
+    { pin = 13, functions = { 0 = "SPIWP" },  limitations = ["spi_flash"] },
+    { pin = 14, functions = { 0 = "SPICS0" }, limitations = ["spi_flash"] },
+    { pin = 15, functions = { 0 = "SPICLK" }, limitations = ["spi_flash"] },
+    { pin = 16, functions = { 0 = "SPID" },   limitations = ["spi_flash"] },
+    { pin = 17, functions = { 0 = "SPIQ" },   limitations = ["spi_flash"] },
     { pin = 18,                          analog = { 0 = "USB_DM" } },
     { pin = 19,                          analog = { 0 = "USB_DP" } },
     { pin = 20, functions = { 0 = "U0RXD" } },
@@ -483,6 +498,11 @@ support_status = "not_supported"
 support_status = "partial"
 apb_cycle_wait_num = 16 # TODO
 
+[device.sleep]
+support_status = "partial"
+light_sleep = true
+deep_sleep = true
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
@@ -498,7 +518,6 @@ apb_cycle_wait_num = 16 # TODO
 [device.dma]
 [device.io_mux]
 [device.temp_sensor]
-[device.sleep]
 [device.systimer]
 
 ## Radio

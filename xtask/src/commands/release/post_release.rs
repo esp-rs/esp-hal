@@ -15,6 +15,8 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
     let plan = Plan::from_path(&plan_path)
         .with_context(|| format!("Failed to read release plan from {}", plan_path.display()))?;
 
+    run_baseline_workflow(&plan)?;
+
     // Process packages from the plan that have migration guides
     for package_plan in plan.packages.iter() {
         let package = package_plan.package;
@@ -234,5 +236,62 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
         println!("{open_pr_url}");
     }
 
+    Ok(())
+}
+
+fn run_baseline_workflow(plan: &Plan) -> Result<()> {
+    // Only include packages where semver_checked is true
+    let checked_packages: Vec<(&str, &str)> = plan
+        .packages
+        .iter()
+        .filter(|p| p.semver_checked)
+        .map(|p| (p.package.as_ref(), p.tag_name.as_str()))
+        .collect();
+
+    if checked_packages.is_empty() {
+        log::info!("No packages with semver_checked = true. Skipping workflow dispatch.");
+        return Ok(());
+    }
+
+    // Check if GitHub CLI is available
+    if Command::new("gh").arg("--version").output().is_err() {
+        log::error!("GitHub CLI (gh) not available. Skipping workflow dispatch.");
+        return Ok(());
+    }
+
+    log::info!("Triggering API Baseline Generation workflow...");
+
+    for (package_name, tag_name) in checked_packages {
+        println!(
+            "Triggering workflow for package: {}, tag: {}",
+            package_name, tag_name
+        );
+
+        // Use a main branch for `-r` so the workflow file with the expected inputs is used;
+        // the target tag is passed via `tag_name` input for checkout.
+        let status = Command::new("gh")
+            .arg("workflow")
+            .arg("run")
+            .arg("api-baseline-generation.yml")
+            .arg("-R")
+            .arg("esp-rs/esp-hal")
+            .arg("-r")
+            .arg("main")
+            .arg("-f")
+            .arg(format!("package_name={}", package_name))
+            .arg("-f")
+            .arg(format!("tag_name={}", tag_name))
+            .status()
+            .context("Failed to run gh workflow")?;
+
+        if !status.success() {
+            anyhow::bail!(
+                "gh workflow run failed for package `{}` — manual trigger required",
+                package_name
+            );
+        }
+    }
+
+    log::info!("All workflows triggered successfully.");
     Ok(())
 }

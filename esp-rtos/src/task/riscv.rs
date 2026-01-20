@@ -4,9 +4,12 @@ use core::ffi::c_void;
 use esp_hal::{interrupt::software::SoftwareInterrupt, riscv::register, system::Cpu};
 use portable_atomic::Ordering;
 
-use crate::SCHEDULER;
 #[cfg(feature = "rtos-trace")]
 use crate::TraceEvents;
+use crate::{
+    SCHEDULER,
+    task::{IdleFn, Task},
+};
 
 unsafe extern "C" {
     fn sys_switch();
@@ -109,16 +112,25 @@ impl CpuContext {
     }
 }
 
-pub(crate) extern "C" fn idle_hook() -> ! {
-    loop {
-        unsafe { core::arch::asm!("wfi") };
-    }
-}
-
-pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext, hook_fn: super::IdleFn) {
+pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext, hook_fn: IdleFn) {
     // Point idle context PC at the assembly that calls the idle hook. We need a new stack
     // frame for the idle task on the main stack.
     idle_context.pc = hook_fn as usize;
+
+    // The idle context has no thread-local data
+    idle_context.tp = 0;
+}
+
+#[inline(always)]
+pub(crate) fn read_thread_pointer() -> *mut Task {
+    let tp: *mut Task;
+    unsafe { core::arch::asm!("c.mv {0}, tp", out(reg) tp, options(nostack)) };
+    tp
+}
+
+#[inline(always)]
+pub(crate) fn write_thread_pointer(task: *mut Task) {
+    unsafe { core::arch::asm!("c.mv tp, {0}", in(reg) task, options(nostack)) };
 }
 
 #[cfg(feature = "esp-radio")]

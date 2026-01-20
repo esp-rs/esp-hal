@@ -665,3 +665,49 @@ fn configure_timg1_wdt_clock_impl(
             })
         });
 }
+
+// UART0_FUNCTION_CLOCK
+
+fn enable_uart0_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
+    PCR::regs()
+        .uart(0)
+        .clk_conf()
+        .modify(|_, w| w.sclk_en().bit(en));
+}
+
+fn configure_uart0_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0FunctionClockConfig>,
+    new_selector: Uart0FunctionClockConfig,
+) {
+    PCR::regs().uart(0).clk_conf().modify(|_, w| unsafe {
+        w.sclk_sel().bits(match new_selector {
+            Uart0FunctionClockConfig::PllF80m => 1,
+            Uart0FunctionClockConfig::RcFast => 2,
+            Uart0FunctionClockConfig::Xtal => 3,
+        })
+    });
+}
+
+// UART1_FUNCTION_CLOCK
+
+fn enable_uart1_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
+    PCR::regs()
+        .uart(1)
+        .clk_conf()
+        .modify(|_, w| w.sclk_en().bit(en));
+}
+
+fn configure_uart1_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<Uart0FunctionClockConfig>,
+    new_selector: Uart0FunctionClockConfig,
+) {
+    PCR::regs().uart(1).clk_conf().modify(|_, w| unsafe {
+        w.sclk_sel().bits(match new_selector {
+            Uart0FunctionClockConfig::PllF80m => 1,
+            Uart0FunctionClockConfig::RcFast => 2,
+            Uart0FunctionClockConfig::Xtal => 3,
+        })
+    });
+}

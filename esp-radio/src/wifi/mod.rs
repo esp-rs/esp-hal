@@ -5,6 +5,7 @@
 use alloc::{collections::vec_deque::VecDeque, vec::Vec};
 use core::{fmt::Debug, marker::PhantomData, mem::MaybeUninit, ptr::addr_of, task::Poll};
 
+use docsplay::Display;
 use enumset::{EnumSet, EnumSetType};
 use esp_config::esp_config_int;
 use esp_hal::{asynch::AtomicWaker, system::Cpu};
@@ -22,12 +23,12 @@ pub(crate) use self::os_adapter::*;
 use self::sniffer::Sniffer;
 #[cfg(feature = "wifi-eap")]
 use self::sta::eap::EapStationConfig;
-pub use self::state::*;
 use self::{
     ap::{AccessPointConfig, AccessPointInfo, convert_ap_info},
     private::PacketBuffer,
     scan::{FreeApListOnDrop, ScanConfig, ScanResults, ScanTypeConfig},
     sta::StationConfig,
+    state::*,
 };
 use crate::{
     InitializationError,
@@ -40,7 +41,6 @@ use crate::{
         include::{self, *},
     },
 };
-
 pub mod ap;
 #[cfg(all(feature = "csi", feature = "unstable"))]
 pub mod csi;
@@ -58,10 +58,10 @@ mod internal;
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
 
 /// Supported Wi-Fi authentication methods.
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, PartialOrd, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub enum AuthMethod {
+pub enum AuthenticationMethod {
     /// No authentication (open network).
     None,
 
@@ -96,14 +96,14 @@ pub enum AuthMethod {
     /// WPA3 Enterprise Suite B 192-bit Encryption
     Wpa3EntSuiteB192Bit,
 
-    /// This authentication mode will yield same result as [AuthMethod::Wpa3Personal] and is not
-    /// recommended to be used. It will be deprecated in future, please use
-    /// [AuthMethod::Wpa3Personal] instead.
+    /// This authentication mode will yield same result as [AuthenticationMethod::Wpa3Personal] and
+    /// is not recommended to be used. It will be deprecated in future, please use
+    /// [AuthenticationMethod::Wpa3Personal] instead.
     Wpa3ExtPsk,
 
-    /// This authentication mode will yield same result as [AuthMethod::Wpa3Personal] and is not
-    /// recommended to be used. It will be deprecated in future, please use
-    /// [AuthMethod::Wpa3Personal] instead.
+    /// This authentication mode will yield same result as [AuthenticationMethod::Wpa3Personal] and
+    /// is not recommended to be used. It will be deprecated in future, please use
+    /// [AuthenticationMethod::Wpa3Personal] instead.
     Wpa3ExtPskMixed,
 
     /// WiFi DPP / Wi-Fi Easy Connect
@@ -120,7 +120,7 @@ pub enum AuthMethod {
 }
 
 /// Supported Wi-Fi protocols.
-#[derive(Debug, Default, PartialOrd, EnumSetType)]
+#[derive(Debug, Default, PartialOrd, Hash, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum Protocol {
@@ -162,7 +162,7 @@ impl Protocol {
 }
 
 /// Secondary Wi-Fi channels.
-#[derive(Clone, Debug, Default, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, PartialOrd, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SecondaryChannel {
     // TODO: Need to extend that for 5GHz
@@ -177,50 +177,19 @@ pub enum SecondaryChannel {
     Below,
 }
 
-/// Access point country information.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Country([u8; 2]);
-
-impl Country {
-    fn try_from_c(info: &wifi_country_t) -> Option<Self> {
-        // Find the null terminator or end of array
-        let cc_len = info
-            .cc
-            .iter()
-            .position(|&b| b == 0)
-            .unwrap_or(info.cc.len());
-
-        if cc_len < 2 {
-            return None;
+impl SecondaryChannel {
+    fn from_raw(raw: u32) -> Self {
+        match raw {
+            0 => SecondaryChannel::None,
+            1 => SecondaryChannel::Above,
+            2 => SecondaryChannel::Below,
+            _ => panic!("Invalid secondary channel value: {}", raw),
         }
-
-        // Validate that we have at least 2 valid ASCII characters
-        let cc_slice = &info.cc[..cc_len.min(2)];
-        if cc_slice.iter().all(|&b| b.is_ascii_uppercase()) {
-            Some(Self([cc_slice[0], cc_slice[1]]))
-        } else {
-            None
-        }
-    }
-
-    /// Returns the country code as a string slice.
-    pub fn country_code(&self) -> &str {
-        unsafe {
-            // SAFETY: we have verified in the constructor that the bytes are upper-case ASCII.
-            core::str::from_utf8_unchecked(&self.0)
-        }
-    }
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for Country {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        self.country_code().format(fmt)
     }
 }
 
 /// Introduces Wi-Fi configuration options.
-#[derive(EnumSetType, Debug, PartialOrd)]
+#[derive(EnumSetType, Debug, PartialOrd, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum Capability {
@@ -238,7 +207,7 @@ pub enum Capability {
 
 /// Configuration of Wi-Fi operation mode.
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ModeConfig {
@@ -280,74 +249,93 @@ impl ModeConfig {
     }
 }
 
-trait AuthMethodExt {
-    fn to_raw(&self) -> wifi_auth_mode_t;
-    fn from_raw(raw: wifi_auth_mode_t) -> Self;
-}
-
-impl AuthMethodExt for AuthMethod {
-    fn to_raw(&self) -> wifi_auth_mode_t {
+impl AuthenticationMethod {
+    fn to_raw(self) -> wifi_auth_mode_t {
         match self {
-            AuthMethod::None => include::wifi_auth_mode_t_WIFI_AUTH_OPEN,
-            AuthMethod::Wep => include::wifi_auth_mode_t_WIFI_AUTH_WEP,
-            AuthMethod::Wpa => include::wifi_auth_mode_t_WIFI_AUTH_WPA_PSK,
-            AuthMethod::Wpa2Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA2_PSK,
-            AuthMethod::WpaWpa2Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA_WPA2_PSK,
-            AuthMethod::Wpa2Enterprise => include::wifi_auth_mode_t_WIFI_AUTH_WPA2_ENTERPRISE,
-            AuthMethod::Wpa3Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK,
-            AuthMethod::Wpa2Wpa3Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK,
-            AuthMethod::WapiPersonal => include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK,
-            AuthMethod::Owe => include::wifi_auth_mode_t_WIFI_AUTH_OWE,
-            AuthMethod::Wpa3EntSuiteB192Bit => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192,
-            AuthMethod::Wpa3ExtPsk => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK,
-            AuthMethod::Wpa3ExtPskMixed => {
+            AuthenticationMethod::None => include::wifi_auth_mode_t_WIFI_AUTH_OPEN,
+            AuthenticationMethod::Wep => include::wifi_auth_mode_t_WIFI_AUTH_WEP,
+            AuthenticationMethod::Wpa => include::wifi_auth_mode_t_WIFI_AUTH_WPA_PSK,
+            AuthenticationMethod::Wpa2Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA2_PSK,
+            AuthenticationMethod::WpaWpa2Personal => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA_WPA2_PSK
+            }
+            AuthenticationMethod::Wpa2Enterprise => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA2_ENTERPRISE
+            }
+            AuthenticationMethod::Wpa3Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK,
+            AuthenticationMethod::Wpa2Wpa3Personal => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK
+            }
+            AuthenticationMethod::WapiPersonal => include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK,
+            AuthenticationMethod::Owe => include::wifi_auth_mode_t_WIFI_AUTH_OWE,
+            AuthenticationMethod::Wpa3EntSuiteB192Bit => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192
+            }
+            AuthenticationMethod::Wpa3ExtPsk => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK,
+            AuthenticationMethod::Wpa3ExtPskMixed => {
                 include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK_MIXED_MODE
             }
-            AuthMethod::Dpp => include::wifi_auth_mode_t_WIFI_AUTH_DPP,
-            AuthMethod::Wpa3Enterprise => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENTERPRISE,
-            AuthMethod::Wpa2Wpa3Enterprise => {
+            AuthenticationMethod::Dpp => include::wifi_auth_mode_t_WIFI_AUTH_DPP,
+            AuthenticationMethod::Wpa3Enterprise => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENTERPRISE
+            }
+            AuthenticationMethod::Wpa2Wpa3Enterprise => {
                 include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_ENTERPRISE
             }
-            AuthMethod::WpaEnterprise => include::wifi_auth_mode_t_WIFI_AUTH_WPA_ENTERPRISE,
+            AuthenticationMethod::WpaEnterprise => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA_ENTERPRISE
+            }
         }
     }
 
     fn from_raw(raw: wifi_auth_mode_t) -> Self {
         match raw {
-            include::wifi_auth_mode_t_WIFI_AUTH_OPEN => AuthMethod::None,
-            include::wifi_auth_mode_t_WIFI_AUTH_WEP => AuthMethod::Wep,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA_PSK => AuthMethod::Wpa,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_PSK => AuthMethod::Wpa2Personal,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA_WPA2_PSK => AuthMethod::WpaWpa2Personal,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_ENTERPRISE => AuthMethod::Wpa2Enterprise,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK => AuthMethod::Wpa3Personal,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK => AuthMethod::Wpa2Wpa3Personal,
-            include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK => AuthMethod::WapiPersonal,
-            include::wifi_auth_mode_t_WIFI_AUTH_OWE => AuthMethod::Owe,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192 => AuthMethod::Wpa3EntSuiteB192Bit,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK => AuthMethod::Wpa3ExtPsk,
+            include::wifi_auth_mode_t_WIFI_AUTH_OPEN => AuthenticationMethod::None,
+            include::wifi_auth_mode_t_WIFI_AUTH_WEP => AuthenticationMethod::Wep,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA_PSK => AuthenticationMethod::Wpa,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_PSK => AuthenticationMethod::Wpa2Personal,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA_WPA2_PSK => {
+                AuthenticationMethod::WpaWpa2Personal
+            }
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_ENTERPRISE => {
+                AuthenticationMethod::Wpa2Enterprise
+            }
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK => AuthenticationMethod::Wpa3Personal,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK => {
+                AuthenticationMethod::Wpa2Wpa3Personal
+            }
+            include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK => AuthenticationMethod::WapiPersonal,
+            include::wifi_auth_mode_t_WIFI_AUTH_OWE => AuthenticationMethod::Owe,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192 => {
+                AuthenticationMethod::Wpa3EntSuiteB192Bit
+            }
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK => AuthenticationMethod::Wpa3ExtPsk,
             include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK_MIXED_MODE => {
-                AuthMethod::Wpa3ExtPskMixed
+                AuthenticationMethod::Wpa3ExtPskMixed
             }
-            include::wifi_auth_mode_t_WIFI_AUTH_DPP => AuthMethod::Dpp,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENTERPRISE => AuthMethod::Wpa3Enterprise,
+            include::wifi_auth_mode_t_WIFI_AUTH_DPP => AuthenticationMethod::Dpp,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENTERPRISE => {
+                AuthenticationMethod::Wpa3Enterprise
+            }
             include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_ENTERPRISE => {
-                AuthMethod::Wpa2Wpa3Enterprise
+                AuthenticationMethod::Wpa2Wpa3Enterprise
             }
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA_ENTERPRISE => AuthMethod::WpaEnterprise,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA_ENTERPRISE => {
+                AuthenticationMethod::WpaEnterprise
+            }
             // we const-assert we know all the auth-methods the wifi driver knows and it shouldn't
             // return anything else.
             //
             // In fact from observation the drivers will return
             // `wifi_auth_mode_t_WIFI_AUTH_OPEN` if the method is unsupported (e.g. any WPA3 in our
             // case, since the supplicant isn't compiled to support it)
-            _ => AuthMethod::None,
+            _ => AuthenticationMethod::None,
         }
     }
 }
 
 /// Wi-Fi Mode (Station and/or AccessPoint).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum WifiMode {
@@ -440,7 +428,7 @@ pub(crate) static DATA_QUEUE_RX_STA: NonReentrantMutex<VecDeque<PacketBuffer>> =
     NonReentrantMutex::new(VecDeque::new());
 
 /// Common errors.
-#[derive(Debug, Clone, Copy)]
+#[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum WifiError {
@@ -456,73 +444,73 @@ pub enum WifiError {
     /// Passed arguments are invalid.
     InvalidArguments,
 
-    /// Generic failure - not further specified
+    /// Generic failure - not further specified.
     Failed,
 
-    /// Out of memory
+    /// Out of memory.
     OutOfMemory,
 
-    /// Wi-Fi driver was not initialized
+    /// Wi-Fi driver was not initialized or not initialized for `Wi-Fi` operations.
     NotInitialized,
 
-    /// Wi-Fi driver was not started by [esp_wifi_start]
+    /// Wi-Fi driver was not started by [esp_wifi_start].
     NotStarted,
 
-    /// Wi-Fi driver was not stopped by [esp_wifi_stop]
+    /// Wi-Fi driver was not stopped by [esp_wifi_stop].
     NotStopped,
 
-    /// Wi-Fi interface error
+    /// Wi-Fi interface error.
     Interface,
 
-    /// Wi-Fi mode error
+    /// Wi-Fi mode error.
     Mode,
 
-    /// Wi-Fi internal state error
+    /// Wi-Fi internal state error.
     State,
 
-    /// Wi-Fi internal control block of station or soft-AccessPoint error
+    /// Wi-Fi internal control block of station or soft-AccessPoint error.
     ControlBlock,
 
-    /// Wi-Fi internal NVS module error
+    /// Wi-Fi internal NVS module error.
     Nvs,
 
-    /// MAC address is invalid
+    /// MAC address is invalid.
     InvalidMac,
 
-    /// SSID is invalid
+    /// SSID is invalid.
     InvalidSsid,
 
-    /// Password is invalid
+    /// Password is invalid.
     InvalidPassword,
 
-    /// Timeout error
+    /// Timeout error.
     Timeout,
 
-    /// Wi-Fi is in sleep state (RF closed) and wakeup failed
+    /// Wi-Fi is in sleep state (RF closed) and wakeup failed.
     WakeFailed,
 
-    /// The operation would block
+    /// The operation would block.
     WouldBlock,
 
-    /// Station still in disconnect status
+    /// Station still in disconnect status.
     NotConnected,
 
-    /// Failed to post the event to Wi-Fi task
+    /// Failed to post the event to Wi-Fi task.
     PostFail,
 
-    /// Invalid Wi-Fi state when init/deinit is called
+    /// Invalid Wi-Fi state when init/deinit is called.
     InvalidInitState,
 
-    /// Returned when Wi-Fi is stopping
+    /// Returned when Wi-Fi is stopping.
     StopState,
 
-    /// The Wi-Fi connection is not associated
+    /// The Wi-Fi connection is not associated.
     NotAssociated,
 
-    /// The Wi-Fi TX is disallowed
+    /// The Wi-Fi TX is disallowed.
     TxDisallowed,
 
-    /// An unknown error was reported by the Wi-Fi driver.
+    /// An unknown error was reported by the Wi-Fi driver: {0}.
     // This is here just in case we encounter an unmapped error - there doesn't seem to be a
     // definitive and exhausting list of errors we should expect and panicking because of an
     // unmapped error.
@@ -573,64 +561,6 @@ impl WifiError {
     }
 }
 
-/// Events generated by the Wi-Fi driver.
-impl core::fmt::Display for WifiError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            WifiError::Disconnected => write!(f, "Wi-Fi disconnected."),
-            WifiError::UnknownWifiMode => write!(f, "Unknown Wi-Fi mode."),
-            WifiError::Unsupported => write!(f, "Unsupported operation or mode."),
-            WifiError::InvalidArguments => write!(f, "Invalid arguments."),
-            WifiError::Failed => write!(f, "Generic unspecified failure."),
-            WifiError::NotInitialized => write!(
-                f,
-                "Wi-Fi module is not initialized or not initialized for `Wi-Fi` operations."
-            ),
-            WifiError::OutOfMemory => write!(f, "Out of memory."),
-            WifiError::NotStarted => write!(f, "Wi-Fi driver was not started."),
-            WifiError::NotStopped => write!(f, "Wi-Fi driver was not stopped."),
-            WifiError::Interface => write!(f, "Wi-Fi interface error."),
-            WifiError::Mode => write!(f, "Wi-Fi mode error."),
-            WifiError::State => write!(f, "Wi-Fi internal state error."),
-            WifiError::ControlBlock => write!(
-                f,
-                "Wi-Fi internal control block of station or soft-AccessPoint error."
-            ),
-            WifiError::Nvs => write!(f, "Wi-Fi internal NVS module error."),
-            WifiError::InvalidMac => write!(f, "MAC address is invalid."),
-            WifiError::InvalidSsid => write!(f, "SSID is invalid."),
-            WifiError::InvalidPassword => write!(f, "Password is invalid."),
-            WifiError::Timeout => write!(f, "Timeout error."),
-            WifiError::WakeFailed => {
-                write!(f, "Wi-Fi is in sleep state (RF closed) and wakeup failed.")
-            }
-            WifiError::WouldBlock => write!(f, "The operation would block."),
-            WifiError::NotConnected => write!(f, "Station still in disconnect status."),
-            WifiError::PostFail => write!(f, "Failed to post the event to Wi-Fi task."),
-            WifiError::InvalidInitState => {
-                write!(f, "Invalid Wi-Fi state when init/deinit is called.")
-            }
-            WifiError::StopState => write!(f, "Returned when Wi-Fi is stopping."),
-            WifiError::NotAssociated => write!(f, "The Wi-Fi connection is not associated."),
-            WifiError::TxDisallowed => write!(f, "The Wi-Fi TX is disallowed."),
-            WifiError::Unknown(_) => {
-                write!(f, "An unknown error was reported by the Wi-Fi driver.")
-            }
-            WifiError::WrongClockConfig => {
-                write!(f, "The current CPU clock frequency is too low")
-            }
-            WifiError::SchedulerNotInitialized => {
-                write!(f, "The scheduler is not initialized")
-            }
-            #[cfg(esp32)]
-            WifiError::Adc2IsUsed => write!(
-                f,
-                "ADC2 cannot be used with `radio` functionality on `esp32`"
-            ),
-        }
-    }
-}
-
 impl core::error::Error for WifiError {}
 
 impl From<InitializationError> for WifiError {
@@ -646,7 +576,7 @@ impl From<InitializationError> for WifiError {
 }
 
 /// Events generated by the Wi-Fi driver.
-#[derive(Debug, FromPrimitive, EnumSetType)]
+#[derive(Debug, Hash, FromPrimitive, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 #[repr(i32)]
@@ -1039,6 +969,7 @@ mod private {
 
 /// Wi-Fi device operational modes.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 enum WifiDeviceMode {
     /// Station mode.
     Station,
@@ -1170,10 +1101,30 @@ impl WifiDevice<'_> {
     }
 }
 
+/// Wi-Fi bandwidth options.
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(
+    clippy::enum_variant_names,
+    reason = "MHz suffix indicates physical unit."
+)]
+pub enum Bandwidth {
+    /// 20 MHz bandwidth.
+    _20MHz,
+    /// 40 MHz bandwidth.
+    _40MHz,
+    /// 80 MHz bandwidth.
+    _80MHz,
+    /// 160 MHz bandwidth.
+    _160MHz,
+    /// 80+80 MHz bandwidth.
+    _80_80MHz,
+}
+
 /// The radio metadata header of the received packet, which is the common header
 /// at the beginning of all RX callback buffers in promiscuous mode.
 #[cfg(not(esp32c6))]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
 pub struct RxControlInfo {
@@ -1231,7 +1182,7 @@ pub struct RxControlInfo {
 /// The radio metadata header of the received packet, which is the common header
 /// at the beginning of all RX callback buffers in promiscuous mode.
 #[cfg(esp32c6)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
 pub struct RxControlInfo {
@@ -1378,7 +1329,7 @@ impl Device for WifiDevice<'_> {
 }
 
 #[doc(hidden)]
-#[derive(Debug)]
+// These token doesn't need the debug trait, they aren't needed publicly.
 pub struct WifiRxToken {
     mode: WifiDeviceMode,
 }
@@ -1422,7 +1373,7 @@ impl RxToken for WifiRxToken {
 }
 
 #[doc(hidden)]
-#[derive(Debug)]
+// These token doesn't need the debug trait, they aren't needed publicly.
 pub struct WifiTxToken {
     mode: WifiDeviceMode,
 }
@@ -1599,7 +1550,7 @@ pub(crate) mod embassy {
 
 /// Power saving mode settings for the modem.
 #[non_exhaustive]
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PowerSaveMode {
     /// No power saving.
@@ -1685,6 +1636,16 @@ impl OperatingClass {
             OperatingClass::Repr(code) => code,
         }
     }
+
+    fn from_code(code: u8) -> Option<Self> {
+        match code {
+            b' ' => Some(OperatingClass::AllEnvironments),
+            b'O' => Some(OperatingClass::Outdoors),
+            b'I' => Some(OperatingClass::Indoors),
+            b'X' => Some(OperatingClass::NonCountryEntity),
+            code => Some(OperatingClass::Repr(code)),
+        }
+    }
 }
 
 #[procmacros::doc_replace]
@@ -1742,10 +1703,20 @@ impl CountryInfo {
             policy: wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
         }
     }
+
+    fn try_from_c(info: &wifi_country_t) -> Option<Self> {
+        let cc = &info.cc;
+        let operating_class = OperatingClass::from_code(cc[2])?;
+
+        Some(Self {
+            country: [cc[0], cc[1]],
+            operating_class,
+        })
+    }
 }
 
 /// Wi-Fi configuration.
-#[derive(Clone, Copy, BuilderLite, Debug)]
+#[derive(Clone, Copy, BuilderLite, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
     /// Power save mode.
@@ -1995,6 +1966,9 @@ impl Drop for WifiController<'_> {
             warn!("Failed to cleanly deinit wifi: {:?}", e);
         }
 
+        set_access_point_state(WifiAccessPointState::Uninitialized);
+        set_station_state(WifiStationState::Uninitialized);
+
         esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
             esp_hal::Internal::conjure()
         });
@@ -2116,6 +2090,9 @@ impl WifiController<'_> {
     /// This method is not blocking. To check if the controller has started, use the
     /// [`Self::is_started`] method.
     pub fn start(&mut self) -> Result<(), WifiError> {
+        set_access_point_state(WifiAccessPointState::Starting);
+        set_station_state(WifiStationState::Starting);
+
         unsafe {
             esp_wifi_result!(esp_wifi_start())?;
 
@@ -2285,19 +2262,104 @@ impl WifiController<'_> {
     #[instability::unstable]
     pub fn set_mode(&mut self, mode: WifiMode) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode.into()) })?;
+
+        Ok(())
+    }
+
+    /// Sets the Wi-Fi channel bandwidth for the currently active interface(s).
+    ///
+    /// If the device is operating in station mode, the bandwidth is applied to the
+    /// Station interface. If operating in access point mode, it is applied to the Access Point
+    /// interface. In Station+Access Point mode, the bandwidth is set for both interfaces.
+    #[instability::unstable]
+    pub fn set_bandwidth(&mut self, bandwidth: Bandwidth) -> Result<(), WifiError> {
+        let mode = self.mode()?;
+        if mode.is_station() {
+            esp_wifi_result!(unsafe {
+                esp_wifi_set_bandwidth(wifi_interface_t_WIFI_IF_STA, bandwidth as u32)
+            })?;
+        }
+        if mode.is_access_point() {
+            esp_wifi_result!(unsafe {
+                esp_wifi_set_bandwidth(wifi_interface_t_WIFI_IF_AP, bandwidth as u32)
+            })?;
+        }
+
+        Ok(())
+    }
+
+    /// Returns the Wi-Fi channel bandwidth of the active interface.
+    ///
+    /// If the device is operating in station mode, the bandwidth of the Station
+    /// interface is returned. If operating in access point mode, the bandwidth
+    /// of the Access Point interface is returned. In Station+Access Point mode, the bandwidth of
+    /// the Access Point interface is returned.
+    #[instability::unstable]
+    pub fn bandwidth(&self) -> Result<Bandwidth, WifiError> {
+        let mut bw = 0;
+
+        let mode = self.mode()?;
+        if mode.is_station() {
+            esp_wifi_result!(unsafe {
+                esp_wifi_get_bandwidth(wifi_interface_t_WIFI_IF_STA, &mut bw)
+            })?;
+        }
+        if mode.is_access_point() {
+            esp_wifi_result!(unsafe {
+                esp_wifi_get_bandwidth(wifi_interface_t_WIFI_IF_AP, &mut bw)
+            })?;
+        }
+
+        match bw {
+            1 => Ok(Bandwidth::_20MHz),
+            2 => Ok(Bandwidth::_40MHz),
+            3 => Ok(Bandwidth::_80MHz),
+            4 => Ok(Bandwidth::_160MHz),
+            5 => Ok(Bandwidth::_80_80MHz),
+            _ => panic!("Invalid bandwidth value: {}", bw),
+        }
+    }
+
+    /// Returns the current Wi-Fi channel configuration.
+    #[instability::unstable]
+    pub fn channel(&self) -> Result<(u8, SecondaryChannel), WifiError> {
+        let mut primary = 0;
+        let mut secondary = 0;
+
+        esp_wifi_result!(unsafe { esp_wifi_get_channel(&mut primary, &mut secondary) })?;
+
+        Ok((primary, SecondaryChannel::from_raw(secondary)))
+    }
+
+    /// Sets the primary and secondary Wi-Fi channel.
+    #[instability::unstable]
+    pub fn set_channel(
+        &mut self,
+        primary: u8,
+        secondary: SecondaryChannel,
+    ) -> Result<(), WifiError> {
+        esp_wifi_result!(unsafe { esp_wifi_set_channel(primary, secondary as u32) })?;
+
         Ok(())
     }
 
     fn stop_impl(&mut self) -> Result<(), WifiError> {
+        set_access_point_state(WifiAccessPointState::Stopping);
+        set_station_state(WifiStationState::Stopping);
+
         esp_wifi_result!(unsafe { esp_wifi_stop() })
     }
 
     fn connect_impl(&mut self) -> Result<(), WifiError> {
+        set_station_state(WifiStationState::Connecting);
+
         // TODO: implement ROAMING
         esp_wifi_result!(unsafe { esp_wifi_connect_internal() })
     }
 
     fn disconnect_impl(&mut self) -> Result<(), WifiError> {
+        set_station_state(WifiStationState::Disconnecting);
+
         // TODO: implement ROAMING
         esp_wifi_result!(unsafe { esp_wifi_disconnect_internal() })
     }
@@ -2410,9 +2472,6 @@ impl WifiController<'_> {
 
         self.wait_for_all_events(events, false).await;
 
-        reset_access_point_state();
-        reset_station_state();
-
         Ok(())
     }
 
@@ -2523,7 +2582,7 @@ impl WifiController<'_> {
             },
         };
 
-        if config.auth_method == AuthMethod::None && !config.password.is_empty() {
+        if config.auth_method == AuthenticationMethod::None && !config.password.is_empty() {
             return Err(WifiError::InvalidArguments);
         }
 
@@ -2569,7 +2628,7 @@ impl WifiController<'_> {
             },
         };
 
-        if config.auth_method == AuthMethod::None && !config.password.is_empty() {
+        if config.auth_method == AuthenticationMethod::None && !config.password.is_empty() {
             return Err(WifiError::InvalidArguments);
         }
 

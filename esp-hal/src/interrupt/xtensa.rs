@@ -291,6 +291,16 @@ pub(crate) unsafe fn change_current_runlevel(level: Priority) -> Priority {
     unwrap!(Priority::try_from(prev_interrupt_priority))
 }
 
+/// Wait for an interrupt to occur.
+///
+/// This function causes the current CPU core to execute its Wait For Interrupt
+/// (WFI or equivalent) instruction. After executing this function, the CPU core
+/// will stop execution until an interrupt occurs.
+#[inline(always)]
+pub fn wait_for_interrupt() {
+    unsafe { core::arch::asm!("waiti 0") };
+}
+
 mod vectored {
     use super::*;
 

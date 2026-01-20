@@ -172,8 +172,14 @@ clocks = { system_clocks = { clock_tree = [
     # {{peripheral}} is derived automatically (e.g. SpiDma -> spi_dma)
 ], peripheral_clocks = [
     # This list is based on TRM (v1.5) - 7.4.1 PCR Register Summary
-    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
-    { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
+    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true, clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [ # UART_SCLK
+            { name = "PLL_F48M", outputs = "PLL_F48M_CLK" },
+            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
+            { name = "XTAL",     outputs = "XTAL_CLK" },
+        ] },
+    ] },
+    { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, clocks = "Uart0" },
     { name = "I2cExt0", template_params = { peripheral = "i2c0" } },
     { name = "I2cExt1", template_params = { peripheral = "i2c1" } },
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
@@ -269,10 +275,10 @@ pins = [
     { pin =  3, functions = { 0 = "MTDI", 2 = "FSPIHD"  }, analog = { 1 = "ADC1_CH2" } },
     { pin =  4, functions = { 0 = "MTCK", 2 = "FSPICLK" }, analog = { 1 = "ADC1_CH3" } },
     { pin =  5, functions = { 0 = "MTDO", 2 = "FSPID"   }, analog = { 1 = "ADC1_CH4" } },
-    { pin =  6,                          limited = true },
-    { pin =  7, lp = { 0 = "LP_GPIO0" }, limited = true },
-    { pin =  8, lp = { 0 = "LP_GPIO1" } },
-    { pin =  9, lp = { 0 = "LP_GPIO2" } },
+    { pin =  6,                          limitations = ["spi_flash"] },
+    { pin =  7, lp = { 0 = "LP_GPIO0" }, limitations = ["spi_flash"] },
+    { pin =  8, lp = { 0 = "LP_GPIO1" }, limitations = ["strapping"] },
+    { pin =  9, lp = { 0 = "LP_GPIO2" }, limitations = ["strapping"] },
     { pin = 10, lp = { 0 = "LP_GPIO3" },                   analog = { 0 = "ZCD0" } },
     { pin = 11, lp = { 0 = "LP_GPIO4" },                   analog = { 0 = "ZCD1" } },
     { pin = 12, lp = { 0 = "LP_GPIO5" } },
@@ -281,7 +287,7 @@ pins = [
     { pin = 22 },
     { pin = 23, functions = { 0 = "U0RXD", 2 = "FSPICS1" } },
     { pin = 24, functions = { 0 = "U0TXD", 2 = "FSPICS2" } },
-    { pin = 25, functions = {              2 = "FSPICS3" } },
+    { pin = 25, functions = {              2 = "FSPICS3" }, limitations = ["strapping"] },
     { pin = 26, functions = {              2 = "FSPICS4" }, analog = { 0 = "USB_DM" } },
     { pin = 27, functions = {              2 = "FSPICS5" }, analog = { 0 = "USB_DP" } },
 ]
@@ -558,6 +564,11 @@ support_status = "not_supported"
 support_status = "partial"
 apb_cycle_wait_num = 16 # TODO
 
+[device.sleep]
+support_status = "partial"
+light_sleep = true
+deep_sleep = true
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
@@ -577,7 +588,6 @@ apb_cycle_wait_num = 16 # TODO
 [device.dma]
 [device.etm]
 [device.io_mux]
-[device.sleep]
 [device.systimer]
 [device.temp_sensor]
 

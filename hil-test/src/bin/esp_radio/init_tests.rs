@@ -10,11 +10,8 @@ mod init_tests {
     use esp_hal::xtensa_lx::interrupt::free as interrupt_free;
     use esp_hal::{
         clock::CpuClock,
-        interrupt::{
-            Priority,
-            software::{SoftwareInterrupt, SoftwareInterruptControl},
-        },
-        peripherals::{Peripherals, TIMG0},
+        interrupt::{Priority, software::SoftwareInterruptControl},
+        peripherals::Peripherals,
         timer::timg::TimerGroup,
     };
     #[cfg(soc_has_bt)]
@@ -30,12 +27,7 @@ mod init_tests {
     async fn try_init(
         signal: &'static Signal<CriticalSectionRawMutex, Option<WifiError>>,
         wifi_peripheral: WIFI<'static>,
-        timer: TIMG0<'static>,
-        sw_int0: SoftwareInterrupt<'static, 0>,
     ) {
-        let timg0 = TimerGroup::new(timer);
-        esp_rtos::start(timg0.timer0, sw_int0);
-
         match esp_radio::wifi::new(wifi_peripheral, Default::default()) {
             Ok(_) => signal.signal(None),
             Err(err) => signal.signal(Some(err)),
@@ -99,14 +91,12 @@ mod init_tests {
 
         let spawner = executor_core0.start(Priority::Priority1);
 
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+
         let signal = mk_static!(Signal<CriticalSectionRawMutex, Option<WifiError>>, Signal::new());
 
-        spawner.must_spawn(try_init(
-            signal,
-            p.WIFI,
-            p.TIMG0,
-            sw_ints.software_interrupt0,
-        ));
+        spawner.must_spawn(try_init(signal, p.WIFI));
 
         let res = signal.wait().await;
 

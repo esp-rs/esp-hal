@@ -1,10 +1,9 @@
-//! Embassy DHCP Example
+//! Embassy COEX Example
 //!
-//!
-//! Set SSID and PASSWORD env variable before running this example.
-//!
-//! This gets an ip address via DHCP then performs an HTTP get request to some
-//! "random" server
+//! - set SSID and PASSWORD env variable
+//! - gets an ip address via DHCP
+//! - performs an HTTP get request to some "random" server
+//! - does BLE advertising (you cannot connect to it - it's just not implemented in the example)
 
 #![no_std]
 #![no_main]
@@ -12,6 +11,7 @@
 use core::net::Ipv4Addr;
 
 use embassy_executor::Spawner;
+use embassy_futures::join::join;
 use embassy_net::{Runner, StackResources, tcp::TcpSocket};
 use embassy_time::{Duration, Timer};
 use esp_alloc as _;
@@ -24,15 +24,18 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{
-    ModeConfig,
-    WifiController,
-    WifiDevice,
-    WifiEvent,
-    scan::ScanConfig,
-    sta::StationConfig,
+use esp_radio::{
+    ble::controller::BleConnector,
+    wifi::{
+        ModeConfig,
+        WifiController,
+        WifiDevice,
+        WifiEvent,
+        scan::ScanConfig,
+        sta::StationConfig,
+    },
 };
-
+use trouble_host::prelude::*;
 esp_bootloader_esp_idf::esp_app_desc!();
 
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
@@ -54,12 +57,25 @@ async fn main(spawner: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
-    esp_alloc::heap_allocator!(size: 36 * 1024);
+    // COEX needs more RAM - add some more
+    #[cfg(feature = "esp32")]
+    {
+        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 96 * 1024);
+        esp_alloc::heap_allocator!(size: 24 * 1024);
+    }
+    #[cfg(not(feature = "esp32"))]
+    {
+        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+        esp_alloc::heap_allocator!(size: 64 * 1024);
+    }
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+
+    let bluetooth = peripherals.BT;
+    let connector = BleConnector::new(bluetooth, Default::default()).unwrap();
+    let ble_controller: ExternalController<_, 1> = ExternalController::new(connector);
 
     let (controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
@@ -79,6 +95,7 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
+    spawner.spawn(ble_task(ble_controller)).ok();
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(runner)).ok();
 
@@ -141,6 +158,57 @@ async fn main(spawner: Spawner) -> ! {
         }
         Timer::after(Duration::from_millis(3000)).await;
     }
+}
+
+#[embassy_executor::task]
+pub async fn ble_task(controller: ExternalController<BleConnector<'static>, 1>) {
+    let address = Address::random([0xff, 0xe4, 0x05, 0x1a, 0x8f, 0xff]);
+
+    println!("Our address = {:?}", address);
+
+    let mut resources: HostResources<DefaultPacketPool, 0, 0> = HostResources::new();
+    let stack = trouble_host::new(controller, &mut resources).set_random_address(address);
+
+    let Host {
+        mut peripheral,
+        mut runner,
+        ..
+    } = stack.build();
+
+    let mut adv_data = [0; 31];
+    let adv_len = AdStructure::encode_slice(
+        &[
+            AdStructure::CompleteLocalName(esp_hal::chip!().as_bytes()),
+            AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
+        ],
+        &mut adv_data[..],
+    )
+    .unwrap();
+
+    join(runner.run(), async move {
+        let mut params = AdvertisementParameters::default();
+        params.interval_min = Duration::from_millis(100);
+        params.interval_max = Duration::from_millis(100);
+
+        let _advertiser = peripheral
+            .advertise(
+                &params,
+                Advertisement::NonconnectableScannableUndirected {
+                    adv_data: &adv_data[..adv_len],
+                    scan_data: &[],
+                },
+            )
+            .await
+            .unwrap();
+
+        println!("BLE advertising started");
+
+        // Keep advertiser alive forever
+        loop {
+            Timer::after(Duration::from_secs(60)).await;
+        }
+    })
+    .await;
 }
 
 #[embassy_executor::task]

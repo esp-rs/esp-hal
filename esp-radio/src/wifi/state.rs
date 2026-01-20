@@ -1,7 +1,7 @@
 use core::sync::atomic::Ordering;
 
 use private::{AtomicWifiAccessPointState, AtomicWifiStationState};
-pub use private::{WifiAccessPointState, WifiStationState};
+pub(crate) use private::{WifiAccessPointState, WifiStationState};
 
 use super::WifiEvent;
 
@@ -10,34 +10,46 @@ mod private {
 
     /// Wi-Fi interface for station state.
     #[atomic_enum]
-    #[derive(PartialEq, Debug)]
+    #[derive(PartialEq, Debug, Clone, Copy, Hash)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[non_exhaustive]
     pub enum WifiStationState {
+        /// Start initiated.
+        Starting,
         /// Station started.
         Started,
+        /// Connect initiated.
+        Connecting,
         /// Station connected.
         Connected,
+        /// Disconnect initiated.
+        Disconnecting,
         /// Station disconnected.
         Disconnected,
+        /// Stop initiated.
+        Stopping,
         /// Station stopped
         Stopped,
-        /// Invalid state.
-        Invalid,
+        /// Uninitialized state.
+        Uninitialized,
     }
 
     /// Wi-Fi interface for access point state.
     #[atomic_enum]
-    #[derive(PartialEq, Debug)]
+    #[derive(PartialEq, Debug, Clone, Copy, Hash)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[non_exhaustive]
     pub enum WifiAccessPointState {
+        /// Start initiated.
+        Starting,
         /// Access point started.
         Started,
+        /// Stop initiated.
+        Stopping,
         /// Access point stopped.
         Stopped,
-        /// Invalid state.
-        Invalid,
+        /// Uninitialized state.
+        Uninitialized,
     }
 }
 
@@ -48,7 +60,7 @@ impl From<WifiEvent> for WifiStationState {
             WifiEvent::StationConnected => WifiStationState::Connected,
             WifiEvent::StationDisconnected => WifiStationState::Disconnected,
             WifiEvent::StationStop => WifiStationState::Stopped,
-            _ => WifiStationState::Invalid,
+            _ => WifiStationState::Uninitialized,
         }
     }
 }
@@ -58,23 +70,23 @@ impl From<WifiEvent> for WifiAccessPointState {
         match event {
             WifiEvent::AccessPointStart => WifiAccessPointState::Started,
             WifiEvent::AccessPointStop => WifiAccessPointState::Stopped,
-            _ => WifiAccessPointState::Invalid,
+            _ => WifiAccessPointState::Uninitialized,
         }
     }
 }
 
 pub(crate) static STATION_STATE: AtomicWifiStationState =
-    AtomicWifiStationState::new(WifiStationState::Invalid);
+    AtomicWifiStationState::new(WifiStationState::Uninitialized);
 pub(crate) static ACCESS_POINT_STATE: AtomicWifiAccessPointState =
-    AtomicWifiAccessPointState::new(WifiAccessPointState::Invalid);
+    AtomicWifiAccessPointState::new(WifiAccessPointState::Uninitialized);
 
 /// Get the current state of the access point.
-pub fn access_point_state() -> WifiAccessPointState {
+pub(crate) fn access_point_state() -> WifiAccessPointState {
     ACCESS_POINT_STATE.load(Ordering::Relaxed)
 }
 
 /// Get the current state of the Station.
-pub fn station_state() -> WifiStationState {
+pub(crate) fn station_state() -> WifiStationState {
     STATION_STATE.load(Ordering::Relaxed)
 }
 
@@ -99,10 +111,10 @@ pub(crate) fn update_state(event: WifiEvent, handled: bool) {
     }
 }
 
-pub(crate) fn reset_access_point_state() {
-    ACCESS_POINT_STATE.store(WifiAccessPointState::Invalid, Ordering::Relaxed)
+pub(crate) fn set_access_point_state(state: WifiAccessPointState) {
+    ACCESS_POINT_STATE.store(state, Ordering::Relaxed)
 }
 
-pub(crate) fn reset_station_state() {
-    STATION_STATE.store(WifiStationState::Invalid, Ordering::Relaxed)
+pub(crate) fn set_station_state(state: WifiStationState) {
+    STATION_STATE.store(state, Ordering::Relaxed)
 }

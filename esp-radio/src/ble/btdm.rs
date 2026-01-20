@@ -307,7 +307,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         (*addr_of_mut!(HCI_OUT_COLLECTOR)).write(HciOutCollector::new());
         // turn on logging
         #[allow(static_mut_refs)]
-        #[cfg(feature = "sys-logs")]
+        #[cfg(feature = "print-logs-from-driver")]
         {
             unsafe extern "C" {
                 static mut g_bt_plf_log_level: u32;

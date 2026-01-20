@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `last_calibration_result` to get the result of the last calibration (#4479)
 - `BleInitError` for BLE init failures and `Internal`, `WrongClockConfig`, `SchedulerNotInitialized` and `Adc2IsUsed` variants to `WifiError (#4482)
 - `wifi::csi::WifiCsiInfo` wraps `wifi::wifi_csi_info_t` (#4643)
+- `WifiController::set_channel()`, `WifiController::channel()` `WifiController::set_bandwidth()`, `WifiController::bandwidth()` methods and `Bandwidth` enum (#4705)
+- Exposed types necessary to configure the ble `Config` structure. (#4764)
 
 ### Changed
 
@@ -31,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `CsiConfig` struct has been moved to the `wifi::csi` module (#4588)
 - The `ScanMethod`, `ScanTypeConfig`, and `ScanConfig` types have been moved to `wifi::scan` (#4588)
 - `esp-alloc` dependency no longer enables default features (#4721)
+- `sys-logs` feature has been renamed to `print-logs-from-driver` and has been marked unstable (#4810)
+- Unstable features now require the `unstable` feature flag to be enabled (#4810)
 
 ### Fixed
 
@@ -44,6 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `serde` feature has been removed (#4435)
 - `Controller` struct and `InitializationError::InterruptsDisabled` enum variant have been removed (#4482)
 - `wifi::wifi_csi_info_t` is no longer exposed to the public API (#4643)
+- the free standing `xxx_state()` functions have been removed together with their return types `WifiApState`/`WifiStaState` (#4571)
+- `wifi::Country` has been replaced by `wifi::CountryInfo` (#4788)
+- `InitializationError` is no longer `pub` for `wifi` (#4809)
 
 ## [v0.17.0] - 2025-10-30
 
@@ -100,6 +107,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The default value of `wifi_max_burst_size` has been changed to 3 (#4231)
 - Set `ble_ll_sync_cnt` to 0 on C6, C2 and H2 as in esp-idf Kconfig default (#4241)
 - `esp_radio::wifi::WifiController::scan_with_config_sync` has been renamed to `scan_with_config` (#4294)
+- `wifi::AuthMethod` has been renamed to `wifi::AuthenticationMethod` (#4778)
 
 ### Fixed
 

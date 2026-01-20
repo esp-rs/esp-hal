@@ -6,14 +6,14 @@ use core::fmt;
 use enumset::EnumSet;
 use procmacros::BuilderLite;
 
-use super::{AuthMethod, Protocol, scan::ScanMethod};
+use super::{AuthenticationMethod, Protocol, scan::ScanMethod};
 use crate::WifiError;
 
 #[cfg(feature = "wifi-eap")]
 pub mod eap;
 
 /// Station configuration for a Wi-Fi connection.
-#[derive(BuilderLite, Clone, Eq, PartialEq)]
+#[derive(BuilderLite, Clone, Eq, PartialEq, Hash)]
 pub struct StationConfig {
     /// The SSID of the Wi-Fi network.
     #[builder_lite(reference)]
@@ -21,7 +21,7 @@ pub struct StationConfig {
     /// The BSSID (MAC address) of the station.
     pub(crate) bssid: Option<[u8; 6]>,
     /// The authentication method for the Wi-Fi connection.
-    pub(crate) auth_method: AuthMethod,
+    pub(crate) auth_method: AuthenticationMethod,
     /// The password for the Wi-Fi connection.
     #[builder_lite(reference)]
     pub(crate) password: String,
@@ -77,7 +77,7 @@ impl Default for StationConfig {
         StationConfig {
             ssid: String::new(),
             bssid: None,
-            auth_method: AuthMethod::Wpa2Personal,
+            auth_method: AuthenticationMethod::Wpa2Personal,
             password: String::new(),
             channel: None,
             protocols: (Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),

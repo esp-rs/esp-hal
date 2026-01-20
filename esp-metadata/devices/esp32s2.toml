@@ -175,6 +175,12 @@ clocks = { system_clocks = { clock_tree = [
         { name = "XTAL", outputs = "XTAL_DIV_CLK" },
         { name = "RC",   outputs = "RC_FAST_CLK" },
     ] },
+
+    # System-wide peripheral clocks
+    { name = "UART_MEM_CLK", type = "mux", default = "XTAL", variants = [
+        # The actual source clock is unknown, but it also doesn't matter.
+        { name = "XTAL", outputs = "XTAL_CLK" },
+    ] },
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
@@ -232,10 +238,18 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Uhci0" },
     { name = "I2cExt0" },
     { name = "Spi2" },
-    { name = "Uart1" },
+    { name = "Uart1", clocks = "Uart0" },
     { name = "I2s0" },
     { name = "Wdg" },
-    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true, clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", default = "APB", variants = [
+            { name = "APB",      outputs = "APB_CLK" },
+            { name = "REF_TICK", outputs = "REF_TICK" }
+        ] },
+        { name = "MEM_CLOCK", type = "mux", default = "MEM", variants = [
+            { name = "MEM", outputs = "UART_MEM_CLK" },
+        ] },
+    ] },
     #{ name = "Spi01" },
     #{ name = "Timers" },
     
@@ -277,7 +291,7 @@ output_signal_max = 256
 constant_0_input = 0x3c
 constant_1_input = 0x38
 pins = [
-    { pin =  0,                                                                                                               rtc = { 0 = "RTC_GPIO0"  } },
+    { pin =  0,                                                                                                               rtc = { 0 = "RTC_GPIO0"  }, limitations = ["strapping"] },
     { pin =  1,                                                                analog = { 0 = "TOUCH1",     1 = "ADC1_CH0" }, rtc = { 0 = "RTC_GPIO1"  } },
     { pin =  2,                                                                analog = { 0 = "TOUCH2",     1 = "ADC1_CH1" }, rtc = { 0 = "RTC_GPIO2"  } },
     { pin =  3,                                                                analog = { 0 = "TOUCH3",     1 = "ADC1_CH2" }, rtc = { 0 = "RTC_GPIO3"  } },
@@ -300,18 +314,18 @@ pins = [
     { pin = 20, functions = { 2 = "U1CTS",   3 = "CLK_OUT1" },                 analog = { 0 = "USB_DP",     1 = "ADC2_CH9" }, rtc = { 0 = "RTC_GPIO20" } },
     { pin = 21,                                                                                                               rtc = { 0 = "RTC_GPIO21" } },
 
-    { pin = 26, functions = { 0 = "SPICS1" }, limited = true },
-    { pin = 27, functions = { 0 = "SPIHD"  }, limited = true },
-    { pin = 28, functions = { 0 = "SPIWP"  }, limited = true },
-    { pin = 29, functions = { 0 = "SPICS0" }, limited = true },
-    { pin = 30, functions = { 0 = "SPICLK" }, limited = true },
-    { pin = 31, functions = { 0 = "SPIQ"   }, limited = true },
-    { pin = 32, functions = { 0 = "SPID"   }, limited = true },
-    { pin = 33, functions = {              2 = "FSPIHD",   3 = "SUBSPIHD"              } },
-    { pin = 34, functions = {              2 = "FSPICS0",  3 = "SUBSPICS0"             } },
-    { pin = 35, functions = {              2 = "FSPID",    3 = "SUBSPID"               } },
-    { pin = 36, functions = {              2 = "FSPICLK",  3 = "SUBSPICLK"             } },
-    { pin = 37, functions = {              2 = "FSPIQ",    3 = "SUBSPIQ", 4 = "SPIDQS" } },
+    { pin = 26, functions = { 0 = "SPICS1" },                                             limitations = ["spi_psram"] },
+    { pin = 27, functions = { 0 = "SPIHD"  },                                             limitations = ["spi_flash", "spi_psram"] },
+    { pin = 28, functions = { 0 = "SPIWP"  },                                             limitations = ["spi_flash", "spi_psram"] },
+    { pin = 29, functions = { 0 = "SPICS0" },                                             limitations = ["spi_flash"] },
+    { pin = 30, functions = { 0 = "SPICLK" },                                             limitations = ["spi_flash", "spi_psram"] },
+    { pin = 31, functions = { 0 = "SPIQ"   },                                             limitations = ["spi_flash", "spi_psram"] },
+    { pin = 32, functions = { 0 = "SPID"   },                                             limitations = ["spi_flash", "spi_psram"] },
+    { pin = 33, functions = {              2 = "FSPIHD",   3 = "SUBSPIHD"              }, limitations = ["octal_flash", "octal_psram"] },
+    { pin = 34, functions = {              2 = "FSPICS0",  3 = "SUBSPICS0"             }, limitations = ["octal_flash", "octal_psram"] },
+    { pin = 35, functions = {              2 = "FSPID",    3 = "SUBSPID"               }, limitations = ["octal_flash", "octal_psram"] },
+    { pin = 36, functions = {              2 = "FSPICLK",  3 = "SUBSPICLK"             }, limitations = ["octal_flash", "octal_psram"] },
+    { pin = 37, functions = {              2 = "FSPIQ",    3 = "SUBSPIQ", 4 = "SPIDQS" }, limitations = ["octal_flash", "octal_psram"] },
     { pin = 38, functions = {              2 = "FSPIWP",   3 = "SUBSPIWP"              } },
     { pin = 39, functions = { 0 = "MTCK",  2 = "CLK_OUT3", 3 = "SUBSPICS1" } },
     { pin = 40, functions = { 0 = "MTDO",  2 = "CLK_OUT2" } },
@@ -319,8 +333,8 @@ pins = [
     { pin = 42, functions = { 0 = "MTMS" } },
     { pin = 43, functions = { 0 = "U0TXD", 2 = "CLK_OUT1" } },
     { pin = 44, functions = { 0 = "U0RXD", 2 = "CLK_OUT2" } },
-    { pin = 45 },
-    { pin = 46 },
+    { pin = 45, limitations = ["strapping"] },
+    { pin = 46, limitations = ["strapping"] },
 ]
 input_signals = [
     { name = "SPIQ",              id = 0 },
@@ -632,6 +646,11 @@ support_status = "not_supported"
 support_status = "partial"
 apb_cycle_wait_num = 16 # TODO
 
+[device.sleep]
+support_status = "partial"
+light_sleep = true
+deep_sleep = true
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
@@ -648,7 +667,6 @@ apb_cycle_wait_num = 16 # TODO
 [device.dma]
 [device.io_mux]
 [device.psram]
-[device.sleep]
 [device.systimer]
 [device.temp_sensor]
 [device.ulp_fsm]

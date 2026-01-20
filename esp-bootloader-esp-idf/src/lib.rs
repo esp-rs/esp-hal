@@ -383,7 +383,7 @@ macro_rules! esp_app_desc {
      $max_efuse_blk_rev_full: expr
     ) => {
         #[unsafe(export_name = "esp_app_desc")]
-        #[unsafe(link_section = ".rodata_desc.appdesc")]
+        #[unsafe(link_section = ".flash.appdesc")]
         #[used]
         /// Application metadata descriptor.
         pub static ESP_APP_DESC: $crate::EspAppDesc = $crate::EspAppDesc::new_internal(

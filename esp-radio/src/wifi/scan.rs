@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// Wi-Fi scan method.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
 #[instability::unstable]
@@ -35,7 +35,8 @@ pub enum ScanMethod {
 /// |--------------------------------------|------------|-------------|
 /// | **Power consumption**                |    High    |     Low     |
 /// | **Time required (typical behavior)** |     Low    |     High    |
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ScanTypeConfig {
     /// Active scan with min and max scan time per channel. This is the default

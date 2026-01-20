@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RsaContext`, `AesContext` now derive `Clone`. (#4709)
 - `Sha<X>Context` now derive `Clone`, except on ESP32. (#4709)
 - Dedicated GPIO implementation (#4699)
+- `esp_hal::interrupt::wait_for_interrupt`, which enters `wfi` (RISC-V) or `waiti 0` (Xtensa) when it would not prevent a debugger from reading memory (#4782)
 
 ### Changed
 
@@ -33,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: Support for `Into<PulseCode>` and `From<PulseCode>` has been removed from Tx and Rx methods, respectively, in favor of requiring `PulseCode` directly. (#4616)
 - RMT: Tx handling has been revised: Some errors will now be returned by `TxTransaction::wait()` instead of `Channel::transmit`. `Channel::transmit_continuously()` can now also report `Error::EndMarkerMissing`. (#4617)
 - `Rtc::time_since_boot()` has been renamed to `Rtc::time_since_power_up()` (#4630)
+- `LP_UART` now has its own configuration structure (#4667)
 
 ### Fixed
 
@@ -47,6 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The interrupt request set by `SoftwareInterrupt::raise()` should now take effect before returning. (#4706)
 - Fixed an issue in `ShaBackend` that resulted in incorrect hash calculation (#4722)
 - The `Peripherals` struct is now marked as `#[non_exhaustive]`. This is a breaking change. (#4729)
+- All GPIOs are now available without unsafe code. The potentially reserved GPIOs are now documented. (#4728)
+- Make sure we added all relevant section to `.rwtext.wifi` (#4808)
+- ESP32-S3: Fixed startup code to prevent a linker error (#4815)
 
 ### Removed
 

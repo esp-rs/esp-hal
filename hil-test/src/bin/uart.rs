@@ -166,18 +166,33 @@ mod tests {
         // send/receive with some other common baud rates to ensure this is
         // working as expected. We will also using different clock sources
         // while we're at it.
+
+        cfg_if::cfg_if! {
+            if #[cfg(esp32c2)] {
+                let fastest_clock_source = ClockSource::PllF40m;
+            } else  if #[cfg(esp32c6)] {
+                let fastest_clock_source = ClockSource::PllF80m;
+            } else if #[cfg(esp32h2)] {
+                let fastest_clock_source = ClockSource::PllF48m;
+            } else {
+                let fastest_clock_source = ClockSource::Apb;
+            }
+        }
+
         let configs = [
-            #[cfg(not(any(esp32, esp32s2)))]
+            #[cfg(not(soc_has_clock_node_ref_tick))]
             (9600, ClockSource::RcFast),
-            #[cfg(not(any(esp32, esp32s2)))]
+            #[cfg(not(soc_has_clock_node_ref_tick))]
             (19_200, ClockSource::Xtal),
-            #[cfg(esp32s2)]
+            #[cfg(soc_has_clock_node_ref_tick)]
             (9600, ClockSource::RefTick),
-            (921_600, ClockSource::Apb),
-            (2_000_000, ClockSource::Apb),
-            (3_500_000, ClockSource::Apb),
-            (5_000_000, ClockSource::Apb),
+            (921_600, fastest_clock_source),
+            (2_000_000, fastest_clock_source),
+            (3_500_000, fastest_clock_source),
+            (5_000_000, fastest_clock_source),
         ];
+
+        // TODO: we need a way to verify these baud rates are actually what we want.
 
         let mut byte_to_write = 0xA5;
         for (baudrate, clock_source) in configs {

@@ -6,19 +6,11 @@ use core::fmt;
 use enumset::EnumSet;
 use procmacros::BuilderLite;
 
-use super::{AuthMethod, AuthMethodExt as _, Country, Protocol, SecondaryChannel};
-use crate::{
-    WifiError,
-    sys::include::{
-        wifi_ap_record_t,
-        wifi_second_chan_t_WIFI_SECOND_CHAN_ABOVE,
-        wifi_second_chan_t_WIFI_SECOND_CHAN_BELOW,
-        wifi_second_chan_t_WIFI_SECOND_CHAN_NONE,
-    },
-};
+use super::{AuthenticationMethod, CountryInfo, Protocol, SecondaryChannel};
+use crate::{WifiError, sys::include::wifi_ap_record_t};
 
 /// Information about a detected Wi-Fi access point.
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct AccessPointInfo {
@@ -35,13 +27,13 @@ pub struct AccessPointInfo {
     /// The signal strength of the access point (RSSI).
     pub signal_strength: i8,
     /// The authentication method used by the access point.
-    pub auth_method: Option<AuthMethod>,
+    pub auth_method: Option<AuthenticationMethod>,
     /// The country information of the access point (if available from beacon frames).
-    pub country: Option<Country>,
+    pub country: Option<CountryInfo>,
 }
 
 /// Configuration for a Wi-Fi access point.
-#[derive(Clone, PartialEq, Eq, BuilderLite)]
+#[derive(Clone, PartialEq, Eq, BuilderLite, Hash)]
 pub struct AccessPointConfig {
     /// The SSID of the access point.
     #[builder_lite(reference)]
@@ -55,7 +47,7 @@ pub struct AccessPointConfig {
     /// The set of protocols supported by the access point.
     pub(crate) protocols: EnumSet<Protocol>,
     /// The authentication method to be used by the access point.
-    pub(crate) auth_method: AuthMethod,
+    pub(crate) auth_method: AuthenticationMethod,
     /// The password for securing the access point (if applicable).
     #[builder_lite(reference)]
     pub(crate) password: String,
@@ -94,7 +86,7 @@ impl Default for AccessPointConfig {
             channel: 1,
             secondary_channel: None,
             protocols: (Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
-            auth_method: AuthMethod::None,
+            auth_method: AuthenticationMethod::None,
             password: String::new(),
             max_connections: 255,
             dtim_period: 2,
@@ -163,14 +155,9 @@ pub(crate) fn convert_ap_info(record: &wifi_ap_record_t) -> AccessPointInfo {
         ssid,
         bssid: record.bssid,
         channel: record.primary,
-        secondary_channel: match record.second {
-            wifi_second_chan_t_WIFI_SECOND_CHAN_NONE => SecondaryChannel::None,
-            wifi_second_chan_t_WIFI_SECOND_CHAN_ABOVE => SecondaryChannel::Above,
-            wifi_second_chan_t_WIFI_SECOND_CHAN_BELOW => SecondaryChannel::Below,
-            _ => panic!(),
-        },
+        secondary_channel: SecondaryChannel::from_raw(record.second),
         signal_strength: record.rssi,
-        auth_method: Some(AuthMethod::from_raw(record.authmode)),
-        country: Country::try_from_c(&record.country),
+        auth_method: Some(AuthenticationMethod::from_raw(record.authmode)),
+        country: CountryInfo::try_from_c(&record.country),
     }
 }

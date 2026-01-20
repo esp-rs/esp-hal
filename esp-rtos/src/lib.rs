@@ -296,8 +296,20 @@ pub fn start_with_idle_hook(
         rtos_trace::trace::start();
     }
 
+    fn is_thread_mode() -> bool {
+        #[cfg(xtensa)]
+        return esp_hal::xtensa_lx::interrupt::get_level() == 0;
+
+        #[cfg(riscv)]
+        return esp_hal::interrupt::current_runlevel() == esp_hal::interrupt::Priority::None;
+    }
+
     trace!("Starting scheduler for the first core");
     assert_eq!(Cpu::current(), Cpu::ProCpu);
+    assert!(
+        is_thread_mode(),
+        "esp_rtos::start must not be called from an interrupt handler"
+    );
 
     SCHEDULER.with(move |scheduler| {
         scheduler.setup(TimeDriver::new(timer.timer()), idle_hook);

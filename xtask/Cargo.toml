@@ -19,6 +19,7 @@ opener         = { version = "0.7.2", optional = true }
 object         = "0.37"
 parking_lot    = "0.12.3"
 prettyplease   = { version = "0.2.34" }
+pretty_yaml    = { version = "0.6" }
 regex          = { version = "1.11.1", optional = true }
 rustc-demangle = "0.1"
 rocket         = { version = "0.5.1", optional = true }

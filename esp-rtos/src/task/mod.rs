@@ -33,6 +33,12 @@ use crate::{
 
 pub type IdleFn = extern "C" fn() -> !;
 
+pub(crate) extern "C" fn idle_hook() -> ! {
+    loop {
+        esp_hal::interrupt::wait_for_interrupt();
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum TaskState {
@@ -567,6 +573,17 @@ pub(super) fn allocate_main_task(
     // This is slightly questionable as we don't ensure SchedulerState is pinned, but it's always
     // part of a static object so taking the pointer is fine.
     let main_task_ptr = NonNull::from(&scheduler.per_cpu[current_cpu].main_task);
+
+    cfg_if::cfg_if! {
+        if #[cfg(xtensa)] {
+            scheduler.per_cpu[current_cpu].main_task.cpu_context.THREADPTR = main_task_ptr.as_ptr() as u32;
+        } else if #[cfg(riscv)] {
+            scheduler.per_cpu[current_cpu].main_task.cpu_context.tp = main_task_ptr.as_ptr() as usize;
+        }
+    }
+
+    write_thread_pointer(main_task_ptr.as_ptr());
+
     debug!("Main task created: {:?}", main_task_ptr);
 
     #[cfg(feature = "rtos-trace")]
@@ -574,6 +591,7 @@ pub(super) fn allocate_main_task(
 
     // The main task is already running, no need to add it to the ready queue.
     scheduler.all_tasks.push(main_task_ptr);
+    #[cfg(multi_core)]
     scheduler.set_current_task(cpu, Some(main_task_ptr));
     scheduler
         .run_queue

@@ -28,15 +28,101 @@ pub(crate) struct GpioPinsAndSignals {
 
 impl GenericProperty for GpioPinsAndSignals {}
 
+/// Possible special cases that may affect pin availability or functionality.
+///
+/// Some of these are explicitly encoded in the TOMLs, others are inferred from the pin alternate
+/// function list.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum PinLimitation {
+    /// Strapping pin, signal level needs to be carefully set during boot.
+    Strapping,
+
+    /// Pin is used to interface with SPI flash.
+    SpiFlash,
+
+    /// Pin is used to interface with Octal SPI flash.
+    OctalFlash,
+
+    /// Pin is used to interface with SPI PSRAM.
+    SpiPsram,
+
+    /// Pin is used to interface with Octal SPI PSRAM.
+    OctalPsram,
+
+    /// Pin is only available on ESP32-PICO-V3.
+    Esp32PicoV3,
+
+    /// The pin has no output stage.
+    InputOnly,
+
+    /// Default UART pins.
+    BootloaderUart,
+
+    /// Debugger pins.
+    Jtag,
+
+    /// USB Serial/JTAG debugger pins.
+    UsbJtag,
+}
+
+impl std::fmt::Display for PinLimitation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PinLimitation::Strapping => write!(
+                f,
+                "This pin is a strapping pin, it determines how the chip boots."
+            ),
+            PinLimitation::SpiFlash => {
+                write!(
+                    f,
+                    "This pin may be reserved for interfacing with SPI flash."
+                )
+            }
+            PinLimitation::OctalFlash => {
+                write!(
+                    f,
+                    "This pin may be reserved for interfacing with Octal SPI flash."
+                )
+            }
+            PinLimitation::SpiPsram => {
+                write!(
+                    f,
+                    "This pin may be reserved for interfacing with SPI PSRAM."
+                )
+            }
+            PinLimitation::OctalPsram => {
+                write!(
+                    f,
+                    "This pin may be reserved for interfacing with Octal SPI PSRAM."
+                )
+            }
+            PinLimitation::Esp32PicoV3 => write!(f, "This pin is only available on ESP32-PICO-V3."),
+            PinLimitation::InputOnly => write!(f, "This pin can only be used as an input."),
+            PinLimitation::BootloaderUart => {
+                write!(
+                    f,
+                    "By default, this pin is used by the UART programming interface."
+                )
+            }
+            PinLimitation::Jtag => {
+                write!(
+                    f,
+                    "These pins may be used to debug the chip using an external JTAG debugger."
+                )
+            }
+            PinLimitation::UsbJtag => {
+                write!(f, "These pins may be used to debug the chip using USB.")
+            }
+        }
+    }
+}
+
 /// Properties of a single GPIO pin.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub(crate) struct PinConfig {
     /// The GPIO pin number.
     pub pin: usize,
-
-    /// Whether the GPIO has an output stage.
-    #[serde(default)]
-    pub input_only: bool,
 
     /// Available IO MUX functions for this pin.
     #[serde(default)]
@@ -50,9 +136,9 @@ pub(crate) struct PinConfig {
     #[serde(default, alias = "rtc")]
     pub lp: LowPowerMap,
 
-    /// GPIO pin is only available in certain cases.
+    /// Lists cases where the GPIO needs special attention.
     #[serde(default)]
-    pub limited: bool,
+    pub limitations: Vec<PinLimitation>,
 }
 
 /// Available alternate functions for a given GPIO pin.
@@ -235,7 +321,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         .iter()
         .map(|pin| {
             // Input must come first
-            if pin.input_only {
+            if pin.limitations.contains(&PinLimitation::InputOnly) {
                 vec![quote! { Input }, quote! {}]
             } else {
                 vec![quote! { Input }, quote! { Output }]

@@ -27,6 +27,12 @@
   *( .iram1  .iram1.*)
   *( .wifiextrairam.* )
   *( .coexiram.* )
+  *( .high_perf_code_iram* )
+  *( .coexsleepiram* )
+  *( .wifiorslpiram* )
+  *( .isr_iram* )
+  *( .conn_iram* )
+  *( .sleep_iram* )
   . = ALIGN(4);
 
   _rwtext_len = . - ORIGIN(RWTEXT);

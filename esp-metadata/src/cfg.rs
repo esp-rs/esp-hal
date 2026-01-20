@@ -546,7 +546,12 @@ driver_configs![
     SleepProperties {
         driver: sleep,
         name: "Light/deep sleep",
-        properties: {}
+        properties: {
+            #[serde(default)]
+            light_sleep: bool,
+            #[serde(default)]
+            deep_sleep: bool,
+        }
     },
     ShaProperties {
         driver: sha,

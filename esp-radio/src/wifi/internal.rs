@@ -166,13 +166,13 @@ pub(crate) static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_func
     _get_random: Some(get_random),
     _get_time: Some(get_time),
     _random: Some(random),
-    #[cfg(feature = "sys-logs")]
+    #[cfg(feature = "print-logs-from-driver")]
     _log_write: Some(log_write),
-    #[cfg(not(feature = "sys-logs"))]
+    #[cfg(not(feature = "print-logs-from-driver"))]
     _log_write: None,
-    #[cfg(feature = "sys-logs")]
+    #[cfg(feature = "print-logs-from-driver")]
     _log_writev: Some(log_writev),
-    #[cfg(not(feature = "sys-logs"))]
+    #[cfg(not(feature = "print-logs-from-driver"))]
     _log_writev: None,
     _log_timestamp: Some(log_timestamp),
     _malloc_internal: Some(malloc_internal),

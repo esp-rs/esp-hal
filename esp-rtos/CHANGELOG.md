@@ -15,8 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `esp_rtos::start` now takes `SoftwareInterrupt<'static, 0>` for all CPUs (#4459)
+- `esp_rtos::start` can no longer be called from an interrupt handler (#4766)
 - `esp_rtos::start_second_core` no longer takes `SoftwareInterrupt<'static, 0>` (#4459)
 - `esp-alloc` dependency no longer enables default features (#4721)
+- Place the pointer to the current thread in the thread pointer registers (#4766)
 
 ### Fixed
 
@@ -27,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a possible deadlock on multi-core chips (#4478)
 - Fixed a memory leak of 48 bytes when deleting esp-radio timers (#4541)
 - Fixed a rare crash on Xtensa MCUs (#4580, #4591)
+- RISC-V: the idle hook no longer prevents a debugger from reading memory (#4782)
 
 ### Removed
 

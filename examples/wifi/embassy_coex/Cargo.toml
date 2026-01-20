@@ -1,12 +1,20 @@
 [package]
-name    = "static-ip"
+name    = "embassy-coex"
 version = "0.0.0"
 edition = "2024"
 publish = false
 
 [dependencies]
-blocking-network-stack = { git = "https://github.com/bjoernQ/blocking-network-stack.git", rev = "b3ecefc" }
-embedded-io = { version = "0.6.1", default-features = false }
+embassy-executor = "0.9.0"
+embassy-futures = "0.1"
+embassy-net = { version = "0.7.0", features = [
+    "dhcpv4",
+    "medium-ethernet",
+    "tcp",
+    "udp",
+] }
+embassy-time = "0.5.0"
+embedded-io-async = "0.6.1"
 esp-alloc = { path = "../../../esp-alloc" }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
     "panic-handler",
@@ -15,16 +23,19 @@ esp-backtrace = { path = "../../../esp-backtrace", features = [
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
 esp-println = { path = "../../../esp-println", features = ["log-04"] }
-esp-rtos = { path = "../../../esp-rtos", features = ["esp-radio", "log-04"] }
+esp-rtos = { path = "../../../esp-rtos", features = ["esp-radio", "embassy", "log-04"] }
 esp-radio = { path = "../../../esp-radio", features = [
     "log-04",
-    "smoltcp",
-    "unstable",
     "wifi",
+    "unstable",
+    "ble",
+    "coex",
 ] }
-smoltcp = { version = "0.12.0", default-features = false, features = [
-    "medium-ethernet",
-    "socket-raw",
+static_cell = "2.1.0"
+trouble-host = { version = "0.5.0", features = [
+    "default-packet-pool-mtu-255",
+    "derive",
+    "scan",
 ] }
 
 [features]
@@ -55,13 +66,6 @@ esp32c6 = [
     "esp-hal/esp32c6",
     "esp-rtos/esp32c6",
     "esp-radio/esp32c6",
-]
-esp32s2 = [
-    "esp-backtrace/esp32s2",
-    "esp-bootloader-esp-idf/esp32s2",
-    "esp-hal/esp32s2",
-    "esp-rtos/esp32s2",
-    "esp-radio/esp32s2",
 ]
 esp32s3 = [
     "esp-backtrace/esp32s3",

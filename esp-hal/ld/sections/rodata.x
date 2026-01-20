@@ -1,9 +1,9 @@
 SECTIONS {
   /* For ESP App Description, must be placed first in image */
-  .rodata_desc : ALIGN(4)
+  .flash.appdesc : ALIGN(4)
   {
-      KEEP(*(.rodata_desc));
-      KEEP(*(.rodata_desc.*));
+      KEEP(*(.flash.appdesc));
+      KEEP(*(.flash.appdesc.*));
   } > RODATA
 
   .rodata : ALIGN(4)

@@ -1,9 +1,9 @@
 name: Backport merged PR
 
 on:
-  pull_request_target: 
+  pull_request_target:
     types:
-      - closed  # this workflow will act on closed PR - no sense in opening PR with unconfirmed changes
+      - closed # this workflow will act on closed PR - no sense in opening PR with unconfirmed changes
       - labeled # will fire if the label was added on an already closed PR
 
 permissions:
@@ -23,10 +23,9 @@ jobs:
          contains(github.event.label.name, '-backport'))
       )
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0 # for the benefit of backport-action, which relies on full history.
 
@@ -43,7 +42,7 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          
+
           # Strip the "-backport" suffix from the label:
           pkg=${pkg_label%-backport}
           echo "Detected package: $pkg"
@@ -77,4 +76,4 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           target_branches: ${{ steps.detect.outputs.target_branch }}
-          label_pattern: '.*-backport$'
+          label_pattern: ".*-backport$"
