@@ -25,6 +25,29 @@
 //! if you plan on reusing them again, after dropping the dedicated driver.
 //!
 //! Due to how the hardware works, [`DedicatedGpioOutput`] can drive any number of GPIO pins.
+//! 
+//! ## Bundles
+//!
+//! If you need to read or update multiple channels together, you can use the bundle helpers:
+//! - [`DedicatedGpioInputBundle`]
+//! - [`DedicatedGpioOutputBundle`]
+//! - [`DedicatedGpioFlexBundle`]
+//!
+//! Bundles are lightweight objects that precompute a channel mask from one or more drivers,
+//! allowing multi-channel operations with a single low-level read/write.
+//! 
+//! ## Low-level functions
+//!
+//! This module also exposes low-level helpers for direct, channel-bitmask-based access:
+//! - [`write_ll`]: write output levels for a selected set of channels in one operation
+//! - [`read_all_ll`]: read the current input levels of all channels
+#![cfg_attr(not(esp32s3), doc = r#"- [`output_levels_ll`]: read the current output levels of all channels"#)]
+#![cfg_attr(esp32s3, doc = r#"- `output_levels_ll`: read the current output levels of all channels (not available on ESP32-S3 due to an LLVM bug, see <https://github.com/espressif/llvm-project/issues/120>)"#)]
+//!
+//! These functions operate purely on channel bitmasks (bit 0 -> channel 0, bit 1 -> channel 1, ...)
+//! and do not track pin configuration. Prefer the higher-level drivers and bundles unless you
+//! specifically need the lowest overhead.
+
 #![cfg_attr(
     multi_core,
     doc = r#"
@@ -856,6 +879,10 @@ pub fn read_all_ll() -> u32 {
     ll::read_in()
 }
 
+/// Low-level function to read the current output levels of all dedicated GPIO channels.
+///
+/// The returned value is a bitmask where each bit represents the output level of a channel:
+/// bit 0 -> channel 0, bit 1 -> channel 1, etc. A bit value of 1 means the channel output is high.
 #[cfg(not(esp32s3))]
 #[inline(always)]
 pub fn output_levels_ll() -> u32 {
