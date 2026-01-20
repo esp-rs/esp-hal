@@ -408,6 +408,8 @@ impl Clocks {
             // Until we have every clock consumer modelled, we should manually keep clocks alive
             #[cfg(soc_has_clock_node_rc_fast_clk)]
             clocks::request_rc_fast_clk(clocks);
+            #[cfg(soc_has_clock_node_rc_slow_clk)]
+            clocks::request_rc_slow_clk(clocks);
             #[cfg(soc_has_clock_node_pll_clk)]
             clocks::request_pll_clk(clocks);
             #[cfg(soc_has_clock_node_pll_f96m_clk)]

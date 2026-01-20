@@ -399,7 +399,7 @@ fn update_apb_frequency(freq: Rate) {
 
 fn uses_80mhz_flash() -> bool {
     unsafe {
-        esp32s2::SPI0::steal()
+        crate::soc::pac::SPI0::steal()
             .clock()
             .read()
             .clk_equ_sysclk()
