@@ -729,6 +729,7 @@ pub fn format_package(
 
     for path in &paths {
         format_package_path(workspace, path, check, format_rules)?;
+        format_yml(check, path)?;
     }
 
     Ok(())
@@ -880,8 +881,8 @@ fn format_package_path(
 }
 
 /// Recursively format all `.yml` files in the `.github/` directory.
-pub fn format_yml(check: bool) -> Result<()> {
-    WalkDir::new("./.github")
+pub fn format_yml<P: AsRef<Path>>(check: bool, path: P) -> Result<()> {
+    WalkDir::new(path)
         .into_iter()
         .filter_map(Result::ok)
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "yml"))
@@ -892,7 +893,7 @@ pub fn format_yml(check: bool) -> Result<()> {
             let formatted = format_text(&content, &FormatOptions::default())
                 .context(format!("Failed to format {:?} yml!", path))?;
 
-            if content != formatted {
+            if content.replace("\r\n", "\n") != formatted.replace("\r\n", "\n") {
                 if check {
                     anyhow::bail!("File not formatted: {:?}", path);
                 }
