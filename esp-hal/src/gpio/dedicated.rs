@@ -514,7 +514,7 @@ impl embedded_hal::digital::InputPin for DedicatedGpioInput<'_> {
     doc = r#"
 
 <section class="warning">
-The method <code>output_level</code> is currently not available on ESP32-S3 due to 
+The method <code>output_level</code> is currently not available on ESP32-S3 due to
 an LLVM bug. See <a href=https://github.com/espressif/llvm-project/issues/120>https://github.com/espressif/llvm-project/issues/120</a> for details.
 </section>
 "#
