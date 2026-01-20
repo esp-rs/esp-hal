@@ -51,33 +51,33 @@ The [`hil.yml`] workflow builds the test suite for all our available targets and
 
 Our self-hosted runners have the following setup:
 - ESP32-C2 (`esp32c2-jtag`):
-  - Devkit: `ESP8684-DevKitM-1` connected via UART.
+  - Devkit: `ESP8684-DevKitM-1` connected via UART (`UART` port).
     - `GPIO18` and `GPIO9` are I2C pins.
     - `GPIO2` and `GPIO3` are connected.
   - Probe: `ESP-Prog` connected with the [following connections][connection_c2]
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-C3 (`rustboard`):
-  - Devkit: `ESP32-C3-DevKit-RUST-1` connected via USB-Serial-JTAG.
+  - Devkit: `ESP32-C3-DevKit-RUST-1` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO4` and `GPIO5` are I2C pins.
     - `GPIO2` and `GPIO3` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-C5 (`esp32c5-usb`):
-  - Devkit: `ESP32-C5-DevKitC-1` connected via USB-Serial-JTAG (`USB` port).
+  - Devkit: `ESP32-C5-DevKitC-1` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
     - `GPIO2` and `GPIO3` are I2C pins.
     - `GPIO9` and `GPIO10` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-C6 (`esp32c6-usb`):
-  - Devkit: `ESP32-C6-DevKitC-1 V1.2` connected via USB-Serial-JTAG (`USB` port).
+  - Devkit: `ESP32-C6-DevKitC-1 V1.2` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
     - `GPIO6` and `GPIO7` are I2C pins.
     - `GPIO2` and `GPIO3` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
-  - ESP32-C61 (`esp32c61-usb`):
-  - Devkit: `ESP32-C61-DevKitC-1 V1.0` connected via USB-Serial-JTAG (`USB` port).
+- ESP32-C61 (`esp32c61-usb`):
+  - Devkit: `ESP32-C61-DevKitC-1 V1.0` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
     - `GPIO6` and `GPIO7` are I2C pins.
     - `GPIO2` and `GPIO3` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-H2 (`esp32h2-usb`):
-  - Devkit: `ESP32-H2-DevKitM-1` connected via USB-Serial-JTAG (`USB` port).
+  - Devkit: `ESP32-H2-DevKitM-1` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
     - `GPIO12` and `GPIO22` are I2C pins.
     - `GPIO2` and `GPIO3` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
@@ -87,18 +87,18 @@ Our self-hosted runners have the following setup:
     - `GPIO7` and `GPIO8` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-S2 (`esp32s2-jtag`):
-  - Devkit: `ESP32-S2-Saola-1` connected via UART.
+  - Devkit: `ESP32-S2-Saola-1` connected via UART (`UART` port).
     - `GPIO2` and `GPIO3` are I2C pins.
     - `GPIO9` and `GPIO10` are connected.
   - Probe: `ESP-Prog` connected with the [following connections][connection_s2]
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-S3 (`esp32s3-usb`):
-  - Devkit: `ESP32-S3-DevKitC-1` connected via USB-Serial-JTAG.
+  - Devkit: `ESP32-S3-DevKitC-1` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
     - `GPIO2` and `GPIO3` are I2C pins.
     - `GPIO9` and `GPIO10` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32 (`esp32-jtag`):
-  - Devkit: `ESP32-DevKitC-V4` connected via UART.
+  - Devkit: `ESP32-DevKitC-V4` connected via UART (`UART` port).
     - `GPIO32` and `GPIO33` are I2C pins.
     - `GPIO2` and `GPIO4` are connected.
   - Probe: `ESP-Prog` connected with the [following connections][connection_esp32]
@@ -130,7 +130,7 @@ curl -L "https://github.com/esp-rs/espflash/releases/latest/download/espflash-${
 unzip "${HOME}/.cargo/bin/espflash.zip" -d "${HOME}/.cargo/bin/"
 rm "${HOME}/.cargo/bin/espflash.zip"
 chmod u+x "${HOME}/.cargo/bin/espflash"
-# Reboot the VM
+# Reboot the runner
 sudo reboot
 ```
 
