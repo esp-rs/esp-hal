@@ -1814,7 +1814,7 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
 
-        ll::read_in() // not sure if we should mask it here
+        ll::read_in()
     }
 
     /// Reads the current state of the channels included by this bundle.
