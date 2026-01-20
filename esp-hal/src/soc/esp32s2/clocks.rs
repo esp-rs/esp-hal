@@ -234,6 +234,9 @@ fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {
             CLK_LL_RC_FAST_WAIT_DEFAULT
         })
     });
+    if en {
+        ets_delay_us(50);
+    }
 }
 
 // CPU_PLL_DIV_IN
