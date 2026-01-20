@@ -33,11 +33,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo::rustc-env=ESP_BOOTLOADER_BUILD_TIME={build_time_formatted}");
     println!("cargo::rustc-env=ESP_BOOTLOADER_BUILD_DATE={build_date_formatted}");
 
+    // Ensure that exactly one chip has been specified (unless the "std" feature is enabled)
+    let chip = if !cfg!(feature = "std") {
+        Some(esp_metadata_generated::Chip::from_cargo_feature().unwrap())
+    } else {
+        None
+    };
+
     // emit config
     println!("cargo:rerun-if-changed=./esp_config.yml");
     let cfg_yaml = std::fs::read_to_string("./esp_config.yml")
         .expect("Failed to read esp_config.yml for esp-bootloader-esp-idf");
-    generate_config_from_yaml_definition(&cfg_yaml, true, true, None).unwrap();
+    generate_config_from_yaml_definition(&cfg_yaml, true, true, chip).unwrap();
 
     Ok(())
 }

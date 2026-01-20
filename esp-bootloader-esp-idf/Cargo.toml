@@ -46,6 +46,7 @@ md-5 = { version = "0.10.6", default-features = false, optional = true }
 [build-dependencies]
 jiff       = { version = "0.2.13", default-features = false, features = ["std"] }
 esp-config = { version = "0.6.1", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 # Make doctests & host-tests work together:
 [target.'cfg(any(target_arch = "riscv32", target_arch = "xtensa"))'.dev-dependencies]
