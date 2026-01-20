@@ -37,7 +37,15 @@ cfg_if::cfg_if! {
 }
 
 #[cfg(all(dedicated_gpio, feature = "unstable"))]
-use esp_hal::gpio::dedicated::DedicatedGpio;
+use esp_hal::gpio::dedicated::{
+    DedicatedGpio,
+    DedicatedGpioFlex,
+    DedicatedGpioFlexBundle,
+    DedicatedGpioInput,
+    DedicatedGpioInputBundle,
+    DedicatedGpioOutput,
+    DedicatedGpioOutputBundle,
+};
 
 struct Context {
     test_gpio1: AnyPin<'static>,
@@ -622,8 +630,6 @@ mod tests {
     #[test]
     #[cfg(all(dedicated_gpio, feature = "unstable"))]
     fn dedicated_gpios(ctx: Context) {
-        use esp_hal::gpio::dedicated::{DedicatedGpioInput, DedicatedGpioOutput};
-
         let input = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
         let output = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
 
@@ -651,8 +657,6 @@ mod tests {
     #[test]
     #[cfg(all(dedicated_gpio, feature = "unstable", not(esp32s3)))]
     fn dedicated_gpios_output_levels(ctx: Context) {
-        use esp_hal::gpio::dedicated::DedicatedGpioOutput;
-
         let output = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
         let mut output_dedicated =
             DedicatedGpioOutput::new(ctx.dedicated_gpio.channel0.output).with_pin(output);
@@ -663,38 +667,86 @@ mod tests {
         assert_eq!(output_dedicated.output_level(), Level::High);
     }
 
+    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    macro_rules! make_dedicated_io_and_bundles {
+        (
+            $ctx:expr, $channel:ident, $in_pin:ident, $out_pin:ident,
+            $in_ded:ident, $out_ded:ident, $in_bundle:ident, $out_bundle:ident $(,)?
+        ) => {
+            let input = Input::new($ctx.$in_pin, InputConfig::default().with_pull(Pull::Down));
+            let output = Output::new($ctx.$out_pin, Level::Low, OutputConfig::default());
+
+            let $in_ded = DedicatedGpioInput::new($ctx.dedicated_gpio.$channel.input, input);
+
+            let $out_ded =
+                DedicatedGpioOutput::new($ctx.dedicated_gpio.$channel.output).with_pin(output);
+
+            let mut $out_bundle = DedicatedGpioOutputBundle::new();
+            $out_bundle.with_output(&$out_ded);
+
+            let mut $in_bundle = DedicatedGpioInputBundle::new();
+            $in_bundle.with_input(&$in_ded);
+        };
+    }
+
     #[test]
     #[cfg(all(dedicated_gpio, feature = "unstable"))]
     fn dedicated_gpio_bundles(ctx: Context) {
-        use esp_hal::gpio::dedicated::{
-            DedicatedGpioInput,
-            DedicatedGpioInputBundle,
-            DedicatedGpioOutput,
-            DedicatedGpioOutputBundle,
-        };
-        let input = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
-        let output = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
+        make_dedicated_io_and_bundles!(
+            ctx,
+            channel0,
+            test_gpio1,
+            test_gpio2,
+            input_dedicated,
+            output_dedicated,
+            input_bundle,
+            output_bundle,
+        );
 
-        let input_dedicated = DedicatedGpioInput::new(ctx.dedicated_gpio.channel0.input, input);
-        let output_dedicated =
-            DedicatedGpioOutput::new(ctx.dedicated_gpio.channel0.output).with_pin(output);
-
-        let mut output_bundle = DedicatedGpioOutputBundle::new();
-        output_bundle.with_output(&output_dedicated);
-        
-        let mut input_bundle = DedicatedGpioInputBundle::new();
-        input_bundle.with_input(&input_dedicated);
-            
         assert_eq!(input_dedicated.level(), Level::Low);
         assert_eq!(input_bundle.masked_levels(), 0);
         #[cfg(not(esp32s3))]
         assert_eq!(output_bundle.all_output_levels(), 0);
 
         output_bundle.set_high(1);
-        
+
         assert_eq!(input_dedicated.level(), Level::High);
         assert_eq!(input_bundle.masked_levels(), 1);
         #[cfg(not(esp32s3))]
         assert_eq!(output_bundle.all_output_levels(), 1);
     }
+
+    #[test]
+    #[should_panic]
+    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    fn dedicated_gpio_bundles_write_outside_channels1(ctx: Context) {
+        make_dedicated_io_and_bundles!(
+            ctx,
+            channel0,
+            test_gpio1,
+            test_gpio2,
+            input_dedicated,
+            output_dedicated,
+            _input_bundle,
+            output_bundle,
+        );
+        output_bundle.set_high(0b10); // should panic, only channel0 is configured
+    }   
+
+    #[test]
+    #[should_panic]
+    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    fn dedicated_gpio_bundles_write_outside_channels2(ctx: Context) {
+        make_dedicated_io_and_bundles!(
+            ctx,
+            channel0,
+            test_gpio1,
+            test_gpio2,
+            input_dedicated,
+            output_dedicated,
+            _input_bundle,
+            output_bundle,
+        );
+        output_bundle.set_low(0b10); // should panic, only channel0 is configured
+    }   
 }
