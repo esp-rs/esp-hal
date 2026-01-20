@@ -1059,18 +1059,10 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
     )]
     pub fn with_output<'d>(&mut self, out: &'lt DedicatedGpioOutput<'d>) -> &mut Self {
         #[cfg(all(debug_assertions, multi_core))]
-        {
-            debug_assert_eq!(
-                self.core,
-                Cpu::current(),
-                "Dedicated GPIO used on a different CPU core than it was created on"
-            );
-
-            debug_assert_eq!(
-                out.core, self.core,
-                "All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself."
-            );
-        }
+        debug_assert_eq!(
+            out.core, self.core,
+            "All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself."
+        );
         self.mask |= out.mask;
         self
     }
@@ -1388,18 +1380,10 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
     )]
     pub fn with_input<'d>(&mut self, inp: &'lt DedicatedGpioInput<'d>) -> &mut Self {
         #[cfg(all(debug_assertions, multi_core))]
-        {
-            debug_assert_eq!(
-                self.core,
-                Cpu::current(),
-                "Dedicated GPIO used on a different CPU core than it was created on"
-            );
-
-            debug_assert_eq!(
-                inp.core, self.core,
-                "All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself."
-            );
-        }
+        debug_assert_eq!(
+            inp.core, self.core,
+            "All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself."
+        );
         self.mask |= inp.mask;
         self
     }
@@ -1612,18 +1596,10 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
     )]
     pub fn with_flex<'d>(&mut self, flex: &'lt DedicatedGpioFlex<'d>) -> &mut Self {
         #[cfg(all(debug_assertions, multi_core))]
-        {
-            debug_assert_eq!(
-                self.core,
-                Cpu::current(),
-                "Dedicated GPIO used on a different CPU core than it was created on"
-            );
-
-            debug_assert_eq!(
-                flex.core, self.core,
-                "All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself."
-            );
-        }
+        debug_assert_eq!(
+            flex.core, self.core,
+            "All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself."
+        );
         self.mask |= flex.mask;
         self
     }
