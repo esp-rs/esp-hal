@@ -63,7 +63,7 @@ Our self-hosted runners have the following setup:
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-C5 (`esp32c5-usb`):
   - Devkit: `ESP32-C5-DevKitC-1` connected via USB-Serial-JTAG (`USB` port).
-    - `GPIO6` and `GPIO7` are I2C pins.
+    - `GPIO2` and `GPIO3` are I2C pins.
     - `GPIO9` and `GPIO10` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-C6 (`esp32c6-usb`):
@@ -80,6 +80,11 @@ Our self-hosted runners have the following setup:
   - Devkit: `ESP32-H2-DevKitM-1` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO12` and `GPIO22` are I2C pins.
     - `GPIO2` and `GPIO3` are connected.
+  - RPi: Raspbian 12 configured with the following [setup]
+- ESP32-P4 (`esp32p4`):
+  - Devkit: `ESP32-P4 EV Board 1.5.2` connected via USB-Serial-JTAG (`USB` port).
+    - `GPIO2` and `GPIO3` are I2C pins.
+    - `GPIO7` and `GPIO8` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-S2 (`esp32s2-jtag`):
   - Devkit: `ESP32-S2-Saola-1` connected via UART.
