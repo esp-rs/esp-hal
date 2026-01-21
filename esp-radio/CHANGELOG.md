@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `InitializationError` is no longer `pub` for `wifi` (#4809)
 - `wifi::Capability` and `WifiController::capabilities()` no longer available (#4816)
 - `FreeApListOnDrop` is no longer available (#4816)
+- `wifi::ModeConfig::None` is no longer available (#4834)
 
 ## [v0.17.0] - 2025-10-30
 
