@@ -1202,7 +1202,6 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
         ll::write(self.mask, bits);
     }
 
-
     /// Returns the current output levels of the channels included by this bundle.
     ///
     /// For channels outside the bundle mask, the corresponding bits are always 0.
