@@ -53,7 +53,6 @@ Both `--test` and `--tests` will work.
 
 Please note that e.g. `/hil esp32s2 --test esp_radio::wifi_controller::tests::test_scan_doesnt_leak` will not work the same as running a specific test via `xtask`, because we use the `xtask` subcommand “run elfs” to run HIL tests in CI. Consequently, the command will be accepted by the bot, but the entire binary file will be run (in the case above, the entire `wifi_controller` test). 
 
-
 ### `/test-size`
 
 Triggers the binary size analysis workflow, which:
