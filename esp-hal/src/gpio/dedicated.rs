@@ -1231,8 +1231,7 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
 ///
 /// An input bundle precomputes a channel mask from one or more [`DedicatedGpioInput`]
 /// drivers. This lets you read multiple dedicated input channels with a single
-/// low-level read (see [`DedicatedGpioInputBundle::all_levels`] and
-/// [`DedicatedGpioInputBundle::masked_levels`]).
+/// low-level read (see [`DedicatedGpioInputBundle::levels`]).
 ///
 /// Attaching a driver does **not** change any pin state. The bundle only stores a
 /// channel mask; it does not own pins or remember which GPIOs were connected.
@@ -1281,7 +1280,7 @@ configured on the same core, and the bundle must only be used on the core that c
 /// bundle.with_input(&in0).with_input(&in1);
 ///
 /// // Read both channels at once:
-/// let bits = bundle.masked_levels();
+/// let bits = bundle.levels();
 /// // bit 0 -> channel 0, bit 1 -> channel 1, ...
 /// #
 /// # {after_snippet}
@@ -1516,7 +1515,7 @@ running on core 1.
 /// bundle.write_bits(0b0000_0010); // ch0 low, ch1 high
 ///
 /// // Read both channels at once:
-/// let in_bits = bundle.masked_levels();
+/// let in_bits = bundle.levels();
 /// #
 /// # {after_snippet}
 /// ```
