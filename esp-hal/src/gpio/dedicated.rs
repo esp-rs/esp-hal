@@ -1204,37 +1204,26 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
         ll::write(self.mask, bits);
     }
 
-    /// Returns the current output levels of **all** dedicated GPIO channels.
+
+    /// Returns the current output levels of the channels included by this bundle.
     ///
-    /// The return value is a bitmask where bit *n* represents the output level of channel *n*
-    /// (1 = high, 0 = low)
+    /// For channels outside the bundle mask, the corresponding bits are always 0.
+    ///
+    /// ## Example
+    ///
+    /// If the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then
+    /// `output_levels()` will only contain bits 0, 1, and 3, regardless of the output
+    /// state of other channels.
     #[cfg(not(esp32s3))]
     #[inline(always)]
-    pub fn all_output_levels(&self) -> u32 {
+    pub fn output_levels(&self) -> u32 {
         #[cfg(all(debug_assertions, multi_core))]
         debug_assert_eq!(
             self.core,
             Cpu::current(),
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
-
-        ll::read_out()
-    }
-
-    /// Returns the current output levels of the channels included by this bundle.
-    ///
-    /// This is a convenience wrapper around [`Self::all_output_levels`]. It returns the same
-    /// bitmask, but with all bits outside [`Self::mask`] cleared to 0.
-    ///
-    /// ## Example
-    ///
-    /// If the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then
-    /// `masked_output_levels()` will only contain bits 0, 1, and 3, regardless of the output
-    /// state of other channels.
-    #[cfg(not(esp32s3))]
-    #[inline(always)]
-    pub fn masked_output_levels(&self) -> u32 {
-        self.all_output_levels() & self.mask
+        ll::read_out() & self.mask
     }
 }
 
@@ -1410,12 +1399,17 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
         self
     }
 
-    /// Reads the current state of the channels
+    /// Reads the current state of the channels included by this bundle.
     ///
-    /// The return value is a bitmask where bit *n* represents the logic level of channel *n*
-    /// (1 = high, 0 = low).
+    /// For channels outside the bundle mask, the corresponding bits are always 0.
+    ///
+    /// ## Example
+    ///
+    /// If the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then
+    /// `levels()` will only contain bits 0, 1, and 3, regardless of the state
+    /// of other channels.
     #[inline(always)]
-    pub fn all_levels(&self) -> u32 {
+    pub fn levels(&self) -> u32 {
         #[cfg(all(debug_assertions, multi_core))]
         debug_assert_eq!(
             self.core,
@@ -1423,22 +1417,33 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
 
-        ll::read_in()
+        ll::read_in() & self.mask
     }
 
-    /// Reads the current state of the channels included by this bundle.
-    ///
-    /// This is a convenience wrapper around [`Self::all_levels`]. It returns the same
-    /// bitmask, but with all bits outside [`Self::mask`] cleared to 0.
-    ///
-    /// ## Example
-    ///
-    /// If the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then
-    /// `masked_levels()` will only contain bits 0, 1, and 3, regardless of the state
-    /// of other channels.
+    /// Returns `true` if all channels in this bundle are currently high.
     #[inline(always)]
-    pub fn masked_levels(&self) -> u32 {
-        self.all_levels() & self.mask
+    pub fn all_high(&self) -> bool {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
+        (ll::read_in() & self.mask) == self.mask
+    }
+
+    /// Returns `true` if all channels in this bundle are currently low.
+    #[inline(always)]
+    pub fn all_low(&self) -> bool {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
+        (ll::read_in() & self.mask) == 0
     }
 }
 
@@ -1724,68 +1729,72 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
         ll::write(self.mask, bits);
     }
 
-    /// Returns the current output levels of **all** dedicated GPIO channels.
-    ///
-    /// The return value is a bitmask where bit *n* represents the output level of channel *n*
-    /// (1 = high, 0 = low)
-    #[cfg(not(esp32s3))]
-    #[inline(always)]
-    pub fn all_output_levels(&self) -> u32 {
-        #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(
-            self.core,
-            Cpu::current(),
-            "Dedicated GPIO used on a different CPU core than it was created on"
-        );
-
-        ll::read_out()
-    }
-
     /// Returns the current output levels of the channels included by this bundle.
     ///
-    /// This is a convenience wrapper around [`Self::all_output_levels`]. It returns the same
-    /// bitmask, but with all bits outside [`Self::mask`] cleared to 0.
+    /// For channels outside the bundle mask, the corresponding bits are always 0.
     ///
     /// ## Example
     ///
     /// If the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then
-    /// `masked_output_levels()` will only contain bits 0, 1, and 3, regardless of the output
+    /// `output_levels()` will only contain bits 0, 1, and 3, regardless of the output
     /// state of other channels.
     #[cfg(not(esp32s3))]
     #[inline(always)]
-    pub fn masked_output_levels(&self) -> u32 {
-        self.all_output_levels() & self.mask
-    }
-
-    /// Reads the current state of the channels
-    ///
-    /// The return value is a bitmask where bit *n* represents the input level of channel *n*
-    /// (1 = high, 0 = low).
-    #[inline(always)]
-    pub fn all_levels(&self) -> u32 {
+    pub fn output_levels(&self) -> u32 {
         #[cfg(all(debug_assertions, multi_core))]
         debug_assert_eq!(
             self.core,
             Cpu::current(),
             "Dedicated GPIO used on a different CPU core than it was created on"
         );
-
-        ll::read_in()
+        ll::read_out() & self.mask
     }
 
     /// Reads the current state of the channels included by this bundle.
     ///
-    /// This is a convenience wrapper around [`Self::all_levels`]. It returns the same
-    /// bitmask, but with all bits outside [`Self::mask`] cleared to 0.
+    /// For channels outside the bundle mask, the corresponding bits are always 0.
     ///
     /// ## Example
     ///
     /// If the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then
-    /// `masked_levels()` will only contain bits 0, 1, and 3, regardless of the state
+    /// `levels()` will only contain bits 0, 1, and 3, regardless of the state
     /// of other channels.
     #[inline(always)]
-    pub fn masked_levels(&self) -> u32 {
-        self.all_levels() & self.mask
+    pub fn levels(&self) -> u32 {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
+        ll::read_in() & self.mask
+    }
+
+    /// Returns `true` if all channels in this bundle are currently high.
+    #[inline(always)]
+    pub fn all_high(&self) -> bool {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
+        (ll::read_in() & self.mask) == self.mask
+    }
+    
+    /// Returns `true` if all channels in this bundle are currently low.
+    #[inline(always)]
+    pub fn all_low(&self) -> bool {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(
+            self.core,
+            Cpu::current(),
+            "Dedicated GPIO used on a different CPU core than it was created on"
+        );
+
+        (ll::read_in() & self.mask) == 0
     }
 }
 

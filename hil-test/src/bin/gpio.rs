@@ -739,16 +739,16 @@ mod tests {
         );
 
         assert_eq!(input_dedicated.level(), Level::Low);
-        assert_eq!(input_bundle.masked_levels(), 0);
+        assert_eq!(input_bundle.levels(), 0);
         #[cfg(not(esp32s3))]
-        assert_eq!(output_bundle.all_output_levels(), 0);
+        assert_eq!(output_bundle.output_levels(), 0);
 
         output_bundle.set_high(1);
 
         assert_eq!(input_dedicated.level(), Level::High);
-        assert_eq!(input_bundle.masked_levels(), 1);
+        assert_eq!(input_bundle.levels(), 1);
         #[cfg(not(esp32s3))]
-        assert_eq!(output_bundle.all_output_levels(), 1);
+        assert_eq!(output_bundle.output_levels(), 1);
     }
 
     #[test]
