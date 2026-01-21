@@ -1527,16 +1527,16 @@ pub struct DedicatedGpioFlexBundle<'lt> {
 
 impl<'lt> DedicatedGpioFlexBundle<'lt> {
     /// Creates a new, empty dedicated GPIO flex bundle.
-    /// 
+    ///
     /// A bundle is a *logical* grouping of one or more [`DedicatedGpioFlex`] drivers.
     /// Internally, it stores a precomputed channel mask (see [`Self::mask`]) which allows
     /// writing multiple dedicated GPIO channels efficiently.
     ///
     /// The returned bundle initially contains no channels. Add flex drivers using
     /// [`Self::with_flex`].
-    /// 
+    ///
     /// ## Notes
-    /// 
+    ///
     /// - Creating a bundle does **not** configure any hardware by itself.
     pub fn new() -> Self {
         Self {
