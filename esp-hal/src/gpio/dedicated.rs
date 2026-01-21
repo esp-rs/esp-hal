@@ -1002,8 +1002,6 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
     /// ## Notes
     ///
     /// - Creating a bundle does **not** configure any hardware by itself.
-    /// - Attaching outputs only updates the bundle’s internal mask; it does not change any output
-    ///   state.
     pub fn new() -> Self {
         Self {
             _marker: PhantomData,
@@ -1308,7 +1306,6 @@ impl<'lt> DedicatedGpioInputBundle<'lt> {
     /// ## Notes
     ///
     /// - Creating a bundle does **not** configure any hardware by itself.
-    /// - Attaching inputs only updates the bundle’s internal mask; it does not change pin state.
     pub fn new() -> Self {
         Self {
             _marker: PhantomData,
@@ -1533,9 +1530,17 @@ pub struct DedicatedGpioFlexBundle<'lt> {
 
 impl<'lt> DedicatedGpioFlexBundle<'lt> {
     /// Creates a new, empty dedicated GPIO flex bundle.
+    /// 
+    /// A bundle is a *logical* grouping of one or more [`DedicatedGpioFlex`] drivers.
+    /// Internally, it stores a precomputed channel mask (see [`Self::mask`]) which allows
+    /// writing multiple dedicated GPIO channels efficiently.
     ///
     /// The returned bundle initially contains no channels. Add flex drivers using
     /// [`Self::with_flex`].
+    /// 
+    /// ## Notes
+    /// 
+    /// - Creating a bundle does **not** configure any hardware by itself.
     pub fn new() -> Self {
         Self {
             _marker: PhantomData,
