@@ -8,6 +8,8 @@ use core::{fmt::Debug, marker::PhantomData, mem::MaybeUninit, ptr::addr_of, task
 use docsplay::Display;
 use enumset::{EnumSet, EnumSetType};
 use esp_config::esp_config_int;
+#[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
+use esp_hal::time::Duration;
 use esp_hal::{asynch::AtomicWaker, system::Cpu};
 use esp_sync::NonReentrantMutex;
 use num_derive::FromPrimitive;
@@ -1155,10 +1157,10 @@ pub struct RxControlInfo {
     pub channel: u32,
     /// Secondary channel on which the packet is received: 0 for none, 1 for
     /// above, 2 for below.
-    pub secondary_channel: u32,
+    pub secondary_channel: SecondaryChannel,
     /// Timestamp of when the packet is received, in microseconds. Precise only
     /// if modem sleep or light sleep is not enabled.
-    pub timestamp: u32,
+    pub timestamp: Duration,
     /// Noise floor of the Radio Frequency module, in dBm.
     pub noise_floor: i32,
     /// Antenna number from which the packet is received: 0 for antenna 0, 1 for
@@ -1200,8 +1202,8 @@ pub struct RxControlInfo {
     pub rx_channel_estimate_info_vld: u32,
     /// Length of the channel estimation.
     pub rx_channel_estimate_len: u32,
-    /// Timing information in seconds.
-    pub second: u32,
+    /// The secondary channel if in HT40.
+    pub secondary_channel: SecondaryChannel,
     /// Primary channel on which the packet is received.
     pub channel: u32,
     /// Noise floor of the Radio Frequency module, in dBm.
@@ -1218,6 +1220,9 @@ pub struct RxControlInfo {
     pub rxmatch1: u32,
     /// Indicate whether the reception frame is from interface 0.
     pub rxmatch0: u32,
+    /// The local time when this packet is received. It is precise only if modem sleep or light
+    /// sleep is not enabled. unit: microsecond.
+    pub timestamp: Duration,
 }
 
 #[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
@@ -1244,8 +1249,8 @@ impl RxControlInfo {
                 sgi: (*rx_cntl).sgi(),
                 ampdu_cnt: (*rx_cntl).ampdu_cnt(),
                 channel: (*rx_cntl).channel(),
-                secondary_channel: (*rx_cntl).secondary_channel(),
-                timestamp: (*rx_cntl).timestamp(),
+                secondary_channel: SecondaryChannel::from_raw((*rx_cntl).secondary_channel()),
+                timestamp: Duration::from_micros((*rx_cntl).timestamp().into()),
                 noise_floor: (*rx_cntl).noise_floor(),
                 ant: (*rx_cntl).ant(),
                 sig_len: (*rx_cntl).sig_len(),
@@ -1265,7 +1270,7 @@ impl RxControlInfo {
                 cur_bb_format: (*rx_cntl).cur_bb_format(),
                 rx_channel_estimate_info_vld: (*rx_cntl).rx_channel_estimate_info_vld(),
                 rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
-                second: (*rx_cntl).second(),
+                secondary_channel: SecondaryChannel::from_raw((*rx_cntl).second()),
                 channel: (*rx_cntl).channel(),
                 noise_floor: (*rx_cntl).noise_floor(),
                 is_group: (*rx_cntl).is_group(),
@@ -1274,6 +1279,7 @@ impl RxControlInfo {
                 rxmatch2: (*rx_cntl).rxmatch2(),
                 rxmatch1: (*rx_cntl).rxmatch1(),
                 rxmatch0: (*rx_cntl).rxmatch0(),
+                timestamp: Duration::from_micros((*rx_cntl).timestamp().into()),
             }
         };
         rx_control_info

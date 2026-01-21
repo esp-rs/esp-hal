@@ -6,12 +6,15 @@ use core::marker::PhantomData;
 use super::{WifiError, c_types::c_void, esp_wifi_result};
 #[cfg(esp32c6)]
 use crate::sys::include::wifi_csi_acquire_config_t;
-use crate::sys::include::{
-    esp_wifi_set_csi,
-    esp_wifi_set_csi_config,
-    esp_wifi_set_csi_rx_cb,
-    wifi_csi_config_t,
-    wifi_csi_info_t,
+use crate::{
+    sys::include::{
+        esp_wifi_set_csi,
+        esp_wifi_set_csi_config,
+        esp_wifi_set_csi_rx_cb,
+        wifi_csi_config_t,
+        wifi_csi_info_t,
+    },
+    wifi::SecondaryChannel,
 };
 
 /// CSI (Channel State Information) packet metadata and associated packet details.
@@ -114,16 +117,18 @@ impl<'a> WifiCsiInfo<'_> {
         unsafe { (*self.inner).rx_ctrl.channel() as u8 }
     }
 
-    /// Secondary channel on which this packet is received.
-    /// 0: none; 1: above; 2: below.
-    pub fn secondary_channel(&self) -> u8 {
-        #[cfg(not(esp32c6))]
-        unsafe {
-            (*self.inner).rx_ctrl.secondary_channel() as u8
-        }
-        #[cfg(esp32c6)]
-        unsafe {
-            (*self.inner).rx_ctrl.second() as u8
+    /// [`SecondaryChannel`] on which this packet is received.
+    pub fn secondary_channel(&self) -> SecondaryChannel {
+        cfg_if::cfg_if! {
+            if #[cfg(not(esp32c6))] {
+                SecondaryChannel::from_raw(unsafe {
+                    (*self.inner).rx_ctrl.secondary_channel()
+                })
+            } else {
+                SecondaryChannel::from_raw(unsafe {
+                    (*self.inner).rx_ctrl.second()
+                })
+            }
         }
     }
 

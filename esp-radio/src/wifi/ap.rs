@@ -43,7 +43,7 @@ pub struct AccessPointConfig {
     /// The channel the access point will operate on.
     pub(crate) channel: u8,
     /// The secondary channel configuration.
-    pub(crate) secondary_channel: Option<u8>,
+    pub(crate) secondary_channel: Option<SecondaryChannel>,
     /// The set of protocols supported by the access point.
     pub(crate) protocols: EnumSet<Protocol>,
     /// The authentication method to be used by the access point.
