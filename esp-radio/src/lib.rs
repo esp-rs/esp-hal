@@ -212,10 +212,13 @@ pub mod wifi;
 
 unstable_module! {
     #[cfg(feature = "esp-now")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "esp-now")))]
     pub mod esp_now;
     #[cfg(feature = "ble")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "ble")))]
     pub mod ble;
     #[cfg(feature = "ieee802154")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "ieee802154")))]
     pub mod ieee802154;
 }
 

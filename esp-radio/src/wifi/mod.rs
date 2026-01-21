@@ -42,12 +42,18 @@ use crate::{
     },
 };
 pub mod ap;
-#[cfg(all(feature = "csi", feature = "unstable"))]
-pub mod csi;
-pub mod event;
+
+unstable_module!(
+    #[cfg(feature = "csi")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "csi")))]
+    pub mod csi;
+    pub mod event;
+    #[cfg(feature = "sniffer")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sniffer")))]
+    pub mod sniffer;
+);
+
 pub mod scan;
-#[cfg(all(feature = "sniffer", feature = "unstable"))]
-pub mod sniffer;
 pub mod sta;
 
 pub(crate) mod os_adapter;
@@ -1111,6 +1117,7 @@ pub enum Bandwidth {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
+#[instability::unstable]
 pub struct RxControlInfo {
     /// Received Signal Strength Indicator (RSSI) of the packet, in dBm.
     pub rssi: i32,
@@ -1169,6 +1176,7 @@ pub struct RxControlInfo {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
+#[instability::unstable]
 pub struct RxControlInfo {
     /// Received Signal Strength Indicator (RSSI) of the packet, in dBm.
     pub rssi: i32,
@@ -1219,7 +1227,7 @@ impl RxControlInfo {
     /// # Safety
     /// When calling this, you must ensure, that `rx_cntl` points to a valid
     /// instance of [wifi_pkt_rx_ctrl_t].
-    pub unsafe fn from_raw(rx_cntl: *const wifi_pkt_rx_ctrl_t) -> Self {
+    pub(super) unsafe fn from_raw(rx_cntl: *const wifi_pkt_rx_ctrl_t) -> Self {
         #[cfg(not(esp32c6))]
         let rx_control_info = unsafe {
             RxControlInfo {
