@@ -1790,7 +1790,6 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
 
         (ll::read_in() & self.mask) == self.mask
     }
-    
     /// Returns `true` if all channels in this bundle are currently low.
     #[inline(always)]
     pub fn all_low(&self) -> bool {
