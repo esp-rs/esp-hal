@@ -897,6 +897,7 @@ pub fn output_levels_ll() -> u32 {
     ll::read_out()
 }
 
+#[doc_replace]
 /// A bundle of dedicated GPIO output drivers.
 ///
 /// An output bundle precomputes a channel mask from one or more
@@ -933,6 +934,7 @@ configured on the same core, and the bundle must only be used on the core that c
 </section>
 "#
 )]
+#[doc = ""]
 /// ## Examples
 ///
 /// ```rust, no_run
@@ -1227,6 +1229,7 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
     }
 }
 
+#[doc_replace]
 /// A bundle of dedicated GPIO input drivers.
 ///
 /// An input bundle precomputes a channel mask from one or more [`DedicatedGpioInput`]
@@ -1446,6 +1449,7 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
     }
 }
 
+#[doc_replace]
 /// A bundle of dedicated GPIO flex drivers (input + output).
 ///
 /// A flex bundle precomputes a channel mask from one or more [`DedicatedGpioFlex`]
@@ -1484,6 +1488,7 @@ running on core 1.
 </section>
 "#
 )]
+#[doc = ""]
 /// ## Examples
 ///
 /// ```rust, no_run
