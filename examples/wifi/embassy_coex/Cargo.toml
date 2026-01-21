@@ -81,3 +81,7 @@ debug            = true
 debug-assertions = true
 lto              = "fat"
 codegen-units    = 1
+
+[package.metadata.cargo-machete]
+# Needed for the gatt_server macro.
+ignored = ["embassy-sync"]
