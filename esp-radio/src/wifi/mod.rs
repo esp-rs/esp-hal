@@ -198,14 +198,10 @@ impl SecondaryChannel {
 
 /// Configuration of Wi-Fi operation mode.
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug, PartialEq, Eq, Default, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ModeConfig {
-    /// No configuration (default).
-    #[default]
-    None,
-
     /// Station configuration.
     Station(StationConfig),
 
@@ -223,7 +219,6 @@ pub enum ModeConfig {
 impl ModeConfig {
     fn validate(&self) -> Result<(), WifiError> {
         match self {
-            ModeConfig::None => Ok(()),
             ModeConfig::Station(station_configuration) => station_configuration.validate(),
             ModeConfig::AccessPoint(access_point_configuration) => {
                 access_point_configuration.validate()
@@ -363,21 +358,15 @@ impl WifiMode {
     }
 }
 
-impl TryFrom<&ModeConfig> for WifiMode {
-    type Error = WifiError;
-
-    /// Based on the current `ModeConfig`, derives a `WifiMode` based on it.
-    fn try_from(config: &ModeConfig) -> Result<Self, Self::Error> {
-        let mode = match config {
-            ModeConfig::None => return Err(WifiError::UnknownWifiMode),
+impl From<&ModeConfig> for WifiMode {
+    fn from(config: &ModeConfig) -> Self {
+        match config {
             ModeConfig::AccessPoint(_) => Self::AccessPoint,
             ModeConfig::Station(_) => Self::Station,
             ModeConfig::AccessPointStation(_, _) => Self::AccessPointStation,
             #[cfg(feature = "wifi-eap")]
             ModeConfig::EapStation(_) => Self::Station,
-        };
-
-        Ok(mode)
+        }
     }
 }
 
@@ -2197,15 +2186,12 @@ impl WifiController<'_> {
     /// This will set the mode accordingly.
     /// You need to use [`Self::connect`] for connecting to an access point.
     ///
-    /// Passing [`ModeConfig::None`] will disable both access point and station modes.
-    ///
     /// If you don't intend to use Wi-Fi anymore at all consider tearing down
     /// Wi-Fi completely.
     pub fn set_config(&mut self, conf: &ModeConfig) -> Result<(), WifiError> {
         conf.validate()?;
 
         let mode = match conf {
-            ModeConfig::None => wifi_mode_t_WIFI_MODE_NULL,
             ModeConfig::Station(_) => wifi_mode_t_WIFI_MODE_STA,
             ModeConfig::AccessPoint(_) => wifi_mode_t_WIFI_MODE_AP,
             ModeConfig::AccessPointStation(_, _) => wifi_mode_t_WIFI_MODE_APSTA,
@@ -2216,7 +2202,6 @@ impl WifiController<'_> {
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) })?;
 
         match conf {
-            ModeConfig::None => Ok(()),
             ModeConfig::Station(config) => {
                 self.apply_sta_config(config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)
