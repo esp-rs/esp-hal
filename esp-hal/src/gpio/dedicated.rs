@@ -1040,8 +1040,6 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
     ///
     /// ## Notes
     ///
-    /// - The referenced output driver must outlive this bundle (`'lt`), since dropping the output
-    ///   driver would release its GPIO pins back to normal GPIO mode.
     /// - This function does not change any GPIO output state.
     #[cfg_attr(
         multi_core,
