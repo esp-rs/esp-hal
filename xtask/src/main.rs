@@ -80,6 +80,10 @@ struct CiArgs {
     /// Whether to skip building documentation
     #[arg(long)]
     no_docs: bool,
+
+    /// Whether to skip checking the crates itself
+    #[arg(long)]
+    no_check_crates: bool,
 }
 
 #[derive(Debug, Args)]
@@ -542,16 +546,18 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         std::env::set_var("CI", "true");
     }
 
-    runner.run("Check crates", || {
-        check_packages(
-            workspace,
-            CheckPackagesArgs {
-                packages: Package::iter().collect(),
-                chips: vec![args.chip],
-                toolchain: args.toolchain.clone(),
-            },
-        )
-    });
+    if !args.no_check_crates {
+        runner.run("Check crates", || {
+            check_packages(
+                workspace,
+                CheckPackagesArgs {
+                    packages: Package::iter().collect(),
+                    chips: vec![args.chip],
+                    toolchain: args.toolchain.clone(),
+                },
+            )
+        });
+    }
 
     if !args.no_lint {
         runner.run("Lint", || {
