@@ -38,6 +38,8 @@ peripherals = [
     # { name = "LP_CORE", virtual = true },
  
     # { name = "SW_INTERRUPT", virtual = true },
+
+    { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
 ]
 
 symbols = [

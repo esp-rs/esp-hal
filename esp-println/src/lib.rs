@@ -458,7 +458,12 @@ mod uart_printer {
         fn flush() {
             unsafe {
                 const TX_FLUSH: usize = 0x4000_0074;
+
+                #[cfg(not(feature = "esp32c5"))]
                 const GET_CHANNEL: usize = 0x4000_003C;
+
+                #[cfg(feature = "esp32c5")]
+                const GET_CHANNEL: usize = 0x4000_0038;
 
                 let tx_flush: unsafe extern "C" fn(u8) = core::mem::transmute(TX_FLUSH);
                 let get_channel: unsafe extern "C" fn() -> u8 = core::mem::transmute(GET_CHANNEL);
