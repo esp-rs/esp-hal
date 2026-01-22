@@ -71,7 +71,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | LP I2C master      |       |          |          |          | ⚒️      |          |          |          |
 | I2C slave          | ❌    |          | ❌       |          | ❌       | ❌       | ❌       | ❌       |
 | I2S                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| Interrupts         | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| Interrupts         | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | IOMUX              | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Camera interface   | ❌    |          |          |          |          |          | ❌       | ⚒️      |
 | RGB display        | ⚒️   |          |          |          |          |          | ❌       | ⚒️      |

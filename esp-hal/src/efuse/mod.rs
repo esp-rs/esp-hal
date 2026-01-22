@@ -56,7 +56,7 @@ use portable_atomic::AtomicU8;
 #[cfg_attr(esp32, path = "esp32/mod.rs")]
 #[cfg_attr(esp32c2, path = "esp32c2/mod.rs")]
 #[cfg_attr(esp32c3, path = "esp32c3/mod.rs")]
-#[cfg_attr(esp32c3, path = "esp32c5/mod.rs")]
+#[cfg_attr(esp32c5, path = "esp32c5/mod.rs")]
 #[cfg_attr(esp32c6, path = "esp32c6/mod.rs")]
 #[cfg_attr(esp32h2, path = "esp32h2/mod.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2/mod.rs")]
