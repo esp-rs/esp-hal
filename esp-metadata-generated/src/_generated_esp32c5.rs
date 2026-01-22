@@ -2720,18 +2720,20 @@ macro_rules! for_each_peripheral {
         virtual())); _for_each_inner!((@ peri_type #[doc = "GPIO27 peripheral singleton"]
         GPIO27 <= virtual())); _for_each_inner!((@ peri_type #[doc =
         "GPIO28 peripheral singleton"] GPIO28 <= virtual())); _for_each_inner!((@
-        peri_type #[doc = "USB_DEVICE peripheral singleton"] USB_DEVICE <=
-        USB_DEVICE(USB_DEVICE : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable))); _for_each_inner!((GPIO0));
-        _for_each_inner!((GPIO1)); _for_each_inner!((GPIO2)); _for_each_inner!((GPIO3));
-        _for_each_inner!((GPIO4)); _for_each_inner!((GPIO5)); _for_each_inner!((GPIO6));
-        _for_each_inner!((GPIO7)); _for_each_inner!((GPIO8)); _for_each_inner!((GPIO9));
-        _for_each_inner!((GPIO10)); _for_each_inner!((GPIO11));
-        _for_each_inner!((GPIO12)); _for_each_inner!((GPIO13));
-        _for_each_inner!((GPIO14)); _for_each_inner!((GPIO23));
-        _for_each_inner!((GPIO24)); _for_each_inner!((GPIO25));
-        _for_each_inner!((GPIO26)); _for_each_inner!((GPIO27));
-        _for_each_inner!((GPIO28)); _for_each_inner!((USB_DEVICE(unstable)));
+        peri_type #[doc = "LPWR peripheral singleton"] LPWR <= LP_CLKRST() (unstable)));
+        _for_each_inner!((@ peri_type #[doc = "USB_DEVICE peripheral singleton"]
+        USB_DEVICE <= USB_DEVICE(USB_DEVICE : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        _for_each_inner!((GPIO0)); _for_each_inner!((GPIO1)); _for_each_inner!((GPIO2));
+        _for_each_inner!((GPIO3)); _for_each_inner!((GPIO4)); _for_each_inner!((GPIO5));
+        _for_each_inner!((GPIO6)); _for_each_inner!((GPIO7)); _for_each_inner!((GPIO8));
+        _for_each_inner!((GPIO9)); _for_each_inner!((GPIO10));
+        _for_each_inner!((GPIO11)); _for_each_inner!((GPIO12));
+        _for_each_inner!((GPIO13)); _for_each_inner!((GPIO14));
+        _for_each_inner!((GPIO23)); _for_each_inner!((GPIO24));
+        _for_each_inner!((GPIO25)); _for_each_inner!((GPIO26));
+        _for_each_inner!((GPIO27)); _for_each_inner!((GPIO28));
+        _for_each_inner!((LPWR(unstable))); _for_each_inner!((USB_DEVICE(unstable)));
         _for_each_inner!((all(@ peri_type #[doc = "GPIO0 peripheral singleton"] GPIO0 <=
         virtual()), (@ peri_type #[doc = "GPIO1 peripheral singleton"] GPIO1 <=
         virtual()), (@ peri_type #[doc =
@@ -2784,12 +2786,13 @@ macro_rules! for_each_peripheral {
         "GPIO26 peripheral singleton"] GPIO26 <= virtual()), (@ peri_type #[doc =
         "GPIO27 peripheral singleton"] GPIO27 <= virtual()), (@ peri_type #[doc =
         "GPIO28 peripheral singleton"] GPIO28 <= virtual()), (@ peri_type #[doc =
-        "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
+        "LPWR peripheral singleton"] LPWR <= LP_CLKRST() (unstable)), (@ peri_type #[doc
+        = "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)))); _for_each_inner!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
         (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11),
         (GPIO12), (GPIO13), (GPIO14), (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27),
-        (GPIO28), (USB_DEVICE(unstable))));
+        (GPIO28), (LPWR(unstable)), (USB_DEVICE(unstable))));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.
