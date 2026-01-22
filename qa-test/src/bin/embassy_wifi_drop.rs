@@ -16,7 +16,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{ModeConfig, sta::StationConfig};
+use esp_radio::wifi::{Config, sta::StationConfig};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -47,7 +47,7 @@ async fn main(_spawner: Spawner) {
         let token = wifi_interface.transmit();
         assert!(matches!(token, None));
 
-        let station_config = ModeConfig::Station(
+        let station_config = Config::Station(
             StationConfig::default()
                 .with_ssid(SSID.into())
                 .with_password(PASSWORD.into()),
@@ -77,7 +77,7 @@ async fn main(_spawner: Spawner) {
         let (mut controller, interfaces) =
             esp_radio::wifi::new(wifi.reborrow(), Default::default()).unwrap();
 
-        let station_config = ModeConfig::Station(
+        let station_config = Config::Station(
             StationConfig::default()
                 .with_ssid(SSID.into())
                 .with_password(PASSWORD.into()),

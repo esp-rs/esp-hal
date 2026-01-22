@@ -22,7 +22,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{Interface, ModeConfig, WifiController, WifiEvent, sta::StationConfig};
+use esp_radio::wifi::{Config, Interface, WifiController, WifiEvent, sta::StationConfig};
 use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -57,7 +57,7 @@ async fn connection_manager(
     println!("Starting WiFi connection manager");
 
     if !matches!(controller.is_started(), Ok(true)) {
-        let station_config = ModeConfig::Station(
+        let station_config = Config::Station(
             StationConfig::default()
                 .with_ssid(SSID.into())
                 .with_password(PASSWORD.into()),

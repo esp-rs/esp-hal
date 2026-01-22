@@ -55,9 +55,7 @@ async fn main(_spawner: Spawner) {
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
     controller
-        .set_config(&esp_radio::wifi::ModeConfig::Station(
-            StationConfig::default(),
-        ))
+        .set_config(&esp_radio::wifi::Config::Station(StationConfig::default()))
         .unwrap();
 
     controller.start_async().await.unwrap();

@@ -25,7 +25,6 @@ use esp_hal::{
 use esp_println::println;
 use esp_radio::wifi::{
     Config,
-    ModeConfig,
     WifiMode,
     scan::{ScanConfig, ScanTypeConfig},
     sta::StationConfig,
@@ -49,7 +48,7 @@ async fn main(_spawner: Spawner) {
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let (mut controller, _interfaces) =
-        esp_radio::wifi::new(peripherals.WIFI.reborrow(), Config::default()).unwrap();
+        esp_radio::wifi::new(peripherals.WIFI.reborrow(), Default::default()).unwrap();
 
     let mut i = 0;
     loop {
@@ -105,7 +104,7 @@ async fn main(_spawner: Spawner) {
         println!("Best AP found: {:?}", best_one);
         println!("Connecting to WiFi SSID: {}", SSID);
 
-        let station_config = ModeConfig::Station(
+        let station_config = Config::Station(
             StationConfig::default()
                 .with_ssid(best_one.ssid.clone())
                 .with_bssid(best_one.bssid)

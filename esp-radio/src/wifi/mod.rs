@@ -198,7 +198,7 @@ impl SecondaryChannel {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub enum ModeConfig {
+pub enum Config {
     /// Station configuration.
     Station(StationConfig),
 
@@ -213,21 +213,19 @@ pub enum ModeConfig {
     EapStation(EapStationConfig),
 }
 
-impl ModeConfig {
+impl Config {
     fn validate(&self) -> Result<(), WifiError> {
         match self {
-            ModeConfig::Station(station_configuration) => station_configuration.validate(),
-            ModeConfig::AccessPoint(access_point_configuration) => {
+            Config::Station(station_configuration) => station_configuration.validate(),
+            Config::AccessPoint(access_point_configuration) => {
                 access_point_configuration.validate()
             }
-            ModeConfig::AccessPointStation(station_configuration, access_point_configuration) => {
+            Config::AccessPointStation(station_configuration, access_point_configuration) => {
                 station_configuration.validate()?;
                 access_point_configuration.validate()
             }
             #[cfg(feature = "wifi-eap")]
-            ModeConfig::EapStation(eap_station_configuration) => {
-                eap_station_configuration.validate()
-            }
+            Config::EapStation(eap_station_configuration) => eap_station_configuration.validate(),
         }
     }
 }
@@ -355,14 +353,14 @@ impl WifiMode {
     }
 }
 
-impl From<&ModeConfig> for WifiMode {
-    fn from(config: &ModeConfig) -> Self {
+impl From<&Config> for WifiMode {
+    fn from(config: &Config) -> Self {
         match config {
-            ModeConfig::AccessPoint(_) => Self::AccessPoint,
-            ModeConfig::Station(_) => Self::Station,
-            ModeConfig::AccessPointStation(_, _) => Self::AccessPointStation,
+            Config::AccessPoint(_) => Self::AccessPoint,
+            Config::Station(_) => Self::Station,
+            Config::AccessPointStation(_, _) => Self::AccessPointStation,
             #[cfg(feature = "wifi-eap")]
-            ModeConfig::EapStation(_) => Self::Station,
+            Config::EapStation(_) => Self::Station,
         }
     }
 }
@@ -1659,7 +1657,7 @@ impl CountryInfo {
 /// Wi-Fi configuration.
 #[derive(Clone, Copy, BuilderLite, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Config {
+pub struct ControllerConfig {
     /// Power save mode.
     power_save_mode: PowerSaveMode,
 
@@ -1759,7 +1757,7 @@ pub struct Config {
     rx_ba_win: u8,
 }
 
-impl Default for Config {
+impl Default for ControllerConfig {
     fn default() -> Self {
         Self {
             power_save_mode: PowerSaveMode::default(),
@@ -1783,7 +1781,7 @@ impl Default for Config {
     }
 }
 
-impl Config {
+impl ControllerConfig {
     fn validate(&self) {
         if self.rx_ba_win as u16 >= self.dynamic_rx_buf_num {
             warn!("RX BA window size should be less than the number of dynamic RX buffers.");
@@ -1802,7 +1800,7 @@ impl Config {
 /// currently in use.
 pub fn new<'d>(
     device: crate::hal::peripherals::WIFI<'d>,
-    config: Config,
+    config: ControllerConfig,
 ) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
     let _guard = RadioRefGuard::new()?;
 
@@ -1948,13 +1946,13 @@ impl WifiController<'_> {
     ///
     /// ```rust,no_run
     /// # {before_snippet}
-    /// # use esp_radio::wifi::{ap::AccessPointConfig, ModeConfig};
+    /// # use esp_radio::wifi::{ap::AccessPointConfig, Config};
     /// use esp_radio::wifi::Protocol;
     ///
     /// let (mut wifi_controller, _interfaces) =
     ///     esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
     ///
-    /// wifi_controller.set_config(&ModeConfig::AccessPoint(
+    /// wifi_controller.set_config(&Config::AccessPoint(
     ///     AccessPointConfig::default().with_ssid("esp-radio".into()),
     /// ))?;
     ///
@@ -2066,36 +2064,36 @@ impl WifiController<'_> {
     ///
     /// If you don't intend to use Wi-Fi anymore at all consider tearing down
     /// Wi-Fi completely.
-    pub fn set_config(&mut self, conf: &ModeConfig) -> Result<(), WifiError> {
+    pub fn set_config(&mut self, conf: &Config) -> Result<(), WifiError> {
         conf.validate()?;
 
         let mode = match conf {
-            ModeConfig::Station(_) => wifi_mode_t_WIFI_MODE_STA,
-            ModeConfig::AccessPoint(_) => wifi_mode_t_WIFI_MODE_AP,
-            ModeConfig::AccessPointStation(_, _) => wifi_mode_t_WIFI_MODE_APSTA,
+            Config::Station(_) => wifi_mode_t_WIFI_MODE_STA,
+            Config::AccessPoint(_) => wifi_mode_t_WIFI_MODE_AP,
+            Config::AccessPointStation(_, _) => wifi_mode_t_WIFI_MODE_APSTA,
             #[cfg(feature = "wifi-eap")]
-            ModeConfig::EapStation(_) => wifi_mode_t_WIFI_MODE_STA,
+            Config::EapStation(_) => wifi_mode_t_WIFI_MODE_STA,
         };
 
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) })?;
 
         match conf {
-            ModeConfig::Station(config) => {
+            Config::Station(config) => {
                 self.apply_sta_config(config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)
             }
-            ModeConfig::AccessPoint(config) => {
+            Config::AccessPoint(config) => {
                 self.apply_ap_config(config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_AP, &config.protocols)
             }
-            ModeConfig::AccessPointStation(sta_config, ap_config) => {
+            Config::AccessPointStation(sta_config, ap_config) => {
                 self.apply_ap_config(ap_config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_AP, &ap_config.protocols)?;
                 self.apply_sta_config(sta_config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &sta_config.protocols)
             }
             #[cfg(feature = "wifi-eap")]
-            ModeConfig::EapStation(config) => {
+            Config::EapStation(config) => {
                 self.apply_sta_eap_config(config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)
             }
