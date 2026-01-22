@@ -28,6 +28,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MSRV: "1.88.0"
   DEFMT_LOG: trace
+  SKIP_CI: ${{ contains(github.event.pull_request.labels.*.name, 'skip-ci-non-code-change') }}
 
 # Cancel any currently running workflows from the same PR, branch, or
 # tag when a new workflow is triggered.
@@ -41,8 +42,6 @@ jobs:
   # --------------------------------------------------------------------------
   # Build Packages
   esp-hal:
-    if: ${{ github.event_name != 'pull_request' ||
-      !contains(github.event.pull_request.labels.*.name, 'skip-ci-non-code-change') }}
     runs-on: macos-m1-self-hosted
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
@@ -62,30 +61,38 @@ jobs:
           - riscv
 
     steps:
+      - name: Skip CI
+        if: env.SKIP_CI == 'true'
+        run: |
+          echo "skip-ci-non-code-change label present — skipping build"
+          exit 0
+
       - uses: actions/checkout@v6
+        if: env.SKIP_CI != 'true'
 
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
-        if: matrix.group == 'xtensa'
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
         with:
           version: 1.92.0.0
 
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
-        if: matrix.group == 'riscv'
+        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
           components: rust-src
 
       - name: Setup cargo-batch
+        if: env.SKIP_CI != 'true'
         run: |
           if ! command -v cargo-batch &> /dev/null; then
               cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
           fi
 
       - name: Build and Check Xtensa
-        if: matrix.group == 'xtensa'
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
         shell: bash
         run: |
           # lints and docs are checked separately
@@ -94,7 +101,7 @@ jobs:
           cargo xcheck ci esp32s3 --toolchain esp --no-lint --no-docs
 
       - name: Build and Check RISC-V
-        if: matrix.group == 'riscv'
+        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         shell: bash
         run: |
           # lints and docs are checked separately
@@ -181,8 +188,6 @@ jobs:
   # MSRV
 
   msrv:
-    if: ${{ github.event_name != 'pull_request' ||
-      !contains(github.event.pull_request.labels.*.name, 'skip-ci-non-code-change') }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -193,35 +198,43 @@ jobs:
           - riscv
 
     steps:
+      - name: Skip CI
+        if: env.SKIP_CI == 'true'
+        run: |
+          echo "skip-ci-non-code-change label present — skipping build"
+          exit 0
+
       - uses: actions/checkout@v6
+        if: env.SKIP_CI != 'true'
+
       - uses: esp-rs/xtensa-toolchain@v1.6
-        if: matrix.group == 'xtensa'
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
         with:
           version: ${{ env.MSRV }}
 
       - name: esp toolchain checks
-        if: matrix.group == 'xtensa'
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
         run: rustc +esp --version --verbose
 
       - uses: dtolnay/rust-toolchain@v1
-        if: matrix.group == 'riscv'
+        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,x86_64-unknown-linux-gnu
           toolchain: ${{ env.MSRV }}
           components: rust-src,clippy
 
       - name: Stable toolchain checks
-        if: matrix.group == 'riscv'
+        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         run: rustc +${{ env.MSRV }} --version --verbose
 
       # Verify the MSRV for all chips by running a lint session
       - name: msrv RISC-V (esp-hal)
-        if: matrix.group == 'riscv'
+        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         run: |
           cargo xtask lint-packages --chips esp32c2,esp32c3,esp32c6,esp32h2 --toolchain ${{ env.MSRV }}
 
       - name: msrv Xtensa (esp-hal)
-        if: matrix.group == 'xtensa'
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
         run: |
           cargo xtask lint-packages --chips esp32,esp32s2,esp32s3 --toolchain esp
 
@@ -300,11 +313,7 @@ jobs:
   #
   # For a reference, check out this GH discussion: https://github.com/orgs/community/discussions/102764
   build-tests-full:
-    if: ${{
-      (github.event_name != 'pull_request' ||
-      !contains(github.event.pull_request.labels.*.name, 'skip-ci-non-code-change')) &&
-      (github.event_name != 'merge_group')
-      }}
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
