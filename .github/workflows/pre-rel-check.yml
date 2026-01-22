@@ -45,7 +45,7 @@ jobs:
         run: |
           cargo xrel-check init
           cargo xrel-check update
-          cargo xrel-check scrap-path-deps
+          cargo xrel-check replace-path-deps
 
       - name: try-build
         shell: bash

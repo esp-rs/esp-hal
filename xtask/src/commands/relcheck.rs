@@ -23,7 +23,7 @@ pub enum RelCheckCmds {
 
     /// Remove the path-dependencies from examples and make sure the dependencies are available in
     /// the local registry.
-    ScrapPathDeps,
+    ReplacePathDeps,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -39,7 +39,7 @@ pub fn run_rel_check(args: RelCheckCmds) -> Result<()> {
         RelCheckCmds::Init => init_rel_check()?,
         RelCheckCmds::Deinit => deinit_rel_check()?,
         RelCheckCmds::Update(args) => update(args)?,
-        RelCheckCmds::ScrapPathDeps => scrap_path_deps()?,
+        RelCheckCmds::ReplacePathDeps => scrap_path_deps()?,
     }
 
     Ok(())
