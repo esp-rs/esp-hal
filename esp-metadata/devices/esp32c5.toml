@@ -13,35 +13,93 @@ cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c5_technical_reference_manual_en.pdf"
 
 peripherals = [
-    #{ name = "DMA" },
-    #{ name = "GPIO" },
-    #{ name = "I2C0", interrupts = { peri = "I2C_EXT0" } },
-    #{ name = "IO_MUX" },
-    #{ name = "INTERRUPT_CORE0" },
-    #{ name = "INTPRI" },
-    #{ name = "LP_AON" },
-    #{ name = "LP_IO" },
-    { name = "LPWR", pac = "LP_CLKRST" },
-    #{ name = "LP_IO_MUX" },
-    #{ name = "PCR" },
-    #{ name = "PLIC_MX" },
-    #{ name = "SPI0" },
-    #{ name = "SPI1" },
-    #{ name = "SPI2", interrupts = { peri = "SPI2" } },
-    # { name = "SYSTEM", pac = "PCR" },
-    #{ name = "SYSTIMER" },
-    #{ name = "UART0", interrupts = { peri = "UART0" } },
-    #{ name = "UART1", interrupts = { peri = "UART1" } },
-
-    # { name = "DMA_CH0", virtual = true },
-    # { name = "DMA_CH1", virtual = true },
-    # { name = "DMA_CH2", virtual = true },
-    # { name = "LP_CORE", virtual = true },
- 
-    # { name = "SW_INTERRUPT", virtual = true },
-
+    { name = "AES", interrupts = { peri = "AES" } },
+    { name = "APB_SARADC" },
+    { name = "BITSCRAMBLER" },
+    { name = "BUS_MONITOR" },
+    { name = "CACHE" },
+    { name = "CLINT_M" },
+    { name = "CPU_APM" },
+    { name = "DMA" },
+    { name = "DS" },
+    { name = "ECC" },
+    { name = "ECDSA" },
+    { name = "EFUSE" },
+    { name = "ETM", pac = "SOC_ETM" },
+    { name = "GPIO" },
+    { name = "GPIO_SD", pac = "GPIO_EXT" },
+    { name = "HINF" },
+    { name = "HMAC" },
+    { name = "HP_APM" },
+    { name = "HP_SYS" },
+    { name = "HUK" },
+    { name = "I2C_ANA_MST" },
+    { name = "I2C0", interrupts = { peri = "I2C" } },
+    { name = "I2S0", interrupts = { peri = "I2S0" } },
+    { name = "IEEE802154" },
+    { name = "INTERRUPT_CORE0" },
+    { name = "INTMTX" },
+    { name = "INTPRI" },
+    { name = "IO_MUX" },
+    { name = "KEYMNG" },
+    { name = "LEDC" },
+    { name = "LP_ANA" },
+    { name = "LP_AON" },
+    { name = "LP_APM" },
+    { name = "LP_APM0" },
+    { name = "LP_CLKRST" },
+    { name = "LP_GPIO" },
+    { name = "LP_I2C0" },
+    { name = "LP_I2C_ANA_MST" },
+    { name = "LP_IO_MUX" },
+    { name = "LP_PERI", pac = "LPPERI" },
+    { name = "LP_TEE" },
+    { name = "LP_TIMER" },
+    { name = "LP_UART" },
+    { name = "LP_WDT" },
+    { name = "MCPWM0" },
+    { name = "MEM_MONITOR" },
+    { name = "MODEM0" },
+    { name = "MODEM1" },
+    { name = "MODEM_PWR0" },
+    { name = "MODEM_PWR1" },
+    { name = "OTP_DEBUG" },
+    { name = "PARL_IO", interrupts = { peri = "PARL_IO" } },
+    { name = "PAU" },
+    { name = "PCNT" },
+    { name = "PCR" },
+    { name = "PMU" },
+    { name = "PSRAM_MEM_MONITOR" },
+    { name = "PVT_MONITOR" },
+    { name = "RMT" },
+    { name = "RSA", interrupts = { peri = "RSA" } },
+    { name = "SHA", interrupts = { peri = "SHA" } },
+    { name = "SLC" },
+    { name = "SLCHOST" },
+    { name = "SPI0" },
+    { name = "SPI1" },
+    { name = "SPI2", interrupts = { peri = "SPI2" } },
+    { name = "SYSTEM", pac = "PCR" },
+    { name = "SYSTIMER" },
+    { name = "TEE" },
+    { name = "TIMG0" },
+    { name = "TIMG1" },
+    { name = "TRACE0", pac = "TRACE" },
+    { name = "TWAI0" },
+    { name = "TWAI1" },
+    { name = "UART0", interrupts = { peri = "UART0" } },
+    { name = "UART1", interrupts = { peri = "UART1" } },
+    { name = "UHCI0" },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
+
+    { name = "BT", virtual = true },
+    { name = "FLASH", virtual = true },
+    { name = "GPIO_DEDICATED", virtual = true },
+    { name = "LP_CORE", virtual = true },
+    { name = "SW_INTERRUPT", virtual = true },
+    { name = "WIFI", virtual = true },
 ]
+
 
 symbols = [
     # Additional peripherals defined by us (the developers):
@@ -459,52 +517,78 @@ output_signals = [
 ]
 
 # TODO: Verify
-# [device.i2c_master]
-# support_status = "supported"
-# instances = [
-#     { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
-# ]
-# has_fsm_timeouts = true
-# has_hw_bus_clear = true
-# ll_intr_mask = 0x3ffff
-# fifo_size = 32
-# has_bus_timeout_enable = true
-# max_bus_timeout = 0x1F
-# can_estimate_nack_reason = true
-# has_conf_update = true
-# has_reliable_fsm_reset = true
-# has_arbitration_en = true
-# has_tx_fifo_watermark = true
-# bus_timeout_is_exponential = true
+[device.i2c_master]
+support_status = "supported"
+instances = [
+    { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
+]
+has_fsm_timeouts = true
+has_hw_bus_clear = true
+ll_intr_mask = 0x3ffff
+fifo_size = 32
+has_bus_timeout_enable = true
+max_bus_timeout = 0x1F
+can_estimate_nack_reason = true
+has_conf_update = true
+has_reliable_fsm_reset = true
+has_arbitration_en = true
+has_tx_fifo_watermark = true
+bus_timeout_is_exponential = true
 
 # [device.i2c_slave]
 # support_status = "not_supported"
 
-# [device.interrupts]
-# support_status = "partial"
-# status_registers = 3 # TODO: Verify
-# software_interrupt_count = 4
-# software_interrupt_delay = 14 # TODO: Verify
+[device.interrupts]
+support_status = "partial"
+status_registers = 3 # TODO: Verify
+software_interrupt_count = 4
+software_interrupt_delay = 14 # TODO: Verify
 
-# [device.spi_master]
-# support_status = "supported"
-# instances = [
-#     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
-# ]
+# TODO: VERIFY
+[device.rmt]
+support_status = "partial"
+ram_start = 0x60006400
+channel_ram_size = 48
+channels = ["Tx", "Tx", "Rx", "Rx"]
+has_tx_immediate_stop = true
+has_tx_loop_count = true
+has_tx_loop_auto_stop = true
+has_tx_carrier_data_only = true
+has_tx_sync = true
+has_rx_wrap = true
+has_rx_demodulation = true
+clock_sources.supported = [ "None", "Pll80MHz", "RcFast", "Xtal" ]
+clock_sources.default = "RcFast"
+
+[device.spi_master]
+support_status = "supported"
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
+]
+
+[device.rsa]
+support_status = "partial"
+size_increment = 32
+memory_size_bytes = 384
+
+[device.sha]
+support_status = "partial"
+dma = true
+algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 # [device.spi_slave]
 # instances = [
 #     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
 # ]
 
-# [device.uart]
-# support_status = "supported"
-# instances = [
-#     { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
-#     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
-# ]
-# ram_size = 128
-# peripheral_controls_mem_clk = true # TODO: VERIFY
+[device.uart]
+support_status = "supported"
+instances = [
+    { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
+    { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
+]
+ram_size = 128
+peripheral_controls_mem_clk = true # TODO: VERIFY
 
 [device.lp_uart]
 support_status = "not_supported"

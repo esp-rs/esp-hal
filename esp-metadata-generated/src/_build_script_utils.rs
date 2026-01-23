@@ -1609,16 +1609,109 @@ impl Chip {
                     "esp32c5",
                     "riscv",
                     "single_core",
-                    "soc_has_lpwr",
+                    "soc_has_aes",
+                    "soc_has_apb_saradc",
+                    "soc_has_bitscrambler",
+                    "soc_has_bus_monitor",
+                    "soc_has_cache",
+                    "soc_has_clint_m",
+                    "soc_has_cpu_apm",
+                    "soc_has_dma",
+                    "soc_has_ds",
+                    "soc_has_ecc",
+                    "soc_has_ecdsa",
+                    "soc_has_efuse",
+                    "soc_has_etm",
+                    "soc_has_gpio",
+                    "soc_has_gpio_sd",
+                    "soc_has_hinf",
+                    "soc_has_hmac",
+                    "soc_has_hp_apm",
+                    "soc_has_hp_sys",
+                    "soc_has_huk",
+                    "soc_has_i2c_ana_mst",
+                    "soc_has_i2c0",
+                    "soc_has_i2s0",
+                    "soc_has_ieee802154",
+                    "soc_has_interrupt_core0",
+                    "soc_has_intmtx",
+                    "soc_has_intpri",
+                    "soc_has_io_mux",
+                    "soc_has_keymng",
+                    "soc_has_ledc",
+                    "soc_has_lp_ana",
+                    "soc_has_lp_aon",
+                    "soc_has_lp_apm",
+                    "soc_has_lp_apm0",
+                    "soc_has_lp_clkrst",
+                    "soc_has_lp_gpio",
+                    "soc_has_lp_i2c0",
+                    "soc_has_lp_i2c_ana_mst",
+                    "soc_has_lp_io_mux",
+                    "soc_has_lp_peri",
+                    "soc_has_lp_tee",
+                    "soc_has_lp_timer",
+                    "soc_has_lp_uart",
+                    "soc_has_lp_wdt",
+                    "soc_has_mcpwm0",
+                    "soc_has_mem_monitor",
+                    "soc_has_modem0",
+                    "soc_has_modem1",
+                    "soc_has_modem_pwr0",
+                    "soc_has_modem_pwr1",
+                    "soc_has_otp_debug",
+                    "soc_has_parl_io",
+                    "soc_has_pau",
+                    "soc_has_pcnt",
+                    "soc_has_pcr",
+                    "soc_has_pmu",
+                    "soc_has_psram_mem_monitor",
+                    "soc_has_pvt_monitor",
+                    "soc_has_rmt",
+                    "soc_has_rsa",
+                    "soc_has_sha",
+                    "soc_has_slc",
+                    "soc_has_slchost",
+                    "soc_has_spi0",
+                    "soc_has_spi1",
+                    "soc_has_spi2",
+                    "soc_has_system",
+                    "soc_has_systimer",
+                    "soc_has_tee",
+                    "soc_has_timg0",
+                    "soc_has_timg1",
+                    "soc_has_trace0",
+                    "soc_has_twai0",
+                    "soc_has_twai1",
+                    "soc_has_uart0",
+                    "soc_has_uart1",
+                    "soc_has_uhci0",
                     "soc_has_usb_device",
+                    "soc_has_bt",
+                    "soc_has_flash",
+                    "soc_has_gpio_dedicated",
+                    "soc_has_lp_core",
+                    "soc_has_sw_interrupt",
+                    "soc_has_wifi",
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
                     "soc",
                     "dma",
                     "gpio",
+                    "i2c_master",
+                    "interrupts",
                     "io_mux",
+                    "rmt",
+                    "rsa",
+                    "sha",
+                    "spi_master",
                     "systimer",
+                    "uart",
+                    "i2c_master_i2c0",
+                    "spi_master_spi2",
+                    "uart_uart0",
+                    "uart_uart1",
                     "soc_cpu_has_csr_pc",
                     "soc_cpu_has_prv_mode",
                     "soc_rc_fast_clk_default=\"17500000\"",
@@ -1668,22 +1761,146 @@ impl Chip {
                     "gpio_func_in_sel_offset=\"0\"",
                     "gpio_input_signal_max=\"116\"",
                     "gpio_output_signal_max=\"256\"",
+                    "i2c_master_has_fsm_timeouts",
+                    "i2c_master_has_hw_bus_clear",
+                    "i2c_master_has_bus_timeout_enable",
+                    "i2c_master_can_estimate_nack_reason",
+                    "i2c_master_has_conf_update",
+                    "i2c_master_has_reliable_fsm_reset",
+                    "i2c_master_has_arbitration_en",
+                    "i2c_master_has_tx_fifo_watermark",
+                    "i2c_master_bus_timeout_is_exponential",
+                    "i2c_master_max_bus_timeout=\"31\"",
+                    "i2c_master_ll_intr_mask=\"262143\"",
+                    "i2c_master_fifo_size=\"32\"",
+                    "interrupts_status_registers=\"3\"",
+                    "rmt_ram_start=\"1610638336\"",
+                    "rmt_channel_ram_size=\"48\"",
+                    "rmt_has_tx_immediate_stop",
+                    "rmt_has_tx_loop_count",
+                    "rmt_has_tx_loop_auto_stop",
+                    "rmt_has_tx_carrier_data_only",
+                    "rmt_has_tx_sync",
+                    "rmt_has_rx_wrap",
+                    "rmt_has_rx_demodulation",
+                    "rmt_supports_none_clock",
+                    "rmt_supports_pll80mhz_clock",
+                    "rmt_supports_rcfast_clock",
+                    "rmt_supports_xtal_clock",
+                    "rsa_size_increment=\"32\"",
+                    "rsa_memory_size_bytes=\"384\"",
+                    "sha_dma",
+                    "uart_ram_size=\"128\"",
+                    "uart_peripheral_controls_mem_clk",
                     "lp_uart_ram_size=\"32\"",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32c5",
                     "cargo:rustc-cfg=riscv",
                     "cargo:rustc-cfg=single_core",
-                    "cargo:rustc-cfg=soc_has_lpwr",
+                    "cargo:rustc-cfg=soc_has_aes",
+                    "cargo:rustc-cfg=soc_has_apb_saradc",
+                    "cargo:rustc-cfg=soc_has_bitscrambler",
+                    "cargo:rustc-cfg=soc_has_bus_monitor",
+                    "cargo:rustc-cfg=soc_has_cache",
+                    "cargo:rustc-cfg=soc_has_clint_m",
+                    "cargo:rustc-cfg=soc_has_cpu_apm",
+                    "cargo:rustc-cfg=soc_has_dma",
+                    "cargo:rustc-cfg=soc_has_ds",
+                    "cargo:rustc-cfg=soc_has_ecc",
+                    "cargo:rustc-cfg=soc_has_ecdsa",
+                    "cargo:rustc-cfg=soc_has_efuse",
+                    "cargo:rustc-cfg=soc_has_etm",
+                    "cargo:rustc-cfg=soc_has_gpio",
+                    "cargo:rustc-cfg=soc_has_gpio_sd",
+                    "cargo:rustc-cfg=soc_has_hinf",
+                    "cargo:rustc-cfg=soc_has_hmac",
+                    "cargo:rustc-cfg=soc_has_hp_apm",
+                    "cargo:rustc-cfg=soc_has_hp_sys",
+                    "cargo:rustc-cfg=soc_has_huk",
+                    "cargo:rustc-cfg=soc_has_i2c_ana_mst",
+                    "cargo:rustc-cfg=soc_has_i2c0",
+                    "cargo:rustc-cfg=soc_has_i2s0",
+                    "cargo:rustc-cfg=soc_has_ieee802154",
+                    "cargo:rustc-cfg=soc_has_interrupt_core0",
+                    "cargo:rustc-cfg=soc_has_intmtx",
+                    "cargo:rustc-cfg=soc_has_intpri",
+                    "cargo:rustc-cfg=soc_has_io_mux",
+                    "cargo:rustc-cfg=soc_has_keymng",
+                    "cargo:rustc-cfg=soc_has_ledc",
+                    "cargo:rustc-cfg=soc_has_lp_ana",
+                    "cargo:rustc-cfg=soc_has_lp_aon",
+                    "cargo:rustc-cfg=soc_has_lp_apm",
+                    "cargo:rustc-cfg=soc_has_lp_apm0",
+                    "cargo:rustc-cfg=soc_has_lp_clkrst",
+                    "cargo:rustc-cfg=soc_has_lp_gpio",
+                    "cargo:rustc-cfg=soc_has_lp_i2c0",
+                    "cargo:rustc-cfg=soc_has_lp_i2c_ana_mst",
+                    "cargo:rustc-cfg=soc_has_lp_io_mux",
+                    "cargo:rustc-cfg=soc_has_lp_peri",
+                    "cargo:rustc-cfg=soc_has_lp_tee",
+                    "cargo:rustc-cfg=soc_has_lp_timer",
+                    "cargo:rustc-cfg=soc_has_lp_uart",
+                    "cargo:rustc-cfg=soc_has_lp_wdt",
+                    "cargo:rustc-cfg=soc_has_mcpwm0",
+                    "cargo:rustc-cfg=soc_has_mem_monitor",
+                    "cargo:rustc-cfg=soc_has_modem0",
+                    "cargo:rustc-cfg=soc_has_modem1",
+                    "cargo:rustc-cfg=soc_has_modem_pwr0",
+                    "cargo:rustc-cfg=soc_has_modem_pwr1",
+                    "cargo:rustc-cfg=soc_has_otp_debug",
+                    "cargo:rustc-cfg=soc_has_parl_io",
+                    "cargo:rustc-cfg=soc_has_pau",
+                    "cargo:rustc-cfg=soc_has_pcnt",
+                    "cargo:rustc-cfg=soc_has_pcr",
+                    "cargo:rustc-cfg=soc_has_pmu",
+                    "cargo:rustc-cfg=soc_has_psram_mem_monitor",
+                    "cargo:rustc-cfg=soc_has_pvt_monitor",
+                    "cargo:rustc-cfg=soc_has_rmt",
+                    "cargo:rustc-cfg=soc_has_rsa",
+                    "cargo:rustc-cfg=soc_has_sha",
+                    "cargo:rustc-cfg=soc_has_slc",
+                    "cargo:rustc-cfg=soc_has_slchost",
+                    "cargo:rustc-cfg=soc_has_spi0",
+                    "cargo:rustc-cfg=soc_has_spi1",
+                    "cargo:rustc-cfg=soc_has_spi2",
+                    "cargo:rustc-cfg=soc_has_system",
+                    "cargo:rustc-cfg=soc_has_systimer",
+                    "cargo:rustc-cfg=soc_has_tee",
+                    "cargo:rustc-cfg=soc_has_timg0",
+                    "cargo:rustc-cfg=soc_has_timg1",
+                    "cargo:rustc-cfg=soc_has_trace0",
+                    "cargo:rustc-cfg=soc_has_twai0",
+                    "cargo:rustc-cfg=soc_has_twai1",
+                    "cargo:rustc-cfg=soc_has_uart0",
+                    "cargo:rustc-cfg=soc_has_uart1",
+                    "cargo:rustc-cfg=soc_has_uhci0",
                     "cargo:rustc-cfg=soc_has_usb_device",
+                    "cargo:rustc-cfg=soc_has_bt",
+                    "cargo:rustc-cfg=soc_has_flash",
+                    "cargo:rustc-cfg=soc_has_gpio_dedicated",
+                    "cargo:rustc-cfg=soc_has_lp_core",
+                    "cargo:rustc-cfg=soc_has_sw_interrupt",
+                    "cargo:rustc-cfg=soc_has_wifi",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
                     "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=dma",
                     "cargo:rustc-cfg=gpio",
+                    "cargo:rustc-cfg=i2c_master",
+                    "cargo:rustc-cfg=interrupts",
                     "cargo:rustc-cfg=io_mux",
+                    "cargo:rustc-cfg=rmt",
+                    "cargo:rustc-cfg=rsa",
+                    "cargo:rustc-cfg=sha",
+                    "cargo:rustc-cfg=spi_master",
                     "cargo:rustc-cfg=systimer",
+                    "cargo:rustc-cfg=uart",
+                    "cargo:rustc-cfg=i2c_master_i2c0",
+                    "cargo:rustc-cfg=spi_master_spi2",
+                    "cargo:rustc-cfg=uart_uart0",
+                    "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
                     "cargo:rustc-cfg=soc_cpu_has_prv_mode",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
@@ -1733,6 +1950,37 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_func_in_sel_offset=\"0\"",
                     "cargo:rustc-cfg=gpio_input_signal_max=\"116\"",
                     "cargo:rustc-cfg=gpio_output_signal_max=\"256\"",
+                    "cargo:rustc-cfg=i2c_master_has_fsm_timeouts",
+                    "cargo:rustc-cfg=i2c_master_has_hw_bus_clear",
+                    "cargo:rustc-cfg=i2c_master_has_bus_timeout_enable",
+                    "cargo:rustc-cfg=i2c_master_can_estimate_nack_reason",
+                    "cargo:rustc-cfg=i2c_master_has_conf_update",
+                    "cargo:rustc-cfg=i2c_master_has_reliable_fsm_reset",
+                    "cargo:rustc-cfg=i2c_master_has_arbitration_en",
+                    "cargo:rustc-cfg=i2c_master_has_tx_fifo_watermark",
+                    "cargo:rustc-cfg=i2c_master_bus_timeout_is_exponential",
+                    "cargo:rustc-cfg=i2c_master_max_bus_timeout=\"31\"",
+                    "cargo:rustc-cfg=i2c_master_ll_intr_mask=\"262143\"",
+                    "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
+                    "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
+                    "cargo:rustc-cfg=rmt_ram_start=\"1610638336\"",
+                    "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
+                    "cargo:rustc-cfg=rmt_has_tx_immediate_stop",
+                    "cargo:rustc-cfg=rmt_has_tx_loop_count",
+                    "cargo:rustc-cfg=rmt_has_tx_loop_auto_stop",
+                    "cargo:rustc-cfg=rmt_has_tx_carrier_data_only",
+                    "cargo:rustc-cfg=rmt_has_tx_sync",
+                    "cargo:rustc-cfg=rmt_has_rx_wrap",
+                    "cargo:rustc-cfg=rmt_has_rx_demodulation",
+                    "cargo:rustc-cfg=rmt_supports_none_clock",
+                    "cargo:rustc-cfg=rmt_supports_pll80mhz_clock",
+                    "cargo:rustc-cfg=rmt_supports_rcfast_clock",
+                    "cargo:rustc-cfg=rmt_supports_xtal_clock",
+                    "cargo:rustc-cfg=rsa_size_increment=\"32\"",
+                    "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
+                    "cargo:rustc-cfg=sha_dma",
+                    "cargo:rustc-cfg=uart_ram_size=\"128\"",
+                    "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
                 ],
                 memory_layout: &MemoryLayout {
@@ -4624,6 +4872,50 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(rmt_supports_xtal_clock)");
     println!("cargo:rustc-check-cfg=cfg(phy_backed_up_digital_register_count_is_set)");
     println!("cargo:rustc-check-cfg=cfg(esp32c5)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_bitscrambler)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_bus_monitor)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_cache)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clint_m)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_cpu_apm)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_ecdsa)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_etm)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_hp_apm)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_hp_sys)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_huk)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_ieee802154)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_intmtx)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_intpri)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_keymng)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_ana)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_aon)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_apm)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_apm0)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_clkrst)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_gpio)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_i2c0)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_i2c_ana_mst)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_io_mux)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_peri)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_tee)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_timer)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_uart)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_wdt)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mem_monitor)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_modem0)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_modem1)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_modem_pwr0)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_modem_pwr1)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_otp_debug)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_parl_io)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_pau)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_pcr)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_pmu)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_psram_mem_monitor)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_pvt_monitor)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_tee)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_trace0)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_twai1)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_core)");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_has_prv_mode)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f22m)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f40m)");
@@ -4643,39 +4935,17 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_parlio_tx_function_clock)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_rmt_function_clock)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_systimer_function_clock)");
+    println!("cargo:rustc-check-cfg=cfg(i2c_master_can_estimate_nack_reason)");
+    println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
+    println!("cargo:rustc-check-cfg=cfg(rmt_has_tx_loop_auto_stop)");
+    println!("cargo:rustc-check-cfg=cfg(rmt_supports_pll80mhz_clock)");
+    println!("cargo:rustc-check-cfg=cfg(uart_peripheral_controls_mem_clk)");
     println!("cargo:rustc-check-cfg=cfg(esp32c6)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_atomic)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_hp_apm)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_hp_sys)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_ieee802154)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_intpri)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_ana)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_aon)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_apm)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_apm0)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_clkrst)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_i2c0)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_i2c_ana_mst)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_io)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_peri)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_tee)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_timer)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_uart)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_wdt)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem_monitor)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_modem_lpcon)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_modem_syscon)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_otp_debug)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_parl_io)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_pau)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_pcr)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_plic_mx)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_pmu)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_etm)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_tee)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_trace0)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_twai1)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_core)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem10)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem11)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem12)");
@@ -4700,11 +4970,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_mspi_fast_ls_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_mspi_fast_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ledc_sclk)");
-    println!("cargo:rustc-check-cfg=cfg(i2c_master_can_estimate_nack_reason)");
-    println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
-    println!("cargo:rustc-check-cfg=cfg(rmt_has_tx_loop_auto_stop)");
-    println!("cargo:rustc-check-cfg=cfg(rmt_supports_pll80mhz_clock)");
-    println!("cargo:rustc-check-cfg=cfg(uart_peripheral_controls_mem_clk)");
     println!("cargo:rustc-check-cfg=cfg(wifi_has_wifi6)");
     println!("cargo:rustc-check-cfg=cfg(esp32h2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f96m_clk)");

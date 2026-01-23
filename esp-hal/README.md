@@ -67,11 +67,11 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | GPIO               | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
 | Dedicated GPIO     |       | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | HMAC               |       |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| I2C master         | ✔️   | ✔️      | ✔️      |          | ✔️      | ✔️      | ✔️      | ✔️      |
+| I2C master         | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
 | LP I2C master      |       |          |          |          | ⚒️      |          |          |          |
 | I2C slave          | ❌    |          | ❌       |          | ❌       | ❌       | ❌       | ❌       |
 | I2S                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| Interrupts         | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| Interrupts         | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | IOMUX              | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Camera interface   | ❌    |          |          |          |          |          | ❌       | ⚒️      |
 | RGB display        | ⚒️   |          |          |          |          |          | ❌       | ⚒️      |
@@ -80,21 +80,21 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | PARL_IO            |       |          |          |          | ⚒️      | ⚒️      |          |          |
 | PCNT               | ⚒️   |          |          |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | PSRAM              | ⚒️   |          |          |          |          |          | ⚒️      | ⚒️      |
-| RMT                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| RMT                | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | RNG                | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| RSA                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| RSA                | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SDIO host          | ⚒️   |          |          |          |          |          |          | ⚒️      |
 | SDIO slave         | ⚒️   |          |          |          | ⚒️      |          |          |          |
 | Light/deep sleep   | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| SHA                | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| SPI master         | ✔️   | ✔️      | ✔️      |          | ✔️      | ✔️      | ✔️      | ✔️      |
+| SHA                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| SPI master         | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
 | SPI slave          | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SYSTIMER           |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Temperature sensor | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Timers             | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Touch              | ⚒️   |          |          |          |          |          | ❌       | ❌       |
 | TWAI               | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| UART               | ✔️   | ✔️      | ✔️      |          | ✔️      | ✔️      | ✔️      | ✔️      |
+| UART               | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
 | LP UART            |       |          |          | ❌       | ⚒️      |          |          |          |
 | ULP (FSM)          | ⚒️   |          |          |          |          |          | ⚒️      | ⚒️      |
 | ULP (RISC-V)       |       |          |          |          | ⚒️      |          | ⚒️      | ⚒️      |
