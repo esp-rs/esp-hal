@@ -99,6 +99,8 @@ impl PartitionEntry {
         self.flags() & 0b10 != 0
     }
 
+    #[cfg(not(feature = "std"))]
+    /// Get the currently booted partition.
     pub fn is_booted(&self) -> bool {
         cfg_if::cfg_if! {
             if #[cfg(feature = "esp32")] {
