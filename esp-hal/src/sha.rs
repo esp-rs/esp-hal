@@ -90,7 +90,13 @@
 
 #![allow(deprecated, reason = "generic_array 0.14 has been deprecated")]
 
-use core::{borrow::BorrowMut, convert::Infallible, marker::PhantomData, mem::size_of, ptr::NonNull};
+use core::{
+    borrow::BorrowMut,
+    convert::Infallible,
+    marker::PhantomData,
+    mem::size_of,
+    ptr::NonNull,
+};
 
 /// Re-export digest for convenience
 pub use digest::Digest;
@@ -418,7 +424,11 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
 
         // Restore the message buffer
         unsafe {
-            core::ptr::copy_nonoverlapping(ctx.buffer.as_ptr(), m_mem(&sha.borrow_mut().sha, 0), 32);
+            core::ptr::copy_nonoverlapping(
+                ctx.buffer.as_ptr(),
+                m_mem(&sha.borrow_mut().sha, 0),
+                32,
+            );
         }
 
         // Restore previously saved hash
