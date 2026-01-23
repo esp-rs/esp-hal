@@ -9,7 +9,7 @@
 
 use core::ffi::CStr;
 
-use zerocopy::{FromBytes, Immutable, KnownLayout};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 /// Maximum length of a partition table.
 pub const PARTITION_TABLE_MAX_LEN: usize = 0xC00;
@@ -17,7 +17,7 @@ pub const PARTITION_TABLE_MAX_LEN: usize = 0xC00;
 const PARTITION_TABLE_OFFSET: u32 =
     esp_config::esp_config_int!(u32, "ESP_BOOTLOADER_ESP_IDF_CONFIG_PARTITION_TABLE_OFFSET");
 
-const RAW_ENTRY_LEN: usize = 32;
+pub const RAW_ENTRY_LEN: usize = 32;
 const ENTRY_MAGIC: u16 = 0x50aa;
 const MD5_MAGIC: u16 = 0xebeb;
 
@@ -25,8 +25,8 @@ const OTA_SUBTYPE_OFFSET: u8 = 0x10;
 
 use zerocopy::little_endian::{U16 as u16_le, U32 as u32_le};
 /// Represents a single partition entry.
-#[derive(Clone, Immutable, FromBytes, KnownLayout)]
-#[repr(C)]
+#[derive(Clone, Immutable, FromBytes, IntoBytes, KnownLayout, Unaligned)]
+#[repr(packed)]
 pub struct PartitionEntry {
     magic: u16_le,
     raw_type: u8,
@@ -97,6 +97,16 @@ impl PartitionEntry {
     /// If the partition is encrypted.
     pub fn is_encrypted(&self) -> bool {
         self.flags() & 0b10 != 0
+    }
+
+    #[cfg(feature = "validation")]
+    /// If entry is magic
+    fn hash(&self) -> Option<&[u8]> {
+        if self.magic() == MD5_MAGIC {
+            Some(&self.as_bytes()[16..][..16])
+        } else {
+            None
+        }
     }
 
     /// The partition type (type and sub-type).
@@ -225,27 +235,20 @@ impl<'a> PartitionTable<'a> {
 
         #[cfg(feature = "validation")]
         {
-            let (hash, index) = {
-                let mut i = 0;
-                loop {
-                    if let Ok(entry) = raw_table.get_partition(i) {
-                        if entry.magic() == MD5_MAGIC {
-                            break (entry.label, i);
-                        }
-
-                        i += 1;
-                        if i >= raw_table.entries {
-                            return Err(Error::Invalid);
-                        }
-                    }
-                }
-            };
+            let (hash, index) = raw_table
+                .iter()
+                .enumerate()
+                .find_map(|(i, e)| e.hash().map(|h| (h, i)))
+                .ok_or(Error::Invalid)?;
 
             let mut hasher = crate::crypto::Md5::new();
 
-            for i in 0..index {
-                hasher.update(&raw_table.binary[i]);
-            }
+            raw_table
+                .binary
+                .iter()
+                .take(index)
+                .for_each(|e| hasher.update(e));
+
             let calculated_hash = hasher.finalize();
 
             if calculated_hash != hash {
