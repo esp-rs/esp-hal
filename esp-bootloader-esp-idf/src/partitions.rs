@@ -99,6 +99,37 @@ impl PartitionEntry {
         self.flags() & 0b10 != 0
     }
 
+    pub fn is_booted(&self) -> bool {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "esp32")] {
+                let paddr = unsafe {
+                    ((0x3FF10000 as *const u32).read_volatile() & 0xff) << 16
+                };
+            } else if #[cfg(feature = "esp32s2")] {
+                let paddr = unsafe {
+                    (((0x61801000 + 128 * 4) as *const u32).read_volatile() & 0xff) << 16
+                };
+            } else if #[cfg(feature = "esp32s3")] {
+                // Revisit this once we support XiP from PSRAM for ESP32-S3
+                let paddr = unsafe {
+                    ((0x600C5000 as *const u32).read_volatile() & 0xff) << 16
+                };
+            } else if #[cfg(any(feature = "esp32c2", feature = "esp32c3"))] {
+                let paddr = unsafe {
+                    ((0x600c5000 as *const u32).read_volatile() & 0xff) << 16
+                };
+            } else if #[cfg(any(feature = "esp32c6", feature = "esp32h2"))] {
+                let paddr = unsafe {
+                    ((0x60002000 + 0x380) as *mut u32).write_volatile(0);
+                    (((0x60002000 + 0x37c) as *const u32).read_volatile() & 0xff) << 16
+                };
+            } else {
+                compile_error!("Paddr not defined for the current esp32 device, check if you have enabled it, or raise an issue about it");
+            }
+        }
+        self.offset == paddr
+    }
+
     #[cfg(feature = "validation")]
     /// If entry is magic
     fn hash(&self) -> Option<&[u8]> {
@@ -123,7 +154,7 @@ impl PartitionEntry {
     /// Provides a "view" into the partition allowing to read/write the
     /// partition contents by using the given [embedded_storage::Storage] and/or
     /// [embedded_storage::ReadStorage] implementation.
-    pub fn as_embedded_storage<'a, F>(&'a self, flash: &'a mut F) -> FlashRegion<'a, F>
+    pub fn as_embedded_storage<'a, F>(self, flash: &'a mut F) -> FlashRegion<'a, F>
     where
         F: embedded_storage::ReadStorage,
     {
@@ -558,7 +589,7 @@ pub fn read_partition_table<'a>(
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FlashRegion<'a, F> {
-    pub(crate) raw: &'a PartitionEntry,
+    pub(crate) raw: PartitionEntry,
     pub(crate) flash: &'a mut F,
 }
 
