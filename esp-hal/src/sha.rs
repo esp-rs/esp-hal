@@ -467,7 +467,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
 
         // Save the content of the current hash.
         self.state.alignment_helper.volatile_read_regset(
-            h_mem(&self.sha.borrow().sha, 0),
+            h_mem(&self.sha.borrow_mut().sha, 0),
             &mut context.saved_digest,
             64,
         );
@@ -475,7 +475,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
         // Save the content of the current (probably partially written) message.
         unsafe {
             core::ptr::copy_nonoverlapping(
-                m_mem(&self.sha.borrow().sha, 0),
+                m_mem(&self.sha.borrow_mut().sha, 0),
                 context.buffer.as_mut_ptr(),
                 32,
             );
