@@ -355,6 +355,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use zerocopy::FromBytes;
+
     use super::*;
     use crate::partitions::PartitionEntry;
 
@@ -421,9 +423,7 @@ mod tests {
     fn test_initial_state_and_next_slot() {
         let mut binary = PARTITION_RAW;
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
+        let mock_entry = PartitionEntry::ref_from_bytes(&binary).unwrap();
 
         let mut mock_flash = MockFlash {
             data: [0xff; 0x2000],
@@ -468,9 +468,7 @@ mod tests {
     fn test_slot0_valid_next_slot() {
         let mut binary = PARTITION_RAW;
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
+        let mock_entry = PartitionEntry::ref_from_bytes(&binary).unwrap();
 
         let mut mock_flash = MockFlash {
             data: [0xff; 0x2000],
@@ -508,9 +506,7 @@ mod tests {
     fn test_slot1_new_next_slot() {
         let mut binary = PARTITION_RAW;
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
+        let mock_entry = PartitionEntry::ref_from_bytes(&binary).unwrap();
 
         let mut mock_flash = MockFlash {
             data: [0xff; 0x2000],
@@ -549,9 +545,7 @@ mod tests {
     fn test_multi_updates() {
         let mut binary = PARTITION_RAW;
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
+        let mock_entry = PartitionEntry::ref_from_bytes(&binary).unwrap();
 
         let mut mock_flash = MockFlash {
             data: [0xff; 0x2000],
@@ -615,9 +609,7 @@ mod tests {
     fn test_multi_updates_4_apps() {
         let mut binary = PARTITION_RAW;
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
+        let mock_entry = PartitionEntry::ref_from_bytes(&binary).unwrap();
 
         let mut mock_flash = MockFlash {
             data: [0xff; 0x2000],
@@ -700,9 +692,7 @@ mod tests {
     fn test_multi_updates_skip_parts() {
         let mut binary = PARTITION_RAW;
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
+        let mock_entry = PartitionEntry::ref_from_bytes(&binary).unwrap();
 
         let mut mock_flash = MockFlash {
             data: [0xff; 0x2000],

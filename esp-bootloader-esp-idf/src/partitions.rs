@@ -7,6 +7,10 @@
 //!
 //! For more information see <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/partition-tables.html#built-in-partition-tables>
 
+use core::ffi::CStr;
+
+use zerocopy::{FromBytes, Immutable, KnownLayout};
+
 /// Maximum length of a partition table.
 pub const PARTITION_TABLE_MAX_LEN: usize = 0xC00;
 
@@ -19,40 +23,48 @@ const MD5_MAGIC: u16 = 0xebeb;
 
 const OTA_SUBTYPE_OFFSET: u8 = 0x10;
 
+use zerocopy::little_endian::{U16 as u16_le, U32 as u32_le};
 /// Represents a single partition entry.
-#[derive(Clone, Copy)]
-pub struct PartitionEntry<'a> {
-    pub(crate) binary: &'a [u8; RAW_ENTRY_LEN],
+#[derive(Clone, Immutable, FromBytes, KnownLayout)]
+#[repr(packed)]
+pub struct PartitionEntry {
+    magic: u16_le,
+    raw_type: u8,
+    raw_subtype: u8,
+    offset: u32_le,
+    len: u32_le,
+    label: [u8; 16],
+    flags: u32_le,
 }
 
-impl<'a> PartitionEntry<'a> {
-    fn new(binary: &'a [u8; RAW_ENTRY_LEN]) -> Self {
-        Self { binary }
+impl PartitionEntry {
+    fn new<'a>(binary: &'a [u8; RAW_ENTRY_LEN]) -> &'a Self {
+        PartitionEntry::ref_from_bytes(binary).unwrap()
     }
 
     /// The magic value of the entry.
     pub fn magic(&self) -> u16 {
-        u16::from_le_bytes(unwrap!(self.binary[..2].try_into()))
+        self.magic.into()
     }
 
     /// The partition type in raw representation.
     pub fn raw_type(&self) -> u8 {
-        self.binary[2]
+        self.raw_type.into()
     }
 
     /// The partition sub-type in raw representation.
     pub fn raw_subtype(&self) -> u8 {
-        self.binary[3]
+        self.raw_subtype.into()
     }
 
     /// Offset of the partition on flash.
     pub fn offset(&self) -> u32 {
-        u32::from_le_bytes(unwrap!(self.binary[4..][..4].try_into()))
+        self.offset.into()
     }
 
     /// Length of the partition in bytes.
     pub fn len(&self) -> u32 {
-        u32::from_le_bytes(unwrap!(self.binary[8..][..4].try_into()))
+        self.len.into()
     }
 
     /// Checks for a zero-length partition.
@@ -61,26 +73,20 @@ impl<'a> PartitionEntry<'a> {
     }
 
     /// The label of the partition.
-    pub fn label(&self) -> &'a [u8] {
-        &self.binary[12..][..16]
+    pub fn label(&self) -> &[u8] {
+        &self.label
     }
 
     /// The label of the partition as `&str`.
-    pub fn label_as_str(&self) -> &'a str {
-        let array = self.label();
-        let len = array
-            .iter()
-            .position(|b| *b == 0 || *b == 0xff)
-            .unwrap_or(array.len());
-        unsafe {
-            core::str::from_utf8_unchecked(core::slice::from_raw_parts(array.as_ptr().cast(), len))
-        }
+    pub fn label_as_str(&self) -> &str {
+        let cstr = CStr::from_bytes_until_nul(self.label()).unwrap();
+        cstr.to_str().unwrap()
     }
 
     /// Raw flags of this partition. You probably want to use
     /// [Self::is_read_only] and [Self::is_encrypted] instead.
     pub fn flags(&self) -> u32 {
-        u32::from_le_bytes(unwrap!(self.binary[28..][..4].try_into()))
+        self.flags.into()
     }
 
     /// If the partition is read only.
@@ -107,7 +113,7 @@ impl<'a> PartitionEntry<'a> {
     /// Provides a "view" into the partition allowing to read/write the
     /// partition contents by using the given [embedded_storage::Storage] and/or
     /// [embedded_storage::ReadStorage] implementation.
-    pub fn as_embedded_storage<F>(self, flash: &'a mut F) -> FlashRegion<'a, F>
+    pub fn as_embedded_storage<'a, F>(&'a self, flash: &'a mut F) -> FlashRegion<'a, F>
     where
         F: embedded_storage::ReadStorage,
     {
@@ -115,7 +121,7 @@ impl<'a> PartitionEntry<'a> {
     }
 }
 
-impl core::fmt::Debug for PartitionEntry<'_> {
+impl core::fmt::Debug for PartitionEntry {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("PartitionEntry")
             .field("magic", &self.magic())
@@ -132,7 +138,7 @@ impl core::fmt::Debug for PartitionEntry<'_> {
 }
 
 #[cfg(feature = "defmt")]
-impl defmt::Format for PartitionEntry<'_> {
+impl defmt::Format for PartitionEntry {
     fn format(&self, fmt: defmt::Formatter) {
         defmt::write!(
             fmt,
@@ -224,7 +230,7 @@ impl<'a> PartitionTable<'a> {
                 loop {
                     if let Ok(entry) = raw_table.get_partition(i) {
                         if entry.magic() == MD5_MAGIC {
-                            break (&entry.binary[16..][..16], i);
+                            break (entry.label, i);
                         }
 
                         i += 1;
@@ -283,7 +289,7 @@ impl<'a> PartitionTable<'a> {
     }
 
     /// Get a partition entry.
-    pub fn get_partition(&self, index: usize) -> Result<PartitionEntry<'a>, Error> {
+    pub fn get_partition(&self, index: usize) -> Result<&'a PartitionEntry, Error> {
         if index >= self.entries {
             return Err(Error::OutOfBounds);
         }
@@ -291,7 +297,7 @@ impl<'a> PartitionTable<'a> {
     }
 
     /// Get the first partition matching the given partition type.
-    pub fn find_partition(&self, pt: PartitionType) -> Result<Option<PartitionEntry<'a>>, Error> {
+    pub fn find_partition(&self, pt: PartitionType) -> Result<Option<&'a PartitionEntry>, Error> {
         for i in 0..self.entries {
             let entry = self.get_partition(i)?;
             if entry.partition_type() == pt {
@@ -302,19 +308,19 @@ impl<'a> PartitionTable<'a> {
     }
 
     /// Returns an iterator over the partitions.
-    pub fn iter(&self) -> impl Iterator<Item = PartitionEntry<'a>> {
+    pub fn iter(&self) -> impl Iterator<Item = &'a PartitionEntry> {
         (0..self.entries).filter_map(|i| self.get_partition(i).ok())
     }
 
     #[cfg(feature = "std")]
     /// Get the currently booted partition.
-    pub fn booted_partition(&self) -> Result<Option<PartitionEntry<'a>>, Error> {
+    pub fn booted_partition(&self) -> Result<Option<&'a PartitionEntry>, Error> {
         Err(Error::Invalid)
     }
 
     #[cfg(not(feature = "std"))]
     /// Get the currently booted partition.
-    pub fn booted_partition(&self) -> Result<Option<PartitionEntry<'a>>, Error> {
+    pub fn booted_partition(&self) -> Result<Option<&'a PartitionEntry>, Error> {
         // Read entry 0 from MMU to know which partition is mapped
         //
         // See <https://github.com/espressif/esp-idf/blob/758939caecb16e5542b3adfba0bc85025517db45/components/hal/mmu_hal.c#L124>
@@ -549,7 +555,7 @@ pub fn read_partition_table<'a>(
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FlashRegion<'a, F> {
-    pub(crate) raw: PartitionEntry<'a>,
+    pub(crate) raw: &'a PartitionEntry,
     pub(crate) flash: &'a mut F,
 }
 
