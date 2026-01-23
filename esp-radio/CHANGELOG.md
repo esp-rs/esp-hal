@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RxControlInfo` is unstable, `RxControlInfo::from_raw()` is no longer public (#4811)
 - `event`, `sniffer`, and `csi` modules are marked unstable (#4811)
 - `WifiDevice` has been renamed to `Interface` and `WifiDeviceMode` to `InterfaceType` (#4881)
+- `wifi::Config` has been changed to `wifi::ControllerConfig` and `wifi::ModeConfig` into `wifi::Config` (#4891)
 
 ### Fixed
 
