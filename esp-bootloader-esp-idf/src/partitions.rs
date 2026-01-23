@@ -26,7 +26,7 @@ const OTA_SUBTYPE_OFFSET: u8 = 0x10;
 use zerocopy::little_endian::{U16 as u16_le, U32 as u32_le};
 /// Represents a single partition entry.
 #[derive(Clone, Immutable, FromBytes, KnownLayout)]
-#[repr(packed)]
+#[repr(C)]
 pub struct PartitionEntry {
     magic: u16_le,
     raw_type: u8,
