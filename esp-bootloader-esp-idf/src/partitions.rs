@@ -17,7 +17,7 @@ pub const PARTITION_TABLE_MAX_LEN: usize = 0xC00;
 const PARTITION_TABLE_OFFSET: u32 =
     esp_config::esp_config_int!(u32, "ESP_BOOTLOADER_ESP_IDF_CONFIG_PARTITION_TABLE_OFFSET");
 
-pub const RAW_ENTRY_LEN: usize = 32;
+const RAW_ENTRY_LEN: usize = 32;
 const ENTRY_MAGIC: u16 = 0x50aa;
 const MD5_MAGIC: u16 = 0xebeb;
 
@@ -25,7 +25,7 @@ const OTA_SUBTYPE_OFFSET: u8 = 0x10;
 
 use zerocopy::little_endian::{U16 as u16_le, U32 as u32_le};
 /// Represents a single partition entry.
-#[derive(Clone, Immutable, FromBytes, IntoBytes, KnownLayout, Unaligned)]
+#[derive(Clone, Copy, Immutable, FromBytes, IntoBytes, KnownLayout, Unaligned)]
 #[repr(packed)]
 pub struct PartitionEntry {
     magic: u16_le,
