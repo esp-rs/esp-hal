@@ -1812,9 +1812,8 @@ mod sha_tests {
 
     /// Test the owned code path (start_owned) to ensure it works with BorrowMut
     #[test]
-    fn test_sha_owned(_ctx: Context) {
-        let mut sha = Sha::new(unsafe { esp_hal::peripherals::SHA::steal() });
-        let mut sha_digest = sha.start_owned::<Sha256>();
+    fn test_sha_owned(ctx: Context) {
+        let mut sha_digest = ctx.sha.start_owned::<Sha256>();
         
         let mut remaining = SOURCE_DATA;
         while !remaining.is_empty() {
