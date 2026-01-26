@@ -1,15 +1,15 @@
 // //! Clock tree definitions and implementations for ESP32-C6.
 // //!
 // //! Remarks:
-// //! - Enabling a clock node assumes it has first been configured. Some fixed clock nodes don't need
-// //!   to be configured.
-// //! - Some information may be assumed, e.g. the possibility to disable watchdog timers before clock
-// //!   configuration.
-// //! - Internal RC oscillators (136k RC_SLOW and 17.5M RC_FAST) are not calibrated here, this system
-// //!   can only give a rough estimate of their frequency. They can be calibrated separately using a
-// //!   known crystal frequency.
-// //! - Some of the SOC capabilities are not implemented: I2S external pad clock source, external 32k
-// //!   oscillator, LP_DYN_FAST_CLK, APB_DECREASE_DIV (which seems unnecessary to model),
+// //! - Enabling a clock node assumes it has first been configured. Some fixed clock nodes don't
+// need //!   to be configured.
+// //! - Some information may be assumed, e.g. the possibility to disable watchdog timers before
+// clock //!   configuration.
+// //! - Internal RC oscillators (136k RC_SLOW and 17.5M RC_FAST) are not calibrated here, this
+// system //!   can only give a rough estimate of their frequency. They can be calibrated separately
+// using a //!   known crystal frequency.
+// //! - Some of the SOC capabilities are not implemented: I2S external pad clock source, external
+// 32k //!   oscillator, LP_DYN_FAST_CLK, APB_DECREASE_DIV (which seems unnecessary to model),
 // //!   PCR_CPU_HS_120M_FORCE.
 // #![allow(dead_code, reason = "Some of this is bound to be unused")]
 
@@ -249,9 +249,9 @@
 
 // fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, en: bool) {
 //     if en {
-//         // SCK_DCAP value controls tuning of 136k clock. The higher the value of DCAP, the lower the
-//         // frequency. There is no separate enable bit, just make sure the calibration value is set.
-//         const RTC_CNTL_SCK_DCAP_DEFAULT: u8 = 128;
+//         // SCK_DCAP value controls tuning of 136k clock. The higher the value of DCAP, the lower
+// the         // frequency. There is no separate enable bit, just make sure the calibration value
+// is set.         const RTC_CNTL_SCK_DCAP_DEFAULT: u8 = 128;
 //         crate::soc::regi2c::I2C_DIG_REG_SCK_DCAP.write_reg(RTC_CNTL_SCK_DCAP_DEFAULT);
 //     }
 
@@ -554,8 +554,8 @@
 // // TIMG0_CALIBRATION_CLOCK
 
 // fn enable_timg0_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-//     // Nothing to do, calibration clocks can only be selected. They are gated by the CALI_START bit,
-//     // which is managed by the calibration process.
+//     // Nothing to do, calibration clocks can only be selected. They are gated by the CALI_START
+// bit,     // which is managed by the calibration process.
 // }
 
 // fn configure_timg0_calibration_clock_impl(
@@ -624,8 +624,8 @@
 // // TIMG1_CALIBRATION_CLOCK
 
 // fn enable_timg1_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-//     // Nothing to do, calibration clocks can only be selected. They are gated by the CALI_START bit,
-//     // which is managed by the calibration process.
+//     // Nothing to do, calibration clocks can only be selected. They are gated by the CALI_START
+// bit,     // which is managed by the calibration process.
 // }
 
 // fn configure_timg1_calibration_clock_impl(

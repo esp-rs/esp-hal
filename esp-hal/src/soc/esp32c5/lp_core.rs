@@ -37,6 +37,8 @@ pub enum LpCoreClockSource {
     RcFastClk,
     /// 20 MHz clock
     XtalD2Clk,
+    /// TODO : verify
+    XtalClk
 }
 
 /// Represents the Low Power (LP) core peripheral.
@@ -55,10 +57,13 @@ impl<'d> LpCore<'d> {
         match clk_src {
             LpCoreClockSource::RcFastClk => LPWR::regs()
                 .lp_clk_conf()
-                .modify(|_, w| w.fast_clk_sel().clear_bit()),
+                .modify(|_, w| unsafe { w.fast_clk_sel().bits(0)}),
             LpCoreClockSource::XtalD2Clk => LPWR::regs()
                 .lp_clk_conf()
-                .modify(|_, w| w.fast_clk_sel().set_bit()),
+                .modify(|_, w| unsafe { w.fast_clk_sel().bits(1)}),
+            LpCoreClockSource::XtalClk => LPWR::regs()
+                .lp_clk_conf()
+                .modify(|_, w| unsafe { w.fast_clk_sel().bits(2)}),
         };
 
         let mut this = Self { _lp_core: lp_core };

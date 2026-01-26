@@ -296,7 +296,7 @@ pub use xtensa_lx_rt::{self, xtensa_lx};
 pub mod clock;
 #[cfg(soc_has_gpio)]
 pub mod gpio;
-#[cfg(any(soc_has_i2c0, soc_has_i2c1))]
+#[cfg(all(not(esp32c5), any(soc_has_i2c0, soc_has_i2c1)))]
 pub mod i2c;
 pub mod peripherals;
 #[cfg(all(feature = "unstable", any(soc_has_hmac, soc_has_sha)))]
@@ -305,7 +305,7 @@ mod reg_access;
 pub mod spi;
 pub mod system;
 pub mod time;
-#[cfg(any(soc_has_uart0, soc_has_uart1, soc_has_uart2))]
+#[cfg(all(not(esp32c5), any(soc_has_uart0, soc_has_uart1, soc_has_uart2)))]
 pub mod uart;
 
 mod macros;
@@ -342,7 +342,7 @@ unstable_module! {
     pub mod analog;
     #[cfg(any(systimer, timergroup))]
     pub mod timer;
-    #[cfg(soc_has_lpwr)]
+    #[cfg(all(not(esp32c5), soc_has_lpwr))]
     pub mod rtc_cntl;
     #[cfg(any(gdma, pdma))]
     pub mod dma;

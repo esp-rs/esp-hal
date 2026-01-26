@@ -59,7 +59,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | AES                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | ASSIST_DEBUG       |       | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      |          | ⚒️      |
 | DAC                | ⚒️   |          |          |          |          |          | ⚒️      |          |
-| DMA                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| DMA                | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | DS                 |       |          | ❌       |          | ❌       | ❌       | ❌       | ❌       |
 | ECC                |       | ⚒️      |          |          | ⚒️      | ⚒️      |          |          |
 | Ethernet           | ❌    |          |          |          |          |          |          |          |
@@ -67,12 +67,12 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | GPIO               | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
 | Dedicated GPIO     |       | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | HMAC               |       |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| I2C master         | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
+| I2C master         | ✔️   | ✔️      | ✔️      |          | ✔️      | ✔️      | ✔️      | ✔️      |
 | LP I2C master      |       |          |          |          | ⚒️      |          |          |          |
 | I2C slave          | ❌    |          | ❌       |          | ❌       | ❌       | ❌       | ❌       |
 | I2S                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Interrupts         | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| IOMUX              | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| IOMUX              | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Camera interface   | ❌    |          |          |          |          |          | ❌       | ⚒️      |
 | RGB display        | ⚒️   |          |          |          |          |          | ❌       | ⚒️      |
 | LEDC               | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
@@ -87,15 +87,15 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | SDIO slave         | ⚒️   |          |          |          | ⚒️      |          |          |          |
 | Light/deep sleep   | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SHA                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| SPI master         | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
+| SPI master         | ✔️   | ✔️      | ✔️      |          | ✔️      | ✔️      | ✔️      | ✔️      |
 | SPI slave          | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| SYSTIMER           |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| SYSTIMER           |       | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Temperature sensor | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Timers             | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Touch              | ⚒️   |          |          |          |          |          | ❌       | ❌       |
 | TWAI               | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| UART               | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
-| LP UART            |       |          |          | ❌       | ⚒️      |          |          |          |
+| UART               | ✔️   | ✔️      | ✔️      |          | ✔️      | ✔️      | ✔️      | ✔️      |
+| LP UART            |       |          |          |          | ⚒️      |          |          |          |
 | ULP (FSM)          | ⚒️   |          |          |          |          |          | ⚒️      | ⚒️      |
 | ULP (RISC-V)       |       |          |          |          | ⚒️      |          | ⚒️      | ⚒️      |
 | USB OTG FS         |       |          |          |          |          |          | ⚒️      | ⚒️      |

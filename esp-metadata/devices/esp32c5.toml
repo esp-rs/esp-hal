@@ -13,13 +13,13 @@ cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c5_technical_reference_manual_en.pdf"
 
 peripherals = [
-    { name = "AES", interrupts = { peri = "AES" } },
+    # { name = "AES", interrupts = { peri = "AES" } },
+    # { name = "ASSIST_DEBUG", pac = "BUS_MONITOR"},
     { name = "APB_SARADC" },
-    { name = "BITSCRAMBLER" },
-    { name = "BUS_MONITOR" },
-    { name = "CACHE" },
-    { name = "CLINT_M" },
-    { name = "CPU_APM" },
+    # { name = "BITSCRAMBLER" },
+    # { name = "CACHE" },
+    { name = "CLINT" },
+    # { name = "CPU_APM" }, # TODO: verify we need it
     { name = "DMA" },
     { name = "DS" },
     { name = "ECC" },
@@ -28,7 +28,7 @@ peripherals = [
     { name = "ETM", pac = "SOC_ETM" },
     { name = "GPIO" },
     { name = "GPIO_SD", pac = "GPIO_EXT" },
-    { name = "HINF" },
+    # { name = "HINF" }, # TODO: add PAC manually later
     { name = "HMAC" },
     { name = "HP_APM" },
     { name = "HP_SYS" },
@@ -36,19 +36,19 @@ peripherals = [
     { name = "I2C_ANA_MST" },
     { name = "I2C0", interrupts = { peri = "I2C" } },
     { name = "I2S0", interrupts = { peri = "I2S0" } },
-    { name = "IEEE802154" },
+    # { name = "IEEE802154" }, # TODO: add PAC manually later
     { name = "INTERRUPT_CORE0" },
-    { name = "INTMTX" },
+    # { name = "INTMTX" }, # TODO: verify we need it
     { name = "INTPRI" },
     { name = "IO_MUX" },
     { name = "KEYMNG" },
-    { name = "LEDC" },
+    # { name = "LEDC" }, # TODO: define later
     { name = "LP_ANA" },
     { name = "LP_AON" },
-    { name = "LP_APM" },
+    # { name = "LP_APM" }, # TODO: add PAC manually later
     { name = "LP_APM0" },
-    { name = "LP_CLKRST" },
-    { name = "LP_GPIO" },
+    { name = "LPWR", pac = "LP_CLKRST" }, # TODO: will need more code changes
+    # { name = "LP_GPIO" }, # TODO: add PAC manually later
     { name = "LP_I2C0" },
     { name = "LP_I2C_ANA_MST" },
     { name = "LP_IO_MUX" },
@@ -59,34 +59,36 @@ peripherals = [
     { name = "LP_WDT" },
     { name = "MCPWM0" },
     { name = "MEM_MONITOR" },
-    { name = "MODEM0" },
-    { name = "MODEM1" },
-    { name = "MODEM_PWR0" },
-    { name = "MODEM_PWR1" },
-    { name = "OTP_DEBUG" },
+    { name = "MODEM_LPCON" },
+    { name = "MODEM_SYSCON" },
+    # { name = "MODEM0" },
+    # { name = "MODEM1" },
+    # { name = "MODEM_PWR0" },
+    # { name = "MODEM_PWR1" },
+    # { name = "OTP_DEBUG" },
     { name = "PARL_IO", interrupts = { peri = "PARL_IO" } },
     { name = "PAU" },
     { name = "PCNT" },
     { name = "PCR" },
     { name = "PMU" },
-    { name = "PSRAM_MEM_MONITOR" },
-    { name = "PVT_MONITOR" },
+    # { name = "PSRAM_MEM_MONITOR" },
+    { name = "PVT_MONITOR", pac = "PVT" },
     { name = "RMT" },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SLC" },
-    { name = "SLCHOST" },
-    { name = "SPI0" },
-    { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2" } },
+    # { name = "SLCHOST" }, TODO: add PAC manually later
+    # { name = "SPI0" },
+    # { name = "SPI1" },
+    # { name = "SPI2", interrupts = { peri = "SPI2" } },
     { name = "SYSTEM", pac = "PCR" },
     { name = "SYSTIMER" },
     { name = "TEE" },
     { name = "TIMG0" },
     { name = "TIMG1" },
     { name = "TRACE0", pac = "TRACE" },
-    { name = "TWAI0" },
-    { name = "TWAI1" },
+    # { name = "TWAI0" }, # TODO: too different from what we know
+    # { name = "TWAI1" }, # TODO: too different from what we know
     { name = "UART0", interrupts = { peri = "UART0" } },
     { name = "UART1", interrupts = { peri = "UART1" } },
     { name = "UHCI0" },
@@ -104,7 +106,7 @@ peripherals = [
 symbols = [
     # Additional peripherals defined by us (the developers):
     # "gdma",
-    # "plic",
+    "clic",
     # "lp_core",
 
     # ROM capabilities
@@ -188,7 +190,7 @@ clocks = { system_clocks = { clock_tree = [
 ], peripheral_clocks = [
     # This list mirrors PCR_*_CONF_REG clock gating / reset controls, and adds modeled functional clock muxes where they exist.
 
-    { name = "Uart0", template_params = { peripheral = "uart0" }, keep_enabled = true, clocks = [
+    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true, clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [
             { name = "PLL_F80M", outputs = "PLL_F80M" },
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
@@ -218,7 +220,7 @@ clocks = { system_clocks = { clock_tree = [
         ] },
     ] },
 
-    { name = "Timg0", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timg0_conf", peripheral = "timg0", peri_clk_template = "{{control}}::regs().timg0_timer_clk_conf().modify(|_, w| w.timg0_timer_clk_en().bit(enable));" }, keep_enabled = true, clocks = [
+    { name = "Timg0", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup0_conf", peripheral = "tg0", peri_clk_template = "{{control}}::regs().timergroup0_timer_clk_conf().modify(|_, w| w.tg0_timer_clk_en().bit(enable));" }, keep_enabled = true, clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [
             { name = "XTAL",     outputs = "XTAL_CLK" },
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
@@ -236,7 +238,7 @@ clocks = { system_clocks = { clock_tree = [
             { name = "PLL_F80M", outputs = "PLL_F80M" },
         ] },
     ] },
-    { name = "Timg1", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timg1_conf", peripheral = "timg1", peri_clk_template = "{{control}}::regs().timg1_timer_clk_conf().modify(|_, w| w.timg1_timer_clk_en().bit(enable));" }, clocks = "Timg0" },
+    { name = "Timg1", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup1_conf", peripheral = "tg1", peri_clk_template = "{{control}}::regs().timergroup1_timer_clk_conf().modify(|_, w| w.tg1_timer_clk_en().bit(enable));" }, clocks = "Timg0" },
 
     { name = "Systimer", template_params = { peripheral = "systimer" }, keep_enabled = true, clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [
@@ -275,10 +277,9 @@ clocks = { system_clocks = { clock_tree = [
         # SARADC divider follows: f = f_src / (N + b/a) (PCR_SARADC_CLKM_DIV_*).
     ] },
 
-    { name = "UsbDevice", template_params = { peripheral = "usb_device" }, keep_enabled = true },
-
-    { name = "Pcnt", template_params = { peripheral = "pcnt" } },
-    { name = "Etm",  template_params = { peripheral = "etm" } },
+    { name = "UsbDevice", keep_enabled = true },
+    { name = "Pcnt" },
+    { name = "Etm" },
 
     { name = "Mcpwm0", template_params = { peripheral = "pwm" }, clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", default = "PLL_F160M", variants = [
@@ -290,7 +291,7 @@ clocks = { system_clocks = { clock_tree = [
 
     # OR LIKE C6? 
     # { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" } },
-    { name = "ParlIo", template_params = { peripheral = "parl" }, clocks = [
+    { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" }, clocks = [
         { name = "TX_FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [
             { name = "XTAL",      outputs = "XTAL_CLK" },
             { name = "RC_FAST",   outputs = "RC_FAST_CLK" },
@@ -302,7 +303,7 @@ clocks = { system_clocks = { clock_tree = [
 
     { name = "Dma", template_params = { peripheral = "gdma" } },
 
-    { name = "Spi2", template_params = { peripheral = "spi2" } },
+    # { name = "Spi2", template_params = { peripheral = "spi2" } },
 
     # Security / crypto clock gates in PCR
     { name = "Aes",  template_params = { peripheral = "aes" } },
@@ -311,7 +312,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Ecc",  template_params = { peripheral = "ecc" } },
     { name = "Ds",   template_params = { peripheral = "ds" } },
     { name = "Hmac", template_params = { peripheral = "hmac" } },
-    { name = "Sec",  template_params = { peripheral = "sec" } },
+    # { name = "Sec",  template_params = { peripheral = "sec" } },
 
     { name = "Trace0", template_params = { peripheral = "trace" } },
 
@@ -516,27 +517,27 @@ output_signals = [
     { name = "GPIO",             id = 256 }
 ]
 
-# TODO: Verify
-[device.i2c_master]
-support_status = "supported"
-instances = [
-    { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
-]
-has_fsm_timeouts = true
-has_hw_bus_clear = true
-ll_intr_mask = 0x3ffff
-fifo_size = 32
-has_bus_timeout_enable = true
-max_bus_timeout = 0x1F
-can_estimate_nack_reason = true
-has_conf_update = true
-has_reliable_fsm_reset = true
-has_arbitration_en = true
-has_tx_fifo_watermark = true
-bus_timeout_is_exponential = true
+# # TODO: Verify
+# [device.i2c_master]
+# support_status = "supported"
+# instances = [
+#     { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
+# ]
+# has_fsm_timeouts = true
+# has_hw_bus_clear = true
+# ll_intr_mask = 0x3ffff
+# fifo_size = 32
+# has_bus_timeout_enable = true
+# max_bus_timeout = 0x1F
+# can_estimate_nack_reason = true
+# has_conf_update = true
+# has_reliable_fsm_reset = true
+# has_arbitration_en = true
+# has_tx_fifo_watermark = true
+# bus_timeout_is_exponential = true
 
-# [device.i2c_slave]
-# support_status = "not_supported"
+# # [device.i2c_slave]
+# # support_status = "not_supported"
 
 [device.interrupts]
 support_status = "partial"
@@ -544,7 +545,7 @@ status_registers = 3 # TODO: Verify
 software_interrupt_count = 4
 software_interrupt_delay = 14 # TODO: Verify
 
-# TODO: VERIFY
+# # TODO: VERIFY
 [device.rmt]
 support_status = "partial"
 ram_start = 0x60006400
@@ -560,11 +561,11 @@ has_rx_demodulation = true
 clock_sources.supported = [ "None", "Pll80MHz", "RcFast", "Xtal" ]
 clock_sources.default = "RcFast"
 
-[device.spi_master]
-support_status = "supported"
-instances = [
-    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
-]
+# [device.spi_master]
+# support_status = "supported"
+# instances = [
+#     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
+# ]
 
 [device.rsa]
 support_status = "partial"
@@ -576,25 +577,25 @@ support_status = "partial"
 dma = true
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
-# [device.spi_slave]
+# # [device.spi_slave]
+# # instances = [
+# #     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
+# # ]
+
+# [device.uart]
+# support_status = "supported"
 # instances = [
-#     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
+#     { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
+#     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
 # ]
+# ram_size = 128
+# peripheral_controls_mem_clk = true # TODO: VERIFY
 
-[device.uart]
-support_status = "supported"
-instances = [
-    { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
-    { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
-]
-ram_size = 128
-peripheral_controls_mem_clk = true # TODO: VERIFY
+# [device.lp_uart]
+# support_status = "not_supported"
+# ram_size = 32
 
-[device.lp_uart]
-support_status = "not_supported"
-ram_size = 32
-
-## Miscellaneous
-[device.dma]
-[device.io_mux]
-[device.systimer]
+# ## Miscellaneous
+# [device.dma]
+# [device.io_mux]
+# [device.systimer]
