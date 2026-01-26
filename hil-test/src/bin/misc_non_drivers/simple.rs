@@ -188,14 +188,13 @@ mod tests {
     /// pointer is too far away to unwind")``)
     #[test]
     fn can_boot() {
-        #[allow(unused)]
         #[repr(align(64))]
         struct Aligned {
-            data: [u8; 128],
+            _data: [u8; 128],
         }
 
         #[used]
-        static ALIGNED: Aligned = Aligned { data: [0; 128] };
+        static ALIGNED: Aligned = Aligned { _data: [0; 128] };
     }
 
     #[test]
