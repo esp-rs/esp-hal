@@ -1809,4 +1809,21 @@ mod sha_tests {
             }
         });
     }
+
+    /// Test the owned code path (start_owned) to ensure it works with BorrowMut
+    #[test]
+    fn test_sha_owned(ctx: Context) {
+        let mut sha_digest = ctx.sha.start_owned::<Sha256>();
+
+        let mut remaining = SOURCE_DATA;
+        while !remaining.is_empty() {
+            remaining = block!(sha_digest.update(remaining)).unwrap();
+        }
+
+        let mut output = [0u8; 32];
+        block!(sha_digest.finish(&mut output)).unwrap();
+
+        // Verify against software implementation
+        assert_sw_hash::<sha2::Sha256>("SHA-256", SOURCE_DATA, &output);
+    }
 }
