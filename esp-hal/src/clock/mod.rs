@@ -59,9 +59,6 @@ use crate::peripherals::BT;
 use crate::peripherals::IEEE802154;
 #[cfg(wifi)]
 use crate::peripherals::WIFI;
-#[cfg(any(esp32, esp32c2))]
-use crate::soc::clocks::Timg0CalibrationClockConfig;
-#[cfg(any(esp32, esp32c2))]
 #[cfg(soc_has_clock_node_timg0_function_clock)]
 use crate::soc::clocks::Timg0FunctionClockConfig;
 use crate::{
@@ -69,7 +66,7 @@ use crate::{
     peripherals::{LPWR, TIMG0},
     private::Sealed,
     rtc_cntl::RtcCalSel,
-    soc::clocks::ClockTree,
+    soc::clocks::{ClockTree, Timg0CalibrationClockConfig},
     time::Rate,
 };
 
@@ -673,50 +670,50 @@ impl RtcClock {
     /// may happen if 32k XTAL is being calibrated, but the oscillator has
     /// not started up (due to incorrect loading capacitance, board design
     /// issue, or lack of 32 XTAL on board).
-    pub(crate) fn calibrate(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
-        let xtal_freq = Rate::from_hz(ClockTree::with(|clocks| {
-            crate::soc::clocks::xtal_clk_frequency(clocks)
-        }));
+    pub(crate) fn calibrate(cal_clk: Timg0CalibrationClockConfig, slowclk_cycles: u32) -> u32 {
+        ClockTree::with(|clocks| {
+            let xtal_freq = Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks));
 
-        #[cfg(esp32c6)]
-        let slowclk_cycles = if Efuse::chip_revision() > 0 && cal_clk == RtcCalSel::RcFast {
-            // The Fosc CLK of calibration circuit is divided by 32 for ECO1.
-            // So we need to divide the calibrate cycles of the FOSC for ECO1 and above
-            // chips by 32 to avoid excessive calibration time.
-            slowclk_cycles >> 5
-        } else {
-            slowclk_cycles
-        };
+            #[cfg(esp32c6)]
+            let slowclk_cycles = if Efuse::chip_revision() > 0
+                && cal_clk == Timg0CalibrationClockConfig::RcFastClk
+            {
+                // The Fosc CLK of calibration circuit is divided by 32 for ECO1.
+                // So we need to divide the calibrate cycles of the FOSC for ECO1 and above
+                // chips by 32 to avoid excessive calibration time.
+                slowclk_cycles >> 5
+            } else {
+                slowclk_cycles
+            };
 
-        let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
-        let divider = xtal_freq.as_mhz() as u64 * slowclk_cycles as u64;
-        let period_64 = ((xtal_cycles << RtcClock::CAL_FRACT) + divider / 2u64 - 1u64) / divider;
+            let xtal_cycles = Clocks::measure_rtc_clock(
+                clocks,
+                cal_clk,
+                #[cfg(soc_has_clock_node_timg0_function_clock)]
+                Timg0FunctionClockConfig::XtalClk,
+                slowclk_cycles,
+            ) as u64;
 
-        (period_64 & u32::MAX as u64) as u32
+            let divider = xtal_freq.as_mhz() as u64 * slowclk_cycles as u64;
+
+            let period_64 =
+                ((xtal_cycles << RtcClock::CAL_FRACT) + divider / 2u64 - 1u64) / divider;
+
+            (period_64 & u32::MAX as u64) as u32
+        })
     }
 
     /// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
     pub(crate) fn cycles_to_1ms() -> u16 {
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32c6, esp32h2))] {
-                let calibration_clock = match RtcClock::slow_freq() {
-                    RtcSlowClock::RcSlow => RtcCalSel::RtcMux,
-                    RtcSlowClock::_32kXtal => RtcCalSel::_32kXtal,
-                    RtcSlowClock::_32kRc => RtcCalSel::_32kRc,
-                    RtcSlowClock::OscSlow => RtcCalSel::_32kOscSlow,
-                    // RtcSlowClock::RcFast => RtcCalSel::RcFast,
-                };
+            if #[cfg(soc_has_lp_aon)] {
+                use crate::peripherals::LP_AON;
             } else {
-                let calibration_clock = match RtcClock::slow_freq() {
-                    RtcSlowClock::RcSlow => RtcCalSel::RtcMux,
-                    RtcSlowClock::_32kXtal => RtcCalSel::_32kXtal,
-                    RtcSlowClock::_8mD256 => RtcCalSel::_8mD256,
-                };
+                use crate::peripherals::LPWR as LP_AON;
             }
         }
 
-        // TODO: store the result somewhere
-        let period_13q19 = RtcClock::calibrate(calibration_clock, 1024);
+        let period_13q19 = LP_AON::regs().store1().read().bits();
 
         // 100_000_000 is used to get rid of `float` calculations
         let period = (100_000_000 * period_13q19 as u64) / (1 << RtcClock::CAL_FRACT);
@@ -726,7 +723,6 @@ impl RtcClock {
 
     /// Return estimated XTAL frequency in MHz.
     pub(crate) fn estimate_xtal_frequency() -> u32 {
-        // TODO: this could reuse Self::calibrate_internal
         const SLOW_CLOCK_CYCLES: u32 = 100;
 
         let calibration_clock = RtcSlowClock::RcSlow;
@@ -851,7 +847,6 @@ impl Clocks {
 
     // We're rather impolite in this function by not saving and restoring configuration, but this is
     // expected to run before configuring peripheral clocks anyway.
-    #[cfg(any(esp32, esp32c2))]
     pub(crate) fn measure_rtc_clock(
         clocks: &mut ClockTree,
         rtc_clock: Timg0CalibrationClockConfig,
@@ -915,7 +910,16 @@ impl Clocks {
 
     pub(crate) fn calibrate_rtc_slow_clock() {
         let cal_val = loop {
-            let res = RtcClock::calibrate(RtcCalSel::RtcMux, 1024);
+            cfg_if::cfg_if! {
+                if #[cfg(any(esp32, esp32c2, esp32c3))] {
+                    let slow_clk = Timg0CalibrationClockConfig::RtcClk;
+                } else if #[cfg(any(esp32c6, esp32h2))] {
+                    let slow_clk = Timg0CalibrationClockConfig::RtcSlowClk;
+                } else {
+                    let slow_clk = Timg0CalibrationClockConfig::RcSlowClk;
+                }
+            }
+            let res = RtcClock::calibrate(slow_clk, 1024);
             if res != 0 {
                 break res;
             }
