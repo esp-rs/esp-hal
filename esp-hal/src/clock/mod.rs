@@ -61,7 +61,7 @@ use crate::peripherals::IEEE802154;
 use crate::peripherals::WIFI;
 #[cfg(soc_has_clock_node_lp_slow_clk)]
 use crate::soc::clocks::LpSlowClkConfig;
-#[cfg(soc_has_clock_node_rtc_slow_clk)]
+#[cfg(all(not(esp32s2), soc_has_clock_node_rtc_slow_clk))]
 use crate::soc::clocks::RtcSlowClkConfig;
 #[cfg(soc_has_clock_node_timg0_function_clock)]
 use crate::soc::clocks::Timg0FunctionClockConfig;
@@ -423,11 +423,15 @@ impl Clocks {
         })
     }
 
+    /// Uses a TIMG0 feature to count clock cycles of a high-frequency clock, for a period of time
+    /// that is measured by a low-frequency clock. This function can be used to calibrate two
+    /// clocks to each other, e.g. to determine a rough value of the XTAL clock, or to determine
+    /// the current frequency of a low-precision RC oscillator.
     pub(crate) fn measure_rtc_clock(
         clocks: &mut ClockTree,
         rtc_clock: Timg0CalibrationClockConfig,
         #[cfg(soc_has_clock_node_timg0_function_clock)] function_clock: Timg0FunctionClockConfig,
-        cycles: u32,
+        slow_cycles: u32,
     ) -> u32 {
         // By default the TIMG0 bus clock is running. Do not create a peripheral guard as dropping
         // it would reset the timer, and it would enable its WDT.
@@ -457,14 +461,14 @@ impl Clocks {
             crate::soc::clocks::timg0_calibration_clock_frequency(clocks);
 
         TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
-            w.rtc_cali_max().bits(cycles as u16);
+            w.rtc_cali_max().bits(slow_cycles as u16);
             w.rtc_cali_start_cycling().clear_bit();
             w.rtc_cali_start().set_bit()
         });
 
         // Delay, otherwise the CPU may read back the previous state of the completion flag and skip
         // waiting.
-        ets_delay_us(cycles * 1_000_000 / calibration_clock_frequency);
+        ets_delay_us(slow_cycles * 1_000_000 / calibration_clock_frequency);
 
         // Wait for the calibration to finish
         while TIMG0::regs()
