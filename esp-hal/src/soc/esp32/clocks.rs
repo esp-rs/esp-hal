@@ -17,6 +17,7 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
+    clock::Clocks,
     efuse::{Efuse, VOL_LEVEL_HP_INV},
     peripherals::{APB_CTRL, LPWR, RTC_IO, SYSTEM, TIMG0, TIMG1, UART0, UART1, UART2},
     rtc_cntl::Rtc,
@@ -132,45 +133,16 @@ fn detect_xtal_freq(clocks: &mut ClockTree) -> XtalClkConfig {
     configure_syscon_pre_div(clocks, SysconPreDivConfig::new(0));
     configure_cpu_clk(clocks, CpuClkConfig::Xtal);
 
-    // Make sure the process doesn't time out due to some spooky configuration.
-    #[cfg(not(esp32))]
-    TIMG0::regs().rtccalicfg2().reset();
+    let xtal_cycles = Clocks::measure_rtc_clock(
+        clocks,
+        Timg0CalibrationClockConfig::RcSlowClk,
+        SLOW_CLOCK_CYCLES,
+    ) / 1_000_000;
 
-    TIMG0::regs()
-        .rtccalicfg()
-        .modify(|_, w| w.rtc_cali_start().clear_bit());
+    let calibration_clock_frequency = crate::soc::clocks::timg0_calibration_clock_frequency(clocks);
 
-    configure_timg0_calibration_clock(clocks, Timg0CalibrationClockConfig::default());
-    request_timg0_calibration_clock(clocks);
+    let mhz = xtal_cycles * (calibration_clock_frequency / SLOW_CLOCK_CYCLES);
 
-    let calibration_clock_frequency = timg0_calibration_clock_frequency(clocks);
-
-    TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
-        w.rtc_cali_max().bits(SLOW_CLOCK_CYCLES as u16);
-        w.rtc_cali_start_cycling().clear_bit();
-        w.rtc_cali_start().set_bit()
-    });
-
-    // Delay, otherwise the CPU may read back the previous state of the completion flag and skip
-    // waiting.
-    ets_delay_us(SLOW_CLOCK_CYCLES * 1_000_000 / calibration_clock_frequency);
-
-    // Wait for the calibration to finish
-    while TIMG0::regs()
-        .rtccalicfg()
-        .read()
-        .rtc_cali_rdy()
-        .bit_is_clear()
-    {}
-
-    let cali_value = TIMG0::regs().rtccalicfg1().read().rtc_cali_value().bits();
-
-    TIMG0::regs()
-        .rtccalicfg()
-        .modify(|_, w| w.rtc_cali_start().clear_bit());
-    release_timg0_calibration_clock(clocks);
-
-    let mhz = (cali_value * (calibration_clock_frequency / SLOW_CLOCK_CYCLES)) / 1_000_000;
     if mhz.abs_diff(40) < mhz.abs_diff(26) {
         XtalClkConfig::_40
     } else {

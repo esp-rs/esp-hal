@@ -59,6 +59,11 @@ use crate::peripherals::BT;
 use crate::peripherals::IEEE802154;
 #[cfg(wifi)]
 use crate::peripherals::WIFI;
+#[cfg(any(esp32, esp32c2))]
+use crate::soc::clocks::Timg0CalibrationClockConfig;
+#[cfg(any(esp32, esp32c2))]
+#[cfg(soc_has_clock_node_timg0_function_clock)]
+use crate::soc::clocks::Timg0FunctionClockConfig;
 use crate::{
     ESP_HAL_LOCK,
     peripherals::{LPWR, TIMG0},
@@ -842,6 +847,70 @@ impl Clocks {
                 xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
             }
         })
+    }
+
+    // We're rather impolite in this function by not saving and restoring configuration, but this is
+    // expected to run before configuring peripheral clocks anyway.
+    #[cfg(any(esp32, esp32c2))]
+    pub(crate) fn measure_rtc_clock(
+        clocks: &mut ClockTree,
+        rtc_clock: Timg0CalibrationClockConfig,
+        #[cfg(soc_has_clock_node_timg0_function_clock)] function_clock: Timg0FunctionClockConfig,
+        cycles: u32,
+    ) -> u32 {
+        // By default the TIMG0 bus clock is running. Do not create a peripheral guard as dropping
+        // it would reset the timer, and it would enable its WDT.
+
+        // Make sure the process doesn't time out due to some spooky configuration.
+        #[cfg(not(esp32))]
+        TIMG0::regs().rtccalicfg2().reset();
+
+        TIMG0::regs()
+            .rtccalicfg()
+            .modify(|_, w| w.rtc_cali_start().clear_bit());
+
+        // Make sure we measure the crystal.
+        #[cfg(soc_has_clock_node_timg0_function_clock)]
+        {
+            crate::soc::clocks::configure_timg0_function_clock(clocks, function_clock);
+            crate::soc::clocks::request_timg0_function_clock(clocks);
+        }
+
+        crate::soc::clocks::configure_timg0_calibration_clock(clocks, rtc_clock);
+        crate::soc::clocks::request_timg0_calibration_clock(clocks);
+
+        let calibration_clock_frequency =
+            crate::soc::clocks::timg0_calibration_clock_frequency(clocks);
+
+        TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
+            w.rtc_cali_max().bits(cycles as u16);
+            w.rtc_cali_start_cycling().clear_bit();
+            w.rtc_cali_start().set_bit()
+        });
+
+        // Delay, otherwise the CPU may read back the previous state of the completion flag and skip
+        // waiting.
+        ets_delay_us(cycles * 1_000_000 / calibration_clock_frequency);
+
+        // Wait for the calibration to finish
+        while TIMG0::regs()
+            .rtccalicfg()
+            .read()
+            .rtc_cali_rdy()
+            .bit_is_clear()
+        {}
+
+        let cali_value = TIMG0::regs().rtccalicfg1().read().rtc_cali_value().bits();
+
+        TIMG0::regs()
+            .rtccalicfg()
+            .modify(|_, w| w.rtc_cali_start().clear_bit());
+        crate::soc::clocks::release_timg0_calibration_clock(clocks);
+
+        #[cfg(soc_has_clock_node_timg0_function_clock)]
+        crate::soc::clocks::release_timg0_function_clock(clocks);
+
+        cali_value
     }
 }
 
