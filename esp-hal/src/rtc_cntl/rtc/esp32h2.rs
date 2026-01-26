@@ -1,7 +1,7 @@
 use strum::FromRepr;
 
 use crate::{
-    clock::{RtcClock, RtcFastClock, RtcSlowClock},
+    clock::RtcClock,
     peripherals::{LP_AON, PMU},
     rtc_cntl::RtcCalSel,
     soc::regi2c,
@@ -74,9 +74,6 @@ pub(crate) fn init() {
         pmu.slp_wakeup_cntl7()
             .modify(|_, w| w.ana_wait_target().bits(1700));
     }
-
-    RtcClock::set_fast_freq(RtcFastClock::RcFast);
-    RtcClock::set_slow_freq(RtcSlowClock::RcSlow);
 }
 
 pub(crate) fn configure_clock() {
