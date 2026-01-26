@@ -838,6 +838,9 @@ macro_rules! define_clock_tree_types {
             clocks.xtal_clk = Some(config);
             configure_xtal_clk_impl(clocks, config);
         }
+        pub fn xtal_clk_config(clocks: &mut ClockTree) -> Option<XtalClkConfig> {
+            clocks.xtal_clk
+        }
         fn request_xtal_clk(_clocks: &mut ClockTree) {}
         fn release_xtal_clk(_clocks: &mut ClockTree) {}
         pub fn xtal_clk_frequency(clocks: &mut ClockTree) -> u32 {
@@ -993,6 +996,9 @@ macro_rules! define_clock_tree_types {
                 configure_hp_root_clk_impl(clocks, old_selector, new_selector);
             }
         }
+        pub fn hp_root_clk_config(clocks: &mut ClockTree) -> Option<HpRootClkConfig> {
+            clocks.hp_root_clk
+        }
         pub fn request_hp_root_clk(clocks: &mut ClockTree) {
             trace!("Requesting HP_ROOT_CLK");
             if increment_reference_count(&mut clocks.hp_root_clk_refcount) {
@@ -1031,6 +1037,9 @@ macro_rules! define_clock_tree_types {
             clocks.cpu_clk = Some(config);
             configure_cpu_clk_impl(clocks, config);
         }
+        pub fn cpu_clk_config(clocks: &mut ClockTree) -> Option<CpuClkConfig> {
+            clocks.cpu_clk
+        }
         pub fn request_cpu_clk(clocks: &mut ClockTree) {
             trace!("Requesting CPU_CLK");
             if increment_reference_count(&mut clocks.cpu_clk_refcount) {
@@ -1054,6 +1063,9 @@ macro_rules! define_clock_tree_types {
             clocks.ahb_clk = Some(config);
             configure_ahb_clk_impl(clocks, config);
         }
+        pub fn ahb_clk_config(clocks: &mut ClockTree) -> Option<AhbClkConfig> {
+            clocks.ahb_clk
+        }
         pub fn request_ahb_clk(clocks: &mut ClockTree) {
             trace!("Requesting AHB_CLK");
             trace!("Enabling AHB_CLK");
@@ -1072,6 +1084,9 @@ macro_rules! define_clock_tree_types {
         pub fn configure_apb_clk(clocks: &mut ClockTree, config: ApbClkConfig) {
             clocks.apb_clk = Some(config);
             configure_apb_clk_impl(clocks, config);
+        }
+        pub fn apb_clk_config(clocks: &mut ClockTree) -> Option<ApbClkConfig> {
+            clocks.apb_clk
         }
         pub fn request_apb_clk(clocks: &mut ClockTree) {
             trace!("Requesting APB_CLK");
@@ -1127,6 +1142,9 @@ macro_rules! define_clock_tree_types {
                 configure_lp_fast_clk_impl(clocks, old_selector, new_selector);
             }
         }
+        pub fn lp_fast_clk_config(clocks: &mut ClockTree) -> Option<LpFastClkConfig> {
+            clocks.lp_fast_clk
+        }
         pub fn request_lp_fast_clk(clocks: &mut ClockTree) {
             trace!("Requesting LP_FAST_CLK");
             if increment_reference_count(&mut clocks.lp_fast_clk_refcount) {
@@ -1177,6 +1195,9 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_lp_slow_clk_impl(clocks, old_selector, new_selector);
             }
+        }
+        pub fn lp_slow_clk_config(clocks: &mut ClockTree) -> Option<LpSlowClkConfig> {
+            clocks.lp_slow_clk
         }
         pub fn request_lp_slow_clk(clocks: &mut ClockTree) {
             trace!("Requesting LP_SLOW_CLK");
@@ -1232,6 +1253,11 @@ macro_rules! define_clock_tree_types {
                 configure_mcpwm0_function_clock_impl(clocks, old_selector, new_selector);
             }
         }
+        pub fn mcpwm0_function_clock_config(
+            clocks: &mut ClockTree,
+        ) -> Option<Mcpwm0FunctionClockConfig> {
+            clocks.mcpwm0_function_clock
+        }
         pub fn request_mcpwm0_function_clock(clocks: &mut ClockTree) {
             trace!("Requesting MCPWM0_FUNCTION_CLOCK");
             if increment_reference_count(&mut clocks.mcpwm0_function_clock_refcount) {
@@ -1285,6 +1311,11 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_timg0_function_clock_impl(clocks, old_selector, new_selector);
             }
+        }
+        pub fn timg0_function_clock_config(
+            clocks: &mut ClockTree,
+        ) -> Option<Timg0FunctionClockConfig> {
+            clocks.timg0_function_clock
         }
         pub fn request_timg0_function_clock(clocks: &mut ClockTree) {
             trace!("Requesting TIMG0_FUNCTION_CLOCK");
@@ -1340,6 +1371,11 @@ macro_rules! define_clock_tree_types {
                 configure_timg0_calibration_clock_impl(clocks, old_selector, new_selector);
             }
         }
+        pub fn timg0_calibration_clock_config(
+            clocks: &mut ClockTree,
+        ) -> Option<Timg0CalibrationClockConfig> {
+            clocks.timg0_calibration_clock
+        }
         pub fn request_timg0_calibration_clock(clocks: &mut ClockTree) {
             trace!("Requesting TIMG0_CALIBRATION_CLOCK");
             if increment_reference_count(&mut clocks.timg0_calibration_clock_refcount) {
@@ -1393,6 +1429,9 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_timg0_wdt_clock_impl(clocks, old_selector, new_selector);
             }
+        }
+        pub fn timg0_wdt_clock_config(clocks: &mut ClockTree) -> Option<Timg0WdtClockConfig> {
+            clocks.timg0_wdt_clock
         }
         pub fn request_timg0_wdt_clock(clocks: &mut ClockTree) {
             trace!("Requesting TIMG0_WDT_CLOCK");
@@ -1448,6 +1487,11 @@ macro_rules! define_clock_tree_types {
                 configure_timg1_function_clock_impl(clocks, old_selector, new_selector);
             }
         }
+        pub fn timg1_function_clock_config(
+            clocks: &mut ClockTree,
+        ) -> Option<Timg0FunctionClockConfig> {
+            clocks.timg1_function_clock
+        }
         pub fn request_timg1_function_clock(clocks: &mut ClockTree) {
             trace!("Requesting TIMG1_FUNCTION_CLOCK");
             if increment_reference_count(&mut clocks.timg1_function_clock_refcount) {
@@ -1501,6 +1545,11 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_timg1_calibration_clock_impl(clocks, old_selector, new_selector);
             }
+        }
+        pub fn timg1_calibration_clock_config(
+            clocks: &mut ClockTree,
+        ) -> Option<Timg0CalibrationClockConfig> {
+            clocks.timg1_calibration_clock
         }
         pub fn request_timg1_calibration_clock(clocks: &mut ClockTree) {
             trace!("Requesting TIMG1_CALIBRATION_CLOCK");
@@ -1556,6 +1605,9 @@ macro_rules! define_clock_tree_types {
                 configure_timg1_wdt_clock_impl(clocks, old_selector, new_selector);
             }
         }
+        pub fn timg1_wdt_clock_config(clocks: &mut ClockTree) -> Option<Timg0WdtClockConfig> {
+            clocks.timg1_wdt_clock
+        }
         pub fn request_timg1_wdt_clock(clocks: &mut ClockTree) {
             trace!("Requesting TIMG1_WDT_CLOCK");
             if increment_reference_count(&mut clocks.timg1_wdt_clock_refcount) {
@@ -1610,6 +1662,11 @@ macro_rules! define_clock_tree_types {
                 configure_uart0_function_clock_impl(clocks, old_selector, new_selector);
             }
         }
+        pub fn uart0_function_clock_config(
+            clocks: &mut ClockTree,
+        ) -> Option<Uart0FunctionClockConfig> {
+            clocks.uart0_function_clock
+        }
         pub fn request_uart0_function_clock(clocks: &mut ClockTree) {
             trace!("Requesting UART0_FUNCTION_CLOCK");
             if increment_reference_count(&mut clocks.uart0_function_clock_refcount) {
@@ -1663,6 +1720,11 @@ macro_rules! define_clock_tree_types {
             } else {
                 configure_uart1_function_clock_impl(clocks, old_selector, new_selector);
             }
+        }
+        pub fn uart1_function_clock_config(
+            clocks: &mut ClockTree,
+        ) -> Option<Uart0FunctionClockConfig> {
+            clocks.uart1_function_clock
         }
         pub fn request_uart1_function_clock(clocks: &mut ClockTree) {
             trace!("Requesting UART1_FUNCTION_CLOCK");

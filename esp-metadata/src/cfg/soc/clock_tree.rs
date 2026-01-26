@@ -79,6 +79,7 @@ pub(crate) struct ClockNodeFunctions {
     pub request: Function,
     pub release: Function,
     pub apply_config: Function,
+    pub current_config: Function,
 
     pub frequency: Function,
     pub hal_functions: Vec<TokenStream>,
@@ -89,10 +90,12 @@ impl ClockNodeFunctions {
         let request_impl = &self.request.implementation;
         let release_impl = &self.release.implementation;
         let apply_impl = &self.apply_config.implementation;
+        let current_config_impl = &self.current_config.implementation;
         let frequency_impl = &self.frequency.implementation;
 
         quote! {
             #apply_impl
+            #current_config_impl
             #request_impl
             #release_impl
             #frequency_impl
@@ -339,12 +342,32 @@ pub(crate) trait ClockTreeNodeType: Any {
         }
     }
 
+    fn config_current_function(&self, tree: &ProcessedClockData) -> TokenStream {
+        if self.is_configurable() {
+            let ty_name = self.config_type_name();
+            let state = tree.properties(self).field_name();
+            let fn_name = self.current_config_function_name();
+            quote! {
+                pub fn #fn_name(clocks: &mut ClockTree) -> Option<#ty_name> {
+                    clocks.#state
+                }
+            }
+        } else {
+            quote! {}
+        }
+    }
+
     fn config_type(&self) -> Option<TokenStream>;
     fn config_docline(&self) -> Option<String>;
 
     fn config_apply_function_name(&self) -> Ident {
         let name = self.name().to_case(Case::Snake);
         format_ident!("configure_{}", name)
+    }
+
+    fn current_config_function_name(&self) -> Ident {
+        let name = self.name().to_case(Case::Snake);
+        format_ident!("{}_config", name)
     }
 
     fn frequency_function_name(&self) -> Ident {
@@ -425,6 +448,7 @@ impl ClockTreeItem {
 
         // Only configurables have an apply fn
         let apply_fn = ty_name.as_ref().map(|_| node.config_apply_function(tree));
+        let current_config_fn = ty_name.as_ref().map(|_| node.config_current_function(tree));
         let apply_fn_impl = ty_name
             .as_ref()
             .map(|_| node.config_apply_impl_function(tree))
@@ -513,6 +537,11 @@ impl ClockTreeItem {
             apply_config: Function {
                 _name: node.config_apply_function_name().to_string(),
                 implementation: quote! { #apply_fn },
+            },
+
+            current_config: Function {
+                _name: node.current_config_function_name().to_string(),
+                implementation: quote! { #current_config_fn },
             },
 
             frequency: Function {

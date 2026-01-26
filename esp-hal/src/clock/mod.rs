@@ -419,9 +419,6 @@ impl Clocks {
         })
     }
 
-    // We're rather impolite in this function by not saving and restoring configuration, but this is
-    // expected to run before configuring peripheral clocks anyway.
-    // TODO: restore settings
     pub(crate) fn measure_rtc_clock(
         clocks: &mut ClockTree,
         rtc_clock: Timg0CalibrationClockConfig,
@@ -440,12 +437,15 @@ impl Clocks {
             .modify(|_, w| w.rtc_cali_start().clear_bit());
 
         // Make sure we measure the crystal.
-        #[cfg(soc_has_clock_node_timg0_function_clock)]
-        {
-            crate::soc::clocks::configure_timg0_function_clock(clocks, function_clock);
-            crate::soc::clocks::request_timg0_function_clock(clocks);
+        cfg_if::cfg_if! {
+            if #[cfg(soc_has_clock_node_timg0_function_clock)] {
+                let current_function_clock = crate::soc::clocks::timg0_function_clock_config(clocks);
+                crate::soc::clocks::configure_timg0_function_clock(clocks, function_clock);
+                crate::soc::clocks::request_timg0_function_clock(clocks);
+            }
         }
 
+        let current_calib_clock = crate::soc::clocks::timg0_calibration_clock_config(clocks);
         crate::soc::clocks::configure_timg0_calibration_clock(clocks, rtc_clock);
         crate::soc::clocks::request_timg0_calibration_clock(clocks);
 
@@ -477,14 +477,29 @@ impl Clocks {
             .modify(|_, w| w.rtc_cali_start().clear_bit());
         crate::soc::clocks::release_timg0_calibration_clock(clocks);
 
+        if let Some(calib_clock) = current_calib_clock
+            && calib_clock != rtc_clock
+        {
+            crate::soc::clocks::configure_timg0_calibration_clock(clocks, calib_clock);
+        }
+
         #[cfg(soc_has_clock_node_timg0_function_clock)]
-        crate::soc::clocks::release_timg0_function_clock(clocks);
+        {
+            crate::soc::clocks::release_timg0_function_clock(clocks);
+
+            if let Some(func_clock) = current_function_clock
+                && func_clock != function_clock
+            {
+                crate::soc::clocks::configure_timg0_function_clock(clocks, func_clock);
+            }
+        }
 
         cali_value
     }
 
     pub(crate) fn calibrate_rtc_slow_clock() {
         let cal_val = loop {
+            // TODO: map actual RTC_SLOW_CLK source
             cfg_if::cfg_if! {
                 if #[cfg(any(esp32, esp32c2, esp32c3, esp32s3))] {
                     let slow_clk = Timg0CalibrationClockConfig::RcSlowClk;

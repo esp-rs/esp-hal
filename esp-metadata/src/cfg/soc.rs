@@ -117,7 +117,10 @@ impl ProcessedClockData {
             .unwrap_or_else(|| panic!("Clock node {} not found", name))
     }
 
-    fn properties(&self, node: &dyn ClockTreeNodeType) -> &ManagementProperties {
+    fn properties<CTNT>(&self, node: &CTNT) -> &ManagementProperties
+    where
+        CTNT: ClockTreeNodeType + ?Sized,
+    {
         self.management_properties
             .get(node.name_str())
             .unwrap_or_else(|| panic!("Management properties for {} not found", node.name_str()))
