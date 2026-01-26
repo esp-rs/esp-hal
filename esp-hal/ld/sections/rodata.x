@@ -6,6 +6,14 @@ SECTIONS {
       KEEP(*(.flash.appdesc.*));
   } > RODATA
 
+  /*
+    Depending on the input sections which go into .rodata the alignment might get adjusted to >4.
+    Make sure we have a "merge-section" here to make the tooling NOT emit more than two sections which go into flash.
+  */
+  .rodata_merge : ALIGN (4) {
+    . = ALIGN(ALIGNOF(.rodata));
+  } > RODATA
+
   .rodata : ALIGN(4)
   {
     . = ALIGN (4);
