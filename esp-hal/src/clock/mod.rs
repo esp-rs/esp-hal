@@ -59,6 +59,10 @@ use crate::peripherals::BT;
 use crate::peripherals::IEEE802154;
 #[cfg(wifi)]
 use crate::peripherals::WIFI;
+#[cfg(soc_has_clock_node_lp_slow_clk)]
+use crate::soc::clocks::LpSlowClkConfig;
+#[cfg(soc_has_clock_node_rtc_slow_clk)]
+use crate::soc::clocks::RtcSlowClkConfig;
 #[cfg(soc_has_clock_node_timg0_function_clock)]
 use crate::soc::clocks::Timg0FunctionClockConfig;
 use crate::{
@@ -250,12 +254,12 @@ impl RtcClock {
 
             #[cfg(esp32c6)]
             let slowclk_cycles = if Efuse::chip_revision() > 0
-                && cal_clk == Timg0CalibrationClockConfig::RcFastClk
+                && cal_clk == Timg0CalibrationClockConfig::RcFastDivClk
             {
                 // The Fosc CLK of calibration circuit is divided by 32 for ECO1.
                 // So we need to divide the calibrate cycles of the FOSC for ECO1 and above
                 // chips by 32 to avoid excessive calibration time.
-                slowclk_cycles >> 5
+                slowclk_cycles / 32
             } else {
                 slowclk_cycles
             };
@@ -498,17 +502,31 @@ impl Clocks {
     }
 
     pub(crate) fn calibrate_rtc_slow_clock() {
-        let cal_val = loop {
-            // TODO: map actual RTC_SLOW_CLK source
-            cfg_if::cfg_if! {
-                if #[cfg(any(esp32, esp32c2, esp32c3, esp32s3))] {
-                    let slow_clk = Timg0CalibrationClockConfig::RcSlowClk;
-                } else if #[cfg(any(esp32c6, esp32h2))] {
-                    let slow_clk = Timg0CalibrationClockConfig::RtcSlowClk;
-                } else {
-                    let slow_clk = Timg0CalibrationClockConfig::RtcClk;
-                }
+        // Unfortunate device specific mapping.
+        // TODO: fix it by generating cfgs for each mux input?
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s2)] {
+                // Can directly measure output of the RTC_SLOW mux
+                let slow_clk = Timg0CalibrationClockConfig::RtcClk;
+            } else if #[cfg(soc_has_clock_node_rtc_slow_clk)] {
+                let slow_clk = match unwrap!(ClockTree::with(crate::soc::clocks::rtc_slow_clk_config)) {
+                    RtcSlowClkConfig::RcFast => Timg0CalibrationClockConfig::RcFastDivClk,
+                    RtcSlowClkConfig::RcSlow => Timg0CalibrationClockConfig::RcSlowClk,
+                    #[cfg(not(esp32c2))]
+                    RtcSlowClkConfig::Xtal32k => Timg0CalibrationClockConfig::Xtal32kClk,
+                    #[cfg(esp32c2)]
+                    RtcSlowClkConfig::OscSlow => Timg0CalibrationClockConfig::Osc32kClk,
+                };
+            } else {
+                let slow_clk = match unwrap!(ClockTree::with(crate::soc::clocks::lp_slow_clk_config)) {
+                    LpSlowClkConfig::OscSlow => Timg0CalibrationClockConfig::Xtal32kClk, //?
+                    LpSlowClkConfig::Xtal32k => Timg0CalibrationClockConfig::Xtal32kClk,
+                    LpSlowClkConfig::RcSlow => Timg0CalibrationClockConfig::RcSlowClk,
+                };
             }
+        }
+
+        let cal_val = loop {
             let res = RtcClock::calibrate(slow_clk, 1024);
             if res != 0 {
                 break res;

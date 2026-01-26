@@ -612,7 +612,7 @@ fn configure_rtc_slow_clk_impl(
 ) {
     LPWR::regs().clk_conf().modify(|_, w| match new_selector {
         RtcSlowClkConfig::RcSlow => w.ana_clk_rtc_sel().slow_ck(),
-        RtcSlowClkConfig::Xtal => w.ana_clk_rtc_sel().ck_xtal_32k(),
+        RtcSlowClkConfig::Xtal32k => w.ana_clk_rtc_sel().ck_xtal_32k(),
         RtcSlowClkConfig::RcFast => w.ana_clk_rtc_sel().ck8m_d256_out(),
     });
 }

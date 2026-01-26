@@ -499,7 +499,7 @@ impl SleepTimeConfig {
     const RTC_CLK_CAL_FRACT: u32 = 19;
 
     fn rtc_clk_cal_fast(slowclk_cycles: u32) -> u32 {
-        RtcClock::calibrate(Timg0CalibrationClockConfig::RcFastClk, slowclk_cycles)
+        RtcClock::calibrate(Timg0CalibrationClockConfig::RcFastDivClk, slowclk_cycles)
     }
 
     fn new() -> Self {

@@ -153,9 +153,9 @@ clocks = { system_clocks = { clock_tree = [
         { name = "XTAL_D2_CLK", outputs = "XTAL_D2_CLK" },
     ] },
     { name = "LP_SLOW_CLK", type = "mux", variants = [
-        { name = "XTAL32K_CLK", outputs = "XTAL32K_CLK" },
-        { name = "RC_SLOW",     outputs = "RC_SLOW_CLK" },
-        { name = "OSC_SLOW",    outputs = "OSC_SLOW_CLK" },
+        { name = "XTAL32K",  outputs = "XTAL32K_CLK" },
+        { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
+        { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
     ] },
     # LP_DYN_SLOW_CLK is LP_SLOW_CLK
     # LP_DYN_FAST_CLK is automatically managed based on power mode. Not sure how to model it, some LP peripherals need it.
@@ -192,9 +192,9 @@ clocks = { system_clocks = { clock_tree = [
             { name = "PLL_F48M",    outputs = "PLL_F48M_CLK" },
         ] },
         { name = "CALIBRATION_CLOCK", type = "mux", variants = [
-            { name = "RTC_SLOW_CLK", outputs = "LP_SLOW_CLK" },
-            { name = "RC_FAST_CLK",  outputs = "RC_FAST_CLK" },
-            { name = "XTAL32K_CLK",  outputs = "XTAL32K_CLK" },
+            { name = "RC_SLOW_CLK",     outputs = "LP_SLOW_CLK" },
+            { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_CLK" }, #?
+            { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
         ] },
         { name = "WDT_CLOCK", type = "mux", default = "XTAL_CLK", variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
