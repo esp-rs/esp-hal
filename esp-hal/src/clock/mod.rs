@@ -796,7 +796,7 @@ impl Clocks {
             unsafe { ACTIVE_CLOCKS = Some(config) };
         });
 
-        crate::rtc_cntl::rtc::configure_clock();
+        Clocks::calibrate_rtc_slow_clock();
     }
 
     fn try_get<'a>() -> Option<&'a Clocks> {
@@ -911,6 +911,27 @@ impl Clocks {
         crate::soc::clocks::release_timg0_function_clock(clocks);
 
         cali_value
+    }
+
+    pub(crate) fn calibrate_rtc_slow_clock() {
+        let cal_val = loop {
+            let res = RtcClock::calibrate(RtcCalSel::RtcMux, 1024);
+            if res != 0 {
+                break res;
+            }
+        };
+
+        cfg_if::cfg_if! {
+            if #[cfg(soc_has_lp_aon)] {
+                use crate::peripherals::LP_AON;
+            } else {
+                use crate::peripherals::LPWR as LP_AON;
+            }
+        }
+
+        LP_AON::regs()
+            .store1()
+            .write(|w| unsafe { w.bits(cal_val) });
     }
 }
 
