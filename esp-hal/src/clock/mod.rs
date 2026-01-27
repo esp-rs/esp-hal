@@ -572,12 +572,7 @@ impl Clocks {
             }
         }
 
-        let cal_val = loop {
-            let res = RtcClock::calibrate(slow_clk, 1024);
-            if res != 0 {
-                break res;
-            }
-        };
+        let cal_val = RtcClock::calibrate(slow_clk, 1024);
 
         cfg_if::cfg_if! {
             if #[cfg(soc_has_lp_aon)] {
