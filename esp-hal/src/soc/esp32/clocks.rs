@@ -122,9 +122,6 @@ impl ClockConfig {
     }
 }
 
-// TODO: this could be chip-independent
-// We're rather impolite in this function by not saving and restoring configuration, but this is
-// expected to run before configuring CPU clocks anyway.
 fn detect_xtal_freq(clocks: &mut ClockTree) -> XtalClkConfig {
     const SLOW_CLOCK_CYCLES: u32 = 100;
 
@@ -133,15 +130,13 @@ fn detect_xtal_freq(clocks: &mut ClockTree) -> XtalClkConfig {
     configure_syscon_pre_div(clocks, SysconPreDivConfig::new(0));
     configure_cpu_clk(clocks, CpuClkConfig::Xtal);
 
-    let xtal_cycles = Clocks::measure_rtc_clock(
+    let (xtal_cycles, calibration_clock_frequency) = Clocks::measure_rtc_clock(
         clocks,
         Timg0CalibrationClockConfig::RcSlowClk,
         SLOW_CLOCK_CYCLES,
-    ) / 1_000_000;
+    );
 
-    let calibration_clock_frequency = crate::soc::clocks::timg0_calibration_clock_frequency(clocks);
-
-    let mhz = xtal_cycles * (calibration_clock_frequency / SLOW_CLOCK_CYCLES);
+    let mhz = (calibration_clock_frequency * xtal_cycles / SLOW_CLOCK_CYCLES).as_mhz();
 
     if mhz.abs_diff(40) < mhz.abs_diff(26) {
         XtalClkConfig::_40

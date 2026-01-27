@@ -264,18 +264,18 @@ impl RtcClock {
                 slowclk_cycles
             };
 
-            let xtal_cycles = Clocks::measure_rtc_clock(
+            let (xtal_cycles, _) = Clocks::measure_rtc_clock(
                 clocks,
                 cal_clk,
                 #[cfg(soc_has_clock_node_timg0_function_clock)]
                 Timg0FunctionClockConfig::XtalClk,
                 slowclk_cycles,
-            ) as u64;
+            );
 
             let divider = xtal_freq.as_mhz() as u64 * slowclk_cycles as u64;
 
             let period_64 =
-                ((xtal_cycles << RtcClock::CAL_FRACT) + divider / 2u64 - 1u64) / divider;
+                (((xtal_cycles as u64) << RtcClock::CAL_FRACT) + divider / 2u64 - 1u64) / divider;
 
             (period_64 & u32::MAX as u64) as u32
         })
@@ -432,7 +432,7 @@ impl Clocks {
         rtc_clock: Timg0CalibrationClockConfig,
         #[cfg(soc_has_clock_node_timg0_function_clock)] function_clock: Timg0FunctionClockConfig,
         slow_cycles: u32,
-    ) -> u32 {
+    ) -> (u32, Rate) {
         // By default the TIMG0 bus clock is running. Do not create a peripheral guard as dropping
         // it would reset the timer, and it would enable its WDT.
 
@@ -457,8 +457,9 @@ impl Clocks {
         crate::soc::clocks::configure_timg0_calibration_clock(clocks, rtc_clock);
         crate::soc::clocks::request_timg0_calibration_clock(clocks);
 
-        let calibration_clock_frequency =
-            crate::soc::clocks::timg0_calibration_clock_frequency(clocks);
+        let calibration_clock_frequency = Rate::from_hz(
+            crate::soc::clocks::timg0_calibration_clock_frequency(clocks),
+        );
 
         TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
             w.rtc_cali_max().bits(slow_cycles as u16);
@@ -468,7 +469,7 @@ impl Clocks {
 
         // Delay, otherwise the CPU may read back the previous state of the completion flag and skip
         // waiting.
-        ets_delay_us(slow_cycles * 1_000_000 / calibration_clock_frequency);
+        ets_delay_us(slow_cycles * 1_000_000 / calibration_clock_frequency.as_hz());
 
         // Wait for the calibration to finish
         while TIMG0::regs()
@@ -483,26 +484,25 @@ impl Clocks {
         TIMG0::regs()
             .rtccalicfg()
             .modify(|_, w| w.rtc_cali_start().clear_bit());
-        crate::soc::clocks::release_timg0_calibration_clock(clocks);
 
         if let Some(calib_clock) = current_calib_clock
             && calib_clock != rtc_clock
         {
             crate::soc::clocks::configure_timg0_calibration_clock(clocks, calib_clock);
         }
+        crate::soc::clocks::release_timg0_calibration_clock(clocks);
 
         #[cfg(soc_has_clock_node_timg0_function_clock)]
         {
-            crate::soc::clocks::release_timg0_function_clock(clocks);
-
             if let Some(func_clock) = current_function_clock
                 && func_clock != function_clock
             {
                 crate::soc::clocks::configure_timg0_function_clock(clocks, func_clock);
             }
+            crate::soc::clocks::release_timg0_function_clock(clocks);
         }
 
-        cali_value
+        (cali_value, calibration_clock_frequency)
     }
 
     pub(crate) fn calibrate_rtc_slow_clock() {
