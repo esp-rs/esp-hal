@@ -241,7 +241,8 @@ impl RtcClock {
         }
     }
 
-    /// Measure RTC slow clock's period, based on main XTAL frequency
+    /// Measure the frequency of one of the TIMG0 calibration clocks,
+    /// using XTAL_CLK as the reference clock.
     ///
     /// This function will time out and return 0 if the time for the given
     /// number of cycles to be counted exceeds the expected time twice. This
@@ -457,9 +458,26 @@ impl Clocks {
         crate::soc::clocks::configure_timg0_calibration_clock(clocks, rtc_clock);
         crate::soc::clocks::request_timg0_calibration_clock(clocks);
 
-        let calibration_clock_frequency = Rate::from_hz(
-            crate::soc::clocks::timg0_calibration_clock_frequency(clocks),
-        );
+        let calibration_clock_frequency =
+            crate::soc::clocks::timg0_calibration_clock_frequency(clocks);
+
+        // Set up timeout based on the calibration clock frequency. This is counted in XTAL_CLK
+        // cycles.
+        #[cfg(not(esp32))]
+        {
+            let function_clk_freq =
+                crate::soc::clocks::timg0_function_clock_frequency(clocks) as u64;
+            let expected_function_clock_cycles = (function_clk_freq * slow_cycles as u64
+                / calibration_clock_frequency as u64)
+                as u32;
+
+            TIMG0::regs().rtccalicfg2().modify(|_, w| unsafe {
+                let writer = w.rtc_cali_timeout_thres();
+                let mask = (1 << writer.width()) - 1;
+                writer.bits((expected_function_clock_cycles * 2).min(mask));
+                w
+            });
+        }
 
         TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
             w.rtc_cali_max().bits(slow_cycles as u16);
@@ -469,17 +487,43 @@ impl Clocks {
 
         // Delay, otherwise the CPU may read back the previous state of the completion flag and skip
         // waiting.
-        ets_delay_us(slow_cycles * 1_000_000 / calibration_clock_frequency.as_hz());
+        let us_time_estimate = slow_cycles * 1_000_000 / calibration_clock_frequency;
+        ets_delay_us(us_time_estimate);
+
+        #[cfg(esp32)]
+        let mut timeout_us = us_time_estimate;
 
         // Wait for the calibration to finish
-        while TIMG0::regs()
-            .rtccalicfg()
-            .read()
-            .rtc_cali_rdy()
-            .bit_is_clear()
-        {}
+        let cali_value = loop {
+            if TIMG0::regs()
+                .rtccalicfg()
+                .read()
+                .rtc_cali_rdy()
+                .bit_is_set()
+            {
+                break TIMG0::regs().rtccalicfg1().read().rtc_cali_value().bits();
+            }
 
-        let cali_value = TIMG0::regs().rtccalicfg1().read().rtc_cali_value().bits();
+            #[cfg(not(esp32))]
+            if TIMG0::regs()
+                .rtccalicfg2()
+                .read()
+                .rtc_cali_timeout()
+                .bit_is_set()
+            {
+                // Timed out waiting for calibration
+                break 0;
+            }
+
+            #[cfg(esp32)]
+            if timeout_us > 0 {
+                timeout_us -= 1;
+                crate::rom::ets_delay_us(1);
+            } else {
+                // Timed out waiting for calibration
+                break 0;
+            }
+        };
 
         TIMG0::regs()
             .rtccalicfg()
@@ -502,7 +546,7 @@ impl Clocks {
             crate::soc::clocks::release_timg0_function_clock(clocks);
         }
 
-        (cali_value, calibration_clock_frequency)
+        (cali_value, Rate::from_hz(calibration_clock_frequency))
     }
 
     pub(crate) fn calibrate_rtc_slow_clock() {
