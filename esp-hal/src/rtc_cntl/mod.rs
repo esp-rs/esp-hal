@@ -116,7 +116,7 @@ use crate::efuse::Efuse;
 #[cfg(sleep)]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
-    clock::{Clock, RtcClock},
+    clock::RtcClock,
     interrupt::{self, InterruptHandler},
     peripherals::{Interrupt, LPWR},
     system::{Cpu, SleepSource},
@@ -211,11 +211,6 @@ impl<'d> Rtc<'d> {
         }
     }
 
-    /// Return estimated XTAL frequency in MHz.
-    pub fn estimate_xtal_frequency(&mut self) -> u32 {
-        RtcClock::estimate_xtal_frequency()
-    }
-
     /// Get the time since boot in the raw register units.
     fn time_since_boot_raw(&self) -> u64 {
         let rtc_cntl = LP_TIMER::regs();
@@ -256,8 +251,7 @@ impl<'d> Rtc<'d> {
     /// reset the RTC timer.
     pub fn time_since_power_up(&self) -> Duration {
         Duration::from_micros(
-            self.time_since_boot_raw() * 1_000_000
-                / RtcClock::slow_freq().frequency().as_hz() as u64,
+            self.time_since_boot_raw() * 1_000_000 / RtcClock::slow_freq().as_hz() as u64,
         )
     }
 
