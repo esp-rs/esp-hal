@@ -175,6 +175,28 @@ mod tests {
         assert_eq!(expected_md5_digest, *md5_digest);
     }
 
+    /// This is just to check that we can create a bootable image
+    /// if there is something with a "specific" alignment in `.rodata`
+    /// on chips with "D/I vaddr are shared" (SOC_MMU_DI_VADDR_SHARED)
+    /// (Which is C6 and later)
+    ///
+    /// The gap produced previously made tooling create three image segments but
+    /// the bootloader will refuse to boot anything with >2 segments in flash.
+    ///
+    /// Unfortunately the way things fail if this fails is "unfortunate"
+    /// (i.e. every test here fails with an unhelpful `ERROR probe_rs_debug::debug_info:Other("Stack
+    /// pointer is too far away to unwind")``)
+    #[test]
+    fn can_boot() {
+        #[repr(align(64))]
+        struct Aligned {
+            _data: [u8; 128],
+        }
+
+        #[used]
+        static ALIGNED: Aligned = Aligned { _data: [0; 128] };
+    }
+
     #[test]
     #[cfg(soc_has_usb_device)]
     fn creating_peripheral_does_not_break_debug_connection(ctx: Context) {

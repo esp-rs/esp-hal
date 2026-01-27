@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All GPIOs are now available without unsafe code. The potentially reserved GPIOs are now documented. (#4728)
 - Make sure we added all relevant section to `.rwtext.wifi` (#4808)
 - ESP32-S3: Fixed startup code to prevent a linker error (#4815)
+- Fixed a situation where the ELF might make tooling emit more than two segments in the image which will make the bootloader refuse to boot (#4844)
 
 ### Removed
 
