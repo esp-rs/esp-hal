@@ -9,8 +9,6 @@
 
 crate::unstable_module! {
     pub mod clocks;
-    pub mod lp_core;
-    pub mod trng;
 }
 pub mod gpio;
 pub(crate) mod regi2c;
@@ -20,6 +18,4 @@ pub(crate) use esp32c5 as pac;
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub(crate) mod constants {}
 
-pub(crate) fn pre_init() {
-    todo!();
-}
+pub(crate) fn pre_init() {}

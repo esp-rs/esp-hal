@@ -389,9 +389,9 @@ unstable_driver! {
     pub mod sha;
     #[cfg(touch)]
     pub mod touch;
-    #[cfg(soc_has_trace0)]
+    #[cfg(all(not(esp32c5), soc_has_trace0))]
     pub mod trace;
-    #[cfg(soc_has_tsens)]
+    #[cfg(all(not(esp32c5), soc_has_tsens))]
     pub mod tsens;
     #[cfg(twai)]
     pub mod twai;

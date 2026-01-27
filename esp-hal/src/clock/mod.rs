@@ -65,6 +65,8 @@ use crate::peripherals::BT;
 use crate::peripherals::IEEE802154;
 #[cfg(wifi)]
 use crate::peripherals::WIFI;
+#[cfg(not(esp32c5))]
+use crate::rtc_cntl::RtcCalSel;
 use crate::{
     ESP_HAL_LOCK,
     peripherals::TIMG0,
@@ -111,6 +113,8 @@ impl CpuClock {
                 Self::_160MHz
             } else if #[cfg(esp32h2)] {
                 Self::_96MHz
+            } else if #[cfg(esp32c5)] {
+                Self::Placeholder
             } else {
                 Self::_240MHz
             }
@@ -180,6 +184,7 @@ impl RtcClock {
     }
 
     /// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
+    #[cfg(not(esp32c5))]
     pub(crate) fn cycles_to_1ms() -> u16 {
         cfg_if::cfg_if! {
             if #[cfg(soc_has_lp_aon)] {

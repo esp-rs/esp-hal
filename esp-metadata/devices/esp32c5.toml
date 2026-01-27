@@ -14,17 +14,17 @@ trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c5_t
 
 peripherals = [
     # { name = "AES", interrupts = { peri = "AES" } },
-    { name = "ASSIST_DEBUG", pac = "BUS_MONITOR"},
+    #{ name = "ASSIST_DEBUG", pac = "BUS_MONITOR"},
     { name = "APB_SARADC" },
     # { name = "BITSCRAMBLER" },
     # { name = "CACHE" },
-    { name = "CLIC", pac = "CLINT" },
+    { name = "CLINT" },
     # { name = "CPU_APM" }, # TODO: verify we need it
     { name = "DMA" },
     { name = "DS" },
     { name = "ECC" },
     { name = "ECDSA" },
-    # { name = "EFUSE" },
+    { name = "EFUSE" },
     { name = "ETM", pac = "SOC_ETM" },
     # { name = "GPIO" },
     # { name = "GPIO_SD", pac = "GPIO_EXT" },
@@ -38,7 +38,6 @@ peripherals = [
     { name = "I2S0", interrupts = { peri = "I2S0" } },
     # { name = "IEEE802154" }, # TODO: add PAC manually later
     { name = "INTERRUPT_CORE0" },
-    # { name = "INTMTX" }, # TODO: verify we need it
     { name = "INTPRI" },
     { name = "IO_MUX" },
     { name = "KEYMNG" },
@@ -47,7 +46,7 @@ peripherals = [
     { name = "LP_AON" },
     # { name = "LP_APM" }, # TODO: add PAC manually later
     { name = "LP_APM0" },
-    { name = "LPWR", pac = "LP_CLKRST" }, # TODO: will need more code changes
+    { name = "LPWR", pac = "LP_CLKRST" },
     # { name = "LP_GPIO" }, # TODO: add PAC manually later
     { name = "LP_I2C0" },
     { name = "LP_I2C_ANA_MST" },
@@ -128,55 +127,10 @@ memory_map = { ranges = [
 ] }
 
 clocks = { system_clocks = { clock_tree = [
-    # High-speed clock sources
-    { name = "XTAL_CLK",    type = "source",  values = "40, 48", output = "VALUE * 1_000_000", always_on = true },
-    { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", output = "480_000_000" },
-    { name = "RC_FAST_CLK", type = "source",                     output = "20_000_000" },
-
-    # Low-speed clocks
-    { name = "XTAL32K_CLK",  type = "source", output = "32768"   },
-    { name = "OSC_SLOW_CLK", type = "source", output = "32768"   },
-    { name = "RC_SLOW_CLK",  type = "source", output = "130_000" },
-
-    # PLL divider taps (fixed-frequency outputs derived from PLL_CLK)
-    { name = "PLL_F22M",  type = "derived", from = "PLL_CLK", output = "22_000_000"  },
-    { name = "PLL_F40M",  type = "derived", from = "PLL_CLK", output = "40_000_000"  },
-    { name = "PLL_F44M",  type = "derived", from = "PLL_CLK", output = "44_000_000"  },
-    { name = "PLL_F48M",  type = "derived", from = "PLL_CLK", output = "48_000_000"  },
-    { name = "PLL_F80M",  type = "derived", from = "PLL_CLK", output = "80_000_000"  },
-    { name = "PLL_F120M", type = "derived", from = "PLL_CLK", output = "120_000_000" },
-    { name = "PLL_F160M", type = "derived", from = "PLL_CLK", output = "160_000_000" },
-    { name = "PLL_F240M", type = "derived", from = "PLL_CLK", output = "240_000_000" },
-
-    # SOC clock root (SOC_CLK_SEL: XTAL, RC_FAST, PLL_F160M, PLL_F240M)
-    { name = "SOC_ROOT_CLK", type = "mux", variants = [
-        { name = "XTAL",      outputs = "XTAL_CLK" },
-        { name = "RC_FAST",   outputs = "RC_FAST_CLK" },
-        { name = "PLL_F160M", outputs = "PLL_F160M" },
-        { name = "PLL_F240M", outputs = "PLL_F240M" },
-    ] },
-    # CPU_CLK divider: divider = (CPU_DIV_NUM + 1)
-    { name = "CPU_CLK", type = "divider", divisors = "0..255", output = "SOC_ROOT_CLK / (DIVISOR + 1)", always_on = true },
-
-    # AHB_CLK divider: divider = (AHB_DIV_NUM + 1)
-    { name = "AHB_CLK", type = "divider", divisors = "0..255", output = "SOC_ROOT_CLK / (DIVISOR + 1)", always_on = true },
-
-    # APB_CLK divider: divider = 1, 2, 4 (APB_DIV_NUM = 0, 1, 3)
-    { name = "APB_CLK", type = "divider", divisors = "0, 1, 3", output = "AHB_CLK / (DIVISOR + 1)", always_on = true },
-
-    # LP clocks (RTC domain)
-    { name = "XTAL_D2_CLK", type = "divider", output = "XTAL_CLK / 2" },
-    { name = "LP_FAST_CLK", type = "mux", variants = [
-        { name = "RC_FAST",   outputs = "RC_FAST_CLK" },
-        { name = "XTAL_D2",   outputs = "XTAL_D2_CLK" },
-        { name = "XTAL",      outputs = "XTAL_CLK" },
-    ] },
-    { name = "LP_SLOW_CLK", type = "mux", variants = [
-        { name = "RC_SLOW",     outputs = "RC_SLOW_CLK" },
-        { name = "XTAL32K",     outputs = "XTAL32K_CLK" },
-        { name = "OSC_SLOW",    outputs = "OSC_SLOW_CLK" },
-    ] },
-
+    # FIXME: these only exist for code to compile
+    { name = "XTAL_CLK", type = "source", output = "1", always_on = true },
+    { name = "CPU_CLK", type = "source", output = "1", always_on = true },
+    { name = "APB_CLK", type = "source", output = "1", always_on = true },
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "default_clk_en_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
@@ -188,135 +142,11 @@ clocks = { system_clocks = { clock_tree = [
     { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
     { name = "rst_field", value = "{{peripheral}}_rst_en" },
 ], peripheral_clocks = [
-    # This list mirrors PCR_*_CONF_REG clock gating / reset controls, and adds modeled functional clock muxes where they exist.
-
-    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [
-            { name = "PLL_F80M", outputs = "PLL_F80M" },
-            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
-            { name = "XTAL",     outputs = "XTAL_CLK" },
-        ] },
-        # UART fractional divider (PCR_UART0_SCLK_DIV_NUM/A/B) is not modeled here.
-    ] },
-    { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, clocks = "Uart0" },
-
-    { name = "I2cExt0", template_params = { peripheral = "i2c0" } },
-    { name = "Uhci0",   template_params = { peripheral = "uhci" } },
-
-    { name = "Rmt", template_params = { peripheral = "rmt" }, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", default = "RC_FAST", variants = [
-            { name = "XTAL",     outputs = "XTAL_CLK" },
-            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
-            { name = "PLL_F80M", outputs = "PLL_F80M" },
-        ] },
-        # RMT fractional divider (PCR_RMT_SCLK_DIV_NUM/A/B) is not modeled here.
-    ] },
-
-    { name = "Ledc", template_params = { peripheral = "ledc" }, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [
-            { name = "XTAL",     outputs = "XTAL_CLK" },
-            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
-            { name = "PLL_F80M", outputs = "PLL_F80M" },
-        ] },
-    ] },
-
-    { name = "Timg0", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup0_conf", peripheral = "tg0", peri_clk_template = "{{control}}::regs().timergroup0_timer_clk_conf().modify(|_, w| w.tg0_timer_clk_en().bit(enable));" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [
-            { name = "XTAL",     outputs = "XTAL_CLK" },
-            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
-            { name = "PLL_F48M", outputs = "PLL_F48M" },
-        ] },
-        { name = "CALIBRATION_CLOCK", type = "mux", default = "XTAL32K", variants = [
-            { name = "XTAL32K",  outputs = "XTAL32K_CLK" },
-            { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
-            { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
-            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
-        ] },
-        { name = "WDT_CLOCK", type = "mux", default = "XTAL", variants = [
-            { name = "XTAL",     outputs = "XTAL_CLK" },
-            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
-            { name = "PLL_F80M", outputs = "PLL_F80M" },
-        ] },
-    ] },
+    { name = "Timg0", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup0_conf", peripheral = "tg0", peri_clk_template = "{{control}}::regs().timergroup0_timer_clk_conf().modify(|_, w| w.tg0_timer_clk_en().bit(enable));" }, keep_enabled = true, clocks = [] },
     { name = "Timg1", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup1_conf", peripheral = "tg1", peri_clk_template = "{{control}}::regs().timergroup1_timer_clk_conf().modify(|_, w| w.tg1_timer_clk_en().bit(enable));" }, clocks = "Timg0" },
 
-    { name = "Systimer", template_params = { peripheral = "systimer" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [
-            { name = "XTAL",    outputs = "XTAL_CLK" },
-            { name = "RC_FAST", outputs = "RC_FAST_CLK" },
-        ] },
-    ] },
-
-    { name = "Twai0", template_params = { peripheral = "twai0" } },
-    { name = "Twai1", template_params = { peripheral = "twai1" } },
-
-    { name = "I2s0", template_params = { peripheral = "i2s" } },
-    # based on TRM and IDF ?
-    # { name = "I2s0", template_params = { peripheral = "i2s" }, clocks = [
-    #     { name = "TX_FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [
-    #         { name = "XTAL",      outputs = "XTAL_CLK" },
-    #         { name = "PLL_F240M", outputs = "PLL_F240M" },
-    #         { name = "PLL_F160M", outputs = "PLL_F160M" },
-    #         { name = "MCLK_IN",   outputs = "I2S_MCLK_IN" },
-    #     ] },
-    #     { name = "RX_FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [
-    #         { name = "XTAL",      outputs = "XTAL_CLK" },
-    #         { name = "PLL_F240M", outputs = "PLL_F240M" },
-    #         { name = "PLL_F160M", outputs = "PLL_F160M" },
-    #         { name = "MCLK_IN",   outputs = "I2S_MCLK_IN" },
-    #     ] },
-    #     # I2S divider follows: f = f_src / (N + b/a), N is mapped from DIV_NUM; b/a is configured via DIV_X/Y/Z/YN1.
-    # ] },
-
-    { name = "ApbSarAdc", template_params = { peripheral = "saradc", clk_en_field = "saradc_reg_clk_en", rst_field = "saradc_reg_rst_en" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [
-            { name = "XTAL",     outputs = "XTAL_CLK" },
-            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
-            { name = "PLL_F80M", outputs = "PLL_F80M" },
-        ] },
-        # SARADC divider follows: f = f_src / (N + b/a) (PCR_SARADC_CLKM_DIV_*).
-    ] },
-
-    { name = "UsbDevice", keep_enabled = true },
-    { name = "Pcnt" },
-    { name = "Etm" },
-
-    { name = "Mcpwm0", template_params = { peripheral = "pwm" }, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", default = "PLL_F160M", variants = [
-            { name = "XTAL",      outputs = "XTAL_CLK" },
-            { name = "RC_FAST",   outputs = "RC_FAST_CLK" },
-            { name = "PLL_F160M", outputs = "PLL_F160M" },
-        ] },
-    ] },
-
-    # OR LIKE C6? 
-    # { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" } },
-    { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" }, clocks = [
-        { name = "TX_FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [
-            { name = "XTAL",      outputs = "XTAL_CLK" },
-            { name = "RC_FAST",   outputs = "RC_FAST_CLK" },
-            { name = "PLL_F240M", outputs = "PLL_F240M" },
-            # { name = "PIN",       outputs = "PARL_CLK_IN" },
-        ] },
-        # Parallel IO TX has an integral divisor (PCR_PARL_CLK_TX_DIV_NUM).
-    ] },
-
-    { name = "Dma", template_params = { peripheral = "gdma" } },
-
-    # { name = "Spi2", template_params = { peripheral = "spi2" } },
-
-    # Security / crypto clock gates in PCR
-    { name = "Aes",  template_params = { peripheral = "aes" } },
-    { name = "Sha",  template_params = { peripheral = "sha" } },
-    { name = "Rsa",  template_params = { peripheral = "rsa" } },
-    { name = "Ecc",  template_params = { peripheral = "ecc" } },
-    { name = "Ds",   template_params = { peripheral = "ds" } },
-    { name = "Hmac", template_params = { peripheral = "hmac" } },
-    # { name = "Sec",  template_params = { peripheral = "sec" } },
-
-    { name = "Trace0", template_params = { peripheral = "trace" } },
-
-] } } 
+    { name = "Systimer", template_params = { peripheral = "systimer" }, keep_enabled = true, clocks = [] },
+] } }
 
 # [device.gpio]
 # support_status = "supported"
@@ -543,41 +373,15 @@ clocks = { system_clocks = { clock_tree = [
 
 [device.interrupts]
 support_status = "partial"
-status_registers = 3 # TODO: Verify
+status_registers = 3
 software_interrupt_count = 4
-software_interrupt_delay = 14 # TODO: Verify
-
-# # TODO: VERIFY
-[device.rmt]
-support_status = "partial"
-ram_start = 0x60006400
-channel_ram_size = 48
-channels = ["Tx", "Tx", "Rx", "Rx"]
-has_tx_immediate_stop = true
-has_tx_loop_count = true
-has_tx_loop_auto_stop = true
-has_tx_carrier_data_only = true
-has_tx_sync = true
-has_rx_wrap = true
-has_rx_demodulation = true
-clock_sources.supported = [ "None", "Pll80MHz", "RcFast", "Xtal" ]
-clock_sources.default = "RcFast"
+software_interrupt_delay = 0
 
 # [device.spi_master]
 # support_status = "supported"
 # instances = [
 #     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
 # ]
-
-[device.rsa]
-support_status = "partial"
-size_increment = 32
-memory_size_bytes = 384
-
-[device.sha]
-support_status = "partial"
-dma = true
-algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 # # [device.spi_slave]
 # # instances = [

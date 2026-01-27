@@ -20,96 +20,52 @@
 //     soc::regi2c,
 // };
 
-// define_clock_tree_types!();
+define_clock_tree_types!();
 
-// /// Clock configuration options.
-// #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-// #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-// #[allow(
-//     clippy::enum_variant_names,
-//     reason = "MHz suffix indicates physical unit."
-// )]
-// #[non_exhaustive]
-// pub enum CpuClock {
-//     /// 80 MHz CPU clock
-//     #[default]
-//     _80MHz  = 80,
+/// Clock configuration options.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(
+    clippy::enum_variant_names,
+    reason = "MHz suffix indicates physical unit."
+)]
+#[non_exhaustive]
+pub enum CpuClock {
+    /// Default CPU clock
+    #[default]
+    Placeholder = 80,
+}
 
-//     /// 160 MHz CPU clock
-//     _160MHz = 160,
-// }
+impl CpuClock {
+    const PRESET: ClockConfig = ClockConfig {};
+}
 
-// impl CpuClock {
-//     const PRESET_80: ClockConfig = ClockConfig {
-//         xtal_clk: None,
-//         soc_root_clk: Some(SocRootClkConfig::Pll),
-//         cpu_hs_div: Some(CpuHsDivConfig::_1),
-//         cpu_ls_div: None, // Unused when root clock is PLL
-//         ahb_hs_div: Some(AhbHsDivConfig::_3),
-//         ahb_ls_div: None, // Unused when root clock is PLL
-//         // Configures 80MHz MSPI clock
-//         mspi_fast_hs_clk: Some(MspiFastHsClkConfig::_5),
-//         mspi_fast_ls_clk: None, // Unused when root clock is PLL
-//         apb_clk: Some(ApbClkConfig::new(0)),
-//         ledc_sclk: Some(LedcSclkConfig::PllF80m),
-//         lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
-//         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
-//     };
-//     const PRESET_160: ClockConfig = ClockConfig {
-//         xtal_clk: None,
-//         soc_root_clk: Some(SocRootClkConfig::Pll),
-//         cpu_hs_div: Some(CpuHsDivConfig::_0),
-//         cpu_ls_div: None, // Unused when root clock is PLL
-//         ahb_hs_div: Some(AhbHsDivConfig::_3),
-//         ahb_ls_div: None, // Unused when root clock is PLL
-//         // Configures 80MHz MSPI clock
-//         mspi_fast_hs_clk: Some(MspiFastHsClkConfig::_5),
-//         mspi_fast_ls_clk: None, // Unused when root clock is PLL
-//         apb_clk: Some(ApbClkConfig::new(0)),
-//         ledc_sclk: Some(LedcSclkConfig::PllF80m),
-//         lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
-//         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
-//     };
-// }
+impl From<CpuClock> for ClockConfig {
+    fn from(value: CpuClock) -> ClockConfig {
+        match value {
+            CpuClock::Placeholder => CpuClock::PRESET,
+        }
+    }
+}
 
-// impl From<CpuClock> for ClockConfig {
-//     fn from(value: CpuClock) -> ClockConfig {
-//         match value {
-//             CpuClock::_80MHz => CpuClock::PRESET_80,
-//             CpuClock::_160MHz => CpuClock::PRESET_160,
-//         }
-//     }
-// }
+impl Default for ClockConfig {
+    fn default() -> Self {
+        Self::from(CpuClock::default())
+    }
+}
 
-// impl Default for ClockConfig {
-//     fn default() -> Self {
-//         Self::from(CpuClock::default())
-//     }
-// }
+impl ClockConfig {
+    pub(crate) fn try_get_preset(self) -> Option<CpuClock> {
+        match self {
+            v if v == CpuClock::PRESET => Some(CpuClock::Placeholder),
+            _ => None,
+        }
+    }
 
-// impl ClockConfig {
-//     pub(crate) fn try_get_preset(self) -> Option<CpuClock> {
-//         match self {
-//             v if v == CpuClock::PRESET_80 => Some(CpuClock::_80MHz),
-//             v if v == CpuClock::PRESET_160 => Some(CpuClock::_160MHz),
-//             _ => None,
-//         }
-//     }
-
-//     pub(crate) fn configure(mut self) {
-//         if self.xtal_clk.is_none() {
-//             self.xtal_clk = Some(XtalClkConfig::_40);
-//         }
-
-//         // On ESP32C5, MSPI source clock's default HS divider leads to 120MHz, which is unusable
-//         // before calibration. Therefore, before switching SOC_ROOT_CLK to HS, we need to set
-//         // MSPI source clock HS divider to make it run at 80MHz after the switch.
-//         // PLL = 480MHz, so divider is 6.
-//         ClockTree::with(|clocks| configure_mspi_fast_hs_clk(clocks, MspiFastHsClkConfig::_5));
-
-//         self.apply();
-//     }
-// }
+    pub(crate) fn configure(mut self) {
+        self.apply();
+    }
+}
 
 // // XTAL_CLK
 

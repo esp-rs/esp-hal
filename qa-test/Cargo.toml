@@ -27,7 +27,7 @@ esp-backtrace = { path = "../esp-backtrace", features = [
 ] }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
 esp-hal = { path = "../esp-hal", features = ["log-04", "unstable"] }
-esp-rtos = { path = "../esp-rtos", features = [
+esp-rtos = { path = "../esp-rtos", optional = true, features = [
     "log-04",
     "embassy",
 ] }
@@ -88,7 +88,6 @@ esp32c5 = [
     "esp-backtrace/esp32c5",
     "esp-bootloader-esp-idf/esp32c5",
     "esp-hal/esp32c5",
-    "esp-rtos/esp32c5",
     "esp-println/esp32c5",
     # "esp-radio?/esp32c5",
 ]

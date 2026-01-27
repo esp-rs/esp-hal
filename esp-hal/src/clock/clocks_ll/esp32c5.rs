@@ -1,5 +1,3 @@
-use crate::peripherals::{MODEM_LPCON, MODEM_SYSCON, PCR, PMU};
-
 // done
 pub(super) fn enable_phy(en: bool) {
     todo!() // update PACs

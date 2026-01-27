@@ -1,15 +1,7 @@
-use crate::{analog::adc::Attenuation, peripherals::EFUSE};
+use crate::peripherals::EFUSE;
 
 mod fields;
 pub use fields::*;
-
-/// Selects which ADC we are interested in the efuse calibration data for
-pub enum AdcCalibUnit {
-    /// Select efuse calibration data for ADC1
-    ADC1,
-    /// Select efuse calibration data for ADC2
-    ADC2,
-}
 
 impl super::Efuse {
     /// Get status of SPI boot encryption.
@@ -42,74 +34,6 @@ impl super::Efuse {
     pub fn rtc_calib_version() -> u8 {
         let (_major, minor) = Self::block_version();
         if minor >= 1 { 1 } else { 0 }
-    }
-
-    /// Get ADC initial code for specified attenuation from efuse
-    ///
-    /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c5/esp_efuse_rtc_calib.c#L32>
-    pub fn rtc_calib_init_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
-        let version = Self::rtc_calib_version();
-
-        if version != 1 {
-            return None;
-        }
-
-        // See <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c5/esp_efuse_table.csv#L147-L152>
-        let init_code: u16 = Self::read_field_le(match atten {
-            Attenuation::_0dB => ADC1_AVE_INITCODE_ATTEN0,
-            Attenuation::_2p5dB => ADC1_AVE_INITCODE_ATTEN1,
-            Attenuation::_6dB => ADC1_AVE_INITCODE_ATTEN2,
-            Attenuation::_11dB => ADC1_AVE_INITCODE_ATTEN3,
-        });
-
-        Some(init_code + 1600) // version 1 logic
-    }
-
-    /// Get ADC reference point voltage for specified attenuation in millivolts
-    ///
-    /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c5/esp_efuse_rtc_calib.c#L42>
-    pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> u16 {
-        match atten {
-            Attenuation::_0dB => 400,
-            Attenuation::_2p5dB => 550,
-            Attenuation::_6dB => 750,
-            Attenuation::_11dB => 1370,
-        }
-    }
-
-    /// Get ADC reference point digital code for specified attenuation
-    ///
-    /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c5/esp_efuse_rtc_calib.c#L42>
-    pub fn rtc_calib_cal_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
-        let version = Self::rtc_calib_version();
-
-        if version != 1 {
-            return None;
-        }
-
-        // See <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c5/esp_efuse_table.csv#L153-L156>
-        let cal_code: u16 = Self::read_field_le(match atten {
-            Attenuation::_0dB => ADC1_HI_DOUT_ATTEN0,
-            Attenuation::_2p5dB => ADC1_HI_DOUT_ATTEN1,
-            Attenuation::_6dB => ADC1_HI_DOUT_ATTEN2,
-            Attenuation::_11dB => ADC1_HI_DOUT_ATTEN3,
-        });
-
-        // TODO: Verify
-        let offset: u16 = match atten {
-            Attenuation::_0dB => 2250,
-            Attenuation::_2p5dB => 2250,
-            Attenuation::_6dB => 2300,
-            Attenuation::_11dB => 2300,
-        };
-
-        let cal_code = if cal_code & (1 << 9) != 0 {
-            offset - (cal_code & !(1 << 9))
-        } else {
-            offset + cal_code
-        };
-
-        Some(cal_code)
     }
 
     /// Returns the major hardware revision
