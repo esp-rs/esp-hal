@@ -47,6 +47,12 @@
 
 use core::{cell::Cell, marker::PhantomData};
 
+#[cfg(soc_has_clock_node_lp_slow_clk)]
+use clocks::LpSlowClkConfig;
+#[cfg(all(not(esp32s2), soc_has_clock_node_rtc_slow_clk))]
+use clocks::RtcSlowClkConfig;
+#[cfg(soc_has_clock_node_timg0_function_clock)]
+use clocks::Timg0FunctionClockConfig;
 use esp_rom_sys::rom::ets_delay_us;
 #[cfg(any(bt, ieee802154, wifi))]
 use esp_sync::RawMutex;
@@ -59,17 +65,11 @@ use crate::peripherals::BT;
 use crate::peripherals::IEEE802154;
 #[cfg(wifi)]
 use crate::peripherals::WIFI;
-#[cfg(soc_has_clock_node_lp_slow_clk)]
-use crate::soc::clocks::LpSlowClkConfig;
-#[cfg(all(not(esp32s2), soc_has_clock_node_rtc_slow_clk))]
-use crate::soc::clocks::RtcSlowClkConfig;
-#[cfg(soc_has_clock_node_timg0_function_clock)]
-use crate::soc::clocks::Timg0FunctionClockConfig;
 use crate::{
     ESP_HAL_LOCK,
     peripherals::{LPWR, TIMG0},
     private::Sealed,
-    soc::clocks::{ClockTree, Timg0CalibrationClockConfig},
+    soc::clocks::{self, ClockTree, Timg0CalibrationClockConfig},
     time::Rate,
 };
 
@@ -251,7 +251,7 @@ impl RtcClock {
     /// issue, or lack of 32 XTAL on board).
     pub(crate) fn calibrate(cal_clk: Timg0CalibrationClockConfig, slowclk_cycles: u32) -> u32 {
         ClockTree::with(|clocks| {
-            let xtal_freq = Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks));
+            let xtal_freq = Rate::from_hz(clocks::xtal_clk_frequency(clocks));
 
             #[cfg(esp32c6)]
             let slowclk_cycles = if Efuse::chip_revision() > 0
@@ -401,25 +401,25 @@ impl Clocks {
             // plain old data structures and remove this pre-configuration, otherwise we will not be
             // able to select a different clock source.
             #[cfg(soc_has_clock_node_mcpwm0_function_clock)]
-            crate::soc::clocks::configure_mcpwm0_function_clock(clocks, Default::default());
+            clocks::configure_mcpwm0_function_clock(clocks, Default::default());
             #[cfg(soc_has_clock_node_mcpwm1_function_clock)]
-            crate::soc::clocks::configure_mcpwm1_function_clock(clocks, Default::default());
+            clocks::configure_mcpwm1_function_clock(clocks, Default::default());
 
             // Until we have every clock consumer modelled, we should manually keep clocks alive
             #[cfg(soc_has_clock_node_rc_fast_clk)]
-            crate::soc::clocks::request_rc_fast_clk(clocks);
+            clocks::request_rc_fast_clk(clocks);
             #[cfg(soc_has_clock_node_pll_clk)]
-            crate::soc::clocks::request_pll_clk(clocks);
+            clocks::request_pll_clk(clocks);
             #[cfg(soc_has_clock_node_pll_f96m_clk)]
-            crate::soc::clocks::request_pll_f96m_clk(clocks);
+            clocks::request_pll_f96m_clk(clocks);
 
             // TODO: this struct can be removed once everything uses the new internal clock tree
             // code
             Self {
-                cpu_clock: Rate::from_hz(crate::soc::clocks::cpu_clk_frequency(clocks)),
-                apb_clock: Rate::from_hz(crate::soc::clocks::apb_clk_frequency(clocks)),
+                cpu_clock: Rate::from_hz(clocks::cpu_clk_frequency(clocks)),
+                apb_clock: Rate::from_hz(clocks::apb_clk_frequency(clocks)),
                 // FIXME: this assumes there is a crystal
-                xtal_clock: Rate::from_hz(crate::soc::clocks::xtal_clk_frequency(clocks)),
+                xtal_clock: Rate::from_hz(clocks::xtal_clk_frequency(clocks)),
             }
         })
     }
@@ -448,25 +448,23 @@ impl Clocks {
         // Make sure we measure the crystal.
         cfg_if::cfg_if! {
             if #[cfg(soc_has_clock_node_timg0_function_clock)] {
-                let current_function_clock = crate::soc::clocks::timg0_function_clock_config(clocks);
-                crate::soc::clocks::configure_timg0_function_clock(clocks, function_clock);
-                crate::soc::clocks::request_timg0_function_clock(clocks);
+                let current_function_clock = clocks::timg0_function_clock_config(clocks);
+                clocks::configure_timg0_function_clock(clocks, function_clock);
+                clocks::request_timg0_function_clock(clocks);
             }
         }
 
-        let current_calib_clock = crate::soc::clocks::timg0_calibration_clock_config(clocks);
-        crate::soc::clocks::configure_timg0_calibration_clock(clocks, rtc_clock);
-        crate::soc::clocks::request_timg0_calibration_clock(clocks);
+        let current_calib_clock = clocks::timg0_calibration_clock_config(clocks);
+        clocks::configure_timg0_calibration_clock(clocks, rtc_clock);
+        clocks::request_timg0_calibration_clock(clocks);
 
-        let calibration_clock_frequency =
-            crate::soc::clocks::timg0_calibration_clock_frequency(clocks);
+        let calibration_clock_frequency = clocks::timg0_calibration_clock_frequency(clocks);
 
         // Set up timeout based on the calibration clock frequency. This is counted in XTAL_CLK
         // cycles.
         #[cfg(not(esp32))]
         {
-            let function_clk_freq =
-                crate::soc::clocks::timg0_function_clock_frequency(clocks) as u64;
+            let function_clk_freq = clocks::timg0_function_clock_frequency(clocks) as u64;
             let expected_function_clock_cycles = (function_clk_freq * slow_cycles as u64
                 / calibration_clock_frequency as u64)
                 as u32;
@@ -532,18 +530,18 @@ impl Clocks {
         if let Some(calib_clock) = current_calib_clock
             && calib_clock != rtc_clock
         {
-            crate::soc::clocks::configure_timg0_calibration_clock(clocks, calib_clock);
+            clocks::configure_timg0_calibration_clock(clocks, calib_clock);
         }
-        crate::soc::clocks::release_timg0_calibration_clock(clocks);
+        clocks::release_timg0_calibration_clock(clocks);
 
         #[cfg(soc_has_clock_node_timg0_function_clock)]
         {
             if let Some(func_clock) = current_function_clock
                 && func_clock != function_clock
             {
-                crate::soc::clocks::configure_timg0_function_clock(clocks, func_clock);
+                clocks::configure_timg0_function_clock(clocks, func_clock);
             }
-            crate::soc::clocks::release_timg0_function_clock(clocks);
+            clocks::release_timg0_function_clock(clocks);
         }
 
         (cali_value, Rate::from_hz(calibration_clock_frequency))
@@ -557,7 +555,7 @@ impl Clocks {
                 // Can directly measure output of the RTC_SLOW mux
                 let slow_clk = Timg0CalibrationClockConfig::RtcClk;
             } else if #[cfg(soc_has_clock_node_rtc_slow_clk)] {
-                let slow_clk = match unwrap!(ClockTree::with(crate::soc::clocks::rtc_slow_clk_config)) {
+                let slow_clk = match unwrap!(ClockTree::with(clocks::rtc_slow_clk_config)) {
                     RtcSlowClkConfig::RcFast => Timg0CalibrationClockConfig::RcFastDivClk,
                     RtcSlowClkConfig::RcSlow => Timg0CalibrationClockConfig::RcSlowClk,
                     #[cfg(not(esp32c2))]
@@ -566,7 +564,7 @@ impl Clocks {
                     RtcSlowClkConfig::OscSlow => Timg0CalibrationClockConfig::Osc32kClk,
                 };
             } else {
-                let slow_clk = match unwrap!(ClockTree::with(crate::soc::clocks::lp_slow_clk_config)) {
+                let slow_clk = match unwrap!(ClockTree::with(clocks::lp_slow_clk_config)) {
                     LpSlowClkConfig::OscSlow => Timg0CalibrationClockConfig::Xtal32kClk, //?
                     LpSlowClkConfig::Xtal32k => Timg0CalibrationClockConfig::Xtal32kClk,
                     LpSlowClkConfig::RcSlow => Timg0CalibrationClockConfig::RcSlowClk,
