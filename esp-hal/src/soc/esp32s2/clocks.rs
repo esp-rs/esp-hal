@@ -234,6 +234,9 @@ fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {
             CLK_LL_RC_FAST_WAIT_DEFAULT
         })
     });
+    if en {
+        ets_delay_us(50);
+    }
 }
 
 // CPU_PLL_DIV_IN
@@ -397,19 +400,26 @@ fn update_apb_frequency(freq: Rate) {
         .modify(|_, w| unsafe { w.data().bits(value) });
 }
 
-fn needs_high_voltage(clocks: &mut ClockTree) -> bool {
-    let flash_frequency_80m = true; // TODO
+fn uses_80mhz_flash() -> bool {
+    unsafe {
+        crate::soc::pac::SPI0::steal()
+            .clock()
+            .read()
+            .clk_equ_sysclk()
+            .bit_is_set()
+    }
+}
+fn is_max_cpu_speed(clocks: &mut ClockTree) -> bool {
     clocks.cpu_clk == Some(CpuClkConfig::Pll)
         && (clocks.pll_clk, clocks.cpu_pll_div)
             == (Some(PllClkConfig::_480), Some(CpuPllDivConfig::_2))
-        || flash_frequency_80m
 }
 
 const RTC_CNTL_DBIAS_1V10: u8 = 4;
 const RTC_CNTL_DBIAS_1V25: u8 = 7;
 
 fn ensure_voltage_raised(clocks: &mut ClockTree) {
-    if needs_high_voltage(clocks) {
+    if is_max_cpu_speed(clocks) || uses_80mhz_flash() {
         LPWR::regs().reg().modify(|_, w| unsafe {
             w.dig_reg_dbias_wak().bits(RTC_CNTL_DBIAS_1V25);
             w.dbias_wak().bits(RTC_CNTL_DBIAS_1V25)
@@ -420,9 +430,13 @@ fn ensure_voltage_raised(clocks: &mut ClockTree) {
 }
 
 fn ensure_voltage_minimal(clocks: &mut ClockTree) {
-    if !needs_high_voltage(clocks) {
+    if !is_max_cpu_speed(clocks) {
         LPWR::regs().reg().modify(|_, w| unsafe {
-            w.dig_reg_dbias_wak().bits(RTC_CNTL_DBIAS_1V10);
+            if uses_80mhz_flash() {
+                w.dig_reg_dbias_wak().bits(RTC_CNTL_DBIAS_1V25);
+            } else {
+                w.dig_reg_dbias_wak().bits(RTC_CNTL_DBIAS_1V10);
+            }
             w.dbias_wak().bits(RTC_CNTL_DBIAS_1V10)
         });
         ets_delay_us(40);
