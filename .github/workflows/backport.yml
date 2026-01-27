@@ -77,4 +77,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           target_branches: ${{ steps.detect.outputs.target_branch }}
           label_pattern: ".*-backport$"
-          experimental: "{\"conflict_resolution\": \"draft_commit_conflicts\"}"
+          experimental: '{"conflict_resolution": "draft_commit_conflicts"}'
