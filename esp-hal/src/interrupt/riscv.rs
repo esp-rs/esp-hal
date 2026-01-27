@@ -678,10 +678,12 @@ mod classic {
 #[cfg(clic)]
 mod clic {
     use super::{CpuInterrupt, InterruptKind, Priority};
-    use crate::Cpu;
+    use crate::system::Cpu;
 
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     pub(super) static DISABLED_CPU_INTERRUPT: u32 = 0;
+
+    pub(super) static EXTERNAL_INTERRUPT_OFFSET: u32 = 16;
 
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     pub(super) static PRIORITY_TO_INTERRUPT: &[u32] =
@@ -739,16 +741,7 @@ mod clic {
     /// Get pointer to interrupt control register for the given core and CPU
     /// interrupt number
     fn intr_cntrl(core: Cpu, cpu_interrupt_number: usize) -> *mut u32 {
-        let offset = if core == crate::core() {
-            0
-        } else {
-            DUALCORE_CLIC_CTRL_OFF
-        };
-
-        unsafe {
-            ((DR_REG_CLIC_CTRL_BASE + offset) as *mut u32)
-                .add(CLIC_EXT_INTR_NUM_OFFSET + cpu_interrupt_number)
-        }
+        todo!()
     }
 
     /// Enable a CPU interrupt
@@ -842,8 +835,8 @@ mod clic {
         core::mem::transmute::<u8, Priority>(prio >> (8 - 3))
     }
 
-    #[no_mangle]
-    #[link_section = ".trap"]
+    #[unsafe(no_mangle)]
+    #[unsafe(link_section = ".trap")]
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
         use super::mcause;
         let clic = &*crate::peripherals::CLIC::PTR;
@@ -866,8 +859,8 @@ mod clic {
         prev_interrupt_priority as u32
     }
 
-    #[no_mangle]
-    #[link_section = ".trap"]
+    #[unsafe(no_mangle)]
+    #[unsafe(link_section = ".trap")]
     pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
         riscv::interrupt::disable();
         let clic = &*crate::peripherals::CLIC::PTR;

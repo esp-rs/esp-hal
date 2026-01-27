@@ -342,7 +342,7 @@ unstable_module! {
     pub mod analog;
     #[cfg(any(systimer, timergroup))]
     pub mod timer;
-    #[cfg(all(not(esp32c5), soc_has_lpwr))]
+    #[cfg(soc_has_lpwr)]
     pub mod rtc_cntl;
     #[cfg(any(gdma, pdma))]
     pub mod dma;
@@ -738,6 +738,8 @@ pub fn init(config: Config) -> Peripherals {
     Clocks::init(config.clock_config());
 
     // RTC domain must be enabled before we try to disable
+    // TODO: add later
+    #[cfg(not(esp32c5))]
     let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.LPWR.reborrow());
 
     #[cfg(sleep)]
@@ -747,6 +749,8 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(swd)]
     rtc.swd.disable();
 
+    // TODO: add later
+    #[cfg(not(esp32c5))]
     rtc.rwdt.disable();
 
     #[cfg(timergroup_timg0)]

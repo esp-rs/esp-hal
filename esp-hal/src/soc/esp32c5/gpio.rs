@@ -26,12 +26,12 @@
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.
 
-crate::gpio::lp_io::lp_gpio! {
-    0
-    1
-    2
-    3
-    4
-    5
-    6
-}
+// crate::gpio::lp_io::lp_gpio! {
+//     0
+//     1
+//     2
+//     3
+//     4
+//     5
+//     6
+// }
