@@ -55,7 +55,7 @@
 crate::unstable_module! {
     pub mod interconnect;
 
-    #[cfg(soc_has_etm)]
+    #[cfg(etm)]
     pub mod etm;
 
     #[cfg(soc_has_lp_io)]
