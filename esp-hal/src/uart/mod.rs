@@ -985,27 +985,28 @@ impl<'d> UartRx<'d, Async> {
     async fn wait_for_buffered_data(
         &mut self,
         minimum: usize,
-        preferred: usize,
+        max_threshold: usize,
         listen_for_timeout: bool,
     ) -> Result<(), RxError> {
-        while self.uart.info().rx_fifo_count() < (minimum as u16).min(Info::RX_FIFO_MAX_THRHD) {
-            let amount = u16::try_from(preferred)
-                .unwrap_or(Info::RX_FIFO_MAX_THRHD)
-                .min(Info::RX_FIFO_MAX_THRHD);
+        let current_threshold = self.uart.info().rx_fifo_full_threshold();
 
-            let current = self.uart.info().rx_fifo_full_threshold();
-            let _guard = if current > amount {
-                // We're ignoring the user configuration here to ensure that this is not waiting
-                // for more data than the buffer. We'll restore the original value after the
-                // future resolved.
-                let info = self.uart.info();
-                unwrap!(info.set_rx_fifo_full_threshold(amount));
-                Some(OnDrop::new(|| {
-                    unwrap!(info.set_rx_fifo_full_threshold(current));
-                }))
-            } else {
-                None
-            };
+        // User preference takes priority.
+        let max_threshold = max_threshold.min(current_threshold as usize) as u16;
+        let minimum = minimum.min(Info::RX_FIFO_MAX_THRHD as usize) as u16;
+
+        // The effective threshold must be >= minimum. We ensure this by lowering the minimum number
+        // of returnable bytes.
+        let minimum = minimum.min(max_threshold);
+
+        if self.uart.info().rx_fifo_count() < minimum {
+            // We're ignoring the user configuration here to ensure that this is not waiting
+            // for more data than the buffer. We'll restore the original value after the
+            // future resolved.
+            let info = self.uart.info();
+            unwrap!(info.set_rx_fifo_full_threshold(max_threshold));
+            let _guard = OnDrop::new(|| {
+                unwrap!(info.set_rx_fifo_full_threshold(current_threshold));
+            });
 
             // Wait for space or event
             let mut events = RxEvent::FifoFull
@@ -1086,6 +1087,14 @@ impl<'d> UartRx<'d, Async> {
     /// before it resolves, or if an error occurs during the read operation,
     /// previously read data may be lost.
     pub async fn read_exact_async(&mut self, mut buf: &mut [u8]) -> Result<(), RxError> {
+        if buf.is_empty() {
+            return Ok(());
+        }
+
+        // Drain the buffer first, there's no point in waiting for data we've already received.
+        let read = self.uart.info().read_buffered(buf)?;
+        buf = &mut buf[read..];
+
         while !buf.is_empty() {
             // No point in listening for timeouts, as we're waiting for an exact amount of
             // data. On ESP32 and S2, the timeout interrupt can't be cleared unless the FIFO
@@ -1183,7 +1192,8 @@ where
     ///
     /// The UART hardware continuously receives bytes and stores them in the RX
     /// FIFO. This function reads the bytes from the RX FIFO and returns
-    /// them in the provided buffer, without blocking.
+    /// them in the provided buffer. If the hardware buffer is empty, this
+    /// function will block until data is available.
     ///
     /// The function returns the number of bytes read into the buffer. This may
     /// be less than the length of the buffer. This function only returns 0
@@ -1643,9 +1653,31 @@ where
         self.tx.uart.info().regs()
     }
 
-    /// Returns whether the UART buffer is ready to accept more data.
+    #[procmacros::doc_replace]
+    /// Returns whether the UART TX buffer is ready to accept more data.
     ///
-    /// If this function returns `true`, [`Self::write`] will not block.
+    /// If this function returns `true`, [`Self::write`] and [`Self::write_async`]
+    /// will not block. Otherwise, the functions will not return until the buffer is
+    /// ready.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::uart::{Config, Uart};
+    /// let mut uart = Uart::new(peripherals.UART0, Config::default())?;
+    ///
+    /// if uart.write_ready() {
+    ///     // Because write_ready has returned true, the following call will immediately
+    ///     // copy some bytes into the FIFO and return a non-zero value.
+    ///     let written = uart.write(b"Hello")?;
+    ///     // ... handle written bytes
+    /// } else {
+    ///     // Calling write would have blocked, but here we can do something useful
+    ///     // instead of waiting for the buffer to become ready.
+    /// }
+    /// # {after_snippet}
+    /// ```
     #[instability::unstable]
     pub fn write_ready(&mut self) -> bool {
         self.tx.write_ready()
@@ -1702,7 +1734,28 @@ where
 
     /// Returns whether the UART buffer has data.
     ///
-    /// If this function returns `true`, [`Self::read`] will not block.
+    /// If this function returns `true`, [`Self::read`] and [`Self::read_async`]
+    /// will not block. Otherwise, they will not return until data is available.
+    ///
+    /// Data that does not get stored due to an error will be lost and does not count
+    /// towards the number of bytes in the receive buffer.
+    // TODO: once we add support for UART_ERR_WR_MASK it needs to be documented here.
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::uart::{Config, Uart};
+    /// let mut uart = Uart::new(peripherals.UART0, Config::default())?;
+    ///
+    /// while !uart.read_ready() {
+    ///     // Do something else while waiting for data to be available.
+    /// }
+    ///
+    /// let mut buf = [0u8; 32];
+    /// uart.read(&mut buf[..])?;
+    ///
+    /// # {after_snippet}
+    /// ```
     #[instability::unstable]
     pub fn read_ready(&mut self) -> bool {
         self.rx.read_ready()
@@ -1713,7 +1766,9 @@ where
     ///
     /// The UART hardware continuously receives bytes and stores them in the RX
     /// FIFO. This function reads the bytes from the RX FIFO and returns
-    /// them in the provided buffer, without blocking.
+    /// them in the provided buffer. If the hardware buffer is empty, this
+    /// function will block until data is available. The [`Self::read_ready`]
+    /// function can be used to check if data is available without blocking.
     ///
     /// The function returns the number of bytes read into the buffer. This may
     /// be less than the length of the buffer. This function only returns 0
@@ -3490,6 +3545,9 @@ impl Info {
         for byte_into in buf[..to_read].iter_mut() {
             *byte_into = self.read_next_from_fifo();
         }
+
+        // This bit is not cleared until the FIFO actually drops below the threshold.
+        self.clear_rx_events(RxEvent::FifoFull);
 
         Ok(to_read)
     }
