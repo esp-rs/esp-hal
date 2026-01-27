@@ -523,7 +523,7 @@ fn configure_rtc_slow_clk_impl(
     LPWR::regs().clk_conf().modify(|_, w| unsafe {
         w.ana_clk_rtc_sel().bits(match new_selector {
             RtcSlowClkConfig::RcSlow => 0,
-            RtcSlowClkConfig::Xtal => 1,
+            RtcSlowClkConfig::Xtal32k => 1,
             RtcSlowClkConfig::RcFast => 2,
         })
     });

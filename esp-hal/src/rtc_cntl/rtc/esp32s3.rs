@@ -1,19 +1,6 @@
 use strum::FromRepr;
 
-use crate::{clock::RtcClock, peripherals::LPWR, rtc_cntl::RtcCalSel};
-
 pub(crate) fn init() {}
-
-pub(crate) fn configure_clock() {
-    let cal_val = loop {
-        let res = RtcClock::calibrate(RtcCalSel::RtcMux, 1024);
-        if res != 0 {
-            break res;
-        }
-    };
-
-    LPWR::regs().store1().write(|w| unsafe { w.bits(cal_val) });
-}
 
 // Terminology:
 //
