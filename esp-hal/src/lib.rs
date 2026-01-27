@@ -332,7 +332,6 @@ mod exception_handler;
 unstable_module! {
     pub mod asynch;
     pub mod debugger;
-    #[cfg(any(soc_has_dport, soc_has_interrupt_core0, soc_has_interrupt_core1))]
     pub mod interrupt;
     pub mod rom;
     #[doc(hidden)]
@@ -346,9 +345,9 @@ unstable_module! {
     pub mod rtc_cntl;
     #[cfg(any(gdma, pdma))]
     pub mod dma;
-    #[cfg(soc_has_etm)]
+    #[cfg(etm)]
     pub mod etm;
-    #[cfg(soc_has_usb0)]
+    #[cfg(usb_otg)]
     pub mod otg_fs;
     #[cfg(psram)] // DMA needs some things from here
     pub mod psram;
@@ -358,34 +357,34 @@ unstable_module! {
 mod work_queue;
 
 unstable_driver! {
-    #[cfg(soc_has_aes)]
+    #[cfg(aes)]
     pub mod aes;
-    #[cfg(soc_has_assist_debug)]
+    #[cfg(assist_debug)]
     pub mod assist_debug;
     pub mod delay;
-    #[cfg(soc_has_ecc)]
+    #[cfg(ecc)]
     pub mod ecc;
-    #[cfg(soc_has_hmac)]
+    #[cfg(hmac)]
     pub mod hmac;
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
+    #[cfg(i2s)]
     pub mod i2s;
     #[cfg(soc_has_lcd_cam)]
     pub mod lcd_cam;
-    #[cfg(soc_has_ledc)]
+    #[cfg(ledc)]
     pub mod ledc;
-    #[cfg(any(soc_has_mcpwm0, soc_has_mcpwm1))]
+    #[cfg(mcpwm)]
     pub mod mcpwm;
-    #[cfg(soc_has_parl_io)]
+    #[cfg(parl_io)]
     pub mod parl_io;
-    #[cfg(soc_has_pcnt)]
+    #[cfg(pcnt)]
     pub mod pcnt;
-    #[cfg(soc_has_rmt)]
+    #[cfg(rmt)]
     pub mod rmt;
-    #[cfg(soc_has_rng)]
+    #[cfg(rng)]
     pub mod rng;
-    #[cfg(soc_has_rsa)]
+    #[cfg(rsa)]
     pub mod rsa;
-    #[cfg(soc_has_sha)]
+    #[cfg(sha)]
     pub mod sha;
     #[cfg(touch)]
     pub mod touch;
@@ -393,9 +392,9 @@ unstable_driver! {
     pub mod trace;
     #[cfg(soc_has_tsens)]
     pub mod tsens;
-    #[cfg(any(soc_has_twai0, soc_has_twai1))]
+    #[cfg(twai)]
     pub mod twai;
-    #[cfg(soc_has_usb_device)]
+    #[cfg(usb_serial_jtag)]
     pub mod usb_serial_jtag;
 }
 
@@ -740,10 +739,11 @@ pub fn init(config: Config) -> Peripherals {
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.LPWR.reborrow());
 
+    #[cfg(sleep)]
     crate::rtc_cntl::sleep::RtcSleepConfig::base_settings(&rtc);
 
     // Disable watchdog timers
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(swd)]
     rtc.swd.disable();
 
     rtc.rwdt.disable();
@@ -756,6 +756,7 @@ pub fn init(config: Config) -> Peripherals {
 
     crate::time::implem::time_init();
 
+    #[cfg(gpio)]
     crate::gpio::interrupt::bind_default_interrupt_handler();
 
     #[cfg(feature = "psram")]
