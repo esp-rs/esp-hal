@@ -60,6 +60,12 @@ macro_rules! property {
     ("interrupts.status_registers", str) => {
         stringify!(3)
     };
+    ("timergroup.timg_has_timer1") => {
+        false
+    };
+    ("timergroup.timg_has_divcnt_rst") => {
+        true
+    };
 }
 #[macro_export]
 /// ESP-HAL must provide implementation for the following functions:
