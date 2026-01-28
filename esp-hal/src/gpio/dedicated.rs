@@ -66,7 +66,7 @@ Do not send the drivers to another core, either directly, or indirectly via a th
 //! ## Examples
 //! ### sharing drivers across multiple bundles
 //!
-//! The same driver can be borrowed by multiple bundles at the same time**.
+//! The same driver can be borrowed by multiple bundles at the same time.
 //!
 //! In this example, we build two *input* bundles:
 //! - `bundle_a` reads channels 0, 1, 2
