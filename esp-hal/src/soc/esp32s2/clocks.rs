@@ -17,7 +17,7 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
-    peripherals::{LPWR, SYSCON, SYSTEM, TIMG0, TIMG1, UART0, UART1},
+    peripherals::{I2C_ANA_MST, LPWR, SYSCON, SYSTEM, TIMG0, TIMG1, UART0, UART1},
     soc::regi2c,
     time::Rate,
 };
@@ -123,6 +123,14 @@ fn configure_xtal_clk_impl(_clocks: &mut ClockTree, _config: XtalClkConfig) {
 
 fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
     let power_down = !en;
+
+    // regi2c_ctrl_ll_i2c_bbpll_enable
+    // regi2c_ctrl_ll_i2c_apll_enable
+    I2C_ANA_MST::regs().config1().modify(|_, w| {
+        w.bbpll().bit(power_down);
+        w.apll().bit(power_down)
+    });
+
     LPWR::regs().options0().modify(|_, w| {
         w.bb_i2c_force_pd().bit(power_down);
         w.bbpll_force_pd().bit(power_down);
