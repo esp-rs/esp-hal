@@ -1678,10 +1678,38 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
     ///
     /// # {after_snippet}
     /// ```
-
     #[inline(always)]
     pub fn mask(&self) -> u32 {
         self.mask
+    }
+    
+    /// Attaches (enables) an already-configured dedicated flex driver to this bundle. After
+    /// enabling, you will be able to control the input/output channels of `flex` via this
+    /// bundle.
+    ///
+    /// This method logically borrows the provided [`DedicatedGpioFlex`] for the lifetime `'lt`.
+    /// Multiple bundles may borrow the same flex driver at the same time. Check examples in the
+    /// module-level documentation for more.
+    ///
+    /// ## Notes
+    ///
+    /// - This function does not change any input/output state.
+    #[cfg_attr(
+        multi_core,
+        doc = r#"
+<section class="warning">
+All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself.
+</section>
+    "#
+    )]
+    pub fn enable_flex<'d>(&mut self, flex: &'lt DedicatedGpioFlex<'d>) -> &mut Self {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(
+            flex.core, self.core,
+            "Trying to enable a dedicated GPIO driver configured on a different core from the bundle."
+        );
+        self.mask |= flex.mask;
+        self
     }
 
     /// Disables a dedicated flex driver in this bundle.
@@ -1711,35 +1739,6 @@ You should only disable dedicated GPIO drivers that were configured on the same 
             "Trying to disable a dedicated GPIO driver configured on a different core from the bundle."
         );
         self.mask &= !flex.mask;
-        self
-    }
-
-    /// Attaches (enables) an already-configured dedicated flex driver to this bundle. After
-    /// enabling, you will be able to control the input/output channels of `flex` via this
-    /// bundle.
-    ///
-    /// This method logically borrows the provided [`DedicatedGpioFlex`] for the lifetime `'lt`.
-    /// Multiple bundles may borrow the same flex driver at the same time. Check examples in the
-    /// module-level documentation for more.
-    ///
-    /// ## Notes
-    ///
-    /// - This function does not change any input/output state.
-    #[cfg_attr(
-        multi_core,
-        doc = r#"
-<section class="warning">
-All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself.
-</section>
-"#
-    )]
-    pub fn enable_flex<'d>(&mut self, flex: &'lt DedicatedGpioFlex<'d>) -> &mut Self {
-        #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(
-            flex.core, self.core,
-            "Trying to enable a dedicated GPIO driver configured on a different core from the bundle."
-        );
-        self.mask |= flex.mask;
         self
     }
 
