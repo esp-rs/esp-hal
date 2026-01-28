@@ -493,7 +493,6 @@ pub enum RwdtStage {
 pub struct Rwdt(());
 
 /// RTC Watchdog Timer driver.
-
 impl Rwdt {
     /// Enable the watchdog timer instance.
     /// Watchdog starts with default settings (`stage 0` resets the system, the
