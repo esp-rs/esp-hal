@@ -139,6 +139,7 @@ impl RtcClock {
     #[cfg(not(esp32c5))]
     const CAL_FRACT: u32 = 19;
 
+    #[cfg(not(esp32c5))]
     /// Get the RTC_SLOW_CLK source.
     pub fn slow_freq() -> Rate {
         cfg_if::cfg_if! {
