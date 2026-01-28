@@ -369,6 +369,30 @@ mod rng {
     }
 
     #[test]
+    fn test_rng_returns_random_values() {
+        let _p = esp_hal::init(Default::default());
+        let rng = Rng::new();
+
+        let mut rng_values = [0; 10];
+        rng.read(&mut rng_values);
+
+        assert!(rng_values.windows(2).any(|w| w[0] != w[1]));
+    }
+
+    #[test]
+    fn test_trng_returns_random_values() {
+        let p = esp_hal::init(Default::default());
+        let _source = TrngSource::new(p.RNG, p.ADC1);
+
+        let rng = Trng::try_new().unwrap();
+
+        let mut rng_values = [0; 10];
+        rng.read(&mut rng_values);
+
+        assert!(rng_values.windows(2).any(|w| w[0] != w[1]));
+    }
+
+    #[test]
     fn test_trng_source_cannot_be_disabled_while_in_use() {
         let p = esp_hal::init(Default::default());
         let source = TrngSource::new(p.RNG, p.ADC1);

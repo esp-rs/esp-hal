@@ -16,6 +16,23 @@ mod tests {
         esp_hal::init(config)
     }
 
+    #[test]
+    fn wifi_starts_with_trng_enabled(p: Peripherals) {
+        let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
+        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+
+        let _source = esp_hal::rng::TrngSource::new(p.RNG, p.ADC1);
+
+        let (mut controller, _interfaces) =
+            esp_radio::wifi::new(p.WIFI, Default::default()).unwrap();
+
+        controller
+            .set_mode(esp_radio::wifi::WifiMode::Station)
+            .unwrap();
+        controller.start().unwrap();
+    }
+
     // If this turns out to be too flaky or time-consuming,
     // we should consider converting this into a qa-test.
     #[test]
