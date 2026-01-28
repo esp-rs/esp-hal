@@ -140,6 +140,20 @@ impl NorFlash for FlashStorage<'_> {
     const WRITE_SIZE: usize = Self::WORD_SIZE as _;
     const ERASE_SIZE: usize = Self::SECTOR_SIZE as _;
 
+    /// Writes `bytes` to the flash storage at `offset`.
+    ///
+    /// Note that NOR flash is only able to flip bits from 1 to 0. Attempting to
+    /// flip a bit from 0 to 1 will silently fail. It may be necessary to call
+    /// [`FlashStorage::erase`] before writing to ensure all bits being written
+    /// to are 1.
+    ///
+    /// Requirements:
+    /// - `offset` must be aligned to a word (4 bytes).
+    /// - `bytes.len()` must be a multiple of the word size.
+    ///
+    /// Requirements not being met will lead to an error.
+    ///
+    /// See [`NorFlash::write`] for more information.
     fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
         const WS: u32 = FlashStorage::WORD_SIZE;
         self.check_alignment::<{ WS }>(offset, bytes.len())?;
@@ -174,6 +188,15 @@ impl NorFlash for FlashStorage<'_> {
         Ok(())
     }
 
+    /// Erases sectors at bytes `[from..to]`
+    ///
+    /// Requirements:
+    /// - `from` must be aligned to a sector (4096 bytes).
+    /// - `to - from` must be a multiple of the sector size.
+    ///
+    /// Requirements not being met will lead to an error.
+    ///
+    /// See [`NorFlash::erase`] for more information.
     fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
         let len = (to - from) as _;
         const SZ: u32 = FlashStorage::SECTOR_SIZE;
