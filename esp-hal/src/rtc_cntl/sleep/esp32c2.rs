@@ -291,6 +291,7 @@ impl Default for RtcConfig {
         cfg.set_pwrctl_init(true);
         cfg.set_rtc_dboost_fpd(true);
         cfg.set_cpu_waiti_clk_gate(true);
+        cfg.set_bbpll_fpu(true);
         cfg
     }
 }
