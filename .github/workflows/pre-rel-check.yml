@@ -1,0 +1,71 @@
+# Check with a local registry.
+#
+# We want to check if we can compile examples/tests after bumping the deps by using a local registry.
+# (i.e. if we will publish the right set of crates)
+
+name: pre-release-checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release-pr')) }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # Install the Rust toolchain for Xtensa devices:
+      - uses: esp-rs/xtensa-toolchain@v1.6
+        with:
+          version: 1.92.0.0
+
+      # Install the Rust stable toolchain for RISC-V devices:
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: stable
+          components: rust-src
+
+      # Install the Rust nightly toolchain for RISC-V devices:
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: nightly
+          components: rust-src
+
+      - name: init-local-registry
+        run: |
+          cargo xrel-check init
+          cargo xrel-check update
+          cargo xrel-check replace-path-deps
+
+      - name: try-build
+        shell: bash
+        run: |
+          # lints and docs are checked a couple of times already by other workflows
+          cargo xcheck ci esp32 --toolchain esp --no-lint --no-docs --no-check-crates
+          cargo xcheck ci esp32s2 --toolchain esp --no-lint --no-docs --no-check-crates
+          cargo xcheck ci esp32s3 --toolchain esp --no-lint --no-docs --no-check-crates
+          cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs --no-check-crates
+          cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs --no-check-crates
+          cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs --no-check-crates
+          cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs --no-check-crates
+
+      - name: try-build-tests
+        shell: bash
+        run: |
+          cargo xtask build tests esp32
+          cargo xtask build tests esp32s2
+          cargo xtask build tests esp32s3
+          cargo xtask build tests esp32c2
+          cargo xtask build tests esp32c3
+          cargo xtask build tests esp32c6
+          cargo xtask build tests esp32h2

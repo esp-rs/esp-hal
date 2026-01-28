@@ -57,6 +57,10 @@ enum Cli {
     #[cfg(feature = "report")]
     /// Generate reports from CI data.
     GenerateReport(generate_report::ReportArgs),
+    /// Tasks for checking compile tests with a local registry.
+    #[cfg(feature = "rel-check")]
+    #[clap(subcommand)]
+    RelCheck(relcheck::RelCheckCmds),
 }
 
 #[derive(Debug, Args)]
@@ -76,6 +80,10 @@ struct CiArgs {
     /// Whether to skip building documentation
     #[arg(long)]
     no_docs: bool,
+
+    /// Whether to skip checking the crates itself
+    #[arg(long)]
+    no_check_crates: bool,
 }
 
 #[derive(Debug, Args)]
@@ -224,6 +232,8 @@ fn main() -> Result<()> {
         Cli::CheckGlobalSymbols(args) => check_global_symbols(&args.chips),
         #[cfg(feature = "report")]
         Cli::GenerateReport(args) => generate_report::generate_report(&workspace, args),
+        #[cfg(feature = "rel-check")]
+        Cli::RelCheck(relcheck) => relcheck::run_rel_check(relcheck),
     }
 }
 
@@ -536,16 +546,18 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         std::env::set_var("CI", "true");
     }
 
-    runner.run("Check crates", || {
-        check_packages(
-            workspace,
-            CheckPackagesArgs {
-                packages: Package::iter().collect(),
-                chips: vec![args.chip],
-                toolchain: args.toolchain.clone(),
-            },
-        )
-    });
+    if !args.no_check_crates {
+        runner.run("Check crates", || {
+            check_packages(
+                workspace,
+                CheckPackagesArgs {
+                    packages: Package::iter().collect(),
+                    chips: vec![args.chip],
+                    toolchain: args.toolchain.clone(),
+                },
+            )
+        });
+    }
 
     if !args.no_lint {
         runner.run("Lint", || {
