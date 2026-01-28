@@ -75,8 +75,6 @@ esp32c2   = ["esp-sync/esp32c2"]
 ##
 esp32c3   = ["esp-sync/esp32c3"]
 ##
-esp32c5   = ["esp-sync/esp32c5"]
-##
 esp32c6   = ["esp-sync/esp32c6"]
 ##
 esp32h2   = ["esp-sync/esp32h2"]
