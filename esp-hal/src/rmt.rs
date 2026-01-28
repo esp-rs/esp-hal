@@ -2294,7 +2294,7 @@ mod chip_specific {
 
             PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
                 cfg_if::cfg_if!(
-                    if #[cfg(esp32c6)] {
+                    if #[cfg(any(esp32c5, esp32c6))] {
                         w.sclk_sel().bits(source.bits())
                     } else {
                         w.sclk_sel().bit(source.bit())

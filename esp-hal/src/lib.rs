@@ -10,6 +10,7 @@
 #![cfg_attr(esp32s3, doc = "**ESP32-S3**")]
 #![cfg_attr(esp32c2, doc = "**ESP32-C2**")]
 #![cfg_attr(esp32c3, doc = "**ESP32-C3**")]
+#![cfg_attr(esp32c5, doc = "**ESP32-C5**")]
 #![cfg_attr(esp32c6, doc = "**ESP32-C6**")]
 #![cfg_attr(esp32h2, doc = "**ESP32-H2**")]
 //! . Please ensure you are reading the correct [documentation] for your target
@@ -295,6 +296,7 @@ pub use xtensa_lx_rt::{self, xtensa_lx};
 pub mod clock;
 #[cfg(soc_has_gpio)]
 pub mod gpio;
+#[cfg(not(esp32c5))]
 #[cfg(any(soc_has_i2c0, soc_has_i2c1))]
 pub mod i2c;
 pub mod peripherals;
@@ -302,8 +304,10 @@ pub mod peripherals;
 mod reg_access;
 #[cfg(any(soc_has_spi0, soc_has_spi1, soc_has_spi2, soc_has_spi3))]
 pub mod spi;
+#[cfg_attr(esp32c5, allow(unused))]
 pub mod system;
 pub mod time;
+#[cfg(not(esp32c5))]
 #[cfg(any(soc_has_uart0, soc_has_uart1, soc_has_uart2))]
 pub mod uart;
 
@@ -354,6 +358,7 @@ unstable_module! {
     pub mod efuse;
 }
 
+#[cfg_attr(esp32c5, allow(unused))]
 mod work_queue;
 
 unstable_driver! {
@@ -388,8 +393,10 @@ unstable_driver! {
     pub mod sha;
     #[cfg(touch)]
     pub mod touch;
+    #[cfg(not(esp32c5))]
     #[cfg(soc_has_trace0)]
     pub mod trace;
+    #[cfg(not(esp32c5))]
     #[cfg(soc_has_tsens)]
     pub mod tsens;
     #[cfg(twai)]
@@ -507,6 +514,7 @@ impl crate::DriverMode for Async {}
 impl crate::private::Sealed for Blocking {}
 impl crate::private::Sealed for Async {}
 
+#[cfg_attr(esp32c5, allow(unused))]
 pub(crate) mod private {
     use core::mem::ManuallyDrop;
 
@@ -746,6 +754,7 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(swd)]
     rtc.swd.disable();
 
+    // TODO: add later
     rtc.rwdt.disable();
 
     #[cfg(timergroup_timg0)]

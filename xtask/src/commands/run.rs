@@ -159,11 +159,7 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
 
         // If filters were provided, only run tests whose name contains
         // at least one of the filter tokens (case-insensitive).
-        if !filters.is_empty()
-            && !filters
-                .iter()
-                .any(|f| elf_name.to_lowercase().contains(f))
-        {
+        if !filters.is_empty() && !filters.iter().any(|f| elf_name.to_lowercase().contains(f)) {
             log::info!(
                 "Skipping test '{}' for '{}' (does not match filters: {:?})",
                 elf_name,

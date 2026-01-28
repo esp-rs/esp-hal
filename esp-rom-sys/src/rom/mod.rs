@@ -97,6 +97,11 @@ extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
             // just rely on RTC_CNTL_STORE4
             let rtc_cntl_store4: *const u32 = 0x600080AC as *const u32;
             ((unsafe { rtc_cntl_store4.read_volatile() }) & 0xff) as i32
+        } else if #[cfg(esp32c5)] {
+            // PCR_CLK_XTAL_FREQ updates its value based on EFUSE_XTAL_48M_SEL.
+            let pcr_sysclk_conf: *const u32 = 0x60096110 as *const u32;
+            // get the CLK_XTAL_FREQ field
+            ((unsafe { pcr_sysclk_conf.read_volatile() } >> 24) & 0x7f) as i32
         } else {
             compile_error!("rtc_clk_xtal_freq_get not implemented for this chip");
         }

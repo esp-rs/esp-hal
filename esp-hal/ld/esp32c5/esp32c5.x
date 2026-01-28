@@ -1,0 +1,37 @@
+/* esp32c5 fixups */
+/* The ESP32-C2 and ESP32-C3 have interrupt IDs 1-31, while the ESP32-C5 has
+   IDs 0-31, so we much define the handler for the one additional interrupt
+   ID: */
+PROVIDE(interrupt0 = DefaultHandler);
+
+SECTIONS {
+  /* Shared sections - ordering matters */
+  INCLUDE "rwtext.x"
+  INCLUDE "rwdata.x"
+  /* End of Shared sections */
+}
+
+SECTIONS {
+  /**
+   * Bootloader really wants to have separate segments for ROTEXT and RODATA
+   * Thus, we need to force a gap here.
+   */
+  .text_gap (NOLOAD): {
+    . = . + 4;
+    . = ALIGN(4) + 0x20;
+  } > ROM
+}
+INSERT BEFORE .text;
+/* end of esp32c5 fixups */
+
+/* Shared sections #2 - ordering matters */
+INCLUDE "rodata.x"
+INCLUDE "text.x"
+INCLUDE "rtc_fast.x"
+INCLUDE "stack.x"
+INCLUDE "dram2.x"
+INCLUDE "metadata.x"
+INCLUDE "eh_frame.x"
+/* End of Shared sections #2 */
+
+_dram_data_start = ORIGIN( RAM ) + SIZEOF(.trap) + SIZEOF(.rwtext);

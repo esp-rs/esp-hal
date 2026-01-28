@@ -4,7 +4,7 @@ use core::ffi::{c_char, c_int, c_long, c_void};
 
 // future chips or ECOs _might_ be different - at least ESP-IDF defines the struct per chip
 #[cfg_attr(
-    any(esp32, esp32s2, esp32s3, esp32c2, esp32c3, esp32c6, esp32h2),
+    any(esp32, esp32s2, esp32s3, esp32c2, esp32c3, esp32c5, esp32c6, esp32h2),
     path = "v1.rs"
 )]
 pub(crate) mod chip_specific;

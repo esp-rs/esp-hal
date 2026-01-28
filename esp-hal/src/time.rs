@@ -781,3 +781,16 @@ pub(crate) mod implem {
         Instant::from_ticks(micros)
     }
 }
+
+#[cfg(esp32c5)]
+pub(crate) mod implem {
+    use super::Instant;
+
+    #[cfg(feature = "rt")]
+    pub(crate) fn time_init() {}
+
+    #[inline]
+    pub(super) fn now() -> Instant {
+        Instant::from_ticks(0)
+    }
+}
