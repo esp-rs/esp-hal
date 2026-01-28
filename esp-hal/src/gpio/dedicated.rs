@@ -63,6 +63,66 @@ Do not send the drivers to another core, either directly, or indirectly via a th
 </section>
 "#
 )]
+//! ## Examples
+//! ### sharing drivers across multiple bundles
+//!
+//! The same driver can be borrowed by multiple bundles at the same time**.
+//!
+//! In this example, we build two *input* bundles:
+//! - `bundle_a` reads channels 0, 1, 2
+//! - `bundle_b` reads channels 0, 2, 4
+//!
+//! Both bundles share the same `in0` and `in2` drivers, and we use [`DedicatedGpioInputBundle::all_high`]
+//! to check if all channels in each bundle are currently high.
+//!
+//! ```rust, no_run
+//!
+//! # {before_snippet}
+//! use esp_hal::gpio::{
+//!     Input,
+//!     InputConfig,
+//!     dedicated::{DedicatedGpio, DedicatedGpioInput, DedicatedGpioInputBundle},
+//! };
+//!
+//! // Create channels.
+//! let channels = DedicatedGpio::new(peripherals.GPIO_DEDICATED);
+//!
+//! // Configure GPIO inputs
+//! let p0 = Input::new(peripherals.GPIO0, InputConfig::default());
+//! let p1 = Input::new(peripherals.GPIO1, InputConfig::default());
+//! let p2 = Input::new(peripherals.GPIO2, InputConfig::default());
+//! let p4 = Input::new(peripherals.GPIO4, InputConfig::default());
+//!
+//! let in0 = DedicatedGpioInput::new(channels.channel0.input, p0);
+//! let in1 = DedicatedGpioInput::new(channels.channel1.input, p1);
+//! let in2 = DedicatedGpioInput::new(channels.channel2.input, p2);
+//! let in4 = DedicatedGpioInput::new(channels.channel4.input, p4);
+//!
+//! // Bundle A reads channels 0, 1, 2.
+//! let mut bundle_a = DedicatedGpioInputBundle::new();
+//! bundle_a
+//!     .enable_input(&in0)
+//!     .enable_input(&in1)
+//!     .enable_input(&in2);
+//!
+//! // Bundle B reads channels 0, 2, 4.
+//! // Note: `in0` and `in2` are *shared* with bundle A.
+//! let mut bundle_b = DedicatedGpioInputBundle::new();
+//! bundle_b
+//!     .enable_input(&in0)
+//!     .enable_input(&in2)
+//!     .enable_input(&in4);
+//!
+//! // Check whether all channels in each bundle are currently high.
+//! let a_all_high = bundle_a.all_high(); // true if ch0, ch1, ch2 are all high
+//! let b_all_high = bundle_b.all_high(); // true if ch0, ch2, ch4 are all high
+//! # {after_snippet}
+//! ```
+//! 
+//! This pattern is useful when different subsystems want different views of the same set of
+//! input channels without duplicating driver setup.
+//! 
+//! 
 
 use core::{convert::Infallible, marker::PhantomData};
 
@@ -1055,7 +1115,8 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
     /// be able to control the output channels of `out` via this bundle.
     ///
     /// This method logically borrows the provided [`DedicatedGpioOutput`] for the lifetime `'lt`.
-    /// Multiple bundles may borrow the same output driver at the same time.
+    /// Multiple bundles may borrow the same output driver at the same time. Check examples in the module-level 
+    /// documentation for more.
     ///
     /// ## Notes
     ///
@@ -1266,6 +1327,7 @@ configured on the same core, and the bundle must only be used on the core that c
 </section>
 "#
 )]
+#[doc = ""]
 /// ## Examples
 ///
 /// ```rust, no_run
@@ -1373,7 +1435,8 @@ impl<'lt> DedicatedGpioInputBundle<'lt> {
     /// will be able to read the input channels of `inp` via this bundle.
     ///
     /// This method logically borrows the provided [`DedicatedGpioInput`] for the lifetime `'lt`.
-    /// Multiple bundles may borrow the same input driver at the same time.
+    /// Multiple bundles may borrow the same input driver at the same time. Check examples in the module-level 
+    /// documentation for more.
     ///
     /// ## Notes
     ///
@@ -1650,7 +1713,8 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     /// will be able to control the input/output channels of `flex` via this bundle.
     ///
     /// This method logically borrows the provided [`DedicatedGpioFlex`] for the lifetime `'lt`.
-    /// Multiple bundles may borrow the same flex driver at the same time.
+    /// Multiple bundles may borrow the same flex driver at the same time. Check examples in the module-level 
+    /// documentation for more.
     ///
     /// ## Notes
     ///
