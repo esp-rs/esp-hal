@@ -83,7 +83,7 @@ jobs:
       - uses: esp-rs/xtensa-toolchain@v1.6
         if: github.event_name != 'merge_group' || steps.skip_in_merge_queue.outputs.skip_check != 'true'
         with:
-          version: 1.92.0.0
+          version: 1.93.0.0
 
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
