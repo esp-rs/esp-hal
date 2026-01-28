@@ -279,12 +279,8 @@ impl Chip {
                     "uart_uart0",
                     "uart_uart1",
                     "uart_uart2",
-                    "soc_ref_tick_hz=\"1000000\"",
-                    "soc_ref_tick_hz_is_set",
                     "soc_rc_fast_clk_default=\"8500000\"",
                     "soc_rc_fast_clk_default_is_set",
-                    "soc_rc_slow_clock=\"150000\"",
-                    "soc_rc_slow_clock_is_set",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_pll_clk",
                     "soc_has_clock_node_apll_clk",
@@ -478,12 +474,8 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=uart_uart2",
-                    "cargo:rustc-cfg=soc_ref_tick_hz=\"1000000\"",
-                    "cargo:rustc-cfg=soc_ref_tick_hz_is_set",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"8500000\"",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
-                    "cargo:rustc-cfg=soc_rc_slow_clock=\"150000\"",
-                    "cargo:rustc-cfg=soc_rc_slow_clock_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_apll_clk",
@@ -804,8 +796,6 @@ impl Chip {
                     "soc_cpu_has_csr_pc",
                     "soc_rc_fast_clk_default=\"17500000\"",
                     "soc_rc_fast_clk_default_is_set",
-                    "soc_rc_slow_clock=\"136000\"",
-                    "soc_rc_slow_clock_is_set",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_pll_clk",
                     "soc_has_clock_node_rc_fast_clk",
@@ -955,8 +945,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
-                    "cargo:rustc-cfg=soc_rc_slow_clock=\"136000\"",
-                    "cargo:rustc-cfg=soc_rc_slow_clock_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_rc_fast_clk",
@@ -1228,8 +1216,6 @@ impl Chip {
                     "soc_cpu_has_csr_pc",
                     "soc_rc_fast_clk_default=\"17500000\"",
                     "soc_rc_fast_clk_default_is_set",
-                    "soc_rc_slow_clock=\"136000\"",
-                    "soc_rc_slow_clock_is_set",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_pll_clk",
                     "soc_has_clock_node_rc_fast_clk",
@@ -1420,8 +1406,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
-                    "cargo:rustc-cfg=soc_rc_slow_clock=\"136000\"",
-                    "cargo:rustc-cfg=soc_rc_slow_clock_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_rc_fast_clk",
@@ -1774,8 +1758,6 @@ impl Chip {
                     "soc_cpu_has_prv_mode",
                     "soc_rc_fast_clk_default=\"17500000\"",
                     "soc_rc_fast_clk_default_is_set",
-                    "soc_rc_slow_clock=\"136000\"",
-                    "soc_rc_slow_clock_is_set",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_pll_clk",
                     "soc_has_clock_node_rc_fast_clk",
@@ -2028,8 +2010,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_cpu_has_prv_mode",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
-                    "cargo:rustc-cfg=soc_rc_slow_clock=\"136000\"",
-                    "cargo:rustc-cfg=soc_rc_slow_clock_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_rc_fast_clk",
@@ -2405,8 +2385,6 @@ impl Chip {
                     "soc_cpu_has_prv_mode",
                     "soc_rc_fast_clk_default=\"8500000\"",
                     "soc_rc_fast_clk_default_is_set",
-                    "soc_rc_slow_clock=\"136000\"",
-                    "soc_rc_slow_clock_is_set",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_pll_f96m_clk",
                     "soc_has_clock_node_pll_f64m_clk",
@@ -2620,8 +2598,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_cpu_has_prv_mode",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"8500000\"",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
-                    "cargo:rustc-cfg=soc_rc_slow_clock=\"136000\"",
-                    "cargo:rustc-cfg=soc_rc_slow_clock_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_f96m_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_f64m_clk",
@@ -2932,12 +2908,8 @@ impl Chip {
                     "timergroup_timg1",
                     "uart_uart0",
                     "uart_uart1",
-                    "soc_ref_tick_hz=\"1000000\"",
-                    "soc_ref_tick_hz_is_set",
                     "soc_rc_fast_clk_default=\"8500000\"",
                     "soc_rc_fast_clk_default_is_set",
-                    "soc_rc_slow_clock=\"90000\"",
-                    "soc_rc_slow_clock_is_set",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_pll_clk",
                     "soc_has_clock_node_apll_clk",
@@ -3143,12 +3115,8 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg1",
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
-                    "cargo:rustc-cfg=soc_ref_tick_hz=\"1000000\"",
-                    "cargo:rustc-cfg=soc_ref_tick_hz_is_set",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"8500000\"",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
-                    "cargo:rustc-cfg=soc_rc_slow_clock=\"90000\"",
-                    "cargo:rustc-cfg=soc_rc_slow_clock_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_apll_clk",
@@ -3566,8 +3534,6 @@ impl Chip {
                     "uart_uart2",
                     "soc_rc_fast_clk_default=\"17500000\"",
                     "soc_rc_fast_clk_default_is_set",
-                    "soc_rc_slow_clock=\"136000\"",
-                    "soc_rc_slow_clock_is_set",
                     "soc_has_clock_node_xtal_clk",
                     "soc_has_clock_node_pll_clk",
                     "soc_has_clock_node_rc_fast_clk",
@@ -3803,8 +3769,6 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart2",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
-                    "cargo:rustc-cfg=soc_rc_slow_clock=\"136000\"",
-                    "cargo:rustc-cfg=soc_rc_slow_clock_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_rc_fast_clk",
@@ -4275,9 +4239,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(uart_uart0)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart1)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart2)");
-    println!("cargo:rustc-check-cfg=cfg(soc_ref_tick_hz_is_set)");
     println!("cargo:rustc-check-cfg=cfg(soc_rc_fast_clk_default_is_set)");
-    println!("cargo:rustc-check-cfg=cfg(soc_rc_slow_clock_is_set)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_xtal_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_apll_clk)");
@@ -4531,12 +4493,8 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_apb_80m)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_crypto_pwm_clk)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_dma)");
-    println!("cargo:rustc-check-cfg=cfg(soc_ref_tick_hz, values(\"1000000\"))");
     println!(
         "cargo:rustc-check-cfg=cfg(soc_rc_fast_clk_default, values(\"8500000\",\"17500000\"))"
-    );
-    println!(
-        "cargo:rustc-check-cfg=cfg(soc_rc_slow_clock, values(\"150000\",\"136000\",\"90000\"))"
     );
     println!("cargo:rustc-check-cfg=cfg(gpio_gpio_function, values(\"2\",\"1\"))");
     println!("cargo:rustc-check-cfg=cfg(gpio_constant_0_input, values(\"48\",\"31\",\"60\"))");
