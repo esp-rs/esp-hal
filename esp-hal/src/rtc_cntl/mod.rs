@@ -111,18 +111,23 @@
 //! ```
 
 pub use self::rtc::SocResetReason;
-#[cfg(not(esp32))]
+#[cfg(not(any(esp32, esp32c5)))]
 use crate::efuse::Efuse;
 #[cfg(not(esp32c5))]
 use crate::interrupt::{self, InterruptHandler};
 #[cfg(sleep)]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
+#[cfg(not(esp32c5))]
 use crate::{
     clock::RtcClock,
     interrupt::{self, InterruptHandler},
     peripherals::{Interrupt, LPWR},
     system::{Cpu, SleepSource},
     time::Duration,
+};
+use crate::{
+    peripherals::LPWR,
+    system::{Cpu, SleepSource},
 };
 // only include sleep where it's been implemented
 #[cfg(sleep)]
@@ -141,6 +146,7 @@ pub(crate) mod rtc;
 cfg_if::cfg_if! {
     if #[cfg(any(esp32c6, esp32h2, esp32c5))] {
         use crate::peripherals::LP_WDT;
+        #[cfg(not(esp32c5))]
         use crate::peripherals::LP_TIMER;
         use crate::peripherals::LP_AON;
     } else {

@@ -377,11 +377,6 @@ status_registers = 3
 software_interrupt_count = 4
 software_interrupt_delay = 0
 
-[device.timergroup]
-support_status = "partial"
-instances = [{ name = "timg0" }, { name = "timg1" }]
-timg_has_divcnt_rst = true
-
 # [device.spi_master]
 # support_status = "supported"
 # instances = [

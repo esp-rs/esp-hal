@@ -394,6 +394,7 @@ unsafe fn assigned_cpu_interrupt(interrupt: Interrupt) -> Option<CpuInterrupt> {
     }
 }
 
+#[cfg_attr(esp32c5, allow(unused))]
 pub(crate) fn bound_cpu_interrupt_for(_cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
     unsafe { assigned_cpu_interrupt(interrupt) }
 }
@@ -676,6 +677,7 @@ mod classic {
 }
 
 #[cfg(clic)]
+#[cfg_attr(esp32c5, allow(unused))]
 mod clic {
     use super::{CpuInterrupt, InterruptKind, Priority};
     use crate::system::Cpu;
@@ -990,7 +992,6 @@ mod rt {
                 .ok();
         }
 
-        #[cfg(not(esp32c5))]
         unsafe {
             let vec_table = (&_vector_table as *const u32).addr();
             mtvec::write({

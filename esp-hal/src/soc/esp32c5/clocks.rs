@@ -62,7 +62,7 @@ impl ClockConfig {
         }
     }
 
-    pub(crate) fn configure(mut self) {
+    pub(crate) fn configure(self) {
         self.apply();
     }
 }
