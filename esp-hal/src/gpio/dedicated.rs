@@ -1059,39 +1059,47 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
         self
     }
 
-    /// Removes a dedicated output driver from this bundle.
+    /// Disables a dedicated output driver in this bundle.
     ///
-    /// This updates the internal mask by clearing the channel bit(s) of `out`.
+    /// This updates the internal mask by clearing the channel bit(s) of `out`. After disabling,
+    /// future *bundle* operations will no longer touch those channels.
     ///
     /// ## Notes
     ///
     /// - This does **not** affect `out` itself. It only changes which channels future *bundle*
     ///   operations will touch.
-    /// - After removal, `out` remains usable as before (e.g. you can still call
-    ///   [`DedicatedGpioOutput::set_level`] if you have `out` mutably).
+    /// - This does **not** end the lifetime-based borrow of `out`. Even after disabling, `out`
+    ///   still cannot be moved or dropped while this bundle exists.
+    /// - You can re-enable it later via [`Self::enable_output`] / [`Self::with_output`].
     #[cfg_attr(
         multi_core,
         doc = r#"
 <section class="warning">
-All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself
+You should only disable dedicated GPIO drivers that were configured on the same core as the bundle itself.
 </section>
 "#
     )]
-    pub fn remove_output<'d>(&mut self, out: &'lt DedicatedGpioOutput<'d>) -> &mut Self {
+    pub fn disable_output<'d>(&mut self, out: &'lt DedicatedGpioOutput<'d>) -> &mut Self {
         #[cfg(all(debug_assertions, multi_core))]
-        {
-            debug_assert_eq!(
-                self.core,
-                Cpu::current(),
-                "Dedicated GPIO used on a different CPU core than it was created on"
-            );
-
-            debug_assert_eq!(
-                out.core, self.core,
-                "All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself."
-            );
-        }
+        debug_assert_eq!(
+            out.core, self.core, 
+            "Trying to disable a dedicated GPIO driver configured on a different core from the bundle."
+        );
         self.mask &= !out.mask;
+        self
+    }
+
+    
+    /// Re-enables a dedicated output driver in this bundle after it was disabled by [`Self::disable_output`].
+    ///
+    /// This is equivalent to [`Self::with_output`].
+    pub fn enable_output<'d>(&mut self, out: &'lt DedicatedGpioOutput<'d>) -> &mut Self {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(
+            out.core, self.core,
+            "Trying to enable a dedicated GPIO driver configured on a different core from the bundle."
+        );
+        self.mask |= out.mask;
         self
     }
 
@@ -1360,38 +1368,46 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
         self
     }
 
-    /// Removes a dedicated input driver from this bundle.
+    /// Disables a dedicated input driver in this bundle.
     ///
-    /// This updates the internal mask by clearing the channel bit(s) of `inp`.
+    /// This updates the internal mask by clearing the channel bit(s) of `inp`. After disabling,
+    /// future *bundle* operations will no longer touch those channels.
     ///
     /// ## Notes
     ///
     /// - This does **not** affect `inp` itself. It only changes which channels future *bundle*
-    ///   reads will include.
-    /// - After removal, `inp` remains usable as before.
+    ///   operations will touch.
+    /// - This does **not** end the lifetime-based borrow of `inp`. Even after disabling, `inp`
+    ///   still cannot be moved or dropped while this bundle exists.
+    /// - You can re-enable it later via [`Self::enable_input`] / [`Self::with_input`].
     #[cfg_attr(
         multi_core,
         doc = r#"
 <section class="warning">
-All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself.
+You should only disable dedicated GPIO drivers that were configured on the same core as the bundle itself.
 </section>
 "#
     )]
-    pub fn remove_input<'d>(&mut self, inp: &'lt DedicatedGpioInput<'d>) -> &mut Self {
+    pub fn disable_input<'d>(&mut self, inp: &'lt DedicatedGpioInput<'d>) -> &mut Self {
         #[cfg(all(debug_assertions, multi_core))]
-        {
-            debug_assert_eq!(
-                self.core,
-                Cpu::current(),
-                "Dedicated GPIO used on a different CPU core than it was created on"
-            );
-
-            debug_assert_eq!(
-                inp.core, self.core,
-                "All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself."
-            );
-        }
+        debug_assert_eq!(
+            inp.core, self.core, 
+            "Trying to disable a dedicated GPIO driver configured on a different core from the bundle."
+        );
         self.mask &= !inp.mask;
+        self
+    }
+
+    /// Re-enables a dedicated input driver in this bundle after it was disabled by [`Self::disable_input`].
+    ///
+    /// This is equivalent to [`Self::with_input`].
+    pub fn enable_input<'d>(&mut self, inp: &'lt DedicatedGpioInput<'d>) -> &mut Self {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(
+            inp.core, self.core,
+            "Trying to enable a dedicated GPIO driver configured on a different core from the bundle."
+        );
+        self.mask |= inp.mask;
         self
     }
 
@@ -1595,37 +1611,46 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
         self
     }
 
-    /// Removes a dedicated flex driver from this bundle.
+    /// Disables a dedicated flex driver in this bundle.
     ///
-    /// This updates the internal mask by clearing the channel bit(s) of `flex`.
+    /// This updates the internal mask by clearing the channel bit(s) of `flex`. After disabling,
+    /// future *bundle* operations will no longer touch those channels.
     ///
     /// ## Notes
     ///
     /// - This does **not** affect `flex` itself. It only changes which channels future *bundle*
     ///   operations will touch.
+    /// - This does **not** end the lifetime-based borrow of `flex`. Even after disabling, `flex`
+    ///   still cannot be moved or dropped while this bundle exists.
+    /// - You can re-enable it later via [`Self::enable_flex`] / [`Self::with_flex`].
     #[cfg_attr(
         multi_core,
         doc = r#"
 <section class="warning">
-All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself.
+You should only disable dedicated GPIO drivers that were configured on the same core as the bundle itself.
 </section>
 "#
     )]
-    pub fn remove_flex<'d>(&mut self, flex: &'lt DedicatedGpioFlex<'d>) -> &mut Self {
+    pub fn disable_flex<'d>(&mut self, flex: &'lt DedicatedGpioFlex<'d>) -> &mut Self {
         #[cfg(all(debug_assertions, multi_core))]
-        {
-            debug_assert_eq!(
-                self.core,
-                Cpu::current(),
-                "Dedicated GPIO used on a different CPU core than it was created on"
-            );
-
-            debug_assert_eq!(
-                flex.core, self.core,
-                "All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself."
-            );
-        }
+        debug_assert_eq!(
+            flex.core, self.core,
+            "Trying to disable a dedicated GPIO driver configured on a different core from the bundle."
+        );
         self.mask &= !flex.mask;
+        self
+    }
+
+    /// Re-enables a dedicated flex driver in this bundle after it was disabled by [`Self::disable_flex`].
+    ///
+    /// This is equivalent to [`Self::with_flex`].
+    pub fn enable_flex<'d>(&mut self, flex: &'lt DedicatedGpioFlex<'d>) -> &mut Self {
+        #[cfg(all(debug_assertions, multi_core))]
+        debug_assert_eq!(
+            flex.core, self.core,
+            "Trying to enable a dedicated GPIO driver configured on a different core from the bundle."
+        );
+        self.mask |= flex.mask;
         self
     }
 
