@@ -179,7 +179,7 @@ pub(crate) fn i2c_rtc_enable_block(block: u8) {
 pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
     i2c_rtc_enable_block(block);
 
-    I2C_ANA_MST::regs().config2().modify(|_, w| unsafe {
+    I2C_ANA_MST::regs().config2().write(|w| unsafe {
         w.slave_id().bits(block);
         w.addr().bits(reg_add)
     });
@@ -192,7 +192,7 @@ pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
 pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
     i2c_rtc_enable_block(block);
 
-    I2C_ANA_MST::regs().config2().modify(|_, w| unsafe {
+    I2C_ANA_MST::regs().config2().write(|w| unsafe {
         w.slave_id().bits(block);
         w.addr().bits(reg_add);
         w.wr_cntl().bit(true);
