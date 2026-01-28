@@ -717,10 +717,10 @@ mod tests {
                 DedicatedGpioOutput::new($ctx.dedicated_gpio.$channel.output).with_pin(output);
 
             let mut $out_bundle = DedicatedGpioOutputBundle::new();
-            $out_bundle.with_output(&$out_ded);
+            $out_bundle.enable_output(&$out_ded);
 
             let mut $in_bundle = DedicatedGpioInputBundle::new();
-            $in_bundle.with_input(&$in_ded);
+            $in_bundle.enable_input(&$in_ded);
         };
     }
 

@@ -967,9 +967,9 @@ configured on the same core, and the bundle must only be used on the core that c
 /// // Build a bundle that controls channels 0..=2:
 /// let mut bundle = DedicatedGpioOutputBundle::new();
 /// bundle
-///     .with_output(&out0)
-///     .with_output(&out1)
-///     .with_output(&out2);
+///     .enable_output(&out0)
+///     .enable_output(&out1)
+///     .enable_output(&out2);
 ///
 /// // Set channel 0 and 2 high, keep channel 1 unchanged:
 /// bundle.set_high(0b101);
@@ -997,7 +997,7 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
     /// writing multiple dedicated GPIO channels efficiently.
     ///
     /// The returned bundle initially contains no channels. Add outputs using
-    /// [`Self::with_output`].
+    /// [`Self::enable_output`].
     ///
     /// ## Notes
     ///
@@ -1011,6 +1011,7 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
         }
     }
 
+    #[doc_replace]
     /// Returns the channel mask of this bundle.
     ///
     /// Each bit corresponds to one dedicated GPIO channel:
@@ -1022,18 +1023,36 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
     ///
     /// ## Example
     ///
-    /// If the bundle contains channels 1, 3, and 5 (added via [`Self::with_output`]),
-    /// then the mask is:
+    /// ```rust, no_run
+    /// # {before_snippet}
     ///
-    /// ```text
-    /// 0b0010_1010
+    /// use esp_hal::gpio::{
+    ///     Level,
+    ///     Output,
+    ///     OutputConfig,
+    ///     dedicated::{DedicatedGpio, DedicatedGpioOutput, DedicatedGpioOutputBundle},
+    /// };
+    ///
+    /// let channels = DedicatedGpio::new(peripherals.GPIO_DEDICATED);
+    /// let out0 = DedicatedGpioOutput::new(channels.channel0)
+    ///      .with_pin(Output::new(peripherals.GPIO0, Level::Low, OutputConfig::default()));
+    /// let out2 = DedicatedGpioOutput::new(channels.channel2)
+    ///      .with_pin(Output::new(peripherals.GPIO2, Level::Low, OutputConfig::default()));
+    /// let mut bundle = DedicatedGpioOutputBundle::new();
+    /// bundle.enable_output(&out0).enable_output(&out2);
+    ///
+    /// let mask = bundle.mask(); // bit 0 -> ch0, bit 2 -> ch2, ...
+    /// // For this bundle: mask == 0b0000_0101 (channels 0 and 2).
+    ///
+    /// # {after_snippet}
     /// ```
     #[inline(always)]
     pub fn mask(&self) -> u32 {
         self.mask
     }
 
-    /// Attaches an already-configured dedicated output driver to this bundle.
+    /// Attaches (enables) a dedicated output driver in this bundle. After enabling, you will 
+    /// be able to control the output channels of `out` via this bundle.
     ///
     /// This method logically borrows the provided [`DedicatedGpioOutput`] for the lifetime `'lt`.
     /// Multiple bundles may borrow the same output driver at the same time.
@@ -1047,18 +1066,18 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
 <section class="warning">
 All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself
 </section>
-"#
+        "#
     )]
-    pub fn with_output<'d>(&mut self, out: &'lt DedicatedGpioOutput<'d>) -> &mut Self {
+    pub fn enable_output<'d>(&mut self, out: &'lt DedicatedGpioOutput<'d>) -> &mut Self {
         #[cfg(all(debug_assertions, multi_core))]
         debug_assert_eq!(
             out.core, self.core,
-            "All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself."
+            "Trying to enable a dedicated GPIO driver configured on a different core from the bundle."
         );
         self.mask |= out.mask;
         self
     }
-
+    
     /// Disables a dedicated output driver in this bundle.
     ///
     /// This updates the internal mask by clearing the channel bit(s) of `out`. After disabling,
@@ -1070,7 +1089,7 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
     ///   operations will touch.
     /// - This does **not** end the lifetime-based borrow of `out`. Even after disabling, `out`
     ///   still cannot be moved or dropped while this bundle exists.
-    /// - You can re-enable it later via [`Self::enable_output`] / [`Self::with_output`].
+    /// - You can re-enable it later via [`Self::enable_output`].
     #[cfg_attr(
         multi_core,
         doc = r#"
@@ -1086,20 +1105,6 @@ You should only disable dedicated GPIO drivers that were configured on the same 
             "Trying to disable a dedicated GPIO driver configured on a different core from the bundle."
         );
         self.mask &= !out.mask;
-        self
-    }
-
-    
-    /// Re-enables a dedicated output driver in this bundle after it was disabled by [`Self::disable_output`].
-    ///
-    /// This is equivalent to [`Self::with_output`].
-    pub fn enable_output<'d>(&mut self, out: &'lt DedicatedGpioOutput<'d>) -> &mut Self {
-        #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(
-            out.core, self.core,
-            "Trying to enable a dedicated GPIO driver configured on a different core from the bundle."
-        );
-        self.mask |= out.mask;
         self
     }
 
@@ -1283,7 +1288,7 @@ configured on the same core, and the bundle must only be used on the core that c
 ///
 /// // Build a bundle that reads channels 0 and 1:
 /// let mut bundle = DedicatedGpioInputBundle::new();
-/// bundle.with_input(&in0).with_input(&in1);
+/// bundle.enable_input(&in0).enable_input(&in1);
 ///
 /// // Read both channels at once:
 /// let bits = bundle.levels();
@@ -1306,7 +1311,7 @@ impl<'lt> DedicatedGpioInputBundle<'lt> {
     /// dedicated input channels efficiently.
     ///
     /// The returned bundle initially contains no channels. Add inputs using
-    /// [`Self::with_input`].
+    /// [`Self::enable_input`].
     ///
     /// ## Notes
     ///
@@ -1320,6 +1325,7 @@ impl<'lt> DedicatedGpioInputBundle<'lt> {
         }
     }
 
+    #[doc_replace]
     /// Returns the channel mask of this bundle.
     ///
     /// Each bit corresponds to one dedicated GPIO channel:
@@ -1331,18 +1337,40 @@ impl<'lt> DedicatedGpioInputBundle<'lt> {
     ///
     /// ## Example
     ///
-    /// If the bundle contains channels 1, 3, and 5 (added via [`Self::with_input`]),
-    /// then the mask is:
+    /// ```rust, no_run
+    /// # {before_snippet}
     ///
-    /// ```text
-    /// 0b0010_1010
+    /// use esp_hal::gpio::{
+    ///     Input,
+    ///     InputConfig,
+    ///     dedicated::{DedicatedGpio, DedicatedGpioInput, DedicatedGpioInputBundle},
+    /// };
+    ///
+    /// let channels = DedicatedGpio::new(peripherals.GPIO_DEDICATED);
+    /// let in0 = DedicatedGpioInput::new(
+    ///     channels.channel0,
+    ///     Input::new(peripherals.GPIO0, InputConfig::default()),
+    /// );
+    /// let in2 = DedicatedGpioInput::new(
+    ///     channels.channel2,
+    ///     Input::new(peripherals.GPIO2, InputConfig::default()),
+    /// );
+    ///
+    /// let mut bundle = DedicatedGpioInputBundle::new();
+    /// bundle.enable_input(&in0).enable_input(&in2);
+    ///
+    /// let mask = bundle.mask(); // bit 0 -> ch0, bit 2 -> ch2, ...
+    /// // For this bundle: mask == 0b0000_0101 (channels 0 and 2).
+    ///
+    /// # {after_snippet}
     /// ```
     #[inline(always)]
     pub fn mask(&self) -> u32 {
         self.mask
     }
 
-    /// Attaches an already-configured dedicated input driver to this bundle.
+    /// Attaches (enables) an already-configured dedicated input driver to this bundle. After enabling, you
+    /// will be able to read the input channels of `inp` via this bundle.
     ///
     /// This method logically borrows the provided [`DedicatedGpioInput`] for the lifetime `'lt`.
     /// Multiple bundles may borrow the same input driver at the same time.
@@ -1358,16 +1386,16 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
 </section>
 "#
     )]
-    pub fn with_input<'d>(&mut self, inp: &'lt DedicatedGpioInput<'d>) -> &mut Self {
+    pub fn enable_input<'d>(&mut self, inp: &'lt DedicatedGpioInput<'d>) -> &mut Self {
         #[cfg(all(debug_assertions, multi_core))]
         debug_assert_eq!(
             inp.core, self.core,
-            "All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself."
+            "Trying to enable a dedicated GPIO driver configured on a different core from the bundle."
         );
         self.mask |= inp.mask;
         self
     }
-
+    
     /// Disables a dedicated input driver in this bundle.
     ///
     /// This updates the internal mask by clearing the channel bit(s) of `inp`. After disabling,
@@ -1379,7 +1407,7 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
     ///   operations will touch.
     /// - This does **not** end the lifetime-based borrow of `inp`. Even after disabling, `inp`
     ///   still cannot be moved or dropped while this bundle exists.
-    /// - You can re-enable it later via [`Self::enable_input`] / [`Self::with_input`].
+    /// - You can re-enable it later via [`Self::enable_input`].
     #[cfg_attr(
         multi_core,
         doc = r#"
@@ -1395,19 +1423,6 @@ You should only disable dedicated GPIO drivers that were configured on the same 
             "Trying to disable a dedicated GPIO driver configured on a different core from the bundle."
         );
         self.mask &= !inp.mask;
-        self
-    }
-
-    /// Re-enables a dedicated input driver in this bundle after it was disabled by [`Self::disable_input`].
-    ///
-    /// This is equivalent to [`Self::with_input`].
-    pub fn enable_input<'d>(&mut self, inp: &'lt DedicatedGpioInput<'d>) -> &mut Self {
-        #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(
-            inp.core, self.core,
-            "Trying to enable a dedicated GPIO driver configured on a different core from the bundle."
-        );
-        self.mask |= inp.mask;
         self
     }
 
@@ -1521,7 +1536,7 @@ running on core 1.
 ///
 /// // Build a bundle that controls channels 0 and 1:
 /// let mut bundle = DedicatedGpioFlexBundle::new();
-/// bundle.with_flex(&f0).with_flex(&f1);
+/// bundle.enable_flex(&f0).enable_flex(&f1);
 ///
 /// // Set channel 0 high:
 /// bundle.set_high(0b0000_0001);
@@ -1534,6 +1549,7 @@ running on core 1.
 /// #
 /// # {after_snippet}
 /// ```
+/// ...
 pub struct DedicatedGpioFlexBundle<'lt> {
     _marker: PhantomData<&'lt ()>,
     mask: u32,
@@ -1549,7 +1565,7 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
     /// writing multiple dedicated GPIO channels efficiently.
     ///
     /// The returned bundle initially contains no channels. Add flex drivers using
-    /// [`Self::with_flex`].
+    /// [`Self::enable_flex`].
     ///
     /// ## Notes
     ///
@@ -1574,41 +1590,30 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
     ///
     /// ## Example
     ///
-    /// If the bundle contains channels 1, 3, and 5 (added via [`Self::with_flex`]),
-    /// then the mask is:
+    /// ```rust, no_run
+    /// # {before_snippet}
     ///
-    /// ```text
-    /// 0b0010_1010
+    /// use esp_hal::gpio::{
+    ///     Flex,
+    ///     dedicated::{DedicatedGpio, DedicatedGpioFlex, DedicatedGpioFlexBundle},
+    /// };
+    ///
+    /// let channels = DedicatedGpio::new(peripherals.GPIO_DEDICATED);
+    /// let f0 = DedicatedGpioFlex::new(channels.channel0, Flex::new(peripherals.GPIO0));
+    /// let f2 = DedicatedGpioFlex::new(channels.channel2, Flex::new(peripherals.GPIO2));
+    ///
+    /// let mut bundle = DedicatedGpioFlexBundle::new();
+    /// bundle.enable_flex(&f0).enable_flex(&f2);
+    ///
+    /// let mask = bundle.mask(); // bit 0 -> ch0, bit 2 -> ch2, ...
+    /// // For this bundle: mask == 0b0000_0101 (channels 0 and 2).
+    ///
+    /// # {after_snippet}
     /// ```
+
     #[inline(always)]
     pub fn mask(&self) -> u32 {
         self.mask
-    }
-
-    /// Attaches an already-configured dedicated flex driver to this bundle.
-    ///
-    /// This method logically borrows the provided [`DedicatedGpioFlex`] for the lifetime `'lt`.
-    /// Multiple bundles may borrow the same flex driver at the same time.
-    ///
-    /// ## Notes
-    ///
-    /// - This function does not change any input/output state.
-    #[cfg_attr(
-        multi_core,
-        doc = r#"
-<section class="warning">
-All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself.
-</section>
-"#
-    )]
-    pub fn with_flex<'d>(&mut self, flex: &'lt DedicatedGpioFlex<'d>) -> &mut Self {
-        #[cfg(all(debug_assertions, multi_core))]
-        debug_assert_eq!(
-            flex.core, self.core,
-            "All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself."
-        );
-        self.mask |= flex.mask;
-        self
     }
 
     /// Disables a dedicated flex driver in this bundle.
@@ -1622,7 +1627,7 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
     ///   operations will touch.
     /// - This does **not** end the lifetime-based borrow of `flex`. Even after disabling, `flex`
     ///   still cannot be moved or dropped while this bundle exists.
-    /// - You can re-enable it later via [`Self::enable_flex`] / [`Self::with_flex`].
+    /// - You can re-enable it later via [`Self::enable_flex`].
     #[cfg_attr(
         multi_core,
         doc = r#"
@@ -1641,9 +1646,23 @@ You should only disable dedicated GPIO drivers that were configured on the same 
         self
     }
 
-    /// Re-enables a dedicated flex driver in this bundle after it was disabled by [`Self::disable_flex`].
+    /// Attaches (enables) an already-configured dedicated flex driver to this bundle. After enabling, you
+    /// will be able to control the input/output channels of `flex` via this bundle.
     ///
-    /// This is equivalent to [`Self::with_flex`].
+    /// This method logically borrows the provided [`DedicatedGpioFlex`] for the lifetime `'lt`.
+    /// Multiple bundles may borrow the same flex driver at the same time.
+    ///
+    /// ## Notes
+    ///
+    /// - This function does not change any input/output state.
+    #[cfg_attr(
+        multi_core,
+        doc = r#"
+<section class="warning">
+All dedicated GPIO drivers in a bundle must be configured on the same core as the bundle itself.
+</section>
+"#
+    )]
     pub fn enable_flex<'d>(&mut self, flex: &'lt DedicatedGpioFlex<'d>) -> &mut Self {
         #[cfg(all(debug_assertions, multi_core))]
         debug_assert_eq!(
