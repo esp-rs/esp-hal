@@ -91,9 +91,13 @@ where
             break Ok(String::from_utf8_lossy(&output.stdout).to_string());
         } else {
             let err_out = String::from_utf8_lossy(&output.stderr).to_string();
-            eprintln!("{}", err_out);
+            if !capture {
+                eprintln!("{}", err_out);
+            }
             if err_out.contains("SIGSEGV") {
-                eprintln!("Retry build ({retries})");
+                if !capture {
+                    eprintln!("Retry build ({retries})");
+                }
                 retries -= 1;
                 if retries > 0 {
                     continue;
