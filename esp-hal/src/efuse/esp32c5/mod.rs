@@ -20,8 +20,8 @@ impl super::Efuse {
     ///
     /// see <https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/efuse_hal.c#L27-L30>
     pub fn block_version() -> (u8, u8) {
-        // see <https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/esp32c5/include/hal/efuse_ll.h#L65-L73>
-        // <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c5/esp_efuse_table.csv#L156>
+        // see <https://github.com/espressif/esp-idf/blob/caf1a18/components/hal/esp32c5/include/hal/efuse_ll.h#L77-L85>
+        // <https://github.com/espressif/esp-idf/blob/caf1a18/components/efuse/esp32c5/esp_efuse_table.csv#L156>
         (
             Self::read_field_le::<u8>(BLK_VERSION_MAJOR),
             Self::read_field_le::<u8>(BLK_VERSION_MINOR),
@@ -30,7 +30,7 @@ impl super::Efuse {
 
     /// Get version of RTC calibration block
     ///
-    /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c5/esp_efuse_rtc_calib.c#L20>
+    /// see <https://github.com/espressif/esp-idf/blob/caf1a18/components/efuse/esp32c5/esp_efuse_rtc_calib.c#L20>
     pub fn rtc_calib_version() -> u8 {
         let (_major, minor) = Self::block_version();
         if minor >= 1 { 1 } else { 0 }
