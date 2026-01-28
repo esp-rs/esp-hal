@@ -78,7 +78,7 @@ where
     }
 
     // retrying - remove once we don't need this anymore
-    let mut retries = 3;
+    let mut retries = 50;
     loop {
         let output = command
             .stdin(Stdio::inherit())
