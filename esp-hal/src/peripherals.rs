@@ -60,27 +60,27 @@ macro_rules! create_peripheral {
                 unsafe { self.clone_unchecked() }
             }
 
-            // $(
-            //     /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
-            //     #[instability::unstable]
-            //     pub fn $bind(&self, handler: $crate::interrupt::IsrCallback) {
-            //         unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$interrupt, handler); }
-            //     }
+            $(
+                /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
+                #[instability::unstable]
+                pub fn $bind(&self, handler: $crate::interrupt::IsrCallback) {
+                    unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$interrupt, handler); }
+                }
 
-            //     /// Disables the interrupt handler
-            //     #[instability::unstable]
-            //     pub fn $disable(&self) {
-            //         for core in $crate::system::Cpu::other() {
-            //             $crate::interrupt::disable(core, $crate::peripherals::Interrupt::$interrupt);
-            //         }
-            //     }
+                /// Disables the interrupt handler
+                #[instability::unstable]
+                pub fn $disable(&self) {
+                    for core in $crate::system::Cpu::other() {
+                        $crate::interrupt::disable(core, $crate::peripherals::Interrupt::$interrupt);
+                    }
+                }
 
-            //     /// Enables the interrupt handler on the given core
-            //     #[instability::unstable]
-            //     pub fn $enable(&self, priority: $crate::interrupt::Priority) {
-            //         unwrap!($crate::interrupt::enable($crate::peripherals::Interrupt::$interrupt, priority));
-            //     }
-            // )*
+                /// Enables the interrupt handler on the given core
+                #[instability::unstable]
+                pub fn $enable(&self, priority: $crate::interrupt::Priority) {
+                    unwrap!($crate::interrupt::enable($crate::peripherals::Interrupt::$interrupt, priority));
+                }
+            )*
         }
 
         impl $crate::private::Sealed for $name<'_> {}

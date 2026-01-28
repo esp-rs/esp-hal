@@ -120,11 +120,11 @@ use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 #[cfg(not(esp32c5))]
 use crate::{
     clock::RtcClock,
-    interrupt::{self, InterruptHandler},
     peripherals::{Interrupt, LPWR},
     system::{Cpu, SleepSource},
     time::Duration,
 };
+#[cfg(esp32c5)]
 use crate::{
     peripherals::LPWR,
     system::{Cpu, SleepSource},

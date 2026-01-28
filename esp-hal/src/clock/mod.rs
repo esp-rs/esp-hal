@@ -72,16 +72,16 @@ use crate::{
     ESP_HAL_LOCK,
     peripherals::TIMG0,
     private::Sealed,
-    soc::clocks::ClockTree,
+    soc::clocks::{self, ClockTree, Timg0CalibrationClockConfig},
+    time::Rate,
 };
+
+#[cfg(esp32c5)]
 use crate::{
     ESP_HAL_LOCK,
     soc::clocks::self,
     time::Rate,
 };
-
-#[cfg(not(esp32c5))]
-use crate::soc::clocks::Timg0CalibrationClockConfig;
 
 #[cfg_attr(esp32, path = "clocks_ll/esp32.rs")]
 #[cfg_attr(esp32c2, path = "clocks_ll/esp32c2.rs")]
