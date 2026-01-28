@@ -17,7 +17,7 @@ use core::{
 };
 
 use docsplay::Display;
-use esp_hal::asynch::AtomicWaker;
+use esp_hal::{asynch::AtomicWaker, time::Duration};
 use esp_sync::NonReentrantMutex;
 use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
@@ -515,8 +515,13 @@ impl EspNowManager<'_> {
     /// Window is milliseconds the chip keep waked each interval, from 0 to
     /// 65535.
     #[instability::unstable]
-    pub fn set_wake_window(&self, wake_window: u16) -> Result<(), EspNowError> {
-        check_error!({ esp_now_set_wake_window(wake_window) })
+    pub fn set_wake_window(&self, wake_window: Duration) -> Result<(), EspNowError> {
+        let ms = wake_window.as_millis();
+
+        if ms > u16::MAX as u64 {
+            return Err(EspNowError::Error(Error::InvalidArgument));
+        }
+        check_error!({ esp_now_set_wake_window(ms as u16) })
     }
 
     /// Configure ESP-NOW rate.
@@ -784,7 +789,7 @@ impl<'d> EspNow<'d> {
     /// Window is milliseconds the chip keep waked each interval, from 0 to
     /// 65535.
     #[instability::unstable]
-    pub fn set_wake_window(&self, wake_window: u16) -> Result<(), EspNowError> {
+    pub fn set_wake_window(&self, wake_window: Duration) -> Result<(), EspNowError> {
         self.manager.set_wake_window(wake_window)
     }
 

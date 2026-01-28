@@ -9,7 +9,7 @@ use docsplay::Display;
 use enumset::{EnumSet, EnumSetType};
 use esp_config::esp_config_int;
 #[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
-use esp_hal::time::Duration;
+use esp_hal::time::{Duration, Instant};
 use esp_hal::{asynch::AtomicWaker, system::Cpu};
 use esp_sync::NonReentrantMutex;
 use num_derive::FromPrimitive;
@@ -1149,7 +1149,7 @@ pub struct RxControlInfo {
     pub secondary_channel: SecondaryChannel,
     /// Timestamp of when the packet is received, in microseconds. Precise only
     /// if modem sleep or light sleep is not enabled.
-    pub timestamp: Duration,
+    pub timestamp: Instant,
     /// Noise floor of the Radio Frequency module, in dBm.
     pub noise_floor: i32,
     /// Antenna number from which the packet is received: 0 for antenna 0, 1 for
@@ -1211,7 +1211,7 @@ pub struct RxControlInfo {
     pub rxmatch0: u32,
     /// The local time when this packet is received. It is precise only if modem sleep or light
     /// sleep is not enabled. unit: microsecond.
-    pub timestamp: Duration,
+    pub timestamp: Instant,
 }
 
 #[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
@@ -1239,7 +1239,7 @@ impl RxControlInfo {
                 ampdu_cnt: (*rx_cntl).ampdu_cnt(),
                 channel: (*rx_cntl).channel(),
                 secondary_channel: SecondaryChannel::from_raw((*rx_cntl).secondary_channel()),
-                timestamp: Duration::from_micros((*rx_cntl).timestamp().into()),
+                timestamp: Instant::EPOCH + Duration::from_micros((*rx_cntl).timestamp() as u64),
                 noise_floor: (*rx_cntl).noise_floor(),
                 ant: (*rx_cntl).ant(),
                 sig_len: (*rx_cntl).sig_len(),
@@ -1268,7 +1268,7 @@ impl RxControlInfo {
                 rxmatch2: (*rx_cntl).rxmatch2(),
                 rxmatch1: (*rx_cntl).rxmatch1(),
                 rxmatch0: (*rx_cntl).rxmatch0(),
-                timestamp: Duration::from_micros((*rx_cntl).timestamp().into()),
+                timestamp: Instant::EPOCH + Duration::from_micros((*rx_cntl).timestamp() as u64),
             }
         };
         rx_control_info

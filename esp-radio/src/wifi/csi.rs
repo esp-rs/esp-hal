@@ -3,6 +3,8 @@
 use alloc::boxed::Box;
 use core::marker::PhantomData;
 
+use esp_hal::time::{Duration, Instant};
+
 use super::{WifiError, c_types::c_void, esp_wifi_result};
 #[cfg(esp32c6)]
 use crate::sys::include::wifi_csi_acquire_config_t;
@@ -134,8 +136,10 @@ impl<'a> WifiCsiInfo<'_> {
 
     /// The local time in microseconds when this packet is received. It is precise only if modem
     /// sleep or light sleep is not enabled.
-    pub fn timestamp(&self) -> u32 {
-        unsafe { (*self.inner).rx_ctrl.timestamp() as u32 }
+    pub fn timestamp(&self) -> Instant {
+        let raw_ticks = unsafe { (*self.inner).rx_ctrl.timestamp() as u64 };
+
+        Instant::EPOCH + Duration::from_micros(raw_ticks)
     }
 
     /// Antenna number from which this packet is received.
