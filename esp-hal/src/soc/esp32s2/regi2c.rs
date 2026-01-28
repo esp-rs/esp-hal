@@ -167,29 +167,22 @@ pub(crate) fn i2c_rtc_enable_block(block: u8) {
         .wifi_clk_en()
         .modify(|_, w| w.mac_clk_en().set_bit());
 
-    match block {
-        v if v == REGI2C_APLL.master => I2C_ANA_MST::regs()
-            .config1()
-            .modify(|_, w| w.apll().clear_bit()),
-        v if v == REGI2C_BBPLL.master => I2C_ANA_MST::regs()
-            .config1()
-            .modify(|_, w| w.bbpll().clear_bit()),
-        v if v == REGI2C_SAR.master => I2C_ANA_MST::regs()
-            .config1()
-            .modify(|_, w| w.sar().clear_bit()),
-        v if v == REGI2C_BOD.master => I2C_ANA_MST::regs()
-            .config1()
-            .modify(|_, w| w.bod().clear_bit()),
+    I2C_ANA_MST::regs().config1().modify(|_, w| match block {
+        v if v == REGI2C_APLL.master => w.apll().clear_bit(),
+        v if v == REGI2C_BBPLL.master => w.bbpll().clear_bit(),
+        v if v == REGI2C_SAR.master => w.sar().clear_bit(),
+        v if v == REGI2C_BOD.master => w.bod().clear_bit(),
         _ => unreachable!(),
-    };
+    });
 }
 
 pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
     i2c_rtc_enable_block(block);
 
-    I2C_ANA_MST::regs()
-        .config2()
-        .modify(|_, w| unsafe { w.slave_id().bits(block).addr().bits(reg_add) });
+    I2C_ANA_MST::regs().config2().modify(|_, w| unsafe {
+        w.slave_id().bits(block);
+        w.addr().bits(reg_add)
+    });
 
     while I2C_ANA_MST::regs().config2().read().busy().bit_is_set() {}
 
@@ -200,14 +193,10 @@ pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
     i2c_rtc_enable_block(block);
 
     I2C_ANA_MST::regs().config2().modify(|_, w| unsafe {
-        w.slave_id()
-            .bits(block)
-            .addr()
-            .bits(reg_add)
-            .wr_cntl()
-            .bit(true)
-            .data()
-            .bits(data)
+        w.slave_id().bits(block);
+        w.addr().bits(reg_add);
+        w.wr_cntl().bit(true);
+        w.data().bits(data)
     });
 
     while I2C_ANA_MST::regs().config2().read().busy().bit_is_set() {}
