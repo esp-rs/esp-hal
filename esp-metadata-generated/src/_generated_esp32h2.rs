@@ -48,12 +48,6 @@ macro_rules! property {
     ("soc.rc_fast_clk_default", str) => {
         stringify!(8500000)
     };
-    ("soc.rc_slow_clock") => {
-        136000
-    };
-    ("soc.rc_slow_clock", str) => {
-        stringify!(136000)
-    };
     ("aes.dma") => {
         true
     };

@@ -42,23 +42,11 @@ macro_rules! property {
     ("soc.cpu_has_prv_mode") => {
         false
     };
-    ("soc.ref_tick_hz") => {
-        1000000
-    };
-    ("soc.ref_tick_hz", str) => {
-        stringify!(1000000)
-    };
     ("soc.rc_fast_clk_default") => {
         8500000
     };
     ("soc.rc_fast_clk_default", str) => {
         stringify!(8500000)
-    };
-    ("soc.rc_slow_clock") => {
-        90000
-    };
-    ("soc.rc_slow_clock", str) => {
-        stringify!(90000)
     };
     ("aes.dma") => {
         true

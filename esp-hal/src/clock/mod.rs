@@ -67,7 +67,7 @@ use crate::peripherals::IEEE802154;
 use crate::peripherals::WIFI;
 use crate::{
     ESP_HAL_LOCK,
-    peripherals::{LPWR, TIMG0},
+    peripherals::TIMG0,
     private::Sealed,
     soc::clocks::{self, ClockTree, Timg0CalibrationClockConfig},
     time::Rate,
@@ -81,23 +81,6 @@ use crate::{
 #[cfg_attr(esp32s2, path = "clocks_ll/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "clocks_ll/esp32s3.rs")]
 pub(crate) mod clocks_ll;
-
-/// Clock properties
-#[doc(hidden)]
-pub trait Clock {
-    /// Frequency of the clock in [Rate].
-    fn frequency(&self) -> Rate;
-
-    /// Frequency of the clock in Megahertz
-    fn mhz(&self) -> u32 {
-        self.frequency().as_mhz()
-    }
-
-    /// Frequency of the clock in Hertz
-    fn hz(&self) -> u32 {
-        self.frequency().as_hz()
-    }
-}
 
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
@@ -134,82 +117,6 @@ impl CpuClock {
     }
 }
 
-/// RTC FAST_CLK frequency values
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[instability::unstable]
-pub enum RtcFastClock {
-    /// Main XTAL, divided by 4
-    #[cfg(not(any(esp32c6, esp32h2)))]
-    XtalD4,
-
-    /// Select XTAL_D2_CLK as RTC_FAST_CLK source
-    #[cfg(any(esp32c6, esp32h2))]
-    XtalD2,
-
-    /// Internal fast RC oscillator
-    RcFast,
-}
-
-impl Clock for RtcFastClock {
-    fn frequency(&self) -> Rate {
-        match self {
-            #[cfg(not(any(esp32c6, esp32h2)))]
-            RtcFastClock::XtalD4 => Clocks::get().xtal_clock / 4,
-            #[cfg(any(esp32c6, esp32h2))]
-            RtcFastClock::XtalD2 => Clocks::get().xtal_clock / 2,
-
-            RtcFastClock::RcFast => Rate::from_hz(property!("soc.rc_fast_clk_default")),
-        }
-    }
-}
-
-/// RTC SLOW_CLK frequency values
-#[cfg(not(any(esp32c6, esp32h2)))]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-#[instability::unstable]
-pub enum RtcSlowClock {
-    /// Internal slow RC oscillator
-    RcSlow   = 0,
-    /// External 32 KHz XTAL
-    _32kXtal = 1,
-    /// Internal fast RC oscillator, divided by 256
-    _8mD256  = 2,
-}
-
-/// RTC SLOW_CLK frequency values
-#[cfg(any(esp32c6, esp32h2))]
-#[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
-#[instability::unstable]
-pub enum RtcSlowClock {
-    /// Select RC_SLOW_CLK as RTC_SLOW_CLK source
-    RcSlow   = 0,
-    /// Select XTAL32K_CLK as RTC_SLOW_CLK source
-    _32kXtal = 1,
-    /// Select RC32K_CLK as RTC_SLOW_CLK source
-    _32kRc   = 2,
-    /// Select OSC_SLOW_CLK (external slow clock) as RTC_SLOW_CLK source
-    OscSlow  = 3,
-}
-
-impl Clock for RtcSlowClock {
-    fn frequency(&self) -> Rate {
-        match self {
-            RtcSlowClock::RcSlow => Rate::from_hz(property!("soc.rc_slow_clock")),
-            RtcSlowClock::_32kXtal => Rate::from_hz(32_768),
-            #[cfg(any(esp32c6, esp32h2))]
-            RtcSlowClock::_32kRc => Rate::from_hz(32_768),
-            #[cfg(not(any(esp32c6, esp32h2)))]
-            RtcSlowClock::_8mD256 => RtcFastClock::RcFast.frequency() / 256,
-            #[cfg(any(esp32c6, esp32h2))]
-            RtcSlowClock::OscSlow => Rate::from_hz(32_768),
-        }
-    }
-}
-
 /// RTC Clocks.
 #[instability::unstable]
 pub struct RtcClock;
@@ -219,26 +126,15 @@ impl RtcClock {
     const CAL_FRACT: u32 = 19;
 
     /// Get the RTC_SLOW_CLK source.
-    #[cfg(not(any(esp32c6, esp32h2)))]
-    pub fn slow_freq() -> RtcSlowClock {
-        match LPWR::regs().clk_conf().read().ana_clk_rtc_sel().bits() {
-            0 => RtcSlowClock::RcSlow,
-            1 => RtcSlowClock::_32kXtal,
-            2 => RtcSlowClock::_8mD256,
-            _ => unreachable!(),
+    pub fn slow_freq() -> Rate {
+        cfg_if::cfg_if! {
+            if #[cfg(soc_has_clock_node_rtc_slow_clk)] {
+                let getter = clocks::rtc_slow_clk_frequency;
+            } else {
+                let getter = clocks::lp_slow_clk_frequency;
+            }
         }
-    }
-
-    /// Get the RTC_SLOW_CLK source
-    #[cfg(any(esp32h2, esp32c6))]
-    pub fn slow_freq() -> RtcSlowClock {
-        match LPWR::regs().lp_clk_conf().read().slow_clk_sel().bits() {
-            0 => RtcSlowClock::RcSlow,
-            1 => RtcSlowClock::_32kXtal,
-            2 => RtcSlowClock::_32kRc,
-            3 => RtcSlowClock::OscSlow,
-            _ => unreachable!(),
-        }
+        Rate::from_hz(ClockTree::with(getter))
     }
 
     /// Measure the frequency of one of the TIMG0 calibration clocks,
@@ -298,48 +194,6 @@ impl RtcClock {
         let period = (100_000_000 * period_13q19 as u64) / (1 << RtcClock::CAL_FRACT);
 
         (100_000_000 * 1000 / period) as u16
-    }
-
-    /// Return estimated XTAL frequency in MHz.
-    pub(crate) fn estimate_xtal_frequency() -> u32 {
-        const SLOW_CLOCK_CYCLES: u32 = 100;
-
-        let calibration_clock = RtcSlowClock::RcSlow;
-
-        // Make sure the process doesn't time out due to some spooky configuration.
-        #[cfg(not(esp32))]
-        TIMG0::regs().rtccalicfg2().reset();
-
-        TIMG0::regs()
-            .rtccalicfg()
-            .modify(|_, w| w.rtc_cali_start().clear_bit());
-
-        TIMG0::regs().rtccalicfg().write(|w| unsafe {
-            w.rtc_cali_clk_sel().bits(calibration_clock as u8);
-            w.rtc_cali_max().bits(SLOW_CLOCK_CYCLES as u16);
-            w.rtc_cali_start_cycling().clear_bit();
-            w.rtc_cali_start().set_bit()
-        });
-
-        // Delay, otherwise the CPU may read back the previous state of the completion flag and skip
-        // waiting.
-        ets_delay_us(SLOW_CLOCK_CYCLES * 1_000_000 / calibration_clock.frequency().as_hz());
-
-        // Wait for the calibration to finish
-        while TIMG0::regs()
-            .rtccalicfg()
-            .read()
-            .rtc_cali_rdy()
-            .bit_is_clear()
-        {}
-
-        let cali_value = TIMG0::regs().rtccalicfg1().read().rtc_cali_value().bits();
-
-        TIMG0::regs()
-            .rtccalicfg()
-            .modify(|_, w| w.rtc_cali_start().clear_bit());
-
-        (cali_value * (calibration_clock.frequency().as_hz() / SLOW_CLOCK_CYCLES)) / 1_000_000
     }
 }
 
