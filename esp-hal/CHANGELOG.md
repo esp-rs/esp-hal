@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unstable detailed clock configuration options (#4660, #4674)
 - `RsaContext`, `AesContext` now derive `Clone`. (#4709)
 - `Sha<X>Context` now derive `Clone`, except on ESP32. (#4709)
-- Dedicated GPIO implementation (#4699)
+- Dedicated GPIO implementation (#4699, #4819)
 - `esp_hal::interrupt::wait_for_interrupt`, which enters `wfi` (RISC-V) or `waiti 0` (Xtensa) when it would not prevent a debugger from reading memory (#4782)
 
 ### Changed
