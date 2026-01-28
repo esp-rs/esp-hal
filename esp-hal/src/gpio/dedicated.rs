@@ -1667,7 +1667,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     /// <section class="warning">
     ///
     /// The caller must ensure that `bits` only contains channels included in this bundle,
-    /// i.e. `bits & !self.mask == 0`.
+    /// i.e. `bits & !self.mask() == 0`.
     ///
     /// For example, if the bundle mask is `0b0000_0011` (channels 0 and 1), then `bits` must not
     /// set bit 2 (e.g. `0b0000_0100`), or you would modify channel 2 outside the bundle.
@@ -1703,7 +1703,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     /// <section class="warning">
     ///
     /// The caller must ensure that `bits` only contains channels included in this bundle,
-    /// i.e. `bits & !self.mask == 0`.
+    /// i.e. `bits & !self.mask() == 0`.
     ///
     /// For example, if the bundle mask is `0b0000_0011` (channels 0 and 1), then `bits` must not
     /// set bit 7 (e.g. `0b1000_0000`), or you would modify channel 7 outside the bundle.
