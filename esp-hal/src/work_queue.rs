@@ -704,7 +704,6 @@ pub(crate) struct WorkQueueFrontend<T: Sync + Send> {
     work_item: WorkItem<T>,
 }
 
-// #[cfg(not(esp32c5))]
 impl<T: Sync + Send> WorkQueueFrontend<T> {
     pub fn new(initial: T) -> Self {
         Self {
