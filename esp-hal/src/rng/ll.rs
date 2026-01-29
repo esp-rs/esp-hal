@@ -33,11 +33,11 @@ fn current_cpu_cycles() -> usize {
 
             read_csr_fn!(read_pccr_machine, "0x7e2");
             read_csr_fn!(read_pccr_user, "0x802");
-            read_csr_fn!(read_prv_m, property!("soc.cpu_csr_prv_mode", str));
 
             fn read_prv_mode() -> usize {
                 #[cfg(soc_cpu_csr_prv_mode_is_set)]
                 if tee_enabled() {
+                    read_csr_fn!(read_prv_m, property!("soc.cpu_csr_prv_mode", str));
                     return read_prv_m();
                 }
 
