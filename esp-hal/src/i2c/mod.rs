@@ -8,6 +8,7 @@
 //! For more information, see
 #![doc = crate::trm_markdown_link!("i2c")]
 
+#[cfg(i2c_master)]
 pub mod master;
 
 #[cfg(soc_has_lp_i2c0)]
