@@ -6,11 +6,6 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
-bleps = { git = "https://github.com/bjoernQ/bleps", package = "bleps", rev = "a5148d8", features = [
-    "async",
-    "macros",
-] }
-blocking-network-stack = { git = "https://github.com/bjoernQ/blocking-network-stack.git", rev = "b3ecefc", optional = true }
 cfg-if = "1"
 embassy-executor = "0.9.0"
 embassy-time = "0.5.0"
@@ -19,7 +14,8 @@ embassy-net = { version = "0.7.0", features = [ "tcp", "udp", "dhcpv4", "medium-
 embassy-sync = "0.7"
 embedded-graphics = "0.8.1"
 embedded-hal-async = "1.0.0"
-embedded-io = { version = "0.6.1", default-features = false }
+#embedded-io = { version = "0.6.1", default-features = false }
+embedded-io-async = "0.6.1"
 esp-alloc = { path = "../esp-alloc" }
 esp-backtrace = { path = "../esp-backtrace", features = [
     "panic-handler",
@@ -34,7 +30,6 @@ esp-rtos = { path = "../esp-rtos", optional = true, features = [
 esp-println = { path = "../esp-println", features = ["log-04"] }
 esp-radio = { path = "../esp-radio", features = [
     "log-04",
-    "smoltcp",
     "unstable",
     "wifi",
 ], optional = true }
@@ -42,10 +37,6 @@ esp-storage = { path = "../esp-storage", optional = true }
 embedded-storage = "0.3.1"
 lis3dh-async = "0.9.3"
 ssd1306 = "0.10.0"
-smoltcp = { version = "0.12.0", default-features = false, features = [
-    "medium-ethernet",
-    "socket-raw",
-], optional = true }
 static_cell = "2.1.1"
 rtos-trace = { version = "0.2.0", optional = true }
 
@@ -53,9 +44,7 @@ rtos-trace = { version = "0.2.0", optional = true }
 unstable = []
 
 esp-radio = [
-    "dep:blocking-network-stack",
     "dep:esp-radio",
-    "dep:smoltcp",
     "esp-rtos/esp-radio",
 ]
 

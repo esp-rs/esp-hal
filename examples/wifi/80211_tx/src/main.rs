@@ -13,7 +13,6 @@ use esp_hal::{
     clock::CpuClock,
     delay::Delay,
     interrupt::software::SoftwareInterruptControl,
-    main,
     ram,
     time::Duration,
     timer::timg::TimerGroup,
@@ -35,8 +34,8 @@ const SSID: &str = "esp-radio 802.11 injection";
 /// This is an arbitrary MAC address, used for the fake beacon frames.
 const MAC_ADDRESS: [u8; 6] = [0x00, 0x80, 0x41, 0x13, 0x37, 0x42];
 
-#[main]
-fn main() -> ! {
+#[esp_rtos::main]
+async fn main(_spawner: embassy_executor::Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
@@ -55,7 +54,7 @@ fn main() -> ! {
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
     controller.set_mode(wifi::WifiMode::Station).unwrap();
-    controller.start().unwrap();
+    controller.start_async().await.unwrap();
 
     let mut sniffer = interfaces.sniffer;
 
