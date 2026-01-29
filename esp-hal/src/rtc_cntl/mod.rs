@@ -111,20 +111,15 @@
 //! ```
 
 pub use self::rtc::SocResetReason;
-#[cfg(not(any(esp32, esp32c5)))]
-use crate::efuse::Efuse;
-#[cfg(not(esp32c5))]
-use crate::interrupt::{self, InterruptHandler};
 #[cfg(sleep)]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 #[cfg(not(esp32c5))]
 use crate::{
     clock::RtcClock,
-    peripherals::{Interrupt, LPWR},
-    system::{Cpu, SleepSource},
+    interrupt::{self, InterruptHandler},
+    peripherals::Interrupt,
     time::Duration,
 };
-#[cfg(esp32c5)]
 use crate::{
     peripherals::LPWR,
     system::{Cpu, SleepSource},
@@ -626,7 +621,7 @@ impl Rwdt {
         };
 
         #[cfg(not(esp32))]
-        let timeout_raw = timeout_raw >> (1 + Efuse::rwdt_multiplier());
+        let timeout_raw = timeout_raw >> (1 + crate::efuse::Efuse::rwdt_multiplier());
 
         config_reg.modify(|_, w| unsafe { w.hold().bits(timeout_raw) });
 
