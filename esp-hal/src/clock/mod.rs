@@ -25,7 +25,7 @@
 #![cfg_attr(esp32h2, doc = "* 96MHz")]
 #![cfg_attr(esp32c2, doc = "* 120MHz")]
 #![cfg_attr(not(any(esp32c2, esp32h2)), doc = "* 160MHz")]
-#![cfg_attr(xtensa, doc = "* 240MHz")]
+#![cfg_attr(any(esp32c5, xtensa), doc = "* 240MHz")]
 //! ### Frozen Clock Frequencies
 //!
 //! Once the clock configuration is applied, the clock frequencies become
@@ -45,6 +45,7 @@
 //! ```
 #![cfg_attr(not(feature = "rt"), expect(unused))]
 
+#[cfg(not(esp32c5))]
 use core::{cell::Cell, marker::PhantomData};
 
 #[cfg(soc_has_clock_node_lp_slow_clk)]
@@ -53,6 +54,7 @@ use clocks::LpSlowClkConfig;
 use clocks::RtcSlowClkConfig;
 #[cfg(soc_has_clock_node_timg0_function_clock)]
 use clocks::Timg0FunctionClockConfig;
+#[cfg(not(esp32c5))]
 use esp_rom_sys::rom::ets_delay_us;
 #[cfg(any(bt, ieee802154, wifi))]
 use esp_sync::RawMutex;
@@ -65,6 +67,7 @@ use crate::peripherals::BT;
 use crate::peripherals::IEEE802154;
 #[cfg(wifi)]
 use crate::peripherals::WIFI;
+#[cfg(not(esp32c5))]
 use crate::{
     ESP_HAL_LOCK,
     peripherals::TIMG0,
@@ -72,10 +75,13 @@ use crate::{
     soc::clocks::{self, ClockTree, Timg0CalibrationClockConfig},
     time::Rate,
 };
+#[cfg(esp32c5)]
+use crate::{ESP_HAL_LOCK, soc::clocks, time::Rate};
 
 #[cfg_attr(esp32, path = "clocks_ll/esp32.rs")]
 #[cfg_attr(esp32c2, path = "clocks_ll/esp32c2.rs")]
 #[cfg_attr(esp32c3, path = "clocks_ll/esp32c3.rs")]
+#[cfg_attr(esp32c5, path = "clocks_ll/esp32c5.rs")]
 #[cfg_attr(esp32c6, path = "clocks_ll/esp32c6.rs")]
 #[cfg_attr(esp32h2, path = "clocks_ll/esp32h2.rs")]
 #[cfg_attr(esp32s2, path = "clocks_ll/esp32s2.rs")]
@@ -110,6 +116,8 @@ impl CpuClock {
                 Self::_160MHz
             } else if #[cfg(esp32h2)] {
                 Self::_96MHz
+            } else if #[cfg(esp32c5)] {
+                Self::Placeholder
             } else {
                 Self::_240MHz
             }
@@ -123,8 +131,10 @@ pub struct RtcClock;
 
 /// RTC Watchdog Timer driver.
 impl RtcClock {
+    #[cfg(not(esp32c5))]
     const CAL_FRACT: u32 = 19;
 
+    #[cfg(not(esp32c5))]
     /// Get the RTC_SLOW_CLK source.
     pub fn slow_freq() -> Rate {
         cfg_if::cfg_if! {
@@ -145,6 +155,7 @@ impl RtcClock {
     /// may happen if 32k XTAL is being calibrated, but the oscillator has
     /// not started up (due to incorrect loading capacitance, board design
     /// issue, or lack of 32 XTAL on board).
+    #[cfg(not(esp32c5))]
     pub(crate) fn calibrate(cal_clk: Timg0CalibrationClockConfig, slowclk_cycles: u32) -> u32 {
         ClockTree::with(|clocks| {
             let xtal_freq = Rate::from_hz(clocks::xtal_clk_frequency(clocks));
@@ -179,6 +190,7 @@ impl RtcClock {
     }
 
     /// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
+    #[cfg(not(esp32c5))]
     pub(crate) fn cycles_to_1ms() -> u16 {
         cfg_if::cfg_if! {
             if #[cfg(soc_has_lp_aon)] {
@@ -286,6 +298,7 @@ impl Clocks {
     /// that is measured by a low-frequency clock. This function can be used to calibrate two
     /// clocks to each other, e.g. to determine a rough value of the XTAL clock, or to determine
     /// the current frequency of a low-precision RC oscillator.
+    #[cfg(not(esp32c5))]
     pub(crate) fn measure_rtc_clock(
         clocks: &mut ClockTree,
         rtc_clock: Timg0CalibrationClockConfig,
@@ -405,6 +418,11 @@ impl Clocks {
         (cali_value, Rate::from_hz(calibration_clock_frequency))
     }
 
+    // TODO: remove when c5 clocks are ready
+    #[cfg(esp32c5)]
+    pub(crate) fn calibrate_rtc_slow_clock() {}
+
+    #[cfg(not(esp32c5))]
     pub(crate) fn calibrate_rtc_slow_clock() {
         // Unfortunate device specific mapping.
         // TODO: fix it by generating cfgs for each mux input?
