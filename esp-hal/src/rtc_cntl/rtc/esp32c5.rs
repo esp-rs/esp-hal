@@ -23,8 +23,6 @@ pub enum SocResetReason {
     CoreSw        = 0x03,
     /// Deep sleep reset the digital core
     CoreDeepSleep = 0x05,
-    /// SDIO Core reset
-    CoreSDIO      = 0x06,
     /// Main watch dog 0 resets digital core
     CoreMwdt0     = 0x07,
     /// Main watch dog 1 resets digital core
@@ -53,4 +51,8 @@ pub enum SocResetReason {
     CoreUsbJtag   = 0x16,
     /// JTAG resets CPU
     Cpu0JtagCpu   = 0x18,
+    /// Power glitch resets CPU
+    PowerGlitch   = 0x19,
+    /// CPU lockup reset
+    CpuLockup     = 0x1A,
 }
