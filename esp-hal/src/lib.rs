@@ -752,7 +752,6 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(swd)]
     rtc.swd.disable();
 
-    // TODO: add later
     rtc.rwdt.disable();
 
     #[cfg(timergroup_timg0)]
