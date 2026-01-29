@@ -1732,6 +1732,7 @@ where
         self.tx.flush()
     }
 
+    #[procmacros::doc_replace]
     /// Returns whether the UART buffer has data.
     ///
     /// If this function returns `true`, [`Self::read`] and [`Self::read_async`]
