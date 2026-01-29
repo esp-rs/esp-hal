@@ -20,3 +20,16 @@ esp-backtrace = "*"
 esp-println = "*"
 
 esp-radio = "*"
+
+# Those are included and unused by design.
+[package.metadata.cargo-machete]
+ignored = [
+    "esp-alloc",
+    "esp-backtrace",
+    "esp-bootloader-esp-idf",
+    "esp-hal",
+    "esp-println",
+    "esp-radio",
+    "esp-rtos",
+    "esp-storage",
+]
