@@ -46,9 +46,7 @@ mod dma_macros;
 mod dma_mem2mem;
 
 #[path = "misc_non_drivers/init.rs"]
-#[cfg(not(esp32c5))]
 mod init;
 
 #[path = "misc_non_drivers/simple.rs"]
-#[cfg(not(esp32c5))]
 mod simple;

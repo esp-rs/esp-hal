@@ -113,16 +113,16 @@
 pub use self::rtc::SocResetReason;
 #[cfg(sleep)]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
-#[cfg(not(esp32c5))]
 use crate::{
     clock::RtcClock,
-    interrupt::{self, InterruptHandler},
-    peripherals::Interrupt,
-    time::Duration,
-};
-use crate::{
     peripherals::LPWR,
     system::{Cpu, SleepSource},
+    time::Duration,
+};
+#[cfg(not(esp32c5))]
+use crate::{
+    interrupt::{self, InterruptHandler},
+    peripherals::Interrupt,
 };
 // only include sleep where it's been implemented
 #[cfg(sleep)]
@@ -606,7 +606,6 @@ impl Rwdt {
     }
 
     /// Configure timeout value in ms for the selected stage.
-    #[cfg(not(esp32c5))]
     pub fn set_timeout(&mut self, stage: RwdtStage, timeout: Duration) {
         let rtc_cntl = LP_WDT::regs();
 
