@@ -480,4 +480,4 @@ software_interrupt_delay = 0
 # ## Miscellaneous
 # [device.dma]
 # [device.io_mux]
-# [device.systimer]
+[device.systimer]
