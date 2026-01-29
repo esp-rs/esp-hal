@@ -58,12 +58,6 @@ macro_rules! property {
 #[macro_export]
 /// ESP-HAL must provide implementation for the following functions:
 /// ```rust, no_run
-/// 
-/// // XTAL_CLK
-///
-/// // CPU_CLK
-///
-/// // APB_CLK
 /// ```
 macro_rules! define_clock_tree_types {
     () => {
@@ -77,21 +71,6 @@ macro_rules! define_clock_tree_types {
         }
         static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
             ::esp_sync::NonReentrantMutex::new(ClockTree {});
-        fn request_xtal_clk(_clocks: &mut ClockTree) {}
-        fn release_xtal_clk(_clocks: &mut ClockTree) {}
-        pub fn xtal_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            1
-        }
-        fn request_cpu_clk(_clocks: &mut ClockTree) {}
-        fn release_cpu_clk(_clocks: &mut ClockTree) {}
-        pub fn cpu_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            1
-        }
-        fn request_apb_clk(_clocks: &mut ClockTree) {}
-        fn release_apb_clk(_clocks: &mut ClockTree) {}
-        pub fn apb_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            1
-        }
         /// Clock tree configuration.
         ///
         /// The fields of this struct are optional, with the following caveats:

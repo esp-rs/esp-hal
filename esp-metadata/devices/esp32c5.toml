@@ -127,10 +127,6 @@ memory_map = { ranges = [
 ] }
 
 clocks = { system_clocks = { clock_tree = [
-    # FIXME: these only exist for code to compile
-    { name = "XTAL_CLK", type = "source", output = "1", always_on = true },
-    { name = "CPU_CLK", type = "source", output = "1", always_on = true },
-    { name = "APB_CLK", type = "source", output = "1", always_on = true },
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "default_clk_en_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
