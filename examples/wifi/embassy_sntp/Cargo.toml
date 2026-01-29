@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 embassy-executor = "0.9.0"
-embassy-net = { version = "0.7.0", features = [
+embassy-net = { version = "0.8.0", features = [
     "dhcpv4",
     "medium-ethernet",
     "udp",
