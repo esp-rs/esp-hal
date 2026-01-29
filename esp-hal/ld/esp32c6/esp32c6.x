@@ -17,7 +17,8 @@ SECTIONS {
    * Thus, we need to force a gap here.
    */
   .text_gap (NOLOAD): {
-    . = . + 8 + 0x20;
+    . = . + 8;
+    . = ALIGN(0x10000) + 0x20;
   } > ROM
 }
 INSERT BEFORE .text;
