@@ -61,6 +61,8 @@ where
 
     let mut command = Command::new(get_cargo());
 
+    let ci = std::env::var("CI").is_ok();
+
     command
         .args(args)
         .current_dir(cwd)
@@ -70,7 +72,11 @@ where
         } else {
             Stdio::inherit()
         })
-        .stderr(Stdio::piped());
+        .stderr(if capture || ci {
+            Stdio::piped()
+        } else {
+            Stdio::inherit()
+        });
 
     if args.iter().any(|a| a.starts_with('+')) {
         // Make sure the right cargo runs
@@ -90,20 +96,21 @@ where
         if output.status.success() {
             break Ok(String::from_utf8_lossy(&output.stdout).to_string());
         } else {
-            let err_out = String::from_utf8_lossy(&output.stderr).to_string();
-            if !capture {
-                eprintln!("{}", err_out);
-            }
-            if err_out.contains("SIGSEGV") {
+            if ci {
+                let err_out = String::from_utf8_lossy(&output.stderr).to_string();
                 if !capture {
-                    eprintln!("Retry build ({retries})");
+                    eprintln!("{}", err_out);
                 }
-                retries -= 1;
-                if retries > 0 {
-                    continue;
+                if err_out.contains("SIGSEGV") {
+                    if !capture {
+                        eprintln!("Retry build ({retries})");
+                    }
+                    retries -= 1;
+                    if retries > 0 {
+                        continue;
+                    }
                 }
             }
-
             bail!(
                 "Failed to execute cargo subcommand `cargo {}`",
                 args.join(" "),
