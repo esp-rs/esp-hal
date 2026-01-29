@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S3: Fixed startup code to prevent a linker error (#4815)
 - Fixed a situation where the ELF might make tooling emit more than two segments in the image which will make the bootloader refuse to boot (#4844)
 - ESP32-S3/ESP32-C2: WiFi will work after light-sleep with default settings (#4826)
+- ESP32-S2: Fixed an issue where enabling TRNG can prevent WiFi from working (#4856)
 
 ### Removed
 
