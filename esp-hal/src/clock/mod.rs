@@ -293,7 +293,6 @@ impl Clocks {
                 cpu_clock: Rate::from_hz(clocks::cpu_clk_frequency(clocks)),
                 #[cfg(soc_has_clock_node_apb_clk)]
                 apb_clock: Rate::from_hz(clocks::apb_clk_frequency(clocks)),
-                // FIXME: this assumes there is a crystal
                 #[cfg(soc_has_clock_node_xtal_clk)]
                 xtal_clock: Rate::from_hz(clocks::xtal_clk_frequency(clocks)),
             }
