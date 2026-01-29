@@ -115,8 +115,8 @@ symbols = [
 ]
 
 [device.soc]
-cpu_has_csr_pc = true # TODO: VERIFY
-cpu_has_prv_mode = true # TODO: VERIFY
+cpu_has_csr_pc = false
+cpu_csr_prv_mode = 0x810
 rc_fast_clk_default = 17_500_000
 rc_slow_clock = 136_000
 

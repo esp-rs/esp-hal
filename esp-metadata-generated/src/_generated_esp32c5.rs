@@ -37,10 +37,13 @@ macro_rules! property {
         "https://www.espressif.com/sites/default/files/documentation/esp32-c5_technical_reference_manual_en.pdf"
     };
     ("soc.cpu_has_csr_pc") => {
-        true
+        false
     };
-    ("soc.cpu_has_prv_mode") => {
-        true
+    ("soc.cpu_csr_prv_mode") => {
+        2064
+    };
+    ("soc.cpu_csr_prv_mode", str) => {
+        stringify!(2064)
     };
     ("soc.rc_fast_clk_default") => {
         17500000

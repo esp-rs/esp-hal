@@ -287,7 +287,7 @@ driver_configs![
             #[serde(default)]
             cpu_has_csr_pc: bool,
             #[serde(default)]
-            cpu_has_prv_mode: bool,
+            cpu_csr_prv_mode: Option<u32>,
             #[serde(default)]
             rc_fast_clk_default: Option<u32>,
             #[serde(default)]
