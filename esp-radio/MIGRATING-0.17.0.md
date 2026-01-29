@@ -102,3 +102,11 @@ Use `WifiController::is_started` and `WifiController::is_connected` instead.
 -      if esp_radio::wifi::station_state() == WifiStationState::Connected {
 +      if matches!(controller.is_connected(), Ok(true)) {
 ```
+
+## Support for non-async `start`,`stop`,`scan`,`connect` and `disconnect` in `WifiController` has been removed
+
+WiFi is intended to be used in an async environment. Therefore `start`,`stop`,`scan`,`connect` and `disconnect` in `WifiController` has been removed.
+
+Use the `*_async` counterparts instead. This might require you to migrate your code to use `embassy`.
+
+Also the `smoltcp` has been removed completely. Use `embassy-net` instead.
