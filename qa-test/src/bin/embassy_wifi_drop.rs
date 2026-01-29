@@ -17,7 +17,6 @@ use esp_hal::{
 };
 use esp_println::println;
 use esp_radio::wifi::{ModeConfig, sta::StationConfig};
-use smoltcp::phy::Device;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -45,11 +44,7 @@ async fn main(_spawner: Spawner) {
 
         let mut wifi_interface = interfaces.station;
 
-        let token = wifi_interface.transmit(smoltcp::time::Instant::from_millis(
-            esp_hal::time::Instant::now()
-                .duration_since_epoch()
-                .as_millis() as i64,
-        ));
+        let token = wifi_interface.transmit();
         assert!(matches!(token, None));
 
         let station_config = ModeConfig::Station(
@@ -61,11 +56,7 @@ async fn main(_spawner: Spawner) {
         controller.start_async().await.unwrap();
         controller.connect_async().await.unwrap();
 
-        let token = wifi_interface.transmit(smoltcp::time::Instant::from_millis(
-            esp_hal::time::Instant::now()
-                .duration_since_epoch()
-                .as_millis() as i64,
-        ));
+        let token = wifi_interface.transmit();
 
         println!("got token {}", token.is_some());
 
@@ -78,11 +69,7 @@ async fn main(_spawner: Spawner) {
             println!("no token");
         }
 
-        let token = wifi_interface.transmit(smoltcp::time::Instant::from_millis(
-            esp_hal::time::Instant::now()
-                .duration_since_epoch()
-                .as_millis() as i64,
-        ));
+        let token = wifi_interface.transmit();
         assert!(matches!(token, None));
     }
 
@@ -101,11 +88,7 @@ async fn main(_spawner: Spawner) {
 
         let mut wifi_interface = interfaces.station;
 
-        let token = wifi_interface.transmit(smoltcp::time::Instant::from_millis(
-            esp_hal::time::Instant::now()
-                .duration_since_epoch()
-                .as_millis() as i64,
-        ));
+        let token = wifi_interface.transmit();
 
         println!("got token {}", token.is_some());
 
