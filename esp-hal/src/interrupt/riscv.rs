@@ -781,18 +781,6 @@ mod clic {
         Priority::None
     }
 
-    #[unsafe(no_mangle)]
-    #[unsafe(link_section = ".trap")]
-    pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
-        todo!()
-    }
-
-    #[unsafe(no_mangle)]
-    #[unsafe(link_section = ".trap")]
-    pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
-        // TODO
-    }
-
     pub(crate) unsafe fn change_current_runlevel(level: Priority) -> Priority {
         // TODO
         Priority::None
