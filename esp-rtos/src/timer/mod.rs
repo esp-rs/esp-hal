@@ -114,16 +114,16 @@ impl TimeDriver {
         let timer_priority = Priority::Priority1;
 
         cfg_if::cfg_if! {
-            if #[cfg(riscv)] {
+            if #[cfg(all(riscv, not(clic)))] {
                 // Register the interrupt handler without nesting to satisfy the requirements of the
                 // task switching code
-                let handler = InterruptHandler::new_not_nested(timer_tick_handler, timer_priority);
+                let new_handler = InterruptHandler::new_not_nested;
             } else {
-                let handler = InterruptHandler::new(timer_tick_handler, timer_priority);
+                let new_handler = InterruptHandler::new;
             }
-        };
+        }
 
-        timer.set_interrupt_handler(handler);
+        timer.set_interrupt_handler(new_handler(timer_tick_handler, timer_priority));
         timer.listen();
 
         Self {
