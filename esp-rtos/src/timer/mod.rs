@@ -110,19 +110,10 @@ impl TimeDriver {
     pub(crate) fn new(mut timer: TimeBase) -> Self {
         // The timer needs to tick at Priority 1 to prevent accidentally interrupting
         // priority limited locks.
-        let timer_priority = Priority::Priority1;
-
-        cfg_if::cfg_if! {
-            if #[cfg(riscv)] {
-                // Register the interrupt handler without nesting to satisfy the requirements of the
-                // task switching code
-                let handler = InterruptHandler::new_not_nested(timer_tick_handler, timer_priority);
-            } else {
-                let handler = InterruptHandler::new(timer_tick_handler, timer_priority);
-            }
-        };
-
-        timer.set_interrupt_handler(handler);
+        timer.set_interrupt_handler(InterruptHandler::new(
+            timer_tick_handler,
+            Priority::Priority1,
+        ));
         timer.listen();
 
         Self {

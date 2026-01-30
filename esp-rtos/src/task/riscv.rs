@@ -2,7 +2,7 @@
 use core::ffi::c_void;
 
 use esp_hal::{interrupt::software::SoftwareInterrupt, riscv::register, system::Cpu};
-use portable_atomic::Ordering;
+use portable_atomic::{AtomicPtr, Ordering};
 
 #[cfg(feature = "rtos-trace")]
 use crate::TraceEvents;
@@ -15,11 +15,8 @@ unsafe extern "C" {
     fn sys_switch();
 }
 
-static _CURRENT_CTX_PTR: portable_atomic::AtomicPtr<CpuContext> =
-    portable_atomic::AtomicPtr::new(core::ptr::null_mut());
-
-static _NEXT_CTX_PTR: portable_atomic::AtomicPtr<CpuContext> =
-    portable_atomic::AtomicPtr::new(core::ptr::null_mut());
+static _CURRENT_CTX_PTR: AtomicPtr<CpuContext> = AtomicPtr::new(core::ptr::null_mut());
+static _NEXT_CTX_PTR: AtomicPtr<CpuContext> = AtomicPtr::new(core::ptr::null_mut());
 
 /// Registers saved / restored
 #[derive(Debug, Default, Clone)]
