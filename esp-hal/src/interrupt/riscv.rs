@@ -969,7 +969,6 @@ mod rt {
         // disable all known interrupts
         // at least after the 2nd stage bootloader there are some interrupts enabled
         // (e.g. UART)
-        #[cfg(not(esp32c5))]
         for peripheral_interrupt in 0..255 {
             crate::peripherals::Interrupt::try_from(peripheral_interrupt)
                 .map(|intr| {
@@ -982,9 +981,16 @@ mod rt {
 
         unsafe {
             let vec_table = (&_vector_table as *const u32).addr();
+            #[cfg(not(clic))]
             mtvec::write({
                 let mut mtvec = mtvec::Mtvec::from_bits(0);
                 mtvec.set_trap_mode(mtvec::TrapMode::Vectored);
+                mtvec.set_address(vec_table);
+                mtvec
+            });
+            #[cfg(clic)]
+            mtvec::write({
+                let mut mtvec = mtvec::Mtvec::from_bits(0x03); // MODE = CLIC
                 mtvec.set_address(vec_table);
                 mtvec
             });
