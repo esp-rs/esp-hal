@@ -26,7 +26,6 @@ use crate::{
     asynch::AtomicWaker,
     interrupt::{self, InterruptHandler},
     peripherals::{Interrupt, SYSTIMER},
-    soc::clocks::ClockTree,
     system::{Cpu, Peripheral as PeripheralEnable, PeripheralClockControl},
     time::{Duration, Instant},
 };
@@ -196,7 +195,14 @@ impl<'d> SystemTimer<'d> {
     pub fn ticks_per_second() -> u64 {
         // FIXME: this requires a critical section. We can probably do better, if we can formulate
         // invariants well.
-        ClockTree::with(|clocks| {
+        #[cfg(esp32c5)]
+        {
+            // Assuming SYSTIMER runs from XTAL, the hardware always runs at 16 MHz.
+            return 16_000_000;
+        }
+
+        #[cfg(not(esp32c5))]
+        crate::soc::clocks::ClockTree::with(|clocks| {
             cfg_if::cfg_if! {
                 if #[cfg(esp32s2)] {
                     crate::soc::clocks::apb_clk_frequency(clocks) as u64
