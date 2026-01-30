@@ -162,7 +162,7 @@ impl RtcClock {
             let xtal_freq = Rate::from_hz(clocks::xtal_clk_frequency(clocks));
 
             #[cfg(esp32c6)]
-            let slowclk_cycles = if Efuse::chip_revision() > 0
+            let slowclk_cycles = if crate::soc::chip_revision_above(1)
                 && cal_clk == TimgCalibrationClockConfig::RcFastDivClk
             {
                 // The Fosc CLK of calibration circuit is divided by 32 for ECO1.

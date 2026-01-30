@@ -279,6 +279,11 @@ use esp_rom_sys as _;
 pub(crate) use unstable_module;
 
 metadata!("build_info", CHIP_NAME, chip!());
+metadata!(
+    "build_info",
+    MIN_CHIP_REVISION,
+    esp_config::esp_config_str!("ESP_HAL_CONFIG_MIN_CHIP_REVISION")
+);
 
 #[cfg(all(riscv, feature = "rt"))]
 #[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
