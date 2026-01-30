@@ -305,14 +305,20 @@ _restore_context:
 );
 
 pub(crate) fn setup_multitasking<const IRQ: u8>(mut irq: SoftwareInterrupt<'static, IRQ>) {
-    // Register the interrupt handler without nesting to satisfy the requirements of the task
-    // switching code
-    let swint_handler = esp_hal::interrupt::InterruptHandler::new_not_nested(
+    cfg_if::cfg_if! {
+        if #[cfg(all(riscv, not(clic)))] {
+            // Register the interrupt handler without nesting to satisfy the requirements of the task
+            // switching code
+            let new_handler = esp_hal::interrupt::InterruptHandler::new_not_nested;
+        } else {
+            let new_handler = esp_hal::interrupt::InterruptHandler::new;
+        }
+    }
+
+    irq.set_interrupt_handler(new_handler(
         swint_handler,
         esp_hal::interrupt::Priority::min(),
-    );
-
-    irq.set_interrupt_handler(swint_handler);
+    ));
 }
 
 #[cfg(multi_core)]

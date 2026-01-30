@@ -1676,6 +1676,9 @@ impl Chip {
                     "soc",
                     "interrupts",
                     "systimer",
+                    "timergroup",
+                    "timergroup_timg0",
+                    "timergroup_timg1",
                     "soc_cpu_has_branch_predictor",
                     "soc_cpu_csr_prv_mode=\"2064\"",
                     "soc_cpu_csr_prv_mode_is_set",
@@ -1713,6 +1716,7 @@ impl Chip {
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "interrupts_status_registers=\"3\"",
+                    "timergroup_timg_has_divcnt_rst",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32c5",
@@ -1785,6 +1789,9 @@ impl Chip {
                     "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=interrupts",
                     "cargo:rustc-cfg=systimer",
+                    "cargo:rustc-cfg=timergroup",
+                    "cargo:rustc-cfg=timergroup_timg0",
+                    "cargo:rustc-cfg=timergroup_timg1",
                     "cargo:rustc-cfg=soc_cpu_has_branch_predictor",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode=\"2064\"",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode_is_set",
@@ -1822,6 +1829,7 @@ impl Chip {
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
+                    "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[

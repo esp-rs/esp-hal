@@ -53,12 +53,20 @@ pub enum InterruptKind {
 /// Enumeration of available CPU interrupts.
 /// It is possible to create a handler for each of the interrupts. (e.g.
 /// `interrupt3`)
+///
+/// When using CLIC, these interrupts correspond to the interrupt numbers 16-47 (external
+/// interrupts).
 #[repr(u32)]
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum CpuInterrupt {
     /// Interrupt number 1.
+    #[cfg(not(clic))]
     Interrupt1 = 1,
+    /// Interrupt number 1.
+    #[cfg(clic)]
+    Interrupt1 = 16,
+
     /// Interrupt number 2.
     Interrupt2,
     /// Interrupt number 3.
@@ -119,6 +127,9 @@ pub enum CpuInterrupt {
     Interrupt30,
     /// Interrupt number 31.
     Interrupt31,
+    #[cfg(clic)]
+    /// Interrupt number 32.
+    Interrupt32,
 }
 
 /// Interrupt priority levels.
@@ -143,7 +154,6 @@ pub enum Priority {
     /// Priority level 7.
     Priority7,
     /// Priority level 8.
-    #[cfg(not(clic))]
     Priority8,
     /// Priority level 9.
     #[cfg(not(clic))]
@@ -199,7 +209,6 @@ impl TryFrom<u32> for Priority {
             5 => Ok(Priority::Priority5),
             6 => Ok(Priority::Priority6),
             7 => Ok(Priority::Priority7),
-            #[cfg(not(clic))]
             8 => Ok(Priority::Priority8),
             #[cfg(not(clic))]
             9 => Ok(Priority::Priority9),
@@ -394,7 +403,7 @@ unsafe fn assigned_cpu_interrupt(interrupt: Interrupt) -> Option<CpuInterrupt> {
     }
 }
 
-#[cfg_attr(esp32c5, allow(unused))]
+#[cfg_attr(esp32c5, expect(unused))]
 pub(crate) fn bound_cpu_interrupt_for(_cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
     unsafe { assigned_cpu_interrupt(interrupt) }
 }
@@ -677,59 +686,31 @@ mod classic {
 }
 
 #[cfg(clic)]
-#[cfg_attr(esp32c5, allow(unused))]
 mod clic {
     use super::{CpuInterrupt, InterruptKind, Priority};
-    use crate::system::Cpu;
+    use crate::{soc::pac::CLIC, system::Cpu};
 
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     pub(super) static DISABLED_CPU_INTERRUPT: u32 = 0;
 
-    pub(super) static EXTERNAL_INTERRUPT_OFFSET: u32 = 16;
-
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(super) static PRIORITY_TO_INTERRUPT: &[u32] =
-        &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    pub(super) static PRIORITY_TO_INTERRUPT: &[u32] = &[16, 17, 18, 19, 20, 21, 22, 23];
 
-    // TODO: can't go higher than 7
-    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(super) static INTERRUPT_TO_PRIORITY: [Priority; 20] = [
-        Priority::None,
-        Priority::Priority1,
-        Priority::Priority2,
-        Priority::Priority3,
-        Priority::Priority4,
-        Priority::Priority5,
-        Priority::Priority6,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-    ];
+    /// Set up CLIC.
+    pub(super) fn init() {
+        let clic = unsafe { CLIC::steal() };
 
-    // The memory map for interrupt registers is on a per-core basis,
-    // base points to the current core interrupt register,
-    // whereas base + DUALCORE_CLIC_CTRL_OFF points to the other
-    // core registers, regardless of the core we are currently running on.
+        // Set 3 level bits = 8 priority levels
+        clic.int_config()
+            .modify(|_, w| unsafe { w.mnlbits().bits(3) });
 
-    const DR_REG_CLIC_CTRL_BASE: u32 = 0x2080_1000;
-    const DUALCORE_CLIC_CTRL_OFF: u32 = 0x1_0000;
-
-    const CLIC_EXT_INTR_NUM_OFFSET: usize = 16;
-
-    /// Get pointer to interrupt control register for the given core and CPU
-    /// interrupt number
-    fn intr_cntrl(core: Cpu, cpu_interrupt_number: usize) -> *mut u32 {
-        todo!()
+        // Enable hardware vectoring
+        for int in clic.int_attr_iter() {
+            int.modify(|_, w| {
+                w.shv().hardware();
+                w.trig().positive_edge()
+            });
+        }
     }
 
     /// Enable a CPU interrupt
@@ -737,8 +718,11 @@ mod clic {
     /// # Safety
     ///
     /// Make sure there is an interrupt handler registered.
-    pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
-        // TODO
+    pub unsafe fn enable_cpu_interrupt(cpu_interrupt: CpuInterrupt) {
+        // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
+        let clic = unsafe { CLIC::steal() };
+        clic.int_ie(cpu_interrupt as usize)
+            .write(|w| w.int_ie().set_bit());
     }
 
     /// Set the interrupt kind (i.e. level or edge) of an CPU interrupt
@@ -746,8 +730,14 @@ mod clic {
     /// This is safe to call when the `vectored` feature is enabled. The
     /// vectored interrupt handler will take care of clearing edge interrupt
     /// bits.
-    pub fn set_kind(core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
-        // TODO
+    pub fn set_kind(_core: Cpu, cpu_interrupt: CpuInterrupt, kind: InterruptKind) {
+        // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
+        let clic = unsafe { CLIC::steal() };
+        clic.int_attr(cpu_interrupt as usize)
+            .modify(|_, w| match kind {
+                InterruptKind::Level => w.trig().positive_level(),
+                InterruptKind::Edge => w.trig().positive_edge(),
+            });
     }
 
     /// Set the priority level of an CPU interrupt
@@ -755,41 +745,190 @@ mod clic {
     /// # Safety
     ///
     /// Great care must be taken when using the `vectored` feature (enabled by
-    /// default). Avoid changing the priority of interrupts 1 - 15 when
+    /// default). Avoid changing the priority of interrupts 1 - 8 when
     /// interrupt vectoring is enabled.
-    pub unsafe fn set_priority(core: Cpu, which: CpuInterrupt, priority: Priority) {
-        // TODO
+    pub unsafe fn set_priority(_core: Cpu, cpu_interrupt: CpuInterrupt, priority: Priority) {
+        // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
+
+        let clic = unsafe { CLIC::steal() };
+        let prio_bits = prio_to_bits(priority);
+        // The `ctl` field would only write the 3 programmable bits, but we have the correct final
+        // value anyway so let's write it directly.
+        clic.int_ctl(cpu_interrupt as usize)
+            .write(|w| unsafe { w.bits(prio_bits) });
     }
 
     /// Clear a CPU interrupt
     #[inline]
-    pub fn clear(core: Cpu, which: CpuInterrupt) {
-        // TODO
+    pub fn clear(_core: Cpu, cpu_interrupt: CpuInterrupt) {
+        // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
+        let clic = unsafe { CLIC::steal() };
+        clic.int_ip(cpu_interrupt as usize)
+            .write(|w| w.int_ip().clear_bit());
     }
 
     /// Get interrupt priority
     #[inline]
-    pub(super) fn priority_by_core(core: Cpu, cpu_interrupt: CpuInterrupt) -> Priority {
-        // TODO
-        Priority::None
+    pub(super) fn priority_by_core(_core: Cpu, cpu_interrupt: CpuInterrupt) -> Priority {
+        priority(cpu_interrupt)
     }
 
-    /// Get interrupt priority - called by assembly code
     #[inline]
-    pub(super) unsafe extern "C" fn priority(cpu_interrupt: CpuInterrupt) -> Priority {
-        // TODO
-        Priority::None
+    /// Get interrupt priority.
+    pub fn priority(cpu_interrupt: CpuInterrupt) -> Priority {
+        // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
+        let clic = unsafe { CLIC::steal() };
+        let prio_level = clic.int_ctl(cpu_interrupt as usize).read().bits() as usize;
+        bits_to_prio(prio_level)
     }
 
+    /// Changes the current interrupt runlevel (the level below which interrupts are masked),
+    /// and returns the previous runlevel.
     pub(crate) unsafe fn change_current_runlevel(level: Priority) -> Priority {
-        // TODO
-        Priority::None
+        let current_runlevel = current_runlevel();
+
+        // All machine mode pending interrupts with levels less than or equal
+        // to the effective threshold level are not allowed to preempt the execution.
+        unsafe { mintthresh::write(prio_to_bits(level) as usize) };
+
+        current_runlevel
+    }
+
+    /// Get the current run level (the level below which interrupts are masked).
+    pub(crate) fn mil() -> usize {
+        mintstatus::read().mil()
     }
 
     /// Get the current run level (the level below which interrupts are masked).
     pub fn current_runlevel() -> Priority {
-        Priority::None
+        let mintthresh = mintthresh::read();
+
+        let mil = mil();
+
+        let level = mil.max(mintthresh);
+
+        let prio = bits_to_prio(level);
+
+        prio
     }
+
+    fn prio_to_bits(priority: Priority) -> u8 {
+        if priority == Priority::None {
+            0
+        } else {
+            0x1F | ((priority as u8 - 1) << 5)
+        }
+    }
+
+    fn bits_to_prio(bits: usize) -> Priority {
+        // If mintthresh starts from 0xf, make sure we don't return Priority1
+        if bits < 0x1f {
+            Priority::None
+        } else {
+            unwrap!(Priority::try_from(((bits >> 5) + 1) as u32))
+        }
+    }
+
+    mod mintthresh {
+        riscv::read_csr_as_usize!(0x347);
+        riscv::write_csr_as_usize!(0x347);
+    }
+
+    mod mintstatus {
+        // Work around riscv using a non-qualified `assert!` in constants
+        macro_rules! assert {
+            ($($tt:tt)*) => {
+                ::core::assert!($($tt)*)
+            };
+        }
+        riscv::read_only_csr! {
+            /// `mintstatus` register
+            Mintstatus: 0xfb1,
+            mask: usize::MAX,
+        }
+        riscv::read_only_csr_field! {
+            Mintstatus,
+            /// Returns the `mil` field.
+            mil: [24:31],
+        }
+    }
+
+    core::arch::global_asm!(
+        r#"
+
+        .section .trap, "ax"
+
+        /* Prevent the compiler from generating 2-byte instruction in the vector tables */
+        .option push
+        .option norvc
+
+        /**
+         * Vectored interrupt table. MTVT CSR points here.
+         *
+         * If an interrupt occurs and is configured as (hardware) vectored, the CPU will jump to
+         * MTVT[31:0] + 4 * interrupt_id
+         *
+         * In the case of the ESP32P4/ESP32C5, the interrupt matrix, between the CPU interrupt lines
+         * and the peripherals, offers 32 lines, and the lower 16 interrupts are used for CLINT.
+         */
+        .balign 0x40
+        .global _mtvt_table
+        .type _mtvt_table, @function
+    _mtvt_table:
+        .word 0
+        .word _start_Trap1_trap
+        .word _start_Trap2_trap
+        .word _start_Trap3_trap
+        .word _start_Trap4_trap
+        .word _start_Trap5_trap
+        .word _start_Trap6_trap
+        .word _start_Trap7_trap
+        .word _start_Trap8_trap
+        .word _start_Trap9_trap
+        .word _start_Trap10_trap
+        .word _start_Trap11_trap
+        .word _start_Trap12_trap
+        .word _start_Trap13_trap
+        .word _start_Trap14_trap
+        .word _start_Trap15_trap
+        .word _start_Trap16_trap
+        .word _start_Trap17_trap
+        .word _start_Trap18_trap
+        .word _start_Trap19_trap
+        .word _start_Trap20_trap
+        .word _start_Trap21_trap
+        .word _start_Trap22_trap
+        .word _start_Trap23_trap
+        .word _start_Trap24_trap
+        .word _start_Trap25_trap
+        .word _start_Trap26_trap
+        .word _start_Trap27_trap
+        .word _start_Trap28_trap
+        .word _start_Trap29_trap
+        .word _start_Trap30_trap
+        .word _start_Trap31_trap
+        .word _start_Trap32_trap
+        .word _start_Trap33_trap
+        .word _start_Trap34_trap
+        .word _start_Trap35_trap
+        .word _start_Trap36_trap
+        .word _start_Trap37_trap
+        .word _start_Trap38_trap
+        .word _start_Trap39_trap
+        .word _start_Trap40_trap
+        .word _start_Trap41_trap
+        .word _start_Trap42_trap
+        .word _start_Trap43_trap
+        .word _start_Trap44_trap
+        .word _start_Trap45_trap
+        .word _start_Trap46_trap
+        .word _start_Trap47_trap
+
+        .size _mtvt_table, .-_mtvt_table
+        .option pop
+
+        "#
+    );
 }
 
 #[cfg(plic)]
@@ -800,7 +939,7 @@ mod plic {
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     pub(super) static DISABLED_CPU_INTERRUPT: u32 = 31;
 
-    // don't use interrupts reserved for CLIC (0,3,4,7)
+    // 0,3,4,7 are reserved for CLINT
     // for some reason also CPU interrupt 8 doesn't work by default since it's
     // disabled after reset - so don't use that, too
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
@@ -964,12 +1103,13 @@ mod rt {
     unsafe fn _setup_interrupts() {
         unsafe extern "C" {
             static _vector_table: u32;
+            #[cfg(clic)]
+            static _mtvt_table: u32;
         }
 
         // disable all known interrupts
         // at least after the 2nd stage bootloader there are some interrupts enabled
         // (e.g. UART)
-        #[cfg(not(esp32c5))]
         for peripheral_interrupt in 0..255 {
             crate::peripherals::Interrupt::try_from(peripheral_interrupt)
                 .map(|intr| {
@@ -980,15 +1120,31 @@ mod rt {
                 .ok();
         }
 
+        #[cfg(clic)]
+        clic::init();
+
         unsafe {
-            let vec_table = (&_vector_table as *const u32).addr();
+            let vec_table = (&raw const _vector_table).addr();
+
+            #[cfg(not(clic))]
             mtvec::write({
                 let mut mtvec = mtvec::Mtvec::from_bits(0);
                 mtvec.set_trap_mode(mtvec::TrapMode::Vectored);
                 mtvec.set_address(vec_table);
                 mtvec
             });
+            #[cfg(clic)]
+            {
+                mtvec::write({
+                    let mut mtvec = mtvec::Mtvec::from_bits(0x03); // MODE = CLIC
+                    mtvec.set_address(vec_table);
+                    mtvec
+                });
 
+                // set mtvt (hardware vector base)
+                let mtvt_table = (&raw const _mtvt_table).addr();
+                core::arch::asm!("csrw 0x307, {0}", in(reg) mtvt_table);
+            }
             crate::interrupt::init_vectoring();
         };
 
@@ -1000,6 +1156,7 @@ mod rt {
 
     #[unsafe(no_mangle)]
     #[ram]
+    #[cfg(not(clic))]
     unsafe fn handle_interrupts(cpu_intr: CpuInterrupt) {
         let core = Cpu::current();
         let status = status(core);
@@ -1045,5 +1202,29 @@ mod rt {
         }
 
         unsafe { change_current_runlevel(level) };
+    }
+
+    #[unsafe(no_mangle)]
+    #[ram]
+    #[cfg(clic)]
+    unsafe fn handle_interrupts(cpu_intr: CpuInterrupt) {
+        let core = Cpu::current();
+        let status = status(core);
+
+        // this has no effect on level interrupts, but the interrupt may be an edge one
+        // so we clear it anyway
+        clear(core, cpu_intr);
+
+        let prio = clic::current_runlevel();
+        let configured_interrupts = vectored::configured_interrupts(core, status, prio);
+
+        for interrupt_nr in configured_interrupts.iterator() {
+            let handler =
+                unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler } as usize;
+
+            let handler: fn() = unsafe { core::mem::transmute::<usize, fn()>(handler) };
+
+            handler();
+        }
     }
 }

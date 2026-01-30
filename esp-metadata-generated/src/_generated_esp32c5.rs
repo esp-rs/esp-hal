@@ -60,6 +60,12 @@ macro_rules! property {
     ("interrupts.status_registers", str) => {
         stringify!(3)
     };
+    ("timergroup.timg_has_timer1") => {
+        false
+    };
+    ("timergroup.timg_has_divcnt_rst") => {
+        true
+    };
 }
 #[macro_export]
 /// ESP-HAL must provide implementation for the following functions:
@@ -1795,7 +1801,32 @@ macro_rules! for_each_sw_interrupt {
 #[macro_export]
 macro_rules! sw_interrupt_delay {
     () => {
-        unsafe {}
+        unsafe {
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+        }
     };
 }
 #[macro_export]

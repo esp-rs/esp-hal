@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `clic-48` feature to generate more trap handlers (#4883)
 
 ### Changed
 

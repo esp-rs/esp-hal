@@ -450,7 +450,7 @@ clocks = { system_clocks = { clock_tree = [
 support_status = "partial"
 status_registers = 3
 software_interrupt_count = 4
-software_interrupt_delay = 0
+software_interrupt_delay = 24 # CPU speed dependent
 
 # [device.spi_master]
 # support_status = "supported"
@@ -462,6 +462,11 @@ software_interrupt_delay = 0
 # # instances = [
 # #     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
 # # ]
+
+[device.timergroup]
+support_status = "partial"
+instances = [{ name = "timg0" }, { name = "timg1" }]
+timg_has_divcnt_rst = true
 
 # [device.uart]
 # support_status = "supported"
