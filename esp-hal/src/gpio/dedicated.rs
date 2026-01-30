@@ -1304,6 +1304,12 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     }
 }
 
+impl<'lt> Default for DedicatedGpioOutputBundle<'lt> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[doc_replace]
 /// A bundle of dedicated GPIO input drivers.
 ///
@@ -1540,6 +1546,12 @@ You should only disable dedicated GPIO drivers that were configured on the same 
         );
 
         (ll::read_in() & self.mask) == 0
+    }
+}
+
+impl<'lt> Default for DedicatedGpioInputBundle<'lt> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -1916,6 +1928,12 @@ You should only disable dedicated GPIO drivers that were configured on the same 
         );
 
         (ll::read_in() & self.mask) == 0
+    }
+}
+
+impl<'lt> Default for DedicatedGpioFlexBundle<'lt> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
