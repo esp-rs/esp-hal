@@ -171,7 +171,7 @@ _vector_table:
     j _start_Trap30_trap
     j _start_Trap31_trap
 "#,
- #[cfg(feature = "clic")]
+ #[cfg(feature = "clic-48")]
 r#"
     j _start_Trap32_trap
     j _start_Trap33_trap
@@ -262,7 +262,7 @@ define_interrupt!(29, Trap29, trap29);
 define_interrupt!(30, Trap30, trap30);
 define_interrupt!(31, Trap31, trap31);
 
-#[cfg(feature = "clic")]
+#[cfg(feature = "clic-48")]
 mod clic {
     define_interrupt!(32, Trap32, trap32);
     define_interrupt!(33, Trap33, trap33);
