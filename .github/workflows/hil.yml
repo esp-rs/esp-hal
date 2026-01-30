@@ -501,7 +501,7 @@ jobs:
 
   required:
     if: github.event_name == 'merge_group'
-    needs: [hil-full]
+    needs: hil-full
     runs-on: ubuntu-latest
     steps:
       - run: echo "All HIL matrix jobs passed on merge_group."

@@ -9,7 +9,7 @@ on:
         type: string
 
 jobs:
-  binary_size:
+  binary-size:
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -164,7 +164,7 @@ jobs:
           path: result-pr-${{ matrix.target.soc }}.txt
 
   report-results:
-    needs: [binary_size]
+    needs: binary-size
     if: always()
     runs-on: ubuntu-latest
     permissions:
