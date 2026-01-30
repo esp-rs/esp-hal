@@ -107,7 +107,7 @@ Use `WifiController::is_started` and `WifiController::is_connected` instead.
 
 WiFi is intended to be used in an async environment. 
 
-Therefore the followign functions have been removed from `WifiController`:
+Therefore the following functions have been removed from `WifiController`:
 
 - `start`
 - `stop`

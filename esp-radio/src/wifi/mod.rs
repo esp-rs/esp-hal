@@ -2253,6 +2253,8 @@ impl WifiController<'_> {
     }
 
     /// An async Wi-Fi network scan with caller-provided scanning options.
+    ///
+    /// Scanning is not supported in AcessPoint-only mode.
     pub async fn scan_with_config_async(
         &mut self,
         config: ScanConfig<'_>,
@@ -2343,9 +2345,10 @@ impl WifiController<'_> {
     }
 
     /// Connect Wi-Fi station to the AP.
+    ///
     /// Use [Self::disconnect_async] to disconnect.
     ///
-    /// This function willCalling [Self::scan_with_config_async] will not be effective until
+    /// Calling [Self::scan_with_config_async] will not be effective until
     /// connection between device and the AP is established.
     ///
     /// If device is scanning and connecting at the same time, it will abort scanning and return a
