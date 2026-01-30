@@ -546,6 +546,7 @@ instances = [
 support_status = "partial"
 instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_divcnt_rst = true
+rc_fast_calibration = { divider = 32, min_rev = 2 }
 
 [device.uart]
 support_status = "supported"

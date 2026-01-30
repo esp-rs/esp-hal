@@ -249,6 +249,12 @@ macro_rules! property {
     ("timergroup.timg_has_divcnt_rst") => {
         true
     };
+    ("timergroup.rc_fast_calibration_divider_min_rev") => {
+        2
+    };
+    ("timergroup.rc_fast_calibration_divider") => {
+        32
+    };
     ("uart.ram_size") => {
         128
     };

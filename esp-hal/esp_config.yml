@@ -163,5 +163,10 @@ options:
             - "8"
     active: 'chip == "esp32s3"'
 
+  - name: min-chip-revision
+    description: "The minimum chip revision required for the application to run, in format: major * 100 + minor."
+    default:
+      - value: 0
+
 checks:
   - "ESP_HAL_CONFIG_STACK_GUARD_OFFSET % 4 == 0"

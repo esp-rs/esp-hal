@@ -8,6 +8,7 @@ pub(crate) mod sha;
 pub(crate) mod soc;
 pub(crate) mod spi_master;
 pub(crate) mod spi_slave;
+pub(crate) mod timergroup;
 pub(crate) mod uart;
 
 pub(crate) use aes::*;
@@ -19,6 +20,7 @@ pub(crate) use sha::*;
 pub(crate) use soc::*;
 pub(crate) use spi_master::*;
 pub(crate) use spi_slave::*;
+pub(crate) use timergroup::*;
 pub(crate) use uart::*;
 
 pub(crate) trait GenericProperty {
@@ -32,6 +34,22 @@ pub(crate) trait GenericProperty {
 
     fn property_macro_branches(&self) -> proc_macro2::TokenStream {
         quote::quote! {}
+    }
+}
+
+impl<T: GenericProperty> GenericProperty for Option<T> {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        self.as_ref().and_then(|v| v.cfgs())
+    }
+
+    fn macros(&self) -> Option<proc_macro2::TokenStream> {
+        self.as_ref().and_then(|v| v.macros())
+    }
+
+    fn property_macro_branches(&self) -> proc_macro2::TokenStream {
+        self.as_ref()
+            .map(|v| v.property_macro_branches())
+            .unwrap_or_default()
     }
 }
 
@@ -592,6 +610,9 @@ driver_configs![
             timg_has_timer1: bool,
             #[serde(default)]
             timg_has_divcnt_rst: bool,
+
+            #[serde(default)]
+            rc_fast_calibration: Option<RcFastCalibrationProperties>,
         }
     },
     TouchProperties {
