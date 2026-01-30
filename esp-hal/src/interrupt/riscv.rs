@@ -718,14 +718,10 @@ mod clic {
     /// # Safety
     ///
     /// Make sure there is an interrupt handler registered.
-    pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
+    pub unsafe fn enable_cpu_interrupt(cpu_interrupt: CpuInterrupt) {
         // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
-        // CpuInterrupt starts with 1.
-        let cpu_interrupt_number = which as usize;
-
         let clic = unsafe { CLIC::steal() };
-
-        clic.int_ie(cpu_interrupt_number)
+        clic.int_ie(cpu_interrupt as usize)
             .write(|w| w.int_ie().set_bit());
     }
 
@@ -734,14 +730,10 @@ mod clic {
     /// This is safe to call when the `vectored` feature is enabled. The
     /// vectored interrupt handler will take care of clearing edge interrupt
     /// bits.
-    pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
+    pub fn set_kind(_core: Cpu, cpu_interrupt: CpuInterrupt, kind: InterruptKind) {
         // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
-        // CpuInterrupt starts with 1.
-        let cpu_interrupt_number = which as usize;
-
         let clic = unsafe { CLIC::steal() };
-
-        clic.int_attr(cpu_interrupt_number)
+        clic.int_attr(cpu_interrupt as usize)
             .modify(|_, w| match kind {
                 InterruptKind::Level => w.trig().positive_level(),
                 InterruptKind::Edge => w.trig().positive_edge(),
@@ -755,31 +747,23 @@ mod clic {
     /// Great care must be taken when using the `vectored` feature (enabled by
     /// default). Avoid changing the priority of interrupts 1 - 8 when
     /// interrupt vectoring is enabled.
-    pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
+    pub unsafe fn set_priority(_core: Cpu, cpu_interrupt: CpuInterrupt, priority: Priority) {
         // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
-        // CpuInterrupt starts with 1.
-        let cpu_interrupt_number = which as usize;
 
         let clic = unsafe { CLIC::steal() };
-
         let prio_bits = prio_to_bits(priority);
-
         // The `ctl` field would only write the 3 programmable bits, but we have the correct final
         // value anyway so let's write it directly.
-        clic.int_ctl(cpu_interrupt_number)
+        clic.int_ctl(cpu_interrupt as usize)
             .write(|w| unsafe { w.bits(prio_bits) });
     }
 
     /// Clear a CPU interrupt
     #[inline]
-    pub fn clear(_core: Cpu, which: CpuInterrupt) {
+    pub fn clear(_core: Cpu, cpu_interrupt: CpuInterrupt) {
         // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
-        // CpuInterrupt starts with 1.
-        let cpu_interrupt_number = which as usize;
-
         let clic = unsafe { CLIC::steal() };
-
-        clic.int_ip(cpu_interrupt_number)
+        clic.int_ip(cpu_interrupt as usize)
             .write(|w| w.int_ip().clear_bit());
     }
 
@@ -793,12 +777,8 @@ mod clic {
     /// Get interrupt priority.
     pub fn priority(cpu_interrupt: CpuInterrupt) -> Priority {
         // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
-        // CpuInterrupt starts with 1.
-        let cpu_interrupt_number = cpu_interrupt as usize;
-
         let clic = unsafe { CLIC::steal() };
-
-        let prio_level = clic.int_ctl(cpu_interrupt_number).read().bits() as usize;
+        let prio_level = clic.int_ctl(cpu_interrupt as usize).read().bits() as usize;
         bits_to_prio(prio_level)
     }
 
@@ -888,11 +868,8 @@ mod clic {
          * If an interrupt occurs and is configured as (hardware) vectored, the CPU will jump to
          * MTVT[31:0] + 4 * interrupt_id
          *
-         * In the case of the ESP32P4, the interrupt matrix, between the CPU interrupt lines
-         * and the peripherals, offers 32 lines. As such, the interrupt_id between 0 and 31.
-         *
-         * Since the interrupts are initialized as vectored on CPU start, we can manage the special
-         * interrupts ETS_T1_WDT_INUM, ETS_CACHEERR_INUM and ETS_MEMPROT_ERR_INUM here.
+         * In the case of the ESP32P4/ESP32C5, the interrupt matrix, between the CPU interrupt lines
+         * and the peripherals, offers 32 lines, and the lower 16 interrupts are used for CLINT.
          */
         .balign 0x40
         .global _mtvt_table
