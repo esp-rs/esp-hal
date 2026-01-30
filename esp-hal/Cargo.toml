@@ -64,7 +64,7 @@ document-features        = "0.2"
 embassy-futures          = "0.1"
 embassy-sync             = "0.7"
 fugit                    = "0.3.7"
-instability              = "0.3.9"
+instability              = { version = "0.3.9", git = "https://github.com/bugadani/instability", branch = "reexport" }
 strum                    = { version = "0.27.1", default-features = false, features = ["derive"] }
 
 esp-config               = { version = "0.6.1", path = "../esp-config" }
