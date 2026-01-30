@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! Dedicated GPIO access.
 //!
 //! This module implements fast GPIO access using special-purpose CPU features.
@@ -116,7 +117,7 @@ Do not send the drivers to another core, either directly, or indirectly via a th
 //! // Check whether all channels in each bundle are currently high.
 //! let a_all_high = bundle_a.all_high(); // true if ch0, ch1, ch2 are all high
 //! let b_all_high = bundle_b.all_high(); // true if ch0, ch2, ch4 are all high
-//! //
+//!
 //! # {after_snippet}
 //! ```
 //!
@@ -1682,7 +1683,7 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
     pub fn mask(&self) -> u32 {
         self.mask
     }
-    
+
     /// Attaches (enables) an already-configured dedicated flex driver to this bundle. After
     /// enabling, you will be able to control the input/output channels of `flex` via this
     /// bundle.
