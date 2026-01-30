@@ -116,11 +116,10 @@ symbols = [
 ]
 
 [device.soc]
+cpu_has_branch_predictor = true
 cpu_has_csr_pc = false
 cpu_csr_prv_mode = 0x810
 rc_fast_clk_default = 17_500_000
-rc_slow_clock = 136_000
-
 
 memory_map = { ranges = [
     { name = "dram", start = 0x4080_0000, end = 0x4086_0000 },
