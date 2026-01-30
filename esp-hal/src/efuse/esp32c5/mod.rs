@@ -45,6 +45,16 @@ impl super::Efuse {
     pub fn minor_chip_version() -> u8 {
         Self::read_field_le(WAFER_VERSION_MINOR)
     }
+
+    /// Returns the frequency of the crystal oscillator in MHz
+    pub fn xtal_frequency_mhz() -> u32 {
+        let sel = Self::read_field_le::<u8>(XTAL_48M_SEL);
+        if sel.count_ones().is_multiple_of(2) {
+            40
+        } else {
+            48
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, strum::FromRepr)]

@@ -191,7 +191,6 @@ impl RtcClock {
     }
 
     /// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
-    #[cfg_attr(esp32c5, expect(dead_code))]
     pub(crate) fn cycles_to_1ms() -> u16 {
         cfg_if::cfg_if! {
             if #[cfg(soc_has_lp_aon)] {
