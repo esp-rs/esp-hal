@@ -1,4 +1,4 @@
-//% FEATURES: esp-radio esp-radio/wifi esp-radio/smoltcp esp-radio/unstable esp-hal/unstable
+//% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3
 
 #![no_std]

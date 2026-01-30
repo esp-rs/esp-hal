@@ -15,9 +15,6 @@ use esp_sync::NonReentrantMutex;
 use num_derive::FromPrimitive;
 use portable_atomic::{AtomicUsize, Ordering};
 use procmacros::BuilderLite;
-#[cfg(all(feature = "smoltcp", feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
 
 pub(crate) use self::os_adapter::*;
 #[cfg(all(feature = "sniffer", feature = "unstable"))]
@@ -1068,7 +1065,7 @@ impl WifiDeviceMode {
     }
 }
 
-/// A wifi device implementing smoltcp's Device trait.
+/// A wifi device.
 pub struct WifiDevice<'d> {
     _phantom: PhantomData<&'d ()>,
     mode: WifiDeviceMode,
@@ -1080,16 +1077,12 @@ impl WifiDevice<'_> {
         self.mode.mac_address()
     }
 
-    /// Receives data from the Wi-Fi device (only when `smoltcp` feature is
-    /// disabled).
-    #[cfg(not(feature = "smoltcp"))]
+    /// Receives data from the Wi-Fi device.
     pub fn receive(&mut self) -> Option<(WifiRxToken, WifiTxToken)> {
         self.mode.rx_token()
     }
 
-    /// Transmits data through the Wi-Fi device (only when `smoltcp` feature is
-    /// disabled).
-    #[cfg(not(feature = "smoltcp"))]
+    /// Transmits data through the Wi-Fi device.
     pub fn transmit(&mut self) -> Option<WifiTxToken> {
         self.mode.tx_token()
     }
@@ -1289,46 +1282,6 @@ impl RxControlInfo {
     }
 }
 
-// see https://docs.rs/smoltcp/0.7.1/smoltcp/phy/index.html
-#[cfg(all(feature = "smoltcp", feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl Device for WifiDevice<'_> {
-    type RxToken<'a>
-        = WifiRxToken
-    where
-        Self: 'a;
-    type TxToken<'a>
-        = WifiTxToken
-    where
-        Self: 'a;
-
-    fn receive(
-        &mut self,
-        _instant: smoltcp::time::Instant,
-    ) -> Option<(Self::RxToken<'_>, Self::TxToken<'_>)> {
-        self.mode.rx_token()
-    }
-
-    fn transmit(&mut self, _instant: smoltcp::time::Instant) -> Option<Self::TxToken<'_>> {
-        self.mode.tx_token()
-    }
-
-    fn capabilities(&self) -> smoltcp::phy::DeviceCapabilities {
-        let mut caps = DeviceCapabilities::default();
-        caps.max_transmission_unit = MTU;
-        caps.max_burst_size = if esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MAX_BURST_SIZE") == 0
-        {
-            None
-        } else {
-            Some(esp_config_int!(
-                usize,
-                "ESP_RADIO_CONFIG_WIFI_MAX_BURST_SIZE"
-            ))
-        };
-        caps
-    }
-}
-
 #[doc(hidden)]
 // These token doesn't need the debug trait, they aren't needed publicly.
 pub struct WifiRxToken {
@@ -1362,17 +1315,6 @@ impl WifiRxToken {
     }
 }
 
-#[cfg(all(feature = "smoltcp", feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl RxToken for WifiRxToken {
-    fn consume<R, F>(self, f: F) -> R
-    where
-        F: FnOnce(&[u8]) -> R,
-    {
-        self.consume_token(|t| f(t))
-    }
-}
-
 #[doc(hidden)]
 // These token doesn't need the debug trait, they aren't needed publicly.
 pub struct WifiTxToken {
@@ -1388,29 +1330,14 @@ impl WifiTxToken {
     {
         self.mode.increase_in_flight_counter();
 
-        // (safety): creation of multiple Wi-Fi devices with the same mode is impossible
-        // in safe Rust, therefore only smoltcp _or_ embassy-net can be used at
-        // one time
-        static mut BUFFER: [u8; MTU] = [0u8; MTU];
-
-        let buffer = unsafe { &mut BUFFER[..len] };
+        let mut buffer: [u8; MTU] = [0u8; MTU];
+        let buffer = &mut buffer[..len];
 
         let res = f(buffer);
 
         esp_wifi_send_data(self.mode.interface(), buffer);
 
         res
-    }
-}
-
-#[cfg(all(feature = "smoltcp", feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl TxToken for WifiTxToken {
-    fn consume<R, F>(self, len: usize, f: F) -> R
-    where
-        F: FnOnce(&mut [u8]) -> R,
-    {
-        self.consume_token(len, f)
     }
 }
 
@@ -2084,84 +2011,6 @@ impl WifiController<'_> {
         apply_power_saving(ps)
     }
 
-    /// A blocking wifi network scan with caller-provided scanning options.
-    pub fn scan_with_config(
-        &mut self,
-        config: ScanConfig<'_>,
-    ) -> Result<Vec<AccessPointInfo>, WifiError> {
-        esp_wifi_result!(crate::wifi::wifi_start_scan(true, config))?;
-        self.scan_results(config.max.unwrap_or(usize::MAX))
-    }
-
-    fn scan_results_iter(&mut self) -> Result<ScanResults<'_>, WifiError> {
-        ScanResults::new(self)
-    }
-
-    fn scan_results(&mut self, max: usize) -> Result<Vec<AccessPointInfo>, WifiError> {
-        Ok(self.scan_results_iter()?.take(max).collect::<Vec<_>>())
-    }
-
-    /// Starts the Wi-Fi controller.
-    ///
-    /// This method is not blocking. To check if the controller has started, use the
-    /// [`Self::is_started`] method.
-    pub fn start(&mut self) -> Result<(), WifiError> {
-        set_access_point_state(WifiAccessPointState::Starting);
-        set_station_state(WifiStationState::Starting);
-
-        unsafe {
-            esp_wifi_result!(esp_wifi_start())?;
-
-            let mode = WifiMode::current()?;
-
-            // This is not an if-else because in AccessPoint-Station mode, both are true
-            if mode.is_access_point() {
-                esp_wifi_result!(include::esp_wifi_set_inactive_time(
-                    wifi_interface_t_WIFI_IF_AP,
-                    self.ap_beacon_timeout
-                ))?;
-            }
-            if mode.is_station() {
-                esp_wifi_result!(include::esp_wifi_set_inactive_time(
-                    wifi_interface_t_WIFI_IF_STA,
-                    self.beacon_timeout
-                ))?;
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Stops the Wi-Fi controller.
-    ///
-    /// This method is not blocking. Use the [`Self::is_started`] method to see if the controller is
-    /// still running.
-    pub fn stop(&mut self) -> Result<(), WifiError> {
-        self.stop_impl()
-    }
-
-    /// Connect Wi-Fi station to the Access Point.
-    ///
-    /// This method is not blocking. Use the [`Self::is_connected`] method to see if the station is
-    /// connected.
-    ///
-    /// - If station is connected, call [`Self::disconnect`] to disconnect.
-    /// - Calling [`Self::scan_with_config`] or [`Self::scan_with_config_async`] will not be
-    ///   effective until connection between device and the access point is established.
-    /// - If device is scanning and connecting at the same time, it will abort scanning and return a
-    ///   warning message and error.
-    pub fn connect(&mut self) -> Result<(), WifiError> {
-        self.connect_impl()
-    }
-
-    /// Disconnect Wi-Fi station from the access point.
-    ///
-    /// This method is not blocking. Use the [`Self::is_connected`] method to see if the station is
-    /// still connected.
-    pub fn disconnect(&mut self) -> Result<(), WifiError> {
-        self.disconnect_impl()
-    }
-
     /// Get the RSSI information of access point to which the device is associated with.
     /// The value is obtained from the last beacon.
     ///
@@ -2213,7 +2062,7 @@ impl WifiController<'_> {
     /// Set the configuration.
     ///
     /// This will set the mode accordingly.
-    /// You need to use [`Self::connect`] for connecting to an access point.
+    /// You need to use [`Self::connect_async`] for connecting to an access point.
     ///
     /// If you don't intend to use Wi-Fi anymore at all consider tearing down
     /// Wi-Fi completely.
@@ -2369,11 +2218,8 @@ impl WifiController<'_> {
         esp_wifi_result!(unsafe { esp_wifi_disconnect_internal() })
     }
 
-    /// Checks if the Wi-Fi controller has started. Returns true if Station and/or AccessPoint are
+    /// Checks if the Wi-Fi controller is started. Returns true if Station and/or AccessPoint are
     /// started.
-    ///
-    /// This function should be called after the [`Self::start`] method to verify if the
-    /// Wi-Fi controller has started successfully.
     pub fn is_started(&self) -> Result<bool, WifiError> {
         if matches!(
             crate::wifi::station_state(),
@@ -2392,10 +2238,7 @@ impl WifiController<'_> {
         Ok(false)
     }
 
-    /// Checks if the Wi-Fi controller is connected to an access point.
-    ///
-    /// This function should be called after the [`Self::connect`] method to verify if
-    /// the connection was successful.
+    /// Checks if the Wi-Fi controller is currently connected to an access point.
     pub fn is_connected(&self) -> Result<bool, WifiError> {
         match crate::wifi::station_state() {
             crate::wifi::WifiStationState::Connected => Ok(true),
@@ -2410,6 +2253,8 @@ impl WifiController<'_> {
     }
 
     /// An async Wi-Fi network scan with caller-provided scanning options.
+    ///
+    /// Scanning is not supported in AcessPoint-only mode.
     pub async fn scan_with_config_async(
         &mut self,
         config: ScanConfig<'_>,
@@ -2422,12 +2267,10 @@ impl WifiController<'_> {
         WifiEventFuture::new(WifiEvent::ScanDone).await;
         guard.defuse();
 
-        let result = self.scan_results(config.max.unwrap_or(usize::MAX))?;
-
-        Ok(result)
+        Ok(ScanResults::new(self)?.collect::<Vec<_>>())
     }
 
-    /// Async version of [`Self::start`].
+    /// Starts the Wi-Fi controller.
     ///
     /// This function will wait for the Wi-Fi controller to start before returning.
     pub async fn start_async(&mut self) -> Result<(), WifiError> {
@@ -2443,14 +2286,35 @@ impl WifiController<'_> {
 
         Self::clear_events(events);
 
-        self.start()?;
+        set_access_point_state(WifiAccessPointState::Starting);
+        set_station_state(WifiStationState::Starting);
+
+        unsafe {
+            esp_wifi_result!(esp_wifi_start())?;
+
+            let mode = WifiMode::current()?;
+
+            // This is not an if-else because in AccessPoint-Station mode, both are true
+            if mode.is_access_point() {
+                esp_wifi_result!(include::esp_wifi_set_inactive_time(
+                    wifi_interface_t_WIFI_IF_AP,
+                    self.ap_beacon_timeout
+                ))?;
+            }
+            if mode.is_station() {
+                esp_wifi_result!(include::esp_wifi_set_inactive_time(
+                    wifi_interface_t_WIFI_IF_STA,
+                    self.beacon_timeout
+                ))?;
+            }
+        }
 
         self.wait_for_all_events(events, false).await;
 
         Ok(())
     }
 
-    /// Async version of [`Self::stop`].
+    /// Stops the Wi-Fi controller.
     ///
     /// This function will wait for the Wi-Fi controller to stop before returning.
     pub async fn stop_async(&mut self) -> Result<(), WifiError> {
@@ -2480,9 +2344,15 @@ impl WifiController<'_> {
         Ok(())
     }
 
-    /// Async version of [`Self::connect`].
+    /// Connect Wi-Fi station to the AP.
     ///
-    /// This function will wait for the connection to be established before returning.
+    /// Use [Self::disconnect_async] to disconnect.
+    ///
+    /// Calling [Self::scan_with_config_async] will not be effective until
+    /// connection between device and the AP is established.
+    ///
+    /// If device is scanning and connecting at the same time, it will abort scanning and return a
+    /// warning message and error.
     pub async fn connect_async(&mut self) -> Result<(), WifiError> {
         Self::clear_events(WifiEvent::StationConnected | WifiEvent::StationDisconnected);
 
@@ -2498,7 +2368,7 @@ impl WifiController<'_> {
         }
     }
 
-    /// Async version of [`Self::disconnect`].
+    /// Disconnect Wi-Fi station from the AP.
     ///
     /// This function will wait for the connection to be closed before returning.
     pub async fn disconnect_async(&mut self) -> Result<(), WifiError> {

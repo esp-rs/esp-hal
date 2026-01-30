@@ -37,7 +37,7 @@ async fn main(_spawner: Spawner) -> ! {
     controller
         .set_mode(esp_radio::wifi::WifiMode::Station)
         .unwrap();
-    controller.start().unwrap();
+    controller.start_async().await.unwrap();
 
     let mut esp_now = interfaces.esp_now;
     esp_now.set_channel(11).unwrap();
