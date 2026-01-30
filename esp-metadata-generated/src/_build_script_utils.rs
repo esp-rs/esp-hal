@@ -1676,6 +1676,7 @@ impl Chip {
                     "soc",
                     "interrupts",
                     "systimer",
+                    "soc_cpu_has_branch_predictor",
                     "soc_cpu_csr_prv_mode=\"2064\"",
                     "soc_cpu_csr_prv_mode_is_set",
                     "soc_rc_fast_clk_default=\"17500000\"",
@@ -1784,6 +1785,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=interrupts",
                     "cargo:rustc-cfg=systimer",
+                    "cargo:rustc-cfg=soc_cpu_has_branch_predictor",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode=\"2064\"",
                     "cargo:rustc-cfg=soc_cpu_csr_prv_mode_is_set",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
@@ -4661,6 +4663,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_trace0)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_core)");
     println!("cargo:rustc-check-cfg=cfg(clic)");
+    println!("cargo:rustc-check-cfg=cfg(soc_cpu_has_branch_predictor)");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_csr_prv_mode_is_set)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f12m)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f20m)");

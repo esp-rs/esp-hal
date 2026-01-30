@@ -733,6 +733,20 @@ With the `unstable` feature enabled, this function accepts both [`ClockConfig`] 
 pub fn init(config: Config) -> Peripherals {
     crate::soc::pre_init();
 
+    #[cfg(soc_cpu_has_branch_predictor)]
+    {
+        // Enable branch predictor
+        // Note that the branch predictor will start cache requests and needs to be disabled when
+        // the cache is disabled.
+        // MHCR: CSR 0x7c1
+        const MHCR_RS: u32 = 1 << 4; // R/W, address return stack set bit
+        const MHCR_BFE: u32 = 1 << 5; // R/W, allow predictive jump set bit
+        const MHCR_BTB: u32 = 1 << 12; // R/W, branch target prediction enable bit
+        unsafe {
+            core::arch::asm!("csrrs x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
+        }
+    }
+
     #[cfg(stack_guard_monitoring)]
     crate::soc::enable_main_stack_guard_monitoring();
 

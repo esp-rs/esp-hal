@@ -36,6 +36,9 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf"
     };
+    ("soc.cpu_has_branch_predictor") => {
+        false
+    };
     ("soc.cpu_has_csr_pc") => {
         true
     };

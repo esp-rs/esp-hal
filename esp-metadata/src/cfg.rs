@@ -285,6 +285,8 @@ driver_configs![
         hide_from_peri_table: true,
         properties: {
             #[serde(default)]
+            cpu_has_branch_predictor: bool,
+            #[serde(default)]
             cpu_has_csr_pc: bool,
             #[serde(default)]
             cpu_csr_prv_mode: Option<u32>,
