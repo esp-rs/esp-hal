@@ -18,7 +18,6 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
     interrupt::software::SoftwareInterruptControl,
-    main,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -29,8 +28,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 static KNOWN_SSIDS: Mutex<RefCell<BTreeSet<String>>> = Mutex::new(RefCell::new(BTreeSet::new()));
 
-#[main]
-fn main() -> ! {
+#[esp_rtos::main]
+async fn main(_spawner: embassy_executor::Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
@@ -46,7 +45,7 @@ fn main() -> ! {
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
     controller.set_mode(wifi::WifiMode::Station).unwrap();
-    controller.start().unwrap();
+    controller.start_async().await.unwrap();
 
     let mut sniffer = interfaces.sniffer;
     sniffer.set_promiscuous_mode(true).unwrap();

@@ -303,7 +303,7 @@ pub mod peripherals;
 mod reg_access;
 #[cfg(any(spi_master, spi_slave))]
 pub mod spi;
-#[cfg_attr(esp32c5, allow(unused))]
+#[cfg_attr(esp32c5, expect(unused))]
 pub mod system;
 pub mod time;
 #[cfg(uart)]
@@ -356,7 +356,7 @@ unstable_module! {
     pub mod efuse;
 }
 
-#[cfg_attr(esp32c5, allow(unused))]
+#[cfg(any(sha, rsa, aes))]
 mod work_queue;
 
 unstable_driver! {
@@ -512,7 +512,7 @@ impl crate::DriverMode for Async {}
 impl crate::private::Sealed for Blocking {}
 impl crate::private::Sealed for Async {}
 
-#[cfg_attr(esp32c5, allow(unused))]
+#[cfg_attr(esp32c5, expect(unused))]
 pub(crate) mod private {
     use core::mem::ManuallyDrop;
 

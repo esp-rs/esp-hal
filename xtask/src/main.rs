@@ -540,6 +540,8 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     log::info!("Running CI checks for chip: {}", args.chip);
     println!("::add-matcher::.github/rust-matchers.json");
 
+    let run_locally = !std::env::var("CI").is_ok();
+
     let mut runner = Runner::new();
 
     unsafe {
@@ -732,6 +734,25 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             CargoAction::Build(None),
         )
     });
+
+    if run_locally {
+        // Try-build tests
+        runner.run("Build tests", || {
+            let target_path = workspace.join("target");
+
+            tests(
+                workspace,
+                TestsArgs {
+                    chip: args.chip,
+                    repeat: 1,
+                    test: None,
+                    toolchain: None,
+                    timings: false,
+                },
+                CargoAction::Build(Some(target_path.join("tests"))),
+            )
+        });
+    }
 
     runner.finish()
 }

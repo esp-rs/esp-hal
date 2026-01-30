@@ -652,7 +652,7 @@ jobs:
         with:
           script: |
             const body = (context.payload.comment.body || '').trim();
-            const allowed = ['esp32c2','esp32c3','esp32c6','esp32h2','esp32','esp32s2','esp32s3'];
+            const allowed = ['esp32c2','esp32c3','esp32c5','esp32c6','esp32h2','esp32','esp32s2','esp32s3'];
 
             // Remove the leading "/hil" command
             const withoutCmd = body.replace(/^\/hil\s+/i, '');
@@ -914,7 +914,7 @@ jobs:
       - name: Dispatch Binary Size Analysis
         uses: benc-uk/workflow-dispatch@v1
         with:
-          workflow: binary_size.yml
+          workflow: binary-size.yml
           ref: ${{ github.event.repository.default_branch }}
           inputs: |
             {

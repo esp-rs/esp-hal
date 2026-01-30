@@ -19,7 +19,7 @@
 //! The goal of this test suite is to collect smaller, simpler test cases, to keep the overall
 //! number of test suites low(er).
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: unstable
 
 #![no_std]
@@ -27,16 +27,28 @@
 
 #[path = "misc_non_drivers/clock_monitor.rs"]
 mod clock_monitor;
+
 #[path = "misc_non_drivers/critical_section.rs"]
+#[cfg(not(esp32c5))]
 mod critical_section;
+
 #[path = "misc_non_drivers/delay_async.rs"]
+#[cfg(timergroup)]
 mod delay_async;
+
 #[path = "misc_non_drivers/dma_macros.rs"]
+#[cfg(any(gdma, pdma))]
 mod dma_macros;
-#[cfg(not(esp32))]
+
 #[path = "misc_non_drivers/dma_mem2mem.rs"]
+#[cfg(not(esp32))]
+#[cfg(any(gdma, pdma))]
 mod dma_mem2mem;
+
 #[path = "misc_non_drivers/init.rs"]
+#[cfg(not(esp32c5))]
 mod init;
+
 #[path = "misc_non_drivers/simple.rs"]
+#[cfg(not(esp32c5))]
 mod simple;

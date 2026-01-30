@@ -12,7 +12,7 @@ license = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
 doc-config = { features = ["esp-hal/unstable", "esp-hal/rt", "esp-alloc/global-allocator", "defmt"], append = [
-    { if = 'chip_has("wifi")', features = ["wifi", "wifi-eap", "csi", "esp-now", "sniffer", "smoltcp/proto-ipv4", "smoltcp/proto-ipv6"] },
+    { if = 'chip_has("wifi")', features = ["wifi", "wifi-eap", "csi", "esp-now", "sniffer"] },
     { if = 'chip_has("bt")', features = ["ble"] },
     { if = 'chip_has("ieee802154")', features = ["ieee802154", "__docs_build"] },
     { if = 'chip_has("wifi") && chip_has("bt")', features = ["coex"] },
@@ -24,10 +24,10 @@ check-configs = [
     { features = ["esp-hal/unstable", "esp-hal/rt", "wifi"], if = 'chip_has("wifi")' },
     # feature(c_variadic) requires nightly compiler, but we can't configure the toolchain here. Only check xtensa chips, where the compiler has nightly features enabled.
     { features = ["esp-hal/unstable", "esp-hal/rt", "wifi", "print-logs-from-driver", "unstable"], if = 'chip_has("wifi") && chip_has("xtensa")' },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer", "smoltcp/proto-ipv4", "smoltcp/proto-ipv6"], if = 'chip_has("wifi")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer"], if = 'chip_has("wifi")' },
     { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ble"], if = 'chip_has("bt")' },
     { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ieee802154"], if = 'chip_has("ieee802154")' },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer", "smoltcp/proto-ipv4", "smoltcp/proto-ipv6", "ble", "coex"], if = 'chip_has("wifi") && chip_has("bt")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer", "ble", "coex"], if = 'chip_has("wifi") && chip_has("bt")' },
     { features = ["esp-hal/unstable", "esp-hal/rt", "wifi-eap", "unstable"], if = 'chip_has("wifi")' },
 ]
 clippy-configs = [
@@ -83,10 +83,6 @@ embedded-io-06 = { package = "embedded-io", version = "0.6", default-features = 
 embedded-io-async-06 = { package = "embedded-io-async", version = "0.6", default-features = false, optional = true }
 embedded-io-07 = { package = "embedded-io", version = "0.7", default-features = false, optional = true }
 embedded-io-async-07 = { package = "embedded-io-async", version = "0.7", default-features = false, optional = true }
-smoltcp = { version = "0.12.0", default-features = false, features = [
-  "medium-ethernet",
-  "socket-raw",
-], optional = true }
 embassy-net-driver = { version = "0.2.0", optional = true }
 bt-hci = { version = "0.6.0", optional = true }
 
@@ -253,11 +249,6 @@ ieee802154 = ["dep:byte", "dep:ieee802154", "__has_unstable_feature_enabled"]
 
 #! ### Ecosystem Feature Flags
 
-## Provide implementations of smoltcp traits.
-##
-## ⚠️ This feature is considered unstable.
-smoltcp = ["dep:smoltcp", "__has_unstable_feature_enabled"]
-
 #! ### Logging Feature Flags
 ## Enable logging output using version 0.4 of the `log` crate.
 log-04 = [
@@ -276,7 +267,6 @@ log-04 = [
 ## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
 defmt = [
     "dep:defmt",
-    "smoltcp?/defmt",
     "esp-hal/defmt",
     "bt-hci?/defmt",
     "esp-wifi-sys-esp32/defmt",

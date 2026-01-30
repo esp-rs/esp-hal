@@ -57,14 +57,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         || cfg!(feature = "csi")
         || cfg!(feature = "esp-now")
         || cfg!(feature = "ieee802154")
-        || cfg!(feature = "smoltcp")
         || cfg!(feature = "sniffer")
         || cfg!(feature = "wifi-eap"))
         && !cfg!(feature = "unstable")
         && !suppress_panics
     {
         panic!(
-            "\n\nThe `unstable` feature was not provided, but is required for the following features: `ble`, `coex`, `csi`, `esp-now`, `ieee802154`, `smoltcp`, `sniffer`, `wifi-eap`.\n\n"
+            "\n\nThe `unstable` feature was not provided, but is required for the following features: `ble`, `coex`, `csi`, `esp-now`, `ieee802154`, `sniffer`, `wifi-eap`.\n\n"
         )
     }
 

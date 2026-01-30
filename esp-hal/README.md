@@ -89,7 +89,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | SHA                | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SPI master         | ✔️   | ✔️      | ✔️      |          | ✔️      | ✔️      | ✔️      | ✔️      |
 | SPI slave          | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| SYSTIMER           |       | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| SYSTIMER           |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Temperature sensor | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Timers             | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Touch              | ⚒️   |          |          |          |          |          | ❌       | ❌       |

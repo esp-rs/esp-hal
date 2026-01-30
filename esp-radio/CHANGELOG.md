@@ -57,6 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `wifi::Capability` and `WifiController::capabilities()` no longer available (#4816)
 - `FreeApListOnDrop` is no longer available (#4816)
 - `wifi::ModeConfig::None` is no longer available (#4834)
+- Support for non-async `start`,`stop`,`scan`,`connect` and `disconnect` in `WifiController` has been removed (#4870)
+- Support for the feature `smoltcp` has been removed (#4870)
 
 ## [v0.17.0] - 2025-10-30
 

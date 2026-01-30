@@ -2,7 +2,7 @@ crate: esp-radio
 
 options:
   - name: wifi_max_burst_size
-    description: See [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_burst_size)
+    description: See [embassy-net's documentation](https://docs.rs/embassy-net-driver/0.2.0/embassy_net_driver/struct.Capabilities.html#structfield.max_burst_size)
     default:
       - value: 3
     constraints:
@@ -10,7 +10,7 @@ options:
           validator: non_negative_integer
 
   - name: wifi_mtu
-    description: "MTU, see [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_transmission_unit)"
+    description: "MTU, see [embassy-net's documentation](https://docs.rs/embassy-net-driver/0.2.0/embassy_net_driver/struct.Capabilities.html#structfield.max_transmission_unit)"
     default:
       - value: 1492
     constraints:

@@ -1,4 +1,4 @@
-#[embedded_test::tests(default_timeout = 3)]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
     use esp_hal::{
         clock::CpuClock,
@@ -17,7 +17,7 @@ mod tests {
     }
 
     #[test]
-    fn wifi_starts_with_trng_enabled(p: Peripherals) {
+    async fn wifi_starts_with_trng_enabled(p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
@@ -30,14 +30,14 @@ mod tests {
         controller
             .set_mode(esp_radio::wifi::WifiMode::Station)
             .unwrap();
-        controller.start().unwrap();
+        controller.start_async().await.unwrap();
     }
 
     // If this turns out to be too flaky or time-consuming,
     // we should consider converting this into a qa-test.
     #[test]
     #[timeout(15)]
-    fn test_scan_doesnt_leak(p: Peripherals) {
+    async fn test_scan_doesnt_leak(p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
@@ -48,19 +48,28 @@ mod tests {
         controller
             .set_mode(esp_radio::wifi::WifiMode::Station)
             .unwrap();
-        controller.start().unwrap();
+        controller.start_async().await.unwrap();
 
         let scan_config = ScanConfig::default().with_max(1);
-        let _ = controller.scan_with_config(scan_config).unwrap();
+        let _ = controller
+            .scan_with_config_async(scan_config)
+            .await
+            .unwrap();
 
         let mut min_free = usize::MAX;
         for _ in 0..30 {
-            let _ = controller.scan_with_config(scan_config).unwrap();
+            let _ = controller
+                .scan_with_config_async(scan_config)
+                .await
+                .unwrap();
             min_free = usize::min(min_free, esp_alloc::HEAP.free());
         }
 
         for _ in 0..10 {
-            let _ = controller.scan_with_config(scan_config).unwrap();
+            let _ = controller
+                .scan_with_config_async(scan_config)
+                .await
+                .unwrap();
             assert!(
                 esp_alloc::HEAP.free() >= min_free,
                 "current free: {}, min free: {}",
