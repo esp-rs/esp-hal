@@ -213,7 +213,7 @@ esp32c3 = [
 esp32c5 = [
     "dep:esp32c5",
     "esp-riscv-rt/rtc-ram",
-    "esp-riscv-rt/clic",
+    "esp-riscv-rt/clic-48",
     "procmacros/has-lp-core",
     "esp-rom-sys/esp32c5",
     "esp-sync/esp32c5",

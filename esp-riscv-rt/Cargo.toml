@@ -38,8 +38,8 @@ riscv-rt          = {version = "0.16.0", features = ["pre-init", "no-exceptions"
 no-mie-mip = ["riscv-rt/no-xie-xip"]
 ## Indicate that the device has RTC RAM.
 rtc-ram = []
-## CLIC
-clic = []
+## CLIC with 48 total interrupt lines
+clic-48 = []
 
 ## Implement `defmt::Format`
 defmt = ["dep:defmt", "riscv-rt/defmt"]
