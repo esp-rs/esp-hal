@@ -652,7 +652,7 @@ jobs:
         with:
           script: |
             const body = (context.payload.comment.body || '').trim();
-            const allowed = ['esp32c2','esp32c3','esp32c6','esp32h2','esp32','esp32s2','esp32s3'];
+            const allowed = ['esp32c2','esp32c3','esp32c5','esp32c6','esp32h2','esp32','esp32s2','esp32s3'];
 
             // Remove the leading "/hil" command
             const withoutCmd = body.replace(/^\/hil\s+/i, '');
