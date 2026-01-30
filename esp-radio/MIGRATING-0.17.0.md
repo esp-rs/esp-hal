@@ -105,8 +105,16 @@ Use `WifiController::is_started` and `WifiController::is_connected` instead.
 
 ## Support for non-async `start`,`stop`,`scan`,`connect` and `disconnect` in `WifiController` has been removed
 
-WiFi is intended to be used in an async environment. Therefore `start`,`stop`,`scan`,`connect` and `disconnect` in `WifiController` has been removed.
+WiFi is intended to be used in an async environment. 
+
+Therefore the followign functions have been removed from `WifiController`:
+
+- `start`
+- `stop`
+- `scan`
+- `connect`
+- `disconnect`
 
 Use the `*_async` counterparts instead. This might require you to migrate your code to use `embassy`.
 
-Also the `smoltcp` has been removed completely. Use `embassy-net` instead.
+The `smoltcp` feature has been removed completely. Use `embassy-net` and async instead.
