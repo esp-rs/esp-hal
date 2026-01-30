@@ -119,6 +119,54 @@ pub enum CpuInterrupt {
     Interrupt30,
     /// Interrupt number 31.
     Interrupt31,
+    #[cfg(clic)]
+    /// Interrupt number 32.
+    Interrupt32,
+    #[cfg(clic)]
+    /// Interrupt number 33.
+    Interrupt33,
+    #[cfg(clic)]
+    /// Interrupt number 34.
+    Interrupt34,
+    #[cfg(clic)]
+    /// Interrupt number 35.
+    Interrupt35,
+    #[cfg(clic)]
+    /// Interrupt number 36.
+    Interrupt36,
+    #[cfg(clic)]
+    /// Interrupt number 37.
+    Interrupt37,
+    #[cfg(clic)]
+    /// Interrupt number 38.
+    Interrupt38,
+    #[cfg(clic)]
+    /// Interrupt number 39.
+    Interrupt39,
+    #[cfg(clic)]
+    /// Interrupt number 40.
+    Interrupt40,
+    #[cfg(clic)]
+    /// Interrupt number 41.
+    Interrupt41,
+    #[cfg(clic)]
+    /// Interrupt number 42.
+    Interrupt42,
+    #[cfg(clic)]
+    /// Interrupt number 43.
+    Interrupt43,
+    #[cfg(clic)]
+    /// Interrupt number 44.
+    Interrupt44,
+    #[cfg(clic)]
+    /// Interrupt number 45.
+    Interrupt45,
+    #[cfg(clic)]
+    /// Interrupt number 46.
+    Interrupt46,
+    #[cfg(clic)]
+    /// Interrupt number 47.
+    Interrupt47,
 }
 
 /// Interrupt priority levels.
