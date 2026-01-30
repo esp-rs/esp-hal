@@ -58,8 +58,6 @@ use esp_rom_sys::rom::ets_delay_us;
 #[cfg(any(bt, ieee802154, wifi))]
 use esp_sync::RawMutex;
 
-#[cfg(esp32c6)]
-use crate::efuse::Efuse;
 #[cfg(bt)]
 use crate::peripherals::BT;
 #[cfg(all(feature = "unstable", ieee802154))]
@@ -161,14 +159,14 @@ impl RtcClock {
         ClockTree::with(|clocks| {
             let xtal_freq = Rate::from_hz(clocks::xtal_clk_frequency(clocks));
 
-            #[cfg(esp32c6)]
-            let slowclk_cycles = if crate::soc::chip_revision_above(1)
-                && cal_clk == TimgCalibrationClockConfig::RcFastDivClk
-            {
-                // The Fosc CLK of calibration circuit is divided by 32 for ECO1.
-                // So we need to divide the calibrate cycles of the FOSC for ECO1 and above
-                // chips by 32 to avoid excessive calibration time.
-                slowclk_cycles / 32
+            #[cfg(timergroup_rc_fast_calibration_divider)]
+            let slowclk_cycles = if cal_clk == TimgCalibrationClockConfig::RcFastDivClk
+                && crate::soc::chip_revision_above(property!(
+                    "timergroup.rc_fast_calibration_divider_min_rev"
+                )) {
+                // Avoid excessive calibration time by dividing the cycles by the divider
+                // that exists between FOSC and the calibration circuit.
+                slowclk_cycles / property!("timergroup.rc_fast_calibration_divider")
             } else {
                 slowclk_cycles
             };
