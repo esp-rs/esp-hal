@@ -39,9 +39,6 @@ macro_rules! property {
     ("soc.cpu_has_csr_pc") => {
         false
     };
-    ("soc.cpu_has_prv_mode") => {
-        false
-    };
     ("soc.rc_fast_clk_default") => {
         8500000
     };

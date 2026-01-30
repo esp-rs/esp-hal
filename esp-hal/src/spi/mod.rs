@@ -11,9 +11,11 @@
 
 use crate::dma::DmaError;
 
+#[cfg(spi_master)]
 pub mod master;
 
 crate::unstable_module! {
+    #[cfg(spi_slave)]
     pub mod slave;
 }
 

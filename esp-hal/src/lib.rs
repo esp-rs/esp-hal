@@ -294,21 +294,19 @@ pub use xtensa_lx_rt::{self, xtensa_lx};
 
 #[cfg(any(soc_has_dport, soc_has_hp_sys, soc_has_pcr, soc_has_system))]
 pub mod clock;
-#[cfg(soc_has_gpio)]
+#[cfg(gpio)]
 pub mod gpio;
-#[cfg(not(esp32c5))]
-#[cfg(any(soc_has_i2c0, soc_has_i2c1))]
+#[cfg(i2c_master)]
 pub mod i2c;
 pub mod peripherals;
-#[cfg(all(feature = "unstable", any(soc_has_hmac, soc_has_sha)))]
+#[cfg(all(feature = "unstable", any(hmac, sha)))]
 mod reg_access;
-#[cfg(any(soc_has_spi0, soc_has_spi1, soc_has_spi2, soc_has_spi3))]
+#[cfg(any(spi_master, spi_slave))]
 pub mod spi;
 #[cfg_attr(esp32c5, allow(unused))]
 pub mod system;
 pub mod time;
-#[cfg(not(esp32c5))]
-#[cfg(any(soc_has_uart0, soc_has_uart1, soc_has_uart2))]
+#[cfg(uart)]
 pub mod uart;
 
 mod macros;
@@ -754,7 +752,6 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(swd)]
     rtc.swd.disable();
 
-    // TODO: add later
     rtc.rwdt.disable();
 
     #[cfg(timergroup_timg0)]

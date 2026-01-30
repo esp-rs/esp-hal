@@ -115,8 +115,8 @@ symbols = [
 ]
 
 [device.soc]
-cpu_has_csr_pc = true # TODO: VERIFY
-cpu_has_prv_mode = true # TODO: VERIFY
+cpu_has_csr_pc = false
+cpu_csr_prv_mode = 0x810
 rc_fast_clk_default = 17_500_000
 rc_slow_clock = 136_000
 
@@ -127,10 +127,6 @@ memory_map = { ranges = [
 ] }
 
 clocks = { system_clocks = { clock_tree = [
-    # FIXME: these only exist for code to compile
-    { name = "XTAL_CLK", type = "source", output = "1", always_on = true },
-    { name = "CPU_CLK", type = "source", output = "1", always_on = true },
-    { name = "APB_CLK", type = "source", output = "1", always_on = true },
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "default_clk_en_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },

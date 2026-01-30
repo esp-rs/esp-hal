@@ -109,7 +109,7 @@ symbols = [
 
 [device.soc]
 cpu_has_csr_pc = true
-cpu_has_prv_mode = true
+cpu_csr_prv_mode = 0xC10
 rc_fast_clk_default = 8_500_000
 
 memory_map = { ranges = [

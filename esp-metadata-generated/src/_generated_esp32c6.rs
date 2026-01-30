@@ -39,8 +39,11 @@ macro_rules! property {
     ("soc.cpu_has_csr_pc") => {
         true
     };
-    ("soc.cpu_has_prv_mode") => {
-        true
+    ("soc.cpu_csr_prv_mode") => {
+        3088
+    };
+    ("soc.cpu_csr_prv_mode", str) => {
+        stringify!(3088)
     };
     ("soc.rc_fast_clk_default") => {
         17500000

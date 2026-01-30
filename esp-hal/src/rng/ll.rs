@@ -4,7 +4,7 @@ use crate::{clock::Clocks, peripherals::RNG};
 
 // TODO: find a better place for these
 #[inline]
-#[cfg(soc_cpu_has_prv_mode)]
+#[cfg(soc_cpu_csr_prv_mode_is_set)]
 fn tee_enabled() -> bool {
     false
 }
@@ -17,24 +17,28 @@ fn current_cpu_cycles() -> usize {
         } else if #[cfg(soc_cpu_has_csr_pc)] {
             const PRV_M: usize = 3;
             macro_rules! read_csr_fn {
-                ($fnname:ident, $csr:literal) => {
+                ($fnname:ident, $csr:expr) => {
                     #[inline]
                     fn $fnname() -> usize {
-                        riscv::read_csr!($csr);
+                        let r: usize;
 
-                        unsafe { _read() }
+                        unsafe {
+                            core::arch::asm!(concat!("csrrs {0}, ", $csr, ", x0"), out(reg) r);
+                        }
+
+                        return r;
                     }
                 }
             }
 
-            read_csr_fn!(read_pccr_machine, 0x7e2);
-            read_csr_fn!(read_pccr_user, 0x802);
+            read_csr_fn!(read_pccr_machine, "0x7e2");
+            read_csr_fn!(read_pccr_user, "0x802");
 
             fn read_prv_mode() -> usize {
-                #[cfg(soc_cpu_has_prv_mode)]
+                #[cfg(soc_cpu_csr_prv_mode_is_set)]
                 if tee_enabled() {
-                    riscv::read_csr!(0x810);
-                    return unsafe { _read() };
+                    read_csr_fn!(read_prv_m, property!("soc.cpu_csr_prv_mode", str));
+                    return read_prv_m();
                 }
 
                 PRV_M

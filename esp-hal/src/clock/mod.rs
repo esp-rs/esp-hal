@@ -217,12 +217,15 @@ impl RtcClock {
 #[instability::unstable]
 pub struct Clocks {
     /// CPU clock frequency
+    #[cfg(soc_has_clock_node_cpu_clk)]
     pub cpu_clock: Rate,
 
     /// APB clock frequency
+    #[cfg(soc_has_clock_node_apb_clk)]
     pub apb_clock: Rate,
 
     /// XTAL clock frequency
+    #[cfg(soc_has_clock_node_xtal_clk)]
     pub xtal_clock: Rate,
 }
 
@@ -286,9 +289,11 @@ impl Clocks {
             // TODO: this struct can be removed once everything uses the new internal clock tree
             // code
             Self {
+                #[cfg(soc_has_clock_node_cpu_clk)]
                 cpu_clock: Rate::from_hz(clocks::cpu_clk_frequency(clocks)),
+                #[cfg(soc_has_clock_node_apb_clk)]
                 apb_clock: Rate::from_hz(clocks::apb_clk_frequency(clocks)),
-                // FIXME: this assumes there is a crystal
+                #[cfg(soc_has_clock_node_xtal_clk)]
                 xtal_clock: Rate::from_hz(clocks::xtal_clk_frequency(clocks)),
             }
         })

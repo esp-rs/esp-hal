@@ -1674,13 +1674,10 @@ impl Chip {
                     "rom_md5_bsd",
                     "soc",
                     "interrupts",
-                    "soc_cpu_has_csr_pc",
-                    "soc_cpu_has_prv_mode",
+                    "soc_cpu_csr_prv_mode=\"2064\"",
+                    "soc_cpu_csr_prv_mode_is_set",
                     "soc_rc_fast_clk_default=\"17500000\"",
                     "soc_rc_fast_clk_default_is_set",
-                    "soc_has_clock_node_xtal_clk",
-                    "soc_has_clock_node_cpu_clk",
-                    "soc_has_clock_node_apb_clk",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "interrupts_status_registers=\"3\"",
@@ -1754,13 +1751,10 @@ impl Chip {
                     "cargo:rustc-cfg=rom_md5_bsd",
                     "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=interrupts",
-                    "cargo:rustc-cfg=soc_cpu_has_csr_pc",
-                    "cargo:rustc-cfg=soc_cpu_has_prv_mode",
+                    "cargo:rustc-cfg=soc_cpu_csr_prv_mode=\"2064\"",
+                    "cargo:rustc-cfg=soc_cpu_csr_prv_mode_is_set",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
-                    "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
-                    "cargo:rustc-cfg=soc_has_clock_node_cpu_clk",
-                    "cargo:rustc-cfg=soc_has_clock_node_apb_clk",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
@@ -1941,7 +1935,8 @@ impl Chip {
                     "uart_uart0",
                     "uart_uart1",
                     "soc_cpu_has_csr_pc",
-                    "soc_cpu_has_prv_mode",
+                    "soc_cpu_csr_prv_mode=\"3088\"",
+                    "soc_cpu_csr_prv_mode_is_set",
                     "soc_rc_fast_clk_default=\"17500000\"",
                     "soc_rc_fast_clk_default_is_set",
                     "soc_has_clock_node_xtal_clk",
@@ -2193,7 +2188,8 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
-                    "cargo:rustc-cfg=soc_cpu_has_prv_mode",
+                    "cargo:rustc-cfg=soc_cpu_csr_prv_mode=\"3088\"",
+                    "cargo:rustc-cfg=soc_cpu_csr_prv_mode_is_set",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
@@ -2568,7 +2564,8 @@ impl Chip {
                     "uart_uart0",
                     "uart_uart1",
                     "soc_cpu_has_csr_pc",
-                    "soc_cpu_has_prv_mode",
+                    "soc_cpu_csr_prv_mode=\"3088\"",
+                    "soc_cpu_csr_prv_mode_is_set",
                     "soc_rc_fast_clk_default=\"8500000\"",
                     "soc_rc_fast_clk_default_is_set",
                     "soc_has_clock_node_xtal_clk",
@@ -2781,7 +2778,8 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
-                    "cargo:rustc-cfg=soc_cpu_has_prv_mode",
+                    "cargo:rustc-cfg=soc_cpu_csr_prv_mode=\"3088\"",
+                    "cargo:rustc-cfg=soc_cpu_csr_prv_mode_is_set",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"8500000\"",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
@@ -4600,7 +4598,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_trace0)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_core)");
     println!("cargo:rustc-check-cfg=cfg(clic)");
-    println!("cargo:rustc-check-cfg=cfg(soc_cpu_has_prv_mode)");
+    println!("cargo:rustc-check-cfg=cfg(soc_cpu_csr_prv_mode_is_set)");
     println!("cargo:rustc-check-cfg=cfg(esp32c6)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_atomic)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ieee802154)");
@@ -4722,6 +4720,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(uart_ram_size, values(\"128\"))");
     println!("cargo:rustc-check-cfg=cfg(bt_controller, values(\"btdm\",\"npl\"))");
     println!("cargo:rustc-check-cfg=cfg(phy_backed_up_digital_register_count, values(\"21\"))");
+    println!("cargo:rustc-check-cfg=cfg(soc_cpu_csr_prv_mode, values(\"2064\",\"3088\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_fifo_size, values(\"16\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_uart_ram_size, values(\"32\"))");
 }
