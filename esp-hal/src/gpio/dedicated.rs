@@ -1648,6 +1648,7 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
         }
     }
 
+    #[doc_replace]
     /// Returns the channel mask of this bundle.
     ///
     /// Each bit corresponds to one dedicated GPIO channel:
