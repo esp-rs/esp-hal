@@ -172,6 +172,7 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
     fn calibration_init() {
         // https://github.com/espressif/esp-idf/blob/800f141f94c0f880c162de476512e183df671307/components/hal/esp32s3/include/hal/adc_ll.h#L833
         // https://github.com/espressif/esp-idf/blob/800f141f94c0f880c162de476512e183df671307/components/hal/esp32s2/include/hal/adc_ll.h#L1145
+        #[cfg(esp32s2)]
         regi2c::ADC_SAR1_DREF.write_field(4);
     }
 
@@ -488,7 +489,9 @@ where
 #[cfg(esp32s3)]
 impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_init_code(AdcCalibUnit::ADC1, atten)
+        // The efuse init code appears to be quite bad
+        // use the "connect to gnd" fallback instead
+        None
     }
 
     fn cal_mv(atten: Attenuation) -> u16 {
