@@ -303,10 +303,19 @@ fn chip_revision_in_range(range: Range<u16>) -> bool {
         esp_config::esp_config_int!(u16, "ESP_HAL_CONFIG_MIN_CHIP_REVISION");
 
     // Check to determine chip is obviously in or out of range, without reading efuse
+    #[allow(
+        clippy::absurd_extreme_comparisons,
+        reason = "Not absurd depending on configuration"
+    )]
     if range.end < BUILD_TIME_MIN_REV {
         // Chip will not boot in this range
         return false;
     }
+
+    #[allow(
+        clippy::absurd_extreme_comparisons,
+        reason = "Not absurd depending on configuration"
+    )]
     if range.start <= BUILD_TIME_MIN_REV && range.end == u16::MAX {
         return true;
     }
