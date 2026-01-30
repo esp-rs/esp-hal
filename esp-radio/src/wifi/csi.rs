@@ -22,7 +22,7 @@ use crate::{
 /// CSI (Channel State Information) packet metadata and associated packet details.
 ///
 /// This structure contains the raw CSI data, along with necessary metadata
-/// from the received WiFi packet (MAC addresses, sequence number, packet headers).
+/// from the received Wi-Fi packet (MAC addresses, sequence number, packet headers).
 #[repr(transparent)]
 pub struct WifiCsiInfo<'a> {
     inner: *const wifi_csi_info_t,
@@ -143,7 +143,7 @@ impl<'a> WifiCsiInfo<'_> {
     }
 
     /// Antenna number from which this packet is received.
-    /// 0: WiFi antenna 0; 1: WiFi antenna 1.
+    /// 0: Wi-Fi antenna 0; 1: Wi-Fi antenna 1.
     #[cfg(not(esp32c6))]
     pub fn antenna(&self) -> u8 {
         unsafe { (*self.inner).rx_ctrl.ant() as u8 }

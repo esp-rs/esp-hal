@@ -29,9 +29,9 @@ use esp_println::println;
 use esp_radio::{
     ble::controller::BleConnector,
     wifi::{
+        Interface,
         ModeConfig,
         WifiController,
-        WifiDevice,
         WifiEvent,
         scan::ScanConfig,
         sta::StationConfig,
@@ -208,6 +208,6 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn net_task(mut runner: Runner<'static, WifiDevice<'static>>) {
+async fn net_task(mut runner: Runner<'static, Interface<'static>>) {
     runner.run().await
 }
