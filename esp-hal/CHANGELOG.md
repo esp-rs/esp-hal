@@ -21,7 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dedicated GPIO implementation (#4699)
 - `esp_hal::interrupt::wait_for_interrupt`, which enters `wfi` (RISC-V) or `waiti 0` (Xtensa) when it would not prevent a debugger from reading memory (#4782)
 - Initial ESP32-C5 support (#4859, #4866, #4871)
-- Initial ESP32-C5 support (#4859, #4866)
 - New configuration option: `ESP_HAL_CONFIG_MIN_CHIP_REVISION` (#4875)
 
 ### Changed

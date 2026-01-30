@@ -325,15 +325,15 @@ fn chip_revision_in_range(range: Range<u16>) -> bool {
     range.contains(&chip_revision)
 }
 
-/// Returns true if the chip is newer than the given revision.
+/// Returns true if the chip revision is at least the given revision.
 #[allow(dead_code)]
 pub(crate) fn chip_revision_above(min: u16) -> bool {
     chip_revision_in_range(min..u16::MAX)
 }
 
-/// Returns true if the chip is newer than the given revision, in the same major version.
+/// Returns true if the chip is at least the given revision, in the same major version.
 #[allow(dead_code)]
 pub(crate) fn chip_minor_revision_above(rev: u16) -> bool {
-    let max = rev.next_multiple_of(100);
+    let max = (rev + 1).next_multiple_of(100);
     chip_revision_in_range(rev..max)
 }
