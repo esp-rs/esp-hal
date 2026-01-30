@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Sha<X>Context` now derive `Clone`, except on ESP32. (#4709)
 - Dedicated GPIO implementation (#4699, #4819)
 - `esp_hal::interrupt::wait_for_interrupt`, which enters `wfi` (RISC-V) or `waiti 0` (Xtensa) when it would not prevent a debugger from reading memory (#4782)
+- Initial ESP32-C5 support (#4859, #4866)
 
 ### Changed
 
@@ -38,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- SHA: Fixed potential unsoundness in `ShaDigest` by requiring exclusive access to the peripheral (#4837)
 - ESP32: ADC1 readings are no longer inverted (#4423)
 - RMT: All blocking methods now return the channel on failure. (#4302)
 - RMT: the `place_rmt_driver_in_ram` option now also places the async interrupt handler in RAM. (#4302)
@@ -52,12 +54,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All GPIOs are now available without unsafe code. The potentially reserved GPIOs are now documented. (#4728)
 - Make sure we added all relevant section to `.rwtext.wifi` (#4808)
 - ESP32-S3: Fixed startup code to prevent a linker error (#4815)
+- Fixed a situation where the ELF might make tooling emit more than two segments in the image which will make the bootloader refuse to boot (#4844)
+- ESP32-S3/ESP32-C2: WiFi will work after light-sleep with default settings (#4826)
+- ESP32-S2: Fixed an issue where enabling TRNG can prevent WiFi from working (#4856)
 
 ### Removed
 
 - The `ESP_HAL_CONFIG_XTAL_FREQUENCY` configuration option has been removed (#4517)
 - `Clocks::{i2c_clock, pwm_clock, crypto_clock}` fields (#4636, #4647)
 - `RtcClock::xtal_freq()` and the `XtalClock` enum (#4724)
+- `Rtc::estimate_xtal_frequency()` (#4851)
+- `RtcFastClock`, `RtcSlowClock` (#4851)
 
 ## [v1.0.0] - 2025-10-30
 

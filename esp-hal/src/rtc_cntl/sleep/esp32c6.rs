@@ -1,12 +1,9 @@
 use core::ops::Not;
 
 use crate::{
-    clock::Clock,
-    efuse::Efuse,
     gpio::RtcFunction,
     rtc_cntl::{
         Rtc,
-        RtcCalSel,
         RtcClock,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower, SavedClockConfig},
         sleep::{
@@ -18,7 +15,7 @@ use crate::{
             WakeupLevel,
         },
     },
-    soc::clocks::ClockTree,
+    soc::clocks::{ClockTree, Timg0CalibrationClockConfig},
 };
 
 impl WakeSource for TimerWakeupSource {
@@ -34,7 +31,7 @@ impl WakeSource for TimerWakeupSource {
         let clock_freq = RtcClock::slow_freq();
         // TODO: maybe add sleep time adjustment like idf
         // TODO: maybe add check to prevent overflow?
-        let clock_hz = clock_freq.frequency().as_hz() as u64;
+        let clock_hz = clock_freq.as_hz() as u64;
         let ticks = self.duration.as_micros() as u64 * clock_hz / 1_000_000u64;
         // "alarm" time in slow rtc ticks
         let now = rtc.time_since_boot_raw();
@@ -616,21 +613,8 @@ const CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ: u32 = 160;
 impl SleepTimeConfig {
     const RTC_CLK_CAL_FRACT: u32 = 19;
 
-    fn rtc_clk_cal_fast(mut slowclk_cycles: u32) -> u32 {
-        let xtal_freq = 40; // esp-idf has a very complicated way of determining this
-
-        // The Fosc CLK of calibration circuit is divided by 32 for ECO1.
-        // So we need to divide the calibrate cycles of the FOSC for ECO1 and above
-        // chips by 32 to avoid excessive calibration time.
-        if Efuse::chip_revision() >= 1 {
-            slowclk_cycles /= 32;
-        }
-
-        let xtal_cycles = RtcClock::calibrate_internal(RtcCalSel::RcFast, slowclk_cycles) as u64;
-
-        let divider: u64 = xtal_freq as u64 * slowclk_cycles as u64;
-        let period_64: u64 = ((xtal_cycles << Self::RTC_CLK_CAL_FRACT) + divider / 2 - 1) / divider;
-        (period_64 & (u32::MAX as u64)) as u32
+    fn rtc_clk_cal_fast(slowclk_cycles: u32) -> u32 {
+        RtcClock::calibrate(Timg0CalibrationClockConfig::RcFastDivClk, slowclk_cycles)
     }
 
     fn new(_deep: bool) -> Self {

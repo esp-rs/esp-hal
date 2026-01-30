@@ -206,7 +206,6 @@ async fn main(spawner: Spawner) -> ! {
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
-    println!("Device capabilities: {:?}", controller.capabilities());
     loop {
         if matches!(controller.is_connected(), Ok(true)) {
             // wait until we're no longer connected

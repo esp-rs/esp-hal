@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if cfg!(feature = "jtag-serial") && !has_jtag_serial {
         panic!(
-            "The `jtag-serial` feature is only supported by the ESP32-C3, ESP32-C6, ESP32-H2, ESP32-P4, and ESP32-S3"
+            "The `jtag-serial` feature is only supported by the ESP32-C3, ESP32-C5, ESP32-C6, ESP32-H2, ESP32-P4, and ESP32-S3"
         );
     }
 

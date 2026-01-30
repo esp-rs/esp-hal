@@ -99,9 +99,7 @@ symbols = [
 ]
 
 [device.soc]
-ref_tick_hz = 1_000_000
 rc_fast_clk_default = 8_500_000
-rc_slow_clock = 150_000
 
 memory_map = { ranges = [
     { name = "dram", start = 0x3FFA_E000, end = 0x4000_0000 },
@@ -219,7 +217,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "XTAL_DIV_CLK",    type = "divider", output = "XTAL_CLK / 4" }, # source: esp-idf SOC_RTC_FAST_CLK_SRC_XTAL_D4
 
     { name = "RTC_SLOW_CLK", type = "mux", variants = [
-        { name = "XTAL",    outputs = "XTAL32K_CLK" },
+        { name = "XTAL32K", outputs = "XTAL32K_CLK" },
         { name = "RC_SLOW", outputs = "RC_SLOW_CLK" },
         { name = "RC_FAST", outputs = "RC_FAST_DIV_CLK" },
     ] },

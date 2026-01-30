@@ -111,16 +111,18 @@
 //! ```
 
 pub use self::rtc::SocResetReason;
-#[cfg(not(esp32))]
-use crate::efuse::Efuse;
 #[cfg(sleep)]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
+#[cfg(not(esp32c5))]
 use crate::{
-    clock::{Clock, RtcClock},
+    clock::RtcClock,
     interrupt::{self, InterruptHandler},
-    peripherals::{Interrupt, LPWR},
-    system::{Cpu, SleepSource},
+    peripherals::Interrupt,
     time::Duration,
+};
+use crate::{
+    peripherals::LPWR,
+    system::{Cpu, SleepSource},
 };
 // only include sleep where it's been implemented
 #[cfg(sleep)]
@@ -129,6 +131,7 @@ pub mod sleep;
 #[cfg_attr(esp32, path = "rtc/esp32.rs")]
 #[cfg_attr(esp32c2, path = "rtc/esp32c2.rs")]
 #[cfg_attr(esp32c3, path = "rtc/esp32c3.rs")]
+#[cfg_attr(esp32c5, path = "rtc/esp32c5.rs")]
 #[cfg_attr(esp32c6, path = "rtc/esp32c6.rs")]
 #[cfg_attr(esp32h2, path = "rtc/esp32h2.rs")]
 #[cfg_attr(esp32s2, path = "rtc/esp32s2.rs")]
@@ -136,8 +139,9 @@ pub mod sleep;
 pub(crate) mod rtc;
 
 cfg_if::cfg_if! {
-    if #[cfg(any(esp32c6, esp32h2))] {
+    if #[cfg(any(esp32c6, esp32h2, esp32c5))] {
         use crate::peripherals::LP_WDT;
+        #[cfg(not(esp32c5))]
         use crate::peripherals::LP_TIMER;
         use crate::peripherals::LP_AON;
     } else {
@@ -188,43 +192,6 @@ bitflags::bitflags! {
     }
 }
 
-/// Clock source to be calibrated using `rtc_clk_cal` function
-#[allow(unused)]
-#[cfg(not(any(esp32c6, esp32h2)))]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum RtcCalSel {
-    /// Currently selected RTC SLOW_CLK
-    RtcMux      = 0,
-    /// Internal 8 MHz RC oscillator, divided by 256
-    _8mD256     = 1,
-    /// External 32 KHz XTAL
-    _32kXtal    = 2,
-    /// Internal 150 KHz RC oscillator
-    #[cfg(not(esp32))]
-    InternalOsc = 3,
-}
-
-/// Clock source to be calibrated using `rtc_clk_cal` function
-#[cfg(any(esp32c6, esp32h2))]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum RtcCalSel {
-    /// Currently selected RTC SLOW_CLK
-    RtcMux      = -1,
-    /// Internal 150kHz RC oscillator
-    RcSlow      = 0,
-    /// External 32kHz XTAL, as one type of 32k clock
-    _32kXtal    = 1,
-    /// Internal 32kHz RC oscillator, as one type of 32k clock
-    _32kRc      = 2,
-    /// External slow clock signal input by lp_pad_gpio0, as one type of 32k
-    /// clock
-    _32kOscSlow = 3,
-    /// Internal MHz-range RC oscillator
-    RcFast,
-}
-
 /// Low-power Management
 pub struct Rtc<'d> {
     _inner: LPWR<'d>,
@@ -248,12 +215,8 @@ impl<'d> Rtc<'d> {
         }
     }
 
-    /// Return estimated XTAL frequency in MHz.
-    pub fn estimate_xtal_frequency(&mut self) -> u32 {
-        RtcClock::estimate_xtal_frequency()
-    }
-
     /// Get the time since boot in the raw register units.
+    #[cfg(not(esp32c5))]
     fn time_since_boot_raw(&self) -> u64 {
         let rtc_cntl = LP_TIMER::regs();
 
@@ -291,14 +254,15 @@ impl<'d> Rtc<'d> {
     ///
     /// It should be noted that any reset or sleep, other than a power-up reset, will not stop or
     /// reset the RTC timer.
+    #[cfg(not(esp32c5))]
     pub fn time_since_power_up(&self) -> Duration {
         Duration::from_micros(
-            self.time_since_boot_raw() * 1_000_000
-                / RtcClock::slow_freq().frequency().as_hz() as u64,
+            self.time_since_boot_raw() * 1_000_000 / RtcClock::slow_freq().as_hz() as u64,
         )
     }
 
     /// Read the current value of the boot time registers in microseconds.
+    #[cfg(not(esp32c5))]
     fn boot_time_us(&self) -> u64 {
         // For more info on about how RTC setting works and what it has to do with boot time, see https://github.com/esp-rs/esp-hal/pull/1883
 
@@ -324,6 +288,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// Set the current value of the boot time registers in microseconds.
+    #[cfg(not(esp32c5))]
     fn set_boot_time_us(&self, boot_time_us: u64) {
         // Please see `boot_time_us` for documentation on registers and peripherals
         // used for certain SOCs.
@@ -363,6 +328,7 @@ impl<'d> Rtc<'d> {
     /// let weekday_in_new_york = now.to_zoned(TZ.clone()).weekday();
     /// # {after_snippet}
     /// ```
+    #[cfg(not(esp32c5))]
     pub fn current_time_us(&self) -> u64 {
         // Current time is boot time + time since boot
 
@@ -381,6 +347,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// Set the current time in microseconds.
+    #[cfg(not(esp32c5))]
     pub fn set_current_time_us(&self, current_time_us: u64) {
         // Current time is boot time + time since boot (rtc time)
         // So boot time = current time - time since boot (rtc time)
@@ -457,6 +424,7 @@ impl<'d> Rtc<'d> {
     /// Note that this will replace any previously registered interrupt
     /// handlers.
     #[instability::unstable]
+    #[cfg(not(esp32c5))]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c6, esp32h2))] {
@@ -476,6 +444,7 @@ impl<'d> Rtc<'d> {
 impl crate::private::Sealed for Rtc<'_> {}
 
 #[instability::unstable]
+#[cfg(not(esp32c5))]
 impl crate::interrupt::InterruptConfigurable for Rtc<'_> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler);
@@ -583,7 +552,15 @@ impl Rwdt {
     /// Feed the watchdog timer.
     pub fn feed(&mut self) {
         self.set_write_protection(false);
-        LP_WDT::regs().wdtfeed().write(|w| w.wdt_feed().set_bit());
+        LP_WDT::regs().wdtfeed().write(|w| {
+            cfg_if::cfg_if! {
+                if #[cfg(esp32c5)] {
+                    w.rtc_wdt_feed().set_bit()
+                } else {
+                    w.wdt_feed().set_bit()
+                }
+            }
+        });
         self.set_write_protection(true);
     }
 
@@ -629,6 +606,7 @@ impl Rwdt {
     }
 
     /// Configure timeout value in ms for the selected stage.
+    #[cfg(not(esp32c5))]
     pub fn set_timeout(&mut self, stage: RwdtStage, timeout: Duration) {
         let rtc_cntl = LP_WDT::regs();
 
@@ -643,7 +621,7 @@ impl Rwdt {
         };
 
         #[cfg(not(esp32))]
-        let timeout_raw = timeout_raw >> (1 + Efuse::rwdt_multiplier());
+        let timeout_raw = timeout_raw >> (1 + crate::efuse::Efuse::rwdt_multiplier());
 
         config_reg.modify(|_, w| unsafe { w.hold().bits(timeout_raw) });
 
@@ -723,7 +701,7 @@ pub fn wakeup_cause() -> SleepSource {
     cfg_if::cfg_if! {
         if #[cfg(esp32)] {
             let wakeup_cause_bits = LPWR::regs().wakeup_state().read().wakeup_cause().bits() as u32;
-        } else if #[cfg(any(esp32c6, esp32h2))] {
+        } else if #[cfg(any(esp32c5, esp32c6, esp32h2))] {
             let wakeup_cause_bits = crate::peripherals::PMU::regs()
                 .slp_wakeup_status0()
                 .read()

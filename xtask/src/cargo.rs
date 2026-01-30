@@ -61,6 +61,8 @@ where
 
     let mut command = Command::new(get_cargo());
 
+    let ci = std::env::var("CI").is_ok();
+
     command
         .args(args)
         .current_dir(cwd)
@@ -70,7 +72,7 @@ where
         } else {
             Stdio::inherit()
         })
-        .stderr(if capture {
+        .stderr(if capture || ci {
             Stdio::piped()
         } else {
             Stdio::inherit()
@@ -81,20 +83,39 @@ where
         command.env_remove("CARGO");
     }
 
-    let output = command
-        .stdin(Stdio::inherit())
-        .output()
-        .with_context(|| format!("Couldn't get output for command {command:?}"))?;
+    // retrying - remove once we don't need this anymore
+    let mut retries = 50;
+    loop {
+        let output = command
+            .stdin(Stdio::inherit())
+            .output()
+            .with_context(|| format!("Couldn't get output for command {command:?}"))?;
 
-    // Make sure that we return an appropriate exit code here, as Github Actions
-    // requires this in order to function correctly:
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    } else {
-        bail!(
-            "Failed to execute cargo subcommand `cargo {}`",
-            args.join(" "),
-        )
+        // Make sure that we return an appropriate exit code here, as Github Actions
+        // requires this in order to function correctly:
+        if output.status.success() {
+            break Ok(String::from_utf8_lossy(&output.stdout).to_string());
+        } else {
+            if ci {
+                let err_out = String::from_utf8_lossy(&output.stderr).to_string();
+                if !capture {
+                    eprintln!("{}", err_out);
+                }
+                if err_out.contains("SIGSEGV") {
+                    if !capture {
+                        eprintln!("Retry build ({retries})");
+                    }
+                    retries -= 1;
+                    if retries > 0 {
+                        continue;
+                    }
+                }
+            }
+            bail!(
+                "Failed to execute cargo subcommand `cargo {}`",
+                args.join(" "),
+            )
+        }
     }
 }
 

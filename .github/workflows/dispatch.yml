@@ -307,7 +307,7 @@ jobs:
         with:
           script: |
             const body = (context.payload.comment.body || '').trim();
-            const m = body.match(/--tests\s+(.+)$/i);
+            const m = body.match(/--tests?\s+(.+)$/i);
             if (!m) {
               core.setOutput('tests', '');
               return;
@@ -477,7 +477,7 @@ jobs:
         with:
           script: |
             const body = (context.payload.comment.body || '').trim();
-            const m = body.match(/--tests\s+(.+)$/i);
+            const m = body.match(/--tests?\s+(.+)$/i);
             if (!m) {
               core.setOutput('tests', '');
               return;
@@ -687,7 +687,7 @@ jobs:
         with:
           script: |
             const body = (context.payload.comment.body || '').trim();
-            const m = body.match(/--tests\s+(.+)$/i);
+            const m = body.match(/--tests?\s+(.+)$/i);
             if (!m) {
               core.setOutput('tests', '');
               return;
@@ -893,7 +893,7 @@ jobs:
             - `/hil full`  — run the full HIL matrix for all supported chips
             - `/hil <chip> [<chip> ...]` — run the full HIL tests **only** for the listed chips
             - `/test-size` — run binary size analysis for this PR
-            - You can optionally append `--tests <name>[,<name>...]` to any `/hil` command to only run selected tests.
+            - You can optionally append `--test <name>[,<name>...]` to any `/hil` command to only run selected tests.
             If you aren't a repository **member/owner**, you must be **trusted for this PR**.
             Maintainers can grant access with a `trusted-author` label or with:
             ```

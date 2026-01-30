@@ -341,7 +341,7 @@ fn configure_lp_slow_clk_impl(
     LP_CLKRST::regs().lp_clk_conf().modify(|_, w| unsafe {
         w.slow_clk_sel().bits(match new_selector {
             LpSlowClkConfig::RcSlow => 0,
-            LpSlowClkConfig::Xtal32kClk => 1,
+            LpSlowClkConfig::Xtal32k => 1,
             LpSlowClkConfig::OscSlow => 2,
         })
     });
@@ -408,8 +408,8 @@ fn configure_timg0_calibration_clock_impl(
 ) {
     TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
         w.rtc_cali_clk_sel().bits(match new_selector {
-            Timg0CalibrationClockConfig::RtcSlowClk => 0,
-            Timg0CalibrationClockConfig::RcFastClk => 1,
+            Timg0CalibrationClockConfig::RcSlowClk => 0,
+            Timg0CalibrationClockConfig::RcFastDivClk => 1,
             Timg0CalibrationClockConfig::Xtal32kClk => 2,
         })
     });
@@ -478,8 +478,8 @@ fn configure_timg1_calibration_clock_impl(
 ) {
     TIMG1::regs().rtccalicfg().modify(|_, w| unsafe {
         w.rtc_cali_clk_sel().bits(match new_selector {
-            Timg0CalibrationClockConfig::RtcSlowClk => 0,
-            Timg0CalibrationClockConfig::RcFastClk => 1,
+            Timg0CalibrationClockConfig::RcSlowClk => 0,
+            Timg0CalibrationClockConfig::RcFastDivClk => 1,
             Timg0CalibrationClockConfig::Xtal32kClk => 2,
         })
     });

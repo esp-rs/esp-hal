@@ -137,7 +137,6 @@ fn main() -> ! {
 
     controller.start().unwrap();
     println!("is wifi started: {:?}", controller.is_started());
-    println!("{:?}", controller.capabilities());
     println!("wifi_connect {:?}", controller.connect());
 
     drop(hci);

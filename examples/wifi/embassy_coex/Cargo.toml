@@ -14,6 +14,7 @@ embassy-net = { version = "0.7.0", features = [
     "udp",
 ] }
 embassy-time = "0.5.0"
+embassy-sync = "0.7.2"
 embedded-io-async = "0.6.1"
 esp-alloc = { path = "../../../esp-alloc" }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
@@ -80,3 +81,7 @@ debug            = true
 debug-assertions = true
 lto              = "fat"
 codegen-units    = 1
+
+[package.metadata.cargo-machete]
+# Needed for the gatt_server macro.
+ignored = ["embassy-sync"]

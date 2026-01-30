@@ -5,9 +5,7 @@
 use strum::FromRepr;
 
 use crate::{
-    clock::{RtcClock, RtcFastClock, RtcSlowClock},
-    peripherals::{LP_AON, LP_CLKRST, MODEM_LPCON, MODEM_SYSCON, PCR, PMU},
-    rtc_cntl::RtcCalSel,
+    peripherals::{LP_CLKRST, MODEM_LPCON, MODEM_SYSCON, PCR, PMU},
     soc::{
         clocks::{ClockTree, SocRootClkConfig},
         regi2c,
@@ -1046,23 +1044,6 @@ pub(crate) fn init() {
     let modem_lpclk_src = ModemClockLpclkSource::from(RtcSlowClockSource::current());
 
     modem_clock_select_lp_clock_source_wifi(modem_lpclk_src, 0);
-
-    RtcClock::set_fast_freq(RtcFastClock::RcFast);
-    RtcClock::set_slow_freq(RtcSlowClock::RcSlow);
-}
-
-pub(crate) fn configure_clock() {
-    let cal_val = loop {
-        let res = RtcClock::calibrate(RtcCalSel::RtcMux, 1024);
-        if res != 0 {
-            break res;
-        }
-    };
-
-    LP_AON::regs()
-        .store1()
-        .modify(|_, w| unsafe { w.bits(cal_val) });
-
     modem_clk_domain_active_state_icg_map_preinit();
 }
 

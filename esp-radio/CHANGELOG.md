@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp-alloc` dependency no longer enables default features (#4721)
 - `sys-logs` feature has been renamed to `print-logs-from-driver` and has been marked unstable (#4810)
 - Unstable features now require the `unstable` feature flag to be enabled (#4810)
+- `RxControlInfo` is unstable, `RxControlInfo::from_raw()` is no longer public (#4811)
+- `event`, `sniffer`, and `csi` modules are marked unstable (#4811)
 
 ### Fixed
 
@@ -42,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a linker error (about missing symbols) when the `wifi` feature is selected but the code doesn't use it (#4513)
 - `Controller::stop_async()` now returns `WifiError::NotStarted` when the `Controller` has not been started (#4504)
 - ESP32-C2: Disable BLE controller before deinitializing the stack (#4606)
+- Fix a crash after shutting down WiFi (#4761)
 
 ### Removed
 
@@ -51,6 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the free standing `xxx_state()` functions have been removed together with their return types `WifiApState`/`WifiStaState` (#4571)
 - `wifi::Country` has been replaced by `wifi::CountryInfo` (#4788)
 - `InitializationError` is no longer `pub` for `wifi` (#4809)
+- `wifi::Capability` and `WifiController::capabilities()` no longer available (#4816)
+- `FreeApListOnDrop` is no longer available (#4816)
+- `wifi::ModeConfig::None` is no longer available (#4834)
 
 ## [v0.17.0] - 2025-10-30
 
@@ -108,6 +114,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Set `ble_ll_sync_cnt` to 0 on C6, C2 and H2 as in esp-idf Kconfig default (#4241)
 - `esp_radio::wifi::WifiController::scan_with_config_sync` has been renamed to `scan_with_config` (#4294)
 - `wifi::AuthMethod` has been renamed to `wifi::AuthenticationMethod` (#4778)
+- `wifi::Bandwidth` is now `#[non_exhaustive]` (#4816)
 
 ### Fixed
 

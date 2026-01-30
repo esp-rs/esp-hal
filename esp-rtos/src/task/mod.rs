@@ -657,7 +657,4 @@ pub(crate) fn schedule_other_core() {
         Cpu::ProCpu => unsafe { SoftwareInterrupt::<'static, 1>::steal() }.raise(),
         Cpu::AppCpu => unsafe { SoftwareInterrupt::<'static, 0>::steal() }.raise(),
     }
-
-    // It takes a bit for the software interrupt to be serviced, but since it's happening on the
-    // other core, we don't need to wait.
 }

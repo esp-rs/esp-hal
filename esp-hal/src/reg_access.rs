@@ -63,12 +63,14 @@ impl EndianessConverter for SocDependentEndianess {
 // ptr.is_aligned can be used). It also assumes that writes are done in FIFO
 // order.
 #[derive(Debug, Clone)]
+#[cfg_attr(esp32c5, allow(unused))]
 pub(crate) struct AlignmentHelper<E: EndianessConverter> {
     buf: [u8; U32_ALIGN_SIZE],
     buf_fill: usize,
     phantom: PhantomData<E>,
 }
 
+#[cfg_attr(esp32c5, allow(unused))]
 impl AlignmentHelper<SocDependentEndianess> {
     pub fn default() -> AlignmentHelper<SocDependentEndianess> {
         AlignmentHelper {
@@ -79,6 +81,7 @@ impl AlignmentHelper<SocDependentEndianess> {
     }
 }
 
+#[cfg_attr(esp32c5, allow(unused))]
 impl<E: EndianessConverter> AlignmentHelper<E> {
     pub fn reset(&mut self) {
         self.buf_fill = 0;

@@ -307,7 +307,6 @@ async fn main(spawner: Spawner) -> ! {
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
-    println!("Device capabilities: {:?}", controller.capabilities());
 
     println!("Starting wifi");
     controller.start_async().await.unwrap();

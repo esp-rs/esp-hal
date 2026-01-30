@@ -1,9 +1,7 @@
 use strum::FromRepr;
 
 use crate::{
-    clock::RtcClock,
     peripherals::{APB_CTRL, EXTMEM, LPWR, SPI0, SPI1, SYSTEM},
-    rtc_cntl::RtcCalSel,
     soc::regi2c,
 };
 
@@ -54,18 +52,6 @@ pub(crate) fn init() {
     }
 
     regi2c::I2C_ULP_IR_FORCE_XPD_CK.write_field(0);
-}
-
-pub(crate) fn configure_clock() {
-    // TODO: this needs to be re-done, too. "RtcMux" is just RC_SLOW_CLK.
-    let cal_val = loop {
-        let res = RtcClock::calibrate(RtcCalSel::RtcMux, 1024);
-        if res != 0 {
-            break res;
-        }
-    };
-
-    LPWR::regs().store1().write(|w| unsafe { w.bits(cal_val) });
 }
 
 fn calibrate_ocode() {}

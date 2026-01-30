@@ -90,7 +90,13 @@
 
 #![allow(deprecated, reason = "generic_array 0.14 has been deprecated")]
 
-use core::{borrow::Borrow, convert::Infallible, marker::PhantomData, mem::size_of, ptr::NonNull};
+use core::{
+    borrow::BorrowMut,
+    convert::Infallible,
+    marker::PhantomData,
+    mem::size_of,
+    ptr::NonNull,
+};
 
 /// Re-export digest for convenience
 pub use digest::Digest;
@@ -346,7 +352,7 @@ impl crate::interrupt::InterruptConfigurable for Sha<'_> {
 ///
 /// This implementation might fail after u32::MAX/8 bytes, to increase please
 /// see ::finish() length/self.cursor usage
-pub struct ShaDigest<'d, A, S: Borrow<Sha<'d>>> {
+pub struct ShaDigest<'d, A, S: BorrowMut<Sha<'d>>> {
     sha: S,
     state: DigestState,
     phantom: PhantomData<(&'d (), A)>,
@@ -387,13 +393,13 @@ impl DigestState {
     }
 }
 
-impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
+impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
     /// Creates a new digest
     #[allow(unused_mut)]
     pub fn new(mut sha: S) -> Self {
         #[cfg(not(esp32))]
         // Setup SHA Mode.
-        sha.borrow()
+        sha.borrow_mut()
             .sha
             .register_block()
             .mode()
@@ -408,9 +414,9 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
 
     /// Restores a previously saved digest.
     #[cfg(not(esp32))]
-    pub fn restore(sha: S, ctx: &mut Context<A>) -> Self {
+    pub fn restore(mut sha: S, ctx: &mut Context<A>) -> Self {
         // Setup SHA Mode.
-        sha.borrow()
+        sha.borrow_mut()
             .sha
             .register_block()
             .mode()
@@ -418,12 +424,16 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
 
         // Restore the message buffer
         unsafe {
-            core::ptr::copy_nonoverlapping(ctx.buffer.as_ptr(), m_mem(&sha.borrow().sha, 0), 32);
+            core::ptr::copy_nonoverlapping(
+                ctx.buffer.as_ptr(),
+                m_mem(&sha.borrow_mut().sha, 0),
+                32,
+            );
         }
 
         // Restore previously saved hash
         ctx.state.alignment_helper.volatile_write_regset(
-            h_mem(&sha.borrow().sha, 0),
+            h_mem(&sha.borrow_mut().sha, 0),
             &ctx.saved_digest,
             64,
         );
@@ -442,7 +452,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
 
     /// Updates the SHA digest with the provided data buffer.
     pub fn update<'a>(&mut self, incoming: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
-        self.sha.borrow().update(&mut self.state, incoming)
+        self.sha.borrow_mut().update(&mut self.state, incoming)
     }
 
     /// Finish of the calculation (if not already) and copy result to output
@@ -453,7 +463,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
     /// [ShaAlgorithm::DIGEST_LENGTH], but smaller inputs can be given to
     /// get a "short hash"
     pub fn finish(&mut self, output: &mut [u8]) -> nb::Result<(), Infallible> {
-        self.sha.borrow().finish(&mut self.state, output)
+        self.sha.borrow_mut().finish(&mut self.state, output)
     }
 
     /// Save the current state of the digest for later continuation.
@@ -467,7 +477,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
 
         // Save the content of the current hash.
         self.state.alignment_helper.volatile_read_regset(
-            h_mem(&self.sha.borrow().sha, 0),
+            h_mem(&self.sha.borrow_mut().sha, 0),
             &mut context.saved_digest,
             64,
         );
@@ -475,7 +485,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
         // Save the content of the current (probably partially written) message.
         unsafe {
             core::ptr::copy_nonoverlapping(
-                m_mem(&self.sha.borrow().sha, 0),
+                m_mem(&self.sha.borrow_mut().sha, 0),
                 context.buffer.as_mut_ptr(),
                 32,
             );
@@ -554,13 +564,13 @@ pub trait ShaAlgorithm: crate::private::Sealed {
 
 /// Note: digest has a blanket trait implementation for [digest::Digest] for any
 /// element that implements FixedOutput + Default + Update + HashMarker
-impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::HashMarker for ShaDigest<'d, A, S> {}
+impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::HashMarker for ShaDigest<'d, A, S> {}
 
-impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::OutputSizeUser for ShaDigest<'d, A, S> {
+impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::OutputSizeUser for ShaDigest<'d, A, S> {
     type OutputSize = A::DigestOutputSize;
 }
 
-impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::Update for ShaDigest<'d, A, S> {
+impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::Update for ShaDigest<'d, A, S> {
     fn update(&mut self, mut remaining: &[u8]) {
         while !remaining.is_empty() {
             remaining = nb::block!(Self::update(self, remaining)).unwrap();
@@ -568,7 +578,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::Update for ShaDigest<'d, A
     }
 }
 
-impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::FixedOutput for ShaDigest<'d, A, S> {
+impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::FixedOutput for ShaDigest<'d, A, S> {
     fn finalize_into(mut self, out: &mut digest::Output<Self>) {
         nb::block!(self.finish(out)).unwrap();
     }

@@ -762,7 +762,7 @@ pub(crate) mod implem {
     }
 }
 
-#[cfg(soc_has_systimer)]
+#[cfg(systimer)]
 pub(crate) mod implem {
     use super::Instant;
     use crate::timer::systimer::{SystemTimer, Unit};
@@ -779,5 +779,18 @@ pub(crate) mod implem {
         let micros = SystemTimer::ticks_to_us(ticks);
 
         Instant::from_ticks(micros)
+    }
+}
+
+#[cfg(esp32c5)]
+pub(crate) mod implem {
+    use super::Instant;
+
+    #[cfg(feature = "rt")]
+    pub(crate) fn time_init() {}
+
+    #[inline]
+    pub(super) fn now() -> Instant {
+        Instant::from_ticks(0)
     }
 }

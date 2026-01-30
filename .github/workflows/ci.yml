@@ -13,7 +13,7 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches-ignore:
       - "gh-readonly-queue/**"
@@ -38,9 +38,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
 
 jobs:
+  get-labels:
+    uses: ./.github/workflows/get-labels.yml
+
   # --------------------------------------------------------------------------
   # Build Packages
   esp-hal:
+    needs: get-labels
     runs-on: macos-m1-self-hosted
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
@@ -50,6 +54,7 @@ jobs:
       STATIC_IP: 1.1.1.1
       GATEWAY_IP: 1.1.1.1
       HOST_IP: 1.1.1.1
+      SKIP_CI: ${{ contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
 
     strategy:
       fail-fast: false
@@ -60,30 +65,38 @@ jobs:
           - riscv
 
     steps:
+      - name: Skip CI
+        if: env.SKIP_CI == 'true'
+        run: |
+          echo "skipping build"
+          exit 0
+
       - uses: actions/checkout@v6
+        if: env.SKIP_CI != 'true'
 
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
-        if: matrix.group == 'xtensa'
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
         with:
           version: 1.92.0.0
 
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
-        if: matrix.group == 'riscv'
+        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
           components: rust-src
 
       - name: Setup cargo-batch
+        if: env.SKIP_CI != 'true'
         run: |
           if ! command -v cargo-batch &> /dev/null; then
               cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
           fi
 
       - name: Build and Check Xtensa
-        if: matrix.group == 'xtensa'
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
         shell: bash
         run: |
           # lints and docs are checked separately
@@ -92,7 +105,7 @@ jobs:
           cargo xcheck ci esp32s3 --toolchain esp --no-lint --no-docs
 
       - name: Build and Check RISC-V
-        if: matrix.group == 'riscv'
+        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         shell: bash
         run: |
           # lints and docs are checked separately
@@ -102,14 +115,20 @@ jobs:
           cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
 
   detect-extras-runner:
+    needs: get-labels
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
     uses: ./.github/workflows/check_runner.yml
     with:
       primary-runner: macos-m1-self-hosted
       fallback-runner: ubuntu-latest
 
   extras:
-    needs: detect-extras-runner
+    needs: [get-labels, detect-extras-runner]
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
     runs-on: ${{ needs.detect-extras-runner.outputs.selected-runner }}
+
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@v1
@@ -129,6 +148,9 @@ jobs:
         run: cd extras/ieee802154-sniffer && cargo build
 
   docs:
+    needs: get-labels
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -173,7 +195,10 @@ jobs:
   # MSRV
 
   msrv:
+    needs: get-labels
     runs-on: ubuntu-latest
+    env:
+      SKIP_CI: ${{ contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
 
     strategy:
       fail-fast: false
@@ -183,35 +208,43 @@ jobs:
           - riscv
 
     steps:
+      - name: Skip CI
+        if: env.SKIP_CI == 'true'
+        run: |
+          echo "skipping build"
+          exit 0
+
       - uses: actions/checkout@v6
+        if: env.SKIP_CI != 'true'
+
       - uses: esp-rs/xtensa-toolchain@v1.6
-        if: matrix.group == 'xtensa'
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
         with:
           version: ${{ env.MSRV }}
 
       - name: esp toolchain checks
-        if: matrix.group == 'xtensa'
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
         run: rustc +esp --version --verbose
 
       - uses: dtolnay/rust-toolchain@v1
-        if: matrix.group == 'riscv'
+        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,x86_64-unknown-linux-gnu
           toolchain: ${{ env.MSRV }}
           components: rust-src,clippy
 
       - name: Stable toolchain checks
-        if: matrix.group == 'riscv'
+        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         run: rustc +${{ env.MSRV }} --version --verbose
 
       # Verify the MSRV for all chips by running a lint session
       - name: msrv RISC-V (esp-hal)
-        if: matrix.group == 'riscv'
+        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         run: |
           cargo xtask lint-packages --chips esp32c2,esp32c3,esp32c6,esp32h2 --toolchain ${{ env.MSRV }}
 
       - name: msrv Xtensa (esp-hal)
-        if: matrix.group == 'xtensa'
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
         run: |
           cargo xtask lint-packages --chips esp32,esp32s2,esp32s3 --toolchain esp
 
@@ -219,6 +252,9 @@ jobs:
   # host tests
 
   detect-host-tests-runner:
+    needs: get-labels
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
     uses: ./.github/workflows/check_runner.yml
     with:
       primary-runner: macos-m1-self-hosted
@@ -226,6 +262,8 @@ jobs:
 
   host-tests:
     needs: detect-host-tests-runner
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
     runs-on: ${{ needs.detect-host-tests-runner.outputs.selected-runner }}
     steps:
       - uses: actions/checkout@v6
@@ -253,6 +291,9 @@ jobs:
   # Check links in .rs, .md, and .toml files
 
   link-check:
+    needs: get-labels
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

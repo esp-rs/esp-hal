@@ -3,7 +3,7 @@
 //! - set SSID and PASSWORD env variable
 //! - gets an ip address via DHCP
 //! - performs an HTTP get request to some "random" server
-//! - does BLE advertising (you cannot connect to it - it's just not implemented in the example)
+//! - does BLE advertising and allows to connect
 
 #![no_std]
 #![no_main]
@@ -50,6 +50,29 @@ macro_rules! mk_static {
 
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
+
+/// Max number of connections
+const CONNECTIONS_MAX: usize = 1;
+/// Max number of L2CAP channels.
+const L2CAP_CHANNELS_MAX: usize = 2; // Signal + att
+
+// GATT Server definition
+#[gatt_server]
+struct Server {
+    battery_service: BatteryService,
+}
+
+/// Battery service
+#[gatt_service(uuid = service::BATTERY)]
+struct BatteryService {
+    /// Battery Level
+    #[descriptor(uuid = descriptors::VALID_RANGE, read, value = [0, 100])]
+    #[descriptor(uuid = descriptors::MEASUREMENT_DESCRIPTION, name = "hello", read, value = "Battery Level")]
+    #[characteristic(uuid = characteristic::BATTERY_LEVEL, read, notify, value = 10)]
+    level: u8,
+    #[characteristic(uuid = "408813df-5dd4-1f87-ec11-cdb001100000", write, read, notify)]
+    status: bool,
+}
 
 #[esp_rtos::main]
 async fn main(spawner: Spawner) -> ! {
@@ -166,7 +189,8 @@ pub async fn ble_task(controller: ExternalController<BleConnector<'static>, 1>) 
 
     println!("Our address = {:?}", address);
 
-    let mut resources: HostResources<DefaultPacketPool, 0, 0> = HostResources::new();
+    let mut resources: HostResources<DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> =
+        HostResources::new();
     let stack = trouble_host::new(controller, &mut resources).set_random_address(address);
 
     let Host {
@@ -185,36 +209,92 @@ pub async fn ble_task(controller: ExternalController<BleConnector<'static>, 1>) 
     )
     .unwrap();
 
-    join(runner.run(), async move {
+    println!("Starting advertising and GATT service");
+    let server = Server::new_with_config(GapConfig::Peripheral(PeripheralConfig {
+        name: "TrouBLE",
+        appearance: &appearance::power_device::GENERIC_POWER_DEVICE,
+    }))
+    .unwrap();
+
+    let _ = join(runner.run(), async {
         let mut params = AdvertisementParameters::default();
         params.interval_min = Duration::from_millis(100);
         params.interval_max = Duration::from_millis(100);
 
-        let _advertiser = peripheral
-            .advertise(
-                &params,
-                Advertisement::NonconnectableScannableUndirected {
-                    adv_data: &adv_data[..adv_len],
-                    scan_data: &[],
-                },
-            )
-            .await
-            .unwrap();
-
-        println!("BLE advertising started");
-
-        // Keep advertiser alive forever
         loop {
-            Timer::after(Duration::from_secs(60)).await;
+            match peripheral
+                .advertise(
+                    &params,
+                    Advertisement::ConnectableScannableUndirected {
+                        adv_data: &adv_data[..adv_len],
+                        scan_data: &[],
+                    },
+                )
+                .await
+            {
+                Ok(adv) => match adv.accept().await.unwrap().with_attribute_server(&server) {
+                    Ok(conn) => {
+                        println!("got connection");
+                        gatt_events_task(&server, &conn).await.unwrap();
+                    }
+                    Err(err) => println!("Error occured: {:?}", err),
+                },
+                Err(e) => {
+                    panic!("[adv] error: {:?}", e);
+                }
+            }
         }
     })
     .await;
 }
 
+/// Stream Events until the connection closes.
+///
+/// This function will handle the GATT events and process them.
+/// This is how we interact with read and write requests.
+async fn gatt_events_task<P: PacketPool>(
+    server: &Server<'_>,
+    conn: &GattConnection<'_, '_, P>,
+) -> Result<(), Error> {
+    let level = server.battery_service.level;
+    let reason = loop {
+        match conn.next().await {
+            GattConnectionEvent::Disconnected { reason } => break reason,
+            GattConnectionEvent::Gatt { event } => {
+                match &event {
+                    GattEvent::Read(event) => {
+                        if event.handle() == level.handle {
+                            let value = server.get(&level);
+                            println!("[gatt] Read Event to Level Characteristic: {:?}", value);
+                        }
+                    }
+                    GattEvent::Write(event) => {
+                        if event.handle() == level.handle {
+                            println!(
+                                "[gatt] Write Event to Level Characteristic: {:?}",
+                                event.data()
+                            );
+                        }
+                    }
+                    _ => {}
+                };
+                // This step is also performed at drop(), but writing it explicitly is necessary
+                // in order to ensure reply is sent.
+                match event.accept() {
+                    Ok(reply) => reply.send().await,
+                    Err(e) => println!("[gatt] error sending response: {:?}", e),
+                };
+            }
+            _ => {} // ignore other Gatt Connection Events
+        }
+    };
+    println!("[gatt] disconnected: {:?}", reason);
+    Ok(())
+}
+
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
-    println!("Device capabilities: {:?}", controller.capabilities());
     loop {
         if matches!(controller.is_connected(), Ok(true)) {
             // wait until we're no longer connected

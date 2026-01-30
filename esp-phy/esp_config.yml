@@ -3,8 +3,8 @@ crate: esp-phy
 options:
   - name: phy_enable_usb
     description: "Keeps USB running when using WiFi.
-                 This allows debugging and log messages via USB Serial JTAG.
-                 Turn off for best WiFi performance."
+      This allows debugging and log messages via USB Serial JTAG.
+      Turn off for best WiFi performance."
     default:
       - value: true
 

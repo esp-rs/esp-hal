@@ -8,6 +8,8 @@ use core::{fmt::Debug, marker::PhantomData, mem::MaybeUninit, ptr::addr_of, task
 use docsplay::Display;
 use enumset::{EnumSet, EnumSetType};
 use esp_config::esp_config_int;
+#[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
+use esp_hal::time::{Duration, Instant};
 use esp_hal::{asynch::AtomicWaker, system::Cpu};
 use esp_sync::NonReentrantMutex;
 use num_derive::FromPrimitive;
@@ -42,12 +44,18 @@ use crate::{
     },
 };
 pub mod ap;
-#[cfg(all(feature = "csi", feature = "unstable"))]
-pub mod csi;
-pub mod event;
+
+unstable_module!(
+    #[cfg(feature = "csi")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "csi")))]
+    pub mod csi;
+    pub mod event;
+    #[cfg(feature = "sniffer")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sniffer")))]
+    pub mod sniffer;
+);
+
 pub mod scan;
-#[cfg(all(feature = "sniffer", feature = "unstable"))]
-pub mod sniffer;
 pub mod sta;
 
 pub(crate) mod os_adapter;
@@ -188,33 +196,12 @@ impl SecondaryChannel {
     }
 }
 
-/// Introduces Wi-Fi configuration options.
-#[derive(EnumSetType, Debug, PartialOrd, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub enum Capability {
-    /// The device operates as a station, connecting to an existing network.
-    Station,
-
-    /// The device operates as an access point, allowing other devices to
-    /// connect to it.
-    AccessPoint,
-
-    /// The device can operate in both station and access point modes
-    /// simultaneously.
-    AccessPointStation,
-}
-
 /// Configuration of Wi-Fi operation mode.
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug, PartialEq, Eq, Default, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ModeConfig {
-    /// No configuration (default).
-    #[default]
-    None,
-
     /// Station configuration.
     Station(StationConfig),
 
@@ -232,7 +219,6 @@ pub enum ModeConfig {
 impl ModeConfig {
     fn validate(&self) -> Result<(), WifiError> {
         match self {
-            ModeConfig::None => Ok(()),
             ModeConfig::Station(station_configuration) => station_configuration.validate(),
             ModeConfig::AccessPoint(access_point_configuration) => {
                 access_point_configuration.validate()
@@ -372,21 +358,15 @@ impl WifiMode {
     }
 }
 
-impl TryFrom<&ModeConfig> for WifiMode {
-    type Error = WifiError;
-
-    /// Based on the current `ModeConfig`, derives a `WifiMode` based on it.
-    fn try_from(config: &ModeConfig) -> Result<Self, Self::Error> {
-        let mode = match config {
-            ModeConfig::None => return Err(WifiError::UnknownWifiMode),
+impl From<&ModeConfig> for WifiMode {
+    fn from(config: &ModeConfig) -> Self {
+        match config {
             ModeConfig::AccessPoint(_) => Self::AccessPoint,
             ModeConfig::Station(_) => Self::Station,
             ModeConfig::AccessPointStation(_, _) => Self::AccessPointStation,
             #[cfg(feature = "wifi-eap")]
             ModeConfig::EapStation(_) => Self::Station,
-        };
-
-        Ok(mode)
+        }
     }
 }
 
@@ -1007,6 +987,20 @@ impl WifiDeviceMode {
         }
 
         if self.can_send() {
+            // even checking for !Uninitialized would be enough to not crash
+            match self {
+                WifiDeviceMode::Station => {
+                    if !matches!(station_state(), WifiStationState::Connected) {
+                        return None;
+                    }
+                }
+                WifiDeviceMode::AccessPoint => {
+                    if !matches!(access_point_state(), WifiAccessPointState::Started) {
+                        return None;
+                    }
+                }
+            }
+
             Some(WifiTxToken { mode: *self })
         } else {
             None
@@ -1108,6 +1102,7 @@ impl WifiDevice<'_> {
     clippy::enum_variant_names,
     reason = "MHz suffix indicates physical unit."
 )]
+#[non_exhaustive]
 pub enum Bandwidth {
     /// 20 MHz bandwidth.
     _20MHz,
@@ -1127,6 +1122,7 @@ pub enum Bandwidth {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
+#[instability::unstable]
 pub struct RxControlInfo {
     /// Received Signal Strength Indicator (RSSI) of the packet, in dBm.
     pub rssi: i32,
@@ -1164,10 +1160,10 @@ pub struct RxControlInfo {
     pub channel: u32,
     /// Secondary channel on which the packet is received: 0 for none, 1 for
     /// above, 2 for below.
-    pub secondary_channel: u32,
+    pub secondary_channel: SecondaryChannel,
     /// Timestamp of when the packet is received, in microseconds. Precise only
     /// if modem sleep or light sleep is not enabled.
-    pub timestamp: u32,
+    pub timestamp: Instant,
     /// Noise floor of the Radio Frequency module, in dBm.
     pub noise_floor: i32,
     /// Antenna number from which the packet is received: 0 for antenna 0, 1 for
@@ -1185,6 +1181,7 @@ pub struct RxControlInfo {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
+#[instability::unstable]
 pub struct RxControlInfo {
     /// Received Signal Strength Indicator (RSSI) of the packet, in dBm.
     pub rssi: i32,
@@ -1208,8 +1205,8 @@ pub struct RxControlInfo {
     pub rx_channel_estimate_info_vld: u32,
     /// Length of the channel estimation.
     pub rx_channel_estimate_len: u32,
-    /// Timing information in seconds.
-    pub second: u32,
+    /// The secondary channel if in HT40.
+    pub secondary_channel: SecondaryChannel,
     /// Primary channel on which the packet is received.
     pub channel: u32,
     /// Noise floor of the Radio Frequency module, in dBm.
@@ -1226,6 +1223,9 @@ pub struct RxControlInfo {
     pub rxmatch1: u32,
     /// Indicate whether the reception frame is from interface 0.
     pub rxmatch0: u32,
+    /// The local time when this packet is received. It is precise only if modem sleep or light
+    /// sleep is not enabled. unit: microsecond.
+    pub timestamp: Instant,
 }
 
 #[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
@@ -1235,7 +1235,7 @@ impl RxControlInfo {
     /// # Safety
     /// When calling this, you must ensure, that `rx_cntl` points to a valid
     /// instance of [wifi_pkt_rx_ctrl_t].
-    pub unsafe fn from_raw(rx_cntl: *const wifi_pkt_rx_ctrl_t) -> Self {
+    pub(super) unsafe fn from_raw(rx_cntl: *const wifi_pkt_rx_ctrl_t) -> Self {
         #[cfg(not(esp32c6))]
         let rx_control_info = unsafe {
             RxControlInfo {
@@ -1252,8 +1252,8 @@ impl RxControlInfo {
                 sgi: (*rx_cntl).sgi(),
                 ampdu_cnt: (*rx_cntl).ampdu_cnt(),
                 channel: (*rx_cntl).channel(),
-                secondary_channel: (*rx_cntl).secondary_channel(),
-                timestamp: (*rx_cntl).timestamp(),
+                secondary_channel: SecondaryChannel::from_raw((*rx_cntl).secondary_channel()),
+                timestamp: Instant::EPOCH + Duration::from_micros((*rx_cntl).timestamp() as u64),
                 noise_floor: (*rx_cntl).noise_floor(),
                 ant: (*rx_cntl).ant(),
                 sig_len: (*rx_cntl).sig_len(),
@@ -1273,7 +1273,7 @@ impl RxControlInfo {
                 cur_bb_format: (*rx_cntl).cur_bb_format(),
                 rx_channel_estimate_info_vld: (*rx_cntl).rx_channel_estimate_info_vld(),
                 rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
-                second: (*rx_cntl).second(),
+                secondary_channel: SecondaryChannel::from_raw((*rx_cntl).second()),
                 channel: (*rx_cntl).channel(),
                 noise_floor: (*rx_cntl).noise_floor(),
                 is_group: (*rx_cntl).is_group(),
@@ -1282,6 +1282,7 @@ impl RxControlInfo {
                 rxmatch2: (*rx_cntl).rxmatch2(),
                 rxmatch1: (*rx_cntl).rxmatch1(),
                 rxmatch0: (*rx_cntl).rxmatch0(),
+                timestamp: Instant::EPOCH + Duration::from_micros((*rx_cntl).timestamp() as u64),
             }
         };
         rx_control_info
@@ -1418,19 +1419,32 @@ impl TxToken for WifiTxToken {
 // though in reality `esp_wifi_internal_tx` copies the buffer into its own
 // memory and does not modify
 pub(crate) fn esp_wifi_send_data(interface: wifi_interface_t, data: &mut [u8]) {
-    trace!("sending... {} bytes", data.len());
-    dump_packet_info(data);
+    // `esp_wifi_internal_tx` will crash if wifi is uninitialized or de-inited
 
-    let len = data.len() as u16;
-    let ptr = data.as_mut_ptr().cast();
+    state::locked(|| {
+        // even checking for !Uninitialized would be enough to not crash
+        if (interface == wifi_interface_t_WIFI_IF_STA
+            && !matches!(station_state(), WifiStationState::Connected))
+            || (interface == wifi_interface_t_WIFI_IF_AP
+                && !matches!(access_point_state(), WifiAccessPointState::Started))
+        {
+            return;
+        }
 
-    let res = unsafe { esp_wifi_result!(esp_wifi_internal_tx(interface, ptr, len)) };
+        trace!("sending... {} bytes", data.len());
+        dump_packet_info(data);
 
-    if res.is_err() {
-        decrement_inflight_counter();
-    } else {
-        trace!("esp_wifi_internal_tx ok");
-    }
+        let len = data.len() as u16;
+        let ptr = data.as_mut_ptr().cast();
+
+        let res = unsafe { esp_wifi_result!(esp_wifi_internal_tx(interface, ptr, len)) };
+
+        if res.is_err() {
+            decrement_inflight_counter();
+        } else {
+            trace!("esp_wifi_internal_tx ok");
+        }
+    })
 }
 
 fn dump_packet_info(_buffer: &mut [u8]) {
@@ -1962,16 +1976,18 @@ pub struct WifiController<'d> {
 
 impl Drop for WifiController<'_> {
     fn drop(&mut self) {
-        if let Err(e) = crate::wifi::wifi_deinit() {
-            warn!("Failed to cleanly deinit wifi: {:?}", e);
-        }
+        state::locked(|| {
+            if let Err(e) = crate::wifi::wifi_deinit() {
+                warn!("Failed to cleanly deinit wifi: {:?}", e);
+            }
 
-        set_access_point_state(WifiAccessPointState::Uninitialized);
-        set_station_state(WifiStationState::Uninitialized);
+            set_access_point_state(WifiAccessPointState::Uninitialized);
+            set_station_state(WifiStationState::Uninitialized);
 
-        esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
-            esp_hal::Internal::conjure()
-        });
+            esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
+                esp_hal::Internal::conjure()
+            });
+        })
     }
 }
 
@@ -2194,19 +2210,10 @@ impl WifiController<'_> {
         }
     }
 
-    /// Get the supported capabilities of the controller.
-    pub fn capabilities(&self) -> Result<EnumSet<crate::wifi::Capability>, WifiError> {
-        let caps = enumset::enum_set! { Capability::Station | Capability::AccessPoint | Capability::AccessPointStation };
-
-        Ok(caps)
-    }
-
     /// Set the configuration.
     ///
     /// This will set the mode accordingly.
     /// You need to use [`Self::connect`] for connecting to an access point.
-    ///
-    /// Passing [`ModeConfig::None`] will disable both access point and station modes.
     ///
     /// If you don't intend to use Wi-Fi anymore at all consider tearing down
     /// Wi-Fi completely.
@@ -2214,7 +2221,6 @@ impl WifiController<'_> {
         conf.validate()?;
 
         let mode = match conf {
-            ModeConfig::None => wifi_mode_t_WIFI_MODE_NULL,
             ModeConfig::Station(_) => wifi_mode_t_WIFI_MODE_STA,
             ModeConfig::AccessPoint(_) => wifi_mode_t_WIFI_MODE_AP,
             ModeConfig::AccessPointStation(_, _) => wifi_mode_t_WIFI_MODE_APSTA,
@@ -2225,7 +2231,6 @@ impl WifiController<'_> {
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) })?;
 
         match conf {
-            ModeConfig::None => Ok(()),
             ModeConfig::Station(config) => {
                 self.apply_sta_config(config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)

@@ -10,6 +10,7 @@
 #![cfg_attr(esp32s3, doc = "**ESP32-S3**")]
 #![cfg_attr(esp32c2, doc = "**ESP32-C2**")]
 #![cfg_attr(esp32c3, doc = "**ESP32-C3**")]
+#![cfg_attr(esp32c5, doc = "**ESP32-C5**")]
 #![cfg_attr(esp32c6, doc = "**ESP32-C6**")]
 #![cfg_attr(esp32h2, doc = "**ESP32-H2**")]
 //! . Please ensure you are reading the correct [documentation] for your target
@@ -293,18 +294,19 @@ pub use xtensa_lx_rt::{self, xtensa_lx};
 
 #[cfg(any(soc_has_dport, soc_has_hp_sys, soc_has_pcr, soc_has_system))]
 pub mod clock;
-#[cfg(soc_has_gpio)]
+#[cfg(gpio)]
 pub mod gpio;
-#[cfg(any(soc_has_i2c0, soc_has_i2c1))]
+#[cfg(i2c_master)]
 pub mod i2c;
 pub mod peripherals;
-#[cfg(all(feature = "unstable", any(soc_has_hmac, soc_has_sha)))]
+#[cfg(all(feature = "unstable", any(hmac, sha)))]
 mod reg_access;
-#[cfg(any(soc_has_spi0, soc_has_spi1, soc_has_spi2, soc_has_spi3))]
+#[cfg(any(spi_master, spi_slave))]
 pub mod spi;
+#[cfg_attr(esp32c5, allow(unused))]
 pub mod system;
 pub mod time;
-#[cfg(any(soc_has_uart0, soc_has_uart1, soc_has_uart2))]
+#[cfg(uart)]
 pub mod uart;
 
 mod macros;
@@ -332,7 +334,6 @@ mod exception_handler;
 unstable_module! {
     pub mod asynch;
     pub mod debugger;
-    #[cfg(any(soc_has_dport, soc_has_interrupt_core0, soc_has_interrupt_core1))]
     pub mod interrupt;
     pub mod rom;
     #[doc(hidden)]
@@ -346,56 +347,59 @@ unstable_module! {
     pub mod rtc_cntl;
     #[cfg(any(gdma, pdma))]
     pub mod dma;
-    #[cfg(soc_has_etm)]
+    #[cfg(etm)]
     pub mod etm;
-    #[cfg(soc_has_usb0)]
+    #[cfg(usb_otg)]
     pub mod otg_fs;
     #[cfg(psram)] // DMA needs some things from here
     pub mod psram;
     pub mod efuse;
 }
 
+#[cfg_attr(esp32c5, allow(unused))]
 mod work_queue;
 
 unstable_driver! {
-    #[cfg(soc_has_aes)]
+    #[cfg(aes)]
     pub mod aes;
-    #[cfg(soc_has_assist_debug)]
+    #[cfg(assist_debug)]
     pub mod assist_debug;
     pub mod delay;
-    #[cfg(soc_has_ecc)]
+    #[cfg(ecc)]
     pub mod ecc;
-    #[cfg(soc_has_hmac)]
+    #[cfg(hmac)]
     pub mod hmac;
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
+    #[cfg(i2s)]
     pub mod i2s;
     #[cfg(soc_has_lcd_cam)]
     pub mod lcd_cam;
-    #[cfg(soc_has_ledc)]
+    #[cfg(ledc)]
     pub mod ledc;
-    #[cfg(any(soc_has_mcpwm0, soc_has_mcpwm1))]
+    #[cfg(mcpwm)]
     pub mod mcpwm;
-    #[cfg(soc_has_parl_io)]
+    #[cfg(parl_io)]
     pub mod parl_io;
-    #[cfg(soc_has_pcnt)]
+    #[cfg(pcnt)]
     pub mod pcnt;
-    #[cfg(soc_has_rmt)]
+    #[cfg(rmt)]
     pub mod rmt;
-    #[cfg(soc_has_rng)]
+    #[cfg(rng)]
     pub mod rng;
-    #[cfg(soc_has_rsa)]
+    #[cfg(rsa)]
     pub mod rsa;
-    #[cfg(soc_has_sha)]
+    #[cfg(sha)]
     pub mod sha;
     #[cfg(touch)]
     pub mod touch;
+    #[cfg(not(esp32c5))]
     #[cfg(soc_has_trace0)]
     pub mod trace;
+    #[cfg(not(esp32c5))]
     #[cfg(soc_has_tsens)]
     pub mod tsens;
-    #[cfg(any(soc_has_twai0, soc_has_twai1))]
+    #[cfg(twai)]
     pub mod twai;
-    #[cfg(soc_has_usb_device)]
+    #[cfg(usb_serial_jtag)]
     pub mod usb_serial_jtag;
 }
 
@@ -508,6 +512,7 @@ impl crate::DriverMode for Async {}
 impl crate::private::Sealed for Blocking {}
 impl crate::private::Sealed for Async {}
 
+#[cfg_attr(esp32c5, allow(unused))]
 pub(crate) mod private {
     use core::mem::ManuallyDrop;
 
@@ -740,10 +745,11 @@ pub fn init(config: Config) -> Peripherals {
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.LPWR.reborrow());
 
+    #[cfg(sleep)]
     crate::rtc_cntl::sleep::RtcSleepConfig::base_settings(&rtc);
 
     // Disable watchdog timers
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(swd)]
     rtc.swd.disable();
 
     rtc.rwdt.disable();
@@ -756,6 +762,7 @@ pub fn init(config: Config) -> Peripherals {
 
     crate::time::implem::time_init();
 
+    #[cfg(gpio)]
     crate::gpio::interrupt::bind_default_interrupt_handler();
 
     #[cfg(feature = "psram")]

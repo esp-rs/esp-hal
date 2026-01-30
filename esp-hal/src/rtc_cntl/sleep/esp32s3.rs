@@ -9,7 +9,7 @@ use super::{
 use crate::{
     gpio::{RtcFunction, RtcPin},
     peripherals::{APB_CTRL, EXTMEM, LPWR, RTC_IO, SPI0, SPI1, SYSTEM},
-    rtc_cntl::{Clock, Rtc, RtcClock, sleep::RtcioWakeupSource},
+    rtc_cntl::{Rtc, RtcClock, sleep::RtcioWakeupSource},
     soc::regi2c,
 };
 
@@ -93,7 +93,7 @@ impl WakeSource for TimerWakeupSource {
         let clock_freq = RtcClock::slow_freq();
         // TODO: maybe add sleep time adjustlemnt like idf
         // TODO: maybe add check to prevent overflow?
-        let clock_hz = clock_freq.frequency().as_hz() as u64;
+        let clock_hz = clock_freq.as_hz() as u64;
         let ticks = self.duration.as_micros() as u64 * clock_hz / 1_000_000u64;
         // "alarm" time in slow rtc ticks
         let now = rtc.time_since_boot_raw();
@@ -675,7 +675,15 @@ impl RtcSleepConfig {
                 .dig_pwc()
                 .modify(|_, w| w.wifi_force_pu().clear_bit().wifi_pd_en().set_bit());
         } else {
-            rtc_cntl.dig_pwc().modify(|_, w| w.wifi_pd_en().clear_bit());
+            rtc_cntl.options0().modify(|_, w| {
+                w.bbpll_force_pu().set_bit();
+                w.bbpll_i2c_force_pu().set_bit();
+                w.bb_i2c_force_pu().set_bit()
+            });
+
+            rtc_cntl
+                .dig_pwc()
+                .modify(|_, w| w.wifi_force_pu().set_bit().wifi_pd_en().clear_bit());
         }
 
         if self.cpu_pd_en() {

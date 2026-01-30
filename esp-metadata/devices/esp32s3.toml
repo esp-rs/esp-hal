@@ -114,7 +114,6 @@ symbols = [
 
 [device.soc]
 rc_fast_clk_default = 17_500_000
-rc_slow_clock = 136_000
 
 memory_map = { ranges = [
     { name = "dram", start = 0x3FC8_8000, end = 0x3FD0_0000 },

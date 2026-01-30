@@ -14,8 +14,13 @@ on:
     types: [opened, reopened, labeled, unlabeled, synchronize, ready_for_review]
 
 jobs:
+  get-labels:
+    uses: ./.github/workflows/get-labels.yml
   changelog:
-    if: github.event.pull_request.draft == false # don't bother checking the changelog for draft PRs
+    needs: get-labels
+    if: ${{ github.event_name != 'pull_request' ||
+      (!contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') &&
+      !github.event.pull_request.draft) }} # don't bother checking the changelog for draft PRs
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
