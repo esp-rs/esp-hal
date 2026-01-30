@@ -190,7 +190,7 @@ impl PartialEq for IsrCallback {
 pub struct InterruptHandler {
     f: extern "C" fn(),
     prio: Priority,
-    #[cfg(riscv)]
+    #[cfg(all(riscv, not(clic)))]
     nested: bool,
 }
 
@@ -201,7 +201,7 @@ impl InterruptHandler {
         Self {
             f,
             prio,
-            #[cfg(riscv)]
+            #[cfg(all(riscv, not(clic)))]
             nested: true,
         }
     }
@@ -211,7 +211,7 @@ impl InterruptHandler {
     ///
     /// Usually higher priority interrupts get served while handling an interrupt.
     /// Using this the interrupt handler won't get preempted by higher priority interrupts.
-    #[cfg(riscv)]
+    #[cfg(all(riscv, not(clic)))]
     pub fn new_not_nested(f: extern "C" fn(), prio: Priority) -> Self {
         Self {
             f,
@@ -224,7 +224,7 @@ impl InterruptHandler {
     #[inline]
     pub fn handler(&self) -> IsrCallback {
         cfg_if::cfg_if! {
-            if #[cfg(riscv)] {
+            if #[cfg(all(riscv, not(clic)))] {
                 let nested = self.nested;
             } else {
                 let nested = true;
