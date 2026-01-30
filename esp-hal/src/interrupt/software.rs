@@ -74,6 +74,13 @@ impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
         }
     }
 
+    fn init() -> Self {
+        let this = unsafe { Self::steal() };
+        #[cfg(esp32c5)]
+        this.reset();
+        this
+    }
+
     /// Creates a new peripheral reference with a shorter lifetime.
     ///
     /// Use this method if you would like to keep working with the peripheral
@@ -185,9 +192,7 @@ for_each_sw_interrupt! {
             pub fn new(_peripheral: crate::peripherals::SW_INTERRUPT<'d>) -> Self {
                 SoftwareInterruptControl {
                     $(
-                        $field: SoftwareInterrupt {
-                            _lifetime: PhantomData,
-                        },
+                        $field: SoftwareInterrupt::init(),
                     )*
                 }
             }
