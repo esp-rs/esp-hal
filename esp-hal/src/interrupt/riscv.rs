@@ -143,7 +143,6 @@ pub enum Priority {
     /// Priority level 7.
     Priority7,
     /// Priority level 8.
-    #[cfg(not(clic))]
     Priority8,
     /// Priority level 9.
     #[cfg(not(clic))]
@@ -199,7 +198,6 @@ impl TryFrom<u32> for Priority {
             5 => Ok(Priority::Priority5),
             6 => Ok(Priority::Priority6),
             7 => Ok(Priority::Priority7),
-            #[cfg(not(clic))]
             8 => Ok(Priority::Priority8),
             #[cfg(not(clic))]
             9 => Ok(Priority::Priority9),
@@ -685,15 +683,13 @@ mod clic {
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     pub(super) static DISABLED_CPU_INTERRUPT: u32 = 0;
 
-    pub(super) static EXTERNAL_INTERRUPT_OFFSET: u32 = 16;
-
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(super) static PRIORITY_TO_INTERRUPT: &[u32] =
-        &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    pub(super) static PRIORITY_TO_INTERRUPT: &[u32] = &[16, 17, 18, 19, 20, 21, 22, 23];
 
-    // TODO: can't go higher than 7
+    // We have 8 priority levels, we assign one CPU interrupt to each.
+    // First element is not used, just there to avoid a -1 in the interrupt handler.
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(super) static INTERRUPT_TO_PRIORITY: [Priority; 20] = [
+    pub(super) static INTERRUPT_TO_PRIORITY: [Priority; 9] = [
         Priority::None,
         Priority::Priority1,
         Priority::Priority2,
@@ -702,29 +698,8 @@ mod clic {
         Priority::Priority5,
         Priority::Priority6,
         Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
-        Priority::Priority7,
+        Priority::Priority8,
     ];
-
-    // The memory map for interrupt registers is on a per-core basis,
-    // base points to the current core interrupt register,
-    // whereas base + DUALCORE_CLIC_CTRL_OFF points to the other
-    // core registers, regardless of the core we are currently running on.
-
-    const DR_REG_CLIC_CTRL_BASE: u32 = 0x2080_1000;
-    const DUALCORE_CLIC_CTRL_OFF: u32 = 0x1_0000;
-
-    const CLIC_EXT_INTR_NUM_OFFSET: usize = 16;
 
     /// Get pointer to interrupt control register for the given core and CPU
     /// interrupt number
@@ -800,7 +775,7 @@ mod plic {
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     pub(super) static DISABLED_CPU_INTERRUPT: u32 = 31;
 
-    // don't use interrupts reserved for CLIC (0,3,4,7)
+    // 0,3,4,7 are reserved for CLINT
     // for some reason also CPU interrupt 8 doesn't work by default since it's
     // disabled after reset - so don't use that, too
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
@@ -977,6 +952,15 @@ mod rt {
                     disable(Cpu::ProCpu, intr);
                 })
                 .ok();
+        }
+
+        #[cfg(clic)]
+        {
+            let clic = unsafe { crate::soc::pac::CLIC::steal() };
+
+            // Set 3 level bits = 8 priority levels
+            clic.int_config()
+                .modify(|_, w| unsafe { w.mnlbits().bits(3) });
         }
 
         unsafe {
