@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- `FlashStorage` documentation mentions async adapters from the `embassy_embedded_hal` crate (#4882)
+
 
 ### Changed
 
