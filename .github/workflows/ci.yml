@@ -68,8 +68,7 @@ jobs:
       - name: Skip CI
         if: env.SKIP_CI == 'true'
         run: |
-          echo "skipping build"
-          exit 0
+          echo "skipping"
 
       - uses: actions/checkout@v6
         if: env.SKIP_CI != 'true'
@@ -211,8 +210,7 @@ jobs:
       - name: Skip CI
         if: env.SKIP_CI == 'true'
         run: |
-          echo "skipping build"
-          exit 0
+          echo "skipping"
 
       - uses: actions/checkout@v6
         if: env.SKIP_CI != 'true'
