@@ -145,9 +145,7 @@ pub(crate) struct RunQueue {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RunSchedulerOn {
     DontRun,
-    CurrentCore,
-    #[cfg(multi_core)]
-    OtherCore,
+    RunOnCore(Cpu),
 }
 
 impl RunQueue {
@@ -218,29 +216,23 @@ impl RunQueue {
 
         let (target_cpu, target_cpu_prio) = if let Some(pinned_to) = task_ref.pinned_to {
             // Task is pinned, we have no choice in our target
-            let target_cpu = pinned_to as usize;
             (
-                target_cpu,
-                SchedulerState::priority_of_core(per_cpu, target_cpu),
+                pinned_to,
+                SchedulerState::priority_of_core(per_cpu, pinned_to as usize),
             )
         } else {
             // Task is not pinned, pick the core that runs the lower priority task.
-            let mut target = (0, SchedulerState::priority_of_core(per_cpu, 0));
-            for i in 1..Cpu::COUNT {
-                let core_prio = SchedulerState::priority_of_core(per_cpu, i);
-                if core_prio < target.1 {
-                    target = (i, core_prio);
-                }
-            }
-            target
+            Cpu::all()
+                .map(|cpu| {
+                    let core_prio = SchedulerState::priority_of_core(per_cpu, cpu as usize);
+                    (cpu, core_prio)
+                })
+                .min_by_key(|(_, prio)| *prio) // Get lowest priority
+                .unwrap()
         };
 
         if ready_task_prio >= target_cpu_prio {
-            if target_cpu == Cpu::current() as usize {
-                RunSchedulerOn::CurrentCore
-            } else {
-                RunSchedulerOn::OtherCore
-            }
+            RunSchedulerOn::RunOnCore(target_cpu)
         } else {
             RunSchedulerOn::DontRun
         }
@@ -251,7 +243,7 @@ impl RunQueue {
         // Run the scheduler if the new priority is >= current maximum priority. This will trigger a
         // run even if the new task's priority is equal, to make sure time slicing is set up.
         if priority >= self.ready_priority.ready() {
-            RunSchedulerOn::CurrentCore
+            RunSchedulerOn::RunOnCore(Cpu::ProCpu)
         } else {
             RunSchedulerOn::DontRun
         }

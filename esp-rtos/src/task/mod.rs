@@ -27,7 +27,7 @@ use crate::InternalMemory;
 use crate::wait_queue::WaitQueue;
 use crate::{
     SCHEDULER,
-    run_queue::{Priority, RunQueue},
+    run_queue::{Priority, RunQueue, RunSchedulerOn},
     scheduler::SchedulerState,
 };
 
@@ -645,6 +645,25 @@ pub(super) fn schedule_task_deletion(task: Option<NonNull<Task>>) {
     if SCHEDULER.with(|scheduler| scheduler.schedule_task_deletion(task)) {
         loop {
             yield_task();
+        }
+    }
+}
+
+pub(crate) fn trigger_scheduler(run_scheduler: RunSchedulerOn) {
+    match run_scheduler {
+        RunSchedulerOn::DontRun => {}
+        RunSchedulerOn::RunOnCore(_core) => {
+            cfg_if::cfg_if! {
+                if #[cfg(multi_core)] {
+                    if _core == Cpu::current() {
+                        yield_task()
+                    } else {
+                        schedule_other_core()
+                    }
+                } else {
+                    yield_task()
+                }
+            }
         }
     }
 }

@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a memory leak of 48 bytes when deleting esp-radio timers (#4541)
 - Fixed a rare crash on Xtensa MCUs (#4580, #4591)
 - RISC-V: the idle hook no longer prevents a debugger from reading memory (#4782)
+- Fixed a bug causing core 1 to not be able to wake up core 0 when started using `CpuControl::start_app_core` (#4890)
 
 ### Removed
 
