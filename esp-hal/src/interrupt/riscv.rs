@@ -185,7 +185,7 @@ impl Priority {
             if #[cfg(not(clic))] {
                 Priority::Priority15
             } else {
-                Priority::Priority7
+                Priority::Priority8
             }
         }
     }
@@ -1208,23 +1208,27 @@ mod rt {
     #[ram]
     #[cfg(clic)]
     unsafe fn handle_interrupts(cpu_intr: CpuInterrupt) {
-        let core = Cpu::current();
-        let status = status(core);
+        fn handle(cpu_intr: CpuInterrupt) {
+            let core = Cpu::current();
+            let status = status(core);
 
-        // this has no effect on level interrupts, but the interrupt may be an edge one
-        // so we clear it anyway
-        clear(core, cpu_intr);
+            // this has no effect on level interrupts, but the interrupt may be an edge one
+            // so we clear it anyway
+            clear(core, cpu_intr);
 
-        let prio = clic::current_runlevel();
-        let configured_interrupts = vectored::configured_interrupts(core, status, prio);
+            let prio = clic::current_runlevel();
+            let configured_interrupts = vectored::configured_interrupts(core, status, prio);
 
-        for interrupt_nr in configured_interrupts.iterator() {
-            let handler =
-                unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler } as usize;
+            for interrupt_nr in configured_interrupts.iterator() {
+                let handler =
+                    unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler } as usize;
 
-            let handler: fn() = unsafe { core::mem::transmute::<usize, fn()>(handler) };
+                let handler: fn() = unsafe { core::mem::transmute::<usize, fn()>(handler) };
 
-            handler();
+                handler();
+            }
         }
+
+        unsafe { riscv::interrupt::nested(|| handle(cpu_intr)) };
     }
 }

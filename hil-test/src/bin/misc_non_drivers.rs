@@ -49,3 +49,6 @@ mod init;
 
 #[path = "misc_non_drivers/simple.rs"]
 mod simple;
+
+#[path = "misc_non_drivers/interrupt_nesting.rs"]
+mod interrupt_nesting;
