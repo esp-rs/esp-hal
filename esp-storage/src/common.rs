@@ -66,6 +66,16 @@ impl<'d> Flash<'d> {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Flash storage abstraction.
+///
+/// This only implements traits from [`embedded_storage`].
+/// If you need to use this struct where traits from [`embedded_storage_async`] are needed, you can
+/// use [`embassy_embedded_hal::adapter::BlockingAsync`] or
+/// [`embassy_embedded_hal::adapter::YieldingAsync`] wrappers.
+///
+/// [`embedded_storage`]: https://docs.rs/embedded-storage/latest/embedded_storage/
+/// [`embedded_storage_async`]: https://docs.rs/embedded-storage-async/latest/embedded_storage_async/
+/// [`embassy_embedded_hal::adapter::BlockingAsync`]: https://docs.rs/embassy-embedded-hal/latest/embassy_embedded_hal/adapter/struct.BlockingAsync.html
+/// [`embassy_embedded_hal::adapter::YieldingAsync`]: https://docs.rs/embassy-embedded-hal/latest/embassy_embedded_hal/adapter/struct.YieldingAsync.html
 pub struct FlashStorage<'d> {
     pub(crate) capacity: usize,
     unlocked: bool,
