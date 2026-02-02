@@ -118,7 +118,7 @@
 //!     time::{Duration, Instant},
 //! };
 //!
-//! // You need a panic handler. Usually, you you would use esp_backtrace, panic-probe, or
+//! // You need a panic handler. Usually, you would use esp_backtrace, panic-probe, or
 //! // something similar, but you can also bring your own like this:
 //! #[panic_handler]
 //! fn panic(_: &core::panic::PanicInfo) -> ! {
