@@ -34,7 +34,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_radio::wifi::{ModeConfig, WifiController, WifiDevice, WifiEvent, ap::AccessPointConfig};
+use esp_radio::wifi::{Interface, ModeConfig, WifiController, WifiEvent, ap::AccessPointConfig};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -246,6 +246,6 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn net_task(mut runner: Runner<'static, WifiDevice<'static>>) {
+async fn net_task(mut runner: Runner<'static, Interface<'static>>) {
     runner.run().await
 }

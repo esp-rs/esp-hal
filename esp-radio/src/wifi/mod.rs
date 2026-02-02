@@ -111,7 +111,7 @@ pub enum AuthenticationMethod {
     /// [AuthenticationMethod::Wpa3Personal] instead.
     Wpa3ExtPskMixed,
 
-    /// WiFi DPP / Wi-Fi Easy Connect
+    /// Wi-Fi DPP / Wi-Fi Easy Connect
     Dpp,
 
     /// WPA3-Enterprise Only Mode
@@ -573,15 +573,15 @@ pub enum WifiEvent {
     /// Station authentication mode changed.
     StationAuthenticationModeChange,
 
-    /// Station WiFi-Protected-Status succeeds in enrollee mode.
+    /// Station Wi-Fi-Protected-Status succeeds in enrollee mode.
     StationWifiProtectedStatusEnrolleeSuccess,
-    /// Station WiFi-Protected-Status fails in enrollee mode.
+    /// Station Wi-Fi-Protected-Status fails in enrollee mode.
     StationWifiProtectedStatusEnrolleeFailed,
-    /// Station WiFi-Protected-Status timeout in enrollee mode.
+    /// Station Wi-Fi-Protected-Status timeout in enrollee mode.
     StationWifiProtectedStatusEnrolleeTimeout,
-    /// Station WiFi-Protected-Status pin code in enrollee mode.
+    /// Station Wi-Fi-Protected-Status pin code in enrollee mode.
     StationWifiProtectedStatusEnrolleePin,
-    /// Station WiFi-Protected-Status overlap in enrollee mode.
+    /// Station Wi-Fi-Protected-Status overlap in enrollee mode.
     StationWifiProtectedStatusEnrolleePushButtonConfigurationOverlap,
 
     /// Soft-AccessPoint start.
@@ -611,15 +611,15 @@ pub enum WifiEvent {
     /// Connectionless module wake interval has started.
     ConnectionlessModuleWakeIntervalStart,
 
-    /// Soft-AccessPoint WiFi-Protected-Status succeeded in registrar mode.
+    /// Soft-AccessPoint Wi-Fi-Protected-Status succeeded in registrar mode.
     AccessPointWifiProtectedStatusRegistrarSuccess,
-    /// Soft-AccessPoint WiFi-Protected-Status failed in registrar mode.
+    /// Soft-AccessPoint Wi-Fi-Protected-Status failed in registrar mode.
     AccessPointWifiProtectedStatusRegistrarFailed,
-    /// Soft-AccessPoint WiFi-Protected-Status timed out in registrar mode.
+    /// Soft-AccessPoint Wi-Fi-Protected-Status timed out in registrar mode.
     AccessPointWifiProtectedStatusRegistrarTimeout,
-    /// Soft-AccessPoint WiFi-Protected-Status pin code in registrar mode.
+    /// Soft-AccessPoint Wi-Fi-Protected-Status pin code in registrar mode.
     AccessPointWifiProtectedStatusRegistrarPin,
-    /// Soft-AccessPoint WiFi-Protected-Status overlap in registrar mode.
+    /// Soft-AccessPoint Wi-Fi-Protected-Status overlap in registrar mode.
     AccessPointWifiProtectedStatusRegistrarPushButtonConfigurationOverlap,
 
     /// Individual Target-Wake-Time setup.
@@ -944,28 +944,28 @@ mod private {
     }
 }
 
-/// Wi-Fi device operational modes.
+/// Wi-Fi interface mode.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-enum WifiDeviceMode {
+enum InterfaceType {
     /// Station mode.
     Station,
     /// Access Point mode.
     AccessPoint,
 }
 
-impl WifiDeviceMode {
+impl InterfaceType {
     fn mac_address(&self) -> [u8; 6] {
         match self {
-            WifiDeviceMode::Station => station_mac(),
-            WifiDeviceMode::AccessPoint => access_point_mac(),
+            InterfaceType::Station => station_mac(),
+            InterfaceType::AccessPoint => access_point_mac(),
         }
     }
 
     fn data_queue_rx(&self) -> &'static NonReentrantMutex<VecDeque<PacketBuffer>> {
         match self {
-            WifiDeviceMode::Station => &DATA_QUEUE_RX_STA,
-            WifiDeviceMode::AccessPoint => &DATA_QUEUE_RX_AP,
+            InterfaceType::Station => &DATA_QUEUE_RX_STA,
+            InterfaceType::AccessPoint => &DATA_QUEUE_RX_AP,
         }
     }
 
@@ -986,12 +986,12 @@ impl WifiDeviceMode {
         if self.can_send() {
             // even checking for !Uninitialized would be enough to not crash
             match self {
-                WifiDeviceMode::Station => {
+                InterfaceType::Station => {
                     if !matches!(station_state(), WifiStationState::Connected) {
                         return None;
                     }
                 }
-                WifiDeviceMode::AccessPoint => {
+                InterfaceType::AccessPoint => {
                     if !matches!(access_point_state(), WifiAccessPointState::Started) {
                         return None;
                     }
@@ -1022,8 +1022,8 @@ impl WifiDeviceMode {
 
     fn interface(&self) -> wifi_interface_t {
         match self {
-            WifiDeviceMode::Station => wifi_interface_t_WIFI_IF_STA,
-            WifiDeviceMode::AccessPoint => wifi_interface_t_WIFI_IF_AP,
+            InterfaceType::Station => wifi_interface_t_WIFI_IF_STA,
+            InterfaceType::AccessPoint => wifi_interface_t_WIFI_IF_AP,
         }
     }
 
@@ -1033,28 +1033,28 @@ impl WifiDeviceMode {
 
     fn register_receive_waker(&self, cx: &mut core::task::Context<'_>) {
         match self {
-            WifiDeviceMode::Station => embassy::STA_RECEIVE_WAKER.register(cx.waker()),
-            WifiDeviceMode::AccessPoint => embassy::AP_RECEIVE_WAKER.register(cx.waker()),
+            InterfaceType::Station => embassy::STA_RECEIVE_WAKER.register(cx.waker()),
+            InterfaceType::AccessPoint => embassy::AP_RECEIVE_WAKER.register(cx.waker()),
         }
     }
 
     fn register_link_state_waker(&self, cx: &mut core::task::Context<'_>) {
         match self {
-            WifiDeviceMode::Station => embassy::STA_LINK_STATE_WAKER.register(cx.waker()),
-            WifiDeviceMode::AccessPoint => embassy::AP_LINK_STATE_WAKER.register(cx.waker()),
+            InterfaceType::Station => embassy::STA_LINK_STATE_WAKER.register(cx.waker()),
+            InterfaceType::AccessPoint => embassy::AP_LINK_STATE_WAKER.register(cx.waker()),
         }
     }
 
     fn link_state(&self) -> embassy_net_driver::LinkState {
         match self {
-            WifiDeviceMode::Station => {
+            InterfaceType::Station => {
                 if matches!(station_state(), WifiStationState::Connected) {
                     embassy_net_driver::LinkState::Up
                 } else {
                     embassy_net_driver::LinkState::Down
                 }
             }
-            WifiDeviceMode::AccessPoint => {
+            InterfaceType::AccessPoint => {
                 if matches!(access_point_state(), WifiAccessPointState::Started) {
                     embassy_net_driver::LinkState::Up
                 } else {
@@ -1065,13 +1065,13 @@ impl WifiDeviceMode {
     }
 }
 
-/// A wifi device.
-pub struct WifiDevice<'d> {
+/// Wi-Fi interface.
+pub struct Interface<'d> {
     _phantom: PhantomData<&'d ()>,
-    mode: WifiDeviceMode,
+    mode: InterfaceType,
 }
 
-impl WifiDevice<'_> {
+impl Interface<'_> {
     /// Retrieves the MAC address of the Wi-Fi device.
     pub fn mac_address(&self) -> [u8; 6] {
         self.mode.mac_address()
@@ -1285,7 +1285,7 @@ impl RxControlInfo {
 #[doc(hidden)]
 // These token doesn't need the debug trait, they aren't needed publicly.
 pub struct WifiRxToken {
-    mode: WifiDeviceMode,
+    mode: InterfaceType,
 }
 
 impl WifiRxToken {
@@ -1318,7 +1318,7 @@ impl WifiRxToken {
 #[doc(hidden)]
 // These token doesn't need the debug trait, they aren't needed publicly.
 pub struct WifiTxToken {
-    mode: WifiDeviceMode,
+    mode: InterfaceType,
 }
 
 impl WifiTxToken {
@@ -1436,7 +1436,7 @@ pub(crate) mod embassy {
         }
     }
 
-    impl Driver for WifiDevice<'_> {
+    impl Driver for Interface<'_> {
         type RxToken<'a>
             = WifiRxToken
         where
@@ -1520,9 +1520,9 @@ pub(crate) fn apply_power_saving(ps: PowerSaveMode) -> Result<(), WifiError> {
 #[non_exhaustive]
 pub struct Interfaces<'d> {
     /// Station mode Wi-Fi device.
-    pub station: WifiDevice<'d>,
+    pub station: Interface<'d>,
     /// Access Point mode Wi-Fi device.
-    pub access_point: WifiDevice<'d>,
+    pub access_point: Interface<'d>,
     /// ESP-NOW interface.
     #[cfg(all(feature = "esp-now", feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
@@ -1675,29 +1675,29 @@ pub struct Config {
     #[builder_lite(unstable)]
     tx_queue_size: usize,
 
-    /// Max number of WiFi static RX buffers.
+    /// Max number of Wi-Fi static RX buffers.
     ///
     /// Each buffer takes approximately 1.6KB of RAM. The static rx buffers are allocated when
     /// esp_wifi_init is called, they are not freed until esp_wifi_deinit is called.
     ///
-    /// WiFi hardware use these buffers to receive all 802.11 frames. A higher number may allow
+    /// Wi-Fi hardware use these buffers to receive all 802.11 frames. A higher number may allow
     /// higher throughput but increases memory use. If [`Self::ampdu_rx_enable`] is enabled,
     /// this value is recommended to set equal or bigger than [`Self::rx_ba_win`] in order to
     /// achieve better throughput and compatibility with both stations and APs.
     #[builder_lite(unstable)]
     static_rx_buf_num: u8,
 
-    /// Max number of WiFi dynamic RX buffers
+    /// Max number of Wi-Fi dynamic RX buffers
     ///
-    /// Set the number of WiFi dynamic RX buffers, 0 means unlimited RX buffers will be allocated
+    /// Set the number of Wi-Fi dynamic RX buffers, 0 means unlimited RX buffers will be allocated
     /// (provided sufficient free RAM). The size of each dynamic RX buffer depends on the size of
     /// the received data frame.
     ///
-    /// For each received data frame, the WiFi driver makes a copy to an RX buffer and then
+    /// For each received data frame, the Wi-Fi driver makes a copy to an RX buffer and then
     /// delivers it to the high layer TCP/IP stack. The dynamic RX buffer is freed after the
     /// higher layer has successfully received the data frame.
     ///
-    /// For some applications, WiFi data frames may be received faster than the application can
+    /// For some applications, Wi-Fi data frames may be received faster than the application can
     /// process them. In these cases we may run out of memory if RX buffer number is unlimited
     /// (0).
     ///
@@ -1706,30 +1706,30 @@ pub struct Config {
     #[builder_lite(unstable)]
     dynamic_rx_buf_num: u16,
 
-    /// Set the number of WiFi static TX buffers.
+    /// Set the number of Wi-Fi static TX buffers.
     ///
     /// Each buffer takes approximately 1.6KB of RAM.
     /// The static RX buffers are allocated when esp_wifi_init() is called, they are not released
     /// until esp_wifi_deinit() is called.
     ///
-    /// For each transmitted data frame from the higher layer TCP/IP stack, the WiFi driver makes a
-    /// copy of it in a TX buffer.
+    /// For each transmitted data frame from the higher layer TCP/IP stack, the Wi-Fi driver makes
+    /// a copy of it in a TX buffer.
     ///
     /// For some applications especially UDP applications, the upper layer can deliver frames
-    /// faster than WiFi layer can transmit. In these cases, we may run out of TX buffers.
+    /// faster than Wi-Fi layer can transmit. In these cases, we may run out of TX buffers.
     #[builder_lite(unstable)]
     static_tx_buf_num: u8,
 
-    /// Set the number of WiFi dynamic TX buffers.
+    /// Set the number of Wi-Fi dynamic TX buffers.
     ///
     /// The size of each dynamic TX buffer is not fixed,
     /// it depends on the size of each transmitted data frame.
     ///
-    /// For each transmitted frame from the higher layer TCP/IP stack, the WiFi driver makes a copy
-    /// of it in a TX buffer.
+    /// For each transmitted frame from the higher layer TCP/IP stack, the Wi-Fi driver makes a
+    /// copy of it in a TX buffer.
     ///
     /// For some applications, especially UDP applications, the upper layer can deliver frames
-    /// faster than WiFi layer can transmit. In these cases, we may run out of TX buffers.
+    /// faster than Wi-Fi layer can transmit. In these cases, we may run out of TX buffers.
     #[builder_lite(unstable)]
     dynamic_tx_buf_num: u16,
 
@@ -1745,14 +1745,14 @@ pub struct Config {
     #[builder_lite(unstable)]
     amsdu_tx_enable: bool,
 
-    /// Set the size of WiFi Block Ack RX window.
+    /// Set the size of Wi-Fi Block Ack RX window.
     ///
     /// Generally a bigger value means higher throughput and better compatibility but more memory.
     /// Most of time we should NOT change the default value unless special reason, e.g. test
     /// the maximum UDP RX throughput with iperf etc. For iperf test in shieldbox, the
     /// recommended value is 9~12.
     ///
-    /// If PSRAM is used and WiFi memory is preferred to allocate in PSRAM first, the default and
+    /// If PSRAM is used and Wi-Fi memory is preferred to allocate in PSRAM first, the default and
     /// minimum value should be 16 to achieve better throughput and compatibility with both
     /// stations and APs.
     #[builder_lite(unstable)]
@@ -1875,13 +1875,13 @@ pub fn new<'d>(
     Ok((
         controller,
         Interfaces {
-            station: WifiDevice {
+            station: Interface {
                 _phantom: Default::default(),
-                mode: WifiDeviceMode::Station,
+                mode: InterfaceType::Station,
             },
-            access_point: WifiDevice {
+            access_point: Interface {
                 _phantom: Default::default(),
-                mode: WifiDeviceMode::AccessPoint,
+                mode: InterfaceType::AccessPoint,
             },
             #[cfg(all(feature = "esp-now", feature = "unstable"))]
             esp_now: crate::esp_now::EspNow::new_internal(),

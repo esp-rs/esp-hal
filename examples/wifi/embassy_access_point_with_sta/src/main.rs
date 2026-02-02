@@ -43,9 +43,9 @@ use esp_hal::{
 };
 use esp_println::{print, println};
 use esp_radio::wifi::{
+    Interface,
     ModeConfig,
     WifiController,
-    WifiDevice,
     WifiEvent,
     ap::AccessPointConfig,
     sta::StationConfig,
@@ -336,6 +336,6 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task(pool_size = 2)]
-async fn net_task(mut runner: Runner<'static, WifiDevice<'static>>) {
+async fn net_task(mut runner: Runner<'static, Interface<'static>>) {
     runner.run().await
 }
