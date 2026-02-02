@@ -297,3 +297,43 @@ pub(crate) fn setup_trap_section_protection() {
         crate::debugger::set_watchpoint(1, addr, len);
     }
 }
+
+fn chip_revision_in_range(range: Range<u16>) -> bool {
+    const BUILD_TIME_MIN_REV: u16 =
+        esp_config::esp_config_int!(u16, "ESP_HAL_CONFIG_MIN_CHIP_REVISION");
+
+    // Check to determine chip is obviously in or out of range, without reading efuse
+    #[allow(
+        clippy::absurd_extreme_comparisons,
+        reason = "Not absurd depending on configuration"
+    )]
+    if range.end < BUILD_TIME_MIN_REV {
+        // Chip will not boot in this range
+        return false;
+    }
+
+    #[allow(
+        clippy::absurd_extreme_comparisons,
+        reason = "Not absurd depending on configuration"
+    )]
+    if range.start <= BUILD_TIME_MIN_REV && range.end == u16::MAX {
+        return true;
+    }
+
+    let chip_revision = crate::efuse::Efuse::chip_revision();
+
+    range.contains(&chip_revision)
+}
+
+/// Returns true if the chip revision is at least the given revision.
+#[allow(dead_code)]
+pub(crate) fn chip_revision_above(min: u16) -> bool {
+    chip_revision_in_range(min..u16::MAX)
+}
+
+/// Returns true if the chip is at least the given revision, in the same major version.
+#[allow(dead_code)]
+pub(crate) fn chip_minor_revision_above(rev: u16) -> bool {
+    let max = (rev + 1).next_multiple_of(100);
+    chip_revision_in_range(rev..max)
+}

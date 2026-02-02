@@ -350,6 +350,7 @@ impl Chip {
                     "sleep_light_sleep",
                     "sleep_deep_sleep",
                     "timergroup_timg_has_timer1",
+                    "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                     "bt_controller=\"btdm\"",
                     "phy_combo_module",
@@ -545,6 +546,7 @@ impl Chip {
                     "cargo:rustc-cfg=sleep_light_sleep",
                     "cargo:rustc-cfg=sleep_deep_sleep",
                     "cargo:rustc-cfg=timergroup_timg_has_timer1",
+                    "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=bt_controller=\"btdm\"",
                     "cargo:rustc-cfg=phy_combo_module",
@@ -856,6 +858,7 @@ impl Chip {
                     "sleep_deep_sleep",
                     "sha_dma",
                     "timergroup_timg_has_divcnt_rst",
+                    "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                     "bt_controller=\"npl\"",
                     "phy_combo_module",
@@ -1005,6 +1008,7 @@ impl Chip {
                     "cargo:rustc-cfg=sleep_deep_sleep",
                     "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
+                    "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=bt_controller=\"npl\"",
                     "cargo:rustc-cfg=phy_combo_module",
@@ -1299,6 +1303,7 @@ impl Chip {
                     "sleep_deep_sleep",
                     "sha_dma",
                     "timergroup_timg_has_divcnt_rst",
+                    "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                     "bt_controller=\"btdm\"",
                     "phy_combo_module",
@@ -1489,6 +1494,7 @@ impl Chip {
                     "cargo:rustc-cfg=sleep_deep_sleep",
                     "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
+                    "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=bt_controller=\"btdm\"",
                     "cargo:rustc-cfg=phy_combo_module",
@@ -2090,6 +2096,8 @@ impl Chip {
                     "sleep_deep_sleep",
                     "sha_dma",
                     "timergroup_timg_has_divcnt_rst",
+                    "timergroup_rc_fast_calibration_divider",
+                    "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                     "uart_peripheral_controls_mem_clk",
                     "lp_uart_ram_size=\"32\"",
@@ -2343,6 +2351,8 @@ impl Chip {
                     "cargo:rustc-cfg=sleep_deep_sleep",
                     "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
+                    "cargo:rustc-cfg=timergroup_rc_fast_calibration_divider",
+                    "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
@@ -2706,6 +2716,8 @@ impl Chip {
                     "sleep_deep_sleep",
                     "sha_dma",
                     "timergroup_timg_has_divcnt_rst",
+                    "timergroup_rc_fast_calibration_divider",
+                    "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                     "uart_peripheral_controls_mem_clk",
                     "bt_controller=\"npl\"",
@@ -2920,6 +2932,8 @@ impl Chip {
                     "cargo:rustc-cfg=sleep_deep_sleep",
                     "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
+                    "cargo:rustc-cfg=timergroup_rc_fast_calibration_divider",
+                    "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
                     "cargo:rustc-cfg=bt_controller=\"npl\"",
@@ -3235,6 +3249,7 @@ impl Chip {
                     "sha_dma",
                     "spi_master_has_octal",
                     "timergroup_timg_has_timer1",
+                    "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                 ],
                 cfgs: &[
@@ -3442,6 +3457,7 @@ impl Chip {
                     "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=spi_master_has_octal",
                     "cargo:rustc-cfg=timergroup_timg_has_timer1",
+                    "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                 ],
                 memory_layout: &MemoryLayout {
@@ -3867,6 +3883,7 @@ impl Chip {
                     "sha_dma",
                     "spi_master_has_octal",
                     "timergroup_timg_has_timer1",
+                    "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                     "bt_controller=\"btdm\"",
                     "phy_combo_module",
@@ -4102,6 +4119,7 @@ impl Chip {
                     "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=spi_master_has_octal",
                     "cargo:rustc-cfg=timergroup_timg_has_timer1",
+                    "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=bt_controller=\"btdm\"",
                     "cargo:rustc-cfg=phy_combo_module",
@@ -4536,6 +4554,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(sleep_light_sleep)");
     println!("cargo:rustc-check-cfg=cfg(sleep_deep_sleep)");
     println!("cargo:rustc-check-cfg=cfg(timergroup_timg_has_timer1)");
+    println!("cargo:rustc-check-cfg=cfg(timergroup_rc_fast_calibration_is_set)");
     println!("cargo:rustc-check-cfg=cfg(phy_combo_module)");
     println!("cargo:rustc-check-cfg=cfg(esp32c2)");
     println!("cargo:rustc-check-cfg=cfg(riscv)");
@@ -4716,6 +4735,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_tx_loop_auto_stop)");
     println!("cargo:rustc-check-cfg=cfg(rmt_supports_pll80mhz_clock)");
+    println!("cargo:rustc-check-cfg=cfg(timergroup_rc_fast_calibration_divider)");
     println!("cargo:rustc-check-cfg=cfg(uart_peripheral_controls_mem_clk)");
     println!("cargo:rustc-check-cfg=cfg(wifi_has_wifi6)");
     println!("cargo:rustc-check-cfg=cfg(esp32h2)");
