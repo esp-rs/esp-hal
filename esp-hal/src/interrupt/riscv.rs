@@ -1167,7 +1167,6 @@ mod rt {
 
     #[unsafe(no_mangle)]
     #[ram]
-    #[cfg(not(clic))]
     unsafe fn handle_interrupts(cpu_intr: CpuInterrupt) {
         let core = Cpu::current();
         let status = status(core);
@@ -1176,26 +1175,39 @@ mod rt {
         // so we clear it anyway
         clear(core, cpu_intr);
 
-        let prio = INTERRUPT_TO_PRIORITY[cpu_intr as usize];
-        let configured_interrupts = vectored::configured_interrupts(core, status, prio);
+        cfg_if::cfg_if! {
+            if #[cfg(clic)] {
+                let prio = clic::current_runlevel();
+                let mcause = riscv::register::mcause::read();
+            } else {
+                // Change the current runlevel so that interrupt handlers can access the correct runlevel.
+                let prio = INTERRUPT_TO_PRIORITY[cpu_intr as usize];
+                let level = unsafe { change_current_runlevel(prio) };
+            }
+        }
 
-        // Change the current runlevel so that interrupt handlers can access the correct runlevel.
-        let level = unsafe { change_current_runlevel(prio) };
+        let configured_interrupts = vectored::configured_interrupts(core, status, prio);
 
         // When nesting is possible, we run the nestable interrupts first. This ensures that we
         // don't violate assumptions made by non-nestable handlers.
 
+        const NOT_NESTED_BIT: usize = 1;
         if prio != Priority::max() {
-            for interrupt_nr in configured_interrupts.iterator() {
-                let handler =
-                    unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler } as usize;
-                let nested = (handler & 1) == 0;
-                if nested {
-                    let handler: fn() =
-                        unsafe { core::mem::transmute::<usize, fn()>(handler & !1) };
+            unsafe {
+                riscv::interrupt::nested(|| {
+                    for interrupt_nr in configured_interrupts.iterator() {
+                        let handler =
+                            pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler as usize;
 
-                    unsafe { riscv::interrupt::nested(handler) };
-                }
+                        let nested = (handler & NOT_NESTED_BIT) == 0;
+                        if nested {
+                            let handler: fn() =
+                                core::mem::transmute::<usize, fn()>(handler & !NOT_NESTED_BIT);
+
+                            handler();
+                        }
+                    }
+                });
             }
         }
 
@@ -1204,50 +1216,27 @@ mod rt {
         for interrupt_nr in configured_interrupts.iterator() {
             let handler =
                 unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler } as usize;
-            let not_nested = (handler & 1) == 1;
+            let not_nested = (handler & NOT_NESTED_BIT) == 1;
             if not_nested || prio == Priority::max() {
-                let handler: fn() = unsafe { core::mem::transmute::<usize, fn()>(handler & !1) };
+                let handler: fn() =
+                    unsafe { core::mem::transmute::<usize, fn()>(handler & !NOT_NESTED_BIT) };
 
                 handler();
             }
         }
 
-        unsafe { change_current_runlevel(level) };
-    }
+        #[cfg(not(clic))]
+        unsafe {
+            change_current_runlevel(level)
+        };
 
-    #[unsafe(no_mangle)]
-    #[ram]
-    #[cfg(clic)]
-    unsafe fn handle_interrupts(cpu_intr: CpuInterrupt) {
-        fn handle(core: Cpu, cpu_intr: CpuInterrupt) {
-            let status = status(core);
-
-            // this has no effect on level interrupts, but the interrupt may be an edge one
-            // so we clear it anyway
-            clear(core, cpu_intr);
-
-            let prio = clic::current_runlevel();
-            let configured_interrupts = vectored::configured_interrupts(core, status, prio);
-
-            for interrupt_nr in configured_interrupts.iterator() {
-                let handler =
-                    unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler } as usize;
-
-                let handler: fn() = unsafe { core::mem::transmute::<usize, fn()>(handler) };
-
-                handler();
-            }
-        }
-
-        let core = Cpu::current();
-        let mcause = riscv::register::mcause::read();
-
-        unsafe { riscv::interrupt::nested(|| handle(core, cpu_intr)) };
-
+        #[cfg(clic)]
         // In case the target uses the CLIC, it is mandatory to restore `mcause` register
         // since it contains the former CPU priority. When executing `mret`,
         // the hardware will restore the former threshold, from `mcause` to
         // `mintstatus` CSR
-        unsafe { core::arch::asm!("csrw 0x342, {}", in(reg) mcause.bits()) }
+        unsafe {
+            core::arch::asm!("csrw 0x342, {}", in(reg) mcause.bits())
+        }
     }
 }
