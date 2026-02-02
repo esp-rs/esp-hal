@@ -15,14 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- No longer enables the default feature of `esp-hal` (#4433)
-- Time driver should no longer generate an interrupt-storm when the wakeup time does not fit 52 bits (#4444)
-- Fixed an issue causing incorrectly re-queueing timers (#4444)
-- Fixed an issue on ESP32 that prevented completing some interrupt handlers (#4459)
-- Fixed a possible deadlock on multi-core chips (#4478)
-- Fixed a memory leak of 48 bytes when deleting esp-radio timers (#4541)
-- Fixed a rare crash on Xtensa MCUs (#4580, #4591)
-- RISC-V: the idle hook no longer prevents a debugger from reading memory (#4782)
 
 ### Removed
 

@@ -9,16 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- RMT: All public types now derive `Debug` and `defmt::Format`. (#4302)
-- RMT: `Channel::apply_config` has been added. (#4302)
-- Added blocking `send_break`, `wait_for_break` and `wait_for_break_with_timeout` for sending and detecting software breaks with the UART driver (#4284)
-- Added support for `RxBreakDetected` interrupt and `wait_for_break_async` for detecting software breaks asynchronously to the UART driver (#4284)
-- Unsafely expose GPIO pins that are only available on certain chip/module variants (#4520)
-- ESP32-H2: light sleep and deep sleep support with timer and EXT1 wakeup sources (#4587, #4641)
-- Unstable detailed clock configuration options (#4660, #4674)
-- `RsaContext`, `AesContext` now derive `Clone`. (#4709)
-- `Sha<X>Context` now derive `Clone`, except on ESP32. (#4709)
-- Dedicated GPIO implementation (#4699)
 - `esp_hal::interrupt::wait_for_interrupt`, which enters `wfi` (RISC-V) or `waiti 0` (Xtensa) when it would not prevent a debugger from reading memory (#4782)
 
 ### Changed
