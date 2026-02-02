@@ -516,6 +516,32 @@ mod tests {
     }
 
     #[test]
+    #[cfg(multi_core)]
+    async fn embassy_cross_core_bare_metal(ctx: Context) {
+        use embassy_sync::signal::Signal;
+        use esp_hal::delay::Delay;
+        use esp_sync::RawMutex;
+
+        static SIGNAL: Signal<RawMutex, ()> = Signal::new();
+
+        let _gaurd = esp_hal::system::CpuControl::new(ctx.cpu_cntl)
+            .start_app_core(
+                #[allow(static_mut_refs)]
+                unsafe {
+                    &mut crate::APP_CORE_STACK
+                },
+                move || {
+                    Delay::new().delay_millis(100);
+                    SIGNAL.signal(());
+                    loop {}
+                },
+            )
+            .unwrap();
+
+        SIGNAL.wait().await;
+    }
+
+    #[test]
     async fn primitives_time_out() {
         let mutex = SemaphoreHandle::new(SemaphoreKind::Mutex);
         let success = mutex.take(Some(0));
