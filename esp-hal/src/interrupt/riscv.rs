@@ -275,29 +275,49 @@ pub fn enable_direct(
         map(Cpu::current(), interrupt, cpu_interrupt);
         set_priority(Cpu::current(), cpu_interrupt, level);
 
-        let mt = mtvec::read();
+        cfg_if::cfg_if! {
+            if #[cfg(clic)] {
+                let clic = crate::soc::pac::CLIC::steal();
 
-        assert_eq!(
-            mt.trap_mode().into_usize(),
-            mtvec::TrapMode::Vectored.into_usize()
-        );
+                // Enable hardware vectoring
+                clic.int_attr(cpu_interrupt as usize).modify(|_, w| {
+                    w.shv().hardware();
+                    w.trig().positive_level()
+                });
 
-        let base_addr = mt.address() as usize;
+                let mtvt_table: *mut [u32; 48];
+                core::arch::asm!("csrr {0}, 0x307", out(reg) mtvt_table);
 
-        let int_slot = base_addr.wrapping_add((cpu_interrupt as usize) * 4);
+                let int_slot = mtvt_table
+                    .cast::<u32>()
+                    .wrapping_add(cpu_interrupt as usize);
 
-        let instr = encode_jal_x0(handler as usize, int_slot)?;
+                let instr = handler as u32;
+            } else {
+                let mt = mtvec::read();
+
+                assert_eq!(
+                    mt.trap_mode().into_usize(),
+                    mtvec::TrapMode::Vectored.into_usize()
+                );
+
+                let base_addr = mt.address() as usize;
+
+                let int_slot = base_addr.wrapping_add((cpu_interrupt as usize) * 4) as *mut u32;
+
+                let instr = encode_jal_x0(handler as usize, int_slot as usize)?;
+            }
+        }
 
         if crate::debugger::debugger_connected() {
-            core::ptr::write_volatile(int_slot as *mut u32, instr);
+            core::ptr::write_volatile(int_slot, instr);
         } else {
             crate::debugger::DEBUGGER_LOCK.lock(|| {
                 let wp = crate::debugger::clear_watchpoint(1);
-                core::ptr::write_volatile(int_slot as *mut u32, instr);
+                core::ptr::write_volatile(int_slot, instr);
                 crate::debugger::restore_watchpoint(1, wp);
             });
         }
-
         core::arch::asm!("fence.i");
 
         enable_cpu_interrupt(cpu_interrupt);
@@ -306,6 +326,7 @@ pub fn enable_direct(
 }
 
 // helper: returns correctly encoded RISC-V `jal` instruction
+#[cfg(not(clic))]
 fn encode_jal_x0(target: usize, pc: usize) -> Result<u32, Error> {
     let offset = (target as isize) - (pc as isize);
 
@@ -708,7 +729,7 @@ mod clic {
         for int in clic.int_attr_iter() {
             int.modify(|_, w| {
                 w.shv().hardware();
-                w.trig().positive_edge()
+                w.trig().positive_level()
             });
         }
     }

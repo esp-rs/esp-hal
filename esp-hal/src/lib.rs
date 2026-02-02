@@ -308,7 +308,6 @@ pub mod peripherals;
 mod reg_access;
 #[cfg(any(spi_master, spi_slave))]
 pub mod spi;
-#[cfg_attr(esp32c5, expect(unused))]
 pub mod system;
 pub mod time;
 #[cfg(uart)]
