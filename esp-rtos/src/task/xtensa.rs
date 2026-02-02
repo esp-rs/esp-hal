@@ -63,7 +63,7 @@ pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext, hook_fn: IdleFn
 
     // Point idle context PC at the assembly that calls the idle hook. We need a new stack
     // frame for the idle task on the main stack.
-    idle_context.PC = idle_entry as usize as u32;
+    idle_context.PC = idle_entry as *const () as u32;
     // Set a valid processor status value, that will not end up spilling registers into the main
     // task's stack. Here we jump to a naked function so we can omit the CALLINC bits.
     idle_context.PS = PS_EXCM | PS_UM | PS_WOE;
@@ -102,7 +102,7 @@ pub(crate) fn new_task_context(
     }
 
     CpuContext {
-        PC: super::task_wrapper as usize as u32,
+        PC: super::task_wrapper as *const () as u32,
         A0: 0,
         A1: stack_top,
         A6: task_fn as usize as u32,
