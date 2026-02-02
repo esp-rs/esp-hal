@@ -66,6 +66,11 @@ impl<'d> Flash<'d> {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Flash storage abstraction.
+///
+/// This can write to any location on the SPI Flash.
+/// It is recommended to create a
+#[doc = concat!("[partition](https://docs.espressif.com/projects/esp-idf/en/latest/", esp_hal::chip!(), "/api-guides/partition-tables.html)")]
+/// to store any app data.
 pub struct FlashStorage<'d> {
     pub(crate) capacity: usize,
     unlocked: bool,
