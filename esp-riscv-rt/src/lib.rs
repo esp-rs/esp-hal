@@ -201,7 +201,7 @@ macro_rules! define_interrupt {
         struct $name;
 
         unsafe impl riscv_rt::InterruptNumber for $name {
-            const MAX_INTERRUPT_NUMBER: usize = 31;
+            const MAX_INTERRUPT_NUMBER: usize = if cfg!(feature = "clic-48") { 47 } else { 31 };
 
             fn number(self) -> usize {
                 $num

@@ -767,6 +767,17 @@ mod clic {
             .write(|w| w.int_ip().clear_bit());
     }
 
+    /// Returns whether a CPU interrupt is pending
+    #[inline]
+    pub fn pending(_core: Cpu, cpu_interrupt: CpuInterrupt) -> bool {
+        // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
+        let clic = unsafe { CLIC::steal() };
+        clic.int_ip(cpu_interrupt as usize)
+            .read()
+            .int_ip()
+            .bit_is_set()
+    }
+
     /// Get interrupt priority
     #[inline]
     pub(super) fn priority_by_core(_core: Cpu, cpu_interrupt: CpuInterrupt) -> Priority {
@@ -1208,8 +1219,7 @@ mod rt {
     #[ram]
     #[cfg(clic)]
     unsafe fn handle_interrupts(cpu_intr: CpuInterrupt) {
-        fn handle(cpu_intr: CpuInterrupt) {
-            let core = Cpu::current();
+        fn handle(core: Cpu, cpu_intr: CpuInterrupt) {
             let status = status(core);
 
             // this has no effect on level interrupts, but the interrupt may be an edge one
@@ -1229,6 +1239,15 @@ mod rt {
             }
         }
 
-        unsafe { riscv::interrupt::nested(|| handle(cpu_intr)) };
+        let core = Cpu::current();
+        let mcause = riscv::register::mcause::read();
+
+        unsafe { riscv::interrupt::nested(|| handle(core, cpu_intr)) };
+
+        // In case the target uses the CLIC, it is mandatory to restore `mcause` register
+        // since it contains the former CPU priority. When executing `mret`,
+        // the hardware will restore the former threshold, from `mcause` to
+        // `mintstatus` CSR
+        unsafe { core::arch::asm!("csrw 0x342, {}", in(reg) mcause.bits()) }
     }
 }
