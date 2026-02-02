@@ -423,7 +423,7 @@ procmacros::warning! {"
 WARNING: use --release
   We *strongly* recommend using release profile when building esp-hal.
   The dev profile can potentially be one or more orders of magnitude
-  slower than release, and may cause issues with timing-senstive
+  slower than release, and may cause issues with timing-sensitive
   peripherals and/or devices.
 "}
 
