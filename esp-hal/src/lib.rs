@@ -19,7 +19,7 @@
 //! ## Overview
 //!
 //! esp-hal is a Hardware Abstraction Layer (HAL) for Espressif's ESP32 lineup of
-//! microcontrollers offering safe, idiotmatic APIs to control hardware peripherals.
+//! microcontrollers offering safe, idiomatic APIs to control hardware peripherals.
 //!
 //! ### Peripheral drivers
 //!
