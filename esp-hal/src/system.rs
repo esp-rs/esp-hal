@@ -285,7 +285,7 @@ impl Cpu {
 
     /// Returns an iterator over all cores.
     #[inline(always)]
-    pub(crate) fn all() -> impl Iterator<Item = Self> {
+    pub fn all() -> impl Iterator<Item = Self> {
         cfg_if::cfg_if! {
             if #[cfg(multi_core)] {
                 [Cpu::ProCpu, Cpu::AppCpu].into_iter()

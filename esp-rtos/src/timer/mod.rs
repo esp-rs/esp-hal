@@ -10,7 +10,6 @@ use crate::{
     SCHEDULER,
     TICK_RATE,
     TimeBase,
-    run_queue::RunSchedulerOn,
     task::{self, TaskExt, TaskPtr, TaskQueue, TaskState, TaskTimerQueueElement},
 };
 
@@ -269,15 +268,10 @@ extern "C" fn timer_tick_handler() {
 
             debug!("Task {:?} is ready", ready_task);
 
-            match scheduler
+            let run_scheduler = scheduler
                 .run_queue
-                .mark_task_ready(&scheduler.per_cpu, ready_task)
-            {
-                RunSchedulerOn::DontRun => {}
-                RunSchedulerOn::CurrentCore => task::yield_task(),
-                #[cfg(multi_core)]
-                RunSchedulerOn::OtherCore => task::schedule_other_core(),
-            }
+                .mark_task_ready(&scheduler.per_cpu, ready_task);
+            task::trigger_scheduler(run_scheduler);
         });
 
         // After processing the timer queue, the next embassy wakeup time is lost and we have to

@@ -19,7 +19,7 @@ use crate::TraceEvents;
 #[cfg(feature = "embassy")]
 use crate::timer::embassy::TimerQueue;
 use crate::{
-    run_queue::{Priority, RunQueue, RunSchedulerOn},
+    run_queue::{Priority, RunQueue},
     task::{
         self,
         CpuContext,
@@ -192,12 +192,8 @@ impl SchedulerState {
         rtos_trace::trace::task_new(task_ptr.rtos_trace_id());
 
         self.all_tasks.push(task_ptr);
-        match self.run_queue.mark_task_ready(&self.per_cpu, task_ptr) {
-            RunSchedulerOn::DontRun => {}
-            RunSchedulerOn::CurrentCore => task::yield_task(),
-            #[cfg(multi_core)]
-            RunSchedulerOn::OtherCore => task::schedule_other_core(),
-        }
+        let run_scheduler = self.run_queue.mark_task_ready(&self.per_cpu, task_ptr);
+        task::trigger_scheduler(run_scheduler);
 
         debug!("Task '{}' created: {:?}", name, task_ptr);
 
@@ -403,12 +399,8 @@ impl SchedulerState {
         let timer_queue = unwrap!(self.time_driver.as_mut());
         timer_queue.timer_queue.remove(task);
 
-        match self.run_queue.mark_task_ready(&self.per_cpu, task) {
-            RunSchedulerOn::DontRun => {}
-            RunSchedulerOn::CurrentCore => task::yield_task(),
-            #[cfg(multi_core)]
-            RunSchedulerOn::OtherCore => task::schedule_other_core(),
-        }
+        let run_scheduler = self.run_queue.mark_task_ready(&self.per_cpu, task);
+        task::trigger_scheduler(run_scheduler);
     }
 
     fn delete_task(&mut self, mut to_delete: TaskPtr) {
