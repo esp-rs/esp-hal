@@ -10,11 +10,10 @@ pub(crate) mod os_adapter_chip_specific;
 use core::ptr::NonNull;
 
 use allocator_api2::boxed::Box;
-use enumset::EnumSet;
 use esp_phy::PhyController;
-use esp_sync::{NonReentrantMutex, RawMutex};
+use esp_sync::RawMutex;
 
-use super::WifiEvent;
+use super::event::WifiEvent;
 use crate::{
     compat::{
         common::{str_from_c, thread_sem_get},
@@ -27,11 +26,6 @@ use crate::{
 };
 
 static WIFI_LOCK: RawMutex = RawMutex::new();
-
-// useful for waiting for events - clear and wait for the event bit to be set
-// again
-pub(crate) static WIFI_EVENTS: NonReentrantMutex<EnumSet<WifiEvent>> =
-    NonReentrantMutex::new(enumset::enum_set!());
 
 /// **************************************************************************
 /// Name: wifi_env_is_chip
@@ -677,17 +671,17 @@ pub unsafe extern "C" fn event_post(
     );
     use num_traits::FromPrimitive;
 
-    let event = unwrap!(WifiEvent::from_i32(event_id));
+    let event = unwrap!(super::event::WifiEvent::from_i32(event_id));
     trace!("EVENT: {:?}", event);
 
-    WIFI_EVENTS.with(|events| events.insert(event));
+    super::state::update_state(event);
 
-    let handled =
-        unsafe { super::event::dispatch_event_handler(event, event_data, event_data_size) };
-
-    super::state::update_state(event, handled);
-
-    event.waker().wake();
+    if let Some(payload) = super::event::EventInfo::from_wifi_event_raw(event, event_data)
+        && let Ok(publisher) = super::event::EVENT_CHANNEL.publisher()
+        && publisher.try_publish(payload).is_err()
+    {
+        warn!("Lost event - consider increasing the capacity of the internal wifi event channel.");
+    }
 
     match event {
         WifiEvent::StationConnected | WifiEvent::StationDisconnected => {

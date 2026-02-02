@@ -428,7 +428,7 @@ mod private {
     use super::Display;
     #[cfg(feature = "wifi")]
     use crate::wifi::WifiError;
-    #[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[derive(Display, Debug, Clone, PartialEq, Eq, Hash)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     /// Error which can be returned during radio initialization.
     #[non_exhaustive]

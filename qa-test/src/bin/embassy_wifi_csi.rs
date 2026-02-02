@@ -25,8 +25,8 @@ use esp_radio::wifi::{
     Config,
     Interface,
     WifiController,
-    WifiEvent,
     csi::CsiConfig,
+    event::WifiEvent,
     scan::ScanConfig,
     sta::StationConfig,
 };
@@ -61,6 +61,11 @@ async fn main(spawner: Spawner) -> ! {
 
     let (controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
+
+    // enable some "interesting" events to be received in the connection task
+    esp_radio::wifi::event::enable_wifi_events(
+        WifiEvent::HomeChannelChange | WifiEvent::StationBeaconTimeout,
+    );
 
     println!("CSI data will be printed shortly ...");
 
@@ -109,9 +114,28 @@ async fn connection(mut controller: WifiController<'static>) {
     loop {
         if matches!(controller.is_connected(), Ok(true)) {
             // wait until we're no longer connected
-            controller
-                .wait_for_event(WifiEvent::StationDisconnected)
+            //
+            // just `controller.wait_for_disconnect_async()` is enough - but here we demonstrate how
+            // to get arbitrary events, too
+            let mut subscriber = controller.subscribe().unwrap();
+            loop {
+                let res = embassy_futures::select::select(
+                    controller.wait_for_disconnect_async(),
+                    subscriber.next_event_pure(),
+                )
                 .await;
+
+                match res {
+                    embassy_futures::select::Either::First(disconnect) => {
+                        println!("Disconnected: {:?}", disconnect);
+                        break;
+                    }
+                    embassy_futures::select::Either::Second(event) => {
+                        println!("Event: {:?}", event);
+                    }
+                }
+            }
+
             Timer::after(Duration::from_millis(5000)).await
         }
 

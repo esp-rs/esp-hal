@@ -3,16 +3,16 @@
 #![deny(missing_docs)]
 
 use alloc::{collections::vec_deque::VecDeque, vec::Vec};
-use core::{fmt::Debug, marker::PhantomData, mem::MaybeUninit, ptr::addr_of, task::Poll};
+use core::{fmt::Debug, marker::PhantomData, mem::MaybeUninit, ptr::addr_of};
 
 use docsplay::Display;
 use enumset::{EnumSet, EnumSetType};
 use esp_config::esp_config_int;
+use esp_hal::system::Cpu;
 #[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
 use esp_hal::time::{Duration, Instant};
-use esp_hal::{asynch::AtomicWaker, system::Cpu};
 use esp_sync::NonReentrantMutex;
-use num_derive::FromPrimitive;
+use event::EVENT_CHANNEL;
 use portable_atomic::{AtomicUsize, Ordering};
 use procmacros::BuilderLite;
 
@@ -39,6 +39,7 @@ use crate::{
         c_types,
         include::{self, *},
     },
+    wifi::event::{EventInfo, WifiEvent},
 };
 pub mod ap;
 
@@ -393,6 +394,270 @@ impl From<WifiMode> for wifi_mode_t {
     }
 }
 
+/// Reason for disconnection.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum DisconnectReason {
+    /// Unspecified reason
+    Unspecified                     = 1,
+    /// Authentication expired
+    AuthExpire                      = 2,
+    /// Deauthentication due to leaving
+    AuthLeave                       = 3,
+    /// Disassociated due to inactivity
+    DisassocDueToInactivity         = 4,
+    /// Too many associated stations
+    AssocTooMany                    = 5,
+    /// Class 2 frame received from non authenticated STA
+    Class2FrameFromNonauthSta       = 6,
+    /// Class 3 frame received from non associated STA
+    Class3FrameFromNonassocSta      = 7,
+    /// Deassociated due to leaving
+    AssocLeave                      = 8,
+    /// Association but not authenticated
+    AssocNotAuthed                  = 9,
+    /// Disassociated due to poor power capability
+    DisassocPwrcapBad               = 10,
+    /// Disassociated due to unsupported channel
+    DisassocSupchanBad              = 11,
+    /// Disassociated due to BSS transition
+    BssTransitionDisassoc           = 12,
+    /// Invalid Information Element (IE)
+    IeInvalid                       = 13,
+    /// MIC failure
+    MicFailure                      = 14,
+    /// 4-way handshake timeout
+    FourWayHandshakeTimeout         = 15,
+    /// Group key update timeout
+    GroupKeyUpdateTimeout           = 16,
+    /// IE differs in 4-way handshake
+    IeIn4wayDiffers                 = 17,
+    /// Invalid group cipher
+    GroupCipherInvalid              = 18,
+    /// Invalid pairwise cipher
+    PairwiseCipherInvalid           = 19,
+    /// Invalid AKMP
+    AkmpInvalid                     = 20,
+    /// Unsupported RSN IE version
+    UnsuppRsnIeVersion              = 21,
+    /// Invalid RSN IE capabilities
+    InvalidRsnIeCap                 = 22,
+    /// 802.1X authentication failed
+    _802_1xAuthFailed               = 23,
+    /// Cipher suite rejected
+    CipherSuiteRejected             = 24,
+    /// TDLS peer unreachable
+    TdlsPeerUnreachable             = 25,
+    /// TDLS unspecified
+    TdlsUnspecified                 = 26,
+    /// SSP requested disassociation
+    SspRequestedDisassoc            = 27,
+    /// No SSP roaming agreement
+    NoSspRoamingAgreement           = 28,
+    /// Bad cipher or AKM
+    BadCipherOrAkm                  = 29,
+    /// Not authorized in this location
+    NotAuthorizedThisLocation       = 30,
+    /// Service change precludes TS
+    ServiceChangePercludesTs        = 31,
+    /// Unspecified QoS reason
+    UnspecifiedQos                  = 32,
+    /// Not enough bandwidth
+    NotEnoughBandwidth              = 33,
+    /// Missing ACKs
+    MissingAcks                     = 34,
+    /// Exceeded TXOP
+    ExceededTxOp                    = 35,
+    /// Station leaving
+    StaLeaving                      = 36,
+    /// End of Block Ack (BA)
+    EndBa                           = 37,
+    /// Unknown Block Ack (BA)
+    UnknownBa                       = 38,
+    /// Timeout
+    Timeout                         = 39,
+    /// Peer initiated disassociation
+    PeerInitiated                   = 46,
+    /// AP initiated disassociation
+    ApInitiated                     = 47,
+    /// Invalid FT action frame count
+    InvalidFtActionFrameCount       = 48,
+    /// Invalid PMKID
+    InvalidPmkid                    = 49,
+    /// Invalid MDE
+    InvalidMde                      = 50,
+    /// Invalid FTE
+    InvalidFte                      = 51,
+    /// Transmission link establishment failed
+    TransmissionLinkEstablishFailed = 67,
+    /// Alternative channel occupied
+    AlterativeChannelOccupied       = 68,
+    /// Beacon timeout
+    BeaconTimeout                   = 200,
+    /// No AP found
+    NoApFound                       = 201,
+    /// Authentication failed
+    AuthFail                        = 202,
+    /// Association failed
+    AssocFail                       = 203,
+    /// Handshake timeout
+    HandshakeTimeout                = 204,
+    /// Connection failed
+    ConnectionFail                  = 205,
+    /// AP TSF reset
+    ApTsfReset                      = 206,
+    /// Roaming
+    Roaming                         = 207,
+    /// Association comeback time too long
+    AssocComebackTimeTooLong        = 208,
+    /// SA query timeout
+    SaQueryTimeout                  = 209,
+    /// No AP found with compatible security
+    NoApFoundWCompatibleSecurity    = 210,
+    /// No AP found in auth mode threshold
+    NoApFoundInAuthmodeThreshold    = 211,
+    /// No AP found in RSSI threshold
+    NoApFoundInRssiThreshold        = 212,
+}
+
+impl DisconnectReason {
+    fn from_raw(id: u16) -> Self {
+        match id {
+            1 => Self::Unspecified,
+            2 => Self::AuthExpire,
+            3 => Self::AuthLeave,
+            4 => Self::DisassocDueToInactivity,
+            5 => Self::AssocTooMany,
+            6 => Self::Class2FrameFromNonauthSta,
+            7 => Self::Class3FrameFromNonassocSta,
+            8 => Self::AssocLeave,
+            9 => Self::AssocNotAuthed,
+            10 => Self::DisassocPwrcapBad,
+            11 => Self::DisassocSupchanBad,
+            12 => Self::BssTransitionDisassoc,
+            13 => Self::IeInvalid,
+            14 => Self::MicFailure,
+            15 => Self::FourWayHandshakeTimeout,
+            16 => Self::GroupKeyUpdateTimeout,
+            17 => Self::IeIn4wayDiffers,
+            18 => Self::GroupCipherInvalid,
+            19 => Self::PairwiseCipherInvalid,
+            20 => Self::AkmpInvalid,
+            21 => Self::UnsuppRsnIeVersion,
+            22 => Self::InvalidRsnIeCap,
+            23 => Self::_802_1xAuthFailed,
+            24 => Self::CipherSuiteRejected,
+            25 => Self::TdlsPeerUnreachable,
+            26 => Self::TdlsUnspecified,
+            27 => Self::SspRequestedDisassoc,
+            28 => Self::NoSspRoamingAgreement,
+            29 => Self::BadCipherOrAkm,
+            30 => Self::NotAuthorizedThisLocation,
+            31 => Self::ServiceChangePercludesTs,
+            32 => Self::UnspecifiedQos,
+            33 => Self::NotEnoughBandwidth,
+            34 => Self::MissingAcks,
+            35 => Self::ExceededTxOp,
+            36 => Self::StaLeaving,
+            37 => Self::EndBa,
+            38 => Self::UnknownBa,
+            39 => Self::Timeout,
+            46 => Self::PeerInitiated,
+            47 => Self::ApInitiated,
+            48 => Self::InvalidFtActionFrameCount,
+            49 => Self::InvalidPmkid,
+            50 => Self::InvalidMde,
+            51 => Self::InvalidFte,
+            67 => Self::TransmissionLinkEstablishFailed,
+            68 => Self::AlterativeChannelOccupied,
+            200 => Self::BeaconTimeout,
+            201 => Self::NoApFound,
+            202 => Self::AuthFail,
+            203 => Self::AssocFail,
+            204 => Self::HandshakeTimeout,
+            205 => Self::ConnectionFail,
+            206 => Self::ApTsfReset,
+            207 => Self::Roaming,
+            208 => Self::AssocComebackTimeTooLong,
+            209 => Self::SaQueryTimeout,
+            210 => Self::NoApFoundWCompatibleSecurity,
+            211 => Self::NoApFoundInAuthmodeThreshold,
+            212 => Self::NoApFoundInRssiThreshold,
+            _ => Self::Unspecified,
+        }
+    }
+}
+
+/// Information about a connected station.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct ConnectedStationInfo {
+    /// The SSID of the connected station.
+    pub ssid: alloc::string::String,
+    /// The BSSID of the connected station.
+    pub bssid: [u8; 6],
+    /// The channel of the connected station.
+    pub channel: u8,
+    /// The authmode of the connected station.
+    pub authmode: AuthenticationMethod,
+    /// The Association ID (AID) of the connected station.
+    pub aid: u16,
+}
+
+/// Information about a disconnected station.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct DisconnectedStationInfo {
+    /// The SSID of the disconnected station.
+    pub ssid: alloc::string::String,
+    /// The BSSID of the disconnected station.
+    pub bssid: [u8; 6],
+    /// The disconnect reason.
+    // should we introduce an enum?
+    pub reason: DisconnectReason,
+    /// The RSSI.
+    pub rssi: i8,
+}
+
+/// Information about a station connected to the access point.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct AccessPointStationConnectedInfo {
+    /// The MAC address.
+    pub mac: [u8; 6],
+    /// The Association ID (AID) of the connected station.
+    pub aid: u16,
+    /// If this is a mesh child.
+    pub is_mesh_child: bool,
+}
+
+/// Information about a station disconnected from the access point.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct AccessPointStationDisconnectedInfo {
+    /// The MAC address.
+    pub mac: [u8; 6],
+    /// The Association ID (AID) of the connected station.
+    pub aid: u16,
+    /// If this is a mesh child.
+    pub is_mesh_child: bool,
+    /// The disconnect reason.
+    pub reason: DisconnectReason,
+}
+
+/// Either the [AccessPointStationConnectedInfo] or [AccessPointStationDisconnectedInfo].
+pub enum AccessPointStationEventInfo {
+    /// Information about a station connected to the access point.
+    Connected(AccessPointStationConnectedInfo),
+    /// Information about a station disconnected from the access point.
+    Disconnected(AccessPointStationDisconnectedInfo),
+}
+
 static RX_QUEUE_SIZE: AtomicUsize = AtomicUsize::new(0);
 static TX_QUEUE_SIZE: AtomicUsize = AtomicUsize::new(0);
 
@@ -403,12 +668,12 @@ pub(crate) static DATA_QUEUE_RX_STA: NonReentrantMutex<VecDeque<PacketBuffer>> =
     NonReentrantMutex::new(VecDeque::new());
 
 /// Common errors.
-#[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Display, Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum WifiError {
     /// The device disconnected from the network or failed to connect to it.
-    Disconnected,
+    Disconnected(DisconnectedStationInfo),
 
     /// Unknown Wi-Fi mode (not Station/AccessPoint/AccessPointStation).
     UnknownWifiMode,
@@ -548,115 +813,6 @@ impl From<InitializationError> for WifiError {
             InitializationError::Adc2IsUsed => WifiError::Adc2IsUsed,
         }
     }
-}
-
-/// Events generated by the Wi-Fi driver.
-#[derive(Debug, Hash, FromPrimitive, EnumSetType)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-#[repr(i32)]
-pub enum WifiEvent {
-    /// Wi-Fi is ready for operation.
-    WifiReady = 0,
-    /// Scan operation has completed.
-    ScanDone,
-    /// Station mode started.
-    StationStart,
-    /// Station mode stopped.
-    StationStop,
-    /// Station connected to a network.
-    StationConnected,
-    /// Station disconnected from a network.
-    StationDisconnected,
-    /// Station authentication mode changed.
-    StationAuthenticationModeChange,
-
-    /// Station Wi-Fi-Protected-Status succeeds in enrollee mode.
-    StationWifiProtectedStatusEnrolleeSuccess,
-    /// Station Wi-Fi-Protected-Status fails in enrollee mode.
-    StationWifiProtectedStatusEnrolleeFailed,
-    /// Station Wi-Fi-Protected-Status timeout in enrollee mode.
-    StationWifiProtectedStatusEnrolleeTimeout,
-    /// Station Wi-Fi-Protected-Status pin code in enrollee mode.
-    StationWifiProtectedStatusEnrolleePin,
-    /// Station Wi-Fi-Protected-Status overlap in enrollee mode.
-    StationWifiProtectedStatusEnrolleePushButtonConfigurationOverlap,
-
-    /// Soft-AccessPoint start.
-    AccessPointStart,
-    /// Soft-AccessPoint stop.
-    AccessPointStop,
-    /// A station connected to Soft-AccessPoint.
-    AccessPointStationConnected,
-    /// A station disconnected from Soft-AccessPoint.
-    AccessPointStationDisconnected,
-    /// Received probe request packet in Soft-AccessPoint interface.
-    AccessPointProbeRequestReceived,
-
-    /// Received report of Fine-Timing-Measurement procedure.
-    FineTimingMeasurementReport,
-
-    /// Station Receive-Signal-Strenght-Indicator goes below the configured threshold.
-    StationBasicServiceSetReceivedSignalStrengthIndicatorLow,
-    /// Status indication of Action Transmission operation.
-    ActionTransmissionStatus,
-    /// Remain-on-Channel operation complete.
-    RemainOnChannelDone,
-
-    /// Station beacon timeout.
-    StationBeaconTimeout,
-
-    /// Connectionless module wake interval has started.
-    ConnectionlessModuleWakeIntervalStart,
-
-    /// Soft-AccessPoint Wi-Fi-Protected-Status succeeded in registrar mode.
-    AccessPointWifiProtectedStatusRegistrarSuccess,
-    /// Soft-AccessPoint Wi-Fi-Protected-Status failed in registrar mode.
-    AccessPointWifiProtectedStatusRegistrarFailed,
-    /// Soft-AccessPoint Wi-Fi-Protected-Status timed out in registrar mode.
-    AccessPointWifiProtectedStatusRegistrarTimeout,
-    /// Soft-AccessPoint Wi-Fi-Protected-Status pin code in registrar mode.
-    AccessPointWifiProtectedStatusRegistrarPin,
-    /// Soft-AccessPoint Wi-Fi-Protected-Status overlap in registrar mode.
-    AccessPointWifiProtectedStatusRegistrarPushButtonConfigurationOverlap,
-
-    /// Individual Target-Wake-Time setup.
-    IndividualTargetWakeTimeSetup,
-    /// Individual Target-Wake-Time teardown.
-    IndividualTargetWakeTimeTeardown,
-    /// Individual Target-Wake-Time probe.
-    IndividualTargetWakeTimeProbe,
-    /// Individual Target-Wake-Time suspended.
-    IndividualTargetWakeTimeSuspend,
-    /// Target-Wake-Wakeup event.
-    TargetWakeTimeWakeup,
-    /// Broadcast-Target-Wake-Time setup.
-    BroadcastTargetWakeTimeSetup,
-    /// Broadcast-Target-Wake-Time teardown.
-    BroadcastTargetWakeTimeTeardown,
-
-    /// Neighbor-Awareness-Networking discovery has started.
-    NeighborAwarenessNetworkingStarted,
-    /// Neighbor-Awareness-Networking discovery has stopped.
-    NeighborAwarenessNetworkingStopped,
-    /// Neighbor-Awareness-Networking service discovery match found.
-    NeighborAwarenessNetworkingServiceMatch,
-    /// Replied to a Neighbor-Awareness-Networking peer with service discovery match.
-    NeighborAwarenessNetworkingReplied,
-    /// Received a follow-up message in Neighbor-Awareness-Networking.
-    NeighborAwarenessNetworkingReceive,
-    /// Received NDP (Neighbor Discovery Protocol) request from a Neighbor-Awareness-Networking
-    /// peer.
-    NeighborDiscoveryProtocolIndication,
-    /// NDP confirm indication.
-    NeighborDiscoveryProtocolConfirmation,
-    /// Neighbor-Awareness-Networking datapath terminated indication.
-    NeighborDiscoveryProtocolTerminated,
-    /// Wi-Fi home channel change, doesn't occur when scanning.
-    HomeChannelChange,
-
-    /// Received Neighbor Report response.
-    StationNeighborRep,
 }
 
 /// Get the access point MAC address of the device.
@@ -1837,6 +1993,16 @@ pub fn new<'d>(
 
     config.validate();
 
+    event::enable_wifi_events(
+        WifiEvent::StationStart
+            | WifiEvent::StationStop
+            | WifiEvent::StationConnected
+            | WifiEvent::StationDisconnected
+            | WifiEvent::AccessPointStart
+            | WifiEvent::AccessPointStop
+            | WifiEvent::ScanDone,
+    );
+
     unsafe {
         internal::G_CONFIG = wifi_init_config_t {
             osi_funcs: (&raw const internal::__ESP_RADIO_G_WIFI_OSI_FUNCS).cast_mut(),
@@ -2363,7 +2529,15 @@ impl WifiController<'_> {
     pub fn is_connected(&self) -> Result<bool, WifiError> {
         match crate::wifi::station_state() {
             crate::wifi::WifiStationState::Connected => Ok(true),
-            crate::wifi::WifiStationState::Disconnected => Err(WifiError::Disconnected),
+            crate::wifi::WifiStationState::Disconnected => {
+                // TODO is this really useful API?
+                Err(WifiError::Disconnected(DisconnectedStationInfo {
+                    ssid: "unknown".into(),
+                    bssid: [0u8; 6],
+                    reason: DisconnectReason::Unspecified,
+                    rssi: 0,
+                }))
+            }
             // FIXME: Should any other enum value trigger an error instead of returning false?
             _ => Ok(false),
         }
@@ -2399,12 +2573,27 @@ impl WifiController<'_> {
         &mut self,
         config: ScanConfig<'_>,
     ) -> Result<Vec<AccessPointInfo>, WifiError> {
-        Self::clear_events(WifiEvent::ScanDone);
+        let mut subscriber = EVENT_CHANNEL
+            .subscriber()
+            .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
+
         esp_wifi_result!(wifi_start_scan(false, config))?;
 
         // Prevents memory leak if `scan_with_config_async`'s future is dropped.
         let guard = FreeApListOnDrop;
-        WifiEventFuture::new(WifiEvent::ScanDone).await;
+
+        loop {
+            let event = subscriber.next_message_pure().await;
+            if let EventInfo::ScanDone {
+                status: _status,
+                number: _number,
+                scan_id: _scan_id,
+            } = event
+            {
+                break;
+            }
+        }
+
         guard.defuse();
 
         Ok(ScanResults::new(self)?.collect::<Vec<_>>())
@@ -2426,17 +2615,18 @@ impl WifiController<'_> {
     ///
     /// # {after_snippet}
     pub async fn start_async(&mut self) -> Result<(), WifiError> {
-        let mut events = enumset::enum_set! {};
-
+        let mut expected_events = 0;
         let mode = self.mode()?;
         if mode.is_access_point() {
-            events |= WifiEvent::AccessPointStart;
+            expected_events += 1;
         }
         if mode.is_station() {
-            events |= WifiEvent::StationStart;
+            expected_events += 1;
         }
 
-        Self::clear_events(events);
+        let mut subscriber = EVENT_CHANNEL
+            .subscriber()
+            .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
 
         set_access_point_state(WifiAccessPointState::Starting);
         set_station_state(WifiStationState::Starting);
@@ -2461,7 +2651,23 @@ impl WifiController<'_> {
             }
         }
 
-        self.wait_for_all_events(events, false).await;
+        loop {
+            let event = subscriber.next_message_pure().await;
+
+            match event {
+                event::EventInfo::StationStart => {
+                    expected_events -= 1;
+                }
+                event::EventInfo::AccessPointStart => {
+                    expected_events -= 1;
+                }
+                _ => (),
+            }
+
+            if expected_events == 0 {
+                break;
+            }
+        }
 
         Ok(())
     }
@@ -2499,21 +2705,38 @@ impl WifiController<'_> {
             return Err(WifiError::NotStarted);
         }
 
-        let mut events = enumset::enum_set! {};
+        let mut subscriber = EVENT_CHANNEL
+            .subscriber()
+            .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
 
+        let mut expected_events = 0;
         let mode = self.mode()?;
         if mode.is_access_point() {
-            events |= WifiEvent::AccessPointStop;
+            expected_events += 1;
         }
         if mode.is_station() {
-            events |= WifiEvent::StationStop;
+            expected_events += 1;
         }
-
-        Self::clear_events(events);
 
         self.stop_impl()?;
 
-        self.wait_for_all_events(events, false).await;
+        loop {
+            let event = subscriber.next_message_pure().await;
+
+            match event {
+                event::EventInfo::StationStop => {
+                    expected_events -= 1;
+                }
+                event::EventInfo::AccessPointStop => {
+                    expected_events -= 1;
+                }
+                _ => (),
+            }
+
+            if expected_events == 0 {
+                break;
+            }
+        }
 
         Ok(())
     }
@@ -2547,18 +2770,60 @@ impl WifiController<'_> {
     ///     }
     /// }
     /// # {after_snippet}
-    pub async fn connect_async(&mut self) -> Result<(), WifiError> {
-        Self::clear_events(WifiEvent::StationConnected | WifiEvent::StationDisconnected);
+    pub async fn connect_async(&mut self) -> Result<ConnectedStationInfo, WifiError> {
+        let mut subscriber = EVENT_CHANNEL
+            .subscriber()
+            .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
 
-        let err = self.connect_impl().err();
+        self.connect_impl()?;
 
-        if MultiWifiEventFuture::new(WifiEvent::StationConnected | WifiEvent::StationDisconnected)
-            .await
-            .contains(WifiEvent::StationDisconnected)
-        {
-            Err(err.unwrap_or(WifiError::Disconnected))
-        } else {
-            Ok(())
+        let result = loop {
+            let event = subscriber.next_message().await;
+            if let embassy_sync::pubsub::WaitResult::Message(event) = event {
+                match event {
+                    EventInfo::StationConnected { .. } => {
+                        break event;
+                    }
+                    EventInfo::StationDisconnected { .. } => {
+                        break event;
+                    }
+                    _ => (),
+                }
+            }
+        };
+
+        match result {
+            event::EventInfo::StationConnected {
+                ssid,
+                ssid_len,
+                bssid,
+                channel,
+                authmode,
+                aid,
+            } => Ok(ConnectedStationInfo {
+                ssid: alloc::string::String::from(unsafe {
+                    str::from_utf8_unchecked(&ssid[..ssid_len as usize])
+                }),
+                bssid,
+                channel,
+                authmode: AuthenticationMethod::from_raw(authmode),
+                aid,
+            }),
+            event::EventInfo::StationDisconnected {
+                ssid,
+                ssid_len,
+                bssid,
+                reason,
+                rssi,
+            } => Err(WifiError::Disconnected(DisconnectedStationInfo {
+                ssid: alloc::string::String::from(unsafe {
+                    str::from_utf8_unchecked(&ssid[..ssid_len as usize])
+                }),
+                bssid,
+                reason: DisconnectReason::from_raw(reason),
+                rssi,
+            })),
+            _ => unreachable!(),
         }
     }
 
@@ -2584,58 +2849,134 @@ impl WifiController<'_> {
     ///     }
     /// }
     /// # {after_snippet}
-    pub async fn disconnect_async(&mut self) -> Result<(), WifiError> {
-        // If not connected, this will do nothing.
-        // It will also wait forever for a `StationDisconnected` event that will never come.
-        // Return early instead of hanging.
+    pub async fn disconnect_async(&mut self) -> Result<DisconnectedStationInfo, WifiError> {
+        // If not connected it would wait forever for a `StationDisconnected` event that will never
+        // happen. Return early instead of hanging.
         if !matches!(self.is_connected(), Ok(true)) {
-            return Ok(());
+            return Err(WifiError::NotConnected);
         }
 
-        Self::clear_events(WifiEvent::StationDisconnected);
+        let mut subscriber = EVENT_CHANNEL
+            .subscriber()
+            .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
+
         self.disconnect_impl()?;
-        WifiEventFuture::new(WifiEvent::StationDisconnected).await;
 
-        Ok(())
-    }
+        loop {
+            let event = subscriber.next_message_pure().await;
 
-    fn clear_events(events: impl Into<EnumSet<WifiEvent>>) {
-        WIFI_EVENTS.with(|evts| evts.remove_all(events.into()));
-    }
-
-    /// Wait for one [`WifiEvent`].
-    pub async fn wait_for_event(&mut self, event: WifiEvent) {
-        Self::clear_events(event);
-        WifiEventFuture::new(event).await
-    }
-
-    /// Wait for one of multiple [`WifiEvent`]s. Returns the events that
-    /// occurred while waiting.
-    pub async fn wait_for_events(
-        &mut self,
-        events: EnumSet<WifiEvent>,
-        clear_pending: bool,
-    ) -> EnumSet<WifiEvent> {
-        if clear_pending {
-            Self::clear_events(events);
+            if let event::EventInfo::StationDisconnected {
+                ssid,
+                ssid_len,
+                bssid,
+                reason,
+                rssi,
+            } = event
+            {
+                break Ok(DisconnectedStationInfo {
+                    ssid: alloc::string::String::from(unsafe {
+                        str::from_utf8_unchecked(&ssid[..ssid_len as usize])
+                    }),
+                    bssid,
+                    reason: DisconnectReason::from_raw(reason),
+                    rssi,
+                });
+            }
         }
-        MultiWifiEventFuture::new(events).await
     }
 
-    /// Wait for multiple [`WifiEvent`]s.
-    pub async fn wait_for_all_events(
-        &mut self,
-        mut events: EnumSet<WifiEvent>,
-        clear_pending: bool,
-    ) {
-        if clear_pending {
-            Self::clear_events(events);
+    /// Wait until the station gets disconnected from the AP.
+    pub async fn wait_for_disconnect_async(&self) -> Result<DisconnectedStationInfo, WifiError> {
+        // If not connected it would wait forever for a `StationDisconnected` event that will never
+        // happen. Return early instead of hanging.
+        if !matches!(self.is_connected(), Ok(true)) {
+            return Err(WifiError::NotConnected);
         }
 
-        while !events.is_empty() {
-            let fired = MultiWifiEventFuture::new(events).await;
-            events -= fired;
+        let mut subscriber = EVENT_CHANNEL
+            .subscriber()
+            .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
+
+        loop {
+            let event = subscriber.next_message_pure().await;
+
+            if let event::EventInfo::StationDisconnected {
+                ssid,
+                ssid_len,
+                bssid,
+                reason,
+                rssi,
+            } = event
+            {
+                break Ok(DisconnectedStationInfo {
+                    ssid: alloc::string::String::from(unsafe {
+                        str::from_utf8_unchecked(&ssid[..ssid_len as usize])
+                    }),
+                    bssid,
+                    reason: DisconnectReason::from_raw(reason),
+                    rssi,
+                });
+            }
         }
+    }
+
+    /// Wait for connected / disconnected events.
+    pub async fn wait_for_access_point_connected_event_async(
+        &self,
+    ) -> Result<AccessPointStationEventInfo, WifiError> {
+        let mut subscriber = EVENT_CHANNEL
+            .subscriber()
+            .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
+
+        loop {
+            let event = subscriber.next_message_pure().await;
+
+            match event {
+                event::EventInfo::AccessPointStationConnected {
+                    mac,
+                    aid,
+                    is_mesh_child,
+                } => {
+                    break Ok(AccessPointStationEventInfo::Connected(
+                        AccessPointStationConnectedInfo {
+                            mac,
+                            aid,
+                            is_mesh_child,
+                        },
+                    ));
+                }
+                event::EventInfo::AccessPointStationDisconnected {
+                    mac,
+                    aid,
+                    is_mesh_child,
+                    reason,
+                } => {
+                    break Ok(AccessPointStationEventInfo::Disconnected(
+                        AccessPointStationDisconnectedInfo {
+                            mac,
+                            aid: aid as u16,
+                            is_mesh_child,
+                            reason: DisconnectReason::from_raw(reason),
+                        },
+                    ));
+                }
+                _ => (),
+            }
+        }
+    }
+
+    /// Subscribe to events.
+    ///
+    /// # Errors
+    /// This returns [WifiError::Failed] if no more subscriptions are available.
+    /// Consider increasing the internal event channel subscriber count in this case.
+    #[instability::unstable]
+    pub fn subscribe<'a>(&'a self) -> Result<event::EventSubscriber<'a>, WifiError> {
+        if let Ok(subscriber) = EVENT_CHANNEL.subscriber() {
+            return Ok(event::EventSubscriber::new(subscriber));
+        }
+
+        Err(WifiError::Failed)
     }
 
     fn apply_ap_config(&mut self, config: &AccessPointConfig) -> Result<(), WifiError> {
@@ -2864,80 +3205,6 @@ impl WifiController<'_> {
             esp_wifi_result!(esp_wifi_sta_enterprise_enable())?;
 
             Ok(())
-        }
-    }
-}
-
-impl WifiEvent {
-    pub(crate) fn waker(&self) -> &'static AtomicWaker {
-        // for now use only one waker for all events
-        // if that ever becomes a problem we might want to pick some events to use their
-        // own
-        static WAKER: AtomicWaker = AtomicWaker::new();
-        &WAKER
-    }
-}
-
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-pub(crate) struct WifiEventFuture {
-    event: WifiEvent,
-}
-
-impl WifiEventFuture {
-    /// Creates a new `Future` for the specified Wi-Fi event.
-    pub fn new(event: WifiEvent) -> Self {
-        Self { event }
-    }
-}
-
-impl core::future::Future for WifiEventFuture {
-    type Output = ();
-
-    fn poll(
-        self: core::pin::Pin<&mut Self>,
-        cx: &mut core::task::Context<'_>,
-    ) -> Poll<Self::Output> {
-        self.event.waker().register(cx.waker());
-        if WIFI_EVENTS.with(|events| events.remove(self.event)) {
-            Poll::Ready(())
-        } else {
-            Poll::Pending
-        }
-    }
-}
-
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-pub(crate) struct MultiWifiEventFuture {
-    event: EnumSet<WifiEvent>,
-}
-
-impl MultiWifiEventFuture {
-    /// Creates a new `Future` for the specified set of Wi-Fi events.
-    pub fn new(event: EnumSet<WifiEvent>) -> Self {
-        Self { event }
-    }
-}
-
-impl core::future::Future for MultiWifiEventFuture {
-    type Output = EnumSet<WifiEvent>;
-
-    fn poll(
-        self: core::pin::Pin<&mut Self>,
-        cx: &mut core::task::Context<'_>,
-    ) -> Poll<Self::Output> {
-        let output = WIFI_EVENTS.with(|events| {
-            let active = events.intersection(self.event);
-            events.remove_all(active);
-            active
-        });
-        if output.is_empty() {
-            for event in self.event.iter() {
-                event.waker().register(cx.waker());
-            }
-
-            Poll::Pending
-        } else {
-            Poll::Ready(output)
         }
     }
 }

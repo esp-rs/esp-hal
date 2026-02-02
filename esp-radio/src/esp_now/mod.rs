@@ -135,7 +135,7 @@ impl Error {
 impl core::error::Error for Error {}
 
 /// Common errors that can occur while using ESP-NOW driver.
-#[derive(Display, Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Display, Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum EspNowError {
