@@ -45,7 +45,7 @@ struct Context {
 unsafe extern "C" fn interrupt_handler() {
     core::arch::naked_asm! {"
         # save affected registers
-        addi sp, sp, -16*4 # allocate 16 words for saving regs (will work with just 2, but RISC-V wants it to be aligned by 16)
+        addi sp, sp, -4*4 # allocate 4 words for saving regs (will work with just 2, but RISC-V wants it to be 16 byte aligned)
         sw t0, 1*4(sp)
         sw t1, 2*4(sp)
 
@@ -61,7 +61,7 @@ unsafe extern "C" fn interrupt_handler() {
         # restore affected registers
         lw t0, 1*4(sp)
         lw t1, 2*4(sp)
-        addi sp, sp, 16*4
+        addi sp, sp, 4*4
         mret
         ",
         x = sym LAST_PERF,
