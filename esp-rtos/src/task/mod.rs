@@ -478,6 +478,16 @@ impl Task {
         task
     }
 
+    pub(crate) fn set_tp(&mut self, tp: u32) {
+        cfg_if::cfg_if! {
+            if #[cfg(xtensa)] {
+                self.cpu_context.THREADPTR = tp;
+            } else if #[cfg(riscv)] {
+                self.cpu_context.tp = tp as usize;
+            }
+        }
+    }
+
     fn set_up_stack_guard(&mut self, offset: usize, _value: u32) {
         let stack_bottom = self.stack.cast::<MaybeUninit<u32>>();
         let stack_guard = unsafe { stack_bottom.byte_add(offset) };
@@ -574,13 +584,9 @@ pub(super) fn allocate_main_task(
     // part of a static object so taking the pointer is fine.
     let main_task_ptr = NonNull::from(&scheduler.per_cpu[current_cpu].main_task);
 
-    cfg_if::cfg_if! {
-        if #[cfg(xtensa)] {
-            scheduler.per_cpu[current_cpu].main_task.cpu_context.THREADPTR = main_task_ptr.as_ptr() as u32;
-        } else if #[cfg(riscv)] {
-            scheduler.per_cpu[current_cpu].main_task.cpu_context.tp = main_task_ptr.as_ptr() as usize;
-        }
-    }
+    scheduler.per_cpu[current_cpu]
+        .main_task
+        .set_tp(main_task_ptr.as_ptr() as u32);
 
     write_thread_pointer(main_task_ptr.as_ptr());
 

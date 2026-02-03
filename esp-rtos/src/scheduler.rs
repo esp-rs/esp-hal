@@ -180,13 +180,7 @@ impl SchedulerState {
         task.heap_allocated = true;
         let mut task_ptr = NonNull::from(Box::leak(task));
 
-        cfg_if::cfg_if! {
-            if #[cfg(xtensa)] {
-                unsafe { task_ptr.as_mut().cpu_context.THREADPTR = task_ptr.as_ptr() as u32; }
-            } else if #[cfg(riscv)] {
-                unsafe { task_ptr.as_mut().cpu_context.tp = task_ptr.as_ptr() as usize; }
-            }
-        }
+        unsafe { task_ptr.as_mut().set_tp(task_ptr.as_ptr() as u32) };
 
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::task_new(task_ptr.rtos_trace_id());

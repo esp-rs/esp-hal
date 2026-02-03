@@ -3,10 +3,8 @@ use core::ffi::c_void;
 
 use esp_hal::{
     interrupt::{self, software::SoftwareInterrupt},
-    riscv::register,
     system::Cpu,
 };
-use portable_atomic::{AtomicPtr, Ordering};
 
 #[cfg(feature = "rtos-trace")]
 use crate::TraceEvents;
@@ -14,13 +12,6 @@ use crate::{
     SCHEDULER,
     task::{IdleFn, Task},
 };
-
-unsafe extern "C" {
-    fn sys_switch();
-}
-
-static _CURRENT_CTX_PTR: AtomicPtr<CpuContext> = AtomicPtr::new(core::ptr::null_mut());
-static _NEXT_CTX_PTR: AtomicPtr<CpuContext> = AtomicPtr::new(core::ptr::null_mut());
 
 /// Registers saved / restored
 #[derive(Debug, Default, Clone)]
@@ -101,9 +92,6 @@ pub struct CpuContext {
     /// Program counter, stores the address of the next instruction to be
     /// executed.
     pub pc: usize,
-
-    /// The mstatus which will be loaded before MRET
-    pub mstatus: usize,
 }
 
 impl CpuContext {
@@ -152,157 +140,15 @@ pub(crate) fn new_task_context(
     }
 }
 
-/// Switch to next task
+/// Select the new task
 ///
-/// *MUST* be called from inside an ISR without interrupt nesting.
-///
-/// The task switching relies on MEPC and MSTATUS to not get clobbered.
-/// We save MEPC as the current task's PC and change MEPC to an assembly function
-/// which will save the current CPU state for the current task (excluding PC) and
-/// restoring the CPU state from the next task.
-pub fn task_switch(old_ctx: *mut CpuContext, new_ctx: *mut CpuContext) {
-    debug_assert!(_NEXT_CTX_PTR.load(Ordering::SeqCst).is_null());
-    _CURRENT_CTX_PTR.store(old_ctx, Ordering::SeqCst);
-    _NEXT_CTX_PTR.store(new_ctx, Ordering::SeqCst);
-
-    if !old_ctx.is_null() {
-        unsafe {
-            (*old_ctx).pc = register::mepc::read();
-        }
-    }
-
-    // set MSTATUS for the switched to task
-    // MIE will be set from MPIE
-    // MPP will be used to determine the privilege-level
-    let mstatus = register::mstatus::read().bits();
+/// Task switching happens when exiting the interrupt handler. The handler detects that `tp` has
+/// changed, and saves/restores registers accordingly.
+pub fn task_switch(_old_ctx: *mut CpuContext, new_ctx: *mut CpuContext) {
     unsafe {
-        (*new_ctx).mstatus = mstatus;
-    }
-
-    unsafe {
-        // set MPIE in MSTATUS to 0 to disable interrupts while task switching
-        register::mstatus::write(register::mstatus::Mstatus::from_bits(mstatus & !(1 << 7)));
-
-        // load address of sys_switch into MEPC - will run after all registers are restored
-        register::mepc::write(sys_switch as *const () as usize);
+        core::arch::asm!("mv tp, {}", in(reg) new_ctx as *const CpuContext as usize);
     }
 }
-
-core::arch::global_asm!(
-    r#"
-.section .trap, "ax"
-
-.globl sys_switch
-.align 4
-sys_switch:
-    # put some regs on the stack since we will need those regs
-    addi sp, sp, -16
-    sw t0, 0(sp)
-    sw t1, 4(sp)
-
-    # t0 => current context
-    la t0, {_CURRENT_CTX_PTR}
-    lw t0, 0(t0)
-
-    # skip storing context if current task is null (deleted)
-    beqz t0, _restore_context
-
-    # store registers to old context - PC needs to be set by the "caller"
-    sw ra, 0*4(t0)
-
-    lw t1, 0(sp)
-    sw t1, 1*4(t0)
-
-    lw t1, 4(sp)
-    sw t1, 2*4(t0)
-
-    sw t2, 3*4(t0)
-    sw t3, 4*4(t0)
-    sw t4, 5*4(t0)
-    sw t5, 6*4(t0)
-    sw t6, 7*4(t0)
-    sw a0, 8*4(t0)
-    sw a1, 9*4(t0)
-    sw a2, 10*4(t0)
-    sw a3, 11*4(t0)
-    sw a4, 12*4(t0)
-    sw a5, 13*4(t0)
-    sw a6, 14*4(t0)
-    sw a7, 15*4(t0)
-    sw s0, 16*4(t0)
-    sw s1, 17*4(t0)
-    sw s2, 18*4(t0)
-    sw s3, 19*4(t0)
-    sw s4, 20*4(t0)
-    sw s5, 21*4(t0)
-    sw s6, 22*4(t0)
-    sw s7, 23*4(t0)
-    sw s8, 24*4(t0)
-    sw s9, 25*4(t0)
-    sw s10, 26*4(t0)
-    sw s11, 27*4(t0)
-    sw gp, 28*4(t0)
-    sw tp, 29*4(t0)
-
-    addi t1, sp, 16
-    sw t1, 30*4(t0)
-
-_restore_context:
-    # t0 => next context
-    la t1, {_NEXT_CTX_PTR}
-    lw t0, 0(t1)
-
-    # signal that the task switch is done - safe to do it already now - interrupts are disabled
-    sw x0, 0(t1)
-
-    # set the next task's PC as MEPC
-    lw t1, 31*4(t0)
-    csrrw x0, mepc, t1
-
-    # set MSTATUS from next context
-    lw t1, 32*4(t0)
-    csrrw x0, mstatus, t1
-
-    # restore registers from old context
-    lw ra, 0*4(t0)
-    lw t1, 2*4(t0)
-    lw t2, 3*4(t0)
-    lw t3, 4*4(t0)
-    lw t4, 5*4(t0)
-    lw t5, 6*4(t0)
-    lw t6, 7*4(t0)
-    lw a0, 8*4(t0)
-    lw a1, 9*4(t0)
-    lw a2, 10*4(t0)
-    lw a3, 11*4(t0)
-    lw a4, 12*4(t0)
-    lw a5, 13*4(t0)
-    lw a6, 14*4(t0)
-    lw a7, 15*4(t0)
-    lw s0, 16*4(t0)
-    lw s1, 17*4(t0)
-    lw s2, 18*4(t0)
-    lw s3, 19*4(t0)
-    lw s4, 20*4(t0)
-    lw s5, 21*4(t0)
-    lw s6, 22*4(t0)
-    lw s7, 23*4(t0)
-    lw s8, 24*4(t0)
-    lw s9, 25*4(t0)
-    lw s10, 26*4(t0)
-    lw s11, 27*4(t0)
-    lw gp, 28*4(t0)
-    lw tp, 29*4(t0)
-    lw sp, 30*4(t0)
-    lw t0, 1*4(t0)
-
-    # jump to next task's PC
-    mret
-
-    "#,
-    _CURRENT_CTX_PTR = sym _CURRENT_CTX_PTR,
-    _NEXT_CTX_PTR = sym _NEXT_CTX_PTR,
-);
 
 pub(crate) fn setup_multitasking<const IRQ: u8>(_irq: SoftwareInterrupt<'static, IRQ>) {
     // Register a direct-bound interrupt handler, so that we don't have to worry about other
@@ -334,6 +180,17 @@ pub(crate) fn setup_smp<const IRQ: u8>(irq: SoftwareInterrupt<'static, IRQ>) {
 }
 
 // We need to place this close to the trap handler for the jump to be resolved properly
+/// Task switch wrapper
+///
+/// This function is the direct interrupt handler for the context switch software interrupt.
+/// It stores context into the Context behind the current thread pointer, calls the scheduler,
+/// and restores context from the Context behind the next thread pointer.
+///
+/// The scheduler itself only changes the thread pointer. The new thread pointer is guaranteed to be non-zero.
+///
+/// The current task's thread pointer can be zero, if and only if the current task is the
+/// idle "task", or the current task is being deleted. The assembly contains jumps to avoid
+/// storing these contexts.
 #[unsafe(link_section = ".trap.rust")]
 #[unsafe(no_mangle)]
 #[unsafe(naked)]
@@ -343,50 +200,110 @@ unsafe extern "C" fn swint_handler_trampoline() {
         .cfi_startproc
         # https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/139d8d8e1d8ee8c0c3ee150de709ceaab5c08417/riscv-dwarf.adoc
         # .cfi_register ra, 0x1341 # Unwind with MEPC as return address, crashes probe-rs
-        # save registers
+
+        # Save registers
         addi sp, sp, -16*4 # allocate 16 bytes for saving regs (will work with just 2, but RISC-V wants it to be aligned by 16)
-        sw ra, 0*4(sp)
 
-        # TODO: this has a runtime cost, fix probe-rs instead
-        csrr ra, mepc # backtrace
+        # Store the thread pointer on the stack. We'll use it to check what needs to be restored
+        sw tp, 0*4(sp)
 
-        sw t0, 1*4(sp)
-        sw t1, 2*4(sp)
-        sw t2, 3*4(sp)
-        sw t3, 4*4(sp)
-        sw t4, 5*4(sp)
-        sw t5, 6*4(sp)
-        sw t6, 7*4(sp)
-        sw a0, 8*4(sp)
-        sw a1, 9*4(sp)
-        sw a2, 10*4(sp)
-        sw a3, 11*4(sp)
-        sw a4, 12*4(sp)
-        sw a5, 13*4(sp)
-        sw a6, 14*4(sp)
-        sw a7, 15*4(sp)
+        # Skip storing context for the idle context or deleted tasks (no thread pointer)
+        beqz tp, 1f # Skip to calling the interrupt handler
 
+        sw ra, 0*4(tp)
+        sw t0, 1*4(tp)
+        sw t1, 2*4(tp)
+        sw t2, 3*4(tp)
+        sw t3, 4*4(tp)
+        sw t4, 5*4(tp)
+        sw t5, 6*4(tp)
+        sw t6, 7*4(tp)
+        sw a0, 8*4(tp)
+        sw a1, 9*4(tp)
+        sw a2, 10*4(tp)
+        sw a3, 11*4(tp)
+        sw a4, 12*4(tp)
+        sw a5, 13*4(tp)
+        sw a6, 14*4(tp)
+        sw a7, 15*4(tp)
+
+1:
         la t0, {handler}
         jalr ra, t0, 0
 
-        # restore registers
-        lw ra, 0*4(sp)
-        lw t0, 1*4(sp)
-        lw t1, 2*4(sp)
-        lw t2, 3*4(sp)
-        lw t3, 4*4(sp)
-        lw t4, 5*4(sp)
-        lw t5, 6*4(sp)
-        lw t6, 7*4(sp)
-        lw a0, 8*4(sp)
-        lw a1, 9*4(sp)
-        lw a2, 10*4(sp)
-        lw a3, 11*4(sp)
-        lw a4, 12*4(sp)
-        lw a5, 13*4(sp)
-        lw a6, 14*4(sp)
-        lw a7, 15*4(sp)
+        # Load old thread pointer and free up stack. This way we store/reload the unmodified stack pointer.
+        lw t0, 0*4(sp)
         addi sp, sp, 16*4
+
+        # If the thread pointer has not changed, just restore caller-saved registers
+        beq t0, tp, 3f # Skip to restoring caller-saved registers in the new context
+
+        # Skip storing context for the idle context or deleted tasks (no thread pointer)
+        beqz t0, 2f # Skip to loading registers for the new context
+
+        # If the thread pointer has changed, switch context
+        # First, save registers to the old context
+        sw s0, 16*4(t0)
+        sw s1, 17*4(t0)
+        sw s2, 18*4(t0)
+        sw s3, 19*4(t0)
+        sw s4, 20*4(t0)
+        sw s5, 21*4(t0)
+        sw s6, 22*4(t0)
+        sw s7, 23*4(t0)
+        sw s8, 24*4(t0)
+        sw s9, 25*4(t0)
+        sw s10, 26*4(t0)
+        sw s11, 27*4(t0)
+        sw gp, 28*4(t0)
+      # sw tp, 29*4(t0) # No need to save TP, it's set up when the task is created.
+        sw sp, 30*4(t0)
+        # mepc -> pc
+        csrr t1, mepc
+        sw t1, 31*4(t0)
+
+2:
+        # Next, load registers from the new context
+        lw s0, 16*4(tp)
+        lw s1, 17*4(tp)
+        lw s2, 18*4(tp)
+        lw s3, 19*4(tp)
+        lw s4, 20*4(tp)
+        lw s5, 21*4(tp)
+        lw s6, 22*4(tp)
+        lw s7, 23*4(tp)
+        lw s8, 24*4(tp)
+        lw s9, 25*4(tp)
+        lw s10, 26*4(tp)
+        lw s11, 27*4(tp)
+        lw gp, 28*4(tp)
+        # TP will be restored last.
+        lw sp, 30*4(tp)
+
+        lw t1, 31*4(tp)
+        csrw mepc, t1
+
+3:
+        lw ra, 0*4(tp)
+        lw t0, 1*4(tp)
+        lw t1, 2*4(tp)
+        lw t2, 3*4(tp)
+        lw t3, 4*4(tp)
+        lw t4, 5*4(tp)
+        lw t5, 6*4(tp)
+        lw t6, 7*4(tp)
+        lw a0, 8*4(tp)
+        lw a1, 9*4(tp)
+        lw a2, 10*4(tp)
+        lw a3, 11*4(tp)
+        lw a4, 12*4(tp)
+        lw a5, 13*4(tp)
+        lw a6, 14*4(tp)
+        lw a7, 15*4(tp)
+
+        # Restore TP last. For the idle hook, this should write 0.
+        lw tp, 29*4(tp)
+
         mret
         .cfi_endproc
         ",
