@@ -22,8 +22,8 @@ use esp_hal::{
 };
 use esp_println::println;
 use esp_radio::wifi::{
+    Config,
     Interface,
-    ModeConfig,
     WifiController,
     WifiEvent,
     csi::CsiConfig,
@@ -116,7 +116,7 @@ async fn connection(mut controller: WifiController<'static>) {
         }
 
         if !matches!(controller.is_started(), Ok(true)) {
-            let station_config = ModeConfig::Station(
+            let station_config = Config::Station(
                 StationConfig::default()
                     .with_ssid(SSID.into())
                     .with_password(PASSWORD.into()),

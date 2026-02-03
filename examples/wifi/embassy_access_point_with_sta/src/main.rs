@@ -43,8 +43,8 @@ use esp_hal::{
 };
 use esp_println::{print, println};
 use esp_radio::wifi::{
+    Config,
     Interface,
-    ModeConfig,
     WifiController,
     WifiEvent,
     ap::AccessPointConfig,
@@ -109,7 +109,7 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    let station_config = ModeConfig::AccessPointStation(
+    let station_config = Config::AccessPointStation(
         StationConfig::default()
             .with_ssid(SSID.into())
             .with_password(PASSWORD.into()),
