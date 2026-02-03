@@ -93,7 +93,7 @@ impl Rate {
     }
 
     #[procmacros::doc_replace]
-    /// Convert the `Rate` to an interger number of Hz.
+    /// Convert the `Rate` to an integer number of Hz.
     ///
     /// ## Example
     ///
@@ -110,7 +110,7 @@ impl Rate {
     }
 
     #[procmacros::doc_replace]
-    /// Convert the `Rate` to an interger number of kHz.
+    /// Convert the `Rate` to an integer number of kHz.
     ///
     /// ## Example
     ///
@@ -127,7 +127,7 @@ impl Rate {
     }
 
     #[procmacros::doc_replace]
-    /// Convert the `Rate` to an interger number of MHz.
+    /// Convert the `Rate` to an integer number of MHz.
     ///
     /// ## Example
     ///
@@ -474,7 +474,7 @@ impl Duration {
         #[inline]
         to self.0 {
             #[procmacros::doc_replace]
-            /// Convert the `Duration` to an interger number of microseconds.
+            /// Convert the `Duration` to an integer number of microseconds.
             ///
             /// ## Example
             ///
@@ -489,7 +489,7 @@ impl Duration {
             pub const fn as_micros(&self) -> u64;
 
             #[procmacros::doc_replace]
-            /// Convert the `Duration` to an interger number of milliseconds.
+            /// Convert the `Duration` to an integer number of milliseconds.
             ///
             /// ## Example
             ///
@@ -504,7 +504,7 @@ impl Duration {
             pub const fn as_millis(&self) -> u64;
 
             #[procmacros::doc_replace]
-            /// Convert the `Duration` to an interger number of seconds.
+            /// Convert the `Duration` to an integer number of seconds.
             ///
             /// ## Example
             ///
@@ -519,7 +519,7 @@ impl Duration {
             pub const fn as_secs(&self) -> u64;
 
             #[procmacros::doc_replace]
-            /// Convert the `Duration` to an interger number of minutes.
+            /// Convert the `Duration` to an integer number of minutes.
             ///
             /// ## Example
             ///
@@ -534,7 +534,7 @@ impl Duration {
             pub const fn as_minutes(&self) -> u64;
 
             #[procmacros::doc_replace]
-            /// Convert the `Duration` to an interger number of hours.
+            /// Convert the `Duration` to an integer number of hours.
             ///
             /// ## Example
             ///
