@@ -149,7 +149,15 @@ jobs:
             runner: esp32s3-usb
             host: armv7
     steps:
+      # merge_group checks out the merge commit implicitly
       - uses: actions/checkout@v6
+        if: github.event_name == 'merge_group'
+      # workflow_dispatch: checkout requested repo+ref (prefer SHA when given)
+      - uses: actions/checkout@v6
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          repository: ${{ github.event.inputs.repository }}
+          ref: ${{ github.event.inputs.branch }}
       - uses: ./.github/actions/build-tests
         with:
           event_name: ${{ github.event_name }}
@@ -178,7 +186,11 @@ jobs:
             runner: esp32s3-usb
             host: armv7
     steps:
+      # workflow_dispatch: checkout requested repo+ref so composite action is from PR
       - uses: actions/checkout@v6
+        with:
+          repository: ${{ github.event.inputs.repository }}
+          ref: ${{ github.event.inputs.branch }}
       - uses: ./.github/actions/build-tests
         with:
           event_name: ${{ github.event_name }}
