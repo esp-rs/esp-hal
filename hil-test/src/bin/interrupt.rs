@@ -99,7 +99,7 @@ mod tests {
         interrupt::enable_direct(
             Interrupt::FROM_CPU_INTR0,
             Priority::Priority3,
-            CpuInterrupt::Interrupt20,
+            CpuInterrupt::Interrupt5,
             interrupt_handler,
         )
         .unwrap();
