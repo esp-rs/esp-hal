@@ -220,7 +220,7 @@ impl InterruptStatusRegisterAccess {
                     Self::Bank0 => GPIO::regs().status().read().bits(),
                     Self::Bank1 => GPIO::regs().status1().read().bits(),
                 }
-            } else if #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))] {
+            } else if #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32h2))] {
                 GPIO::regs().pcpu_int().read().bits()
             } else if #[cfg(any(esp32s2, esp32s3))] {
                 // Whilst the S3 is a dual core chip, it shares the enable registers between
