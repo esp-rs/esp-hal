@@ -237,6 +237,9 @@ impl TryFrom<u8> for Priority {
     }
 }
 
+// TODO: provide a `DirectBoundInterrupt` enum that lists the available options. This enables
+// portable direct binding.
+
 /// The interrupts reserved by the HAL
 #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
 pub static RESERVED_INTERRUPTS: &[u32] = PRIORITY_TO_INTERRUPT;
@@ -500,6 +503,9 @@ mod vectored {
                     assigned_cpu_interrupt(core::mem::transmute::<u16, Interrupt>(
                         interrupt_nr as u16,
                     ))
+                    && cpu_interrupt as u32 >= PRIORITY_TO_INTERRUPT[0]
+                    && cpu_interrupt as u32
+                        <= PRIORITY_TO_INTERRUPT[PRIORITY_TO_INTERRUPT.len() - 1]
                     && priority_by_core(core, cpu_interrupt) == priority
                 {
                     res.set(interrupt_nr);
@@ -578,13 +584,31 @@ mod classic {
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     pub(super) static DISABLED_CPU_INTERRUPT: u32 = 0;
 
+    // The CPU serves interrupt requests with lowest pending interrupt first. Use last interrupts
+    // for vectoring.
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     pub(super) static PRIORITY_TO_INTERRUPT: &[u32] =
-        &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        &[17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
 
-    // First element is not used, just there to avoid a -1 in the interrupt handler.
+    // Priority levels of the vectored interrupts.
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(super) static INTERRUPT_TO_PRIORITY: [Priority; 16] = [
+    pub(super) static INTERRUPT_TO_PRIORITY: [Priority; 32] = [
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
         Priority::None,
         Priority::Priority1,
         Priority::Priority2,
@@ -714,6 +738,8 @@ mod clic {
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     pub(super) static DISABLED_CPU_INTERRUPT: u32 = 0;
 
+    // The CPU serves interrupt requests with equal prio/level with highest ID first. Use first
+    // interrupts for vectoring.
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     pub(super) static PRIORITY_TO_INTERRUPT: &[u32] = &[16, 17, 18, 19, 20, 21, 22, 23];
 
@@ -974,22 +1000,35 @@ mod plic {
     // 0,3,4,7 are reserved for CLINT
     // for some reason also CPU interrupt 8 doesn't work by default since it's
     // disabled after reset - so don't use that, too
+    // The CPU serves interrupt requests with lowest pending interrupt first. Use last interrupts
+    // for vectoring.
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     pub(super) static PRIORITY_TO_INTERRUPT: &[u32] =
-        &[1, 2, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+        &[16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
 
-    // First element is not used, just there to avoid a -1 in the interrupt handler.
+    // Priority levels of the vectored interrupts.
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(super) static INTERRUPT_TO_PRIORITY: [Priority; 20] = [
+    pub(super) static INTERRUPT_TO_PRIORITY: [Priority; 31] = [
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
+        Priority::None,
         Priority::None,
         Priority::Priority1,
         Priority::Priority2,
-        Priority::None,
-        Priority::None,
         Priority::Priority3,
         Priority::Priority4,
-        Priority::None,
-        Priority::None,
         Priority::Priority5,
         Priority::Priority6,
         Priority::Priority7,
