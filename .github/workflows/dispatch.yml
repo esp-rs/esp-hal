@@ -325,7 +325,7 @@ jobs:
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: hil.yml
-          ref: ${{ github.event.repository.default_branch }}
+          ref: refs/pull/${{ github.event.issue.number }}/head
           inputs: |
             {
               "repository": "${{ github.repository }}",
@@ -495,7 +495,7 @@ jobs:
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: hil.yml
-          ref: ${{ github.event.repository.default_branch }}
+          ref: refs/pull/${{ github.event.issue.number }}/head
           inputs: |
             {
               "repository": "${{ github.repository }}",
@@ -714,7 +714,7 @@ jobs:
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: hil.yml
-          ref: ${{ github.event.repository.default_branch }}
+          ref: refs/pull/${{ github.event.issue.number }}/head
           inputs: |
             {
               "repository": "${{ github.repository }}",
@@ -915,7 +915,7 @@ jobs:
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: binary-size.yml
-          ref: ${{ github.event.repository.default_branch }}
+          ref: refs/pull/${{ github.event.issue.number }}/head
           inputs: |
             {
               "pr_number": "${{ github.event.issue.number }}"
