@@ -1894,11 +1894,11 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 2,
-                        limitations: &[],
+                        limitations: &["strapping"],
                     },
                     PinInfo {
                         pin: 3,
-                        limitations: &[],
+                        limitations: &["strapping"],
                     },
                     PinInfo {
                         pin: 4,
@@ -1914,7 +1914,7 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 7,
-                        limitations: &[],
+                        limitations: &["strapping"],
                     },
                     PinInfo {
                         pin: 8,
@@ -1954,19 +1954,19 @@ impl Chip {
                     },
                     PinInfo {
                         pin: 25,
-                        limitations: &[],
+                        limitations: &["strapping"],
                     },
                     PinInfo {
                         pin: 26,
-                        limitations: &[],
+                        limitations: &["strapping"],
                     },
                     PinInfo {
                         pin: 27,
-                        limitations: &[],
+                        limitations: &["strapping"],
                     },
                     PinInfo {
                         pin: 28,
-                        limitations: &[],
+                        limitations: &["strapping"],
                     },
                 ],
             },

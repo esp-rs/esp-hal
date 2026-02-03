@@ -110,12 +110,10 @@ impl crate::private::Sealed for PinGuard {}
 impl PinGuard {
     // This must only be used with a pin currently configured for output, and the PinGuard must be
     // dropped before the pin can be reconfigured (e.g. for input).
-    // #[cfg_attr(esp32c5, expect(unused))]
     fn new(pin: AnyPin<'_>) -> Self {
         Self { pin: pin.number() }
     }
 
-    // #[cfg_attr(esp32c5, expect(unused))]
     pub(crate) fn new_unconnected() -> Self {
         Self { pin: u8::MAX }
     }

@@ -1,5 +1,6 @@
 //! GPIO Test
 
+//% CHIPS(stable): esp32c5
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES(unstable): unstable embassy
 //% FEATURES(stable):
@@ -75,6 +76,7 @@ pub fn interrupt_handler_unlisten() {
 }
 
 // Compile-time test to check that GPIOs can be passed by reference.
+#[cfg(spi_master)]
 fn _gpios_can_be_reused() {
     let p = esp_hal::init(esp_hal::Config::default());
 
