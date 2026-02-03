@@ -18,7 +18,7 @@ use crate::{
     ble::{Config, InvalidConfigError, have_hci_read_data, read_hci, read_next, send_hci},
 };
 
-#[derive(Display, Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Display, Debug, Copy, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Error enum for BLE initialization failures.
 pub enum BleInitError {

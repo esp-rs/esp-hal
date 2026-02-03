@@ -806,6 +806,26 @@ pub struct CredentialsInfo {
     pub passphrase: [u8; 64usize],
 }
 
+/// A collection of elements.
+#[derive(Debug, Clone)]
+pub struct Collection<T>(alloc::vec::Vec<T>);
+
+impl<T> Collection<T> {
+    /// The elements of this collection.
+    pub fn as_slice(&self) -> &[T] {
+        self.0.as_slice()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl<T: defmt::Format> defmt::Format for Collection<T> {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        self.0.iter().for_each(|v| {
+            defmt::write!(fmt, "{}", v);
+        });
+    }
+}
+
 /// Event including the payload.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -871,7 +891,7 @@ pub enum EventInfo {
     /// Station WiFi-Protected-Status succeeds in enrollee mode.
     StationWifiProtectedStatusEnrolleeSuccess {
         /// Credentials
-        credentials: alloc::vec::Vec<CredentialsInfo>,
+        credentials: Collection<CredentialsInfo>,
     },
 
     /// Station WiFi-Protected-Status fails in enrollee mode.
@@ -938,7 +958,7 @@ pub enum EventInfo {
         /// Estimated one-way distance in Centi-Meters
         dist_est: u32,
         /// Detailed FTM report entries.
-        entries: alloc::vec::Vec<FineTimingMeasurementReportInfo>,
+        entries: Collection<FineTimingMeasurementReportInfo>,
     },
 
     /// Station Receive-Signal-Strenght-Indicator goes below the configured threshold.
@@ -1108,13 +1128,13 @@ impl EventInfo {
                     StationWifiProtectedStatusEnrolleeSuccess::from_raw_event_data(payload)
                 };
                 Some(EventInfo::StationWifiProtectedStatusEnrolleeSuccess {
-                    credentials: ev
+                    credentials: Collection(ev
                         .access_point_cred()[..ev.access_point_cred_cnt() as usize].iter()
                         .map(|cred| CredentialsInfo {
                             ssid: cred.ssid().try_into().unwrap(),
                             passphrase: cred.passphrase().try_into().unwrap(),
                         })
-                        .collect(),
+                        .collect()),
                 })
             }
             WifiEvent::StationWifiProtectedStatusEnrolleeFailed => {
@@ -1148,7 +1168,7 @@ impl EventInfo {
                     rtt_raw: ev.rtt_raw(),
                     rtt_est: ev.rtt_est(),
                     dist_est: ev.dist_est(),
-                    entries: ev
+                    entries: Collection(ev
                         .entries()
                         .map(|entry| FineTimingMeasurementReportInfo {
                             dlog_token: entry.dialog_token(),
@@ -1159,7 +1179,7 @@ impl EventInfo {
                             t3: entry.t3(),
                             t4: entry.t4(),
                         })
-                        .collect(),
+                        .collect()),
                 })
             }
             WifiEvent::StationBasicServiceSetReceivedSignalStrengthIndicatorLow => {

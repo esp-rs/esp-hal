@@ -3,7 +3,12 @@
 #![deny(missing_docs)]
 
 use alloc::{collections::vec_deque::VecDeque, vec::Vec};
-use core::{fmt::Debug, marker::PhantomData, mem::MaybeUninit, ptr::addr_of};
+use core::{
+    fmt::{Debug, Write},
+    marker::PhantomData,
+    mem::MaybeUninit,
+    ptr::addr_of,
+};
 
 use docsplay::Display;
 use enumset::{EnumSet, EnumSetType};
@@ -395,7 +400,7 @@ impl From<WifiMode> for wifi_mode_t {
 }
 
 /// Reason for disconnection.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum DisconnectReason {
@@ -590,12 +595,49 @@ impl DisconnectReason {
 }
 
 /// Information about a connected station.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Ssid {
+    ssid: [u8; 32],
+    len: u8,
+}
+
+impl Ssid {
+    pub(crate) fn new(ssid: &str) -> Self {
+        Self {
+            ssid: ssid.as_bytes().try_into().unwrap(),
+            len: ssid.len() as u8,
+        }
+    }
+
+    pub(crate) fn from_raw(ssid: &[u8], len: u8) -> Self {
+        Self {
+            ssid: ssid.try_into().unwrap(),
+            len,
+        }
+    }
+
+    /// The SSID as a string slice.
+    pub fn as_str(&self) -> &str {
+        unsafe { str::from_utf8_unchecked(&self.ssid[..self.len as usize]) }
+    }
+}
+
+impl Debug for Ssid {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_char('"')?;
+        f.write_str(self.as_str())?;
+        f.write_char('"')
+    }
+}
+
+/// Information about a connected station.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct ConnectedStationInfo {
     /// The SSID of the connected station.
-    pub ssid: alloc::string::String,
+    pub ssid: Ssid,
     /// The BSSID of the connected station.
     pub bssid: [u8; 6],
     /// The channel of the connected station.
@@ -607,12 +649,12 @@ pub struct ConnectedStationInfo {
 }
 
 /// Information about a disconnected station.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct DisconnectedStationInfo {
     /// The SSID of the disconnected station.
-    pub ssid: alloc::string::String,
+    pub ssid: Ssid,
     /// The BSSID of the disconnected station.
     pub bssid: [u8; 6],
     /// The disconnect reason.
@@ -623,7 +665,7 @@ pub struct DisconnectedStationInfo {
 }
 
 /// Information about a station connected to the access point.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct AccessPointStationConnectedInfo {
@@ -636,7 +678,7 @@ pub struct AccessPointStationConnectedInfo {
 }
 
 /// Information about a station disconnected from the access point.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct AccessPointStationDisconnectedInfo {
@@ -668,7 +710,7 @@ pub(crate) static DATA_QUEUE_RX_STA: NonReentrantMutex<VecDeque<PacketBuffer>> =
     NonReentrantMutex::new(VecDeque::new());
 
 /// Common errors.
-#[derive(Display, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum WifiError {
@@ -2532,7 +2574,7 @@ impl WifiController<'_> {
             crate::wifi::WifiStationState::Disconnected => {
                 // TODO is this really useful API?
                 Err(WifiError::Disconnected(DisconnectedStationInfo {
-                    ssid: "unknown".into(),
+                    ssid: Ssid::new("unknown"),
                     bssid: [0u8; 6],
                     reason: DisconnectReason::Unspecified,
                     rssi: 0,
@@ -2801,9 +2843,7 @@ impl WifiController<'_> {
                 authmode,
                 aid,
             } => Ok(ConnectedStationInfo {
-                ssid: alloc::string::String::from(unsafe {
-                    str::from_utf8_unchecked(&ssid[..ssid_len as usize])
-                }),
+                ssid: Ssid::from_raw(&ssid, ssid_len),
                 bssid,
                 channel,
                 authmode: AuthenticationMethod::from_raw(authmode),
@@ -2816,9 +2856,7 @@ impl WifiController<'_> {
                 reason,
                 rssi,
             } => Err(WifiError::Disconnected(DisconnectedStationInfo {
-                ssid: alloc::string::String::from(unsafe {
-                    str::from_utf8_unchecked(&ssid[..ssid_len as usize])
-                }),
+                ssid: Ssid::from_raw(&ssid, ssid_len),
                 bssid,
                 reason: DisconnectReason::from_raw(reason),
                 rssi,
@@ -2874,9 +2912,7 @@ impl WifiController<'_> {
             } = event
             {
                 break Ok(DisconnectedStationInfo {
-                    ssid: alloc::string::String::from(unsafe {
-                        str::from_utf8_unchecked(&ssid[..ssid_len as usize])
-                    }),
+                    ssid: Ssid::from_raw(&ssid, ssid_len),
                     bssid,
                     reason: DisconnectReason::from_raw(reason),
                     rssi,
@@ -2909,9 +2945,7 @@ impl WifiController<'_> {
             } = event
             {
                 break Ok(DisconnectedStationInfo {
-                    ssid: alloc::string::String::from(unsafe {
-                        str::from_utf8_unchecked(&ssid[..ssid_len as usize])
-                    }),
+                    ssid: Ssid::from_raw(&ssid, ssid_len),
                     bssid,
                     reason: DisconnectReason::from_raw(reason),
                     rssi,
