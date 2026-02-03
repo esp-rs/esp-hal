@@ -1795,7 +1795,32 @@ macro_rules! for_each_sw_interrupt {
 #[macro_export]
 macro_rules! sw_interrupt_delay {
     () => {
-        unsafe {}
+        unsafe {
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+        }
     };
 }
 #[macro_export]

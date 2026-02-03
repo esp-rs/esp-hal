@@ -121,7 +121,7 @@ mod tests {
                 "
             );
         }
-        
+
         // interrupt is raised from assembly for max timer granularity.
         unsafe {
             asm!(
