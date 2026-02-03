@@ -116,9 +116,8 @@ pub enum Error {
 }
 
 impl Error {
-    #[instability::unstable]
     /// Create an `Error` from a raw error code.
-    pub fn from_code(code: u32) -> Error {
+    fn from_code(code: u32) -> Error {
         match code {
             12389 => Error::NotInitialized,
             12390 => Error::InvalidArgument,
