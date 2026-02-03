@@ -1,7 +1,11 @@
 #[cfg(feature = "esp-radio")]
 use core::ffi::c_void;
 
-use esp_hal::{interrupt::software::SoftwareInterrupt, riscv::register, system::Cpu};
+use esp_hal::{
+    interrupt::{self, software::SoftwareInterrupt},
+    riscv::register,
+    system::Cpu,
+};
 use portable_atomic::{AtomicPtr, Ordering};
 
 #[cfg(feature = "rtos-trace")]
@@ -292,7 +296,6 @@ _restore_context:
     lw sp, 30*4(t0)
     lw t0, 1*4(t0)
 
-
     # jump to next task's PC
     mret
 
@@ -301,20 +304,94 @@ _restore_context:
     _NEXT_CTX_PTR = sym _NEXT_CTX_PTR,
 );
 
-pub(crate) fn setup_multitasking<const IRQ: u8>(mut irq: SoftwareInterrupt<'static, IRQ>) {
-    // Register the interrupt handler without nesting to satisfy the requirements of the task
-    // switching code
-    let swint_handler = esp_hal::interrupt::InterruptHandler::new_not_nested(
-        swint_handler,
-        esp_hal::interrupt::Priority::min(),
-    );
+pub(crate) fn setup_multitasking<const IRQ: u8>(_irq: SoftwareInterrupt<'static, IRQ>) {
+    // Register a direct-bound interrupt handler, so that we don't have to worry about other
+    // interrupt handlers interfering.
 
-    irq.set_interrupt_handler(swint_handler);
+    let interrupt = match IRQ {
+        0 => esp_hal::peripherals::Interrupt::FROM_CPU_INTR0,
+        _ => panic!("Invalid IRQ number"),
+    };
+
+    let cpu_interrupt = if cfg!(clic) {
+        interrupt::CpuInterrupt::Interrupt9
+    } else {
+        interrupt::CpuInterrupt::Interrupt15
+    };
+
+    // TODO: perhaps we need to provide an enum for the direct vector-able interrupts
+    unwrap!(interrupt::enable_direct(
+        interrupt,
+        interrupt::Priority::min(),
+        cpu_interrupt,
+        swint_handler_trampoline,
+    ));
 }
 
 #[cfg(multi_core)]
 pub(crate) fn setup_smp<const IRQ: u8>(irq: SoftwareInterrupt<'static, IRQ>) {
     setup_multitasking(irq);
+}
+
+// We need to place this close to the trap handler for the jump to be resolved properly
+#[unsafe(link_section = ".trap.rust")]
+#[unsafe(no_mangle)]
+#[unsafe(naked)]
+#[rustfmt::skip]
+unsafe extern "C" fn swint_handler_trampoline() {
+    core::arch::naked_asm! {"
+        .cfi_startproc
+        # https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/139d8d8e1d8ee8c0c3ee150de709ceaab5c08417/riscv-dwarf.adoc
+        # .cfi_register ra, 0x1341 # Unwind with MEPC as return address, crashes probe-rs
+        # save registers
+        addi sp, sp, -16*4 # allocate 16 bytes for saving regs (will work with just 2, but RISC-V wants it to be aligned by 16)
+        sw ra, 0*4(sp)
+
+        # TODO: this has a runtime cost, fix probe-rs instead
+        csrr ra, mepc # backtrace
+
+        sw t0, 1*4(sp)
+        sw t1, 2*4(sp)
+        sw t2, 3*4(sp)
+        sw t3, 4*4(sp)
+        sw t4, 5*4(sp)
+        sw t5, 6*4(sp)
+        sw t6, 7*4(sp)
+        sw a0, 8*4(sp)
+        sw a1, 9*4(sp)
+        sw a2, 10*4(sp)
+        sw a3, 11*4(sp)
+        sw a4, 12*4(sp)
+        sw a5, 13*4(sp)
+        sw a6, 14*4(sp)
+        sw a7, 15*4(sp)
+
+        la t0, {handler}
+        jalr ra, t0, 0
+
+        # restore registers
+        lw ra, 0*4(sp)
+        lw t0, 1*4(sp)
+        lw t1, 2*4(sp)
+        lw t2, 3*4(sp)
+        lw t3, 4*4(sp)
+        lw t4, 5*4(sp)
+        lw t5, 6*4(sp)
+        lw t6, 7*4(sp)
+        lw a0, 8*4(sp)
+        lw a1, 9*4(sp)
+        lw a2, 10*4(sp)
+        lw a3, 11*4(sp)
+        lw a4, 12*4(sp)
+        lw a5, 13*4(sp)
+        lw a6, 14*4(sp)
+        lw a7, 15*4(sp)
+        addi sp, sp, 16*4
+        mret
+        .cfi_endproc
+        ",
+        handler = sym swint_handler,
+    }
 }
 
 #[esp_hal::ram]
