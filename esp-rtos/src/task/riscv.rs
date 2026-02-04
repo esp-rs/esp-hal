@@ -228,7 +228,9 @@ unsafe extern "C" fn swint_handler_trampoline() {
         sw a7, 15*4(tp)
 
 1:
-        la t0, {handler}
+        # Let's run the interrupt handler, which runs the scheduler. If the scheduler
+        # decides we need to switch context, it will change the thread pointer to the new context.
+        la t0, {scheduler_interrupt_handler}
         jalr ra, t0, 0
 
         # Load old thread pointer and free up stack. This way we store/reload the unmodified stack pointer.
@@ -307,7 +309,7 @@ unsafe extern "C" fn swint_handler_trampoline() {
         mret
         .cfi_endproc
         ",
-        handler = sym swint_handler,
+        scheduler_interrupt_handler = sym swint_handler,
     }
 }
 
