@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `wifi::csi::WifiCsiInfo` wraps `wifi::wifi_csi_info_t` (#4643)
 - `WifiController::set_channel()`, `WifiController::channel()` `WifiController::set_bandwidth()`, `WifiController::bandwidth()` methods and `Bandwidth` enum (#4705)
 - Exposed types necessary to configure the ble `Config` structure. (#4764)
+- Added support for configuring maximum Wi-Fi transmitting power in the `CountryInfo` struct. (#4906)
 
 ### Changed
 
