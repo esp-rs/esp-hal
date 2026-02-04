@@ -106,7 +106,6 @@ peripherals = [
 symbols = [
     # Additional peripherals defined by us (the developers):
     # "gdma",
-    "clic",
     # "lp_core",
 
     # ROM capabilities
@@ -451,6 +450,7 @@ support_status = "partial"
 status_registers = 3
 software_interrupt_count = 4
 software_interrupt_delay = 24 # CPU speed dependent
+controller = { Riscv = { flavour = "clic" } }
 
 # [device.spi_master]
 # support_status = "supported"

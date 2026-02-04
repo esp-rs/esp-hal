@@ -44,3 +44,31 @@ impl GenericProperty for SoftwareInterruptProperties {
         })
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RiscvFlavour {
+    Basic,
+    Plic,
+    Clic,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum InterruptControllerProperties {
+    Xtensa,
+    Riscv { flavour: RiscvFlavour },
+}
+
+impl GenericProperty for InterruptControllerProperties {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        let controller = match self {
+            Self::Xtensa => "xtensa",
+            Self::Riscv { flavour, .. } => match flavour {
+                RiscvFlavour::Basic => "riscv_basic",
+                RiscvFlavour::Plic => "plic",
+                RiscvFlavour::Clic => "clic",
+            },
+        };
+
+        Some(vec![format!("interrupt_controller=\"{controller}\"")])
+    }
+}

@@ -17,12 +17,15 @@ pub use esp_riscv_rt::TrapFrame;
 use procmacros::ram;
 use riscv::register::{mcause, mtvec};
 
-#[cfg(not(any(clic, plic)))]
-pub use self::classic::*;
-#[cfg(clic)]
-pub use self::clic::*;
-#[cfg(plic)]
-pub use self::plic::*;
+cfg_if::cfg_if! {
+    if #[cfg(interrupt_controller = "riscv_basic")] {
+        pub use self::basic::*;
+    } else if #[cfg(interrupt_controller = "plic")] {
+        pub use self::plic::*;
+    } else if #[cfg(interrupt_controller = "clic")] {
+        pub use self::clic::*;
+    }
+}
 pub use self::vectored::*;
 use super::InterruptStatus;
 use crate::{
@@ -61,10 +64,10 @@ pub enum InterruptKind {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum CpuInterrupt {
     /// Interrupt number 1.
-    #[cfg(not(clic))]
+    #[cfg(not(interrupt_controller = "clic"))]
     Interrupt1 = 1,
     /// Interrupt number 1.
-    #[cfg(clic)]
+    #[cfg(interrupt_controller = "clic")]
     Interrupt1 = 16,
 
     /// Interrupt number 2.
@@ -127,7 +130,7 @@ pub enum CpuInterrupt {
     Interrupt30,
     /// Interrupt number 31.
     Interrupt31,
-    #[cfg(clic)]
+    #[cfg(interrupt_controller = "clic")]
     /// Interrupt number 32.
     Interrupt32,
 }
@@ -156,25 +159,25 @@ pub enum Priority {
     /// Priority level 8.
     Priority8,
     /// Priority level 9.
-    #[cfg(not(clic))]
+    #[cfg(not(interrupt_controller = "clic"))]
     Priority9,
     /// Priority level 10.
-    #[cfg(not(clic))]
+    #[cfg(not(interrupt_controller = "clic"))]
     Priority10,
     /// Priority level 11.
-    #[cfg(not(clic))]
+    #[cfg(not(interrupt_controller = "clic"))]
     Priority11,
     /// Priority level 12.
-    #[cfg(not(clic))]
+    #[cfg(not(interrupt_controller = "clic"))]
     Priority12,
     /// Priority level 13.
-    #[cfg(not(clic))]
+    #[cfg(not(interrupt_controller = "clic"))]
     Priority13,
     /// Priority level 14.
-    #[cfg(not(clic))]
+    #[cfg(not(interrupt_controller = "clic"))]
     Priority14,
     /// Priority level 15.
-    #[cfg(not(clic))]
+    #[cfg(not(interrupt_controller = "clic"))]
     Priority15,
 }
 
@@ -182,7 +185,7 @@ impl Priority {
     /// Maximum interrupt priority
     pub const fn max() -> Priority {
         cfg_if::cfg_if! {
-            if #[cfg(not(clic))] {
+            if #[cfg(not(interrupt_controller = "clic"))] {
                 Priority::Priority15
             } else {
                 Priority::Priority8
@@ -210,19 +213,19 @@ impl TryFrom<u32> for Priority {
             6 => Ok(Priority::Priority6),
             7 => Ok(Priority::Priority7),
             8 => Ok(Priority::Priority8),
-            #[cfg(not(clic))]
+            #[cfg(not(interrupt_controller = "clic"))]
             9 => Ok(Priority::Priority9),
-            #[cfg(not(clic))]
+            #[cfg(not(interrupt_controller = "clic"))]
             10 => Ok(Priority::Priority10),
-            #[cfg(not(clic))]
+            #[cfg(not(interrupt_controller = "clic"))]
             11 => Ok(Priority::Priority11),
-            #[cfg(not(clic))]
+            #[cfg(not(interrupt_controller = "clic"))]
             12 => Ok(Priority::Priority12),
-            #[cfg(not(clic))]
+            #[cfg(not(interrupt_controller = "clic"))]
             13 => Ok(Priority::Priority13),
-            #[cfg(not(clic))]
+            #[cfg(not(interrupt_controller = "clic"))]
             14 => Ok(Priority::Priority14),
-            #[cfg(not(clic))]
+            #[cfg(not(interrupt_controller = "clic"))]
             15 => Ok(Priority::Priority15),
             _ => Err(Error::InvalidInterruptPriority),
         }
@@ -279,7 +282,7 @@ pub fn enable_direct(
         set_priority(Cpu::current(), cpu_interrupt, level);
 
         cfg_if::cfg_if! {
-            if #[cfg(clic)] {
+            if #[cfg(interrupt_controller = "clic")] {
                 let clic = crate::soc::pac::CLIC::steal();
 
                 // Enable hardware vectoring
@@ -329,7 +332,7 @@ pub fn enable_direct(
 }
 
 // helper: returns correctly encoded RISC-V `jal` instruction
-#[cfg(not(clic))]
+#[cfg(not(interrupt_controller = "clic"))]
 fn encode_jal_x0(target: usize, pc: usize) -> Result<u32, Error> {
     let offset = (target as isize) - (pc as isize);
 
@@ -576,8 +579,8 @@ mod vectored {
     }
 }
 
-#[cfg(not(any(clic, plic)))]
-mod classic {
+#[cfg(interrupt_controller = "riscv_basic")]
+mod basic {
     use super::{CpuInterrupt, InterruptKind, Priority};
     use crate::{peripherals::INTERRUPT_CORE0, system::Cpu};
 
@@ -730,7 +733,7 @@ mod classic {
     }
 }
 
-#[cfg(clic)]
+#[cfg(interrupt_controller = "clic")]
 mod clic {
     use super::{CpuInterrupt, InterruptKind, Priority};
     use crate::{soc::pac::CLIC, system::Cpu};
@@ -990,7 +993,7 @@ mod clic {
     );
 }
 
-#[cfg(plic)]
+#[cfg(interrupt_controller = "plic")]
 mod plic {
     use super::{CpuInterrupt, InterruptKind, Priority};
     use crate::{peripherals::PLIC_MX, system::Cpu};
@@ -1175,7 +1178,7 @@ mod rt {
     unsafe fn _setup_interrupts() {
         unsafe extern "C" {
             static _vector_table: u32;
-            #[cfg(clic)]
+            #[cfg(interrupt_controller = "clic")]
             static _mtvt_table: u32;
         }
 
@@ -1192,20 +1195,20 @@ mod rt {
                 .ok();
         }
 
-        #[cfg(clic)]
+        #[cfg(interrupt_controller = "clic")]
         clic::init();
 
         unsafe {
             let vec_table = (&raw const _vector_table).addr();
 
-            #[cfg(not(clic))]
+            #[cfg(not(interrupt_controller = "clic"))]
             mtvec::write({
                 let mut mtvec = mtvec::Mtvec::from_bits(0);
                 mtvec.set_trap_mode(mtvec::TrapMode::Vectored);
                 mtvec.set_address(vec_table);
                 mtvec
             });
-            #[cfg(clic)]
+            #[cfg(interrupt_controller = "clic")]
             {
                 mtvec::write({
                     let mut mtvec = mtvec::Mtvec::from_bits(0x03); // MODE = CLIC
@@ -1220,7 +1223,7 @@ mod rt {
             crate::interrupt::init_vectoring();
         };
 
-        #[cfg(plic)]
+        #[cfg(interrupt_controller = "plic")]
         unsafe {
             core::arch::asm!("csrw mie, {0}", in(reg) u32::MAX);
         }
@@ -1237,7 +1240,7 @@ mod rt {
         clear(core, cpu_intr);
 
         cfg_if::cfg_if! {
-            if #[cfg(clic)] {
+            if #[cfg(interrupt_controller = "clic")] {
                 let prio = clic::current_runlevel();
                 let mcause = riscv::register::mcause::read();
             } else {
@@ -1286,12 +1289,12 @@ mod rt {
             }
         }
 
-        #[cfg(not(clic))]
+        #[cfg(not(interrupt_controller = "clic"))]
         unsafe {
             change_current_runlevel(level)
         };
 
-        #[cfg(clic)]
+        #[cfg(interrupt_controller = "clic")]
         // In case the target uses the CLIC, it is mandatory to restore `mcause` register
         // since it contains the former CPU priority. When executing `mret`,
         // the hardware will restore the former threshold, from `mcause` to
