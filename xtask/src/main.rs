@@ -806,7 +806,7 @@ fn build_rlib(package: &str, chip: &str, target: &str) -> Result<PathBuf> {
 /// specified chips. Reports any unmangled global symbols that may pollute the
 /// global namespace.
 fn check_global_symbols(chips: &[Chip]) -> Result<()> {
-    let mut total_problematic = 0;
+    let mut total_problematic = vec![];
 
     let package = Package::EspHal; // Only esp-hal for now
 
@@ -862,13 +862,21 @@ fn check_global_symbols(chips: &[Chip]) -> Result<()> {
                 println!("{:?} {}", kind, name);
             }
 
-            total_problematic += problematic_symbols.len();
+            total_problematic.extend(
+                problematic_symbols
+                    .into_iter()
+                    .map(|(name, kind, _)| (chip, name, kind)),
+            );
         }
     }
 
-    if total_problematic > 0 {
+    if !total_problematic.is_empty() {
+        for (chip, name, kind) in total_problematic.iter() {
+            println!("{}: {} ({:?})", chip, name, kind);
+        }
         Err(anyhow::anyhow!(
-            "Found {total_problematic} unmangled global symbols across all packages/chips"
+            "Found {count} unmangled global symbols across all packages/chips",
+            count = total_problematic.len()
         ))
     } else {
         Ok(())

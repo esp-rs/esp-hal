@@ -911,6 +911,7 @@ mod clic {
         }
     }
 
+    #[cfg(feature = "rt")]
     core::arch::global_asm!(
         r#"
 
