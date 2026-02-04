@@ -99,6 +99,15 @@ macro_rules! property {
     ("gpio.output_signal_max", str) => {
         stringify!(256)
     };
+    ("dedicated_gpio.needs_initialization") => {
+        false
+    };
+    ("dedicated_gpio.channel_count") => {
+        8
+    };
+    ("dedicated_gpio.channel_count", str) => {
+        stringify!(8)
+    };
     ("interrupts.status_registers") => {
         3
     };
@@ -2429,14 +2438,14 @@ macro_rules! define_io_mux_signals {
             I2SI_SD             = 15,
             I2SI_BCK            = 16,
             I2SI_WS             = 17,
-            CPU_GPIO_IN0        = 27,
-            CPU_GPIO_IN1        = 28,
-            CPU_GPIO_IN2        = 29,
-            CPU_GPIO_IN3        = 30,
-            CPU_GPIO_IN4        = 31,
-            CPU_GPIO_IN5        = 32,
-            CPU_GPIO_IN6        = 33,
-            CPU_GPIO_IN7        = 34,
+            CPU_GPIO_0          = 27,
+            CPU_GPIO_1          = 28,
+            CPU_GPIO_2          = 29,
+            CPU_GPIO_3          = 30,
+            CPU_GPIO_4          = 31,
+            CPU_GPIO_5          = 32,
+            CPU_GPIO_6          = 33,
+            CPU_GPIO_7          = 34,
             USB_JTAG_TDO_BRIDGE = 35,
             I2CEXT0_SCL         = 46,
             I2CEXT0_SDA         = 47,
@@ -2528,14 +2537,14 @@ macro_rules! define_io_mux_signals {
             I2SI_BCK         = 16,
             I2SI_WS          = 17,
             I2SO_SD1         = 18,
-            CPU_GPIO_OUT0    = 27,
-            CPU_GPIO_OUT1    = 28,
-            CPU_GPIO_OUT2    = 29,
-            CPU_GPIO_OUT3    = 30,
-            CPU_GPIO_OUT4    = 31,
-            CPU_GPIO_OUT5    = 32,
-            CPU_GPIO_OUT6    = 33,
-            CPU_GPIO_OUT7    = 34,
+            CPU_GPIO_0       = 27,
+            CPU_GPIO_1       = 28,
+            CPU_GPIO_2       = 29,
+            CPU_GPIO_3       = 30,
+            CPU_GPIO_4       = 31,
+            CPU_GPIO_5       = 32,
+            CPU_GPIO_6       = 33,
+            CPU_GPIO_7       = 34,
             I2CEXT0_SCL      = 46,
             I2CEXT0_SDA      = 47,
             PARL_TX_DATA0    = 48,

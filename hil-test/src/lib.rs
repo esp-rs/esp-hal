@@ -102,6 +102,8 @@ macro_rules! unconnected_pin {
                 $peripherals.GPIO9
             } else if #[cfg(esp32c2)] {
                 $peripherals.GPIO8
+            } else if #[cfg(esp32c5)] {
+                $peripherals.GPIO28
             } else {
                 $peripherals.GPIO9
             }

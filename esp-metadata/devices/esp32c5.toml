@@ -263,14 +263,14 @@ input_signals = [
     { name = "I2SI_SD",             id = 15 },
     { name = "I2SI_BCK",            id = 16 },
     { name = "I2SI_WS",             id = 17 },
-    { name = "CPU_GPIO_IN0",        id = 27 },
-    { name = "CPU_GPIO_IN1",        id = 28 },
-    { name = "CPU_GPIO_IN2",        id = 29 },
-    { name = "CPU_GPIO_IN3",        id = 30 },
-    { name = "CPU_GPIO_IN4",        id = 31 },
-    { name = "CPU_GPIO_IN5",        id = 32 },
-    { name = "CPU_GPIO_IN6",        id = 33 },
-    { name = "CPU_GPIO_IN7",        id = 34 },
+    { name = "CPU_GPIO_0",        id = 27 },
+    { name = "CPU_GPIO_1",        id = 28 },
+    { name = "CPU_GPIO_2",        id = 29 },
+    { name = "CPU_GPIO_3",        id = 30 },
+    { name = "CPU_GPIO_4",        id = 31 },
+    { name = "CPU_GPIO_5",        id = 32 },
+    { name = "CPU_GPIO_6",        id = 33 },
+    { name = "CPU_GPIO_7",        id = 34 },
     { name = "USB_JTAG_TDO_BRIDGE", id = 35 },
     { name = "I2CEXT0_SCL",         id = 46 },
     { name = "I2CEXT0_SDA",         id = 47 },
@@ -360,14 +360,14 @@ output_signals = [
     { name = "I2SI_BCK",         id = 16 },
     { name = "I2SI_WS",          id = 17 },
     { name = "I2SO_SD1",         id = 18 },
-    { name = "CPU_GPIO_OUT0",    id = 27 },
-    { name = "CPU_GPIO_OUT1",    id = 28 },
-    { name = "CPU_GPIO_OUT2",    id = 29 },
-    { name = "CPU_GPIO_OUT3",    id = 30 },
-    { name = "CPU_GPIO_OUT4",    id = 31 },
-    { name = "CPU_GPIO_OUT5",    id = 32 },
-    { name = "CPU_GPIO_OUT6",    id = 33 },
-    { name = "CPU_GPIO_OUT7",    id = 34 },
+    { name = "CPU_GPIO_0",    id = 27 },
+    { name = "CPU_GPIO_1",    id = 28 },
+    { name = "CPU_GPIO_2",    id = 29 },
+    { name = "CPU_GPIO_3",    id = 30 },
+    { name = "CPU_GPIO_4",    id = 31 },
+    { name = "CPU_GPIO_5",    id = 32 },
+    { name = "CPU_GPIO_6",    id = 33 },
+    { name = "CPU_GPIO_7",    id = 34 },
     { name = "I2CEXT0_SCL",      id = 46 },
     { name = "I2CEXT0_SDA",      id = 47 },
     { name = "PARL_TX_DATA0",    id = 48 },
@@ -419,9 +419,9 @@ output_signals = [
     { name = "GPIO",             id = 256 }
 ]
 
-# [device.dedicated_gpio]
-# support_status = "partial"
-# channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4", "CPU_GPIO_5", "CPU_GPIO_6", "CPU_GPIO_7"]]
+[device.dedicated_gpio]
+support_status = "partial"
+channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4", "CPU_GPIO_5", "CPU_GPIO_6", "CPU_GPIO_7"]]
 
 # # TODO: Verify
 # [device.i2c_master]
