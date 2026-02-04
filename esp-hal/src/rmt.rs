@@ -660,11 +660,11 @@ impl<Dir: Direction> DynChannelAccess<Dir> {
 pub struct TxChannelConfig {
     /// Channel's clock divider
     clk_divider: u8,
-    /// Set the idle output level to low/high
+    /// Whether the idle output level is low/high
     idle_output_level: Level,
-    /// Enable idle output
+    /// Whether idle output is enabled
     idle_output: bool,
-    /// Enable carrier modulation
+    /// Whether carrier modulation is enabled
     carrier_modulation: bool,
     /// Carrier high phase in ticks
     carrier_high: u16,
@@ -697,7 +697,7 @@ impl Default for TxChannelConfig {
 pub struct RxChannelConfig {
     /// Channel's clock divider
     clk_divider: u8,
-    /// Enable carrier demodulation
+    /// Whether carrier demodulation is enabled
     carrier_modulation: bool,
     /// Carrier high phase in ticks
     carrier_high: u16,
