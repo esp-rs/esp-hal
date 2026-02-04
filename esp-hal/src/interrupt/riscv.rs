@@ -391,7 +391,6 @@ unsafe fn assigned_cpu_interrupt(interrupt: Interrupt) -> Option<CpuInterrupt> {
     }
 }
 
-#[cfg_attr(esp32c5, expect(unused))]
 pub(crate) fn bound_cpu_interrupt_for(_cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
     unsafe { assigned_cpu_interrupt(interrupt) }
 }
