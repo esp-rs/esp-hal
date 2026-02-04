@@ -1,6 +1,6 @@
 /* esp32c5 fixups */
 /* The ESP32-C2 and ESP32-C3 have interrupt IDs 1-31, while the ESP32-C5 has
-   IDs 0-31, so we much define the handler for the one additional interrupt
+   IDs 0-31, so we must define the handler for the one additional interrupt
    ID: */
 PROVIDE(interrupt0 = DefaultHandler);
 

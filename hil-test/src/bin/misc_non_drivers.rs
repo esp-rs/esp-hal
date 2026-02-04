@@ -29,7 +29,6 @@
 mod clock_monitor;
 
 #[path = "misc_non_drivers/critical_section.rs"]
-#[cfg(not(esp32c5))]
 mod critical_section;
 
 #[path = "misc_non_drivers/delay_async.rs"]
@@ -50,3 +49,6 @@ mod init;
 
 #[path = "misc_non_drivers/simple.rs"]
 mod simple;
+
+#[path = "misc_non_drivers/interrupt_nesting.rs"]
+mod interrupt_nesting;
