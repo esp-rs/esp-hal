@@ -292,8 +292,8 @@ impl SchedulerState {
                 // be pinned to the current CPU. If we're switching out the main task, however, we
                 // can't rely on its saved context - use the current stack pointer which will still
                 // point to the right stack, just to another place we can use within it.
-                let idle_sp = if current_context.is_null()
-                    || current_context == &raw mut self.per_cpu[current_cpu].main_task.cpu_context
+                let idle_sp = if current_context
+                    == &raw mut self.per_cpu[current_cpu].main_task.cpu_context
                 {
                     // We're using the current task's stack, for which the watchpoint is already set
                     // up.
