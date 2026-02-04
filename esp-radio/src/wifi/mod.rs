@@ -1617,7 +1617,7 @@ pub struct CountryInfo {
     #[builder_lite(unstable)]
     operating_class: OperatingClass,
 
-    /// Maximum Wi-Fi Transmitting Power
+    /// Maximum Wi-Fi Transmitting Power.
     #[builder_lite(unstable)]
     max_tx_power: i8,
 }
