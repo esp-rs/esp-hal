@@ -888,25 +888,25 @@ pub enum EventInfo {
         new_mode: u32,
     },
 
-    /// Station WiFi-Protected-Status succeeds in enrollee mode.
+    /// Station Wi-Fi-Protected-Status succeeds in enrollee mode.
     StationWifiProtectedStatusEnrolleeSuccess {
         /// Credentials
         credentials: Collection<CredentialsInfo>,
     },
 
-    /// Station WiFi-Protected-Status fails in enrollee mode.
+    /// Station Wi-Fi-Protected-Status fails in enrollee mode.
     StationWifiProtectedStatusEnrolleeFailed,
 
-    /// Station WiFi-Protected-Status timeout in enrollee mode.
+    /// Station Wi-Fi-Protected-Status timeout in enrollee mode.
     StationWifiProtectedStatusEnrolleeTimeout,
 
-    /// Station WiFi-Protected-Status pin code in enrollee mode.
+    /// Station Wi-Fi-Protected-Status pin code in enrollee mode.
     StationWifiProtectedStatusEnrolleePin {
         /// PIN code of station in enrollee mode
         pin_code: [u8; 8usize],
     },
 
-    /// Station WiFi-Protected-Status overlap in enrollee mode.
+    /// Station Wi-Fi-Protected-Status overlap in enrollee mode.
     StationWifiProtectedStatusEnrolleePushButtonConfigurationOverlap,
 
     /// Soft-AccessPoint start.
@@ -999,13 +999,13 @@ pub enum EventInfo {
     /// Connectionless module wake interval has started.
     ConnectionlessModuleWakeIntervalStart,
 
-    /// Soft-AccessPoint WiFi-Protected-Status succeeded in registrar mode.
+    /// Soft-AccessPoint Wi-Fi-Protected-Status succeeded in registrar mode.
     AccessPointWifiProtectedStatusRegistrarSuccess {
         /// Enrollee mac address
         peer_macaddr: [u8; 6usize],
     },
 
-    /// Soft-AccessPoint WiFi-Protected-Status failed in registrar mode.
+    /// Soft-AccessPoint Wi-Fi-Protected-Status failed in registrar mode.
     AccessPointWifiProtectedStatusRegistrarFailed {
         /// WPS failure reason wps_fail_reason_t
         reason: u32,
@@ -1013,16 +1013,16 @@ pub enum EventInfo {
         peer_macaddr: [u8; 6usize],
     },
 
-    /// Soft-AccessPoint WiFi-Protected-Status timed out in registrar mode.
+    /// Soft-AccessPoint Wi-Fi-Protected-Status timed out in registrar mode.
     AccessPointWifiProtectedStatusRegistrarTimeout,
 
-    /// Soft-AccessPoint WiFi-Protected-Status pin code in registrar mode.
+    /// Soft-AccessPoint Wi-Fi-Protected-Status pin code in registrar mode.
     AccessPointWifiProtectedStatusRegistrarPin {
         /// PIN code of station in enrollee mode
         pin_code: [u8; 8usize],
     },
 
-    /// Soft-AccessPoint WiFi-Protected-Status overlap in registrar mode.
+    /// Soft-AccessPoint Wi-Fi-Protected-Status overlap in registrar mode.
     AccessPointWifiProtectedStatusRegistrarPushButtonConfigurationOverlap,
 
     /// Individual Target-Wake-Time setup.

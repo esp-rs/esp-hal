@@ -405,142 +405,142 @@ impl From<WifiMode> for wifi_mode_t {
 #[non_exhaustive]
 pub enum DisconnectReason {
     /// Unspecified reason
-    Unspecified                     = 1,
+    Unspecified                         = 1,
     /// Authentication expired
-    AuthExpire                      = 2,
+    AuthenticationExpired               = 2,
     /// Deauthentication due to leaving
-    AuthLeave                       = 3,
+    AuthenticationLeave                 = 3,
     /// Disassociated due to inactivity
-    DisassocDueToInactivity         = 4,
+    DisassociatedDueToInactivity        = 4,
     /// Too many associated stations
-    AssocTooMany                    = 5,
-    /// Class 2 frame received from non authenticated STA
-    Class2FrameFromNonauthSta       = 6,
-    /// Class 3 frame received from non associated STA
-    Class3FrameFromNonassocSta      = 7,
-    /// Deassociated due to leaving
-    AssocLeave                      = 8,
+    AssociationTooMany                  = 5,
+    /// Class 2 frame received from non authenticated station
+    Class2FrameFromNonAuthenticatedStation = 6,
+    /// Class 3 frame received from non associated station
+    Class3FrameFromNonAssociatedStation = 7,
+    /// Disassociated due to leaving
+    AssociationLeave                    = 8,
     /// Association but not authenticated
-    AssocNotAuthed                  = 9,
+    AssociationNotAuthenticated         = 9,
     /// Disassociated due to poor power capability
-    DisassocPwrcapBad               = 10,
+    DisassociatedPowerCapabilityBad     = 10,
     /// Disassociated due to unsupported channel
-    DisassocSupchanBad              = 11,
+    DisassociatedUnsupportedChannel     = 11,
     /// Disassociated due to BSS transition
-    BssTransitionDisassoc           = 12,
+    BssTransitionDisassociated          = 12,
     /// Invalid Information Element (IE)
-    IeInvalid                       = 13,
+    IeInvalid                           = 13,
     /// MIC failure
-    MicFailure                      = 14,
+    MicFailure                          = 14,
     /// 4-way handshake timeout
-    FourWayHandshakeTimeout         = 15,
+    FourWayHandshakeTimeout             = 15,
     /// Group key update timeout
-    GroupKeyUpdateTimeout           = 16,
+    GroupKeyUpdateTimeout               = 16,
     /// IE differs in 4-way handshake
-    IeIn4wayDiffers                 = 17,
+    IeIn4wayDiffers                     = 17,
     /// Invalid group cipher
-    GroupCipherInvalid              = 18,
+    GroupCipherInvalid                  = 18,
     /// Invalid pairwise cipher
-    PairwiseCipherInvalid           = 19,
+    PairwiseCipherInvalid               = 19,
     /// Invalid AKMP
-    AkmpInvalid                     = 20,
+    AkmpInvalid                         = 20,
     /// Unsupported RSN IE version
-    UnsuppRsnIeVersion              = 21,
+    UnsupportedRsnIeVersion             = 21,
     /// Invalid RSN IE capabilities
-    InvalidRsnIeCap                 = 22,
+    InvalidRsnIeCapabilities            = 22,
     /// 802.1X authentication failed
-    _802_1xAuthFailed               = 23,
+    _802_1xAuthenticationFailed         = 23,
     /// Cipher suite rejected
-    CipherSuiteRejected             = 24,
+    CipherSuiteRejected                 = 24,
     /// TDLS peer unreachable
-    TdlsPeerUnreachable             = 25,
+    TdlsPeerUnreachable                 = 25,
     /// TDLS unspecified
-    TdlsUnspecified                 = 26,
+    TdlsUnspecified                     = 26,
     /// SSP requested disassociation
-    SspRequestedDisassoc            = 27,
+    SspRequestedDisassociation          = 27,
     /// No SSP roaming agreement
-    NoSspRoamingAgreement           = 28,
+    NoSspRoamingAgreement               = 28,
     /// Bad cipher or AKM
-    BadCipherOrAkm                  = 29,
+    BadCipherOrAkm                      = 29,
     /// Not authorized in this location
-    NotAuthorizedThisLocation       = 30,
+    NotAuthorizedThisLocation           = 30,
     /// Service change precludes TS
-    ServiceChangePercludesTs        = 31,
+    ServiceChangePercludesTs            = 31,
     /// Unspecified QoS reason
-    UnspecifiedQos                  = 32,
+    UnspecifiedQos                      = 32,
     /// Not enough bandwidth
-    NotEnoughBandwidth              = 33,
+    NotEnoughBandwidth                  = 33,
     /// Missing ACKs
-    MissingAcks                     = 34,
+    MissingAcks                         = 34,
     /// Exceeded TXOP
-    ExceededTxOp                    = 35,
+    ExceededTxOp                        = 35,
     /// Station leaving
-    StaLeaving                      = 36,
+    StationLeaving                      = 36,
     /// End of Block Ack (BA)
-    EndBa                           = 37,
+    EndBlockAck                         = 37,
     /// Unknown Block Ack (BA)
-    UnknownBa                       = 38,
+    UnknownBlockAck                     = 38,
     /// Timeout
-    Timeout                         = 39,
+    Timeout                             = 39,
     /// Peer initiated disassociation
-    PeerInitiated                   = 46,
-    /// AP initiated disassociation
-    ApInitiated                     = 47,
+    PeerInitiated                       = 46,
+    /// Access point initiated disassociation
+    AccessPointInitiatedDisassociation  = 47,
     /// Invalid FT action frame count
-    InvalidFtActionFrameCount       = 48,
+    InvalidFtActionFrameCount           = 48,
     /// Invalid PMKID
-    InvalidPmkid                    = 49,
+    InvalidPmkid                        = 49,
     /// Invalid MDE
-    InvalidMde                      = 50,
+    InvalidMde                          = 50,
     /// Invalid FTE
-    InvalidFte                      = 51,
+    InvalidFte                          = 51,
     /// Transmission link establishment failed
-    TransmissionLinkEstablishFailed = 67,
+    TransmissionLinkEstablishmentFailed = 67,
     /// Alternative channel occupied
-    AlterativeChannelOccupied       = 68,
+    AlterativeChannelOccupied           = 68,
     /// Beacon timeout
-    BeaconTimeout                   = 200,
-    /// No AP found
-    NoApFound                       = 201,
+    BeaconTimeout                       = 200,
+    /// No access point found
+    NoAccessPointFound                  = 201,
     /// Authentication failed
-    AuthFail                        = 202,
+    AuthenticationFailed                = 202,
     /// Association failed
-    AssocFail                       = 203,
+    AssociationFailed                   = 203,
     /// Handshake timeout
-    HandshakeTimeout                = 204,
+    HandshakeTimeout                    = 204,
     /// Connection failed
-    ConnectionFail                  = 205,
+    ConnectionFailed                    = 205,
     /// AP TSF reset
-    ApTsfReset                      = 206,
+    AccessPointTsfReset                 = 206,
     /// Roaming
-    Roaming                         = 207,
+    Roaming                             = 207,
     /// Association comeback time too long
-    AssocComebackTimeTooLong        = 208,
+    AssociationComebackTimeTooLong      = 208,
     /// SA query timeout
-    SaQueryTimeout                  = 209,
+    SaQueryTimeout                      = 209,
     /// No AP found with compatible security
-    NoApFoundWCompatibleSecurity    = 210,
+    NoAccessPointFoundWithCompatibleSecurity = 210,
     /// No AP found in auth mode threshold
-    NoApFoundInAuthmodeThreshold    = 211,
+    NoAccessPointFoundInAuthmodeThreshold = 211,
     /// No AP found in RSSI threshold
-    NoApFoundInRssiThreshold        = 212,
+    NoAccessPointFoundInRssiThreshold   = 212,
 }
 
 impl DisconnectReason {
     fn from_raw(id: u16) -> Self {
         match id {
             1 => Self::Unspecified,
-            2 => Self::AuthExpire,
-            3 => Self::AuthLeave,
-            4 => Self::DisassocDueToInactivity,
-            5 => Self::AssocTooMany,
-            6 => Self::Class2FrameFromNonauthSta,
-            7 => Self::Class3FrameFromNonassocSta,
-            8 => Self::AssocLeave,
-            9 => Self::AssocNotAuthed,
-            10 => Self::DisassocPwrcapBad,
-            11 => Self::DisassocSupchanBad,
-            12 => Self::BssTransitionDisassoc,
+            2 => Self::AuthenticationExpired,
+            3 => Self::AuthenticationLeave,
+            4 => Self::DisassociatedDueToInactivity,
+            5 => Self::AssociationTooMany,
+            6 => Self::Class2FrameFromNonAuthenticatedStation,
+            7 => Self::Class3FrameFromNonAssociatedStation,
+            8 => Self::AssociationLeave,
+            9 => Self::AssociationNotAuthenticated,
+            10 => Self::DisassociatedPowerCapabilityBad,
+            11 => Self::DisassociatedUnsupportedChannel,
+            12 => Self::BssTransitionDisassociated,
             13 => Self::IeInvalid,
             14 => Self::MicFailure,
             15 => Self::FourWayHandshakeTimeout,
@@ -549,13 +549,13 @@ impl DisconnectReason {
             18 => Self::GroupCipherInvalid,
             19 => Self::PairwiseCipherInvalid,
             20 => Self::AkmpInvalid,
-            21 => Self::UnsuppRsnIeVersion,
-            22 => Self::InvalidRsnIeCap,
-            23 => Self::_802_1xAuthFailed,
+            21 => Self::UnsupportedRsnIeVersion,
+            22 => Self::InvalidRsnIeCapabilities,
+            23 => Self::_802_1xAuthenticationFailed,
             24 => Self::CipherSuiteRejected,
             25 => Self::TdlsPeerUnreachable,
             26 => Self::TdlsUnspecified,
-            27 => Self::SspRequestedDisassoc,
+            27 => Self::SspRequestedDisassociation,
             28 => Self::NoSspRoamingAgreement,
             29 => Self::BadCipherOrAkm,
             30 => Self::NotAuthorizedThisLocation,
@@ -564,31 +564,31 @@ impl DisconnectReason {
             33 => Self::NotEnoughBandwidth,
             34 => Self::MissingAcks,
             35 => Self::ExceededTxOp,
-            36 => Self::StaLeaving,
-            37 => Self::EndBa,
-            38 => Self::UnknownBa,
+            36 => Self::StationLeaving,
+            37 => Self::EndBlockAck,
+            38 => Self::UnknownBlockAck,
             39 => Self::Timeout,
             46 => Self::PeerInitiated,
-            47 => Self::ApInitiated,
+            47 => Self::AccessPointInitiatedDisassociation,
             48 => Self::InvalidFtActionFrameCount,
             49 => Self::InvalidPmkid,
             50 => Self::InvalidMde,
             51 => Self::InvalidFte,
-            67 => Self::TransmissionLinkEstablishFailed,
+            67 => Self::TransmissionLinkEstablishmentFailed,
             68 => Self::AlterativeChannelOccupied,
             200 => Self::BeaconTimeout,
-            201 => Self::NoApFound,
-            202 => Self::AuthFail,
-            203 => Self::AssocFail,
+            201 => Self::NoAccessPointFound,
+            202 => Self::AuthenticationFailed,
+            203 => Self::AssociationFailed,
             204 => Self::HandshakeTimeout,
-            205 => Self::ConnectionFail,
-            206 => Self::ApTsfReset,
+            205 => Self::ConnectionFailed,
+            206 => Self::AccessPointTsfReset,
             207 => Self::Roaming,
-            208 => Self::AssocComebackTimeTooLong,
+            208 => Self::AssociationComebackTimeTooLong,
             209 => Self::SaQueryTimeout,
-            210 => Self::NoApFoundWCompatibleSecurity,
-            211 => Self::NoApFoundInAuthmodeThreshold,
-            212 => Self::NoApFoundInRssiThreshold,
+            210 => Self::NoAccessPointFoundWithCompatibleSecurity,
+            211 => Self::NoAccessPointFoundInAuthmodeThreshold,
+            212 => Self::NoAccessPointFoundInRssiThreshold,
             _ => Self::Unspecified,
         }
     }
