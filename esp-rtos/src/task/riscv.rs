@@ -191,6 +191,10 @@ pub(crate) fn setup_smp<const IRQ: u8>(irq: SoftwareInterrupt<'static, IRQ>) {
 /// The current task's thread pointer can be zero, if and only if the current task is the
 /// idle "task", or the current task is being deleted. The assembly contains jumps to avoid
 /// storing these contexts.
+///
+/// We must not save the state of the idle task, or we'll risk running code with an incorrectly
+/// set stack pointer inherited from the last scheduled task. We must not save the state of deleted
+/// tasks, or we'll write some of the registers to memory that has been freed.
 #[unsafe(link_section = ".trap.rust")]
 #[unsafe(no_mangle)]
 #[unsafe(naked)]
@@ -303,7 +307,7 @@ unsafe extern "C" fn swint_handler_trampoline() {
         lw a6, 14*4(tp)
         lw a7, 15*4(tp)
 
-        # Restore TP last. For the idle hook, this should write 0.
+        # Restore TP last. For the idle hook, this should write 0, which prevents saving its state.
         lw tp, 29*4(tp)
 
         mret
