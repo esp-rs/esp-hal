@@ -610,7 +610,7 @@ support_status = "partial"
 status_registers = 3
 software_interrupt_count = 4
 software_interrupt_delay = 14 # CPU-speed sensitive - what's clocked from where?
-controller = { Riscv = { flavour = "plic" } }
+controller = { Riscv = { flavour = "plic", interrupts = 32, priority_levels = 15 } }
 
 [device.rmt]
 support_status = "partial"

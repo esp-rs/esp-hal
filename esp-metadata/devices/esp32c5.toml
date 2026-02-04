@@ -450,7 +450,7 @@ support_status = "partial"
 status_registers = 3
 software_interrupt_count = 4
 software_interrupt_delay = 24 # CPU speed dependent
-controller = { Riscv = { flavour = "clic" } }
+controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 } }
 
 # [device.spi_master]
 # support_status = "supported"

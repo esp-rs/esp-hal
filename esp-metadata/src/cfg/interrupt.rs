@@ -45,24 +45,165 @@ impl GenericProperty for SoftwareInterruptProperties {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RiscvFlavour {
     Basic,
     Plic,
     Clic,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+
+impl RiscvFlavour {
+    /// Interrupt lines reserved for vectored interrupts.
+    fn reserved_interrupts(&self) -> impl Iterator<Item = usize> {
+        let reserved: &[_] = match self {
+            RiscvFlavour::Basic => &[0], // Disabled interrupt
+            RiscvFlavour::Plic => {
+                // Some CLINT interrupts
+                &[0, 3, 4, 7]
+            }
+            RiscvFlavour::Clic => {
+                // All CLINT interrupts
+                &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+            }
+        };
+        reserved.iter().copied()
+    }
+
+    fn disabled_interrupt(&self) -> usize {
+        match *self {
+            RiscvFlavour::Plic => 31, // 0 is U-mode software interrupt
+            RiscvFlavour::Basic | RiscvFlavour::Clic => 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct RiscvControllerProperties {
+    flavour: RiscvFlavour,
+    /// Total number of interrupts supported by the controller.
+    interrupts: u32,
+    /// Priority levels above 0
+    priority_levels: u32,
+}
+
+impl RiscvControllerProperties {
+    /// Interrupt lines reserved for vectored interrupts.
+    fn vector_interrupts(&self) -> impl Iterator<Item = usize> {
+        let start = match self.flavour {
+            RiscvFlavour::Basic | RiscvFlavour::Plic => {
+                // Vectoring uses high interrupt lines, as higher IDs are serviced later.
+                (self.interrupts - self.priority_levels) as usize
+            }
+            RiscvFlavour::Clic => {
+                // After CLINT interrupts. Lower IDs are serviced later.
+                // Controller implements proper level/priority management.
+                16
+            }
+        };
+
+        start..start + self.priority_levels as usize
+    }
+
+    fn disabled_interrupt(&self) -> usize {
+        self.flavour.disabled_interrupt()
+    }
+
+    fn reserved_interrupts(&self) -> impl Iterator<Item = usize> {
+        self.flavour.reserved_interrupts()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum InterruptControllerProperties {
     Xtensa,
-    Riscv { flavour: RiscvFlavour },
+    Riscv(RiscvControllerProperties),
 }
 
 impl GenericProperty for InterruptControllerProperties {
+    fn macros(&self) -> Option<TokenStream> {
+        let Self::Riscv(properties) = self else {
+            return None;
+        };
+
+        enum Class {
+            Interrupt,
+            Reserved,
+            Vector,
+            Disabled,
+        }
+
+        // interrupt number => class
+        let mut classes = (0..properties.interrupts)
+            .map(|_| Class::Interrupt)
+            .collect::<Vec<_>>();
+
+        classes[properties.disabled_interrupt()] = Class::Disabled;
+        for intr in properties.vector_interrupts() {
+            classes[intr] = Class::Vector;
+        }
+        for intr in properties.reserved_interrupts() {
+            classes[intr] = Class::Reserved;
+        }
+
+        let mut all = vec![];
+        let mut vector = vec![];
+        let mut reserved = vec![];
+        let mut direct_bindable = vec![];
+
+        for (i, class) in classes.iter().enumerate() {
+            let intr_number = number(i);
+            let idx_in_class = number(match class {
+                Class::Interrupt => direct_bindable.len(),
+                Class::Vector => vector.len(),
+                Class::Reserved => reserved.len(),
+                Class::Disabled => 0,
+            });
+            let class_name = match class {
+                Class::Interrupt => format_ident!("direct_bindable"),
+                Class::Vector => format_ident!("vector"),
+                Class::Reserved => format_ident!("reserved"),
+                Class::Disabled => format_ident!("disabled"),
+            };
+
+            let tokens = quote! { [#class_name #idx_in_class] #intr_number };
+
+            all.push(tokens.clone());
+            match class {
+                Class::Interrupt => direct_bindable.push(tokens),
+                Class::Vector => vector.push(tokens),
+                Class::Reserved => reserved.push(tokens),
+                Class::Disabled => {}
+            }
+        }
+
+        let for_each_interrupt = generate_for_each_macro("interrupt", &[("all", &all)]);
+
+        let all_priorities = (0..properties.priority_levels)
+            .map(|p| {
+                let variant = format_ident!("Priority{}", p + 1);
+                let numeric = number(p + 1);
+                let p = number(p);
+
+                quote! {
+                    #p, #numeric, #variant
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let for_each_priority =
+            generate_for_each_macro("interrupt_priority", &[("all", &all_priorities)]);
+
+        Some(quote! {
+            #for_each_interrupt
+            #for_each_priority
+        })
+    }
+
     fn cfgs(&self) -> Option<Vec<String>> {
         let controller = match self {
             Self::Xtensa => "xtensa",
-            Self::Riscv { flavour, .. } => match flavour {
+            Self::Riscv(properties) => match properties.flavour {
                 RiscvFlavour::Basic => "riscv_basic",
                 RiscvFlavour::Plic => "plic",
                 RiscvFlavour::Clic => "clic",
@@ -70,5 +211,19 @@ impl GenericProperty for InterruptControllerProperties {
         };
 
         Some(vec![format!("interrupt_controller=\"{controller}\"")])
+    }
+
+    fn property_macro_branches(&self) -> proc_macro2::TokenStream {
+        match self {
+            Self::Xtensa => quote! {},
+            Self::Riscv(properties) => {
+                let disabled = number(properties.disabled_interrupt());
+                quote::quote! {
+                    ("interrupts.disabled_interrupt") => {
+                        #disabled
+                    };
+                }
+            }
+        }
     }
 }

@@ -159,7 +159,7 @@ pub(crate) fn setup_multitasking<const IRQ: u8>(_irq: SoftwareInterrupt<'static,
         _ => panic!("Invalid IRQ number"),
     };
 
-    let cpu_interrupt = if cfg!(clic) {
+    let cpu_interrupt = if cfg!(interrupt_controller = "clic") {
         interrupt::CpuInterrupt::Interrupt9
     } else {
         interrupt::CpuInterrupt::Interrupt15

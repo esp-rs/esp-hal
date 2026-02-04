@@ -386,7 +386,7 @@ support_status = "partial"
 status_registers = 2
 software_interrupt_count = 4
 software_interrupt_delay = 5
-controller = { Riscv = { flavour = "basic" } }
+controller = { Riscv = { flavour = "basic", interrupts = 32, priority_levels = 15 } }
 
 [device.sha]
 support_status = "partial"
