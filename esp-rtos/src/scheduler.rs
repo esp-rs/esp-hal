@@ -22,6 +22,7 @@ use crate::{
     run_queue::{Priority, RunQueue},
     task::{
         self,
+        ContextExt,
         CpuContext,
         IdleFn,
         Task,
@@ -180,7 +181,12 @@ impl SchedulerState {
         task.heap_allocated = true;
         let mut task_ptr = NonNull::from(Box::leak(task));
 
-        unsafe { task_ptr.as_mut().set_tp(task_ptr.as_ptr() as u32) };
+        unsafe {
+            task_ptr
+                .as_mut()
+                .cpu_context
+                .set_tp(task_ptr.as_ptr() as u32)
+        };
 
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::task_new(task_ptr.rtos_trace_id());
@@ -307,22 +313,10 @@ impl SchedulerState {
                         .main_task
                         .set_up_stack_watchpoint();
 
-                    cfg_if::cfg_if! {
-                        if #[cfg(xtensa)] {
-                            self.per_cpu[current_cpu].main_task.cpu_context.A1
-                        } else {
-                            self.per_cpu[current_cpu].main_task.cpu_context.sp
-                        }
-                    }
+                    self.per_cpu[current_cpu].main_task.cpu_context.sp()
                 };
 
-                cfg_if::cfg_if! {
-                    if #[cfg(xtensa)] {
-                        self.per_cpu[current_cpu].idle_context.A1 = idle_sp;
-                    } else {
-                        self.per_cpu[current_cpu].idle_context.sp = idle_sp;
-                    }
-                }
+                self.per_cpu[current_cpu].idle_context.set_sp(idle_sp);
 
                 #[cfg(feature = "rtos-trace")]
                 rtos_trace::trace::system_idle();

@@ -390,6 +390,46 @@ pub(crate) struct Task {
     pub(crate) heap_allocated: bool,
 }
 
+pub(crate) trait ContextExt {
+    fn set_tp(&mut self, tp: u32);
+
+    fn sp(&self) -> u32;
+
+    fn set_sp(&mut self, sp: u32);
+}
+
+impl ContextExt for CpuContext {
+    fn set_tp(&mut self, tp: u32) {
+        cfg_if::cfg_if! {
+            if #[cfg(xtensa)] {
+                self.THREADPTR = tp;
+            } else if #[cfg(riscv)] {
+                self.tp = tp as usize;
+            }
+        }
+    }
+
+    fn sp(&self) -> u32 {
+        cfg_if::cfg_if! {
+            if #[cfg(xtensa)] {
+                self.A1
+            } else {
+                self.sp as u32
+            }
+        }
+    }
+
+    fn set_sp(&mut self, sp: u32) {
+        cfg_if::cfg_if! {
+            if #[cfg(xtensa)] {
+                self.A1 = sp;
+            } else {
+                self.sp = sp as usize;
+            }
+        }
+    }
+}
+
 #[cfg(feature = "esp-radio")]
 extern "C" fn task_wrapper(task_fn: extern "C" fn(*mut c_void), param: *mut c_void) {
     task_fn(param);
@@ -476,16 +516,6 @@ impl Task {
         task.set_up_stack_guard(stack_guard_offset, 0xDEED_BAAD);
 
         task
-    }
-
-    pub(crate) fn set_tp(&mut self, tp: u32) {
-        cfg_if::cfg_if! {
-            if #[cfg(xtensa)] {
-                self.cpu_context.THREADPTR = tp;
-            } else if #[cfg(riscv)] {
-                self.cpu_context.tp = tp as usize;
-            }
-        }
     }
 
     fn set_up_stack_guard(&mut self, offset: usize, _value: u32) {
@@ -586,6 +616,7 @@ pub(super) fn allocate_main_task(
 
     scheduler.per_cpu[current_cpu]
         .main_task
+        .cpu_context
         .set_tp(main_task_ptr.as_ptr() as u32);
 
     write_thread_pointer(main_task_ptr.as_ptr());
