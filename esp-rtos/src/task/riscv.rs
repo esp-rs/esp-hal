@@ -202,7 +202,7 @@ unsafe extern "C" fn swint_handler_trampoline() {
         # .cfi_register ra, 0x1341 # Unwind with MEPC as return address, crashes probe-rs
 
         # Save registers
-        addi sp, sp, -16*4 # allocate 16 bytes for saving regs (will work with just 2, but RISC-V wants it to be aligned by 16)
+        addi sp, sp, -16 # allocate 16 bytes for saving regs (RISC-V requires 16-byte alignment)
 
         # Store the thread pointer on the stack. We'll use it to check what needs to be restored
         sw tp, 0*4(sp)
@@ -233,7 +233,7 @@ unsafe extern "C" fn swint_handler_trampoline() {
 
         # Load old thread pointer and free up stack. This way we store/reload the unmodified stack pointer.
         lw t0, 0*4(sp)
-        addi sp, sp, 16*4
+        addi sp, sp, 16
 
         # If the thread pointer has not changed, just restore caller-saved registers
         beq t0, tp, 3f # Skip to restoring caller-saved registers in the new context
