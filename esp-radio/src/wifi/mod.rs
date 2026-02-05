@@ -344,7 +344,7 @@ impl WifiMode {
         }
     }
 
-    /// Returns true if this mode works as an access point
+    /// Returns true if this mode works as an access point.
     pub fn is_access_point(&self) -> bool {
         match self {
             Self::Station => false,
@@ -1070,16 +1070,32 @@ pub struct Interface<'d> {
 }
 
 impl Interface<'_> {
+    #[procmacros::doc_replace]
     /// Retrieves the MAC address of the Wi-Fi device.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// let (_controller, interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    ///
+    /// let station = interfaces.station;
+    /// let mac = station.mac_address();
+    ///
+    /// println!("Station MAC: {:02x?}", mac);
+    /// # {after_snippet}
+    /// ```
     pub fn mac_address(&self) -> [u8; 6] {
         self.mode.mac_address()
     }
 
+    #[doc(hidden)]
     /// Receives data from the Wi-Fi device.
     pub fn receive(&mut self) -> Option<(WifiRxToken, WifiTxToken)> {
         self.mode.rx_token()
     }
 
+    #[doc(hidden)]
     /// Transmits data through the Wi-Fi device.
     pub fn transmit(&mut self) -> Option<WifiTxToken> {
         self.mode.tx_token()
@@ -1792,12 +1808,22 @@ impl ControllerConfig {
     }
 }
 
+#[procmacros::doc_replace]
 /// Create a Wi-Fi controller and it's associated interfaces.
 ///
 /// Dropping the controller will deinitialize / stop Wi-Fi.
 ///
 /// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
 /// currently in use.
+///
+/// ## Example
+///
+/// ```rust,no_run
+/// # {before_snippet}
+/// let (controller, interfaces) =
+///     esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
+/// # {after_snippet}
+/// ```
 pub fn new<'d>(
     device: crate::hal::peripherals::WIFI<'d>,
     config: ControllerConfig,
@@ -2004,11 +2030,23 @@ impl WifiController<'_> {
         esp_wifi_result!(unsafe { esp_wifi_set_protocol(iface, mask as u8) })
     }
 
+    #[procmacros::doc_replace]
     /// Configures modem power saving.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # use esp_radio::wifi::PowerSaveMode;
+    /// let (mut controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// controller.set_power_saving(PowerSaveMode::Maximum)?;
+    /// # {after_snippet}
+    /// ```
     pub fn set_power_saving(&mut self, ps: PowerSaveMode) -> Result<(), WifiError> {
         apply_power_saving(ps)
     }
 
+    #[procmacros::doc_replace]
     /// Get the RSSI information of access point to which the device is associated with.
     /// The value is obtained from the last beacon.
     ///
@@ -2017,6 +2055,23 @@ impl WifiController<'_> {
     /// - Use this API only in Station or AccessPoint-Station mode.
     /// - This API should be called after the station has connected to an access point.
     /// </div>
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # let (controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// // Assume the station has already been started and connected
+    /// match controller.rssi() {
+    ///     Ok(rssi) => {
+    ///         println!("RSSI: {} dBm", rssi);
+    ///     }
+    ///     Err(e) => {
+    ///         println!("Failed to get RSSI: {e:?}");
+    ///     }
+    /// }
+    /// # {after_snippet}
+    /// ```
     ///
     /// # Errors
     /// This function returns [`WifiError::Unsupported`] if the Station side isn't
@@ -2032,6 +2087,7 @@ impl WifiController<'_> {
         }
     }
 
+    #[procmacros::doc_replace]
     /// Get the Access Point information of access point to which the device is associated with.
     /// The value is obtained from the last beacon.
     ///
@@ -2040,6 +2096,23 @@ impl WifiController<'_> {
     /// - Use this API only in Station or AccessPoint-Station mode.
     /// - This API should be called after the station has connected to an access point.
     /// </div>
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # let (controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// // Assume the station has already been started and connected
+    /// match controller.ap_info() {
+    ///     Ok(info) => {
+    ///         println!("BSSID: {}", info.bssid);
+    ///     }
+    ///     Err(e) => {
+    ///         println!("Failed to get AP info: {e:?}");
+    ///     }
+    /// }
+    /// # {after_snippet}
+    /// ```
     ///
     /// # Errors
     /// This function returns [`WifiError::Unsupported`] if the Station side isn't
@@ -2057,6 +2130,7 @@ impl WifiController<'_> {
         }
     }
 
+    #[procmacros::doc_replace]
     /// Set the configuration.
     ///
     /// This will set the mode accordingly.
@@ -2064,6 +2138,22 @@ impl WifiController<'_> {
     ///
     /// If you don't intend to use Wi-Fi anymore at all consider tearing down
     /// Wi-Fi completely.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # use esp_radio::wifi::{Config, sta::StationConfig};
+    /// # let (mut controller, _interfaces) =
+    /// #    esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// let station_config = Config::Station(
+    ///     StationConfig::default()
+    ///         .with_ssid("SSID".into())
+    ///         .with_password("PASSWORD".into()),
+    /// );
+    ///
+    /// controller.set_config(&station_config)?;
+    /// # {after_snippet}
     pub fn set_config(&mut self, conf: &Config) -> Result<(), WifiError> {
         conf.validate()?;
 
@@ -2216,8 +2306,21 @@ impl WifiController<'_> {
         esp_wifi_result!(unsafe { esp_wifi_disconnect_internal() })
     }
 
+    #[procmacros::doc_replace]
     /// Checks if the Wi-Fi controller is started. Returns true if Station and/or AccessPoint are
     /// started.
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # let (controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// if controller.is_started()? {
+    ///     println!("Wi-Fi is started");
+    /// } else {
+    ///     println!("Wi-Fi is not started");
+    /// }
+    /// # {after_snippet}
+    /// ```
     pub fn is_started(&self) -> Result<bool, WifiError> {
         if matches!(
             crate::wifi::station_state(),
@@ -2236,7 +2339,27 @@ impl WifiController<'_> {
         Ok(false)
     }
 
+    #[procmacros::doc_replace]
     /// Checks if the Wi-Fi controller is currently connected to an access point.
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # use esp_radio::wifi::WifiError;
+    /// # let (controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// match controller.is_connected() {
+    ///     Ok(true) => {
+    ///         println!("Station is connected");
+    ///     }
+    ///     Ok(false) => {
+    ///         println!("Station is not connected yet");
+    ///     }
+    ///     Err(e) => {
+    ///         println!("Failed to query connection state: {e:?}");
+    ///     }
+    /// }
+    /// # {after_snippet}
+    /// ```
     pub fn is_connected(&self) -> Result<bool, WifiError> {
         match crate::wifi::station_state() {
             crate::wifi::WifiStationState::Connected => Ok(true),
@@ -2250,9 +2373,28 @@ impl WifiController<'_> {
         WifiMode::current()
     }
 
+    #[procmacros::doc_replace]
     /// An async Wi-Fi network scan with caller-provided scanning options.
     ///
     /// Scanning is not supported in AcessPoint-only mode.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # use esp_radio::wifi::{WifiController, scan::ScanConfig};
+    /// # let (mut controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// // Create a scan configuration (e.g., scan up to 10 APs)
+    /// let scan_config = ScanConfig::default().with_max(10);
+    /// let result = controller
+    ///     .scan_with_config_async(scan_config)
+    ///     .await
+    ///     .unwrap();
+    /// for ap in result {
+    ///     println!("{:?}", ap);
+    /// }
+    /// # {after_snippet}
+    /// ```
     pub async fn scan_with_config_async(
         &mut self,
         config: ScanConfig<'_>,
@@ -2268,9 +2410,21 @@ impl WifiController<'_> {
         Ok(ScanResults::new(self)?.collect::<Vec<_>>())
     }
 
+    #[procmacros::doc_replace]
     /// Starts the Wi-Fi controller.
     ///
     /// This function will wait for the Wi-Fi controller to start before returning.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # use esp_radio::wifi::{Config, sta::StationConfig};
+    /// # let (mut controller, _interfaces) =
+    /// #    esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// controller.start_async().await?;
+    ///
+    /// # {after_snippet}
     pub async fn start_async(&mut self) -> Result<(), WifiError> {
         let mut events = enumset::enum_set! {};
 
@@ -2312,9 +2466,31 @@ impl WifiController<'_> {
         Ok(())
     }
 
+    #[procmacros::doc_replace]
     /// Stops the Wi-Fi controller.
     ///
     /// This function will wait for the Wi-Fi controller to stop before returning.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # use esp_radio::wifi::WifiError;
+    /// # let (mut controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    ///
+    /// match controller.stop_async().await {
+    ///     Ok(()) => {
+    ///         println!("Wi-Fi stopped successfully");
+    ///     }
+    ///     Err(WifiError::NotStarted) => {
+    ///         println!("Wi-Fi was not running");
+    ///     }
+    ///     Err(e) => {
+    ///         println!("Failed to stop Wi-Fi: {e:?}");
+    ///     }
+    /// }
+    /// # {after_snippet}
+    /// ```
     pub async fn stop_async(&mut self) -> Result<(), WifiError> {
         // TODO: This might be racey when there is a start operation in progress but it didn't made
         // it to the state where the driver emits the Started event?
@@ -2342,6 +2518,7 @@ impl WifiController<'_> {
         Ok(())
     }
 
+    #[procmacros::doc_replace]
     /// Connect Wi-Fi station to the AP.
     ///
     /// Use [Self::disconnect_async] to disconnect.
@@ -2351,6 +2528,25 @@ impl WifiController<'_> {
     ///
     /// If device is scanning and connecting at the same time, it will abort scanning and return a
     /// warning message and error.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # use esp_radio::wifi::{Config, sta::StationConfig};
+    ///
+    /// # let (mut controller, _interfaces) =
+    /// #   esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    ///
+    /// match controller.connect_async().await {
+    ///     Ok(_) => {
+    ///         println!("Wifi connected!");
+    ///     }
+    ///     Err(e) => {
+    ///       println!("Failed to connect to wifi: {e:?}");
+    ///     }
+    /// }
+    /// # {after_snippet}
     pub async fn connect_async(&mut self) -> Result<(), WifiError> {
         Self::clear_events(WifiEvent::StationConnected | WifiEvent::StationDisconnected);
 
@@ -2366,9 +2562,28 @@ impl WifiController<'_> {
         }
     }
 
+    #[procmacros::doc_replace]
     /// Disconnect Wi-Fi station from the AP.
     ///
     /// This function will wait for the connection to be closed before returning.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # use esp_radio::wifi::{Config, sta::StationConfig};
+    ///
+    /// # let (mut controller, _interfaces) =
+    /// #    esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// match controller.disconnect_async().await {
+    ///     Ok(()) => {
+    ///         println!("Station disconnected successfully");
+    ///     }
+    ///     Err(e) => {
+    ///         println!("Failed to disconnect: {e:?}");
+    ///     }
+    /// }
+    /// # {after_snippet}
     pub async fn disconnect_async(&mut self) -> Result<(), WifiError> {
         // If not connected, this will do nothing.
         // It will also wait forever for a `StationDisconnected` event that will never come.
