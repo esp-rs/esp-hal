@@ -374,24 +374,31 @@ impl<'d> CpuControl<'d> {
 
         unsafe {
             let stack_bottom = stack.bottom().cast::<u8>();
+            let (stack_guard, stack_bottom_above_guard) =
+                if let Some(stack_guard_offset) = stack_guard_offset {
+                    assert!(stack_guard_offset.is_multiple_of(4));
+                    assert!(stack_guard_offset <= stack.len() - 4);
+                    (
+                        stack_bottom.byte_add(stack_guard_offset),
+                        stack_bottom.byte_add(stack_guard_offset).byte_add(4),
+                    )
+                } else {
+                    (core::ptr::null_mut(), stack_bottom)
+                };
 
-            // Push `entry` to an aligned address at the (physical) bottom of the stack.
-            // The second core will copy it into its proper place, then calls it.
-            let align_offset = stack_bottom.align_offset(core::mem::align_of::<F>());
-            let entry_dst = stack_bottom.add(align_offset).cast::<ManuallyDrop<F>>();
+            // Push `entry` to an aligned address at the (physical) bottom of the stack, but above
+            // the stack guard. The second core will copy it into its proper place, then
+            // calls it.
+            let align_offset = stack_bottom_above_guard.align_offset(core::mem::align_of::<F>());
+            let entry_dst = stack_bottom_above_guard
+                .add(align_offset)
+                .cast::<ManuallyDrop<F>>();
 
             entry_dst.write(entry);
 
             let entry_fn = entry_dst.cast::<()>();
             START_CORE1_FUNCTION.store(entry_fn, Ordering::Release);
             APP_CORE_STACK_TOP.store(stack.top(), Ordering::Release);
-            let stack_guard = if let Some(stack_guard_offset) = stack_guard_offset {
-                assert!(stack_guard_offset.is_multiple_of(4));
-                assert!(stack_guard_offset <= stack.len() - 4);
-                stack_bottom.byte_add(stack_guard_offset)
-            } else {
-                core::ptr::null_mut()
-            };
             APP_CORE_STACK_GUARD.store(stack_guard.cast(), Ordering::Release);
         }
 

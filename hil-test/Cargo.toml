@@ -28,7 +28,7 @@ required-features = ["embassy"]
 [[bin]]
 name              = "esp_radio"
 harness           = false
-required-features = ["esp-radio", "esp-alloc"]
+required-features = ["esp-alloc"]
 
 [[bin]]
 name              = "gpio"
@@ -141,6 +141,7 @@ unstable = ["esp-hal/unstable"]
 defmt = ["dep:defmt-rtt"]
 esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/esp-radio"]
 embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
+rtos-radio-driver = ["dep:esp-rtos", "esp-rtos/esp-radio", "dep:esp-radio-rtos-driver"]
 
 # Device support (required!):
 esp32 = [
@@ -173,12 +174,12 @@ esp32c3 = [
 ]
 esp32c5 = [
     "esp-hal/esp32c5",
-    #"esp-alloc/esp32c5",
+    "esp-alloc/esp32c5",
     # "esp-radio?/esp32c5",
     #"esp-storage?/esp32c5",
     "esp-bootloader-esp-idf/esp32c5",
     "esp-metadata-generated/esp32c5",
-    # "esp-rtos?/esp32c5",
+    "esp-rtos?/esp32c5",
 ]
 esp32c6 = [
     "esp-hal/esp32c6",
