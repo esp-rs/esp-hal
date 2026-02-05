@@ -5,18 +5,18 @@ edition = "2024"
 publish = false
 
 [dependencies]
-edge-dhcp = "0.5.0"
-edge-nal = "0.5.0"
-edge-nal-embassy = "0.6.0"
+edge-dhcp = "0.7.0"
+edge-nal = "0.6.0"
+edge-nal-embassy = "0.8.1"
 embassy-executor = "0.9.0"
-embassy-net = { version = "0.7.0", features = [
+embassy-net = { version = "0.8.0", features = [
     "dhcpv4",
     "medium-ethernet",
     "tcp",
     "udp",
 ] }
 embassy-time = "0.5.0"
-embedded-io-async = "0.6.1"
+embedded-io-async = "0.7"
 esp-alloc = { path = "../../../esp-alloc" }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
     "panic-handler",

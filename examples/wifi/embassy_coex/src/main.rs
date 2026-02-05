@@ -8,11 +8,14 @@
 #![no_std]
 #![no_main]
 
-use core::net::Ipv4Addr;
-
 use embassy_executor::Spawner;
 use embassy_futures::join::join;
-use embassy_net::{Runner, StackResources, tcp::TcpSocket};
+use embassy_net::{
+    Runner,
+    StackResources,
+    dns::DnsSocket,
+    tcp::client::{TcpClient, TcpClientState},
+};
 use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
@@ -27,6 +30,10 @@ use esp_println::println;
 use esp_radio::{
     ble::controller::BleConnector,
     wifi::{Config, Interface, WifiController, scan::ScanConfig, sta::StationConfig},
+};
+use reqwless::{
+    client::HttpClient,
+    request::{Method, RequestBuilder},
 };
 use trouble_host::prelude::*;
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -115,9 +122,6 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(runner)).ok();
 
-    let mut rx_buffer = [0; 4096];
-    let mut tx_buffer = [0; 4096];
-
     loop {
         if stack.is_link_up() {
             break;
@@ -134,43 +138,38 @@ async fn main(spawner: Spawner) -> ! {
         Timer::after(Duration::from_millis(500)).await;
     }
 
+    // Init HTTP client
+    let tcp_client = TcpClient::new(
+        stack,
+        mk_static!(
+            TcpClientState<1, 1500, 1500>,
+            TcpClientState::<1, 1500, 1500>::new()
+        ),
+    );
+    let dns_client = DnsSocket::new(stack);
+
     loop {
-        Timer::after(Duration::from_millis(1_000)).await;
+        Timer::after(Duration::from_millis(1000)).await;
 
-        let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
+        let mut client = HttpClient::new(&tcp_client, &dns_client);
+        let mut rx_buf = [0u8; 4096];
 
-        socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
+        let builder = client
+            .request(Method::GET, "http://httpbin.org/get?hello=Hello+esp-hal")
+            .await
+            .unwrap();
 
-        let remote_endpoint = (Ipv4Addr::new(216, 239, 32, 21), 80);
-        println!("connecting...");
-        let r = socket.connect(remote_endpoint).await;
-        if let Err(e) = r {
-            println!("connect error: {:?}", e);
-            continue;
-        }
-        println!("connected!");
-        let mut buf = [0; 1024];
-        loop {
-            use embedded_io_async::Write;
-            let r = socket
-                .write_all(b"GET / HTTP/1.0\r\nHost: www.mobile-j.de\r\n\r\n")
-                .await;
-            if let Err(e) = r {
-                println!("write error: {:?}", e);
-                break;
+        let mut builder = builder.headers(&[("Host", "httpbin.org"), ("Connection", "close")]);
+
+        let response = builder.send(&mut rx_buf).await.unwrap();
+
+        match response.body().read_to_end().await {
+            Ok(data) => {
+                if let Ok(st) = core::str::from_utf8(data) {
+                    println!("Body: {}", st);
+                }
             }
-            let n = match socket.read(&mut buf).await {
-                Ok(0) => {
-                    println!("read EOF");
-                    break;
-                }
-                Ok(n) => n,
-                Err(e) => {
-                    println!("read error: {:?}", e);
-                    break;
-                }
-            };
-            println!("{}", core::str::from_utf8(&buf[..n]).unwrap());
+            Err(e) => println!("Body error: {:?}", e),
         }
         Timer::after(Duration::from_millis(3000)).await;
     }
