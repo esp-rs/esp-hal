@@ -1,14 +1,13 @@
-//! Test we get an error when attempting to initialize esp-radio with interrupts
-//! disabled in common ways
-
 //% CHIPS(no_wifi): esp32h2
 //% CHIPS(no_ble): esp32s2
+//% CHIPS(no_radio): esp32c5
 //% CHIPS(has_wifi_ble): esp32 esp32c2 esp32c3 esp32c6 esp32s3
 
-//% FEATURES: unstable esp-radio esp-alloc esp-radio/unstable embassy
-//% FEATURES(no_ble): esp-radio/wifi
-//% FEATURES(no_wifi): esp-radio/ble
-//% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble
+//% FEATURES: unstable esp-alloc embassy
+//% FEATURES(no_radio): rtos-radio-driver
+//% FEATURES(no_ble): esp-radio/wifi esp-radio esp-radio/unstable
+//% FEATURES(no_wifi): esp-radio/ble esp-radio esp-radio/unstable
+//% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble  esp-radio esp-radio/unstable
 
 // Even if the defaults change, keep this at a low-ish value for
 // the esp_rtos/moving_data_to_second_core test
@@ -29,7 +28,7 @@ fn init_heap() {
             use esp_hal::ram;
             esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
             esp_alloc::heap_allocator!(size: 36 * 1024);
-        } else if #[cfg(esp32h2)] {
+        } else if #[cfg(any(esp32c5, esp32h2))] {
             esp_alloc::heap_allocator!(size: 72 * 1024);
         }
     }
@@ -42,14 +41,17 @@ static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 mod esp_rtos;
 
 #[path = "esp_radio/init_tests.rs"]
+#[cfg(feature = "esp-radio")]
 mod init_tests;
 
 #[cfg(soc_has_bt)]
 #[path = "esp_radio/ble_controller.rs"]
+#[cfg(feature = "esp-radio")]
 mod ble_controller;
 
 #[cfg(soc_has_wifi)]
 #[path = "esp_radio/wifi_controller.rs"]
+#[cfg(feature = "esp-radio")]
 mod wifi_controller;
 
 #[cfg(xtensa)]

@@ -42,6 +42,9 @@ mod init_tests {
         esp_hal::init(config)
     }
 
+    // Test we get an error when attempting to initialize esp-radio with interrupts
+    // disabled in common ways
+
     #[test]
     #[cfg(soc_has_wifi)]
     fn test_init_fails_without_scheduler(p: Peripherals) {
