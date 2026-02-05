@@ -2566,7 +2566,7 @@ macro_rules! for_each_dedicated_gpio {
 macro_rules! for_each_interrupt {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_interrupt { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_interrupt!(([reserved 0] 0));
+        => {} } _for_each_inner_interrupt!(([disabled 0] 0));
         _for_each_inner_interrupt!(([direct_bindable 0] 1));
         _for_each_inner_interrupt!(([direct_bindable 1] 2));
         _for_each_inner_interrupt!(([direct_bindable 2] 3));
@@ -2593,7 +2593,7 @@ macro_rules! for_each_interrupt {
         10] 27)); _for_each_inner_interrupt!(([vector 11] 28));
         _for_each_inner_interrupt!(([vector 12] 29)); _for_each_inner_interrupt!(([vector
         13] 30)); _for_each_inner_interrupt!(([vector 14] 31));
-        _for_each_inner_interrupt!((all([reserved 0] 0), ([direct_bindable 0] 1),
+        _for_each_inner_interrupt!((all([disabled 0] 0), ([direct_bindable 0] 1),
         ([direct_bindable 1] 2), ([direct_bindable 2] 3), ([direct_bindable 3] 4),
         ([direct_bindable 4] 5), ([direct_bindable 5] 6), ([direct_bindable 6] 7),
         ([direct_bindable 7] 8), ([direct_bindable 8] 9), ([direct_bindable 9] 10),

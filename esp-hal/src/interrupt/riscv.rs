@@ -79,13 +79,15 @@ impl Priority {
     /// Maximum interrupt priority
     #[allow(unused_assignments)]
     pub const fn max() -> Priority {
-        let mut last = Self::min();
-        for_each_interrupt_priority!(
-            ($_idx:literal, $_n:literal, $ident:ident) => {
-                last = Self::$ident;
-            };
-        );
-        last
+        const {
+            let mut last = Self::min();
+            for_each_interrupt_priority!(
+                ($_idx:literal, $_n:literal, $ident:ident) => {
+                    last = Self::$ident;
+                };
+            );
+            last
+        }
     }
 
     /// Minimum interrupt priority
@@ -129,6 +131,7 @@ pub(super) static DISABLED_CPU_INTERRUPT: u32 = property!("interrupts.disabled_i
 /// The number of reserved (not directly bindable) interrupts.
 const RESERVED_COUNT: usize = const {
     let mut count = 0;
+    for_each_interrupt!(([disabled $n:tt] $_:literal) => { count += 1; };);
     for_each_interrupt!(([reserved $n:tt] $_:literal) => { count += 1; };);
     for_each_interrupt!(([vector $n:tt] $_:literal) => { count += 1; };);
     count
@@ -140,6 +143,10 @@ pub static RESERVED_INTERRUPTS: [u32; RESERVED_COUNT] = const {
     let mut counter = 0;
     let mut reserved = [0; RESERVED_COUNT];
     for_each_interrupt!(
+        ([disabled $_n:tt] $interrupt:literal) => {
+            reserved[counter] = $interrupt as u32;
+            counter += 1;
+        };
         ([reserved $_n:tt] $interrupt:literal) => {
             reserved[counter] = $interrupt as u32;
             counter += 1;

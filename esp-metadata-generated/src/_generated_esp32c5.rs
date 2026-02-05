@@ -1796,22 +1796,22 @@ macro_rules! memory_range {
 macro_rules! for_each_interrupt {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_interrupt { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_interrupt!(([reserved 0] 0));
-        _for_each_inner_interrupt!(([reserved 1] 1));
-        _for_each_inner_interrupt!(([reserved 2] 2));
-        _for_each_inner_interrupt!(([reserved 3] 3));
-        _for_each_inner_interrupt!(([reserved 4] 4));
-        _for_each_inner_interrupt!(([reserved 5] 5));
-        _for_each_inner_interrupt!(([reserved 6] 6));
-        _for_each_inner_interrupt!(([reserved 7] 7));
-        _for_each_inner_interrupt!(([reserved 8] 8));
-        _for_each_inner_interrupt!(([reserved 9] 9));
-        _for_each_inner_interrupt!(([reserved 10] 10));
-        _for_each_inner_interrupt!(([reserved 11] 11));
-        _for_each_inner_interrupt!(([reserved 12] 12));
-        _for_each_inner_interrupt!(([reserved 13] 13));
-        _for_each_inner_interrupt!(([reserved 14] 14));
-        _for_each_inner_interrupt!(([reserved 15] 15));
+        => {} } _for_each_inner_interrupt!(([disabled 0] 0));
+        _for_each_inner_interrupt!(([reserved 0] 1));
+        _for_each_inner_interrupt!(([reserved 1] 2));
+        _for_each_inner_interrupt!(([reserved 2] 3));
+        _for_each_inner_interrupt!(([reserved 3] 4));
+        _for_each_inner_interrupt!(([reserved 4] 5));
+        _for_each_inner_interrupt!(([reserved 5] 6));
+        _for_each_inner_interrupt!(([reserved 6] 7));
+        _for_each_inner_interrupt!(([reserved 7] 8));
+        _for_each_inner_interrupt!(([reserved 8] 9));
+        _for_each_inner_interrupt!(([reserved 9] 10));
+        _for_each_inner_interrupt!(([reserved 10] 11));
+        _for_each_inner_interrupt!(([reserved 11] 12));
+        _for_each_inner_interrupt!(([reserved 12] 13));
+        _for_each_inner_interrupt!(([reserved 13] 14));
+        _for_each_inner_interrupt!(([reserved 14] 15));
         _for_each_inner_interrupt!(([vector 0] 16)); _for_each_inner_interrupt!(([vector
         1] 17)); _for_each_inner_interrupt!(([vector 2] 18));
         _for_each_inner_interrupt!(([vector 3] 19)); _for_each_inner_interrupt!(([vector
@@ -1841,11 +1841,11 @@ macro_rules! for_each_interrupt {
         _for_each_inner_interrupt!(([direct_bindable 21] 45));
         _for_each_inner_interrupt!(([direct_bindable 22] 46));
         _for_each_inner_interrupt!(([direct_bindable 23] 47));
-        _for_each_inner_interrupt!((all([reserved 0] 0), ([reserved 1] 1), ([reserved 2]
-        2), ([reserved 3] 3), ([reserved 4] 4), ([reserved 5] 5), ([reserved 6] 6),
-        ([reserved 7] 7), ([reserved 8] 8), ([reserved 9] 9), ([reserved 10] 10),
-        ([reserved 11] 11), ([reserved 12] 12), ([reserved 13] 13), ([reserved 14] 14),
-        ([reserved 15] 15), ([vector 0] 16), ([vector 1] 17), ([vector 2] 18), ([vector
+        _for_each_inner_interrupt!((all([disabled 0] 0), ([reserved 0] 1), ([reserved 1]
+        2), ([reserved 2] 3), ([reserved 3] 4), ([reserved 4] 5), ([reserved 5] 6),
+        ([reserved 6] 7), ([reserved 7] 8), ([reserved 8] 9), ([reserved 9] 10),
+        ([reserved 10] 11), ([reserved 11] 12), ([reserved 12] 13), ([reserved 13] 14),
+        ([reserved 14] 15), ([vector 0] 16), ([vector 1] 17), ([vector 2] 18), ([vector
         3] 19), ([vector 4] 20), ([vector 5] 21), ([vector 6] 22), ([vector 7] 23),
         ([direct_bindable 0] 24), ([direct_bindable 1] 25), ([direct_bindable 2] 26),
         ([direct_bindable 3] 27), ([direct_bindable 4] 28), ([direct_bindable 5] 29),

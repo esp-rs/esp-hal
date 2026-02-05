@@ -54,7 +54,7 @@ pub enum RiscvFlavour {
 }
 
 impl RiscvFlavour {
-    /// Interrupt lines reserved for vectored interrupts.
+    /// Interrupt lines reserved by hardware.
     fn reserved_interrupts(&self) -> impl Iterator<Item = usize> {
         let reserved: &[_] = match self {
             RiscvFlavour::Basic => &[0], // Disabled interrupt
@@ -88,7 +88,7 @@ pub struct RiscvControllerProperties {
 }
 
 impl RiscvControllerProperties {
-    /// Interrupt lines reserved for vectored interrupts.
+    /// Interrupt lines allocated for vectored interrupt handling.
     fn vector_interrupts(&self) -> impl Iterator<Item = usize> {
         let start = match self.flavour {
             RiscvFlavour::Basic | RiscvFlavour::Plic => {
@@ -138,13 +138,13 @@ impl GenericProperty for InterruptControllerProperties {
             .map(|_| Class::Interrupt)
             .collect::<Vec<_>>();
 
-        classes[properties.disabled_interrupt()] = Class::Disabled;
         for intr in properties.vector_interrupts() {
             classes[intr] = Class::Vector;
         }
         for intr in properties.reserved_interrupts() {
             classes[intr] = Class::Reserved;
         }
+        classes[properties.disabled_interrupt()] = Class::Disabled;
 
         let mut all = vec![];
         let mut vector = vec![];

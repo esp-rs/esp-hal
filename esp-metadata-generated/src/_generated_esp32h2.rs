@@ -2343,7 +2343,7 @@ macro_rules! for_each_interrupt {
         _for_each_inner_interrupt!(([vector 9] 26)); _for_each_inner_interrupt!(([vector
         10] 27)); _for_each_inner_interrupt!(([vector 11] 28));
         _for_each_inner_interrupt!(([vector 12] 29)); _for_each_inner_interrupt!(([vector
-        13] 30)); _for_each_inner_interrupt!(([vector 14] 31));
+        13] 30)); _for_each_inner_interrupt!(([disabled 0] 31));
         _for_each_inner_interrupt!((all([reserved 0] 0), ([direct_bindable 0] 1),
         ([direct_bindable 1] 2), ([reserved 1] 3), ([reserved 2] 4), ([direct_bindable 2]
         5), ([direct_bindable 3] 6), ([reserved 3] 7), ([direct_bindable 4] 8),
@@ -2352,7 +2352,7 @@ macro_rules! for_each_interrupt {
         ([direct_bindable 11] 15), ([direct_bindable 12] 16), ([vector 0] 17), ([vector
         1] 18), ([vector 2] 19), ([vector 3] 20), ([vector 4] 21), ([vector 5] 22),
         ([vector 6] 23), ([vector 7] 24), ([vector 8] 25), ([vector 9] 26), ([vector 10]
-        27), ([vector 11] 28), ([vector 12] 29), ([vector 13] 30), ([vector 14] 31)));
+        27), ([vector 11] 28), ([vector 12] 29), ([vector 13] 30), ([disabled 0] 31)));
     };
 }
 #[macro_export]
