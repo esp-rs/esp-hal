@@ -160,7 +160,7 @@ pub(crate) fn setup_multitasking<const IRQ: u8>(_irq: SoftwareInterrupt<'static,
     };
 
     let cpu_interrupt = if cfg!(interrupt_controller = "clic") {
-        interrupt::CpuInterrupt::Interrupt9
+        interrupt::CpuInterrupt::Interrupt25
     } else {
         interrupt::CpuInterrupt::Interrupt15
     };
