@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `esp_hal::interrupt::wait_for_interrupt`, which enters `wfi` (RISC-V) or `waiti 0` (Xtensa) when it would not prevent a debugger from reading memory (#4782)
 
 ### Changed
 
