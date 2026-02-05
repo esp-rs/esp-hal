@@ -2,6 +2,13 @@
 
 use esp_sync::NonReentrantMutex;
 
+cfg_if::cfg_if! {
+    if #[cfg(soc_multi_core_enabled)] {
+        pub(crate) mod multi_core;
+        pub use multi_core::*;
+    }
+}
+
 // Implements the Peripheral enum based on esp-metadata/device.soc/peripheral_clocks
 implement_peripheral_clocks!();
 
@@ -217,10 +224,6 @@ impl PeripheralClockControl {
         PERIPHERAL_REF_COUNT.with(|_| unsafe { Self::reset_racey(peripheral) })
     }
 }
-
-#[cfg(any(esp32, esp32s3))]
-#[allow(unused_imports)]
-pub use crate::soc::cpu_control::*;
 
 /// Available CPU cores
 ///
