@@ -90,19 +90,27 @@ pub struct RiscvControllerProperties {
 impl RiscvControllerProperties {
     /// Interrupt lines allocated for vectored interrupt handling.
     fn vector_interrupts(&self) -> impl Iterator<Item = usize> {
-        let start = match self.flavour {
+        let vectors = match self.flavour {
             RiscvFlavour::Basic | RiscvFlavour::Plic => {
                 // Vectoring uses high interrupt lines, as higher IDs are serviced later.
-                (self.interrupts - self.priority_levels) as usize
+                // Allocate the last interrupt lines, that are not reserved or disabled.
+                (0..self.interrupts as usize)
+                    .rev()
+                    .filter(|&intr| {
+                        self.disabled_interrupt() != intr
+                            && self.reserved_interrupts().all(|reserved| reserved != intr)
+                    })
+                    .take(self.priority_levels as usize)
+                    .collect::<Vec<_>>()
             }
             RiscvFlavour::Clic => {
                 // After CLINT interrupts. Lower IDs are serviced later.
                 // Controller implements proper level/priority management.
-                16
+                (16..(16 + self.priority_levels as usize)).collect::<Vec<_>>()
             }
         };
 
-        start..start + self.priority_levels as usize
+        vectors.into_iter()
     }
 
     fn disabled_interrupt(&self) -> usize {
@@ -126,6 +134,7 @@ impl GenericProperty for InterruptControllerProperties {
             return None;
         };
 
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         enum Class {
             Interrupt,
             Reserved,
@@ -139,11 +148,14 @@ impl GenericProperty for InterruptControllerProperties {
             .collect::<Vec<_>>();
 
         for intr in properties.vector_interrupts() {
+            assert_eq!(classes[intr], Class::Interrupt);
             classes[intr] = Class::Vector;
         }
         for intr in properties.reserved_interrupts() {
+            assert_eq!(classes[intr], Class::Interrupt);
             classes[intr] = Class::Reserved;
         }
+        assert_ne!(classes[properties.disabled_interrupt()], Class::Vector);
         classes[properties.disabled_interrupt()] = Class::Disabled;
 
         let mut all = vec![];
