@@ -183,6 +183,9 @@ macro_rules! property {
     ("interrupts.status_registers", str) => {
         stringify!(3)
     };
+    ("interrupts.disabled_interrupt") => {
+        31
+    };
     ("rmt.ram_start") => {
         1610638336
     };
@@ -3050,6 +3053,76 @@ macro_rules! for_each_dedicated_gpio {
         (7))); _for_each_inner_dedicated_gpio!((signals(0, 0, CPU_GPIO_0), (0, 1,
         CPU_GPIO_1), (0, 2, CPU_GPIO_2), (0, 3, CPU_GPIO_3), (0, 4, CPU_GPIO_4), (0, 5,
         CPU_GPIO_5), (0, 6, CPU_GPIO_6), (0, 7, CPU_GPIO_7)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_interrupt {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_interrupt { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_interrupt!(([reserved 0] 0));
+        _for_each_inner_interrupt!(([direct_bindable 0] 1));
+        _for_each_inner_interrupt!(([direct_bindable 1] 2));
+        _for_each_inner_interrupt!(([reserved 1] 3));
+        _for_each_inner_interrupt!(([reserved 2] 4));
+        _for_each_inner_interrupt!(([direct_bindable 2] 5));
+        _for_each_inner_interrupt!(([direct_bindable 3] 6));
+        _for_each_inner_interrupt!(([reserved 3] 7));
+        _for_each_inner_interrupt!(([direct_bindable 4] 8));
+        _for_each_inner_interrupt!(([direct_bindable 5] 9));
+        _for_each_inner_interrupt!(([direct_bindable 6] 10));
+        _for_each_inner_interrupt!(([direct_bindable 7] 11));
+        _for_each_inner_interrupt!(([direct_bindable 8] 12));
+        _for_each_inner_interrupt!(([direct_bindable 9] 13));
+        _for_each_inner_interrupt!(([direct_bindable 10] 14));
+        _for_each_inner_interrupt!(([direct_bindable 11] 15));
+        _for_each_inner_interrupt!(([vector 0] 16)); _for_each_inner_interrupt!(([vector
+        1] 17)); _for_each_inner_interrupt!(([vector 2] 18));
+        _for_each_inner_interrupt!(([vector 3] 19)); _for_each_inner_interrupt!(([vector
+        4] 20)); _for_each_inner_interrupt!(([vector 5] 21));
+        _for_each_inner_interrupt!(([vector 6] 22)); _for_each_inner_interrupt!(([vector
+        7] 23)); _for_each_inner_interrupt!(([vector 8] 24));
+        _for_each_inner_interrupt!(([vector 9] 25)); _for_each_inner_interrupt!(([vector
+        10] 26)); _for_each_inner_interrupt!(([vector 11] 27));
+        _for_each_inner_interrupt!(([vector 12] 28)); _for_each_inner_interrupt!(([vector
+        13] 29)); _for_each_inner_interrupt!(([vector 14] 30));
+        _for_each_inner_interrupt!(([disabled 0] 31));
+        _for_each_inner_interrupt!((all([reserved 0] 0), ([direct_bindable 0] 1),
+        ([direct_bindable 1] 2), ([reserved 1] 3), ([reserved 2] 4), ([direct_bindable 2]
+        5), ([direct_bindable 3] 6), ([reserved 3] 7), ([direct_bindable 4] 8),
+        ([direct_bindable 5] 9), ([direct_bindable 6] 10), ([direct_bindable 7] 11),
+        ([direct_bindable 8] 12), ([direct_bindable 9] 13), ([direct_bindable 10] 14),
+        ([direct_bindable 11] 15), ([vector 0] 16), ([vector 1] 17), ([vector 2] 18),
+        ([vector 3] 19), ([vector 4] 20), ([vector 5] 21), ([vector 6] 22), ([vector 7]
+        23), ([vector 8] 24), ([vector 9] 25), ([vector 10] 26), ([vector 11] 27),
+        ([vector 12] 28), ([vector 13] 29), ([vector 14] 30), ([disabled 0] 31)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_interrupt_priority {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_interrupt_priority { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_interrupt_priority!((0, 1, Priority1));
+        _for_each_inner_interrupt_priority!((1, 2, Priority2));
+        _for_each_inner_interrupt_priority!((2, 3, Priority3));
+        _for_each_inner_interrupt_priority!((3, 4, Priority4));
+        _for_each_inner_interrupt_priority!((4, 5, Priority5));
+        _for_each_inner_interrupt_priority!((5, 6, Priority6));
+        _for_each_inner_interrupt_priority!((6, 7, Priority7));
+        _for_each_inner_interrupt_priority!((7, 8, Priority8));
+        _for_each_inner_interrupt_priority!((8, 9, Priority9));
+        _for_each_inner_interrupt_priority!((9, 10, Priority10));
+        _for_each_inner_interrupt_priority!((10, 11, Priority11));
+        _for_each_inner_interrupt_priority!((11, 12, Priority12));
+        _for_each_inner_interrupt_priority!((12, 13, Priority13));
+        _for_each_inner_interrupt_priority!((13, 14, Priority14));
+        _for_each_inner_interrupt_priority!((14, 15, Priority15));
+        _for_each_inner_interrupt_priority!((all(0, 1, Priority1), (1, 2, Priority2), (2,
+        3, Priority3), (3, 4, Priority4), (4, 5, Priority5), (5, 6, Priority6), (6, 7,
+        Priority7), (7, 8, Priority8), (8, 9, Priority9), (9, 10, Priority10), (10, 11,
+        Priority11), (11, 12, Priority12), (12, 13, Priority13), (13, 14, Priority14),
+        (14, 15, Priority15)));
     };
 }
 #[macro_export]

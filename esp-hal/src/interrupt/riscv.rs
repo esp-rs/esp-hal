@@ -1,28 +1,19 @@
 //! Interrupt handling
-//!
-//! CPU interrupts 1 through 15 are reserved for each of the possible interrupt
-//! priorities.
-//!
-//! On chips with a PLIC CPU interrupts 1,2,5,6,9 .. 19 are used.
-//!
-//! ```rust, ignore
-//! interrupt1() => Priority::Priority1
-//! interrupt2() => Priority::Priority2
-//! ...
-//! interrupt15() => Priority::Priority15
-//! ```
 
 #[cfg(feature = "rt")]
 pub use esp_riscv_rt::TrapFrame;
 use procmacros::ram;
 use riscv::register::{mcause, mtvec};
 
-#[cfg(not(any(clic, plic)))]
-pub use self::classic::*;
-#[cfg(clic)]
-pub use self::clic::*;
-#[cfg(plic)]
-pub use self::plic::*;
+cfg_if::cfg_if! {
+    if #[cfg(interrupt_controller = "riscv_basic")] {
+        pub use self::basic::*;
+    } else if #[cfg(interrupt_controller = "plic")] {
+        pub use self::plic::*;
+    } else if #[cfg(interrupt_controller = "clic")] {
+        pub use self::clic::*;
+    }
+}
 pub use self::vectored::*;
 use super::InterruptStatus;
 use crate::{
@@ -50,143 +41,52 @@ pub enum InterruptKind {
     Edge,
 }
 
-/// Enumeration of available CPU interrupts.
-/// It is possible to create a handler for each of the interrupts. (e.g.
-/// `interrupt3`)
-///
-/// When using CLIC, these interrupts correspond to the interrupt numbers 16-47 (external
-/// interrupts).
-#[repr(u32)]
-#[derive(Debug, Copy, Clone)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum CpuInterrupt {
-    /// Interrupt number 1.
-    #[cfg(not(clic))]
-    Interrupt1 = 1,
-    /// Interrupt number 1.
-    #[cfg(clic)]
-    Interrupt1 = 16,
+for_each_interrupt!(
+    (all $( ([$class:ident $idx_in_class:literal] $n:literal) ),*) => {
+        paste::paste! {
+            /// Enumeration of available CPU interrupts.
+            #[repr(u32)]
+            #[derive(Debug, Copy, Clone)]
+            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+            pub enum CpuInterrupt {
+                $(
+                    #[doc = concat!(" Interrupt number ", stringify!($n), ".")]
+                    [<Interrupt $n>] = $n,
+                )*
+            }
+        }
+    };
+);
 
-    /// Interrupt number 2.
-    Interrupt2,
-    /// Interrupt number 3.
-    Interrupt3,
-    /// Interrupt number 4.
-    Interrupt4,
-    /// Interrupt number 5.
-    Interrupt5,
-    /// Interrupt number 6.
-    Interrupt6,
-    /// Interrupt number 7.
-    Interrupt7,
-    /// Interrupt number 8.
-    Interrupt8,
-    /// Interrupt number 9.
-    Interrupt9,
-    /// Interrupt number 10.
-    Interrupt10,
-    /// Interrupt number 11.
-    Interrupt11,
-    /// Interrupt number 12.
-    Interrupt12,
-    /// Interrupt number 13.
-    Interrupt13,
-    /// Interrupt number 14.
-    Interrupt14,
-    /// Interrupt number 15.
-    Interrupt15,
-    /// Interrupt number 16.
-    Interrupt16,
-    /// Interrupt number 17.
-    Interrupt17,
-    /// Interrupt number 18.
-    Interrupt18,
-    /// Interrupt number 19.
-    Interrupt19,
-    /// Interrupt number 20.
-    Interrupt20,
-    /// Interrupt number 21.
-    Interrupt21,
-    /// Interrupt number 22.
-    Interrupt22,
-    /// Interrupt number 23.
-    Interrupt23,
-    /// Interrupt number 24.
-    Interrupt24,
-    /// Interrupt number 25.
-    Interrupt25,
-    /// Interrupt number 26.
-    Interrupt26,
-    /// Interrupt number 27.
-    Interrupt27,
-    /// Interrupt number 28.
-    Interrupt28,
-    /// Interrupt number 29.
-    Interrupt29,
-    /// Interrupt number 30.
-    Interrupt30,
-    /// Interrupt number 31.
-    Interrupt31,
-    #[cfg(clic)]
-    /// Interrupt number 32.
-    Interrupt32,
-}
-
-/// Interrupt priority levels.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[repr(u8)]
-pub enum Priority {
-    /// No priority.
-    None = 0,
-    /// Priority level 1.
-    Priority1,
-    /// Priority level 2.
-    Priority2,
-    /// Priority level 3.
-    Priority3,
-    /// Priority level 4.
-    Priority4,
-    /// Priority level 5.
-    Priority5,
-    /// Priority level 6.
-    Priority6,
-    /// Priority level 7.
-    Priority7,
-    /// Priority level 8.
-    Priority8,
-    /// Priority level 9.
-    #[cfg(not(clic))]
-    Priority9,
-    /// Priority level 10.
-    #[cfg(not(clic))]
-    Priority10,
-    /// Priority level 11.
-    #[cfg(not(clic))]
-    Priority11,
-    /// Priority level 12.
-    #[cfg(not(clic))]
-    Priority12,
-    /// Priority level 13.
-    #[cfg(not(clic))]
-    Priority13,
-    /// Priority level 14.
-    #[cfg(not(clic))]
-    Priority14,
-    /// Priority level 15.
-    #[cfg(not(clic))]
-    Priority15,
-}
+for_each_interrupt_priority!(
+    (all $( ($idx:literal, $n:literal, $ident:ident) ),*) => {
+        /// Interrupt priority levels.
+        #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[repr(u8)]
+        pub enum Priority {
+            /// No priority.
+            None = 0,
+            $(
+                #[doc = concat!(" Priority level ", stringify!($n), ".")]
+                $ident,
+            )*
+        }
+    };
+);
 
 impl Priority {
     /// Maximum interrupt priority
+    #[allow(unused_assignments)]
     pub const fn max() -> Priority {
-        cfg_if::cfg_if! {
-            if #[cfg(not(clic))] {
-                Priority::Priority15
-            } else {
-                Priority::Priority8
-            }
+        const {
+            let mut last = Self::min();
+            for_each_interrupt_priority!(
+                ($_idx:literal, $_n:literal, $ident:ident) => {
+                    last = Self::$ident;
+                };
+            );
+            last
         }
     }
 
@@ -200,32 +100,17 @@ impl TryFrom<u32> for Priority {
     type Error = Error;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(Priority::None),
-            1 => Ok(Priority::Priority1),
-            2 => Ok(Priority::Priority2),
-            3 => Ok(Priority::Priority3),
-            4 => Ok(Priority::Priority4),
-            5 => Ok(Priority::Priority5),
-            6 => Ok(Priority::Priority6),
-            7 => Ok(Priority::Priority7),
-            8 => Ok(Priority::Priority8),
-            #[cfg(not(clic))]
-            9 => Ok(Priority::Priority9),
-            #[cfg(not(clic))]
-            10 => Ok(Priority::Priority10),
-            #[cfg(not(clic))]
-            11 => Ok(Priority::Priority11),
-            #[cfg(not(clic))]
-            12 => Ok(Priority::Priority12),
-            #[cfg(not(clic))]
-            13 => Ok(Priority::Priority13),
-            #[cfg(not(clic))]
-            14 => Ok(Priority::Priority14),
-            #[cfg(not(clic))]
-            15 => Ok(Priority::Priority15),
-            _ => Err(Error::InvalidInterruptPriority),
-        }
+        let result;
+        for_each_interrupt_priority!(
+            (all $( ($idx:literal, $n:literal, $ident:ident) ),*) => {
+                result = match value {
+                    0 => Ok(Priority::None),
+                    $($n => Ok(Priority::$ident),)*
+                    _ => Err(Error::InvalidInterruptPriority),
+                }
+            };
+        );
+        result
     }
 }
 
@@ -240,9 +125,88 @@ impl TryFrom<u8> for Priority {
 // TODO: provide a `DirectBoundInterrupt` enum that lists the available options. This enables
 // portable direct binding.
 
+#[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
+pub(super) static DISABLED_CPU_INTERRUPT: u32 = property!("interrupts.disabled_interrupt");
+
+/// The number of reserved (not directly bindable) interrupts.
+const RESERVED_COUNT: usize = const {
+    let mut count = 0;
+    for_each_interrupt!(([disabled $n:tt] $_:literal) => { count += 1; };);
+    for_each_interrupt!(([reserved $n:tt] $_:literal) => { count += 1; };);
+    for_each_interrupt!(([vector $n:tt] $_:literal) => { count += 1; };);
+    count
+};
+
 /// The interrupts reserved by the HAL
 #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-pub static RESERVED_INTERRUPTS: &[u32] = PRIORITY_TO_INTERRUPT;
+pub static RESERVED_INTERRUPTS: [u32; RESERVED_COUNT] = const {
+    let mut counter = 0;
+    let mut reserved = [0; RESERVED_COUNT];
+    for_each_interrupt!(
+        ([disabled $_n:tt] $interrupt:literal) => {
+            reserved[counter] = $interrupt as u32;
+            counter += 1;
+        };
+        ([reserved $_n:tt] $interrupt:literal) => {
+            reserved[counter] = $interrupt as u32;
+            counter += 1;
+        };
+        ([vector $_n:tt] $interrupt:literal) => {
+            reserved[counter] = $interrupt as u32;
+            counter += 1;
+        };
+    );
+
+    reserved
+};
+
+/// The number of vectored interrupts / The number of priority levels.
+const VECTOR_COUNT: usize = const {
+    let mut count = 0;
+    for_each_interrupt!(([vector $n:tt] $_:literal) => { count += 1; };);
+
+    core::assert!(count == Priority::max() as usize);
+
+    count
+};
+
+/// Maps priority levels to their corresponding interrupt vectors.
+#[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
+pub(super) static PRIORITY_TO_INTERRUPT: [u32; VECTOR_COUNT] = const {
+    let mut counter = 0;
+    let mut vector = [0; VECTOR_COUNT];
+    for_each_interrupt!(
+        ([vector $_n:tt] $interrupt:literal) => {
+            vector[counter] = $interrupt as u32;
+            counter += 1;
+        };
+    );
+
+    vector
+};
+
+/// The total number of interrupts.
+#[cfg(not(interrupt_controller = "clic"))]
+const INTERRUPT_COUNT: usize = const {
+    let mut count = 0;
+    for_each_interrupt!(([$_class:tt $n:tt] $_:literal) => { count += 1; };);
+    count
+};
+
+/// Maps interrupt numbers to their vector priority levels.
+#[cfg(not(interrupt_controller = "clic"))]
+#[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
+pub(super) static INTERRUPT_TO_PRIORITY: [Priority; INTERRUPT_COUNT] = const {
+    let mut priorities = [Priority::None; INTERRUPT_COUNT];
+
+    for_each_interrupt!(
+        ([vector $n:tt] $int:literal) => {
+            for_each_interrupt_priority!(($n, $__:tt, $ident:ident) => { priorities[$int] = Priority::$ident };);
+        };
+    );
+
+    priorities
+};
 
 /// Enable an interrupt by directly binding it to a available CPU interrupt
 ///
@@ -279,7 +243,7 @@ pub fn enable_direct(
         set_priority(Cpu::current(), cpu_interrupt, level);
 
         cfg_if::cfg_if! {
-            if #[cfg(clic)] {
+            if #[cfg(interrupt_controller = "clic")] {
                 let clic = crate::soc::pac::CLIC::steal();
 
                 // Enable hardware vectoring
@@ -329,7 +293,7 @@ pub fn enable_direct(
 }
 
 // helper: returns correctly encoded RISC-V `jal` instruction
-#[cfg(not(clic))]
+#[cfg(not(interrupt_controller = "clic"))]
 fn encode_jal_x0(target: usize, pc: usize) -> Result<u32, Error> {
     let offset = (target as isize) - (pc as isize);
 
@@ -576,56 +540,10 @@ mod vectored {
     }
 }
 
-#[cfg(not(any(clic, plic)))]
-mod classic {
+#[cfg(interrupt_controller = "riscv_basic")]
+mod basic {
     use super::{CpuInterrupt, InterruptKind, Priority};
     use crate::{peripherals::INTERRUPT_CORE0, system::Cpu};
-
-    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(super) static DISABLED_CPU_INTERRUPT: u32 = 0;
-
-    // The CPU serves interrupt requests with lowest pending interrupt first. Use last interrupts
-    // for vectoring.
-    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(super) static PRIORITY_TO_INTERRUPT: &[u32] =
-        &[17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
-
-    // Priority levels of the vectored interrupts.
-    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(super) static INTERRUPT_TO_PRIORITY: [Priority; 32] = [
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::Priority1,
-        Priority::Priority2,
-        Priority::Priority3,
-        Priority::Priority4,
-        Priority::Priority5,
-        Priority::Priority6,
-        Priority::Priority7,
-        Priority::Priority8,
-        Priority::Priority9,
-        Priority::Priority10,
-        Priority::Priority11,
-        Priority::Priority12,
-        Priority::Priority13,
-        Priority::Priority14,
-        Priority::Priority15,
-    ];
 
     /// Enable a CPU interrupt
     ///
@@ -730,18 +648,10 @@ mod classic {
     }
 }
 
-#[cfg(clic)]
+#[cfg(interrupt_controller = "clic")]
 mod clic {
     use super::{CpuInterrupt, InterruptKind, Priority};
     use crate::{soc::pac::CLIC, system::Cpu};
-
-    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(super) static DISABLED_CPU_INTERRUPT: u32 = 0;
-
-    // The CPU serves interrupt requests with equal prio/level with highest ID first. Use first
-    // interrupts for vectoring.
-    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(super) static PRIORITY_TO_INTERRUPT: &[u32] = &[16, 17, 18, 19, 20, 21, 22, 23];
 
     /// Set up CLIC.
     pub(super) fn init() {
@@ -990,58 +900,10 @@ mod clic {
     );
 }
 
-#[cfg(plic)]
+#[cfg(interrupt_controller = "plic")]
 mod plic {
     use super::{CpuInterrupt, InterruptKind, Priority};
     use crate::{peripherals::PLIC_MX, system::Cpu};
-
-    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(super) static DISABLED_CPU_INTERRUPT: u32 = 31;
-
-    // 0,3,4,7 are reserved for CLINT
-    // for some reason also CPU interrupt 8 doesn't work by default since it's
-    // disabled after reset - so don't use that, too
-    // The CPU serves interrupt requests with lowest pending interrupt first. Use last interrupts
-    // for vectoring.
-    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(super) static PRIORITY_TO_INTERRUPT: &[u32] =
-        &[16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
-
-    // Priority levels of the vectored interrupts.
-    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(super) static INTERRUPT_TO_PRIORITY: [Priority; 31] = [
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::None,
-        Priority::Priority1,
-        Priority::Priority2,
-        Priority::Priority3,
-        Priority::Priority4,
-        Priority::Priority5,
-        Priority::Priority6,
-        Priority::Priority7,
-        Priority::Priority8,
-        Priority::Priority9,
-        Priority::Priority10,
-        Priority::Priority11,
-        Priority::Priority12,
-        Priority::Priority13,
-        Priority::Priority14,
-        Priority::Priority15,
-    ];
 
     /// Enable a CPU interrupt
     ///
@@ -1175,7 +1037,7 @@ mod rt {
     unsafe fn _setup_interrupts() {
         unsafe extern "C" {
             static _vector_table: u32;
-            #[cfg(clic)]
+            #[cfg(interrupt_controller = "clic")]
             static _mtvt_table: u32;
         }
 
@@ -1192,20 +1054,20 @@ mod rt {
                 .ok();
         }
 
-        #[cfg(clic)]
+        #[cfg(interrupt_controller = "clic")]
         clic::init();
 
         unsafe {
             let vec_table = (&raw const _vector_table).addr();
 
-            #[cfg(not(clic))]
+            #[cfg(not(interrupt_controller = "clic"))]
             mtvec::write({
                 let mut mtvec = mtvec::Mtvec::from_bits(0);
                 mtvec.set_trap_mode(mtvec::TrapMode::Vectored);
                 mtvec.set_address(vec_table);
                 mtvec
             });
-            #[cfg(clic)]
+            #[cfg(interrupt_controller = "clic")]
             {
                 mtvec::write({
                     let mut mtvec = mtvec::Mtvec::from_bits(0x03); // MODE = CLIC
@@ -1220,7 +1082,7 @@ mod rt {
             crate::interrupt::init_vectoring();
         };
 
-        #[cfg(plic)]
+        #[cfg(interrupt_controller = "plic")]
         unsafe {
             core::arch::asm!("csrw mie, {0}", in(reg) u32::MAX);
         }
@@ -1237,7 +1099,7 @@ mod rt {
         clear(core, cpu_intr);
 
         cfg_if::cfg_if! {
-            if #[cfg(clic)] {
+            if #[cfg(interrupt_controller = "clic")] {
                 let prio = clic::current_runlevel();
                 let mcause = riscv::register::mcause::read();
             } else {
@@ -1286,12 +1148,12 @@ mod rt {
             }
         }
 
-        #[cfg(not(clic))]
+        #[cfg(not(interrupt_controller = "clic"))]
         unsafe {
             change_current_runlevel(level)
         };
 
-        #[cfg(clic)]
+        #[cfg(interrupt_controller = "clic")]
         // In case the target uses the CLIC, it is mandatory to restore `mcause` register
         // since it contains the former CPU priority. When executing `mret`,
         // the hardware will restore the former threshold, from `mcause` to

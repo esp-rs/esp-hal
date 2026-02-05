@@ -463,6 +463,7 @@ driver_configs![
         name: "Interrupts",
         properties: {
             status_registers: u32,
+            controller: InterruptControllerProperties,
             #[serde(flatten)]
             software_interrupt_properties: SoftwareInterruptProperties,
         }
