@@ -387,7 +387,7 @@ pub trait RtcPin: Pin {
     unsafe fn apply_wakeup(&self, wakeup: bool, level: u8);
 }
 
-/// Trait implemented by RTC pins which supporting internal pull-up / pull-down
+/// Trait implemented by RTC pins which support internal pull-up / pull-down
 /// resistors.
 #[instability::unstable]
 pub trait RtcPinWithResistors: RtcPin {
