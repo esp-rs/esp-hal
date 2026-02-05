@@ -399,7 +399,6 @@ unstable_driver! {
     #[cfg(not(esp32c5))]
     #[cfg(soc_has_trace0)]
     pub mod trace;
-    #[cfg(not(esp32c5))]
     #[cfg(soc_has_tsens)]
     pub mod tsens;
     #[cfg(twai)]

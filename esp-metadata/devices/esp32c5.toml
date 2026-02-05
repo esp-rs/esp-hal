@@ -28,7 +28,7 @@ peripherals = [
     { name = "ETM", pac = "SOC_ETM" },
     { name = "GPIO" },
     { name = "GPIO_SD", pac = "GPIO_EXT" },
-    # { name = "HINF" }, # TODO: add PAC manually later
+    # { name = "HINF" },
     { name = "HMAC" },
     { name = "HP_APM" },
     { name = "HP_SYS" },
@@ -36,7 +36,7 @@ peripherals = [
     { name = "I2C_ANA_MST" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" } },
     { name = "I2S0", interrupts = { peri = "I2S0" } },
-    # { name = "IEEE802154" }, # TODO: add PAC manually later
+    # { name = "IEEE802154" },
     { name = "INTERRUPT_CORE0" },
     { name = "INTPRI" },
     { name = "IO_MUX" },
@@ -44,10 +44,10 @@ peripherals = [
     # { name = "LEDC" }, # TODO: define later
     { name = "LP_ANA" },
     { name = "LP_AON" },
-    # { name = "LP_APM" }, # TODO: add PAC manually later
+    # { name = "LP_APM" },
     { name = "LP_APM0" },
     { name = "LP_CLKRST" },
-    # { name = "LP_GPIO" }, # TODO: add PAC manually later
+    # { name = "LP_GPIO" }, # TODO: rename LP_IO?
     { name = "LP_I2C0" },
     { name = "LP_I2C_ANA_MST" },
     { name = "LP_IO_MUX" },
