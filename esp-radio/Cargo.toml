@@ -69,6 +69,7 @@ xtensa-lx-rt = { version = "0.21.0", path = "../xtensa-lx-rt", optional = true }
 byte = { version = "0.2.7", optional = true }
 ieee802154 = { version = "0.6.1", optional = true }
 heapless = "0.9"
+embassy-sync = "0.7.2"
 # Make sure these are aligned with esp-phy's dependencies, too!
 esp-wifi-sys-esp32 = { version = "0.1.0", optional = true }
 esp-wifi-sys-esp32c2 = { version = "0.1.0", optional = true }

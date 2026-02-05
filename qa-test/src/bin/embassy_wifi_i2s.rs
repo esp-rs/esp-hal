@@ -22,7 +22,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{Config, Interface, WifiController, WifiEvent, sta::StationConfig};
+use esp_radio::wifi::{Config, Interface, WifiController, sta::StationConfig};
 use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -80,9 +80,7 @@ async fn connection_manager(
     loop {
         match controller.is_connected() {
             Ok(true) => {
-                controller
-                    .wait_for_event(WifiEvent::StationDisconnected)
-                    .await;
+                controller.wait_for_disconnect_async().await.ok();
                 println!("WiFi connection lost - attempting reconnection");
                 Timer::after(Duration::from_millis(2000)).await;
                 match controller.connect_async().await {

@@ -26,7 +26,7 @@ use esp_hal::{
 use esp_println::println;
 use esp_radio::{
     ble::controller::BleConnector,
-    wifi::{Config, Interface, WifiController, WifiEvent, scan::ScanConfig, sta::StationConfig},
+    wifi::{Config, Interface, WifiController, scan::ScanConfig, sta::StationConfig},
 };
 use trouble_host::prelude::*;
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -291,9 +291,8 @@ async fn connection(mut controller: WifiController<'static>) {
     loop {
         if matches!(controller.is_connected(), Ok(true)) {
             // wait until we're no longer connected
-            controller
-                .wait_for_event(WifiEvent::StationDisconnected)
-                .await;
+            let info = controller.wait_for_disconnect_async().await.ok();
+            println!("Disconnected: {:?}", info);
             Timer::after(Duration::from_millis(5000)).await
         }
 
