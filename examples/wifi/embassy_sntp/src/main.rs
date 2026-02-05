@@ -30,14 +30,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{
-    Config,
-    Interface,
-    WifiController,
-    WifiEvent,
-    scan::ScanConfig,
-    sta::StationConfig,
-};
+use esp_radio::wifi::{Config, Interface, WifiController, scan::ScanConfig, sta::StationConfig};
 use log::{error, info};
 use sntpc::{NtpContext, NtpTimestampGenerator, get_time};
 
@@ -209,9 +202,8 @@ async fn connection(mut controller: WifiController<'static>) {
     loop {
         if matches!(controller.is_connected(), Ok(true)) {
             // wait until we're no longer connected
-            controller
-                .wait_for_event(WifiEvent::StationDisconnected)
-                .await;
+            let info = controller.wait_for_disconnect_async().await.ok();
+            println!("Disconnected: {:?}", info);
             Timer::after(Duration::from_millis(5000)).await
         }
 

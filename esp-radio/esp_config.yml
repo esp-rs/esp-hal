@@ -21,3 +21,19 @@ options:
     description: "Dump packets via an info log statement"
     default:
       - value: false
+
+  - name: event_channel_capacity
+    description: "Capacity of the internal event channel"
+    default:
+      - value: 2
+    constraints:
+      - type:
+          validator: non_negative_integer
+
+  - name: event_channel_subscribers
+    description: "Max subscriber count of the internal event channel"
+    default:
+      - value: 2
+    constraints:
+      - type:
+          validator: non_negative_integer

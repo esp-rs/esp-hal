@@ -25,5 +25,8 @@ STATIC_IP = "1.1.1.1 "
 GATEWAY_IP = "1.1.1.1"
 HOST_IP = "1.1.1.1"
 
+# this is needed for AP-STA to work
+ESP_RADIO_CONFIG_EVENT_CHANNEL_CAPACITY = "4"
+
 [unstable]
 build-std = ["alloc", "core"]
