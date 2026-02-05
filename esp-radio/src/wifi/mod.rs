@@ -2879,8 +2879,8 @@ impl WifiController<'_> {
     /// # let (mut controller, _interfaces) =
     /// #    esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
     /// match controller.disconnect_async().await {
-    ///     Ok(()) => {
-    ///         println!("Station disconnected successfully");
+    ///     Ok(info) => {
+    ///         println!("Station disconnected successfully. {info:?}");
     ///     }
     ///     Err(e) => {
     ///         println!("Failed to disconnect: {e:?}");
