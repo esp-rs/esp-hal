@@ -42,6 +42,9 @@ macro_rules! property {
     ("soc.cpu_has_csr_pc") => {
         true
     };
+    ("soc.multi_core_enabled") => {
+        false
+    };
     ("soc.rc_fast_clk_default") => {
         17500000
     };

@@ -284,6 +284,7 @@ impl Chip {
                     "uart_uart0",
                     "uart_uart1",
                     "uart_uart2",
+                    "soc_multi_core_enabled",
                     "soc_rc_fast_clk_default=\"8500000\"",
                     "soc_rc_fast_clk_default_is_set",
                     "soc_has_clock_node_xtal_clk",
@@ -480,6 +481,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=uart_uart2",
+                    "cargo:rustc-cfg=soc_multi_core_enabled",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"8500000\"",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
@@ -3806,6 +3808,7 @@ impl Chip {
                     "uart_uart0",
                     "uart_uart1",
                     "uart_uart2",
+                    "soc_multi_core_enabled",
                     "soc_rc_fast_clk_default=\"17500000\"",
                     "soc_rc_fast_clk_default_is_set",
                     "soc_has_clock_node_xtal_clk",
@@ -4042,6 +4045,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=uart_uart2",
+                    "cargo:rustc-cfg=soc_multi_core_enabled",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
@@ -4515,6 +4519,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(uart_uart0)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart1)");
     println!("cargo:rustc-check-cfg=cfg(uart_uart2)");
+    println!("cargo:rustc-check-cfg=cfg(soc_multi_core_enabled)");
     println!("cargo:rustc-check-cfg=cfg(soc_rc_fast_clk_default_is_set)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_xtal_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_clk)");
