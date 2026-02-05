@@ -1631,6 +1631,8 @@ impl Chip {
                     "soc_has_ecdsa",
                     "soc_has_efuse",
                     "soc_has_etm",
+                    "soc_has_gpio",
+                    "soc_has_gpio_sd",
                     "soc_has_hmac",
                     "soc_has_hp_apm",
                     "soc_has_hp_sys",
@@ -1680,6 +1682,7 @@ impl Chip {
                     "soc_has_usb_device",
                     "soc_has_bt",
                     "soc_has_flash",
+                    "soc_has_gpio_dedicated",
                     "soc_has_lp_core",
                     "soc_has_sw_interrupt",
                     "soc_has_wifi",
@@ -1687,6 +1690,8 @@ impl Chip {
                     "rom_crc_be",
                     "rom_md5_bsd",
                     "soc",
+                    "gpio",
+                    "dedicated_gpio",
                     "interrupts",
                     "systimer",
                     "timergroup",
@@ -1728,6 +1733,12 @@ impl Chip {
                     "soc_has_clock_node_uart1_function_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
+                    "gpio_gpio_function=\"1\"",
+                    "gpio_constant_0_input=\"96\"",
+                    "gpio_constant_1_input=\"64\"",
+                    "gpio_func_in_sel_offset=\"0\"",
+                    "gpio_input_signal_max=\"116\"",
+                    "gpio_output_signal_max=\"256\"",
                     "interrupts_status_registers=\"3\"",
                     "interrupt_controller=\"clic\"",
                     "timergroup_timg_has_divcnt_rst",
@@ -1745,6 +1756,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_ecdsa",
                     "cargo:rustc-cfg=soc_has_efuse",
                     "cargo:rustc-cfg=soc_has_etm",
+                    "cargo:rustc-cfg=soc_has_gpio",
+                    "cargo:rustc-cfg=soc_has_gpio_sd",
                     "cargo:rustc-cfg=soc_has_hmac",
                     "cargo:rustc-cfg=soc_has_hp_apm",
                     "cargo:rustc-cfg=soc_has_hp_sys",
@@ -1794,6 +1807,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_usb_device",
                     "cargo:rustc-cfg=soc_has_bt",
                     "cargo:rustc-cfg=soc_has_flash",
+                    "cargo:rustc-cfg=soc_has_gpio_dedicated",
                     "cargo:rustc-cfg=soc_has_lp_core",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_wifi",
@@ -1801,6 +1815,8 @@ impl Chip {
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
                     "cargo:rustc-cfg=soc",
+                    "cargo:rustc-cfg=gpio",
+                    "cargo:rustc-cfg=dedicated_gpio",
                     "cargo:rustc-cfg=interrupts",
                     "cargo:rustc-cfg=systimer",
                     "cargo:rustc-cfg=timergroup",
@@ -1842,6 +1858,12 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_uart1_function_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
+                    "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
+                    "cargo:rustc-cfg=gpio_constant_0_input=\"96\"",
+                    "cargo:rustc-cfg=gpio_constant_1_input=\"64\"",
+                    "cargo:rustc-cfg=gpio_func_in_sel_offset=\"0\"",
+                    "cargo:rustc-cfg=gpio_input_signal_max=\"116\"",
+                    "cargo:rustc-cfg=gpio_output_signal_max=\"256\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=interrupt_controller=\"clic\"",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
@@ -1863,7 +1885,92 @@ impl Chip {
                         ),
                     ],
                 },
-                pins: &[],
+                pins: &[
+                    PinInfo {
+                        pin: 0,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 1,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 2,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 3,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 4,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 5,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 6,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 7,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 8,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 9,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 10,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 11,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 12,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 13,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 14,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 23,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 24,
+                        limitations: &[],
+                    },
+                    PinInfo {
+                        pin: 25,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 26,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 27,
+                        limitations: &["strapping"],
+                    },
+                    PinInfo {
+                        pin: 28,
+                        limitations: &["strapping"],
+                    },
+                ],
             },
             Self::Esp32c6 => Config {
                 architecture: "riscv",
@@ -4803,12 +4910,14 @@ pub fn emit_check_cfg_directives() {
         "cargo:rustc-check-cfg=cfg(soc_rc_fast_clk_default, values(\"8500000\",\"17500000\"))"
     );
     println!("cargo:rustc-check-cfg=cfg(gpio_gpio_function, values(\"2\",\"1\"))");
-    println!("cargo:rustc-check-cfg=cfg(gpio_constant_0_input, values(\"48\",\"31\",\"60\"))");
-    println!("cargo:rustc-check-cfg=cfg(gpio_constant_1_input, values(\"56\",\"30\"))");
+    println!(
+        "cargo:rustc-check-cfg=cfg(gpio_constant_0_input, values(\"48\",\"31\",\"96\",\"60\"))"
+    );
+    println!("cargo:rustc-check-cfg=cfg(gpio_constant_1_input, values(\"56\",\"30\",\"64\"))");
     println!("cargo:rustc-check-cfg=cfg(gpio_func_in_sel_offset, values(\"0\"))");
     println!(
         "cargo:rustc-check-cfg=cfg(gpio_input_signal_max, \
-         values(\"206\",\"100\",\"124\",\"242\",\"255\"))"
+         values(\"206\",\"100\",\"116\",\"124\",\"242\",\"255\"))"
     );
     println!("cargo:rustc-check-cfg=cfg(gpio_output_signal_max, values(\"256\",\"128\"))");
     println!(

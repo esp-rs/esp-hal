@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial ESP32-C5 support (#4859, #4866, #4871, #4872, #4873, #4877, #4879, #4883, #4884)
 - New configuration option: `ESP_HAL_CONFIG_MIN_CHIP_REVISION` (#4875)
 - `Cpu::all` to iterate over all CPUs (#4890)
+- C5: Add initial GPIO support (#4899)
 
 ### Changed
 
