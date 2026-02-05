@@ -1297,7 +1297,7 @@ pub fn enable_wifi_events(events: EnumSet<WifiEvent>) {
 /// - [WifiEvent::AccessPointStop]
 /// - [WifiEvent::ScanDone]
 ///
-/// [crate::wifi::new] will enable these events - so disabling them before will re-enable them.
+/// [crate::wifi::new] always enables these events, even if they were disabled beforehand.
 #[instability::unstable]
 pub fn disable_wifi_events(events: EnumSet<WifiEvent>) {
     WIFI_EVENT_ENABLE_MASK.with(|mask| *mask &= !events);
