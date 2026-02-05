@@ -164,6 +164,9 @@ pub static RESERVED_INTERRUPTS: [u32; RESERVED_COUNT] = const {
 const VECTOR_COUNT: usize = const {
     let mut count = 0;
     for_each_interrupt!(([vector $n:tt] $_:literal) => { count += 1; };);
+
+    core::assert!(count == Priority::max() as usize);
+
     count
 };
 
