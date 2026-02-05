@@ -10,6 +10,10 @@
 //% FEATURES(no_wifi): esp-radio/ble
 //% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble
 
+// Even if the defaults change, keep this at a low-ish value for
+// the esp_rtos/moving_data_to_second_core test
+//% ENV: ESP_HAL_CONFIG_STACK_GUARD_OFFSET=4
+
 #![no_std]
 #![no_main]
 

@@ -517,6 +517,60 @@ mod tests {
 
     #[test]
     #[cfg(multi_core)]
+    async fn moving_data_to_second_core(ctx: Context) {
+        // This is a regression test for https://github.com/esp-rs/esp-hal/issues/4912.
+        // It doesn't necessarily need RTOS, but RTOS uses the affected multi-core APIs
+        // so we might as well test the whole chain.
+        use embassy_sync::signal::Signal;
+        use esp_sync::RawMutex;
+
+        static SIGNAL: Signal<RawMutex, Result<(), (usize, u32)>> = Signal::new();
+
+        // We rely on ESP_HAL_CONFIG_STACK_GUARD_OFFSET=4 here
+        let data = [0xabad1dea_u32; 20];
+
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            ctx.sw_int1,
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            move || {
+                let result = if let Some(mismatch) = data
+                    .iter()
+                    .copied()
+                    .enumerate()
+                    .find(|(_, v)| *v != 0xabad1dea_u32)
+                {
+                    Err(mismatch)
+                } else {
+                    Ok(())
+                };
+
+                SIGNAL.signal(result);
+            },
+        );
+
+        let result = SIGNAL.wait().await;
+
+        if let Err((index, read)) = result {
+            defmt::panic!(
+                "Data corrupted at index {} (got {:x} instead of {:x})",
+                index,
+                read,
+                data[index]
+            );
+        }
+
+        unsafe {
+            // Park the second core, we don't need it anymore
+            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
+        }
+    }
+
+    #[test]
+    #[cfg(multi_core)]
     async fn embassy_cross_core_bare_metal(ctx: Context) {
         use embassy_sync::signal::Signal;
         use esp_hal::delay::Delay;
