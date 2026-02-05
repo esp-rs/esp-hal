@@ -12,11 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-
 ### Fixed
 
 - I2C: avoid potential infinite loop while checking for command completion (#4519)
 - ESP32: ADC1 readings are no longer inverted (#4423)
+- UART: correct documentation of `read` which incorrectly stated that it would never block (#4586)
 - Fixed an issue that caused the stack guard to overwrite data moved to the second core (#4914)
 
 ### Removed
