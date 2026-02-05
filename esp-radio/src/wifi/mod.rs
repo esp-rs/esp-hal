@@ -2047,14 +2047,13 @@ impl WifiController<'_> {
     }
 
     #[procmacros::doc_replace]
-    /// Get the RSSI information of access point to which the device is associated with.
+    /// Get the RSSI information of the access point to which the device is associated.
     /// The value is obtained from the last beacon.
     ///
-    /// <div class="warning">
+    /// # Warning
     ///
     /// - Use this API only in Station or AccessPoint-Station mode.
-    /// - This API should be called after the station has connected to an access point.
-    /// </div>
+    /// - Call this API only after the station has connected to an access point.
     ///
     /// ## Example
     ///
@@ -2091,11 +2090,10 @@ impl WifiController<'_> {
     /// Get the Access Point information of access point to which the device is associated with.
     /// The value is obtained from the last beacon.
     ///
-    /// <div class="warning">
+    /// # Warning
     ///
     /// - Use this API only in Station or AccessPoint-Station mode.
-    /// - This API should be called after the station has connected to an access point.
-    /// </div>
+    /// - Call this API only after the station has connected to an access point.
     ///
     /// ## Example
     ///
