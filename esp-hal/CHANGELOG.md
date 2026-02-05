@@ -17,6 +17,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - I2C: avoid potential infinite loop while checking for command completion (#4519)
 - ESP32: ADC1 readings are no longer inverted (#4423)
+- UART: correct documentation of `read` which incorrectly stated that it would never block (#4586)
+- Fixed System Timer timestamp inaccuracy when using uncommon crystal frequencies (#4634)
+- `SystemTimer::ticks_per_second()` now correctly returns the number of ticks per second. (#4634)
+- The interrupt request set by `SoftwareInterrupt::raise()` should now take effect before returning. (#4706)
+- Fixed an issue in `ShaBackend` that resulted in incorrect hash calculation (#4722)
+- The `Peripherals` struct is now marked as `#[non_exhaustive]`. This is a breaking change. (#4729)
+- All GPIOs are now available without unsafe code. The potentially reserved GPIOs are now documented. (#4728)
+- Make sure we added all relevant section to `.rwtext.wifi` (#4808)
+- ESP32-S3: Fixed startup code to prevent a linker error (#4815)
+- Fixed a situation where the ELF might make tooling emit more than two segments in the image which will make the bootloader refuse to boot (#4844)
+- ESP32-S3/ESP32-C2: WiFi will work after light-sleep with default settings (#4826)
+- ESP32-S2: Fixed an issue where enabling TRNG can prevent WiFi from working (#4856)
+- Fixed an issue that caused the stack guard to overwrite data moved to the second core (#4914)
 
 ### Removed
 
