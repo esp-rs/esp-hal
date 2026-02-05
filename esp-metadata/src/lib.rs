@@ -710,6 +710,7 @@ fn generate_for_each_macro(name: &str, branches: &[Branch<'_>]) -> TokenStream {
     let flat_branches = branches.iter().flat_map(|b| b.1.iter());
     let repeat_names = branches.iter().map(|b| TokenStream::from_str(b.0).unwrap());
     let repeat_branches = branches.iter().map(|b| b.1);
+    let inner = format_ident!("_for_each_inner_{name}");
 
     quote! {
         // This macro is called in esp-hal to implement a driver's
@@ -721,7 +722,7 @@ fn generate_for_each_macro(name: &str, branches: &[Branch<'_>]) -> TokenStream {
             (
                 $($pattern:tt => $code:tt;)*
             ) => {
-                macro_rules! _for_each_inner {
+                macro_rules! #inner {
                     $(($pattern) => $code;)*
                     ($other:tt) => {}
                 }
@@ -735,7 +736,7 @@ fn generate_for_each_macro(name: &str, branches: &[Branch<'_>]) -> TokenStream {
                 //     }
                 // }
                 // ```
-                #(_for_each_inner!(( #flat_branches ));)*
+                #( #inner!(( #flat_branches ));)*
 
                 // Generate a single macro call with all branches.
                 // Usage:
@@ -746,7 +747,7 @@ fn generate_for_each_macro(name: &str, branches: &[Branch<'_>]) -> TokenStream {
                 //     }
                 // }
                 // ```
-                #( _for_each_inner!( (#repeat_names #( (#repeat_branches) ),*) ); )*
+                #(  #inner!( (#repeat_names #( (#repeat_branches) ),*) ); )*
             };
         }
     }
