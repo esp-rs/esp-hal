@@ -40,8 +40,6 @@ cfg_if::cfg_if! {
 #[cfg(all(dedicated_gpio, feature = "unstable"))]
 use esp_hal::gpio::dedicated::{
     DedicatedGpio,
-    DedicatedGpioFlex,
-    DedicatedGpioFlexBundle,
     DedicatedGpioInput,
     DedicatedGpioInputBundle,
     DedicatedGpioOutput,
@@ -685,23 +683,15 @@ mod tests {
     #[test]
     #[should_panic]
     #[cfg(all(dedicated_gpio, multi_core, feature = "unstable", debug_assertions))]
-    fn dedicated_gpio_different_cores_panics(ctx: Context) {
-        use core::{
-            mem::MaybeUninit,
-            sync::atomic::{AtomicBool, Ordering},
-        };
-
+    async fn dedicated_gpio_different_cores_panics(ctx: Context) {
         use esp_hal::system::Stack;
         use hil_test::mk_static;
 
         let pin1 = ctx.test_gpio1;
-        let static_mem_slot = mk_static!(
-            MaybeUninit<DedicatedGpioInput<'static>>,
-            MaybeUninit::uninit()
+        let driver_signal = &*mk_static!(
+            Signal<CriticalSectionRawMutex, DedicatedGpioInput<'static>>,
+            Signal::new()
         );
-        let slot_addr: usize = static_mem_slot.as_mut_ptr() as usize;
-        // cast to usize, otherwise compiler will complain about !Send
-        let ready = &*mk_static!(AtomicBool, AtomicBool::new(false));
         let app_core_stack = mk_static!(Stack<4096>, Stack::new());
 
         // creating the driver at core1, and then use it at core
@@ -710,22 +700,10 @@ mod tests {
             let input = Input::new(pin1, InputConfig::default().with_pull(Pull::Down));
             let driver = DedicatedGpioInput::new(ctx.dedicated_gpio.channel1.input, input);
 
-            let driver_static: DedicatedGpioInput<'static> = unsafe {
-                core::mem::transmute::<DedicatedGpioInput<'_>, DedicatedGpioInput<'static>>(driver)
-            };
-
-            let slot_ptr = slot_addr as *mut DedicatedGpioInput<'static>;
-            unsafe { slot_ptr.write(driver_static) };
-            ready.store(true, Ordering::Release);
+            driver_signal.signal(driver);
         });
 
-        while !ready.load(Ordering::Acquire) {
-            core::hint::spin_loop();
-            // wait until the driver is transferred to the static slot
-        }
-
-        let input_dedicated: DedicatedGpioInput<'static> =
-            unsafe { static_mem_slot.assume_init_read() };
+        let input_dedicated = driver_signal.wait().await;
 
         let _level = input_dedicated.level();
     }
