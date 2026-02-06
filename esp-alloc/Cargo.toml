@@ -62,6 +62,17 @@ defmt = ["dep:defmt", "enumset/defmt"]
 internal-heap-stats = []
 
 ## Provide C-compatibility functions (malloc, free, ...)
+##
+## Note that allocated memory returned by all these functions is 4-byte aligned.
+## This is in-line with e.g. ESP-IDF and the supported CPU architectures and usually
+## not a problem.
+##
+## Strictly speaking it violates `malloc`s contract saying
+## > "...  functions return a pointer to the allocated memory, which is suitably
+## > aligned for any type that fits into the requested size or less."
+##
+## However this _can_ cause problems when using the allocated memory from Rust
+## where alignment checks are in place. So special caution might be needed in this case.
 compat = []
 
 ## Enable the `#[global_allocator]` attribute for `EspHeap`.
@@ -74,6 +85,8 @@ global-allocator = []
 esp32c2   = ["esp-sync/esp32c2"]
 ##
 esp32c3   = ["esp-sync/esp32c3"]
+##
+esp32c5   = ["esp-sync/esp32c5"]
 ##
 esp32c6   = ["esp-sync/esp32c6"]
 ##

@@ -49,7 +49,7 @@ jobs:
         with:
           buildtargets: ${{ matrix.target.soc }}
           default: true
-          version: 1.92.0.0
+          version: 1.93.0.0
 
       - name: Install Binutils and Hub
         run: |

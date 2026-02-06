@@ -2,6 +2,13 @@
 
 use esp_sync::NonReentrantMutex;
 
+cfg_if::cfg_if! {
+    if #[cfg(soc_multi_core_enabled)] {
+        pub(crate) mod multi_core;
+        pub use multi_core::*;
+    }
+}
+
 // Implements the Peripheral enum based on esp-metadata/device.soc/peripheral_clocks
 implement_peripheral_clocks!();
 
@@ -218,10 +225,6 @@ impl PeripheralClockControl {
     }
 }
 
-#[cfg(any(esp32, esp32s3))]
-#[allow(unused_imports)]
-pub use crate::soc::cpu_control::*;
-
 /// Available CPU cores
 ///
 /// The actual number of available cores depends on the target.
@@ -285,7 +288,7 @@ impl Cpu {
 
     /// Returns an iterator over all cores.
     #[inline(always)]
-    pub(crate) fn all() -> impl Iterator<Item = Self> {
+    pub fn all() -> impl Iterator<Item = Self> {
         cfg_if::cfg_if! {
             if #[cfg(multi_core)] {
                 [Cpu::ProCpu, Cpu::AppCpu].into_iter()

@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `wifi::csi::WifiCsiInfo` wraps `wifi::wifi_csi_info_t` (#4643)
 - `WifiController::set_channel()`, `WifiController::channel()` `WifiController::set_bandwidth()`, `WifiController::bandwidth()` methods and `Bandwidth` enum (#4705)
 - Exposed types necessary to configure the ble `Config` structure. (#4764)
+- New configuration options `ESP_RADIO_CONFIG_EVENT_CHANNEL_CAPACITY` and `ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS` to configure the internal event channel. (#4898)
+- A new `subscribe()` method on `WifiController` to get an `EventSubscriber` for receiving Wi-Fi events. (#4898)
+- New event-related types: `event::EventInfo`, `event::WifiEvent`, `wifi::DisconnectReason`, `wifi::ConnectedStationInfo`, `wifi::DisconnectedStationInfo`, `wifi::AccessPointStationConnectedInfo`, `wifi::AccessPointStationDisconnectedInfo`, `wifi::AccessPointStationEventInfo`. (#4898)
+- `enable_wifi_events` and `disable_wifi_events` functions to control which Wi-Fi events are processed. (#4898)
 
 ### Changed
 
@@ -37,6 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unstable features now require the `unstable` feature flag to be enabled (#4810)
 - `RxControlInfo` is unstable, `RxControlInfo::from_raw()` is no longer public (#4811)
 - `event`, `sniffer`, and `csi` modules are marked unstable (#4811)
+- `WifiDevice` has been renamed to `Interface` and `WifiDeviceMode` to `InterfaceType` (#4881)
+- `wifi::Config` has been changed to `wifi::ControllerConfig` and `wifi::ModeConfig` into `wifi::Config` (#4891)
+- `connect_async` now returns `Ok(ConnectedStationInfo)` on success, providing detailed information about the connection. (#4898)
+- `disconnect_async` now returns `Ok(DisconnectedStationInfo)`. (#4898)
+- `WifiError::Disconnected` is now a tuple-like enum variant `WifiError::Disconnected(DisconnectedStationInfo)` containing details about the disconnection. (#4898)
 
 ### Fixed
 
@@ -59,6 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `wifi::ModeConfig::None` is no longer available (#4834)
 - Support for non-async `start`,`stop`,`scan`,`connect` and `disconnect` in `WifiController` has been removed (#4870)
 - Support for the feature `smoltcp` has been removed (#4870)
+- The `event::EventExt` trait and its associated handler functions (`update_handler`, `take_handler`, `replace_handler`) have been removed. Use `WifiController::subscribe()` instead. (#4898)
+- `WifiController` methods `wait_for_event`, `wait_for_events`, and `wait_for_all_events` have been removed. They are replaced by `wait_for_disconnect_async`, `wait_for_access_point_connected_event_async`, or by using an `EventSubscriber`. (#4898)
 
 ## [v0.17.0] - 2025-10-30
 

@@ -24,14 +24,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{
-    ModeConfig,
-    WifiController,
-    WifiDevice,
-    WifiEvent,
-    scan::ScanConfig,
-    sta::StationConfig,
-};
+use esp_radio::wifi::{Config, Interface, WifiController, scan::ScanConfig, sta::StationConfig};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -149,14 +142,13 @@ async fn connection(mut controller: WifiController<'static>) {
     loop {
         if matches!(controller.is_connected(), Ok(true)) {
             // wait until we're no longer connected
-            controller
-                .wait_for_event(WifiEvent::StationDisconnected)
-                .await;
+            let info = controller.wait_for_disconnect_async().await.ok();
+            println!("Disconnected: {:?}", info);
             Timer::after(Duration::from_millis(5000)).await
         }
 
         if !matches!(controller.is_started(), Ok(true)) {
-            let station_config = ModeConfig::Station(
+            let station_config = Config::Station(
                 StationConfig::default()
                     .with_ssid(SSID.into())
                     .with_password(PASSWORD.into()),
@@ -179,7 +171,7 @@ async fn connection(mut controller: WifiController<'static>) {
         println!("About to connect...");
 
         match controller.connect_async().await {
-            Ok(_) => println!("Wifi connected!"),
+            Ok(info) => println!("Wifi connected to {:?}", info),
             Err(e) => {
                 println!("Failed to connect to wifi: {e:?}");
                 Timer::after(Duration::from_millis(5000)).await
@@ -189,6 +181,6 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn net_task(mut runner: Runner<'static, WifiDevice<'static>>) {
+async fn net_task(mut runner: Runner<'static, Interface<'static>>) {
     runner.run().await
 }

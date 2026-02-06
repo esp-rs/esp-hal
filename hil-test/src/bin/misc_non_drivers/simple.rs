@@ -198,7 +198,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(soc_has_usb_device)]
+    #[cfg(usb_serial_jtag)]
     fn creating_peripheral_does_not_break_debug_connection(ctx: Context) {
         use esp_hal::usb_serial_jtag::UsbSerialJtag;
 

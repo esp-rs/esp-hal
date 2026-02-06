@@ -19,9 +19,10 @@ use crate::TraceEvents;
 #[cfg(feature = "embassy")]
 use crate::timer::embassy::TimerQueue;
 use crate::{
-    run_queue::{Priority, RunQueue, RunSchedulerOn},
+    run_queue::{Priority, RunQueue},
     task::{
         self,
+        ContextExt,
         CpuContext,
         IdleFn,
         Task,
@@ -180,24 +181,19 @@ impl SchedulerState {
         task.heap_allocated = true;
         let mut task_ptr = NonNull::from(Box::leak(task));
 
-        cfg_if::cfg_if! {
-            if #[cfg(xtensa)] {
-                unsafe { task_ptr.as_mut().cpu_context.THREADPTR = task_ptr.as_ptr() as u32; }
-            } else if #[cfg(riscv)] {
-                unsafe { task_ptr.as_mut().cpu_context.tp = task_ptr.as_ptr() as usize; }
-            }
-        }
+        unsafe {
+            task_ptr
+                .as_mut()
+                .cpu_context
+                .set_tp(task_ptr.as_ptr() as u32)
+        };
 
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::task_new(task_ptr.rtos_trace_id());
 
         self.all_tasks.push(task_ptr);
-        match self.run_queue.mark_task_ready(&self.per_cpu, task_ptr) {
-            RunSchedulerOn::DontRun => {}
-            RunSchedulerOn::CurrentCore => task::yield_task(),
-            #[cfg(multi_core)]
-            RunSchedulerOn::OtherCore => task::schedule_other_core(),
-        }
+        let run_scheduler = self.run_queue.mark_task_ready(&self.per_cpu, task_ptr);
+        task::trigger_scheduler(run_scheduler);
 
         debug!("Task '{}' created: {:?}", name, task_ptr);
 
@@ -296,8 +292,8 @@ impl SchedulerState {
                 // be pinned to the current CPU. If we're switching out the main task, however, we
                 // can't rely on its saved context - use the current stack pointer which will still
                 // point to the right stack, just to another place we can use within it.
-                let idle_sp = if current_context.is_null()
-                    || current_context == &raw mut self.per_cpu[current_cpu].main_task.cpu_context
+                let idle_sp = if current_context
+                    == &raw mut self.per_cpu[current_cpu].main_task.cpu_context
                 {
                     // We're using the current task's stack, for which the watchpoint is already set
                     // up.
@@ -317,22 +313,10 @@ impl SchedulerState {
                         .main_task
                         .set_up_stack_watchpoint();
 
-                    cfg_if::cfg_if! {
-                        if #[cfg(xtensa)] {
-                            self.per_cpu[current_cpu].main_task.cpu_context.A1
-                        } else {
-                            self.per_cpu[current_cpu].main_task.cpu_context.sp
-                        }
-                    }
+                    self.per_cpu[current_cpu].main_task.cpu_context.sp()
                 };
 
-                cfg_if::cfg_if! {
-                    if #[cfg(xtensa)] {
-                        self.per_cpu[current_cpu].idle_context.A1 = idle_sp;
-                    } else {
-                        self.per_cpu[current_cpu].idle_context.sp = idle_sp;
-                    }
-                }
+                self.per_cpu[current_cpu].idle_context.set_sp(idle_sp);
 
                 #[cfg(feature = "rtos-trace")]
                 rtos_trace::trace::system_idle();
@@ -403,12 +387,8 @@ impl SchedulerState {
         let timer_queue = unwrap!(self.time_driver.as_mut());
         timer_queue.timer_queue.remove(task);
 
-        match self.run_queue.mark_task_ready(&self.per_cpu, task) {
-            RunSchedulerOn::DontRun => {}
-            RunSchedulerOn::CurrentCore => task::yield_task(),
-            #[cfg(multi_core)]
-            RunSchedulerOn::OtherCore => task::schedule_other_core(),
-        }
+        let run_scheduler = self.run_queue.mark_task_ready(&self.per_cpu, task);
+        task::trigger_scheduler(run_scheduler);
     }
 
     fn delete_task(&mut self, mut to_delete: TaskPtr) {

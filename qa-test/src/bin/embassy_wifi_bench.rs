@@ -33,7 +33,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{ModeConfig, WifiController, WifiDevice, WifiEvent, sta::StationConfig};
+use esp_radio::wifi::{Config, Interface, WifiController, sta::StationConfig};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -140,14 +140,12 @@ async fn connection(mut controller: WifiController<'static>) {
     loop {
         if matches!(controller.is_connected(), Ok(true)) {
             // wait until we're no longer connected
-            controller
-                .wait_for_event(WifiEvent::StationDisconnected)
-                .await;
+            controller.wait_for_disconnect_async().await.ok();
             Timer::after(Duration::from_millis(5000)).await
         }
 
         if !matches!(controller.is_started(), Ok(true)) {
-            let station_config = ModeConfig::Station(
+            let station_config = Config::Station(
                 StationConfig::default()
                     .with_ssid(SSID.into())
                     .with_password(PASSWORD.into()),
@@ -170,7 +168,7 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn net_task(mut runner: Runner<'static, WifiDevice<'static>>) {
+async fn net_task(mut runner: Runner<'static, Interface<'static>>) {
     runner.run().await
 }
 

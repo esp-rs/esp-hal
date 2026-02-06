@@ -71,7 +71,7 @@ jobs:
       - name: Install xtensa toolchain
         uses: esp-rs/xtensa-toolchain@v1.6
         with:
-          version: 1.92.0.0
+          version: 1.93.0.0
 
       - name: Check if baseline generation is needed
         id: check-generation
@@ -156,15 +156,15 @@ jobs:
         if: steps.check-generation.outputs.should_generate == 'true'
         uses: actions/upload-artifact@v6
         with:
-          name: api-baselines-${{ github.event.inputs.package_name }}
-          path: ${{ github.event.inputs.package_name }}/api-baseline/
+          name: api-baselines-${{ steps.check-generation.outputs.packages }}
+          path: ${{ steps.check-generation.outputs.packages }}/api-baseline/
           retention-days: 90 # Maximum for public repos
 
       - name: Create baseline summary
         if: steps.check-generation.outputs.should_generate == 'true'
         shell: bash
         run: |
-          PACKAGE_NAME="${{ github.event.inputs.package_name }}"
+          PACKAGE_NAME="${{ steps.check-generation.outputs.packages }}"
           echo "Successfully generated and uploaded API baselines"
           echo "Artifact name: api-baselines-$PACKAGE_NAME"
           echo "Retention: 90 days (expires on $(date -d '+90 days' '+%Y-%m-%d'))"

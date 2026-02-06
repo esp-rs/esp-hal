@@ -118,3 +118,52 @@ Therefore the following functions have been removed from `WifiController`:
 Use the `*_async` counterparts instead. This might require you to migrate your code to use `embassy`.
 
 The `smoltcp` feature has been removed completely. Use `embassy-net` and async instead.
+
+## Wi-Fi Event System
+
+The Wi-Fi event handling system has been completely refactored
+
+#### Waiting for Disconnection
+
+The generic `wait_for_event` has been replaced by more specific and descriptive methods. These also return more detailed information.
+
+```diff
+- use esp_radio::wifi::WifiEvent;
+-
+- // Wait until the station is disconnected
+- controller
+-     .wait_for_event(WifiEvent::StationDisconnected)
+-     .await;
+- println!("Station disconnected");
++ // Wait until the station is disconnected
++ let info = controller.wait_for_disconnect_async().await.ok();
++ println!("Disconnected: {:?}", info);
+```
+
+#### Handling Access Point Client Events
+
+Previously, you would wait for `AccessPointStationConnected` or `AccessPointStationDisconnected` events. This is now handled by `wait_for_access_point_connected_event_async`.
+
+```diff
+- use esp_radio::wifi::WifiEvent;
+-
+- // In your AP task loop
+- controller.wait_for_events(
+-     WifiEvent::AccessPointStationConnected | WifiEvent::AccessPointStationDisconnected,
+-     true
+- ).await;
+- // No way to know the details here
++ // In your AP task loop
++ let event = controller
++     .wait_for_access_point_connected_event_async()
++     .await
++     .unwrap();
++ match event {
++     esp_radio::wifi::AccessPointStationEventInfo::Connected(info) => {
++         println!("Station connected: {:?}", info);
++     }
++     esp_radio::wifi::AccessPointStationEventInfo::Disconnected(info) => {
++         println!("Station disconnected: {:?}", info);
++     }
++ }
+```

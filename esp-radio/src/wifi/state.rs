@@ -4,7 +4,7 @@ use esp_radio_rtos_driver::semaphore::{SemaphoreHandle, SemaphoreKind};
 use esp_sync::NonReentrantMutex;
 use portable_atomic_enum::atomic_enum;
 
-use super::WifiEvent;
+use super::event::WifiEvent;
 
 /// Wi-Fi interface for station state.
 #[atomic_enum]
@@ -87,7 +87,7 @@ pub(crate) fn station_state() -> WifiStationState {
     STATION_STATE.load(Ordering::Relaxed)
 }
 
-pub(crate) fn update_state(event: WifiEvent, handled: bool) {
+pub(crate) fn update_state(event: WifiEvent) {
     match event {
         WifiEvent::StationConnected
         | WifiEvent::StationDisconnected
@@ -100,11 +100,7 @@ pub(crate) fn update_state(event: WifiEvent, handled: bool) {
             ACCESS_POINT_STATE.store(WifiAccessPointState::from(event), Ordering::Relaxed)
         }
 
-        other => {
-            if !handled {
-                debug!("Unhandled event: {:?}", other)
-            }
-        }
+        _ => (),
     }
 }
 

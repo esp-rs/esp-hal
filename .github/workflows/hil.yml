@@ -54,7 +54,12 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
+  get-labels:
+    uses: ./.github/workflows/get-labels.yml
   build-xtasks:
+    needs: get-labels
+    if: >
+      !contains(needs.get-labels.outputs.labels, 'skip-ci')
     name: Build xtasks
     runs-on: ubuntu-latest
 
@@ -106,12 +111,15 @@ jobs:
   # This job is the *real* HIL test-build job, used on merge_group and when
   # triggered via `/hil full`.
   build-tests-full:
+    needs: get-labels
     if: >
       github.event_name == 'merge_group' ||
       (github.event_name == 'workflow_dispatch' &&
        github.event.inputs.matrix == 'full' &&
        github.event.inputs.chips == '')
     runs-on: ubuntu-latest
+    env:
+      SKIP_CI: ${{ contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
     strategy:
       fail-fast: false
       matrix:
@@ -149,8 +157,16 @@ jobs:
             runner: esp32s3-usb
             host: armv7
     steps:
+      - name: Skip CI
+        if: env.SKIP_CI == 'true'
+        run: |
+          echo "skipping"
+
       - uses: actions/checkout@v6
+        if: env.SKIP_CI != 'true'
+
       - uses: ./.github/actions/build-tests
+        if: env.SKIP_CI != 'true'
         with:
           event_name: ${{ github.event_name }}
           repository: ${{ github.event.inputs.repository || github.repository }}
@@ -325,11 +341,14 @@ jobs:
 
   hil-full:
     if: >
-      github.event_name == 'merge_group' ||
-      (github.event_name == 'workflow_dispatch' &&
-       github.event.inputs.matrix == 'full' &&
-       github.event.inputs.chips == '')
-    needs: [build-tests-full, build-xtasks]
+      !contains(needs.get-labels.outputs.labels, 'skip-ci') &&
+      (
+        github.event_name == 'merge_group' ||
+        (github.event_name == 'workflow_dispatch' &&
+        github.event.inputs.matrix == 'full' &&
+        github.event.inputs.chips == '')
+       )
+    needs: [build-tests-full, build-xtasks, get-labels]
     runs-on:
       labels: [self-hosted, "${{ matrix.target.runner }}"]
     strategy:
@@ -500,8 +519,10 @@ jobs:
           rm -f xtask || true
 
   required:
-    if: github.event_name == 'merge_group'
-    needs: hil-full
+    needs: get-labels
+    if: >
+      github.event_name == 'merge_group' &&
+      !contains(needs.get-labels.outputs.labels, 'skip-ci')
     runs-on: ubuntu-latest
     steps:
       - run: echo "All HIL matrix jobs passed on merge_group."

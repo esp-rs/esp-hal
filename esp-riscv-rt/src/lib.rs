@@ -170,7 +170,28 @@ _vector_table:
     j _start_Trap29_trap
     j _start_Trap30_trap
     j _start_Trap31_trap
-.option pop
+"#,
+ #[cfg(feature = "clic-48")]
+r#"
+    j _start_Trap32_trap
+    j _start_Trap33_trap
+    j _start_Trap34_trap
+    j _start_Trap35_trap
+    j _start_Trap36_trap
+    j _start_Trap37_trap
+    j _start_Trap38_trap
+    j _start_Trap39_trap
+    j _start_Trap40_trap
+    j _start_Trap41_trap
+    j _start_Trap42_trap
+    j _start_Trap43_trap
+    j _start_Trap44_trap
+    j _start_Trap45_trap
+    j _start_Trap46_trap
+    j _start_Trap47_trap
+"#,
+r#"
+    .option pop
 "#,
 }
 
@@ -180,7 +201,7 @@ macro_rules! define_interrupt {
         struct $name;
 
         unsafe impl riscv_rt::InterruptNumber for $name {
-            const MAX_INTERRUPT_NUMBER: usize = 31;
+            const MAX_INTERRUPT_NUMBER: usize = if cfg!(feature = "clic-48") { 47 } else { 31 };
 
             fn number(self) -> usize {
                 $num
@@ -240,3 +261,23 @@ define_interrupt!(28, Trap28, trap28);
 define_interrupt!(29, Trap29, trap29);
 define_interrupt!(30, Trap30, trap30);
 define_interrupt!(31, Trap31, trap31);
+
+#[cfg(feature = "clic-48")]
+mod clic {
+    define_interrupt!(32, Trap32, trap32);
+    define_interrupt!(33, Trap33, trap33);
+    define_interrupt!(34, Trap34, trap34);
+    define_interrupt!(35, Trap35, trap35);
+    define_interrupt!(36, Trap36, trap36);
+    define_interrupt!(37, Trap37, trap37);
+    define_interrupt!(38, Trap38, trap38);
+    define_interrupt!(39, Trap39, trap39);
+    define_interrupt!(40, Trap40, trap40);
+    define_interrupt!(41, Trap41, trap41);
+    define_interrupt!(42, Trap42, trap42);
+    define_interrupt!(43, Trap43, trap43);
+    define_interrupt!(44, Trap44, trap44);
+    define_interrupt!(45, Trap45, trap45);
+    define_interrupt!(46, Trap46, trap46);
+    define_interrupt!(47, Trap47, trap47);
+}

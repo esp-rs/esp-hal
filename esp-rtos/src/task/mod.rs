@@ -27,7 +27,7 @@ use crate::InternalMemory;
 use crate::wait_queue::WaitQueue;
 use crate::{
     SCHEDULER,
-    run_queue::{Priority, RunQueue},
+    run_queue::{Priority, RunQueue, RunSchedulerOn},
     scheduler::SchedulerState,
 };
 
@@ -390,6 +390,46 @@ pub(crate) struct Task {
     pub(crate) heap_allocated: bool,
 }
 
+pub(crate) trait ContextExt {
+    fn set_tp(&mut self, tp: u32);
+
+    fn sp(&self) -> u32;
+
+    fn set_sp(&mut self, sp: u32);
+}
+
+impl ContextExt for CpuContext {
+    fn set_tp(&mut self, tp: u32) {
+        cfg_if::cfg_if! {
+            if #[cfg(xtensa)] {
+                self.THREADPTR = tp;
+            } else if #[cfg(riscv)] {
+                self.tp = tp as usize;
+            }
+        }
+    }
+
+    fn sp(&self) -> u32 {
+        cfg_if::cfg_if! {
+            if #[cfg(xtensa)] {
+                self.A1
+            } else {
+                self.sp as u32
+            }
+        }
+    }
+
+    fn set_sp(&mut self, sp: u32) {
+        cfg_if::cfg_if! {
+            if #[cfg(xtensa)] {
+                self.A1 = sp;
+            } else {
+                self.sp = sp as usize;
+            }
+        }
+    }
+}
+
 #[cfg(feature = "esp-radio")]
 extern "C" fn task_wrapper(task_fn: extern "C" fn(*mut c_void), param: *mut c_void) {
     task_fn(param);
@@ -574,13 +614,10 @@ pub(super) fn allocate_main_task(
     // part of a static object so taking the pointer is fine.
     let main_task_ptr = NonNull::from(&scheduler.per_cpu[current_cpu].main_task);
 
-    cfg_if::cfg_if! {
-        if #[cfg(xtensa)] {
-            scheduler.per_cpu[current_cpu].main_task.cpu_context.THREADPTR = main_task_ptr.as_ptr() as u32;
-        } else if #[cfg(riscv)] {
-            scheduler.per_cpu[current_cpu].main_task.cpu_context.tp = main_task_ptr.as_ptr() as usize;
-        }
-    }
+    scheduler.per_cpu[current_cpu]
+        .main_task
+        .cpu_context
+        .set_tp(main_task_ptr.as_ptr() as u32);
 
     write_thread_pointer(main_task_ptr.as_ptr());
 
@@ -645,6 +682,25 @@ pub(super) fn schedule_task_deletion(task: Option<NonNull<Task>>) {
     if SCHEDULER.with(|scheduler| scheduler.schedule_task_deletion(task)) {
         loop {
             yield_task();
+        }
+    }
+}
+
+pub(crate) fn trigger_scheduler(run_scheduler: RunSchedulerOn) {
+    match run_scheduler {
+        RunSchedulerOn::DontRun => {}
+        RunSchedulerOn::RunOnCore(_core) => {
+            cfg_if::cfg_if! {
+                if #[cfg(multi_core)] {
+                    if _core == Cpu::current() {
+                        yield_task()
+                    } else {
+                        schedule_other_core()
+                    }
+                } else {
+                    yield_task()
+                }
+            }
         }
     }
 }

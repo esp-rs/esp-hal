@@ -19,7 +19,7 @@
 //! ## Overview
 //!
 //! esp-hal is a Hardware Abstraction Layer (HAL) for Espressif's ESP32 lineup of
-//! microcontrollers offering safe, idiotmatic APIs to control hardware peripherals.
+//! microcontrollers offering safe, idiomatic APIs to control hardware peripherals.
 //!
 //! ### Peripheral drivers
 //!
@@ -118,7 +118,7 @@
 //!     time::{Duration, Instant},
 //! };
 //!
-//! // You need a panic handler. Usually, you you would use esp_backtrace, panic-probe, or
+//! // You need a panic handler. Usually, you would use esp_backtrace, panic-probe, or
 //! // something similar, but you can also bring your own like this:
 //! #[panic_handler]
 //! fn panic(_: &core::panic::PanicInfo) -> ! {
@@ -279,6 +279,11 @@ use esp_rom_sys as _;
 pub(crate) use unstable_module;
 
 metadata!("build_info", CHIP_NAME, chip!());
+metadata!(
+    "build_info",
+    MIN_CHIP_REVISION,
+    esp_config::esp_config_str!("ESP_HAL_CONFIG_MIN_CHIP_REVISION")
+);
 
 #[cfg(all(riscv, feature = "rt"))]
 #[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
@@ -303,7 +308,7 @@ pub mod peripherals;
 mod reg_access;
 #[cfg(any(spi_master, spi_slave))]
 pub mod spi;
-#[cfg_attr(esp32c5, expect(unused))]
+#[cfg_attr(esp32c5, allow(dead_code))]
 pub mod system;
 pub mod time;
 #[cfg(uart)]
@@ -394,7 +399,6 @@ unstable_driver! {
     #[cfg(not(esp32c5))]
     #[cfg(soc_has_trace0)]
     pub mod trace;
-    #[cfg(not(esp32c5))]
     #[cfg(soc_has_tsens)]
     pub mod tsens;
     #[cfg(twai)]
@@ -423,7 +427,7 @@ procmacros::warning! {"
 WARNING: use --release
   We *strongly* recommend using release profile when building esp-hal.
   The dev profile can potentially be one or more orders of magnitude
-  slower than release, and may cause issues with timing-senstive
+  slower than release, and may cause issues with timing-sensitive
   peripherals and/or devices.
 "}
 
@@ -732,6 +736,20 @@ With the `unstable` feature enabled, this function accepts both [`ClockConfig`] 
 #[cfg(feature = "rt")]
 pub fn init(config: Config) -> Peripherals {
     crate::soc::pre_init();
+
+    #[cfg(soc_cpu_has_branch_predictor)]
+    {
+        // Enable branch predictor
+        // Note that the branch predictor will start cache requests and needs to be disabled when
+        // the cache is disabled.
+        // MHCR: CSR 0x7c1
+        const MHCR_RS: u32 = 1 << 4; // R/W, address return stack set bit
+        const MHCR_BFE: u32 = 1 << 5; // R/W, allow predictive jump set bit
+        const MHCR_BTB: u32 = 1 << 12; // R/W, branch target prediction enable bit
+        unsafe {
+            core::arch::asm!("csrrs x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
+        }
+    }
 
     #[cfg(stack_guard_monitoring)]
     crate::soc::enable_main_stack_guard_monitoring();
