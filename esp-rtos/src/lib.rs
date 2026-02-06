@@ -77,9 +77,9 @@ use core::mem::MaybeUninit;
 
 #[cfg(feature = "alloc")]
 pub(crate) use esp_alloc::InternalMemory;
-#[cfg(systimer)]
+#[cfg(systimer_driver_supported)]
 use esp_hal::timer::systimer::Alarm;
-#[cfg(timergroup)]
+#[cfg(timergroup_driver_supported)]
 use esp_hal::timer::timg::Timer;
 use esp_hal::{
     Blocking,
@@ -212,9 +212,9 @@ mod private {
 
 impl private::Sealed for TimeBase {}
 impl private::Sealed for AnyTimer<'static> {}
-#[cfg(timergroup)]
+#[cfg(timergroup_driver_supported)]
 impl private::Sealed for Timer<'static> {}
-#[cfg(systimer)]
+#[cfg(systimer_driver_supported)]
 impl private::Sealed for Alarm<'static> {}
 
 impl TimerSource for TimeBase {
@@ -229,14 +229,14 @@ impl TimerSource for AnyTimer<'static> {
     }
 }
 
-#[cfg(timergroup)]
+#[cfg(timergroup_driver_supported)]
 impl TimerSource for Timer<'static> {
     fn timer(self) -> TimeBase {
         TimeBase::new(self.degrade())
     }
 }
 
-#[cfg(systimer)]
+#[cfg(systimer_driver_supported)]
 impl TimerSource for Alarm<'static> {
     fn timer(self) -> TimeBase {
         TimeBase::new(self.degrade())

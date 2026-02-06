@@ -540,7 +540,7 @@ mod spi_slave {
 
 #[embedded_test::tests(default_timeout = 3)]
 mod qspi {
-    #[cfg(pcnt)]
+    #[cfg(pcnt_driver_supported)]
     use esp_hal::pcnt::{Pcnt, channel::EdgeMode, unit::Unit};
     use esp_hal::{
         Blocking,
@@ -574,7 +574,7 @@ mod qspi {
 
     struct Context {
         spi: Spi<'static, Blocking>,
-        #[cfg(pcnt)]
+        #[cfg(pcnt_driver_supported)]
         pcnt: esp_hal::peripherals::PCNT<'static>,
         dma_channel: DmaChannel0<'static>,
         gpios: [AnyPin<'static>; 3],
@@ -663,7 +663,7 @@ mod qspi {
         }
     }
 
-    #[cfg(pcnt)]
+    #[cfg(pcnt_driver_supported)]
     fn execute_write(
         unit0: Unit<'static, 0>,
         unit1: Unit<'static, 1>,
@@ -747,7 +747,7 @@ mod qspi {
 
         Context {
             spi,
-            #[cfg(pcnt)]
+            #[cfg(pcnt_driver_supported)]
             pcnt: peripherals.PCNT,
             dma_channel,
             gpios: [pin.into(), pin_mirror.into(), unconnected_pin.into()],
@@ -835,7 +835,7 @@ mod qspi {
     }
 
     #[test]
-    #[cfg(pcnt)]
+    #[cfg(pcnt_driver_supported)]
     fn test_spi_writes_correctly_to_pin_0(ctx: Context) {
         // For PCNT-using tests we swap the pins around so that the PCNT is not pulled
         // up by a resistor if the command phase doesn't drive its line.
@@ -858,7 +858,7 @@ mod qspi {
     }
 
     #[test]
-    #[cfg(pcnt)]
+    #[cfg(pcnt_driver_supported)]
     fn test_spi_writes_correctly_to_pin_1(ctx: Context) {
         // For PCNT-using tests we swap the pins around so that the PCNT is not pulled
         // up by a resistor if the command phase doesn't drive its line.
@@ -891,7 +891,7 @@ mod qspi {
     }
 
     #[test]
-    #[cfg(pcnt)]
+    #[cfg(pcnt_driver_supported)]
     fn test_spi_writes_correctly_to_pin_2(ctx: Context) {
         // For PCNT-using tests we swap the pins around so that the PCNT is not pulled
         // up by a resistor if the command phase doesn't drive its line.
@@ -924,7 +924,7 @@ mod qspi {
     }
 
     #[test]
-    #[cfg(pcnt)]
+    #[cfg(pcnt_driver_supported)]
     fn test_spi_writes_correctly_to_pin_3(ctx: Context) {
         // For PCNT-using tests we swap the pins around so that the PCNT is not pulled
         // up by a resistor if the command phase doesn't drive its line.
