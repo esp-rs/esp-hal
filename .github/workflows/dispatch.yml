@@ -22,6 +22,10 @@ jobs:
       github.event.label.name == 'trusted-author'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
       - name: Get PR author login
         id: pr
         uses: actions/github-script@v7
@@ -46,36 +50,12 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const login = "${{ steps.pr.outputs.login }}".toLowerCase();
+            const { upsertTrusted } = require('./.github/scripts/hil-trust.js');
             const existing = `${{ toJson(steps.find.outputs.comment-body || '') }}`;
+            const login = '${{ steps.pr.outputs.login }}'.toLowerCase();
 
-            // read existing trusted[] from hidden JSON if present
-            let list = [];
-            const m = existing.match(/<!--\s*HIL_TRUST_JSON\s*([\s\S]*?)\s*HIL_TRUST_JSON\s*-->/);
-            if (m && m[1]) {
-              try { list = JSON.parse(m[1]).trusted || []; } catch {}
-            }
-
-            if (!list.includes(login)) list.push(login);
-            list = Array.from(new Set(list)).sort();
-
-            const json = JSON.stringify({ trusted: list }, null, 2);
-            const pretty = list.length ? list.map(u => `- @${u}`).join('\n') : '_None yet_';
-
-            const body =
-            `### [HIL trust list]
-            <!-- HIL_TRUST_JSON
-            ${json}
-            HIL_TRUST_JSON -->
-
-            <details>
-            <summary>Trusted users for this PR (click to expand)</summary>
-
-            ${pretty}
-
-            </details>`;
-
-            core.setOutput("body", body);
+            const { body } = upsertTrusted(existing, login);
+            core.setOutput('body', body);
 
       - uses: peter-evans/create-or-update-comment@v4
         with:
@@ -91,6 +71,7 @@ jobs:
             Author **@${{ steps.pr.outputs.login }}** was trusted for this PR via the `trusted-author` label.
             They can now use `/hil quick` or `/hil full`.
 
+
   # ---------------------------------------------------------------------------
   # TRUST MANAGEMENT (/trust, /revoke)
   # ---------------------------------------------------------------------------
@@ -104,15 +85,19 @@ jobs:
       startsWith(github.event.comment.body, '/trust ')
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
       - name: Parse login
         id: parse
         uses: actions/github-script@v7
         with:
           script: |
-            const body = (context.payload.comment.body || '').trim();
-            const m = body.match(/^\/trust\s+@([A-Za-z0-9-]+)\b$/i);
-            if (!m) core.setFailed("Usage: /trust @<login>");
-            core.setOutput('login', m[1].toLowerCase());
+            const { parseTrustCommand } = require('./.github/scripts/hil-trust.js');
+            const res = parseTrustCommand(context.payload.comment.body, 'trust');
+            if (res.error) core.setFailed(res.error);
+            core.setOutput('login', res.login);
 
       - id: find
         uses: peter-evans/find-comment@v3
@@ -126,36 +111,12 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const login = "${{ steps.parse.outputs.login }}".toLowerCase();
+            const { upsertTrusted } = require('./.github/scripts/hil-trust.js');
             const existing = `${{ toJson(steps.find.outputs.comment-body || '') }}`;
+            const login = '${{ steps.parse.outputs.login }}'.toLowerCase();
 
-            // read existing trusted[] from hidden JSON if present
-            let list = [];
-            const m = existing.match(/<!--\s*HIL_TRUST_JSON\s*([\s\S]*?)\s*HIL_TRUST_JSON\s*-->/);
-            if (m && m[1]) {
-              try { list = JSON.parse(m[1]).trusted || []; } catch {}
-            }
-
-            if (!list.includes(login)) list.push(login);
-            list = Array.from(new Set(list)).sort();
-
-            const json = JSON.stringify({ trusted: list }, null, 2);
-            const pretty = list.length ? list.map(u => `- @${u}`).join('\n') : '_None yet_';
-
-            const body =
-            `### [HIL trust list]
-            <!-- HIL_TRUST_JSON
-            ${json}
-            HIL_TRUST_JSON -->
-
-            <details>
-            <summary>Trusted users for this PR (click to expand)</summary>
-
-            ${pretty}
-
-            </details>`;
-
-            core.setOutput("body", body);
+            const { body } = upsertTrusted(existing, login);
+            core.setOutput('body', body);
 
       - uses: peter-evans/create-or-update-comment@v4
         with:
@@ -179,15 +140,19 @@ jobs:
       startsWith(github.event.comment.body, '/revoke ')
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
       - name: Parse login
         id: parse
         uses: actions/github-script@v7
         with:
           script: |
-            const body = (context.payload.comment.body || '').trim();
-            const m = body.match(/^\/revoke\s+@([A-Za-z0-9-]+)\b$/i);
-            if (!m) core.setFailed("Usage: /revoke @<login>");
-            core.setOutput('login', m[1].toLowerCase());
+            const { parseTrustCommand } = require('./.github/scripts/hil-trust.js');
+            const res = parseTrustCommand(context.payload.comment.body, 'revoke');
+            if (res.error) core.setFailed(res.error);
+            core.setOutput('login', res.login);
 
       - id: find
         uses: peter-evans/find-comment@v3
@@ -201,35 +166,12 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const login = "${{ steps.parse.outputs.login }}".toLowerCase();
+            const { revokeTrusted } = require('./.github/scripts/hil-trust.js');
             const existing = `${{ toJson(steps.find.outputs.comment-body || '') }}`;
+            const login = '${{ steps.parse.outputs.login }}'.toLowerCase();
 
-            // read existing trusted[] from hidden JSON if present
-            let list = [];
-            const m = existing.match(/<!--\s*HIL_TRUST_JSON\s*([\s\S]*?)\s*HIL_TRUST_JSON\s*-->/);
-            if (m && m[1]) {
-              try { list = JSON.parse(m[1]).trusted || []; } catch {}
-            }
-
-            list = list.filter(u => u !== login).sort();
-
-            const json = JSON.stringify({ trusted: list }, null, 2);
-            const pretty = list.length ? list.map(u => `- @${u}`).join('\n') : '_None yet_';
-
-            const body =
-            `### [HIL trust list]
-            <!-- HIL_TRUST_JSON
-            ${json}
-            HIL_TRUST_JSON -->
-
-            <details>
-            <summary>Trusted users for this PR (click to expand)</summary>
-
-            ${pretty}
-
-            </details>`;
-
-            core.setOutput("body", body);
+            const { body } = revokeTrusted(existing, login);
+            core.setOutput('body', body);
 
       - uses: peter-evans/create-or-update-comment@v4
         with:
@@ -301,25 +243,17 @@ jobs:
       run_id: ${{ steps.find-run.outputs.run_id }}
       comment_id: ${{ steps.comment.outputs.comment-id }}
     steps:
+      - uses: actions/checkout@v4 # for `require`
+        with:
+          fetch-depth: 1
+
       - name: Parse tests
         id: parse-tests
         uses: actions/github-script@v7
         with:
           script: |
-            const body = (context.payload.comment.body || '').trim();
-            const m = body.match(/--tests?\s+(.+)$/i);
-            if (!m) {
-              core.setOutput('tests', '');
-              return;
-            }
-
-            const tail = m[1].trim();
-            const parts = tail
-              .split(/[,\s]+/)
-              .map(s => s.trim())
-              .filter(Boolean);
-
-            core.setOutput('tests', parts.join(','));
+            const { parseTests } = require('./.github/scripts/hil-parse.js');
+            core.setOutput('tests', parseTests(context.payload.comment.body));
 
       - name: Dispatch HIL (quick)
         uses: benc-uk/workflow-dispatch@v1
@@ -341,58 +275,17 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const { owner, repo } = context.repo;
-            const pr = context.payload.issue.number;
-            const matrix = 'quick';
-            const tests = '${{ steps.parse-tests.outputs.tests }}';
+            const { findHilRun } = require('./.github/scripts/hil-find-run.js');
 
-            let expectedTitle;
-            if (tests && tests.trim() !== '') {
-              expectedTitle = `HIL for PR #${pr} (${matrix}; tests: ${tests})`;
-            } else {
-              expectedTitle = `HIL for PR #${pr} (${matrix})`;
-            }
+            const { runId, body } = await findHilRun({
+              github,
+              context,
+              pr: context.payload.issue.number,
+              selector: 'quick',
+              tests: '${{ steps.parse-tests.outputs.tests }}',
+            });
 
-            const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-            let run = null;
-
-            // Try multiple times; keep the *last* matching run we see
-            for (let attempt = 1; attempt <= 10; attempt++) {
-              const { data } = await github.rest.actions.listWorkflowRuns({
-                owner,
-                repo,
-                workflow_id: 'hil.yml',
-                event: 'workflow_dispatch',
-                per_page: 50,
-              });
-
-              if (data.workflow_runs && data.workflow_runs.length > 0) {
-                const candidate = data.workflow_runs.find(r =>
-                  (r.display_title && r.display_title.trim() === expectedTitle) ||
-                  (r.name && r.name.trim() === expectedTitle)
-                );
-                // Keep the *last* matching run we see across all attempts
-                if (candidate) {
-                  run = candidate;
-                }
-              }
-
-              await delay(3000);
-            }
-
-            let body = `Triggered **quick** HIL run for #${pr}.`;
-            if (run && run.html_url) {
-              body += `\n\nRun: ${run.html_url}`;
-            } else {
-              body += `\n\nCould not determine run URL yet. Please check the **HIL** workflow runs manually.`;
-            }
-
-            if (run && run.id) {
-              core.setOutput('run_id', String(run.id));
-            } else {
-              core.setOutput('run_id', '');
-            }
-
+            core.setOutput('run_id', runId);
             core.setOutput('body', body);
 
       - name: Confirm in PR
@@ -407,58 +300,22 @@ jobs:
     if: needs.hil-quick.outputs.run_id != '' && needs.hil-quick.outputs.comment_id != ''
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4 # for `require`
+        with:
+          fetch-depth: 1
+
       - name: Wait for quick HIL run and update comment
         uses: actions/github-script@v7
         with:
           script: |
-            const { owner, repo } = context.repo;
-            const runId = Number('${{ needs.hil-quick.outputs.run_id }}');
-            const commentId = Number('${{ needs.hil-quick.outputs.comment_id }}');
-            const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+            const { pollRunAndUpdateComment } = require('./.github/scripts/hil-status.js');
 
-            let conclusion = null;
-
-            // Poll up to ~15 minutes (60 * 15s)
-            for (let i = 0; i < 60; i++) {
-              const { data } = await github.rest.actions.getWorkflowRun({
-                owner,
-                repo,
-                run_id: runId,
-              });
-
-              if (data.status === 'completed') {
-                conclusion = data.conclusion;
-                break;
-              }
-
-              await delay(15000);
-            }
-
-            let suffix;
-            if (!conclusion) {
-              suffix = `\n\n**Status update:** HIL (quick) run is still in progress or status unknown.`;
-            } else if (conclusion === 'success') {
-              suffix = `\n\n**Status update:** ✅ HIL (quick) run **succeeded**.`;
-            } else if (conclusion === 'cancelled') {
-              suffix = `\n\n**Status update:** ⚠️ HIL (quick) run was **cancelled**.`;
-            } else {
-              suffix = `\n\n**Status update:** ❌ HIL (quick) run **failed** (conclusion: ${conclusion}).`;
-            }
-
-            // Fetch existing comment
-            const comment = await github.rest.issues.getComment({
-              owner,
-              repo,
-              comment_id: commentId,
-            });
-
-            const body = `${comment.data.body}\n${suffix}`;
-
-            await github.rest.issues.updateComment({
-              owner,
-              repo,
-              comment_id: commentId,
-              body,
+            await pollRunAndUpdateComment({
+              github,
+              context,
+              runId: Number('${{ needs.hil-quick.outputs.run_id }}'),
+              commentId: Number('${{ needs.hil-quick.outputs.comment_id }}'),
+              kind: 'HIL (quick)',
             });
 
   hil-full:
@@ -471,25 +328,17 @@ jobs:
       run_id: ${{ steps.find-run.outputs.run_id }}
       comment_id: ${{ steps.comment.outputs.comment-id }}
     steps:
+      - uses: actions/checkout@v4 # for `require`
+        with:
+          fetch-depth: 1
+
       - name: Parse tests
         id: parse-tests
         uses: actions/github-script@v7
         with:
           script: |
-            const body = (context.payload.comment.body || '').trim();
-            const m = body.match(/--tests?\s+(.+)$/i);
-            if (!m) {
-              core.setOutput('tests', '');
-              return;
-            }
-
-            const tail = m[1].trim();
-            const parts = tail
-              .split(/[,\s]+/)
-              .map(s => s.trim())
-              .filter(Boolean);
-
-            core.setOutput('tests', parts.join(','));
+            const { parseTests } = require('./.github/scripts/hil-parse.js');
+            core.setOutput('tests', parseTests(context.payload.comment.body));
 
       - name: Dispatch HIL (full)
         uses: benc-uk/workflow-dispatch@v1
@@ -511,58 +360,17 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const { owner, repo } = context.repo;
-            const pr = context.payload.issue.number;
-            const matrix = 'full';
-            const tests = '${{ steps.parse-tests.outputs.tests }}';
+            const { findHilRun } = require('./.github/scripts/hil-find-run.js');
 
-            let expectedTitle;
-            if (tests && tests.trim() !== '') {
-              expectedTitle = `HIL for PR #${pr} (${matrix}; tests: ${tests})`;
-            } else {
-              expectedTitle = `HIL for PR #${pr} (${matrix})`;
-            }
+            const { runId, body } = await findHilRun({
+              github,
+              context,
+              pr: context.payload.issue.number,
+              selector: 'full',
+              tests: '${{ steps.parse-tests.outputs.tests }}',
+            });
 
-            const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-            let run = null;
-
-            // Try multiple times; keep the *last* matching run we see
-            for (let attempt = 1; attempt <= 10; attempt++) {
-              const { data } = await github.rest.actions.listWorkflowRuns({
-                owner,
-                repo,
-                workflow_id: 'hil.yml',
-                event: 'workflow_dispatch',
-                per_page: 50,
-              });
-
-              if (data.workflow_runs && data.workflow_runs.length > 0) {
-                const candidate = data.workflow_runs.find(r =>
-                  (r.display_title && r.display_title.trim() === expectedTitle) ||
-                  (r.name && r.name.trim() === expectedTitle)
-                );
-                // Keep the *last* matching run we see across all attempts
-                if (candidate) {
-                  run = candidate;
-                }
-              }
-
-              await delay(3000);
-            }
-
-            let body = `Triggered **full** HIL run for #${pr}.`;
-            if (run && run.html_url) {
-              body += `\n\nRun: ${run.html_url}`;
-            } else {
-              body += `\n\nCould not determine run URL yet. Please check the **HIL** workflow runs manually.`;
-            }
-
-            if (run && run.id) {
-              core.setOutput('run_id', String(run.id));
-            } else {
-              core.setOutput('run_id', '');
-            }
-
+            core.setOutput('run_id', runId);
             core.setOutput('body', body);
 
       - name: Confirm in PR
@@ -577,57 +385,22 @@ jobs:
     if: needs.hil-full.outputs.run_id != '' && needs.hil-full.outputs.comment_id != ''
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4 # for `require`
+        with:
+          fetch-depth: 1
+
       - name: Wait for full HIL run and update comment
         uses: actions/github-script@v7
         with:
           script: |
-            const { owner, repo } = context.repo;
-            const runId = Number('${{ needs.hil-full.outputs.run_id }}');
-            const commentId = Number('${{ needs.hil-full.outputs.comment_id }}');
-            const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+            const { pollRunAndUpdateComment } = require('./.github/scripts/hil-status.js');
 
-            let conclusion = null;
-
-            // Poll up to ~15 minutes (60 * 15s)
-            for (let i = 0; i < 60; i++) {
-              const { data } = await github.rest.actions.getWorkflowRun({
-                owner,
-                repo,
-                run_id: runId,
-              });
-
-              if (data.status === 'completed') {
-                conclusion = data.conclusion;
-                break;
-              }
-              await delay(15000);
-            }
-
-            let suffix;
-            if (!conclusion) {
-              suffix = `\n\n**Status update:** HIL (full) run is still in progress or status unknown._`;
-            } else if (conclusion === 'success') {
-              suffix = `\n\n**Status update:** ✅ HIL (full) run **succeeded**.`;
-            } else if (conclusion === 'cancelled') {
-              suffix = `\n\n**Status update:** ⚠️ HIL (full) run was **cancelled**.`;
-            } else {
-              suffix = `\n\n**Status update:** ❌ HIL (full) run **failed** (conclusion: ${conclusion}).`;
-            }
-
-            // Fetch existing comment
-            const comment = await github.rest.issues.getComment({
-              owner,
-              repo,
-              comment_id: commentId,
-            });
-
-            const body = `${comment.data.body}\n${suffix}`;
-
-            await github.rest.issues.updateComment({
-              owner,
-              repo,
-              comment_id: commentId,
-              body,
+            await pollRunAndUpdateComment({
+              github,
+              context,
+              runId: Number('${{ needs.hil-full.outputs.run_id }}'),
+              commentId: Number('${{ needs.hil-full.outputs.comment_id }}'),
+              kind: 'HIL (full)',
             });
 
   # ---------------------------------------------------------------------------
@@ -646,60 +419,30 @@ jobs:
       run_id: ${{ steps.find-run.outputs.run_id }}
       comment_id: ${{ steps.comment.outputs.comment-id }}
     steps:
+      - uses: actions/checkout@v4 # for `require`
+        with:
+          fetch-depth: 1
+
       - name: Parse chips
         id: parse
         uses: actions/github-script@v7
         with:
           script: |
-            const body = (context.payload.comment.body || '').trim();
-            const allowed = ['esp32c2','esp32c3','esp32c5','esp32c6','esp32h2','esp32','esp32s2','esp32s3'];
+            const { parseChips } = require('./.github/scripts/hil-parse.js');
 
-            // Remove the leading "/hil" command
-            const withoutCmd = body.replace(/^\/hil\s+/i, '');
+            const res = parseChips(context.payload.comment.body);
 
-            // Split on commas and/or whitespace, normalize and dedupe
-            const parts = withoutCmd
-              .split(/[,\s]+/)
-              .map(s =>
-                s.toLowerCase().replace(/[,]+$/,'')
-              )
-              .filter(Boolean);
-
-            const chips = Array.from(new Set(
-              parts.filter(s => allowed.includes(s))
-            ));
-
-            if (!chips.length) {
-              const msg = 'No valid chips specified.\n\nAllowed chips are: ' + allowed.join(', ');
-              core.setOutput('chips', '');
-              core.setOutput('chips_label', '');
-              core.setOutput('error', msg);
-              return;
-            }
-
-            core.setOutput('chips', chips.join(' '));
-            core.setOutput('chips_label', chips.join(', '));
-            core.setOutput('error', '');
+            core.setOutput('chips', res.chips);
+            core.setOutput('chips_label', res.chipsLabel);
+            core.setOutput('error', res.error);
 
       - name: Parse tests
         id: parse-tests
         uses: actions/github-script@v7
         with:
           script: |
-            const body = (context.payload.comment.body || '').trim();
-            const m = body.match(/--tests?\s+(.+)$/i);
-            if (!m) {
-              core.setOutput('tests', '');
-              return;
-            }
-
-            const tail = m[1].trim();
-            const parts = tail
-              .split(/[,\s]+/)
-              .map(s => s.trim())
-              .filter(Boolean);
-
-            core.setOutput('tests', parts.join(','));
+            const { parseTests } = require('./.github/scripts/hil-parse.js');
+            core.setOutput('tests', parseTests(context.payload.comment.body));
 
       - name: Report invalid chips
         if: steps.parse.outputs.chips == '' && steps.parse.outputs.error != ''
@@ -731,58 +474,17 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const { owner, repo } = context.repo;
-            const pr = context.payload.issue.number;
-            const chips = '${{ steps.parse.outputs.chips }}';
-            const tests = '${{ steps.parse-tests.outputs.tests }}';
+            const { findHilRun } = require('./.github/scripts/hil-find-run.js');
 
-            let expectedTitle;
-            if (tests && tests.trim() !== '') {
-              expectedTitle = `HIL for PR #${pr} (${chips}; tests: ${tests})`;
-            } else {
-              expectedTitle = `HIL for PR #${pr} (${chips})`;
-            }
+            const { runId, body } = await findHilRun({
+              github,
+              context,
+              pr: context.payload.issue.number,
+              selector: '${{ steps.parse.outputs.chips }}',
+              tests: '${{ steps.parse-tests.outputs.tests }}',
+            });
 
-            const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-            let run = null;
-
-            // Try multiple times; keep the *last* matching run we see
-            for (let attempt = 1; attempt <= 10; attempt++) {
-              const { data } = await github.rest.actions.listWorkflowRuns({
-                owner,
-                repo,
-                workflow_id: 'hil.yml',
-                event: 'workflow_dispatch',
-                per_page: 50,
-              });
-
-              if (data.workflow_runs && data.workflow_runs.length > 0) {
-                const candidate = data.workflow_runs.find(r =>
-                  (r.display_title && r.display_title.trim() === expectedTitle) ||
-                  (r.name && r.name.trim() === expectedTitle)
-                );
-                // Keep the *last* matching run we see across all attempts
-                if (candidate) {
-                  run = candidate;
-                }
-              }
-
-              await delay(3000);
-            }
-
-            let body = `Triggered **HIL** run for #${pr} (chips: ${chips}).`;
-            if (run && run.html_url) {
-              body += `\n\nRun: ${run.html_url}`;
-            } else {
-              body += `\n\nCould not determine run URL yet. Please check the **HIL** workflow runs manually.`;
-            }
-
-            if (run && run.id) {
-              core.setOutput('run_id', String(run.id));
-            } else {
-              core.setOutput('run_id', '');
-            }
-
+            core.setOutput('run_id', runId);
             core.setOutput('body', body);
 
       - name: Confirm in PR
@@ -798,58 +500,22 @@ jobs:
     if: needs.hil-chips.outputs.run_id != '' && needs.hil-chips.outputs.comment_id != ''
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4 # for `require`
+        with:
+          fetch-depth: 1
+
       - name: Wait for per-chip HIL run and update comment
         uses: actions/github-script@v7
         with:
           script: |
-            const { owner, repo } = context.repo;
-            const runId = Number('${{ needs.hil-chips.outputs.run_id }}');
-            const commentId = Number('${{ needs.hil-chips.outputs.comment_id }}');
-            const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+            const { pollRunAndUpdateComment } = require('./.github/scripts/hil-status.js');
 
-            let conclusion = null;
-
-            // Poll up to ~15 minutes (60 * 15s)
-            for (let i = 0; i < 60; i++) {
-              const { data } = await github.rest.actions.getWorkflowRun({
-                owner,
-                repo,
-                run_id: runId,
-              });
-
-              if (data.status === 'completed') {
-                conclusion = data.conclusion;
-                break;
-              }
-
-              await delay(15000);
-            }
-
-            let suffix;
-            if (!conclusion) {
-              suffix = `\n\n**Status update:** HIL (per-chip) run is still in progress or status unknown.`;
-            } else if (conclusion === 'success') {
-              suffix = `\n\n**Status update:** ✅ HIL (per-chip) run **succeeded**.`;
-            } else if (conclusion === 'cancelled') {
-              suffix = `\n\n**Status update:** ⚠️ HIL (per-chip) run was **cancelled**.`;
-            } else {
-              suffix = `\n\n**Status update:** ❌ HIL (per-chip) run **failed** (conclusion: ${conclusion}).`;
-            }
-
-            // Fetch existing comment
-            const comment = await github.rest.issues.getComment({
-              owner,
-              repo,
-              comment_id: commentId,
-            });
-
-            const body = `${comment.data.body}\n${suffix}`;
-
-            await github.rest.issues.updateComment({
-              owner,
-              repo,
-              comment_id: commentId,
-              body,
+            await pollRunAndUpdateComment({
+              github,
+              context,
+              runId: Number('${{ needs.hil-chips.outputs.run_id }}'),
+              commentId: Number('${{ needs.hil-chips.outputs.comment_id }}'),
+              kind: 'HIL (per-chip)',
             });
 
   hil-deny:
