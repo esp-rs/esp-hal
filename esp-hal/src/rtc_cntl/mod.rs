@@ -111,7 +111,7 @@
 //! ```
 
 pub use self::rtc::SocResetReason;
-#[cfg(sleep)]
+#[cfg(sleep_driver_supported)]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::RtcClock,
@@ -125,7 +125,7 @@ use crate::{
     peripherals::Interrupt,
 };
 // only include sleep where it's been implemented
-#[cfg(sleep)]
+#[cfg(sleep_driver_supported)]
 pub mod sleep;
 
 #[cfg_attr(esp32, path = "rtc/esp32.rs")]
@@ -389,7 +389,7 @@ impl<'d> Rtc<'d> {
 
     /// Enter sleep with the provided `config` and wake with the provided
     /// `wake_sources`.
-    #[cfg(sleep)]
+    #[cfg(sleep_driver_supported)]
     pub fn sleep(&mut self, config: &RtcSleepConfig, wake_sources: &[&dyn WakeSource]) {
         let mut config = *config;
         let mut wakeup_triggers = WakeTriggers::default();

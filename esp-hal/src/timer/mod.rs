@@ -7,10 +7,13 @@
 //! can be used to interact with different hardware timers, like the `TIMG` and
 //! SYSTIMER.
 #![cfg_attr(
-    systimer,
+    systimer_driver_supported,
     doc = "See the [timg] and [systimer] modules for more information."
 )]
-#![cfg_attr(not(systimer), doc = "See the [timg] module for more information.")]
+#![cfg_attr(
+    not(systimer_driver_supported),
+    doc = "See the [timg] module for more information."
+)]
 //! ## Examples
 //!
 //! ### One-shot Timer
@@ -58,9 +61,9 @@ use crate::{
     time::{Duration, Instant},
 };
 
-#[cfg(systimer)]
+#[cfg(systimer_driver_supported)]
 pub mod systimer;
-#[cfg(timergroup)]
+#[cfg(timergroup_driver_supported)]
 pub mod timg;
 
 /// Timer errors.
@@ -426,9 +429,9 @@ where
 crate::any_peripheral! {
     /// Any Timer peripheral.
     pub peripheral AnyTimer<'d> {
-        #[cfg(timergroup)]
+        #[cfg(timergroup_driver_supported)]
         TimgTimer(timg::Timer<'d>),
-        #[cfg(systimer)]
+        #[cfg(systimer_driver_supported)]
         SystimerAlarm(systimer::Alarm<'d>),
     }
 }
@@ -436,9 +439,9 @@ crate::any_peripheral! {
 impl Timer for AnyTimer<'_> {
     delegate::delegate! {
         to match &self.0 {
-            #[cfg(timergroup)]
+            #[cfg(timergroup_driver_supported)]
             any::Inner::TimgTimer(inner) => inner,
-            #[cfg(systimer)]
+            #[cfg(systimer_driver_supported)]
             any::Inner::SystimerAlarm(inner) => inner,
         } {
             fn start(&self);

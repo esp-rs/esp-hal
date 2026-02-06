@@ -14,6 +14,7 @@ crate::unstable_module! {
     pub mod trng;
     pub mod ulp_core;
 }
+#[cfg(feature = "unstable")]
 pub mod cpu_control;
 pub mod gpio;
 pub(crate) mod regi2c;

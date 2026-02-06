@@ -24,7 +24,7 @@
 //! ```
 
 cfg_if::cfg_if! {
-    if #[cfg(feature = "esp32c6")] {
+    if #[cfg(esp32c6)] {
         type LpIo = crate::pac::LP_IO;
         const MAX_GPIO_PIN: u8 = 7;
     } else {
@@ -40,11 +40,11 @@ impl<const PIN: u8> Input<PIN> {
     /// Read the input state/level of the pin.
     pub fn input_state(&self) -> bool {
         cfg_if::cfg_if! {
-            if #[cfg(feature = "esp32c6")] {
+            if #[cfg(esp32c6)] {
                 (unsafe { &*LpIo::PTR }.in_().read().bits() >> PIN) & 0x1 != 0
-            } else if #[cfg(feature = "esp32s2")] {
+            } else if #[cfg(esp32s2)] {
                 (unsafe { &*LpIo::PTR }.in_().read().gpio_in_next().bits() >> PIN) & 0x1 != 0
-            } else if #[cfg(feature = "esp32s3")] {
+            } else if #[cfg(esp32s3)] {
                 (unsafe { &*LpIo::PTR }.in_().read().next().bits() >> PIN) & 0x1 != 0
             }
         }
@@ -58,11 +58,11 @@ impl<const PIN: u8> Output<PIN> {
     /// Read the output state/level of the pin.
     pub fn output_state(&self) -> bool {
         cfg_if::cfg_if! {
-            if #[cfg(feature = "esp32c6")] {
+            if #[cfg(esp32c6)] {
                 (unsafe { &*LpIo::PTR }.out().read().bits() >> PIN) & 0x1 != 0
-            } else if #[cfg(feature = "esp32s2")] {
+            } else if #[cfg(esp32s2)] {
                 (unsafe { &*LpIo::PTR }.out().read().gpio_out_data().bits() >> PIN) & 0x1 != 0
-            } else if #[cfg(feature = "esp32s3")] {
+            } else if #[cfg(esp32s3)] {
                 (unsafe { &*LpIo::PTR }.out().read().data().bits() >> PIN) & 0x1 != 0
             }
         }

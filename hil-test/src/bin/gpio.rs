@@ -36,7 +36,7 @@ cfg_if::cfg_if! {
     }
 }
 
-#[cfg(all(dedicated_gpio, feature = "unstable"))]
+#[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
 use esp_hal::gpio::dedicated::{
     DedicatedGpio,
     DedicatedGpioInput,
@@ -52,11 +52,11 @@ struct Context {
     delay: Delay,
     #[cfg(feature = "unstable")]
     io: Io<'static>,
-    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
     dedicated_gpio: DedicatedGpio<'static>,
-    #[cfg(all(dedicated_gpio, multi_core, feature = "unstable"))]
+    #[cfg(all(dedicated_gpio_driver_supported, multi_core, feature = "unstable"))]
     int1: esp_hal::interrupt::software::SoftwareInterrupt<'static, 1>,
-    #[cfg(all(dedicated_gpio, multi_core, feature = "unstable"))]
+    #[cfg(all(dedicated_gpio_driver_supported, multi_core, feature = "unstable"))]
     cpu_ctrl: esp_hal::peripherals::CPU_CTRL<'static>,
 }
 
@@ -85,7 +85,7 @@ pub fn interrupt_handler_unlisten() {
 }
 
 // Compile-time test to check that GPIOs can be passed by reference.
-#[cfg(spi_master)]
+#[cfg(spi_master_driver_supported)]
 fn _gpios_can_be_reused() {
     let p = esp_hal::init(esp_hal::Config::default());
 
@@ -166,9 +166,9 @@ mod tests {
             int1
         };
 
-        #[cfg(all(dedicated_gpio, feature = "unstable"))]
+        #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
         let dedicated_gpio = DedicatedGpio::new(peripherals.GPIO_DEDICATED);
-        #[cfg(all(dedicated_gpio, multi_core, feature = "unstable"))]
+        #[cfg(all(dedicated_gpio_driver_supported, multi_core, feature = "unstable"))]
         let cpu_ctrl = peripherals.CPU_CTRL;
 
         Context {
@@ -178,11 +178,11 @@ mod tests {
             delay,
             #[cfg(feature = "unstable")]
             io,
-            #[cfg(all(dedicated_gpio, feature = "unstable"))]
+            #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
             dedicated_gpio,
-            #[cfg(all(dedicated_gpio, multi_core, feature = "unstable"))]
+            #[cfg(all(dedicated_gpio_driver_supported, multi_core, feature = "unstable"))]
             int1,
-            #[cfg(all(dedicated_gpio, multi_core, feature = "unstable"))]
+            #[cfg(all(dedicated_gpio_driver_supported, multi_core, feature = "unstable"))]
             cpu_ctrl,
         }
     }
@@ -641,7 +641,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
     fn dedicated_gpios(ctx: Context) {
         let input = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
         let output = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
@@ -668,7 +668,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(dedicated_gpio, feature = "unstable", not(esp32s3)))]
+    #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable", not(esp32s3)))]
     fn dedicated_gpios_output_levels(ctx: Context) {
         let output = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
         let mut output_dedicated =
@@ -682,7 +682,12 @@ mod tests {
 
     #[test]
     #[should_panic]
-    #[cfg(all(dedicated_gpio, multi_core, feature = "unstable", debug_assertions))]
+    #[cfg(all(
+        dedicated_gpio_driver_supported,
+        multi_core,
+        feature = "unstable",
+        debug_assertions
+    ))]
     async fn dedicated_gpio_different_cores_panics(ctx: Context) {
         use esp_hal::system::Stack;
         use hil_test::mk_static;
@@ -708,7 +713,7 @@ mod tests {
         let _level = input_dedicated.level();
     }
 
-    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
     macro_rules! make_dedicated_io_and_bundles {
         (
             $ctx:expr, $channel:ident, $in_pin:ident, $out_pin:ident,
@@ -731,7 +736,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
     fn dedicated_gpio_bundles(ctx: Context) {
         make_dedicated_io_and_bundles!(
             ctx,
@@ -766,7 +771,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
     fn dedicated_gpio_bundles_write_outside_channels1(ctx: Context) {
         make_dedicated_io_and_bundles!(
             ctx,
@@ -783,7 +788,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
     fn dedicated_gpio_bundles_write_outside_channels2(ctx: Context) {
         make_dedicated_io_and_bundles!(
             ctx,
