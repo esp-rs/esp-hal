@@ -154,6 +154,7 @@ mod tests {
         let io = Io::new(peripherals.IO_MUX);
 
         #[cfg(feature = "unstable")]
+        #[cfg_attr(single_core, expect(unused_variables))]
         let int1 = {
             let sw_int = esp_hal::interrupt::software::SoftwareInterruptControl::new(
                 peripherals.SW_INTERRUPT,
@@ -751,6 +752,13 @@ mod tests {
 
         output_bundle.set_high(1);
 
+        #[cfg(esp32s2)]
+        unsafe {
+            core::arch::asm!("nop");
+            core::arch::asm!("nop");
+            core::arch::asm!("nop");
+            core::arch::asm!("nop");
+        }
         assert_eq!(input_dedicated.level(), Level::High);
         assert_eq!(input_bundle.levels(), 1);
         #[cfg(not(esp32s3))]
