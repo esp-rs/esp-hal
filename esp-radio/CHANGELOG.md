@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A new `subscribe()` method on `WifiController` to get an `EventSubscriber` for receiving Wi-Fi events. (#4898)
 - New event-related types: `event::EventInfo`, `event::WifiEvent`, `wifi::DisconnectReason`, `wifi::ConnectedStationInfo`, `wifi::DisconnectedStationInfo`, `wifi::AccessPointStationConnectedInfo`, `wifi::AccessPointStationDisconnectedInfo`, `wifi::AccessPointStationEventInfo`. (#4898)
 - `enable_wifi_events` and `disable_wifi_events` functions to control which Wi-Fi events are processed. (#4898)
-- Added support for configuring maximum Wi-Fi transmitting power in the `CountryInfo` struct. (#4906)
+- Added `WifiController::set_max_tx_power` allowing configuring the maximum Wi-Fi transmitting power. (#4906)
 
 ### Changed
 
