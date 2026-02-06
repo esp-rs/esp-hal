@@ -208,7 +208,8 @@ impl<const NUM: usize> Unit<'_, NUM> {
                     return Err(InvalidFilterThreshold);
                 }
                 unit.conf0().modify(|_, w| unsafe {
-                    w.filter_thres().bits(threshold).filter_en().set_bit()
+                    w.filter_thres().bits(threshold);
+                    w.filter_en().set_bit()
                 });
             }
         }

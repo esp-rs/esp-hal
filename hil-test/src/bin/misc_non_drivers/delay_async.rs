@@ -1,7 +1,7 @@
 #[embedded_test::tests(default_timeout = 2, executor = hil_test::Executor::new())]
 mod tests {
     use embedded_hal_async::delay::DelayNs;
-    #[cfg(systimer)]
+    #[cfg(systimer_driver_supported)]
     use esp_hal::timer::systimer::SystemTimer;
     use esp_hal::{
         peripherals::Peripherals,
@@ -64,7 +64,7 @@ mod tests {
         }
     }
 
-    #[cfg(systimer)]
+    #[cfg(systimer_driver_supported)]
     #[test]
     async fn test_systimer_async_delay_ns(ctx: Context) {
         let alarms = SystemTimer::new(ctx.peripherals.SYSTIMER);
@@ -92,7 +92,7 @@ mod tests {
         test_async_delay_ns(OneShotTimer::new(timg1.timer1).into_async(), 10_000).await;
     }
 
-    #[cfg(systimer)]
+    #[cfg(systimer_driver_supported)]
     #[test]
     async fn test_systimer_async_delay_us(ctx: Context) {
         let alarms = SystemTimer::new(ctx.peripherals.SYSTIMER);
@@ -120,7 +120,7 @@ mod tests {
         test_async_delay_us(OneShotTimer::new(timg1.timer1).into_async(), 10).await;
     }
 
-    #[cfg(systimer)]
+    #[cfg(systimer_driver_supported)]
     #[test]
     async fn test_systimer_async_delay_ms(ctx: Context) {
         let alarms = SystemTimer::new(ctx.peripherals.SYSTIMER);
