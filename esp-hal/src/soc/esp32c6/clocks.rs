@@ -121,6 +121,7 @@ fn configure_xtal_clk_impl(_clocks: &mut ClockTree, _config: XtalClkConfig) {
 
 fn enable_pll_clk_impl(_clocks: &mut ClockTree, en: bool) {
     if en {
+        // TODO: these are WT fields, PAC should be fixed accordingly
         PMU::regs().imm_hp_ck_power().modify(|_, w| {
             w.tie_high_xpd_bb_i2c().set_bit();
             w.tie_high_xpd_bbpll().set_bit();

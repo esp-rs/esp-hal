@@ -5,6 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
+embassy-executor = "0.9.0"
 esp-alloc = { path = "../../../esp-alloc" }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
     "panic-handler",
@@ -13,7 +14,7 @@ esp-backtrace = { path = "../../../esp-backtrace", features = [
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
 esp-println = { path = "../../../esp-println", features = ["log-04"] }
-esp-rtos = { path = "../../../esp-rtos", features = ["esp-radio", "log-04"] }
+esp-rtos = { path = "../../../esp-rtos", features = ["esp-radio", "log-04", "embassy"] }
 esp-radio = { path = "../../../esp-radio", features = [
     "log-04",
     "sniffer",
