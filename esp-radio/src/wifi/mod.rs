@@ -2499,6 +2499,14 @@ impl WifiController<'_> {
         Ok(())
     }
 
+    /// Set maximum transmitting power after WiFi start.
+    ///
+    /// Power unit is 0.25dBm, range is [8, 84] corresponding to 2dBm - 20dBm.
+    #[instability::unstable]
+    pub fn set_max_tx_power(power: i8) -> Result<(), WifiError> {
+        esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(power) })
+    }
+
     fn stop_impl(&mut self) -> Result<(), WifiError> {
         set_access_point_state(WifiAccessPointState::Stopping);
         set_station_state(WifiStationState::Stopping);
