@@ -587,13 +587,22 @@ driver_configs![
         name: "SPI master",
         properties: {
             #[serde(default)]
+            supports_dma: bool,
+            #[serde(default)]
             has_octal: bool,
+            #[serde(default)]
+            has_app_interrupts: bool,
+            #[serde(default)]
+            has_dma_segmented_transfer: bool,
         }
     },
     SpiSlaveProperties<SpiSlaveInstanceConfig> {
         driver: spi_slave,
         name: "SPI slave",
-        properties: {}
+        properties: {
+            #[serde(default)]
+            supports_dma: bool,
+        }
     },
     SysTimerProperties {
         driver: systimer,

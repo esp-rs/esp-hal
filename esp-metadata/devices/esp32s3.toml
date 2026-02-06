@@ -787,7 +787,10 @@ algo = { sha1 = 0, sha224 = 1, sha256 = 2, sha384 = 3, sha512 = 4, sha512_224 = 
 
 [device.spi_master]
 support_status = "supported"
+supports_dma = true
 has_octal = true
+has_app_interrupts = true
+has_dma_segmented_transfer = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD", "FSPIIO4", "FSPIIO5", "FSPIIO6", "FSPIIO7"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
     { name = "spi3", sys_instance = "Spi3", sclk = "SPI3_CLK", sio = ["SPI3_D", "SPI3_Q", "SPI3_WP", "SPI3_HD"], cs = ["SPI3_CS0", "SPI3_CS1", "SPI3_CS2"] },
@@ -795,6 +798,7 @@ instances = [
 
 [device.spi_slave]
 support_status = "partial"
+supports_dma = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
     { name = "spi3", sys_instance = "Spi3", sclk = "SPI3_CLK", mosi = "SPI3_D", miso = "SPI3_Q", cs = "SPI3_CS0" },
