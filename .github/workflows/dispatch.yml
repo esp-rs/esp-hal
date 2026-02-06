@@ -69,8 +69,7 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
             Author **@${{ steps.pr.outputs.login }}** was trusted for this PR via the `trusted-author` label.
-            They can now use `/hil quick` or `/hil full`.
-
+            They can now use `/hil quick`, `/hil full` and `/hil <CHIPS>` and their features.
 
   # ---------------------------------------------------------------------------
   # TRUST MANAGEMENT (/trust, /revoke)
@@ -129,7 +128,7 @@ jobs:
         with:
           issue-number: ${{ github.event.issue.number }}
           # separate short confirmation comment
-          body: "Trusted **@${{ steps.parse.outputs.login }}** for this PR. They can now use `/hil quick` or `/hil full`."
+          body: "Trusted **@${{ steps.parse.outputs.login }}** for this PR. They can now use `/hil quick`, `/hil full` and `/hil <CHIPS>` and their features."
 
   revoke:
     if: >

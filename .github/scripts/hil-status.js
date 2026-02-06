@@ -11,7 +11,7 @@ function statusSuffix(kind, conclusion) {
   return `\n\n**Status update:** ❌ ${kind} run **failed** (conclusion: ${conclusion}).`;
 }
 
-module.exports = async function pollRun({
+async function pollRun({
   github,
   context,
   runId,
@@ -58,3 +58,5 @@ module.exports = async function pollRun({
     body,
   });
 }
+
+module.exports = { pollRun };
