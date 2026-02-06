@@ -21,19 +21,21 @@ use hil_test as _;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "unstable")] {
+        use esp_hal::peripherals::SPI2;
+
+        #[cfg(spi_master_supports_dma)]
         use esp_hal::{
+            gpio::{Level, NoPin},
+            spi::master::{Address, Command, DataMode},
             dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf},
             dma_buffers,
-            gpio::{Level, NoPin},
-            peripherals::SPI2,
-            spi::master::{Address, Command, DataMode},
         };
         #[cfg(pcnt_driver_supported)]
         use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
     }
 }
 
-#[cfg(feature = "unstable")]
+#[cfg(all(spi_master_supports_dma, feature = "unstable"))]
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2))] {
         type DmaChannel<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
@@ -44,14 +46,14 @@ cfg_if::cfg_if! {
 
 struct Context {
     spi: Spi<'static, Blocking>,
-    #[cfg(feature = "unstable")]
+    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     dma_channel: DmaChannel<'static>,
     // Reuse the really large buffer so we don't run out of DRAM with many tests
     rx_buffer: &'static mut [u8],
-    #[cfg(feature = "unstable")]
+    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     rx_descriptors: &'static mut [DmaDescriptor],
     tx_buffer: &'static mut [u8],
-    #[cfg(feature = "unstable")]
+    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     tx_descriptors: &'static mut [DmaDescriptor],
     miso_input: Input<'static>,
     #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
@@ -77,7 +79,7 @@ mod tests {
         // Will be used later to detect edges directly or through PCNT.
         let miso_input = Input::new(miso_input, Default::default());
 
-        #[cfg(feature = "unstable")]
+        #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
                 let dma_channel = peripherals.DMA_SPI2;
@@ -87,7 +89,7 @@ mod tests {
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(feature = "unstable")] {
+            if #[cfg(all(spi_master_supports_dma, feature = "unstable"))] {
                 let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
             } else {
                 static mut TX_BUFFER: [u8; 4096] = [0; 4096];
@@ -119,8 +121,11 @@ mod tests {
                     rx_buffer,
                     tx_buffer,
                     miso_input,
+                    #[cfg(spi_master_supports_dma)]
                     dma_channel,
+                    #[cfg(spi_master_supports_dma)]
                     rx_descriptors,
+                    #[cfg(spi_master_supports_dma)]
                     tx_descriptors,
                     #[cfg(pcnt_driver_supported)]
                     pcnt_unit: pcnt.unit0,
@@ -347,7 +352,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+    #[cfg(all(pcnt_driver_supported, spi_master_supports_dma, feature = "unstable"))]
     fn test_dma_read_dma_write_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 8;
         const TRANSFER_SIZE: usize = 5;
@@ -385,7 +390,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+    #[cfg(all(pcnt_driver_supported, spi_master_supports_dma, feature = "unstable"))]
     fn test_dma_read_dma_transfer_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 8;
         const TRANSFER_SIZE: usize = 5;
@@ -423,7 +428,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "unstable")]
+    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     fn test_symmetric_dma_transfer(ctx: Context) {
         // This test case sends a large amount of data, multiple times to verify that
         // https://github.com/esp-rs/esp-hal/issues/2151 is and remains fixed.
@@ -454,7 +459,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "unstable")]
+    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     fn test_asymmetric_dma_transfer(ctx: Context) {
         const WRITE_SIZE: usize = 4;
         const READ_SIZE: usize = 2;
@@ -491,7 +496,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+    #[cfg(all(pcnt_driver_supported, spi_master_supports_dma, feature = "unstable"))]
     fn test_dma_bus_read_write_pcnt(ctx: Context) {
         const TRANSFER_SIZE: usize = 4;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
@@ -526,7 +531,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "unstable")]
+    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     fn test_dma_bus_symmetric_transfer(ctx: Context) {
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
@@ -546,7 +551,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "unstable")]
+    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     fn test_dma_bus_asymmetric_transfer(ctx: Context) {
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
@@ -566,7 +571,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "unstable")]
+    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     fn test_dma_bus_symmetric_transfer_huge_buffer(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4096;
 
@@ -588,7 +593,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+    #[cfg(all(pcnt_driver_supported, spi_master_supports_dma, feature = "unstable"))]
     async fn test_async_dma_read_dma_write_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 8;
         const TRANSFER_SIZE: usize = 5;
@@ -624,7 +629,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
+    #[cfg(all(pcnt_driver_supported, spi_master_supports_dma, feature = "unstable"))]
     async fn test_async_dma_read_dma_transfer_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 8;
         const TRANSFER_SIZE: usize = 5;
@@ -663,7 +668,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "unstable")]
+    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     fn test_write_read(ctx: Context) {
         let spi = ctx
             .spi
@@ -750,7 +755,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "unstable")]
+    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     fn cancel_stops_dma_transaction(mut ctx: Context) {
         // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
         // This means that without working cancellation, the test case should
@@ -775,7 +780,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "unstable")]
+    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     fn can_transmit_after_cancel(mut ctx: Context) {
         // Slow down. At 80kHz, the transfer is supposed to take a bit over 3 seconds.
         ctx.spi
@@ -813,7 +818,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "unstable")]
+    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     async fn cancelling_an_awaited_transfer_does_nothing(ctx: Context) {
         // Set up a large buffer that would trigger a timeout
         let dma_rx_buf = DmaRxBuf::new(ctx.rx_descriptors, ctx.rx_buffer).unwrap();
@@ -835,7 +840,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "unstable")]
+    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     fn transfer_works_after_half_duplex_operation(ctx: Context) {
         let mut spi = ctx.spi;
 
@@ -859,7 +864,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "unstable")]
+    #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     fn dma_transfer_works_after_half_duplex_operation(ctx: Context) {
         let mut spi = ctx.spi;
 

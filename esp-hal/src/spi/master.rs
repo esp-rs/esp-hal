@@ -36,23 +36,28 @@
 
 #[cfg(esp32)]
 use core::cell::Cell;
-use core::marker::PhantomData;
+use core::{
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 #[instability::unstable]
+#[cfg(spi_master_supports_dma)]
 pub use dma::*;
 use enumset::{EnumSet, EnumSetType};
 use procmacros::doc_replace;
 #[cfg(place_spi_master_driver_in_ram)]
 use procmacros::ram;
 
-use super::{BitOrder, DmaError, Error, Mode};
+use super::{BitOrder, Error, Mode};
 use crate::{
     Async,
     Blocking,
     DriverMode,
     asynch::AtomicWaker,
     clock::Clocks,
-    dma::{DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer},
     gpio::{
         InputConfig,
         InputSignal,
@@ -82,15 +87,15 @@ pub enum SpiInterrupt {
     TransferDone,
 
     /// Triggered at the end of configurable segmented transfer.
-    #[cfg(any(esp32s2, gdma))]
+    #[cfg(spi_master_has_dma_segmented_transfer)]
     DmaSegmentedTransferDone,
 
     /// Used and triggered by software. Only used for user defined function.
-    #[cfg(gdma)]
+    #[cfg(spi_master_has_app_interrupts)]
     App2,
 
     /// Used and triggered by software. Only used for user defined function.
-    #[cfg(gdma)]
+    #[cfg(spi_master_has_app_interrupts)]
     App1,
 }
 
@@ -99,8 +104,6 @@ const FIFO_SIZE: usize = if cfg!(esp32s2) { 72 } else { 64 };
 
 /// Padding byte for empty write transfers
 const EMPTY_WRITE_PAD: u8 = 0x00;
-
-const MAX_DMA_SIZE: usize = 32736;
 
 /// SPI commands, each consisting of a 16-bit command value and a data mode.
 ///
@@ -766,49 +769,6 @@ impl<'d> Spi<'d, Blocking> {
     }
 
     #[doc_replace(
-        "dma_channel" => {
-            cfg(any(esp32, esp32s2)) => "let dma_channel = peripherals.DMA_SPI2;",
-            _ => "let dma_channel = peripherals.DMA_CH0;",
-        }
-    )]
-    /// Configures the SPI instance to use DMA with the specified channel.
-    ///
-    /// This method prepares the SPI instance for DMA transfers using SPI
-    /// and returns an instance of `SpiDma` that supports DMA
-    /// operations.
-    /// ```rust, no_run
-    /// # {before_snippet}
-    /// use esp_hal::{
-    ///     dma::{DmaRxBuf, DmaTxBuf},
-    ///     dma_buffers,
-    ///     spi::{
-    ///         Mode,
-    ///         master::{Config, Spi},
-    ///     },
-    /// };
-    /// # {dma_channel}
-    /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
-    ///
-    /// let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer)?;
-    ///
-    /// let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer)?;
-    ///
-    /// let mut spi = Spi::new(
-    ///     peripherals.SPI2,
-    ///     Config::default()
-    ///         .with_frequency(Rate::from_khz(100))
-    ///         .with_mode(Mode::_0),
-    /// )?
-    /// .with_dma(dma_channel)
-    /// .with_buffers(dma_rx_buf, dma_tx_buf);
-    /// # {after_snippet}
-    /// ```
-    #[instability::unstable]
-    pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {
-        SpiDma::new(self.spi, self.pins, channel.degrade())
-    }
-
-    #[doc_replace(
         "header" => {
             cfg(multi_core) => "Registers an interrupt handler for the peripheral on the current core.",
             _ => "Registers an interrupt handler for the peripheral.",
@@ -1376,6 +1336,7 @@ where
     }
 }
 
+#[cfg(spi_master_supports_dma)]
 mod dma {
     use core::{
         cmp::min,
@@ -1385,9 +1346,67 @@ mod dma {
 
     use super::*;
     use crate::{
-        dma::{Channel, DmaRxBuf, DmaTxBuf, EmptyBuf, PeripheralDmaChannel, asynch::DmaRxFuture},
-        spi::master::dma::asynch::DropGuard,
+        dma::{
+            Channel,
+            DmaChannelFor,
+            DmaEligible,
+            DmaRxBuf,
+            DmaRxBuffer,
+            DmaTxBuf,
+            DmaTxBuffer,
+            EmptyBuf,
+            PeripheralDmaChannel,
+            asynch::DmaRxFuture,
+        },
+        spi::{DmaError, master::dma::asynch::DropGuard},
     };
+
+    const MAX_DMA_SIZE: usize = 32736;
+
+    impl<'d> Spi<'d, Blocking> {
+        #[doc_replace(
+            "dma_channel" => {
+                cfg(any(esp32, esp32s2)) => "let dma_channel = peripherals.DMA_SPI2;",
+                _ => "let dma_channel = peripherals.DMA_CH0;",
+            }
+        )]
+        /// Configures the SPI instance to use DMA with the specified channel.
+        ///
+        /// This method prepares the SPI instance for DMA transfers using SPI
+        /// and returns an instance of `SpiDma` that supports DMA
+        /// operations.
+        /// ```rust, no_run
+        /// # {before_snippet}
+        /// use esp_hal::{
+        ///     dma::{DmaRxBuf, DmaTxBuf},
+        ///     dma_buffers,
+        ///     spi::{
+        ///         Mode,
+        ///         master::{Config, Spi},
+        ///     },
+        /// };
+        /// # {dma_channel}
+        /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
+        ///
+        /// let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer)?;
+        ///
+        /// let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer)?;
+        ///
+        /// let mut spi = Spi::new(
+        ///     peripherals.SPI2,
+        ///     Config::default()
+        ///         .with_frequency(Rate::from_khz(100))
+        ///         .with_mode(Mode::_0),
+        /// )?
+        /// .with_dma(dma_channel)
+        /// .with_buffers(dma_rx_buf, dma_tx_buf);
+        /// # {after_snippet}
+        /// ```
+        #[instability::unstable]
+        pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {
+            SpiDma::new(self.spi, self.pins, channel.degrade())
+        }
+    }
 
     #[doc_replace(
         "dma_channel" => {
@@ -2580,6 +2599,163 @@ mod dma {
         }
     }
 
+    pub(super) struct DmaDriver {
+        driver: Driver,
+        dma_peripheral: crate::dma::DmaPeripheral,
+    }
+
+    impl DmaDriver {
+        fn abort_transfer(&self) {
+            self.driver.configure_datalen(1, 1);
+            self.driver.update();
+        }
+
+        fn regs(&self) -> &RegisterBlock {
+            self.driver.regs()
+        }
+
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+        unsafe fn start_transfer_dma<Dm: DriverMode>(
+            &self,
+            _full_duplex: bool,
+            rx_len: usize,
+            tx_len: usize,
+            rx_buffer: &mut impl DmaRxBuffer,
+            tx_buffer: &mut impl DmaTxBuffer,
+            channel: &mut Channel<Dm, PeripheralDmaChannel<AnySpi<'_>>>,
+        ) -> Result<(), Error> {
+            #[cfg(esp32s2)]
+            {
+                // without this a transfer after a write will fail
+                self.regs().dma_out_link().write(|w| unsafe { w.bits(0) });
+                self.regs().dma_in_link().write(|w| unsafe { w.bits(0) });
+            }
+
+            self.driver.configure_datalen(rx_len, tx_len);
+
+            // enable the MISO and MOSI if needed
+            self.regs()
+                .user()
+                .modify(|_, w| w.usr_miso().bit(rx_len > 0).usr_mosi().bit(tx_len > 0));
+
+            self.enable_dma();
+
+            if rx_len > 0 {
+                unsafe {
+                    channel
+                        .rx
+                        .prepare_transfer(self.dma_peripheral, rx_buffer)
+                        .and_then(|_| channel.rx.start_transfer())?;
+                }
+            } else {
+                #[cfg(esp32)]
+                {
+                    // see https://github.com/espressif/esp-idf/commit/366e4397e9dae9d93fe69ea9d389b5743295886f
+                    // see https://github.com/espressif/esp-idf/commit/0c3653b1fd7151001143451d4aa95dbf15ee8506
+                    if _full_duplex {
+                        self.regs()
+                            .dma_in_link()
+                            .modify(|_, w| unsafe { w.inlink_addr().bits(0) });
+                        self.regs()
+                            .dma_in_link()
+                            .modify(|_, w| w.inlink_start().set_bit());
+                    }
+                }
+            }
+            if tx_len > 0 {
+                unsafe {
+                    channel
+                        .tx
+                        .prepare_transfer(self.dma_peripheral, tx_buffer)
+                        .and_then(|_| channel.tx.start_transfer())?;
+                }
+            }
+
+            #[cfg(gdma)]
+            self.reset_dma();
+
+            self.driver.start_operation();
+
+            Ok(())
+        }
+
+        fn enable_dma(&self) {
+            #[cfg(gdma)]
+            // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
+            self.regs().dma_conf().modify(|_, w| {
+                w.dma_tx_ena().set_bit();
+                w.dma_rx_ena().set_bit()
+            });
+
+            #[cfg(pdma)]
+            self.reset_dma();
+        }
+
+        fn reset_dma(&self) {
+            fn set_reset_bit(reg_block: &RegisterBlock, bit: bool) {
+                #[cfg(pdma)]
+                reg_block.dma_conf().modify(|_, w| {
+                    w.out_rst().bit(bit);
+                    w.in_rst().bit(bit);
+                    w.ahbm_fifo_rst().bit(bit);
+                    w.ahbm_rst().bit(bit)
+                });
+                #[cfg(gdma)]
+                reg_block.dma_conf().modify(|_, w| {
+                    w.rx_afifo_rst().bit(bit);
+                    w.buf_afifo_rst().bit(bit);
+                    w.dma_afifo_rst().bit(bit)
+                });
+            }
+
+            set_reset_bit(self.regs(), true);
+            set_reset_bit(self.regs(), false);
+            self.clear_dma_interrupts();
+        }
+
+        #[cfg(gdma)]
+        fn clear_dma_interrupts(&self) {
+            self.regs().dma_int_clr().write(|w| {
+                w.dma_infifo_full_err().clear_bit_by_one();
+                w.dma_outfifo_empty_err().clear_bit_by_one();
+                w.trans_done().clear_bit_by_one();
+                w.mst_rx_afifo_wfull_err().clear_bit_by_one();
+                w.mst_tx_afifo_rempty_err().clear_bit_by_one()
+            });
+        }
+
+        #[cfg(pdma)]
+        fn clear_dma_interrupts(&self) {
+            self.regs().dma_int_clr().write(|w| {
+                w.inlink_dscr_empty().clear_bit_by_one();
+                w.outlink_dscr_error().clear_bit_by_one();
+                w.inlink_dscr_error().clear_bit_by_one();
+                w.in_done().clear_bit_by_one();
+                w.in_err_eof().clear_bit_by_one();
+                w.in_suc_eof().clear_bit_by_one();
+                w.out_done().clear_bit_by_one();
+                w.out_eof().clear_bit_by_one();
+                w.out_total_eof().clear_bit_by_one()
+            });
+        }
+    }
+
+    impl<'d> DmaEligible for AnySpi<'d> {
+        #[cfg(gdma)]
+        type Dma = crate::dma::AnyGdmaChannel<'d>;
+        #[cfg(pdma)]
+        type Dma = crate::dma::AnySpiDmaChannel<'d>;
+
+        fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+            match &self.0 {
+                #[cfg(spi_master_spi2)]
+                any::Inner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
+                #[cfg(spi_master_spi3)]
+                any::Inner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
+            }
+        }
+    }
+
     /// Async functionality
     mod asynch {
         use core::ops::{Deref, DerefMut};
@@ -2848,8 +3024,7 @@ mod ehal1 {
 }
 
 /// SPI peripheral instance.
-#[cfg_attr(not(feature = "unstable"), expect(private_bounds))] // DmaEligible
-pub trait Instance: private::Sealed + any::Degrade + DmaEligible {
+pub trait Instance: private::Sealed + any::Degrade {
     #[doc(hidden)]
     /// Returns the peripheral data and state describing this instance.
     fn parts(&self) -> (&'static Info, &'static State);
@@ -2920,147 +3095,6 @@ impl Info {
     }
 }
 
-struct DmaDriver {
-    driver: Driver,
-    dma_peripheral: crate::dma::DmaPeripheral,
-}
-
-impl DmaDriver {
-    fn abort_transfer(&self) {
-        self.driver.configure_datalen(1, 1);
-        self.driver.update();
-    }
-
-    fn regs(&self) -> &RegisterBlock {
-        self.driver.regs()
-    }
-
-    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    unsafe fn start_transfer_dma<Dm: DriverMode>(
-        &self,
-        _full_duplex: bool,
-        rx_len: usize,
-        tx_len: usize,
-        rx_buffer: &mut impl DmaRxBuffer,
-        tx_buffer: &mut impl DmaTxBuffer,
-        channel: &mut Channel<Dm, PeripheralDmaChannel<AnySpi<'_>>>,
-    ) -> Result<(), Error> {
-        #[cfg(esp32s2)]
-        {
-            // without this a transfer after a write will fail
-            self.regs().dma_out_link().write(|w| unsafe { w.bits(0) });
-            self.regs().dma_in_link().write(|w| unsafe { w.bits(0) });
-        }
-
-        self.driver.configure_datalen(rx_len, tx_len);
-
-        // enable the MISO and MOSI if needed
-        self.regs()
-            .user()
-            .modify(|_, w| w.usr_miso().bit(rx_len > 0).usr_mosi().bit(tx_len > 0));
-
-        self.enable_dma();
-
-        if rx_len > 0 {
-            unsafe {
-                channel
-                    .rx
-                    .prepare_transfer(self.dma_peripheral, rx_buffer)
-                    .and_then(|_| channel.rx.start_transfer())?;
-            }
-        } else {
-            #[cfg(esp32)]
-            {
-                // see https://github.com/espressif/esp-idf/commit/366e4397e9dae9d93fe69ea9d389b5743295886f
-                // see https://github.com/espressif/esp-idf/commit/0c3653b1fd7151001143451d4aa95dbf15ee8506
-                if _full_duplex {
-                    self.regs()
-                        .dma_in_link()
-                        .modify(|_, w| unsafe { w.inlink_addr().bits(0) });
-                    self.regs()
-                        .dma_in_link()
-                        .modify(|_, w| w.inlink_start().set_bit());
-                }
-            }
-        }
-        if tx_len > 0 {
-            unsafe {
-                channel
-                    .tx
-                    .prepare_transfer(self.dma_peripheral, tx_buffer)
-                    .and_then(|_| channel.tx.start_transfer())?;
-            }
-        }
-
-        #[cfg(gdma)]
-        self.reset_dma();
-
-        self.driver.start_operation();
-
-        Ok(())
-    }
-
-    fn enable_dma(&self) {
-        #[cfg(gdma)]
-        // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
-        self.regs().dma_conf().modify(|_, w| {
-            w.dma_tx_ena().set_bit();
-            w.dma_rx_ena().set_bit()
-        });
-
-        #[cfg(pdma)]
-        self.reset_dma();
-    }
-
-    fn reset_dma(&self) {
-        fn set_reset_bit(reg_block: &RegisterBlock, bit: bool) {
-            #[cfg(pdma)]
-            reg_block.dma_conf().modify(|_, w| {
-                w.out_rst().bit(bit);
-                w.in_rst().bit(bit);
-                w.ahbm_fifo_rst().bit(bit);
-                w.ahbm_rst().bit(bit)
-            });
-            #[cfg(gdma)]
-            reg_block.dma_conf().modify(|_, w| {
-                w.rx_afifo_rst().bit(bit);
-                w.buf_afifo_rst().bit(bit);
-                w.dma_afifo_rst().bit(bit)
-            });
-        }
-
-        set_reset_bit(self.regs(), true);
-        set_reset_bit(self.regs(), false);
-        self.clear_dma_interrupts();
-    }
-
-    #[cfg(gdma)]
-    fn clear_dma_interrupts(&self) {
-        self.regs().dma_int_clr().write(|w| {
-            w.dma_infifo_full_err().clear_bit_by_one();
-            w.dma_outfifo_empty_err().clear_bit_by_one();
-            w.trans_done().clear_bit_by_one();
-            w.mst_rx_afifo_wfull_err().clear_bit_by_one();
-            w.mst_tx_afifo_rempty_err().clear_bit_by_one()
-        });
-    }
-
-    #[cfg(pdma)]
-    fn clear_dma_interrupts(&self) {
-        self.regs().dma_int_clr().write(|w| {
-            w.inlink_dscr_empty().clear_bit_by_one();
-            w.outlink_dscr_error().clear_bit_by_one();
-            w.inlink_dscr_error().clear_bit_by_one();
-            w.in_done().clear_bit_by_one();
-            w.in_err_eof().clear_bit_by_one();
-            w.in_suc_eof().clear_bit_by_one();
-            w.out_done().clear_bit_by_one();
-            w.out_eof().clear_bit_by_one();
-            w.out_total_eof().clear_bit_by_one()
-        });
-    }
-}
-
 struct Driver {
     info: &'static Info,
     state: &'static State,
@@ -3104,7 +3138,7 @@ impl Driver {
             w.usr_command().clear_bit()
         });
 
-        #[cfg(gdma)]
+        #[cfg(not(any(esp32, esp32s2)))]
         self.regs().clk_gate().modify(|_, w| {
             w.clk_en().set_bit();
             w.mst_clk_active().set_bit();
@@ -3120,25 +3154,22 @@ impl Driver {
                 .modify(|_, w| w.spi2_clkm_sel().bits(1));
         }
 
-        #[cfg(gdma)]
-        self.regs().ctrl().modify(|_, w| {
-            w.q_pol().clear_bit();
-            w.d_pol().clear_bit();
-            w.hold_pol().clear_bit()
-        });
-
-        #[cfg(esp32s2)]
-        self.regs().ctrl().modify(|_, w| {
-            w.q_pol().clear_bit();
-            w.d_pol().clear_bit();
-            w.wp().clear_bit()
-        });
-
-        #[cfg(esp32)]
-        self.regs().ctrl().modify(|_, w| w.wp().clear_bit());
-
-        #[cfg(not(esp32))]
-        self.regs().misc().write(|w| unsafe { w.bits(0) });
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                self.regs().ctrl().modify(|_, w| w.wp().clear_bit());
+            } else {
+                self.regs().ctrl().modify(|_, w| {
+                    w.q_pol().clear_bit();
+                    w.d_pol().clear_bit();
+                    #[cfg(esp32s2)]
+                    w.wp().clear_bit();
+                    #[cfg(not(esp32s2))]
+                    w.hold_pol().clear_bit();
+                    w
+                });
+                self.regs().misc().write(|w| unsafe { w.bits(0) });
+            }
+        }
 
         self.regs().slave().write(|w| unsafe { w.bits(0) });
     }
@@ -3255,8 +3286,11 @@ impl Driver {
                     for interrupt in interrupts {
                         match interrupt {
                             SpiInterrupt::TransferDone => w.trans_done().bit(enable),
+                            #[cfg(spi_master_has_dma_segmented_transfer)]
                             SpiInterrupt::DmaSegmentedTransferDone => w.dma_seg_trans_done().bit(enable),
+                            #[cfg(spi_master_has_app_interrupts)]
                             SpiInterrupt::App2 => w.app2().bit(enable),
+                            #[cfg(spi_master_has_app_interrupts)]
                             SpiInterrupt::App1 => w.app1().bit(enable),
                         };
                     }
@@ -3289,12 +3323,15 @@ impl Driver {
                 if ints.trans_done().bit() {
                     res.insert(SpiInterrupt::TransferDone);
                 }
+                #[cfg(spi_master_has_dma_segmented_transfer)]
                 if ints.dma_seg_trans_done().bit() {
                     res.insert(SpiInterrupt::DmaSegmentedTransferDone);
                 }
+                #[cfg(spi_master_has_app_interrupts)]
                 if ints.app2().bit() {
                     res.insert(SpiInterrupt::App2);
                 }
+                #[cfg(spi_master_has_app_interrupts)]
                 if ints.app1().bit() {
                     res.insert(SpiInterrupt::App1);
                 }
@@ -3335,8 +3372,11 @@ impl Driver {
                     for interrupt in interrupts {
                         match interrupt {
                             SpiInterrupt::TransferDone => w.trans_done().clear_bit_by_one(),
+                            #[cfg(spi_master_has_dma_segmented_transfer)]
                             SpiInterrupt::DmaSegmentedTransferDone => w.dma_seg_trans_done().clear_bit_by_one(),
+                            #[cfg(spi_master_has_app_interrupts)]
                             SpiInterrupt::App2 => w.app2().clear_bit_by_one(),
+                            #[cfg(spi_master_has_app_interrupts)]
                             SpiInterrupt::App1 => w.app1().clear_bit_by_one(),
                         };
                     }
@@ -3426,7 +3466,7 @@ impl Driver {
 
     fn ch_bus_freq(&self, bus_clock_config: &Config) -> Result<(), ConfigError> {
         fn enable_clocks(_reg_block: &RegisterBlock, _enable: bool) {
-            #[cfg(gdma)]
+            #[cfg(not(any(esp32, esp32s2)))]
             _reg_block.clk_gate().modify(|_, w| {
                 w.clk_en().bit(_enable);
                 w.mst_clk_active().bit(_enable);
@@ -3761,7 +3801,7 @@ impl Driver {
             w.usr_command().bit(!cmd.is_none())
         });
 
-        #[cfg(gdma)]
+        #[cfg(not(any(esp32, esp32s2)))]
         reg_block.clk_gate().modify(|_, w| {
             w.clk_en().set_bit();
             w.mst_clk_active().set_bit();
@@ -3819,7 +3859,7 @@ impl Driver {
 
     fn update(&self) {
         cfg_if::cfg_if! {
-            if #[cfg(gdma)] {
+            if #[cfg(not(any(esp32, esp32s2)))] {
                 let reg_block = self.regs();
 
                 reg_block.cmd().modify(|_, w| w.update().set_bit());
@@ -3976,22 +4016,6 @@ crate::any_peripheral! {
     }
 }
 
-impl<'d> DmaEligible for AnySpi<'d> {
-    #[cfg(gdma)]
-    type Dma = crate::dma::AnyGdmaChannel<'d>;
-    #[cfg(pdma)]
-    type Dma = crate::dma::AnySpiDmaChannel<'d>;
-
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        match &self.0 {
-            #[cfg(spi_master_spi2)]
-            any::Inner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
-            #[cfg(spi_master_spi3)]
-            any::Inner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
-        }
-    }
-}
-
 impl Instance for AnySpi<'_> {
     #[inline]
     fn parts(&self) -> (&'static Info, &'static State) {
@@ -4036,14 +4060,6 @@ impl<'a> SpiFuture<'a> {
         })
     }
 }
-
-use core::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-};
-
-use crate::dma::{Channel, PeripheralDmaChannel};
 
 impl Future for SpiFuture<'_> {
     type Output = ();

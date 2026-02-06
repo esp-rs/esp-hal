@@ -80,7 +80,7 @@ peripherals = [
     # { name = "SLCHOST" }, TODO: add PAC manually later
     # { name = "SPI0" },
     # { name = "SPI1" },
-    # { name = "SPI2", interrupts = { peri = "SPI2" } },
+    { name = "SPI2", interrupts = { peri = "SPI2" } },
     { name = "SYSTEM", pac = "PCR" },
     { name = "SYSTIMER" },
     { name = "TEE" },
@@ -456,13 +456,13 @@ controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 
 # [device.spi_master]
 # support_status = "supported"
 # instances = [
-#     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
+#     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0"] },
 # ]
-
-# # [device.spi_slave]
-# # instances = [
-# #     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
-# # ]
+# 
+# [device.spi_slave]
+# instances = [
+#     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", mosi = "FSPID", miso = "FSPIQ", cs = "FSPICS0" },
+# ]
 
 [device.timergroup]
 support_status = "partial"

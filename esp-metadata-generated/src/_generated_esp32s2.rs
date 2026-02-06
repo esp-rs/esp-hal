@@ -237,7 +237,19 @@ macro_rules! property {
     ("sha.dma") => {
         true
     };
+    ("spi_master.supports_dma") => {
+        true
+    };
     ("spi_master.has_octal") => {
+        true
+    };
+    ("spi_master.has_app_interrupts") => {
+        false
+    };
+    ("spi_master.has_dma_segmented_transfer") => {
+        true
+    };
+    ("spi_slave.supports_dma") => {
         true
     };
     ("timergroup.timg_has_timer1") => {
