@@ -420,7 +420,7 @@ output_signals = [
 ]
 
 [device.dedicated_gpio]
-support_status = "partial"
+support_status = "not_supported"
 channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4", "CPU_GPIO_5", "CPU_GPIO_6", "CPU_GPIO_7"]]
 
 # # TODO: Verify
