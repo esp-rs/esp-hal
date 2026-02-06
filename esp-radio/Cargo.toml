@@ -64,7 +64,7 @@ esp-phy = { version = "0.1.1", path = "../esp-phy/" }
 num-derive = "0.4.2"
 num-traits = { version = "0.2.19", default-features = false }
 portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
-procmacros = { version = "0.21.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+procmacros = { version = "0.21.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros", features = ["__esp_idf_bootloader"] }
 xtensa-lx-rt = { version = "0.21.0", path = "../xtensa-lx-rt", optional = true }
 byte = { version = "0.2.7", optional = true }
 ieee802154 = { version = "0.6.1", optional = true }

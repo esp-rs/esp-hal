@@ -29,6 +29,43 @@
 //! the simplest option that is supported by us is `esp-rtos`, but you may use Ariel
 //! OS or other operating systems as well.
 //!
+//! ```rust, no_run
+//! # #![no_std]
+//! # #![no_main]
+//! # use esp_hal::{   
+//! #    gpio::{Io, Level, Output, OutputConfig},
+//! #    main,
+//! #    time::{Duration, Instant},
+//! # };
+//! # use esp_hal::clock::CpuClock;
+//! # use esp_hal::timer::timg::TimerGroup;
+//! # use esp_hal::ram;
+//! # use esp_alloc::HEAP;
+//! # use esp_alloc as _;
+//! # #[panic_handler]
+//! # fn panic(_: &core::panic::PanicInfo) -> ! {
+//! #    esp_hal::system::software_reset()
+//! # }
+//! # #[main]
+//! # fn main() -> ! {
+//! # let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+//! # let peripherals = esp_hal::init(config);
+//! esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+//! esp_alloc::heap_allocator!(size: 36 * 1024);
+//!
+//! let timg0 = TimerGroup::new(peripherals.TIMG0);
+//! let sw_interrupt =
+//!    esp_hal::interrupt::software::SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+//!
+//! // THIS IS IMPORTANT: You MUST start the scheduler before initiallizing the radio!
+//! esp_rtos::start(timg0.timer0, sw_interrupt.software_interrupt0);
+//!
+//! // Now the radio can be initialized and used.
+//!
+//! # loop {}
+//! # }
+//! ```
+//!
 //! ```toml
 //! [dependencies.esp-radio]
 //! # A supported chip needs to be specified, as well as specific use-case features
