@@ -680,51 +680,53 @@ mod tests {
         assert_eq!(output_dedicated.output_level(), Level::High);
     }
 
-#[test]
-#[should_panic]
-#[cfg(all(dedicated_gpio, multi_core, feature = "unstable", debug_assertions))]
-fn dedicated_gpio_different_cores_panics(ctx: Context) {
-    use core::{
-        mem::MaybeUninit,
-        sync::atomic::{AtomicBool, Ordering},
-    };
-    use esp_hal::system::Stack;
-    use hil_test::mk_static;
-
-    let pin1 = ctx.test_gpio1;
-    let static_mem_slot =
-        mk_static!(MaybeUninit<DedicatedGpioInput<'static>>, MaybeUninit::uninit());
-    let slot_addr: usize = static_mem_slot.as_mut_ptr() as usize; 
-    // cast to usize, otherwise compiler will complain about !Send
-    let ready = &*mk_static!(AtomicBool, AtomicBool::new(false));
-    let app_core_stack = mk_static!(Stack<4096>, Stack::new());
-
-    // creating the driver at core1, and then use it at core
-    // this should panic
-    esp_rtos::start_second_core(ctx.cpu_ctrl, ctx.int1, app_core_stack, move || {
-        let input = Input::new(pin1, InputConfig::default().with_pull(Pull::Down));
-        let driver = DedicatedGpioInput::new(ctx.dedicated_gpio.channel1.input, input);
-
-        let driver_static: DedicatedGpioInput<'static> = unsafe {
-            core::mem::transmute::<DedicatedGpioInput<'_>, DedicatedGpioInput<'static>>(driver)
+    #[test]
+    #[should_panic]
+    #[cfg(all(dedicated_gpio, multi_core, feature = "unstable", debug_assertions))]
+    fn dedicated_gpio_different_cores_panics(ctx: Context) {
+        use core::{
+            mem::MaybeUninit,
+            sync::atomic::{AtomicBool, Ordering},
         };
 
-        let slot_ptr = slot_addr as *mut DedicatedGpioInput<'static>;
-        unsafe { slot_ptr.write(driver_static) };
-        ready.store(true, Ordering::Release);
+        use esp_hal::system::Stack;
+        use hil_test::mk_static;
 
-    });
+        let pin1 = ctx.test_gpio1;
+        let static_mem_slot = mk_static!(
+            MaybeUninit<DedicatedGpioInput<'static>>,
+            MaybeUninit::uninit()
+        );
+        let slot_addr: usize = static_mem_slot.as_mut_ptr() as usize;
+        // cast to usize, otherwise compiler will complain about !Send
+        let ready = &*mk_static!(AtomicBool, AtomicBool::new(false));
+        let app_core_stack = mk_static!(Stack<4096>, Stack::new());
 
-    while !ready.load(Ordering::Acquire) {
-        core::hint::spin_loop();
-        // wait until the driver is transferred to the static slot
+        // creating the driver at core1, and then use it at core
+        // this should panic
+        esp_rtos::start_second_core(ctx.cpu_ctrl, ctx.int1, app_core_stack, move || {
+            let input = Input::new(pin1, InputConfig::default().with_pull(Pull::Down));
+            let driver = DedicatedGpioInput::new(ctx.dedicated_gpio.channel1.input, input);
+
+            let driver_static: DedicatedGpioInput<'static> = unsafe {
+                core::mem::transmute::<DedicatedGpioInput<'_>, DedicatedGpioInput<'static>>(driver)
+            };
+
+            let slot_ptr = slot_addr as *mut DedicatedGpioInput<'static>;
+            unsafe { slot_ptr.write(driver_static) };
+            ready.store(true, Ordering::Release);
+        });
+
+        while !ready.load(Ordering::Acquire) {
+            core::hint::spin_loop();
+            // wait until the driver is transferred to the static slot
+        }
+
+        let input_dedicated: DedicatedGpioInput<'static> =
+            unsafe { static_mem_slot.assume_init_read() };
+
+        let _level = input_dedicated.level();
     }
-
-    let input_dedicated: DedicatedGpioInput<'static> =
-        unsafe { static_mem_slot.assume_init_read() };
-
-    let _level = input_dedicated.level();
-}
 
     #[cfg(all(dedicated_gpio, feature = "unstable"))]
     macro_rules! make_dedicated_io_and_bundles {
