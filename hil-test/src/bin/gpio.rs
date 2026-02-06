@@ -37,7 +37,13 @@ cfg_if::cfg_if! {
 }
 
 #[cfg(all(dedicated_gpio, feature = "unstable"))]
-use esp_hal::gpio::dedicated::DedicatedGpio;
+use esp_hal::gpio::dedicated::{
+    DedicatedGpio,
+    DedicatedGpioInput,
+    DedicatedGpioInputBundle,
+    DedicatedGpioOutput,
+    DedicatedGpioOutputBundle,
+};
 
 struct Context {
     test_gpio1: AnyPin<'static>,
@@ -48,6 +54,10 @@ struct Context {
     io: Io<'static>,
     #[cfg(all(dedicated_gpio, feature = "unstable"))]
     dedicated_gpio: DedicatedGpio<'static>,
+    #[cfg(all(dedicated_gpio, multi_core, feature = "unstable"))]
+    int1: esp_hal::interrupt::software::SoftwareInterrupt<'static, 1>,
+    #[cfg(all(dedicated_gpio, multi_core, feature = "unstable"))]
+    cpu_ctrl: esp_hal::peripherals::CPU_CTRL<'static>,
 }
 
 #[cfg_attr(feature = "unstable", handler)]
@@ -143,17 +153,23 @@ mod tests {
         let io = Io::new(peripherals.IO_MUX);
 
         #[cfg(feature = "unstable")]
-        {
+        #[cfg_attr(single_core, expect(unused_variables))]
+        let int1 = {
             let sw_int = esp_hal::interrupt::software::SoftwareInterruptControl::new(
                 peripherals.SW_INTERRUPT,
             );
             // Timers are unstable
             let timg0 = TimerGroup::new(peripherals.TIMG0);
-            esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
-        }
+            let int0 = sw_int.software_interrupt0;
+            let int1 = sw_int.software_interrupt1;
+            esp_rtos::start(timg0.timer0, int0);
+            int1
+        };
 
         #[cfg(all(dedicated_gpio, feature = "unstable"))]
         let dedicated_gpio = DedicatedGpio::new(peripherals.GPIO_DEDICATED);
+        #[cfg(all(dedicated_gpio, multi_core, feature = "unstable"))]
+        let cpu_ctrl = peripherals.CPU_CTRL;
 
         Context {
             test_gpio1: gpio1.degrade(),
@@ -164,6 +180,10 @@ mod tests {
             io,
             #[cfg(all(dedicated_gpio, feature = "unstable"))]
             dedicated_gpio,
+            #[cfg(all(dedicated_gpio, multi_core, feature = "unstable"))]
+            int1,
+            #[cfg(all(dedicated_gpio, multi_core, feature = "unstable"))]
+            cpu_ctrl,
         }
     }
 
@@ -623,16 +643,17 @@ mod tests {
     #[test]
     #[cfg(all(dedicated_gpio, feature = "unstable"))]
     fn dedicated_gpios(ctx: Context) {
-        use esp_hal::gpio::dedicated::{DedicatedGpioInput, DedicatedGpioOutput};
-
         let input = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
         let output = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
 
-        let mut input_dedicated = DedicatedGpioInput::new(ctx.dedicated_gpio.channel0.input, input);
+        let input_dedicated = DedicatedGpioInput::new(ctx.dedicated_gpio.channel0.input, input);
         let mut output_dedicated =
             DedicatedGpioOutput::new(ctx.dedicated_gpio.channel0.output).with_pin(output);
 
+        // output_dedicated.set_level(Level::Low);
         assert_eq!(input_dedicated.level(), Level::Low);
+        #[cfg(not(esp32s3))]
+        assert_eq!(output_dedicated.output_level(), Level::Low);
         output_dedicated.set_level(Level::High);
         #[cfg(esp32s2)]
         unsafe {
@@ -642,5 +663,138 @@ mod tests {
             core::arch::asm!("nop");
         }
         assert_eq!(input_dedicated.level(), Level::High);
+        #[cfg(not(esp32s3))]
+        assert_eq!(output_dedicated.output_level(), Level::High);
+    }
+
+    #[test]
+    #[cfg(all(dedicated_gpio, feature = "unstable", not(esp32s3)))]
+    fn dedicated_gpios_output_levels(ctx: Context) {
+        let output = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
+        let mut output_dedicated =
+            DedicatedGpioOutput::new(ctx.dedicated_gpio.channel0.output).with_pin(output);
+
+        output_dedicated.set_level(Level::Low);
+        assert_eq!(output_dedicated.output_level(), Level::Low);
+        output_dedicated.set_level(Level::High);
+        assert_eq!(output_dedicated.output_level(), Level::High);
+    }
+
+    #[test]
+    #[should_panic]
+    #[cfg(all(dedicated_gpio, multi_core, feature = "unstable", debug_assertions))]
+    async fn dedicated_gpio_different_cores_panics(ctx: Context) {
+        use esp_hal::system::Stack;
+        use hil_test::mk_static;
+
+        let pin1 = ctx.test_gpio1;
+        let driver_signal = &*mk_static!(
+            Signal<CriticalSectionRawMutex, DedicatedGpioInput<'static>>,
+            Signal::new()
+        );
+        let app_core_stack = mk_static!(Stack<4096>, Stack::new());
+
+        // creating the driver at core1, and then use it at core
+        // this should panic
+        esp_rtos::start_second_core(ctx.cpu_ctrl, ctx.int1, app_core_stack, move || {
+            let input = Input::new(pin1, InputConfig::default().with_pull(Pull::Down));
+            let driver = DedicatedGpioInput::new(ctx.dedicated_gpio.channel1.input, input);
+
+            driver_signal.signal(driver);
+        });
+
+        let input_dedicated = driver_signal.wait().await;
+
+        let _level = input_dedicated.level();
+    }
+
+    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    macro_rules! make_dedicated_io_and_bundles {
+        (
+            $ctx:expr, $channel:ident, $in_pin:ident, $out_pin:ident,
+            $in_ded:ident, $out_ded:ident, $in_bundle:ident, $out_bundle:ident $(,)?
+        ) => {
+            let input = Input::new($ctx.$in_pin, InputConfig::default().with_pull(Pull::Down));
+            let output = Output::new($ctx.$out_pin, Level::Low, OutputConfig::default());
+
+            let $in_ded = DedicatedGpioInput::new($ctx.dedicated_gpio.$channel.input, input);
+
+            let $out_ded =
+                DedicatedGpioOutput::new($ctx.dedicated_gpio.$channel.output).with_pin(output);
+
+            let mut $out_bundle = DedicatedGpioOutputBundle::new();
+            $out_bundle.enable_output(&$out_ded);
+
+            let mut $in_bundle = DedicatedGpioInputBundle::new();
+            $in_bundle.enable_input(&$in_ded);
+        };
+    }
+
+    #[test]
+    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    fn dedicated_gpio_bundles(ctx: Context) {
+        make_dedicated_io_and_bundles!(
+            ctx,
+            channel0,
+            test_gpio1,
+            test_gpio2,
+            input_dedicated,
+            output_dedicated,
+            input_bundle,
+            output_bundle,
+        );
+
+        assert_eq!(input_dedicated.level(), Level::Low);
+        assert_eq!(input_bundle.levels(), 0);
+        #[cfg(not(esp32s3))]
+        assert_eq!(output_bundle.output_levels(), 0);
+
+        output_bundle.set_high(1);
+
+        #[cfg(esp32s2)]
+        unsafe {
+            core::arch::asm!("nop");
+            core::arch::asm!("nop");
+            core::arch::asm!("nop");
+            core::arch::asm!("nop");
+        }
+        assert_eq!(input_dedicated.level(), Level::High);
+        assert_eq!(input_bundle.levels(), 1);
+        #[cfg(not(esp32s3))]
+        assert_eq!(output_bundle.output_levels(), 1);
+    }
+
+    #[test]
+    #[should_panic]
+    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    fn dedicated_gpio_bundles_write_outside_channels1(ctx: Context) {
+        make_dedicated_io_and_bundles!(
+            ctx,
+            channel0,
+            test_gpio1,
+            test_gpio2,
+            input_dedicated,
+            output_dedicated,
+            _input_bundle,
+            output_bundle,
+        );
+        output_bundle.set_high(0b10); // should panic, only channel0 is configured
+    }
+
+    #[test]
+    #[should_panic]
+    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    fn dedicated_gpio_bundles_write_outside_channels2(ctx: Context) {
+        make_dedicated_io_and_bundles!(
+            ctx,
+            channel0,
+            test_gpio1,
+            test_gpio2,
+            input_dedicated,
+            output_dedicated,
+            _input_bundle,
+            output_bundle,
+        );
+        output_bundle.set_low(0b10); // should panic, only channel0 is configured
     }
 }
