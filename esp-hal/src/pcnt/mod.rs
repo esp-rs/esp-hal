@@ -138,6 +138,8 @@ impl<'d> Pcnt<'d> {
         let guard = GenericPeripheralGuard::new();
         let pcnt = PCNT::regs();
 
+        let unit_count = pcnt.unit_iter().count() as u8;
+
         // disable filter, all events, and channel settings
         for unit in pcnt.unit_iter() {
             unit.conf0().write(|w| unsafe {
@@ -148,11 +150,6 @@ impl<'d> Pcnt<'d> {
 
         // Remove reset bit from units.
         pcnt.ctrl().modify(|_, w| {
-            #[cfg(not(esp32))]
-            let unit_count = 4;
-            #[cfg(esp32)]
-            let unit_count = 8;
-
             for i in 0..unit_count {
                 w.cnt_rst_u(i).clear_bit();
             }

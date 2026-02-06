@@ -46,10 +46,8 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
         let conf0 = pcnt.unit(UNIT).conf0();
 
         conf0.modify(|_, w| {
-            w.ch_hctrl_mode(NUM as u8)
-                .variant(high)
-                .ch_lctrl_mode(NUM as u8)
-                .variant(low)
+            w.ch_hctrl_mode(NUM as u8).variant(high);
+            w.ch_lctrl_mode(NUM as u8).variant(low)
         });
     }
 
@@ -122,6 +120,8 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
             let source = source.into();
             source.set_input_enable(true);
             signal.connect_to(&source);
+        } else {
+            warn!("Signal {} out of range", signal);
         }
         self
     }
@@ -180,6 +180,8 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
             let source = source.into();
             source.set_input_enable(true);
             signal.connect_to(&source);
+        } else {
+            warn!("Signal {} out of range", signal);
         }
         self
     }
