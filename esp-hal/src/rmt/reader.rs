@@ -54,6 +54,8 @@ impl RmtReader {
         let memsize = raw.memsize().codes();
         let offset = self.offset as usize;
 
+        // cf. comments on delay in ../rmt.rs
+        crate::rom::ets_delay_us(4);
         let max_count = if final_ {
             let hw_offset = raw.hw_offset();
 
