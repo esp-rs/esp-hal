@@ -61,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S3/ESP32-C2: WiFi will work after light-sleep with default settings (#4826)
 - ESP32-S2: Fixed an issue where enabling TRNG can prevent WiFi from working (#4856)
 - Fixed an issue that caused the stack guard to overwrite data moved to the second core (#4914)
+- PCNT: Fixed some potential data race issues (#4932)
 
 ### Removed
 

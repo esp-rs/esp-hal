@@ -82,8 +82,9 @@ pub struct Unit<'d, const NUM: usize> {
     pub channel0: Channel<'d, NUM, 0>,
     /// The second channel in PCNT unit.
     pub channel1: Channel<'d, NUM, 1>,
-    mutex: RawMutex,
 }
+
+static MUTEX: RawMutex = RawMutex::new();
 
 impl<const NUM: usize> Unit<'_, NUM> {
     /// return a new Unit
@@ -92,7 +93,6 @@ impl<const NUM: usize> Unit<'_, NUM> {
             counter: Counter::new(),
             channel0: Channel::new(),
             channel1: Channel::new(),
-            mutex: RawMutex::new(),
         }
     }
 
@@ -217,37 +217,40 @@ impl<const NUM: usize> Unit<'_, NUM> {
 
     /// Resets the counter value to zero.
     pub fn clear(&self) {
-        let pcnt = PCNT::regs();
-        self.mutex.lock(|| {
-            pcnt.ctrl().modify(|_, w| w.cnt_rst_u(NUM as u8).set_bit());
-            // TODO: does this need a delay? (liebman / Jan 2 2023)
-            pcnt.ctrl()
-                .modify(|_, w| w.cnt_rst_u(NUM as u8).clear_bit());
+        MUTEX.lock(|| {
+            let bits = PCNT::regs().ctrl().read().bits();
+            PCNT::regs().ctrl().write(|w| {
+                unsafe { w.bits(bits) };
+                w.cnt_rst_u(NUM as u8).set_bit()
+            });
+            PCNT::regs().ctrl().write(|w| {
+                unsafe { w.bits(bits) };
+                w.cnt_rst_u(NUM as u8).clear_bit()
+            });
         });
     }
 
     /// Pause the counter
     pub fn pause(&self) {
-        let pcnt = PCNT::regs();
-        self.mutex.lock(|| {
-            pcnt.ctrl()
+        MUTEX.lock(|| {
+            PCNT::regs()
+                .ctrl()
                 .modify(|_, w| w.cnt_pause_u(NUM as u8).set_bit());
         });
     }
 
     /// Resume the counter
     pub fn resume(&self) {
-        let pcnt = PCNT::regs();
-        self.mutex.lock(|| {
-            pcnt.ctrl()
+        MUTEX.lock(|| {
+            PCNT::regs()
+                .ctrl()
                 .modify(|_, w| w.cnt_pause_u(NUM as u8).clear_bit());
         });
     }
 
     /// Get the latest events for this unit.
     pub fn events(&self) -> Events {
-        let pcnt = PCNT::regs();
-        let status = pcnt.u_status(NUM).read();
+        let status = PCNT::regs().u_status(NUM).read();
 
         Events {
             low_limit: status.l_lim().bit(),
@@ -260,41 +263,41 @@ impl<const NUM: usize> Unit<'_, NUM> {
 
     /// Get the mode of the last zero crossing
     pub fn zero_mode(&self) -> ZeroMode {
-        let pcnt = PCNT::regs();
-        pcnt.u_status(NUM).read().zero_mode().bits().into()
+        PCNT::regs().u_status(NUM).read().zero_mode().bits().into()
     }
 
     /// Enable interrupts for this unit.
     pub fn listen(&self) {
-        let pcnt = PCNT::regs();
-        self.mutex.lock(|| {
-            pcnt.int_ena()
+        MUTEX.lock(|| {
+            PCNT::regs()
+                .int_ena()
                 .modify(|_, w| w.cnt_thr_event_u(NUM as u8).set_bit());
         });
     }
 
     /// Disable interrupts for this unit.
     pub fn unlisten(&self) {
-        let pcnt = PCNT::regs();
-        self.mutex.lock(|| {
-            pcnt.int_ena()
+        MUTEX.lock(|| {
+            PCNT::regs()
+                .int_ena()
                 .modify(|_, w| w.cnt_thr_event_u(NUM as u8).clear_bit());
         });
     }
 
     /// Returns true if an interrupt is active for this unit.
     pub fn interrupt_is_set(&self) -> bool {
-        let pcnt = PCNT::regs();
-        pcnt.int_raw().read().cnt_thr_event_u(NUM as u8).bit()
+        PCNT::regs()
+            .int_raw()
+            .read()
+            .cnt_thr_event_u(NUM as u8)
+            .bit()
     }
 
     /// Clear the interrupt bit for this unit.
     pub fn reset_interrupt(&self) {
-        let pcnt = PCNT::regs();
-        self.mutex.lock(|| {
-            pcnt.int_clr()
-                .write(|w| w.cnt_thr_event_u(NUM as u8).set_bit());
-        });
+        PCNT::regs()
+            .int_clr()
+            .write(|w| w.cnt_thr_event_u(NUM as u8).set_bit());
     }
 
     /// Get the current counter value.
