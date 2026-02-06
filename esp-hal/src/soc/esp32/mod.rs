@@ -9,6 +9,7 @@ crate::unstable_module! {
     pub mod clocks;
     pub mod trng;
 }
+#[cfg(feature = "unstable")]
 pub mod cpu_control;
 pub mod gpio;
 pub(crate) mod regi2c;
