@@ -5,6 +5,7 @@ use esp_sync::NonReentrantMutex;
 cfg_if::cfg_if! {
     if #[cfg(soc_multi_core_enabled)] {
         pub(crate) mod multi_core;
+        #[cfg(feature = "unstable")]
         pub use multi_core::*;
     }
 }
