@@ -2503,7 +2503,7 @@ impl WifiController<'_> {
     ///
     /// Power unit is 0.25dBm, range is [8, 84] corresponding to 2dBm - 20dBm.
     #[instability::unstable]
-    pub fn set_max_tx_power(power: i8) -> Result<(), WifiError> {
+    pub fn set_max_tx_power(&mut self, power: i8) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(power) })
     }
 
