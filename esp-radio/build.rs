@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // implementation detail.
     assert_unique_features!("log-04", "defmt");
 
-    if cfg!(feature = "ble") && !chip.contains("bt") {
+    if cfg!(feature = "ble") && !chip.contains("soc_has_bt") {
         panic!(
             r#"
 
@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
-    if cfg!(feature = "wifi") && !chip.contains("wifi") {
+    if cfg!(feature = "wifi") && !chip.contains("soc_has_wifi") {
         panic!(
             r#"
 
@@ -92,7 +92,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
-    if cfg!(feature = "ieee802154") && !chip.contains("ieee802154") {
+    if cfg!(feature = "ieee802154") && !chip.contains("soc_has_ieee802154") {
         panic!(
             r#"
 
@@ -118,7 +118,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "coex")]
     {
         assert!(
-            chip.contains("wifi") && chip.contains("bt"),
+            chip.contains("soc_has_wifi") && chip.contains("soc_has_bt"),
             r#"
 
             Wi-Fi/Bluetooth coexistence is not supported on this target.

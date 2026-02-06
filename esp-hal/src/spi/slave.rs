@@ -66,11 +66,10 @@
 
 use core::marker::PhantomData;
 
-use super::{Error, Mode};
+use super::Mode;
 use crate::{
     Blocking,
     DriverMode,
-    dma::DmaEligible,
     gpio::{
         InputSignal,
         NoPin,
@@ -81,8 +80,6 @@ use crate::{
     pac::spi2::RegisterBlock,
     system::PeripheralGuard,
 };
-
-const MAX_DMA_SIZE: usize = 32768 - 32;
 
 /// SPI peripheral driver.
 ///
@@ -159,6 +156,7 @@ impl<'d> Spi<'d, Blocking> {
 
 /// DMA (Direct Memory Access) functionality (Slave).
 #[instability::unstable]
+#[cfg(spi_slave_supports_dma)]
 pub mod dma {
     use core::mem::ManuallyDrop;
 
@@ -170,13 +168,17 @@ pub mod dma {
         dma::{
             Channel,
             DmaChannelFor,
+            DmaEligible,
             DmaRxBuffer,
             DmaRxInterrupt,
             DmaTxBuffer,
             EmptyBuf,
             PeripheralDmaChannel,
         },
+        spi::Error,
     };
+
+    const MAX_DMA_SIZE: usize = 32768 - 32;
 
     impl<'d> Spi<'d, Blocking> {
         /// Configures the SPI peripheral with the provided DMA channel and
@@ -573,6 +575,34 @@ pub mod dma {
             });
         }
     }
+
+    /// A marker for DMA-capable SPI peripheral instances.
+    #[doc(hidden)]
+    #[allow(private_bounds)]
+    pub trait InstanceDma: Instance + DmaEligible {}
+
+    impl<'d> DmaEligible for AnySpi<'d> {
+        #[cfg(gdma)]
+        type Dma = crate::dma::AnyGdmaChannel<'d>;
+        #[cfg(pdma)]
+        type Dma = crate::dma::AnySpiDmaChannel<'d>;
+
+        fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+            match &self.0 {
+                #[cfg(spi_master_spi2)]
+                any::Inner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
+                #[cfg(spi_master_spi3)]
+                any::Inner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
+            }
+        }
+    }
+
+    #[cfg(soc_has_spi2)]
+    impl InstanceDma for crate::peripherals::SPI2<'_> {}
+    #[cfg(soc_has_spi3)]
+    impl InstanceDma for crate::peripherals::SPI3<'_> {}
+
+    impl InstanceDma for AnySpi<'_> {}
 }
 
 /// A peripheral singleton compatible with the SPI slave driver.
@@ -581,16 +611,6 @@ pub trait Instance: crate::private::Sealed + any::Degrade {
     #[doc(hidden)]
     fn info(&self) -> &'static Info;
 }
-
-/// A marker for DMA-capable SPI peripheral instances.
-#[doc(hidden)]
-#[allow(private_bounds)]
-pub trait InstanceDma: Instance + DmaEligible {}
-
-#[cfg(soc_has_spi2)]
-impl InstanceDma for crate::peripherals::SPI2<'_> {}
-#[cfg(soc_has_spi3)]
-impl InstanceDma for crate::peripherals::SPI3<'_> {}
 
 /// Peripheral data describing a particular SPI instance.
 #[non_exhaustive]
@@ -752,12 +772,13 @@ impl Info {
         }
     }
 
+    #[cfg(spi_slave_supports_dma)]
     fn is_bus_busy(&self) -> bool {
         #[cfg(pdma)]
         {
             self.regs().slave().read().trans_done().bit_is_clear()
         }
-        #[cfg(gdma)]
+        #[cfg(not(pdma))]
         {
             self.regs().dma_int_raw().read().trans_done().bit_is_clear()
         }
@@ -765,12 +786,13 @@ impl Info {
 
     // Clear the transaction-done interrupt flag so flush() can work properly. Not
     // used in DMA mode.
+    #[cfg(spi_slave_supports_dma)]
     fn setup_for_flush(&self) {
         #[cfg(pdma)]
         self.regs()
             .slave()
             .modify(|_, w| w.trans_done().clear_bit());
-        #[cfg(gdma)]
+        #[cfg(not(pdma))]
         self.regs()
             .dma_int_clr()
             .write(|w| w.trans_done().clear_bit_by_one());
@@ -815,25 +837,8 @@ crate::any_peripheral! {
     }
 }
 
-impl<'d> DmaEligible for AnySpi<'d> {
-    #[cfg(gdma)]
-    type Dma = crate::dma::AnyGdmaChannel<'d>;
-    #[cfg(pdma)]
-    type Dma = crate::dma::AnySpiDmaChannel<'d>;
-
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        match &self.0 {
-            #[cfg(spi_master_spi2)]
-            any::Inner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
-            #[cfg(spi_master_spi3)]
-            any::Inner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
-        }
-    }
-}
 impl Instance for AnySpi<'_> {
     fn info(&self) -> &'static Info {
         any::delegate!(self, spi => { spi.info() })
     }
 }
-
-impl InstanceDma for AnySpi<'_> {}

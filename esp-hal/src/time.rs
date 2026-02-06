@@ -762,7 +762,7 @@ pub(crate) mod implem {
     }
 }
 
-#[cfg(systimer)]
+#[cfg(systimer_driver_supported)]
 pub(crate) mod implem {
     use super::Instant;
     use crate::timer::systimer::{SystemTimer, Unit};

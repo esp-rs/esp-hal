@@ -36,7 +36,7 @@ cfg_if::cfg_if! {
     }
 }
 
-#[cfg(all(dedicated_gpio, feature = "unstable"))]
+#[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
 use esp_hal::gpio::dedicated::DedicatedGpio;
 
 struct Context {
@@ -46,7 +46,7 @@ struct Context {
     delay: Delay,
     #[cfg(feature = "unstable")]
     io: Io<'static>,
-    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
     dedicated_gpio: DedicatedGpio<'static>,
 }
 
@@ -75,7 +75,7 @@ pub fn interrupt_handler_unlisten() {
 }
 
 // Compile-time test to check that GPIOs can be passed by reference.
-#[cfg(spi_master)]
+#[cfg(spi_master_driver_supported)]
 fn _gpios_can_be_reused() {
     let p = esp_hal::init(esp_hal::Config::default());
 
@@ -152,7 +152,7 @@ mod tests {
             esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
         }
 
-        #[cfg(all(dedicated_gpio, feature = "unstable"))]
+        #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
         let dedicated_gpio = DedicatedGpio::new(peripherals.GPIO_DEDICATED);
 
         Context {
@@ -162,7 +162,7 @@ mod tests {
             delay,
             #[cfg(feature = "unstable")]
             io,
-            #[cfg(all(dedicated_gpio, feature = "unstable"))]
+            #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
             dedicated_gpio,
         }
     }
@@ -621,7 +621,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(dedicated_gpio, feature = "unstable"))]
+    #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
     fn dedicated_gpios(ctx: Context) {
         use esp_hal::gpio::dedicated::{DedicatedGpioInput, DedicatedGpioOutput};
 

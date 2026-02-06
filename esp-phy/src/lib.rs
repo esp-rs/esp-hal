@@ -349,9 +349,9 @@ macro_rules! impl_phy_controller {
         impl<'d> PhyController<'d> for esp_hal::peripherals::$peripheral<'d> {}
     };
 }
-impl_phy_controller!(wifi, WIFI);
-impl_phy_controller!(bt, BT);
-impl_phy_controller!(ieee802154, IEEE802154);
+impl_phy_controller!(soc_has_wifi, WIFI);
+impl_phy_controller!(soc_has_bt, BT);
+impl_phy_controller!(soc_has_ieee802154, IEEE802154);
 
 #[cfg(esp32)]
 /// Trait providing MAC time functionality for the Wi-Fi peripheral.
