@@ -681,7 +681,7 @@ impl<'lt> DedicatedGpioOutput<'lt> {
     /// Returns [`Level::High`] if any of the GPIO pins are set high, otherwise [`Level::Low`].
     #[cfg(not(esp32s3))]
     #[inline(always)]
-    pub fn output_level(&mut self) -> Level {
+    pub fn output_level(&self) -> Level {
         #[cfg(all(debug_assertions, multi_core))]
         debug_assert_eq!(
             self.core,
@@ -838,7 +838,7 @@ impl<'lt> DedicatedGpioFlex<'lt> {
     /// Returns the current output state of the GPIO pin.
     #[cfg(not(esp32s3))]
     #[inline(always)]
-    pub fn output_level(&mut self) -> Level {
+    pub fn output_level(&self) -> Level {
         #[cfg(all(debug_assertions, multi_core))]
         debug_assert_eq!(
             self.core,
