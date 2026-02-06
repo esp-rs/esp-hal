@@ -1728,9 +1728,13 @@ impl Chip {
                     "dedicated_gpio_driver_supported",
                     "interrupts_driver_supported",
                     "pcnt_driver_supported",
+                    "spi_master_driver_supported",
+                    "spi_slave_driver_supported",
                     "systimer_driver_supported",
                     "timergroup_driver_supported",
                     "uart_driver_supported",
+                    "spi_master_spi2",
+                    "spi_slave_spi2",
                     "timergroup_timg0",
                     "timergroup_timg1",
                     "uart_uart0",
@@ -1786,6 +1790,9 @@ impl Chip {
                     "gpio_output_signal_max=\"256\"",
                     "interrupts_status_registers=\"3\"",
                     "interrupt_controller=\"clic\"",
+                    "spi_master_has_app_interrupts",
+                    "spi_master_has_dma_segmented_transfer",
+                    "spi_master_has_clk_pre_div",
                     "timergroup_timg_has_divcnt_rst",
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
@@ -1876,9 +1883,13 @@ impl Chip {
                     "cargo:rustc-cfg=dedicated_gpio_driver_supported",
                     "cargo:rustc-cfg=interrupts_driver_supported",
                     "cargo:rustc-cfg=pcnt_driver_supported",
+                    "cargo:rustc-cfg=spi_master_driver_supported",
+                    "cargo:rustc-cfg=spi_slave_driver_supported",
                     "cargo:rustc-cfg=systimer_driver_supported",
                     "cargo:rustc-cfg=timergroup_driver_supported",
                     "cargo:rustc-cfg=uart_driver_supported",
+                    "cargo:rustc-cfg=spi_master_spi2",
+                    "cargo:rustc-cfg=spi_slave_spi2",
                     "cargo:rustc-cfg=timergroup_timg0",
                     "cargo:rustc-cfg=timergroup_timg1",
                     "cargo:rustc-cfg=uart_uart0",
@@ -1934,6 +1945,9 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_output_signal_max=\"256\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=interrupt_controller=\"clic\"",
+                    "cargo:rustc-cfg=spi_master_has_app_interrupts",
+                    "cargo:rustc-cfg=spi_master_has_dma_segmented_transfer",
+                    "cargo:rustc-cfg=spi_master_has_clk_pre_div",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
@@ -4974,6 +4988,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_lp_slow_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg_calibration_clock)");
     println!("cargo:rustc-check-cfg=cfg(dma_separate_in_out_interrupts)");
+    println!("cargo:rustc-check-cfg=cfg(spi_master_has_clk_pre_div)");
     println!("cargo:rustc-check-cfg=cfg(uart_peripheral_controls_mem_clk)");
     println!("cargo:rustc-check-cfg=cfg(esp32c6)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_atomic)");

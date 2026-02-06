@@ -138,6 +138,24 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
+    ("spi_master.supports_dma") => {
+        false
+    };
+    ("spi_master.has_octal") => {
+        false
+    };
+    ("spi_master.has_app_interrupts") => {
+        true
+    };
+    ("spi_master.has_dma_segmented_transfer") => {
+        true
+    };
+    ("spi_master.has_clk_pre_div") => {
+        true
+    };
+    ("spi_slave.supports_dma") => {
+        false
+    };
     ("timergroup.timg_has_timer1") => {
         false
     };
@@ -1756,8 +1774,12 @@ macro_rules! implement_peripheral_clocks {
         #[repr(u8)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum Peripheral {
+            /// DMA peripheral clock signal
+            Dma,
             /// PCNT peripheral clock signal
             Pcnt,
+            /// SPI2 peripheral clock signal
+            Spi2,
             /// SYSTIMER peripheral clock signal
             Systimer,
             /// TIMG0 peripheral clock signal
@@ -1774,7 +1796,9 @@ macro_rules! implement_peripheral_clocks {
                 &[Self::Systimer, Self::Timg0, Self::Uart0, Self::Uart1];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
+                Self::Dma,
                 Self::Pcnt,
+                Self::Spi2,
                 Self::Systimer,
                 Self::Timg0,
                 Self::Timg1,
@@ -1784,10 +1808,20 @@ macro_rules! implement_peripheral_clocks {
         }
         unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
             match peripheral {
+                Peripheral::Dma => {
+                    crate::peripherals::SYSTEM::regs()
+                        .gdma_conf()
+                        .modify(|_, w| w.gdma_clk_en().bit(enable));
+                }
                 Peripheral::Pcnt => {
                     crate::peripherals::SYSTEM::regs()
                         .pcnt_conf()
                         .modify(|_, w| w.pcnt_clk_en().bit(enable));
+                }
+                Peripheral::Spi2 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .spi2_conf()
+                        .modify(|_, w| w.spi2_clk_en().bit(enable));
                 }
                 Peripheral::Systimer => {
                     crate::peripherals::SYSTEM::regs()
@@ -1826,10 +1860,20 @@ macro_rules! implement_peripheral_clocks {
         }
         unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
             match peripheral {
+                Peripheral::Dma => {
+                    crate::peripherals::SYSTEM::regs()
+                        .gdma_conf()
+                        .modify(|_, w| w.gdma_rst_en().bit(reset));
+                }
                 Peripheral::Pcnt => {
                     crate::peripherals::SYSTEM::regs()
                         .pcnt_conf()
                         .modify(|_, w| w.pcnt_rst_en().bit(reset));
+                }
+                Peripheral::Spi2 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .spi2_conf()
+                        .modify(|_, w| w.spi2_rst_en().bit(reset));
                 }
                 Peripheral::Systimer => {
                     crate::peripherals::SYSTEM::regs()
@@ -2065,6 +2109,63 @@ macro_rules! for_each_uart {
         Uart1, U1RXD, U1TXD, U1CTS, U1RTS)));
     };
 }
+/// This macro can be used to generate code for each peripheral instance of the SPI master driver.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($instance:ident, $sys:ident, $sclk:ident, [$($cs:ident),*] [$($sio:ident),*
+/// $($is_qspi:iteral)?])`
+///
+/// Macro fragments:
+///
+/// - `$instance`: the name of the SPI instance
+/// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
+/// - `$cs`, `$sio`: chip select and SIO signal names.
+/// - `$is_qspi`: a `true` literal present if the SPI instance supports QSPI.
+///
+/// Example data:
+/// - `(SPI2, Spi2, FSPICLK [FSPICS0, FSPICS1, FSPICS2, FSPICS3, FSPICS4, FSPICS5] [FSPID, FSPIQ,
+///   FSPIWP, FSPIHD, FSPIIO4, FSPIIO5, FSPIIO6, FSPIIO7], true)`
+/// - `(SPI3, Spi3, SPI3_CLK [SPI3_CS0, SPI3_CS1, SPI3_CS2] [SPI3_D, SPI3_Q])`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_spi_master {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_spi_master { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_spi_master!((SPI2, Spi2, FSPICLK[FSPICS0, FSPICS1,
+        FSPICS2, FSPICS3, FSPICS4, FSPICS5] [FSPID, FSPIQ, FSPIWP, FSPIHD], true));
+        _for_each_inner_spi_master!((all(SPI2, Spi2, FSPICLK[FSPICS0, FSPICS1, FSPICS2,
+        FSPICS3, FSPICS4, FSPICS5] [FSPID, FSPIQ, FSPIWP, FSPIHD], true)));
+    };
+}
+/// This macro can be used to generate code for each peripheral instance of the SPI slave driver.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($instance:ident, $sys:ident, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident)`
+///
+/// Macro fragments:
+///
+/// - `$instance`: the name of the I2C instance
+/// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
+/// - `$mosi`, `$miso`, `$cs`: signal names.
+///
+/// Example data: `(SPI2, Spi2, FSPICLK, FSPID, FSPIQ, FSPICS0)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_spi_slave {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_spi_slave { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_spi_slave!((SPI2, Spi2, FSPICLK, FSPID, FSPIQ, FSPICS0));
+        _for_each_inner_spi_slave!((all(SPI2, Spi2, FSPICLK, FSPID, FSPIQ, FSPICS0)));
+    };
+}
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_peripheral {
@@ -2248,8 +2349,8 @@ macro_rules! for_each_peripheral {
         "SLC peripheral singleton"] SLC <= SLC() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "SPI2 peripheral singleton"]
         SPI2 <= SPI2(SPI2 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "SYSTEM peripheral singleton"] SYSTEM <= PCR() (unstable)));
+        disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "SYSTEM peripheral singleton"] SYSTEM <= PCR() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "SYSTIMER peripheral singleton"]
         SYSTIMER <= SYSTIMER() (unstable))); _for_each_inner_peripheral!((@ peri_type
         #[doc = "TEE peripheral singleton"] TEE <= TEE() (unstable)));
@@ -2347,7 +2448,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((RSA(unstable)));
         _for_each_inner_peripheral!((SHA(unstable)));
         _for_each_inner_peripheral!((SLC(unstable)));
-        _for_each_inner_peripheral!((SPI2(unstable)));
+        _for_each_inner_peripheral!((SPI2));
         _for_each_inner_peripheral!((SYSTEM(unstable)));
         _for_each_inner_peripheral!((SYSTIMER(unstable)));
         _for_each_inner_peripheral!((TEE(unstable)));
@@ -2527,15 +2628,15 @@ macro_rules! for_each_peripheral {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "SLC peripheral singleton"] SLC <= SLC()
         (unstable)), (@ peri_type #[doc = "SPI2 peripheral singleton"] SPI2 <= SPI2(SPI2
-        : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable)), (@ peri_type #[doc = "SYSTEM peripheral singleton"] SYSTEM <= PCR()
-        (unstable)), (@ peri_type #[doc = "SYSTIMER peripheral singleton"] SYSTIMER <=
-        SYSTIMER() (unstable)), (@ peri_type #[doc = "TEE peripheral singleton"] TEE <=
-        TEE() (unstable)), (@ peri_type #[doc = "TIMG0 peripheral singleton"] TIMG0 <=
-        TIMG0() (unstable)), (@ peri_type #[doc = "TIMG1 peripheral singleton"] TIMG1 <=
-        TIMG1() (unstable)), (@ peri_type #[doc = "TRACE0 peripheral singleton"] TRACE0
-        <= TRACE() (unstable)), (@ peri_type #[doc = "UART0 peripheral singleton"] UART0
-        <= UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
+        : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
+        peri_type #[doc = "SYSTEM peripheral singleton"] SYSTEM <= PCR() (unstable)), (@
+        peri_type #[doc = "SYSTIMER peripheral singleton"] SYSTIMER <= SYSTIMER()
+        (unstable)), (@ peri_type #[doc = "TEE peripheral singleton"] TEE <= TEE()
+        (unstable)), (@ peri_type #[doc = "TIMG0 peripheral singleton"] TIMG0 <= TIMG0()
+        (unstable)), (@ peri_type #[doc = "TIMG1 peripheral singleton"] TIMG1 <= TIMG1()
+        (unstable)), (@ peri_type #[doc = "TRACE0 peripheral singleton"] TRACE0 <=
+        TRACE() (unstable)), (@ peri_type #[doc = "UART0 peripheral singleton"] UART0 <=
+        UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt })), (@ peri_type #[doc = "UART1 peripheral singleton"]
         UART1 <= UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt })), (@ peri_type #[doc =
@@ -2575,7 +2676,7 @@ macro_rules! for_each_peripheral {
         (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)),
         (PARL_IO(unstable)), (PAU(unstable)), (PCNT(unstable)), (PCR(unstable)),
         (PMU(unstable)), (PVT_MONITOR(unstable)), (RMT(unstable)), (RSA(unstable)),
-        (SHA(unstable)), (SLC(unstable)), (SPI2(unstable)), (SYSTEM(unstable)),
+        (SHA(unstable)), (SLC(unstable)), (SPI2), (SYSTEM(unstable)),
         (SYSTIMER(unstable)), (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
         (TRACE0(unstable)), (UART0), (UART1), (USB_DEVICE(unstable)), (BT(unstable)),
         (FLASH(unstable)), (GPIO_DEDICATED(unstable)), (LP_CORE(unstable)),

@@ -249,6 +249,9 @@ macro_rules! property {
     ("spi_master.has_dma_segmented_transfer") => {
         false
     };
+    ("spi_master.has_clk_pre_div") => {
+        false
+    };
     ("spi_slave.supports_dma") => {
         true
     };

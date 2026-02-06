@@ -237,7 +237,6 @@ impl Clocks {
     }
 
     /// Get the active clock configuration.
-    #[cfg_attr(all(not(feature = "unstable"), esp32c5), expect(dead_code))]
     pub fn get<'a>() -> &'a Clocks {
         unwrap!(Self::try_get())
     }
