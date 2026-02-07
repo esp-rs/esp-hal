@@ -7,7 +7,9 @@ use strum::IntoEnumIterator;
 use crate::Package;
 
 /// Commands for performing semver checks on the public API of packages.
-#[derive(Debug, Subcommand)]
+#[derive(Debug, Clone, Copy, Subcommand, serde::Deserialize, serde::Serialize)]
+#[cfg_attr(feature = "mcp", derive(schemars::JsonSchema))]
+#[serde(rename_all = "kebab-case")]
 pub enum SemverCheckCmd {
     GenerateBaseline,
     Check,

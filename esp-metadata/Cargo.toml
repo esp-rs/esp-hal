@@ -21,6 +21,7 @@ anyhow       = "1.0"
 clap         = { version = "4.5", features = ["derive"], optional = true }
 convert_case = "0.8"
 basic-toml   = "0.1"
+schemars     = { version = "1", optional = true }
 serde        = { version = "1.0", default-features = false, features = ["derive"] }
 somni-parser = "0.2.1"
 somni-expr   = "0.2"
@@ -32,3 +33,4 @@ indexmap     = { version = "2", features = ["serde"] }
 [features]
 default = []
 clap = ["dep:clap"]
+schemars = ["dep:schemars"]

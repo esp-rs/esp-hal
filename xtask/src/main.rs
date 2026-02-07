@@ -17,6 +17,9 @@ use xtask::{
     update_metadata,
 };
 
+#[cfg(feature = "mcp")]
+mod mcp;
+
 // ----------------------------------------------------------------------------
 // Command-line Interface
 
@@ -61,6 +64,13 @@ enum Cli {
     #[cfg(feature = "rel-check")]
     #[clap(subcommand)]
     RelCheck(relcheck::RelCheckCmds),
+    /// Start the MCP (Model Context Protocol) server for AI agent integration.
+    ///
+    /// The MCP server exposes all xtask operations as tools that can be called
+    /// by AI agents like GitHub Copilot, Claude, or other MCP-compatible clients.
+    /// Communication happens over stdio using JSON-RPC 2.0.
+    #[cfg(feature = "mcp")]
+    Mcp,
 }
 
 #[derive(Debug, Args)]
@@ -234,6 +244,12 @@ fn main() -> Result<()> {
         Cli::GenerateReport(args) => generate_report::generate_report(&workspace, args),
         #[cfg(feature = "rel-check")]
         Cli::RelCheck(relcheck) => relcheck::run_rel_check(relcheck),
+        #[cfg(feature = "mcp")]
+        Cli::Mcp => {
+            // Run the MCP server using tokio runtime
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(mcp::run_mcp_server(workspace))
+        }
     }
 }
 

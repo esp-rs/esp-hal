@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "esp-hal-xtask": {
+      "type": "stdio",
+      "command": "cargo",
+      "args": ["xmcp"],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}

@@ -17,10 +17,10 @@ mod check_changelog;
 pub mod generate_report;
 #[cfg(feature = "semver-checks")]
 pub(crate) mod generate_rom_symbols;
-mod release;
-mod run;
 #[cfg(feature = "rel-check")]
 pub mod relcheck;
+mod release;
+mod run;
 
 // ----------------------------------------------------------------------------
 // Subcommand Arguments

@@ -44,6 +44,7 @@ pub mod semver_check;
     serde::Deserialize,
     serde::Serialize,
 )]
+#[cfg_attr(feature = "mcp", derive(schemars::JsonSchema))]
 #[serde(rename_all = "kebab-case")]
 #[strum(serialize_all = "kebab-case")]
 /// Represents the packages in the `esp-hal` workspace.
@@ -496,7 +497,9 @@ impl Package {
 }
 
 #[derive(Debug, Clone, Copy, strum::Display, clap::ValueEnum, Serialize, Deserialize)]
+#[cfg_attr(feature = "mcp", derive(schemars::JsonSchema))]
 #[strum(serialize_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 /// Represents the versioning scheme for a package.
 pub enum Version {
     Major,
