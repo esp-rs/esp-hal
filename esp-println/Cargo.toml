@@ -15,7 +15,7 @@ links         = "esp-println"
 doc-config = { features = ["auto", "defmt-espflash", "critical-section"] }
 check-configs = [
     { features = ["auto"] },
-    { features = ["jtag-serial"], if = 'chip_has("soc_has_usb_serial_jtag")' },
+    { features = ["jtag-serial"], if = 'chip_has("soc_has_usb_device")' },
     { features = ["uart"] },
     { features = ["no-op"] },
     { features = ["auto", "log-04", "timestamp"] },
