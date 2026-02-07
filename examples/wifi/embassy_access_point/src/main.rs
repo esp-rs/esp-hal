@@ -129,8 +129,6 @@ async fn main(spawner: Spawner) -> ! {
             continue;
         }
 
-        use embedded_io_async::Write;
-
         let mut buffer = [0u8; 1024];
         let mut pos = 0;
         loop {
@@ -159,7 +157,7 @@ async fn main(spawner: Spawner) -> ! {
         }
 
         let r = socket
-            .write_all(
+            .write(
                 b"HTTP/1.0 200 OK\r\n\r\n\
             <html>\
                 <body>\
