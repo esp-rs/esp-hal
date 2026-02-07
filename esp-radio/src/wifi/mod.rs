@@ -1830,6 +1830,10 @@ pub struct CountryInfo {
     /// Operating class.
     #[builder_lite(unstable)]
     operating_class: OperatingClass,
+
+    /// Maximum Wi-Fi Transmitting Power.
+    #[builder_lite(unstable)]
+    max_tx_power: i8,
 }
 
 impl From<[u8; 2]> for CountryInfo {
@@ -1837,6 +1841,7 @@ impl From<[u8; 2]> for CountryInfo {
         Self {
             country,
             operating_class: OperatingClass::default(),
+            max_tx_power: 20,
         }
     }
 }
@@ -1849,10 +1854,10 @@ impl CountryInfo {
                 self.country[1],
                 self.operating_class.into_code(),
             ],
+            max_tx_power: self.max_tx_power,
             // TODO: these may be valid defaults, but they should be configurable.
             schan: 1,
             nchan: 13,
-            max_tx_power: 20,
             policy: wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
         }
     }
@@ -1864,6 +1869,7 @@ impl CountryInfo {
         Some(Self {
             country: [cc[0], cc[1]],
             operating_class,
+            max_tx_power: info.max_tx_power,
         })
     }
 }
@@ -2491,6 +2497,14 @@ impl WifiController<'_> {
         esp_wifi_result!(unsafe { esp_wifi_set_channel(primary, secondary as u32) })?;
 
         Ok(())
+    }
+
+    /// Set maximum transmitting power after WiFi start.
+    ///
+    /// Power unit is 0.25dBm, range is [8, 84] corresponding to 2dBm - 20dBm.
+    #[instability::unstable]
+    pub fn set_max_tx_power(&mut self, power: i8) -> Result<(), WifiError> {
+        esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(power) })
     }
 
     fn stop_impl(&mut self) -> Result<(), WifiError> {
