@@ -210,7 +210,12 @@ impl Package {
 
     fn parse_conditional_features(table: &InlineTable, config: &Config) -> Option<Vec<String>> {
         let mut eval_context = somni_expr::Context::new();
-        eval_context.add_function("chip_has", |symbol: &str| {
+        let possible_symbols = Chip::list_of_possible_symbols();
+        eval_context.add_function("chip_has", move |symbol: &str| {
+            assert!(
+                possible_symbols.contains_key(symbol),
+                "Unknown chip symbol: {symbol}",
+            );
             config.all().iter().any(|sym| sym == symbol)
         });
         eval_context.add_variable("chip", config.name());

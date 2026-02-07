@@ -201,6 +201,35 @@ impl Chip {
         !self.is_xtensa()
     }
 
+    pub fn list_of_possible_symbols() -> IndexMap<String, Option<Vec<String>>> {
+        let mut cfgs: IndexMap<String, Option<Vec<String>>> = IndexMap::new();
+
+        for chip in Chip::iter() {
+            let config = Config::for_chip(&chip);
+            for symbol in config.all() {
+                if let Some((symbol_name, symbol_value)) = symbol.split_once('=') {
+                    let symbol_name = symbol_name.replace('.', "_");
+                    let entry = cfgs.entry(symbol_name).or_default();
+                    let vec = entry.get_or_insert_with(Vec::new);
+
+                    // Avoid duplicates in the same cfg.
+                    if !vec.contains(&symbol_value.to_string()) {
+                        vec.push(symbol_value.to_string());
+                    }
+                } else {
+                    // https://doc.rust-lang.org/cargo/reference/build-scripts.html#rustc-check-cfg
+                    let cfg = symbol.replace('.', "_");
+
+                    if !cfgs.contains_key(&cfg) {
+                        cfgs.insert(cfg, None);
+                    }
+                }
+            }
+        }
+
+        cfgs
+    }
+
     pub fn list_of_check_cfgs() -> Vec<String> {
         let mut cfgs = vec![];
 
@@ -208,37 +237,20 @@ impl Chip {
         cfgs.push(String::from("cargo:rustc-check-cfg=cfg(not_really_docsrs)"));
         cfgs.push(String::from("cargo:rustc-check-cfg=cfg(semver_checks)"));
 
-        let mut cfg_values: IndexMap<String, Vec<String>> = IndexMap::new();
-
-        for chip in Chip::iter() {
-            let config = Config::for_chip(&chip);
-            for symbol in config.all() {
-                if let Some((symbol_name, symbol_value)) = symbol.split_once('=') {
-                    // cfg's with values need special syntax, so let's collect all
-                    // of them separately.
-                    let symbol_name = symbol_name.replace('.', "_");
-                    let entry = cfg_values.entry(symbol_name).or_default();
-                    // Avoid duplicates in the same cfg.
-                    if !entry.contains(&symbol_value.to_string()) {
-                        entry.push(symbol_value.to_string());
-                    }
-                } else {
-                    // https://doc.rust-lang.org/cargo/reference/build-scripts.html#rustc-check-cfg
-                    let cfg = format!("cargo:rustc-check-cfg=cfg({})", symbol.replace('.', "_"));
-
-                    if !cfgs.contains(&cfg) {
-                        cfgs.push(cfg);
-                    }
-                }
+        let possible_symbols = Self::list_of_possible_symbols();
+        for (sym, values) in possible_symbols.iter() {
+            if values.is_none() {
+                cfgs.push(format!("cargo:rustc-check-cfg=cfg({})", sym));
             }
         }
 
-        // Now output all cfgs with values.
-        for (symbol_name, symbol_values) in cfg_values {
-            cfgs.push(format!(
-                "cargo:rustc-check-cfg=cfg({symbol_name}, values({}))",
-                symbol_values.join(",")
-            ));
+        for (sym, values) in possible_symbols.iter() {
+            if let Some(values) = values {
+                cfgs.push(format!(
+                    "cargo:rustc-check-cfg=cfg({sym}, values({}))",
+                    values.join(",")
+                ));
+            }
         }
 
         cfgs
