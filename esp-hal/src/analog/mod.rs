@@ -5,7 +5,7 @@
 //! available on the device. For more information about a peripheral driver,
 //! please refer to the relevant module documentation.
 
-#[cfg(adc)]
+#[cfg(adc_driver_supported)]
 pub mod adc;
-#[cfg(dac)]
+#[cfg(dac_driver_supported)]
 pub mod dac;

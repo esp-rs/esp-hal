@@ -924,7 +924,7 @@ mod asynch {
 }
 
 /// Event Task Matrix
-#[cfg(etm)]
+#[cfg(etm_driver_supported)]
 pub mod etm {
     use super::*;
     use crate::etm::{EtmEvent, EtmTask};

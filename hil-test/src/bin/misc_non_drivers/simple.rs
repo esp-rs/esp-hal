@@ -47,7 +47,7 @@ mod tests {
         );
     }
 
-    #[cfg(systimer)]
+    #[cfg(systimer_driver_supported)]
     #[test]
     fn test_current_time_construct_systimer(ctx: Context) {
         time_moves_forward_during(ctx, |ctx| {
@@ -198,7 +198,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(usb_serial_jtag)]
+    #[cfg(usb_serial_jtag_driver_supported)]
     fn creating_peripheral_does_not_break_debug_connection(ctx: Context) {
         use esp_hal::usb_serial_jtag::UsbSerialJtag;
 

@@ -104,6 +104,22 @@ impl Package {
             .any(|(feature, _)| chips.iter().any(|c| c == feature))
     }
 
+    /// Is the package compatible with the given chip?
+    pub fn supports_chip(&self, chip: Chip) -> bool {
+        if !self.has_chip_features() {
+            // Chip-independent package
+            return true;
+        }
+
+        let toml = self.toml();
+        let Some(Item::Table(features)) = toml.manifest.get("features") else {
+            unreachable!("has_chip_features() already checked for a features table");
+        };
+
+        let chip_name = chip.to_string();
+        features.iter().any(|(feature, _)| feature == chip_name)
+    }
+
     /// Does the package have inline assembly?
     pub fn has_inline_assembly(&self, workspace: &Path) -> bool {
         // feature(asm_experimental_arch) is enabled in all crates that use Xtensa
@@ -423,6 +439,12 @@ impl Package {
         if self.targets_lp_core() && !chip.has_lp_core() {
             return Err(anyhow!(
                 "Package '{self}' requires an LP core, but '{chip}' does not have one",
+            ));
+        }
+
+        if !self.supports_chip(*chip) {
+            return Err(anyhow!(
+                "Package '{self}' does not have a chip feature for {chip}"
             ));
         }
 

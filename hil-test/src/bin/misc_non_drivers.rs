@@ -32,7 +32,7 @@ mod clock_monitor;
 mod critical_section;
 
 #[path = "misc_non_drivers/delay_async.rs"]
-#[cfg(timergroup)]
+#[cfg(timergroup_driver_supported)]
 mod delay_async;
 
 #[path = "misc_non_drivers/dma_macros.rs"]
