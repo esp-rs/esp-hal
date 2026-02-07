@@ -126,6 +126,22 @@ impl Package {
             .any(|line| line.contains("asm_experimental_arch"))
     }
 
+    /// Is the package compatible with the given chip?
+    pub fn supports_chip(&self, chip: Chip) -> bool {
+        if !self.has_chip_features() {
+            // Chip-independent package
+            return true;
+        }
+
+        let toml = self.toml();
+        let Some(Item::Table(features)) = toml.manifest.get("features") else {
+            unreachable!("has_chip_features() already checked for a features table");
+        };
+
+        let chip_name = chip.to_string();
+        features.iter().any(|(feature, _)| feature == chip_name)
+    }
+
     /// Does the package have a migration guide?
     pub fn has_migration_guide(&self, workspace: &Path) -> bool {
         let package_path = workspace.join(self.to_string());
@@ -431,8 +447,13 @@ impl Package {
             ));
         }
 
-        let toml = self.toml();
+        if !self.supports_chip(*chip) {
+            return Err(anyhow!(
+                "Package '{self}' does not have a chip feature for {chip}"
+            ));
+        }
 
+        let toml = self.toml();
         if let Some(metadata) = toml.espressif_metadata()
             && let Some(Item::Value(Value::Array(targets))) = metadata.get("requires_target")
             && !targets.iter().any(|t| t.as_str() == Some(&chip.target()))
