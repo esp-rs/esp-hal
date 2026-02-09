@@ -51,25 +51,16 @@ mod tests {
         controller.start_async().await.unwrap();
 
         let scan_config = ScanConfig::default().with_max(1);
-        let _ = controller
-            .scan_with_config_async(scan_config)
-            .await
-            .unwrap();
+        let _ = controller.scan_async(scan_config).await.unwrap();
 
         let mut min_free = usize::MAX;
         for _ in 0..30 {
-            let _ = controller
-                .scan_with_config_async(scan_config)
-                .await
-                .unwrap();
+            let _ = controller.scan_async(scan_config).await.unwrap();
             min_free = usize::min(min_free, esp_alloc::HEAP.free());
         }
 
         for _ in 0..10 {
-            let _ = controller
-                .scan_with_config_async(scan_config)
-                .await
-                .unwrap();
+            let _ = controller.scan_async(scan_config).await.unwrap();
             assert!(
                 esp_alloc::HEAP.free() >= min_free,
                 "current free: {}, min free: {}",
