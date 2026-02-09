@@ -3311,8 +3311,6 @@ impl Chip {
                     "psram",
                     "psram_dma",
                     "ulp_riscv_core",
-                    "soc_has_copy_dma",
-                    "soc_has_crypto_dma",
                     "rom_crc_le",
                     "rom_md5_bsd",
                     "pm_support_ext0_wakeup",
@@ -3524,8 +3522,6 @@ impl Chip {
                     "cargo:rustc-cfg=psram",
                     "cargo:rustc-cfg=psram_dma",
                     "cargo:rustc-cfg=ulp_riscv_core",
-                    "cargo:rustc-cfg=soc_has_copy_dma",
-                    "cargo:rustc-cfg=soc_has_crypto_dma",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_md5_bsd",
                     "cargo:rustc-cfg=pm_support_ext0_wakeup",
@@ -4987,8 +4983,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_ulp_riscv_core)");
     println!("cargo:rustc-check-cfg=cfg(psram_dma)");
     println!("cargo:rustc-check-cfg=cfg(ulp_riscv_core)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_copy_dma)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_crypto_dma)");
     println!("cargo:rustc-check-cfg=cfg(riscv_coproc_supported)");
     println!("cargo:rustc-check-cfg=cfg(usb_otg_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ref_tick_ck8m)");
