@@ -2729,6 +2729,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((MEM2MEM6(unstable)));
         _for_each_inner_peripheral!((MEM2MEM7(unstable)));
         _for_each_inner_peripheral!((MEM2MEM8(unstable)));
+        _for_each_inner_peripheral!((Spi2, 0)); _for_each_inner_peripheral!((Sha, 7));
         _for_each_inner_peripheral!((all(@ peri_type #[doc =
         "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type #[doc =
         "GPIO1 peripheral singleton"] GPIO1 <= virtual()), (@ peri_type #[doc =
@@ -2894,7 +2895,8 @@ macro_rules! for_each_peripheral {
         (SW_INTERRUPT(unstable)), (WIFI(unstable)), (MEM2MEM1(unstable)),
         (MEM2MEM2(unstable)), (MEM2MEM3(unstable)), (MEM2MEM4(unstable)),
         (MEM2MEM5(unstable)), (MEM2MEM6(unstable)), (MEM2MEM7(unstable)),
-        (MEM2MEM8(unstable))));
+        (MEM2MEM8(unstable)))); _for_each_inner_peripheral!((dma_eligible(Spi2, 0), (Sha,
+        7)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

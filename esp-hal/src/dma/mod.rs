@@ -875,51 +875,20 @@ pub enum DmaPriority {
     Priority9 = 9,
 }
 
-/// DMA capable peripherals
-/// The values need to match the TRM
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[doc(hidden)]
-pub enum DmaPeripheral {
-    Spi2      = 0,
-    #[cfg(any(dma_kind = "pdma", esp32s3))]
-    Spi3      = 1,
-    #[cfg(any(esp32c2, esp32c6, esp32h2))]
-    Mem2Mem1  = 1,
-    #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
-    Uhci0     = 2,
-    #[cfg(any(esp32, esp32s2, esp32c3, esp32c6, esp32h2, esp32s3))]
-    I2s0      = 3,
-    #[cfg(any(esp32, esp32s3))]
-    I2s1      = 4,
-    #[cfg(any(esp32c6, esp32h2))]
-    Mem2Mem4  = 4,
-    #[cfg(esp32s3)]
-    LcdCam    = 5,
-    #[cfg(any(esp32c6, esp32h2))]
-    Mem2Mem5  = 5,
-    #[cfg(not(esp32c2))]
-    Aes       = 6,
-    #[cfg(any(esp32s2, dma_kind = "gdma"))]
-    Sha       = 7,
-    #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
-    Adc       = 8,
-    #[cfg(esp32s3)]
-    Rmt       = 9,
-    #[cfg(soc_has_parl_io)]
-    ParlIo    = 9,
-    #[cfg(any(esp32c6, esp32h2))]
-    Mem2Mem10 = 10,
-    #[cfg(any(esp32c6, esp32h2))]
-    Mem2Mem11 = 11,
-    #[cfg(any(esp32c6, esp32h2))]
-    Mem2Mem12 = 12,
-    #[cfg(any(esp32c6, esp32h2))]
-    Mem2Mem13 = 13,
-    #[cfg(any(esp32c6, esp32h2))]
-    Mem2Mem14 = 14,
-    #[cfg(any(esp32c6, esp32h2))]
-    Mem2Mem15 = 15,
+for_each_peripheral! {
+    (dma_eligible $(( $name:ident, $id:literal )),*) => {
+        /// DMA capable peripherals
+        /// The values need to match the TRM
+        #[derive(Debug, Clone, Copy, PartialEq)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)]
+        pub enum DmaPeripheral {
+            $(
+                #[doc = concat!("DMA accesses ", stringify!($name))]
+                $name = $id,
+            )*
+        }
+    };
 }
 
 /// The owner bit of a DMA descriptor.

@@ -3525,6 +3525,9 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((PSRAM(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
         _for_each_inner_peripheral!((ULP_RISCV_CORE(unstable)));
+        _for_each_inner_peripheral!((I2s0, 0)); _for_each_inner_peripheral!((Spi2, 1));
+        _for_each_inner_peripheral!((Spi3, 2)); _for_each_inner_peripheral!((Uhci0, 3));
+        _for_each_inner_peripheral!((Aes, 4)); _for_each_inner_peripheral!((Sha, 5));
         _for_each_inner_peripheral!((all(@ peri_type #[doc =
         "GPIO0 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
@@ -3782,6 +3785,8 @@ macro_rules! for_each_peripheral {
         (DMA_COPY(unstable)), (ADC1(unstable)), (ADC2(unstable)), (DAC1(unstable)),
         (DAC2(unstable)), (FLASH(unstable)), (GPIO_DEDICATED(unstable)),
         (PSRAM(unstable)), (SW_INTERRUPT(unstable)), (ULP_RISCV_CORE(unstable))));
+        _for_each_inner_peripheral!((dma_eligible(I2s0, 0), (Spi2, 1), (Spi3, 2), (Uhci0,
+        3), (Aes, 4), (Sha, 5)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

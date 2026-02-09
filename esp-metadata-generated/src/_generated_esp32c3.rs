@@ -3305,9 +3305,13 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((GPIO_DEDICATED(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
         _for_each_inner_peripheral!((TSENS(unstable)));
-        _for_each_inner_peripheral!((WIFI(unstable))); _for_each_inner_peripheral!((all(@
-        peri_type #[doc = "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type
-        #[doc = "GPIO1 peripheral singleton"] GPIO1 <= virtual()), (@ peri_type #[doc =
+        _for_each_inner_peripheral!((WIFI(unstable))); _for_each_inner_peripheral!((Spi2,
+        0)); _for_each_inner_peripheral!((Uhci0, 2)); _for_each_inner_peripheral!((I2s0,
+        3)); _for_each_inner_peripheral!((Aes, 6)); _for_each_inner_peripheral!((Sha,
+        7)); _for_each_inner_peripheral!((ApbSaradc, 8));
+        _for_each_inner_peripheral!((all(@ peri_type #[doc =
+        "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type #[doc =
+        "GPIO1 peripheral singleton"] GPIO1 <= virtual()), (@ peri_type #[doc =
         "GPIO2 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
         "<section class=\"warning\">"] #[doc =
         "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
@@ -3490,6 +3494,8 @@ macro_rules! for_each_peripheral {
         (DMA_CH0(unstable)), (DMA_CH1(unstable)), (DMA_CH2(unstable)), (ADC1(unstable)),
         (ADC2(unstable)), (BT(unstable)), (FLASH(unstable)), (GPIO_DEDICATED(unstable)),
         (SW_INTERRUPT(unstable)), (TSENS(unstable)), (WIFI(unstable))));
+        _for_each_inner_peripheral!((dma_eligible(Spi2, 0), (Uhci0, 2), (I2s0, 3), (Aes,
+        6), (Sha, 7), (ApbSaradc, 8)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

@@ -1720,6 +1720,15 @@ impl Chip {
                     "soc_has_lp_core",
                     "soc_has_sw_interrupt",
                     "soc_has_wifi",
+                    "soc_has_mem2mem0",
+                    "soc_has_mem2mem4",
+                    "soc_has_mem2mem5",
+                    "soc_has_mem2mem10",
+                    "soc_has_mem2mem11",
+                    "soc_has_mem2mem12",
+                    "soc_has_mem2mem13",
+                    "soc_has_mem2mem14",
+                    "soc_has_mem2mem15",
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
@@ -1852,6 +1861,15 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_lp_core",
                     "cargo:rustc-cfg=soc_has_sw_interrupt",
                     "cargo:rustc-cfg=soc_has_wifi",
+                    "cargo:rustc-cfg=soc_has_mem2mem0",
+                    "cargo:rustc-cfg=soc_has_mem2mem4",
+                    "cargo:rustc-cfg=soc_has_mem2mem5",
+                    "cargo:rustc-cfg=soc_has_mem2mem10",
+                    "cargo:rustc-cfg=soc_has_mem2mem11",
+                    "cargo:rustc-cfg=soc_has_mem2mem12",
+                    "cargo:rustc-cfg=soc_has_mem2mem13",
+                    "cargo:rustc-cfg=soc_has_mem2mem14",
+                    "cargo:rustc-cfg=soc_has_mem2mem15",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
@@ -4912,6 +4930,13 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_tee)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_trace0)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_core)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem0)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem10)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem11)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem12)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem13)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem14)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem15)");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_has_branch_predictor)");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_csr_prv_mode_is_set)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f12m)");
@@ -4937,12 +4962,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_otp_debug)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_plic_mx)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_twai1)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem10)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem11)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem12)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem13)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem14)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem15)");
     println!("cargo:rustc-check-cfg=cfg(lp_core)");
     println!("cargo:rustc-check-cfg=cfg(pm_support_beacon_wakeup)");
     println!("cargo:rustc-check-cfg=cfg(etm_driver_supported)");
