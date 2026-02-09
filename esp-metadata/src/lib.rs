@@ -416,7 +416,7 @@ impl Config {
                 self.device
                     .peri_config
                     .driver_names()
-                    .map(|name| name.to_string()),
+                    .map(|name| format!("{name}_driver_supported")),
             );
             all.extend(self.device.peri_config.driver_instances());
 

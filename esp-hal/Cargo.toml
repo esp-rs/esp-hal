@@ -15,23 +15,23 @@ exclude = [ "api-baseline", "MIGRATING-*", "CHANGELOG.md" ]
 semver-checked = true
 doc-config = { features = ["unstable", "rt"], append = [
     { if = 'chip_has("psram")', features = ["psram"] },
-    { if = 'chip_has("soc_has_usb0")', features = ["__usb_otg"] },
-    { if = 'chip_has("bt")', features = ["__bluetooth"] },
+    { if = 'chip_has("usb_otg_driver_supported")', features = ["__usb_otg"] },
+    { if = 'chip_has("bt_driver_supported")', features = ["__bluetooth"] },
 ] }
 check-configs = [
     { features = [] },
     { features = ["rt"] },
     { features = ["unstable", "rt"] },
     { features = ["unstable", "rt", "psram"], if = 'chip_has("psram")' },
-    { features = ["unstable", "rt", "__usb_otg"], if = 'chip_has("soc_has_usb0")' },
-    { features = ["unstable", "rt", "__bluetooth"], if = 'chip_has("bt")' },
+    { features = ["unstable", "rt", "__usb_otg"], if = 'chip_has("usb_otg_driver_supported")' },
+    { features = ["unstable", "rt", "__bluetooth"], if = 'chip_has("bt_driver_supported")' },
 ]
 # Prefer fewer, but more complex clippy rules. A clippy run should cover as much code as possible.
 clippy-configs = [
     { features = ["unstable", "rt"], append = [
         { if = 'chip_has("psram")', features = ["psram"] },
-        { if = 'chip_has("soc_has_usb0")', features = ["__usb_otg"] },
-        { if = 'chip_has("bt")', features = ["__bluetooth"] },
+        { if = 'chip_has("usb_otg_driver_supported")', features = ["__usb_otg"] },
+        { if = 'chip_has("bt_driver_supported")', features = ["__bluetooth"] },
     ] },
 ]
 

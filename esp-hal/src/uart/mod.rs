@@ -2697,7 +2697,7 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
 }
 
 /// Low-power UART
-#[cfg(lp_uart)]
+#[cfg(lp_uart_driver_supported)]
 #[instability::unstable]
 pub mod lp_uart {
     use crate::{
