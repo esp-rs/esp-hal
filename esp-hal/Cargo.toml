@@ -15,23 +15,23 @@ exclude = [ "api-baseline", "MIGRATING-*", "CHANGELOG.md" ]
 semver-checked = true
 doc-config = { features = ["unstable", "rt"], append = [
     { if = 'chip_has("psram")', features = ["psram"] },
-    { if = 'chip_has("soc_has_usb0")', features = ["__usb_otg"] },
-    { if = 'chip_has("bt")', features = ["__bluetooth"] },
+    { if = 'chip_has("usb_otg_driver_supported")', features = ["__usb_otg"] },
+    { if = 'chip_has("bt_driver_supported")', features = ["__bluetooth"] },
 ] }
 check-configs = [
     { features = [] },
     { features = ["rt"] },
     { features = ["unstable", "rt"] },
     { features = ["unstable", "rt", "psram"], if = 'chip_has("psram")' },
-    { features = ["unstable", "rt", "__usb_otg"], if = 'chip_has("soc_has_usb0")' },
-    { features = ["unstable", "rt", "__bluetooth"], if = 'chip_has("bt")' },
+    { features = ["unstable", "rt", "__usb_otg"], if = 'chip_has("usb_otg_driver_supported")' },
+    { features = ["unstable", "rt", "__bluetooth"], if = 'chip_has("bt_driver_supported")' },
 ]
 # Prefer fewer, but more complex clippy rules. A clippy run should cover as much code as possible.
 clippy-configs = [
     { features = ["unstable", "rt"], append = [
         { if = 'chip_has("psram")', features = ["psram"] },
-        { if = 'chip_has("soc_has_usb0")', features = ["__usb_otg"] },
-        { if = 'chip_has("bt")', features = ["__bluetooth"] },
+        { if = 'chip_has("usb_otg_driver_supported")', features = ["__usb_otg"] },
+        { if = 'chip_has("bt_driver_supported")', features = ["__bluetooth"] },
     ] },
 ]
 
@@ -104,14 +104,14 @@ ufmt-write               = { version = "0.1", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { version = "0.39", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b4d0bf5" }
-esp32c2 = { version = "0.28", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b4d0bf5" }
-esp32c3 = { version = "0.31", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b4d0bf5" }
-esp32c5 = { version = "0.1",  features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b4d0bf5" }
-esp32c6 = { version = "0.22", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b4d0bf5" }
-esp32h2 = { version = "0.18", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b4d0bf5" }
-esp32s2 = { version = "0.30", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b4d0bf5" }
-esp32s3 = { version = "0.34", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b4d0bf5" }
+esp32   = { version = "0.39", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "17ac10a" }
+esp32c2 = { version = "0.28", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "17ac10a" }
+esp32c3 = { version = "0.31", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "17ac10a" }
+esp32c5 = { version = "0.1",  features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "17ac10a" }
+esp32c6 = { version = "0.22", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "17ac10a" }
+esp32h2 = { version = "0.18", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "17ac10a" }
+esp32s2 = { version = "0.30", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "17ac10a" }
+esp32s3 = { version = "0.34", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "17ac10a" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.15.0" }

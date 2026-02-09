@@ -42,6 +42,9 @@ macro_rules! property {
     ("soc.cpu_has_csr_pc") => {
         false
     };
+    ("soc.multi_core_enabled") => {
+        false
+    };
     ("soc.cpu_csr_prv_mode") => {
         2064
     };
@@ -54,11 +57,65 @@ macro_rules! property {
     ("soc.rc_fast_clk_default", str) => {
         stringify!(17500000)
     };
+    ("gpio.has_bank_1") => {
+        false
+    };
+    ("gpio.gpio_function") => {
+        1
+    };
+    ("gpio.gpio_function", str) => {
+        stringify!(1)
+    };
+    ("gpio.constant_0_input") => {
+        96
+    };
+    ("gpio.constant_0_input", str) => {
+        stringify!(96)
+    };
+    ("gpio.constant_1_input") => {
+        64
+    };
+    ("gpio.constant_1_input", str) => {
+        stringify!(64)
+    };
+    ("gpio.remap_iomux_pin_registers") => {
+        false
+    };
+    ("gpio.func_in_sel_offset") => {
+        0
+    };
+    ("gpio.func_in_sel_offset", str) => {
+        stringify!(0)
+    };
+    ("gpio.input_signal_max") => {
+        116
+    };
+    ("gpio.input_signal_max", str) => {
+        stringify!(116)
+    };
+    ("gpio.output_signal_max") => {
+        256
+    };
+    ("gpio.output_signal_max", str) => {
+        stringify!(256)
+    };
+    ("dedicated_gpio.needs_initialization") => {
+        false
+    };
+    ("dedicated_gpio.channel_count") => {
+        8
+    };
+    ("dedicated_gpio.channel_count", str) => {
+        stringify!(8)
+    };
     ("interrupts.status_registers") => {
         3
     };
     ("interrupts.status_registers", str) => {
         stringify!(3)
+    };
+    ("interrupts.disabled_interrupt") => {
+        0
     };
     ("timergroup.timg_has_timer1") => {
         false
@@ -1787,13 +1844,122 @@ macro_rules! memory_range {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_dedicated_gpio {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_dedicated_gpio { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_dedicated_gpio!((0));
+        _for_each_inner_dedicated_gpio!((1)); _for_each_inner_dedicated_gpio!((2));
+        _for_each_inner_dedicated_gpio!((3)); _for_each_inner_dedicated_gpio!((4));
+        _for_each_inner_dedicated_gpio!((5)); _for_each_inner_dedicated_gpio!((6));
+        _for_each_inner_dedicated_gpio!((7)); _for_each_inner_dedicated_gpio!((0, 0,
+        CPU_GPIO_0)); _for_each_inner_dedicated_gpio!((0, 1, CPU_GPIO_1));
+        _for_each_inner_dedicated_gpio!((0, 2, CPU_GPIO_2));
+        _for_each_inner_dedicated_gpio!((0, 3, CPU_GPIO_3));
+        _for_each_inner_dedicated_gpio!((0, 4, CPU_GPIO_4));
+        _for_each_inner_dedicated_gpio!((0, 5, CPU_GPIO_5));
+        _for_each_inner_dedicated_gpio!((0, 6, CPU_GPIO_6));
+        _for_each_inner_dedicated_gpio!((0, 7, CPU_GPIO_7));
+        _for_each_inner_dedicated_gpio!((channels(0), (1), (2), (3), (4), (5), (6),
+        (7))); _for_each_inner_dedicated_gpio!((signals(0, 0, CPU_GPIO_0), (0, 1,
+        CPU_GPIO_1), (0, 2, CPU_GPIO_2), (0, 3, CPU_GPIO_3), (0, 4, CPU_GPIO_4), (0, 5,
+        CPU_GPIO_5), (0, 6, CPU_GPIO_6), (0, 7, CPU_GPIO_7)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_interrupt {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_interrupt { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_interrupt!(([disabled 0] 0));
+        _for_each_inner_interrupt!(([reserved 0] 1));
+        _for_each_inner_interrupt!(([reserved 1] 2));
+        _for_each_inner_interrupt!(([reserved 2] 3));
+        _for_each_inner_interrupt!(([reserved 3] 4));
+        _for_each_inner_interrupt!(([reserved 4] 5));
+        _for_each_inner_interrupt!(([reserved 5] 6));
+        _for_each_inner_interrupt!(([reserved 6] 7));
+        _for_each_inner_interrupt!(([reserved 7] 8));
+        _for_each_inner_interrupt!(([reserved 8] 9));
+        _for_each_inner_interrupt!(([reserved 9] 10));
+        _for_each_inner_interrupt!(([reserved 10] 11));
+        _for_each_inner_interrupt!(([reserved 11] 12));
+        _for_each_inner_interrupt!(([reserved 12] 13));
+        _for_each_inner_interrupt!(([reserved 13] 14));
+        _for_each_inner_interrupt!(([reserved 14] 15));
+        _for_each_inner_interrupt!(([vector 0] 16)); _for_each_inner_interrupt!(([vector
+        1] 17)); _for_each_inner_interrupt!(([vector 2] 18));
+        _for_each_inner_interrupt!(([vector 3] 19)); _for_each_inner_interrupt!(([vector
+        4] 20)); _for_each_inner_interrupt!(([vector 5] 21));
+        _for_each_inner_interrupt!(([vector 6] 22)); _for_each_inner_interrupt!(([vector
+        7] 23)); _for_each_inner_interrupt!(([direct_bindable 0] 24));
+        _for_each_inner_interrupt!(([direct_bindable 1] 25));
+        _for_each_inner_interrupt!(([direct_bindable 2] 26));
+        _for_each_inner_interrupt!(([direct_bindable 3] 27));
+        _for_each_inner_interrupt!(([direct_bindable 4] 28));
+        _for_each_inner_interrupt!(([direct_bindable 5] 29));
+        _for_each_inner_interrupt!(([direct_bindable 6] 30));
+        _for_each_inner_interrupt!(([direct_bindable 7] 31));
+        _for_each_inner_interrupt!(([direct_bindable 8] 32));
+        _for_each_inner_interrupt!(([direct_bindable 9] 33));
+        _for_each_inner_interrupt!(([direct_bindable 10] 34));
+        _for_each_inner_interrupt!(([direct_bindable 11] 35));
+        _for_each_inner_interrupt!(([direct_bindable 12] 36));
+        _for_each_inner_interrupt!(([direct_bindable 13] 37));
+        _for_each_inner_interrupt!(([direct_bindable 14] 38));
+        _for_each_inner_interrupt!(([direct_bindable 15] 39));
+        _for_each_inner_interrupt!(([direct_bindable 16] 40));
+        _for_each_inner_interrupt!(([direct_bindable 17] 41));
+        _for_each_inner_interrupt!(([direct_bindable 18] 42));
+        _for_each_inner_interrupt!(([direct_bindable 19] 43));
+        _for_each_inner_interrupt!(([direct_bindable 20] 44));
+        _for_each_inner_interrupt!(([direct_bindable 21] 45));
+        _for_each_inner_interrupt!(([direct_bindable 22] 46));
+        _for_each_inner_interrupt!(([direct_bindable 23] 47));
+        _for_each_inner_interrupt!((all([disabled 0] 0), ([reserved 0] 1), ([reserved 1]
+        2), ([reserved 2] 3), ([reserved 3] 4), ([reserved 4] 5), ([reserved 5] 6),
+        ([reserved 6] 7), ([reserved 7] 8), ([reserved 8] 9), ([reserved 9] 10),
+        ([reserved 10] 11), ([reserved 11] 12), ([reserved 12] 13), ([reserved 13] 14),
+        ([reserved 14] 15), ([vector 0] 16), ([vector 1] 17), ([vector 2] 18), ([vector
+        3] 19), ([vector 4] 20), ([vector 5] 21), ([vector 6] 22), ([vector 7] 23),
+        ([direct_bindable 0] 24), ([direct_bindable 1] 25), ([direct_bindable 2] 26),
+        ([direct_bindable 3] 27), ([direct_bindable 4] 28), ([direct_bindable 5] 29),
+        ([direct_bindable 6] 30), ([direct_bindable 7] 31), ([direct_bindable 8] 32),
+        ([direct_bindable 9] 33), ([direct_bindable 10] 34), ([direct_bindable 11] 35),
+        ([direct_bindable 12] 36), ([direct_bindable 13] 37), ([direct_bindable 14] 38),
+        ([direct_bindable 15] 39), ([direct_bindable 16] 40), ([direct_bindable 17] 41),
+        ([direct_bindable 18] 42), ([direct_bindable 19] 43), ([direct_bindable 20] 44),
+        ([direct_bindable 21] 45), ([direct_bindable 22] 46), ([direct_bindable 23]
+        47)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_interrupt_priority {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_interrupt_priority { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_interrupt_priority!((0, 1, Priority1));
+        _for_each_inner_interrupt_priority!((1, 2, Priority2));
+        _for_each_inner_interrupt_priority!((2, 3, Priority3));
+        _for_each_inner_interrupt_priority!((3, 4, Priority4));
+        _for_each_inner_interrupt_priority!((4, 5, Priority5));
+        _for_each_inner_interrupt_priority!((5, 6, Priority6));
+        _for_each_inner_interrupt_priority!((6, 7, Priority7));
+        _for_each_inner_interrupt_priority!((7, 8, Priority8));
+        _for_each_inner_interrupt_priority!((all(0, 1, Priority1), (1, 2, Priority2), (2,
+        3, Priority3), (3, 4, Priority4), (4, 5, Priority5), (5, 6, Priority6), (6, 7,
+        Priority7), (7, 8, Priority8)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_sw_interrupt {
     ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
-        _for_each_inner!((0, FROM_CPU_INTR0, software_interrupt0)); _for_each_inner!((1,
-        FROM_CPU_INTR1, software_interrupt1)); _for_each_inner!((2, FROM_CPU_INTR2,
-        software_interrupt2)); _for_each_inner!((3, FROM_CPU_INTR3,
-        software_interrupt3)); _for_each_inner!((all(0, FROM_CPU_INTR0,
+        macro_rules! _for_each_inner_sw_interrupt { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_sw_interrupt!((0, FROM_CPU_INTR0,
+        software_interrupt0)); _for_each_inner_sw_interrupt!((1, FROM_CPU_INTR1,
+        software_interrupt1)); _for_each_inner_sw_interrupt!((2, FROM_CPU_INTR2,
+        software_interrupt2)); _for_each_inner_sw_interrupt!((3, FROM_CPU_INTR3,
+        software_interrupt3)); _for_each_inner_sw_interrupt!((all(0, FROM_CPU_INTR0,
         software_interrupt0), (1, FROM_CPU_INTR1, software_interrupt1), (2,
         FROM_CPU_INTR2, software_interrupt2), (3, FROM_CPU_INTR3, software_interrupt3)));
     };
@@ -1833,165 +1999,396 @@ macro_rules! sw_interrupt_delay {
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_peripheral {
     ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
-        _for_each_inner!((@ peri_type #[doc = "APB_SARADC peripheral singleton"]
-        APB_SARADC <= APB_SARADC() (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "CLINT peripheral singleton"] CLINT <= CLINT() (unstable))); _for_each_inner!((@
-        peri_type #[doc = "DMA peripheral singleton"] DMA <= DMA() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "DS peripheral singleton"] DS <= DS()
-        (unstable))); _for_each_inner!((@ peri_type #[doc = "ECC peripheral singleton"]
-        ECC <= ECC() (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "ECDSA peripheral singleton"] ECDSA <= ECDSA() (unstable))); _for_each_inner!((@
-        peri_type #[doc = "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "ETM peripheral singleton"] ETM <=
-        SOC_ETM() (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "HMAC peripheral singleton"] HMAC <= HMAC() (unstable))); _for_each_inner!((@
-        peri_type #[doc = "HP_APM peripheral singleton"] HP_APM <= HP_APM() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "HP_SYS peripheral singleton"] HP_SYS <=
-        HP_SYS() (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "HUK peripheral singleton"] HUK <= HUK() (unstable))); _for_each_inner!((@
-        peri_type #[doc = "I2C_ANA_MST peripheral singleton"] I2C_ANA_MST <=
-        I2C_ANA_MST() (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "I2C0 peripheral singleton"] I2C0 <= I2C0(I2C_EXT0 : { bind_peri_interrupt,
+        macro_rules! _for_each_inner_peripheral { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO0 peripheral singleton"] GPIO0 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO1 peripheral singleton"]
+        GPIO1 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO2 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        =
+        "<li>These pins may be used to debug the chip using an external JTAG debugger.</li>"]
+        #[doc = "</ul>"] #[doc = "</section>"] GPIO2 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO3 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        =
+        "<li>These pins may be used to debug the chip using an external JTAG debugger.</li>"]
+        #[doc = "</ul>"] #[doc = "</section>"] GPIO3 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO4 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>These pins may be used to debug the chip using an external JTAG debugger.</li>"]
+        #[doc = "</ul>"] #[doc = "</section>"] GPIO4 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO5 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>These pins may be used to debug the chip using an external JTAG debugger.</li>"]
+        #[doc = "</ul>"] #[doc = "</section>"] GPIO5 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO6 peripheral singleton"]
+        GPIO6 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO7 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO7 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO8 peripheral singleton"]
+        GPIO8 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO9 peripheral singleton"] GPIO9 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO10 peripheral singleton"]
+        GPIO10 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO11 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>By default, this pin is used by the UART programming interface.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO11 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO12 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>By default, this pin is used by the UART programming interface.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO12 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO13 peripheral singleton"]
+        GPIO13 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO14 peripheral singleton"] GPIO14 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO23 peripheral singleton"]
+        GPIO23 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO24 peripheral singleton"] GPIO24 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO25 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO25 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO26 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO26 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO27 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO27 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO28 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO28 <= virtual()));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "APB_SARADC peripheral singleton"] APB_SARADC <= APB_SARADC() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "CLINT peripheral singleton"]
+        CLINT <= CLINT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "DMA peripheral singleton"] DMA <= DMA() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "DS peripheral singleton"] DS <=
+        DS() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "ECC peripheral singleton"] ECC <= ECC() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "ECDSA peripheral singleton"]
+        ECDSA <= ECDSA() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "ETM peripheral singleton"] ETM
+        <= SOC_ETM() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO peripheral singleton"] GPIO <= GPIO() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO_SD peripheral singleton"]
+        GPIO_SD <= GPIO_EXT() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "HMAC peripheral singleton"] HMAC <= HMAC() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "HP_APM peripheral singleton"]
+        HP_APM <= HP_APM() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "HP_SYS peripheral singleton"] HP_SYS <= HP_SYS() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "HUK peripheral singleton"] HUK
+        <= HUK() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "I2C_ANA_MST peripheral singleton"] I2C_ANA_MST <= I2C_ANA_MST() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "I2C0 peripheral singleton"]
+        I2C0 <= I2C0(I2C_EXT0 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "I2S0 peripheral singleton"] I2S0 <= I2S0(I2S0 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "I2S0 peripheral singleton"] I2S0 <=
-        I2S0(I2S0 : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
-        }) (unstable))); _for_each_inner!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
-        (unstable))); _for_each_inner!((@ peri_type #[doc =
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "INTPRI peripheral singleton"] INTPRI <= INTPRI() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "IO_MUX peripheral singleton"] IO_MUX <=
-        IO_MUX() (unstable))); _for_each_inner!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "IO_MUX peripheral singleton"]
+        IO_MUX <= IO_MUX() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "KEYMNG peripheral singleton"] KEYMNG <= KEYMNG() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "LP_ANA peripheral singleton"] LP_ANA <=
-        LP_ANA() (unstable))); _for_each_inner!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "LP_ANA peripheral singleton"]
+        LP_ANA <= LP_ANA() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "LP_AON peripheral singleton"] LP_AON <= LP_AON() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "LP_APM0 peripheral singleton"] LP_APM0 <=
-        LP_APM0() (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "LP_CLKRST peripheral singleton"] LP_CLKRST <= LP_CLKRST() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "LP_I2C0 peripheral singleton"] LP_I2C0 <=
-        LP_I2C0() (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "LP_I2C_ANA_MST peripheral singleton"] LP_I2C_ANA_MST <= LP_I2C_ANA_MST()
-        (unstable))); _for_each_inner!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "LP_APM0 peripheral singleton"]
+        LP_APM0 <= LP_APM0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
+        = "LP_CLKRST peripheral singleton"] LP_CLKRST <= LP_CLKRST() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "LP_I2C0 peripheral singleton"]
+        LP_I2C0 <= LP_I2C0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
+        = "LP_I2C_ANA_MST peripheral singleton"] LP_I2C_ANA_MST <= LP_I2C_ANA_MST()
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "LP_IO_MUX peripheral singleton"] LP_IO_MUX <= LP_IO_MUX() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "LP_PERI peripheral singleton"] LP_PERI <=
-        LPPERI() (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "LP_TEE peripheral singleton"] LP_TEE <= LP_TEE() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "LP_TIMER peripheral singleton"] LP_TIMER
-        <= LP_TIMER() (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "LP_UART peripheral singleton"] LP_UART <= LP_UART() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "LP_WDT peripheral singleton"] LP_WDT <=
-        LP_WDT() (unstable))); _for_each_inner!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "LP_PERI peripheral singleton"]
+        LP_PERI <= LPPERI() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
+        = "LP_TEE peripheral singleton"] LP_TEE <= LP_TEE() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "LP_TIMER peripheral singleton"]
+        LP_TIMER <= LP_TIMER() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "LP_UART peripheral singleton"] LP_UART <= LP_UART() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "LP_WDT peripheral singleton"]
+        LP_WDT <= LP_WDT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "LPWR peripheral singleton"] LPWR <= LP_CLKRST() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "MCPWM0 peripheral singleton"] MCPWM0 <=
-        MCPWM0() (unstable))); _for_each_inner!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "MCPWM0 peripheral singleton"]
+        MCPWM0 <= MCPWM0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "MEM_MONITOR peripheral singleton"] MEM_MONITOR <= MEM_MONITOR() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "MODEM_LPCON peripheral singleton"]
-        MODEM_LPCON <= MODEM_LPCON() (unstable))); _for_each_inner!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "MODEM_LPCON peripheral singleton"] MODEM_LPCON <= MODEM_LPCON() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "MODEM_SYSCON peripheral singleton"] MODEM_SYSCON <= MODEM_SYSCON() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "PARL_IO peripheral singleton"] PARL_IO <=
-        PARL_IO(PARL_IO_RX : { bind_rx_interrupt, enable_rx_interrupt,
+        _for_each_inner_peripheral!((@ peri_type #[doc = "PARL_IO peripheral singleton"]
+        PARL_IO <= PARL_IO(PARL_IO_RX : { bind_rx_interrupt, enable_rx_interrupt,
         disable_rx_interrupt }, PARL_IO_TX : { bind_tx_interrupt, enable_tx_interrupt,
-        disable_tx_interrupt }) (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "PAU peripheral singleton"] PAU <= PAU() (unstable))); _for_each_inner!((@
-        peri_type #[doc = "PCR peripheral singleton"] PCR <= PCR() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "PMU peripheral singleton"] PMU <= PMU()
-        (unstable))); _for_each_inner!((@ peri_type #[doc =
+        disable_tx_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "PAU peripheral singleton"] PAU <= PAU() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "PCR peripheral singleton"] PCR
+        <= PCR() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "PMU peripheral singleton"] PMU <= PMU() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "PVT_MONITOR peripheral singleton"] PVT_MONITOR <= PVT() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "RMT peripheral singleton"] RMT <= RMT()
-        (unstable))); _for_each_inner!((@ peri_type #[doc = "RSA peripheral singleton"]
-        RSA <= RSA(RSA : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "SHA peripheral singleton"] SHA <= SHA(SHA : { bind_peri_interrupt,
+        _for_each_inner_peripheral!((@ peri_type #[doc = "RMT peripheral singleton"] RMT
+        <= RMT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "RSA peripheral singleton"] RSA <= RSA(RSA : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "SLC peripheral singleton"] SLC <= SLC()
-        (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "SYSTEM peripheral singleton"] SYSTEM <= PCR() (unstable))); _for_each_inner!((@
-        peri_type #[doc = "SYSTIMER peripheral singleton"] SYSTIMER <= SYSTIMER()
-        (unstable))); _for_each_inner!((@ peri_type #[doc = "TEE peripheral singleton"]
-        TEE <= TEE() (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "TIMG0 peripheral singleton"] TIMG0 <= TIMG0() (unstable))); _for_each_inner!((@
-        peri_type #[doc = "TIMG1 peripheral singleton"] TIMG1 <= TIMG1() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "TRACE0 peripheral singleton"] TRACE0 <=
-        TRACE() (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "UART0 peripheral singleton"] UART0 <= UART0(UART0 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "UART1 peripheral singleton"] UART1 <=
-        UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "UHCI0 peripheral singleton"] UHCI0 <= UHCI0() (unstable))); _for_each_inner!((@
-        peri_type #[doc = "USB_DEVICE peripheral singleton"] USB_DEVICE <=
-        USB_DEVICE(USB_DEVICE : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "BT peripheral singleton"] BT <= virtual() (unstable))); _for_each_inner!((@
-        peri_type #[doc = "FLASH peripheral singleton"] FLASH <= virtual() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "LP_CORE peripheral singleton"] LP_CORE <=
-        virtual() (unstable))); _for_each_inner!((@ peri_type #[doc =
-        "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <= virtual() (unstable)));
-        _for_each_inner!((@ peri_type #[doc = "WIFI peripheral singleton"] WIFI <=
-        virtual() (unstable))); _for_each_inner!((APB_SARADC(unstable)));
-        _for_each_inner!((CLINT(unstable))); _for_each_inner!((DMA(unstable)));
-        _for_each_inner!((DS(unstable))); _for_each_inner!((ECC(unstable)));
-        _for_each_inner!((ECDSA(unstable))); _for_each_inner!((EFUSE(unstable)));
-        _for_each_inner!((ETM(unstable))); _for_each_inner!((HMAC(unstable)));
-        _for_each_inner!((HP_APM(unstable))); _for_each_inner!((HP_SYS(unstable)));
-        _for_each_inner!((HUK(unstable))); _for_each_inner!((I2C_ANA_MST(unstable)));
-        _for_each_inner!((I2C0(unstable))); _for_each_inner!((I2S0(unstable)));
-        _for_each_inner!((INTERRUPT_CORE0(unstable)));
-        _for_each_inner!((INTPRI(unstable))); _for_each_inner!((IO_MUX(unstable)));
-        _for_each_inner!((KEYMNG(unstable))); _for_each_inner!((LP_ANA(unstable)));
-        _for_each_inner!((LP_AON(unstable))); _for_each_inner!((LP_APM0(unstable)));
-        _for_each_inner!((LP_CLKRST(unstable))); _for_each_inner!((LP_I2C0(unstable)));
-        _for_each_inner!((LP_I2C_ANA_MST(unstable)));
-        _for_each_inner!((LP_IO_MUX(unstable))); _for_each_inner!((LP_PERI(unstable)));
-        _for_each_inner!((LP_TEE(unstable))); _for_each_inner!((LP_TIMER(unstable)));
-        _for_each_inner!((LP_UART(unstable))); _for_each_inner!((LP_WDT(unstable)));
-        _for_each_inner!((LPWR(unstable))); _for_each_inner!((MCPWM0(unstable)));
-        _for_each_inner!((MEM_MONITOR(unstable)));
-        _for_each_inner!((MODEM_LPCON(unstable)));
-        _for_each_inner!((MODEM_SYSCON(unstable)));
-        _for_each_inner!((PARL_IO(unstable))); _for_each_inner!((PAU(unstable)));
-        _for_each_inner!((PCR(unstable))); _for_each_inner!((PMU(unstable)));
-        _for_each_inner!((PVT_MONITOR(unstable))); _for_each_inner!((RMT(unstable)));
-        _for_each_inner!((RSA(unstable))); _for_each_inner!((SHA(unstable)));
-        _for_each_inner!((SLC(unstable))); _for_each_inner!((SYSTEM(unstable)));
-        _for_each_inner!((SYSTIMER(unstable))); _for_each_inner!((TEE(unstable)));
-        _for_each_inner!((TIMG0(unstable))); _for_each_inner!((TIMG1(unstable)));
-        _for_each_inner!((TRACE0(unstable))); _for_each_inner!((UART0(unstable)));
-        _for_each_inner!((UART1(unstable))); _for_each_inner!((UHCI0(unstable)));
-        _for_each_inner!((USB_DEVICE(unstable))); _for_each_inner!((BT(unstable)));
-        _for_each_inner!((FLASH(unstable))); _for_each_inner!((LP_CORE(unstable)));
-        _for_each_inner!((SW_INTERRUPT(unstable))); _for_each_inner!((WIFI(unstable)));
-        _for_each_inner!((all(@ peri_type #[doc = "APB_SARADC peripheral singleton"]
-        APB_SARADC <= APB_SARADC() (unstable)), (@ peri_type #[doc =
-        "CLINT peripheral singleton"] CLINT <= CLINT() (unstable)), (@ peri_type #[doc =
-        "DMA peripheral singleton"] DMA <= DMA() (unstable)), (@ peri_type #[doc =
-        "DS peripheral singleton"] DS <= DS() (unstable)), (@ peri_type #[doc =
-        "ECC peripheral singleton"] ECC <= ECC() (unstable)), (@ peri_type #[doc =
-        "ECDSA peripheral singleton"] ECDSA <= ECDSA() (unstable)), (@ peri_type #[doc =
-        "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)), (@ peri_type #[doc =
-        "ETM peripheral singleton"] ETM <= SOC_ETM() (unstable)), (@ peri_type #[doc =
-        "HMAC peripheral singleton"] HMAC <= HMAC() (unstable)), (@ peri_type #[doc =
-        "HP_APM peripheral singleton"] HP_APM <= HP_APM() (unstable)), (@ peri_type #[doc
-        = "HP_SYS peripheral singleton"] HP_SYS <= HP_SYS() (unstable)), (@ peri_type
-        #[doc = "HUK peripheral singleton"] HUK <= HUK() (unstable)), (@ peri_type #[doc
-        = "I2C_ANA_MST peripheral singleton"] I2C_ANA_MST <= I2C_ANA_MST() (unstable)),
-        (@ peri_type #[doc = "I2C0 peripheral singleton"] I2C0 <= I2C0(I2C_EXT0 : {
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SHA peripheral singleton"] SHA
+        <= SHA(SHA : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
+        }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "SLC peripheral singleton"] SLC <= SLC() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SYSTEM peripheral singleton"]
+        SYSTEM <= PCR() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "SYSTIMER peripheral singleton"] SYSTIMER <= SYSTIMER() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "TEE peripheral singleton"] TEE
+        <= TEE() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "TIMG0 peripheral singleton"] TIMG0 <= TIMG0() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "TIMG1 peripheral singleton"]
+        TIMG1 <= TIMG1() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "TRACE0 peripheral singleton"] TRACE0 <= TRACE() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "UART0 peripheral singleton"]
+        UART0 <= UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "UART1 peripheral singleton"] UART1 <= UART1(UART1 : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable)), (@ peri_type #[doc = "I2S0 peripheral singleton"] I2S0 <= I2S0(I2S0
-        : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable)), (@ peri_type #[doc = "INTERRUPT_CORE0 peripheral singleton"]
-        INTERRUPT_CORE0 <= INTERRUPT_CORE0() (unstable)), (@ peri_type #[doc =
-        "INTPRI peripheral singleton"] INTPRI <= INTPRI() (unstable)), (@ peri_type #[doc
-        = "IO_MUX peripheral singleton"] IO_MUX <= IO_MUX() (unstable)), (@ peri_type
-        #[doc = "KEYMNG peripheral singleton"] KEYMNG <= KEYMNG() (unstable)), (@
-        peri_type #[doc = "LP_ANA peripheral singleton"] LP_ANA <= LP_ANA() (unstable)),
-        (@ peri_type #[doc = "LP_AON peripheral singleton"] LP_AON <= LP_AON()
-        (unstable)), (@ peri_type #[doc = "LP_APM0 peripheral singleton"] LP_APM0 <=
-        LP_APM0() (unstable)), (@ peri_type #[doc = "LP_CLKRST peripheral singleton"]
-        LP_CLKRST <= LP_CLKRST() (unstable)), (@ peri_type #[doc =
-        "LP_I2C0 peripheral singleton"] LP_I2C0 <= LP_I2C0() (unstable)), (@ peri_type
-        #[doc = "LP_I2C_ANA_MST peripheral singleton"] LP_I2C_ANA_MST <= LP_I2C_ANA_MST()
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "UHCI0 peripheral singleton"] UHCI0 <= UHCI0() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "BT peripheral singleton"] BT <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "FLASH peripheral singleton"]
+        FLASH <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "LP_CORE peripheral singleton"]
+        LP_CORE <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
+        = "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "WIFI peripheral singleton"]
+        WIFI <= virtual() (unstable))); _for_each_inner_peripheral!((GPIO0));
+        _for_each_inner_peripheral!((GPIO1)); _for_each_inner_peripheral!((GPIO2));
+        _for_each_inner_peripheral!((GPIO3)); _for_each_inner_peripheral!((GPIO4));
+        _for_each_inner_peripheral!((GPIO5)); _for_each_inner_peripheral!((GPIO6));
+        _for_each_inner_peripheral!((GPIO7)); _for_each_inner_peripheral!((GPIO8));
+        _for_each_inner_peripheral!((GPIO9)); _for_each_inner_peripheral!((GPIO10));
+        _for_each_inner_peripheral!((GPIO11)); _for_each_inner_peripheral!((GPIO12));
+        _for_each_inner_peripheral!((GPIO13)); _for_each_inner_peripheral!((GPIO14));
+        _for_each_inner_peripheral!((GPIO23)); _for_each_inner_peripheral!((GPIO24));
+        _for_each_inner_peripheral!((GPIO25)); _for_each_inner_peripheral!((GPIO26));
+        _for_each_inner_peripheral!((GPIO27)); _for_each_inner_peripheral!((GPIO28));
+        _for_each_inner_peripheral!((APB_SARADC(unstable)));
+        _for_each_inner_peripheral!((CLINT(unstable)));
+        _for_each_inner_peripheral!((DMA(unstable)));
+        _for_each_inner_peripheral!((DS(unstable)));
+        _for_each_inner_peripheral!((ECC(unstable)));
+        _for_each_inner_peripheral!((ECDSA(unstable)));
+        _for_each_inner_peripheral!((EFUSE(unstable)));
+        _for_each_inner_peripheral!((ETM(unstable)));
+        _for_each_inner_peripheral!((GPIO(unstable)));
+        _for_each_inner_peripheral!((GPIO_SD(unstable)));
+        _for_each_inner_peripheral!((HMAC(unstable)));
+        _for_each_inner_peripheral!((HP_APM(unstable)));
+        _for_each_inner_peripheral!((HP_SYS(unstable)));
+        _for_each_inner_peripheral!((HUK(unstable)));
+        _for_each_inner_peripheral!((I2C_ANA_MST(unstable)));
+        _for_each_inner_peripheral!((I2C0(unstable)));
+        _for_each_inner_peripheral!((I2S0(unstable)));
+        _for_each_inner_peripheral!((INTERRUPT_CORE0(unstable)));
+        _for_each_inner_peripheral!((INTPRI(unstable)));
+        _for_each_inner_peripheral!((IO_MUX(unstable)));
+        _for_each_inner_peripheral!((KEYMNG(unstable)));
+        _for_each_inner_peripheral!((LP_ANA(unstable)));
+        _for_each_inner_peripheral!((LP_AON(unstable)));
+        _for_each_inner_peripheral!((LP_APM0(unstable)));
+        _for_each_inner_peripheral!((LP_CLKRST(unstable)));
+        _for_each_inner_peripheral!((LP_I2C0(unstable)));
+        _for_each_inner_peripheral!((LP_I2C_ANA_MST(unstable)));
+        _for_each_inner_peripheral!((LP_IO_MUX(unstable)));
+        _for_each_inner_peripheral!((LP_PERI(unstable)));
+        _for_each_inner_peripheral!((LP_TEE(unstable)));
+        _for_each_inner_peripheral!((LP_TIMER(unstable)));
+        _for_each_inner_peripheral!((LP_UART(unstable)));
+        _for_each_inner_peripheral!((LP_WDT(unstable)));
+        _for_each_inner_peripheral!((LPWR(unstable)));
+        _for_each_inner_peripheral!((MCPWM0(unstable)));
+        _for_each_inner_peripheral!((MEM_MONITOR(unstable)));
+        _for_each_inner_peripheral!((MODEM_LPCON(unstable)));
+        _for_each_inner_peripheral!((MODEM_SYSCON(unstable)));
+        _for_each_inner_peripheral!((PARL_IO(unstable)));
+        _for_each_inner_peripheral!((PAU(unstable)));
+        _for_each_inner_peripheral!((PCR(unstable)));
+        _for_each_inner_peripheral!((PMU(unstable)));
+        _for_each_inner_peripheral!((PVT_MONITOR(unstable)));
+        _for_each_inner_peripheral!((RMT(unstable)));
+        _for_each_inner_peripheral!((RSA(unstable)));
+        _for_each_inner_peripheral!((SHA(unstable)));
+        _for_each_inner_peripheral!((SLC(unstable)));
+        _for_each_inner_peripheral!((SYSTEM(unstable)));
+        _for_each_inner_peripheral!((SYSTIMER(unstable)));
+        _for_each_inner_peripheral!((TEE(unstable)));
+        _for_each_inner_peripheral!((TIMG0(unstable)));
+        _for_each_inner_peripheral!((TIMG1(unstable)));
+        _for_each_inner_peripheral!((TRACE0(unstable)));
+        _for_each_inner_peripheral!((UART0(unstable)));
+        _for_each_inner_peripheral!((UART1(unstable)));
+        _for_each_inner_peripheral!((UHCI0(unstable)));
+        _for_each_inner_peripheral!((USB_DEVICE(unstable)));
+        _for_each_inner_peripheral!((BT(unstable)));
+        _for_each_inner_peripheral!((FLASH(unstable)));
+        _for_each_inner_peripheral!((GPIO_DEDICATED(unstable)));
+        _for_each_inner_peripheral!((LP_CORE(unstable)));
+        _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
+        _for_each_inner_peripheral!((WIFI(unstable))); _for_each_inner_peripheral!((all(@
+        peri_type #[doc = "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type
+        #[doc = "GPIO1 peripheral singleton"] GPIO1 <= virtual()), (@ peri_type #[doc =
+        "GPIO2 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        =
+        "<li>These pins may be used to debug the chip using an external JTAG debugger.</li>"]
+        #[doc = "</ul>"] #[doc = "</section>"] GPIO2 <= virtual()), (@ peri_type #[doc =
+        "GPIO3 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        =
+        "<li>These pins may be used to debug the chip using an external JTAG debugger.</li>"]
+        #[doc = "</ul>"] #[doc = "</section>"] GPIO3 <= virtual()), (@ peri_type #[doc =
+        "GPIO4 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>These pins may be used to debug the chip using an external JTAG debugger.</li>"]
+        #[doc = "</ul>"] #[doc = "</section>"] GPIO4 <= virtual()), (@ peri_type #[doc =
+        "GPIO5 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>These pins may be used to debug the chip using an external JTAG debugger.</li>"]
+        #[doc = "</ul>"] #[doc = "</section>"] GPIO5 <= virtual()), (@ peri_type #[doc =
+        "GPIO6 peripheral singleton"] GPIO6 <= virtual()), (@ peri_type #[doc =
+        "GPIO7 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO7 <= virtual()), (@ peri_type #[doc =
+        "GPIO8 peripheral singleton"] GPIO8 <= virtual()), (@ peri_type #[doc =
+        "GPIO9 peripheral singleton"] GPIO9 <= virtual()), (@ peri_type #[doc =
+        "GPIO10 peripheral singleton"] GPIO10 <= virtual()), (@ peri_type #[doc =
+        "GPIO11 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>By default, this pin is used by the UART programming interface.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO11 <= virtual()), (@ peri_type #[doc =
+        "GPIO12 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>By default, this pin is used by the UART programming interface.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO12 <= virtual()), (@ peri_type #[doc =
+        "GPIO13 peripheral singleton"] GPIO13 <= virtual()), (@ peri_type #[doc =
+        "GPIO14 peripheral singleton"] GPIO14 <= virtual()), (@ peri_type #[doc =
+        "GPIO23 peripheral singleton"] GPIO23 <= virtual()), (@ peri_type #[doc =
+        "GPIO24 peripheral singleton"] GPIO24 <= virtual()), (@ peri_type #[doc =
+        "GPIO25 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO25 <= virtual()), (@ peri_type #[doc =
+        "GPIO26 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO26 <= virtual()), (@ peri_type #[doc =
+        "GPIO27 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO27 <= virtual()), (@ peri_type #[doc =
+        "GPIO28 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
+        "<section class=\"warning\">"] #[doc =
+        "This pin may be available with certain limitations. Check your hardware to make sure whether you can use it."]
+        #[doc = "<ul>"] #[doc =
+        "<li>This pin is a strapping pin, it determines how the chip boots.</li>"] #[doc
+        = "</ul>"] #[doc = "</section>"] GPIO28 <= virtual()), (@ peri_type #[doc =
+        "APB_SARADC peripheral singleton"] APB_SARADC <= APB_SARADC() (unstable)), (@
+        peri_type #[doc = "CLINT peripheral singleton"] CLINT <= CLINT() (unstable)), (@
+        peri_type #[doc = "DMA peripheral singleton"] DMA <= DMA() (unstable)), (@
+        peri_type #[doc = "DS peripheral singleton"] DS <= DS() (unstable)), (@ peri_type
+        #[doc = "ECC peripheral singleton"] ECC <= ECC() (unstable)), (@ peri_type #[doc
+        = "ECDSA peripheral singleton"] ECDSA <= ECDSA() (unstable)), (@ peri_type #[doc
+        = "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)), (@ peri_type #[doc
+        = "ETM peripheral singleton"] ETM <= SOC_ETM() (unstable)), (@ peri_type #[doc =
+        "GPIO peripheral singleton"] GPIO <= GPIO() (unstable)), (@ peri_type #[doc =
+        "GPIO_SD peripheral singleton"] GPIO_SD <= GPIO_EXT() (unstable)), (@ peri_type
+        #[doc = "HMAC peripheral singleton"] HMAC <= HMAC() (unstable)), (@ peri_type
+        #[doc = "HP_APM peripheral singleton"] HP_APM <= HP_APM() (unstable)), (@
+        peri_type #[doc = "HP_SYS peripheral singleton"] HP_SYS <= HP_SYS() (unstable)),
+        (@ peri_type #[doc = "HUK peripheral singleton"] HUK <= HUK() (unstable)), (@
+        peri_type #[doc = "I2C_ANA_MST peripheral singleton"] I2C_ANA_MST <=
+        I2C_ANA_MST() (unstable)), (@ peri_type #[doc = "I2C0 peripheral singleton"] I2C0
+        <= I2C0(I2C_EXT0 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
+        "I2S0 peripheral singleton"] I2S0 <= I2S0(I2S0 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
+        = "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
+        (unstable)), (@ peri_type #[doc = "INTPRI peripheral singleton"] INTPRI <=
+        INTPRI() (unstable)), (@ peri_type #[doc = "IO_MUX peripheral singleton"] IO_MUX
+        <= IO_MUX() (unstable)), (@ peri_type #[doc = "KEYMNG peripheral singleton"]
+        KEYMNG <= KEYMNG() (unstable)), (@ peri_type #[doc =
+        "LP_ANA peripheral singleton"] LP_ANA <= LP_ANA() (unstable)), (@ peri_type #[doc
+        = "LP_AON peripheral singleton"] LP_AON <= LP_AON() (unstable)), (@ peri_type
+        #[doc = "LP_APM0 peripheral singleton"] LP_APM0 <= LP_APM0() (unstable)), (@
+        peri_type #[doc = "LP_CLKRST peripheral singleton"] LP_CLKRST <= LP_CLKRST()
+        (unstable)), (@ peri_type #[doc = "LP_I2C0 peripheral singleton"] LP_I2C0 <=
+        LP_I2C0() (unstable)), (@ peri_type #[doc =
+        "LP_I2C_ANA_MST peripheral singleton"] LP_I2C_ANA_MST <= LP_I2C_ANA_MST()
         (unstable)), (@ peri_type #[doc = "LP_IO_MUX peripheral singleton"] LP_IO_MUX <=
         LP_IO_MUX() (unstable)), (@ peri_type #[doc = "LP_PERI peripheral singleton"]
         LP_PERI <= LPPERI() (unstable)), (@ peri_type #[doc =
@@ -2036,27 +2433,433 @@ macro_rules! for_each_peripheral {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "BT peripheral singleton"] BT <= virtual()
         (unstable)), (@ peri_type #[doc = "FLASH peripheral singleton"] FLASH <=
-        virtual() (unstable)), (@ peri_type #[doc = "LP_CORE peripheral singleton"]
-        LP_CORE <= virtual() (unstable)), (@ peri_type #[doc =
-        "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <= virtual() (unstable)), (@
-        peri_type #[doc = "WIFI peripheral singleton"] WIFI <= virtual() (unstable))));
-        _for_each_inner!((singletons(APB_SARADC(unstable)), (CLINT(unstable)),
-        (DMA(unstable)), (DS(unstable)), (ECC(unstable)), (ECDSA(unstable)),
-        (EFUSE(unstable)), (ETM(unstable)), (HMAC(unstable)), (HP_APM(unstable)),
-        (HP_SYS(unstable)), (HUK(unstable)), (I2C_ANA_MST(unstable)), (I2C0(unstable)),
-        (I2S0(unstable)), (INTERRUPT_CORE0(unstable)), (INTPRI(unstable)),
-        (IO_MUX(unstable)), (KEYMNG(unstable)), (LP_ANA(unstable)), (LP_AON(unstable)),
-        (LP_APM0(unstable)), (LP_CLKRST(unstable)), (LP_I2C0(unstable)),
-        (LP_I2C_ANA_MST(unstable)), (LP_IO_MUX(unstable)), (LP_PERI(unstable)),
-        (LP_TEE(unstable)), (LP_TIMER(unstable)), (LP_UART(unstable)),
-        (LP_WDT(unstable)), (LPWR(unstable)), (MCPWM0(unstable)),
+        virtual() (unstable)), (@ peri_type #[doc =
+        "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)),
+        (@ peri_type #[doc = "LP_CORE peripheral singleton"] LP_CORE <= virtual()
+        (unstable)), (@ peri_type #[doc = "SW_INTERRUPT peripheral singleton"]
+        SW_INTERRUPT <= virtual() (unstable)), (@ peri_type #[doc =
+        "WIFI peripheral singleton"] WIFI <= virtual() (unstable))));
+        _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
+        (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11),
+        (GPIO12), (GPIO13), (GPIO14), (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27),
+        (GPIO28), (APB_SARADC(unstable)), (CLINT(unstable)), (DMA(unstable)),
+        (DS(unstable)), (ECC(unstable)), (ECDSA(unstable)), (EFUSE(unstable)),
+        (ETM(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)), (HMAC(unstable)),
+        (HP_APM(unstable)), (HP_SYS(unstable)), (HUK(unstable)), (I2C_ANA_MST(unstable)),
+        (I2C0(unstable)), (I2S0(unstable)), (INTERRUPT_CORE0(unstable)),
+        (INTPRI(unstable)), (IO_MUX(unstable)), (KEYMNG(unstable)), (LP_ANA(unstable)),
+        (LP_AON(unstable)), (LP_APM0(unstable)), (LP_CLKRST(unstable)),
+        (LP_I2C0(unstable)), (LP_I2C_ANA_MST(unstable)), (LP_IO_MUX(unstable)),
+        (LP_PERI(unstable)), (LP_TEE(unstable)), (LP_TIMER(unstable)),
+        (LP_UART(unstable)), (LP_WDT(unstable)), (LPWR(unstable)), (MCPWM0(unstable)),
         (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)),
         (PARL_IO(unstable)), (PAU(unstable)), (PCR(unstable)), (PMU(unstable)),
         (PVT_MONITOR(unstable)), (RMT(unstable)), (RSA(unstable)), (SHA(unstable)),
         (SLC(unstable)), (SYSTEM(unstable)), (SYSTIMER(unstable)), (TEE(unstable)),
         (TIMG0(unstable)), (TIMG1(unstable)), (TRACE0(unstable)), (UART0(unstable)),
         (UART1(unstable)), (UHCI0(unstable)), (USB_DEVICE(unstable)), (BT(unstable)),
-        (FLASH(unstable)), (LP_CORE(unstable)), (SW_INTERRUPT(unstable)),
-        (WIFI(unstable))));
+        (FLASH(unstable)), (GPIO_DEDICATED(unstable)), (LP_CORE(unstable)),
+        (SW_INTERRUPT(unstable)), (WIFI(unstable))));
+    };
+}
+/// This macro can be used to generate code for each `GPIOn` instance.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($n:literal, $gpio:ident ($($digital_input_function:ident =>
+/// $digital_input_signal:ident)*) ($($digital_output_function:ident =>
+/// $digital_output_signal:ident)*) ($([$pin_attribute:ident])*))`
+///
+/// Macro fragments:
+///
+/// - `$n`: the number of the GPIO. For `GPIO0`, `$n` is 0.
+/// - `$gpio`: the name of the GPIO.
+/// - `$digital_input_function`: the number of the digital function, as an identifier (i.e. for
+///   function 0 this is `_0`).
+/// - `$digital_input_function`: the name of the digital function, as an identifier.
+/// - `$digital_output_function`: the number of the digital function, as an identifier (i.e. for
+///   function 0 this is `_0`).
+/// - `$digital_output_function`: the name of the digital function, as an identifier.
+/// - `$pin_attribute`: `Input` and/or `Output`, marks the possible directions of the GPIO.
+///   Bracketed so that they can also be matched as optional fragments. Order is always Input first.
+///
+/// Example data: `(0, GPIO0 (_5 => EMAC_TX_CLK) (_1 => CLK_OUT1 _5 => EMAC_TX_CLK) ([Input]
+/// [Output]))`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_gpio {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_gpio { $(($pattern) => $code;)* ($other : tt) => {}
+        } _for_each_inner_gpio!((0, GPIO0() () ([Input] [Output])));
+        _for_each_inner_gpio!((1, GPIO1() () ([Input] [Output])));
+        _for_each_inner_gpio!((2, GPIO2(_0 => MTMS _2 => FSPIQ) (_2 => FSPIQ) ([Input]
+        [Output]))); _for_each_inner_gpio!((3, GPIO3(_0 => MTDI) () ([Input] [Output])));
+        _for_each_inner_gpio!((4, GPIO4(_0 => MTCK _2 => FSPIHD) (_2 => FSPIHD) ([Input]
+        [Output]))); _for_each_inner_gpio!((5, GPIO5(_0 => MTDO _2 => FSPIWP) (_2 =>
+        FSPIWP) ([Input] [Output]))); _for_each_inner_gpio!((6, GPIO6(_2 => FSPICLK) (_2
+        => FSPICLK) ([Input] [Output]))); _for_each_inner_gpio!((7, GPIO7(_0 =>
+        SDIO_DATA1 _2 => FSPID) (_2 => FSPID) ([Input] [Output])));
+        _for_each_inner_gpio!((8, GPIO8(_0 => SDIO_DATA0) () ([Input] [Output])));
+        _for_each_inner_gpio!((9, GPIO9(_0 => SDIO_CLK) () ([Input] [Output])));
+        _for_each_inner_gpio!((10, GPIO10(_0 => SDIO_CMD _2 => FSPICS0) (_2 => FSPICS0)
+        ([Input] [Output]))); _for_each_inner_gpio!((11, GPIO11() (_0 => U0TXD) ([Input]
+        [Output]))); _for_each_inner_gpio!((12, GPIO12(_0 => U0RXD) () ([Input]
+        [Output]))); _for_each_inner_gpio!((13, GPIO13(_0 => SDIO_DATA3) () ([Input]
+        [Output]))); _for_each_inner_gpio!((14, GPIO14(_0 => SDIO_DATA2) () ([Input]
+        [Output]))); _for_each_inner_gpio!((23, GPIO23() () ([Input] [Output])));
+        _for_each_inner_gpio!((24, GPIO24() () ([Input] [Output])));
+        _for_each_inner_gpio!((25, GPIO25() () ([Input] [Output])));
+        _for_each_inner_gpio!((26, GPIO26() () ([Input] [Output])));
+        _for_each_inner_gpio!((27, GPIO27() () ([Input] [Output])));
+        _for_each_inner_gpio!((28, GPIO28() () ([Input] [Output])));
+        _for_each_inner_gpio!((all(0, GPIO0() () ([Input] [Output])), (1, GPIO1() ()
+        ([Input] [Output])), (2, GPIO2(_0 => MTMS _2 => FSPIQ) (_2 => FSPIQ) ([Input]
+        [Output])), (3, GPIO3(_0 => MTDI) () ([Input] [Output])), (4, GPIO4(_0 => MTCK _2
+        => FSPIHD) (_2 => FSPIHD) ([Input] [Output])), (5, GPIO5(_0 => MTDO _2 => FSPIWP)
+        (_2 => FSPIWP) ([Input] [Output])), (6, GPIO6(_2 => FSPICLK) (_2 => FSPICLK)
+        ([Input] [Output])), (7, GPIO7(_0 => SDIO_DATA1 _2 => FSPID) (_2 => FSPID)
+        ([Input] [Output])), (8, GPIO8(_0 => SDIO_DATA0) () ([Input] [Output])), (9,
+        GPIO9(_0 => SDIO_CLK) () ([Input] [Output])), (10, GPIO10(_0 => SDIO_CMD _2 =>
+        FSPICS0) (_2 => FSPICS0) ([Input] [Output])), (11, GPIO11() (_0 => U0TXD)
+        ([Input] [Output])), (12, GPIO12(_0 => U0RXD) () ([Input] [Output])), (13,
+        GPIO13(_0 => SDIO_DATA3) () ([Input] [Output])), (14, GPIO14(_0 => SDIO_DATA2) ()
+        ([Input] [Output])), (23, GPIO23() () ([Input] [Output])), (24, GPIO24() ()
+        ([Input] [Output])), (25, GPIO25() () ([Input] [Output])), (26, GPIO26() ()
+        ([Input] [Output])), (27, GPIO27() () ([Input] [Output])), (28, GPIO28() ()
+        ([Input] [Output]))));
+    };
+}
+/// This macro can be used to generate code for each analog function of each GPIO.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has two options for its "Individual matcher" case:
+///
+/// - `all`: `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
+/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` -
+///   expanded signal case, where you need the number(s) of a signal, or the general group to which
+///   the signal belongs. For example, in case of `ADC2_CH3` the expanded form looks like
+///   `(ADC2_CH3, ADCn_CHm, 2, 3)`.
+///
+/// Macro fragments:
+///
+/// - `$signal`: the name of the signal.
+/// - `$group`: the name of the signal, with numbers replaced by placeholders. For `ADC2_CH3` this
+///   is `ADCn_CHm`.
+/// - `$number`: the numbers extracted from `$signal`.
+/// - `$gpio`: the name of the GPIO.
+///
+/// Example data:
+/// - `(ADC2_CH5, GPIO12)`
+/// - `((ADC2_CH5, ADCn_CHm, 2, 5), GPIO12)`
+///
+/// The expanded syntax is only available when the signal has at least one numbered component.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_analog_function {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_analog_function { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_analog_function!((XTAL_32K_P, GPIO0));
+        _for_each_inner_analog_function!((XTAL_32K_N, GPIO1));
+        _for_each_inner_analog_function!((ADC1_CH0, GPIO1));
+        _for_each_inner_analog_function!((ADC1_CH1, GPIO2));
+        _for_each_inner_analog_function!((ADC1_CH2, GPIO3));
+        _for_each_inner_analog_function!((ADC1_CH3, GPIO4));
+        _for_each_inner_analog_function!((ADC1_CH4, GPIO5));
+        _for_each_inner_analog_function!((ADC1_CH5, GPIO6));
+        _for_each_inner_analog_function!((ZCD0, GPIO8));
+        _for_each_inner_analog_function!((ZCD1, GPIO9));
+        _for_each_inner_analog_function!((USB_DM, GPIO13));
+        _for_each_inner_analog_function!((USB_DP, GPIO14));
+        _for_each_inner_analog_function!(((ADC1_CH0, ADCn_CHm, 1, 0), GPIO1));
+        _for_each_inner_analog_function!(((ADC1_CH1, ADCn_CHm, 1, 1), GPIO2));
+        _for_each_inner_analog_function!(((ADC1_CH2, ADCn_CHm, 1, 2), GPIO3));
+        _for_each_inner_analog_function!(((ADC1_CH3, ADCn_CHm, 1, 3), GPIO4));
+        _for_each_inner_analog_function!(((ADC1_CH4, ADCn_CHm, 1, 4), GPIO5));
+        _for_each_inner_analog_function!(((ADC1_CH5, ADCn_CHm, 1, 5), GPIO6));
+        _for_each_inner_analog_function!(((ZCD0, ZCDn, 0), GPIO8));
+        _for_each_inner_analog_function!(((ZCD1, ZCDn, 1), GPIO9));
+        _for_each_inner_analog_function!((all(XTAL_32K_P, GPIO0), (XTAL_32K_N, GPIO1),
+        (ADC1_CH0, GPIO1), (ADC1_CH1, GPIO2), (ADC1_CH2, GPIO3), (ADC1_CH3, GPIO4),
+        (ADC1_CH4, GPIO5), (ADC1_CH5, GPIO6), (ZCD0, GPIO8), (ZCD1, GPIO9), (USB_DM,
+        GPIO13), (USB_DP, GPIO14)));
+        _for_each_inner_analog_function!((all_expanded((ADC1_CH0, ADCn_CHm, 1, 0),
+        GPIO1), ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO2), ((ADC1_CH2, ADCn_CHm, 1, 2), GPIO3),
+        ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO4), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO5),
+        ((ADC1_CH5, ADCn_CHm, 1, 5), GPIO6), ((ZCD0, ZCDn, 0), GPIO8), ((ZCD1, ZCDn, 1),
+        GPIO9)));
+    };
+}
+/// This macro can be used to generate code for each LP/RTC function of each GPIO.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has two options for its "Individual matcher" case:
+///
+/// - `all`: `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
+/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` -
+///   expanded signal case, where you need the number(s) of a signal, or the general group to which
+///   the signal belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like
+///   `(SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1)`.
+///
+/// Macro fragments:
+///
+/// - `$signal`: the name of the signal.
+/// - `$group`: the name of the signal, with numbers replaced by placeholders. For `ADC2_CH3` this
+///   is `ADCn_CHm`.
+/// - `$number`: the numbers extracted from `$signal`.
+/// - `$gpio`: the name of the GPIO.
+///
+/// Example data:
+/// - `(RTC_GPIO15, GPIO12)`
+/// - `((RTC_GPIO15, RTC_GPIOn, 15), GPIO12)`
+///
+/// The expanded syntax is only available when the signal has at least one numbered component.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_lp_function {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_lp_function { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_lp_function!((LP_UART_DTRN, GPIO0));
+        _for_each_inner_lp_function!((LP_GPIO0, GPIO0));
+        _for_each_inner_lp_function!((LP_UART_DSRN, GPIO1));
+        _for_each_inner_lp_function!((LP_GPIO1, GPIO1));
+        _for_each_inner_lp_function!((LP_UART_RTSN, GPIO2));
+        _for_each_inner_lp_function!((LP_GPIO2, GPIO2));
+        _for_each_inner_lp_function!((LP_I2C_SDA, GPIO2));
+        _for_each_inner_lp_function!((LP_UART_CTSN, GPIO3));
+        _for_each_inner_lp_function!((LP_GPIO3, GPIO3));
+        _for_each_inner_lp_function!((LP_I2C_SCL, GPIO3));
+        _for_each_inner_lp_function!((LP_UART_RXD_PAD, GPIO4));
+        _for_each_inner_lp_function!((LP_GPIO4, GPIO4));
+        _for_each_inner_lp_function!((LP_UART_TXD_PAD, GPIO5));
+        _for_each_inner_lp_function!((LP_GPIO5, GPIO5));
+        _for_each_inner_lp_function!((LP_GPIO6, GPIO6));
+        _for_each_inner_lp_function!(((LP_GPIO0, LP_GPIOn, 0), GPIO0));
+        _for_each_inner_lp_function!(((LP_GPIO1, LP_GPIOn, 1), GPIO1));
+        _for_each_inner_lp_function!(((LP_GPIO2, LP_GPIOn, 2), GPIO2));
+        _for_each_inner_lp_function!(((LP_GPIO3, LP_GPIOn, 3), GPIO3));
+        _for_each_inner_lp_function!(((LP_GPIO4, LP_GPIOn, 4), GPIO4));
+        _for_each_inner_lp_function!(((LP_GPIO5, LP_GPIOn, 5), GPIO5));
+        _for_each_inner_lp_function!(((LP_GPIO6, LP_GPIOn, 6), GPIO6));
+        _for_each_inner_lp_function!((all(LP_UART_DTRN, GPIO0), (LP_GPIO0, GPIO0),
+        (LP_UART_DSRN, GPIO1), (LP_GPIO1, GPIO1), (LP_UART_RTSN, GPIO2), (LP_GPIO2,
+        GPIO2), (LP_I2C_SDA, GPIO2), (LP_UART_CTSN, GPIO3), (LP_GPIO3, GPIO3),
+        (LP_I2C_SCL, GPIO3), (LP_UART_RXD_PAD, GPIO4), (LP_GPIO4, GPIO4),
+        (LP_UART_TXD_PAD, GPIO5), (LP_GPIO5, GPIO5), (LP_GPIO6, GPIO6)));
+        _for_each_inner_lp_function!((all_expanded((LP_GPIO0, LP_GPIOn, 0), GPIO0),
+        ((LP_GPIO1, LP_GPIOn, 1), GPIO1), ((LP_GPIO2, LP_GPIOn, 2), GPIO2), ((LP_GPIO3,
+        LP_GPIOn, 3), GPIO3), ((LP_GPIO4, LP_GPIOn, 4), GPIO4), ((LP_GPIO5, LP_GPIOn, 5),
+        GPIO5), ((LP_GPIO6, LP_GPIOn, 6), GPIO6)));
+    };
+}
+/// Defines the `InputSignal` and `OutputSignal` enums.
+///
+/// This macro is intended to be called in esp-hal only.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! define_io_mux_signals {
+    () => {
+        #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+        #[derive(Debug, PartialEq, Copy, Clone)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)]
+        pub enum InputSignal {
+            U0RXD               = 6,
+            U0CTS               = 7,
+            U0DSR               = 8,
+            U1RXD               = 9,
+            U1CTS               = 10,
+            U1DSR               = 11,
+            I2S_MCLK            = 12,
+            I2SO_BCK            = 13,
+            I2SO_WS             = 14,
+            I2SI_SD             = 15,
+            I2SI_BCK            = 16,
+            I2SI_WS             = 17,
+            CPU_GPIO_0          = 27,
+            CPU_GPIO_1          = 28,
+            CPU_GPIO_2          = 29,
+            CPU_GPIO_3          = 30,
+            CPU_GPIO_4          = 31,
+            CPU_GPIO_5          = 32,
+            CPU_GPIO_6          = 33,
+            CPU_GPIO_7          = 34,
+            USB_JTAG_TDO_BRIDGE = 35,
+            I2CEXT0_SCL         = 46,
+            I2CEXT0_SDA         = 47,
+            PARL_RX_DATA0       = 48,
+            PARL_RX_DATA1       = 49,
+            PARL_RX_DATA2       = 50,
+            PARL_RX_DATA3       = 51,
+            PARL_RX_DATA4       = 52,
+            PARL_RX_DATA5       = 53,
+            PARL_RX_DATA6       = 54,
+            PARL_RX_DATA7       = 55,
+            FSPICLK             = 56,
+            FSPIQ               = 57,
+            FSPID               = 58,
+            FSPIHD              = 59,
+            FSPIWP              = 60,
+            FSPICS0             = 61,
+            PARL_RX_CLK         = 62,
+            PARL_TX_CLK         = 63,
+            RMT_SIG_0           = 64,
+            RMT_SIG_1           = 65,
+            TWAI0_RX            = 66,
+            TWAI1_RX            = 70,
+            PCNT0_RST           = 76,
+            PCNT1_RST           = 77,
+            PCNT2_RST           = 78,
+            PCNT3_RST           = 79,
+            PWM0_SYNC0          = 80,
+            PWM0_SYNC1          = 81,
+            PWM0_SYNC2          = 82,
+            PWM0_F0             = 83,
+            PWM0_F1             = 84,
+            PWM0_F2             = 85,
+            PWM0_CAP0           = 86,
+            PWM0_CAP1           = 87,
+            PWM0_CAP2           = 88,
+            SIG_IN_FUNC97       = 97,
+            SIG_IN_FUNC98       = 98,
+            SIG_IN_FUNC99       = 99,
+            SIG_IN_FUNC100      = 100,
+            PCNT0_SIG_CH0       = 101,
+            PCNT0_SIG_CH1       = 102,
+            PCNT0_CTRL_CH0      = 103,
+            PCNT0_CTRL_CH1      = 104,
+            PCNT1_SIG_CH0       = 105,
+            PCNT1_SIG_CH1       = 106,
+            PCNT1_CTRL_CH0      = 107,
+            PCNT1_CTRL_CH1      = 108,
+            PCNT2_SIG_CH0       = 109,
+            PCNT2_SIG_CH1       = 110,
+            PCNT2_CTRL_CH0      = 111,
+            PCNT2_CTRL_CH1      = 112,
+            PCNT3_SIG_CH0       = 113,
+            PCNT3_SIG_CH1       = 114,
+            PCNT3_CTRL_CH0      = 115,
+            PCNT3_CTRL_CH1      = 116,
+            SDIO_CLK,
+            SDIO_CMD,
+            SDIO_DATA0,
+            SDIO_DATA1,
+            SDIO_DATA2,
+            SDIO_DATA3,
+            MTDI,
+            MTDO,
+            MTCK,
+            MTMS,
+        }
+        #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+        #[derive(Debug, PartialEq, Copy, Clone)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)]
+        pub enum OutputSignal {
+            LEDC_LS_SIG0     = 0,
+            LEDC_LS_SIG1     = 1,
+            LEDC_LS_SIG2     = 2,
+            LEDC_LS_SIG3     = 3,
+            LEDC_LS_SIG4     = 4,
+            LEDC_LS_SIG5     = 5,
+            U0TXD            = 6,
+            U0RTS            = 7,
+            U0DTR            = 8,
+            U1TXD            = 9,
+            U1RTS            = 10,
+            U1DTR            = 11,
+            I2S_MCLK         = 12,
+            I2SO_BCK         = 13,
+            I2SO_WS          = 14,
+            I2SO_SD          = 15,
+            I2SI_BCK         = 16,
+            I2SI_WS          = 17,
+            I2SO_SD1         = 18,
+            CPU_GPIO_0       = 27,
+            CPU_GPIO_1       = 28,
+            CPU_GPIO_2       = 29,
+            CPU_GPIO_3       = 30,
+            CPU_GPIO_4       = 31,
+            CPU_GPIO_5       = 32,
+            CPU_GPIO_6       = 33,
+            CPU_GPIO_7       = 34,
+            I2CEXT0_SCL      = 46,
+            I2CEXT0_SDA      = 47,
+            PARL_TX_DATA0    = 48,
+            PARL_TX_DATA1    = 49,
+            PARL_TX_DATA2    = 50,
+            PARL_TX_DATA3    = 51,
+            PARL_TX_DATA4    = 52,
+            PARL_TX_DATA5    = 53,
+            PARL_TX_DATA6    = 54,
+            PARL_TX_DATA7    = 55,
+            FSPICLK          = 56,
+            FSPIQ            = 57,
+            FSPID            = 58,
+            FSPIHD           = 59,
+            FSPIWP           = 60,
+            FSPICS0          = 61,
+            PARL_RX_CLK      = 62,
+            PARL_TX_CLK      = 63,
+            RMT_SIG_0        = 64,
+            RMT_SIG_1        = 65,
+            TWAI0_TX         = 66,
+            TWAI0_BUS_OFF_ON = 67,
+            TWAI0_CLKOUT     = 68,
+            TWAI0_STANDBY    = 69,
+            TWAI1_TX         = 70,
+            TWAI1_BUS_OFF_ON = 71,
+            TWAI1_CLKOUT     = 72,
+            TWAI1_STANDBY    = 73,
+            GPIO_SD0         = 76,
+            GPIO_SD1         = 77,
+            GPIO_SD2         = 78,
+            GPIO_SD3         = 79,
+            PWM0_0A          = 80,
+            PWM0_0B          = 81,
+            PWM0_1A          = 82,
+            PWM0_1B          = 83,
+            PWM0_2A          = 84,
+            PWM0_2B          = 85,
+            PARL_TX_CS       = 86,
+            SIG_IN_FUNC97    = 97,
+            SIG_IN_FUNC98    = 98,
+            SIG_IN_FUNC99    = 99,
+            SIG_IN_FUNC100   = 100,
+            FSPICS1          = 101,
+            FSPICS2          = 102,
+            FSPICS3          = 103,
+            FSPICS4          = 104,
+            FSPICS5          = 105,
+            GPIO             = 256,
+        }
+    };
+}
+/// Defines and implements the `io_mux_reg` function.
+///
+/// The generated function has the following signature:
+///
+/// ```rust,ignore
+/// pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO0 {
+///     // ...
+/// # unimplemented!()
+/// }
+/// ```
+///
+/// This macro is intended to be called in esp-hal only.
+#[macro_export]
+#[expect(clippy::crate_in_macro_def)]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! define_io_mux_reg {
+    () => {
+        pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO {
+            crate::peripherals::IO_MUX::regs().gpio(gpio_num as usize)
+        }
     };
 }

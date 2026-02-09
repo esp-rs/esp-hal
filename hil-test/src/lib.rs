@@ -64,6 +64,8 @@ macro_rules! i2c_pins {
                 ($peripherals.GPIO12, $peripherals.GPIO22)
             } else if #[cfg(esp32c2)] {
                 ($peripherals.GPIO18, $peripherals.GPIO9)
+            } else if #[cfg(esp32c5)] {
+                ($peripherals.GPIO2, $peripherals.GPIO3)
             } else { // esp32c3
                 ($peripherals.GPIO4, $peripherals.GPIO5)
             }
@@ -75,7 +77,7 @@ macro_rules! i2c_pins {
 macro_rules! common_test_pins {
     ($peripherals:expr) => {{
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32s2, esp32s3))] {
+            if #[cfg(any(esp32s2, esp32s3, esp32c5))] {
                 ($peripherals.GPIO9, $peripherals.GPIO10)
             } else if #[cfg(esp32)] {
                 ($peripherals.GPIO2, $peripherals.GPIO4)
@@ -100,6 +102,8 @@ macro_rules! unconnected_pin {
                 $peripherals.GPIO9
             } else if #[cfg(esp32c2)] {
                 $peripherals.GPIO8
+            } else if #[cfg(esp32c5)] {
+                $peripherals.GPIO28
             } else {
                 $peripherals.GPIO9
             }

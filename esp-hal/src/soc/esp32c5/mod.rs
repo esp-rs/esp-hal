@@ -18,4 +18,7 @@ pub(crate) use esp32c5 as pac;
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub(crate) mod constants {}
 
-pub(crate) fn pre_init() {}
+pub(crate) fn pre_init() {
+    // this is hacky, but for some reason we must reset the output enable register manually
+    crate::peripherals::GPIO::regs().enable().reset();
+}

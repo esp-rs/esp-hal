@@ -299,19 +299,19 @@ pub use xtensa_lx_rt::{self, xtensa_lx};
 
 #[cfg(any(soc_has_dport, soc_has_hp_sys, soc_has_pcr, soc_has_system))]
 pub mod clock;
-#[cfg(gpio)]
+#[cfg(gpio_driver_supported)]
 pub mod gpio;
-#[cfg(i2c_master)]
+#[cfg(i2c_master_driver_supported)]
 pub mod i2c;
 pub mod peripherals;
-#[cfg(all(feature = "unstable", any(hmac, sha)))]
+#[cfg(all(feature = "unstable", any(hmac_driver_supported, sha_driver_supported)))]
 mod reg_access;
-#[cfg(any(spi_master, spi_slave))]
+#[cfg(any(spi_master_driver_supported, spi_slave_driver_supported))]
 pub mod spi;
 #[cfg_attr(esp32c5, allow(dead_code))]
 pub mod system;
 pub mod time;
-#[cfg(uart)]
+#[cfg(uart_driver_supported)]
 pub mod uart;
 
 mod macros;
@@ -344,67 +344,66 @@ unstable_module! {
     #[doc(hidden)]
     pub mod sync;
     // Drivers needed for initialization or they are tightly coupled to something else.
-    #[cfg(any(adc, dac))]
+    #[cfg(any(adc_driver_supported, dac_driver_supported))]
     pub mod analog;
-    #[cfg(any(systimer, timergroup))]
+    #[cfg(any(systimer_driver_supported, timergroup_driver_supported))]
     pub mod timer;
     #[cfg(soc_has_lpwr)]
     pub mod rtc_cntl;
     #[cfg(any(gdma, pdma))]
     pub mod dma;
-    #[cfg(etm)]
+    #[cfg(etm_driver_supported)]
     pub mod etm;
-    #[cfg(usb_otg)]
+    #[cfg(usb_otg_driver_supported)]
     pub mod otg_fs;
     #[cfg(psram)] // DMA needs some things from here
     pub mod psram;
     pub mod efuse;
 }
 
-#[cfg(any(sha, rsa, aes))]
+#[cfg(any(sha_driver_supported, rsa_driver_supported, aes_driver_supported))]
 mod work_queue;
 
 unstable_driver! {
-    #[cfg(aes)]
+    #[cfg(aes_driver_supported)]
     pub mod aes;
-    #[cfg(assist_debug)]
+    #[cfg(assist_debug_driver_supported)]
     pub mod assist_debug;
     pub mod delay;
-    #[cfg(ecc)]
+    #[cfg(ecc_driver_supported)]
     pub mod ecc;
-    #[cfg(hmac)]
+    #[cfg(hmac_driver_supported)]
     pub mod hmac;
-    #[cfg(i2s)]
+    #[cfg(i2s_driver_supported)]
     pub mod i2s;
     #[cfg(soc_has_lcd_cam)]
     pub mod lcd_cam;
-    #[cfg(ledc)]
+    #[cfg(ledc_driver_supported)]
     pub mod ledc;
-    #[cfg(mcpwm)]
+    #[cfg(mcpwm_driver_supported)]
     pub mod mcpwm;
-    #[cfg(parl_io)]
+    #[cfg(parl_io_driver_supported)]
     pub mod parl_io;
-    #[cfg(pcnt)]
+    #[cfg(pcnt_driver_supported)]
     pub mod pcnt;
-    #[cfg(rmt)]
+    #[cfg(rmt_driver_supported)]
     pub mod rmt;
-    #[cfg(rng)]
+    #[cfg(rng_driver_supported)]
     pub mod rng;
-    #[cfg(rsa)]
+    #[cfg(rsa_driver_supported)]
     pub mod rsa;
-    #[cfg(sha)]
+    #[cfg(sha_driver_supported)]
     pub mod sha;
     #[cfg(touch)]
     pub mod touch;
     #[cfg(not(esp32c5))]
     #[cfg(soc_has_trace0)]
     pub mod trace;
-    #[cfg(not(esp32c5))]
     #[cfg(soc_has_tsens)]
     pub mod tsens;
-    #[cfg(twai)]
+    #[cfg(twai_driver_supported)]
     pub mod twai;
-    #[cfg(usb_serial_jtag)]
+    #[cfg(usb_serial_jtag_driver_supported)]
     pub mod usb_serial_jtag;
 }
 
@@ -764,7 +763,7 @@ pub fn init(config: Config) -> Peripherals {
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.LPWR.reborrow());
 
-    #[cfg(sleep)]
+    #[cfg(sleep_driver_supported)]
     crate::rtc_cntl::sleep::RtcSleepConfig::base_settings(&rtc);
 
     // Disable watchdog timers
@@ -781,7 +780,7 @@ pub fn init(config: Config) -> Peripherals {
 
     crate::time::implem::time_init();
 
-    #[cfg(gpio)]
+    #[cfg(gpio_driver_supported)]
     crate::gpio::interrupt::bind_default_interrupt_handler();
 
     #[cfg(feature = "psram")]

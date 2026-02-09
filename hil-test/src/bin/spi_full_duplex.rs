@@ -28,7 +28,7 @@ cfg_if::cfg_if! {
             peripherals::SPI2,
             spi::master::{Address, Command, DataMode},
         };
-        #[cfg(pcnt)]
+        #[cfg(pcnt_driver_supported)]
         use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
     }
 }
@@ -54,7 +54,7 @@ struct Context {
     #[cfg(feature = "unstable")]
     tx_descriptors: &'static mut [DmaDescriptor],
     miso_input: Input<'static>,
-    #[cfg(all(pcnt, feature = "unstable"))]
+    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
     pcnt_unit: Unit<'static, 0>,
 }
 
@@ -111,7 +111,7 @@ mod tests {
 
         cfg_if::cfg_if! {
             if #[cfg(feature = "unstable")] {
-                #[cfg(pcnt)]
+                #[cfg(pcnt_driver_supported)]
                 let pcnt = Pcnt::new(peripherals.PCNT);
 
                 Context {
@@ -122,7 +122,7 @@ mod tests {
                     dma_channel,
                     rx_descriptors,
                     tx_descriptors,
-                    #[cfg(pcnt)]
+                    #[cfg(pcnt_driver_supported)]
                     pcnt_unit: pcnt.unit0,
                 }
             } else {
@@ -183,7 +183,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(pcnt, feature = "unstable"))]
+    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
     fn test_asymmetric_write(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
@@ -202,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(pcnt, feature = "unstable"))]
+    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
     async fn test_async_asymmetric_write(ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
@@ -222,7 +222,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(pcnt, feature = "unstable"))]
+    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
     async fn async_write_after_sync_write_waits_for_flush(ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef];
 
@@ -248,7 +248,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(pcnt, feature = "unstable"))]
+    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
     fn test_asymmetric_write_transfer(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
@@ -267,7 +267,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(pcnt, feature = "unstable"))]
+    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
     async fn test_async_asymmetric_write_transfer(ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
 
@@ -347,7 +347,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(pcnt, feature = "unstable"))]
+    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
     fn test_dma_read_dma_write_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 8;
         const TRANSFER_SIZE: usize = 5;
@@ -385,7 +385,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(pcnt, feature = "unstable"))]
+    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
     fn test_dma_read_dma_transfer_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 8;
         const TRANSFER_SIZE: usize = 5;
@@ -491,7 +491,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(pcnt, feature = "unstable"))]
+    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
     fn test_dma_bus_read_write_pcnt(ctx: Context) {
         const TRANSFER_SIZE: usize = 4;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4);
@@ -588,7 +588,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(pcnt, feature = "unstable"))]
+    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
     async fn test_async_dma_read_dma_write_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 8;
         const TRANSFER_SIZE: usize = 5;
@@ -624,7 +624,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(pcnt, feature = "unstable"))]
+    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
     async fn test_async_dma_read_dma_transfer_pcnt(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 8;
         const TRANSFER_SIZE: usize = 5;

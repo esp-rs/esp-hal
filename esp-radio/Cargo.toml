@@ -12,28 +12,28 @@ license = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
 doc-config = { features = ["esp-hal/unstable", "esp-hal/rt", "esp-alloc/global-allocator", "defmt"], append = [
-    { if = 'chip_has("wifi")', features = ["wifi", "wifi-eap", "csi", "esp-now", "sniffer"] },
-    { if = 'chip_has("bt")', features = ["ble"] },
-    { if = 'chip_has("ieee802154")', features = ["ieee802154", "__docs_build"] },
-    { if = 'chip_has("wifi") && chip_has("bt")', features = ["coex"] },
-    { if = 'chip_has("wifi") || chip_has("bt") || chip_has("ieee802154")', features = ["unstable"] },
+    { if = 'chip_has("wifi_driver_supported")', features = ["wifi", "wifi-eap", "csi", "esp-now", "sniffer"] },
+    { if = 'chip_has("bt_driver_supported")', features = ["ble"] },
+    { if = 'chip_has("ieee802154_driver_supported")', features = ["ieee802154", "__docs_build"] },
+    { if = 'chip_has("wifi_driver_supported") && chip_has("bt_driver_supported")', features = ["coex"] },
+    { if = 'chip_has("wifi_driver_supported") || chip_has("bt_driver_supported") || chip_has("ieee802154_driver_supported")', features = ["unstable"] },
 ] }
 check-configs = [
     { features = ["esp-hal/unstable", "esp-hal/rt"] },
     { features = ["esp-hal/unstable", "esp-hal/rt", "defmt"] },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi"], if = 'chip_has("wifi")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi"], if = 'chip_has("wifi_driver_supported")' },
     # feature(c_variadic) requires nightly compiler, but we can't configure the toolchain here. Only check xtensa chips, where the compiler has nightly features enabled.
-    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi", "print-logs-from-driver", "unstable"], if = 'chip_has("wifi") && chip_has("xtensa")' },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer"], if = 'chip_has("wifi")' },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ble"], if = 'chip_has("bt")' },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ieee802154"], if = 'chip_has("ieee802154")' },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer", "ble", "coex"], if = 'chip_has("wifi") && chip_has("bt")' },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi-eap", "unstable"], if = 'chip_has("wifi")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi", "print-logs-from-driver", "unstable"], if = 'chip_has("wifi_driver_supported") && chip_has("xtensa")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer"], if = 'chip_has("wifi_driver_supported")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ble"], if = 'chip_has("bt_driver_supported")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ieee802154"], if = 'chip_has("ieee802154_driver_supported")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer", "ble", "coex"], if = 'chip_has("wifi_driver_supported") && chip_has("bt_driver_supported")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi-eap", "unstable"], if = 'chip_has("wifi_driver_supported")' },
 ]
 clippy-configs = [
     { features = ["esp-hal/unstable", "esp-hal/rt"] },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi", "wifi-eap", "unstable"], if = 'chip_has("wifi")', append = [
-        { features = ["ble"], if = 'chip_has("bt")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi", "wifi-eap", "unstable"], if = 'chip_has("wifi_driver_supported")', append = [
+        { features = ["ble"], if = 'chip_has("bt_driver_supported")' },
     ] },
 ]
 

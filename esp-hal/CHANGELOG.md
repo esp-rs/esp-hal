@@ -18,11 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unstable detailed clock configuration options (#4660, #4674)
 - `RsaContext`, `AesContext` now derive `Clone`. (#4709)
 - `Sha<X>Context` now derive `Clone`, except on ESP32. (#4709)
-- Dedicated GPIO implementation (#4699)
+- Dedicated GPIO implementation (#4699, #4819)
 - `esp_hal::interrupt::wait_for_interrupt`, which enters `wfi` (RISC-V) or `waiti 0` (Xtensa) when it would not prevent a debugger from reading memory (#4782)
 - Initial ESP32-C5 support (#4859, #4866, #4871, #4872, #4873, #4877, #4879, #4883, #4884)
 - New configuration option: `ESP_HAL_CONFIG_MIN_CHIP_REVISION` (#4875)
 - `Cpu::all` to iterate over all CPUs (#4890)
+- C5: Add initial GPIO support (#4899, #4928, #4935)
 
 ### Changed
 
@@ -60,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S3/ESP32-C2: WiFi will work after light-sleep with default settings (#4826)
 - ESP32-S2: Fixed an issue where enabling TRNG can prevent WiFi from working (#4856)
 - Fixed an issue that caused the stack guard to overwrite data moved to the second core (#4914)
+- PCNT: Fixed some potential data race issues (#4932)
 
 ### Removed
 

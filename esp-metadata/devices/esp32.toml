@@ -99,6 +99,7 @@ symbols = [
 ]
 
 [device.soc]
+multi_core_enabled = true
 rc_fast_clk_default = 8_500_000
 
 memory_map = { ranges = [
@@ -796,6 +797,7 @@ support_status = "partial"
 status_registers = 3
 software_interrupt_count = 4
 software_interrupt_delay = 0
+controller = "Xtensa"
 
 [device.rmt]
 support_status = "partial"
