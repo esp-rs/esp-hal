@@ -1575,7 +1575,7 @@ pub trait DmaChannel: Sized {
     type Tx: DmaTxChannel;
 
     /// Splits the DMA channel into its RX and TX halves.
-    #[cfg(any(esp32c6, esp32h2, esp32s3))] // TODO relax this to allow splitting on all chips
+    #[cfg(any(esp32c5, esp32c6, esp32h2, esp32s3))] // TODO relax this to allow splitting on all chips
     fn split(self) -> (Self::Rx, Self::Tx) {
         // This function is exposed safely on chips that have separate IN and OUT
         // interrupt handlers.
@@ -2513,6 +2513,7 @@ pub(crate) mod dma_private {
 /// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
 #[must_use]
+#[cfg(i2s_driver_supported)]
 pub struct DmaTransferTx<'a, I>
 where
     I: dma_private::DmaSupportTx,
@@ -2520,11 +2521,11 @@ where
     instance: &'a mut I,
 }
 
+#[cfg(i2s_driver_supported)]
 impl<'a, I> DmaTransferTx<'a, I>
 where
     I: dma_private::DmaSupportTx,
 {
-    #[cfg_attr(esp32c2, allow(dead_code))]
     pub(crate) fn new(instance: &'a mut I) -> Self {
         Self { instance }
     }
@@ -2551,6 +2552,7 @@ where
     }
 }
 
+#[cfg(i2s_driver_supported)]
 impl<I> Drop for DmaTransferTx<'_, I>
 where
     I: dma_private::DmaSupportTx,
@@ -2567,6 +2569,7 @@ where
 /// Never use [core::mem::forget] on an in-progress transfer
 #[non_exhaustive]
 #[must_use]
+#[cfg(i2s_driver_supported)]
 pub struct DmaTransferRx<'a, I>
 where
     I: dma_private::DmaSupportRx,
@@ -2574,11 +2577,11 @@ where
     instance: &'a mut I,
 }
 
+#[cfg(i2s_driver_supported)]
 impl<'a, I> DmaTransferRx<'a, I>
 where
     I: dma_private::DmaSupportRx,
 {
-    #[cfg_attr(esp32c2, allow(dead_code))]
     pub(crate) fn new(instance: &'a mut I) -> Self {
         Self { instance }
     }
@@ -2605,6 +2608,7 @@ where
     }
 }
 
+#[cfg(i2s_driver_supported)]
 impl<I> Drop for DmaTransferRx<'_, I>
 where
     I: dma_private::DmaSupportRx,
@@ -2826,7 +2830,7 @@ pub(crate) mod asynch {
         const FAILURE_INTERRUPTS: EnumSet<DmaTxInterrupt> =
             enum_set!(DmaTxInterrupt::DescriptorError);
 
-        #[cfg_attr(esp32c2, allow(dead_code))]
+        #[cfg_attr(any(esp32c2, esp32c5), expect(dead_code))]
         pub fn new(tx: &'a mut ChannelTx<Async, CH>) -> Self {
             Self { tx }
         }
@@ -2943,7 +2947,8 @@ pub(crate) mod asynch {
         }
     }
 
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
+    // Legacy API still used by I2S
+    #[cfg(i2s_driver_supported)]
     pub struct DmaTxDoneChFuture<'a, CH>
     where
         CH: DmaTxChannel,
@@ -2952,7 +2957,7 @@ pub(crate) mod asynch {
         _a: (),
     }
 
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
+    #[cfg(i2s_driver_supported)]
     impl<'a, CH> DmaTxDoneChFuture<'a, CH>
     where
         CH: DmaTxChannel,
@@ -2962,7 +2967,7 @@ pub(crate) mod asynch {
         }
     }
 
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
+    #[cfg(i2s_driver_supported)]
     impl<CH> core::future::Future for DmaTxDoneChFuture<'_, CH>
     where
         CH: DmaTxChannel,
@@ -2996,7 +3001,7 @@ pub(crate) mod asynch {
         }
     }
 
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
+    #[cfg(i2s_driver_supported)]
     impl<CH> Drop for DmaTxDoneChFuture<'_, CH>
     where
         CH: DmaTxChannel,
@@ -3007,7 +3012,7 @@ pub(crate) mod asynch {
         }
     }
 
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
+    #[cfg(i2s_driver_supported)]
     pub struct DmaRxDoneChFuture<'a, CH>
     where
         CH: DmaRxChannel,
@@ -3016,7 +3021,7 @@ pub(crate) mod asynch {
         _a: (),
     }
 
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
+    #[cfg(i2s_driver_supported)]
     impl<'a, CH> DmaRxDoneChFuture<'a, CH>
     where
         CH: DmaRxChannel,
@@ -3026,7 +3031,7 @@ pub(crate) mod asynch {
         }
     }
 
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
+    #[cfg(i2s_driver_supported)]
     impl<CH> core::future::Future for DmaRxDoneChFuture<'_, CH>
     where
         CH: DmaRxChannel,
@@ -3064,7 +3069,7 @@ pub(crate) mod asynch {
         }
     }
 
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
+    #[cfg(i2s_driver_supported)]
     impl<CH> Drop for DmaRxDoneChFuture<'_, CH>
     where
         CH: DmaRxChannel,

@@ -18,6 +18,7 @@ use crate::{
 };
 
 #[cfg_attr(dma_gdma_version = "1", path = "ahb_v1.rs")]
+#[cfg_attr(dma_gdma_version = "2", path = "ahb_v2.rs")]
 mod implementation;
 
 /// An arbitrary GDMA channel
@@ -29,7 +30,7 @@ pub struct AnyGdmaChannel<'d> {
 }
 
 impl AnyGdmaChannel<'_> {
-    #[cfg_attr(esp32c2, expect(unused))]
+    #[cfg_attr(any(esp32c2, esp32c5), expect(unused))]
     pub(crate) unsafe fn clone_unchecked(&self) -> Self {
         Self {
             channel: self.channel,
@@ -275,4 +276,6 @@ pub(super) fn init_dma_racey() {
         .misc_conf()
         .modify(|_, w| w.ahbm_rst_inter().clear_bit());
     DMA::regs().misc_conf().modify(|_, w| w.clk_en().set_bit());
+
+    implementation::setup();
 }

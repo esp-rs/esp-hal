@@ -94,6 +94,10 @@ peripherals = [
     # { name = "UHCI0", dma_peripheral = 2 },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
 
+    { name = "DMA_CH0", virtual = true },
+    { name = "DMA_CH1", virtual = true },
+    { name = "DMA_CH2", virtual = true },
+
     { name = "BT", virtual = true },
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
@@ -234,12 +238,14 @@ clocks = { system_clocks = { clock_tree = [
 ] } }
 
 [device.dma]
-support_status = "not_supported"
+support_status = "partial"
 kind = "gdma"
 gdma_version = 2
 separate_in_out_interrupts = true
 supports_mem2mem = true
 max_priority = 5
+# TODO: DMA can access flash
+# TODO: weight-based arbitration
 
 [device.gpio]
 support_status = "partial"
@@ -473,7 +479,7 @@ controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 
 
 [device.spi_master]
 support_status = "supported"
-supports_dma = false
+supports_dma = true
 has_app_interrupts = true
 has_dma_segmented_transfer = true
 has_clk_pre_div = true

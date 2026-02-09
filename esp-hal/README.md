@@ -59,7 +59,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | AES                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | ASSIST_DEBUG       |       | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      |          | ⚒️      |
 | DAC                | ⚒️   |          |          |          |          |          | ⚒️      |          |
-| DMA                | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| DMA                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | DS                 |       |          | ❌       |          | ❌       | ❌       | ❌       | ❌       |
 | ECC                |       | ⚒️      |          |          | ⚒️      | ⚒️      |          |          |
 | Ethernet           | ❌    |          |          |          |          |          |          |          |

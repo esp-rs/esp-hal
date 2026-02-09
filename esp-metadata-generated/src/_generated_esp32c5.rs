@@ -139,7 +139,7 @@ macro_rules! property {
         0
     };
     ("spi_master.supports_dma") => {
-        false
+        true
     };
     ("spi_master.has_octal") => {
         false
@@ -2367,9 +2367,14 @@ macro_rules! for_each_peripheral {
         "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "BT peripheral singleton"] BT <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "FLASH peripheral singleton"]
-        FLASH <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "DMA_CH0 peripheral singleton"] DMA_CH0 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "DMA_CH1 peripheral singleton"]
+        DMA_CH1 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
+        = "DMA_CH2 peripheral singleton"] DMA_CH2 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "BT peripheral singleton"] BT <=
+        virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "FLASH peripheral singleton"] FLASH <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "LP_CORE peripheral singleton"]
         LP_CORE <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
@@ -2457,6 +2462,9 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((TRACE0(unstable)));
         _for_each_inner_peripheral!((UART0)); _for_each_inner_peripheral!((UART1));
         _for_each_inner_peripheral!((USB_DEVICE(unstable)));
+        _for_each_inner_peripheral!((DMA_CH0(unstable)));
+        _for_each_inner_peripheral!((DMA_CH1(unstable)));
+        _for_each_inner_peripheral!((DMA_CH2(unstable)));
         _for_each_inner_peripheral!((BT(unstable)));
         _for_each_inner_peripheral!((FLASH(unstable)));
         _for_each_inner_peripheral!((GPIO_DEDICATED(unstable)));
@@ -2642,28 +2650,32 @@ macro_rules! for_each_peripheral {
         disable_peri_interrupt })), (@ peri_type #[doc =
         "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable)), (@ peri_type #[doc = "BT peripheral singleton"] BT <= virtual()
-        (unstable)), (@ peri_type #[doc = "FLASH peripheral singleton"] FLASH <=
-        virtual() (unstable)), (@ peri_type #[doc =
-        "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)),
-        (@ peri_type #[doc = "LP_CORE peripheral singleton"] LP_CORE <= virtual()
-        (unstable)), (@ peri_type #[doc = "SW_INTERRUPT peripheral singleton"]
-        SW_INTERRUPT <= virtual() (unstable)), (@ peri_type #[doc =
-        "WIFI peripheral singleton"] WIFI <= virtual() (unstable)), (@ peri_type #[doc =
-        "MEM2MEM0 peripheral singleton"] MEM2MEM0 <= virtual() (unstable)), (@ peri_type
-        #[doc = "MEM2MEM1 peripheral singleton"] MEM2MEM1 <= virtual() (unstable)), (@
-        peri_type #[doc = "MEM2MEM2 peripheral singleton"] MEM2MEM2 <= virtual()
-        (unstable)), (@ peri_type #[doc = "MEM2MEM3 peripheral singleton"] MEM2MEM3 <=
-        virtual() (unstable)), (@ peri_type #[doc = "MEM2MEM4 peripheral singleton"]
-        MEM2MEM4 <= virtual() (unstable)), (@ peri_type #[doc =
-        "MEM2MEM5 peripheral singleton"] MEM2MEM5 <= virtual() (unstable)), (@ peri_type
-        #[doc = "MEM2MEM6 peripheral singleton"] MEM2MEM6 <= virtual() (unstable)), (@
-        peri_type #[doc = "MEM2MEM7 peripheral singleton"] MEM2MEM7 <= virtual()
-        (unstable)), (@ peri_type #[doc = "MEM2MEM8 peripheral singleton"] MEM2MEM8 <=
-        virtual() (unstable)))); _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1),
-        (GPIO2), (GPIO3), (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10),
-        (GPIO11), (GPIO12), (GPIO13), (GPIO14), (GPIO23), (GPIO24), (GPIO25), (GPIO26),
-        (GPIO27), (GPIO28), (APB_SARADC(unstable)), (CLINT(unstable)), (DMA(unstable)),
+        (unstable)), (@ peri_type #[doc = "DMA_CH0 peripheral singleton"] DMA_CH0 <=
+        virtual() (unstable)), (@ peri_type #[doc = "DMA_CH1 peripheral singleton"]
+        DMA_CH1 <= virtual() (unstable)), (@ peri_type #[doc =
+        "DMA_CH2 peripheral singleton"] DMA_CH2 <= virtual() (unstable)), (@ peri_type
+        #[doc = "BT peripheral singleton"] BT <= virtual() (unstable)), (@ peri_type
+        #[doc = "FLASH peripheral singleton"] FLASH <= virtual() (unstable)), (@
+        peri_type #[doc = "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <=
+        virtual() (unstable)), (@ peri_type #[doc = "LP_CORE peripheral singleton"]
+        LP_CORE <= virtual() (unstable)), (@ peri_type #[doc =
+        "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <= virtual() (unstable)), (@
+        peri_type #[doc = "WIFI peripheral singleton"] WIFI <= virtual() (unstable)), (@
+        peri_type #[doc = "MEM2MEM0 peripheral singleton"] MEM2MEM0 <= virtual()
+        (unstable)), (@ peri_type #[doc = "MEM2MEM1 peripheral singleton"] MEM2MEM1 <=
+        virtual() (unstable)), (@ peri_type #[doc = "MEM2MEM2 peripheral singleton"]
+        MEM2MEM2 <= virtual() (unstable)), (@ peri_type #[doc =
+        "MEM2MEM3 peripheral singleton"] MEM2MEM3 <= virtual() (unstable)), (@ peri_type
+        #[doc = "MEM2MEM4 peripheral singleton"] MEM2MEM4 <= virtual() (unstable)), (@
+        peri_type #[doc = "MEM2MEM5 peripheral singleton"] MEM2MEM5 <= virtual()
+        (unstable)), (@ peri_type #[doc = "MEM2MEM6 peripheral singleton"] MEM2MEM6 <=
+        virtual() (unstable)), (@ peri_type #[doc = "MEM2MEM7 peripheral singleton"]
+        MEM2MEM7 <= virtual() (unstable)), (@ peri_type #[doc =
+        "MEM2MEM8 peripheral singleton"] MEM2MEM8 <= virtual() (unstable))));
+        _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
+        (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11),
+        (GPIO12), (GPIO13), (GPIO14), (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27),
+        (GPIO28), (APB_SARADC(unstable)), (CLINT(unstable)), (DMA(unstable)),
         (DS(unstable)), (ECC(unstable)), (ECDSA(unstable)), (EFUSE(unstable)),
         (ETM(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)), (HMAC(unstable)),
         (HP_APM(unstable)), (HP_SYS(unstable)), (HUK(unstable)), (I2C_ANA_MST(unstable)),
@@ -2678,7 +2690,8 @@ macro_rules! for_each_peripheral {
         (PMU(unstable)), (PVT_MONITOR(unstable)), (RMT(unstable)), (RSA(unstable)),
         (SHA(unstable)), (SLC(unstable)), (SPI2), (SYSTEM(unstable)),
         (SYSTIMER(unstable)), (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
-        (TRACE0(unstable)), (UART0), (UART1), (USB_DEVICE(unstable)), (BT(unstable)),
+        (TRACE0(unstable)), (UART0), (UART1), (USB_DEVICE(unstable)),
+        (DMA_CH0(unstable)), (DMA_CH1(unstable)), (DMA_CH2(unstable)), (BT(unstable)),
         (FLASH(unstable)), (GPIO_DEDICATED(unstable)), (LP_CORE(unstable)),
         (SW_INTERRUPT(unstable)), (WIFI(unstable)), (MEM2MEM0(unstable)),
         (MEM2MEM1(unstable)), (MEM2MEM2(unstable)), (MEM2MEM3(unstable)),
