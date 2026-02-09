@@ -229,6 +229,7 @@ has_sp_monitor = true
 [device.dma]
 support_status = "partial"
 kind = "gdma"
+supports_mem2mem = true
 
 [device.gpio]
 support_status = "supported"

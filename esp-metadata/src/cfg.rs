@@ -356,6 +356,8 @@ driver_configs![
         name: "DMA",
         properties: {
             kind: String,
+            #[serde(default)]
+            supports_mem2mem: bool,
         }
     },
     DsProperties {

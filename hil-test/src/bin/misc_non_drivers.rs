@@ -40,8 +40,7 @@ mod delay_async;
 mod dma_macros;
 
 #[path = "misc_non_drivers/dma_mem2mem.rs"]
-#[cfg(not(esp32))] // TODO: dma_supports_mem2mem
-#[cfg(dma_driver_supported)]
+#[cfg(all(dma_driver_supported, dma_supports_mem2mem))]
 mod dma_mem2mem;
 
 #[path = "misc_non_drivers/init.rs"]

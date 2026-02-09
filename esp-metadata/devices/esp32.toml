@@ -333,6 +333,7 @@ instances = [
 [device.dma]
 support_status = "partial"
 kind = "pdma"
+supports_mem2mem = false
 
 [device.gpio]
 support_status = "supported"

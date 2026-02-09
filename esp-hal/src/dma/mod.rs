@@ -378,12 +378,17 @@ impl DmaDescriptor {
 unsafe impl Send for DmaDescriptor {}
 
 mod buffers;
-#[cfg(dma_kind = "gdma")]
-mod gdma;
-#[cfg(any(dma_kind = "gdma", esp32s2))] // TODO
+cfg_if::cfg_if! {
+    if #[cfg(dma_kind = "gdma")] {
+        mod gdma;
+    } else if #[cfg(dma_kind = "pdma")] {
+        mod pdma;
+    } else {
+        compile_error!("Unsupported DMA kind");
+    }
+}
+#[cfg(dma_supports_mem2mem)]
 mod m2m;
-#[cfg(dma_kind = "pdma")]
-mod pdma;
 
 /// Kinds of interrupt to listen to.
 #[derive(Debug, EnumSetType)]

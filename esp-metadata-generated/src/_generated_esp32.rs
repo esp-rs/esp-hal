@@ -63,6 +63,9 @@ macro_rules! property {
     ("dma.kind") => {
         "pdma"
     };
+    ("dma.supports_mem2mem") => {
+        false
+    };
     ("gpio.has_bank_1") => {
         true
     };
