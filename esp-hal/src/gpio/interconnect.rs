@@ -855,7 +855,6 @@ impl<'d> OutputSignal<'d> {
 
     #[doc(hidden)]
     #[instability::unstable]
-    #[cfg_attr(esp32c5, expect(unused))]
     pub(crate) fn connect_with_guard(self, signal: crate::gpio::OutputSignal) -> PinGuard {
         signal.connect_to(&self);
         match self.pin {
