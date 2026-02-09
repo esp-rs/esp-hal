@@ -78,7 +78,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | LEDC               | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | MCPWM              | ⚒️   |          |          |          | ⚒️      | ⚒️      |          | ⚒️      |
 | PARL_IO            |       |          |          |          | ⚒️      | ⚒️      |          |          |
-| PCNT               | ⚒️   |          |          |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| PCNT               | ⚒️   |          |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | PSRAM              | ⚒️   |          |          |          |          |          | ⚒️      | ⚒️      |
 | RMT                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | RNG                | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |

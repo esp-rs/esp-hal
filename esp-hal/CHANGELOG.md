@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New configuration option: `ESP_HAL_CONFIG_MIN_CHIP_REVISION` (#4875)
 - `Cpu::all` to iterate over all CPUs (#4890)
 - C5: Add initial GPIO support (#4899, #4928, #4935)
+- C5: Add PCNT support (#4934)
 
 ### Changed
 
