@@ -784,8 +784,7 @@ impl Info {
         }
     }
 
-    // Clear the transaction-done interrupt flag so flush() can work properly. Not
-    // used in DMA mode.
+    // Clear the transaction-done interrupt flag so flush() can work properly.
     #[cfg(spi_slave_supports_dma)]
     fn setup_for_flush(&self) {
         #[cfg(pdma)]
