@@ -100,7 +100,7 @@ timestamp = []
 
 ## Automatically select the best output interface for the target.
 auto        = ["dep:portable-atomic"]
-## Use the `USB_SERIAL_JTAG` interface for printing. Available on ESP32-C3, ESP32-C6, ESP32-H2, ESP32-P4, and ESP32-S3.
+## Use the `USB_SERIAL_JTAG` interface for printing. Available on ESP32-C3, ESP32-C5, ESP32-C6, ESP32-H2, and ESP32-S3.
 jtag-serial = ["dep:portable-atomic"]
 ## Use the `UART0` peripheral for printing. Available on all devices.
 uart        = []
