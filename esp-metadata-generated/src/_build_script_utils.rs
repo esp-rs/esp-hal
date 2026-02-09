@@ -1763,6 +1763,7 @@ impl Chip {
                     "has_dram2_uninit_region",
                     "dma_kind=\"gdma\"",
                     "dma_supports_mem2mem",
+                    "dma_separate_in_out_interrupts",
                     "dma_max_priority=\"5\"",
                     "dma_max_priority_is_set",
                     "gpio_gpio_function=\"1\"",
@@ -1904,6 +1905,7 @@ impl Chip {
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=dma_kind=\"gdma\"",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=dma_separate_in_out_interrupts",
                     "cargo:rustc-cfg=dma_max_priority=\"5\"",
                     "cargo:rustc-cfg=dma_max_priority_is_set",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
@@ -2229,6 +2231,7 @@ impl Chip {
                     "assist_debug_has_region_monitor",
                     "dma_kind=\"gdma\"",
                     "dma_supports_mem2mem",
+                    "dma_separate_in_out_interrupts",
                     "dma_max_priority=\"9\"",
                     "dma_max_priority_is_set",
                     "gpio_gpio_function=\"1\"",
@@ -2491,6 +2494,7 @@ impl Chip {
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=dma_kind=\"gdma\"",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=dma_separate_in_out_interrupts",
                     "cargo:rustc-cfg=dma_max_priority=\"9\"",
                     "cargo:rustc-cfg=dma_max_priority_is_set",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
@@ -2866,6 +2870,7 @@ impl Chip {
                     "assist_debug_has_region_monitor",
                     "dma_kind=\"gdma\"",
                     "dma_supports_mem2mem",
+                    "dma_separate_in_out_interrupts",
                     "dma_max_priority=\"5\"",
                     "dma_max_priority_is_set",
                     "gpio_gpio_function=\"1\"",
@@ -3089,6 +3094,7 @@ impl Chip {
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=dma_kind=\"gdma\"",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=dma_separate_in_out_interrupts",
                     "cargo:rustc-cfg=dma_max_priority=\"5\"",
                     "cargo:rustc-cfg=dma_max_priority_is_set",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
@@ -4051,6 +4057,7 @@ impl Chip {
                     "assist_debug_has_region_monitor",
                     "dma_kind=\"gdma\"",
                     "dma_supports_mem2mem",
+                    "dma_separate_in_out_interrupts",
                     "dma_max_priority=\"9\"",
                     "dma_max_priority_is_set",
                     "gpio_has_bank_1",
@@ -4296,6 +4303,7 @@ impl Chip {
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=dma_kind=\"gdma\"",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
+                    "cargo:rustc-cfg=dma_separate_in_out_interrupts",
                     "cargo:rustc-cfg=dma_max_priority=\"9\"",
                     "cargo:rustc-cfg=dma_max_priority_is_set",
                     "cargo:rustc-cfg=gpio_has_bank_1",
@@ -4932,6 +4940,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_lp_fast_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_lp_slow_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg_calibration_clock)");
+    println!("cargo:rustc-check-cfg=cfg(dma_separate_in_out_interrupts)");
     println!("cargo:rustc-check-cfg=cfg(esp32c6)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_atomic)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ieee802154)");

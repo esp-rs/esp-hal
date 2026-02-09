@@ -66,6 +66,9 @@ macro_rules! property {
     ("dma.supports_mem2mem") => {
         false
     };
+    ("dma.separate_in_out_interrupts") => {
+        false
+    };
     ("gpio.has_bank_1") => {
         true
     };

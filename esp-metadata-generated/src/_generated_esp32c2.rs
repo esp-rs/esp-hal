@@ -63,6 +63,9 @@ macro_rules! property {
     ("dma.supports_mem2mem") => {
         true
     };
+    ("dma.separate_in_out_interrupts") => {
+        false
+    };
     ("dma.max_priority") => {
         9
     };

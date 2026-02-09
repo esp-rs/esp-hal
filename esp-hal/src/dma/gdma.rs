@@ -712,27 +712,35 @@ macro_rules! impl_channel {
     };
 }
 
+const CHANNEL_COUNT: usize = cfg!(soc_has_dma_ch0) as usize
+    + cfg!(soc_has_dma_ch1) as usize
+    + cfg!(soc_has_dma_ch2) as usize
+    + cfg!(soc_has_dma_ch3) as usize
+    + cfg!(soc_has_dma_ch4) as usize;
+
 cfg_if::cfg_if! {
-    if #[cfg(esp32c2)] {
-        const CHANNEL_COUNT: usize = 1;
-        impl_channel!(0, DMA_CH0);
-    } else if #[cfg(esp32c3)] {
-        const CHANNEL_COUNT: usize = 3;
-        impl_channel!(0, DMA_CH0);
-        impl_channel!(1, DMA_CH1);
-        impl_channel!(2, DMA_CH2);
-    } else if #[cfg(any(esp32c6, esp32h2))] {
-        const CHANNEL_COUNT: usize = 3;
+    if #[cfg(dma_separate_in_out_interrupts)] {
+        #[cfg(soc_has_dma_ch0)]
         impl_channel!(0, DMA_IN_CH0, DMA_OUT_CH0);
+        #[cfg(soc_has_dma_ch1)]
         impl_channel!(1, DMA_IN_CH1, DMA_OUT_CH1);
+        #[cfg(soc_has_dma_ch2)]
         impl_channel!(2, DMA_IN_CH2, DMA_OUT_CH2);
-    } else if #[cfg(esp32s3)] {
-        const CHANNEL_COUNT: usize = 5;
-        impl_channel!(0, DMA_IN_CH0, DMA_OUT_CH0);
-        impl_channel!(1, DMA_IN_CH1, DMA_OUT_CH1);
-        impl_channel!(2, DMA_IN_CH2, DMA_OUT_CH2);
+        #[cfg(soc_has_dma_ch3)]
         impl_channel!(3, DMA_IN_CH3, DMA_OUT_CH3);
+        #[cfg(soc_has_dma_ch4)]
         impl_channel!(4, DMA_IN_CH4, DMA_OUT_CH4);
+    } else {
+        #[cfg(soc_has_dma_ch0)]
+        impl_channel!(0, DMA_CH0);
+        #[cfg(soc_has_dma_ch1)]
+        impl_channel!(1, DMA_CH1);
+        #[cfg(soc_has_dma_ch2)]
+        impl_channel!(2, DMA_CH2);
+        #[cfg(soc_has_dma_ch3)]
+        impl_channel!(3, DMA_CH3);
+        #[cfg(soc_has_dma_ch4)]
+        impl_channel!(4, DMA_CH4);
     }
 }
 
