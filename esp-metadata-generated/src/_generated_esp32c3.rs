@@ -66,6 +66,9 @@ macro_rules! property {
     ("assist_debug.has_region_monitor") => {
         true
     };
+    ("dma.kind") => {
+        "gdma"
+    };
     ("gpio.has_bank_1") => {
         false
     };

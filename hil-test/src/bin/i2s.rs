@@ -109,7 +109,7 @@ mod tests {
         );
 
         cfg_if::cfg_if! {
-            if #[cfg(pdma)] {
+            if #[cfg(dma_kind = "pdma")] {
                 let dma_channel = peripherals.DMA_I2S0;
             } else {
                 let dma_channel = peripherals.DMA_CH0;

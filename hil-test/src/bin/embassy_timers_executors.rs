@@ -600,7 +600,7 @@ mod interrupt_spi_dma {
         };
 
         cfg_if::cfg_if! {
-            if #[cfg(pdma)] {
+            if #[cfg(dma_kind = "pdma")] {
                 type DmaChannel<'a> = esp_hal::peripherals::DMA_SPI2<'a>;
             } else {
                 type DmaChannel<'a> = esp_hal::peripherals::DMA_CH0<'a>;
@@ -651,7 +651,7 @@ mod interrupt_spi_dma {
         esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
         cfg_if::cfg_if! {
-            if #[cfg(pdma)] {
+            if #[cfg(dma_kind = "pdma")] {
                 let dma_channel = peripherals.DMA_SPI2;
             } else {
                 let dma_channel = peripherals.DMA_CH0;

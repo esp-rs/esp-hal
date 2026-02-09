@@ -752,10 +752,10 @@ crate::dma::impl_dma_eligible! {
         #[cfg(esp32s3)]
         LCD_CAM => LcdCam,
 
-        #[cfg(all(gdma, soc_has_aes))]
+        #[cfg(all(dma_kind = "gdma", soc_has_aes))]
         AES => Aes,
 
-        #[cfg(all(gdma, soc_has_sha))]
+        #[cfg(all(dma_kind = "gdma", soc_has_sha))]
         SHA => Sha,
 
         #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]

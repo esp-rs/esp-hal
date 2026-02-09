@@ -36,12 +36,12 @@ mod critical_section;
 mod delay_async;
 
 #[path = "misc_non_drivers/dma_macros.rs"]
-#[cfg(any(gdma, pdma))]
+#[cfg(dma_driver_supported)]
 mod dma_macros;
 
 #[path = "misc_non_drivers/dma_mem2mem.rs"]
-#[cfg(not(esp32))]
-#[cfg(any(gdma, pdma))]
+#[cfg(not(esp32))] // TODO: dma_supports_mem2mem
+#[cfg(dma_driver_supported)]
 mod dma_mem2mem;
 
 #[path = "misc_non_drivers/init.rs"]

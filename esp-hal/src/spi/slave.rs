@@ -515,7 +515,7 @@ pub mod dma {
         }
 
         fn reset_dma_before_usr_cmd(&self) {
-            #[cfg(gdma)]
+            #[cfg(dma_kind = "gdma")]
             self.regs().dma_conf().modify(|_, w| {
                 w.rx_afifo_rst().set_bit();
                 w.buf_afifo_rst().set_bit();
@@ -524,14 +524,14 @@ pub mod dma {
         }
 
         fn enable_dma(&self) {
-            #[cfg(gdma)]
+            #[cfg(dma_kind = "gdma")]
             self.regs().dma_conf().modify(|_, w| {
                 w.dma_tx_ena().set_bit();
                 w.dma_rx_ena().set_bit();
                 w.rx_eof_en().clear_bit()
             });
 
-            #[cfg(pdma)]
+            #[cfg(dma_kind = "pdma")]
             {
                 fn set_rst_bit(reg_block: &RegisterBlock, bit: bool) {
                     reg_block.dma_conf().modify(|_, w| {
@@ -552,7 +552,7 @@ pub mod dma {
         }
 
         fn clear_dma_interrupts(&self) {
-            #[cfg(gdma)]
+            #[cfg(dma_kind = "gdma")]
             self.regs().dma_int_clr().write(|w| {
                 w.dma_infifo_full_err().clear_bit_by_one();
                 w.dma_outfifo_empty_err().clear_bit_by_one();
@@ -561,7 +561,7 @@ pub mod dma {
                 w.mst_tx_afifo_rempty_err().clear_bit_by_one()
             });
 
-            #[cfg(pdma)]
+            #[cfg(dma_kind = "pdma")]
             self.regs().dma_int_clr().write(|w| {
                 w.inlink_dscr_empty().clear_bit_by_one();
                 w.outlink_dscr_error().clear_bit_by_one();
@@ -582,9 +582,9 @@ pub mod dma {
     pub trait InstanceDma: Instance + DmaEligible {}
 
     impl<'d> DmaEligible for AnySpi<'d> {
-        #[cfg(gdma)]
+        #[cfg(dma_kind = "gdma")]
         type Dma = crate::dma::AnyGdmaChannel<'d>;
-        #[cfg(pdma)]
+        #[cfg(dma_kind = "pdma")]
         type Dma = crate::dma::AnySpiDmaChannel<'d>;
 
         fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
@@ -774,11 +774,11 @@ impl Info {
 
     #[cfg(spi_slave_supports_dma)]
     fn is_bus_busy(&self) -> bool {
-        #[cfg(pdma)]
+        #[cfg(dma_kind = "pdma")]
         {
             self.regs().slave().read().trans_done().bit_is_clear()
         }
-        #[cfg(not(pdma))]
+        #[cfg(dma_kind = "gdma")]
         {
             self.regs().dma_int_raw().read().trans_done().bit_is_clear()
         }
@@ -787,11 +787,11 @@ impl Info {
     // Clear the transaction-done interrupt flag so flush() can work properly.
     #[cfg(spi_slave_supports_dma)]
     fn setup_for_flush(&self) {
-        #[cfg(pdma)]
+        #[cfg(dma_kind = "pdma")]
         self.regs()
             .slave()
             .modify(|_, w| w.trans_done().clear_bit());
-        #[cfg(not(pdma))]
+        #[cfg(dma_kind = "gdma")]
         self.regs()
             .dma_int_clr()
             .write(|w| w.trans_done().clear_bit_by_one());

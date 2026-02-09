@@ -81,7 +81,6 @@ peripherals = [
 
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "pdma",
     "phy",
     "psram",
     "touch",
@@ -330,6 +329,10 @@ instances = [
     { name = "dac1" },
     { name = "dac2" },
 ]
+
+[device.dma]
+support_status = "partial"
+kind = "pdma"
 
 [device.gpio]
 support_status = "supported"
@@ -879,7 +882,6 @@ deep_sleep = true
 [device.twai]
 
 ## Miscellaneous
-[device.dma]
 [device.io_mux]
 [device.psram]
 [device.temp_sensor]

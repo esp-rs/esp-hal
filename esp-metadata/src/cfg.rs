@@ -354,7 +354,9 @@ driver_configs![
     DmaProperties {
         driver: dma,
         name: "DMA",
-        properties: {}
+        properties: {
+            kind: String,
+        }
     },
     DsProperties {
         driver: ds,

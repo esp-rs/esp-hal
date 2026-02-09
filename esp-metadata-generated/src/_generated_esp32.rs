@@ -60,6 +60,9 @@ macro_rules! property {
     ("aes.endianness_configurable") => {
         true
     };
+    ("dma.kind") => {
+        "pdma"
+    };
     ("gpio.has_bank_1") => {
         true
     };

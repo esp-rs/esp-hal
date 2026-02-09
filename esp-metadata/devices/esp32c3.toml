@@ -70,7 +70,6 @@ peripherals = [
 
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "gdma",
     "phy",
     "swd",
 
@@ -250,6 +249,10 @@ key_length = { options = [
 support_status = "partial"
 has_sp_monitor = true
 has_region_monitor = true
+
+[device.dma]
+support_status = "partial"
+kind = "gdma"
 
 [device.gpio]
 support_status = "supported"
@@ -519,7 +522,6 @@ deep_sleep = true
 [device.usb_serial_jtag]
 
 ## Miscellaneous
-[device.dma]
 [device.io_mux]
 [device.temp_sensor]
 [device.systimer]

@@ -18,9 +18,9 @@ crate::any_peripheral! {
 }
 
 impl<'d> DmaEligible for AnyI2s<'d> {
-    #[cfg(gdma)]
+    #[cfg(dma_kind = "gdma")]
     type Dma = crate::dma::AnyGdmaChannel<'d>;
-    #[cfg(pdma)]
+    #[cfg(dma_kind = "pdma")]
     type Dma = crate::dma::AnyI2sDmaChannel<'d>;
 
     fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {

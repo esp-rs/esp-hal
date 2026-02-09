@@ -1,7 +1,7 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "dma_channel" => {
-        cfg(pdma) => "let dma_channel = peripherals.DMA_SPI2;",
-        cfg(gdma) => "let dma_channel = peripherals.DMA_CH0;"
+        cfg(dma_kind = "pdma") => "let dma_channel = peripherals.DMA_SPI2;",
+        cfg(dma_kind = "gdma") => "let dma_channel = peripherals.DMA_CH0;"
     }
 ))]
 //! # Direct Memory Access (DMA)
@@ -60,13 +60,13 @@ use core::{cmp::min, fmt::Debug, marker::PhantomData, sync::atomic::compiler_fen
 use enumset::{EnumSet, EnumSetType};
 
 pub use self::buffers::*;
-#[cfg(gdma)]
+#[cfg(dma_kind = "gdma")]
 pub use self::gdma::*;
-#[cfg(any(gdma, esp32s2))]
+#[cfg(any(dma_kind = "gdma", esp32s2))] // TODO
 pub use self::m2m::*;
-#[cfg(pdma)]
+#[cfg(dma_kind = "pdma")]
 pub use self::pdma::*;
-#[cfg(pdma)]
+#[cfg(dma_kind = "pdma")]
 use crate::system::Peripheral;
 use crate::{
     Async,
@@ -378,11 +378,11 @@ impl DmaDescriptor {
 unsafe impl Send for DmaDescriptor {}
 
 mod buffers;
-#[cfg(gdma)]
+#[cfg(dma_kind = "gdma")]
 mod gdma;
-#[cfg(any(gdma, esp32s2))]
+#[cfg(any(dma_kind = "gdma", esp32s2))] // TODO
 mod m2m;
-#[cfg(pdma)]
+#[cfg(dma_kind = "pdma")]
 mod pdma;
 
 /// Kinds of interrupt to listen to.
@@ -840,7 +840,7 @@ impl From<DmaBufError> for DmaError {
 }
 
 /// DMA Priorities
-#[cfg(gdma)]
+#[cfg(dma_kind = "gdma")]
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaPriority {
@@ -868,7 +868,7 @@ pub enum DmaPriority {
 
 /// DMA Priorities
 /// The values need to match the TRM
-#[cfg(pdma)]
+#[cfg(dma_kind = "pdma")]
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaPriority {
@@ -883,7 +883,7 @@ pub enum DmaPriority {
 #[doc(hidden)]
 pub enum DmaPeripheral {
     Spi2      = 0,
-    #[cfg(any(pdma, esp32s3))]
+    #[cfg(any(dma_kind = "pdma", esp32s3))]
     Spi3      = 1,
     #[cfg(any(esp32c2, esp32c6, esp32h2))]
     Mem2Mem1  = 1,
@@ -901,7 +901,7 @@ pub enum DmaPeripheral {
     Mem2Mem5  = 5,
     #[cfg(not(esp32c2))]
     Aes       = 6,
-    #[cfg(any(esp32s2, gdma))]
+    #[cfg(any(esp32s2, dma_kind = "gdma"))]
     Sha       = 7,
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
     Adc       = 8,
@@ -1648,11 +1648,11 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 
 #[procmacros::doc_replace(
     "dma_channel" => {
-        cfg(pdma) => "let dma_channel = peripherals.DMA_SPI2;",
-        cfg(gdma) => "let dma_channel = peripherals.DMA_CH0;"
+        cfg(dma_kind = "pdma") => "let dma_channel = peripherals.DMA_SPI2;",
+        cfg(dma_kind = "gdma") => "let dma_channel = peripherals.DMA_CH0;"
     },
     "note" => {
-        cfg(pdma) => "\n\nNote that using mismatching channels (e.g. trying to use `DMA_SPI2` with SPI3) may compile, but will panic in runtime.\n\n",
+        cfg(dma_kind = "pdma") => "\n\nNote that using mismatching channels (e.g. trying to use `DMA_SPI2` with SPI3) may compile, but will panic in runtime.\n\n",
         _ => ""
     }
 )]
@@ -1733,7 +1733,7 @@ where
 // NOTE(p4): because the P4 has two different GDMAs, we won't be able to use
 // `GenericPeripheralGuard`.
 cfg_if::cfg_if! {
-    if #[cfg(pdma)] {
+    if #[cfg(dma_kind = "pdma")] {
         type PeripheralGuard = Option<system::PeripheralGuard>;
     } else {
         type PeripheralGuard = system::GenericPeripheralGuard<{ system::Peripheral::Dma as u8}>;
@@ -1742,7 +1742,7 @@ cfg_if::cfg_if! {
 
 fn create_guard(_ch: &impl RegisterAccess) -> PeripheralGuard {
     cfg_if::cfg_if! {
-        if #[cfg(pdma)] {
+        if #[cfg(dma_kind = "pdma")] {
             _ch.peripheral_clock().map(|peri_clock| system::PeripheralGuard::new_with(peri_clock, init_dma_racey))
         } else {
             // NOTE(p4): this function will read the channel's DMA peripheral from `_ch`
@@ -1772,7 +1772,7 @@ where
     pub fn new(rx_impl: CH) -> Self {
         let _guard = create_guard(&rx_impl);
 
-        #[cfg(gdma)]
+        #[cfg(dma_kind = "gdma")]
         // clear the mem2mem mode to avoid failed DMA if this
         // channel was previously used for a mem2mem transfer.
         rx_impl.set_mem2mem_mode(false);
@@ -1842,7 +1842,7 @@ where
     CH: DmaRxChannel,
 {
     /// Configure the channel.
-    #[cfg(gdma)]
+    #[cfg(dma_kind = "gdma")]
     pub fn set_priority(&mut self, priority: DmaPriority) {
         self.rx_impl.set_priority(priority);
     }
@@ -1967,7 +1967,7 @@ where
         self.rx_impl.stop()
     }
 
-    #[cfg(gdma)]
+    #[cfg(dma_kind = "gdma")]
     pub(crate) fn set_mem2mem_mode(&mut self, value: bool) {
         self.rx_impl.set_mem2mem_mode(value);
     }
@@ -2105,7 +2105,7 @@ where
     CH: DmaTxChannel,
 {
     /// Configure the channel priority.
-    #[cfg(gdma)]
+    #[cfg(dma_kind = "gdma")]
     pub fn set_priority(&mut self, priority: DmaPriority) {
         self.tx_impl.set_priority(priority);
     }
@@ -2282,7 +2282,7 @@ where
 
 #[doc(hidden)]
 pub trait RegisterAccess: crate::private::Sealed {
-    #[cfg(pdma)]
+    #[cfg(dma_kind = "pdma")]
     fn peripheral_clock(&self) -> Option<Peripheral>;
 
     /// Reset the state machine of the channel and FIFO pointer.
@@ -2298,7 +2298,7 @@ pub trait RegisterAccess: crate::private::Sealed {
 
     /// The priority of the channel. The larger the value, the higher the
     /// priority.
-    #[cfg(gdma)]
+    #[cfg(dma_kind = "gdma")]
     fn set_priority(&self, priority: DmaPriority);
 
     /// Select a peripheral for the channel.
@@ -2323,7 +2323,7 @@ pub trait RegisterAccess: crate::private::Sealed {
     #[cfg(psram_dma)]
     fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize);
 
-    #[cfg(pdma)]
+    #[cfg(dma_kind = "pdma")]
     fn is_compatible_with(&self, peripheral: DmaPeripheral) -> bool;
 
     #[cfg(psram_dma)]
@@ -2332,7 +2332,7 @@ pub trait RegisterAccess: crate::private::Sealed {
 
 #[doc(hidden)]
 pub trait RxRegisterAccess: RegisterAccess {
-    #[cfg(gdma)]
+    #[cfg(dma_kind = "gdma")]
     fn set_mem2mem_mode(&self, value: bool);
 
     fn peripheral_interrupt(&self) -> Option<Interrupt>;
@@ -2456,7 +2456,7 @@ where
     }
 
     /// Configure the channel priorities.
-    #[cfg(gdma)]
+    #[cfg(dma_kind = "gdma")]
     pub fn set_priority(&mut self, priority: DmaPriority) {
         self.tx.set_priority(priority);
         self.rx.set_priority(priority);

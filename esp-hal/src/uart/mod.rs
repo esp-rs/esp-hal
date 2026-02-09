@@ -43,7 +43,7 @@
 
 /// UHCI wrapper around UART
 // TODO add support for PDMA and multiple UHCI for 32/S2 support
-#[cfg(all(soc_has_uhci0, gdma))]
+#[cfg(all(soc_has_uhci0, dma_kind = "gdma"))]
 #[cfg(feature = "unstable")]
 pub mod uhci;
 

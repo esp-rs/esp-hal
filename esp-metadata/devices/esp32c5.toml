@@ -105,7 +105,6 @@ peripherals = [
 
 symbols = [
     # Additional peripherals defined by us (the developers):
-    # "gdma",
     # "lp_core",
 
     # ROM capabilities
@@ -222,6 +221,10 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Pcnt" },
     { name = "Systimer", keep_enabled = true }, # can be clocked from XTAL_CLK or RC_FAST_CLK, the latter has no divider?
 ] } }
+
+[device.dma]
+support_status = "not_supported"
+kind = "gdma"
 
 [device.gpio]
 support_status = "partial"
@@ -483,7 +486,6 @@ timg_has_divcnt_rst = true
 # ram_size = 32
 
 # ## Miscellaneous
-# [device.dma]
 # [device.io_mux]
 [device.systimer]
 [device.pcnt]

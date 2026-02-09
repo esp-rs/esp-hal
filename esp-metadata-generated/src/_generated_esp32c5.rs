@@ -57,6 +57,9 @@ macro_rules! property {
     ("soc.rc_fast_clk_default", str) => {
         stringify!(17500000)
     };
+    ("dma.kind") => {
+        "gdma"
+    };
     ("gpio.has_bank_1") => {
         false
     };

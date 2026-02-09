@@ -81,7 +81,7 @@ mod tests {
 
         #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
         cfg_if::cfg_if! {
-            if #[cfg(pdma)] {
+            if #[cfg(dma_kind = "pdma")] {
                 let dma_channel = peripherals.DMA_SPI2;
             } else {
                 let dma_channel = peripherals.DMA_CH0;
