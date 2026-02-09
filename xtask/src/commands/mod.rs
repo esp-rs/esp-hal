@@ -27,6 +27,7 @@ pub mod relcheck;
 
 /// Arguments common to commands which act on examples.
 #[derive(Debug, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 pub struct ExamplesArgs {
     /// Example to act on ("all" will execute every example).
     pub example: Option<String>,
@@ -51,9 +52,11 @@ pub struct ExamplesArgs {
 
 /// Arguments common to commands which act on doctests.
 #[derive(Debug, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 pub struct DocTestArgs {
     /// Package(s) where we wish to run doc tests.
     #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
+    #[cfg_attr(feature = "mcp", serde(default = "crate::mcp::default_packages"))]
     pub packages: Vec<Package>,
     /// Chip to target.
     #[arg(value_enum)]
@@ -62,6 +65,7 @@ pub struct DocTestArgs {
 
 /// Arguments common to commands which act on tests.
 #[derive(Debug, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 pub struct TestsArgs {
     /// Chip to target.
     #[arg(value_enum)]

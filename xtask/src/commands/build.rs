@@ -37,12 +37,15 @@ pub enum Build {
 
 /// Arguments for building documentation.
 #[derive(Debug, Default, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 pub struct BuildDocumentationArgs {
     /// Package(s) to document.
     #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
+    #[cfg_attr(feature = "mcp", serde(default = "crate::mcp::default_packages"))]
     pub packages: Vec<Package>,
     /// Chip(s) to build documentation for.
     #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
+    #[cfg_attr(feature = "mcp", serde(default = "crate::mcp::default_chips"))]
     pub chips: Vec<Chip>,
     /// Base URL of the deployed documentation.
     #[arg(long)]
@@ -54,6 +57,7 @@ pub struct BuildDocumentationArgs {
 
 /// Arguments for building a package.
 #[derive(Debug, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 pub struct BuildPackageArgs {
     /// Package to build.
     #[arg(value_enum)]

@@ -35,6 +35,7 @@ pub enum Run {
 
 /// Arguments for running ELFs.
 #[derive(Debug, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 pub struct RunElfsArgs {
     /// Which chip to run the tests for.
     #[arg(value_enum)]

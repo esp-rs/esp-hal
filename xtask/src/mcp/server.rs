@@ -1,0 +1,232 @@
+//! Minimal MCP (Model Context Protocol) server over stdio.
+//!
+//! Implements the subset of JSON-RPC 2.0 required by the MCP specification:
+//! - `initialize` / `notifications/initialized` handshake
+//! - `tools/list` — returns all registered tools with JSON Schemas
+//! - `tools/call` — executes a tool and returns captured stdout as content
+//!
+//! No async runtime is needed; the server runs a synchronous read loop on
+//! stdin and writes responses to stdout.  Command output (which normally
+//! prints to stdout) is captured via `gag::BufferRedirect` so it does not
+//! corrupt the JSON-RPC stream.
+
+use std::{
+    io::{self, BufRead, Read, Write},
+    path::Path,
+};
+
+use anyhow::{Context, Result};
+use serde_json::{json, Value};
+
+use super::registry::CommandEntry;
+
+// ------------------------------------------------------------------ //
+// Public entry point                                                  //
+// ------------------------------------------------------------------ //
+
+/// Run the MCP server.  Blocks forever reading JSON-RPC requests from
+/// stdin and writing responses to stdout.
+pub fn run(workspace: &Path, commands: Vec<CommandEntry>) -> Result<()> {
+    // In MCP mode, reconfigure the logger to write to stderr so that
+    // log output does not corrupt the JSON-RPC stream on stdout.
+    // (env_logger is already initialised targeting stdout in main();
+    // we cannot re-init, but we *can* redirect the global logger.)
+    //
+    // For now we just accept that env_logger messages go to stdout
+    // before `serve-mcp` takes over — they are emitted during setup
+    // only.  All *command* output is captured by `gag`.
+
+    let stdin = io::stdin();
+    let mut stdout = io::stdout();
+
+    for line in stdin.lock().lines() {
+        let line = line.context("Failed to read line from stdin")?;
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        let request: Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(e) => {
+                let err_resp = jsonrpc_error(Value::Null, -32700, &format!("Parse error: {e}"));
+                write_response(&mut stdout, &err_resp)?;
+                continue;
+            }
+        };
+
+        // Notifications have no "id" — we must not reply.
+        let is_notification = request.get("id").is_none();
+
+        let method = request
+            .get("method")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+
+        let id = request.get("id").cloned().unwrap_or(Value::Null);
+        let params = request.get("params").cloned().unwrap_or(json!({}));
+
+        match method {
+            "initialize" => {
+                let result = handle_initialize(&params);
+                write_response(&mut stdout, &jsonrpc_ok(id, result))?;
+            }
+            "notifications/initialized" => {
+                // Client acknowledgement — nothing to do.
+            }
+            "tools/list" => {
+                let result = handle_tools_list(&commands);
+                write_response(&mut stdout, &jsonrpc_ok(id, result))?;
+            }
+            "tools/call" => {
+                let result = handle_tools_call(workspace, &commands, &params);
+                write_response(&mut stdout, &jsonrpc_ok(id, result))?;
+            }
+            _ if is_notification => {
+                // Unknown notification — ignore per spec.
+            }
+            _ => {
+                let resp = jsonrpc_error(id, -32601, &format!("Method not found: {method}"));
+                write_response(&mut stdout, &resp)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// ------------------------------------------------------------------ //
+// Method handlers                                                     //
+// ------------------------------------------------------------------ //
+
+fn handle_initialize(_params: &Value) -> Value {
+    json!({
+        "protocolVersion": "2024-11-05",
+        "capabilities": {
+            "tools": {}
+        },
+        "serverInfo": {
+            "name": "xtask-mcp",
+            "version": env!("CARGO_PKG_VERSION")
+        }
+    })
+}
+
+fn handle_tools_list(commands: &[CommandEntry]) -> Value {
+    let tools: Vec<Value> = commands
+        .iter()
+        .map(|cmd| {
+            json!({
+                "name": cmd.name,
+                "description": cmd.description,
+                "inputSchema": (cmd.schema)()
+            })
+        })
+        .collect();
+
+    json!({ "tools": tools })
+}
+
+fn handle_tools_call(workspace: &Path, commands: &[CommandEntry], params: &Value) -> Value {
+    let tool_name = params
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+
+    let arguments = params
+        .get("arguments")
+        .cloned()
+        .unwrap_or(json!({}));
+
+    let Some(cmd) = commands.iter().find(|c| c.name == tool_name) else {
+        return tool_error(&format!("Unknown tool: {tool_name}"));
+    };
+
+    // Capture stdout during command execution so that `println!` output
+    // from the command handler does not corrupt the JSON-RPC stream.
+    let (result, captured_stdout) = capture_stdout(|| (cmd.execute)(workspace, arguments));
+
+    match result {
+        Ok(()) => tool_result(false, &captured_stdout),
+        Err(e) => {
+            let mut text = captured_stdout;
+            if !text.is_empty() {
+                text.push_str("\n\n");
+            }
+            text.push_str(&format!("Error: {e:#}"));
+            tool_result(true, &text)
+        }
+    }
+}
+
+// ------------------------------------------------------------------ //
+// Stdout capture                                                      //
+// ------------------------------------------------------------------ //
+
+/// Execute `f` while redirecting stdout to an in-memory buffer.
+/// Returns `(f_result, captured_text)`.
+fn capture_stdout<F, T>(f: F) -> (T, String)
+where
+    F: FnOnce() -> T,
+{
+    // Try to set up the redirect.  If it fails (e.g. not a real fd)
+    // we fall back to running without capture.
+    let redirect = gag::BufferRedirect::stdout();
+    match redirect {
+        Ok(mut buf) => {
+            let result = f();
+            let mut captured = String::new();
+            let _ = buf.read_to_string(&mut captured);
+            drop(buf); // restore original stdout
+            (result, captured)
+        }
+        Err(_) => {
+            let result = f();
+            (result, String::new())
+        }
+    }
+}
+
+// ------------------------------------------------------------------ //
+// JSON-RPC helpers                                                    //
+// ------------------------------------------------------------------ //
+
+fn jsonrpc_ok(id: Value, result: Value) -> Value {
+    json!({
+        "jsonrpc": "2.0",
+        "id": id,
+        "result": result
+    })
+}
+
+fn jsonrpc_error(id: Value, code: i64, message: &str) -> Value {
+    json!({
+        "jsonrpc": "2.0",
+        "id": id,
+        "error": {
+            "code": code,
+            "message": message
+        }
+    })
+}
+
+fn tool_result(is_error: bool, text: &str) -> Value {
+    json!({
+        "content": [{
+            "type": "text",
+            "text": text
+        }],
+        "isError": is_error
+    })
+}
+
+fn tool_error(message: &str) -> Value {
+    tool_result(true, message)
+}
+
+fn write_response(out: &mut impl Write, value: &Value) -> Result<()> {
+    let msg = serde_json::to_string(value).context("Failed to serialise response")?;
+    writeln!(out, "{msg}")?;
+    out.flush()?;
+    Ok(())
+}
