@@ -234,6 +234,7 @@ clocks = { system_clocks = { clock_tree = [
 [device.dma]
 support_status = "not_supported"
 kind = "gdma"
+gdma_version = 2
 separate_in_out_interrupts = true
 supports_mem2mem = true
 max_priority = 5

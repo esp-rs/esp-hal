@@ -72,6 +72,12 @@ macro_rules! property {
     ("dma.max_priority", str) => {
         stringify!(5)
     };
+    ("dma.gdma_version") => {
+        2
+    };
+    ("dma.gdma_version", str) => {
+        stringify!(2)
+    };
     ("gpio.has_bank_1") => {
         false
     };
