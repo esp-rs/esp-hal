@@ -405,125 +405,125 @@ impl From<WifiMode> for wifi_mode_t {
 #[non_exhaustive]
 pub enum DisconnectReason {
     /// Unspecified reason
-    Unspecified                         = 1,
+    Unspecified,
     /// Authentication expired
-    AuthenticationExpired               = 2,
+    AuthenticationExpired,
     /// Deauthentication due to leaving
-    AuthenticationLeave                 = 3,
+    AuthenticationLeave,
     /// Disassociated due to inactivity
-    DisassociatedDueToInactivity        = 4,
+    DisassociatedDueToInactivity,
     /// Too many associated stations
-    AssociationTooMany                  = 5,
+    AssociationTooMany,
     /// Class 2 frame received from non authenticated station
-    Class2FrameFromNonAuthenticatedStation = 6,
+    Class2FrameFromNonAuthenticatedStation,
     /// Class 3 frame received from non associated station
-    Class3FrameFromNonAssociatedStation = 7,
+    Class3FrameFromNonAssociatedStation,
     /// Disassociated due to leaving
-    AssociationLeave                    = 8,
+    AssociationLeave,
     /// Association but not authenticated
-    AssociationNotAuthenticated         = 9,
+    AssociationNotAuthenticated,
     /// Disassociated due to poor power capability
-    DisassociatedPowerCapabilityBad     = 10,
+    DisassociatedPowerCapabilityBad,
     /// Disassociated due to unsupported channel
-    DisassociatedUnsupportedChannel     = 11,
+    DisassociatedUnsupportedChannel,
     /// Disassociated due to BSS transition
-    BssTransitionDisassociated          = 12,
+    BssTransitionDisassociated,
     /// Invalid Information Element (IE)
-    IeInvalid                           = 13,
+    IeInvalid,
     /// MIC failure
-    MicFailure                          = 14,
+    MicFailure,
     /// 4-way handshake timeout
-    FourWayHandshakeTimeout             = 15,
+    FourWayHandshakeTimeout,
     /// Group key update timeout
-    GroupKeyUpdateTimeout               = 16,
+    GroupKeyUpdateTimeout,
     /// IE differs in 4-way handshake
-    IeIn4wayDiffers                     = 17,
+    IeIn4wayDiffers,
     /// Invalid group cipher
-    GroupCipherInvalid                  = 18,
+    GroupCipherInvalid,
     /// Invalid pairwise cipher
-    PairwiseCipherInvalid               = 19,
+    PairwiseCipherInvalid,
     /// Invalid AKMP
-    AkmpInvalid                         = 20,
+    AkmpInvalid,
     /// Unsupported RSN IE version
-    UnsupportedRsnIeVersion             = 21,
+    UnsupportedRsnIeVersion,
     /// Invalid RSN IE capabilities
-    InvalidRsnIeCapabilities            = 22,
+    InvalidRsnIeCapabilities,
     /// 802.1X authentication failed
-    _802_1xAuthenticationFailed         = 23,
+    _802_1xAuthenticationFailed,
     /// Cipher suite rejected
-    CipherSuiteRejected                 = 24,
+    CipherSuiteRejected,
     /// TDLS peer unreachable
-    TdlsPeerUnreachable                 = 25,
+    TdlsPeerUnreachable,
     /// TDLS unspecified
-    TdlsUnspecified                     = 26,
+    TdlsUnspecified,
     /// SSP requested disassociation
-    SspRequestedDisassociation          = 27,
+    SspRequestedDisassociation,
     /// No SSP roaming agreement
-    NoSspRoamingAgreement               = 28,
+    NoSspRoamingAgreement,
     /// Bad cipher or AKM
-    BadCipherOrAkm                      = 29,
+    BadCipherOrAkm,
     /// Not authorized in this location
-    NotAuthorizedThisLocation           = 30,
+    NotAuthorizedThisLocation,
     /// Service change precludes TS
-    ServiceChangePercludesTs            = 31,
+    ServiceChangePercludesTs,
     /// Unspecified QoS reason
-    UnspecifiedQos                      = 32,
+    UnspecifiedQos,
     /// Not enough bandwidth
-    NotEnoughBandwidth                  = 33,
+    NotEnoughBandwidth,
     /// Missing ACKs
-    MissingAcks                         = 34,
+    MissingAcks,
     /// Exceeded TXOP
-    ExceededTxOp                        = 35,
+    ExceededTxOp,
     /// Station leaving
-    StationLeaving                      = 36,
+    StationLeaving,
     /// End of Block Ack (BA)
-    EndBlockAck                         = 37,
+    EndBlockAck,
     /// Unknown Block Ack (BA)
-    UnknownBlockAck                     = 38,
+    UnknownBlockAck,
     /// Timeout
-    Timeout                             = 39,
+    Timeout,
     /// Peer initiated disassociation
-    PeerInitiated                       = 46,
+    PeerInitiated,
     /// Access point initiated disassociation
-    AccessPointInitiatedDisassociation  = 47,
+    AccessPointInitiatedDisassociation,
     /// Invalid FT action frame count
-    InvalidFtActionFrameCount           = 48,
+    InvalidFtActionFrameCount,
     /// Invalid PMKID
-    InvalidPmkid                        = 49,
+    InvalidPmkid,
     /// Invalid MDE
-    InvalidMde                          = 50,
+    InvalidMde,
     /// Invalid FTE
-    InvalidFte                          = 51,
+    InvalidFte,
     /// Transmission link establishment failed
-    TransmissionLinkEstablishmentFailed = 67,
+    TransmissionLinkEstablishmentFailed,
     /// Alternative channel occupied
-    AlterativeChannelOccupied           = 68,
+    AlterativeChannelOccupied,
     /// Beacon timeout
-    BeaconTimeout                       = 200,
+    BeaconTimeout,
     /// No access point found
-    NoAccessPointFound                  = 201,
+    NoAccessPointFound,
     /// Authentication failed
-    AuthenticationFailed                = 202,
+    AuthenticationFailed,
     /// Association failed
-    AssociationFailed                   = 203,
+    AssociationFailed,
     /// Handshake timeout
-    HandshakeTimeout                    = 204,
+    HandshakeTimeout,
     /// Connection failed
-    ConnectionFailed                    = 205,
+    ConnectionFailed,
     /// AP TSF reset
-    AccessPointTsfReset                 = 206,
+    AccessPointTsfReset,
     /// Roaming
-    Roaming                             = 207,
+    Roaming,
     /// Association comeback time too long
-    AssociationComebackTimeTooLong      = 208,
+    AssociationComebackTimeTooLong,
     /// SA query timeout
-    SaQueryTimeout                      = 209,
+    SaQueryTimeout,
     /// No AP found with compatible security
-    NoAccessPointFoundWithCompatibleSecurity = 210,
+    NoAccessPointFoundWithCompatibleSecurity,
     /// No AP found in auth mode threshold
-    NoAccessPointFoundInAuthmodeThreshold = 211,
+    NoAccessPointFoundInAuthmodeThreshold,
     /// No AP found in RSSI threshold
-    NoAccessPointFoundInRssiThreshold   = 212,
+    NoAccessPointFoundInRssiThreshold,
 }
 
 impl DisconnectReason {
@@ -604,16 +604,25 @@ pub struct Ssid {
 
 impl Ssid {
     pub(crate) fn new(ssid: &str) -> Self {
+        let mut ssid_bytes = [0u8; 32];
+        let bytes = ssid.as_bytes();
+        let len = usize::min(32, bytes.len());
+        ssid_bytes[..len].copy_from_slice(bytes);
+
         Self {
-            ssid: ssid.as_bytes().try_into().unwrap(),
-            len: ssid.len() as u8,
+            ssid: ssid_bytes,
+            len: len as u8,
         }
     }
 
     pub(crate) fn from_raw(ssid: &[u8], len: u8) -> Self {
+        let mut ssid_bytes = [0u8; 32];
+        let len = usize::min(32, len as usize);
+        ssid_bytes[..len].copy_from_slice(&ssid[..len]);
+
         Self {
             ssid: ssid.try_into().unwrap(),
-            len,
+            len: len as u8,
         }
     }
 
