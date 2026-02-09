@@ -876,7 +876,7 @@ pub enum DmaPriority {
 }
 
 for_each_peripheral! {
-    (dma_eligible $(( $name:ident, $id:literal )),*) => {
+    (dma_eligible $(( $peri:ident, $name:ident, $id:literal )),*) => {
         /// DMA capable peripherals
         /// The values need to match the TRM
         #[derive(Debug, Clone, Copy, PartialEq)]

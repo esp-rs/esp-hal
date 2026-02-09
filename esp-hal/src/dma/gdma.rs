@@ -732,59 +732,14 @@ cfg_if::cfg_if! {
     }
 }
 
-crate::dma::impl_dma_eligible! {
-    AnyGdmaChannel {
-        #[cfg(soc_has_spi2)]
-        SPI2 => Spi2,
-
-        #[cfg(soc_has_spi3)]
-        SPI3 => Spi3,
-
-        #[cfg(soc_has_uhci0)]
-        UHCI0 => Uhci0,
-
-        #[cfg(soc_has_i2s0)]
-        I2S0 => I2s0,
-
-        #[cfg(soc_has_i2s1)]
-        I2S1 => I2s1,
-
-        #[cfg(esp32s3)]
-        LCD_CAM => LcdCam,
-
-        #[cfg(all(dma_kind = "gdma", soc_has_aes))]
-        AES => Aes,
-
-        #[cfg(all(dma_kind = "gdma", soc_has_sha))]
-        SHA => Sha,
-
-        #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
-        ADC1 => ApbSaradc,
-
-        #[cfg(any(esp32c3, esp32s3))]
-        ADC2 => ApbSaradc,
-
-        #[cfg(esp32s3)]
-        RMT => Rmt,
-
-        #[cfg(soc_has_parl_io)]
-        PARL_IO => ParlIo,
-    }
-}
-
-#[cfg(soc_has_mem2mem0)]
-crate::dma::impl_dma_eligible! {
-    AnyGdmaChannel {
-        MEM2MEM0 => Mem2mem0,
-        MEM2MEM1 => Mem2mem1,
-        MEM2MEM2 => Mem2mem2,
-        MEM2MEM3 => Mem2mem3,
-        MEM2MEM4 => Mem2mem4,
-        MEM2MEM5 => Mem2mem5,
-        MEM2MEM6 => Mem2mem6,
-        MEM2MEM7 => Mem2mem7,
-        MEM2MEM8 => Mem2mem8,
-    }
+for_each_peripheral! {
+    (dma_eligible $(( $peri:ident, $name:ident, $id:literal )),*) => {
+        crate::dma::impl_dma_eligible! {
+            AnyGdmaChannel {
+                $($peri => $name,)*
+            }
+        }
+    };
 }
 
 pub(super) fn init_dma_racey() {

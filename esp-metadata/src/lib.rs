@@ -704,6 +704,7 @@ This pin may be available with certain limitations. Check your hardware to make 
             .map(|(name, dma_peripheral)| {
                 use convert_case::{Boundary, Case, Casing, pattern};
 
+                let peri = format_ident!("{}", name);
                 let dma_peripheral = number(dma_peripheral);
                 let variant_name = format_ident!(
                     "{}",
@@ -714,7 +715,7 @@ This pin may be available with certain limitations. Check your hardware to make 
                     })
                     .to_case(Case::Pascal)
                 );
-                quote! { #variant_name, #dma_peripheral }
+                quote! { #peri, #variant_name, #dma_peripheral }
             })
             .collect::<Vec<_>>();
 
