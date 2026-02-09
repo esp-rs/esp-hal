@@ -702,11 +702,18 @@ This pin may be available with certain limitations. Check your hardware to make 
         let dma_peripherals = dma_peripherals
             .into_iter()
             .map(|(name, dma_peripheral)| {
-                use convert_case::{Case, Casing};
+                use convert_case::{Boundary, Case, Casing, pattern};
 
                 let dma_peripheral = number(dma_peripheral);
-                let variant_name =
-                    format_ident!("{}", name.from_case(Case::Constant).to_case(Case::Pascal));
+                let variant_name = format_ident!(
+                    "{}",
+                    name.from_case(Case::Custom {
+                        boundaries: &[Boundary::LOWER_UPPER, Boundary::UNDERSCORE],
+                        pattern: pattern::capital,
+                        delim: "",
+                    })
+                    .to_case(Case::Pascal)
+                );
                 quote! { #variant_name, #dma_peripheral }
             })
             .collect::<Vec<_>>();

@@ -68,7 +68,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
         unsafe {
             Self::new_unsafe(
                 channel,
-                #[cfg(cfg(dma_kind = "gdma"))]
+                #[cfg(dma_kind = "gdma")]
                 peripheral.dma_peripheral(),
             )
         }

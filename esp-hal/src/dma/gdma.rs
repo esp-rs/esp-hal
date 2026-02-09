@@ -759,33 +759,31 @@ crate::dma::impl_dma_eligible! {
         SHA => Sha,
 
         #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
-        ADC1 => Adc,
+        ADC1 => ApbSaradc,
 
         #[cfg(any(esp32c3, esp32s3))]
-        ADC2 => Adc,
+        ADC2 => ApbSaradc,
 
         #[cfg(esp32s3)]
         RMT => Rmt,
 
         #[cfg(soc_has_parl_io)]
         PARL_IO => ParlIo,
-
-        #[cfg(any(esp32c2, esp32c6, esp32h2))]
-        MEM2MEM1 => Mem2Mem1,
     }
 }
 
 #[cfg(any(esp32c6, esp32h2))]
 crate::dma::impl_dma_eligible! {
     AnyGdmaChannel {
-        MEM2MEM4 => Mem2Mem4,
-        MEM2MEM5 => Mem2Mem5,
-        MEM2MEM10 => Mem2Mem10,
-        MEM2MEM11 => Mem2Mem11,
-        MEM2MEM12 => Mem2Mem12,
-        MEM2MEM13 => Mem2Mem13,
-        MEM2MEM14 => Mem2Mem14,
-        MEM2MEM15 => Mem2Mem15,
+        MEM2MEM1 => Mem2mem1,
+        MEM2MEM4 => Mem2mem4,
+        MEM2MEM5 => Mem2mem5,
+        MEM2MEM10 => Mem2mem10,
+        MEM2MEM11 => Mem2mem11,
+        MEM2MEM12 => Mem2mem12,
+        MEM2MEM13 => Mem2mem13,
+        MEM2MEM14 => Mem2mem14,
+        MEM2MEM15 => Mem2mem15,
     }
 }
 

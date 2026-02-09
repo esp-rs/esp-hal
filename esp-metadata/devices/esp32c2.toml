@@ -50,14 +50,6 @@ peripherals = [
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "WIFI", virtual = true },
-    { name = "MEM2MEM1", virtual = true },
-    { name = "MEM2MEM2", virtual = true },
-    { name = "MEM2MEM3", virtual = true },
-    { name = "MEM2MEM4", virtual = true },
-    { name = "MEM2MEM5", virtual = true },
-    { name = "MEM2MEM6", virtual = true },
-    { name = "MEM2MEM7", virtual = true },
-    { name = "MEM2MEM8", virtual = true },
 ]
 
 symbols = [
