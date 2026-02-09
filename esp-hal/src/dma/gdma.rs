@@ -772,18 +772,18 @@ crate::dma::impl_dma_eligible! {
     }
 }
 
-#[cfg(any(esp32c6, esp32h2))]
+#[cfg(soc_has_mem2mem0)]
 crate::dma::impl_dma_eligible! {
     AnyGdmaChannel {
+        MEM2MEM0 => Mem2mem0,
         MEM2MEM1 => Mem2mem1,
+        MEM2MEM2 => Mem2mem2,
+        MEM2MEM3 => Mem2mem3,
         MEM2MEM4 => Mem2mem4,
         MEM2MEM5 => Mem2mem5,
-        MEM2MEM10 => Mem2mem10,
-        MEM2MEM11 => Mem2mem11,
-        MEM2MEM12 => Mem2mem12,
-        MEM2MEM13 => Mem2mem13,
-        MEM2MEM14 => Mem2mem14,
-        MEM2MEM15 => Mem2mem15,
+        MEM2MEM6 => Mem2mem6,
+        MEM2MEM7 => Mem2mem7,
+        MEM2MEM8 => Mem2mem8,
     }
 }
 

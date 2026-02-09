@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: Tx handling has been revised: Some errors will now be returned by `TxTransaction::wait()` instead of `Channel::transmit`. `Channel::transmit_continuously()` can now also report `Error::EndMarkerMissing`. (#4617)
 - `Rtc::time_since_boot()` has been renamed to `Rtc::time_since_power_up()` (#4630)
 - `LP_UART` now has its own configuration structure (#4667)
+- The `MEM2MEM` peripheral singletons have been re-numbered from 0-8 (#4944)
+- The `DmaPeripheral::Mem2MemX` variants have been renamed to `Mem2memX` and re-numbered from 0-8 (#4944)
 
 ### Fixed
 

@@ -2998,33 +2998,30 @@ macro_rules! for_each_peripheral {
         "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "MEM2MEM1 peripheral singleton"]
-        MEM2MEM1 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "MEM2MEM4 peripheral singleton"] MEM2MEM4 <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "MEM2MEM5 peripheral singleton"]
-        MEM2MEM5 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "MEM2MEM10 peripheral singleton"] MEM2MEM10 <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
-        "MEM2MEM11 peripheral singleton"] MEM2MEM11 <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
-        "MEM2MEM12 peripheral singleton"] MEM2MEM12 <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
-        "MEM2MEM13 peripheral singleton"] MEM2MEM13 <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
-        "MEM2MEM14 peripheral singleton"] MEM2MEM14 <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
-        "MEM2MEM15 peripheral singleton"] MEM2MEM15 <= virtual() (unstable)));
-        _for_each_inner_peripheral!((GPIO0)); _for_each_inner_peripheral!((GPIO1));
-        _for_each_inner_peripheral!((GPIO2)); _for_each_inner_peripheral!((GPIO3));
-        _for_each_inner_peripheral!((GPIO4)); _for_each_inner_peripheral!((GPIO5));
-        _for_each_inner_peripheral!((GPIO6)); _for_each_inner_peripheral!((GPIO7));
-        _for_each_inner_peripheral!((GPIO8)); _for_each_inner_peripheral!((GPIO9));
-        _for_each_inner_peripheral!((GPIO10)); _for_each_inner_peripheral!((GPIO11));
-        _for_each_inner_peripheral!((GPIO12)); _for_each_inner_peripheral!((GPIO13));
-        _for_each_inner_peripheral!((GPIO14)); _for_each_inner_peripheral!((GPIO22));
-        _for_each_inner_peripheral!((GPIO23)); _for_each_inner_peripheral!((GPIO24));
-        _for_each_inner_peripheral!((GPIO25)); _for_each_inner_peripheral!((GPIO26));
-        _for_each_inner_peripheral!((GPIO27));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "MEM2MEM0 peripheral singleton"]
+        MEM2MEM0 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "MEM2MEM1 peripheral singleton"] MEM2MEM1 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "MEM2MEM2 peripheral singleton"]
+        MEM2MEM2 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "MEM2MEM3 peripheral singleton"] MEM2MEM3 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "MEM2MEM4 peripheral singleton"]
+        MEM2MEM4 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "MEM2MEM5 peripheral singleton"] MEM2MEM5 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "MEM2MEM6 peripheral singleton"]
+        MEM2MEM6 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "MEM2MEM7 peripheral singleton"] MEM2MEM7 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "MEM2MEM8 peripheral singleton"]
+        MEM2MEM8 <= virtual() (unstable))); _for_each_inner_peripheral!((GPIO0));
+        _for_each_inner_peripheral!((GPIO1)); _for_each_inner_peripheral!((GPIO2));
+        _for_each_inner_peripheral!((GPIO3)); _for_each_inner_peripheral!((GPIO4));
+        _for_each_inner_peripheral!((GPIO5)); _for_each_inner_peripheral!((GPIO6));
+        _for_each_inner_peripheral!((GPIO7)); _for_each_inner_peripheral!((GPIO8));
+        _for_each_inner_peripheral!((GPIO9)); _for_each_inner_peripheral!((GPIO10));
+        _for_each_inner_peripheral!((GPIO11)); _for_each_inner_peripheral!((GPIO12));
+        _for_each_inner_peripheral!((GPIO13)); _for_each_inner_peripheral!((GPIO14));
+        _for_each_inner_peripheral!((GPIO22)); _for_each_inner_peripheral!((GPIO23));
+        _for_each_inner_peripheral!((GPIO24)); _for_each_inner_peripheral!((GPIO25));
+        _for_each_inner_peripheral!((GPIO26)); _for_each_inner_peripheral!((GPIO27));
         _for_each_inner_peripheral!((AES(unstable)));
         _for_each_inner_peripheral!((APB_SARADC(unstable)));
         _for_each_inner_peripheral!((ASSIST_DEBUG(unstable)));
@@ -3091,27 +3088,27 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((FLASH(unstable)));
         _for_each_inner_peripheral!((GPIO_DEDICATED(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
+        _for_each_inner_peripheral!((MEM2MEM0(unstable)));
         _for_each_inner_peripheral!((MEM2MEM1(unstable)));
+        _for_each_inner_peripheral!((MEM2MEM2(unstable)));
+        _for_each_inner_peripheral!((MEM2MEM3(unstable)));
         _for_each_inner_peripheral!((MEM2MEM4(unstable)));
         _for_each_inner_peripheral!((MEM2MEM5(unstable)));
-        _for_each_inner_peripheral!((MEM2MEM10(unstable)));
-        _for_each_inner_peripheral!((MEM2MEM11(unstable)));
-        _for_each_inner_peripheral!((MEM2MEM12(unstable)));
-        _for_each_inner_peripheral!((MEM2MEM13(unstable)));
-        _for_each_inner_peripheral!((MEM2MEM14(unstable)));
-        _for_each_inner_peripheral!((MEM2MEM15(unstable)));
-        _for_each_inner_peripheral!((Spi2, 0)); _for_each_inner_peripheral!((Mem2mem1,
+        _for_each_inner_peripheral!((MEM2MEM6(unstable)));
+        _for_each_inner_peripheral!((MEM2MEM7(unstable)));
+        _for_each_inner_peripheral!((MEM2MEM8(unstable)));
+        _for_each_inner_peripheral!((Spi2, 0)); _for_each_inner_peripheral!((Mem2mem0,
         1)); _for_each_inner_peripheral!((Uhci0, 2)); _for_each_inner_peripheral!((I2s0,
-        3)); _for_each_inner_peripheral!((Mem2mem4, 4));
-        _for_each_inner_peripheral!((Mem2mem5, 5)); _for_each_inner_peripheral!((Aes,
+        3)); _for_each_inner_peripheral!((Mem2mem1, 4));
+        _for_each_inner_peripheral!((Mem2mem2, 5)); _for_each_inner_peripheral!((Aes,
         6)); _for_each_inner_peripheral!((Sha, 7));
         _for_each_inner_peripheral!((ApbSaradc, 8)); _for_each_inner_peripheral!((ParlIo,
-        9)); _for_each_inner_peripheral!((Mem2mem10, 10));
-        _for_each_inner_peripheral!((Mem2mem11, 11));
-        _for_each_inner_peripheral!((Mem2mem12, 12));
-        _for_each_inner_peripheral!((Mem2mem13, 13));
-        _for_each_inner_peripheral!((Mem2mem14, 14));
-        _for_each_inner_peripheral!((Mem2mem15, 15)); _for_each_inner_peripheral!((all(@
+        9)); _for_each_inner_peripheral!((Mem2mem3, 10));
+        _for_each_inner_peripheral!((Mem2mem4, 11));
+        _for_each_inner_peripheral!((Mem2mem5, 12));
+        _for_each_inner_peripheral!((Mem2mem6, 13));
+        _for_each_inner_peripheral!((Mem2mem7, 14));
+        _for_each_inner_peripheral!((Mem2mem8, 15)); _for_each_inner_peripheral!((all(@
         peri_type #[doc = "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type
         #[doc = "GPIO1 peripheral singleton"] GPIO1 <= virtual()), (@ peri_type #[doc =
         "GPIO2 peripheral singleton (Limitations exist)"] #[doc = ""] #[doc =
@@ -3276,19 +3273,19 @@ macro_rules! for_each_peripheral {
         virtual() (unstable)), (@ peri_type #[doc =
         "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)),
         (@ peri_type #[doc = "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <=
-        virtual() (unstable)), (@ peri_type #[doc = "MEM2MEM1 peripheral singleton"]
-        MEM2MEM1 <= virtual() (unstable)), (@ peri_type #[doc =
-        "MEM2MEM4 peripheral singleton"] MEM2MEM4 <= virtual() (unstable)), (@ peri_type
-        #[doc = "MEM2MEM5 peripheral singleton"] MEM2MEM5 <= virtual() (unstable)), (@
-        peri_type #[doc = "MEM2MEM10 peripheral singleton"] MEM2MEM10 <= virtual()
-        (unstable)), (@ peri_type #[doc = "MEM2MEM11 peripheral singleton"] MEM2MEM11 <=
-        virtual() (unstable)), (@ peri_type #[doc = "MEM2MEM12 peripheral singleton"]
-        MEM2MEM12 <= virtual() (unstable)), (@ peri_type #[doc =
-        "MEM2MEM13 peripheral singleton"] MEM2MEM13 <= virtual() (unstable)), (@
-        peri_type #[doc = "MEM2MEM14 peripheral singleton"] MEM2MEM14 <= virtual()
-        (unstable)), (@ peri_type #[doc = "MEM2MEM15 peripheral singleton"] MEM2MEM15 <=
-        virtual() (unstable)))); _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1),
-        (GPIO2), (GPIO3), (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10),
+        virtual() (unstable)), (@ peri_type #[doc = "MEM2MEM0 peripheral singleton"]
+        MEM2MEM0 <= virtual() (unstable)), (@ peri_type #[doc =
+        "MEM2MEM1 peripheral singleton"] MEM2MEM1 <= virtual() (unstable)), (@ peri_type
+        #[doc = "MEM2MEM2 peripheral singleton"] MEM2MEM2 <= virtual() (unstable)), (@
+        peri_type #[doc = "MEM2MEM3 peripheral singleton"] MEM2MEM3 <= virtual()
+        (unstable)), (@ peri_type #[doc = "MEM2MEM4 peripheral singleton"] MEM2MEM4 <=
+        virtual() (unstable)), (@ peri_type #[doc = "MEM2MEM5 peripheral singleton"]
+        MEM2MEM5 <= virtual() (unstable)), (@ peri_type #[doc =
+        "MEM2MEM6 peripheral singleton"] MEM2MEM6 <= virtual() (unstable)), (@ peri_type
+        #[doc = "MEM2MEM7 peripheral singleton"] MEM2MEM7 <= virtual() (unstable)), (@
+        peri_type #[doc = "MEM2MEM8 peripheral singleton"] MEM2MEM8 <= virtual()
+        (unstable)))); _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1), (GPIO2),
+        (GPIO3), (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10),
         (GPIO11), (GPIO12), (GPIO13), (GPIO14), (GPIO22), (GPIO23), (GPIO24), (GPIO25),
         (GPIO26), (GPIO27), (AES(unstable)), (APB_SARADC(unstable)),
         (ASSIST_DEBUG(unstable)), (DMA(unstable)), (DS(unstable)), (ECC(unstable)),
@@ -3308,13 +3305,13 @@ macro_rules! for_each_peripheral {
         (TWAI0(unstable)), (UART0), (UART1), (UHCI0(unstable)), (USB_DEVICE(unstable)),
         (DMA_CH0(unstable)), (DMA_CH1(unstable)), (DMA_CH2(unstable)), (ADC1(unstable)),
         (BT(unstable)), (FLASH(unstable)), (GPIO_DEDICATED(unstable)),
-        (SW_INTERRUPT(unstable)), (MEM2MEM1(unstable)), (MEM2MEM4(unstable)),
-        (MEM2MEM5(unstable)), (MEM2MEM10(unstable)), (MEM2MEM11(unstable)),
-        (MEM2MEM12(unstable)), (MEM2MEM13(unstable)), (MEM2MEM14(unstable)),
-        (MEM2MEM15(unstable)))); _for_each_inner_peripheral!((dma_eligible(Spi2, 0),
-        (Mem2mem1, 1), (Uhci0, 2), (I2s0, 3), (Mem2mem4, 4), (Mem2mem5, 5), (Aes, 6),
-        (Sha, 7), (ApbSaradc, 8), (ParlIo, 9), (Mem2mem10, 10), (Mem2mem11, 11),
-        (Mem2mem12, 12), (Mem2mem13, 13), (Mem2mem14, 14), (Mem2mem15, 15)));
+        (SW_INTERRUPT(unstable)), (MEM2MEM0(unstable)), (MEM2MEM1(unstable)),
+        (MEM2MEM2(unstable)), (MEM2MEM3(unstable)), (MEM2MEM4(unstable)),
+        (MEM2MEM5(unstable)), (MEM2MEM6(unstable)), (MEM2MEM7(unstable)),
+        (MEM2MEM8(unstable)))); _for_each_inner_peripheral!((dma_eligible(Spi2, 0),
+        (Mem2mem0, 1), (Uhci0, 2), (I2s0, 3), (Mem2mem1, 4), (Mem2mem2, 5), (Aes, 6),
+        (Sha, 7), (ApbSaradc, 8), (ParlIo, 9), (Mem2mem3, 10), (Mem2mem4, 11), (Mem2mem5,
+        12), (Mem2mem6, 13), (Mem2mem7, 14), (Mem2mem8, 15)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.
