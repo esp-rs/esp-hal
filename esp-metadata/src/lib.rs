@@ -201,33 +201,37 @@ impl Chip {
         !self.is_xtensa()
     }
 
-    pub fn list_of_possible_symbols() -> IndexMap<String, Option<Vec<String>>> {
-        let mut cfgs: IndexMap<String, Option<Vec<String>>> = IndexMap::new();
+    pub fn list_of_possible_symbols() -> &'static IndexMap<String, Option<Vec<String>>> {
+        type SymbolMap = IndexMap<String, Option<Vec<String>>>;
+        static CACHED_SYMBOLS: OnceLock<SymbolMap> = OnceLock::new();
+        CACHED_SYMBOLS.get_or_init(|| {
+            let mut cfgs: SymbolMap = SymbolMap::new();
 
-        for chip in Chip::iter() {
-            let config = Config::for_chip(&chip);
-            for symbol in config.all() {
-                if let Some((symbol_name, symbol_value)) = symbol.split_once('=') {
-                    let symbol_name = symbol_name.replace('.', "_");
-                    let entry = cfgs.entry(symbol_name).or_default();
-                    let vec = entry.get_or_insert_with(Vec::new);
+            for chip in Chip::iter() {
+                let config = Config::for_chip(&chip);
+                for symbol in config.all() {
+                    if let Some((symbol_name, symbol_value)) = symbol.split_once('=') {
+                        let symbol_name = symbol_name.replace('.', "_");
+                        let entry = cfgs.entry(symbol_name).or_default();
+                        let vec = entry.get_or_insert_with(Vec::new);
 
-                    // Avoid duplicates in the same cfg.
-                    if !vec.contains(&symbol_value.to_string()) {
-                        vec.push(symbol_value.to_string());
-                    }
-                } else {
-                    // https://doc.rust-lang.org/cargo/reference/build-scripts.html#rustc-check-cfg
-                    let cfg = symbol.replace('.', "_");
+                        // Avoid duplicates in the same cfg.
+                        if !vec.contains(&symbol_value.to_string()) {
+                            vec.push(symbol_value.to_string());
+                        }
+                    } else {
+                        // https://doc.rust-lang.org/cargo/reference/build-scripts.html#rustc-check-cfg
+                        let cfg = symbol.replace('.', "_");
 
-                    if !cfgs.contains_key(&cfg) {
-                        cfgs.insert(cfg, None);
+                        if !cfgs.contains_key(&cfg) {
+                            cfgs.insert(cfg, None);
+                        }
                     }
                 }
             }
-        }
 
-        cfgs
+            cfgs
+        })
     }
 
     pub fn list_of_check_cfgs() -> Vec<String> {
