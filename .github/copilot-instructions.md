@@ -41,6 +41,15 @@ cargo xmcp
 
 The MCP server exposes only safe commands (build, lint, check, format, test). Release commands are intentionally excluded. The allow-list lives in `build_mcp_registry()` in `xtask/src/main.rs`.
 
+## Important: command performance
+
+**Many commands are slow** when run against all chips and packages. Always filter to the minimum scope needed:
+- Use `chips` to target a single chip (e.g. `esp32c3`) instead of all.
+- Use `packages` to target only the crate you changed.
+- Use `example` or `test` to build/run a single item instead of `all`.
+
+**The `ci` command is a full CI simulation and is very slow.** Only run it as a final pre-PR validation step after all other work is complete and individually tested. Do not use it during iterative development.
+
 ## Key commands
 
 | Task | Command |
@@ -84,3 +93,4 @@ grep -E '^\s*MSRV:\s*' .github/workflows/ci.yml
 5. Build relevant examples: `cargo xtask build examples <EXAMPLE> --chip <chip>`
 6. Run `cargo xtask host-tests` if host-side code changed
 7. Do not hand-edit formatting diffs — let `fmt-packages` handle them
+8. **Final step only**: run `ci` for the relevant chip(s) once everything above passes

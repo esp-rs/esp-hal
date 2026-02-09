@@ -935,14 +935,16 @@ fn build_mcp_registry() -> Vec<xtask::mcp::registry::CommandEntry> {
         // -- Build commands --------------------------------------------------
         command!(
             "build-documentation",
-            "Build documentation for the specified packages and chips",
+            "Build documentation for the specified packages and chips. \
+             WARNING: slow when targeting all chips/packages. Filter with `chips` and `packages` to reduce build time.",
             BuildDocumentationArgs,
             |workspace, args| build_documentation(workspace, args)
         ),
         command!(
             "build-examples",
             "Build all examples (or a specific example) for a chip. \
-             Provide `chip` and optionally `example` (use \"all\" for every example).",
+             Provide `chip` and optionally `example` (use \"all\" for every example). \
+             WARNING: building all examples is slow. Prefer specifying a single example name when possible.",
             ExamplesArgs,
             |workspace, args| examples(workspace, args, CargoAction::Build(None))
         ),
@@ -954,7 +956,8 @@ fn build_mcp_registry() -> Vec<xtask::mcp::registry::CommandEntry> {
         ),
         command!(
             "build-tests",
-            "Build all applicable tests or a specific test for a chip",
+            "Build all applicable tests or a specific test for a chip. \
+             Specify `test` to build a single test and avoid long build times.",
             TestsArgs,
             |workspace, args| {
                 let target_path = workspace.join("target");
@@ -983,7 +986,8 @@ fn build_mcp_registry() -> Vec<xtask::mcp::registry::CommandEntry> {
         // -- Lint / check / format commands ----------------------------------
         command!(
             "ci",
-            "Perform (parts of) the checks done in CI for a specific chip",
+            "Perform (parts of) the checks done in CI for a specific chip. \
+             WARNING: this is very slow. Only run as a final pre-PR validation step after all other work is complete and tested.",
             CiArgs,
             |workspace, args| run_ci_checks(workspace, args)
         ),
@@ -1002,14 +1006,16 @@ fn build_mcp_registry() -> Vec<xtask::mcp::registry::CommandEntry> {
         ),
         command!(
             "check-packages",
-            "Check all packages with `cargo check` for the specified chips",
+            "Check all packages with `cargo check` for the specified chips. \
+             WARNING: slow when targeting all chips/packages. Filter with `chips` and `packages` to reduce time.",
             CheckPackagesArgs,
             |workspace, args| check_packages(workspace, args)
         ),
         command!(
             "lint-packages",
             "Lint all packages with clippy for the specified chips. \
-             Set `fix: true` to auto-apply fixes.",
+             Set `fix: true` to auto-apply fixes. \
+             WARNING: slow when targeting all chips/packages. Filter with `chips` and `packages` to reduce time.",
             LintPackagesArgs,
             |workspace, args| lint_packages(workspace, args)
         ),
