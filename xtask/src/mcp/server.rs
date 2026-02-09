@@ -68,7 +68,7 @@ pub fn run(workspace: &Path, commands: Vec<CommandEntry>) -> Result<()> {
 
         match method {
             "initialize" => {
-                let result = handle_initialize(&params);
+                let result = handle_initialize(workspace);
                 write_response(&mut stdout, &jsonrpc_ok(id, result))?;
             }
             "notifications/initialized" => {
@@ -99,7 +99,12 @@ pub fn run(workspace: &Path, commands: Vec<CommandEntry>) -> Result<()> {
 // Method handlers                                                     //
 // ------------------------------------------------------------------ //
 
-fn handle_initialize(_params: &Value) -> Value {
+fn handle_initialize(workspace: &Path) -> Value {
+    let instructions = workspace
+        .join(".github")
+        .join("copilot-instructions.md");
+    let instructions = std::fs::read_to_string(instructions).unwrap_or_default();
+
     json!({
         "protocolVersion": "2024-11-05",
         "capabilities": {
@@ -108,7 +113,8 @@ fn handle_initialize(_params: &Value) -> Value {
         "serverInfo": {
             "name": "xtask-mcp",
             "version": env!("CARGO_PKG_VERSION")
-        }
+        },
+        "instructions": instructions
     })
 }
 
