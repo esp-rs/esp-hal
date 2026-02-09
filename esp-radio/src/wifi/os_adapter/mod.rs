@@ -671,31 +671,36 @@ pub unsafe extern "C" fn event_post(
     );
     use num_traits::FromPrimitive;
 
-    let event = unwrap!(super::event::WifiEvent::from_i32(event_id));
-    trace!("EVENT: {:?}", event);
+    if let Some(event) = super::event::WifiEvent::from_i32(event_id) {
+        trace!("EVENT: {:?}", event);
 
-    super::state::update_state(event);
+        super::state::update_state(event);
 
-    if let Some(payload) = super::event::EventInfo::from_wifi_event_raw(event, event_data)
-        && let Ok(publisher) = super::event::EVENT_CHANNEL.publisher()
-        && publisher.try_publish(payload).is_err()
-    {
-        warn!("Lost event - consider increasing the capacity of the internal wifi event channel.");
-    }
-
-    match event {
-        WifiEvent::StationConnected | WifiEvent::StationDisconnected => {
-            crate::wifi::embassy::STA_LINK_STATE_WAKER.wake();
+        if let Some(payload) = super::event::EventInfo::from_wifi_event_raw(event, event_data)
+            && let Ok(publisher) = super::event::EVENT_CHANNEL.publisher()
+            && publisher.try_publish(payload).is_err()
+        {
+            warn!(
+                "Lost event - consider increasing the capacity of the internal wifi event channel."
+            );
         }
 
-        WifiEvent::AccessPointStart | WifiEvent::AccessPointStop => {
-            crate::wifi::embassy::AP_LINK_STATE_WAKER.wake();
+        match event {
+            WifiEvent::StationConnected | WifiEvent::StationDisconnected => {
+                crate::wifi::embassy::STA_LINK_STATE_WAKER.wake();
+            }
+
+            WifiEvent::AccessPointStart | WifiEvent::AccessPointStop => {
+                crate::wifi::embassy::AP_LINK_STATE_WAKER.wake();
+            }
+
+            _ => {}
         }
 
-        _ => {}
+        memory_fence();
+    } else {
+        warn!("Got unmapped event: {}", event_id);
     }
-
-    memory_fence();
 
     0
 }
