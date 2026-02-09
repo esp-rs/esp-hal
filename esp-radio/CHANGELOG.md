@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Controller::stop_async()` now returns `WifiError::NotStarted` when the `Controller` has not been started (#4504)
 - ESP32-C2: Disable BLE controller before deinitializing the stack (#4606)
 - Fix a crash after shutting down WiFi (#4761)
+- Fix a crash when trying to handle an unknown WiFi event (#4942)
 
 ### Removed
 
