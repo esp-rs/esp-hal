@@ -358,6 +358,8 @@ driver_configs![
             kind: String,
             #[serde(default)]
             supports_mem2mem: bool,
+            #[serde(default)]
+            max_priority: Option<u32>,
         }
     },
     DsProperties {

@@ -63,6 +63,12 @@ macro_rules! property {
     ("dma.supports_mem2mem") => {
         true
     };
+    ("dma.max_priority") => {
+        5
+    };
+    ("dma.max_priority", str) => {
+        stringify!(5)
+    };
     ("gpio.has_bank_1") => {
         false
     };

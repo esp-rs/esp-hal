@@ -845,7 +845,7 @@ impl From<DmaBufError> for DmaError {
 }
 
 /// DMA Priorities
-#[cfg(dma_kind = "gdma")]
+#[cfg(dma_max_priority_is_set)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaPriority {
@@ -862,23 +862,17 @@ pub enum DmaPriority {
     /// Priority level 5.
     Priority5 = 5,
     /// Priority level 6.
+    #[cfg(dma_max_priority = "9")]
     Priority6 = 6,
     /// Priority level 7.
+    #[cfg(dma_max_priority = "9")]
     Priority7 = 7,
     /// Priority level 8.
+    #[cfg(dma_max_priority = "9")]
     Priority8 = 8,
-    /// The highest priority level (Priority 9).
+    /// Priority level 9.
+    #[cfg(dma_max_priority = "9")]
     Priority9 = 9,
-}
-
-/// DMA Priorities
-/// The values need to match the TRM
-#[cfg(dma_kind = "pdma")]
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum DmaPriority {
-    /// The lowest priority level (Priority 0).
-    Priority0 = 0,
 }
 
 /// DMA capable peripherals

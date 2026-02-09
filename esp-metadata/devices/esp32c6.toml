@@ -310,6 +310,7 @@ has_region_monitor = true
 support_status = "partial"
 kind = "gdma"
 supports_mem2mem = true
+max_priority = 9
 
 [device.gpio]
 support_status = "supported"

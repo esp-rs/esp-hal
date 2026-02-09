@@ -226,6 +226,7 @@ clocks = { system_clocks = { clock_tree = [
 support_status = "not_supported"
 kind = "gdma"
 supports_mem2mem = true
+max_priority = 5
 
 [device.gpio]
 support_status = "partial"
