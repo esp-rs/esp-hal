@@ -228,14 +228,15 @@ impl TxRegisterAccess for AnyGdmaTxChannel<'_> {
 
     fn async_handler(&self) -> Option<InterruptHandler> {
         match self.channel {
+            #[cfg(soc_has_dma_ch0)]
             0 => DMA_CH0::handler_out(),
-            #[cfg(not(esp32c2))]
+            #[cfg(soc_has_dma_ch1)]
             1 => DMA_CH1::handler_out(),
-            #[cfg(not(esp32c2))]
+            #[cfg(soc_has_dma_ch2)]
             2 => DMA_CH2::handler_out(),
-            #[cfg(esp32s3)]
+            #[cfg(soc_has_dma_ch3)]
             3 => DMA_CH3::handler_out(),
-            #[cfg(esp32s3)]
+            #[cfg(soc_has_dma_ch4)]
             4 => DMA_CH4::handler_out(),
             _ => unreachable!(),
         }
@@ -243,14 +244,15 @@ impl TxRegisterAccess for AnyGdmaTxChannel<'_> {
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
         match self.channel {
+            #[cfg(soc_has_dma_ch0)]
             0 => DMA_CH0::isr_out(),
-            #[cfg(not(esp32c2))]
+            #[cfg(soc_has_dma_ch1)]
             1 => DMA_CH1::isr_out(),
-            #[cfg(not(esp32c2))]
+            #[cfg(soc_has_dma_ch2)]
             2 => DMA_CH2::isr_out(),
-            #[cfg(esp32s3)]
+            #[cfg(soc_has_dma_ch3)]
             3 => DMA_CH3::isr_out(),
-            #[cfg(esp32s3)]
+            #[cfg(soc_has_dma_ch4)]
             4 => DMA_CH4::isr_out(),
             _ => unreachable!(),
         }
@@ -458,14 +460,15 @@ impl RxRegisterAccess for AnyGdmaRxChannel<'_> {
 
     fn async_handler(&self) -> Option<InterruptHandler> {
         match self.channel {
+            #[cfg(soc_has_dma_ch0)]
             0 => DMA_CH0::handler_in(),
-            #[cfg(not(esp32c2))]
+            #[cfg(soc_has_dma_ch1)]
             1 => DMA_CH1::handler_in(),
-            #[cfg(not(esp32c2))]
+            #[cfg(soc_has_dma_ch2)]
             2 => DMA_CH2::handler_in(),
-            #[cfg(esp32s3)]
+            #[cfg(soc_has_dma_ch3)]
             3 => DMA_CH3::handler_in(),
-            #[cfg(esp32s3)]
+            #[cfg(soc_has_dma_ch4)]
             4 => DMA_CH4::handler_in(),
             _ => unreachable!(),
         }
@@ -473,14 +476,15 @@ impl RxRegisterAccess for AnyGdmaRxChannel<'_> {
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
         match self.channel {
+            #[cfg(soc_has_dma_ch0)]
             0 => DMA_CH0::isr_in(),
-            #[cfg(not(esp32c2))]
+            #[cfg(soc_has_dma_ch1)]
             1 => DMA_CH1::isr_in(),
-            #[cfg(not(esp32c2))]
+            #[cfg(soc_has_dma_ch2)]
             2 => DMA_CH2::isr_in(),
-            #[cfg(esp32s3)]
+            #[cfg(soc_has_dma_ch3)]
             3 => DMA_CH3::isr_in(),
-            #[cfg(esp32s3)]
+            #[cfg(soc_has_dma_ch4)]
             4 => DMA_CH4::isr_in(),
             _ => unreachable!(),
         }
