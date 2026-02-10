@@ -54,7 +54,7 @@ pub(crate) fn generate_spi_master_peripherals(spi_slave: &SpiMasterProperties) -
         ///
         /// This macro has one option for its "Individual matcher" case:
         ///
-        /// Syntax: `($instance:ident, $sys:ident, $sclk:ident, [$($cs:ident),*] [$($sio:ident),* $($is_qspi:iteral)?])`
+        /// Syntax: `($instance:ident, $sys:ident, $sclk:ident [$($cs:ident),*] [$($sio:ident),*] $($is_qspi:literal)?)`
         ///
         /// Macro fragments:
         ///

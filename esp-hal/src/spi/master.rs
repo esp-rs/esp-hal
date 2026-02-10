@@ -512,9 +512,10 @@ impl Config {
                 let _clocks = clocks;
                 Rate::from_mhz(48)
             } else if #[cfg(esp32c5)] {
-                // We select the 160MHz PLL as the clock source in the driver
+                // We select the 160MHz PLL as the clock source in the driver. There is a by-2 divider
+                // configured between the PLL and the SPI clock (spi2_clkm_div_num).
                 let _clocks = clocks;
-                Rate::from_mhz(80) // 160MHz, but clk_spi2_mst must be <= 80MHz
+                Rate::from_mhz(80) // clk_spi2_mst must be <= 80MHz
             } else if #[cfg(esp32c6)] {
                 // We select the 80MHz PLL as the clock source in the driver
                 // FIXME we state that the default clock source is APB, which just isn't true
