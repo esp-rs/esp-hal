@@ -167,3 +167,28 @@ Previously, you would wait for `AccessPointStationConnected` or `AccessPointStat
 +     }
 + }
 ```
+
+## SSID Type Change
+
+The API has been updated to use a dedicated SSID type instead of String for SSID values.
+
+Builders now take `Into<Ssid>` instead of a String.
+
+e.g.
+
+```diff
+ let station_config = Config::Station(
+     StationConfig::default()
+-        .with_ssid("MyNetwork".into())  // Used .into() to convert to String
++        .with_ssid("MyNetwork")  // Ssid implements From<&str>
+         .with_password("password".into()),
+ );
+```
+
+Migration Steps
+
+1. Remove `.into()` calls: Remove .into() calls when passing SSIDs to configuration methods:
+    - Change .with_ssid("network".into()) to .with_ssid("network")
+
+2. Update SSID access: When retrieving SSIDs from structs or events, use .as_str() to get the string representation:
+    - Change ssid_value to ssid_value.as_str() when you need a string slice
