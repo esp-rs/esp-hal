@@ -1419,7 +1419,7 @@ fn configure_clock(
 ) -> Result<(), ConfigError> {
     unsafe {
         // divider
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+        #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32h2, esp32s3))]
         register_block.clk_conf().modify(|_, w| {
             w.sclk_sel().clear_bit();
             w.sclk_div_num().bits((sclk_div - 1) as u8)
@@ -1687,7 +1687,7 @@ impl Driver<'_> {
                 self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
             } else {
                 // Even though C2 and C3 have a FSM reset bit, esp-idf does not
-                // define SOC_I2C_SUPPORT_HW_FSM_RST for them, so include them in the fallback impl.
+                // define I2C_LL_SUPPORT_HW_FSM_RST for them, so include them in the fallback impl.
 
                 crate::system::PeripheralClockControl::reset(self.info.peripheral);
 
