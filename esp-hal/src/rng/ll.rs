@@ -72,7 +72,7 @@ fn read_one(wait_cycles: usize) -> u32 {
                         //
                         // On H2-ECO5+ the LPPERI peripherals contains an additional register inserted before the `rng_data` register.
                         // https://github.com/espressif/esp-idf/commit/4c5e1a03414a6d55be4b42ba071b30ad228414f6#diff-bc8f2eca37e32ee4ba21ac812e4934998e764132a400479c4d091eb6f7e2e444
-                        if crate::efuse::Efuse::major_chip_version() >= 1 && crate::efuse::Efuse::minor_chip_version() >= 2 {
+                        if crate::soc::chip_revision_above(102) {
                             Some(unsafe { RNG::regs().data().as_ptr().add(1).read_volatile() })
                         } else {
                             Some(RNG::regs().data().read().bits())
