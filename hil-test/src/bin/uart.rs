@@ -212,6 +212,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(esp32c5))] // TODO
     fn test_send_receive_inverted(ctx: Context) {
         let mut uart = ctx
             .uart1

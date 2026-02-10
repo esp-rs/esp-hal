@@ -556,11 +556,12 @@ fn configure_timg1_wdt_clock_impl(
 
 // UART0_FUNCTION_CLOCK
 
-fn enable_uart0_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
-    PCR::regs()
-        .uart(0)
-        .clk_conf()
-        .modify(|_, w| w.sclk_en().bit(en));
+fn enable_uart0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Disabling this prevents the device from booting
+    // PCR::regs()
+    //    .uart(0)
+    //    .clk_conf()
+    //    .modify(|_, w| w.sclk_en().bit(en));
 }
 
 fn configure_uart0_function_clock_impl(
