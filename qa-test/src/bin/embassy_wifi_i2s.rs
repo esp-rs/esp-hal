@@ -59,7 +59,7 @@ async fn connection_manager(
     if !matches!(controller.is_started(), Ok(true)) {
         let station_config = Config::Station(
             StationConfig::default()
-                .with_ssid(SSID.into())
+                .with_ssid(SSID)
                 .with_password(PASSWORD.into()),
         );
         controller.set_config(&station_config).unwrap();

@@ -8,6 +8,7 @@ use esp_config::esp_config_int;
 use esp_sync::NonReentrantMutex;
 use num_derive::FromPrimitive;
 
+use super::Ssid;
 use crate::wifi::include::{
     wifi_event_sta_wps_er_success_t__bindgen_ty_1,
     wifi_ftm_report_entry_t,
@@ -801,7 +802,7 @@ pub struct FineTimingMeasurementReportInfo {
 #[instability::unstable]
 pub struct CredentialsInfo {
     /// SSID of AP
-    pub ssid: [u8; 32usize],
+    pub ssid: Ssid,
     /// Passphrase for the AP
     pub passphrase: [u8; 64usize],
 }
@@ -853,9 +854,7 @@ pub enum EventInfo {
     /// Station connected to a network.
     StationConnected {
         /// SSID of connected AP
-        ssid: [u8; 32usize],
-        /// SSID length of connected AP
-        ssid_len: u8,
+        ssid: Ssid,
         /// BSSID of connected AP
         bssid: [u8; 6usize],
         /// Channel of connected AP
@@ -869,9 +868,7 @@ pub enum EventInfo {
     /// Station disconnected from a network.
     StationDisconnected {
         /// SSID of disconnected AP
-        ssid: [u8; 32usize],
-        /// SSID length of disconnected AP
-        ssid_len: u8,
+        ssid: Ssid,
         /// BSSID of disconnected AP
         bssid: [u8; 6usize],
         /// Disconnection reason
@@ -1079,8 +1076,7 @@ impl EventInfo {
                 let ev = unsafe { StationConnected::from_raw_event_data(payload) };
 
                 Some(EventInfo::StationConnected {
-                    ssid: ev.ssid().try_into().unwrap(),
-                    ssid_len: ev.ssid_len(),
+                    ssid: Ssid::from_raw(ev.ssid(), ev.ssid_len()),
                     bssid: ev.bssid().try_into().unwrap(),
                     channel: ev.channel(),
                     authmode: ev.authmode(),
@@ -1090,8 +1086,7 @@ impl EventInfo {
             WifiEvent::StationDisconnected => {
                 let ev = unsafe { StationDisconnected::from_raw_event_data(payload) };
                 Some(EventInfo::StationDisconnected {
-                    ssid: ev.ssid().try_into().unwrap(),
-                    ssid_len: ev.ssid_len(),
+                    ssid: Ssid::from_raw(ev.ssid(), ev.ssid_len()),
                     bssid: ev.bssid().try_into().unwrap(),
                     reason: ev.reason() as u16,
                     rssi: ev.rssi(),
@@ -1131,7 +1126,7 @@ impl EventInfo {
                     credentials: Collection(ev
                         .access_point_cred()[..ev.access_point_cred_cnt() as usize].iter()
                         .map(|cred| CredentialsInfo {
-                            ssid: cred.ssid().try_into().unwrap(),
+                            ssid: cred.ssid().into(),
                             passphrase: cred.passphrase().try_into().unwrap(),
                         })
                         .collect()),

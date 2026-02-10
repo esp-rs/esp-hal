@@ -6,7 +6,7 @@ use core::fmt;
 use enumset::EnumSet;
 use procmacros::BuilderLite;
 
-use super::{AuthenticationMethod, Protocol, scan::ScanMethod};
+use super::{AuthenticationMethod, Protocol, Ssid, scan::ScanMethod};
 use crate::WifiError;
 
 unstable_module!(
@@ -19,8 +19,8 @@ unstable_module!(
 #[derive(BuilderLite, Clone, Eq, PartialEq, Hash)]
 pub struct StationConfig {
     /// The SSID of the Wi-Fi network.
-    #[builder_lite(reference)]
-    pub(crate) ssid: String,
+    #[builder_lite(skip_setter)]
+    pub(crate) ssid: Ssid,
     /// The BSSID (MAC address) of the station.
     pub(crate) bssid: Option<[u8; 6]>,
     /// The authentication method for the Wi-Fi connection.
@@ -58,6 +58,12 @@ pub struct StationConfig {
 }
 
 impl StationConfig {
+    /// Set the SSID of the access point.
+    pub fn with_ssid(mut self, ssid: impl Into<Ssid>) -> Self {
+        self.ssid = ssid.into();
+        self
+    }
+
     pub(crate) fn validate(&self) -> Result<(), WifiError> {
         if self.ssid.len() > 32 {
             return Err(WifiError::InvalidArguments);
@@ -78,7 +84,7 @@ impl StationConfig {
 impl Default for StationConfig {
     fn default() -> Self {
         StationConfig {
-            ssid: String::new(),
+            ssid: Ssid::default(),
             bssid: None,
             auth_method: AuthenticationMethod::Wpa2Personal,
             password: String::new(),

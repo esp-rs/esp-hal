@@ -6,7 +6,7 @@ use core::fmt;
 use enumset::EnumSet;
 use procmacros::BuilderLite;
 
-use super::{AuthenticationMethod, CountryInfo, Protocol, SecondaryChannel};
+use super::{AuthenticationMethod, CountryInfo, Protocol, SecondaryChannel, Ssid};
 use crate::{WifiError, sys::include::wifi_ap_record_t};
 
 /// Information about a detected Wi-Fi access point.
@@ -15,9 +15,7 @@ use crate::{WifiError, sys::include::wifi_ap_record_t};
 #[non_exhaustive]
 pub struct AccessPointInfo {
     /// The SSID of the access point.
-    // TODO: we can use the `alloc` feature once we have `defmt` 1.0.2
-    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
-    pub ssid: String,
+    pub ssid: Ssid,
     /// The BSSID (MAC address) of the access point.
     pub bssid: [u8; 6],
     /// The channel the access point is operating on.
@@ -36,8 +34,8 @@ pub struct AccessPointInfo {
 #[derive(Clone, PartialEq, Eq, BuilderLite, Hash)]
 pub struct AccessPointConfig {
     /// The SSID of the access point.
-    #[builder_lite(reference)]
-    pub(crate) ssid: String,
+    #[builder_lite(skip_setter)]
+    pub(crate) ssid: Ssid,
     /// Whether the SSID is hidden or visible.
     pub(crate) ssid_hidden: bool,
     /// The channel the access point will operate on.
@@ -61,6 +59,12 @@ pub struct AccessPointConfig {
 }
 
 impl AccessPointConfig {
+    /// Set the SSID of the access point.
+    pub fn with_ssid(mut self, ssid: impl Into<Ssid>) -> Self {
+        self.ssid = ssid.into();
+        self
+    }
+
     pub(crate) fn validate(&self) -> Result<(), WifiError> {
         if self.ssid.len() > 32 {
             return Err(WifiError::InvalidArguments);
@@ -81,7 +85,7 @@ impl AccessPointConfig {
 impl Default for AccessPointConfig {
     fn default() -> Self {
         Self {
-            ssid: String::from("iot-device"),
+            ssid: "iot-device".into(),
             ssid_hidden: false,
             channel: 1,
             secondary_channel: None,
@@ -149,7 +153,7 @@ pub(crate) fn convert_ap_info(record: &wifi_ap_record_t) -> AccessPointInfo {
         .iter()
         .position(|&c| c == 0)
         .unwrap_or(record.ssid.len());
-    let ssid = alloc::string::String::from_utf8_lossy(&record.ssid[..str_len]).into_owned();
+    let ssid = Ssid::from(&record.ssid[..str_len]);
 
     AccessPointInfo {
         ssid,

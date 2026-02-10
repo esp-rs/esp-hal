@@ -2,7 +2,7 @@
 
 #![deny(missing_docs)]
 
-use alloc::{collections::vec_deque::VecDeque, vec::Vec};
+use alloc::{borrow::ToOwned, collections::vec_deque::VecDeque, vec::Vec};
 use core::{
     fmt::{Debug, Write},
     marker::PhantomData,
@@ -595,7 +595,7 @@ impl DisconnectReason {
 }
 
 /// Information about a connected station.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Ssid {
     ssid: [u8; 32],
@@ -621,9 +621,23 @@ impl Ssid {
         ssid_bytes[..len].copy_from_slice(&ssid[..len]);
 
         Self {
-            ssid: ssid.try_into().unwrap(),
+            ssid: ssid_bytes,
             len: len as u8,
         }
+    }
+
+    pub(crate) fn as_bytes(&self) -> &[u8] {
+        &self.ssid[..self.len as usize]
+    }
+
+    /// The length of the SSID.
+    pub fn len(&self) -> usize {
+        self.len as usize
+    }
+
+    /// Returns true if the SSID is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
     }
 
     /// The SSID as a string slice.
@@ -637,6 +651,24 @@ impl Debug for Ssid {
         f.write_char('"')?;
         f.write_str(self.as_str())?;
         f.write_char('"')
+    }
+}
+
+impl From<alloc::string::String> for Ssid {
+    fn from(ssid: alloc::string::String) -> Self {
+        Self::new(&ssid)
+    }
+}
+
+impl From<&str> for Ssid {
+    fn from(ssid: &str) -> Self {
+        Self::new(ssid)
+    }
+}
+
+impl From<&[u8]> for Ssid {
+    fn from(ssid: &[u8]) -> Self {
+        Self::from_raw(ssid, ssid.len() as u8)
     }
 }
 
@@ -1059,7 +1091,7 @@ pub(crate) fn wifi_start_scan(
         show_hidden,
         scan_type,
         ..
-    }: ScanConfig<'_>,
+    }: ScanConfig,
 ) -> i32 {
     scan_type.validate();
     let (scan_time, scan_type) = match scan_type {
@@ -1083,7 +1115,7 @@ pub(crate) fn wifi_start_scan(
     };
 
     let mut ssid_buf = ssid.map(|m| {
-        let mut buf = Vec::from_iter(m.bytes());
+        let mut buf = Vec::from_iter(m.as_bytes().to_owned());
         buf.push(b'\0');
         buf
     });
@@ -2196,7 +2228,7 @@ impl WifiController<'_> {
     ///     esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
     ///
     /// wifi_controller.set_config(&Config::AccessPoint(
-    ///     AccessPointConfig::default().with_ssid("esp-radio".into()),
+    ///     AccessPointConfig::default().with_ssid("esp-radio"),
     /// ))?;
     ///
     /// wifi_controller.set_protocol(Protocol::P802D11BGNLR.into());
@@ -2365,7 +2397,7 @@ impl WifiController<'_> {
     /// #    esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
     /// let station_config = Config::Station(
     ///     StationConfig::default()
-    ///         .with_ssid("SSID".into())
+    ///         .with_ssid("SSID")
     ///         .with_password("PASSWORD".into()),
     /// );
     ///
@@ -2630,7 +2662,7 @@ impl WifiController<'_> {
     /// ```
     pub async fn scan_with_config_async(
         &mut self,
-        config: ScanConfig<'_>,
+        config: ScanConfig,
     ) -> Result<Vec<AccessPointInfo>, WifiError> {
         let mut subscriber = EVENT_CHANNEL
             .subscriber()
@@ -2854,13 +2886,12 @@ impl WifiController<'_> {
         match result {
             event::EventInfo::StationConnected {
                 ssid,
-                ssid_len,
                 bssid,
                 channel,
                 authmode,
                 aid,
             } => Ok(ConnectedStationInfo {
-                ssid: Ssid::from_raw(&ssid, ssid_len),
+                ssid,
                 bssid,
                 channel,
                 authmode: AuthenticationMethod::from_raw(authmode),
@@ -2868,12 +2899,11 @@ impl WifiController<'_> {
             }),
             event::EventInfo::StationDisconnected {
                 ssid,
-                ssid_len,
                 bssid,
                 reason,
                 rssi,
             } => Err(WifiError::Disconnected(DisconnectedStationInfo {
-                ssid: Ssid::from_raw(&ssid, ssid_len),
+                ssid,
                 bssid,
                 reason: DisconnectReason::from_raw(reason),
                 rssi,
@@ -2922,14 +2952,13 @@ impl WifiController<'_> {
 
             if let event::EventInfo::StationDisconnected {
                 ssid,
-                ssid_len,
                 bssid,
                 reason,
                 rssi,
             } = event
             {
                 break Ok(DisconnectedStationInfo {
-                    ssid: Ssid::from_raw(&ssid, ssid_len),
+                    ssid,
                     bssid,
                     reason: DisconnectReason::from_raw(reason),
                     rssi,
@@ -2955,14 +2984,13 @@ impl WifiController<'_> {
 
             if let event::EventInfo::StationDisconnected {
                 ssid,
-                ssid_len,
                 bssid,
                 reason,
                 rssi,
             } = event
             {
                 break Ok(DisconnectedStationInfo {
-                    ssid: Ssid::from_raw(&ssid, ssid_len),
+                    ssid,
                     bssid,
                     reason: DisconnectReason::from_raw(reason),
                     rssi,

@@ -49,7 +49,7 @@ async fn main(_spawner: Spawner) {
 
         let station_config = Config::Station(
             StationConfig::default()
-                .with_ssid(SSID.into())
+                .with_ssid(SSID)
                 .with_password(PASSWORD.into()),
         );
         controller.set_config(&station_config).unwrap();
@@ -79,7 +79,7 @@ async fn main(_spawner: Spawner) {
 
         let station_config = Config::Station(
             StationConfig::default()
-                .with_ssid(SSID.into())
+                .with_ssid(SSID)
                 .with_password(PASSWORD.into()),
         );
         controller.set_config(&station_config).unwrap();
