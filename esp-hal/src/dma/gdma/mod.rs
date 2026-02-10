@@ -7,12 +7,6 @@
 //!
 //! The `GDMA` module provides multiple DMA channels, each capable of managing
 //! data transfer for various peripherals.
-//!
-//! ## Configuration
-//! GDMA peripheral can be initializes using the `new` function, which requires
-//! a DMA peripheral instance and a clock control reference.
-//!
-//! <em>PS: Note that the number of DMA channels is chip-specific.</em>
 
 use core::marker::PhantomData;
 
