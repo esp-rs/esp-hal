@@ -39,6 +39,18 @@ cargo xmcp
 }
 ```
 
+### Register in Gemini CLI (`.gemini/settings.json` or `~/.gemini/settings.json`)
+
+```json
+{
+  "mcpServers": {
+    "esp-hal-xtask": {
+      "command": "cargo xmcp"
+    }
+  }
+}
+```
+
 The MCP server exposes only safe commands (build, lint, check, format, test). Release commands are intentionally excluded. The allow-list lives in `build_mcp_registry()` in `xtask/src/main.rs`.
 
 ## Important: command performance
@@ -86,11 +98,10 @@ grep -E '^\s*MSRV:\s*' .github/workflows/ci.yml
 
 ## PR checklist
 
-1. Run `cargo xtask fmt-packages`
-2. Run `cargo xtask lint-packages` (targeted: `--packages <name>`) and fix issues
-3. Add/update changelog entry if API behavior changed
-4. Run `cargo xtask update-metadata --check` if package metadata changed
-5. Build relevant examples: `cargo xtask build examples <EXAMPLE> --chip <chip>`
-6. Run `cargo xtask host-tests` if host-side code changed
-7. Do not hand-edit formatting diffs — let `fmt-packages` handle them
-8. **Final step only**: run `ci` for the relevant chip(s) once everything above passes
+1. Run `cargo xtask lint-packages` (targeted: `--packages <name>`) and fix issues
+2. Add/update changelog entry if API behavior changed
+3. Run `cargo xtask update-metadata --check` if package metadata changed
+4. Build relevant examples: `cargo xtask build examples --chip <chip> <EXAMPLE NAME | all>`
+5. Run `cargo xtask host-tests` if host-side code changed
+6. Do not hand-edit formatting diffs — let `fmt-packages` handle them - Run `cargo xtask fmt-packages`
+7. **Final step only**: run `ci` for the relevant chip(s) once everything above passes
