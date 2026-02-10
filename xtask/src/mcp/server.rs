@@ -37,19 +37,26 @@ pub fn run(workspace: &Path, commands: Vec<CommandEntry>) -> Result<()> {
     // only.  All *command* output is captured by `gag`.
 
     let stdin = io::stdin();
+    let mut reader = io::BufReader::new(stdin.lock());
     let mut stdout = io::stdout();
 
-    for line in stdin.lock().lines() {
-        let line = line.context("Failed to read line from stdin")?;
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
+    loop {
+        let request_text = match read_message(&mut reader) {
+            Ok(Some(text)) => text,
+            Ok(None) => break, // EOF
+            Err(e) => {
+                let err_resp =
+                    jsonrpc_error(Value::Null, -32700, &format!("Read error: {e}"));
+                write_response(&mut stdout, &err_resp)?;
+                continue;
+            }
+        };
 
-        let request: Value = match serde_json::from_str(line) {
+        let request: Value = match serde_json::from_str(&request_text) {
             Ok(v) => v,
             Err(e) => {
-                let err_resp = jsonrpc_error(Value::Null, -32700, &format!("Parse error: {e}"));
+                let err_resp =
+                    jsonrpc_error(Value::Null, -32700, &format!("Parse error: {e}"));
                 write_response(&mut stdout, &err_resp)?;
                 continue;
             }
@@ -66,33 +73,95 @@ pub fn run(workspace: &Path, commands: Vec<CommandEntry>) -> Result<()> {
         let id = request.get("id").cloned().unwrap_or(Value::Null);
         let params = request.get("params").cloned().unwrap_or(json!({}));
 
-        match method {
-            "initialize" => {
-                let result = handle_initialize(workspace);
-                write_response(&mut stdout, &jsonrpc_ok(id, result))?;
-            }
-            "notifications/initialized" => {
-                // Client acknowledgement — nothing to do.
-            }
-            "tools/list" => {
-                let result = handle_tools_list(&commands);
-                write_response(&mut stdout, &jsonrpc_ok(id, result))?;
-            }
+        let response = match method {
+            "initialize" => Some(jsonrpc_ok(id, handle_initialize(workspace))),
+            "tools/list" => Some(jsonrpc_ok(id, handle_tools_list(&commands))),
             "tools/call" => {
-                let result = handle_tools_call(workspace, &commands, &params);
-                write_response(&mut stdout, &jsonrpc_ok(id, result))?;
+                Some(jsonrpc_ok(id, handle_tools_call(workspace, &commands, &params)))
             }
-            _ if is_notification => {
-                // Unknown notification — ignore per spec.
-            }
-            _ => {
-                let resp = jsonrpc_error(id, -32601, &format!("Method not found: {method}"));
+            "notifications/initialized" => None,
+            _ if is_notification => None,
+            _ => Some(jsonrpc_error(id, -32601, &format!("Method not found: {method}"))),
+        };
+
+        if let Some(resp) = response {
+            if !is_notification {
                 write_response(&mut stdout, &resp)?;
             }
         }
     }
 
     Ok(())
+}
+
+// ------------------------------------------------------------------ //
+// Message framing                                                     //
+// ------------------------------------------------------------------ //
+
+/// Read a single JSON-RPC message from `reader`.
+///
+/// Supports two framing styles:
+/// - **Newline-delimited JSON** (MCP stdio spec): one JSON object per line.
+/// - **Content-Length header framing** (LSP-style): `Content-Length: N\r\n`
+///   headers followed by a blank line and then exactly N bytes of JSON.
+///
+/// Returns `Ok(None)` on EOF.
+fn read_message(reader: &mut impl BufRead) -> Result<Option<String>> {
+    let mut line = String::new();
+
+    // Read the first line — this determines which framing style the
+    // client is using.
+    loop {
+        line.clear();
+        let n = reader.read_line(&mut line).context("read_line failed")?;
+        if n == 0 {
+            return Ok(None); // EOF
+        }
+
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue; // skip blank lines between messages
+        }
+
+        // If the line looks like a Content-Length header, switch to
+        // header-framed reading.
+        if let Some(rest) = trimmed.strip_prefix("Content-Length:") {
+            let content_length: usize = rest
+                .trim()
+                .parse()
+                .context("Invalid Content-Length value")?;
+            return read_content_length_body(reader, content_length).map(Some);
+        }
+
+        // Otherwise treat the whole line as a newline-delimited JSON message.
+        return Ok(Some(trimmed.to_string()));
+    }
+}
+
+/// After reading a `Content-Length` header, consume any remaining headers
+/// (until a blank line) then read exactly `content_length` bytes.
+fn read_content_length_body(reader: &mut impl BufRead, content_length: usize) -> Result<String> {
+    // Consume remaining headers until blank line.
+    let mut header_line = String::new();
+    loop {
+        header_line.clear();
+        let n = reader
+            .read_line(&mut header_line)
+            .context("read_line on header failed")?;
+        if n == 0 {
+            anyhow::bail!("Unexpected EOF while reading headers");
+        }
+        if header_line.trim().is_empty() {
+            break;
+        }
+    }
+
+    // Read exactly content_length bytes.
+    let mut body = vec![0u8; content_length];
+    reader
+        .read_exact(&mut body)
+        .context("Failed to read Content-Length body")?;
+    String::from_utf8(body).context("Content-Length body is not valid UTF-8")
 }
 
 // ------------------------------------------------------------------ //
@@ -181,8 +250,13 @@ where
     match redirect {
         Ok(mut buf) => {
             let result = f();
+            // Flush stdout so any buffered output reaches the redirect
+            // before we read from it.
+            let _ = io::stdout().flush();
             let mut captured = String::new();
-            let _ = buf.read_to_string(&mut captured);
+            if buf.read_to_string(&mut captured).is_err() {
+                captured.clear();
+            }
             drop(buf); // restore original stdout
             (result, captured)
         }

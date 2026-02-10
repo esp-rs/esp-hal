@@ -274,7 +274,7 @@ jobs:
 
       # Run xtask tests
       - name: Run xtask tests
-        run: cd xtask && cargo test --features release
+        run: cd xtask && cargo test --features release,mcp
 
       # Check the formatting of all packages:
       - run: cargo xtask fmt-packages --check
