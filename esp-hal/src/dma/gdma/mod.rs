@@ -1,4 +1,4 @@
-//! # General Direct Memory Access (GMDA)
+//! # General Direct Memory Access (GDMA)
 //!
 //! ## Overview
 //! GDMA is a feature that allows peripheral-to-memory, memory-to-peripheral,
