@@ -892,7 +892,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add interrupt related functions to `PeriodicTimer`/`OneShotTimer`, added `ErasedTimer` (#1753)
 - Added blocking `read_bytes` method to `Uart` and `UartRx` (#1784)
 - Add method to expose `InputPin::is_interrupt_set` in `Input<InputPin>` for use in interrupt handlers (#1829)
-- Support ESP32-H2-ECO5 (#4949)
+- Support ESP32-H2 rev 1.2 (#4949)
 
 ### Fixed
 
