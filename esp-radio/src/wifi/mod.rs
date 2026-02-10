@@ -2083,6 +2083,8 @@ pub fn new<'d>(
             | WifiEvent::StationDisconnected
             | WifiEvent::AccessPointStart
             | WifiEvent::AccessPointStop
+            | WifiEvent::AccessPointStationConnected
+            | WifiEvent::AccessPointStationDisconnected
             | WifiEvent::ScanDone,
     );
 

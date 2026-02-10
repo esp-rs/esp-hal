@@ -1290,6 +1290,8 @@ pub fn enable_wifi_events(events: EnumSet<WifiEvent>) {
 /// - [WifiEvent::StationDisconnected]
 /// - [WifiEvent::AccessPointStart]
 /// - [WifiEvent::AccessPointStop]
+/// - [WifiEvent::AccessPointStationConnected]
+/// - [WifiEvent::AccessPointStationDisconnected]
 /// - [WifiEvent::ScanDone]
 ///
 /// [crate::wifi::new] always enables these events, even if they were disabled beforehand.
