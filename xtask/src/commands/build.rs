@@ -67,12 +67,14 @@ pub struct BuildPackageArgs {
     pub target: Option<String>,
     /// Features to build with.
     #[arg(long, value_delimiter = ',')]
+    #[cfg_attr(feature = "mcp", serde(default))]
     pub features: Vec<String>,
     /// Toolchain to build with.
     #[arg(long)]
     pub toolchain: Option<String>,
     /// Don't enabled the default features.
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     pub no_default_features: bool,
 }
 

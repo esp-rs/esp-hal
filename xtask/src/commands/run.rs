@@ -44,6 +44,7 @@ pub struct RunElfsArgs {
     pub path: PathBuf,
     /// Optional list of elfs to execute
     #[arg(long, value_delimiter = ',')]
+    #[cfg_attr(feature = "mcp", serde(default))]
     pub elfs: Vec<String>,
 }
 

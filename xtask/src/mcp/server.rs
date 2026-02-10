@@ -213,7 +213,10 @@ fn handle_tools_call(workspace: &Path, commands: &[CommandEntry], params: &Value
 
     // Capture stdout during command execution so that `println!` output
     // from the command handler does not corrupt the JSON-RPC stream.
-    let (result, captured_stdout) = capture_stdout(|| (cmd.execute)(workspace, arguments));
+    let (result, captured_stdout) = match capture_stdout(|| (cmd.execute)(workspace, arguments)) {
+        Ok(pair) => pair,
+        Err(e) => return tool_error(&format!("Internal error: {e:#}")),
+    };
 
     match result {
         Ok(()) => tool_result(false, &captured_stdout),
@@ -234,31 +237,25 @@ fn handle_tools_call(workspace: &Path, commands: &[CommandEntry], params: &Value
 
 /// Execute `f` while redirecting stdout to an in-memory buffer.
 /// Returns `(f_result, captured_text)`.
-fn capture_stdout<F, T>(f: F) -> (T, String)
+///
+/// If the redirect cannot be set up, returns an error rather than
+/// allowing command output to corrupt the JSON-RPC stream.
+fn capture_stdout<F, T>(f: F) -> Result<(T, String)>
 where
     F: FnOnce() -> T,
 {
-    // Try to set up the redirect.  If it fails (e.g. not a real fd)
-    // we fall back to running without capture.
-    let redirect = gag::BufferRedirect::stdout();
-    match redirect {
-        Ok(mut buf) => {
-            let result = f();
-            // Flush stdout so any buffered output reaches the redirect
-            // before we read from it.
-            let _ = io::stdout().flush();
-            let mut captured = String::new();
-            if buf.read_to_string(&mut captured).is_err() {
-                captured.clear();
-            }
-            drop(buf); // restore original stdout
-            (result, captured)
-        }
-        Err(_) => {
-            let result = f();
-            (result, String::new())
-        }
+    let mut buf = gag::BufferRedirect::stdout()
+        .context("Failed to redirect stdout; cannot safely run tool in MCP mode")?;
+    let result = f();
+    // Flush stdout so any buffered output reaches the redirect
+    // before we read from it.
+    let _ = io::stdout().flush();
+    let mut captured = String::new();
+    if buf.read_to_string(&mut captured).is_err() {
+        captured.clear();
     }
+    drop(buf); // restore original stdout
+    Ok((result, captured))
 }
 
 // ------------------------------------------------------------------ //

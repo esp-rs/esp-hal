@@ -83,14 +83,17 @@ struct CiArgs {
 
     /// Whether to skip running lints
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     no_lint: bool,
 
     /// Whether to skip building documentation
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     no_docs: bool,
 
     /// Whether to skip checking the crates itself
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     no_check_crates: bool,
 }
 
@@ -99,6 +102,7 @@ struct CiArgs {
 struct FmtPackagesArgs {
     /// Run in 'check' mode; exists with 0 if formatted correctly, 1 otherwise
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     check: bool,
 
     /// Package(s) to target.
@@ -158,6 +162,7 @@ struct LintPackagesArgs {
 
     /// Automatically apply fixes
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     fix: bool,
 
     /// The toolchain used to run the lints
@@ -175,6 +180,7 @@ struct CheckChangelogArgs {
 
     /// Re-generate the changelog with consistent formatting.
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     normalize: bool,
 }
 
@@ -183,6 +189,7 @@ struct CheckChangelogArgs {
 struct UpdateMetadataArgs {
     /// Run in 'check' mode; exists with 0 if formatted correctly, 1 otherwise
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     check: bool,
 }
 

@@ -48,9 +48,11 @@ pub struct ExamplesArgs {
     pub chip: Option<Chip>,
     /// Package whose examples we wish to act on.
     #[arg(value_enum, long, default_value_t = Package::Examples)]
+    #[cfg_attr(feature = "mcp", serde(default = "crate::mcp::default_package_examples"))]
     pub package: Package,
     /// Build examples in debug mode only
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     pub debug: bool,
 
     /// The toolchain used to build the examples
@@ -59,6 +61,7 @@ pub struct ExamplesArgs {
 
     /// Emit crate build timings
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     pub timings: bool,
 }
 
@@ -85,6 +88,7 @@ pub struct TestsArgs {
 
     /// Repeat the tests for a specific number of times.
     #[arg(long, default_value_t = 1)]
+    #[cfg_attr(feature = "mcp", serde(default = "crate::mcp::default_repeat"))]
     pub repeat: usize,
     /// Optional test to act on (all tests used if omitted).
     ///
@@ -100,6 +104,7 @@ pub struct TestsArgs {
 
     /// Emit crate build timings
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     pub timings: bool,
 }
 
