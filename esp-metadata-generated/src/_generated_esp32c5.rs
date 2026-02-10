@@ -2263,10 +2263,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "UART1 peripheral singleton"]
         UART1 <= UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "UHCI0 peripheral singleton"] UHCI0 <= UHCI0() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
-        "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        #[doc = "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE :
+        { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "BT peripheral singleton"] BT <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "FLASH peripheral singleton"]
