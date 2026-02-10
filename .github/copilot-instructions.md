@@ -75,6 +75,7 @@ The MCP server exposes only safe commands (build, lint, check, format, test). Re
 | Check changelog | `cargo xtask check-changelog` |
 | Check metadata | `cargo xtask update-metadata --check` |
 | Build docs | `cargo xtask build documentation --chips <chip>` |
+| Run doc-tests | `cargo xtask run doc-tests --chip <chip>` |
 
 Use `--packages` and `--chips` to scope work and reduce build time.
 

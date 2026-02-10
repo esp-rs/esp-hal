@@ -27,14 +27,8 @@ use super::registry::CommandEntry;
 /// Run the MCP server.  Blocks forever reading JSON-RPC requests from
 /// stdin and writing responses to stdout.
 pub fn run(workspace: &Path, commands: Vec<CommandEntry>) -> Result<()> {
-    // In MCP mode, reconfigure the logger to write to stderr so that
-    // log output does not corrupt the JSON-RPC stream on stdout.
-    // (env_logger is already initialised targeting stdout in main();
-    // we cannot re-init, but we *can* redirect the global logger.)
-    //
-    // For now we just accept that env_logger messages go to stdout
-    // before `serve-mcp` takes over — they are emitted during setup
-    // only.  All *command* output is captured by `gag`.
+    // env_logger is already initialised targeting stderr in main() when MCP
+    // mode is detected.  All *command* output is captured by `gag`.
 
     let stdin = io::stdin();
     let mut reader = io::BufReader::new(stdin.lock());
@@ -309,4 +303,97 @@ fn write_response(out: &mut impl Write, value: &Value) -> Result<()> {
     writeln!(out, "{msg}")?;
     out.flush()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use super::*;
+
+    // -- Newline-delimited JSON framing -----------------------------------
+
+    #[test]
+    fn read_message_newline_delimited() {
+        let input = b"{\"jsonrpc\":\"2.0\",\"method\":\"initialize\"}\n";
+        let mut reader = Cursor::new(input.as_slice());
+        let msg = read_message(&mut reader).unwrap().unwrap();
+        assert_eq!(msg, "{\"jsonrpc\":\"2.0\",\"method\":\"initialize\"}");
+    }
+
+    #[test]
+    fn read_message_skips_blank_lines() {
+        let input = b"\n\n{\"id\":1}\n";
+        let mut reader = Cursor::new(input.as_slice());
+        let msg = read_message(&mut reader).unwrap().unwrap();
+        assert_eq!(msg, "{\"id\":1}");
+    }
+
+    #[test]
+    fn read_message_eof_returns_none() {
+        let input = b"";
+        let mut reader = Cursor::new(input.as_slice());
+        assert!(read_message(&mut reader).unwrap().is_none());
+    }
+
+    // -- Content-Length header framing ------------------------------------
+
+    #[test]
+    fn read_message_content_length_lf() {
+        let body = r#"{"jsonrpc":"2.0","id":1}"#;
+        let input = format!("Content-Length: {}\n\n{}", body.len(), body);
+        let mut reader = Cursor::new(input.as_bytes());
+        let msg = read_message(&mut reader).unwrap().unwrap();
+        assert_eq!(msg, body);
+    }
+
+    #[test]
+    fn read_message_content_length_crlf() {
+        let body = r#"{"method":"tools/list"}"#;
+        let input = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
+        let mut reader = Cursor::new(input.as_bytes());
+        let msg = read_message(&mut reader).unwrap().unwrap();
+        assert_eq!(msg, body);
+    }
+
+    #[test]
+    fn read_message_content_length_with_extra_header() {
+        let body = r#"{"id":42}"#;
+        let input = format!(
+            "Content-Length: {}\r\nContent-Type: application/json\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        let mut reader = Cursor::new(input.as_bytes());
+        let msg = read_message(&mut reader).unwrap().unwrap();
+        assert_eq!(msg, body);
+    }
+
+    #[test]
+    fn read_message_content_length_exact_bytes() {
+        // Ensure we read *exactly* content_length bytes and no more.
+        let body = r#"{"a":1}"#;
+        let trailing = r#"{"trailing":true}"#;
+        let input = format!(
+            "Content-Length: {}\r\n\r\n{}{}",
+            body.len(),
+            body,
+            trailing
+        );
+        let mut reader = Cursor::new(input.as_bytes());
+        let msg = read_message(&mut reader).unwrap().unwrap();
+        assert_eq!(msg, body);
+    }
+
+    // -- Multiple sequential messages ------------------------------------
+
+    #[test]
+    fn read_two_newline_delimited_messages() {
+        let input = b"{\"id\":1}\n{\"id\":2}\n";
+        let mut reader = Cursor::new(input.as_slice());
+        let msg1 = read_message(&mut reader).unwrap().unwrap();
+        let msg2 = read_message(&mut reader).unwrap().unwrap();
+        assert_eq!(msg1, "{\"id\":1}");
+        assert_eq!(msg2, "{\"id\":2}");
+    }
 }

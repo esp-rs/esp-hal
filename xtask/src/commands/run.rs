@@ -7,8 +7,6 @@ use std::{
 use anyhow::{Context as _, Result, bail};
 use clap::{Args, Subcommand};
 use esp_metadata::Chip;
-use inquire::Select;
-use strum::IntoEnumIterator as _;
 
 use super::{DocTestArgs, ExamplesArgs, TestsArgs};
 use crate::{
@@ -57,8 +55,7 @@ pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
     let chip = if let Some(chip) = args.chip {
         chip
     } else {
-        let chip_variants = Chip::iter().collect::<Vec<_>>();
-        Select::new("Select your target chip:", chip_variants).prompt()?
+        super::select_chip_interactive()?
     };
 
     let mut success = true;

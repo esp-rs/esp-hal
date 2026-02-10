@@ -190,9 +190,21 @@ struct UpdateMetadataArgs {
 // Application
 
 fn main() -> Result<()> {
+    // When running as an MCP server, log output must go to stderr so it does
+    // not corrupt the JSON-RPC stream on stdout.  We detect MCP mode early
+    // (before Clap parses) by checking raw CLI args.
+    #[cfg(feature = "mcp")]
+    let is_mcp = std::env::args().any(|a| a == "serve-mcp");
+    #[cfg(not(feature = "mcp"))]
+    let is_mcp = false;
+
     let mut builder =
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"));
-    builder.target(env_logger::Target::Stdout);
+    builder.target(if is_mcp {
+        env_logger::Target::Stderr
+    } else {
+        env_logger::Target::Stdout
+    });
     builder.init();
 
     let workspace =

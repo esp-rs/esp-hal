@@ -1,10 +1,22 @@
-use std::path::Path;
+use std::{io::IsTerminal, path::Path};
 
 use anyhow::{Context, Result, bail};
 use clap::Args;
 use esp_metadata::Chip;
 use inquire::Select;
 use strum::IntoEnumIterator;
+
+/// Prompt the user for a chip if stdin is a TTY, otherwise bail.
+///
+/// When running under MCP (or any non-interactive context), stdin is not
+/// a terminal so interactive prompts would hang or corrupt the transport.
+fn select_chip_interactive() -> Result<Chip> {
+    if !std::io::stdin().is_terminal() {
+        bail!("'chip' must be provided; interactive selection is not available in non-interactive mode.");
+    }
+    let chip_variants = Chip::iter().collect::<Vec<_>>();
+    Ok(Select::new("Select your target chip:", chip_variants).prompt()?)
+}
 
 pub use self::{build::*, check_changelog::*, release::*, run::*};
 use crate::{
@@ -104,9 +116,9 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
     let chip = if let Some(chip) = args.chip {
         chip
     } else {
-        let chip_variants = Chip::iter().collect::<Vec<_>>();
-        Select::new("Select your target chip:", chip_variants).prompt()?
+        select_chip_interactive()?
     };
+    args.chip = Some(chip);
 
     // Ensure that the package/chip combination provided are valid:
     args.package.validate_package_chip(&chip).with_context(|| {
@@ -172,6 +184,13 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
             filtered.retain(|ex| ex.matches_name(example));
 
             if filtered.is_empty() {
+                if !std::io::stdin().is_terminal() {
+                    bail!(
+                        "Example '{example}' not found or unsupported for the given chip. \
+                         Interactive selection is not available in non-interactive mode."
+                    );
+                }
+
                 log::warn!(
                     "Example '{example}' not found or unsupported for the given chip. Please select one of the existing examples in the desired package."
                 );
@@ -189,6 +208,13 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
             }
         }
     } else {
+        if !std::io::stdin().is_terminal() {
+            bail!(
+                "'example' must be provided; interactive selection is not available \
+                 in non-interactive mode."
+            );
+        }
+
         let example_name = inquire::Select::new(
             "Select an example:",
             examples.iter().map(|ex| ex.binary_name()).collect(),
@@ -220,8 +246,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     let chip = if let Some(chip) = args.chip {
         chip
     } else {
-        let chip_variants = Chip::iter().collect::<Vec<_>>();
-        Select::new("Select your target chip:", chip_variants).prompt()?
+        select_chip_interactive()?
     };
 
     // Determine the appropriate build target for the given package and chip:
