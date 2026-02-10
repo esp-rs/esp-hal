@@ -20,7 +20,6 @@ use crate::{
         malloc::{InternalMemory, calloc_internal},
     },
     hal::{clock::ModemClockController, peripherals::WIFI},
-    memory_fence::memory_fence,
     sys::c_types::*,
     time::{blob_ticks_to_micros, millis_to_blob_ticks},
 };
@@ -696,8 +695,6 @@ pub unsafe extern "C" fn event_post(
 
             _ => {}
         }
-
-        memory_fence();
     } else {
         warn!("Got unmapped event: {}", event_id);
     }

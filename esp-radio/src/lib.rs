@@ -223,7 +223,6 @@ unstable_module! {
 }
 
 pub(crate) mod common_adapter;
-pub(crate) mod memory_fence;
 
 pub(crate) static ESP_RADIO_LOCK: RawMutex = RawMutex::new();
 

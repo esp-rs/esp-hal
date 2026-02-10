@@ -14,7 +14,6 @@ use esp_sync::NonReentrantMutex;
 use super::{OSI_FUNCS_TIME_BLOCKING, malloc::free};
 use crate::{
     ESP_RADIO_LOCK,
-    memory_fence::memory_fence,
     preempt::{current_task, yield_task},
     sys::{
         c_types::{c_char, c_int, c_uint, c_void},
