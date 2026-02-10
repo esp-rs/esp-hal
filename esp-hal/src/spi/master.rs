@@ -3810,6 +3810,7 @@ impl Driver {
             w.usr_command().bit(!cmd.is_none())
         });
 
+        // FIXME why is clock config even here?
         #[cfg(not(any(esp32, esp32s2)))]
         reg_block.clk_gate().modify(|_, w| {
             w.clk_en().set_bit();
@@ -3818,7 +3819,7 @@ impl Driver {
         });
 
         #[cfg(soc_has_pcr)]
-        // use default clock source PLL_F80M_CLK
+        // use default clock source
         crate::peripherals::PCR::regs()
             .spi2_clkm_conf()
             .modify(|_, w| unsafe { w.spi2_clkm_sel().bits(1) });
