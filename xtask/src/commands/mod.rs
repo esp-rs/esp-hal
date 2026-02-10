@@ -59,8 +59,8 @@ pub struct DocTestArgs {
     #[cfg_attr(feature = "mcp", serde(default = "crate::mcp::default_packages"))]
     pub packages: Vec<Package>,
     /// Chip to target.
-    #[arg(value_enum)]
-    pub chip: Chip,
+    #[arg(value_enum, long)]
+    pub chip: Option<Chip>,
 }
 
 /// Arguments common to commands which act on tests.
@@ -68,8 +68,8 @@ pub struct DocTestArgs {
 #[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 pub struct TestsArgs {
     /// Chip to target.
-    #[arg(value_enum)]
-    pub chip: Chip,
+    #[arg(value_enum, long)]
+    pub chip: Option<Chip>,
 
     /// Repeat the tests for a specific number of times.
     #[arg(long, default_value_t = 1)]
@@ -101,15 +101,12 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
         args.package,
         args.chip
     );
-    if args.chip.is_none() {
+    let chip = if let Some(chip) = args.chip {
+        chip
+    } else {
         let chip_variants = Chip::iter().collect::<Vec<_>>();
-
-        let chip = Select::new("Select your target chip:", chip_variants).prompt()?;
-
-        args.chip = Some(chip);
-    }
-
-    let chip = args.chip.unwrap();
+        Select::new("Select your target chip:", chip_variants).prompt()?
+    };
 
     // Ensure that the package/chip combination provided are valid:
     args.package.validate_package_chip(&chip).with_context(|| {
@@ -223,13 +220,20 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     // Absolute path of the 'hil-test' package's root:
     let package_path = crate::windows_safe_path(&workspace.join("hil-test"));
 
+    let chip = if let Some(chip) = args.chip {
+        chip
+    } else {
+        let chip_variants = Chip::iter().collect::<Vec<_>>();
+        Select::new("Select your target chip:", chip_variants).prompt()?
+    };
+
     // Determine the appropriate build target for the given package and chip:
-    let target = Package::HilTest.target_triple(&args.chip)?;
+    let target = Package::HilTest.target_triple(&chip)?;
 
     // Load all tests which support the specified chip and parse their metadata:
     let mut tests = crate::firmware::load(&package_path.join("src").join("bin"))?
         .into_iter()
-        .filter(|example| example.supports_chip(args.chip))
+        .filter(|example| example.supports_chip(chip))
         .collect::<Vec<_>>();
 
     // Sort all tests by name:
@@ -277,7 +281,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 for test in matched {
                     let command = crate::generate_build_command(
                         &package_path,
-                        args.chip,
+                        chip,
                         &target,
                         test,
                         action.clone(),
@@ -301,7 +305,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
         for test in tests {
             let command = crate::generate_build_command(
                 &package_path,
-                args.chip,
+                chip,
                 &target,
                 &test,
                 action.clone(),
@@ -337,7 +341,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
         }
     }
 
-    move_artifacts(args.chip, &action);
+    move_artifacts(chip, &action);
 
     if !failed.is_empty() {
         bail!("Failed tests: {:#?}", failed);

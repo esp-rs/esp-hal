@@ -609,7 +609,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             workspace,
             DocTestArgs {
                 packages: Package::iter().collect(),
-                chip: args.chip,
+                chip: Some(args.chip),
             },
         )
     });
@@ -772,7 +772,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             tests(
                 workspace,
                 TestsArgs {
-                    chip: args.chip,
+                    chip: Some(args.chip),
                     repeat: 1,
                     test: None,
                     toolchain: None,

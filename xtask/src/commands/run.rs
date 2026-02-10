@@ -7,6 +7,8 @@ use std::{
 use anyhow::{Context as _, Result, bail};
 use clap::{Args, Subcommand};
 use esp_metadata::Chip;
+use inquire::Select;
+use strum::IntoEnumIterator as _;
 
 use super::{DocTestArgs, ExamplesArgs, TestsArgs};
 use crate::{
@@ -52,9 +54,17 @@ pub struct RunElfsArgs {
 
 /// Run doc tests for the specified package and chip.
 pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
+    let chip = if let Some(chip) = args.chip {
+        chip
+    } else {
+        let chip_variants = Chip::iter().collect::<Vec<_>>();
+        Select::new("Select your target chip:", chip_variants).prompt()?
+    };
+
     let mut success = true;
+    
     for package in args.packages {
-        success &= run_doc_tests_for_package(workspace, package, args.chip)?;
+        success &= run_doc_tests_for_package(workspace, package, chip)?;
     }
     anyhow::ensure!(success, "One or more doc tests failed");
     Ok(())

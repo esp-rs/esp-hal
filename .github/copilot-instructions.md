@@ -57,8 +57,8 @@ The MCP server exposes only safe commands (build, lint, check, format, test). Re
 | Format (required before PR) | `cargo xtask fmt-packages` |
 | Lint | `cargo xtask lint-packages` |
 | Check packages | `cargo xtask check-packages` |
-| Build examples | `cargo xtask build examples <EXAMPLE> --chip <chip>` |
-| Build tests | `cargo xtask build tests --chip <chip>` |
+| Build examples | `cargo xtask build examples --chip <chip> <EXAMPLE NAME \| all>` |
+| Build tests | `cargo xtask build tests --chip <chip> --test <TEST NAME>` |
 | Run host tests | `cargo xtask host-tests` |
 | Check changelog | `cargo xtask check-changelog` |
 | Check metadata | `cargo xtask update-metadata --check` |
