@@ -157,9 +157,6 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
         .filter(|example| example.supports_chip(chip))
         .collect::<Vec<_>>();
 
-    // At this point, chip can never be `None`, so we can safely unwrap it.
-    let chip = args.chip.unwrap();
-
     // Filter the examples down to only the binaries supported by the given chip
     examples.retain(|ex| ex.supports_chip(chip));
 
