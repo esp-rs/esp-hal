@@ -12,19 +12,33 @@ use hil_test as _;
 mod read {
     use esp_hal::{
         Blocking,
-        dma::{DmaRxBuf, DmaTxBuf},
-        dma_buffers,
         gpio::{Level, Output, OutputConfig},
         spi::{
             Mode,
-            master::{Address, Command, Config, DataMode, Spi, SpiDma},
+            master::{Address, Command, Config, DataMode, Spi},
         },
         time::Rate,
     };
+    #[cfg(spi_master_supports_dma)]
+    use esp_hal::{
+        dma::{DmaRxBuf, DmaTxBuf},
+        dma_buffers,
+    };
+
+    #[cfg(spi_master_supports_dma)]
+    cfg_if::cfg_if! {
+        if #[cfg(any(pdma))] {
+            type DmaChannel<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
+        } else {
+            type DmaChannel<'d> = esp_hal::peripherals::DMA_CH0<'d>;
+        }
+    }
 
     struct Context {
-        spi: SpiDma<'static, Blocking>,
+        spi: Spi<'static, Blocking>,
         miso_mirror: Output<'static>,
+        #[cfg(spi_master_supports_dma)]
+        dma_channel: DmaChannel<'static>,
     }
 
     #[init]
@@ -36,6 +50,7 @@ mod read {
 
         let miso_mirror = Output::new(miso_mirror, Level::High, OutputConfig::default());
 
+        #[cfg(spi_master_supports_dma)]
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
                 let dma_channel = peripherals.DMA_SPI2;
@@ -52,14 +67,56 @@ mod read {
         )
         .unwrap()
         .with_sck(sclk)
-        .with_miso(miso)
-        .with_dma(dma_channel);
+        .with_miso(miso);
 
-        Context { spi, miso_mirror }
+        Context {
+            spi,
+            miso_mirror,
+            #[cfg(spi_master_supports_dma)]
+            dma_channel,
+        }
     }
 
     #[test]
     fn test_spi_reads_correctly_from_gpio_pin(mut ctx: Context) {
+        const BUFFER_SIZE: usize = 4;
+
+        // SPI should read '0's from the MISO pin
+        ctx.miso_mirror.set_low();
+
+        let mut rx_buf = [0u8; BUFFER_SIZE];
+
+        let mut spi = ctx.spi;
+
+        spi.half_duplex_read(
+            DataMode::SingleTwoDataLines,
+            Command::None,
+            Address::None,
+            0,
+            &mut rx_buf,
+        )
+        .unwrap();
+
+        assert_eq!(rx_buf.as_slice(), &[0x00; BUFFER_SIZE]);
+
+        // SPI should read '1's from the MISO pin
+        ctx.miso_mirror.set_high();
+
+        spi.half_duplex_read(
+            DataMode::SingleTwoDataLines,
+            Command::None,
+            Address::None,
+            0,
+            &mut rx_buf,
+        )
+        .unwrap();
+
+        assert_eq!(rx_buf.as_slice(), &[0xFF; BUFFER_SIZE]);
+    }
+
+    #[test]
+    #[cfg(spi_master_supports_dma)]
+    fn test_spidma_reads_correctly_from_gpio_pin(mut ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
 
         let (buffer, descriptors, _, _) = dma_buffers!(DMA_BUFFER_SIZE, 0);
@@ -68,7 +125,7 @@ mod read {
         // SPI should read '0's from the MISO pin
         ctx.miso_mirror.set_low();
 
-        let mut spi = ctx.spi;
+        let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
         let transfer = spi
             .half_duplex_read(
@@ -106,6 +163,7 @@ mod read {
     }
 
     #[test]
+    #[cfg(spi_master_supports_dma)]
     fn test_spidmabus_reads_correctly_from_gpio_pin(mut ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
 
@@ -114,7 +172,10 @@ mod read {
         let dma_rx_buf = DmaRxBuf::new(descriptors, buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(txd, tx).unwrap();
 
-        let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);
+        let mut spi = ctx
+            .spi
+            .with_dma(ctx.dma_channel)
+            .with_buffers(dma_rx_buf, dma_tx_buf);
 
         // SPI should read '0's from the MISO pin
         ctx.miso_mirror.set_low();
@@ -147,6 +208,7 @@ mod read {
     }
 
     #[test]
+    #[cfg(spi_master_supports_dma)]
     fn data_mode_combinations_are_not_rejected(ctx: Context) {
         const DMA_BUFFER_SIZE: usize = 4;
 
@@ -155,7 +217,10 @@ mod read {
         let dma_tx_buf = DmaTxBuf::new(txd, tx).unwrap();
 
         let mut buffer = [0xAA; DMA_BUFFER_SIZE];
-        let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);
+        let mut spi = ctx
+            .spi
+            .with_dma(ctx.dma_channel)
+            .with_buffers(dma_rx_buf, dma_tx_buf);
 
         let modes = [
             // 4-wire half-duplex mode
@@ -201,35 +266,117 @@ mod read {
     }
 }
 
-#[cfg(not(any(esp32c2, esp32c3)))]
+#[cfg(pcnt_driver_supported)]
 #[embedded_test::tests(default_timeout = 3)]
 mod write {
     use esp_hal::{
         Blocking,
-        dma::{DmaRxBuf, DmaTxBuf},
-        dma_buffers,
         gpio::interconnect::InputSignal,
         pcnt::{Pcnt, channel::EdgeMode, unit::Unit},
         spi::{
             Mode,
-            master::{Address, Command, Config, DataMode, Spi, SpiDma},
+            master::{Address, Command, Config, DataMode, Spi},
         },
         time::Rate,
     };
+    #[cfg(spi_master_supports_dma)]
+    use esp_hal::{
+        dma::{DmaRxBuf, DmaTxBuf},
+        dma_buffers,
+    };
+
+    #[cfg(spi_master_supports_dma)]
+    cfg_if::cfg_if! {
+        if #[cfg(pdma)] {
+            type DmaChannel<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
+        } else {
+            type DmaChannel<'d> = esp_hal::peripherals::DMA_CH0<'d>;
+        }
+    }
+
     struct Context {
-        spi: SpiDma<'static, Blocking>,
+        spi: Spi<'static, Blocking>,
         pcnt_unit: Unit<'static, 0>,
         pcnt_source: InputSignal<'static>,
+
+        #[cfg(spi_master_supports_dma)]
+        dma_channel: DmaChannel<'static>,
+    }
+
+    #[init]
+    fn init() -> Context {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let sclk = peripherals.GPIO0;
+        let (mosi, _) = hil_test::common_test_pins!(peripherals);
+
+        let pcnt = Pcnt::new(peripherals.PCNT);
+
+        #[cfg(spi_master_supports_dma)]
+        cfg_if::cfg_if! {
+            if #[cfg(pdma)] {
+                let dma_channel = peripherals.DMA_SPI2;
+            } else {
+                let dma_channel = peripherals.DMA_CH0;
+            }
+        }
+
+        let (mosi_loopback, mosi) = unsafe { mosi.split() };
+
+        let spi = Spi::new(
+            peripherals.SPI2,
+            Config::default()
+                .with_frequency(Rate::from_khz(100))
+                .with_mode(Mode::_0),
+        )
+        .unwrap()
+        .with_sck(sclk)
+        .with_sio0(mosi);
+
+        Context {
+            spi,
+            pcnt_unit: pcnt.unit0,
+            pcnt_source: mosi_loopback,
+            #[cfg(spi_master_supports_dma)]
+            dma_channel,
+        }
     }
 
     fn perform_spi_writes_are_correctly_by_pcnt(ctx: Context, mode: DataMode) {
+        const BUFFER_SIZE: usize = 4;
+
+        let tx_buf = &mut [0; BUFFER_SIZE];
+
+        let unit = ctx.pcnt_unit;
+        let mut spi = ctx.spi;
+
+        unit.channel0.set_edge_signal(ctx.pcnt_source);
+        unit.channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+        // Fill the buffer where each byte has 3 pos edges.
+        tx_buf.fill(0b0110_1010);
+
+        spi.half_duplex_write(mode, Command::None, Address::None, 0, tx_buf)
+            .unwrap();
+
+        assert_eq!(unit.value(), (3 * BUFFER_SIZE) as _);
+
+        spi.half_duplex_write(mode, Command::None, Address::None, 0, tx_buf)
+            .unwrap();
+
+        assert_eq!(unit.value(), (6 * BUFFER_SIZE) as _);
+    }
+
+    #[cfg(spi_master_supports_dma)]
+    fn perform_spidma_writes_are_correctly_by_pcnt(ctx: Context, mode: DataMode) {
         const DMA_BUFFER_SIZE: usize = 4;
 
         let (_, _, buffer, descriptors) = dma_buffers!(0, DMA_BUFFER_SIZE);
         let mut dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
 
         let unit = ctx.pcnt_unit;
-        let mut spi = ctx.spi;
+        let mut spi = ctx.spi.with_dma(ctx.dma_channel);
 
         unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
@@ -270,6 +417,7 @@ mod write {
         assert_eq!(unit.value(), (6 * DMA_BUFFER_SIZE) as _);
     }
 
+    #[cfg(spi_master_supports_dma)]
     fn perform_spidmabus_writes_are_correctly_by_pcnt(ctx: Context, mode: DataMode) {
         const DMA_BUFFER_SIZE: usize = 4;
 
@@ -278,7 +426,10 @@ mod write {
         let dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
 
         let unit = ctx.pcnt_unit;
-        let mut spi = ctx.spi.with_buffers(dma_rx_buf, dma_tx_buf);
+        let mut spi = ctx
+            .spi
+            .with_dma(ctx.dma_channel)
+            .with_buffers(dma_rx_buf, dma_tx_buf);
 
         unit.channel0.set_edge_signal(ctx.pcnt_source);
         unit.channel0
@@ -297,51 +448,9 @@ mod write {
         assert_eq!(unit.value(), (6 * DMA_BUFFER_SIZE) as _);
     }
 
-    #[init]
-    fn init() -> Context {
-        let peripherals = esp_hal::init(esp_hal::Config::default());
-
-        let sclk = peripherals.GPIO0;
-        let (mosi, _) = hil_test::common_test_pins!(peripherals);
-
-        let pcnt = Pcnt::new(peripherals.PCNT);
-
-        cfg_if::cfg_if! {
-            if #[cfg(pdma)] {
-                let dma_channel = peripherals.DMA_SPI2;
-            } else {
-                let dma_channel = peripherals.DMA_CH0;
-            }
-        }
-
-        let (mosi_loopback, mosi) = unsafe { mosi.split() };
-
-        let spi = Spi::new(
-            peripherals.SPI2,
-            Config::default()
-                .with_frequency(Rate::from_khz(100))
-                .with_mode(Mode::_0),
-        )
-        .unwrap()
-        .with_sck(sclk)
-        .with_sio0(mosi)
-        .with_dma(dma_channel);
-
-        Context {
-            spi,
-            pcnt_unit: pcnt.unit0,
-            pcnt_source: mosi_loopback,
-        }
-    }
-
     #[test]
     fn test_spi_writes_are_correctly_by_pcnt(ctx: Context) {
         perform_spi_writes_are_correctly_by_pcnt(ctx, DataMode::SingleTwoDataLines);
-    }
-
-    #[test]
-    fn test_spidmabus_writes_are_correctly_by_pcnt(ctx: Context) {
-        perform_spidmabus_writes_are_correctly_by_pcnt(ctx, DataMode::SingleTwoDataLines);
     }
 
     #[test]
@@ -350,31 +459,63 @@ mod write {
     }
 
     #[test]
-    fn test_spidmabus_writes_are_correctly_by_pcnt_tree_wire(ctx: Context) {
-        perform_spidmabus_writes_are_correctly_by_pcnt(ctx, DataMode::SingleTwoDataLines);
-    }
-
-    #[test]
     fn test_spi_writes_are_correctly_by_pcnt_four_wire(ctx: Context) {
         perform_spi_writes_are_correctly_by_pcnt(ctx, DataMode::Single);
     }
 
     #[test]
+    #[cfg(spi_master_supports_dma)]
+    fn test_spidma_writes_are_correctly_by_pcnt(ctx: Context) {
+        perform_spidma_writes_are_correctly_by_pcnt(ctx, DataMode::SingleTwoDataLines);
+    }
+
+    #[test]
+    #[cfg(spi_master_supports_dma)]
+    fn test_spidmabus_writes_are_correctly_by_pcnt(ctx: Context) {
+        perform_spidmabus_writes_are_correctly_by_pcnt(ctx, DataMode::SingleTwoDataLines);
+    }
+
+    #[test]
+    #[cfg(spi_master_supports_dma)]
+    fn test_spidma_writes_are_correctly_by_pcnt_tree_wire(ctx: Context) {
+        perform_spidma_writes_are_correctly_by_pcnt(ctx, DataMode::SingleTwoDataLines);
+    }
+
+    #[test]
+    #[cfg(spi_master_supports_dma)]
+    fn test_spidmabus_writes_are_correctly_by_pcnt_tree_wire(ctx: Context) {
+        perform_spidmabus_writes_are_correctly_by_pcnt(ctx, DataMode::SingleTwoDataLines);
+    }
+
+    #[test]
+    #[cfg(spi_master_supports_dma)]
+    fn test_spidma_writes_are_correctly_by_pcnt_four_wire(ctx: Context) {
+        perform_spidma_writes_are_correctly_by_pcnt(ctx, DataMode::Single);
+    }
+
+    #[test]
+    #[cfg(spi_master_supports_dma)]
     fn test_spidmabus_writes_are_correctly_by_pcnt_four_wire(ctx: Context) {
         perform_spidmabus_writes_are_correctly_by_pcnt(ctx, DataMode::Single);
     }
 }
 
 #[embedded_test::tests(default_timeout = 10, executor = hil_test::Executor::new())]
-#[cfg(feature = "unstable")]
+#[cfg(any(feature = "unstable", spi_slave_driver_supported))]
+#[cfg(spi_slave_supports_dma)]
 mod spi_slave {
     use esp_hal::{
         Blocking,
-        dma::{DmaRxBuf, DmaTxBuf},
-        dma_buffers,
         gpio::{Flex, Input, InputConfig, Level, OutputConfig, Pull},
         spi::{Mode, slave::Spi},
     };
+    #[cfg(spi_slave_supports_dma)]
+    use esp_hal::{
+        dma::{DmaRxBuf, DmaTxBuf},
+        dma_buffers,
+    };
+
+    #[cfg(spi_slave_supports_dma)]
     cfg_if::cfg_if! {
         if #[cfg(any(esp32, esp32s2))] {
             type DmaChannel<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
@@ -385,6 +526,7 @@ mod spi_slave {
 
     struct Context {
         spi: Spi<'static, Blocking>,
+        #[cfg(spi_slave_supports_dma)]
         dma_channel: DmaChannel<'static>,
         bitbang_spi: BitbangSpi,
     }
@@ -459,6 +601,7 @@ mod spi_slave {
         let (sclk_pin, _) = hil_test::common_test_pins!(peripherals);
         let cs_pin = hil_test::unconnected_pin!(peripherals);
 
+        #[cfg(spi_slave_supports_dma)]
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
                 let dma_channel = peripherals.DMA_SPI2;
@@ -499,12 +642,13 @@ mod spi_slave {
                 .with_miso(miso_out)
                 .with_cs(cs),
             bitbang_spi: BitbangSpi::new(sclk_gpio, mosi_gpio, miso_in, cs_gpio),
+            #[cfg(spi_slave_supports_dma)]
             dma_channel,
         }
     }
 
     #[test]
-    fn test_basic(mut ctx: Context) {
+    fn test_basic_dma(mut ctx: Context) {
         const DMA_SIZE: usize = 32;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_SIZE);
         let mut slave_receive = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
@@ -539,6 +683,7 @@ mod spi_slave {
 }
 
 #[embedded_test::tests(default_timeout = 3)]
+#[cfg(spi_master_supports_dma)]
 mod qspi {
     #[cfg(pcnt_driver_supported)]
     use esp_hal::pcnt::{Pcnt, channel::EdgeMode, unit::Unit};
