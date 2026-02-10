@@ -28,10 +28,6 @@ If a cell contains an em dash (&mdash;) this means that the particular feature i
 | ESP32-S2 |                          ✓                           |                       &mdash;                       |                       &mdash;                        |    ✓    | &mdash; |
 | ESP32-S3 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    | &mdash; |
 
-## Missing / To be done
-
-- Support for non-open SoftAP
-
 ## Bluetooth stack
 We recommend using [`TrouBLE`] as the Bluetooth stack. You can find detailed examples [here].
 
