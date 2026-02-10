@@ -1731,6 +1731,7 @@ impl Chip {
                     "pcnt_driver_supported",
                     "systimer_driver_supported",
                     "timergroup_driver_supported",
+                    "i2c_master_i2c0",
                     "timergroup_timg0",
                     "timergroup_timg1",
                     "soc_cpu_has_branch_predictor",
@@ -1887,6 +1888,7 @@ impl Chip {
                     "cargo:rustc-cfg=pcnt_driver_supported",
                     "cargo:rustc-cfg=systimer_driver_supported",
                     "cargo:rustc-cfg=timergroup_driver_supported",
+                    "cargo:rustc-cfg=i2c_master_i2c0",
                     "cargo:rustc-cfg=timergroup_timg0",
                     "cargo:rustc-cfg=timergroup_timg1",
                     "cargo:rustc-cfg=soc_cpu_has_branch_predictor",
@@ -4989,6 +4991,8 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_lp_slow_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg_calibration_clock)");
     println!("cargo:rustc-check-cfg=cfg(dma_separate_in_out_interrupts)");
+    println!("cargo:rustc-check-cfg=cfg(i2c_master_can_estimate_nack_reason)");
+    println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
     println!("cargo:rustc-check-cfg=cfg(esp32c6)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_atomic)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ieee802154)");
