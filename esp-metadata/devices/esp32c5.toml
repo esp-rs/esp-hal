@@ -91,7 +91,7 @@ peripherals = [
     # { name = "TWAI1" }, # TODO: too different from what we know
     { name = "UART0", interrupts = { peri = "UART0" } },
     { name = "UART1", interrupts = { peri = "UART1" } },
-    { name = "UHCI0", dma_peripheral = 2 },
+    # { name = "UHCI0", dma_peripheral = 2 },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
 
     { name = "BT", virtual = true },

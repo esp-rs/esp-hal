@@ -791,7 +791,7 @@ mod async_tx_rx {
     }
 }
 
-#[cfg(all(soc_has_uhci0, gdma))]
+#[cfg(all(soc_has_uhci0, dma_kind = "gdma"))]
 #[embedded_test::tests(default_timeout = 5, executor = hil_test::Executor::new())]
 mod uhci {
     use esp_hal::{
