@@ -2992,8 +2992,8 @@ macro_rules! for_each_uart {
 ///
 /// This macro has one option for its "Individual matcher" case:
 ///
-/// Syntax: `($instance:ident, $sys:ident, $sclk:ident, [$($cs:ident),*] [$($sio:ident),*
-/// $($is_qspi:iteral)?])`
+/// Syntax: `($instance:ident, $sys:ident, $sclk:ident [$($cs:ident),*] [$($sio:ident),*]
+/// $($is_qspi:literal)?)`
 ///
 /// Macro fragments:
 ///
@@ -3028,9 +3028,9 @@ macro_rules! for_each_spi_master {
 ///
 /// Macro fragments:
 ///
-/// - `$instance`: the name of the I2C instance
+/// - `$instance`: the name of the SPI instance
 /// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
-/// - `$mosi`, `$miso`, `$cs`: signal names.
+/// - `$sclk`, `$mosi`, `$miso`, `$cs`: signal names.
 ///
 /// Example data: `(SPI2, Spi2, FSPICLK, FSPID, FSPIQ, FSPICS0)`
 #[macro_export]
