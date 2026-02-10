@@ -3237,24 +3237,24 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// This macro has one option for its "Individual matcher" case:
 ///
-/// Syntax: `($instance:ident, $sys:ident, $scl:ident, $sda:ident)`
+/// Syntax: `($id:literal, $instance:ident, $sys:ident, $scl:ident, $sda:ident)`
 ///
 /// Macro fragments:
-///
+/// - `$id`: the index of the I2C instance
 /// - `$instance`: the name of the I2C instance
 /// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
 /// - `$scl`, `$sda`: peripheral signal names.
 ///
-/// Example data: `(I2C0, I2cExt0, I2CEXT0_SCL, I2CEXT0_SDA)`
+/// Example data: `(0, I2C0, I2cExt0, I2CEXT0_SCL, I2CEXT0_SDA)`
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_i2c_master {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_i2c_master { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_i2c_master!((I2C0, I2cExt0, I2CEXT0_SCL, I2CEXT0_SDA));
-        _for_each_inner_i2c_master!((I2C1, I2cExt1, I2CEXT1_SCL, I2CEXT1_SDA));
-        _for_each_inner_i2c_master!((all(I2C0, I2cExt0, I2CEXT0_SCL, I2CEXT0_SDA), (I2C1,
-        I2cExt1, I2CEXT1_SCL, I2CEXT1_SDA)));
+        => {} } _for_each_inner_i2c_master!((0, I2C0, I2cExt0, I2CEXT0_SCL,
+        I2CEXT0_SDA)); _for_each_inner_i2c_master!((1, I2C1, I2cExt1, I2CEXT1_SCL,
+        I2CEXT1_SDA)); _for_each_inner_i2c_master!((all(0, I2C0, I2cExt0, I2CEXT0_SCL,
+        I2CEXT0_SDA), (1, I2C1, I2cExt1, I2CEXT1_SCL, I2CEXT1_SDA)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the UART driver.
