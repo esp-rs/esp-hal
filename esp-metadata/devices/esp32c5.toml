@@ -91,7 +91,7 @@ peripherals = [
     # { name = "TWAI1" }, # TODO: too different from what we know
     { name = "UART0", interrupts = { peri = "UART0" } },
     { name = "UART1", interrupts = { peri = "UART1" } },
-    { name = "UHCI0", dma_peripheral = 2 },
+    # { name = "UHCI0", dma_peripheral = 2 },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
 
     { name = "BT", virtual = true },
@@ -485,14 +485,14 @@ support_status = "partial"
 instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_divcnt_rst = true
 
-# [device.uart]
-# support_status = "supported"
-# instances = [
-#     { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
-#     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
-# ]
-# ram_size = 128
-# peripheral_controls_mem_clk = true # TODO: VERIFY
+[device.uart]
+support_status = "supported"
+instances = [
+    { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
+    { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
+]
+ram_size = 128
+peripheral_controls_mem_clk = true
 
 # [device.lp_uart]
 # support_status = "not_supported"

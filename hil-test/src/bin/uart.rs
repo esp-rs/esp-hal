@@ -1,6 +1,6 @@
 //! UART Test
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: unstable embassy
 
 #![no_std]
@@ -170,7 +170,7 @@ mod tests {
         cfg_if::cfg_if! {
             if #[cfg(esp32c2)] {
                 let fastest_clock_source = ClockSource::PllF40m;
-            } else  if #[cfg(esp32c6)] {
+            } else if #[cfg(any(esp32c5, esp32c6))] {
                 let fastest_clock_source = ClockSource::PllF80m;
             } else if #[cfg(esp32h2)] {
                 let fastest_clock_source = ClockSource::PllF48m;
@@ -790,7 +790,8 @@ mod async_tx_rx {
         assert_eq!(&data[..3], &[1, 2, 3]);
     }
 }
-#[cfg(not(any(esp32, esp32c2, esp32s2)))]
+
+#[cfg(all(soc_has_uhci0, dma_kind = "gdma"))]
 #[embedded_test::tests(default_timeout = 5, executor = hil_test::Executor::new())]
 mod uhci {
     use esp_hal::{
