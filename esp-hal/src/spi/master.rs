@@ -2671,7 +2671,7 @@ mod dma {
                 }
             }
 
-            #[cfg(gdma)]
+            #[cfg(dma_kind = "gdma")]
             self.reset_dma();
 
             self.driver.start_operation();
@@ -2680,27 +2680,27 @@ mod dma {
         }
 
         fn enable_dma(&self) {
-            #[cfg(gdma)]
+            #[cfg(dma_kind = "gdma")]
             // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
             self.regs().dma_conf().modify(|_, w| {
                 w.dma_tx_ena().set_bit();
                 w.dma_rx_ena().set_bit()
             });
 
-            #[cfg(pdma)]
+            #[cfg(dma_kind = "pdma")]
             self.reset_dma();
         }
 
         fn reset_dma(&self) {
             fn set_reset_bit(reg_block: &RegisterBlock, bit: bool) {
-                #[cfg(pdma)]
+                #[cfg(dma_kind = "pdma")]
                 reg_block.dma_conf().modify(|_, w| {
                     w.out_rst().bit(bit);
                     w.in_rst().bit(bit);
                     w.ahbm_fifo_rst().bit(bit);
                     w.ahbm_rst().bit(bit)
                 });
-                #[cfg(gdma)]
+                #[cfg(dma_kind = "gdma")]
                 reg_block.dma_conf().modify(|_, w| {
                     w.rx_afifo_rst().bit(bit);
                     w.buf_afifo_rst().bit(bit);
@@ -2713,7 +2713,7 @@ mod dma {
             self.clear_dma_interrupts();
         }
 
-        #[cfg(gdma)]
+        #[cfg(dma_kind = "gdma")]
         fn clear_dma_interrupts(&self) {
             self.regs().dma_int_clr().write(|w| {
                 w.dma_infifo_full_err().clear_bit_by_one();
@@ -2724,7 +2724,7 @@ mod dma {
             });
         }
 
-        #[cfg(pdma)]
+        #[cfg(dma_kind = "pdma")]
         fn clear_dma_interrupts(&self) {
             self.regs().dma_int_clr().write(|w| {
                 w.inlink_dscr_empty().clear_bit_by_one();
@@ -2741,9 +2741,9 @@ mod dma {
     }
 
     impl<'d> DmaEligible for AnySpi<'d> {
-        #[cfg(gdma)]
+        #[cfg(dma_kind = "gdma")]
         type Dma = crate::dma::AnyGdmaChannel<'d>;
-        #[cfg(pdma)]
+        #[cfg(dma_kind = "pdma")]
         type Dma = crate::dma::AnySpiDmaChannel<'d>;
 
         fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {

@@ -34,16 +34,16 @@ use crate::{
     peripherals::Interrupt,
 };
 
-#[cfg(soc_has_copy_dma)]
+#[cfg(soc_has_dma_copy)]
 mod copy;
-#[cfg(soc_has_crypto_dma)]
+#[cfg(soc_has_dma_crypto)]
 mod crypto;
 mod i2s;
 mod spi;
 
-#[cfg(soc_has_copy_dma)]
+#[cfg(soc_has_dma_copy)]
 pub use copy::{CopyDmaRxChannel, CopyDmaTxChannel};
-#[cfg(soc_has_crypto_dma)]
+#[cfg(soc_has_dma_crypto)]
 pub use crypto::{CryptoDmaRxChannel, CryptoDmaTxChannel};
 use i2s::I2sRegisterBlock;
 pub use i2s::{AnyI2sDmaChannel, AnyI2sDmaRxChannel, AnyI2sDmaTxChannel};

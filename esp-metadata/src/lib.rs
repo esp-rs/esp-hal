@@ -281,6 +281,9 @@ pub struct PeripheralDef {
     /// List of related interrupt signals
     #[serde(default)]
     interrupts: IndexMap<String, String>,
+    /// If the peripheral is DMA eligible, this defines the peripheral selector value.
+    #[serde(default)]
+    dma_peripheral: Option<u32>,
 }
 
 impl PeripheralDef {
@@ -588,6 +591,7 @@ impl Config {
     fn generate_peripherals_macro(&self) -> TokenStream {
         let mut all_peripherals = vec![];
         let mut singleton_peripherals = vec![];
+        let mut dma_peripherals = vec![];
 
         let mut stable_peris = vec![];
 
@@ -687,13 +691,40 @@ This pin may be available with certain limitations. Check your hardware to make 
                 all_peripherals.push(quote! { @peri_type #tokens (unstable) });
                 singleton_peripherals.push(quote! { #hal (unstable) });
             }
+
+            if let Some(dma_peripheral) = peri.dma_peripheral {
+                dma_peripherals.push((peri.name.as_str(), dma_peripheral));
+            }
         }
+
+        dma_peripherals.sort_by_key(|(_, dma_peripheral)| *dma_peripheral);
+
+        let dma_peripherals = dma_peripherals
+            .into_iter()
+            .map(|(name, dma_peripheral)| {
+                use convert_case::{Boundary, Case, Casing, pattern};
+
+                let peri = format_ident!("{}", name);
+                let dma_peripheral = number(dma_peripheral);
+                let variant_name = format_ident!(
+                    "{}",
+                    name.from_case(Case::Custom {
+                        boundaries: &[Boundary::LOWER_UPPER, Boundary::UNDERSCORE],
+                        pattern: pattern::capital,
+                        delim: "",
+                    })
+                    .to_case(Case::Pascal)
+                );
+                quote! { #peri, #variant_name, #dma_peripheral }
+            })
+            .collect::<Vec<_>>();
 
         generate_for_each_macro(
             "peripheral",
             &[
                 ("all", &all_peripherals),
                 ("singletons", &singleton_peripherals),
+                ("dma_eligible", &dma_peripherals),
             ],
         )
     }

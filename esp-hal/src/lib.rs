@@ -350,7 +350,7 @@ unstable_module! {
     pub mod timer;
     #[cfg(soc_has_lpwr)]
     pub mod rtc_cntl;
-    #[cfg(any(gdma, pdma))]
+    #[cfg(dma_driver_supported)]
     pub mod dma;
     #[cfg(etm_driver_supported)]
     pub mod etm;

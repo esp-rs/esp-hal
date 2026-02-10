@@ -29,8 +29,8 @@ peripherals = [
     { name = "HINF" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" } },
     { name = "I2C1", interrupts = { peri = "I2C_EXT1" } },
-    { name = "I2S0", interrupts = { peri = "I2S0" } },
-    { name = "I2S1", interrupts = { peri = "I2S1" } },
+    { name = "I2S0", interrupts = { peri = "I2S0" }, dma_peripheral = 0 },
+    { name = "I2S1", interrupts = { peri = "I2S1" }, dma_peripheral = 1 },
     { name = "IO_MUX" },
     { name = "LEDC" },
     { name = "MCPWM0" },
@@ -50,16 +50,16 @@ peripherals = [
     { name = "SLCHOST" },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA" } },
-    { name = "SPI3", interrupts = { peri = "SPI3", dma = "SPI3_DMA" } },
+    { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA" }, dma_peripheral = 2 },
+    { name = "SPI3", interrupts = { peri = "SPI3", dma = "SPI3_DMA" }, dma_peripheral = 3 },
     { name = "TIMG0" },
     { name = "TIMG1" },
     { name = "TWAI0" },
     { name = "UART0", interrupts = { peri = "UART0" } },
     { name = "UART1", interrupts = { peri = "UART1" } },
     { name = "UART2", interrupts = { peri = "UART2" } },
-    { name = "UHCI0" },
-    { name = "UHCI1" },
+    { name = "UHCI0", dma_peripheral = 4 },
+    { name = "UHCI1", dma_peripheral = 5 },
     { name = "WIFI" },
 
     { name = "DMA_SPI2", pac = "SPI2" },
@@ -81,7 +81,6 @@ peripherals = [
 
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "pdma",
     "phy",
     "psram",
     "touch",
@@ -330,6 +329,11 @@ instances = [
     { name = "dac1" },
     { name = "dac2" },
 ]
+
+[device.dma]
+support_status = "partial"
+kind = "pdma"
+supports_mem2mem = false
 
 [device.gpio]
 support_status = "supported"
@@ -879,7 +883,6 @@ deep_sleep = true
 [device.twai]
 
 ## Miscellaneous
-[device.dma]
 [device.io_mux]
 [device.psram]
 [device.temp_sensor]

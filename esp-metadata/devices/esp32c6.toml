@@ -13,8 +13,8 @@ cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf"
 
 peripherals = [
-    { name = "AES", interrupts = { peri = "AES" } },
-    { name = "APB_SARADC" },
+    { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 6 },
+    { name = "APB_SARADC", dma_peripheral = 8 },
     { name = "ASSIST_DEBUG" },
     { name = "ATOMIC" },
     { name = "DMA" },
@@ -30,7 +30,7 @@ peripherals = [
     { name = "HP_SYS" },
     { name = "I2C_ANA_MST" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" } },
-    { name = "I2S0", interrupts = { peri = "I2S0" } },
+    { name = "I2S0", interrupts = { peri = "I2S0" }, dma_peripheral = 3 },
     { name = "IEEE802154" },
     { name = "INTERRUPT_CORE0" },
     { name = "INTPRI" },
@@ -55,7 +55,7 @@ peripherals = [
     { name = "MODEM_LPCON" },
     { name = "MODEM_SYSCON" },
     { name = "OTP_DEBUG" },
-    { name = "PARL_IO", interrupts = { peri = "PARL_IO" } },
+    { name = "PARL_IO", interrupts = { peri = "PARL_IO" }, dma_peripheral = 9 },
     { name = "PAU" },
     { name = "PCNT" },
     { name = "PCR" },
@@ -64,12 +64,12 @@ peripherals = [
     { name = "RMT" },
     { name = "RNG" },
     { name = "RSA", interrupts = { peri = "RSA" } },
-    { name = "SHA", interrupts = { peri = "SHA" } },
+    { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 7 },
     { name = "SLCHOST" },
     { name = "ETM", pac = "SOC_ETM" },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2" } },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, dma_peripheral = 0 },
     { name = "SYSTEM", pac = "PCR" },
     { name = "SYSTIMER" },
     { name = "TEE" },
@@ -80,7 +80,7 @@ peripherals = [
     { name = "TWAI1" },
     { name = "UART0", interrupts = { peri = "UART0" } },
     { name = "UART1", interrupts = { peri = "UART1" } },
-    { name = "UHCI0" },
+    { name = "UHCI0", dma_peripheral = 2 },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
 
     { name = "DMA_CH0", virtual = true },
@@ -95,20 +95,19 @@ peripherals = [
     { name = "SW_INTERRUPT", virtual = true },
     { name = "TSENS", virtual = true },
     { name = "WIFI", virtual = true },
-    { name = "MEM2MEM1", virtual = true },
-    { name = "MEM2MEM4", virtual = true },
-    { name = "MEM2MEM5", virtual = true },
-    { name = "MEM2MEM10", virtual = true },
-    { name = "MEM2MEM11", virtual = true },
-    { name = "MEM2MEM12", virtual = true },
-    { name = "MEM2MEM13", virtual = true },
-    { name = "MEM2MEM14", virtual = true },
-    { name = "MEM2MEM15", virtual = true },
+    { name = "MEM2MEM0", virtual = true, dma_peripheral = 1 },
+    { name = "MEM2MEM1", virtual = true, dma_peripheral = 4 },
+    { name = "MEM2MEM2", virtual = true, dma_peripheral = 5 },
+    { name = "MEM2MEM3", virtual = true, dma_peripheral = 10 },
+    { name = "MEM2MEM4", virtual = true, dma_peripheral = 11 },
+    { name = "MEM2MEM5", virtual = true, dma_peripheral = 12 },
+    { name = "MEM2MEM6", virtual = true, dma_peripheral = 13 },
+    { name = "MEM2MEM7", virtual = true, dma_peripheral = 14 },
+    { name = "MEM2MEM8", virtual = true, dma_peripheral = 15 },
 ]
 
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "gdma",
     "phy",
     "lp_core",
     "swd",
@@ -306,6 +305,14 @@ key_length = { options = [
 support_status = "partial"
 has_sp_monitor = true
 has_region_monitor = true
+
+[device.dma]
+support_status = "partial"
+kind = "gdma"
+gdma_version = 1
+separate_in_out_interrupts = true
+supports_mem2mem = true
+max_priority = 9
 
 [device.gpio]
 support_status = "supported"
@@ -701,7 +708,6 @@ deep_sleep = true
 [device.usb_serial_jtag]
 
 ## Miscellaneous
-[device.dma]
 [device.etm]
 [device.io_mux]
 [device.temp_sensor]

@@ -18,7 +18,7 @@ mod tests {
         cfg_if::cfg_if! {
             if #[cfg(esp32s2)] {
                 let mem2mem = Mem2Mem::new(peripherals.DMA_COPY);
-            } else if #[cfg(any(esp32c2, esp32c6, esp32h2))] {
+            } else if #[cfg(any(esp32c6, esp32h2))] {
                 let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.MEM2MEM1);
             } else {
                 let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2);

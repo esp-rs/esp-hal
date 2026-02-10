@@ -31,10 +31,10 @@ peripherals = [
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "MODEM_CLKRST" },
     { name = "SENSITIVE" },
-    { name = "SHA", interrupts = { peri = "SHA" } },
+    { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 7 },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2" } },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, dma_peripheral = 0 },
     { name = "SYSTEM" },
     { name = "SYSTIMER" },
     { name = "TIMG0" },
@@ -50,19 +50,10 @@ peripherals = [
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "WIFI", virtual = true },
-    { name = "MEM2MEM1", virtual = true },
-    { name = "MEM2MEM2", virtual = true },
-    { name = "MEM2MEM3", virtual = true },
-    { name = "MEM2MEM4", virtual = true },
-    { name = "MEM2MEM5", virtual = true },
-    { name = "MEM2MEM6", virtual = true },
-    { name = "MEM2MEM7", virtual = true },
-    { name = "MEM2MEM8", virtual = true },
 ]
 
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "gdma",
     "phy",
     "swd",
 
@@ -226,6 +217,13 @@ instances = [
 [device.assist_debug]
 support_status = "partial"
 has_sp_monitor = true
+
+[device.dma]
+support_status = "partial"
+kind = "gdma"
+gdma_version = 1
+supports_mem2mem = true
+max_priority = 9
 
 [device.gpio]
 support_status = "supported"
@@ -441,7 +439,6 @@ deep_sleep = true
 [device.ledc]
 
 ## Miscellaneous
-[device.dma]
 [device.io_mux]
 [device.temp_sensor]
 [device.systimer]

@@ -4,13 +4,7 @@ use core::{
 };
 
 #[cfg(not(esp32s2))]
-use crate::dma::{
-    AnyGdmaChannel,
-    AnyGdmaRxChannel,
-    AnyGdmaTxChannel,
-    DmaChannelConvert,
-    DmaEligible,
-};
+use crate::dma::{AnyGdmaChannel, AnyGdmaRxChannel, AnyGdmaTxChannel, DmaEligible};
 use crate::{
     Async,
     Blocking,
@@ -20,6 +14,7 @@ use crate::{
         Channel,
         ChannelRx,
         ChannelTx,
+        DmaChannelConvert,
         DmaDescriptor,
         DmaError,
         DmaPeripheral,
@@ -36,6 +31,18 @@ use crate::{
     dma::{CopyDmaRxChannel, CopyDmaTxChannel},
     peripherals::DMA_COPY,
 };
+
+cfg_if::cfg_if! {
+    if #[cfg(esp32s2)] {
+        type Mem2MemChannel<'d> = DMA_COPY<'d>;
+        type Mem2MemRxChannel<'d> = CopyDmaRxChannel<'d>;
+        type Mem2MemTxChannel<'d> = CopyDmaTxChannel<'d>;
+    } else {
+        type Mem2MemChannel<'d> = AnyGdmaChannel<'d>;
+        type Mem2MemRxChannel<'d> = AnyGdmaRxChannel<'d>;
+        type Mem2MemTxChannel<'d> = AnyGdmaTxChannel<'d>;
+    }
+}
 
 /// DMA Memory to Memory pseudo-Peripheral
 ///
@@ -54,12 +61,17 @@ where
 
 impl<'d> Mem2Mem<'d, Blocking> {
     /// Create a new Mem2Mem instance.
-    #[cfg(not(esp32s2))]
     pub fn new(
-        channel: impl DmaChannelConvert<AnyGdmaChannel<'d>>,
-        peripheral: impl DmaEligible,
+        channel: impl DmaChannelConvert<Mem2MemChannel<'d>>,
+        #[cfg(dma_kind = "gdma")] peripheral: impl DmaEligible,
     ) -> Self {
-        unsafe { Self::new_unsafe(channel, peripheral.dma_peripheral()) }
+        unsafe {
+            Self::new_unsafe(
+                channel,
+                #[cfg(dma_kind = "gdma")]
+                peripheral.dma_peripheral(),
+            )
+        }
     }
 
     /// Create a new Mem2Mem instance.
@@ -68,35 +80,22 @@ impl<'d> Mem2Mem<'d, Blocking> {
     ///
     /// You must ensure that you're not using DMA for the same peripheral and
     /// that you're the only one using the DmaPeripheral.
-    #[cfg(not(esp32s2))]
     pub unsafe fn new_unsafe(
-        channel: impl DmaChannelConvert<AnyGdmaChannel<'d>>,
-        peripheral: DmaPeripheral,
+        channel: impl DmaChannelConvert<Mem2MemChannel<'d>>,
+        #[cfg(dma_kind = "gdma")] peripheral: DmaPeripheral,
     ) -> Self {
-        let mut channel = Channel::new(channel.degrade());
+        let channel = Channel::new(channel.degrade());
 
-        channel.rx.set_mem2mem_mode(true);
-
-        Mem2Mem {
-            rx: Mem2MemRx {
-                channel: channel.rx,
-                peripheral,
-            },
-            tx: Mem2MemTx {
-                channel: channel.tx,
-                peripheral,
-            },
+        cfg_if::cfg_if! {
+            if #[cfg(dma_kind = "gdma")] {
+                let mut channel = channel;
+                channel.rx.set_mem2mem_mode(true);
+            } else {
+                // The S2's COPY DMA channel doesn't care about this. Once support for other
+                // channels are added, this will need updating.
+                let peripheral = DmaPeripheral::Spi2;
+            }
         }
-    }
-
-    /// Create a new Mem2Mem instance.
-    #[cfg(esp32s2)]
-    pub fn new(channel: DMA_COPY<'d>) -> Self {
-        let channel = Channel::new(channel);
-
-        // The S2's COPY DMA channel doesn't care about this. Once support for other
-        // channels are added, this will need updating.
-        let peripheral = DmaPeripheral::Spi2;
 
         Mem2Mem {
             rx: Mem2MemRx {
@@ -131,10 +130,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
 
 /// The RX half of [Mem2Mem].
 pub struct Mem2MemRx<'d, Dm: DriverMode> {
-    #[cfg(not(esp32s2))]
-    channel: ChannelRx<Dm, AnyGdmaRxChannel<'d>>,
-    #[cfg(esp32s2)]
-    channel: ChannelRx<Dm, CopyDmaRxChannel<'d>>,
+    channel: ChannelRx<Dm, Mem2MemRxChannel<'d>>,
     peripheral: DmaPeripheral,
 }
 
@@ -262,10 +258,7 @@ impl<M: DriverMode, BUF: DmaRxBuffer> Drop for Mem2MemRxTransfer<'_, M, BUF> {
 
 /// The TX half of [Mem2Mem].
 pub struct Mem2MemTx<'d, Dm: DriverMode> {
-    #[cfg(not(esp32s2))]
-    channel: ChannelTx<Dm, AnyGdmaTxChannel<'d>>,
-    #[cfg(esp32s2)]
-    channel: ChannelTx<Dm, CopyDmaTxChannel<'d>>,
+    channel: ChannelTx<Dm, Mem2MemTxChannel<'d>>,
     peripheral: DmaPeripheral,
 }
 

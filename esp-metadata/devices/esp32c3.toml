@@ -13,9 +13,9 @@ cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf"
 
 peripherals = [
-    { name = "AES", interrupts = { peri = "AES" } },
+    { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 6 },
     { name = "APB_CTRL" },
-    { name = "APB_SARADC" },
+    { name = "APB_SARADC", dma_peripheral = 8 },
     { name = "ASSIST_DEBUG" },
     { name = "BB" },
     { name = "DMA" },
@@ -29,7 +29,7 @@ peripherals = [
     { name = "HMAC" },
     { name = "I2C_ANA_MST" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" } },
-    { name = "I2S0", interrupts = { peri = "I2S0" } },
+    { name = "I2S0", interrupts = { peri = "I2S0" }, dma_peripheral = 3 },
     { name = "INTERRUPT_CORE0" },
     { name = "IO_MUX" },
     { name = "LEDC" },
@@ -39,10 +39,10 @@ peripherals = [
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "SENSITIVE" },
-    { name = "SHA", interrupts = { peri = "SHA" } },
+    { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 7 },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2" } },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, dma_peripheral = 0 },
     { name = "SYSTEM" },
     { name = "SYSTIMER" },
     { name = "TIMG0" },
@@ -50,7 +50,7 @@ peripherals = [
     { name = "TWAI0" },
     { name = "UART0", interrupts = { peri = "UART0" } },
     { name = "UART1", interrupts = { peri = "UART1" } },
-    { name = "UHCI0" },
+    { name = "UHCI0", dma_peripheral = 2 },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
     { name = "XTS_AES" },
 
@@ -70,7 +70,6 @@ peripherals = [
 
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "gdma",
     "phy",
     "swd",
 
@@ -250,6 +249,13 @@ key_length = { options = [
 support_status = "partial"
 has_sp_monitor = true
 has_region_monitor = true
+
+[device.dma]
+support_status = "partial"
+kind = "gdma"
+gdma_version = 1
+supports_mem2mem = true
+max_priority = 9
 
 [device.gpio]
 support_status = "supported"
@@ -519,7 +525,6 @@ deep_sleep = true
 [device.usb_serial_jtag]
 
 ## Miscellaneous
-[device.dma]
 [device.io_mux]
 [device.temp_sensor]
 [device.systimer]

@@ -145,7 +145,7 @@ crate::any_peripheral! {
 }
 
 impl<'d> DmaEligible for AnyUhci<'d> {
-    #[cfg(gdma)]
+    #[cfg(dma_kind = "gdma")]
     type Dma = crate::dma::AnyGdmaChannel<'d>;
 
     fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {

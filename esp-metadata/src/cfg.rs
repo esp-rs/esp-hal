@@ -354,7 +354,17 @@ driver_configs![
     DmaProperties {
         driver: dma,
         name: "DMA",
-        properties: {}
+        properties: {
+            kind: String,
+            #[serde(default)]
+            supports_mem2mem: bool,
+            #[serde(default)]
+            separate_in_out_interrupts: bool,
+            #[serde(default)]
+            max_priority: Option<u32>,
+            #[serde(default)]
+            gdma_version: Option<u32>,
+        }
     },
     DsProperties {
         driver: ds,

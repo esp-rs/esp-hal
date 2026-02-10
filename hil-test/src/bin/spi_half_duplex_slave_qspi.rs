@@ -27,7 +27,7 @@ mod read {
 
     #[cfg(spi_master_supports_dma)]
     cfg_if::cfg_if! {
-        if #[cfg(any(pdma))] {
+        if #[cfg(dma_kind = "pdma")] {
             type DmaChannel<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
         } else {
             type DmaChannel<'d> = esp_hal::peripherals::DMA_CH0<'d>;
@@ -52,7 +52,7 @@ mod read {
 
         #[cfg(spi_master_supports_dma)]
         cfg_if::cfg_if! {
-            if #[cfg(pdma)] {
+            if #[cfg(dma_kind = "pdma")] {
                 let dma_channel = peripherals.DMA_SPI2;
             } else {
                 let dma_channel = peripherals.DMA_CH0;
@@ -287,7 +287,7 @@ mod write {
 
     #[cfg(spi_master_supports_dma)]
     cfg_if::cfg_if! {
-        if #[cfg(pdma)] {
+        if #[cfg(dma_kind = "pdma")] {
             type DmaChannel<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
         } else {
             type DmaChannel<'d> = esp_hal::peripherals::DMA_CH0<'d>;
@@ -314,7 +314,7 @@ mod write {
 
         #[cfg(spi_master_supports_dma)]
         cfg_if::cfg_if! {
-            if #[cfg(pdma)] {
+            if #[cfg(dma_kind = "pdma")] {
                 let dma_channel = peripherals.DMA_SPI2;
             } else {
                 let dma_channel = peripherals.DMA_CH0;
@@ -603,7 +603,7 @@ mod spi_slave {
 
         #[cfg(spi_slave_supports_dma)]
         cfg_if::cfg_if! {
-            if #[cfg(pdma)] {
+            if #[cfg(dma_kind = "pdma")] {
                 let dma_channel = peripherals.DMA_SPI2;
             } else {
                 let dma_channel = peripherals.DMA_CH0;
@@ -700,7 +700,7 @@ mod qspi {
     };
 
     cfg_if::cfg_if! {
-        if #[cfg(pdma)] {
+        if #[cfg(dma_kind = "pdma")] {
             type DmaChannel0<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
         } else {
             type DmaChannel0<'d> = esp_hal::peripherals::DMA_CH0<'d>;
@@ -875,7 +875,7 @@ mod qspi {
         let _ = Input::new(unconnected_pin.reborrow(), config);
 
         cfg_if::cfg_if! {
-            if #[cfg(pdma)] {
+            if #[cfg(dma_kind = "pdma")] {
                 let dma_channel = peripherals.DMA_SPI2;
             } else {
                 let dma_channel = peripherals.DMA_CH0;
