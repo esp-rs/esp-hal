@@ -229,6 +229,8 @@ clocks = { system_clocks = { clock_tree = [
 
     { name = "Pcnt" },
     { name = "Systimer", keep_enabled = true }, # can be clocked from XTAL_CLK or RC_FAST_CLK, the latter has no divider?
+    { name = "Dma", template_params = { peripheral = "gdma" } },
+    { name = "Spi2" },
 ] } }
 
 [device.dma]
@@ -469,16 +471,20 @@ software_interrupt_count = 4
 software_interrupt_delay = 24 # CPU speed dependent
 controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 } }
 
-# [device.spi_master]
-# support_status = "supported"
-# instances = [
-#     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0"] },
-# ]
-# 
-# [device.spi_slave]
-# instances = [
-#     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", mosi = "FSPID", miso = "FSPIQ", cs = "FSPICS0" },
-# ]
+[device.spi_master]
+support_status = "supported"
+supports_dma = false
+has_app_interrupts = true
+has_dma_segmented_transfer = true
+has_clk_pre_div = true
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
+]
+
+[device.spi_slave]
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", mosi = "FSPID", miso = "FSPIQ", cs = "FSPICS0" },
+]
 
 [device.timergroup]
 support_status = "partial"

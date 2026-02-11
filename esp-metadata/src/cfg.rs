@@ -154,7 +154,7 @@ macro_rules! driver_configs {
     (@one
         $struct:ident $(<$instance_config:ident>)? ($group:ident) {
             $(
-                $(#[$meta:meta])? $config:ident: $ty:tt $(<$generic:tt>)?,
+                $(#[$meta:meta])* $config:ident: $ty:tt $(<$generic:tt>)?,
             )*
         }
     ) => {
@@ -167,7 +167,7 @@ macro_rules! driver_configs {
             #[serde(default)]
             pub instances: Vec<PeriInstance $(<$instance_config>)?>,
             $(
-                $(#[$meta])?
+                $(#[$meta])*
                 pub $config: $ty $(<$generic>)?
             ),*
         }
@@ -604,6 +604,9 @@ driver_configs![
             has_app_interrupts: bool,
             #[serde(default)]
             has_dma_segmented_transfer: bool,
+            /// The PCR has a clock pre-divider before the SPI peripheral.
+            #[serde(default)]
+            has_clk_pre_div: bool,
         }
     },
     SpiSlaveProperties<SpiSlaveInstanceConfig> {

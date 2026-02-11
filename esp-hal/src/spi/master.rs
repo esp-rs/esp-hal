@@ -511,6 +511,11 @@ impl Config {
                 // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
                 let _clocks = clocks;
                 Rate::from_mhz(48)
+            } else if #[cfg(esp32c5)] {
+                // We select the 160MHz PLL as the clock source in the driver. There is a by-2 divider
+                // configured between the PLL and the SPI clock (spi2_clkm_div_num).
+                let _clocks = clocks;
+                Rate::from_mhz(80) // clk_spi2_mst must be <= 80MHz
             } else if #[cfg(esp32c6)] {
                 // We select the 80MHz PLL as the clock source in the driver
                 // FIXME we state that the default clock source is APB, which just isn't true
@@ -3145,13 +3150,17 @@ impl Driver {
             w.mst_clk_sel().set_bit()
         });
 
-        #[cfg(any(esp32c6, esp32h2))]
+        #[cfg(soc_has_pcr)]
         unsafe {
-            // use default clock source PLL_F80M_CLK (ESP32-C6) and
-            // PLL_F48M_CLK (ESP32-H2)
+            // use default clock source
             crate::peripherals::PCR::regs()
                 .spi2_clkm_conf()
-                .modify(|_, w| w.spi2_clkm_sel().bits(1));
+                .modify(|_, w| {
+                    #[cfg(spi_master_has_clk_pre_div)]
+                    w.spi2_clkm_div_num().bits(1);
+                    w.spi2_clkm_sel().bits(1);
+                    w.spi2_clkm_en().set_bit()
+                });
         }
 
         cfg_if::cfg_if! {
@@ -3801,6 +3810,7 @@ impl Driver {
             w.usr_command().bit(!cmd.is_none())
         });
 
+        // FIXME why is clock config even here?
         #[cfg(not(any(esp32, esp32s2)))]
         reg_block.clk_gate().modify(|_, w| {
             w.clk_en().set_bit();
@@ -3808,8 +3818,8 @@ impl Driver {
             w.mst_clk_sel().set_bit()
         });
 
-        #[cfg(any(esp32c6, esp32h2))]
-        // use default clock source PLL_F80M_CLK
+        #[cfg(soc_has_pcr)]
+        // use default clock source
         crate::peripherals::PCR::regs()
             .spi2_clkm_conf()
             .modify(|_, w| unsafe { w.spi2_clkm_sel().bits(1) });

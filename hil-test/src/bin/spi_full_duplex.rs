@@ -1,6 +1,6 @@
 //! SPI Full Duplex test suite.
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES(unstable): unstable
 //% FEATURES(stable):
 
@@ -903,6 +903,8 @@ mod tests {
             40_000_000
         } else if cfg!(esp32h2) {
             48_000_000
+        } else if cfg!(esp32c5) {
+            80_000_000 // pre-divided by 2
         } else {
             80_000_000
         };
