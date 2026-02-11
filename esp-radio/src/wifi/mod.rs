@@ -2,7 +2,7 @@
 
 #![deny(missing_docs)]
 
-use alloc::{borrow::ToOwned, collections::vec_deque::VecDeque, vec::Vec};
+use alloc::{borrow::ToOwned, collections::vec_deque::VecDeque, str, vec::Vec};
 use core::{
     fmt::{Debug, Write},
     marker::PhantomData,
@@ -609,10 +609,7 @@ impl Ssid {
         let len = usize::min(32, bytes.len());
         ssid_bytes[..len].copy_from_slice(bytes);
 
-        Self {
-            ssid: ssid_bytes,
-            len: len as u8,
-        }
+        Self::from_raw(&ssid_bytes, len as u8)
     }
 
     pub(crate) fn from_raw(ssid: &[u8], len: u8) -> Self {
@@ -630,7 +627,7 @@ impl Ssid {
         &self.ssid[..self.len as usize]
     }
 
-    /// The length of the SSID.
+    /// The length (in bytes) of the SSID.
     pub fn len(&self) -> usize {
         self.len as usize
     }
@@ -642,7 +639,14 @@ impl Ssid {
 
     /// The SSID as a string slice.
     pub fn as_str(&self) -> &str {
-        unsafe { str::from_utf8_unchecked(&self.ssid[..self.len as usize]) }
+        let part = &self.ssid[..self.len as usize];
+        match str::from_utf8(part) {
+            Ok(s) => s,
+            Err(e) => {
+                let (valid, _) = part.split_at(e.valid_up_to());
+                unsafe { str::from_utf8_unchecked(valid) }
+            }
+        }
     }
 }
 
