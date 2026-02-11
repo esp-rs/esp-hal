@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `disconnect_async` now returns `Ok(DisconnectedStationInfo)`. (#4898)
 - `WifiError::Disconnected` is now a tuple-like enum variant `WifiError::Disconnected(DisconnectedStationInfo)` containing details about the disconnection. (#4898)
 - Various structs now use the `Ssid` type to represent SSIDs instead of `String` (#4953)
+- Update to `bt-hci` version 0.8 and `trouble-host` version 0.6 (#4962)
 
 ### Fixed
 
