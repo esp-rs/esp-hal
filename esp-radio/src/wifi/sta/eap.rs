@@ -6,6 +6,7 @@ use core::fmt;
 use enumset::EnumSet;
 use procmacros::BuilderLite;
 
+use super::Ssid;
 use crate::{
     WifiError,
     wifi::{AuthenticationMethod, Protocol, scan::ScanMethod},
@@ -71,8 +72,8 @@ type CertificateAndKey = (&'static [u8], &'static [u8], Option<&'static [u8]>);
 #[instability::unstable]
 pub struct EapStationConfig {
     /// The SSID of the network the station is connecting to.
-    #[builder_lite(reference)]
-    pub(crate) ssid: String,
+    #[builder_lite(skip_setter)]
+    pub(crate) ssid: Ssid,
     /// The BSSID (MAC Address) of the specific access point.
     pub(crate) bssid: Option<[u8; 6]>,
     /// The authentication method used for EAP.
@@ -138,6 +139,12 @@ pub struct EapStationConfig {
 }
 
 impl EapStationConfig {
+    /// Set the SSID of the access point.
+    pub fn with_ssid(mut self, ssid: impl Into<Ssid>) -> Self {
+        self.ssid = ssid.into();
+        self
+    }
+
     pub(crate) fn validate(&self) -> Result<(), WifiError> {
         if self.ssid.len() > 32 {
             return Err(WifiError::InvalidArguments);
@@ -170,7 +177,7 @@ impl EapStationConfig {
 impl Default for EapStationConfig {
     fn default() -> Self {
         EapStationConfig {
-            ssid: String::new(),
+            ssid: Ssid::default(),
             bssid: None,
             auth_method: AuthenticationMethod::Wpa2Enterprise,
             identity: None,

@@ -516,7 +516,6 @@ impl crate::DriverMode for Async {}
 impl crate::private::Sealed for Blocking {}
 impl crate::private::Sealed for Async {}
 
-#[cfg_attr(esp32c5, expect(unused))]
 pub(crate) mod private {
     use core::mem::ManuallyDrop;
 

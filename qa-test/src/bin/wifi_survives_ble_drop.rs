@@ -120,7 +120,7 @@ async fn main(spawner: Spawner) -> ! {
 
         socket.set_timeout(Some(embassy_time::Duration::from_secs(10)));
 
-        let remote_endpoint = (Ipv4Addr::new(142, 250, 185, 115), 80);
+        let remote_endpoint = (Ipv4Addr::new(216, 239, 32, 21), 80);
         println!("connecting...");
         let r = socket.connect(remote_endpoint).await;
         if let Err(e) = r {
@@ -168,7 +168,7 @@ async fn connection(mut controller: WifiController<'static>) {
         if !matches!(controller.is_started(), Ok(true)) {
             let station_config = Config::Station(
                 StationConfig::default()
-                    .with_ssid(SSID.into())
+                    .with_ssid(SSID)
                     .with_password(PASSWORD.into()),
             );
             controller.set_config(&station_config).unwrap();

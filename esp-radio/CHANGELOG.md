@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `disconnect_async` now returns `Ok(DisconnectedStationInfo)`. (#4898)
 - `WifiError::Disconnected` is now a tuple-like enum variant `WifiError::Disconnected(DisconnectedStationInfo)` containing details about the disconnection. (#4898)
 - `WifiController::scan_with_config_async` has been changed to `WifiController::scan_async` (#4946)
+- Various structs now use the `Ssid` type to represent SSIDs instead of `String` (#4953)
 
 ### Fixed
 
