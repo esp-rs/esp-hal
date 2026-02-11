@@ -82,7 +82,7 @@ async fn main(_spawner: Spawner) {
                 });
         println!("Scanning for WiFi networks");
         let aps = controller
-            .scan_async(scan_config)
+            .scan_async(&scan_config)
             .with_timeout(Duration::from_secs(5))
             .await
             .unwrap();

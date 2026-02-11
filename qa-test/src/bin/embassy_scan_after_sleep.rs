@@ -61,7 +61,7 @@ async fn main(_spawner: Spawner) {
     controller.start_async().await.unwrap();
 
     let res = controller
-        .scan_async(esp_radio::wifi::scan::ScanConfig::default())
+        .scan_async(&esp_radio::wifi::scan::ScanConfig::default())
         .await
         .unwrap();
 
