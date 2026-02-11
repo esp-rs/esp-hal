@@ -110,9 +110,9 @@ async fn main(spawner: Spawner) -> ! {
 
     let station_config = Config::AccessPointStation(
         StationConfig::default()
-            .with_ssid(SSID.into())
+            .with_ssid(SSID)
             .with_password(PASSWORD.into()),
-        AccessPointConfig::default().with_ssid("esp-radio-apsta".into()),
+        AccessPointConfig::default().with_ssid("esp-radio-apsta"),
     );
     controller.set_config(&station_config).unwrap();
 
@@ -216,7 +216,7 @@ async fn main(spawner: Spawner) -> ! {
             };
         }
         if sta_stack.is_link_up() {
-            let remote_endpoint = (Ipv4Addr::new(142, 250, 185, 115), 80);
+            let remote_endpoint = (Ipv4Addr::new(216, 239, 32, 21), 80);
             println!("connecting...");
             let r = sta_socket.connect(remote_endpoint).await;
             if let Err(e) = r {
