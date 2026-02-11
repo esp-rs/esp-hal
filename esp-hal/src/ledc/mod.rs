@@ -125,6 +125,15 @@ impl<'d> Ledc<'d> {
             PeripheralClockControl::reset(PeripheralEnable::Ledc);
         }
 
+        #[cfg(esp32c5)]
+        unsafe {
+            // SAFETY: writing PCR LEDC power control is required to unforce power-down
+            // of the LEDC memory block, which backs gamma fade parameters.
+            (&*crate::peripherals::PCR::ptr())
+                .ledc_pd_ctrl()
+                .modify(|_, w| w.ledc_mem_force_pd().clear_bit());
+        }
+
         let ledc = LEDC::regs();
         Ledc { _instance, ledc }
     }

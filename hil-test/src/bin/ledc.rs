@@ -246,4 +246,62 @@ mod tests {
             PERIOD_TOLERANCE_PERCENT
         );
     }
+
+    #[cfg(esp32c5)]
+    #[test]
+    fn duty_fade_changes_output_and_completes(ctx: Context) {
+        let Context {
+            ledc,
+            test_pin,
+            delay,
+        } = ctx;
+
+        let pin = Flex::new(test_pin);
+        // SAFETY: we only configure the pin output through LEDC and only sample the input.
+        let (input, output) = unsafe { pin.split_into_drivers() };
+
+        let mut ledc = Ledc::new(ledc);
+        ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
+
+        let mut timer0 = ledc.timer::<LowSpeed>(timer::Number::Timer0);
+        timer0
+            .configure(timer::config::Config {
+                duty: timer::config::Duty::Duty8Bit,
+                clock_source: timer::LSClockSource::APBClk,
+                frequency: PWM_FREQUENCY,
+            })
+            .unwrap();
+
+        let mut channel0 = ledc.channel(channel::Number::Channel0, output);
+        channel0
+            .configure(channel::config::Config {
+                timer: &timer0,
+                duty_pct: 10,
+                drive_mode: esp_hal::gpio::DriveMode::PushPull,
+            })
+            .unwrap();
+
+        delay.delay_millis(6);
+        let initial_high_count = sample_high_count(&input, &delay);
+        assert!(initial_high_count < SAMPLE_COUNT / 3);
+
+        channel0.start_duty_fade(10, 90, 200).unwrap();
+
+        let mut saw_running = false;
+        for _ in 0..50 {
+            if channel0.is_duty_fade_running() {
+                saw_running = true;
+                break;
+            }
+
+            delay.delay_millis(1);
+        }
+        assert!(saw_running);
+
+        delay.delay_millis(260);
+        assert!(!channel0.is_duty_fade_running());
+
+        let final_high_count = sample_high_count(&input, &delay);
+        assert!(final_high_count > SAMPLE_COUNT * 2 / 3);
+    }
 }
