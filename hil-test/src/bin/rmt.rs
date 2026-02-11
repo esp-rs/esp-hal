@@ -5,7 +5,7 @@
 //! timing-sensitive tests! This doesn't apply to `check_data_eq` since it is used after the
 //! action, but adding any additional logging to the driver is likely to cause sporadic issues.
 
-//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c3 esp32c5 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: embassy esp-alloc unstable
 
 #![no_std]
@@ -18,38 +18,17 @@ use core::task::Poll;
 use allocator_api2::{vec, vec::Vec};
 use embassy_futures::poll_once;
 use esp_hal::{
-    Async,
-    Blocking,
-    DriverMode,
+    Async, Blocking, DriverMode,
     delay::Delay,
     gpio::{
-        AnyPin,
-        Flex,
-        InputConfig,
-        Level,
-        NoPin,
-        OutputConfig,
-        Pin,
-        Pull,
+        AnyPin, Flex, InputConfig, Level, NoPin, OutputConfig, Pin, Pull,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
     peripherals::RMT,
     ram,
     rmt::{
-        CHANNEL_RAM_SIZE,
-        Channel,
-        ConfigError,
-        Error,
-        HAS_RX_WRAP,
-        LoopMode,
-        PulseCode,
-        Rmt,
-        Rx,
-        RxChannelConfig,
-        RxChannelCreator,
-        Tx,
-        TxChannelConfig,
-        TxChannelCreator,
+        CHANNEL_RAM_SIZE, Channel, ConfigError, Error, HAS_RX_WRAP, LoopMode, PulseCode, Rmt, Rx,
+        RxChannelConfig, RxChannelCreator, Tx, TxChannelConfig, TxChannelCreator,
     },
     time::Rate,
     timer::timg::TimerGroup,
