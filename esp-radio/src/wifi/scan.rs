@@ -63,7 +63,7 @@ pub enum ScanTypeConfig {
     /// 3. Repeat from 1.
     ///
     /// # Note
-    /// It is recommended to avoid duration longer thean 1500ms, as it may cause
+    /// It is recommended to avoid duration longer than 1500ms, as it may cause
     /// a station to disconnect from the Access Point.
     Passive(Duration),
 }

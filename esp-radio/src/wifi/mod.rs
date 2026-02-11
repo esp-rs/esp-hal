@@ -2658,7 +2658,7 @@ impl WifiController<'_> {
     /// // Create a scan configuration (e.g., scan up to 10 APs)
     /// let scan_config = ScanConfig::default().with_max(10);
     /// let result = controller
-    ///     .scan_with_config_async(scan_config)
+    ///     .scan_async(&scan_config)
     ///     .await
     ///     .unwrap();
     /// for ap in result {
@@ -2666,17 +2666,17 @@ impl WifiController<'_> {
     /// }
     /// # {after_snippet}
     /// ```
-    pub async fn scan_with_config_async(
+    pub async fn scan_async(
         &mut self,
-        config: ScanConfig,
+        config: &ScanConfig,
     ) -> Result<Vec<AccessPointInfo>, WifiError> {
         let mut subscriber = EVENT_CHANNEL
             .subscriber()
             .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
 
-        esp_wifi_result!(wifi_start_scan(false, config))?;
+        esp_wifi_result!(wifi_start_scan(false, *config))?;
 
-        // Prevents memory leak if `scan_with_config_async`'s future is dropped.
+        // Prevents memory leak if `scan_async`'s future is dropped.
         let guard = FreeApListOnDrop;
 
         loop {
@@ -2843,7 +2843,7 @@ impl WifiController<'_> {
     ///
     /// Use [Self::disconnect_async] to disconnect.
     ///
-    /// Calling [Self::scan_with_config_async] will not be effective until
+    /// Calling [Self::scan_async] will not be effective until
     /// connection between device and the AP is established.
     ///
     /// If device is scanning and connecting at the same time, it will abort scanning and return a
