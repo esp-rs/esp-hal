@@ -2205,7 +2205,11 @@ for_each_rmt_clock_source!(
                     ClockSource::Apb => Clocks::get().apb_clock,
 
                     #[cfg(rmt_supports_rcfast_clock)]
-                    ClockSource::RcFast => todo!(),
+                    ClockSource::RcFast => {
+                        Rate::from_hz(crate::soc::clocks::ClockTree::with(
+                            crate::soc::clocks::rc_fast_clk_frequency,
+                        ))
+                    }
 
                     #[cfg(rmt_supports_xtal_clock)]
                     ClockSource::Xtal => Clocks::get().xtal_clock,
