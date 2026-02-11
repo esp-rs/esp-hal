@@ -18,12 +18,16 @@ use esp_hal::{
         timer::{self, TimerIFace},
     },
     peripherals::LEDC,
-    time::Rate,
+    time::{Instant, Rate},
 };
 
 const PWM_FREQUENCY: Rate = Rate::from_khz(2);
 const SAMPLE_COUNT: usize = 400;
 const SAMPLE_INTERVAL_US: u32 = 37;
+const EDGE_POLL_INTERVAL_US: u32 = 2;
+const EDGE_WAIT_MAX_ITERS: usize = 100_000;
+const PERIOD_SAMPLE_EDGES: usize = 32;
+const PERIOD_TOLERANCE_PERCENT: u32 = 20;
 
 fn sample_high_count(input: &Input<'_>, delay: &Delay) -> usize {
     let mut high_count = 0;
@@ -37,6 +41,46 @@ fn sample_high_count(input: &Input<'_>, delay: &Delay) -> usize {
     }
 
     high_count
+}
+
+fn wait_until_level(input: &Input<'_>, delay: &Delay, high: bool) -> bool {
+    for _ in 0..EDGE_WAIT_MAX_ITERS {
+        if input.is_high() == high {
+            return true;
+        }
+
+        delay.delay_micros(EDGE_POLL_INTERVAL_US);
+    }
+
+    false
+}
+
+fn average_period_us(input: &Input<'_>, delay: &Delay, edges: usize) -> Option<u32> {
+    if edges < 2 {
+        return None;
+    }
+
+    // Synchronize to a clean rising edge.
+    if input.is_high() && !wait_until_level(input, delay, false) {
+        return None;
+    }
+    if !wait_until_level(input, delay, true) {
+        return None;
+    }
+
+    let first_edge = Instant::now();
+
+    for _ in 0..(edges - 1) {
+        if !wait_until_level(input, delay, false) {
+            return None;
+        }
+        if !wait_until_level(input, delay, true) {
+            return None;
+        }
+    }
+
+    let total_us = (Instant::now() - first_edge).as_micros() as u32;
+    Some(total_us / (edges as u32 - 1))
 }
 
 struct Context {
@@ -150,5 +194,56 @@ mod tests {
 
         assert!(mid_duty_high_count > SAMPLE_COUNT / 5);
         assert!(mid_duty_high_count < SAMPLE_COUNT * 4 / 5);
+    }
+
+    #[test]
+    fn configured_frequency_matches_output_period(ctx: Context) {
+        let Context {
+            ledc,
+            test_pin,
+            delay,
+        } = ctx;
+
+        let pin = Flex::new(test_pin);
+        // SAFETY: we only configure the pin output through LEDC and only sample the input.
+        let (input, output) = unsafe { pin.split_into_drivers() };
+
+        let mut ledc = Ledc::new(ledc);
+        ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
+
+        let mut timer0 = ledc.timer::<LowSpeed>(timer::Number::Timer0);
+        timer0
+            .configure(timer::config::Config {
+                duty: timer::config::Duty::Duty8Bit,
+                clock_source: timer::LSClockSource::APBClk,
+                frequency: PWM_FREQUENCY,
+            })
+            .unwrap();
+
+        let mut channel0 = ledc.channel(channel::Number::Channel0, output);
+        channel0
+            .configure(channel::config::Config {
+                timer: &timer0,
+                duty_pct: 50,
+                drive_mode: esp_hal::gpio::DriveMode::PushPull,
+            })
+            .unwrap();
+
+        delay.delay_millis(4);
+
+        let measured_period_us = average_period_us(&input, &delay, PERIOD_SAMPLE_EDGES)
+            .expect("failed to detect PWM edges while measuring period");
+
+        let expected_period_us = 1_000_000u32 / PWM_FREQUENCY.as_hz();
+        let min_period_us = expected_period_us * (100 - PERIOD_TOLERANCE_PERCENT) / 100;
+        let max_period_us = expected_period_us * (100 + PERIOD_TOLERANCE_PERCENT) / 100;
+
+        assert!(
+            measured_period_us >= min_period_us && measured_period_us <= max_period_us,
+            "measured period {} us, expected {} us (+/- {}%)",
+            measured_period_us,
+            expected_period_us,
+            PERIOD_TOLERANCE_PERCENT
+        );
     }
 }
