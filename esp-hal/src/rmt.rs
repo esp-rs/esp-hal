@@ -219,16 +219,11 @@ use portable_atomic::Ordering;
 use procmacros::ram;
 
 use crate::{
-    Async,
-    Blocking,
+    Async, Blocking,
     asynch::AtomicWaker,
     clock::Clocks,
     gpio::{
-        self,
-        InputConfig,
-        Level,
-        OutputConfig,
-        PinGuard,
+        self, InputConfig, Level, OutputConfig, PinGuard,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
     peripherals::{Interrupt, RMT},
@@ -2248,19 +2243,8 @@ mod chip_specific {
     use procmacros::ram;
 
     use super::{
-        ChannelIndex,
-        ClockSource,
-        ConfigError,
-        Direction,
-        DynChannelAccess,
-        Event,
-        Level,
-        LoopMode,
-        MemSize,
-        RMT_LOCK,
-        Rx,
-        Tx,
-        WAKER,
+        ChannelIndex, ClockSource, ConfigError, Direction, DynChannelAccess, Event, Level,
+        LoopMode, MemSize, RMT_LOCK, Rx, Tx, WAKER,
     };
     use crate::{peripherals::RMT, time::Rate};
 
@@ -2416,6 +2400,18 @@ mod chip_specific {
                     .modify(|_, w| unsafe { w.mem_size().bits(blocks) });
             }
         }
+
+        #[inline(always)]
+        pub fn reset_channel_clock_divider(self) {
+            #[cfg(esp32c5)]
+            {
+                let mask = 1u32 << self.channel();
+                let rmt = RMT::regs();
+
+                rmt.ref_cnt_rst().write(|w| unsafe { w.bits(mask) });
+                rmt.ref_cnt_rst().write(|w| unsafe { w.bits(0) });
+            }
+        }
     }
 
     // documented in re-export below
@@ -2521,6 +2517,8 @@ mod chip_specific {
         pub fn start_tx(self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
+
+            self.reset_channel_clock_divider();
 
             rmt.ch_tx_conf0(ch_idx).modify(|_, w| {
                 w.mem_rd_rst().set_bit();
@@ -2662,6 +2660,8 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as u8;
 
+            self.reset_channel_clock_divider();
+
             for i in 1..self.memsize().blocks() {
                 rmt.ch_rx_conf1((ch_idx + i).into())
                     .modify(|_, w| w.mem_owner().set_bit());
@@ -2774,19 +2774,8 @@ mod chip_specific {
     use procmacros::ram;
 
     use super::{
-        ChannelIndex,
-        ClockSource,
-        ConfigError,
-        Direction,
-        DynChannelAccess,
-        Event,
-        Level,
-        MemSize,
-        NUM_CHANNELS,
-        RMT_LOCK,
-        Rx,
-        Tx,
-        WAKER,
+        ChannelIndex, ClockSource, ConfigError, Direction, DynChannelAccess, Event, Level, MemSize,
+        NUM_CHANNELS, RMT_LOCK, Rx, Tx, WAKER,
     };
     use crate::{peripherals::RMT, time::Rate};
 
