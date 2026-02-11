@@ -2668,7 +2668,7 @@ impl WifiController<'_> {
     /// ```
     pub async fn scan_async(
         &mut self,
-        config: &ScanConfig<'_>,
+        config: &ScanConfig,
     ) -> Result<Vec<AccessPointInfo>, WifiError> {
         let mut subscriber = EVENT_CHANNEL
             .subscriber()
