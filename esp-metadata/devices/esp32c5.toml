@@ -155,6 +155,11 @@ clocks = { system_clocks = { clock_tree = [
     { name = "PLL_F120M", type = "divider", output = "PLL_CLK / 4"  },
     { name = "PLL_F160M", type = "divider", output = "PLL_CLK / 3"  },
     { name = "PLL_F240M", type = "divider", output = "PLL_CLK / 2"  },
+    { name = "LEDC_SCLK", type = "mux", variants = [
+        { name = "PLL_F80M",    outputs = "PLL_F80M" },
+        { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+        { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+    ] },
 
     # HP SOC clock root (PCR_SOC_CLK_SEL: XTAL, RC_FAST, PLL_F160M, PLL_F240M)
     { name = "HP_ROOT_CLK", type = "mux", variants = [

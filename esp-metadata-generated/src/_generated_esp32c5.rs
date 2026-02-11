@@ -265,6 +265,20 @@ macro_rules! property {
 ///     todo!()
 /// }
 ///
+/// // LEDC_SCLK
+///
+/// fn enable_ledc_sclk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_ledc_sclk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<LedcSclkConfig>,
+///     _new_selector: LedcSclkConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // HP_ROOT_CLK
 ///
 /// fn enable_hp_root_clk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -460,6 +474,17 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
+        /// The list of clock signals that the `LEDC_SCLK` multiplexer can output.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum LedcSclkConfig {
+            /// Selects `PLL_F80M`.
+            PllF80m,
+            /// Selects `RC_FAST_CLK`.
+            RcFastClk,
+            /// Selects `XTAL_CLK`.
+            XtalClk,
+        }
         /// The list of clock signals that the `HP_ROOT_CLK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -619,6 +644,7 @@ macro_rules! define_clock_tree_types {
         /// Represents the device's clock tree.
         pub struct ClockTree {
             xtal_clk: Option<XtalClkConfig>,
+            ledc_sclk: Option<LedcSclkConfig>,
             hp_root_clk: Option<HpRootClkConfig>,
             cpu_clk: Option<CpuClkConfig>,
             ahb_clk: Option<AhbClkConfig>,
@@ -644,6 +670,7 @@ macro_rules! define_clock_tree_types {
             pll_f60m_refcount: u32,
             pll_f80m_refcount: u32,
             pll_f120m_refcount: u32,
+            ledc_sclk_refcount: u32,
             hp_root_clk_refcount: u32,
             cpu_clk_refcount: u32,
             apb_clk_refcount: u32,
@@ -665,6 +692,10 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the XTAL_CLK clock tree node
             pub fn xtal_clk(&self) -> Option<XtalClkConfig> {
                 self.xtal_clk
+            }
+            /// Returns the current configuration of the LEDC_SCLK clock tree node
+            pub fn ledc_sclk(&self) -> Option<LedcSclkConfig> {
+                self.ledc_sclk
             }
             /// Returns the current configuration of the HP_ROOT_CLK clock tree node
             pub fn hp_root_clk(&self) -> Option<HpRootClkConfig> {
@@ -722,6 +753,7 @@ macro_rules! define_clock_tree_types {
         static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
             ::esp_sync::NonReentrantMutex::new(ClockTree {
                 xtal_clk: None,
+                ledc_sclk: None,
                 hp_root_clk: None,
                 cpu_clk: None,
                 ahb_clk: None,
@@ -747,6 +779,7 @@ macro_rules! define_clock_tree_types {
                 pll_f60m_refcount: 0,
                 pll_f80m_refcount: 0,
                 pll_f120m_refcount: 0,
+                ledc_sclk_refcount: 0,
                 hp_root_clk_refcount: 0,
                 cpu_clk_refcount: 0,
                 apb_clk_refcount: 0,
@@ -1021,6 +1054,60 @@ macro_rules! define_clock_tree_types {
         }
         pub fn pll_f240m_frequency(clocks: &mut ClockTree) -> u32 {
             (pll_clk_frequency(clocks) / 2)
+        }
+        pub fn configure_ledc_sclk(clocks: &mut ClockTree, new_selector: LedcSclkConfig) {
+            let old_selector = clocks.ledc_sclk.replace(new_selector);
+            if clocks.ledc_sclk_refcount > 0 {
+                match new_selector {
+                    LedcSclkConfig::PllF80m => request_pll_f80m(clocks),
+                    LedcSclkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    LedcSclkConfig::XtalClk => request_xtal_clk(clocks),
+                }
+                configure_ledc_sclk_impl(clocks, old_selector, new_selector);
+                if let Some(old_selector) = old_selector {
+                    match old_selector {
+                        LedcSclkConfig::PllF80m => release_pll_f80m(clocks),
+                        LedcSclkConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        LedcSclkConfig::XtalClk => release_xtal_clk(clocks),
+                    }
+                }
+            } else {
+                configure_ledc_sclk_impl(clocks, old_selector, new_selector);
+            }
+        }
+        pub fn ledc_sclk_config(clocks: &mut ClockTree) -> Option<LedcSclkConfig> {
+            clocks.ledc_sclk
+        }
+        pub fn request_ledc_sclk(clocks: &mut ClockTree) {
+            trace!("Requesting LEDC_SCLK");
+            if increment_reference_count(&mut clocks.ledc_sclk_refcount) {
+                trace!("Enabling LEDC_SCLK");
+                match unwrap!(clocks.ledc_sclk) {
+                    LedcSclkConfig::PllF80m => request_pll_f80m(clocks),
+                    LedcSclkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    LedcSclkConfig::XtalClk => request_xtal_clk(clocks),
+                }
+                enable_ledc_sclk_impl(clocks, true);
+            }
+        }
+        pub fn release_ledc_sclk(clocks: &mut ClockTree) {
+            trace!("Releasing LEDC_SCLK");
+            if decrement_reference_count(&mut clocks.ledc_sclk_refcount) {
+                trace!("Disabling LEDC_SCLK");
+                enable_ledc_sclk_impl(clocks, false);
+                match unwrap!(clocks.ledc_sclk) {
+                    LedcSclkConfig::PllF80m => release_pll_f80m(clocks),
+                    LedcSclkConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    LedcSclkConfig::XtalClk => release_xtal_clk(clocks),
+                }
+            }
+        }
+        pub fn ledc_sclk_frequency(clocks: &mut ClockTree) -> u32 {
+            match unwrap!(clocks.ledc_sclk) {
+                LedcSclkConfig::PllF80m => pll_f80m_frequency(clocks),
+                LedcSclkConfig::RcFastClk => rc_fast_clk_frequency(clocks),
+                LedcSclkConfig::XtalClk => xtal_clk_frequency(clocks),
+            }
         }
         pub fn configure_hp_root_clk(clocks: &mut ClockTree, new_selector: HpRootClkConfig) {
             let old_selector = clocks.hp_root_clk.replace(new_selector);
@@ -1705,6 +1792,8 @@ macro_rules! define_clock_tree_types {
         pub struct ClockConfig {
             /// `XTAL_CLK` configuration.
             pub xtal_clk: Option<XtalClkConfig>,
+            /// `LEDC_SCLK` configuration.
+            pub ledc_sclk: Option<LedcSclkConfig>,
             /// `HP_ROOT_CLK` configuration.
             pub hp_root_clk: Option<HpRootClkConfig>,
             /// `CPU_CLK` configuration.
@@ -1725,6 +1814,9 @@ macro_rules! define_clock_tree_types {
                 ClockTree::with(|clocks| {
                     if let Some(config) = self.xtal_clk {
                         configure_xtal_clk(clocks, config);
+                    }
+                    if let Some(config) = self.ledc_sclk {
+                        configure_ledc_sclk(clocks, config);
                     }
                     if let Some(config) = self.hp_root_clk {
                         configure_hp_root_clk(clocks, config);

@@ -32,7 +32,7 @@ define_clock_tree_types!();
 pub enum CpuClock {
     /// 80 MHz CPU clock
     #[default]
-    _80MHz  = 80,
+    _80MHz = 80,
 
     /// 160 MHz CPU clock
     _160MHz = 160,
@@ -48,6 +48,7 @@ impl CpuClock {
         cpu_clk: Some(CpuClkConfig(1)),
         ahb_clk: Some(AhbClkConfig(3)), // 40MHz - cannot exceed XTAL_CLK
         apb_clk: Some(ApbClkConfig(0)),
+        ledc_sclk: Some(LedcSclkConfig::PllF80m),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         timg_calibration_clock: None,
@@ -58,6 +59,7 @@ impl CpuClock {
         cpu_clk: Some(CpuClkConfig(0)),
         ahb_clk: Some(AhbClkConfig(3)), // 40MHz - cannot exceed XTAL_CLK
         apb_clk: Some(ApbClkConfig(0)),
+        ledc_sclk: Some(LedcSclkConfig::PllF80m),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         timg_calibration_clock: None,
@@ -68,6 +70,7 @@ impl CpuClock {
         cpu_clk: Some(CpuClkConfig(0)),
         ahb_clk: Some(AhbClkConfig(5)), // 40MHz - cannot exceed XTAL_CLK
         apb_clk: Some(ApbClkConfig(0)),
+        ledc_sclk: Some(LedcSclkConfig::PllF80m),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         timg_calibration_clock: None,
@@ -385,6 +388,28 @@ fn configure_apb_clk_impl(_clocks: &mut ClockTree, new_config: ApbClkConfig) {
     PCR::regs()
         .apb_freq_conf()
         .modify(|_, w| unsafe { w.apb_div_num().bits(new_config.value() as u8) });
+}
+
+// LEDC_SCLK
+
+fn enable_ledc_sclk_impl(_clocks: &mut ClockTree, en: bool) {
+    PCR::regs()
+        .ledc_sclk_conf()
+        .modify(|_, w| w.ledc_sclk_en().bit(en));
+}
+
+fn configure_ledc_sclk_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<LedcSclkConfig>,
+    new_selector: LedcSclkConfig,
+) {
+    PCR::regs().ledc_sclk_conf().modify(|_, w| unsafe {
+        w.ledc_sclk_sel().bits(match new_selector {
+            LedcSclkConfig::XtalClk => 0,
+            LedcSclkConfig::RcFastClk => 1,
+            LedcSclkConfig::PllF80m => 2,
+        })
+    });
 }
 
 // XTAL_D2_CLK

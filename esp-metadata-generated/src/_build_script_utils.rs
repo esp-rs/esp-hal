@@ -1761,6 +1761,7 @@ impl Chip {
                     "soc_has_clock_node_pll_f120m",
                     "soc_has_clock_node_pll_f160m",
                     "soc_has_clock_node_pll_f240m",
+                    "soc_has_clock_node_ledc_sclk",
                     "soc_has_clock_node_hp_root_clk",
                     "soc_has_clock_node_cpu_clk",
                     "soc_has_clock_node_ahb_clk",
@@ -1918,6 +1919,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_pll_f120m",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_f160m",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_f240m",
+                    "cargo:rustc-cfg=soc_has_clock_node_ledc_sclk",
                     "cargo:rustc-cfg=soc_has_clock_node_hp_root_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_cpu_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_ahb_clk",
@@ -4985,6 +4987,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f120m)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f160m)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f240m)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ledc_sclk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_hp_root_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ahb_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_xtal_d2_clk)");
@@ -5018,7 +5021,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_mspi_fast_hs_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_mspi_fast_ls_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_mspi_fast_clk)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ledc_sclk)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_can_estimate_nack_reason)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_tx_loop_auto_stop)");

@@ -142,6 +142,16 @@ impl<'d> Ledc<'d> {
     #[cfg(not(esp32))]
     /// Set global slow clock source
     pub fn set_global_slow_clock(&mut self, clock_source: LSGlobalClkSource) {
+        #[cfg(soc_has_clock_node_ledc_sclk)]
+        let ledc_sclk = match clock_source {
+            LSGlobalClkSource::APBClk => crate::soc::clocks::LedcSclkConfig::PllF80m,
+        };
+
+        #[cfg(soc_has_clock_node_ledc_sclk)]
+        crate::soc::clocks::ClockTree::with(|clocks| {
+            crate::soc::clocks::configure_ledc_sclk(clocks, ledc_sclk);
+        });
+
         #[cfg(any(esp32c5, esp32c6, esp32h2))]
         let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
 
