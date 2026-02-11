@@ -75,7 +75,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | IOMUX              | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Camera interface   | ❌    |          |          |          |          |          | ❌       | ⚒️      |
 | RGB display        | ⚒️   |          |          |          |          |          | ❌       | ⚒️      |
-| LEDC               | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| LEDC               | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | MCPWM              | ⚒️   |          |          |          | ⚒️      | ⚒️      |          | ⚒️      |
 | PARL_IO            |       |          |          |          | ⚒️      | ⚒️      |          |          |
 | PCNT               | ⚒️   |          |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |

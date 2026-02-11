@@ -41,7 +41,7 @@ peripherals = [
     { name = "INTPRI" },
     { name = "IO_MUX" },
     { name = "KEYMNG" },
-    # { name = "LEDC" }, # TODO: define later
+    { name = "LEDC" },
     { name = "LP_ANA" },
     { name = "LP_AON" },
     # { name = "LP_APM" },
@@ -228,6 +228,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Timg1", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup1_conf", peripheral = "tg1", peri_clk_template = "{{control}}::regs().timergroup1_timer_clk_conf().modify(|_, w| w.tg1_timer_clk_en().bit(enable));" }, clocks = "Timg0" },
 
     { name = "Pcnt" },
+    { name = "Ledc" },
     { name = "Systimer", keep_enabled = true }, # can be clocked from XTAL_CLK or RC_FAST_CLK, the latter has no divider?
     { name = "Dma", template_params = { peripheral = "gdma" } },
     { name = "Spi2" },
@@ -507,4 +508,5 @@ peripheral_controls_mem_clk = true
 # ## Miscellaneous
 # [device.io_mux]
 [device.systimer]
+[device.ledc]
 [device.pcnt]
