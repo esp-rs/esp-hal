@@ -27,12 +27,13 @@
 //! You will also need a dynamic memory allocator, and a preemptive task scheduler in your
 //! application. For the dynamic allocator, we recommend using `esp-alloc`. For the task scheduler,
 //! the simplest option that is supported by us is `esp-rtos`, but you may use Ariel
-//! OS or other operating systems as well.
+//! OS or other operating systems as well. Please note that the scheduler is not needed for
+//! 802.15.4.
 //!
 //! ```rust, no_run
 //! # #![no_std]
 //! # #![no_main]
-//! # use esp_hal::{   
+//! # use esp_hal::{
 //! #    gpio::{Io, Level, Output, OutputConfig},
 //! #    main,
 //! #    time::{Duration, Instant},
@@ -57,15 +58,26 @@
 //! let sw_interrupt =
 //!    esp_hal::interrupt::software::SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 //!
-//! // THIS IS IMPORTANT: You MUST start the scheduler before initiallizing the radio!
+//! // THIS IS IMPORTANT FOR WIFI AND BLE: You MUST start the scheduler before initiallizing the radio!
 //! esp_rtos::start(timg0.timer0, sw_interrupt.software_interrupt0);
-//!
-//! // Now the radio can be initialized and used.
-//!
+#![cfg_attr(
+    wifi_driver_supported,
+    doc = r#"
+
+if let Ok((controller, interfaces)) = esp_radio::wifi::new(peripherals.WIFI, Default::default()) {}
+"#
+)]
+#![cfg_attr(
+    all(bt_driver_supported, not(wifi_driver_supported)),
+    doc = r#"
+
+# use esp_radio::ble::controller::BleConnector;
+if let Ok(controller) = BleConnector::new(peripherals.BT, Default::default()) {}
+"#
+)]
 //! # loop {}
 //! # }
 //! ```
-//!
 //! ```toml
 //! [dependencies.esp-radio]
 //! # A supported chip needs to be specified, as well as specific use-case features
