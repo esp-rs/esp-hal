@@ -201,6 +201,9 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         31
     };
+    ("ledc.has_gamma_fade") => {
+        true
+    };
     ("rmt.ram_start") => {
         1610642432
     };

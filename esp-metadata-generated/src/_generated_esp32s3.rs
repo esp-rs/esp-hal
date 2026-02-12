@@ -192,6 +192,9 @@ macro_rules! property {
     ("interrupts.status_registers", str) => {
         stringify!(4)
     };
+    ("ledc.has_gamma_fade") => {
+        false
+    };
     ("rmt.ram_start") => {
         1610704896
     };

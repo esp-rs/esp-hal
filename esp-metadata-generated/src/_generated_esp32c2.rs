@@ -186,6 +186,9 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
+    ("ledc.has_gamma_fade") => {
+        false
+    };
     ("rng.apb_cycle_wait_num") => {
         16
     };

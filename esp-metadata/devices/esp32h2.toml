@@ -589,6 +589,7 @@ deep_sleep = true
 ## Interfaces
 [device.i2s]
 [device.ledc]
+has_gamma_fade = true
 [device.mcpwm]
 [device.parl_io]
 [device.pcnt]

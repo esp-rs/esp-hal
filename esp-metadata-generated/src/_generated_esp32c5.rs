@@ -138,6 +138,9 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
+    ("ledc.has_gamma_fade") => {
+        true
+    };
     ("spi_master.supports_dma") => {
         false
     };

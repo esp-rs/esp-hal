@@ -514,4 +514,5 @@ peripheral_controls_mem_clk = true
 # [device.io_mux]
 [device.systimer]
 [device.ledc]
+has_gamma_fade = true
 [device.pcnt]

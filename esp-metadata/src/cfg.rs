@@ -496,7 +496,10 @@ driver_configs![
     LedcProperties {
         driver: ledc,
         name: "LEDC",
-        properties: {}
+        properties: {
+            #[serde(default)]
+            has_gamma_fade: bool,
+        }
     },
     McpwmProperties {
         driver: mcpwm,

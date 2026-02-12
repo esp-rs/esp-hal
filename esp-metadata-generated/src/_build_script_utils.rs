@@ -1793,6 +1793,7 @@ impl Chip {
                     "gpio_output_signal_max=\"256\"",
                     "interrupts_status_registers=\"3\"",
                     "interrupt_controller=\"clic\"",
+                    "ledc_has_gamma_fade",
                     "spi_master_has_app_interrupts",
                     "spi_master_has_dma_segmented_transfer",
                     "spi_master_has_clk_pre_div",
@@ -1951,6 +1952,7 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_output_signal_max=\"256\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=interrupt_controller=\"clic\"",
+                    "cargo:rustc-cfg=ledc_has_gamma_fade",
                     "cargo:rustc-cfg=spi_master_has_app_interrupts",
                     "cargo:rustc-cfg=spi_master_has_dma_segmented_transfer",
                     "cargo:rustc-cfg=spi_master_has_clk_pre_div",
@@ -2297,6 +2299,7 @@ impl Chip {
                     "lp_i2c_master_fifo_size=\"16\"",
                     "interrupts_status_registers=\"3\"",
                     "interrupt_controller=\"plic\"",
+                    "ledc_has_gamma_fade",
                     "rmt_ram_start=\"1610638336\"",
                     "rmt_channel_ram_size=\"48\"",
                     "rmt_has_tx_immediate_stop",
@@ -2562,6 +2565,7 @@ impl Chip {
                     "cargo:rustc-cfg=lp_i2c_master_fifo_size=\"16\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=interrupt_controller=\"plic\"",
+                    "cargo:rustc-cfg=ledc_has_gamma_fade",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610638336\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
                     "cargo:rustc-cfg=rmt_has_tx_immediate_stop",
@@ -2939,6 +2943,7 @@ impl Chip {
                     "i2c_master_fifo_size=\"32\"",
                     "interrupts_status_registers=\"2\"",
                     "interrupt_controller=\"plic\"",
+                    "ledc_has_gamma_fade",
                     "rmt_ram_start=\"1610642432\"",
                     "rmt_channel_ram_size=\"48\"",
                     "rmt_has_tx_immediate_stop",
@@ -3165,6 +3170,7 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"2\"",
                     "cargo:rustc-cfg=interrupt_controller=\"plic\"",
+                    "cargo:rustc-cfg=ledc_has_gamma_fade",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610642432\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
                     "cargo:rustc-cfg=rmt_has_tx_immediate_stop",
@@ -4995,6 +5001,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_lp_slow_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg_calibration_clock)");
     println!("cargo:rustc-check-cfg=cfg(dma_separate_in_out_interrupts)");
+    println!("cargo:rustc-check-cfg=cfg(ledc_has_gamma_fade)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_has_clk_pre_div)");
     println!("cargo:rustc-check-cfg=cfg(uart_peripheral_controls_mem_clk)");
     println!("cargo:rustc-check-cfg=cfg(esp32c6)");
