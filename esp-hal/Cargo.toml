@@ -113,6 +113,8 @@ esp32h2 = { version = "0.18", features = ["critical-section", "rt"], optional = 
 esp32s2 = { version = "0.30", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "17ac10a" }
 esp32s3 = { version = "0.34", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "17ac10a" }
 
+esp-println = { path = "../esp-println", features = ["log-04", "esp32c5"] }
+
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.15.0" }
 esp-riscv-rt     = { version = "0.13.0", path = "../esp-riscv-rt", optional = true }

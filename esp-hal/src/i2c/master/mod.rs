@@ -2207,11 +2207,14 @@ impl Driver<'_> {
 
     /// Waits for the completion of an I2C transaction.
     fn wait_for_completion_blocking(&self, deadline: Option<Instant>) -> Result<(), Error> {
+        esp_println::println!("create future");
         let mut future =
             I2cFuture::new_blocking(Event::TxComplete | Event::EndDetect, *self, deadline);
+        esp_println::println!("nope");
         loop {
             if let Poll::Ready(result) = future.poll_completion() {
                 result?;
+                esp_println::println!("woah");
                 return self.check_all_commands_done_blocking(deadline);
             }
         }
@@ -2478,16 +2481,21 @@ impl Driver<'_> {
         stop: bool,
         deadline: Deadline,
     ) -> Result<(), Error> {
+        esp_println::println!("validate write");
         address.validate()?;
+        esp_println::println!("reset before trans");
         self.reset_before_transmission();
 
         // Short circuit for zero length writes without start or end as that would be an
         // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
+        esp_println::println!("is empty?");
         if bytes.is_empty() && !start && !stop {
             return Ok(());
         }
 
+        esp_println::println!("start op");
         let deadline = self.start_write_operation(address, bytes, start, stop, deadline)?;
+        esp_println::println!("wait for completion");
         self.wait_for_completion_blocking(deadline)?;
 
         Ok(())
@@ -2625,12 +2633,14 @@ impl Driver<'_> {
         stop: bool,
         deadline: Deadline,
     ) -> Result<(), Error> {
+        esp_println::println!("is empty?");
         if buffer.is_empty() {
             return self.write_operation_blocking(address, &[], start, stop, deadline);
         }
 
         let chunk_count = VariableChunkIter::new(buffer).count();
         for (idx, chunk) in VariableChunkIter::new(buffer).enumerate() {
+            esp_println::println!("chunk");
             self.write_operation_blocking(
                 address,
                 chunk,
@@ -2638,6 +2648,7 @@ impl Driver<'_> {
                 stop && idx == chunk_count - 1,
                 deadline,
             )?;
+            esp_println::println!("nevah");
         }
 
         Ok(())
@@ -2702,7 +2713,9 @@ impl Driver<'_> {
         address: I2cAddress,
         operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
+        esp_println::println!("validate");
         address.validate()?;
+        esp_println::println!("ensure");
         self.ensure_idle_blocking();
 
         let mut deadline = Deadline::None;
@@ -2713,21 +2726,25 @@ impl Driver<'_> {
 
         let mut last_op: Option<OpKind> = None;
         // filter out 0 length read operations
+        esp_println::println!("filter");
         let mut op_iter = operations
             .filter(|op| op.is_write() || !op.is_empty())
             .peekable();
 
+        esp_println::println!("while");
         while let Some(op) = op_iter.next() {
             let next_op = op_iter.peek().map(|v| v.kind());
             let kind = op.kind();
             match op {
                 Operation::Write(buffer) => {
+                    esp_println::println!("write");
                     // execute a write operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
                     if let SoftwareTimeout::PerByte(timeout) = self.config.config.software_timeout {
                         deadline = Deadline::PerByte(timeout);
                     }
+                    esp_println::println!("before write_block");
                     self.write_blocking(
                         address,
                         buffer,
@@ -2735,8 +2752,10 @@ impl Driver<'_> {
                         next_op.is_none(),
                         deadline,
                     )?;
+                    esp_println::println!("haha nope you");
                 }
                 Operation::Read(buffer) => {
+                    esp_println::println!("read");
                     if let SoftwareTimeout::PerByte(timeout) = self.config.config.software_timeout {
                         deadline = Deadline::PerByte(timeout);
                     }

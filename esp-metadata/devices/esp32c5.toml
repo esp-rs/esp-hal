@@ -454,7 +454,7 @@ instances = [
     { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
 ]
 has_fsm_timeouts = true # why not S2? 
-has_hw_bus_clear = true
+# has_hw_bus_clear = true
 ll_intr_mask = 0x3ffff
 fifo_size = 32
 has_bus_timeout_enable = true
@@ -466,8 +466,8 @@ has_arbitration_en = true
 has_tx_fifo_watermark = true # why not s2
 bus_timeout_is_exponential = true
 
-# # [device.i2c_slave]
-# # support_status = "not_supported"
+[device.i2c_slave]
+support_status = "not_supported"
 
 [device.interrupts]
 support_status = "partial"
