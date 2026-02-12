@@ -9,12 +9,15 @@
 //! duty cycles and frequencies, making it ideal for Pulse-Width Modulation
 //! (PWM) applications and LED lighting control.
 //!
-//! LEDC uses APB as clock source.
+//! LEDC timer source clock is chip-specific.
 
 #[cfg(esp32)]
 use super::HighSpeed;
 use super::{LowSpeed, Speed};
-use crate::{clock::Clocks, pac, time::Rate};
+use crate::clock::Clocks;
+#[cfg(soc_has_clock_node_ledc_sclk)]
+use crate::soc::clocks::ClockTree;
+use crate::{pac, time::Rate};
 
 const LEDC_TIMER_DIV_NUM_MAX: u64 = 0x3FFFF;
 
@@ -315,8 +318,21 @@ impl TimerHW<LowSpeed> for Timer<'_, LowSpeed> {
     fn freq_hw(&self) -> Option<Rate> {
         self.clock_source.map(|source| match source {
             LSClockSource::APBClk => {
-                let clocks = Clocks::get();
-                clocks.apb_clock
+                #[cfg(soc_has_clock_node_ledc_sclk)]
+                {
+                    ClockTree::with(|clocks| {
+                        if crate::soc::clocks::ledc_sclk_config(clocks).is_some() {
+                            Rate::from_hz(crate::soc::clocks::ledc_sclk_frequency(clocks))
+                        } else {
+                            Clocks::get().apb_clock
+                        }
+                    })
+                }
+                #[cfg(not(soc_has_clock_node_ledc_sclk))]
+                {
+                    let clocks = Clocks::get();
+                    clocks.apb_clock
+                }
             }
         })
     }

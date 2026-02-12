@@ -12,9 +12,7 @@
 use super::timer::{TimerIFace, TimerSpeed};
 use crate::{
     gpio::{
-        DriveMode,
-        OutputConfig,
-        OutputSignal,
+        DriveMode, OutputConfig, OutputSignal,
         interconnect::{self, PeripheralOutput},
     },
     pac::ledc::RegisterBlock,
@@ -65,10 +63,10 @@ pub enum Number {
     Channel4 = 4,
     /// Channel 5
     Channel5 = 5,
-    #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+    #[cfg(not(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32h2)))]
     /// Channel 6
     Channel6 = 6,
-    #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+    #[cfg(not(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32h2)))]
     /// Channel 7
     Channel7 = 7,
 }
@@ -335,6 +333,40 @@ mod ehal1 {
 }
 
 impl<S: crate::ledc::timer::TimerSpeed> Channel<'_, S> {
+    #[cfg(esp32c5)]
+    const C5_GAMMA_RAM_BASE_OFFSET: usize = 0x400;
+    #[cfg(esp32c5)]
+    const C5_GAMMA_RAM_CHANNEL_STRIDE: usize = 0x40;
+    #[cfg(esp32c5)]
+    const C5_GAMMA_RANGE_COUNT: usize = 16;
+
+    #[cfg(esp32c5)]
+    fn c5_enable_gamma_ram_clock(&self) {
+        self.ledc.conf().modify(|_, w| match self.number {
+            Number::Channel0 => w.gamma_ram_clk_en_ch0().set_bit(),
+            Number::Channel1 => w.gamma_ram_clk_en_ch1().set_bit(),
+            Number::Channel2 => w.gamma_ram_clk_en_ch2().set_bit(),
+            Number::Channel3 => w.gamma_ram_clk_en_ch3().set_bit(),
+            Number::Channel4 => w.gamma_ram_clk_en_ch4().set_bit(),
+            Number::Channel5 => w.gamma_ram_clk_en_ch5().set_bit(),
+        });
+    }
+
+    #[cfg(esp32c5)]
+    fn c5_write_gamma_range(&self, range: usize, value: u32) {
+        let offset = Self::C5_GAMMA_RAM_BASE_OFFSET
+            + (self.number as usize) * Self::C5_GAMMA_RAM_CHANNEL_STRIDE
+            + range * core::mem::size_of::<u32>();
+
+        let reg = (LEDC::PTR as *mut u8).wrapping_add(offset).cast::<u32>();
+
+        unsafe {
+            // SAFETY: `reg` is computed from the LEDC peripheral base and points to one
+            // of the documented gamma RAM entries for this channel/range.
+            reg.write_volatile(value);
+        }
+    }
+
     #[cfg(esp32)]
     fn set_channel(&mut self, timer_number: u8) {
         if S::IS_HS {
@@ -362,7 +394,7 @@ impl<S: crate::ledc::timer::TimerSpeed> Channel<'_, S> {
         }
 
         // this is needed to make low duty-resolutions / high frequencies work
-        #[cfg(any(esp32h2, esp32c6))]
+        #[cfg(any(esp32c6, esp32h2))]
         self.ledc
             .ch_gamma_wr_addr(self.number as usize)
             .write(|w| unsafe { w.bits(0) });
@@ -412,7 +444,14 @@ impl<S: crate::ledc::timer::TimerSpeed> Channel<'_, S> {
             }
         });
     }
-    #[cfg(not(any(esp32, esp32c6, esp32h2)))]
+    #[cfg(esp32c5)]
+    fn start_duty_without_fading(&self) {
+        self.ledc
+            .ch(self.number as usize)
+            .conf1()
+            .write(|w| w.duty_start().set_bit());
+    }
+    #[cfg(not(any(esp32, esp32c5, esp32c6, esp32h2)))]
     fn start_duty_without_fading(&self) {
         self.ledc.ch(self.number as usize).conf1().write(|w| {
             w.duty_start().set_bit();
@@ -499,7 +538,35 @@ impl<S: crate::ledc::timer::TimerSpeed> Channel<'_, S> {
             .write(|w| unsafe { w.ch_gamma_entry_num().bits(0x1) });
     }
 
-    #[cfg(not(any(esp32, esp32c6, esp32h2)))]
+    #[cfg(esp32c5)]
+    fn start_duty_fade_inner(
+        &self,
+        duty_inc: bool,
+        duty_steps: u16,
+        cycles_per_step: u16,
+        duty_per_cycle: u16,
+    ) {
+        let cnum = self.number as usize;
+        let range_cfg = u32::from(duty_inc)
+            | (u32::from(cycles_per_step) << 1)
+            | (u32::from(duty_per_cycle) << 11)
+            | (u32::from(duty_steps) << 21);
+
+        self.c5_enable_gamma_ram_clock();
+        self.c5_write_gamma_range(0, range_cfg);
+        for range in 1..Self::C5_GAMMA_RANGE_COUNT {
+            self.c5_write_gamma_range(range, 0);
+        }
+        self.ledc
+            .ch_gamma_conf(cnum)
+            .write(|w| unsafe { w.ch_gamma_entry_num().bits(0x1) });
+        self.ledc
+            .ch(cnum)
+            .conf1()
+            .write(|w| w.duty_start().set_bit());
+    }
+
+    #[cfg(not(any(esp32, esp32c5, esp32c6, esp32h2)))]
     fn start_duty_fade_inner(
         &self,
         duty_inc: bool,
@@ -583,9 +650,9 @@ where
                     Number::Channel3 => OutputSignal::LEDC_LS_SIG3,
                     Number::Channel4 => OutputSignal::LEDC_LS_SIG4,
                     Number::Channel5 => OutputSignal::LEDC_LS_SIG5,
-                    #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+                    #[cfg(not(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32h2)))]
                     Number::Channel6 => OutputSignal::LEDC_LS_SIG6,
-                    #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+                    #[cfg(not(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32h2)))]
                     Number::Channel7 => OutputSignal::LEDC_LS_SIG7,
                 }
             };
@@ -597,9 +664,9 @@ where
                 Number::Channel3 => OutputSignal::LEDC_LS_SIG3,
                 Number::Channel4 => OutputSignal::LEDC_LS_SIG4,
                 Number::Channel5 => OutputSignal::LEDC_LS_SIG5,
-                #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+                #[cfg(not(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32h2)))]
                 Number::Channel6 => OutputSignal::LEDC_LS_SIG6,
-                #[cfg(not(any(esp32c2, esp32c3, esp32c6, esp32h2)))]
+                #[cfg(not(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32h2)))]
                 Number::Channel7 => OutputSignal::LEDC_LS_SIG7,
             };
 
@@ -672,7 +739,31 @@ where
     }
 
     /// Start a duty-cycle fade HW
-    #[cfg(not(esp32))]
+    #[cfg(esp32c5)]
+    fn start_duty_fade_hw(
+        &self,
+        start_duty: u32,
+        duty_inc: bool,
+        duty_steps: u16,
+        cycles_per_step: u16,
+        duty_per_cycle: u16,
+    ) {
+        self.ledc
+            .ch(self.number as usize)
+            .duty()
+            .write(|w| unsafe { w.duty().bits(start_duty << 4) });
+        self.ledc
+            .int_clr()
+            .write(|w| w.duty_chng_end_ch(self.number as u8).clear_bit_by_one());
+        self.ledc
+            .int_ena()
+            .modify(|_, w| w.duty_chng_end_ch(self.number as u8).set_bit());
+        self.start_duty_fade_inner(duty_inc, duty_steps, cycles_per_step, duty_per_cycle);
+        self.update_channel();
+    }
+
+    /// Start a duty-cycle fade HW
+    #[cfg(not(any(esp32, esp32c5)))]
     fn start_duty_fade_hw(
         &self,
         start_duty: u32,
@@ -702,7 +793,16 @@ where
         }
     }
 
-    #[cfg(not(esp32))]
+    #[cfg(esp32c5)]
+    fn is_duty_fade_running_hw(&self) -> bool {
+        self.ledc
+            .int_st()
+            .read()
+            .duty_chng_end_ch(self.number as u8)
+            .bit_is_clear()
+    }
+
+    #[cfg(not(any(esp32, esp32c5)))]
     fn is_duty_fade_running_hw(&self) -> bool {
         self.ledc
             .int_raw()

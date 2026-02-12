@@ -1668,6 +1668,7 @@ impl Chip {
                     "soc_has_intpri",
                     "soc_has_io_mux",
                     "soc_has_keymng",
+                    "soc_has_ledc",
                     "soc_has_lp_ana",
                     "soc_has_lp_aon",
                     "soc_has_lp_apm0",
@@ -1731,6 +1732,7 @@ impl Chip {
                     "gpio_driver_supported",
                     "dedicated_gpio_driver_supported",
                     "interrupts_driver_supported",
+                    "ledc_driver_supported",
                     "pcnt_driver_supported",
                     "spi_master_driver_supported",
                     "spi_slave_driver_supported",
@@ -1763,6 +1765,7 @@ impl Chip {
                     "soc_has_clock_node_pll_f120m",
                     "soc_has_clock_node_pll_f160m",
                     "soc_has_clock_node_pll_f240m",
+                    "soc_has_clock_node_ledc_sclk",
                     "soc_has_clock_node_hp_root_clk",
                     "soc_has_clock_node_cpu_clk",
                     "soc_has_clock_node_ahb_clk",
@@ -1828,6 +1831,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_intpri",
                     "cargo:rustc-cfg=soc_has_io_mux",
                     "cargo:rustc-cfg=soc_has_keymng",
+                    "cargo:rustc-cfg=soc_has_ledc",
                     "cargo:rustc-cfg=soc_has_lp_ana",
                     "cargo:rustc-cfg=soc_has_lp_aon",
                     "cargo:rustc-cfg=soc_has_lp_apm0",
@@ -1891,6 +1895,7 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_driver_supported",
                     "cargo:rustc-cfg=dedicated_gpio_driver_supported",
                     "cargo:rustc-cfg=interrupts_driver_supported",
+                    "cargo:rustc-cfg=ledc_driver_supported",
                     "cargo:rustc-cfg=pcnt_driver_supported",
                     "cargo:rustc-cfg=spi_master_driver_supported",
                     "cargo:rustc-cfg=spi_slave_driver_supported",
@@ -1923,6 +1928,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_pll_f120m",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_f160m",
                     "cargo:rustc-cfg=soc_has_clock_node_pll_f240m",
+                    "cargo:rustc-cfg=soc_has_clock_node_ledc_sclk",
                     "cargo:rustc-cfg=soc_has_clock_node_hp_root_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_cpu_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_ahb_clk",
@@ -4991,6 +4997,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f120m)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f160m)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f240m)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ledc_sclk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_hp_root_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ahb_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_xtal_d2_clk)");
@@ -5024,7 +5031,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_mspi_fast_hs_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_mspi_fast_ls_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_mspi_fast_clk)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ledc_sclk)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_can_estimate_nack_reason)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_tx_loop_auto_stop)");
