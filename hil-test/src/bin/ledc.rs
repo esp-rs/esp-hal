@@ -22,65 +22,55 @@ use esp_hal::{
 };
 
 const PWM_FREQUENCY: Rate = Rate::from_khz(2);
-const SAMPLE_COUNT: usize = 400;
-const SAMPLE_INTERVAL_US: u32 = 37;
-const EDGE_POLL_INTERVAL_US: u32 = 2;
-const EDGE_WAIT_MAX_ITERS: usize = 100_000;
+const SAMPLE_COUNT: usize = 1_000_000;
 const PERIOD_SAMPLE_EDGES: usize = 32;
 const PERIOD_TOLERANCE_PERCENT: u32 = 20;
 
-fn sample_high_count(input: &Input<'_>, delay: &Delay) -> usize {
+fn sample_high_count(input: &Input<'_>) -> usize {
     let mut high_count = 0;
 
     for _ in 0..SAMPLE_COUNT {
         if input.is_high() {
             high_count += 1;
         }
-
-        delay.delay_micros(SAMPLE_INTERVAL_US);
+        core::hint::spin_loop();
     }
 
     high_count
 }
 
-fn wait_until_level(input: &Input<'_>, delay: &Delay, high: bool) -> bool {
-    for _ in 0..EDGE_WAIT_MAX_ITERS {
-        if input.is_high() == high {
-            return true;
+fn average_period_us(input: &Input<'_>, edges: usize) -> u32 {
+    assert!(edges > 1);
+
+    let mut prev = input.is_high();
+
+    // Wait for the first rising edge.
+    loop {
+        let now = input.is_high();
+        if !prev && now {
+            prev = now;
+            break;
         }
-
-        delay.delay_micros(EDGE_POLL_INTERVAL_US);
-    }
-
-    false
-}
-
-fn average_period_us(input: &Input<'_>, delay: &Delay, edges: usize) -> Option<u32> {
-    if edges < 2 {
-        return None;
-    }
-
-    // Synchronize to a clean rising edge.
-    if input.is_high() && !wait_until_level(input, delay, false) {
-        return None;
-    }
-    if !wait_until_level(input, delay, true) {
-        return None;
+        prev = now;
+        core::hint::spin_loop();
     }
 
     let first_edge = Instant::now();
+    let mut last_edge = first_edge;
+    let mut seen_edges = 1usize;
 
-    for _ in 0..(edges - 1) {
-        if !wait_until_level(input, delay, false) {
-            return None;
+    while seen_edges < edges {
+        let now = input.is_high();
+        if !prev && now {
+            seen_edges += 1;
+            last_edge = Instant::now();
         }
-        if !wait_until_level(input, delay, true) {
-            return None;
-        }
+        prev = now;
+        core::hint::spin_loop();
     }
 
-    let total_us = (Instant::now() - first_edge).as_micros() as u32;
-    Some(total_us / (edges as u32 - 1))
+    let total_us = (last_edge - first_edge).as_micros() as u32;
+    total_us / (edges as u32 - 1)
 }
 
 struct Context {
@@ -139,12 +129,12 @@ mod tests {
             .unwrap();
 
         delay.delay_millis(4);
-        let low_duty_high_count = sample_high_count(&input, &delay);
+        let low_duty_high_count = sample_high_count(&input);
 
         channel0.set_duty(80).unwrap();
 
         delay.delay_millis(4);
-        let high_duty_high_count = sample_high_count(&input, &delay);
+        let high_duty_high_count = sample_high_count(&input);
 
         assert!(low_duty_high_count < SAMPLE_COUNT * 2 / 5);
         assert!(high_duty_high_count > SAMPLE_COUNT * 3 / 5);
@@ -184,13 +174,13 @@ mod tests {
             .unwrap();
 
         delay.delay_millis(4);
-        let zero_duty_high_count = sample_high_count(&input, &delay);
+        let zero_duty_high_count = sample_high_count(&input);
         assert_eq!(zero_duty_high_count, 0);
 
         channel0.set_duty(50).unwrap();
         delay.delay_millis(4);
 
-        let mid_duty_high_count = sample_high_count(&input, &delay);
+        let mid_duty_high_count = sample_high_count(&input);
 
         assert!(mid_duty_high_count > SAMPLE_COUNT / 5);
         assert!(mid_duty_high_count < SAMPLE_COUNT * 4 / 5);
@@ -231,8 +221,7 @@ mod tests {
 
         delay.delay_millis(4);
 
-        let measured_period_us = average_period_us(&input, &delay, PERIOD_SAMPLE_EDGES)
-            .expect("failed to detect PWM edges while measuring period");
+        let measured_period_us = average_period_us(&input, PERIOD_SAMPLE_EDGES);
 
         let expected_period_us = 1_000_000u32 / PWM_FREQUENCY.as_hz();
         let min_period_us = expected_period_us * (100 - PERIOD_TOLERANCE_PERCENT) / 100;
@@ -282,7 +271,7 @@ mod tests {
             .unwrap();
 
         delay.delay_millis(6);
-        let initial_high_count = sample_high_count(&input, &delay);
+        let initial_high_count = sample_high_count(&input);
         assert!(initial_high_count < SAMPLE_COUNT / 3);
 
         channel0.start_duty_fade(10, 90, 200).unwrap();
@@ -301,7 +290,7 @@ mod tests {
         delay.delay_millis(260);
         assert!(!channel0.is_duty_fade_running());
 
-        let final_high_count = sample_high_count(&input, &delay);
+        let final_high_count = sample_high_count(&input);
         assert!(final_high_count > SAMPLE_COUNT * 2 / 3);
     }
 }
