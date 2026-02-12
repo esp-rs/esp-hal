@@ -1,6 +1,6 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "etm_availability" => {
-        cfg(soc_has_etm) => "The GPIO pins also provide tasks and events via the ETM interconnect system. For more information, see the [etm] module."
+        cfg(etm_driver_supported) => "The GPIO pins also provide tasks and events via the ETM interconnect system. For more information, see the [etm] module."
     }
 ))]
 //! # General Purpose Input/Output (GPIO)
