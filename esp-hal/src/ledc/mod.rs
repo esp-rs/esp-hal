@@ -164,9 +164,6 @@ impl<'d> Ledc<'d> {
         #[cfg(any(esp32c5, esp32c6, esp32h2))]
         let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
 
-        #[cfg(any(esp32c5, esp32c6, esp32h2))]
-        pcr.ledc_sclk_conf().write(|w| w.ledc_sclk_en().set_bit());
-
         match clock_source {
             LSGlobalClkSource::APBClk => {
                 #[cfg(not(any(esp32c5, esp32c6, esp32h2)))]
@@ -179,11 +176,15 @@ impl<'d> Ledc<'d> {
                     w.ledc_sclk_en().set_bit()
                 });
                 #[cfg(esp32c6)]
-                pcr.ledc_sclk_conf()
-                    .write(|w| unsafe { w.ledc_sclk_sel().bits(1) });
+                pcr.ledc_sclk_conf().modify(|_, w| unsafe {
+                    w.ledc_sclk_sel().bits(1);
+                    w.ledc_sclk_en().set_bit()
+                });
                 #[cfg(esp32h2)]
-                pcr.ledc_sclk_conf()
-                    .write(|w| unsafe { w.ledc_sclk_sel().bits(0) });
+                pcr.ledc_sclk_conf().modify(|_, w| unsafe {
+                    w.ledc_sclk_sel().bits(0);
+                    w.ledc_sclk_en().set_bit()
+                });
             }
         }
         self.ledc
