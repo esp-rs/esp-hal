@@ -2618,10 +2618,10 @@ impl WifiController<'_> {
     /// # {after_snippet}
     /// ```
     pub fn is_connected(&self) -> bool {
-        match crate::wifi::station_state() {
-            crate::wifi::WifiStationState::Connected => true,
-            _ => false,
-        }
+        matches!(
+            crate::wifi::station_state(),
+            crate::wifi::WifiStationState::Connected
+        )
     }
 
     fn mode(&self) -> Result<WifiMode, WifiError> {
