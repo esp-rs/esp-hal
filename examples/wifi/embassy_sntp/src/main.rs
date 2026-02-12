@@ -200,14 +200,14 @@ async fn main(spawner: Spawner) -> ! {
 async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
     loop {
-        if matches!(controller.is_connected(), Ok(true)) {
+        if controller.is_connected() {
             // wait until we're no longer connected
             let info = controller.wait_for_disconnect_async().await.ok();
             println!("Disconnected: {:?}", info);
             Timer::after(Duration::from_millis(5000)).await
         }
 
-        if !matches!(controller.is_started(), Ok(true)) {
+        if !controller.is_started() {
             let station_config = Config::Station(
                 StationConfig::default()
                     .with_ssid(SSID)

@@ -326,7 +326,7 @@ async fn connection(mut controller: WifiController<'static>) {
     println!("Wifi started!");
 
     loop {
-        if matches!(controller.is_started(), Ok(true)) {
+        if controller.is_started() {
             println!("About to connect...");
 
             match controller.connect_async().await {

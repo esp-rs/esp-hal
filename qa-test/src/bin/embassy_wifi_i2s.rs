@@ -56,7 +56,7 @@ async fn connection_manager(
 ) {
     println!("Starting WiFi connection manager");
 
-    if !matches!(controller.is_started(), Ok(true)) {
+    if !controller.is_started() {
         let station_config = Config::Station(
             StationConfig::default()
                 .with_ssid(SSID)
@@ -78,33 +78,30 @@ async fn connection_manager(
     }
 
     loop {
-        match controller.is_connected() {
-            Ok(true) => {
-                controller.wait_for_disconnect_async().await.ok();
-                println!("WiFi connection lost - attempting reconnection");
-                Timer::after(Duration::from_millis(2000)).await;
-                match controller.connect_async().await {
-                    Ok(_) => {
-                        println!("WiFi reconnected!");
-                        connected_signal.signal(true);
-                    }
-                    Err(e) => {
-                        println!("WiFi reconnection failed: {:?}", e);
-                        Timer::after(Duration::from_millis(5000)).await;
-                    }
+        if controller.is_connected() {
+            controller.wait_for_disconnect_async().await.ok();
+            println!("WiFi connection lost - attempting reconnection");
+            Timer::after(Duration::from_millis(2000)).await;
+            match controller.connect_async().await {
+                Ok(_) => {
+                    println!("WiFi reconnected!");
+                    connected_signal.signal(true);
+                }
+                Err(e) => {
+                    println!("WiFi reconnection failed: {:?}", e);
+                    Timer::after(Duration::from_millis(5000)).await;
                 }
             }
-            _ => {
-                println!("Reconnecting to WiFi network: {}", SSID);
-                match controller.connect_async().await {
-                    Ok(_) => {
-                        println!("WiFi connected!");
-                        connected_signal.signal(true);
-                    }
-                    Err(e) => {
-                        println!("WiFi connection failed: {:?}", e);
-                        Timer::after(Duration::from_millis(5000)).await;
-                    }
+        } else {
+            println!("Reconnecting to WiFi network: {}", SSID);
+            match controller.connect_async().await {
+                Ok(_) => {
+                    println!("WiFi connected!");
+                    connected_signal.signal(true);
+                }
+                Err(e) => {
+                    println!("WiFi connection failed: {:?}", e);
+                    Timer::after(Duration::from_millis(5000)).await;
                 }
             }
         }

@@ -230,7 +230,7 @@ async fn run_dhcp(stack: Stack<'static>, gw_ip_addr: &'static str) {
 async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
     loop {
-        if !matches!(controller.is_started(), Ok(true)) {
+        if !controller.is_started() {
             let station_config =
                 Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio"));
             controller.set_config(&station_config).unwrap();

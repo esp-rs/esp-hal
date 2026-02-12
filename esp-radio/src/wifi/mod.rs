@@ -2577,29 +2577,29 @@ impl WifiController<'_> {
     /// ```rust,no_run
     /// # {before_snippet}
     /// # let (controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
-    /// if controller.is_started()? {
+    /// if controller.is_started() {
     ///     println!("Wi-Fi is started");
     /// } else {
     ///     println!("Wi-Fi is not started");
     /// }
     /// # {after_snippet}
     /// ```
-    pub fn is_started(&self) -> Result<bool, WifiError> {
+    pub fn is_started(&self) -> bool {
         if matches!(
             crate::wifi::station_state(),
             WifiStationState::Started
                 | WifiStationState::Connected
                 | WifiStationState::Disconnected
         ) {
-            return Ok(true);
+            return true;
         }
         if matches!(
             crate::wifi::access_point_state(),
             WifiAccessPointState::Started
         ) {
-            return Ok(true);
+            return true;
         }
-        Ok(false)
+        false
     }
 
     #[procmacros::doc_replace]
@@ -2610,33 +2610,17 @@ impl WifiController<'_> {
     /// # {before_snippet}
     /// # use esp_radio::wifi::WifiError;
     /// # let (controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
-    /// match controller.is_connected() {
-    ///     Ok(true) => {
-    ///         println!("Station is connected");
-    ///     }
-    ///     Ok(false) => {
-    ///         println!("Station is not connected yet");
-    ///     }
-    ///     Err(e) => {
-    ///         println!("Failed to query connection state: {e:?}");
-    ///     }
+    /// if controller.is_connected() {
+    ///     println!("Station is connected");
+    /// } else {
+    ///     println!("Station is not connected yet");
     /// }
     /// # {after_snippet}
     /// ```
-    pub fn is_connected(&self) -> Result<bool, WifiError> {
+    pub fn is_connected(&self) -> bool {
         match crate::wifi::station_state() {
-            crate::wifi::WifiStationState::Connected => Ok(true),
-            crate::wifi::WifiStationState::Disconnected => {
-                // TODO is this really useful API?
-                Err(WifiError::Disconnected(DisconnectedStationInfo {
-                    ssid: Ssid::new("unknown"),
-                    bssid: [0u8; 6],
-                    reason: DisconnectReason::Unspecified,
-                    rssi: 0,
-                }))
-            }
-            // FIXME: Should any other enum value trigger an error instead of returning false?
-            _ => Ok(false),
+            crate::wifi::WifiStationState::Connected => true,
+            _ => false,
         }
     }
 
@@ -2798,7 +2782,7 @@ impl WifiController<'_> {
         // TODO: This might be racey when there is a start operation in progress but it didn't made
         // it to the state where the driver emits the Started event?
         // https://github.com/esp-rs/esp-hal/pull/4504#discussion_r2533184425
-        if !self.is_started()? {
+        if !self.is_started() {
             return Err(WifiError::NotStarted);
         }
 
@@ -2943,7 +2927,7 @@ impl WifiController<'_> {
     pub async fn disconnect_async(&mut self) -> Result<DisconnectedStationInfo, WifiError> {
         // If not connected it would wait forever for a `StationDisconnected` event that will never
         // happen. Return early instead of hanging.
-        if !matches!(self.is_connected(), Ok(true)) {
+        if !self.is_connected() {
             return Err(WifiError::NotConnected);
         }
 
@@ -2977,7 +2961,7 @@ impl WifiController<'_> {
     pub async fn wait_for_disconnect_async(&self) -> Result<DisconnectedStationInfo, WifiError> {
         // If not connected it would wait forever for a `StationDisconnected` event that will never
         // happen. Return early instead of hanging.
-        if !matches!(self.is_connected(), Ok(true)) {
+        if !self.is_connected() {
             return Err(WifiError::NotConnected);
         }
 

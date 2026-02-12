@@ -62,7 +62,7 @@ async fn main(_spawner: Spawner) {
             "===========================================#{}=========================================",
             i
         );
-        if controller.is_started().unwrap_or(false) {
+        if controller.is_started() {
             // Timer::after(Duration::from_secs(10)).await; // These sleeps delay reproducing the
             // bug, but do not prevent it
             controller.stop_async().await.unwrap();
