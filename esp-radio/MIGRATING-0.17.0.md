@@ -192,3 +192,21 @@ Migration Steps
 
 2. Update SSID access: When retrieving SSIDs from structs or events, use .as_str() to get the string representation:
     - Change ssid_value to ssid_value.as_str() when you need a string slice
+
+## Simplified WiFi Connection State Functions
+
+The `is_connected()` and `is_started()` functions in `WifiController` have been simplified to return a plain boolean instead of a `Result<bool, WifiError>`.
+
+This change removes the need to handle potential errors when checking connection states, making the API simpler to use.
+
+```diff
+- if matches!(controller.is_connected(), Ok(true)) {
++ if controller.is_connected() {
+      println!("Station is connected");
+  }
+
+- if matches!(controller.is_started(), Ok(true)) {
++ if controller.is_started() {
+      println!("Wi-Fi is started");
+  }
+```
