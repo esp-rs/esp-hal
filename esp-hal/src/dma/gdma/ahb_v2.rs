@@ -6,22 +6,9 @@ impl AnyGdmaTxChannel<'_> {
         DMA::regs().ch(self.channel as usize)
     }
 
-    #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
-    pub(super) fn int(&self) -> &pac::dma::int_ch::INT_CH {
-        DMA::regs().int_ch(self.channel as usize)
-    }
-
-    #[inline(always)]
-    #[cfg(any(esp32c6, esp32h2))]
     pub(super) fn int(&self) -> &pac::dma::out_int_ch::OUT_INT_CH {
         DMA::regs().out_int_ch(self.channel as usize)
-    }
-
-    #[cfg(esp32s3)]
-    #[inline(always)]
-    pub(super) fn int(&self) -> &pac::dma::ch::out_int::OUT_INT {
-        DMA::regs().ch(self.channel as usize).out_int()
     }
 }
 
@@ -53,13 +40,14 @@ impl RegisterAccess for AnyGdmaTxChannel<'_> {
     fn set_peripheral(&self, peripheral: u8) {
         self.ch()
             .out_peri_sel()
-            .modify(|_, w| unsafe { w.peri_out_sel().bits(peripheral) });
+            .write(|w| unsafe { w.peri_out_sel().bits(peripheral) });
     }
 
     fn set_link_addr(&self, address: u32) {
-        self.ch()
-            .out_link()
-            .modify(|_, w| unsafe { w.outlink_addr().bits(address) });
+        trace!("Setting out-link address to 0x{:08X}", address);
+        DMA::regs()
+            .out_link_addr_ch(self.channel as usize)
+            .write(|w| unsafe { w.outlink_addr().bits(address) });
     }
 
     fn start(&self) {
@@ -86,13 +74,6 @@ impl RegisterAccess for AnyGdmaTxChannel<'_> {
             .modify(|_, w| w.out_check_owner().bit(check_owner.unwrap_or(true)));
     }
 
-    #[cfg(esp32s3)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
-        self.ch()
-            .out_conf1()
-            .modify(|_, w| unsafe { w.out_ext_mem_bk_size().bits(size as u8) });
-    }
-
     #[cfg(psram_dma)]
     fn can_access_psram(&self) -> bool {
         true
@@ -101,13 +82,11 @@ impl RegisterAccess for AnyGdmaTxChannel<'_> {
 
 impl TxRegisterAccess for AnyGdmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s3)] {
-                 self.ch().outfifo_status().read().outfifo_empty_l3().bit_is_set()
-            } else {
-                 self.ch().outfifo_status().read().outfifo_empty().bit_is_set()
-            }
-        }
+        self.ch()
+            .outfifo_status()
+            .read()
+            .outfifo_empty()
+            .bit_is_set()
     }
 
     fn set_auto_write_back(&self, enable: bool) {
@@ -231,22 +210,10 @@ impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
     }
 
     fn is_async(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3))] {
-                TX_IS_ASYNC[self.channel as usize].load(portable_atomic::Ordering::Acquire)
-            } else {
-                true
-            }
-        }
+        true
     }
 
-    fn set_async(&self, _is_async: bool) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3))] {
-                TX_IS_ASYNC[self.channel as usize].store(_is_async, portable_atomic::Ordering::Release);
-            }
-        }
-    }
+    fn set_async(&self, _is_async: bool) {}
 }
 
 impl AnyGdmaRxChannel<'_> {
@@ -255,22 +222,9 @@ impl AnyGdmaRxChannel<'_> {
         DMA::regs().ch(self.channel as usize)
     }
 
-    #[cfg(any(esp32c2, esp32c3))]
     #[inline(always)]
-    fn int(&self) -> &pac::dma::int_ch::INT_CH {
-        DMA::regs().int_ch(self.channel as usize)
-    }
-
-    #[inline(always)]
-    #[cfg(any(esp32c6, esp32h2))]
     fn int(&self) -> &pac::dma::in_int_ch::IN_INT_CH {
         DMA::regs().in_int_ch(self.channel as usize)
-    }
-
-    #[cfg(esp32s3)]
-    #[inline(always)]
-    fn int(&self) -> &pac::dma::ch::in_int::IN_INT {
-        DMA::regs().ch(self.channel as usize).in_int()
     }
 }
 
@@ -302,13 +256,14 @@ impl RegisterAccess for AnyGdmaRxChannel<'_> {
     fn set_peripheral(&self, peripheral: u8) {
         self.ch()
             .in_peri_sel()
-            .modify(|_, w| unsafe { w.peri_in_sel().bits(peripheral) });
+            .write(|w| unsafe { w.peri_in_sel().bits(peripheral) });
     }
 
     fn set_link_addr(&self, address: u32) {
-        self.ch()
-            .in_link()
-            .modify(|_, w| unsafe { w.inlink_addr().bits(address) });
+        trace!("Setting in-link address to 0x{:08X}", address);
+        DMA::regs()
+            .in_link_addr_ch(self.channel as usize)
+            .write(|w| unsafe { w.inlink_addr().bits(address) });
     }
 
     fn start(&self) {
@@ -331,13 +286,6 @@ impl RegisterAccess for AnyGdmaRxChannel<'_> {
         self.ch()
             .in_conf1()
             .modify(|_, w| w.in_check_owner().bit(check_owner.unwrap_or(true)));
-    }
-
-    #[cfg(esp32s3)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
-        self.ch()
-            .in_conf1()
-            .modify(|_, w| unsafe { w.in_ext_mem_bk_size().bits(size as u8) });
     }
 
     #[cfg(psram_dma)]
@@ -468,22 +416,23 @@ impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel<'_> {
     }
 
     fn is_async(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3))] {
-                RX_IS_ASYNC[self.channel as usize].load(portable_atomic::Ordering::Acquire)
-            } else {
-                true
-            }
-        }
+        true
     }
 
-    fn set_async(&self, _is_async: bool) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3))] {
-                RX_IS_ASYNC[self.channel as usize].store(_is_async, portable_atomic::Ordering::Release);
-            }
-        }
-    }
+    fn set_async(&self, _is_async: bool) {}
 }
 
-pub(crate) fn setup() {}
+pub(crate) fn setup() {
+    // TODO: configure accessible memory range with non-hardcoded data
+    // let range = 0x4080_0000..0x4400_0000;
+    // trace!(
+    //     "Configuring accessible memory range: 0x{:x}..0x{:x}",
+    //     range.start, range.end
+    // );
+    // DMA::regs()
+    //     .intr_mem_start_addr()
+    //     .write(|w| unsafe { w.bits(range.start) });
+    // DMA::regs()
+    //     .intr_mem_end_addr()
+    //     .write(|w| unsafe { w.bits(range.end) });
+}

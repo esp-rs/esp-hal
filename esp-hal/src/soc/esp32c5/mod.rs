@@ -19,6 +19,11 @@ pub(crate) use esp32c5 as pac;
 pub(crate) mod constants {}
 
 pub(crate) fn pre_init() {
+    // Reset TEE security modes. This allows unrestricted access to TEE masters, including DMA.
+    // FIXME: this is a temporary workaround until we have a proper solution for TEE security modes.
+    for m in crate::peripherals::TEE::regs().m_mode_ctrl_iter() {
+        m.reset();
+    }
     // this is hacky, but for some reason we must reset the output enable register manually
     crate::peripherals::GPIO::regs().enable().reset();
 }
