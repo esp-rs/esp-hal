@@ -16,100 +16,103 @@
 //! * Calibration
 //! * Low-Power Management
 //! * Handling Watchdog Timers
-//!
-//! ## Examples
-//!
-//! ### Get time in ms from the RTC Timer
-//!
-//! ```rust, no_run
-//! # {before_snippet}
-//! # use core::time::Duration;
-//! # use esp_hal::{delay::Delay, rtc_cntl::Rtc};
-//!
-//! let rtc = Rtc::new(peripherals.LPWR);
-//! let delay = Delay::new();
-//!
-//! loop {
-//!     // Print the current RTC time in milliseconds
-//!     let time_ms = rtc.current_time_us() / 1000;
-//!     delay.delay_millis(1000);
-//!
-//!     // Set the time to half a second in the past
-//!     let new_time = rtc.current_time_us() - 500_000;
-//!     rtc.set_current_time_us(new_time);
-//! }
-//! # }
-//! ```
-//!
-//! ### RWDT usage
-//! ```rust, no_run
-//! # {before_snippet}
-//! # use core::cell::RefCell;
-//! # use critical_section::Mutex;
-//! # use esp_hal::delay::Delay;
-//! # use esp_hal::rtc_cntl::Rtc;
-//! # use esp_hal::rtc_cntl::Rwdt;
-//! # use esp_hal::rtc_cntl::RwdtStage;
-//! static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
-//!
-//! let mut delay = Delay::new();
-//! let mut rtc = Rtc::new(peripherals.LPWR);
-//!
-//! rtc.set_interrupt_handler(interrupt_handler);
-//! rtc.rwdt
-//!     .set_timeout(RwdtStage::Stage0, Duration::from_millis(2000));
-//! rtc.rwdt.listen();
-//!
-//! critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
-//! # {after_snippet}
-//!
-//! // Where the `LP_WDT` interrupt handler is defined as:
-//! # use core::cell::RefCell;
-//! # use critical_section::Mutex;
-//! # use esp_hal::rtc_cntl::Rwdt;
-//! # use esp_hal::rtc_cntl::RwdtStage;
-//! static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
-//!
-//! // Handle the corresponding interrupt
-//! #[handler]
-//! fn interrupt_handler() {
-//!     critical_section::with(|cs| {
-//!         println!("RWDT Interrupt");
-//!
-//!         let mut rwdt = RWDT.borrow_ref_mut(cs);
-//!         if let Some(rwdt) = rwdt.as_mut() {
-//!             rwdt.clear_interrupt();
-//!
-//!             println!("Restarting in 5 seconds...");
-//!
-//!             rwdt.set_timeout(RwdtStage::Stage0, Duration::from_millis(5000));
-//!             rwdt.unlisten();
-//!         }
-//!     });
-//! }
-//! ```
-//!
-//! ### Get time in ms from the RTC Timer
-//! ```rust, no_run
-//! # {before_snippet}
-//! # use core::time::Duration;
-//! # use esp_hal::{delay::Delay, rtc_cntl::Rtc};
-//!
-//! let rtc = Rtc::new(peripherals.LPWR);
-//! let delay = Delay::new();
-//!
-//! loop {
-//!     // Get the current RTC time in milliseconds
-//!     let time_ms = rtc.current_time_us() * 1000;
-//!     delay.delay_millis(1000);
-//!
-//!     // Set the time to half a second in the past
-//!     let new_time = rtc.current_time_us() - 500_000;
-//!     rtc.set_current_time_us(new_time);
-//! }
-//! # }
-//! ```
+#![cfg_attr(
+    not(esp32c5), // TODO: these examples need to be feature-gated instead of chip-gated
+    doc = r#"
+## Examples
 
+### Get time in ms from the RTC Timer
+
+```rust, no_run
+# {before_snippet}
+# use core::time::Duration;
+# use esp_hal::{delay::Delay, rtc_cntl::Rtc};
+
+let rtc = Rtc::new(peripherals.LPWR);
+let delay = Delay::new();
+
+loop {
+    // Print the current RTC time in milliseconds
+    let time_ms = rtc.current_time_us() / 1000;
+    delay.delay_millis(1000);
+
+    // Set the time to half a second in the past
+    let new_time = rtc.current_time_us() - 500_000;
+    rtc.set_current_time_us(new_time);
+}
+# }
+```
+
+### RWDT usage
+```rust, no_run
+# {before_snippet}
+# use core::cell::RefCell;
+# use critical_section::Mutex;
+# use esp_hal::delay::Delay;
+# use esp_hal::rtc_cntl::Rtc;
+# use esp_hal::rtc_cntl::Rwdt;
+# use esp_hal::rtc_cntl::RwdtStage;
+static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
+
+let mut delay = Delay::new();
+let mut rtc = Rtc::new(peripherals.LPWR);
+
+rtc.set_interrupt_handler(interrupt_handler);
+rtc.rwdt
+    .set_timeout(RwdtStage::Stage0, Duration::from_millis(2000));
+rtc.rwdt.listen();
+
+critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
+# {after_snippet}
+
+// Where the `LP_WDT` interrupt handler is defined as:
+# use core::cell::RefCell;
+# use critical_section::Mutex;
+# use esp_hal::rtc_cntl::Rwdt;
+# use esp_hal::rtc_cntl::RwdtStage;
+static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
+
+// Handle the corresponding interrupt
+#[handler]
+fn interrupt_handler() {
+    critical_section::with(|cs| {
+        println!("RWDT Interrupt");
+
+        let mut rwdt = RWDT.borrow_ref_mut(cs);
+        if let Some(rwdt) = rwdt.as_mut() {
+            rwdt.clear_interrupt();
+
+            println!("Restarting in 5 seconds...");
+
+            rwdt.set_timeout(RwdtStage::Stage0, Duration::from_millis(5000));
+            rwdt.unlisten();
+        }
+    });
+}
+```
+
+### Get time in ms from the RTC Timer
+```rust, no_run
+# {before_snippet}
+# use core::time::Duration;
+# use esp_hal::{delay::Delay, rtc_cntl::Rtc};
+
+let rtc = Rtc::new(peripherals.LPWR);
+let delay = Delay::new();
+
+loop {
+    // Get the current RTC time in milliseconds
+    let time_ms = rtc.current_time_us() * 1000;
+    delay.delay_millis(1000);
+
+    // Set the time to half a second in the past
+    let new_time = rtc.current_time_us() - 500_000;
+    rtc.set_current_time_us(new_time);
+}
+# }
+```
+"#
+)]
 pub use self::rtc::SocResetReason;
 #[cfg(sleep_driver_supported)]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
