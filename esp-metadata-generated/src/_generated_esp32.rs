@@ -36,21 +36,6 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf"
     };
-    ("soc.cpu_has_branch_predictor") => {
-        false
-    };
-    ("soc.cpu_has_csr_pc") => {
-        false
-    };
-    ("soc.multi_core_enabled") => {
-        true
-    };
-    ("soc.rc_fast_clk_default") => {
-        8500000
-    };
-    ("soc.rc_fast_clk_default", str) => {
-        stringify!(8500000)
-    };
     ("aes.dma") => {
         false
     };
@@ -59,6 +44,9 @@ macro_rules! property {
     };
     ("aes.endianness_configurable") => {
         true
+    };
+    ("bt.controller") => {
+        "btdm"
     };
     ("dma.kind") => {
         "pdma"
@@ -171,6 +159,9 @@ macro_rules! property {
     ("interrupts.status_registers", str) => {
         stringify!(3)
     };
+    ("phy.combo_module") => {
+        true
+    };
     ("rmt.ram_start") => {
         1073047552
     };
@@ -231,14 +222,29 @@ macro_rules! property {
     ("rsa.memory_size_bytes", str) => {
         stringify!(512)
     };
+    ("sha.dma") => {
+        false
+    };
     ("sleep.light_sleep") => {
         true
     };
     ("sleep.deep_sleep") => {
         true
     };
-    ("sha.dma") => {
+    ("soc.cpu_has_branch_predictor") => {
         false
+    };
+    ("soc.cpu_has_csr_pc") => {
+        false
+    };
+    ("soc.multi_core_enabled") => {
+        true
+    };
+    ("soc.rc_fast_clk_default") => {
+        8500000
+    };
+    ("soc.rc_fast_clk_default", str) => {
+        stringify!(8500000)
     };
     ("spi_master.supports_dma") => {
         true
@@ -279,11 +285,144 @@ macro_rules! property {
     ("wifi.has_wifi6") => {
         false
     };
-    ("bt.controller") => {
-        "btdm"
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_aes_key_length {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_aes_key_length { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_aes_key_length!((128));
+        _for_each_inner_aes_key_length!((192)); _for_each_inner_aes_key_length!((256));
+        _for_each_inner_aes_key_length!((128, 0, 4));
+        _for_each_inner_aes_key_length!((192, 1, 5));
+        _for_each_inner_aes_key_length!((256, 2, 6));
+        _for_each_inner_aes_key_length!((bits(128), (192), (256)));
+        _for_each_inner_aes_key_length!((modes(128, 0, 4), (192, 1, 5), (256, 2, 6)));
     };
-    ("phy.combo_module") => {
-        true
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sw_interrupt {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sw_interrupt { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_sw_interrupt!((0, FROM_CPU_INTR0,
+        software_interrupt0)); _for_each_inner_sw_interrupt!((1, FROM_CPU_INTR1,
+        software_interrupt1)); _for_each_inner_sw_interrupt!((2, FROM_CPU_INTR2,
+        software_interrupt2)); _for_each_inner_sw_interrupt!((3, FROM_CPU_INTR3,
+        software_interrupt3)); _for_each_inner_sw_interrupt!((all(0, FROM_CPU_INTR0,
+        software_interrupt0), (1, FROM_CPU_INTR1, software_interrupt1), (2,
+        FROM_CPU_INTR2, software_interrupt2), (3, FROM_CPU_INTR3, software_interrupt3)));
+    };
+}
+#[macro_export]
+macro_rules! sw_interrupt_delay {
+    () => {
+        unsafe {}
+    };
+}
+/// This macro can be used to generate code for each channel of the RMT peripheral.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has three options for its "Individual matcher" case:
+///
+/// - `all`: `($num:literal)`
+/// - `tx`: `($num:literal, $idx:literal)`
+/// - `rx`: `($num:literal, $idx:literal)`
+///
+/// Macro fragments:
+///
+/// - `$num`: number of the channel, e.g. `0`
+/// - `$idx`: index of the channel among channels of the same capability, e.g. `0`
+///
+/// Example data:
+///
+/// - `all`: `(0)`
+/// - `tx`: `(1, 1)`
+/// - `rx`: `(2, 0)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rmt_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_rmt_channel { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_rmt_channel!((0)); _for_each_inner_rmt_channel!((1));
+        _for_each_inner_rmt_channel!((2)); _for_each_inner_rmt_channel!((3));
+        _for_each_inner_rmt_channel!((4)); _for_each_inner_rmt_channel!((5));
+        _for_each_inner_rmt_channel!((6)); _for_each_inner_rmt_channel!((7));
+        _for_each_inner_rmt_channel!((0, 0)); _for_each_inner_rmt_channel!((1, 1));
+        _for_each_inner_rmt_channel!((2, 2)); _for_each_inner_rmt_channel!((3, 3));
+        _for_each_inner_rmt_channel!((4, 4)); _for_each_inner_rmt_channel!((5, 5));
+        _for_each_inner_rmt_channel!((6, 6)); _for_each_inner_rmt_channel!((7, 7));
+        _for_each_inner_rmt_channel!((0, 0)); _for_each_inner_rmt_channel!((1, 1));
+        _for_each_inner_rmt_channel!((2, 2)); _for_each_inner_rmt_channel!((3, 3));
+        _for_each_inner_rmt_channel!((4, 4)); _for_each_inner_rmt_channel!((5, 5));
+        _for_each_inner_rmt_channel!((6, 6)); _for_each_inner_rmt_channel!((7, 7));
+        _for_each_inner_rmt_channel!((all(0), (1), (2), (3), (4), (5), (6), (7)));
+        _for_each_inner_rmt_channel!((tx(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5),
+        (6, 6), (7, 7))); _for_each_inner_rmt_channel!((rx(0, 0), (1, 1), (2, 2), (3, 3),
+        (4, 4), (5, 5), (6, 6), (7, 7)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rmt_clock_source {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_rmt_clock_source { $(($pattern) => $code;)* ($other
+        : tt) => {} } _for_each_inner_rmt_clock_source!((RefTick, 0));
+        _for_each_inner_rmt_clock_source!((Apb, 1));
+        _for_each_inner_rmt_clock_source!((Apb));
+        _for_each_inner_rmt_clock_source!((all(RefTick, 0), (Apb, 1)));
+        _for_each_inner_rmt_clock_source!((default(Apb)));
+        _for_each_inner_rmt_clock_source!((is_boolean));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rsa_exponentiation {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_rsa_exponentiation { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_rsa_exponentiation!((512));
+        _for_each_inner_rsa_exponentiation!((1024));
+        _for_each_inner_rsa_exponentiation!((1536));
+        _for_each_inner_rsa_exponentiation!((2048));
+        _for_each_inner_rsa_exponentiation!((2560));
+        _for_each_inner_rsa_exponentiation!((3072));
+        _for_each_inner_rsa_exponentiation!((3584));
+        _for_each_inner_rsa_exponentiation!((4096));
+        _for_each_inner_rsa_exponentiation!((all(512), (1024), (1536), (2048), (2560),
+        (3072), (3584), (4096)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rsa_multiplication {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_rsa_multiplication { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_rsa_multiplication!((512));
+        _for_each_inner_rsa_multiplication!((1024));
+        _for_each_inner_rsa_multiplication!((1536));
+        _for_each_inner_rsa_multiplication!((2048));
+        _for_each_inner_rsa_multiplication!((all(512), (1024), (1536), (2048)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sha_algorithm {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sha_algorithm { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_sha_algorithm!((Sha1, "SHA-1"(sizes : 64, 20, 8)
+        (insecure_against : "collision", "length extension"), 0));
+        _for_each_inner_sha_algorithm!((Sha256, "SHA-256"(sizes : 64, 32, 8)
+        (insecure_against : "length extension"), 0));
+        _for_each_inner_sha_algorithm!((Sha384, "SHA-384"(sizes : 128, 48, 16)
+        (insecure_against :), 0)); _for_each_inner_sha_algorithm!((Sha512,
+        "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 0));
+        _for_each_inner_sha_algorithm!((algos(Sha1, "SHA-1"(sizes : 64, 20, 8)
+        (insecure_against : "collision", "length extension"), 0), (Sha256,
+        "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"), 0),
+        (Sha384, "SHA-384"(sizes : 128, 48, 16) (insecure_against :), 0), (Sha512,
+        "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 0)));
     };
 }
 #[macro_export]
@@ -2815,145 +2954,6 @@ macro_rules! memory_range {
     };
     (size as str, "DRAM2_UNINIT") => {
         "98768"
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_aes_key_length {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_aes_key_length { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_aes_key_length!((128));
-        _for_each_inner_aes_key_length!((192)); _for_each_inner_aes_key_length!((256));
-        _for_each_inner_aes_key_length!((128, 0, 4));
-        _for_each_inner_aes_key_length!((192, 1, 5));
-        _for_each_inner_aes_key_length!((256, 2, 6));
-        _for_each_inner_aes_key_length!((bits(128), (192), (256)));
-        _for_each_inner_aes_key_length!((modes(128, 0, 4), (192, 1, 5), (256, 2, 6)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_sw_interrupt {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_sw_interrupt { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_sw_interrupt!((0, FROM_CPU_INTR0,
-        software_interrupt0)); _for_each_inner_sw_interrupt!((1, FROM_CPU_INTR1,
-        software_interrupt1)); _for_each_inner_sw_interrupt!((2, FROM_CPU_INTR2,
-        software_interrupt2)); _for_each_inner_sw_interrupt!((3, FROM_CPU_INTR3,
-        software_interrupt3)); _for_each_inner_sw_interrupt!((all(0, FROM_CPU_INTR0,
-        software_interrupt0), (1, FROM_CPU_INTR1, software_interrupt1), (2,
-        FROM_CPU_INTR2, software_interrupt2), (3, FROM_CPU_INTR3, software_interrupt3)));
-    };
-}
-#[macro_export]
-macro_rules! sw_interrupt_delay {
-    () => {
-        unsafe {}
-    };
-}
-/// This macro can be used to generate code for each channel of the RMT peripheral.
-///
-/// For an explanation on the general syntax, as well as usage of individual/repeated
-/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
-///
-/// This macro has three options for its "Individual matcher" case:
-///
-/// - `all`: `($num:literal)`
-/// - `tx`: `($num:literal, $idx:literal)`
-/// - `rx`: `($num:literal, $idx:literal)`
-///
-/// Macro fragments:
-///
-/// - `$num`: number of the channel, e.g. `0`
-/// - `$idx`: index of the channel among channels of the same capability, e.g. `0`
-///
-/// Example data:
-///
-/// - `all`: `(0)`
-/// - `tx`: `(1, 1)`
-/// - `rx`: `(2, 0)`
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_rmt_channel {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_rmt_channel { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_rmt_channel!((0)); _for_each_inner_rmt_channel!((1));
-        _for_each_inner_rmt_channel!((2)); _for_each_inner_rmt_channel!((3));
-        _for_each_inner_rmt_channel!((4)); _for_each_inner_rmt_channel!((5));
-        _for_each_inner_rmt_channel!((6)); _for_each_inner_rmt_channel!((7));
-        _for_each_inner_rmt_channel!((0, 0)); _for_each_inner_rmt_channel!((1, 1));
-        _for_each_inner_rmt_channel!((2, 2)); _for_each_inner_rmt_channel!((3, 3));
-        _for_each_inner_rmt_channel!((4, 4)); _for_each_inner_rmt_channel!((5, 5));
-        _for_each_inner_rmt_channel!((6, 6)); _for_each_inner_rmt_channel!((7, 7));
-        _for_each_inner_rmt_channel!((0, 0)); _for_each_inner_rmt_channel!((1, 1));
-        _for_each_inner_rmt_channel!((2, 2)); _for_each_inner_rmt_channel!((3, 3));
-        _for_each_inner_rmt_channel!((4, 4)); _for_each_inner_rmt_channel!((5, 5));
-        _for_each_inner_rmt_channel!((6, 6)); _for_each_inner_rmt_channel!((7, 7));
-        _for_each_inner_rmt_channel!((all(0), (1), (2), (3), (4), (5), (6), (7)));
-        _for_each_inner_rmt_channel!((tx(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5),
-        (6, 6), (7, 7))); _for_each_inner_rmt_channel!((rx(0, 0), (1, 1), (2, 2), (3, 3),
-        (4, 4), (5, 5), (6, 6), (7, 7)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_rmt_clock_source {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_rmt_clock_source { $(($pattern) => $code;)* ($other
-        : tt) => {} } _for_each_inner_rmt_clock_source!((RefTick, 0));
-        _for_each_inner_rmt_clock_source!((Apb, 1));
-        _for_each_inner_rmt_clock_source!((Apb));
-        _for_each_inner_rmt_clock_source!((all(RefTick, 0), (Apb, 1)));
-        _for_each_inner_rmt_clock_source!((default(Apb)));
-        _for_each_inner_rmt_clock_source!((is_boolean));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_rsa_exponentiation {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_rsa_exponentiation { $(($pattern) => $code;)*
-        ($other : tt) => {} } _for_each_inner_rsa_exponentiation!((512));
-        _for_each_inner_rsa_exponentiation!((1024));
-        _for_each_inner_rsa_exponentiation!((1536));
-        _for_each_inner_rsa_exponentiation!((2048));
-        _for_each_inner_rsa_exponentiation!((2560));
-        _for_each_inner_rsa_exponentiation!((3072));
-        _for_each_inner_rsa_exponentiation!((3584));
-        _for_each_inner_rsa_exponentiation!((4096));
-        _for_each_inner_rsa_exponentiation!((all(512), (1024), (1536), (2048), (2560),
-        (3072), (3584), (4096)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_rsa_multiplication {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_rsa_multiplication { $(($pattern) => $code;)*
-        ($other : tt) => {} } _for_each_inner_rsa_multiplication!((512));
-        _for_each_inner_rsa_multiplication!((1024));
-        _for_each_inner_rsa_multiplication!((1536));
-        _for_each_inner_rsa_multiplication!((2048));
-        _for_each_inner_rsa_multiplication!((all(512), (1024), (1536), (2048)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_sha_algorithm {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_sha_algorithm { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_sha_algorithm!((Sha1, "SHA-1"(sizes : 64, 20, 8)
-        (insecure_against : "collision", "length extension"), 0));
-        _for_each_inner_sha_algorithm!((Sha256, "SHA-256"(sizes : 64, 32, 8)
-        (insecure_against : "length extension"), 0));
-        _for_each_inner_sha_algorithm!((Sha384, "SHA-384"(sizes : 128, 48, 16)
-        (insecure_against :), 0)); _for_each_inner_sha_algorithm!((Sha512,
-        "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 0));
-        _for_each_inner_sha_algorithm!((algos(Sha1, "SHA-1"(sizes : 64, 20, 8)
-        (insecure_against : "collision", "length extension"), 0), (Sha256,
-        "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"), 0),
-        (Sha384, "SHA-384"(sizes : 128, 48, 16) (insecure_against :), 0), (Sha512,
-        "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 0)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the I2C master driver.

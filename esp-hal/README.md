@@ -58,35 +58,43 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ADC                | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | AES                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | ASSIST_DEBUG       |       | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      |          | ⚒️      |
+| AVC                |       |          |          |          |          |          |          |          |
+| BITSCRAMBLER       |       |          |          |          |          |          |          |          |
+| Bluetooth          | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      |          | ⚒️      |
+| Camera interface   | ❌    |          |          |          |          |          | ❌       | ⚒️      |
+| CANFD              |       |          |          |          |          |          |          |          |
 | DAC                | ⚒️   |          |          |          |          |          | ⚒️      |          |
+| Dedicated GPIO     |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | DMA                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | DS                 |       |          | ❌       |          | ❌       | ❌       | ❌       | ❌       |
 | ECC                |       | ⚒️      |          | ❌       | ⚒️      | ⚒️      |          |          |
 | Ethernet           | ❌    |          |          |          |          |          |          |          |
 | ETM                |       |          |          |          | ⚒️      | ⚒️      |          |          |
 | GPIO               | ✔️   | ✔️      | ✔️      | ⚒️      | ✔️      | ✔️      | ✔️      | ✔️      |
-| Dedicated GPIO     |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | HMAC               |       |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | I2C master         | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
-| LP I2C master      |       |          |          |          | ⚒️      |          |          |          |
 | I2C slave          | ❌    |          | ❌       | ❌       | ❌       | ❌       | ❌       | ❌       |
 | I2S                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| IEEE 802.15.4      |       |          |          |          | ⚒️      | ⚒️      |          |          |
 | Interrupts         | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | IOMUX              | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| Camera interface   | ❌    |          |          |          |          |          | ❌       | ⚒️      |
-| RGB display        | ⚒️   |          |          |          |          |          | ❌       | ⚒️      |
+| KEY MANAGER        |       |          |          |          |          |          |          |          |
 | LEDC               | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| LP I2C master      |       |          |          |          | ⚒️      |          |          |          |
+| LP UART            |       |          |          |          | ⚒️      |          |          |          |
 | MCPWM              | ⚒️   |          |          |          | ⚒️      | ⚒️      |          | ⚒️      |
 | PARL_IO            |       |          |          |          | ⚒️      | ⚒️      |          |          |
 | PCNT               | ⚒️   |          |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| PHY                | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | PSRAM              | ⚒️   |          |          |          |          |          | ⚒️      | ⚒️      |
+| RGB display        | ⚒️   |          |          |          |          |          | ❌       | ⚒️      |
 | RMT                | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | RNG                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | RSA                | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SDIO host          | ⚒️   |          |          |          |          |          |          | ⚒️      |
 | SDIO slave         | ⚒️   |          |          |          | ⚒️      |          |          |          |
-| Light/deep sleep   | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SHA                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| Light/deep sleep   | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SPI master         | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
 | SPI slave          | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SYSTIMER           |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
@@ -95,16 +103,12 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | Touch              | ⚒️   |          |          |          |          |          | ❌       | ❌       |
 | TWAI               | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | UART               | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
-| LP UART            |       |          |          |          | ⚒️      |          |          |          |
 | UHCI               | ❌    |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ❌       | ⚒️      |
 | ULP (FSM)          | ⚒️   |          |          |          |          |          | ⚒️      | ⚒️      |
 | ULP (RISC-V)       |       |          |          |          | ⚒️      |          | ⚒️      | ⚒️      |
 | USB OTG FS         |       |          |          |          |          |          | ⚒️      | ⚒️      |
 | USB Serial/JTAG    |       |          | ⚒️      |          | ⚒️      | ⚒️      |          | ⚒️      |
 | WIFI               | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      |          | ⚒️      | ⚒️      |
-| Bluetooth          | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      |          | ⚒️      |
-| IEEE 802.15.4      |       |          |          |          | ⚒️      | ⚒️      |          |          |
-| PHY                | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 
  * Empty cell: not available
  * ❌: Not supported
