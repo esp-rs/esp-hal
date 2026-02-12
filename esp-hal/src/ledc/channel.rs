@@ -333,14 +333,14 @@ mod ehal1 {
 }
 
 impl<S: crate::ledc::timer::TimerSpeed> Channel<'_, S> {
-    #[cfg(esp32c5)]
+    #[cfg(all(esp32c5, ledc_has_gamma_fade))]
     const C5_GAMMA_RAM_BASE_OFFSET: usize = 0x400;
-    #[cfg(esp32c5)]
+    #[cfg(all(esp32c5, ledc_has_gamma_fade))]
     const C5_GAMMA_RAM_CHANNEL_STRIDE: usize = 0x40;
-    #[cfg(esp32c5)]
+    #[cfg(all(esp32c5, ledc_has_gamma_fade))]
     const C5_GAMMA_RANGE_COUNT: usize = 16;
 
-    #[cfg(esp32c5)]
+    #[cfg(all(esp32c5, ledc_has_gamma_fade))]
     fn c5_enable_gamma_ram_clock(&self) {
         self.ledc.conf().modify(|_, w| match self.number {
             Number::Channel0 => w.gamma_ram_clk_en_ch0().set_bit(),
@@ -352,7 +352,7 @@ impl<S: crate::ledc::timer::TimerSpeed> Channel<'_, S> {
         });
     }
 
-    #[cfg(esp32c5)]
+    #[cfg(all(esp32c5, ledc_has_gamma_fade))]
     fn c5_write_gamma_range(&self, range: usize, value: u32) {
         let offset = Self::C5_GAMMA_RAM_BASE_OFFSET
             + (self.number as usize) * Self::C5_GAMMA_RAM_CHANNEL_STRIDE
@@ -444,7 +444,7 @@ impl<S: crate::ledc::timer::TimerSpeed> Channel<'_, S> {
             }
         });
     }
-    #[cfg(esp32c5)]
+    #[cfg(all(esp32c5, ledc_has_gamma_fade))]
     fn start_duty_without_fading(&self) {
         self.ledc
             .ch(self.number as usize)
@@ -538,7 +538,7 @@ impl<S: crate::ledc::timer::TimerSpeed> Channel<'_, S> {
             .write(|w| unsafe { w.ch_gamma_entry_num().bits(0x1) });
     }
 
-    #[cfg(esp32c5)]
+    #[cfg(all(esp32c5, ledc_has_gamma_fade))]
     fn start_duty_fade_inner(
         &self,
         duty_inc: bool,
@@ -739,7 +739,7 @@ where
     }
 
     /// Start a duty-cycle fade HW
-    #[cfg(esp32c5)]
+    #[cfg(all(esp32c5, ledc_has_gamma_fade))]
     fn start_duty_fade_hw(
         &self,
         start_duty: u32,
@@ -793,7 +793,7 @@ where
         }
     }
 
-    #[cfg(esp32c5)]
+    #[cfg(all(esp32c5, ledc_has_gamma_fade))]
     fn is_duty_fade_running_hw(&self) -> bool {
         self.ledc
             .int_st()

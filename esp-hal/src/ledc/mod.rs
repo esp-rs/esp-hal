@@ -125,14 +125,10 @@ impl<'d> Ledc<'d> {
             PeripheralClockControl::reset(PeripheralEnable::Ledc);
         }
 
-        #[cfg(esp32c5)]
-        unsafe {
-            // SAFETY: writing PCR LEDC power control is required to unforce power-down
-            // of the LEDC memory block, which backs gamma fade parameters.
-            (&*crate::peripherals::PCR::ptr())
-                .ledc_pd_ctrl()
-                .modify(|_, w| w.ledc_mem_force_pd().clear_bit());
-        }
+        #[cfg(all(esp32c5, soc_has_pcr, ledc_has_gamma_fade))]
+        crate::peripherals::PCR::regs()
+            .ledc_pd_ctrl()
+            .modify(|_, w| w.ledc_mem_force_pd().clear_bit());
 
         let ledc = LEDC::regs();
         Ledc { _instance, ledc }
@@ -151,40 +147,32 @@ impl<'d> Ledc<'d> {
     #[cfg(not(esp32))]
     /// Set global slow clock source
     pub fn set_global_slow_clock(&mut self, clock_source: LSGlobalClkSource) {
-        #[cfg(soc_has_clock_node_ledc_sclk)]
-        let ledc_sclk = match clock_source {
-            LSGlobalClkSource::APBClk => crate::soc::clocks::LedcSclkConfig::PllF80m,
-        };
-
-        #[cfg(soc_has_clock_node_ledc_sclk)]
-        crate::soc::clocks::ClockTree::with(|clocks| {
-            crate::soc::clocks::configure_ledc_sclk(clocks, ledc_sclk);
-        });
-
-        #[cfg(any(esp32c5, esp32c6, esp32h2))]
-        let pcr = unsafe { &*crate::peripherals::PCR::ptr() };
-
         match clock_source {
             LSGlobalClkSource::APBClk => {
-                #[cfg(not(any(esp32c5, esp32c6, esp32h2)))]
-                self.ledc
-                    .conf()
-                    .write(|w| unsafe { w.apb_clk_sel().bits(1) });
-                #[cfg(esp32c5)]
-                pcr.ledc_sclk_conf().modify(|_, w| unsafe {
-                    w.ledc_sclk_sel().bits(2);
-                    w.ledc_sclk_en().set_bit()
-                });
-                #[cfg(esp32c6)]
-                pcr.ledc_sclk_conf().modify(|_, w| unsafe {
-                    w.ledc_sclk_sel().bits(1);
-                    w.ledc_sclk_en().set_bit()
-                });
-                #[cfg(esp32h2)]
-                pcr.ledc_sclk_conf().modify(|_, w| unsafe {
-                    w.ledc_sclk_sel().bits(0);
-                    w.ledc_sclk_en().set_bit()
-                });
+                cfg_if::cfg_if! {
+                    if #[cfg(soc_has_clock_node_ledc_sclk)] {
+                        crate::soc::clocks::ClockTree::with(|clocks| {
+                            crate::soc::clocks::configure_ledc_sclk(
+                                clocks,
+                                crate::soc::clocks::LedcSclkConfig::PllF80m,
+                            );
+                        });
+
+                        #[cfg(soc_has_pcr)]
+                        crate::peripherals::PCR::regs()
+                            .ledc_sclk_conf()
+                            .modify(|_, w| w.ledc_sclk_en().set_bit());
+                    } else if #[cfg(soc_has_pcr)] {
+                        crate::peripherals::PCR::regs().ledc_sclk_conf().modify(|_, w| unsafe {
+                            w.ledc_sclk_sel().bits(0);
+                            w.ledc_sclk_en().set_bit()
+                        });
+                    } else {
+                        self.ledc
+                            .conf()
+                            .write(|w| unsafe { w.apb_clk_sel().bits(1) });
+                    }
+                }
             }
         }
         self.ledc

@@ -236,7 +236,7 @@ mod tests {
         );
     }
 
-    #[cfg(esp32c5)]
+    #[cfg(all(esp32c5, ledc_has_gamma_fade))]
     #[test]
     fn duty_fade_changes_output_and_completes(ctx: Context) {
         let Context {
@@ -276,16 +276,9 @@ mod tests {
 
         channel0.start_duty_fade(10, 90, 200).unwrap();
 
-        let mut saw_running = false;
-        for _ in 0..50 {
-            if channel0.is_duty_fade_running() {
-                saw_running = true;
-                break;
-            }
-
-            delay.delay_millis(1);
+        while !channel0.is_duty_fade_running() {
+            core::hint::spin_loop();
         }
-        assert!(saw_running);
 
         delay.delay_millis(260);
         assert!(!channel0.is_duty_fade_running());
