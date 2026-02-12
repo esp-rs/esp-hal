@@ -826,6 +826,9 @@ instances = [
 ]
 ram_size = 128
 
+[device.uhci]
+support_status = "partial"
+
 [device.touch]
 support_status = "not_supported"
 

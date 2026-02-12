@@ -282,6 +282,7 @@ use core::marker::PhantomData;
 
 pub use esp_metadata_generated::chip;
 use esp_rom_sys as _;
+pub(crate) use unstable_driver;
 pub(crate) use unstable_module;
 
 metadata!("build_info", CHIP_NAME, chip!());

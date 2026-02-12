@@ -291,6 +291,9 @@ macro_rules! property {
     ("uart.peripheral_controls_mem_clk") => {
         false
     };
+    ("uhci.combined_uart_selector_field") => {
+        false
+    };
     ("wifi.has_wifi6") => {
         false
     };
@@ -3261,25 +3264,28 @@ macro_rules! for_each_i2c_master {
 ///
 /// This macro has one option for its "Individual matcher" case:
 ///
-/// Syntax: `($instance:ident, $sys:ident, $rx:ident, $tx:ident, $cts:ident, $rts:ident)`
+/// Syntax: `($id:literal, $instance:ident, $sys:ident, $rx:ident, $tx:ident, $cts:ident,
+/// $rts:ident)`
 ///
 /// Macro fragments:
 ///
+/// - `$id`: the index of the UART instance
 /// - `$instance`: the name of the UART instance
 /// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
 /// - `$rx`, `$tx`, `$cts`, `$rts`: signal names.
 ///
-/// Example data: `(UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS)`
+/// Example data: `(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS)`
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_uart {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_uart { $(($pattern) => $code;)* ($other : tt) => {}
-        } _for_each_inner_uart!((UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS));
-        _for_each_inner_uart!((UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS));
-        _for_each_inner_uart!((UART2, Uart2, U2RXD, U2TXD, U2CTS, U2RTS));
-        _for_each_inner_uart!((all(UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS), (UART1,
-        Uart1, U1RXD, U1TXD, U1CTS, U1RTS), (UART2, Uart2, U2RXD, U2TXD, U2CTS, U2RTS)));
+        } _for_each_inner_uart!((0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS));
+        _for_each_inner_uart!((1, UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS));
+        _for_each_inner_uart!((2, UART2, Uart2, U2RXD, U2TXD, U2CTS, U2RTS));
+        _for_each_inner_uart!((all(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS), (1,
+        UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS), (2, UART2, Uart2, U2RXD, U2TXD, U2CTS,
+        U2RTS)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the SPI master driver.
