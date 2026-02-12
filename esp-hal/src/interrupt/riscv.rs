@@ -259,7 +259,7 @@ pub fn enable_direct(
                     .cast::<u32>()
                     .wrapping_add(cpu_interrupt as usize);
 
-                let instr = handler as u32;
+                let instr = handler as usize as u32;
             } else {
                 let mt = mtvec::read();
 
@@ -774,9 +774,7 @@ mod clic {
 
         let level = mil.max(mintthresh);
 
-        let prio = bits_to_prio(level);
-
-        prio
+        bits_to_prio(level)
     }
 
     fn prio_to_bits(priority: Priority) -> u8 {

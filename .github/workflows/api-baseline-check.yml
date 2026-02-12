@@ -53,5 +53,6 @@ jobs:
           cargo xcheck semver-check --chips esp32s3 check
           cargo xcheck semver-check --chips esp32c2 check
           cargo xcheck semver-check --chips esp32c3 check
+          # cargo xcheck semver-check --chips esp32c5 check # TODO: enable
           cargo xcheck semver-check --chips esp32c6 check
           cargo xcheck semver-check --chips esp32h2 check

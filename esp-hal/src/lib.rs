@@ -41,18 +41,24 @@
 //! handle to the peripheral with a shorter lifetime. This allows you to pass
 //! the handle to a driver, while still keeping the original handle alive. Once
 //! you drop the driver, you will be able to reborrow the peripheral again.
-//!
-//! For example, if you want to use the [`I2c`](i2c::master::I2c) driver and you
-//! don't intend to drop the driver, you can pass the peripheral singleton to
-//! the driver by value:
-//!
-//! ```rust, ignore
-//! // Peripheral singletons are returned from the `init` function.
-//! let peripherals = esp_hal::init(esp_hal::Config::default());
-//!
-//! let mut i2c = I2C::new(peripherals.I2C0, /* ... */);
-//! ```
-//!
+#![cfg_attr(
+    // Feature-gated so that this doesn't prevent gradual device bringup. Any
+    // stable driver would serve the purpose here, so this block will be part
+    // of the released documentation.
+    i2c_master_driver_supported,
+    doc = r#"
+For example, if you want to use the [`I2c`](i2c::master::I2c) driver and you
+don't intend to drop the driver, you can pass the peripheral singleton to
+the driver by value:
+
+```rust, ignore
+// Peripheral singletons are returned from the `init` function.
+let peripherals = esp_hal::init(esp_hal::Config::default());
+
+let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
+```
+"#
+)]
 //! If you want to use the peripheral in multiple places (for example, you want
 //! to drop the driver for some period of time to minimize power consumption),
 //! you can reborrow the peripheral singleton and pass it to the driver by
