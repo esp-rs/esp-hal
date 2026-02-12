@@ -1404,7 +1404,7 @@ fn set_filter(
 #[allow(unused)]
 /// Configures the clock and timing parameters for the I2C peripheral.
 fn configure_clock(
-    register_block: &RegisterBlock,
+    info: &Info,
     sclk_div: u32,
     scl_low_period: u32,
     scl_high_period: u32,
@@ -1418,15 +1418,29 @@ fn configure_clock(
     timeout: Option<u32>,
 ) -> Result<(), ConfigError> {
     unsafe {
-        // divider
-        #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32h2, esp32s3))]
-        register_block.clk_conf().modify(|_, w| {
-            w.sclk_sel().clear_bit();
-            w.sclk_div_num().bits((sclk_div - 1) as u8)
-        });
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
+                info.regs().clk_conf().modify(|_, w| {
+                    w.sclk_sel().clear_bit();
+                    w.sclk_div_num().bits((sclk_div - 1) as u8)
+                });
+            } else if #[cfg(any(esp32c5, esp32c6))] {
+                crate::peripherals::PCR::regs().i2c_sclk_conf().modify(|_, w| {
+                    w.i2c_sclk_sel().clear_bit();
+                    w.i2c_sclk_div_num().bits((sclk_div - 1) as u8);
+                    w.i2c_sclk_en().set_bit()
+                });
+            } else if #[cfg(esp32h2)] {
+                crate::peripherals::PCR::regs().i2c_sclk_conf(info.id as usize).modify(|_, w| {
+                    w.i2c_sclk_sel().clear_bit();
+                    w.i2c_sclk_div_num().bits((sclk_div - 1) as u8);
+                    w.i2c_sclk_en().set_bit()
+                });
+            }
+        }
 
         // scl period
-        register_block
+        info.regs()
             .scl_low_period()
             .write(|w| w.scl_low_period().bits(scl_low_period as u16));
 
@@ -1435,44 +1449,44 @@ fn configure_clock(
             .try_into()
             .map_err(|_| ConfigError::FrequencyOutOfRange)?;
 
-        register_block.scl_high_period().write(|w| {
+        info.regs().scl_high_period().write(|w| {
             #[cfg(not(esp32))] // ESP32 does not have a wait_high field
             w.scl_wait_high_period().bits(scl_wait_high_period);
             w.scl_high_period().bits(scl_high_period as u16)
         });
 
         // sda sample
-        register_block
+        info.regs()
             .sda_hold()
             .write(|w| w.time().bits(sda_hold_time as u16));
-        register_block
+        info.regs()
             .sda_sample()
             .write(|w| w.time().bits(sda_sample_time as u16));
 
         // setup
-        register_block
+        info.regs()
             .scl_rstart_setup()
             .write(|w| w.time().bits(scl_rstart_setup_time as u16));
-        register_block
+        info.regs()
             .scl_stop_setup()
             .write(|w| w.time().bits(scl_stop_setup_time as u16));
 
         // hold
-        register_block
+        info.regs()
             .scl_start_hold()
             .write(|w| w.time().bits(scl_start_hold_time as u16));
-        register_block
+        info.regs()
             .scl_stop_hold()
             .write(|w| w.time().bits(scl_stop_hold_time as u16));
 
         cfg_if::cfg_if! {
             if #[cfg(i2c_master_has_bus_timeout_enable)] {
-                register_block.to().write(|w| {
+                info.regs().to().write(|w| {
                     w.time_out_en().bit(timeout.is_some());
                     w.time_out_value().bits(timeout.unwrap_or(1) as _)
                 });
             } else {
-                register_block
+                info.regs()
                     .to()
                     .write(|w| w.time_out().bits(timeout.unwrap_or(1)));
             }
@@ -1486,6 +1500,9 @@ fn configure_clock(
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct Info {
+    /// Numeric instance id (0 = I2C0, 1 = I2C1, ...)
+    pub id: u8,
+
     /// Pointer to the register block for this I2C instance.
     ///
     /// Use [Self::register_block] to access the register block.
@@ -1837,7 +1854,7 @@ impl Driver<'_> {
         let scl_stop_hold_time = hold;
 
         configure_clock(
-            self.regs(),
+            self.info,
             0,
             scl_low_period,
             scl_high_period,
@@ -1895,7 +1912,7 @@ impl Driver<'_> {
         let scl_stop_hold_time = hold;
 
         configure_clock(
-            self.regs(),
+            self.info,
             0,
             scl_low_period,
             scl_high_period,
@@ -1966,7 +1983,7 @@ impl Driver<'_> {
         let scl_stop_hold_time = hold - 1;
 
         configure_clock(
-            self.regs(),
+            self.info,
             clkm_div,
             scl_low_period,
             scl_high_period,
@@ -2207,14 +2224,11 @@ impl Driver<'_> {
 
     /// Waits for the completion of an I2C transaction.
     fn wait_for_completion_blocking(&self, deadline: Option<Instant>) -> Result<(), Error> {
-        esp_println::println!("create future");
         let mut future =
             I2cFuture::new_blocking(Event::TxComplete | Event::EndDetect, *self, deadline);
-        esp_println::println!("nope");
         loop {
             if let Poll::Ready(result) = future.poll_completion() {
                 result?;
-                esp_println::println!("woah");
                 return self.check_all_commands_done_blocking(deadline);
             }
         }
@@ -2481,21 +2495,17 @@ impl Driver<'_> {
         stop: bool,
         deadline: Deadline,
     ) -> Result<(), Error> {
-        esp_println::println!("validate write");
         address.validate()?;
-        esp_println::println!("reset before trans");
+
         self.reset_before_transmission();
 
         // Short circuit for zero length writes without start or end as that would be an
         // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
-        esp_println::println!("is empty?");
         if bytes.is_empty() && !start && !stop {
             return Ok(());
         }
 
-        esp_println::println!("start op");
         let deadline = self.start_write_operation(address, bytes, start, stop, deadline)?;
-        esp_println::println!("wait for completion");
         self.wait_for_completion_blocking(deadline)?;
 
         Ok(())
@@ -2633,14 +2643,12 @@ impl Driver<'_> {
         stop: bool,
         deadline: Deadline,
     ) -> Result<(), Error> {
-        esp_println::println!("is empty?");
         if buffer.is_empty() {
             return self.write_operation_blocking(address, &[], start, stop, deadline);
         }
 
         let chunk_count = VariableChunkIter::new(buffer).count();
         for (idx, chunk) in VariableChunkIter::new(buffer).enumerate() {
-            esp_println::println!("chunk");
             self.write_operation_blocking(
                 address,
                 chunk,
@@ -2648,7 +2656,6 @@ impl Driver<'_> {
                 stop && idx == chunk_count - 1,
                 deadline,
             )?;
-            esp_println::println!("nevah");
         }
 
         Ok(())
@@ -2713,9 +2720,7 @@ impl Driver<'_> {
         address: I2cAddress,
         operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
-        esp_println::println!("validate");
         address.validate()?;
-        esp_println::println!("ensure");
         self.ensure_idle_blocking();
 
         let mut deadline = Deadline::None;
@@ -2726,25 +2731,21 @@ impl Driver<'_> {
 
         let mut last_op: Option<OpKind> = None;
         // filter out 0 length read operations
-        esp_println::println!("filter");
         let mut op_iter = operations
             .filter(|op| op.is_write() || !op.is_empty())
             .peekable();
 
-        esp_println::println!("while");
         while let Some(op) = op_iter.next() {
             let next_op = op_iter.peek().map(|v| v.kind());
             let kind = op.kind();
             match op {
                 Operation::Write(buffer) => {
-                    esp_println::println!("write");
                     // execute a write operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
                     if let SoftwareTimeout::PerByte(timeout) = self.config.config.software_timeout {
                         deadline = Deadline::PerByte(timeout);
                     }
-                    esp_println::println!("before write_block");
                     self.write_blocking(
                         address,
                         buffer,
@@ -2752,10 +2753,8 @@ impl Driver<'_> {
                         next_op.is_none(),
                         deadline,
                     )?;
-                    esp_println::println!("haha nope you");
                 }
                 Operation::Read(buffer) => {
-                    esp_println::println!("read");
                     if let SoftwareTimeout::PerByte(timeout) = self.config.config.software_timeout {
                         deadline = Deadline::PerByte(timeout);
                     }
@@ -3318,7 +3317,7 @@ fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeChe
 }
 
 for_each_i2c_master!(
-    ($inst:ident, $peri:ident, $scl:ident, $sda:ident) => {
+    ($id:literal, $inst:ident, $peri:ident, $scl:ident, $sda:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&Info, &State) {
                 #[handler]
@@ -3332,6 +3331,7 @@ for_each_i2c_master!(
                 };
 
                 static PERIPHERAL: Info = Info {
+                    id: $id, // <— NEW
                     register_block: crate::peripherals::$inst::ptr(),
                     peripheral: crate::system::Peripheral::$peri,
                     async_handler: irq_handler,
