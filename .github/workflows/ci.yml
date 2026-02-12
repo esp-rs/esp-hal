@@ -110,6 +110,7 @@ jobs:
           # lints and docs are checked separately
           cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32c5 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
 
@@ -188,7 +189,7 @@ jobs:
       - name: Build RISC-V docs
         if: matrix.group == 'riscv'
         shell: bash
-        run: cargo xtask build documentation --chips esp32c2,esp32c3,esp32c6,esp32h2
+        run: cargo xtask build documentation --chips esp32c2,esp32c3,esp32c5,esp32c6,esp32h2
 
   # --------------------------------------------------------------------------
   # MSRV
@@ -239,7 +240,7 @@ jobs:
       - name: msrv RISC-V (esp-hal)
         if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         run: |
-          cargo xtask lint-packages --chips esp32c2,esp32c3,esp32c6,esp32h2 --toolchain ${{ env.MSRV }}
+          cargo xtask lint-packages --chips esp32c2,esp32c3,esp32c5,esp32c6,esp32h2 --toolchain ${{ env.MSRV }}
 
       - name: msrv Xtensa (esp-hal)
         if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
@@ -337,6 +338,10 @@ jobs:
             rust-target: riscv32imc-unknown-none-elf
             runner: esp32c3-usb
             host: armv7
+          - soc: esp32c5
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32c5-usb
+            host: aarch64
           - soc: esp32c6
             rust-target: riscv32imac-unknown-none-elf
             runner: esp32c6-usb
