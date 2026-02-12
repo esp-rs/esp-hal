@@ -866,6 +866,7 @@ support_status = "partial"
 
 [device.rng]
 support_status = "partial"
+trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 
 [device.sleep]

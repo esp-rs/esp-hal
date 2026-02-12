@@ -4,7 +4,7 @@ use crate::{clock::Clocks, peripherals::RNG};
 
 // TODO: find a better place for these
 #[inline]
-#[cfg(soc_cpu_csr_prv_mode_is_set)]
+#[cfg(all(soc_cpu_has_csr_pc, soc_cpu_csr_prv_mode_is_set))]
 fn tee_enabled() -> bool {
     false
 }

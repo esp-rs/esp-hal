@@ -186,6 +186,15 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
+    ("rng.apb_cycle_wait_num") => {
+        16
+    };
+    ("rng.apb_cycle_wait_num", str) => {
+        stringify!(16)
+    };
+    ("rng.trng_supported") => {
+        false
+    };
     ("spi_master.supports_dma") => {
         true
     };
@@ -2445,31 +2454,32 @@ macro_rules! for_each_peripheral {
         "PVT_MONITOR peripheral singleton"] PVT_MONITOR <= PVT() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "RMT peripheral singleton"] RMT
         <= RMT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "RSA peripheral singleton"] RSA <= RSA(RSA : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "SHA peripheral singleton"] SHA
-        <= SHA(SHA : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
+        "RNG peripheral singleton"] RNG <= RNG() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "RSA peripheral singleton"] RSA
+        <= RSA(RSA : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
         }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "SLC peripheral singleton"] SLC <= SLC() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "SPI2 peripheral singleton"]
-        SPI2 <= SPI2(SPI2 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "SYSTEM peripheral singleton"] SYSTEM <= PCR() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "SYSTIMER peripheral singleton"]
-        SYSTIMER <= SYSTIMER() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "TEE peripheral singleton"] TEE <= TEE() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "TIMG0 peripheral singleton"]
-        TIMG0 <= TIMG0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "TIMG1 peripheral singleton"] TIMG1 <= TIMG1() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "TRACE0 peripheral singleton"]
-        TRACE0 <= TRACE() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "UART0 peripheral singleton"] UART0 <= UART0(UART0 : { bind_peri_interrupt,
+        "SHA peripheral singleton"] SHA <= SHA(SHA : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SLC peripheral singleton"] SLC
+        <= SLC() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "SPI2 peripheral singleton"] SPI2 <= SPI2(SPI2 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "UART1 peripheral singleton"]
-        UART1 <= UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SYSTEM peripheral singleton"]
+        SYSTEM <= PCR() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "SYSTIMER peripheral singleton"] SYSTIMER <= SYSTIMER() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "TEE peripheral singleton"] TEE
+        <= TEE() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "TIMG0 peripheral singleton"] TIMG0 <= TIMG0() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "TIMG1 peripheral singleton"]
+        TIMG1 <= TIMG1() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "TRACE0 peripheral singleton"] TRACE0 <= TRACE() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "UART0 peripheral singleton"]
+        UART0 <= UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "UHCI0 peripheral singleton"] UHCI0 <= UHCI0() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "UART1 peripheral singleton"] UART1 <= UART1(UART1 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt })));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "UHCI0 peripheral singleton"]
+        UHCI0 <= UHCI0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -2555,6 +2565,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((PMU(unstable)));
         _for_each_inner_peripheral!((PVT_MONITOR(unstable)));
         _for_each_inner_peripheral!((RMT(unstable)));
+        _for_each_inner_peripheral!((RNG(unstable)));
         _for_each_inner_peripheral!((RSA(unstable)));
         _for_each_inner_peripheral!((SHA(unstable)));
         _for_each_inner_peripheral!((SLC(unstable)));
@@ -2735,6 +2746,7 @@ macro_rules! for_each_peripheral {
         "PMU peripheral singleton"] PMU <= PMU() (unstable)), (@ peri_type #[doc =
         "PVT_MONITOR peripheral singleton"] PVT_MONITOR <= PVT() (unstable)), (@
         peri_type #[doc = "RMT peripheral singleton"] RMT <= RMT() (unstable)), (@
+        peri_type #[doc = "RNG peripheral singleton"] RNG <= RNG() (unstable)), (@
         peri_type #[doc = "RSA peripheral singleton"] RSA <= RSA(RSA : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "SHA peripheral singleton"] SHA <= SHA(SHA : {
@@ -2793,20 +2805,21 @@ macro_rules! for_each_peripheral {
         (MCPWM0(unstable)), (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)),
         (MODEM_SYSCON(unstable)), (PARL_IO(unstable)), (PAU(unstable)), (PCNT(unstable)),
         (PCR(unstable)), (PMU(unstable)), (PVT_MONITOR(unstable)), (RMT(unstable)),
-        (RSA(unstable)), (SHA(unstable)), (SLC(unstable)), (SPI2), (SYSTEM(unstable)),
-        (SYSTIMER(unstable)), (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
-        (TRACE0(unstable)), (UART0), (UART1), (UHCI0(unstable)), (USB_DEVICE(unstable)),
-        (DMA_CH0(unstable)), (DMA_CH1(unstable)), (DMA_CH2(unstable)), (BT(unstable)),
-        (FLASH(unstable)), (GPIO_DEDICATED(unstable)), (LP_CORE(unstable)),
-        (SW_INTERRUPT(unstable)), (WIFI(unstable)), (MEM2MEM0(unstable)),
-        (MEM2MEM1(unstable)), (MEM2MEM2(unstable)), (MEM2MEM3(unstable)),
-        (MEM2MEM4(unstable)), (MEM2MEM5(unstable)), (MEM2MEM6(unstable)),
-        (MEM2MEM7(unstable)), (MEM2MEM8(unstable))));
-        _for_each_inner_peripheral!((dma_eligible(MEM2MEM0, Mem2mem0, 0), (SPI2, Spi2,
-        1), (UHCI0, Uhci0, 2), (I2S0, I2s0, 3), (MEM2MEM1, Mem2mem1, 4), (MEM2MEM2,
-        Mem2mem2, 5), (SHA, Sha, 7), (APB_SARADC, ApbSaradc, 8), (PARL_IO, ParlIo, 9),
-        (MEM2MEM3, Mem2mem3, 10), (MEM2MEM4, Mem2mem4, 11), (MEM2MEM5, Mem2mem5, 12),
-        (MEM2MEM6, Mem2mem6, 13), (MEM2MEM7, Mem2mem7, 14), (MEM2MEM8, Mem2mem8, 15)));
+        (RNG(unstable)), (RSA(unstable)), (SHA(unstable)), (SLC(unstable)), (SPI2),
+        (SYSTEM(unstable)), (SYSTIMER(unstable)), (TEE(unstable)), (TIMG0(unstable)),
+        (TIMG1(unstable)), (TRACE0(unstable)), (UART0), (UART1), (UHCI0(unstable)),
+        (USB_DEVICE(unstable)), (DMA_CH0(unstable)), (DMA_CH1(unstable)),
+        (DMA_CH2(unstable)), (BT(unstable)), (FLASH(unstable)),
+        (GPIO_DEDICATED(unstable)), (LP_CORE(unstable)), (SW_INTERRUPT(unstable)),
+        (WIFI(unstable)), (MEM2MEM0(unstable)), (MEM2MEM1(unstable)),
+        (MEM2MEM2(unstable)), (MEM2MEM3(unstable)), (MEM2MEM4(unstable)),
+        (MEM2MEM5(unstable)), (MEM2MEM6(unstable)), (MEM2MEM7(unstable)),
+        (MEM2MEM8(unstable)))); _for_each_inner_peripheral!((dma_eligible(MEM2MEM0,
+        Mem2mem0, 0), (SPI2, Spi2, 1), (UHCI0, Uhci0, 2), (I2S0, I2s0, 3), (MEM2MEM1,
+        Mem2mem1, 4), (MEM2MEM2, Mem2mem2, 5), (SHA, Sha, 7), (APB_SARADC, ApbSaradc, 8),
+        (PARL_IO, ParlIo, 9), (MEM2MEM3, Mem2mem3, 10), (MEM2MEM4, Mem2mem4, 11),
+        (MEM2MEM5, Mem2mem5, 12), (MEM2MEM6, Mem2mem6, 13), (MEM2MEM7, Mem2mem7, 14),
+        (MEM2MEM8, Mem2mem8, 15)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

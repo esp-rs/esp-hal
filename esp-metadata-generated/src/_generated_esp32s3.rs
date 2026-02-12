@@ -237,6 +237,9 @@ macro_rules! property {
     ("rng.apb_cycle_wait_num", str) => {
         stringify!(16)
     };
+    ("rng.trng_supported") => {
+        true
+    };
     ("rsa.size_increment") => {
         32
     };

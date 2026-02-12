@@ -551,6 +551,8 @@ driver_configs![
         name: "RNG",
         properties: {
             apb_cycle_wait_num: u32,
+            #[serde(default)]
+            trng_supported: bool,
         }
     },
     RsaProperties {
