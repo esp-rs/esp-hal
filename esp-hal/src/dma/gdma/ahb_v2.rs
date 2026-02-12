@@ -74,9 +74,10 @@ impl RegisterAccess for AnyGdmaTxChannel<'_> {
             .modify(|_, w| w.out_check_owner().bit(check_owner.unwrap_or(true)));
     }
 
-    // fn can_access_psram(&self) -> bool {
-    //    true
-    //}
+    #[cfg(psram_dma)]
+    fn can_access_psram(&self) -> bool {
+        true
+    }
 }
 
 impl TxRegisterAccess for AnyGdmaTxChannel<'_> {
@@ -287,9 +288,10 @@ impl RegisterAccess for AnyGdmaRxChannel<'_> {
             .modify(|_, w| w.in_check_owner().bit(check_owner.unwrap_or(true)));
     }
 
-    // fn can_access_psram(&self) -> bool {
-    //    true
-    //}
+    #[cfg(psram_dma)]
+    fn can_access_psram(&self) -> bool {
+        true
+    }
 }
 
 impl RxRegisterAccess for AnyGdmaRxChannel<'_> {
@@ -421,16 +423,16 @@ impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel<'_> {
 }
 
 pub(crate) fn setup() {
-    // TODO: the range is device-specific
-    let range = 0x4080_0000..0x4400_0000;
-    trace!(
-        "Configuring accessible memory range: 0x{:x}..0x{:x}",
-        range.start, range.end
-    );
-    DMA::regs()
-        .intr_mem_start_addr()
-        .write(|w| unsafe { w.bits(range.start) });
-    DMA::regs()
-        .intr_mem_end_addr()
-        .write(|w| unsafe { w.bits(range.end) });
+    // TODO: configure accessible memory range with non-hardcoded data
+    // let range = 0x4080_0000..0x4400_0000;
+    // trace!(
+    //     "Configuring accessible memory range: 0x{:x}..0x{:x}",
+    //     range.start, range.end
+    // );
+    // DMA::regs()
+    //     .intr_mem_start_addr()
+    //     .write(|w| unsafe { w.bits(range.start) });
+    // DMA::regs()
+    //     .intr_mem_end_addr()
+    //     .write(|w| unsafe { w.bits(range.end) });
 }
