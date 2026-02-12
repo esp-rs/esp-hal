@@ -219,11 +219,16 @@ use portable_atomic::Ordering;
 use procmacros::ram;
 
 use crate::{
-    Async, Blocking,
+    Async,
+    Blocking,
     asynch::AtomicWaker,
     clock::Clocks,
     gpio::{
-        self, InputConfig, Level, OutputConfig, PinGuard,
+        self,
+        InputConfig,
+        Level,
+        OutputConfig,
+        PinGuard,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
     peripherals::{Interrupt, RMT},
@@ -2243,8 +2248,19 @@ mod chip_specific {
     use procmacros::ram;
 
     use super::{
-        ChannelIndex, ClockSource, ConfigError, Direction, DynChannelAccess, Event, Level,
-        LoopMode, MemSize, RMT_LOCK, Rx, Tx, WAKER,
+        ChannelIndex,
+        ClockSource,
+        ConfigError,
+        Direction,
+        DynChannelAccess,
+        Event,
+        Level,
+        LoopMode,
+        MemSize,
+        RMT_LOCK,
+        Rx,
+        Tx,
+        WAKER,
     };
     use crate::{peripherals::RMT, time::Rate};
 
@@ -2774,8 +2790,19 @@ mod chip_specific {
     use procmacros::ram;
 
     use super::{
-        ChannelIndex, ClockSource, ConfigError, Direction, DynChannelAccess, Event, Level, MemSize,
-        NUM_CHANNELS, RMT_LOCK, Rx, Tx, WAKER,
+        ChannelIndex,
+        ClockSource,
+        ConfigError,
+        Direction,
+        DynChannelAccess,
+        Event,
+        Level,
+        MemSize,
+        NUM_CHANNELS,
+        RMT_LOCK,
+        Rx,
+        Tx,
+        WAKER,
     };
     use crate::{peripherals::RMT, time::Rate};
 
