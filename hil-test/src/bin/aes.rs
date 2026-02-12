@@ -10,6 +10,8 @@
 //% FEATURES(quad, octal): psram
 //% FEATURES: unstable esp-alloc/nightly
 
+// TODO: PSRAM tests for C5
+
 #![no_std]
 #![no_main]
 

@@ -13,8 +13,8 @@ cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c5_technical_reference_manual_en.pdf"
 
 peripherals = [
-    # { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 6 },
-    #{ name = "ASSIST_DEBUG", pac = "BUS_MONITOR"},
+    { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 6 },
+    #{ name = "ASSIST_DEBUG" },
     { name = "APB_SARADC", dma_peripheral = 8 },
     # { name = "BITSCRAMBLER" },
     # { name = "CACHE" },
@@ -242,7 +242,24 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Dma", template_params = { peripheral = "gdma" } },
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
     { name = "Spi2" },
+    { name = "Aes" },
+    { name = "Sha" },
+    { name = "Rsa" },
+    { name = "Ecc" },
 ] } }
+
+# Needs a bit of PAC massaging
+# TODO: define functionality for PSEUDO register
+# [device.aes]
+# support_status = "partial"
+# has_split_text_registers = true
+# endianness_configurable = false
+# dma = true
+# dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128"]
+# key_length = { options = [
+#     { bits = 128, encrypt_mode = 0, decrypt_mode = 4 },
+#     { bits = 256, encrypt_mode = 2, decrypt_mode = 6 }
+# ] }
 
 [device.dma]
 support_status = "partial"
@@ -253,6 +270,9 @@ supports_mem2mem = true
 max_priority = 5
 # TODO: DMA can access flash
 # TODO: weight-based arbitration
+
+[device.ecc]
+support_status = "not_supported" # tests fail
 
 [device.gpio]
 support_status = "partial"
@@ -476,6 +496,16 @@ bus_timeout_is_exponential = true
 [device.i2c_slave]
 support_status = "not_supported"
 
+[device.rsa]
+support_status = "not_supported" # compiles but does not work
+size_increment = 32
+memory_size_bytes = 384
+
+[device.sha]
+support_status = "partial"
+dma = true
+algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
+
 [device.interrupts]
 support_status = "partial"
 status_registers = 3
@@ -527,5 +557,6 @@ apb_cycle_wait_num = 16 # TODO
 
 # ## Miscellaneous
 # [device.io_mux]
+
 [device.systimer]
 [device.pcnt]

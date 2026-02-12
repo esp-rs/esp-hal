@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C5: Add DMA support (#4959)
 - C5: Add I2C support (#4975)
 - C5: Add basic RNG support (#4978)
+- C5: Add SHA support (#4979)
 
 ### Changed
 
