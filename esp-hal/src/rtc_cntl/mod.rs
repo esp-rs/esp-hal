@@ -102,7 +102,7 @@ let delay = Delay::new();
 
 loop {
     // Get the current RTC time in milliseconds
-    let time_ms = rtc.current_time_us() * 1000;
+    let time_ms = rtc.current_time_us() / 1000;
     delay.delay_millis(1000);
 
     // Set the time to half a second in the past

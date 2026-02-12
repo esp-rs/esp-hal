@@ -55,7 +55,7 @@ the driver by value:
 // Peripheral singletons are returned from the `init` function.
 let peripherals = esp_hal::init(esp_hal::Config::default());
 
-let mut i2c = I2C::new(peripherals.I2C0, /* ... */);
+let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 ```
 "#
 )]
