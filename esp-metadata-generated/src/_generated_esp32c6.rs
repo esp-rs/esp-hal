@@ -312,14 +312,14 @@ macro_rules! property {
     ("uart.peripheral_controls_mem_clk") => {
         true
     };
-    ("uhci.combined_uart_selector_field") => {
-        false
-    };
     ("lp_uart.ram_size") => {
         32
     };
     ("lp_uart.ram_size", str) => {
         stringify!(32)
+    };
+    ("uhci.combined_uart_selector_field") => {
+        false
     };
     ("wifi.has_wifi6") => {
         true

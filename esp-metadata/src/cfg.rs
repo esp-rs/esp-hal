@@ -659,19 +659,19 @@ driver_configs![
             peripheral_controls_mem_clk: bool,
         }
     },
-    UhciProperties {
-        driver: uhci,
-        name: "UART",
-        properties: {
-            #[serde(default)]
-            combined_uart_selector_field: bool,
-        }
-    },
     LpUartProperties {
         driver: lp_uart,
         name: "LP UART",
         properties: {
             ram_size: u32,
+        }
+    },
+    UhciProperties {
+        driver: uhci,
+        name: "UHCI",
+        properties: {
+            #[serde(default)]
+            combined_uart_selector_field: bool,
         }
     },
     UlpFsmProperties {

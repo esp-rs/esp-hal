@@ -95,8 +95,8 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | Touch              | ⚒️   |          |          |          |          |          | ❌       | ❌       |
 | TWAI               | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | UART               | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
-| UART               | ❌    |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ❌       | ⚒️      |
 | LP UART            |       |          |          |          | ⚒️      |          |          |          |
+| UHCI               | ❌    |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ❌       | ⚒️      |
 | ULP (FSM)          | ⚒️   |          |          |          |          |          | ⚒️      | ⚒️      |
 | ULP (RISC-V)       |       |          |          |          | ⚒️      |          | ⚒️      | ⚒️      |
 | USB OTG FS         |       |          |          |          |          |          | ⚒️      | ⚒️      |
