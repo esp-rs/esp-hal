@@ -55,7 +55,7 @@ peripherals = [
     { name = "PLIC_MX" },
     { name = "PMU" },
     { name = "RMT" },
-    { name = "RNG" },
+    { name = "RNG", virtual = true }, # a) RNG is LP_PERI in truth. b) we need to offset the rng_data register at runtime for newer revisions.
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 7 },
     { name = "ETM", pac = "SOC_ETM" },

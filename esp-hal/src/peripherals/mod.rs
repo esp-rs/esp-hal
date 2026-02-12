@@ -14,6 +14,10 @@ pub use pac::Interrupt;
 
 pub(crate) use crate::soc::pac;
 
+#[cfg(esp32h2)]
+#[path = "overlay_h2.rs"]
+mod overlay;
+
 /// Macro to create a peripheral structure.
 macro_rules! create_peripheral {
     ($(#[$attr:meta])* $name:ident <= virtual ($($interrupt:ident: { $bind:ident, $enable:ident, $disable:ident }),*)) => {
