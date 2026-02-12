@@ -155,8 +155,8 @@ impl Chip {
 
     pub fn has_lp_core(&self) -> bool {
         use Chip::*;
-
-        matches!(self, Esp32c5 | Esp32c6 | Esp32s2 | Esp32s3)
+        // TODO this should be checking for lp_core_driver_supported
+        matches!(self, Esp32c6 | Esp32s2 | Esp32s3)
     }
 
     pub fn lp_target(&self) -> Result<&'static str> {
