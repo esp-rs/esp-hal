@@ -2964,7 +2964,7 @@ macro_rules! for_each_peripheral {
         = "PMU peripheral singleton"] PMU <= PMU() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "RMT peripheral singleton"] RMT
         <= RMT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "RNG peripheral singleton"] RNG <= RNG() (unstable)));
+        "RNG peripheral singleton"] RNG <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "RSA peripheral singleton"] RSA
         <= RSA(RSA : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
         }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -3255,7 +3255,7 @@ macro_rules! for_each_peripheral {
         "PLIC_MX peripheral singleton"] PLIC_MX <= PLIC_MX() (unstable)), (@ peri_type
         #[doc = "PMU peripheral singleton"] PMU <= PMU() (unstable)), (@ peri_type #[doc
         = "RMT peripheral singleton"] RMT <= RMT() (unstable)), (@ peri_type #[doc =
-        "RNG peripheral singleton"] RNG <= RNG() (unstable)), (@ peri_type #[doc =
+        "RNG peripheral singleton"] RNG <= virtual() (unstable)), (@ peri_type #[doc =
         "RSA peripheral singleton"] RSA <= RSA(RSA : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "SHA peripheral singleton"] SHA <= SHA(SHA : { bind_peri_interrupt,

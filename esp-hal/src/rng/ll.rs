@@ -64,21 +64,7 @@ fn read_one(wait_cycles: usize) -> u32 {
             if now.wrapping_sub(*last_wait_start) >= wait_cycles {
                 *last_wait_start = now;
 
-                cfg_if::cfg_if! {
-                    if #[cfg(not(esp32h2))] {
-                        Some(RNG::regs().data().read().bits())
-                    } else {
-                        // TODO find a better way to do this
-                        //
-                        // On H2-ECO5+ the LPPERI peripherals contains an additional register inserted before the `rng_data` register.
-                        // https://github.com/espressif/esp-idf/commit/4c5e1a03414a6d55be4b42ba071b30ad228414f6#diff-bc8f2eca37e32ee4ba21ac812e4934998e764132a400479c4d091eb6f7e2e444
-                        if crate::soc::chip_revision_above(102) {
-                            Some(unsafe { RNG::regs().data().as_ptr().add(1).read_volatile() })
-                        } else {
-                            Some(RNG::regs().data().read().bits())
-                        }
-                    }
-                }
+                Some(RNG::regs().data().read().bits())
             } else {
                 None
             }
