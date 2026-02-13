@@ -232,25 +232,25 @@ async fn connection(mut controller: WifiController<'static>) {
     loop {
         let ev = controller
             .wait_for_access_point_connected_event_async()
-            .await
-            .unwrap();
+            .await;
         match ev {
-            esp_radio::wifi::AccessPointStationEventInfo::Connected(
+            Ok(esp_radio::wifi::AccessPointStationEventInfo::Connected(
                 access_point_station_connected_info,
-            ) => {
+            )) => {
                 println!(
                     "Station connected: {:?}",
                     access_point_station_connected_info
                 );
             }
-            esp_radio::wifi::AccessPointStationEventInfo::Disconnected(
+            Ok(esp_radio::wifi::AccessPointStationEventInfo::Disconnected(
                 access_point_station_disconnected_info,
-            ) => {
+            )) => {
                 println!(
                     "Station disconnected: {:?}",
                     access_point_station_disconnected_info
                 );
             }
+            _ => (),
         }
         Timer::after(Duration::from_millis(5000)).await
     }
