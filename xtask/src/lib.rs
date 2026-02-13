@@ -28,6 +28,9 @@ pub mod git;
 #[cfg(feature = "semver-checks")]
 pub mod semver_check;
 
+#[cfg(feature = "mcp")]
+pub mod mcp;
+
 #[derive(
     Debug,
     Clone,
@@ -44,6 +47,7 @@ pub mod semver_check;
     serde::Deserialize,
     serde::Serialize,
 )]
+#[cfg_attr(feature = "mcp", derive(schemars::JsonSchema))]
 #[serde(rename_all = "kebab-case")]
 #[strum(serialize_all = "kebab-case")]
 /// Represents the packages in the `esp-hal` workspace.

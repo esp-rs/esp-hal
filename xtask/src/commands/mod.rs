@@ -1,10 +1,22 @@
-use std::path::Path;
+use std::{io::IsTerminal, path::Path};
 
 use anyhow::{Context, Result, bail};
 use clap::Args;
 use esp_metadata::Chip;
 use inquire::Select;
 use strum::IntoEnumIterator;
+
+/// Prompt the user for a chip if stdin is a TTY, otherwise bail.
+///
+/// When running under MCP (or any non-interactive context), stdin is not
+/// a terminal so interactive prompts would hang or corrupt the transport.
+fn select_chip_interactive() -> Result<Chip> {
+    if !std::io::stdin().is_terminal() {
+        bail!("'chip' must be provided; interactive selection is not available in non-interactive mode.");
+    }
+    let chip_variants = Chip::iter().collect::<Vec<_>>();
+    Ok(Select::new("Select your target chip:", chip_variants).prompt()?)
+}
 
 pub use self::{build::*, check_changelog::*, release::*, run::*};
 use crate::{
@@ -27,6 +39,7 @@ pub mod relcheck;
 
 /// Arguments common to commands which act on examples.
 #[derive(Debug, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 pub struct ExamplesArgs {
     /// Example to act on ("all" will execute every example).
     pub example: Option<String>,
@@ -35,9 +48,11 @@ pub struct ExamplesArgs {
     pub chip: Option<Chip>,
     /// Package whose examples we wish to act on.
     #[arg(value_enum, long, default_value_t = Package::Examples)]
+    #[cfg_attr(feature = "mcp", serde(default = "crate::mcp::default_package_examples"))]
     pub package: Package,
     /// Build examples in debug mode only
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     pub debug: bool,
 
     /// The toolchain used to build the examples
@@ -46,29 +61,34 @@ pub struct ExamplesArgs {
 
     /// Emit crate build timings
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     pub timings: bool,
 }
 
 /// Arguments common to commands which act on doctests.
 #[derive(Debug, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 pub struct DocTestArgs {
     /// Package(s) where we wish to run doc tests.
     #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
+    #[cfg_attr(feature = "mcp", serde(default = "crate::mcp::default_packages"))]
     pub packages: Vec<Package>,
     /// Chip to target.
-    #[arg(value_enum)]
-    pub chip: Chip,
+    #[arg(value_enum, long)]
+    pub chip: Option<Chip>,
 }
 
 /// Arguments common to commands which act on tests.
 #[derive(Debug, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 pub struct TestsArgs {
     /// Chip to target.
-    #[arg(value_enum)]
-    pub chip: Chip,
+    #[arg(value_enum, long)]
+    pub chip: Option<Chip>,
 
     /// Repeat the tests for a specific number of times.
     #[arg(long, default_value_t = 1)]
+    #[cfg_attr(feature = "mcp", serde(default = "crate::mcp::default_repeat"))]
     pub repeat: usize,
     /// Optional test to act on (all tests used if omitted).
     ///
@@ -84,6 +104,7 @@ pub struct TestsArgs {
 
     /// Emit crate build timings
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     pub timings: bool,
 }
 
@@ -97,15 +118,12 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
         args.package,
         args.chip
     );
-    if args.chip.is_none() {
-        let chip_variants = Chip::iter().collect::<Vec<_>>();
-
-        let chip = Select::new("Select your target chip:", chip_variants).prompt()?;
-
-        args.chip = Some(chip);
-    }
-
-    let chip = args.chip.unwrap();
+    let chip = if let Some(chip) = args.chip {
+        chip
+    } else {
+        select_chip_interactive()?
+    };
+    args.chip = Some(chip);
 
     // Ensure that the package/chip combination provided are valid:
     args.package.validate_package_chip(&chip).with_context(|| {
@@ -156,9 +174,6 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
         .filter(|example| example.supports_chip(chip))
         .collect::<Vec<_>>();
 
-    // At this point, chip can never be `None`, so we can safely unwrap it.
-    let chip = args.chip.unwrap();
-
     // Filter the examples down to only the binaries supported by the given chip
     examples.retain(|ex| ex.supports_chip(chip));
 
@@ -174,6 +189,13 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
             filtered.retain(|ex| ex.matches_name(example));
 
             if filtered.is_empty() {
+                if !std::io::stdin().is_terminal() {
+                    bail!(
+                        "Example '{example}' not found or unsupported for the given chip. \
+                         Interactive selection is not available in non-interactive mode."
+                    );
+                }
+
                 log::warn!(
                     "Example '{example}' not found or unsupported for the given chip. Please select one of the existing examples in the desired package."
                 );
@@ -191,6 +213,13 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
             }
         }
     } else {
+        if !std::io::stdin().is_terminal() {
+            bail!(
+                "'example' must be provided; interactive selection is not available \
+                 in non-interactive mode."
+            );
+        }
+
         let example_name = inquire::Select::new(
             "Select an example:",
             examples.iter().map(|ex| ex.binary_name()).collect(),
@@ -219,13 +248,19 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     // Absolute path of the 'hil-test' package's root:
     let package_path = crate::windows_safe_path(&workspace.join("hil-test"));
 
+    let chip = if let Some(chip) = args.chip {
+        chip
+    } else {
+        select_chip_interactive()?
+    };
+
     // Determine the appropriate build target for the given package and chip:
-    let target = Package::HilTest.target_triple(&args.chip)?;
+    let target = Package::HilTest.target_triple(&chip)?;
 
     // Load all tests which support the specified chip and parse their metadata:
     let mut tests = crate::firmware::load(&package_path.join("src").join("bin"))?
         .into_iter()
-        .filter(|example| example.supports_chip(args.chip))
+        .filter(|example| example.supports_chip(chip))
         .collect::<Vec<_>>();
 
     // Sort all tests by name:
@@ -273,7 +308,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 for test in matched {
                     let command = crate::generate_build_command(
                         &package_path,
-                        args.chip,
+                        chip,
                         &target,
                         test,
                         action.clone(),
@@ -297,7 +332,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
         for test in tests {
             let command = crate::generate_build_command(
                 &package_path,
-                args.chip,
+                chip,
                 &target,
                 &test,
                 action.clone(),
@@ -333,7 +368,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
         }
     }
 
-    move_artifacts(args.chip, &action);
+    move_artifacts(chip, &action);
 
     if !failed.is_empty() {
         bail!("Failed tests: {:#?}", failed);

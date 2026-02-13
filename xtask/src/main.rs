@@ -61,9 +61,17 @@ enum Cli {
     #[cfg(feature = "rel-check")]
     #[clap(subcommand)]
     RelCheck(relcheck::RelCheckCmds),
+
+    /// Start an MCP (Model Context Protocol) server over stdio.
+    ///
+    /// This exposes safe xtask commands as MCP tools for use by AI agents
+    /// and other MCP clients. Release-related commands are not exposed.
+    #[cfg(feature = "mcp")]
+    ServeMcp,
 }
 
 #[derive(Debug, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 struct CiArgs {
     /// Chip to target.
     #[arg(value_enum)]
@@ -75,50 +83,63 @@ struct CiArgs {
 
     /// Whether to skip running lints
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     no_lint: bool,
 
     /// Whether to skip building documentation
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     no_docs: bool,
 
     /// Whether to skip checking the crates itself
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     no_check_crates: bool,
 }
 
 #[derive(Debug, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 struct FmtPackagesArgs {
     /// Run in 'check' mode; exists with 0 if formatted correctly, 1 otherwise
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     check: bool,
 
     /// Package(s) to target.
     #[arg(value_enum, default_values_t = Package::iter())]
+    #[cfg_attr(feature = "mcp", serde(default = "xtask::mcp::default_packages"))]
     packages: Vec<Package>,
 }
 
 #[derive(Debug, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 struct CleanArgs {
     /// Package(s) to target.
     #[arg(value_enum, default_values_t = Package::iter())]
+    #[cfg_attr(feature = "mcp", serde(default = "xtask::mcp::default_packages"))]
     packages: Vec<Package>,
 }
 
 #[derive(Debug, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 struct HostTestsArgs {
     /// Package(s) to target.
     #[arg(value_enum, default_values_t = Package::iter())]
+    #[cfg_attr(feature = "mcp", serde(default = "xtask::mcp::default_packages"))]
     packages: Vec<Package>,
 }
 
 #[derive(Debug, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 struct CheckPackagesArgs {
     /// Package(s) to target.
     #[arg(value_enum, default_values_t = Package::iter())]
+    #[cfg_attr(feature = "mcp", serde(default = "xtask::mcp::default_packages"))]
     packages: Vec<Package>,
 
     /// Check for a specific chip
     #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
+    #[cfg_attr(feature = "mcp", serde(default = "xtask::mcp::default_chips"))]
     chips: Vec<Chip>,
 
     /// The toolchain used to run the checks
@@ -127,17 +148,21 @@ struct CheckPackagesArgs {
 }
 
 #[derive(Debug, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 struct LintPackagesArgs {
     /// Package(s) to target.
     #[arg(value_enum, default_values_t = Package::iter())]
+    #[cfg_attr(feature = "mcp", serde(default = "xtask::mcp::default_packages"))]
     packages: Vec<Package>,
 
     /// Lint for a specific chip
     #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
+    #[cfg_attr(feature = "mcp", serde(default = "xtask::mcp::default_chips"))]
     chips: Vec<Chip>,
 
     /// Automatically apply fixes
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     fix: bool,
 
     /// The toolchain used to run the lints
@@ -146,20 +171,25 @@ struct LintPackagesArgs {
 }
 
 #[derive(Debug, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 struct CheckChangelogArgs {
     /// Package(s) to tag.
     #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
+    #[cfg_attr(feature = "mcp", serde(default = "xtask::mcp::default_packages"))]
     packages: Vec<Package>,
 
     /// Re-generate the changelog with consistent formatting.
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     normalize: bool,
 }
 
 #[derive(Debug, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 struct UpdateMetadataArgs {
     /// Run in 'check' mode; exists with 0 if formatted correctly, 1 otherwise
     #[arg(long)]
+    #[cfg_attr(feature = "mcp", serde(default))]
     check: bool,
 }
 
@@ -167,9 +197,21 @@ struct UpdateMetadataArgs {
 // Application
 
 fn main() -> Result<()> {
+    // When running as an MCP server, log output must go to stderr so it does
+    // not corrupt the JSON-RPC stream on stdout.  We detect MCP mode early
+    // (before Clap parses) by checking raw CLI args.
+    #[cfg(feature = "mcp")]
+    let is_mcp = std::env::args().any(|a| a == "serve-mcp");
+    #[cfg(not(feature = "mcp"))]
+    let is_mcp = false;
+
     let mut builder =
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"));
-    builder.target(env_logger::Target::Stdout);
+    builder.target(if is_mcp {
+        env_logger::Target::Stderr
+    } else {
+        env_logger::Target::Stdout
+    });
     builder.init();
 
     let workspace =
@@ -234,6 +276,12 @@ fn main() -> Result<()> {
         Cli::GenerateReport(args) => generate_report::generate_report(&workspace, args),
         #[cfg(feature = "rel-check")]
         Cli::RelCheck(relcheck) => relcheck::run_rel_check(relcheck),
+
+        #[cfg(feature = "mcp")]
+        Cli::ServeMcp => {
+            let commands = build_mcp_registry();
+            xtask::mcp::server::run(&workspace, commands)
+        }
     }
 }
 
@@ -580,7 +628,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             workspace,
             DocTestArgs {
                 packages: Package::iter().collect(),
-                chip: args.chip,
+                chip: Some(args.chip),
             },
         )
     });
@@ -743,7 +791,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             tests(
                 workspace,
                 TestsArgs {
-                    chip: args.chip,
+                    chip: Some(args.chip),
                     repeat: 1,
                     test: None,
                     toolchain: None,
@@ -881,4 +929,140 @@ fn check_global_symbols(chips: &[Chip]) -> Result<()> {
     } else {
         Ok(())
     }
+}
+
+// ----------------------------------------------------------------------------
+// MCP Command Registry
+
+/// Build the MCP command registry.
+///
+/// Each entry maps a tool name to its Args type (for schema generation and
+/// deserialization) and a handler function.  Only commands listed here are
+/// exposed via the MCP server — this acts as an **allow-list**.
+///
+/// To add a new MCP-exposed command:
+/// 1. Ensure the Args struct derives `serde::Deserialize` and
+///    `schemars::JsonSchema` (behind `cfg_attr(feature = "mcp", ...)`).
+/// 2. Add a `command!()` entry below.
+///
+/// Release commands are intentionally excluded.
+#[cfg(feature = "mcp")]
+fn build_mcp_registry() -> Vec<xtask::mcp::registry::CommandEntry> {
+    use xtask::command;
+
+    vec![
+        // -- Build commands --------------------------------------------------
+        command!(
+            "build-documentation",
+            "Build documentation for the specified packages and chips. \
+             WARNING: slow when targeting all chips/packages. Filter with `chips` and `packages` to reduce build time.",
+            BuildDocumentationArgs,
+            |workspace, args| build_documentation(workspace, args)
+        ),
+        command!(
+            "build-examples",
+            "Build all examples (or a specific example) for a chip. \
+             Provide `chip` and optionally `example` (use \"all\" for every example). \
+             WARNING: building all examples is slow. Prefer specifying a single example name when possible.",
+            ExamplesArgs,
+            |workspace, args| examples(workspace, args, CargoAction::Build(None))
+        ),
+        command!(
+            "build-package",
+            "Build a specific package with the given target, features, and toolchain",
+            BuildPackageArgs,
+            |workspace, args| build_package(workspace, args)
+        ),
+        command!(
+            "build-tests",
+            "Build all applicable tests or a specific test for a chip. \
+             Specify `test` to build a single test and avoid long build times.",
+            TestsArgs,
+            |workspace, args| {
+                let target_path = workspace.join("target");
+                tests(workspace, args, CargoAction::Build(Some(target_path.join("tests"))))
+            }
+        ),
+        // -- Run commands ----------------------------------------------------
+        command!(
+            "run-doc-tests",
+            "Run doc-tests for the specified packages and chip",
+            DocTestArgs,
+            |workspace, args| run_doc_tests(workspace, args)
+        ),
+        command!(
+            "run-elfs",
+            "Run ELF binaries from a folder using probe-rs",
+            RunElfsArgs,
+            |_workspace, args| run_elfs(args)
+        ),
+        command!(
+            "run-tests",
+            "Run all applicable tests or a specific test for a chip",
+            TestsArgs,
+            |workspace, args| tests(workspace, args, CargoAction::Run)
+        ),
+        // -- Lint / check / format commands ----------------------------------
+        command!(
+            "ci",
+            "Perform (parts of) the checks done in CI for a specific chip. \
+             WARNING: this is very slow. Only run as a final pre-PR validation step after all other work is complete and tested.",
+            CiArgs,
+            |workspace, args| run_ci_checks(workspace, args)
+        ),
+        command!(
+            "fmt-packages",
+            "Format all packages in the workspace with rustfmt. \
+             Set `check: true` for check-only mode.",
+            FmtPackagesArgs,
+            |workspace, args| fmt_packages(workspace, args)
+        ),
+        command!(
+            "clean",
+            "Run cargo clean for the specified packages",
+            CleanArgs,
+            |workspace, args| clean(workspace, args)
+        ),
+        command!(
+            "check-packages",
+            "Check all packages with `cargo check` for the specified chips. \
+             WARNING: slow when targeting all chips/packages. Filter with `chips` and `packages` to reduce time.",
+            CheckPackagesArgs,
+            |workspace, args| check_packages(workspace, args)
+        ),
+        command!(
+            "lint-packages",
+            "Lint all packages with clippy for the specified chips. \
+             Set `fix: true` to auto-apply fixes. \
+             WARNING: slow when targeting all chips/packages. Filter with `chips` and `packages` to reduce time.",
+            LintPackagesArgs,
+            |workspace, args| lint_packages(workspace, args)
+        ),
+        command!(
+            "check-changelog",
+            "Check the changelog for the specified packages. \
+             Set `normalize: true` to rewrite with consistent formatting.",
+            CheckChangelogArgs,
+            |workspace, args| check_changelog(workspace, &args.packages, args.normalize)
+        ),
+        command!(
+            "update-metadata",
+            "Re-generate metadata and the chip support table in the esp-hal README. \
+             Set `check: true` for check-only mode.",
+            UpdateMetadataArgs,
+            |workspace, args| update_metadata(workspace, args.check)
+        ),
+        command!(
+            "host-tests",
+            "Run host-tests in the workspace with `cargo test`",
+            HostTestsArgs,
+            |workspace, args| host_tests(workspace, args)
+        ),
+        command!(
+            "check-global-symbols",
+            "Check global symbols in compiled `.rlib` files for unmangled names",
+            CheckPackagesArgs,
+            |_workspace, args| check_global_symbols(&args.chips)
+        ),
+    ]
 }

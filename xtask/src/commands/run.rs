@@ -35,6 +35,7 @@ pub enum Run {
 
 /// Arguments for running ELFs.
 #[derive(Debug, Args)]
+#[cfg_attr(feature = "mcp", derive(serde::Deserialize, schemars::JsonSchema))]
 pub struct RunElfsArgs {
     /// Which chip to run the tests for.
     #[arg(value_enum)]
@@ -43,6 +44,7 @@ pub struct RunElfsArgs {
     pub path: PathBuf,
     /// Optional list of elfs to execute
     #[arg(long, value_delimiter = ',')]
+    #[cfg_attr(feature = "mcp", serde(default))]
     pub elfs: Vec<String>,
 }
 
@@ -51,9 +53,16 @@ pub struct RunElfsArgs {
 
 /// Run doc tests for the specified package and chip.
 pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
+    let chip = if let Some(chip) = args.chip {
+        chip
+    } else {
+        super::select_chip_interactive()?
+    };
+
     let mut success = true;
+    
     for package in args.packages {
-        success &= run_doc_tests_for_package(workspace, package, args.chip)?;
+        success &= run_doc_tests_for_package(workspace, package, chip)?;
     }
     anyhow::ensure!(success, "One or more doc tests failed");
     Ok(())
