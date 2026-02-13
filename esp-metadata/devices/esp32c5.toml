@@ -497,7 +497,7 @@ bus_timeout_is_exponential = true
 support_status = "not_supported"
 
 [device.rsa]
-support_status = "not_supported" # compiles but does not work
+support_status = "partial"
 size_increment = 32
 memory_size_bytes = 384
 
@@ -557,6 +557,5 @@ apb_cycle_wait_num = 16 # TODO
 
 # ## Miscellaneous
 # [device.io_mux]
-
 [device.systimer]
 [device.pcnt]

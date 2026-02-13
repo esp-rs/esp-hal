@@ -58,7 +58,11 @@ impl RsaMemoryPowerGuard {
     fn new() -> Self {
         crate::peripherals::SYSTEM::regs()
             .rsa_pd_ctrl()
-            .modify(|_, w| w.rsa_mem_pd().clear_bit());
+            .modify(|_, w| {
+                w.rsa_mem_force_pd().clear_bit();
+                w.rsa_mem_force_pu().set_bit();
+                w.rsa_mem_pd().clear_bit()
+            });
         Self
     }
 }
@@ -68,7 +72,11 @@ impl Drop for RsaMemoryPowerGuard {
     fn drop(&mut self) {
         crate::peripherals::SYSTEM::regs()
             .rsa_pd_ctrl()
-            .modify(|_, w| w.rsa_mem_pd().set_bit());
+            .modify(|_, w| {
+                w.rsa_mem_force_pd().clear_bit();
+                w.rsa_mem_force_pu().clear_bit();
+                w.rsa_mem_pd().set_bit()
+            });
     }
 }
 
