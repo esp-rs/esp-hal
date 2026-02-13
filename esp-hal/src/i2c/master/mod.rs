@@ -1419,22 +1419,22 @@ fn configure_clock(
 ) -> Result<(), ConfigError> {
     unsafe {
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32c2, esp32c3, esp32s3))] {
-                info.regs().clk_conf().modify(|_, w| {
-                    w.sclk_sel().clear_bit();
-                    w.sclk_div_num().bits((sclk_div - 1) as u8)
+            if #[cfg(all(soc_has_pcr, soc_has_i2c1))] {
+                crate::peripherals::PCR::regs().i2c_sclk_conf(info.id as usize).modify(|_, w| {
+                    w.i2c_sclk_sel().clear_bit();
+                    w.i2c_sclk_div_num().bits((sclk_div - 1) as u8);
+                    w.i2c_sclk_en().set_bit()
                 });
-            } else if #[cfg(any(esp32c5, esp32c6))] {
+            } else if #[cfg(soc_has_pcr)] {
                 crate::peripherals::PCR::regs().i2c_sclk_conf().modify(|_, w| {
                     w.i2c_sclk_sel().clear_bit();
                     w.i2c_sclk_div_num().bits((sclk_div - 1) as u8);
                     w.i2c_sclk_en().set_bit()
                 });
-            } else if #[cfg(esp32h2)] {
-                crate::peripherals::PCR::regs().i2c_sclk_conf(info.id as usize).modify(|_, w| {
-                    w.i2c_sclk_sel().clear_bit();
-                    w.i2c_sclk_div_num().bits((sclk_div - 1) as u8);
-                    w.i2c_sclk_en().set_bit()
+            } else if #[cfg(not(any(esp32, esp32s2)))] { // TODO have a better cfg for this
+                info.regs().clk_conf().modify(|_, w| {
+                    w.sclk_sel().clear_bit();
+                    w.sclk_div_num().bits((sclk_div - 1) as u8)
                 });
             }
         }
@@ -1501,6 +1501,7 @@ fn configure_clock(
 #[non_exhaustive]
 pub struct Info {
     /// Numeric instance id (0 = I2C0, 1 = I2C1, ...)
+    #[cfg(soc_has_i2c1)]
     pub id: u8,
 
     /// Pointer to the register block for this I2C instance.
@@ -3331,7 +3332,8 @@ for_each_i2c_master!(
                 };
 
                 static PERIPHERAL: Info = Info {
-                    id: $id, // <— NEW
+                    #[cfg(soc_has_i2c1)]
+                    id: $id,
                     register_block: crate::peripherals::$inst::ptr(),
                     peripheral: crate::system::Peripheral::$peri,
                     async_handler: irq_handler,
