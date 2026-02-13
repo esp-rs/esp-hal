@@ -74,6 +74,7 @@ peripherals = [
     # { name = "PSRAM_MEM_MONITOR" },
     { name = "PVT_MONITOR", pac = "PVT" },
     { name = "RMT" },
+    { name = "RNG" },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 7 },
     { name = "SLC" },
@@ -513,6 +514,11 @@ combined_uart_selector_field = true
 # [device.lp_uart]
 # support_status = "not_supported"
 # ram_size = 32
+
+[device.rng]
+support_status = "partial"
+trng_supported = false  # TODO
+apb_cycle_wait_num = 16 # TODO
 
 # ## Miscellaneous
 # [device.io_mux]

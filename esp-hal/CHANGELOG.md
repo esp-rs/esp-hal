@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support ESP32-H2 rev 1.2 (#4949, #4969)
 - C5: Add DMA support (#4959)
 - C5: Add I2C support (#4975)
+- C5: Add basic RNG support (#4978)
 
 ### Changed
 

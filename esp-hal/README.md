@@ -81,7 +81,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | PCNT               | ⚒️   |          |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | PSRAM              | ⚒️   |          |          |          |          |          | ⚒️      | ⚒️      |
 | RMT                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| RNG                | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| RNG                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | RSA                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SDIO host          | ⚒️   |          |          |          |          |          |          | ⚒️      |
 | SDIO slave         | ⚒️   |          |          |          | ⚒️      |          |          |          |

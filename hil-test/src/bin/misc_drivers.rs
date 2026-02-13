@@ -359,9 +359,12 @@ mod pcnt {
 #[cfg(rng_driver_supported)]
 #[embedded_test::tests(default_timeout = 5)]
 mod rng {
-    use esp_hal::rng::{Rng, Trng, TrngSource};
+    use esp_hal::rng::Rng;
+    #[cfg(rng_trng_supported)]
+    use esp_hal::rng::{Trng, TrngSource};
 
     #[test]
+    #[cfg(rng_trng_supported)]
     fn test_trng_without_source_is_error() {
         assert!(Trng::try_new().is_err());
 
@@ -381,6 +384,7 @@ mod rng {
     }
 
     #[test]
+    #[cfg(rng_trng_supported)]
     fn test_trng_returns_random_values() {
         let p = esp_hal::init(Default::default());
         let _source = TrngSource::new(p.RNG, p.ADC1);
@@ -394,6 +398,7 @@ mod rng {
     }
 
     #[test]
+    #[cfg(rng_trng_supported)]
     fn test_trng_source_cannot_be_disabled_while_in_use() {
         let p = esp_hal::init(Default::default());
         let source = TrngSource::new(p.RNG, p.ADC1);
@@ -411,6 +416,7 @@ mod rng {
 
     #[test]
     #[should_panic]
+    #[cfg(rng_trng_supported)]
     fn test_trng_source_cannot_be_dropped_while_in_use() {
         let p = esp_hal::init(Default::default());
         let source = TrngSource::new(p.RNG, p.ADC1);
@@ -421,6 +427,7 @@ mod rng {
     }
 
     #[test]
+    #[cfg(rng_trng_supported)]
     fn test_trng_source_can_be_dropped_if_unsafely_enabled() {
         let p = esp_hal::init(Default::default());
 
