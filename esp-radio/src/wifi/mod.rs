@@ -1750,6 +1750,7 @@ pub(crate) mod embassy {
 #[non_exhaustive]
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum PowerSaveMode {
     /// No power saving.
     #[default]
@@ -1917,14 +1918,6 @@ impl CountryInfo {
 #[derive(Clone, Copy, BuilderLite, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ControllerConfig {
-    /// Power save mode.
-    power_save_mode: PowerSaveMode,
-
-    /// Country code.
-    #[builder_lite(into)]
-    #[builder_lite(unstable)]
-    country_code: CountryInfo,
-
     /// Size of the RX queue in frames.
     #[builder_lite(unstable)]
     rx_queue_size: usize,
@@ -2019,9 +2012,6 @@ pub struct ControllerConfig {
 impl Default for ControllerConfig {
     fn default() -> Self {
         Self {
-            power_save_mode: PowerSaveMode::default(),
-            country_code: CountryInfo::from(*b"CN"),
-
             rx_queue_size: 5,
             tx_queue_size: 3,
 
@@ -2132,24 +2122,20 @@ pub fn new<'d>(
 
     crate::wifi::wifi_init(device)?;
 
-    unsafe {
-        let country = config.country_code.into_blob();
-        esp_wifi_result!(esp_wifi_set_country(&country))?;
-    }
-
     // At some point the "High-speed ADC" entropy source became available.
     unsafe { esp_hal::rng::TrngSource::increase_entropy_source_counter() };
 
     // Only create WifiController after we've enabled TRNG - otherwise returning an error from this
     // function will cause panic because WifiController::drop tries to disable the TRNG.
-    let mut controller = WifiController {
+    let controller = WifiController {
         _guard,
         _phantom: Default::default(),
         beacon_timeout: 6,
         ap_beacon_timeout: 100,
     };
 
-    controller.set_power_saving(config.power_save_mode)?;
+    // Set a sane default power saving mode. The blob default is not the best for bandwidth.
+    controller.set_power_saving(PowerSaveMode::default())?;
 
     Ok((
         controller,
@@ -2297,8 +2283,30 @@ impl WifiController<'_> {
     /// controller.set_power_saving(PowerSaveMode::Maximum)?;
     /// # {after_snippet}
     /// ```
+    #[instability::unstable]
     pub fn set_power_saving(&mut self, ps: PowerSaveMode) -> Result<(), WifiError> {
         apply_power_saving(ps)
+    }
+
+    #[procmacros::doc_replace]
+    /// Configures Country Code.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # use esp_radio::wifi::CountryInfo;
+    /// let (mut controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
+    /// controller.set_country_code(&CountryInfo::from(*b"CN"))?;
+    /// # {after_snippet}
+    /// ```
+    #[instability::unstable]
+    pub fn set_country_code(&mut self, country: &CountryInfo) -> Result<(), WifiError> {
+        unsafe {
+            let country = country.into_blob();
+            esp_wifi_result!(esp_wifi_set_country(&country))?;
+        }
+        Ok(())
     }
 
     #[procmacros::doc_replace]
