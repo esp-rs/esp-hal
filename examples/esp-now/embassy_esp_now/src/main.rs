@@ -18,7 +18,7 @@ use esp_hal::{
 use esp_println::println;
 use esp_radio::{
     esp_now::{BROADCAST_ADDRESS, PeerInfo},
-    wifi::{Config, ap::AccessPointConfig, sta::StationConfig},
+    wifi::{Config, sta::StationConfig},
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();

@@ -34,7 +34,12 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_radio::wifi::{Config, Interface, WifiController, ap::AccessPointConfig};
+use esp_radio::wifi::{
+    Config,
+    Interface,
+    WifiController,
+    ap::AccessPointConfig,
+};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
