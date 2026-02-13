@@ -2584,6 +2584,7 @@ impl WifiController<'_> {
     /// }
     /// # {after_snippet}
     /// ```
+    #[instability::unstable]
     pub fn is_started(&self) -> bool {
         if matches!(
             crate::wifi::station_state(),
@@ -2617,6 +2618,7 @@ impl WifiController<'_> {
     /// }
     /// # {after_snippet}
     /// ```
+    #[instability::unstable]
     pub fn is_connected(&self) -> bool {
         matches!(
             crate::wifi::station_state(),

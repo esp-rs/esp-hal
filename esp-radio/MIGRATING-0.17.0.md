@@ -210,3 +210,5 @@ This change removes the need to handle potential errors when checking connection
       println!("Wi-Fi is started");
   }
 ```
+
+Both functions are now `unstable` - in general you shouldn't need them. See the examples for how to avoid them.
