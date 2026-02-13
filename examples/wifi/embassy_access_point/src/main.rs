@@ -101,12 +101,6 @@ async fn main(spawner: Spawner) -> ! {
     let mut rx_buffer = [0; 1536];
     let mut tx_buffer = [0; 1536];
 
-    loop {
-        if stack.is_link_up() {
-            break;
-        }
-        Timer::after(Duration::from_millis(500)).await;
-    }
     println!(
         "Connect to the AP `esp-radio` and point your browser to http://{gw_ip_addr_str}:8080/"
     );
