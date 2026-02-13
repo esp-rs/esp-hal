@@ -129,6 +129,54 @@ macro_rules! property {
     ("dedicated_gpio.channel_count", str) => {
         stringify!(8)
     };
+    ("i2c_master.has_fsm_timeouts") => {
+        true
+    };
+    ("i2c_master.has_hw_bus_clear") => {
+        false
+    };
+    ("i2c_master.has_bus_timeout_enable") => {
+        true
+    };
+    ("i2c_master.separate_filter_config_registers") => {
+        false
+    };
+    ("i2c_master.can_estimate_nack_reason") => {
+        true
+    };
+    ("i2c_master.has_conf_update") => {
+        true
+    };
+    ("i2c_master.has_reliable_fsm_reset") => {
+        true
+    };
+    ("i2c_master.has_arbitration_en") => {
+        true
+    };
+    ("i2c_master.has_tx_fifo_watermark") => {
+        true
+    };
+    ("i2c_master.bus_timeout_is_exponential") => {
+        true
+    };
+    ("i2c_master.max_bus_timeout") => {
+        31
+    };
+    ("i2c_master.max_bus_timeout", str) => {
+        stringify!(31)
+    };
+    ("i2c_master.ll_intr_mask") => {
+        262143
+    };
+    ("i2c_master.ll_intr_mask", str) => {
+        stringify!(262143)
+    };
+    ("i2c_master.fifo_size") => {
+        32
+    };
+    ("i2c_master.fifo_size", str) => {
+        stringify!(32)
+    };
     ("interrupts.status_registers") => {
         3
     };
@@ -1779,6 +1827,8 @@ macro_rules! implement_peripheral_clocks {
         pub enum Peripheral {
             /// DMA peripheral clock signal
             Dma,
+            /// I2C_EXT0 peripheral clock signal
+            I2cExt0,
             /// PCNT peripheral clock signal
             Pcnt,
             /// SPI2 peripheral clock signal
@@ -1802,6 +1852,7 @@ macro_rules! implement_peripheral_clocks {
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::Dma,
+                Self::I2cExt0,
                 Self::Pcnt,
                 Self::Spi2,
                 Self::Systimer,
@@ -1818,6 +1869,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .gdma_conf()
                         .modify(|_, w| w.gdma_clk_en().bit(enable));
+                }
+                Peripheral::I2cExt0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .i2c0_conf()
+                        .modify(|_, w| w.i2c0_clk_en().bit(enable));
                 }
                 Peripheral::Pcnt => {
                     crate::peripherals::SYSTEM::regs()
@@ -1875,6 +1931,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .gdma_conf()
                         .modify(|_, w| w.gdma_rst_en().bit(reset));
+                }
+                Peripheral::I2cExt0 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .i2c0_conf()
+                        .modify(|_, w| w.i2c0_rst_en().bit(reset));
                 }
                 Peripheral::Pcnt => {
                     crate::peripherals::SYSTEM::regs()
@@ -2098,6 +2159,32 @@ macro_rules! sw_interrupt_delay {
         }
     };
 }
+/// This macro can be used to generate code for each peripheral instance of the I2C master driver.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($id:literal, $instance:ident, $sys:ident, $scl:ident, $sda:ident)`
+///
+/// Macro fragments:
+/// - `$id`: the index of the I2C instance
+/// - `$instance`: the name of the I2C instance
+/// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
+/// - `$scl`, `$sda`: peripheral signal names.
+///
+/// Example data: `(0, I2C0, I2cExt0, I2CEXT0_SCL, I2CEXT0_SDA)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_i2c_master {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_i2c_master { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_i2c_master!((0, I2C0, I2cExt0, I2CEXT0_SCL,
+        I2CEXT0_SDA)); _for_each_inner_i2c_master!((all(0, I2C0, I2cExt0, I2CEXT0_SCL,
+        I2CEXT0_SDA)));
+    };
+}
 /// This macro can be used to generate code for each peripheral instance of the UART driver.
 ///
 /// For an explanation on the general syntax, as well as usage of individual/repeated
@@ -2309,8 +2396,8 @@ macro_rules! for_each_peripheral {
         "I2C_ANA_MST peripheral singleton"] I2C_ANA_MST <= I2C_ANA_MST() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "I2C0 peripheral singleton"]
         I2C0 <= I2C0(I2C_EXT0 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "I2S0 peripheral singleton"] I2S0 <= I2S0(I2S0 : { bind_peri_interrupt,
+        disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "I2S0 peripheral singleton"] I2S0 <= I2S0(I2S0 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
@@ -2325,9 +2412,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "LP_APM0 peripheral singleton"]
         LP_APM0 <= LP_APM0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
         = "LP_CLKRST peripheral singleton"] LP_CLKRST <= LP_CLKRST() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "LP_I2C0 peripheral singleton"]
-        LP_I2C0 <= LP_I2C0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
-        = "LP_I2C_ANA_MST peripheral singleton"] LP_I2C_ANA_MST <= LP_I2C_ANA_MST()
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "LP_I2C_ANA_MST peripheral singleton"] LP_I2C_ANA_MST <= LP_I2C_ANA_MST()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "LP_IO_MUX peripheral singleton"] LP_IO_MUX <= LP_IO_MUX() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "LP_PERI peripheral singleton"]
@@ -2440,7 +2526,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((HP_SYS(unstable)));
         _for_each_inner_peripheral!((HUK(unstable)));
         _for_each_inner_peripheral!((I2C_ANA_MST(unstable)));
-        _for_each_inner_peripheral!((I2C0(unstable)));
+        _for_each_inner_peripheral!((I2C0));
         _for_each_inner_peripheral!((I2S0(unstable)));
         _for_each_inner_peripheral!((INTERRUPT_CORE0(unstable)));
         _for_each_inner_peripheral!((INTPRI(unstable)));
@@ -2450,7 +2536,6 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((LP_AON(unstable)));
         _for_each_inner_peripheral!((LP_APM0(unstable)));
         _for_each_inner_peripheral!((LP_CLKRST(unstable)));
-        _for_each_inner_peripheral!((LP_I2C0(unstable)));
         _for_each_inner_peripheral!((LP_I2C_ANA_MST(unstable)));
         _for_each_inner_peripheral!((LP_IO_MUX(unstable)));
         _for_each_inner_peripheral!((LP_PERI(unstable)));
@@ -2613,10 +2698,10 @@ macro_rules! for_each_peripheral {
         peri_type #[doc = "I2C_ANA_MST peripheral singleton"] I2C_ANA_MST <=
         I2C_ANA_MST() (unstable)), (@ peri_type #[doc = "I2C0 peripheral singleton"] I2C0
         <= I2C0(I2C_EXT0 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt })), (@ peri_type #[doc = "I2S0 peripheral singleton"]
+        I2S0 <= I2S0(I2S0 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
-        "I2S0 peripheral singleton"] I2S0 <= I2S0(I2S0 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
+        "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
         (unstable)), (@ peri_type #[doc = "INTPRI peripheral singleton"] INTPRI <=
         INTPRI() (unstable)), (@ peri_type #[doc = "IO_MUX peripheral singleton"] IO_MUX
         <= IO_MUX() (unstable)), (@ peri_type #[doc = "KEYMNG peripheral singleton"]
@@ -2625,25 +2710,23 @@ macro_rules! for_each_peripheral {
         = "LP_AON peripheral singleton"] LP_AON <= LP_AON() (unstable)), (@ peri_type
         #[doc = "LP_APM0 peripheral singleton"] LP_APM0 <= LP_APM0() (unstable)), (@
         peri_type #[doc = "LP_CLKRST peripheral singleton"] LP_CLKRST <= LP_CLKRST()
-        (unstable)), (@ peri_type #[doc = "LP_I2C0 peripheral singleton"] LP_I2C0 <=
-        LP_I2C0() (unstable)), (@ peri_type #[doc =
-        "LP_I2C_ANA_MST peripheral singleton"] LP_I2C_ANA_MST <= LP_I2C_ANA_MST()
-        (unstable)), (@ peri_type #[doc = "LP_IO_MUX peripheral singleton"] LP_IO_MUX <=
-        LP_IO_MUX() (unstable)), (@ peri_type #[doc = "LP_PERI peripheral singleton"]
-        LP_PERI <= LPPERI() (unstable)), (@ peri_type #[doc =
-        "LP_TEE peripheral singleton"] LP_TEE <= LP_TEE() (unstable)), (@ peri_type #[doc
-        = "LP_TIMER peripheral singleton"] LP_TIMER <= LP_TIMER() (unstable)), (@
-        peri_type #[doc = "LP_UART peripheral singleton"] LP_UART <= LP_UART()
-        (unstable)), (@ peri_type #[doc = "LP_WDT peripheral singleton"] LP_WDT <=
-        LP_WDT() (unstable)), (@ peri_type #[doc = "LPWR peripheral singleton"] LPWR <=
-        LP_CLKRST() (unstable)), (@ peri_type #[doc = "MCPWM0 peripheral singleton"]
-        MCPWM0 <= MCPWM0() (unstable)), (@ peri_type #[doc =
-        "MEM_MONITOR peripheral singleton"] MEM_MONITOR <= MEM_MONITOR() (unstable)), (@
-        peri_type #[doc = "MODEM_LPCON peripheral singleton"] MODEM_LPCON <=
-        MODEM_LPCON() (unstable)), (@ peri_type #[doc =
-        "MODEM_SYSCON peripheral singleton"] MODEM_SYSCON <= MODEM_SYSCON() (unstable)),
-        (@ peri_type #[doc = "PARL_IO peripheral singleton"] PARL_IO <=
-        PARL_IO(PARL_IO_RX : { bind_rx_interrupt, enable_rx_interrupt,
+        (unstable)), (@ peri_type #[doc = "LP_I2C_ANA_MST peripheral singleton"]
+        LP_I2C_ANA_MST <= LP_I2C_ANA_MST() (unstable)), (@ peri_type #[doc =
+        "LP_IO_MUX peripheral singleton"] LP_IO_MUX <= LP_IO_MUX() (unstable)), (@
+        peri_type #[doc = "LP_PERI peripheral singleton"] LP_PERI <= LPPERI()
+        (unstable)), (@ peri_type #[doc = "LP_TEE peripheral singleton"] LP_TEE <=
+        LP_TEE() (unstable)), (@ peri_type #[doc = "LP_TIMER peripheral singleton"]
+        LP_TIMER <= LP_TIMER() (unstable)), (@ peri_type #[doc =
+        "LP_UART peripheral singleton"] LP_UART <= LP_UART() (unstable)), (@ peri_type
+        #[doc = "LP_WDT peripheral singleton"] LP_WDT <= LP_WDT() (unstable)), (@
+        peri_type #[doc = "LPWR peripheral singleton"] LPWR <= LP_CLKRST() (unstable)),
+        (@ peri_type #[doc = "MCPWM0 peripheral singleton"] MCPWM0 <= MCPWM0()
+        (unstable)), (@ peri_type #[doc = "MEM_MONITOR peripheral singleton"] MEM_MONITOR
+        <= MEM_MONITOR() (unstable)), (@ peri_type #[doc =
+        "MODEM_LPCON peripheral singleton"] MODEM_LPCON <= MODEM_LPCON() (unstable)), (@
+        peri_type #[doc = "MODEM_SYSCON peripheral singleton"] MODEM_SYSCON <=
+        MODEM_SYSCON() (unstable)), (@ peri_type #[doc = "PARL_IO peripheral singleton"]
+        PARL_IO <= PARL_IO(PARL_IO_RX : { bind_rx_interrupt, enable_rx_interrupt,
         disable_rx_interrupt }, PARL_IO_TX : { bind_tx_interrupt, enable_tx_interrupt,
         disable_tx_interrupt }) (unstable)), (@ peri_type #[doc =
         "PAU peripheral singleton"] PAU <= PAU() (unstable)), (@ peri_type #[doc =
@@ -2702,16 +2785,15 @@ macro_rules! for_each_peripheral {
         (DS(unstable)), (ECC(unstable)), (ECDSA(unstable)), (EFUSE(unstable)),
         (ETM(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)), (HMAC(unstable)),
         (HP_APM(unstable)), (HP_SYS(unstable)), (HUK(unstable)), (I2C_ANA_MST(unstable)),
-        (I2C0(unstable)), (I2S0(unstable)), (INTERRUPT_CORE0(unstable)),
-        (INTPRI(unstable)), (IO_MUX(unstable)), (KEYMNG(unstable)), (LP_ANA(unstable)),
-        (LP_AON(unstable)), (LP_APM0(unstable)), (LP_CLKRST(unstable)),
-        (LP_I2C0(unstable)), (LP_I2C_ANA_MST(unstable)), (LP_IO_MUX(unstable)),
-        (LP_PERI(unstable)), (LP_TEE(unstable)), (LP_TIMER(unstable)),
-        (LP_UART(unstable)), (LP_WDT(unstable)), (LPWR(unstable)), (MCPWM0(unstable)),
-        (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)),
-        (PARL_IO(unstable)), (PAU(unstable)), (PCNT(unstable)), (PCR(unstable)),
-        (PMU(unstable)), (PVT_MONITOR(unstable)), (RMT(unstable)), (RSA(unstable)),
-        (SHA(unstable)), (SLC(unstable)), (SPI2), (SYSTEM(unstable)),
+        (I2C0), (I2S0(unstable)), (INTERRUPT_CORE0(unstable)), (INTPRI(unstable)),
+        (IO_MUX(unstable)), (KEYMNG(unstable)), (LP_ANA(unstable)), (LP_AON(unstable)),
+        (LP_APM0(unstable)), (LP_CLKRST(unstable)), (LP_I2C_ANA_MST(unstable)),
+        (LP_IO_MUX(unstable)), (LP_PERI(unstable)), (LP_TEE(unstable)),
+        (LP_TIMER(unstable)), (LP_UART(unstable)), (LP_WDT(unstable)), (LPWR(unstable)),
+        (MCPWM0(unstable)), (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)),
+        (MODEM_SYSCON(unstable)), (PARL_IO(unstable)), (PAU(unstable)), (PCNT(unstable)),
+        (PCR(unstable)), (PMU(unstable)), (PVT_MONITOR(unstable)), (RMT(unstable)),
+        (RSA(unstable)), (SHA(unstable)), (SLC(unstable)), (SPI2), (SYSTEM(unstable)),
         (SYSTIMER(unstable)), (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
         (TRACE0(unstable)), (UART0), (UART1), (UHCI0(unstable)), (USB_DEVICE(unstable)),
         (DMA_CH0(unstable)), (DMA_CH1(unstable)), (DMA_CH2(unstable)), (BT(unstable)),

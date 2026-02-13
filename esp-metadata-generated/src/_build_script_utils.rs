@@ -1674,7 +1674,6 @@ impl Chip {
                     "soc_has_lp_aon",
                     "soc_has_lp_apm0",
                     "soc_has_lp_clkrst",
-                    "soc_has_lp_i2c0",
                     "soc_has_lp_i2c_ana_mst",
                     "soc_has_lp_io_mux",
                     "soc_has_lp_peri",
@@ -1733,6 +1732,7 @@ impl Chip {
                     "dma_driver_supported",
                     "gpio_driver_supported",
                     "dedicated_gpio_driver_supported",
+                    "i2c_master_driver_supported",
                     "interrupts_driver_supported",
                     "pcnt_driver_supported",
                     "spi_master_driver_supported",
@@ -1741,6 +1741,7 @@ impl Chip {
                     "timergroup_driver_supported",
                     "uart_driver_supported",
                     "uhci_driver_supported",
+                    "i2c_master_i2c0",
                     "spi_master_spi2",
                     "spi_slave_spi2",
                     "timergroup_timg0",
@@ -1796,6 +1797,17 @@ impl Chip {
                     "gpio_func_in_sel_offset=\"0\"",
                     "gpio_input_signal_max=\"116\"",
                     "gpio_output_signal_max=\"256\"",
+                    "i2c_master_has_fsm_timeouts",
+                    "i2c_master_has_bus_timeout_enable",
+                    "i2c_master_can_estimate_nack_reason",
+                    "i2c_master_has_conf_update",
+                    "i2c_master_has_reliable_fsm_reset",
+                    "i2c_master_has_arbitration_en",
+                    "i2c_master_has_tx_fifo_watermark",
+                    "i2c_master_bus_timeout_is_exponential",
+                    "i2c_master_max_bus_timeout=\"31\"",
+                    "i2c_master_ll_intr_mask=\"262143\"",
+                    "i2c_master_fifo_size=\"32\"",
                     "interrupts_status_registers=\"3\"",
                     "interrupt_controller=\"clic\"",
                     "spi_master_supports_dma",
@@ -1837,7 +1849,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_lp_aon",
                     "cargo:rustc-cfg=soc_has_lp_apm0",
                     "cargo:rustc-cfg=soc_has_lp_clkrst",
-                    "cargo:rustc-cfg=soc_has_lp_i2c0",
                     "cargo:rustc-cfg=soc_has_lp_i2c_ana_mst",
                     "cargo:rustc-cfg=soc_has_lp_io_mux",
                     "cargo:rustc-cfg=soc_has_lp_peri",
@@ -1896,6 +1907,7 @@ impl Chip {
                     "cargo:rustc-cfg=dma_driver_supported",
                     "cargo:rustc-cfg=gpio_driver_supported",
                     "cargo:rustc-cfg=dedicated_gpio_driver_supported",
+                    "cargo:rustc-cfg=i2c_master_driver_supported",
                     "cargo:rustc-cfg=interrupts_driver_supported",
                     "cargo:rustc-cfg=pcnt_driver_supported",
                     "cargo:rustc-cfg=spi_master_driver_supported",
@@ -1904,6 +1916,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_driver_supported",
                     "cargo:rustc-cfg=uart_driver_supported",
                     "cargo:rustc-cfg=uhci_driver_supported",
+                    "cargo:rustc-cfg=i2c_master_i2c0",
                     "cargo:rustc-cfg=spi_master_spi2",
                     "cargo:rustc-cfg=spi_slave_spi2",
                     "cargo:rustc-cfg=timergroup_timg0",
@@ -1959,6 +1972,17 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_func_in_sel_offset=\"0\"",
                     "cargo:rustc-cfg=gpio_input_signal_max=\"116\"",
                     "cargo:rustc-cfg=gpio_output_signal_max=\"256\"",
+                    "cargo:rustc-cfg=i2c_master_has_fsm_timeouts",
+                    "cargo:rustc-cfg=i2c_master_has_bus_timeout_enable",
+                    "cargo:rustc-cfg=i2c_master_can_estimate_nack_reason",
+                    "cargo:rustc-cfg=i2c_master_has_conf_update",
+                    "cargo:rustc-cfg=i2c_master_has_reliable_fsm_reset",
+                    "cargo:rustc-cfg=i2c_master_has_arbitration_en",
+                    "cargo:rustc-cfg=i2c_master_has_tx_fifo_watermark",
+                    "cargo:rustc-cfg=i2c_master_bus_timeout_is_exponential",
+                    "cargo:rustc-cfg=i2c_master_max_bus_timeout=\"31\"",
+                    "cargo:rustc-cfg=i2c_master_ll_intr_mask=\"262143\"",
+                    "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=interrupt_controller=\"clic\"",
                     "cargo:rustc-cfg=spi_master_supports_dma",
@@ -4967,7 +4991,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_aon)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_apm0)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_clkrst)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_i2c0)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_i2c_ana_mst)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_io_mux)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_peri)");
@@ -5013,6 +5036,8 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_lp_slow_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg_calibration_clock)");
     println!("cargo:rustc-check-cfg=cfg(dma_separate_in_out_interrupts)");
+    println!("cargo:rustc-check-cfg=cfg(i2c_master_can_estimate_nack_reason)");
+    println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_has_clk_pre_div)");
     println!("cargo:rustc-check-cfg=cfg(uart_peripheral_controls_mem_clk)");
     println!("cargo:rustc-check-cfg=cfg(uhci_combined_uart_selector_field)");
@@ -5020,6 +5045,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_atomic)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ieee802154)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_apm)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_lp_i2c0)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_io)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_otp_debug)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_plic_mx)");
@@ -5041,8 +5067,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_mspi_fast_ls_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_mspi_fast_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ledc_sclk)");
-    println!("cargo:rustc-check-cfg=cfg(i2c_master_can_estimate_nack_reason)");
-    println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_tx_loop_auto_stop)");
     println!("cargo:rustc-check-cfg=cfg(rmt_supports_pll80mhz_clock)");
     println!("cargo:rustc-check-cfg=cfg(timergroup_rc_fast_calibration_divider)");

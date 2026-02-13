@@ -1404,7 +1404,7 @@ fn set_filter(
 #[allow(unused)]
 /// Configures the clock and timing parameters for the I2C peripheral.
 fn configure_clock(
-    register_block: &RegisterBlock,
+    info: &Info,
     sclk_div: u32,
     scl_low_period: u32,
     scl_high_period: u32,
@@ -1418,15 +1418,29 @@ fn configure_clock(
     timeout: Option<u32>,
 ) -> Result<(), ConfigError> {
     unsafe {
-        // divider
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
-        register_block.clk_conf().modify(|_, w| {
-            w.sclk_sel().clear_bit();
-            w.sclk_div_num().bits((sclk_div - 1) as u8)
-        });
+        cfg_if::cfg_if! {
+            if #[cfg(all(soc_has_pcr, soc_has_i2c1))] {
+                crate::peripherals::PCR::regs().i2c_sclk_conf(info.id as usize).modify(|_, w| {
+                    w.i2c_sclk_sel().clear_bit();
+                    w.i2c_sclk_div_num().bits((sclk_div - 1) as u8);
+                    w.i2c_sclk_en().set_bit()
+                });
+            } else if #[cfg(soc_has_pcr)] {
+                crate::peripherals::PCR::regs().i2c_sclk_conf().modify(|_, w| {
+                    w.i2c_sclk_sel().clear_bit();
+                    w.i2c_sclk_div_num().bits((sclk_div - 1) as u8);
+                    w.i2c_sclk_en().set_bit()
+                });
+            } else if #[cfg(not(any(esp32, esp32s2)))] { // TODO have a better cfg for this
+                info.regs().clk_conf().modify(|_, w| {
+                    w.sclk_sel().clear_bit();
+                    w.sclk_div_num().bits((sclk_div - 1) as u8)
+                });
+            }
+        }
 
         // scl period
-        register_block
+        info.regs()
             .scl_low_period()
             .write(|w| w.scl_low_period().bits(scl_low_period as u16));
 
@@ -1435,44 +1449,44 @@ fn configure_clock(
             .try_into()
             .map_err(|_| ConfigError::FrequencyOutOfRange)?;
 
-        register_block.scl_high_period().write(|w| {
+        info.regs().scl_high_period().write(|w| {
             #[cfg(not(esp32))] // ESP32 does not have a wait_high field
             w.scl_wait_high_period().bits(scl_wait_high_period);
             w.scl_high_period().bits(scl_high_period as u16)
         });
 
         // sda sample
-        register_block
+        info.regs()
             .sda_hold()
             .write(|w| w.time().bits(sda_hold_time as u16));
-        register_block
+        info.regs()
             .sda_sample()
             .write(|w| w.time().bits(sda_sample_time as u16));
 
         // setup
-        register_block
+        info.regs()
             .scl_rstart_setup()
             .write(|w| w.time().bits(scl_rstart_setup_time as u16));
-        register_block
+        info.regs()
             .scl_stop_setup()
             .write(|w| w.time().bits(scl_stop_setup_time as u16));
 
         // hold
-        register_block
+        info.regs()
             .scl_start_hold()
             .write(|w| w.time().bits(scl_start_hold_time as u16));
-        register_block
+        info.regs()
             .scl_stop_hold()
             .write(|w| w.time().bits(scl_stop_hold_time as u16));
 
         cfg_if::cfg_if! {
             if #[cfg(i2c_master_has_bus_timeout_enable)] {
-                register_block.to().write(|w| {
+                info.regs().to().write(|w| {
                     w.time_out_en().bit(timeout.is_some());
                     w.time_out_value().bits(timeout.unwrap_or(1) as _)
                 });
             } else {
-                register_block
+                info.regs()
                     .to()
                     .write(|w| w.time_out().bits(timeout.unwrap_or(1)));
             }
@@ -1486,6 +1500,10 @@ fn configure_clock(
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct Info {
+    /// Numeric instance id (0 = I2C0, 1 = I2C1, ...)
+    #[cfg(soc_has_i2c1)]
+    pub id: u8,
+
     /// Pointer to the register block for this I2C instance.
     ///
     /// Use [Self::register_block] to access the register block.
@@ -1687,7 +1705,7 @@ impl Driver<'_> {
                 self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
             } else {
                 // Even though C2 and C3 have a FSM reset bit, esp-idf does not
-                // define SOC_I2C_SUPPORT_HW_FSM_RST for them, so include them in the fallback impl.
+                // define I2C_LL_SUPPORT_HW_FSM_RST for them, so include them in the fallback impl.
 
                 crate::system::PeripheralClockControl::reset(self.info.peripheral);
 
@@ -1837,7 +1855,7 @@ impl Driver<'_> {
         let scl_stop_hold_time = hold;
 
         configure_clock(
-            self.regs(),
+            self.info,
             0,
             scl_low_period,
             scl_high_period,
@@ -1895,7 +1913,7 @@ impl Driver<'_> {
         let scl_stop_hold_time = hold;
 
         configure_clock(
-            self.regs(),
+            self.info,
             0,
             scl_low_period,
             scl_high_period,
@@ -1966,7 +1984,7 @@ impl Driver<'_> {
         let scl_stop_hold_time = hold - 1;
 
         configure_clock(
-            self.regs(),
+            self.info,
             clkm_div,
             scl_low_period,
             scl_high_period,
@@ -2479,6 +2497,7 @@ impl Driver<'_> {
         deadline: Deadline,
     ) -> Result<(), Error> {
         address.validate()?;
+
         self.reset_before_transmission();
 
         // Short circuit for zero length writes without start or end as that would be an
@@ -3299,7 +3318,7 @@ fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeChe
 }
 
 for_each_i2c_master!(
-    ($inst:ident, $peri:ident, $scl:ident, $sda:ident) => {
+    ($id:literal, $inst:ident, $peri:ident, $scl:ident, $sda:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&Info, &State) {
                 #[handler]
@@ -3313,6 +3332,8 @@ for_each_i2c_master!(
                 };
 
                 static PERIPHERAL: Info = Info {
+                    #[cfg(soc_has_i2c1)]
+                    id: $id,
                     register_block: crate::peripherals::$inst::ptr(),
                     peripheral: crate::system::Peripheral::$peri,
                     async_handler: irq_handler,
