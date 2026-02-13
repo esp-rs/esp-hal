@@ -34,7 +34,7 @@ define_clock_tree_types!();
 pub enum CpuClock {
     /// 80 MHz CPU clock
     #[default]
-    _80MHz  = 80,
+    _80MHz = 80,
 
     /// 160 MHz CPU clock
     _160MHz = 160,
@@ -724,7 +724,8 @@ fn enable_uart_mem_clk_impl(_clocks: &mut ClockTree, en: bool) {
 // RMT_SCLK
 
 fn enable_rmt_sclk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do.
+    // This node has no dedicated local gate on ESP32-S3.
+    // Source clock ownership is handled by request_rmt_sclk/release_rmt_sclk.
 }
 
 fn configure_rmt_sclk_impl(
