@@ -15,7 +15,6 @@ embassy-net = { version = "0.8.0", features = [
 ] }
 embassy-time = "0.5.0"
 embassy-sync = "0.7.2"
-embedded-io-async = "0.7"
 esp-alloc = { path = "../../../esp-alloc" }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
     "panic-handler",
