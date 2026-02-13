@@ -50,6 +50,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig(0)),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        crypto_clk: Some(CryptoClkConfig::PllF480m),
         timg_calibration_clock: None,
     };
     const PRESET_160: ClockConfig = ClockConfig {
@@ -60,6 +61,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig(0)),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        crypto_clk: Some(CryptoClkConfig::PllF480m),
         timg_calibration_clock: None,
     };
     const PRESET_240: ClockConfig = ClockConfig {
@@ -70,6 +72,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig(0)),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        crypto_clk: Some(CryptoClkConfig::PllF480m),
         timg_calibration_clock: None,
     };
 }
@@ -430,6 +433,26 @@ fn configure_lp_slow_clk_impl(
             LpSlowClkConfig::Xtal32k => 1,
             // LpSlowClkConfig::Ext32k => 2,
             LpSlowClkConfig::OscSlow => 3,
+        })
+    });
+}
+
+// CRYPTO_CLK
+
+fn enable_crypto_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here.
+}
+
+fn configure_crypto_clk_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<CryptoClkConfig>,
+    new_selector: CryptoClkConfig,
+) {
+    PCR::regs().sec_conf().modify(|_, w| unsafe {
+        w.sec_clk_sel().bits(match new_selector {
+            CryptoClkConfig::Xtal => 0,
+            CryptoClkConfig::Fosc => 1,
+            CryptoClkConfig::PllF480m => 2,
         })
     });
 }

@@ -403,6 +403,20 @@ macro_rules! property {
 ///     todo!()
 /// }
 ///
+/// // CRYPTO_CLK
+///
+/// fn enable_crypto_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_crypto_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<CryptoClkConfig>,
+///     _new_selector: CryptoClkConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // TIMG_CALIBRATION_CLOCK
 ///
 /// fn enable_timg_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -627,6 +641,17 @@ macro_rules! define_clock_tree_types {
             /// Selects `OSC_SLOW_CLK`.
             OscSlow,
         }
+        /// The list of clock signals that the `CRYPTO_CLK` multiplexer can output.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum CryptoClkConfig {
+            /// Selects `XTAL_CLK`.
+            Xtal,
+            /// Selects `RC_FAST_CLK`.
+            Fosc,
+            /// Selects `PLL_CLK`.
+            PllF480m,
+        }
         /// The list of clock signals that the `TIMG_CALIBRATION_CLOCK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -685,6 +710,7 @@ macro_rules! define_clock_tree_types {
             apb_clk: Option<ApbClkConfig>,
             lp_fast_clk: Option<LpFastClkConfig>,
             lp_slow_clk: Option<LpSlowClkConfig>,
+            crypto_clk: Option<CryptoClkConfig>,
             timg_calibration_clock: Option<TimgCalibrationClockConfig>,
             timg0_function_clock: Option<Timg0FunctionClockConfig>,
             timg0_wdt_clock: Option<Timg0WdtClockConfig>,
@@ -709,6 +735,7 @@ macro_rules! define_clock_tree_types {
             apb_clk_refcount: u32,
             lp_fast_clk_refcount: u32,
             lp_slow_clk_refcount: u32,
+            crypto_clk_refcount: u32,
             timg_calibration_clock_refcount: u32,
             timg0_function_clock_refcount: u32,
             timg0_wdt_clock_refcount: u32,
@@ -750,6 +777,10 @@ macro_rules! define_clock_tree_types {
             pub fn lp_slow_clk(&self) -> Option<LpSlowClkConfig> {
                 self.lp_slow_clk
             }
+            /// Returns the current configuration of the CRYPTO_CLK clock tree node
+            pub fn crypto_clk(&self) -> Option<CryptoClkConfig> {
+                self.crypto_clk
+            }
             /// Returns the current configuration of the TIMG_CALIBRATION_CLOCK clock tree node
             pub fn timg_calibration_clock(&self) -> Option<TimgCalibrationClockConfig> {
                 self.timg_calibration_clock
@@ -788,6 +819,7 @@ macro_rules! define_clock_tree_types {
                 apb_clk: None,
                 lp_fast_clk: None,
                 lp_slow_clk: None,
+                crypto_clk: None,
                 timg_calibration_clock: None,
                 timg0_function_clock: None,
                 timg0_wdt_clock: None,
@@ -812,6 +844,7 @@ macro_rules! define_clock_tree_types {
                 apb_clk_refcount: 0,
                 lp_fast_clk_refcount: 0,
                 lp_slow_clk_refcount: 0,
+                crypto_clk_refcount: 0,
                 timg_calibration_clock_refcount: 0,
                 timg0_function_clock_refcount: 0,
                 timg0_wdt_clock_refcount: 0,
@@ -1338,6 +1371,60 @@ macro_rules! define_clock_tree_types {
                 LpSlowClkConfig::OscSlow => osc_slow_clk_frequency(clocks),
             }
         }
+        pub fn configure_crypto_clk(clocks: &mut ClockTree, new_selector: CryptoClkConfig) {
+            let old_selector = clocks.crypto_clk.replace(new_selector);
+            if clocks.crypto_clk_refcount > 0 {
+                match new_selector {
+                    CryptoClkConfig::Xtal => request_xtal_clk(clocks),
+                    CryptoClkConfig::Fosc => request_rc_fast_clk(clocks),
+                    CryptoClkConfig::PllF480m => request_pll_clk(clocks),
+                }
+                configure_crypto_clk_impl(clocks, old_selector, new_selector);
+                if let Some(old_selector) = old_selector {
+                    match old_selector {
+                        CryptoClkConfig::Xtal => release_xtal_clk(clocks),
+                        CryptoClkConfig::Fosc => release_rc_fast_clk(clocks),
+                        CryptoClkConfig::PllF480m => release_pll_clk(clocks),
+                    }
+                }
+            } else {
+                configure_crypto_clk_impl(clocks, old_selector, new_selector);
+            }
+        }
+        pub fn crypto_clk_config(clocks: &mut ClockTree) -> Option<CryptoClkConfig> {
+            clocks.crypto_clk
+        }
+        pub fn request_crypto_clk(clocks: &mut ClockTree) {
+            trace!("Requesting CRYPTO_CLK");
+            if increment_reference_count(&mut clocks.crypto_clk_refcount) {
+                trace!("Enabling CRYPTO_CLK");
+                match unwrap!(clocks.crypto_clk) {
+                    CryptoClkConfig::Xtal => request_xtal_clk(clocks),
+                    CryptoClkConfig::Fosc => request_rc_fast_clk(clocks),
+                    CryptoClkConfig::PllF480m => request_pll_clk(clocks),
+                }
+                enable_crypto_clk_impl(clocks, true);
+            }
+        }
+        pub fn release_crypto_clk(clocks: &mut ClockTree) {
+            trace!("Releasing CRYPTO_CLK");
+            if decrement_reference_count(&mut clocks.crypto_clk_refcount) {
+                trace!("Disabling CRYPTO_CLK");
+                enable_crypto_clk_impl(clocks, false);
+                match unwrap!(clocks.crypto_clk) {
+                    CryptoClkConfig::Xtal => release_xtal_clk(clocks),
+                    CryptoClkConfig::Fosc => release_rc_fast_clk(clocks),
+                    CryptoClkConfig::PllF480m => release_pll_clk(clocks),
+                }
+            }
+        }
+        pub fn crypto_clk_frequency(clocks: &mut ClockTree) -> u32 {
+            match unwrap!(clocks.crypto_clk) {
+                CryptoClkConfig::Xtal => xtal_clk_frequency(clocks),
+                CryptoClkConfig::Fosc => rc_fast_clk_frequency(clocks),
+                CryptoClkConfig::PllF480m => pll_clk_frequency(clocks),
+            }
+        }
         pub fn configure_timg_calibration_clock(
             clocks: &mut ClockTree,
             new_selector: TimgCalibrationClockConfig,
@@ -1777,6 +1864,8 @@ macro_rules! define_clock_tree_types {
             pub lp_fast_clk: Option<LpFastClkConfig>,
             /// `LP_SLOW_CLK` configuration.
             pub lp_slow_clk: Option<LpSlowClkConfig>,
+            /// `CRYPTO_CLK` configuration.
+            pub crypto_clk: Option<CryptoClkConfig>,
             /// `TIMG_CALIBRATION_CLOCK` configuration.
             pub timg_calibration_clock: Option<TimgCalibrationClockConfig>,
         }
@@ -1803,6 +1892,9 @@ macro_rules! define_clock_tree_types {
                     }
                     if let Some(config) = self.lp_slow_clk {
                         configure_lp_slow_clk(clocks, config);
+                    }
+                    if let Some(config) = self.crypto_clk {
+                        configure_crypto_clk(clocks, config);
                     }
                     if let Some(config) = self.timg_calibration_clock {
                         configure_timg_calibration_clock(clocks, config);

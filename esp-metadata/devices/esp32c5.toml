@@ -192,6 +192,11 @@ clocks = { system_clocks = { clock_tree = [
     ] },
     
     # Global peripheral-related clocks
+    { name = "CRYPTO_CLK", type = "mux", variants = [ # PCR_SEC_CONF
+        { name = "XTAL",      outputs = "XTAL_CLK" },
+        { name = "FOSC",      outputs = "RC_FAST_CLK" },
+        { name = "PLL_F480M", outputs = "PLL_CLK" },
+    ] },
     { name = "TIMG_CALIBRATION_CLOCK", type = "mux", variants = [ # PCR_32K_SEL / clk_tg_xtal32k
         { name = "OSC_SLOW_CLK",    outputs = "OSC_SLOW_CLK" },
         { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
