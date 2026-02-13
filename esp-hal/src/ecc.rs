@@ -25,7 +25,7 @@ use crate::{
     Blocking,
     DriverMode,
     interrupt::InterruptHandler,
-    pac,
+    pac::{self, ecc::mult_conf::KEY_LENGTH},
     peripherals::{ECC, Interrupt},
     reg_access::{AlignmentHelper, SocDependentEndianess},
     system::{self, GenericPeripheralGuard},
@@ -36,7 +36,37 @@ pub struct Ecc<'d, Dm: DriverMode> {
     ecc: ECC<'d>,
     alignment_helper: AlignmentHelper<SocDependentEndianess>,
     phantom: PhantomData<Dm>,
+    _memory_guard: EccMemoryPowerGuard,
     _guard: GenericPeripheralGuard<{ system::Peripheral::Ecc as u8 }>,
+}
+
+struct EccMemoryPowerGuard;
+
+impl EccMemoryPowerGuard {
+    fn new() -> Self {
+        #[cfg(soc_has_pcr)]
+        crate::peripherals::PCR::regs()
+            .ecc_pd_ctrl()
+            .modify(|_, w| {
+                w.ecc_mem_force_pd().clear_bit();
+                w.ecc_mem_force_pu().set_bit();
+                w.ecc_mem_pd().clear_bit()
+            });
+        Self
+    }
+}
+
+impl Drop for EccMemoryPowerGuard {
+    fn drop(&mut self) {
+        #[cfg(soc_has_pcr)]
+        crate::peripherals::PCR::regs()
+            .ecc_pd_ctrl()
+            .modify(|_, w| {
+                w.ecc_mem_force_pd().clear_bit();
+                w.ecc_mem_force_pu().clear_bit();
+                w.ecc_mem_pd().set_bit()
+            });
+    }
 }
 
 /// ECC interface error
@@ -57,13 +87,13 @@ pub enum EllipticCurve {
     P256 = 1,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 /// Represents the operational modes for elliptic curve or modular arithmetic
 /// computations.
 pub enum WorkMode {
     /// Point multiplication mode.
     PointMultiMode          = 0,
-    #[cfg(esp32c2)]
+    #[cfg(ecc_working_modes = "7")]
     /// Division mode.
     DivisionMode            = 1,
     /// Point verification mode.
@@ -72,23 +102,23 @@ pub enum WorkMode {
     PointVerifMulti         = 3,
     /// Jacobian point multiplication mode.
     JacobianPointMulti      = 4,
-    #[cfg(esp32h2)]
+    #[cfg(ecc_working_modes = "11")]
     /// Point addition mode.
     PointAdd                = 5,
     /// Jacobian point verification mode.
     JacobianPointVerif      = 6,
     /// Point verification and multiplication in Jacobian coordinates.
     PointVerifJacobianMulti = 7,
-    #[cfg(esp32h2)]
+    #[cfg(ecc_working_modes = "11")]
     /// Modular addition mode.
     ModAdd                  = 8,
-    #[cfg(esp32h2)]
+    #[cfg(ecc_working_modes = "11")]
     /// Modular subtraction mode.
     ModSub                  = 9,
-    #[cfg(esp32h2)]
+    #[cfg(ecc_working_modes = "11")]
     /// Modular multiplication mode.
     ModMulti                = 10,
-    #[cfg(esp32h2)]
+    #[cfg(ecc_working_modes = "11")]
     /// Modular division mode.
     ModDiv                  = 11,
 }
@@ -102,6 +132,7 @@ impl<'d> Ecc<'d, Blocking> {
             ecc,
             alignment_helper: AlignmentHelper::default(),
             phantom: PhantomData,
+            _memory_guard: EccMemoryPowerGuard::new(),
             _guard: guard,
         }
     }
@@ -149,13 +180,13 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
                 if k.len() != 24 || x.len() != 24 || y.len() != 24 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                false
+                KEY_LENGTH::P192
             }
             EllipticCurve::P256 => {
                 if k.len() != 32 || x.len() != 32 || y.len() != 32 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                true
+                KEY_LENGTH::P256
             }
         };
         let mode = WorkMode::PointMultiMode;
@@ -181,12 +212,9 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         );
 
         self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode()
-                .bits(mode as u8)
-                .key_length()
-                .bit(curve)
-                .start()
-                .set_bit()
+            w.work_mode().bits(mode as u8);
+            w.key_length().variant(curve);
+            w.start().set_bit()
         });
 
         // wait for interrupt
@@ -225,13 +253,13 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
                 if k.len() != 24 || y.len() != 24 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                false
+                KEY_LENGTH::P192
             }
             EllipticCurve::P256 => {
                 if k.len() != 32 || y.len() != 32 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                true
+                KEY_LENGTH::P256
             }
         };
         let mode = WorkMode::DivisionMode;
@@ -251,12 +279,9 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         );
 
         self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode()
-                .bits(mode as u8)
-                .key_length()
-                .bit(curve)
-                .start()
-                .set_bit()
+            w.work_mode().bits(mode as u8);
+            w.key_length().variant(curve);
+            w.start().set_bit()
         });
 
         // wait for interrupt
@@ -292,13 +317,13 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
                 if x.len() != 24 || y.len() != 24 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                false
+                KEY_LENGTH::P192
             }
             EllipticCurve::P256 => {
                 if x.len() != 32 || y.len() != 32 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                true
+                KEY_LENGTH::P256
             }
         };
         let mode = WorkMode::PointVerif;
@@ -318,12 +343,9 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         );
 
         self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode()
-                .bits(mode as u8)
-                .key_length()
-                .bit(curve)
-                .start()
-                .set_bit()
+            w.work_mode().bits(mode as u8);
+            w.key_length().variant(curve);
+            w.start().set_bit()
         });
 
         // wait for interrupt
@@ -352,7 +374,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     ///
     /// This function will return an error if the point is not on the selected
     /// elliptic curve.
-    #[cfg(not(esp32h2))]
+    #[cfg(not(ecc_working_modes = "11"))]
     pub fn affine_point_verification_multiplication(
         &mut self,
         curve: &EllipticCurve,
@@ -365,13 +387,13 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
                 if k.len() != 24 || x.len() != 24 || y.len() != 24 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                false
+                KEY_LENGTH::P192
             }
             EllipticCurve::P256 => {
                 if k.len() != 32 || x.len() != 32 || y.len() != 32 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                true
+                KEY_LENGTH::P256
             }
         };
         let mode = WorkMode::PointVerifMulti;
@@ -397,12 +419,9 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         );
 
         self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode()
-                .bits(mode as u8)
-                .key_length()
-                .bit(curve)
-                .start()
-                .set_bit()
+            w.work_mode().bits(mode as u8);
+            w.key_length().variant(curve);
+            w.start().set_bit()
         });
 
         // wait for interrupt
@@ -441,7 +460,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     /// This function will return an error if the point is not on the selected
     /// elliptic curve.
     #[expect(clippy::too_many_arguments)]
-    #[cfg(esp32h2)]
+    #[cfg(ecc_working_modes = "11")]
     pub fn affine_point_verification_multiplication(
         &mut self,
         curve: &EllipticCurve,
@@ -457,13 +476,13 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
                 if k.len() != 24 || px.len() != 24 || py.len() != 24 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                false
+                KEY_LENGTH::P192
             }
             EllipticCurve::P256 => {
                 if k.len() != 32 || px.len() != 32 || py.len() != 32 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                true
+                KEY_LENGTH::P256
             }
         };
         let mode = WorkMode::PointVerifMulti;
@@ -490,7 +509,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
 
         self.regs().mult_conf().write(|w| unsafe {
             w.work_mode().bits(mode as u8);
-            w.key_length().bit(curve);
+            w.key_length().variant(curve);
             w.start().set_bit()
         });
 
@@ -544,13 +563,13 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
                 if k.len() != 24 || x.len() != 24 || y.len() != 24 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                false
+                KEY_LENGTH::P192
             }
             EllipticCurve::P256 => {
                 if k.len() != 32 || x.len() != 32 || y.len() != 32 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                true
+                KEY_LENGTH::P256
             }
         };
         let mode = WorkMode::JacobianPointMulti;
@@ -577,33 +596,33 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
 
         self.regs().mult_conf().write(|w| unsafe {
             w.work_mode().bits(mode as u8);
-            w.key_length().bit(curve);
+            w.key_length().variant(curve);
             w.start().set_bit()
         });
 
         while self.is_busy() {}
 
         cfg_if::cfg_if! {
-            if #[cfg(not(esp32h2))] {
-            self.alignment_helper
-                .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 32);
-            self.reverse_words(tmp.as_ref(), x);
-            self.alignment_helper
-                .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 32);
-            self.reverse_words(tmp.as_ref(), y);
-            self.alignment_helper
-                .volatile_read_regset(self.regs().k_mem(0).as_ptr(), &mut tmp, 32);
-            self.reverse_words(tmp.as_ref(), k);
+            if #[cfg(not(ecc_working_modes = "11"))] {
+                self.alignment_helper
+                    .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 32);
+                self.reverse_words(tmp.as_ref(), x);
+                self.alignment_helper
+                    .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 32);
+                self.reverse_words(tmp.as_ref(), y);
+                self.alignment_helper
+                    .volatile_read_regset(self.regs().k_mem(0).as_ptr(), &mut tmp, 32);
+                self.reverse_words(tmp.as_ref(), k);
             } else {
-            self.alignment_helper
-                .volatile_read_regset(self.regs().qx_mem(0).as_ptr(), &mut tmp, 32);
-            self.reverse_words(tmp.as_ref(), x);
-            self.alignment_helper
-                .volatile_read_regset(self.regs().qy_mem(0).as_ptr(), &mut tmp, 32);
-            self.reverse_words(tmp.as_ref(), y);
-            self.alignment_helper
-                .volatile_read_regset(self.regs().qz_mem(0).as_ptr(), &mut tmp, 32);
-            self.reverse_words(tmp.as_ref(), k);
+                self.alignment_helper
+                    .volatile_read_regset(self.regs().qx_mem(0).as_ptr(), &mut tmp, 32);
+                self.reverse_words(tmp.as_ref(), x);
+                self.alignment_helper
+                    .volatile_read_regset(self.regs().qy_mem(0).as_ptr(), &mut tmp, 32);
+                self.reverse_words(tmp.as_ref(), y);
+                self.alignment_helper
+                    .volatile_read_regset(self.regs().qz_mem(0).as_ptr(), &mut tmp, 32);
+                self.reverse_words(tmp.as_ref(), k);
             }
         }
 
@@ -634,13 +653,13 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
                 if x.len() != 24 || y.len() != 24 || z.len() != 24 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                false
+                KEY_LENGTH::P192
             }
             EllipticCurve::P256 => {
                 if x.len() != 32 || y.len() != 32 || z.len() != 32 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                true
+                KEY_LENGTH::P256
             }
         };
         let mode = WorkMode::JacobianPointVerif;
@@ -649,7 +668,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.reverse_words(x, &mut tmp);
 
         cfg_if::cfg_if! {
-            if #[cfg(not(esp32h2))] {
+            if #[cfg(not(ecc_working_modes = "11"))] {
                 self.alignment_helper
                     .volatile_write_regset(self.regs().px_mem(0).as_ptr(), tmp.as_ref(), 32);
                 self.reverse_words(y, &mut tmp);
@@ -671,12 +690,9 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         }
 
         self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode()
-                .bits(mode as u8)
-                .key_length()
-                .bit(curve)
-                .start()
-                .set_bit()
+            w.work_mode().bits(mode as u8);
+            w.key_length().variant(curve);
+            w.start().set_bit()
         });
 
         // wait for interrupt
@@ -717,13 +733,13 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
                 if k.len() != 24 || x.len() != 24 || y.len() != 24 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                false
+                KEY_LENGTH::P192
             }
             EllipticCurve::P256 => {
                 if k.len() != 32 || x.len() != 32 || y.len() != 32 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                true
+                KEY_LENGTH::P256
             }
         };
         let mode = WorkMode::PointVerifJacobianMulti;
@@ -750,7 +766,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
 
         self.regs().mult_conf().write(|w| unsafe {
             w.work_mode().bits(mode as u8);
-            w.key_length().bit(curve);
+            w.key_length().variant(curve);
             w.start().set_bit()
         });
 
@@ -768,7 +784,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         }
 
         cfg_if::cfg_if! {
-            if #[cfg(not(esp32h2))] {
+            if #[cfg(not(ecc_working_modes = "11"))] {
                 self.alignment_helper
                     .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 32);
                 self.reverse_words(tmp.as_ref(), x);
@@ -812,7 +828,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     ///
     /// This function will return an error if the point is not on the selected
     /// elliptic curve.
-    #[cfg(esp32h2)]
+    #[cfg(ecc_working_modes = "11")]
     pub fn affine_point_addition(
         &mut self,
         curve: &EllipticCurve,
@@ -832,7 +848,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
                 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                false
+                KEY_LENGTH::P192
             }
             EllipticCurve::P256 => {
                 if px.len() != 32
@@ -843,7 +859,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
                 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                true
+                KEY_LENGTH::P256
             }
         };
         let mode = WorkMode::PointAdd;
@@ -867,12 +883,9 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
             .volatile_write_regset(self.regs().qz_mem(0).as_ptr(), &tmp, 32);
 
         self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode()
-                .bits(mode as u8)
-                .key_length()
-                .bit(curve)
-                .start()
-                .set_bit()
+            w.work_mode().bits(mode as u8);
+            w.key_length().variant(curve);
+            w.start().set_bit()
         });
 
         // wait for interrupt
@@ -918,7 +931,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     ///
     /// This function will return an error if the point is not on the selected
     /// elliptic curve.
-    #[cfg(esp32h2)]
+    #[cfg(ecc_working_modes = "11")]
     pub fn mod_operations(
         &mut self,
         curve: &EllipticCurve,
@@ -931,13 +944,13 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
                 if a.len() != 24 || b.len() != 24 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                false
+                KEY_LENGTH::P192
             }
             EllipticCurve::P256 => {
                 if a.len() != 32 || b.len() != 32 {
                     return Err(Error::SizeMismatchCurve);
                 }
-                true
+                KEY_LENGTH::P256
             }
         };
 
@@ -950,12 +963,9 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
             .volatile_write_regset(self.regs().py_mem(0).as_ptr(), &tmp, 32);
 
         self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode()
-                .bits(work_mode.clone() as u8)
-                .key_length()
-                .bit(curve)
-                .start()
-                .set_bit()
+            w.work_mode().bits(work_mode as u8);
+            w.key_length().variant(curve);
+            w.start().set_bit()
         });
 
         // wait for interrupt

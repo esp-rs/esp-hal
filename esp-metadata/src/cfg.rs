@@ -374,7 +374,9 @@ driver_configs![
     EccProperties {
         driver: ecc,
         name: "ECC",
-        properties: {}
+        properties: {
+            working_modes: u32, // TODO: list instead of count
+        }
     },
     EthernetProperties {
         driver: ethernet,

@@ -225,6 +225,10 @@ gdma_version = 1
 supports_mem2mem = true
 max_priority = 9
 
+[device.ecc]
+support_status = "partial"
+working_modes = 7
+
 [device.gpio]
 support_status = "supported"
 gpio_function = 1
@@ -434,7 +438,6 @@ deep_sleep = true
 
 ## Crypto
 # [device.aes] Product portfolio lists AES, but TRM only has XTS_AES?
-[device.ecc]
 
 ## Interfaces
 [device.ledc]

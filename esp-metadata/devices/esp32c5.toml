@@ -272,7 +272,10 @@ max_priority = 5
 # TODO: weight-based arbitration
 
 [device.ecc]
-support_status = "not_supported" # tests fail
+support_status = "partial"
+working_modes = 11 # TODO: list instead of count
+# TODO: 3 curve parameters
+# TODO: different memory size
 
 [device.gpio]
 support_status = "partial"
