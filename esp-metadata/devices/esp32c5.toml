@@ -256,18 +256,17 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Ecc" },
 ] } }
 
-# Needs a bit of PAC massaging
 # TODO: define functionality for PSEUDO register
-# [device.aes]
-# support_status = "partial"
-# has_split_text_registers = true
-# endianness_configurable = false
-# dma = true
-# dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128"]
-# key_length = { options = [
-#     { bits = 128, encrypt_mode = 0, decrypt_mode = 4 },
-#     { bits = 256, encrypt_mode = 2, decrypt_mode = 6 }
-# ] }
+[device.aes]
+support_status = "partial"
+has_split_text_registers = true
+endianness_configurable = false
+dma = true
+dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128"]
+key_length = { options = [
+    { bits = 128, encrypt_mode = 0, decrypt_mode = 4 },
+    { bits = 256, encrypt_mode = 2, decrypt_mode = 6 }
+] }
 
 [device.dma]
 support_status = "partial"
