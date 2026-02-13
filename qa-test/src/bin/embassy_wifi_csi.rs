@@ -59,7 +59,7 @@ async fn main(spawner: Spawner) -> ! {
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let (controller, interfaces) =
+    let (mut controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
     // enable some "interesting" events to be received in the connection task
@@ -84,23 +84,37 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
+    let station_config = Config::Station(
+        StationConfig::default()
+            .with_ssid(SSID)
+            .with_password(PASSWORD.into()),
+    );
+    controller.set_config(&station_config).unwrap();
+    println!("Starting wifi");
+    controller.start_async().await.unwrap();
+    println!("Wifi started!");
+
+    let csi = CsiConfig::default();
+    controller
+        .set_csi(csi, |data: esp_radio::wifi::csi::WifiCsiInfo| {
+            println!("rssi: {:?} rate: {}", data.rssi(), data.rate());
+        })
+        .unwrap();
+
+    println!("Scan");
+    let scan_config = ScanConfig::default().with_max(10);
+    let result = controller.scan_async(&scan_config).await.unwrap();
+    for ap in result {
+        println!("{:?}", ap);
+    }
+
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(runner)).ok();
 
-    loop {
-        if stack.is_link_up() {
-            break;
-        }
-        Timer::after(Duration::from_millis(500)).await;
-    }
+    stack.wait_config_up().await;
 
-    println!("Waiting to get IP address...");
-    loop {
-        if let Some(config) = stack.config_v4() {
-            println!("Got IP: {}", config.address);
-            break;
-        }
-        Timer::after(Duration::from_millis(500)).await;
+    if let Some(config) = stack.config_v4() {
+        println!("Got IP: {}", config.address);
     }
 
     loop {
@@ -111,68 +125,24 @@ async fn main(spawner: Spawner) -> ! {
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
+
     loop {
-        if matches!(controller.is_connected(), Ok(true)) {
-            // wait until we're no longer connected
-            //
-            // just `controller.wait_for_disconnect_async()` is enough - but here we demonstrate how
-            // to get arbitrary events, too
-            let mut subscriber = controller.subscribe().unwrap();
-            loop {
-                let res = embassy_futures::select::select(
-                    controller.wait_for_disconnect_async(),
-                    subscriber.next_event_pure(),
-                )
-                .await;
-
-                match res {
-                    embassy_futures::select::Either::First(disconnect) => {
-                        println!("Disconnected: {:?}", disconnect);
-                        break;
-                    }
-                    embassy_futures::select::Either::Second(event) => {
-                        println!("Event: {:?}", event);
-                    }
-                }
-            }
-
-            Timer::after(Duration::from_millis(5000)).await
-        }
-
-        if !matches!(controller.is_started(), Ok(true)) {
-            let station_config = Config::Station(
-                StationConfig::default()
-                    .with_ssid(SSID)
-                    .with_password(PASSWORD.into()),
-            );
-            controller.set_config(&station_config).unwrap();
-            println!("Starting wifi");
-            controller.start_async().await.unwrap();
-            println!("Wifi started!");
-
-            let csi = CsiConfig::default();
-            controller
-                .set_csi(csi, |data: esp_radio::wifi::csi::WifiCsiInfo| {
-                    println!("rssi: {:?} rate: {}", data.rssi(), data.rate());
-                })
-                .unwrap();
-
-            println!("Scan");
-            let scan_config = ScanConfig::default().with_max(10);
-            let result = controller.scan_async(&scan_config).await.unwrap();
-            for ap in result {
-                println!("{:?}", ap);
-            }
-        }
         println!("About to connect...");
 
         match controller.connect_async().await {
-            Ok(_) => println!("Wifi connected!"),
+            Ok(info) => {
+                println!("Wifi connected to {:?}", info);
+
+                // wait until we're no longer connected
+                let info = controller.wait_for_disconnect_async().await.ok();
+                println!("Disconnected: {:?}", info);
+            }
             Err(e) => {
                 println!("Failed to connect to wifi: {e:?}");
-                Timer::after(Duration::from_millis(5000)).await
             }
         }
+
+        Timer::after(Duration::from_millis(5000)).await
     }
 }
 

@@ -124,6 +124,10 @@ async fn main(spawner: Spawner) -> ! {
     );
     controller.set_config(&station_config).unwrap();
 
+    println!("Starting wifi");
+    controller.start_async().await.unwrap();
+    println!("Wifi started!");
+
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(ap_runner)).ok();
     spawner.spawn(net_task(sta_runner)).ok();
@@ -137,13 +141,11 @@ async fn main(spawner: Spawner) -> ! {
         println!("Waiting for IP...");
         Timer::after(Duration::from_millis(500)).await;
     };
-    loop {
-        if ap_stack.is_link_up() {
-            break;
-        }
-        Timer::after(Duration::from_millis(500)).await;
-    }
-    println!("Connect to the AP `esp-radio` and point your browser to http://192.168.2.1:8080/");
+    ap_stack.wait_config_up().await;
+
+    println!(
+        "Connect to the AP `esp-radio-apsta` and point your browser to http://192.168.2.1:8080/"
+    );
     println!("Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1");
     println!("Or connect to the ap `{SSID}` and point your browser to http://{sta_address}:8080/");
 
@@ -323,53 +325,53 @@ async fn main(spawner: Spawner) -> ! {
 async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
 
-    println!("Starting wifi");
-    controller.start_async().await.unwrap();
-    println!("Wifi started!");
-
     loop {
-        if matches!(controller.is_started(), Ok(true)) {
-            println!("About to connect...");
+        match controller.connect_async().await {
+            Ok(_) => {
+                // wait until we're no longer connected
+                loop {
+                    let info = embassy_futures::select::select(
+                        controller.wait_for_disconnect_async(),
+                        controller.wait_for_access_point_connected_event_async(),
+                    )
+                    .await;
 
-            match controller.connect_async().await {
-                Ok(_) => {
-                    // wait until we're no longer connected
-                    loop {
-                        let info = embassy_futures::select::select(
-                            controller.wait_for_disconnect_async(),
-                            controller.wait_for_access_point_connected_event_async(),
-                        )
-                        .await;
-
-                        match info {
-                            Either::First(station_disconnected) => {
-                                if let Ok(station_disconnected) = station_disconnected {
-                                    println!("Station disconnected: {:?}", station_disconnected);
-                                    break;
-                                }
+                    match info {
+                        Either::First(station_disconnected) => {
+                            if let Ok(station_disconnected) = station_disconnected {
+                                println!("Station disconnected: {:?}", station_disconnected);
+                                break;
                             }
-                            Either::Second(event) => {
-                                if let Ok(event) = event {
-                                    match event {
-                                    esp_radio::wifi::AccessPointStationEventInfo::Connected(access_point_station_connected_info) => {
-                                        println!("Station connected: {:?}", access_point_station_connected_info);
+                        }
+                        Either::Second(event) => {
+                            if let Ok(event) = event {
+                                match event {
+                                    esp_radio::wifi::AccessPointStationEventInfo::Connected(
+                                        access_point_station_connected_info,
+                                    ) => {
+                                        println!(
+                                            "Station connected: {:?}",
+                                            access_point_station_connected_info
+                                        );
                                     }
-                                    esp_radio::wifi::AccessPointStationEventInfo::Disconnected(access_point_station_disconnected_info) => {
-                                        println!("Station disconnected: {:?}", access_point_station_disconnected_info);
+                                    esp_radio::wifi::AccessPointStationEventInfo::Disconnected(
+                                        access_point_station_disconnected_info,
+                                    ) => {
+                                        println!(
+                                            "Station disconnected: {:?}",
+                                            access_point_station_disconnected_info
+                                        );
                                     }
-                                }
                                 }
                             }
                         }
                     }
                 }
-                Err(e) => {
-                    println!("Failed to connect to wifi: {e:?}");
-                    Timer::after(Duration::from_millis(5000)).await
-                }
             }
-        } else {
-            return;
+            Err(e) => {
+                println!("Failed to connect to wifi: {e:?}");
+                Timer::after(Duration::from_millis(5000)).await
+            }
         }
     }
 }

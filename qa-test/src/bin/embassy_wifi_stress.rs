@@ -62,12 +62,6 @@ async fn main(_spawner: Spawner) {
             "===========================================#{}=========================================",
             i
         );
-        if controller.is_started().unwrap_or(false) {
-            // Timer::after(Duration::from_secs(10)).await; // These sleeps delay reproducing the
-            // bug, but do not prevent it
-            controller.stop_async().await.unwrap();
-            // Timer::after(Duration::from_secs(10)).await;
-        }
 
         controller.set_mode(WifiMode::Station).unwrap();
         println!("Wifi stack setup (STA)");
@@ -97,6 +91,7 @@ async fn main(_spawner: Spawner) {
         if aps.is_empty() {
             println!("No access points found.");
             Timer::after(Duration::from_secs(2)).await;
+            controller.stop_async().await.unwrap();
             continue;
         }
         aps.sort_by(|x, y| y.signal_strength.cmp(&x.signal_strength));
@@ -131,5 +126,10 @@ async fn main(_spawner: Spawner) {
         } else {
             println!("Connect OK");
         }
+
+        // Timer::after(Duration::from_secs(10)).await; // These sleeps delay reproducing the
+        // bug, but do not prevent it
+        controller.stop_async().await.unwrap();
+        // Timer::after(Duration::from_secs(10)).await;
     }
 }

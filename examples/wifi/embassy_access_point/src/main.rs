@@ -63,7 +63,7 @@ async fn main(spawner: Spawner) -> ! {
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let (controller, interfaces) =
+    let (mut controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
     let device = interfaces.access_point;
@@ -88,6 +88,12 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
+    let station_config = Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio"));
+    controller.set_config(&station_config).unwrap();
+    println!("Starting wifi");
+    controller.start_async().await.unwrap();
+    println!("Wifi started!");
+
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(runner)).ok();
     spawner.spawn(run_dhcp(stack, gw_ip_addr_str)).ok();
@@ -95,19 +101,13 @@ async fn main(spawner: Spawner) -> ! {
     let mut rx_buffer = [0; 1536];
     let mut tx_buffer = [0; 1536];
 
-    loop {
-        if stack.is_link_up() {
-            break;
-        }
-        Timer::after(Duration::from_millis(500)).await;
-    }
     println!(
         "Connect to the AP `esp-radio` and point your browser to http://{gw_ip_addr_str}:8080/"
     );
     println!("DHCP is enabled so there's no need to configure a static IP, just in case:");
-    while !stack.is_config_up() {
-        Timer::after(Duration::from_millis(100)).await
-    }
+
+    stack.wait_config_up().await;
+
     stack
         .config_v4()
         .inspect(|c| println!("ipv4 config: {c:?}"));
@@ -230,38 +230,29 @@ async fn run_dhcp(stack: Stack<'static>, gw_ip_addr: &'static str) {
 async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
     loop {
-        if !matches!(controller.is_started(), Ok(true)) {
-            let station_config =
-                Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio"));
-            controller.set_config(&station_config).unwrap();
-            println!("Starting wifi");
-            controller.start_async().await.unwrap();
-            println!("Wifi started!");
-        } else {
-            let ev = controller
-                .wait_for_access_point_connected_event_async()
-                .await
-                .unwrap();
-            match ev {
-                esp_radio::wifi::AccessPointStationEventInfo::Connected(
-                    access_point_station_connected_info,
-                ) => {
-                    println!(
-                        "Station connected: {:?}",
-                        access_point_station_connected_info
-                    );
-                }
-                esp_radio::wifi::AccessPointStationEventInfo::Disconnected(
-                    access_point_station_disconnected_info,
-                ) => {
-                    println!(
-                        "Station disconnected: {:?}",
-                        access_point_station_disconnected_info
-                    );
-                }
+        let ev = controller
+            .wait_for_access_point_connected_event_async()
+            .await;
+        match ev {
+            Ok(esp_radio::wifi::AccessPointStationEventInfo::Connected(
+                access_point_station_connected_info,
+            )) => {
+                println!(
+                    "Station connected: {:?}",
+                    access_point_station_connected_info
+                );
             }
-            Timer::after(Duration::from_millis(5000)).await
+            Ok(esp_radio::wifi::AccessPointStationEventInfo::Disconnected(
+                access_point_station_disconnected_info,
+            )) => {
+                println!(
+                    "Station disconnected: {:?}",
+                    access_point_station_disconnected_info
+                );
+            }
+            _ => (),
         }
+        Timer::after(Duration::from_millis(5000)).await
     }
 }
 

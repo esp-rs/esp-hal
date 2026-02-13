@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WifiController::scan_with_config_async` has been changed to `WifiController::scan_async` (#4946)
 - Various structs now use the `Ssid` type to represent SSIDs instead of `String` (#4953)
 - Update to `bt-hci` version 0.8 and `trouble-host` version 0.6 (#4962)
+- `WifiController::is_connected()` and `WifiController::is_started()` now return a simple `bool` instead of `Result<bool, WifiError>` and are marked as unstable (#4971)
 
 ### Fixed
 
