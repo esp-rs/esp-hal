@@ -239,28 +239,6 @@ macro_rules! unstable_module {
     };
 }
 
-// we can't use instability because it mucks up the short description in rustdoc
-#[doc(hidden)]
-macro_rules! unstable_reexport {
-    ($(
-        $(#[$meta:meta])*
-        pub use $path:path;
-    )*) => {
-        $(
-            $(#[$meta])*
-            #[cfg(feature = "unstable")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-            pub use $path;
-
-            $(#[$meta])*
-            #[cfg(not(feature = "unstable"))]
-            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-            #[allow(unused)]
-            pub(crate) use $path;
-        )*
-    };
-}
-
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 // we don't want unstable drivers to be compiled even, unless enabled
 #[doc(hidden)]
@@ -328,20 +306,19 @@ mod macros;
 
 #[cfg(feature = "rt")]
 pub use procmacros::blocking_main as main;
+#[instability::unstable]
+pub use procmacros::handler;
+#[instability::unstable]
+#[cfg(any(lp_core, ulp_riscv_core))]
+pub use procmacros::load_lp_code;
 pub use procmacros::ram;
 
-unstable_reexport! {
-    pub use procmacros::handler;
-
-    #[cfg(any(lp_core, ulp_riscv_core))]
-    pub use procmacros::load_lp_code;
-
-    #[cfg(lp_core)]
-    pub use self::soc::lp_core;
-
-    #[cfg(ulp_riscv_core)]
-    pub use self::soc::ulp_core;
-}
+#[instability::unstable]
+#[cfg(lp_core)]
+pub use self::soc::lp_core;
+#[instability::unstable]
+#[cfg(ulp_riscv_core)]
+pub use self::soc::ulp_core;
 
 #[cfg(all(feature = "rt", feature = "exception-handler"))]
 mod exception_handler;
