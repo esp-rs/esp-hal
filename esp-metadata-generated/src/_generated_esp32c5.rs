@@ -396,6 +396,20 @@ macro_rules! property {
 ///     todo!()
 /// }
 ///
+/// // RMT_SCLK
+///
+/// fn enable_rmt_sclk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_rmt_sclk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<RmtSclkConfig>,
+///     _new_selector: RmtSclkConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // TIMG0_FUNCTION_CLOCK
 ///
 /// fn enable_timg0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -619,6 +633,18 @@ macro_rules! define_clock_tree_types {
             /// Selects `XTAL32K_CLK`.
             Xtal32kClk,
         }
+        /// The list of clock signals that the `RMT_SCLK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum RmtSclkConfig {
+            /// Selects `XTAL_CLK`.
+            XtalClk,
+            /// Selects `RC_FAST_CLK`.
+            RcFastClk,
+            #[default]
+            /// Selects `PLL_F80M`.
+            PllF80m,
+        }
         /// The list of clock signals that the `TIMG0_FUNCTION_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -665,6 +691,7 @@ macro_rules! define_clock_tree_types {
             lp_fast_clk: Option<LpFastClkConfig>,
             lp_slow_clk: Option<LpSlowClkConfig>,
             timg_calibration_clock: Option<TimgCalibrationClockConfig>,
+            rmt_sclk: Option<RmtSclkConfig>,
             timg0_function_clock: Option<Timg0FunctionClockConfig>,
             timg0_wdt_clock: Option<Timg0WdtClockConfig>,
             timg1_function_clock: Option<Timg0FunctionClockConfig>,
@@ -689,6 +716,7 @@ macro_rules! define_clock_tree_types {
             lp_fast_clk_refcount: u32,
             lp_slow_clk_refcount: u32,
             timg_calibration_clock_refcount: u32,
+            rmt_sclk_refcount: u32,
             timg0_function_clock_refcount: u32,
             timg0_wdt_clock_refcount: u32,
             timg1_function_clock_refcount: u32,
@@ -733,6 +761,10 @@ macro_rules! define_clock_tree_types {
             pub fn timg_calibration_clock(&self) -> Option<TimgCalibrationClockConfig> {
                 self.timg_calibration_clock
             }
+            /// Returns the current configuration of the RMT_SCLK clock tree node
+            pub fn rmt_sclk(&self) -> Option<RmtSclkConfig> {
+                self.rmt_sclk
+            }
             /// Returns the current configuration of the TIMG0_FUNCTION_CLOCK clock tree node
             pub fn timg0_function_clock(&self) -> Option<Timg0FunctionClockConfig> {
                 self.timg0_function_clock
@@ -768,6 +800,7 @@ macro_rules! define_clock_tree_types {
                 lp_fast_clk: None,
                 lp_slow_clk: None,
                 timg_calibration_clock: None,
+                rmt_sclk: None,
                 timg0_function_clock: None,
                 timg0_wdt_clock: None,
                 timg1_function_clock: None,
@@ -792,6 +825,7 @@ macro_rules! define_clock_tree_types {
                 lp_fast_clk_refcount: 0,
                 lp_slow_clk_refcount: 0,
                 timg_calibration_clock_refcount: 0,
+                rmt_sclk_refcount: 0,
                 timg0_function_clock_refcount: 0,
                 timg0_wdt_clock_refcount: 0,
                 timg1_function_clock_refcount: 0,
@@ -1379,6 +1413,60 @@ macro_rules! define_clock_tree_types {
                 TimgCalibrationClockConfig::RcSlowClk => rc_slow_clk_frequency(clocks),
                 TimgCalibrationClockConfig::RcFastDivClk => rc_fast_clk_frequency(clocks),
                 TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(clocks),
+            }
+        }
+        pub fn configure_rmt_sclk(clocks: &mut ClockTree, new_selector: RmtSclkConfig) {
+            let old_selector = clocks.rmt_sclk.replace(new_selector);
+            if clocks.rmt_sclk_refcount > 0 {
+                match new_selector {
+                    RmtSclkConfig::XtalClk => request_xtal_clk(clocks),
+                    RmtSclkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    RmtSclkConfig::PllF80m => request_pll_f80m(clocks),
+                }
+                configure_rmt_sclk_impl(clocks, old_selector, new_selector);
+                if let Some(old_selector) = old_selector {
+                    match old_selector {
+                        RmtSclkConfig::XtalClk => release_xtal_clk(clocks),
+                        RmtSclkConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        RmtSclkConfig::PllF80m => release_pll_f80m(clocks),
+                    }
+                }
+            } else {
+                configure_rmt_sclk_impl(clocks, old_selector, new_selector);
+            }
+        }
+        pub fn rmt_sclk_config(clocks: &mut ClockTree) -> Option<RmtSclkConfig> {
+            clocks.rmt_sclk
+        }
+        pub fn request_rmt_sclk(clocks: &mut ClockTree) {
+            trace!("Requesting RMT_SCLK");
+            if increment_reference_count(&mut clocks.rmt_sclk_refcount) {
+                trace!("Enabling RMT_SCLK");
+                match unwrap!(clocks.rmt_sclk) {
+                    RmtSclkConfig::XtalClk => request_xtal_clk(clocks),
+                    RmtSclkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    RmtSclkConfig::PllF80m => request_pll_f80m(clocks),
+                }
+                enable_rmt_sclk_impl(clocks, true);
+            }
+        }
+        pub fn release_rmt_sclk(clocks: &mut ClockTree) {
+            trace!("Releasing RMT_SCLK");
+            if decrement_reference_count(&mut clocks.rmt_sclk_refcount) {
+                trace!("Disabling RMT_SCLK");
+                enable_rmt_sclk_impl(clocks, false);
+                match unwrap!(clocks.rmt_sclk) {
+                    RmtSclkConfig::XtalClk => release_xtal_clk(clocks),
+                    RmtSclkConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    RmtSclkConfig::PllF80m => release_pll_f80m(clocks),
+                }
+            }
+        }
+        pub fn rmt_sclk_frequency(clocks: &mut ClockTree) -> u32 {
+            match unwrap!(clocks.rmt_sclk) {
+                RmtSclkConfig::XtalClk => xtal_clk_frequency(clocks),
+                RmtSclkConfig::RcFastClk => rc_fast_clk_frequency(clocks),
+                RmtSclkConfig::PllF80m => pll_f80m_frequency(clocks),
             }
         }
         pub fn configure_timg0_function_clock(
