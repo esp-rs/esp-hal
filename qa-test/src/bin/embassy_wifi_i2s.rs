@@ -54,57 +54,26 @@ async fn connection_manager(
     mut controller: WifiController<'static>,
     connected_signal: &'static Signal<NoopRawMutex, bool>,
 ) {
-    println!("Starting WiFi connection manager");
-
-    if !controller.is_started() {
-        let station_config = Config::Station(
-            StationConfig::default()
-                .with_ssid(SSID)
-                .with_password(PASSWORD.into()),
-        );
-        controller.set_config(&station_config).unwrap();
-        println!("Starting WiFi...");
-        controller.start_async().await.unwrap();
-        println!("WiFi started");
-    }
-
-    println!("Connecting to WiFi network");
-    match controller.connect_async().await {
-        Ok(_) => {
-            println!("WiFi connected!");
-            connected_signal.signal(true);
-        }
-        Err(e) => println!("Initial WiFi connection failed: {:?}", e),
-    }
+    println!("start connection task");
 
     loop {
-        if controller.is_connected() {
-            controller.wait_for_disconnect_async().await.ok();
-            println!("WiFi connection lost - attempting reconnection");
-            Timer::after(Duration::from_millis(2000)).await;
-            match controller.connect_async().await {
-                Ok(_) => {
-                    println!("WiFi reconnected!");
-                    connected_signal.signal(true);
-                }
-                Err(e) => {
-                    println!("WiFi reconnection failed: {:?}", e);
-                    Timer::after(Duration::from_millis(5000)).await;
-                }
+        println!("About to connect...");
+
+        match controller.connect_async().await {
+            Ok(info) => {
+                println!("Wifi connected to {:?}", info);
+                connected_signal.signal(true);
+
+                // wait until we're no longer connected
+                let info = controller.wait_for_disconnect_async().await.ok();
+                println!("Disconnected: {:?}", info);
             }
-        } else {
-            println!("Reconnecting to WiFi network: {}", SSID);
-            match controller.connect_async().await {
-                Ok(_) => {
-                    println!("WiFi connected!");
-                    connected_signal.signal(true);
-                }
-                Err(e) => {
-                    println!("WiFi connection failed: {:?}", e);
-                    Timer::after(Duration::from_millis(5000)).await;
-                }
+            Err(e) => {
+                println!("Failed to connect to wifi: {e:?}");
             }
         }
+
+        Timer::after(Duration::from_millis(5000)).await
     }
 }
 
@@ -231,7 +200,7 @@ async fn main(spawner: Spawner) {
         .build(rx_descriptors);
 
     // WiFi + network stack
-    let (controller, interfaces) =
+    let (mut controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
     let wifi_interface = interfaces.station;
 
@@ -249,6 +218,16 @@ async fn main(spawner: Spawner) {
     static CONNECTED_SIGNAL: StaticCell<Signal<NoopRawMutex, bool>> = StaticCell::new();
 
     let connected_signal = &*CONNECTED_SIGNAL.init(Signal::new());
+
+    let station_config = Config::Station(
+        StationConfig::default()
+            .with_ssid(SSID)
+            .with_password(PASSWORD.into()),
+    );
+    controller.set_config(&station_config).unwrap();
+    println!("Starting wifi");
+    controller.start_async().await.unwrap();
+    println!("Wifi started!");
 
     // Tasks
     spawner.spawn(net_task(runner)).ok();
