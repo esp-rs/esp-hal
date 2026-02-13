@@ -91,7 +91,7 @@ peripherals = [
     # { name = "TWAI1" }, # TODO: too different from what we know
     { name = "UART0", interrupts = { peri = "UART0" } },
     { name = "UART1", interrupts = { peri = "UART1" } },
-    # { name = "UHCI0", dma_peripheral = 2 },
+    { name = "UHCI0", dma_peripheral = 2 },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
 
     { name = "DMA_CH0", virtual = true },
@@ -234,6 +234,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Pcnt" },
     { name = "Systimer", keep_enabled = true }, # can be clocked from XTAL_CLK or RC_FAST_CLK, the latter has no divider?
     { name = "Dma", template_params = { peripheral = "gdma" } },
+    { name = "Uhci0", template_params = { peripheral = "uhci" } },
     { name = "Spi2" },
 ] } }
 
@@ -505,6 +506,10 @@ instances = [
 ]
 ram_size = 128
 peripheral_controls_mem_clk = true
+
+[device.uhci]
+support_status = "partial"
+combined_uart_selector_field = true
 
 # [device.lp_uart]
 # support_status = "not_supported"

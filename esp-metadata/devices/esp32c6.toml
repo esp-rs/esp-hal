@@ -675,6 +675,9 @@ instances = [
 ram_size = 128
 peripheral_controls_mem_clk = true
 
+[device.uhci]
+support_status = "partial"
+
 [device.lp_uart]
 support_status = "partial"
 ram_size = 32

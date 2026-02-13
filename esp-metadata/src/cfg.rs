@@ -666,6 +666,14 @@ driver_configs![
             ram_size: u32,
         }
     },
+    UhciProperties {
+        driver: uhci,
+        name: "UHCI",
+        properties: {
+            #[serde(default)]
+            combined_uart_selector_field: bool,
+        }
+    },
     UlpFsmProperties {
         driver: ulp_fsm,
         name: "ULP (FSM)",

@@ -501,6 +501,9 @@ instances = [
 ]
 ram_size = 128
 
+[device.uhci]
+support_status = "partial"
+
 [device.ds]
 support_status = "not_supported"
 

@@ -1220,6 +1220,7 @@ impl Chip {
                     "timergroup_driver_supported",
                     "twai_driver_supported",
                     "uart_driver_supported",
+                    "uhci_driver_supported",
                     "usb_serial_jtag_driver_supported",
                     "wifi_driver_supported",
                     "bt_driver_supported",
@@ -1421,6 +1422,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_driver_supported",
                     "cargo:rustc-cfg=twai_driver_supported",
                     "cargo:rustc-cfg=uart_driver_supported",
+                    "cargo:rustc-cfg=uhci_driver_supported",
                     "cargo:rustc-cfg=usb_serial_jtag_driver_supported",
                     "cargo:rustc-cfg=wifi_driver_supported",
                     "cargo:rustc-cfg=bt_driver_supported",
@@ -1704,6 +1706,7 @@ impl Chip {
                     "soc_has_trace0",
                     "soc_has_uart0",
                     "soc_has_uart1",
+                    "soc_has_uhci0",
                     "soc_has_usb_device",
                     "soc_has_dma_ch0",
                     "soc_has_dma_ch1",
@@ -1737,6 +1740,7 @@ impl Chip {
                     "systimer_driver_supported",
                     "timergroup_driver_supported",
                     "uart_driver_supported",
+                    "uhci_driver_supported",
                     "spi_master_spi2",
                     "spi_slave_spi2",
                     "timergroup_timg0",
@@ -1802,6 +1806,7 @@ impl Chip {
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
                     "uart_peripheral_controls_mem_clk",
+                    "uhci_combined_uart_selector_field",
                 ],
                 cfgs: &[
                     "cargo:rustc-cfg=esp32c5",
@@ -1864,6 +1869,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_trace0",
                     "cargo:rustc-cfg=soc_has_uart0",
                     "cargo:rustc-cfg=soc_has_uart1",
+                    "cargo:rustc-cfg=soc_has_uhci0",
                     "cargo:rustc-cfg=soc_has_usb_device",
                     "cargo:rustc-cfg=soc_has_dma_ch0",
                     "cargo:rustc-cfg=soc_has_dma_ch1",
@@ -1897,6 +1903,7 @@ impl Chip {
                     "cargo:rustc-cfg=systimer_driver_supported",
                     "cargo:rustc-cfg=timergroup_driver_supported",
                     "cargo:rustc-cfg=uart_driver_supported",
+                    "cargo:rustc-cfg=uhci_driver_supported",
                     "cargo:rustc-cfg=spi_master_spi2",
                     "cargo:rustc-cfg=spi_slave_spi2",
                     "cargo:rustc-cfg=timergroup_timg0",
@@ -1962,6 +1969,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=uart_peripheral_controls_mem_clk",
+                    "cargo:rustc-cfg=uhci_combined_uart_selector_field",
                 ],
                 memory_layout: &MemoryLayout {
                     regions: &[
@@ -2207,6 +2215,7 @@ impl Chip {
                     "twai_driver_supported",
                     "uart_driver_supported",
                     "lp_uart_driver_supported",
+                    "uhci_driver_supported",
                     "ulp_riscv_driver_supported",
                     "usb_serial_jtag_driver_supported",
                     "wifi_driver_supported",
@@ -2472,6 +2481,7 @@ impl Chip {
                     "cargo:rustc-cfg=twai_driver_supported",
                     "cargo:rustc-cfg=uart_driver_supported",
                     "cargo:rustc-cfg=lp_uart_driver_supported",
+                    "cargo:rustc-cfg=uhci_driver_supported",
                     "cargo:rustc-cfg=ulp_riscv_driver_supported",
                     "cargo:rustc-cfg=usb_serial_jtag_driver_supported",
                     "cargo:rustc-cfg=wifi_driver_supported",
@@ -2861,6 +2871,7 @@ impl Chip {
                     "timergroup_driver_supported",
                     "twai_driver_supported",
                     "uart_driver_supported",
+                    "uhci_driver_supported",
                     "usb_serial_jtag_driver_supported",
                     "bt_driver_supported",
                     "ieee802154_driver_supported",
@@ -3087,6 +3098,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_driver_supported",
                     "cargo:rustc-cfg=twai_driver_supported",
                     "cargo:rustc-cfg=uart_driver_supported",
+                    "cargo:rustc-cfg=uhci_driver_supported",
                     "cargo:rustc-cfg=usb_serial_jtag_driver_supported",
                     "cargo:rustc-cfg=bt_driver_supported",
                     "cargo:rustc-cfg=ieee802154_driver_supported",
@@ -4040,6 +4052,7 @@ impl Chip {
                     "timergroup_driver_supported",
                     "twai_driver_supported",
                     "uart_driver_supported",
+                    "uhci_driver_supported",
                     "ulp_fsm_driver_supported",
                     "ulp_riscv_driver_supported",
                     "usb_otg_driver_supported",
@@ -4288,6 +4301,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_driver_supported",
                     "cargo:rustc-cfg=twai_driver_supported",
                     "cargo:rustc-cfg=uart_driver_supported",
+                    "cargo:rustc-cfg=uhci_driver_supported",
                     "cargo:rustc-cfg=ulp_fsm_driver_supported",
                     "cargo:rustc-cfg=ulp_riscv_driver_supported",
                     "cargo:rustc-cfg=usb_otg_driver_supported",
@@ -4915,6 +4929,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_tsens)");
     println!("cargo:rustc-check-cfg=cfg(hmac_driver_supported)");
+    println!("cargo:rustc-check-cfg=cfg(uhci_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(usb_serial_jtag_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_cpu_pll_div_out)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_160m)");
@@ -5000,6 +5015,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(dma_separate_in_out_interrupts)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_has_clk_pre_div)");
     println!("cargo:rustc-check-cfg=cfg(uart_peripheral_controls_mem_clk)");
+    println!("cargo:rustc-check-cfg=cfg(uhci_combined_uart_selector_field)");
     println!("cargo:rustc-check-cfg=cfg(esp32c6)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_atomic)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ieee802154)");

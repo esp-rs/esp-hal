@@ -853,6 +853,9 @@ instances = [
 ]
 ram_size = 128
 
+[device.uhci]
+support_status = "not_supported"
+
 [device.ethernet]
 support_status = "not_supported"
 

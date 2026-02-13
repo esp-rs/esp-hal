@@ -82,6 +82,7 @@
 //!     software_reset()
 //! }
 //! ```
+// TODO add support for PDMA and multiple UHCI for 32/S2 support
 
 use core::{
     mem::ManuallyDrop,
@@ -311,21 +312,35 @@ where
         let reg = self.uhci_per.register_block();
 
         for_each_uart! {
-            (all $( ($peri:ident, $variant:ident, $($pins:ident),*) ),*) => {
-
+            (all $( ($id:literal, $peri:ident, $variant:ident, $($pins:ident),*) ),*) => {
                 reg.conf0().modify(|_, w| {
-                    paste::paste! {
-                        // Clear any previous selection
-                        $(
-                        w.[< $peri:lower _ce >]().clear_bit();
-                        )*
+                    cfg_if::cfg_if! {
+                        if #[cfg(uhci_combined_uart_selector_field)] {
+                            unsafe {
+                                w.uart_sel().bits(
+                                    match &self.uart.tx.uart.0 {
+                                        $(super::any::Inner::$variant(_) => {
+                                            debug!("Uhci will use UART{}", stringify!($id));
+                                            $id
+                                        })*
+                                    }
+                                )
+                            }
+                        } else {
+                            paste::paste! {
+                                // Clear any previous selection
+                                $(
+                                w.[< $peri:lower _ce >]().clear_bit();
+                                )*
 
-                        // Select UART
-                        match &self.uart.tx.uart.0 {
-                            $(super::any::Inner::$variant(_) => {
-                                debug!("Uhci will use {}", stringify!($peri));
-                                w.[< $peri:lower _ce >]().set_bit()
-                            })*
+                                // Select UART
+                                match &self.uart.tx.uart.0 {
+                                    $(super::any::Inner::$variant(_) => {
+                                        debug!("Uhci will use {}", stringify!($peri));
+                                        w.[< $peri:lower _ce >]().set_bit()
+                                    })*
+                                }
+                            }
                         }
                     }
                 });

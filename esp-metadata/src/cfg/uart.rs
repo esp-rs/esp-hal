@@ -29,8 +29,11 @@ pub(crate) fn generate_uart_peripherals(uart: &UartProperties) -> TokenStream {
     let uart_instance_cfgs = uart
         .instances
         .iter()
-        .map(|instance| {
+        .enumerate()
+        .map(|(index, instance)| {
             let instance_config = &instance.instance_config;
+
+            let id = crate::number(index);
 
             let instance = format_ident!("{}", instance.name.to_uppercase());
 
@@ -43,7 +46,7 @@ pub(crate) fn generate_uart_peripherals(uart: &UartProperties) -> TokenStream {
             // The order and meaning of these tokens must match their use in the
             // `for_each_uart!` call.
             quote! {
-                #instance, #sys, #rx, #tx, #cts, #rts
+                #id, #instance, #sys, #rx, #tx, #cts, #rts
             }
         })
         .collect::<Vec<_>>();
@@ -57,15 +60,16 @@ pub(crate) fn generate_uart_peripherals(uart: &UartProperties) -> TokenStream {
         ///
         /// This macro has one option for its "Individual matcher" case:
         ///
-        /// Syntax: `($instance:ident, $sys:ident, $rx:ident, $tx:ident, $cts:ident, $rts:ident)`
+        /// Syntax: `($id:literal, $instance:ident, $sys:ident, $rx:ident, $tx:ident, $cts:ident, $rts:ident)`
         ///
         /// Macro fragments:
         ///
+        /// - `$id`: the index of the UART instance
         /// - `$instance`: the name of the UART instance
         /// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
         /// - `$rx`, `$tx`, `$cts`, `$rts`: signal names.
         ///
-        /// Example data: `(UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS)`
+        /// Example data: `(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS)`
         #for_each
     }
 }

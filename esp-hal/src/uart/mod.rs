@@ -41,11 +41,11 @@
 //! [embedded-hal-async]: embedded_hal_async
 //! [embedded-io-async]: embedded_io_async_07
 
-/// UHCI wrapper around UART
-// TODO add support for PDMA and multiple UHCI for 32/S2 support
-#[cfg(all(soc_has_uhci0, dma_kind = "gdma"))]
-#[cfg(feature = "unstable")]
-pub mod uhci;
+crate::unstable_driver! {
+    /// UHCI wrapper around UART
+    #[cfg(uhci_driver_supported)]
+    pub mod uhci;
+}
 
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
@@ -3740,7 +3740,7 @@ impl PartialEq for Info {
 unsafe impl Sync for Info {}
 
 for_each_uart! {
-    ($inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
+    ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&'static Info, &'static State) {
                 #[crate::handler]

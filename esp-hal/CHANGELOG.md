@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Cpu::all` to iterate over all CPUs (#4890)
 - C5: Add initial GPIO support (#4899, #4928, #4935)
 - C5: Add PCNT support (#4934)
-- C5: Initial UART support (#4948)
+- C5: Initial UART support (#4948, #4967)
 - C5: Add SPI support (#4943)
 - Support ESP32-H2 rev 1.2 (#4949, #4969)
 - C5: Add DMA support (#4959)
