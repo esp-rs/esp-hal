@@ -519,6 +519,22 @@ impl Package {
         }
         Ok(())
     }
+
+    #[cfg(feature = "semver-checks")]
+    fn is_forever_unstable(&self) -> bool {
+        match self
+            .toml()
+            .espressif_metadata()
+            .and_then(|m| m.get("forever-unstable"))
+        {
+            Some(Item::Value(Value::Boolean(b))) => *b.value(),
+            Some(Item::Value(_)) => {
+                log::warn!("Invalid value for 'forever-unstable' in metadata - must be a boolean");
+                true
+            }
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, strum::Display, clap::ValueEnum, Serialize, Deserialize)]
