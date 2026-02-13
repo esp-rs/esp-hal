@@ -261,7 +261,9 @@ async fn main(spawner: Spawner) -> ! {
                                 match body_reader.read(&mut chunk_buf).await {
                                     Ok(0) => break,
                                     Ok(n) => {
-                                        if let Err(e) = server_socket.write(&chunk_buf[..n]).await {
+                                        if let Err(e) =
+                                            server_socket.write_all(&chunk_buf[..n]).await
+                                        {
                                             println!("AP write error: {:?}", e);
                                             break;
                                         }
@@ -292,7 +294,7 @@ async fn main(spawner: Spawner) -> ! {
             }
         } else {
             let r = server_socket
-                .write(
+                .write_all(
                     b"HTTP/1.0 200 OK\r\n\r\n\
                     <html>\
                         <body>\
