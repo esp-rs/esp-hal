@@ -1,6 +1,6 @@
 //! ECC, RSA and SHA Tests
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: unstable
 
 #![no_std]
@@ -8,7 +8,7 @@
 
 use hil_test as _;
 
-#[cfg(any(esp32c2, esp32c6, esp32h2))]
+#[cfg(ecc_driver_supported)]
 #[embedded_test::tests(default_timeout = 10)]
 mod ecc_tests {
     use core::ops::Mul;
@@ -20,20 +20,22 @@ mod ecc_tests {
         modular::runtime_mod::{DynResidue, DynResidueParams},
     };
     use elliptic_curve::sec1::ToEncodedPoint;
-    #[cfg(feature = "esp32h2")]
+    #[cfg(esp32h2)]
     use esp_hal::ecc::WorkMode;
+    #[cfg(rng_trng_supported)]
+    use esp_hal::rng::TrngSource;
     use esp_hal::{
         Blocking,
         clock::CpuClock,
         ecc::{Ecc, EllipticCurve, Error},
-        rng::{Rng, TrngSource},
+        rng::Rng,
     };
     use hex_literal::hex;
 
     struct TestParams<'a> {
         prime_fields: &'a [&'a [u8]],
         nb_loop_mul: usize,
-        #[cfg(feature = "esp32c2")]
+        #[cfg(esp32c2)]
         nb_loop_inv: usize,
     }
 
@@ -43,12 +45,13 @@ mod ecc_tests {
             &hex!("ffffffff00000001000000000000000000000000ffffffffffffffffffffffff"),
         ],
         nb_loop_mul: 10,
-        #[cfg(feature = "esp32c2")]
+        #[cfg(esp32c2)]
         nb_loop_inv: 20,
     };
 
     struct Context<'a> {
         ecc: Ecc<'a, Blocking>,
+        #[cfg(rng_trng_supported)]
         _rng_source: TrngSource<'a>,
     }
 
@@ -59,6 +62,7 @@ mod ecc_tests {
 
         Context {
             ecc: Ecc::new(p.ECC),
+            #[cfg(rng_trng_supported)]
             _rng_source: TrngSource::new(p.RNG, p.ADC1),
         }
     }
@@ -233,11 +237,11 @@ mod ecc_tests {
             let (k, px) = t1.split_at_mut(prime_field.len());
             let (px, py) = px.split_at_mut(prime_field.len());
             let (py, _) = py.split_at_mut(prime_field.len());
-            #[cfg(feature = "esp32h2")]
+            #[cfg(esp32h2)]
             let qx = &mut [0u8; 8];
-            #[cfg(feature = "esp32h2")]
+            #[cfg(esp32h2)]
             let qy = &mut [0u8; 8];
-            #[cfg(feature = "esp32h2")]
+            #[cfg(esp32h2)]
             let qz = &mut [0u8; 8];
             for _ in 0..TEST_PARAMS_VECTOR.nb_loop_mul {
                 loop {
@@ -282,11 +286,11 @@ mod ecc_tests {
                     _ => unimplemented!(),
                 };
 
-                #[cfg(not(feature = "esp32h2"))]
+                #[cfg(not(esp32h2))]
                 let result = ctx
                     .ecc
                     .affine_point_verification_multiplication(curve, k, px, py);
-                #[cfg(feature = "esp32h2")]
+                #[cfg(esp32h2)]
                 let result = ctx
                     .ecc
                     .affine_point_verification_multiplication(curve, k, px, py, qx, qy, qz);
@@ -343,6 +347,7 @@ mod ecc_tests {
             }
         }
     }
+
     #[test]
     fn test_ecc_jacobian_point_multiplication(mut ctx: Context<'static>) {
         let rng = Rng::new();
@@ -862,7 +867,7 @@ mod ecc_tests {
     }
 
     #[test]
-    #[cfg(feature = "esp32h2")]
+    #[cfg(esp32h2)]
     fn test_ecc_mod_operations_256(mut ctx: Context<'static>) {
         const ECC_256_X: [u8; 32] = [
             0x96, 0xC2, 0x98, 0xD8, 0x45, 0x39, 0xA1, 0xF4, 0xA0, 0x33, 0xEB, 0x2D, 0x81, 0x7D,
@@ -963,7 +968,7 @@ mod ecc_tests {
     }
 
     #[test]
-    #[cfg(feature = "esp32h2")]
+    #[cfg(esp32h2)]
     fn test_ecc_mod_operations_192(mut ctx: Context<'static>) {
         const ECC_192_X: [u8; 24] = [
             0x1A, 0x80, 0xA1, 0x5F, 0x1F, 0xB7, 0x59, 0x1B, 0x9F, 0xD7, 0xFB, 0xAE, 0xA9, 0xF9,
@@ -1056,7 +1061,7 @@ mod ecc_tests {
     }
 }
 
-#[cfg(not(esp32c2))]
+#[cfg(rsa_driver_supported)]
 #[embedded_test::tests(default_timeout = 5, executor = hil_test::Executor::new())]
 mod rsa_tests {
     use crypto_bigint::{U512, U1024, Uint};
@@ -1290,9 +1295,12 @@ mod rsa_tests {
     }
 }
 
+#[cfg(sha_driver_supported)]
 #[embedded_test::tests(default_timeout = 6)]
 mod sha_tests {
     use digest::{Digest, Update};
+    #[cfg(rng_trng_supported)]
+    use esp_hal::rng::TrngSource;
     #[cfg(not(esp32))]
     use esp_hal::sha::Sha224;
     #[cfg(any(esp32, esp32s2, esp32s3))]
@@ -1301,7 +1309,7 @@ mod sha_tests {
     use esp_hal::sha::{Sha512_224, Sha512_256};
     use esp_hal::{
         clock::CpuClock,
-        rng::{Rng, TrngSource},
+        rng::Rng,
         sha::{Sha, Sha1, Sha256, ShaAlgorithm, ShaBackend, ShaDigest},
     };
     use nb::block;
@@ -1309,6 +1317,7 @@ mod sha_tests {
     const SOURCE_DATA: &[u8] = &[b'a'; 258];
 
     pub struct Context {
+        #[cfg(rng_trng_supported)]
         _rng_source: TrngSource<'static>,
         sha: Sha<'static>,
     }
@@ -1448,6 +1457,7 @@ mod sha_tests {
         let peripherals = esp_hal::init(config);
 
         Context {
+            #[cfg(rng_trng_supported)]
             _rng_source: TrngSource::new(peripherals.RNG, peripherals.ADC1),
             sha: Sha::new(peripherals.SHA),
         }

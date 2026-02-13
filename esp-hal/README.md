@@ -61,7 +61,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | DAC                | ⚒️   |          |          |          |          |          | ⚒️      |          |
 | DMA                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | DS                 |       |          | ❌       |          | ❌       | ❌       | ❌       | ❌       |
-| ECC                |       | ⚒️      |          |          | ⚒️      | ⚒️      |          |          |
+| ECC                |       | ⚒️      |          | ❌       | ⚒️      | ⚒️      |          |          |
 | Ethernet           | ❌    |          |          |          |          |          |          |          |
 | ETM                |       |          |          |          | ⚒️      | ⚒️      |          |          |
 | GPIO               | ✔️   | ✔️      | ✔️      | ⚒️      | ✔️      | ✔️      | ✔️      | ✔️      |
@@ -82,11 +82,11 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | PSRAM              | ⚒️   |          |          |          |          |          | ⚒️      | ⚒️      |
 | RMT                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | RNG                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| RSA                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| RSA                | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SDIO host          | ⚒️   |          |          |          |          |          |          | ⚒️      |
 | SDIO slave         | ⚒️   |          |          |          | ⚒️      |          |          |          |
 | Light/deep sleep   | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| SHA                | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| SHA                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SPI master         | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
 | SPI slave          | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SYSTIMER           |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |

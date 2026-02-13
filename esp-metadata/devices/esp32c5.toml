@@ -13,8 +13,8 @@ cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c5_technical_reference_manual_en.pdf"
 
 peripherals = [
-    # { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 6 },
-    #{ name = "ASSIST_DEBUG", pac = "BUS_MONITOR"},
+    { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 6 },
+    #{ name = "ASSIST_DEBUG" },
     { name = "APB_SARADC", dma_peripheral = 8 },
     # { name = "BITSCRAMBLER" },
     # { name = "CACHE" },
@@ -192,6 +192,11 @@ clocks = { system_clocks = { clock_tree = [
     ] },
     
     # Global peripheral-related clocks
+    { name = "CRYPTO_CLK", type = "mux", variants = [ # PCR_SEC_CONF
+        { name = "XTAL",      outputs = "XTAL_CLK" },
+        { name = "FOSC",      outputs = "RC_FAST_CLK" },
+        { name = "PLL_F480M", outputs = "PLL_CLK" },
+    ] },
     { name = "TIMG_CALIBRATION_CLOCK", type = "mux", variants = [ # PCR_32K_SEL / clk_tg_xtal32k
         { name = "OSC_SLOW_CLK",    outputs = "OSC_SLOW_CLK" },
         { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
@@ -237,7 +242,24 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Dma", template_params = { peripheral = "gdma" } },
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
     { name = "Spi2" },
+    { name = "Aes" },
+    { name = "Sha" },
+    { name = "Rsa" },
+    { name = "Ecc" },
 ] } }
+
+# Needs a bit of PAC massaging
+# TODO: define functionality for PSEUDO register
+# [device.aes]
+# support_status = "partial"
+# has_split_text_registers = true
+# endianness_configurable = false
+# dma = true
+# dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128"]
+# key_length = { options = [
+#     { bits = 128, encrypt_mode = 0, decrypt_mode = 4 },
+#     { bits = 256, encrypt_mode = 2, decrypt_mode = 6 }
+# ] }
 
 [device.dma]
 support_status = "partial"
@@ -248,6 +270,9 @@ supports_mem2mem = true
 max_priority = 5
 # TODO: DMA can access flash
 # TODO: weight-based arbitration
+
+[device.ecc]
+support_status = "not_supported" # tests fail
 
 [device.gpio]
 support_status = "partial"
@@ -470,6 +495,16 @@ bus_timeout_is_exponential = true
 
 [device.i2c_slave]
 support_status = "not_supported"
+
+[device.rsa]
+support_status = "partial"
+size_increment = 32
+memory_size_bytes = 384
+
+[device.sha]
+support_status = "partial"
+dma = true
+algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.interrupts]
 support_status = "partial"
