@@ -34,7 +34,7 @@ define_clock_tree_types!();
 pub enum CpuClock {
     /// 80 MHz CPU clock
     #[default]
-    _80MHz = 80,
+    _80MHz  = 80,
 
     /// 160 MHz CPU clock
     _160MHz = 160,
