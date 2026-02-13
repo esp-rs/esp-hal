@@ -809,6 +809,7 @@ impl Chip {
                     "dma_max_priority_is_set",
                     "dma_gdma_version=\"1\"",
                     "dma_gdma_version_is_set",
+                    "ecc_working_modes=\"7\"",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"31\"",
                     "gpio_constant_1_input=\"30\"",
@@ -962,6 +963,7 @@ impl Chip {
                     "cargo:rustc-cfg=dma_max_priority_is_set",
                     "cargo:rustc-cfg=dma_gdma_version=\"1\"",
                     "cargo:rustc-cfg=dma_gdma_version_is_set",
+                    "cargo:rustc-cfg=ecc_working_modes=\"7\"",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"31\"",
                     "cargo:rustc-cfg=gpio_constant_1_input=\"30\"",
@@ -1740,6 +1742,7 @@ impl Chip {
                     "rom_md5_bsd",
                     "dedicated_gpio_driver_supported",
                     "dma_driver_supported",
+                    "ecc_driver_supported",
                     "gpio_driver_supported",
                     "i2c_master_driver_supported",
                     "interrupts_driver_supported",
@@ -1771,6 +1774,7 @@ impl Chip {
                     "dma_max_priority_is_set",
                     "dma_gdma_version=\"2\"",
                     "dma_gdma_version_is_set",
+                    "ecc_working_modes=\"11\"",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"96\"",
                     "gpio_constant_1_input=\"64\"",
@@ -1943,6 +1947,7 @@ impl Chip {
                     "cargo:rustc-cfg=rom_md5_bsd",
                     "cargo:rustc-cfg=dedicated_gpio_driver_supported",
                     "cargo:rustc-cfg=dma_driver_supported",
+                    "cargo:rustc-cfg=ecc_driver_supported",
                     "cargo:rustc-cfg=gpio_driver_supported",
                     "cargo:rustc-cfg=i2c_master_driver_supported",
                     "cargo:rustc-cfg=interrupts_driver_supported",
@@ -1974,6 +1979,7 @@ impl Chip {
                     "cargo:rustc-cfg=dma_max_priority_is_set",
                     "cargo:rustc-cfg=dma_gdma_version=\"2\"",
                     "cargo:rustc-cfg=dma_gdma_version_is_set",
+                    "cargo:rustc-cfg=ecc_working_modes=\"11\"",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"96\"",
                     "cargo:rustc-cfg=gpio_constant_1_input=\"64\"",
@@ -2336,6 +2342,7 @@ impl Chip {
                     "dma_max_priority_is_set",
                     "dma_gdma_version=\"1\"",
                     "dma_gdma_version_is_set",
+                    "ecc_working_modes=\"8\"",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"60\"",
                     "gpio_constant_1_input=\"56\"",
@@ -2604,6 +2611,7 @@ impl Chip {
                     "cargo:rustc-cfg=dma_max_priority_is_set",
                     "cargo:rustc-cfg=dma_gdma_version=\"1\"",
                     "cargo:rustc-cfg=dma_gdma_version_is_set",
+                    "cargo:rustc-cfg=ecc_working_modes=\"8\"",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"60\"",
                     "cargo:rustc-cfg=gpio_constant_1_input=\"56\"",
@@ -2995,6 +3003,7 @@ impl Chip {
                     "dma_max_priority_is_set",
                     "dma_gdma_version=\"1\"",
                     "dma_gdma_version_is_set",
+                    "ecc_working_modes=\"11\"",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"60\"",
                     "gpio_constant_1_input=\"56\"",
@@ -3224,6 +3233,7 @@ impl Chip {
                     "cargo:rustc-cfg=dma_max_priority_is_set",
                     "cargo:rustc-cfg=dma_gdma_version=\"1\"",
                     "cargo:rustc-cfg=dma_gdma_version_is_set",
+                    "cargo:rustc-cfg=ecc_working_modes=\"11\"",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"60\"",
                     "cargo:rustc-cfg=gpio_constant_1_input=\"56\"",
@@ -5230,6 +5240,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(uart_ram_size, values(\"128\"))");
     println!("cargo:rustc-check-cfg=cfg(dma_max_priority, values(\"9\",\"5\"))");
     println!("cargo:rustc-check-cfg=cfg(dma_gdma_version, values(\"1\",\"2\"))");
+    println!("cargo:rustc-check-cfg=cfg(ecc_working_modes, values(\"7\",\"11\",\"8\"))");
     println!("cargo:rustc-check-cfg=cfg(phy_backed_up_digital_register_count, values(\"21\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_fifo_size, values(\"16\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_uart_ram_size, values(\"32\"))");
