@@ -6,7 +6,7 @@ mod tests {
         peripherals::Peripherals,
         timer::timg::TimerGroup,
     };
-    use esp_radio::wifi::scan::ScanConfig;
+    use esp_radio::wifi::{Config, sta::StationConfig, scan::ScanConfig};
 
     #[init]
     fn init() -> Peripherals {
