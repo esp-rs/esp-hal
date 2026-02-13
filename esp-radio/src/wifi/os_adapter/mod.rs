@@ -1,6 +1,7 @@
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32c2, path = "esp32c2.rs")]
 #[cfg_attr(esp32c3, path = "esp32c3.rs")]
+#[cfg_attr(esp32c5, path = "esp32c5.rs")]
 #[cfg_attr(esp32c6, path = "esp32c6.rs")]
 #[cfg_attr(esp32h2, path = "esp32h2.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2.rs")]
@@ -1606,7 +1607,7 @@ pub unsafe extern "C" fn coex_event_duration_get(event: u32, duration: *mut u32)
 ///   Don't support
 ///
 /// *************************************************************************
-#[cfg(any(esp32c3, esp32c2, esp32c6, esp32s3))]
+#[cfg(any(esp32c3, esp32c2, esp32c5, esp32c6, esp32s3))]
 #[cfg_attr(not(coex), allow(unused_variables))]
 pub unsafe extern "C" fn coex_pti_get(event: u32, pti: *mut u8) -> c_int {
     trace!("coex_pti_get");
@@ -1846,7 +1847,7 @@ pub unsafe extern "C" fn slowclk_cal_get() -> u32 {
     #[cfg(esp32c2)]
     return 28639;
 
-    #[cfg(any(esp32c6, esp32h2))]
+    #[cfg(any(esp32c6, esp32h2, esp32c5))]
     return 0;
 
     #[cfg(esp32)]

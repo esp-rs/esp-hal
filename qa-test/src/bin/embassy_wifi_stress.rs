@@ -1,7 +1,7 @@
 //! This example stress-tests esp-radio and esp-rtos's ability to deal with repeatedly
 //! disconnecting and reconnecting to networks.
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32s2 esp32s3
 //% FEATURES: esp-radio esp-radio/wifi
 
 #![no_std]

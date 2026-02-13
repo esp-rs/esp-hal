@@ -107,7 +107,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ULP (RISC-V)              |       |          |          | ❌       | ⚒️      |          | ⚒️      | ⚒️      |
 | USB OTG FS                |       |          |          |          |          |          | ⚒️      | ⚒️      |
 | USB Serial/JTAG           |       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |          | ⚒️      |
-| WIFI                      | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      |          | ⚒️      | ⚒️      |
+| WIFI                      | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      |
 
  * Empty cell: not available
  * ❌: Not supported

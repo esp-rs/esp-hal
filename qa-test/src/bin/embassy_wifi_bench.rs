@@ -11,7 +11,7 @@
 //! variable before running this example.
 
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32s2 esp32s3
 
 #![allow(static_mut_refs)]
 #![no_std]

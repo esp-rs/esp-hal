@@ -2,7 +2,7 @@
 //!
 //! Set SSID and PASSWORD env variable before running this example.
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32s2 esp32s3
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/csi esp-radio/unstable esp-hal/unstable
 
 #![no_std]

@@ -53,6 +53,13 @@ esp32c3 = [
     "esp-rtos/esp32c3",
     "esp-radio/esp32c3",
 ]
+esp32c5 = [
+    "esp-backtrace/esp32c5",
+    "esp-bootloader-esp-idf/esp32c5",
+    "esp-hal/esp32c5",
+    "esp-rtos/esp32c5",
+    "esp-radio/esp32c5",
+]
 esp32c6 = [
     "esp-backtrace/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",

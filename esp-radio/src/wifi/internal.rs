@@ -202,7 +202,7 @@ pub(crate) static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_func
     _coex_schm_interval_get: Some(coex_schm_interval_get),
     _coex_schm_curr_period_get: Some(coex_schm_curr_period_get),
     _coex_schm_curr_phase_get: Some(coex_schm_curr_phase_get),
-    #[cfg(any(esp32c3, esp32c2, esp32c6, esp32h2, esp32s3, esp32s2))]
+    #[cfg(any(esp32c3, esp32c2, esp32c5, esp32c6, esp32h2, esp32s3, esp32s2))]
     _slowclk_cal_get: Some(slowclk_cal_get),
     #[cfg(any(esp32, esp32s2))]
     _phy_common_clock_disable: Some(os_adapter_chip_specific::phy_common_clock_disable),
@@ -210,11 +210,11 @@ pub(crate) static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_func
     _phy_common_clock_enable: Some(os_adapter_chip_specific::phy_common_clock_enable),
     _coex_register_start_cb: Some(coex_register_start_cb),
 
-    #[cfg(esp32c6)]
+    #[cfg(any(esp32c6, esp32c5))]
     _regdma_link_set_write_wait_content: Some(
         os_adapter_chip_specific::regdma_link_set_write_wait_content_dummy,
     ),
-    #[cfg(esp32c6)]
+    #[cfg(any(esp32c6, esp32c5))]
     _sleep_retention_find_link_by_id: Some(
         os_adapter_chip_specific::sleep_retention_find_link_by_id_dummy,
     ),

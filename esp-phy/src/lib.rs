@@ -37,6 +37,8 @@ pub(crate) mod sys {
     pub use esp_wifi_sys_esp32c2::*;
     #[cfg(esp32c3)]
     pub use esp_wifi_sys_esp32c3::*;
+    #[cfg(esp32c5)]
+    pub use esp_wifi_sys_esp32c5::*;
     #[cfg(esp32c6)]
     pub use esp_wifi_sys_esp32c6::*;
     #[cfg(esp32h2)]
