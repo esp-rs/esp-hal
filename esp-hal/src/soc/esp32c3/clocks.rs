@@ -531,6 +531,29 @@ fn enable_uart_mem_clk_impl(_clocks: &mut ClockTree, en: bool) {
         .modify(|_, w| w.uart_mem_clk_en().bit(en));
 }
 
+// RMT_SCLK
+
+fn enable_rmt_sclk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_rmt_sclk_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<RmtSclkConfig>,
+    new_selector: RmtSclkConfig,
+) {
+    crate::peripherals::RMT::regs()
+        .sys_conf()
+        .modify(|_, w| unsafe {
+            w.clk_en().clear_bit();
+            w.sclk_sel().bits(match new_selector {
+                RmtSclkConfig::ApbClk => 1,
+                RmtSclkConfig::RcFastClk => 2,
+                RmtSclkConfig::XtalClk => 3,
+            })
+        });
+}
+
 // TIMG0_FUNCTION_CLOCK
 
 // Note that the function clock is a pre-requisite of the timer, but does not enable the counter.

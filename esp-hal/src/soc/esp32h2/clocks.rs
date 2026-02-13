@@ -439,6 +439,27 @@ fn configure_timg0_wdt_clock_impl(
         });
 }
 
+// RMT_SCLK
+
+fn enable_rmt_sclk_impl(_clocks: &mut ClockTree, en: bool) {
+    PCR::regs()
+        .rmt_sclk_conf()
+        .modify(|_, w| w.sclk_en().bit(en));
+}
+
+fn configure_rmt_sclk_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<RmtSclkConfig>,
+    new_selector: RmtSclkConfig,
+) {
+    PCR::regs().rmt_sclk_conf().modify(|_, w| {
+        w.sclk_sel().bit(match new_selector {
+            RmtSclkConfig::XtalClk => false,
+            RmtSclkConfig::RcFastClk => true,
+        })
+    });
+}
+
 // TIMG1_FUNCTION_CLOCK
 
 fn enable_timg1_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
