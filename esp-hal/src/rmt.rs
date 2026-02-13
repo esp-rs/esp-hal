@@ -232,7 +232,7 @@ use crate::{
         interconnect::{PeripheralInput, PeripheralOutput},
     },
     peripherals::{Interrupt, RMT},
-    system::{self, GenericPeripheralGuard},
+    system::GenericPeripheralGuard,
     time::Rate,
 };
 
@@ -1113,6 +1113,45 @@ mod state {
 
 use state::RmtState;
 
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+struct RmtClockGuard;
+
+impl RmtClockGuard {
+    fn new() -> Self {
+        #[cfg(soc_has_clock_node_rmt_sclk)]
+        crate::soc::clocks::ClockTree::with(|clocks| {
+            crate::soc::clocks::configure_rmt_sclk(clocks, ClockSource::default().into());
+            crate::soc::clocks::request_rmt_sclk(clocks);
+        });
+
+        Self
+    }
+}
+
+impl Drop for RmtClockGuard {
+    fn drop(&mut self) {
+        #[cfg(soc_has_clock_node_rmt_sclk)]
+        crate::soc::clocks::ClockTree::with(crate::soc::clocks::release_rmt_sclk);
+    }
+}
+
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+struct ChannelGuards {
+    _peripheral: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
+    _clock: RmtClockGuard,
+}
+
+impl ChannelGuards {
+    fn new() -> Self {
+        Self {
+            _peripheral: GenericPeripheralGuard::new(),
+            _clock: RmtClockGuard::new(),
+        }
+    }
+}
+
 /// RMT Channel
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1132,9 +1171,9 @@ where
 
     _mem_guard: MemoryGuard<Dir>,
 
-    // Only the "outermost" Channel/ChannelCreator holds the GenericPeripheralGuard, which avoids
-    // constant inc/dec of the reference count on reborrow and drop.
-    _guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
+    // Only the "outermost" Channel/ChannelCreator holds these guards, which avoids constant
+    // inc/dec of the reference counts on reborrow and drop.
+    _guard: Option<ChannelGuards>,
 }
 
 // The reborrowing API treats Channel similar to a smart pointer: Ensure that it's size is actually
@@ -1587,7 +1626,8 @@ where
     // the `Rmt` and obtaining a duplicate `ChannelCreator`.
     _rmt: PhantomData<Rmt<'ch, Dm>>,
 
-    // We need to keep the peripheral clocked since the following sequence of events is possible:
+    // We need to keep the peripheral and source clocks alive since the following sequence of
+    // events is possible:
     //
     // ```
     // let cc = {
@@ -1600,7 +1640,7 @@ where
     //
     // If there was no _guard in ChannelCreator, the peripheral would be disabled in step 3, and
     // re-enabled in step 4, losing the clock configuration that was set in step 1.
-    _guard: Option<GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>>,
+    _guard: Option<ChannelGuards>,
 }
 
 impl<'ch, Dm, const CHANNEL: u8> ChannelCreator<'ch, Dm, CHANNEL>
@@ -1610,7 +1650,7 @@ where
     fn conjure() -> Self {
         Self {
             _rmt: PhantomData,
-            _guard: Some(GenericPeripheralGuard::new()),
+            _guard: Some(ChannelGuards::new()),
         }
     }
 
@@ -1640,7 +1680,7 @@ where
     pub unsafe fn steal() -> Self {
         Self {
             _rmt: PhantomData,
-            _guard: Some(GenericPeripheralGuard::new()),
+            _guard: Some(ChannelGuards::new()),
         }
     }
 }
@@ -2225,6 +2265,28 @@ for_each_rmt_clock_source!(
     };
 );
 
+#[cfg(soc_has_clock_node_rmt_sclk)]
+impl From<ClockSource> for crate::soc::clocks::RmtSclkConfig {
+    fn from(value: ClockSource) -> Self {
+        match value {
+            #[cfg(rmt_supports_apb_clock)]
+            ClockSource::Apb => Self::ApbClk,
+
+            #[cfg(rmt_supports_rcfast_clock)]
+            ClockSource::RcFast => Self::RcFastClk,
+
+            #[cfg(rmt_supports_xtal_clock)]
+            ClockSource::Xtal => Self::XtalClk,
+
+            #[cfg(rmt_supports_pll80mhz_clock)]
+            ClockSource::Pll80MHz => Self::PllF80m,
+
+            #[cfg(rmt_supports_reftick_clock)]
+            ClockSource::RefTick => unreachable!(),
+        }
+    }
+}
+
 // Obtain maximum value for a register field from the PAC's register spec.
 macro_rules! max_from_register_spec {
     ($typ:ty, $reg:ident, $spec:ident, $w:ident) => {{
@@ -2280,19 +2342,28 @@ mod chip_specific {
     }
 
     pub(super) fn configure_clock(source: ClockSource, div: u8) {
-        #[cfg(not(soc_has_pcr))]
-        {
-            RMT::regs().sys_conf().modify(|_, w| unsafe {
-                w.clk_en().clear_bit();
-                w.sclk_sel().bits(source.bits());
-                w.sclk_div_num().bits(div);
-                w.sclk_div_a().bits(0);
-                w.sclk_div_b().bits(0);
-                w.apb_fifo_mask().set_bit()
-            });
-        }
+        #[cfg(soc_has_clock_node_rmt_sclk)]
+        let _ = source;
 
-        #[cfg(soc_has_pcr)]
+        #[cfg(all(not(soc_has_pcr), not(soc_has_clock_node_rmt_sclk)))]
+        RMT::regs().sys_conf().modify(|_, w| unsafe {
+            w.clk_en().clear_bit();
+            w.sclk_sel().bits(source.bits());
+            w.sclk_div_num().bits(div);
+            w.sclk_div_a().bits(0);
+            w.sclk_div_b().bits(0);
+            w.apb_fifo_mask().set_bit()
+        });
+
+        #[cfg(all(not(soc_has_pcr), soc_has_clock_node_rmt_sclk))]
+        RMT::regs().sys_conf().modify(|_, w| unsafe {
+            w.sclk_div_num().bits(div);
+            w.sclk_div_a().bits(0);
+            w.sclk_div_b().bits(0);
+            w.apb_fifo_mask().set_bit()
+        });
+
+        #[cfg(all(soc_has_pcr, not(soc_has_clock_node_rmt_sclk)))]
         {
             use crate::peripherals::PCR;
 
@@ -2314,6 +2385,21 @@ mod chip_specific {
                 w.sclk_div_a().bits(0);
                 w.sclk_div_b().bits(0);
                 w.sclk_en().set_bit()
+            });
+
+            RMT::regs()
+                .sys_conf()
+                .modify(|_, w| w.apb_fifo_mask().set_bit());
+        }
+
+        #[cfg(all(soc_has_pcr, soc_has_clock_node_rmt_sclk))]
+        {
+            use crate::peripherals::PCR;
+
+            PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
+                w.sclk_div_num().bits(div);
+                w.sclk_div_a().bits(0);
+                w.sclk_div_b().bits(0)
             });
 
             RMT::regs()
