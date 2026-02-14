@@ -1121,7 +1121,10 @@ impl RmtClockGuard {
     fn new() -> Self {
         #[cfg(soc_has_clock_node_rmt_sclk)]
         crate::soc::clocks::ClockTree::with(|clocks| {
-            crate::soc::clocks::configure_rmt_sclk(clocks, ClockSource::default().into());
+            if crate::soc::clocks::rmt_sclk_config(clocks).is_none() {
+                crate::soc::clocks::configure_rmt_sclk(clocks, ClockSource::default().into());
+            }
+
             crate::soc::clocks::request_rmt_sclk(clocks);
         });
 
