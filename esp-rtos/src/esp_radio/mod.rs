@@ -30,13 +30,13 @@ impl esp_radio_rtos_driver::SchedulerImplementation for Scheduler {
     fn initialized(&self) -> bool {
         self.with(|scheduler| {
             if scheduler.time_driver.is_none() {
-                warn!("Trying to initialize esp-radio before starting esp-rtos");
+                error!("Trying to initialize esp-radio before starting esp-rtos");
                 return false;
             }
 
             let current_cpu = Cpu::current() as usize;
             if !scheduler.per_cpu[current_cpu].initialized {
-                warn!(
+                error!(
                     "Trying to initialize esp-radio on {:?} but esp-rtos is not running on this core",
                     current_cpu
                 );
