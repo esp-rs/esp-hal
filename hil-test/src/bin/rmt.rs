@@ -5,7 +5,7 @@
 //! timing-sensitive tests! This doesn't apply to `check_data_eq` since it is used after the
 //! action, but adding any additional logging to the driver is likely to cause sporadic issues.
 
-//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIPS: esp32 esp32c3 esp32c5 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: embassy esp-alloc unstable
 
 #![no_std]

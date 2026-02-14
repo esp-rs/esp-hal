@@ -180,7 +180,12 @@ clocks = { system_clocks = { clock_tree = [
     { name = "I2cExt0", template_params = { peripheral = "i2c0" } },
     { name = "I2cExt1", template_params = { peripheral = "i2c1" } },
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
-    { name = "Rmt" },
+    { name = "Rmt", clocks = [
+        { name = "SCLK", type = "mux", default = "XTAL_CLK", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+        ] },
+    ] },
     { name = "Ledc" },
     { name = "Timg0", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup0_conf", peripheral = "tg0", peri_clk_template = "{{control}}::regs().timergroup0_timer_clk_conf().modify(|_, w| w.tg0_timer_clk_en().bit(enable));" }, keep_enabled = true, clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL_CLK", variants = [

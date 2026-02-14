@@ -186,6 +186,45 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
+    ("rmt.ram_start") => {
+        1610638336
+    };
+    ("rmt.ram_start", str) => {
+        stringify!(1610638336)
+    };
+    ("rmt.channel_ram_size") => {
+        48
+    };
+    ("rmt.channel_ram_size", str) => {
+        stringify!(48)
+    };
+    ("rmt.has_tx_immediate_stop") => {
+        true
+    };
+    ("rmt.has_tx_loop_count") => {
+        true
+    };
+    ("rmt.has_tx_loop_auto_stop") => {
+        true
+    };
+    ("rmt.has_tx_carrier_data_only") => {
+        true
+    };
+    ("rmt.has_tx_sync") => {
+        true
+    };
+    ("rmt.has_rx_wrap") => {
+        true
+    };
+    ("rmt.has_rx_demodulation") => {
+        true
+    };
+    ("rmt.has_dma") => {
+        false
+    };
+    ("rmt.has_per_channel_clock") => {
+        false
+    };
     ("rng.apb_cycle_wait_num") => {
         16
     };
@@ -446,6 +485,20 @@ macro_rules! property {
 ///     todo!()
 /// }
 ///
+/// // RMT_SCLK
+///
+/// fn enable_rmt_sclk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_rmt_sclk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<RmtSclkConfig>,
+///     _new_selector: RmtSclkConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // TIMG0_FUNCTION_CLOCK
 ///
 /// fn enable_timg0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -680,6 +733,18 @@ macro_rules! define_clock_tree_types {
             /// Selects `XTAL32K_CLK`.
             Xtal32kClk,
         }
+        /// The list of clock signals that the `RMT_SCLK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum RmtSclkConfig {
+            /// Selects `XTAL_CLK`.
+            XtalClk,
+            /// Selects `RC_FAST_CLK`.
+            RcFastClk,
+            #[default]
+            /// Selects `PLL_F80M`.
+            PllF80m,
+        }
         /// The list of clock signals that the `TIMG0_FUNCTION_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -727,6 +792,7 @@ macro_rules! define_clock_tree_types {
             lp_slow_clk: Option<LpSlowClkConfig>,
             crypto_clk: Option<CryptoClkConfig>,
             timg_calibration_clock: Option<TimgCalibrationClockConfig>,
+            rmt_sclk: Option<RmtSclkConfig>,
             timg0_function_clock: Option<Timg0FunctionClockConfig>,
             timg0_wdt_clock: Option<Timg0WdtClockConfig>,
             timg1_function_clock: Option<Timg0FunctionClockConfig>,
@@ -752,6 +818,7 @@ macro_rules! define_clock_tree_types {
             lp_slow_clk_refcount: u32,
             crypto_clk_refcount: u32,
             timg_calibration_clock_refcount: u32,
+            rmt_sclk_refcount: u32,
             timg0_function_clock_refcount: u32,
             timg0_wdt_clock_refcount: u32,
             timg1_function_clock_refcount: u32,
@@ -800,6 +867,10 @@ macro_rules! define_clock_tree_types {
             pub fn timg_calibration_clock(&self) -> Option<TimgCalibrationClockConfig> {
                 self.timg_calibration_clock
             }
+            /// Returns the current configuration of the RMT_SCLK clock tree node
+            pub fn rmt_sclk(&self) -> Option<RmtSclkConfig> {
+                self.rmt_sclk
+            }
             /// Returns the current configuration of the TIMG0_FUNCTION_CLOCK clock tree node
             pub fn timg0_function_clock(&self) -> Option<Timg0FunctionClockConfig> {
                 self.timg0_function_clock
@@ -836,6 +907,7 @@ macro_rules! define_clock_tree_types {
                 lp_slow_clk: None,
                 crypto_clk: None,
                 timg_calibration_clock: None,
+                rmt_sclk: None,
                 timg0_function_clock: None,
                 timg0_wdt_clock: None,
                 timg1_function_clock: None,
@@ -861,6 +933,7 @@ macro_rules! define_clock_tree_types {
                 lp_slow_clk_refcount: 0,
                 crypto_clk_refcount: 0,
                 timg_calibration_clock_refcount: 0,
+                rmt_sclk_refcount: 0,
                 timg0_function_clock_refcount: 0,
                 timg0_wdt_clock_refcount: 0,
                 timg1_function_clock_refcount: 0,
@@ -1504,6 +1577,60 @@ macro_rules! define_clock_tree_types {
                 TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(clocks),
             }
         }
+        pub fn configure_rmt_sclk(clocks: &mut ClockTree, new_selector: RmtSclkConfig) {
+            let old_selector = clocks.rmt_sclk.replace(new_selector);
+            if clocks.rmt_sclk_refcount > 0 {
+                match new_selector {
+                    RmtSclkConfig::XtalClk => request_xtal_clk(clocks),
+                    RmtSclkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    RmtSclkConfig::PllF80m => request_pll_f80m(clocks),
+                }
+                configure_rmt_sclk_impl(clocks, old_selector, new_selector);
+                if let Some(old_selector) = old_selector {
+                    match old_selector {
+                        RmtSclkConfig::XtalClk => release_xtal_clk(clocks),
+                        RmtSclkConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        RmtSclkConfig::PllF80m => release_pll_f80m(clocks),
+                    }
+                }
+            } else {
+                configure_rmt_sclk_impl(clocks, old_selector, new_selector);
+            }
+        }
+        pub fn rmt_sclk_config(clocks: &mut ClockTree) -> Option<RmtSclkConfig> {
+            clocks.rmt_sclk
+        }
+        pub fn request_rmt_sclk(clocks: &mut ClockTree) {
+            trace!("Requesting RMT_SCLK");
+            if increment_reference_count(&mut clocks.rmt_sclk_refcount) {
+                trace!("Enabling RMT_SCLK");
+                match unwrap!(clocks.rmt_sclk) {
+                    RmtSclkConfig::XtalClk => request_xtal_clk(clocks),
+                    RmtSclkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    RmtSclkConfig::PllF80m => request_pll_f80m(clocks),
+                }
+                enable_rmt_sclk_impl(clocks, true);
+            }
+        }
+        pub fn release_rmt_sclk(clocks: &mut ClockTree) {
+            trace!("Releasing RMT_SCLK");
+            if decrement_reference_count(&mut clocks.rmt_sclk_refcount) {
+                trace!("Disabling RMT_SCLK");
+                enable_rmt_sclk_impl(clocks, false);
+                match unwrap!(clocks.rmt_sclk) {
+                    RmtSclkConfig::XtalClk => release_xtal_clk(clocks),
+                    RmtSclkConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    RmtSclkConfig::PllF80m => release_pll_f80m(clocks),
+                }
+            }
+        }
+        pub fn rmt_sclk_frequency(clocks: &mut ClockTree) -> u32 {
+            match unwrap!(clocks.rmt_sclk) {
+                RmtSclkConfig::XtalClk => xtal_clk_frequency(clocks),
+                RmtSclkConfig::RcFastClk => rc_fast_clk_frequency(clocks),
+                RmtSclkConfig::PllF80m => pll_f80m_frequency(clocks),
+            }
+        }
         pub fn configure_timg0_function_clock(
             clocks: &mut ClockTree,
             new_selector: Timg0FunctionClockConfig,
@@ -1951,6 +2078,8 @@ macro_rules! implement_peripheral_clocks {
             I2cExt0,
             /// PCNT peripheral clock signal
             Pcnt,
+            /// RMT peripheral clock signal
+            Rmt,
             /// RSA peripheral clock signal
             Rsa,
             /// SHA peripheral clock signal
@@ -1980,6 +2109,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Ecc,
                 Self::I2cExt0,
                 Self::Pcnt,
+                Self::Rmt,
                 Self::Rsa,
                 Self::Sha,
                 Self::Spi2,
@@ -2017,6 +2147,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .pcnt_conf()
                         .modify(|_, w| w.pcnt_clk_en().bit(enable));
+                }
+                Peripheral::Rmt => {
+                    crate::peripherals::SYSTEM::regs()
+                        .rmt_conf()
+                        .modify(|_, w| w.rmt_clk_en().bit(enable));
                 }
                 Peripheral::Rsa => {
                     crate::peripherals::SYSTEM::regs()
@@ -2099,6 +2234,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .pcnt_conf()
                         .modify(|_, w| w.pcnt_rst_en().bit(reset));
+                }
+                Peripheral::Rmt => {
+                    crate::peripherals::SYSTEM::regs()
+                        .rmt_conf()
+                        .modify(|_, w| w.rmt_rst_en().bit(reset));
                 }
                 Peripheral::Rsa => {
                     crate::peripherals::SYSTEM::regs()
@@ -2325,6 +2465,54 @@ macro_rules! sw_interrupt_delay {
             ::core::arch::asm!("nop");
             ::core::arch::asm!("nop");
         }
+    };
+}
+/// This macro can be used to generate code for each channel of the RMT peripheral.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has three options for its "Individual matcher" case:
+///
+/// - `all`: `($num:literal)`
+/// - `tx`: `($num:literal, $idx:literal)`
+/// - `rx`: `($num:literal, $idx:literal)`
+///
+/// Macro fragments:
+///
+/// - `$num`: number of the channel, e.g. `0`
+/// - `$idx`: index of the channel among channels of the same capability, e.g. `0`
+///
+/// Example data:
+///
+/// - `all`: `(0)`
+/// - `tx`: `(1, 1)`
+/// - `rx`: `(2, 0)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rmt_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_rmt_channel { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_rmt_channel!((0)); _for_each_inner_rmt_channel!((1));
+        _for_each_inner_rmt_channel!((2)); _for_each_inner_rmt_channel!((3));
+        _for_each_inner_rmt_channel!((0, 0)); _for_each_inner_rmt_channel!((1, 1));
+        _for_each_inner_rmt_channel!((2, 0)); _for_each_inner_rmt_channel!((3, 1));
+        _for_each_inner_rmt_channel!((all(0), (1), (2), (3)));
+        _for_each_inner_rmt_channel!((tx(0, 0), (1, 1)));
+        _for_each_inner_rmt_channel!((rx(2, 0), (3, 1)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rmt_clock_source {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_rmt_clock_source { $(($pattern) => $code;)* ($other
+        : tt) => {} } _for_each_inner_rmt_clock_source!((Xtal, 0));
+        _for_each_inner_rmt_clock_source!((RcFast, 1));
+        _for_each_inner_rmt_clock_source!((Pll80MHz, 2));
+        _for_each_inner_rmt_clock_source!((Pll80MHz));
+        _for_each_inner_rmt_clock_source!((all(Xtal, 0), (RcFast, 1), (Pll80MHz, 2)));
+        _for_each_inner_rmt_clock_source!((default(Pll80MHz)));
     };
 }
 #[macro_export]

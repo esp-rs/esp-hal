@@ -207,7 +207,13 @@ clocks = { system_clocks = { clock_tree = [
         ] },
     ] },
     { name = "Ledc" },
-    { name = "Rmt" },
+    { name = "Rmt", clocks = [
+        { name = "SCLK", type = "mux", default = "APB_CLK", variants = [
+            { name = "APB_CLK",     outputs = "APB_CLK" },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+        ] },
+    ] },
     { name = "Uhci0" },
     { name = "I2cExt0" },
     { name = "Spi2" },

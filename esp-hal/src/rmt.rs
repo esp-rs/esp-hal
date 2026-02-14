@@ -232,7 +232,7 @@ use crate::{
         interconnect::{PeripheralInput, PeripheralOutput},
     },
     peripherals::{Interrupt, RMT},
-    system::{self, GenericPeripheralGuard},
+    system::GenericPeripheralGuard,
     time::Rate,
 };
 
@@ -1113,6 +1113,48 @@ mod state {
 
 use state::RmtState;
 
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+struct RmtClockGuard;
+
+impl RmtClockGuard {
+    fn new() -> Self {
+        #[cfg(soc_has_clock_node_rmt_sclk)]
+        crate::soc::clocks::ClockTree::with(|clocks| {
+            if crate::soc::clocks::rmt_sclk_config(clocks).is_none() {
+                crate::soc::clocks::configure_rmt_sclk(clocks, ClockSource::default().into());
+            }
+
+            crate::soc::clocks::request_rmt_sclk(clocks);
+        });
+
+        Self
+    }
+}
+
+impl Drop for RmtClockGuard {
+    fn drop(&mut self) {
+        #[cfg(soc_has_clock_node_rmt_sclk)]
+        crate::soc::clocks::ClockTree::with(crate::soc::clocks::release_rmt_sclk);
+    }
+}
+
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+struct ChannelGuards {
+    _peripheral: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
+    _clock: RmtClockGuard,
+}
+
+impl ChannelGuards {
+    fn new() -> Self {
+        Self {
+            _peripheral: GenericPeripheralGuard::new(),
+            _clock: RmtClockGuard::new(),
+        }
+    }
+}
+
 /// RMT Channel
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1132,9 +1174,9 @@ where
 
     _mem_guard: MemoryGuard<Dir>,
 
-    // Only the "outermost" Channel/ChannelCreator holds the GenericPeripheralGuard, which avoids
-    // constant inc/dec of the reference count on reborrow and drop.
-    _guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
+    // Only the "outermost" Channel/ChannelCreator holds these guards, which avoids constant
+    // inc/dec of the reference counts on reborrow and drop.
+    _guard: Option<ChannelGuards>,
 }
 
 // The reborrowing API treats Channel similar to a smart pointer: Ensure that it's size is actually
@@ -1587,7 +1629,8 @@ where
     // the `Rmt` and obtaining a duplicate `ChannelCreator`.
     _rmt: PhantomData<Rmt<'ch, Dm>>,
 
-    // We need to keep the peripheral clocked since the following sequence of events is possible:
+    // We need to keep the peripheral and source clocks alive since the following sequence of
+    // events is possible:
     //
     // ```
     // let cc = {
@@ -1600,7 +1643,7 @@ where
     //
     // If there was no _guard in ChannelCreator, the peripheral would be disabled in step 3, and
     // re-enabled in step 4, losing the clock configuration that was set in step 1.
-    _guard: Option<GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>>,
+    _guard: Option<ChannelGuards>,
 }
 
 impl<'ch, Dm, const CHANNEL: u8> ChannelCreator<'ch, Dm, CHANNEL>
@@ -1610,7 +1653,7 @@ where
     fn conjure() -> Self {
         Self {
             _rmt: PhantomData,
-            _guard: Some(GenericPeripheralGuard::new()),
+            _guard: Some(ChannelGuards::new()),
         }
     }
 
@@ -1640,7 +1683,7 @@ where
     pub unsafe fn steal() -> Self {
         Self {
             _rmt: PhantomData,
-            _guard: Some(GenericPeripheralGuard::new()),
+            _guard: Some(ChannelGuards::new()),
         }
     }
 }
@@ -2205,7 +2248,11 @@ for_each_rmt_clock_source!(
                     ClockSource::Apb => Clocks::get().apb_clock,
 
                     #[cfg(rmt_supports_rcfast_clock)]
-                    ClockSource::RcFast => todo!(),
+                    ClockSource::RcFast => {
+                        Rate::from_hz(crate::soc::clocks::ClockTree::with(
+                            crate::soc::clocks::rc_fast_clk_frequency,
+                        ))
+                    }
 
                     #[cfg(rmt_supports_xtal_clock)]
                     ClockSource::Xtal => Clocks::get().xtal_clock,
@@ -2220,6 +2267,28 @@ for_each_rmt_clock_source!(
         }
     };
 );
+
+#[cfg(soc_has_clock_node_rmt_sclk)]
+impl From<ClockSource> for crate::soc::clocks::RmtSclkConfig {
+    fn from(value: ClockSource) -> Self {
+        match value {
+            #[cfg(rmt_supports_apb_clock)]
+            ClockSource::Apb => Self::ApbClk,
+
+            #[cfg(rmt_supports_rcfast_clock)]
+            ClockSource::RcFast => Self::RcFastClk,
+
+            #[cfg(rmt_supports_xtal_clock)]
+            ClockSource::Xtal => Self::XtalClk,
+
+            #[cfg(rmt_supports_pll80mhz_clock)]
+            ClockSource::Pll80MHz => Self::PllF80m,
+
+            #[cfg(rmt_supports_reftick_clock)]
+            ClockSource::RefTick => unreachable!(),
+        }
+    }
+}
 
 // Obtain maximum value for a register field from the PAC's register spec.
 macro_rules! max_from_register_spec {
@@ -2276,33 +2345,44 @@ mod chip_specific {
     }
 
     pub(super) fn configure_clock(source: ClockSource, div: u8) {
+        #[cfg(soc_has_clock_node_rmt_sclk)]
+        let _ = source;
+
         #[cfg(not(soc_has_pcr))]
-        {
-            RMT::regs().sys_conf().modify(|_, w| unsafe {
+        RMT::regs().sys_conf().modify(|_, w| unsafe {
+            #[cfg(not(soc_has_clock_node_rmt_sclk))]
+            {
                 w.clk_en().clear_bit();
                 w.sclk_sel().bits(source.bits());
-                w.sclk_div_num().bits(div);
-                w.sclk_div_a().bits(0);
-                w.sclk_div_b().bits(0);
-                w.apb_fifo_mask().set_bit()
-            });
-        }
+            }
+
+            w.sclk_div_num().bits(div);
+            w.sclk_div_a().bits(0);
+            w.sclk_div_b().bits(0);
+            w.apb_fifo_mask().set_bit()
+        });
 
         #[cfg(soc_has_pcr)]
         {
             use crate::peripherals::PCR;
 
             PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
+                #[cfg(not(soc_has_clock_node_rmt_sclk))]
                 cfg_if::cfg_if!(
                     if #[cfg(any(esp32c5, esp32c6))] {
-                        w.sclk_sel().bits(source.bits())
+                        w.sclk_sel().bits(source.bits());
                     } else {
-                        w.sclk_sel().bit(source.bit())
+                        w.sclk_sel().bit(source.bit());
                     }
                 );
+
                 w.sclk_div_num().bits(div);
                 w.sclk_div_a().bits(0);
-                w.sclk_div_b().bits(0)
+                w.sclk_div_b().bits(0);
+                #[cfg(not(soc_has_clock_node_rmt_sclk))]
+                w.sclk_en().set_bit();
+
+                w
             });
 
             RMT::regs()
@@ -2403,6 +2483,18 @@ mod chip_specific {
             } else {
                 rmt.ch_rx_conf0(ch_idx)
                     .modify(|_, w| unsafe { w.mem_size().bits(blocks) });
+            }
+        }
+
+        #[inline(always)]
+        pub fn reset_channel_clock_divider(self) {
+            #[cfg(esp32c5)]
+            {
+                let mask = 1u32 << self.channel();
+                let rmt = RMT::regs();
+
+                rmt.ref_cnt_rst().write(|w| unsafe { w.bits(mask) });
+                rmt.ref_cnt_rst().write(|w| unsafe { w.bits(0) });
             }
         }
     }
@@ -2510,6 +2602,8 @@ mod chip_specific {
         pub fn start_tx(self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
+
+            self.reset_channel_clock_divider();
 
             rmt.ch_tx_conf0(ch_idx).modify(|_, w| {
                 w.mem_rd_rst().set_bit();
@@ -2650,6 +2744,8 @@ mod chip_specific {
         pub fn start_rx(self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as u8;
+
+            self.reset_channel_clock_divider();
 
             for i in 1..self.memsize().blocks() {
                 rmt.ch_rx_conf1((ch_idx + i).into())

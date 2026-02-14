@@ -460,6 +460,28 @@ fn configure_ledc_sclk_impl(
     });
 }
 
+// RMT_SCLK
+
+fn enable_rmt_sclk_impl(_clocks: &mut ClockTree, en: bool) {
+    PCR::regs()
+        .rmt_sclk_conf()
+        .modify(|_, w| w.sclk_en().bit(en));
+}
+
+fn configure_rmt_sclk_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<RmtSclkConfig>,
+    new_selector: RmtSclkConfig,
+) {
+    PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
+        w.sclk_sel().bits(match new_selector {
+            RmtSclkConfig::PllF80m => 1,
+            RmtSclkConfig::RcFastClk => 2,
+            RmtSclkConfig::XtalClk => 3,
+        })
+    });
+}
+
 // XTAL_D2_CLK
 
 fn enable_xtal_d2_clk_impl(_clocks: &mut ClockTree, _en: bool) {

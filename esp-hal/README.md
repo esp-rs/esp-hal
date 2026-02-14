@@ -80,7 +80,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | PARL_IO            |       |          |          |          | ⚒️      | ⚒️      |          |          |
 | PCNT               | ⚒️   |          |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | PSRAM              | ⚒️   |          |          |          |          |          | ⚒️      | ⚒️      |
-| RMT                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| RMT                | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | RNG                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | RSA                | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SDIO host          | ⚒️   |          |          |          |          |          |          | ⚒️      |

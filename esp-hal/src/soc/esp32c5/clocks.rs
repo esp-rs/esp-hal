@@ -479,6 +479,33 @@ fn configure_timg_calibration_clock_impl(
     });
 }
 
+// RMT_SCLK
+
+fn enable_rmt_sclk_impl(_clocks: &mut ClockTree, en: bool) {
+    PCR::regs().rmt_pd_ctrl().modify(|_, w| {
+        w.rmt_mem_force_pu().bit(en);
+        w.rmt_mem_force_pd().bit(!en)
+    });
+
+    PCR::regs()
+        .rmt_sclk_conf()
+        .modify(|_, w| w.sclk_en().bit(en));
+}
+
+fn configure_rmt_sclk_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<RmtSclkConfig>,
+    new_selector: RmtSclkConfig,
+) {
+    PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
+        w.sclk_sel().bits(match new_selector {
+            RmtSclkConfig::XtalClk => 0,
+            RmtSclkConfig::RcFastClk => 1,
+            RmtSclkConfig::PllF80m => 2,
+        })
+    });
+}
+
 // TIMG0_FUNCTION_CLOCK
 
 fn enable_timg0_function_clock_impl(_clocks: &mut ClockTree, en: bool) {

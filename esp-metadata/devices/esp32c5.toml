@@ -238,6 +238,13 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Timg1", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup1_conf", peripheral = "tg1", peri_clk_template = "{{control}}::regs().timergroup1_timer_clk_conf().modify(|_, w| w.tg1_timer_clk_en().bit(enable));" }, clocks = "Timg0" },
     { name = "I2cExt0", template_params = { peripheral = "i2c0" } },
     { name = "Pcnt" },
+    { name = "Rmt", clocks = [
+        { name = "SCLK", type = "mux", default = "PLL_F80M", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "PLL_F80M",    outputs = "PLL_F80M" },
+        ] },
+    ] },
     { name = "Systimer", keep_enabled = true }, # can be clocked from XTAL_CLK or RC_FAST_CLK, the latter has no divider?
     { name = "Dma", template_params = { peripheral = "gdma" } },
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
@@ -512,6 +519,21 @@ status_registers = 3
 software_interrupt_count = 4
 software_interrupt_delay = 24 # CPU speed dependent
 controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 } }
+
+[device.rmt]
+support_status = "partial"
+ram_start = 0x60006400
+channel_ram_size = 48
+channels = ["Tx", "Tx", "Rx", "Rx"]
+has_tx_immediate_stop = true
+has_tx_loop_count = true
+has_tx_loop_auto_stop = true
+has_tx_carrier_data_only = true
+has_tx_sync = true
+has_rx_wrap = true
+has_rx_demodulation = true
+clock_sources.supported = ["Xtal", "RcFast", "Pll80MHz"]
+clock_sources.default = "Pll80MHz"
 
 [device.spi_master]
 support_status = "supported"
