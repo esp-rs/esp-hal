@@ -320,6 +320,10 @@ separate_in_out_interrupts = true
 supports_mem2mem = true
 max_priority = 9
 
+[device.ecc]
+support_status = "partial"
+working_modes = 8
+
 [device.gpio]
 support_status = "supported"
 gpio_function = 1
@@ -704,7 +708,6 @@ deep_sleep = true
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
-[device.ecc]
 [device.hmac]
 
 ## Interfaces

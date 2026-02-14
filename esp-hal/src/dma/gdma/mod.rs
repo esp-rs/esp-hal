@@ -30,7 +30,7 @@ pub struct AnyGdmaChannel<'d> {
 }
 
 impl AnyGdmaChannel<'_> {
-    #[cfg_attr(any(esp32c2, esp32c5), expect(unused))]
+    #[cfg_attr(esp32c2, expect(unused))]
     pub(crate) unsafe fn clone_unchecked(&self) -> Self {
         Self {
             channel: self.channel,

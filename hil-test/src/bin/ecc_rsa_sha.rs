@@ -20,7 +20,7 @@ mod ecc_tests {
         modular::runtime_mod::{DynResidue, DynResidueParams},
     };
     use elliptic_curve::sec1::ToEncodedPoint;
-    #[cfg(esp32h2)]
+    #[cfg(ecc_working_modes = "11")]
     use esp_hal::ecc::WorkMode;
     #[cfg(rng_trng_supported)]
     use esp_hal::rng::TrngSource;
@@ -237,12 +237,14 @@ mod ecc_tests {
             let (k, px) = t1.split_at_mut(prime_field.len());
             let (px, py) = px.split_at_mut(prime_field.len());
             let (py, _) = py.split_at_mut(prime_field.len());
-            #[cfg(esp32h2)]
-            let qx = &mut [0u8; 8];
-            #[cfg(esp32h2)]
-            let qy = &mut [0u8; 8];
-            #[cfg(esp32h2)]
-            let qz = &mut [0u8; 8];
+            cfg_if::cfg_if! {
+                if #[cfg(ecc_working_modes = "11")] {
+                    let qx = &mut [0u8; 8];
+                    let qy = &mut [0u8; 8];
+                    let qz = &mut [0u8; 8];
+                }
+            }
+
             for _ in 0..TEST_PARAMS_VECTOR.nb_loop_mul {
                 loop {
                     rng.read(k);
@@ -286,11 +288,11 @@ mod ecc_tests {
                     _ => unimplemented!(),
                 };
 
-                #[cfg(not(esp32h2))]
+                #[cfg(not(ecc_working_modes = "11"))]
                 let result = ctx
                     .ecc
                     .affine_point_verification_multiplication(curve, k, px, py);
-                #[cfg(esp32h2)]
+                #[cfg(ecc_working_modes = "11")]
                 let result = ctx
                     .ecc
                     .affine_point_verification_multiplication(curve, k, px, py, qx, qy, qz);
@@ -693,7 +695,7 @@ mod ecc_tests {
     }
 
     #[test]
-    #[cfg(feature = "esp32c2")]
+    #[cfg(ecc_working_modes = "7")]
     fn test_ecc_finite_field_division(mut ctx: Context<'static>) {
         let rng = Rng::new();
         for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
@@ -757,7 +759,7 @@ mod ecc_tests {
     }
 
     #[test]
-    #[cfg(feature = "esp32h2")]
+    #[cfg(ecc_working_modes = "11")]
     fn test_ecc_point_addition_256(mut ctx: Context<'static>) {
         const ECC_256_X: [u8; 32] = [
             0x96, 0xC2, 0x98, 0xD8, 0x45, 0x39, 0xA1, 0xF4, 0xA0, 0x33, 0xEB, 0x2D, 0x81, 0x7D,
@@ -815,7 +817,7 @@ mod ecc_tests {
     }
 
     #[test]
-    #[cfg(feature = "esp32h2")]
+    #[cfg(ecc_working_modes = "11")]
     fn test_ecc_point_addition_192(mut ctx: Context<'static>) {
         const ECC_192_X: [u8; 24] = [
             0x12, 0x10, 0xFF, 0x82, 0xFD, 0x0A, 0xFF, 0xF4, 0x00, 0x88, 0xA1, 0x43, 0xEB, 0x20,
@@ -867,7 +869,7 @@ mod ecc_tests {
     }
 
     #[test]
-    #[cfg(esp32h2)]
+    #[cfg(ecc_working_modes = "11")]
     fn test_ecc_mod_operations_256(mut ctx: Context<'static>) {
         const ECC_256_X: [u8; 32] = [
             0x96, 0xC2, 0x98, 0xD8, 0x45, 0x39, 0xA1, 0xF4, 0xA0, 0x33, 0xEB, 0x2D, 0x81, 0x7D,
@@ -968,7 +970,7 @@ mod ecc_tests {
     }
 
     #[test]
-    #[cfg(esp32h2)]
+    #[cfg(ecc_working_modes = "11")]
     fn test_ecc_mod_operations_192(mut ctx: Context<'static>) {
         const ECC_192_X: [u8; 24] = [
             0x1A, 0x80, 0xA1, 0x5F, 0x1F, 0xB7, 0x59, 0x1B, 0x9F, 0xD7, 0xFB, 0xAE, 0xA9, 0xF9,
