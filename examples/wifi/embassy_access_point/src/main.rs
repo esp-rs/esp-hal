@@ -34,7 +34,12 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_radio::wifi::{Config, Interface, WifiController, ap::AccessPointConfig};
+use esp_radio::wifi::{
+    Config,
+    Interface,
+    WifiController,
+    ap::AccessPointConfig,
+};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -89,9 +94,8 @@ async fn main(spawner: Spawner) -> ! {
     );
 
     let station_config = Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio"));
-    controller.set_config(&station_config).unwrap();
     println!("Starting wifi");
-    controller.start_async().await.unwrap();
+    controller.set_config(&station_config).unwrap();
     println!("Wifi started!");
 
     spawner.spawn(connection(controller)).ok();
