@@ -2345,61 +2345,41 @@ mod chip_specific {
         #[cfg(soc_has_clock_node_rmt_sclk)]
         let _ = source;
 
-        #[cfg(all(not(soc_has_pcr), not(soc_has_clock_node_rmt_sclk)))]
+        #[cfg(not(soc_has_pcr))]
         RMT::regs().sys_conf().modify(|_, w| unsafe {
-            w.clk_en().clear_bit();
-            w.sclk_sel().bits(source.bits());
+            #[cfg(not(soc_has_clock_node_rmt_sclk))]
+            {
+                w.clk_en().clear_bit();
+                w.sclk_sel().bits(source.bits());
+            }
+
             w.sclk_div_num().bits(div);
             w.sclk_div_a().bits(0);
             w.sclk_div_b().bits(0);
             w.apb_fifo_mask().set_bit()
         });
 
-        #[cfg(all(not(soc_has_pcr), soc_has_clock_node_rmt_sclk))]
-        RMT::regs().sys_conf().modify(|_, w| unsafe {
-            w.sclk_div_num().bits(div);
-            w.sclk_div_a().bits(0);
-            w.sclk_div_b().bits(0);
-            w.apb_fifo_mask().set_bit()
-        });
-
-        #[cfg(all(soc_has_pcr, not(soc_has_clock_node_rmt_sclk)))]
+        #[cfg(soc_has_pcr)]
         {
             use crate::peripherals::PCR;
 
-            #[cfg(esp32c5)]
-            PCR::regs().rmt_pd_ctrl().modify(|_, w| {
-                w.rmt_mem_force_pu().set_bit();
-                w.rmt_mem_force_pd().clear_bit()
-            });
-
             PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
+                #[cfg(not(soc_has_clock_node_rmt_sclk))]
                 cfg_if::cfg_if!(
                     if #[cfg(any(esp32c5, esp32c6))] {
-                        w.sclk_sel().bits(source.bits())
+                        w.sclk_sel().bits(source.bits());
                     } else {
-                        w.sclk_sel().bit(source.bit())
+                        w.sclk_sel().bit(source.bit());
                     }
                 );
+
                 w.sclk_div_num().bits(div);
                 w.sclk_div_a().bits(0);
                 w.sclk_div_b().bits(0);
-                w.sclk_en().set_bit()
-            });
+                #[cfg(not(soc_has_clock_node_rmt_sclk))]
+                w.sclk_en().set_bit();
 
-            RMT::regs()
-                .sys_conf()
-                .modify(|_, w| w.apb_fifo_mask().set_bit());
-        }
-
-        #[cfg(all(soc_has_pcr, soc_has_clock_node_rmt_sclk))]
-        {
-            use crate::peripherals::PCR;
-
-            PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
-                w.sclk_div_num().bits(div);
-                w.sclk_div_a().bits(0);
-                w.sclk_div_b().bits(0)
+                w
             });
 
             RMT::regs()

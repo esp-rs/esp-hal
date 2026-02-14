@@ -482,9 +482,10 @@ fn configure_timg_calibration_clock_impl(
 // RMT_SCLK
 
 fn enable_rmt_sclk_impl(_clocks: &mut ClockTree, en: bool) {
-    PCR::regs()
-        .rmt_pd_ctrl()
-        .modify(|_, w| w.rmt_mem_force_pu().bit(en).rmt_mem_force_pd().bit(!en));
+    PCR::regs().rmt_pd_ctrl().modify(|_, w| {
+        w.rmt_mem_force_pu().bit(en);
+        w.rmt_mem_force_pd().bit(!en)
+    });
 
     PCR::regs()
         .rmt_sclk_conf()

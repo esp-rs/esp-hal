@@ -723,9 +723,10 @@ fn enable_uart_mem_clk_impl(_clocks: &mut ClockTree, en: bool) {
 
 // RMT_SCLK
 
-fn enable_rmt_sclk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // This node has no dedicated local gate on ESP32-S3.
-    // Source clock ownership is handled by request_rmt_sclk/release_rmt_sclk.
+fn enable_rmt_sclk_impl(_clocks: &mut ClockTree, en: bool) {
+    crate::peripherals::RMT::regs()
+        .sys_conf()
+        .modify(|_, w| w.sclk_active().bit(en));
 }
 
 fn configure_rmt_sclk_impl(
