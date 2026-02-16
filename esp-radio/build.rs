@@ -7,18 +7,7 @@ use std::{
 };
 
 use esp_config::{Value, generate_config_from_yaml_definition};
-use esp_metadata_generated::Chip;
-
-#[macro_export]
-macro_rules! assert_unique_features {
-    ($($feature:literal),+ $(,)?) => {
-        assert!(
-            (0 $(+ cfg!(feature = $feature) as usize)+ ) <= 1,
-            "Exactly zero or one of the following features must be enabled: {}",
-            [$($feature),+].join(", ")
-        );
-    };
-}
+use esp_metadata_generated::{Chip, assert_unique_features};
 
 fn main() -> Result<(), Box<dyn Error>> {
     // if using '"rust-analyzer.cargo.buildScripts.useRustcWrapper": true' we can detect this

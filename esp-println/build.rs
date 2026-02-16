@@ -1,27 +1,7 @@
 use std::{env, path::Path};
 
+use esp_metadata_generated::assert_unique_used_features;
 use log_04::LevelFilter;
-
-#[macro_export]
-macro_rules! assert_unique_used_features {
-    ($($feature:literal),+ $(,)?) => {{
-        let enabled: Vec<&str> = vec![
-            $(
-                if cfg!(feature = $feature) { Some($feature) } else { None },
-            )+
-        ]
-        .into_iter()
-        .flatten()
-        .collect();
-
-        assert!(
-            enabled.len() == 1,
-            "Exactly one feature must be enabled among: {}.\nCurrently enabled: {}",
-            [$($feature),+].join(", "),
-            if enabled.is_empty() { "none".to_string() } else { enabled.join(", ") }
-        );
-    }};
-}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Ensure that only a single communication method is specified
