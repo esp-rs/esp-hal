@@ -386,4 +386,60 @@ mod tests {
 
         assert_ne!(data, [0u8; 22]);
     }
+
+    #[test]
+    #[cfg(all(multi_core, feature = "embassy"))]
+    async fn async_operation_on_different_core(ctx: Context) {
+        use embassy_sync::signal::Signal;
+        use esp_hal::{
+            Async,
+            interrupt::software::SoftwareInterrupt,
+            system::{Cpu, Stack},
+        };
+        use esp_sync::RawMutex;
+        use hil_test::Executor;
+        use static_cell::StaticCell;
+
+        static SIGNAL: Signal<RawMutex, [u8; 22]> = Signal::new();
+
+        static mut APP_CORE_STACK: Stack<8192> = Stack::new();
+
+        #[embassy_executor::task]
+        async fn i2c_task(mut i2c: I2c<'static, Async>) {
+            let mut read_data: [u8; 22] = [0x00u8; 22];
+
+            i2c.write_read_async(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
+                .await
+                .unwrap();
+
+            SIGNAL.signal(read_data);
+        }
+
+        let cpu_cntl = unsafe { esp_hal::peripherals::CPU_CTRL::steal() };
+
+        // Create async SPI on the first core. This will register its interrupt handler there.
+        let i2c = ctx.i2c.into_async();
+        esp_rtos::start_second_core(
+            unsafe { cpu_cntl.clone_unchecked() },
+            unsafe { SoftwareInterrupt::<1>::steal() },
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut APP_CORE_STACK
+            },
+            move || {
+                static CORE1_EXECUTOR: StaticCell<Executor> = StaticCell::new();
+                let executor = CORE1_EXECUTOR.init(Executor::new());
+                executor.run(|spawner| {
+                    spawner.must_spawn(i2c_task(i2c));
+                });
+            },
+        );
+
+        let result = SIGNAL.wait().await;
+
+        assert_ne!(result, [0; 22]);
+
+        // Park the second core, we don't need it anymore
+        unsafe { esp_hal::system::CpuControl::new(cpu_cntl).park_core(Cpu::AppCpu) };
+    }
 }
