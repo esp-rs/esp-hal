@@ -282,3 +282,126 @@ impl Iterator for InterruptStatusIterator {
         None
     }
 }
+
+// Peripheral interrupt API.
+
+use crate::{peripherals::Interrupt, system::Cpu};
+
+cfg_if::cfg_if! {
+    if #[cfg(esp32)] {
+        use crate::peripherals::DPORT as INTERRUPT_CORE0;
+        use crate::peripherals::DPORT as INTERRUPT_CORE1;
+    } else {
+        use crate::peripherals::INTERRUPT_CORE0;
+        #[cfg(multi_core)]
+        use crate::peripherals::INTERRUPT_CORE1;
+    }
+}
+
+pub(crate) fn setup_interrupts() {
+    // disable all known peripheral interrupts
+    for peripheral_interrupt in 0..255 {
+        crate::peripherals::Interrupt::try_from(peripheral_interrupt)
+            .map(|intr| {
+                #[cfg(multi_core)]
+                disable(Cpu::AppCpu, intr);
+                disable(Cpu::ProCpu, intr);
+            })
+            .ok();
+    }
+}
+
+/// Assign a peripheral interrupt to a CPU interrupt.
+pub(crate) fn map(core: Cpu, interrupt: Interrupt, cpu_interrupt: CpuInterrupt) {
+    map_raw(core, interrupt, cpu_interrupt as u32)
+}
+
+/// Disable the given peripheral interrupt.
+#[inline]
+pub fn disable(core: Cpu, interrupt: Interrupt) {
+    map_raw(core, interrupt, DISABLED_CPU_INTERRUPT)
+}
+
+pub(super) fn map_raw(core: Cpu, interrupt: Interrupt, cpu_interrupt: u32) {
+    match core {
+        Cpu::ProCpu => {
+            INTERRUPT_CORE0::regs()
+                .core_0_intr_map(interrupt as usize)
+                .write(|w| unsafe { w.bits(cpu_interrupt) });
+        }
+        #[cfg(multi_core)]
+        Cpu::AppCpu => {
+            INTERRUPT_CORE1::regs()
+                .core_1_intr_map(interrupt as usize)
+                .write(|w| unsafe { w.bits(cpu_interrupt) });
+        }
+    }
+}
+
+/// Get cpu interrupt assigned to peripheral interrupt
+pub(crate) fn mapped_to(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
+    mapped_to_raw(cpu, interrupt as u32)
+}
+
+pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
+    let cpu_intr = match cpu {
+        Cpu::ProCpu => INTERRUPT_CORE0::regs()
+            .core_0_intr_map(interrupt as usize)
+            .read()
+            .bits(),
+        #[cfg(multi_core)]
+        Cpu::AppCpu => INTERRUPT_CORE1::regs()
+            .core_1_intr_map(interrupt as usize)
+            .read()
+            .bits(),
+    };
+    let cpu_intr = CpuInterrupt::from_u32(cpu_intr)?;
+
+    if cpu_intr.is_mappable() {
+        Some(cpu_intr)
+    } else {
+        None
+    }
+}
+
+/// Get the vectored peripheral interrupts configured for the core at the given priority
+/// matching the given status.
+#[inline]
+pub(crate) fn configured_interrupts(status: InterruptStatus, level: u32) -> InterruptStatus {
+    let core = Cpu::current();
+    let mut res = InterruptStatus::empty();
+
+    for interrupt_nr in status.iterator() {
+        if let Some(cpu_interrupt) = crate::interrupt::mapped_to_raw(core, interrupt_nr as u32)
+            && cpu_interrupt.is_vectored()
+            && cpu_interrupt.level() as u32 == level
+        {
+            res.set(interrupt_nr);
+        }
+    }
+    res
+}
+
+/// Get status of peripheral interrupts
+#[inline]
+pub fn status(core: Cpu) -> InterruptStatus {
+    match core {
+        Cpu::ProCpu => InterruptStatus::from(
+            INTERRUPT_CORE0::regs().core_0_intr_status(0).read().bits(),
+            INTERRUPT_CORE0::regs().core_0_intr_status(1).read().bits(),
+            #[cfg(any(interrupts_status_registers = "3", interrupts_status_registers = "4"))]
+            INTERRUPT_CORE0::regs().core_0_intr_status(2).read().bits(),
+            #[cfg(interrupts_status_registers = "4")]
+            INTERRUPT_CORE0::regs().core_0_intr_status(3).read().bits(),
+        ),
+        #[cfg(multi_core)]
+        Cpu::AppCpu => InterruptStatus::from(
+            INTERRUPT_CORE1::regs().core_1_intr_status(0).read().bits(),
+            INTERRUPT_CORE1::regs().core_1_intr_status(1).read().bits(),
+            #[cfg(any(interrupts_status_registers = "3", interrupts_status_registers = "4"))]
+            INTERRUPT_CORE1::regs().core_1_intr_status(2).read().bits(),
+            #[cfg(interrupts_status_registers = "4")]
+            INTERRUPT_CORE1::regs().core_1_intr_status(3).read().bits(),
+        ),
+    }
+}

@@ -103,7 +103,7 @@ pub(crate) fn bind_default_interrupt_handler() {
     // The vector table doesn't contain a custom entry. Still, the
     // peripheral interrupt may already be bound to something else.
     for cpu in cores() {
-        if interrupt::bound_cpu_interrupt_for(cpu, Interrupt::GPIO).is_some() {
+        if interrupt::mapped_to(cpu, Interrupt::GPIO).is_some() {
             info!("Not using default GPIO interrupt handler: peripheral interrupt already in use");
             return;
         }

@@ -96,7 +96,7 @@ pub enum CpuInterrupt {
 }
 
 impl CpuInterrupt {
-    fn from_u32(n: u32) -> Option<Self> {
+    pub(super) fn from_u32(n: u32) -> Option<Self> {
         if n < 32 {
             Some(unsafe { core::mem::transmute::<u32, Self>(n) })
         } else {
@@ -116,74 +116,12 @@ impl CpuInterrupt {
         )
     }
 
-    fn is_peripheral(self) -> bool {
+    pub(super) fn is_mappable(self) -> bool {
         !self.is_internal()
     }
 }
 
-pub(crate) fn setup_interrupts() {
-    // disable all known interrupts
-    // at least after the 2nd stage bootloader there are some interrupts enabled
-    // (e.g. UART)
-    for peripheral_interrupt in 0..255 {
-        Interrupt::try_from(peripheral_interrupt)
-            .map(|intr| {
-                #[cfg(multi_core)]
-                disable(Cpu::AppCpu, intr);
-                disable(Cpu::ProCpu, intr);
-            })
-            .ok();
-    }
-}
-
-/// Assign a peripheral interrupt to an CPU interrupt
-///
-/// Note: this only maps the interrupt to the CPU interrupt. The CPU interrupt
-/// still needs to be enabled afterwards.
-fn map(cpu: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
-    let interrupt_number = interrupt as usize;
-    let cpu_interrupt_number = which as u32;
-    match cpu {
-        Cpu::ProCpu => {
-            INTERRUPT_CORE0::regs()
-                .core_0_intr_map(interrupt_number)
-                .write(|w| unsafe { w.bits(cpu_interrupt_number) });
-        }
-        #[cfg(multi_core)]
-        Cpu::AppCpu => {
-            INTERRUPT_CORE1::regs()
-                .core_1_intr_map(interrupt_number)
-                .write(|w| unsafe { w.bits(cpu_interrupt_number) });
-        }
-    }
-}
-
-/// Get cpu interrupt assigned to peripheral interrupt
-pub(crate) fn bound_cpu_interrupt_for(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
-    let cpu_intr = match cpu {
-        Cpu::ProCpu => INTERRUPT_CORE0::regs()
-            .core_0_intr_map(interrupt as usize)
-            .read()
-            .bits(),
-        #[cfg(multi_core)]
-        Cpu::AppCpu => INTERRUPT_CORE1::regs()
-            .core_1_intr_map(interrupt as usize)
-            .read()
-            .bits(),
-    };
-    let cpu_intr = CpuInterrupt::from_u32(cpu_intr)?;
-
-    if cpu_intr.is_peripheral() {
-        Some(cpu_intr)
-    } else {
-        None
-    }
-}
-
-/// Disable the given peripheral interrupt
-pub fn disable(core: Cpu, interrupt: Interrupt) {
-    map(core, interrupt, CpuInterrupt::Interrupt16Timer2Priority5);
-}
+pub(super) const DISABLED_CPU_INTERRUPT: u32 = CpuInterrupt::Interrupt16Timer2Priority5 as u32;
 
 /// Clear the given CPU interrupt
 pub fn clear(_core: Cpu, which: CpuInterrupt) {
@@ -192,25 +130,12 @@ pub fn clear(_core: Cpu, which: CpuInterrupt) {
     }
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(esp32)] {
-        use crate::peripherals::DPORT as INTERRUPT_CORE0;
-        use crate::peripherals::DPORT as INTERRUPT_CORE1;
-    } else {
-        use crate::peripherals::INTERRUPT_CORE0;
-        #[cfg(esp32s3)]
-        use crate::peripherals::INTERRUPT_CORE1;
-    }
-}
-
 /// Get the current run level (the level below which interrupts are masked).
 pub fn current_runlevel() -> Priority {
     let ps: u32;
     unsafe { core::arch::asm!("rsr.ps {0}", out(reg) ps) };
 
-    let prev_interrupt_priority = ps as u8 & 0x0F;
-
-    unwrap!(Priority::try_from(prev_interrupt_priority))
+    unwrap!(Priority::try_from(ps & 0x0F))
 }
 
 /// Changes the current run level (the level below which interrupts are
@@ -232,9 +157,7 @@ pub(crate) unsafe fn change_current_runlevel(level: Priority) -> Priority {
         };
     }
 
-    let prev_interrupt_priority = token as u8 & 0x0F;
-
-    unwrap!(Priority::try_from(prev_interrupt_priority))
+    unwrap!(Priority::try_from(token & 0x0F))
 }
 
 /// Wait for an interrupt to occur.
@@ -301,7 +224,7 @@ mod vectored {
 
     impl CpuInterrupt {
         #[inline]
-        fn level(&self) -> Priority {
+        pub(crate) fn level(&self) -> Priority {
             match self {
                 CpuInterrupt::Interrupt0LevelPriority1
                 | CpuInterrupt::Interrupt1LevelPriority1
@@ -342,37 +265,11 @@ mod vectored {
                 | CpuInterrupt::Interrupt14NmiPriority7 => Priority::None,
             }
         }
-    }
 
-    /// Get the interrupts configured for the core
-    #[inline(always)]
-    pub(crate) fn configured_interrupts(
-        core: Cpu,
-        status: InterruptStatus,
-        level: u32,
-    ) -> InterruptStatus {
-        unsafe {
-            let intr_map_base = match core {
-                Cpu::ProCpu => INTERRUPT_CORE0::regs().core_0_intr_map(0).as_ptr(),
-                #[cfg(multi_core)]
-                Cpu::AppCpu => INTERRUPT_CORE1::regs().core_1_intr_map(0).as_ptr(),
-            };
-
-            let mut res = InterruptStatus::empty();
-
-            for interrupt_nr in status.iterator() {
-                let i = interrupt_nr as isize;
-                let cpu_interrupt = intr_map_base.offset(i).read_volatile();
-                // safety: cast is safe because of repr(u32)
-                let cpu_interrupt = core::mem::transmute::<u32, CpuInterrupt>(cpu_interrupt);
-                let int_level = cpu_interrupt.level() as u32;
-
-                if int_level == level {
-                    res.set(interrupt_nr);
-                }
-            }
-
-            res
+        #[inline]
+        pub(crate) fn is_vectored(self) -> bool {
+            // Even "direct bound" interrupts go through the vectored interrupt handler
+            true
         }
     }
 
@@ -389,7 +286,7 @@ mod vectored {
         let cpu_interrupt =
             interrupt_level_to_cpu_interrupt(level, EDGE_INTERRUPTS.contains(&interrupt))?;
 
-        map(cpu, interrupt, cpu_interrupt);
+        crate::interrupt::map(cpu, interrupt, cpu_interrupt);
 
         unsafe {
             xtensa_lx::interrupt::enable_mask(1 << cpu_interrupt as u32);
@@ -590,7 +487,7 @@ mod rt {
                 InterruptStatus::current()
             };
 
-            let configured_interrupts = configured_interrupts(core, status, LEVEL);
+            let configured_interrupts = crate::interrupt::configured_interrupts(status, LEVEL);
             for interrupt_nr in configured_interrupts.iterator() {
                 let handler = unsafe { pac::__INTERRUPTS[interrupt_nr as usize]._handler };
                 let handler: fn(&mut Context) = unsafe {
