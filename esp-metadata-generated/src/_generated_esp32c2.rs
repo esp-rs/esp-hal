@@ -36,26 +36,23 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf"
     };
-    ("soc.cpu_has_branch_predictor") => {
-        false
-    };
-    ("soc.cpu_has_csr_pc") => {
-        true
-    };
-    ("soc.multi_core_enabled") => {
-        false
-    };
-    ("soc.rc_fast_clk_default") => {
-        17500000
-    };
-    ("soc.rc_fast_clk_default", str) => {
-        stringify!(17500000)
-    };
     ("assist_debug.has_sp_monitor") => {
         true
     };
     ("assist_debug.has_region_monitor") => {
         false
+    };
+    ("bt.controller") => {
+        "npl"
+    };
+    ("dedicated_gpio.needs_initialization") => {
+        false
+    };
+    ("dedicated_gpio.channel_count") => {
+        8
+    };
+    ("dedicated_gpio.channel_count", str) => {
+        stringify!(8)
     };
     ("dma.kind") => {
         "gdma"
@@ -120,15 +117,6 @@ macro_rules! property {
     ("gpio.output_signal_max", str) => {
         stringify!(128)
     };
-    ("dedicated_gpio.needs_initialization") => {
-        false
-    };
-    ("dedicated_gpio.channel_count") => {
-        8
-    };
-    ("dedicated_gpio.channel_count", str) => {
-        stringify!(8)
-    };
     ("i2c_master.has_fsm_timeouts") => {
         true
     };
@@ -186,6 +174,9 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
+    ("phy.combo_module") => {
+        true
+    };
     ("rng.apb_cycle_wait_num") => {
         16
     };
@@ -195,14 +186,29 @@ macro_rules! property {
     ("rng.trng_supported") => {
         true
     };
+    ("sha.dma") => {
+        true
+    };
     ("sleep.light_sleep") => {
         true
     };
     ("sleep.deep_sleep") => {
         true
     };
-    ("sha.dma") => {
+    ("soc.cpu_has_branch_predictor") => {
+        false
+    };
+    ("soc.cpu_has_csr_pc") => {
         true
+    };
+    ("soc.multi_core_enabled") => {
+        false
+    };
+    ("soc.rc_fast_clk_default") => {
+        17500000
+    };
+    ("soc.rc_fast_clk_default", str) => {
+        stringify!(17500000)
     };
     ("spi_master.supports_dma") => {
         true
@@ -240,11 +246,143 @@ macro_rules! property {
     ("wifi.has_wifi6") => {
         false
     };
-    ("bt.controller") => {
-        "npl"
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_dedicated_gpio {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_dedicated_gpio { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_dedicated_gpio!((0));
+        _for_each_inner_dedicated_gpio!((1)); _for_each_inner_dedicated_gpio!((2));
+        _for_each_inner_dedicated_gpio!((3)); _for_each_inner_dedicated_gpio!((4));
+        _for_each_inner_dedicated_gpio!((5)); _for_each_inner_dedicated_gpio!((6));
+        _for_each_inner_dedicated_gpio!((7)); _for_each_inner_dedicated_gpio!((0, 0,
+        CPU_GPIO_0)); _for_each_inner_dedicated_gpio!((0, 1, CPU_GPIO_1));
+        _for_each_inner_dedicated_gpio!((0, 2, CPU_GPIO_2));
+        _for_each_inner_dedicated_gpio!((0, 3, CPU_GPIO_3));
+        _for_each_inner_dedicated_gpio!((0, 4, CPU_GPIO_4));
+        _for_each_inner_dedicated_gpio!((0, 5, CPU_GPIO_5));
+        _for_each_inner_dedicated_gpio!((0, 6, CPU_GPIO_6));
+        _for_each_inner_dedicated_gpio!((0, 7, CPU_GPIO_7));
+        _for_each_inner_dedicated_gpio!((channels(0), (1), (2), (3), (4), (5), (6),
+        (7))); _for_each_inner_dedicated_gpio!((signals(0, 0, CPU_GPIO_0), (0, 1,
+        CPU_GPIO_1), (0, 2, CPU_GPIO_2), (0, 3, CPU_GPIO_3), (0, 4, CPU_GPIO_4), (0, 5,
+        CPU_GPIO_5), (0, 6, CPU_GPIO_6), (0, 7, CPU_GPIO_7)));
     };
-    ("phy.combo_module") => {
-        true
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_interrupt {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_interrupt { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_interrupt!(([disabled 0] 0));
+        _for_each_inner_interrupt!(([direct_bindable 0] 1));
+        _for_each_inner_interrupt!(([direct_bindable 1] 2));
+        _for_each_inner_interrupt!(([direct_bindable 2] 3));
+        _for_each_inner_interrupt!(([direct_bindable 3] 4));
+        _for_each_inner_interrupt!(([direct_bindable 4] 5));
+        _for_each_inner_interrupt!(([direct_bindable 5] 6));
+        _for_each_inner_interrupt!(([direct_bindable 6] 7));
+        _for_each_inner_interrupt!(([direct_bindable 7] 8));
+        _for_each_inner_interrupt!(([direct_bindable 8] 9));
+        _for_each_inner_interrupt!(([direct_bindable 9] 10));
+        _for_each_inner_interrupt!(([direct_bindable 10] 11));
+        _for_each_inner_interrupt!(([direct_bindable 11] 12));
+        _for_each_inner_interrupt!(([direct_bindable 12] 13));
+        _for_each_inner_interrupt!(([direct_bindable 13] 14));
+        _for_each_inner_interrupt!(([direct_bindable 14] 15));
+        _for_each_inner_interrupt!(([direct_bindable 15] 16));
+        _for_each_inner_interrupt!(([vector 0] 17)); _for_each_inner_interrupt!(([vector
+        1] 18)); _for_each_inner_interrupt!(([vector 2] 19));
+        _for_each_inner_interrupt!(([vector 3] 20)); _for_each_inner_interrupt!(([vector
+        4] 21)); _for_each_inner_interrupt!(([vector 5] 22));
+        _for_each_inner_interrupt!(([vector 6] 23)); _for_each_inner_interrupt!(([vector
+        7] 24)); _for_each_inner_interrupt!(([vector 8] 25));
+        _for_each_inner_interrupt!(([vector 9] 26)); _for_each_inner_interrupt!(([vector
+        10] 27)); _for_each_inner_interrupt!(([vector 11] 28));
+        _for_each_inner_interrupt!(([vector 12] 29)); _for_each_inner_interrupt!(([vector
+        13] 30)); _for_each_inner_interrupt!(([vector 14] 31));
+        _for_each_inner_interrupt!((all([disabled 0] 0), ([direct_bindable 0] 1),
+        ([direct_bindable 1] 2), ([direct_bindable 2] 3), ([direct_bindable 3] 4),
+        ([direct_bindable 4] 5), ([direct_bindable 5] 6), ([direct_bindable 6] 7),
+        ([direct_bindable 7] 8), ([direct_bindable 8] 9), ([direct_bindable 9] 10),
+        ([direct_bindable 10] 11), ([direct_bindable 11] 12), ([direct_bindable 12] 13),
+        ([direct_bindable 13] 14), ([direct_bindable 14] 15), ([direct_bindable 15] 16),
+        ([vector 0] 17), ([vector 1] 18), ([vector 2] 19), ([vector 3] 20), ([vector 4]
+        21), ([vector 5] 22), ([vector 6] 23), ([vector 7] 24), ([vector 8] 25), ([vector
+        9] 26), ([vector 10] 27), ([vector 11] 28), ([vector 12] 29), ([vector 13] 30),
+        ([vector 14] 31)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_interrupt_priority {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_interrupt_priority { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_interrupt_priority!((0, 1, Priority1));
+        _for_each_inner_interrupt_priority!((1, 2, Priority2));
+        _for_each_inner_interrupt_priority!((2, 3, Priority3));
+        _for_each_inner_interrupt_priority!((3, 4, Priority4));
+        _for_each_inner_interrupt_priority!((4, 5, Priority5));
+        _for_each_inner_interrupt_priority!((5, 6, Priority6));
+        _for_each_inner_interrupt_priority!((6, 7, Priority7));
+        _for_each_inner_interrupt_priority!((7, 8, Priority8));
+        _for_each_inner_interrupt_priority!((8, 9, Priority9));
+        _for_each_inner_interrupt_priority!((9, 10, Priority10));
+        _for_each_inner_interrupt_priority!((10, 11, Priority11));
+        _for_each_inner_interrupt_priority!((11, 12, Priority12));
+        _for_each_inner_interrupt_priority!((12, 13, Priority13));
+        _for_each_inner_interrupt_priority!((13, 14, Priority14));
+        _for_each_inner_interrupt_priority!((14, 15, Priority15));
+        _for_each_inner_interrupt_priority!((all(0, 1, Priority1), (1, 2, Priority2), (2,
+        3, Priority3), (3, 4, Priority4), (4, 5, Priority5), (5, 6, Priority6), (6, 7,
+        Priority7), (7, 8, Priority8), (8, 9, Priority9), (9, 10, Priority10), (10, 11,
+        Priority11), (11, 12, Priority12), (12, 13, Priority13), (13, 14, Priority14),
+        (14, 15, Priority15)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sw_interrupt {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sw_interrupt { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_sw_interrupt!((0, FROM_CPU_INTR0,
+        software_interrupt0)); _for_each_inner_sw_interrupt!((1, FROM_CPU_INTR1,
+        software_interrupt1)); _for_each_inner_sw_interrupt!((2, FROM_CPU_INTR2,
+        software_interrupt2)); _for_each_inner_sw_interrupt!((3, FROM_CPU_INTR3,
+        software_interrupt3)); _for_each_inner_sw_interrupt!((all(0, FROM_CPU_INTR0,
+        software_interrupt0), (1, FROM_CPU_INTR1, software_interrupt1), (2,
+        FROM_CPU_INTR2, software_interrupt2), (3, FROM_CPU_INTR3, software_interrupt3)));
+    };
+}
+#[macro_export]
+macro_rules! sw_interrupt_delay {
+    () => {
+        unsafe {
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+            ::core::arch::asm!("nop");
+        }
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sha_algorithm {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sha_algorithm { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_sha_algorithm!((Sha1, "SHA-1"(sizes : 64, 20, 8)
+        (insecure_against : "collision", "length extension"), 0));
+        _for_each_inner_sha_algorithm!((Sha224, "SHA-224"(sizes : 64, 28, 8)
+        (insecure_against : "length extension"), 1));
+        _for_each_inner_sha_algorithm!((Sha256, "SHA-256"(sizes : 64, 32, 8)
+        (insecure_against : "length extension"), 2));
+        _for_each_inner_sha_algorithm!((algos(Sha1, "SHA-1"(sizes : 64, 20, 8)
+        (insecure_against : "collision", "length extension"), 0), (Sha224,
+        "SHA-224"(sizes : 64, 28, 8) (insecure_against : "length extension"), 1),
+        (Sha256, "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"),
+        2)));
     };
 }
 #[macro_export]
@@ -2252,144 +2390,6 @@ macro_rules! memory_range {
     };
     (size as str, "DRAM2_UNINIT") => {
         "66416"
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_dedicated_gpio {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_dedicated_gpio { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_dedicated_gpio!((0));
-        _for_each_inner_dedicated_gpio!((1)); _for_each_inner_dedicated_gpio!((2));
-        _for_each_inner_dedicated_gpio!((3)); _for_each_inner_dedicated_gpio!((4));
-        _for_each_inner_dedicated_gpio!((5)); _for_each_inner_dedicated_gpio!((6));
-        _for_each_inner_dedicated_gpio!((7)); _for_each_inner_dedicated_gpio!((0, 0,
-        CPU_GPIO_0)); _for_each_inner_dedicated_gpio!((0, 1, CPU_GPIO_1));
-        _for_each_inner_dedicated_gpio!((0, 2, CPU_GPIO_2));
-        _for_each_inner_dedicated_gpio!((0, 3, CPU_GPIO_3));
-        _for_each_inner_dedicated_gpio!((0, 4, CPU_GPIO_4));
-        _for_each_inner_dedicated_gpio!((0, 5, CPU_GPIO_5));
-        _for_each_inner_dedicated_gpio!((0, 6, CPU_GPIO_6));
-        _for_each_inner_dedicated_gpio!((0, 7, CPU_GPIO_7));
-        _for_each_inner_dedicated_gpio!((channels(0), (1), (2), (3), (4), (5), (6),
-        (7))); _for_each_inner_dedicated_gpio!((signals(0, 0, CPU_GPIO_0), (0, 1,
-        CPU_GPIO_1), (0, 2, CPU_GPIO_2), (0, 3, CPU_GPIO_3), (0, 4, CPU_GPIO_4), (0, 5,
-        CPU_GPIO_5), (0, 6, CPU_GPIO_6), (0, 7, CPU_GPIO_7)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_interrupt {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_interrupt { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_interrupt!(([disabled 0] 0));
-        _for_each_inner_interrupt!(([direct_bindable 0] 1));
-        _for_each_inner_interrupt!(([direct_bindable 1] 2));
-        _for_each_inner_interrupt!(([direct_bindable 2] 3));
-        _for_each_inner_interrupt!(([direct_bindable 3] 4));
-        _for_each_inner_interrupt!(([direct_bindable 4] 5));
-        _for_each_inner_interrupt!(([direct_bindable 5] 6));
-        _for_each_inner_interrupt!(([direct_bindable 6] 7));
-        _for_each_inner_interrupt!(([direct_bindable 7] 8));
-        _for_each_inner_interrupt!(([direct_bindable 8] 9));
-        _for_each_inner_interrupt!(([direct_bindable 9] 10));
-        _for_each_inner_interrupt!(([direct_bindable 10] 11));
-        _for_each_inner_interrupt!(([direct_bindable 11] 12));
-        _for_each_inner_interrupt!(([direct_bindable 12] 13));
-        _for_each_inner_interrupt!(([direct_bindable 13] 14));
-        _for_each_inner_interrupt!(([direct_bindable 14] 15));
-        _for_each_inner_interrupt!(([direct_bindable 15] 16));
-        _for_each_inner_interrupt!(([vector 0] 17)); _for_each_inner_interrupt!(([vector
-        1] 18)); _for_each_inner_interrupt!(([vector 2] 19));
-        _for_each_inner_interrupt!(([vector 3] 20)); _for_each_inner_interrupt!(([vector
-        4] 21)); _for_each_inner_interrupt!(([vector 5] 22));
-        _for_each_inner_interrupt!(([vector 6] 23)); _for_each_inner_interrupt!(([vector
-        7] 24)); _for_each_inner_interrupt!(([vector 8] 25));
-        _for_each_inner_interrupt!(([vector 9] 26)); _for_each_inner_interrupt!(([vector
-        10] 27)); _for_each_inner_interrupt!(([vector 11] 28));
-        _for_each_inner_interrupt!(([vector 12] 29)); _for_each_inner_interrupt!(([vector
-        13] 30)); _for_each_inner_interrupt!(([vector 14] 31));
-        _for_each_inner_interrupt!((all([disabled 0] 0), ([direct_bindable 0] 1),
-        ([direct_bindable 1] 2), ([direct_bindable 2] 3), ([direct_bindable 3] 4),
-        ([direct_bindable 4] 5), ([direct_bindable 5] 6), ([direct_bindable 6] 7),
-        ([direct_bindable 7] 8), ([direct_bindable 8] 9), ([direct_bindable 9] 10),
-        ([direct_bindable 10] 11), ([direct_bindable 11] 12), ([direct_bindable 12] 13),
-        ([direct_bindable 13] 14), ([direct_bindable 14] 15), ([direct_bindable 15] 16),
-        ([vector 0] 17), ([vector 1] 18), ([vector 2] 19), ([vector 3] 20), ([vector 4]
-        21), ([vector 5] 22), ([vector 6] 23), ([vector 7] 24), ([vector 8] 25), ([vector
-        9] 26), ([vector 10] 27), ([vector 11] 28), ([vector 12] 29), ([vector 13] 30),
-        ([vector 14] 31)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_interrupt_priority {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_interrupt_priority { $(($pattern) => $code;)*
-        ($other : tt) => {} } _for_each_inner_interrupt_priority!((0, 1, Priority1));
-        _for_each_inner_interrupt_priority!((1, 2, Priority2));
-        _for_each_inner_interrupt_priority!((2, 3, Priority3));
-        _for_each_inner_interrupt_priority!((3, 4, Priority4));
-        _for_each_inner_interrupt_priority!((4, 5, Priority5));
-        _for_each_inner_interrupt_priority!((5, 6, Priority6));
-        _for_each_inner_interrupt_priority!((6, 7, Priority7));
-        _for_each_inner_interrupt_priority!((7, 8, Priority8));
-        _for_each_inner_interrupt_priority!((8, 9, Priority9));
-        _for_each_inner_interrupt_priority!((9, 10, Priority10));
-        _for_each_inner_interrupt_priority!((10, 11, Priority11));
-        _for_each_inner_interrupt_priority!((11, 12, Priority12));
-        _for_each_inner_interrupt_priority!((12, 13, Priority13));
-        _for_each_inner_interrupt_priority!((13, 14, Priority14));
-        _for_each_inner_interrupt_priority!((14, 15, Priority15));
-        _for_each_inner_interrupt_priority!((all(0, 1, Priority1), (1, 2, Priority2), (2,
-        3, Priority3), (3, 4, Priority4), (4, 5, Priority5), (5, 6, Priority6), (6, 7,
-        Priority7), (7, 8, Priority8), (8, 9, Priority9), (9, 10, Priority10), (10, 11,
-        Priority11), (11, 12, Priority12), (12, 13, Priority13), (13, 14, Priority14),
-        (14, 15, Priority15)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_sw_interrupt {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_sw_interrupt { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_sw_interrupt!((0, FROM_CPU_INTR0,
-        software_interrupt0)); _for_each_inner_sw_interrupt!((1, FROM_CPU_INTR1,
-        software_interrupt1)); _for_each_inner_sw_interrupt!((2, FROM_CPU_INTR2,
-        software_interrupt2)); _for_each_inner_sw_interrupt!((3, FROM_CPU_INTR3,
-        software_interrupt3)); _for_each_inner_sw_interrupt!((all(0, FROM_CPU_INTR0,
-        software_interrupt0), (1, FROM_CPU_INTR1, software_interrupt1), (2,
-        FROM_CPU_INTR2, software_interrupt2), (3, FROM_CPU_INTR3, software_interrupt3)));
-    };
-}
-#[macro_export]
-macro_rules! sw_interrupt_delay {
-    () => {
-        unsafe {
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-        }
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_sha_algorithm {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_sha_algorithm { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_sha_algorithm!((Sha1, "SHA-1"(sizes : 64, 20, 8)
-        (insecure_against : "collision", "length extension"), 0));
-        _for_each_inner_sha_algorithm!((Sha224, "SHA-224"(sizes : 64, 28, 8)
-        (insecure_against : "length extension"), 1));
-        _for_each_inner_sha_algorithm!((Sha256, "SHA-256"(sizes : 64, 32, 8)
-        (insecure_against : "length extension"), 2));
-        _for_each_inner_sha_algorithm!((algos(Sha1, "SHA-1"(sizes : 64, 20, 8)
-        (insecure_against : "collision", "length extension"), 0), (Sha224,
-        "SHA-224"(sizes : 64, 28, 8) (insecure_against : "length extension"), 1),
-        (Sha256, "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"),
-        2)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the I2C master driver.
