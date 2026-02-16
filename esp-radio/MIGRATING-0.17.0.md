@@ -212,3 +212,33 @@ This change removes the need to handle potential errors when checking connection
 ```
 
 Both functions are now `unstable` - in general you shouldn't need them. See the examples for how to avoid them.
+
+## Starting / Stopping the WiFi Controller is now implicit
+
+The `start_async` and `stop_async` methods have been removed.
+
+The WiFi controller is now started (or restarted) automatically when you call `set_config`. Dropping the controller will stop it automatically.
+
+In most cases just the manual call to `start_async` needs to be removed.
+
+```diff
+    let station_config = Config::Station(
+        StationConfig::default()
+            .with_ssid(SSID)
+            .with_password(PASSWORD.into()),
+    );
+    controller.set_config(&station_config).unwrap();
+-   controller.start_async().await.unwrap();
+```
+
+If you previously only set the WiFi mode and then started the controller, you must now provide an appropriate configuration instead:
+
+```diff
+-   controller
+-       .set_mode(esp_radio::wifi::WifiMode::Station)
+-       .unwrap();
+-   controller.start_async().await.unwrap();
++   controller
++       .set_config(&Config::Station(StationConfig::default()))
++       .unwrap();
+```

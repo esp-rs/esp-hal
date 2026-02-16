@@ -77,6 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `event::EventExt` trait and its associated handler functions (`update_handler`, `take_handler`, `replace_handler`) have been removed. Use `WifiController::subscribe()` instead. (#4898)
 - `WifiController` methods `wait_for_event`, `wait_for_events`, and `wait_for_all_events` have been removed. They are replaced by `wait_for_disconnect_async`, `wait_for_access_point_connected_event_async`, or by using an `EventSubscriber`. (#4898)
 - `wifi::WifiMode` and `WifiController::set_mode` have been removed (#4991)
+- `WifiController` methods `start_async` and `stop_async` have been removed. `set_config` will now make sure that the controller is started / re-started as needed. Dropping the controller will stop it first. (#4984)
 
 ## [v0.17.0] - 2025-10-30
 
