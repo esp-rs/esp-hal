@@ -2171,6 +2171,9 @@ pub fn new<'d>(
 }
 
 /// Wi-Fi controller.
+///
+/// After initial creation via [new] the controller is in stopped state.
+/// Use [WifiController::set_config] to set the configuration and start the controller.
 #[non_exhaustive]
 pub struct WifiController<'d> {
     _guard: RadioRefGuard,
@@ -2386,7 +2389,7 @@ impl WifiController<'_> {
     }
 
     #[procmacros::doc_replace]
-    /// Set the configuration and start the controller.
+    /// Set the configuration and start / re-start the controller as needed.
     ///
     /// This will set the mode accordingly.
     /// You need to use [`Self::connect_async`] for connecting to an access point.
