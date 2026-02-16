@@ -81,7 +81,9 @@ async fn main(spawner: Spawner) -> ! {
 
     // make sure WiFi is started before scanning
     println!("Starting wifi");
-    controller.set_config(&Config::Station(StationConfig::default())).unwrap();
+    controller
+        .set_config(&Config::Station(StationConfig::default()))
+        .unwrap();
 
     println!("Scan");
     let scan_config = ScanConfig::default().with_max(10);

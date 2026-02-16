@@ -17,13 +17,10 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::{esp_now::{
-    BROADCAST_ADDRESS,
-    EspNowManager,
-    EspNowReceiver,
-    EspNowSender,
-    PeerInfo,
-}, wifi::{Config, sta::StationConfig}};
+use esp_radio::{
+    esp_now::{BROADCAST_ADDRESS, EspNowManager, EspNowReceiver, EspNowSender, PeerInfo},
+    wifi::{Config, sta::StationConfig},
+};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 

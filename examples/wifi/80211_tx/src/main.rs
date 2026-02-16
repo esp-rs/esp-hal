@@ -18,7 +18,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::{wifi::Config, wifi::sta::StationConfig};
+use esp_radio::wifi::{Config, sta::StationConfig};
 use ieee80211::{
     common::{CapabilitiesInformation, FCFFlags},
     element_chain,
