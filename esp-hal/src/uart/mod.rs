@@ -66,9 +66,11 @@ use crate::{
         Pull,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
+    handler,
     interrupt::InterruptHandler,
     pac::uart0::RegisterBlock,
     private::OnDrop,
+    ram,
     soc::clocks::{self, ClockTree},
     system::PeripheralGuard,
 };
@@ -2672,6 +2674,7 @@ impl embedded_io_async_07::Write for UartTx<'_, Async> {
 /// Clears and disables interrupts that have occurred and have their enable
 /// bit set. The fact that an interrupt has been disabled is used by the
 /// futures to detect that they should indeed resolve after being woken up
+#[ram]
 pub(super) fn intr_handler(uart: &Info, state: &State) {
     let interrupts = uart.regs().int_st().read();
     let interrupt_bits = interrupts.bits(); // = int_raw & int_ena
@@ -3743,7 +3746,8 @@ for_each_uart! {
     ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&'static Info, &'static State) {
-                #[crate::handler]
+                #[handler]
+                #[ram]
                 pub(super) fn irq_handler() {
                     intr_handler(&PERIPHERAL, &STATE);
                 }
