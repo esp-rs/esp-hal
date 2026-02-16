@@ -332,7 +332,7 @@ driver_configs![
     },
     BitScramblerProperties {
         driver: bit_scrambler,
-        name: "BITSCRAMBLER",
+        name: "Bit Scrambler",
         properties: {}
     },
     BluetoothProperties {
@@ -345,11 +345,6 @@ driver_configs![
     CameraProperties {
         driver: camera,
         name: "Camera interface", // LCD_CAM, ESP32 I2S, S2 SPI
-        properties: {}
-    },
-    CanfdProperties {
-        driver: canfd,
-        name: "CANFD",
         properties: {}
     },
     DacProperties {
@@ -489,7 +484,7 @@ driver_configs![
     },
     KeyManagerProperties {
         driver: key_manager,
-        name: "KEY MANAGER",
+        name: "Key Manager",
         properties: {}
     },
     LedcProperties {
@@ -697,7 +692,7 @@ driver_configs![
     },
     TwaiProperties {
         driver: twai,
-        name: "TWAI",
+        name: "TWAI / CAN / CANFD",
         properties: {}
     },
     UartProperties<UartInstanceConfig> {

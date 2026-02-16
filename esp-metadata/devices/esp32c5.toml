@@ -16,7 +16,8 @@ peripherals = [
     { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 6 },
     #{ name = "ASSIST_DEBUG" },
     { name = "APB_SARADC", dma_peripheral = 8 },
-    # { name = "BITSCRAMBLER" },
+    { name = "AVC" },
+    { name = "BITSCRAMBLER" },
     # { name = "CACHE" },
     { name = "CLINT" },
     # { name = "CPU_APM" }, # TODO: verify we need it
@@ -568,6 +569,24 @@ peripheral_controls_mem_clk = true
 support_status = "partial"
 combined_uart_selector_field = true
 
+[device.bit_scrambler]
+support_status = "not_supported"
+
+[device.avc]
+support_status = "not_supported"
+
+[device.twai]
+support_status = "not_supported"
+
+[device.key_manager]
+support_status = "not_supported"
+
+[device.touch]
+support_status = "not_supported"
+
+[device.ds]
+support_status = "not_supported"
+
 # [device.lp_uart]
 # support_status = "not_supported"
 # ram_size = 32
@@ -577,7 +596,21 @@ support_status = "partial"
 trng_supported = false  # TODO
 apb_cycle_wait_num = 16 # TODO
 
+## Radio
+[device.wifi]
+support_status = "not_supported"
+
+[device.bt]
+controller = "btdm"
+support_status = "not_supported"
+
+[device.ieee802154]
+support_status = "not_supported"
+
 # ## Miscellaneous
 # [device.io_mux]
 [device.systimer]
 [device.pcnt]
+
+[device.sleep]
+support_status = "not_supported"

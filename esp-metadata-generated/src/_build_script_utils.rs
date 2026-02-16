@@ -1659,6 +1659,8 @@ impl Chip {
                     "single_core",
                     "soc_has_aes",
                     "soc_has_apb_saradc",
+                    "soc_has_avc",
+                    "soc_has_bitscrambler",
                     "soc_has_clint",
                     "soc_has_dma",
                     "soc_has_ds",
@@ -1762,6 +1764,7 @@ impl Chip {
                     "timergroup_timg1",
                     "uart_uart0",
                     "uart_uart1",
+                    "bt_controller=\"btdm\"",
                     "dma_kind=\"gdma\"",
                     "dma_supports_mem2mem",
                     "dma_separate_in_out_interrupts",
@@ -1858,6 +1861,8 @@ impl Chip {
                     "cargo:rustc-cfg=single_core",
                     "cargo:rustc-cfg=soc_has_aes",
                     "cargo:rustc-cfg=soc_has_apb_saradc",
+                    "cargo:rustc-cfg=soc_has_avc",
+                    "cargo:rustc-cfg=soc_has_bitscrambler",
                     "cargo:rustc-cfg=soc_has_clint",
                     "cargo:rustc-cfg=soc_has_dma",
                     "cargo:rustc-cfg=soc_has_ds",
@@ -1961,6 +1966,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg1",
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
+                    "cargo:rustc-cfg=bt_controller=\"btdm\"",
                     "cargo:rustc-cfg=dma_kind=\"gdma\"",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
                     "cargo:rustc-cfg=dma_separate_in_out_interrupts",
@@ -5051,6 +5057,8 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg1_function_clock)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg1_wdt_clock)");
     println!("cargo:rustc-check-cfg=cfg(esp32c5)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_avc)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_bitscrambler)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clint)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ecdsa)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_etm)");

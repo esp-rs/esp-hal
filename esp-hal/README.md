@@ -58,15 +58,14 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ADC                | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | AES                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | ASSIST_DEBUG       |       | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      |          | ⚒️      |
-| AVC                |       |          |          |          |          |          |          |          |
-| BITSCRAMBLER       |       |          |          |          |          |          |          |          |
-| Bluetooth          | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      |          | ⚒️      |
+| AVC                |       |          |          | ❌       |          |          |          |          |
+| Bit Scrambler      |       |          |          | ❌       |          |          |          |          |
+| Bluetooth          | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      |          | ⚒️      |
 | Camera interface   | ❌    |          |          |          |          |          | ❌       | ⚒️      |
-| CANFD              |       |          |          |          |          |          |          |          |
 | DAC                | ⚒️   |          |          |          |          |          | ⚒️      |          |
 | Dedicated GPIO     |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | DMA                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| DS                 |       |          | ❌       |          | ❌       | ❌       | ❌       | ❌       |
+| DS                 |       |          | ❌       | ❌       | ❌       | ❌       | ❌       | ❌       |
 | ECC                |       | ⚒️      |          | ❌       | ⚒️      | ⚒️      |          |          |
 | Ethernet           | ❌    |          |          |          |          |          |          |          |
 | ETM                |       |          |          |          | ⚒️      | ⚒️      |          |          |
@@ -75,10 +74,10 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | I2C master         | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
 | I2C slave          | ❌    |          | ❌       | ❌       | ❌       | ❌       | ❌       | ❌       |
 | I2S                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| IEEE 802.15.4      |       |          |          |          | ⚒️      | ⚒️      |          |          |
+| IEEE 802.15.4      |       |          |          | ❌       | ⚒️      | ⚒️      |          |          |
 | Interrupts         | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | IOMUX              | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| KEY MANAGER        |       |          |          |          |          |          |          |          |
+| Key Manager        |       |          |          | ❌       |          |          |          |          |
 | LEDC               | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | LP I2C master      |       |          |          |          | ⚒️      |          |          |          |
 | LP UART            |       |          |          |          | ⚒️      |          |          |          |
@@ -94,21 +93,21 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | SDIO host          | ⚒️   |          |          |          |          |          |          | ⚒️      |
 | SDIO slave         | ⚒️   |          |          |          | ⚒️      |          |          |          |
 | SHA                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| Light/deep sleep   | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| Light/deep sleep   | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SPI master         | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
 | SPI slave          | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SYSTIMER           |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Temperature sensor | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Timers             | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| Touch              | ⚒️   |          |          |          |          |          | ❌       | ❌       |
-| TWAI               | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| Touch              | ⚒️   |          |          | ❌       |          |          | ❌       | ❌       |
+| TWAI / CAN / CANFD | ⚒️   |          | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | UART               | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
 | UHCI               | ❌    |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ❌       | ⚒️      |
 | ULP (FSM)          | ⚒️   |          |          |          |          |          | ⚒️      | ⚒️      |
 | ULP (RISC-V)       |       |          |          |          | ⚒️      |          | ⚒️      | ⚒️      |
 | USB OTG FS         |       |          |          |          |          |          | ⚒️      | ⚒️      |
 | USB Serial/JTAG    |       |          | ⚒️      |          | ⚒️      | ⚒️      |          | ⚒️      |
-| WIFI               | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      |          | ⚒️      | ⚒️      |
+| WIFI               | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      |          | ⚒️      | ⚒️      |
 
  * Empty cell: not available
  * ❌: Not supported
