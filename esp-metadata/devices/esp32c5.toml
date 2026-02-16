@@ -16,8 +16,8 @@ peripherals = [
     { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 6 },
     #{ name = "ASSIST_DEBUG" },
     { name = "APB_SARADC", dma_peripheral = 8 },
-    { name = "AVC" },
-    { name = "BITSCRAMBLER" },
+    # { name = "AVC" },
+    # { name = "BITSCRAMBLER" },
     # { name = "CACHE" },
     { name = "CLINT" },
     # { name = "CPU_APM" }, # TODO: verify we need it
@@ -587,9 +587,13 @@ support_status = "not_supported"
 [device.ds]
 support_status = "not_supported"
 
-# [device.lp_uart]
-# support_status = "not_supported"
-# ram_size = 32
+[device.lp_uart]
+support_status = "not_supported"
+ram_size = 32
+
+[device.lp_i2c_master]
+support_status = "partial"
+fifo_size = 16
 
 [device.rng]
 support_status = "partial"
@@ -605,6 +609,9 @@ controller = "btdm"
 support_status = "not_supported"
 
 [device.ieee802154]
+support_status = "not_supported"
+
+[device.phy]
 support_status = "not_supported"
 
 # ## Miscellaneous
