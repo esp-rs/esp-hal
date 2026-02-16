@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `LP_UART` now has its own configuration structure (#4667)
 - The `MEM2MEM` peripheral singletons have been re-numbered from 0-8 (#4944)
 - The `DmaPeripheral::Mem2MemX` variants have been renamed to `Mem2memX` and re-numbered from 0-8 (#4944)
+- `Async` drivers now implement `Send` again (#4986)
 
 ### Fixed
 
