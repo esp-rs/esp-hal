@@ -4,13 +4,23 @@ use log_04::LevelFilter;
 
 #[macro_export]
 macro_rules! assert_unique_used_features {
-    ($($feature:literal),+ $(,)?) => {
+    ($($feature:literal),+ $(,)?) => {{
+        let enabled: Vec<&str> = vec![
+            $(
+                if cfg!(feature = $feature) { Some($feature) } else { None },
+            )+
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+
         assert!(
-            (0 $(+ cfg!(feature = $feature) as usize)+ ) == 1,
-            "Exactly one of the following features must be enabled: {}",
-            [$($feature),+].join(", ")
+            enabled.len() == 1,
+            "Exactly one feature must be enabled among: {}.\nCurrently enabled: {}",
+            [$($feature),+].join(", "),
+            if enabled.is_empty() { "none".to_string() } else { enabled.join(", ") }
         );
-    };
+    }};
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
