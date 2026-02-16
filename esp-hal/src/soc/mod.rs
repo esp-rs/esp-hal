@@ -1,6 +1,9 @@
 #![cfg_attr(not(feature = "rt"), expect(unused))]
 
-use core::ops::Range;
+use core::{ops::Range, sync::atomic::Ordering};
+
+use portable_atomic::AtomicU32;
+use procmacros::ram;
 
 pub use self::implementation::*;
 
@@ -298,6 +301,25 @@ pub(crate) fn setup_trap_section_protection() {
     }
 }
 
+static CHIP_REVISION: AtomicU32 = AtomicU32::new(0);
+const LOADED: u32 = 1 << 31;
+
+#[cold]
+fn load_chip_revision_from_efuse() -> u16 {
+    let chip_revision = crate::efuse::Efuse::chip_revision();
+    CHIP_REVISION.store(chip_revision as u32 | LOADED, Ordering::Release);
+    chip_revision
+}
+
+#[ram]
+fn load_chip_revision() -> u16 {
+    let stored = CHIP_REVISION.load(Ordering::Acquire);
+    if stored & LOADED == 0 {
+        return load_chip_revision_from_efuse();
+    }
+    (stored & u16::MAX as u32) as u16
+}
+
 fn chip_revision_in_range(range: Range<u16>) -> bool {
     const BUILD_TIME_MIN_REV: u16 =
         esp_config::esp_config_int!(u16, "ESP_HAL_CONFIG_MIN_CHIP_REVISION");
@@ -320,7 +342,7 @@ fn chip_revision_in_range(range: Range<u16>) -> bool {
         return true;
     }
 
-    let chip_revision = crate::efuse::Efuse::chip_revision();
+    let chip_revision = load_chip_revision();
 
     range.contains(&chip_revision)
 }
