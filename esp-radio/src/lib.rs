@@ -27,11 +27,12 @@
 //! You will also need a dynamic memory allocator, and a preemptive task scheduler in your
 //! application. For the dynamic allocator, we recommend using `esp-alloc`. For the task scheduler,
 //! the simplest option that is supported by us is `esp-rtos`, but you may use Ariel
-//! OS or other operating systems as well
+//! OS or other operating systems as well.
 #![cfg_attr(
     feature = "ieee802154",
-    doc = ". <div class=\"warning\">**Hint:** The scheduler is not required for the 802.15.4.</div>"
+    doc = "<div class=\"warning\"><b>Hint:</b> The scheduler is not required for the 802.15.4.</div>"
 )]
+#![doc = ""]
 //! ```rust, no_run
 //! # #![no_std]
 //! # #![no_main]
