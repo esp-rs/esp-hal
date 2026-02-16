@@ -1659,8 +1659,6 @@ impl Chip {
                     "single_core",
                     "soc_has_aes",
                     "soc_has_apb_saradc",
-                    "soc_has_avc",
-                    "soc_has_bitscrambler",
                     "soc_has_clint",
                     "soc_has_dma",
                     "soc_has_ds",
@@ -1745,6 +1743,7 @@ impl Chip {
                     "gpio_driver_supported",
                     "i2c_master_driver_supported",
                     "interrupts_driver_supported",
+                    "lp_i2c_master_driver_supported",
                     "pcnt_driver_supported",
                     "rmt_driver_supported",
                     "rng_driver_supported",
@@ -1764,7 +1763,7 @@ impl Chip {
                     "timergroup_timg1",
                     "uart_uart0",
                     "uart_uart1",
-                    "bt_controller=\"btdm\"",
+                    "bt_controller=\"npl\"",
                     "dma_kind=\"gdma\"",
                     "dma_supports_mem2mem",
                     "dma_separate_in_out_interrupts",
@@ -1791,6 +1790,8 @@ impl Chip {
                     "i2c_master_fifo_size=\"32\"",
                     "interrupts_status_registers=\"3\"",
                     "interrupt_controller=\"clic\"",
+                    "lp_i2c_master_fifo_size=\"16\"",
+                    "lp_uart_ram_size=\"32\"",
                     "rmt_ram_start=\"1610638336\"",
                     "rmt_channel_ram_size=\"48\"",
                     "rmt_has_tx_immediate_stop",
@@ -1861,8 +1862,6 @@ impl Chip {
                     "cargo:rustc-cfg=single_core",
                     "cargo:rustc-cfg=soc_has_aes",
                     "cargo:rustc-cfg=soc_has_apb_saradc",
-                    "cargo:rustc-cfg=soc_has_avc",
-                    "cargo:rustc-cfg=soc_has_bitscrambler",
                     "cargo:rustc-cfg=soc_has_clint",
                     "cargo:rustc-cfg=soc_has_dma",
                     "cargo:rustc-cfg=soc_has_ds",
@@ -1947,6 +1946,7 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_driver_supported",
                     "cargo:rustc-cfg=i2c_master_driver_supported",
                     "cargo:rustc-cfg=interrupts_driver_supported",
+                    "cargo:rustc-cfg=lp_i2c_master_driver_supported",
                     "cargo:rustc-cfg=pcnt_driver_supported",
                     "cargo:rustc-cfg=rmt_driver_supported",
                     "cargo:rustc-cfg=rng_driver_supported",
@@ -1966,7 +1966,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg1",
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
-                    "cargo:rustc-cfg=bt_controller=\"btdm\"",
+                    "cargo:rustc-cfg=bt_controller=\"npl\"",
                     "cargo:rustc-cfg=dma_kind=\"gdma\"",
                     "cargo:rustc-cfg=dma_supports_mem2mem",
                     "cargo:rustc-cfg=dma_separate_in_out_interrupts",
@@ -1993,6 +1993,8 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=interrupt_controller=\"clic\"",
+                    "cargo:rustc-cfg=lp_i2c_master_fifo_size=\"16\"",
+                    "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610638336\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
                     "cargo:rustc-cfg=rmt_has_tx_immediate_stop",
@@ -5057,8 +5059,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg1_function_clock)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg1_wdt_clock)");
     println!("cargo:rustc-check-cfg=cfg(esp32c5)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_avc)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_bitscrambler)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clint)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ecdsa)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_etm)");
@@ -5098,6 +5098,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem6)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem7)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem8)");
+    println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(dma_separate_in_out_interrupts)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_can_estimate_nack_reason)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
@@ -5136,7 +5137,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(pm_support_beacon_wakeup)");
     println!("cargo:rustc-check-cfg=cfg(etm_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(ieee802154_driver_supported)");
-    println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(lp_uart_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(parl_io_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(ulp_riscv_driver_supported)");
@@ -5231,7 +5231,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(dma_max_priority, values(\"9\",\"5\"))");
     println!("cargo:rustc-check-cfg=cfg(dma_gdma_version, values(\"1\",\"2\"))");
     println!("cargo:rustc-check-cfg=cfg(phy_backed_up_digital_register_count, values(\"21\"))");
-    println!("cargo:rustc-check-cfg=cfg(soc_cpu_csr_prv_mode, values(\"2064\",\"3088\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_fifo_size, values(\"16\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_uart_ram_size, values(\"32\"))");
+    println!("cargo:rustc-check-cfg=cfg(soc_cpu_csr_prv_mode, values(\"2064\",\"3088\"))");
 }

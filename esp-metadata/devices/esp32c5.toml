@@ -572,8 +572,8 @@ combined_uart_selector_field = true
 [device.bit_scrambler]
 support_status = "not_supported"
 
-[device.avc]
-support_status = "not_supported"
+# [device.avc]
+# support_status = "not_supported"
 
 [device.twai]
 support_status = "not_supported"
@@ -605,8 +605,8 @@ apb_cycle_wait_num = 16 # TODO
 support_status = "not_supported"
 
 [device.bt]
-controller = "btdm"
 support_status = "not_supported"
+controller = "npl"
 
 [device.ieee802154]
 support_status = "not_supported"

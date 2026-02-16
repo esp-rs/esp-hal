@@ -58,7 +58,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ADC                | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | AES                | ⚒️   |          | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | ASSIST_DEBUG       |       | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      |          | ⚒️      |
-| AVC                |       |          |          | ❌       |          |          |          |          |
+| AVC                |       |          |          |          |          |          |          |          |
 | Bit Scrambler      |       |          |          | ❌       |          |          |          |          |
 | Bluetooth          | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      |          | ⚒️      |
 | Camera interface   | ❌    |          |          |          |          |          | ❌       | ⚒️      |
@@ -79,12 +79,12 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | IOMUX              | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Key Manager        |       |          |          | ❌       |          |          |          |          |
 | LEDC               | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| LP I2C master      |       |          |          |          | ⚒️      |          |          |          |
-| LP UART            |       |          |          |          | ⚒️      |          |          |          |
+| LP I2C master      |       |          |          | ⚒️      | ⚒️      |          |          |          |
+| LP UART            |       |          |          | ❌       | ⚒️      |          |          |          |
 | MCPWM              | ⚒️   |          |          |          | ⚒️      | ⚒️      |          | ⚒️      |
 | PARL_IO            |       |          |          |          | ⚒️      | ⚒️      |          |          |
 | PCNT               | ⚒️   |          |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| PHY                | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| PHY                | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | PSRAM              | ⚒️   |          |          |          |          |          | ⚒️      | ⚒️      |
 | RGB display        | ⚒️   |          |          |          |          |          | ❌       | ⚒️      |
 | RMT                | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
