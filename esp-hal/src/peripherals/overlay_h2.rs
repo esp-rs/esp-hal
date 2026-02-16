@@ -34,6 +34,7 @@ impl Deref for RngRegisterBlock {
 
 impl RngRegisterBlock {
     /// Random number data
+    #[instability::unstable]
     pub fn data(&self) -> &pac::rng::DATA {
         let ptr = unsafe { pac::RNG::steal().data() as *const pac::rng::DATA };
         if crate::soc::chip_revision_above(102) {
