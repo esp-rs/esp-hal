@@ -286,9 +286,9 @@ pub fn enable_direct(
             });
         }
         core::arch::asm!("fence.i");
-
-        enable_cpu_interrupt(cpu_interrupt);
     }
+
+    unsafe { enable_cpu_interrupt_raw(cpu_interrupt as u32) };
     Ok(())
 }
 
@@ -318,9 +318,37 @@ fn encode_jal_x0(target: usize, pc: usize) -> Result<u32, Error> {
     Ok(instr)
 }
 
+/// Enable a CPU interrupt
+///
+/// # Safety
+///
+/// Make sure there is an interrupt handler registered.
+pub unsafe fn enable_cpu_interrupt(cpu_interrupt: CpuInterrupt) {
+    unsafe { enable_cpu_interrupt_raw(cpu_interrupt as u32) };
+}
+
 /// Disable the given peripheral interrupt.
 pub fn disable(core: Cpu, interrupt: Interrupt) {
     map_raw(core, interrupt, DISABLED_CPU_INTERRUPT)
+}
+
+/// Set the interrupt kind (i.e. level or edge) of an CPU interrupt
+///
+/// This is safe to call when the `vectored` feature is enabled. The
+/// vectored interrupt handler will take care of clearing edge interrupt
+/// bits.
+pub fn set_kind(core: Cpu, cpu_interrupt: CpuInterrupt, kind: InterruptKind) {
+    unsafe { set_kind_raw(core, cpu_interrupt as u32, kind) };
+}
+
+/// Set the priority level of an CPU interrupt
+///
+/// # Safety
+///
+/// Great care must be taken when using this function; avoid changing the
+/// priority of interrupts 1 - 15.
+pub unsafe fn set_priority(core: Cpu, which: CpuInterrupt, priority: Priority) {
+    unsafe { set_priority_raw(core, which as u32, priority) };
 }
 
 /// Assign a peripheral interrupt to an CPU interrupt.
@@ -411,15 +439,15 @@ mod vectored {
     pub(crate) unsafe fn init_vectoring() {
         for (num, prio) in PRIORITY_TO_INTERRUPT.iter().copied().zip(1..) {
             let which = unsafe { core::mem::transmute::<u32, CpuInterrupt>(num) };
-            set_kind(Cpu::current(), which, InterruptKind::Level);
+            unsafe { set_kind_raw(Cpu::current(), num, InterruptKind::Level) };
             unsafe {
                 set_priority(
                     Cpu::current(),
                     which,
                     core::mem::transmute::<u8, Priority>(prio),
                 );
-                enable_cpu_interrupt(which);
             }
+            unsafe { enable_cpu_interrupt_raw(num) };
         }
     }
 
@@ -469,11 +497,9 @@ mod vectored {
             return Err(Error::InvalidInterruptPriority);
         }
         unsafe {
-            let cpu_interrupt = core::mem::transmute::<u32, CpuInterrupt>(
-                PRIORITY_TO_INTERRUPT[(level as usize) - 1],
-            );
-            map(cpu, interrupt, cpu_interrupt);
-            enable_cpu_interrupt(cpu_interrupt);
+            let cpu_interrupt = PRIORITY_TO_INTERRUPT[(level as usize) - 1];
+            map_raw(cpu, interrupt, cpu_interrupt);
+            enable_cpu_interrupt_raw(cpu_interrupt);
         }
         Ok(())
     }
@@ -521,49 +547,30 @@ mod basic {
     use super::{CpuInterrupt, InterruptKind, Priority};
     use crate::{peripherals::INTERRUPT_CORE0, system::Cpu};
 
-    /// Enable a CPU interrupt
-    ///
-    /// # Safety
-    ///
-    /// Make sure there is an interrupt handler registered.
-    pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
-        let cpu_interrupt_number = which as isize;
-        let intr = INTERRUPT_CORE0::regs();
-        intr.cpu_int_enable()
-            .modify(|r, w| unsafe { w.bits((1 << cpu_interrupt_number) | r.bits()) });
+    pub(super) unsafe fn enable_cpu_interrupt_raw(which: u32) {
+        INTERRUPT_CORE0::regs()
+            .cpu_int_enable()
+            .modify(|r, w| unsafe { w.bits((1 << which) | r.bits()) });
     }
 
-    /// Set the interrupt kind (i.e. level or edge) of an CPU interrupt
-    ///
-    /// The vectored interrupt handler will take care of clearing edge interrupt
-    /// bits.
-    pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
-        unsafe {
-            let intr = INTERRUPT_CORE0::regs();
-            let cpu_interrupt_number = which as isize;
-
-            let interrupt_type = match kind {
-                InterruptKind::Level => 0,
-                InterruptKind::Edge => 1,
-            };
-            intr.cpu_int_type().modify(|r, w| {
+    pub(super) unsafe fn set_kind_raw(_core: Cpu, cpu_interrupt_number: u32, kind: InterruptKind) {
+        let interrupt_type = match kind {
+            InterruptKind::Level => 0,
+            InterruptKind::Edge => 1,
+        };
+        INTERRUPT_CORE0::regs()
+            .cpu_int_type()
+            .modify(|r, w| unsafe {
                 w.bits(
                     r.bits() & !(1 << cpu_interrupt_number)
                         | (interrupt_type << cpu_interrupt_number),
                 )
             });
-        }
     }
 
-    /// Set the priority level of an CPU interrupt
-    ///
-    /// # Safety
-    ///
-    /// Great care must be taken when using this function; avoid changing the
-    /// priority of interrupts 1 - 15.
-    pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
-        let intr = INTERRUPT_CORE0::regs();
-        intr.cpu_int_pri(which as usize)
+    pub(super) unsafe fn set_priority_raw(_core: Cpu, which: u32, priority: Priority) {
+        INTERRUPT_CORE0::regs()
+            .cpu_int_pri(which as usize)
             .write(|w| unsafe { w.map().bits(priority as u8) });
     }
 
@@ -646,24 +653,14 @@ mod clic {
         }
     }
 
-    /// Enable a CPU interrupt
-    ///
-    /// # Safety
-    ///
-    /// Make sure there is an interrupt handler registered.
-    pub unsafe fn enable_cpu_interrupt(cpu_interrupt: CpuInterrupt) {
+    pub(super) unsafe fn enable_cpu_interrupt_raw(cpu_interrupt: u32) {
         // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
         let clic = unsafe { CLIC::steal() };
         clic.int_ie(cpu_interrupt as usize)
             .write(|w| w.int_ie().set_bit());
     }
 
-    /// Set the interrupt kind (i.e. level or edge) of an CPU interrupt
-    ///
-    /// This is safe to call when the `vectored` feature is enabled. The
-    /// vectored interrupt handler will take care of clearing edge interrupt
-    /// bits.
-    pub fn set_kind(_core: Cpu, cpu_interrupt: CpuInterrupt, kind: InterruptKind) {
+    pub(super) unsafe fn set_kind_raw(_core: Cpu, cpu_interrupt: u32, kind: InterruptKind) {
         // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
         let clic = unsafe { CLIC::steal() };
         clic.int_attr(cpu_interrupt as usize)
@@ -673,16 +670,8 @@ mod clic {
             });
     }
 
-    /// Set the priority level of an CPU interrupt
-    ///
-    /// # Safety
-    ///
-    /// Great care must be taken when using the `vectored` feature (enabled by
-    /// default). Avoid changing the priority of interrupts 1 - 8 when
-    /// interrupt vectoring is enabled.
-    pub unsafe fn set_priority(_core: Cpu, cpu_interrupt: CpuInterrupt, priority: Priority) {
+    pub(super) unsafe fn set_priority_raw(_core: Cpu, cpu_interrupt: u32, priority: Priority) {
         // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
-
         let clic = unsafe { CLIC::steal() };
         let prio_bits = prio_to_bits(priority);
         // The `ctl` field would only write the 3 programmable bits, but we have the correct final
@@ -879,55 +868,39 @@ mod plic {
     use super::{CpuInterrupt, InterruptKind, Priority};
     use crate::{peripherals::PLIC_MX, system::Cpu};
 
-    /// Enable a CPU interrupt
-    ///
-    /// # Safety
-    ///
-    /// Make sure there is an interrupt handler registered.
-    pub unsafe fn enable_cpu_interrupt(which: CpuInterrupt) {
-        PLIC_MX::regs().mxint_enable().modify(|r, w| {
-            let old = r.cpu_mxint_enable().bits();
-            let new = old | (1 << (which as isize));
-            unsafe { w.cpu_mxint_enable().bits(new) }
+    pub(super) unsafe fn enable_cpu_interrupt_raw(cpu_interrupt: u32) {
+        PLIC_MX::regs().mxint_enable().modify(|r, w| unsafe {
+            w.cpu_mxint_enable()
+                .bits(r.cpu_mxint_enable().bits() | (1 << cpu_interrupt))
         });
     }
 
-    /// Set the interrupt kind (i.e. level or edge) of an CPU interrupt
-    ///
-    /// The vectored interrupt handler will take care of clearing edge interrupt
-    /// bits.
-    pub fn set_kind(_core: Cpu, which: CpuInterrupt, kind: InterruptKind) {
+    pub(super) fn set_kind_raw(_core: Cpu, cpu_interrupt: u32, kind: InterruptKind) {
         let interrupt_type = match kind {
             InterruptKind::Level => 0,
             InterruptKind::Edge => 1,
         };
 
-        PLIC_MX::regs().mxint_type().modify(|r, w| {
-            let old = r.cpu_mxint_type().bits();
-            let new = old & !(1 << (which as isize)) | (interrupt_type << (which as isize));
-            unsafe { w.cpu_mxint_type().bits(new) }
+        PLIC_MX::regs().mxint_type().modify(|r, w| unsafe {
+            w.cpu_mxint_type().bits(
+                r.cpu_mxint_type().bits() & !(1 << cpu_interrupt)
+                    | (interrupt_type << cpu_interrupt),
+            )
         });
     }
 
-    /// Set the priority level of an CPU interrupt
-    ///
-    /// # Safety
-    ///
-    /// Great care must be taken when using this function; avoid changing the
-    /// priority of interrupts 1 - 15.
-    pub unsafe fn set_priority(_core: Cpu, which: CpuInterrupt, priority: Priority) {
+    pub(super) unsafe fn set_priority_raw(_core: Cpu, cpu_interrupt: u32, priority: Priority) {
         PLIC_MX::regs()
-            .mxint_pri(which as usize)
+            .mxint_pri(cpu_interrupt as usize)
             .modify(|_, w| unsafe { w.cpu_mxint_pri().bits(priority as u8) });
     }
 
     /// Clear a CPU interrupt
     #[inline]
     pub fn clear(_core: Cpu, which: CpuInterrupt) {
-        PLIC_MX::regs().mxint_clear().modify(|r, w| {
-            let old = r.cpu_mxint_clear().bits();
-            let new = old | (1 << (which as isize));
-            unsafe { w.cpu_mxint_clear().bits(new) }
+        PLIC_MX::regs().mxint_clear().modify(|r, w| unsafe {
+            w.cpu_mxint_clear()
+                .bits(r.cpu_mxint_clear().bits() | (1 << (which as u32)))
         });
     }
 
