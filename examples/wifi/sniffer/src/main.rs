@@ -44,7 +44,9 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     let (mut controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
-    controller.set_mode(wifi::WifiMode::Station).unwrap();
+    controller
+        .set_config(&wifi::Config::Station(wifi::sta::StationConfig::default()))
+        .unwrap();
     controller.start_async().await.unwrap();
 
     let mut sniffer = interfaces.sniffer;

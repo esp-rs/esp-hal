@@ -28,7 +28,9 @@ mod tests {
             esp_radio::wifi::new(p.WIFI, Default::default()).unwrap();
 
         controller
-            .set_mode(esp_radio::wifi::WifiMode::Station)
+            .set_config(&esp_radio::wifi::Config::Station(
+                esp_radio::wifi::sta::StationConfig::default(),
+            ))
             .unwrap();
         controller.start_async().await.unwrap();
     }
@@ -46,7 +48,9 @@ mod tests {
             esp_radio::wifi::new(p.WIFI, Default::default()).unwrap();
 
         controller
-            .set_mode(esp_radio::wifi::WifiMode::Station)
+            .set_config(&esp_radio::wifi::Config::Station(
+                esp_radio::wifi::sta::StationConfig::default(),
+            ))
             .unwrap();
         controller.start_async().await.unwrap();
 
