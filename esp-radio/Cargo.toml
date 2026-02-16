@@ -11,7 +11,7 @@ repository = "https://github.com/esp-rs/esp-hal"
 license = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
-doc-config = { features = ["esp-hal/unstable", "esp-hal/rt", "esp-alloc/global-allocator", "defmt"], append = [
+doc-config = { features = ["esp-hal/unstable", "esp-hal/rt", "esp-alloc/global-allocator", "procmacros/__esp_idf_bootloader", "defmt"], append = [
     { if = 'chip_has("wifi_driver_supported")', features = ["wifi", "wifi-eap", "csi", "esp-now", "sniffer"] },
     { if = 'chip_has("bt_driver_supported")', features = ["ble"] },
     { if = 'chip_has("ieee802154_driver_supported")', features = ["ieee802154", "__docs_build"] },
