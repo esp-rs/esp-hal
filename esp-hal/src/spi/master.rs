@@ -48,8 +48,6 @@ use core::{
 pub use dma::*;
 use enumset::{EnumSet, EnumSetType};
 use procmacros::doc_replace;
-#[cfg(place_spi_master_driver_in_ram)]
-use procmacros::ram;
 
 use super::{BitOrder, Error, Mode};
 use crate::{
@@ -67,9 +65,11 @@ use crate::{
         PinGuard,
         interconnect::{self, PeripheralInput, PeripheralOutput},
     },
+    handler,
     interrupt::InterruptHandler,
     pac::spi2::RegisterBlock,
     private::{self, OnDrop, Sealed},
+    ram,
     system::PeripheralGuard,
     time::Rate,
 };
@@ -3933,8 +3933,8 @@ for_each_spi_master! {
         impl Instance for crate::peripherals::$peri<'_> {
             #[inline(always)]
             fn parts(&self) -> (&'static Info, &'static State) {
-                #[crate::handler]
-                #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+                #[handler]
+                #[ram]
                 fn irq_handler() {
                     handle_async(&INFO, &STATE)
                 }
@@ -3989,7 +3989,7 @@ struct Esp32Hack {
 #[cfg(esp32)]
 unsafe impl Sync for Esp32Hack {}
 
-#[cfg_attr(place_spi_master_driver_in_ram, ram)]
+#[ram]
 fn handle_async(info: &'static Info, state: &'static State) {
     let driver = Driver { info, state };
     if driver.interrupts().contains(SpiInterrupt::TransferDone) {
