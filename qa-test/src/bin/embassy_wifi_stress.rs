@@ -25,7 +25,6 @@ use esp_hal::{
 use esp_println::println;
 use esp_radio::wifi::{
     Config,
-    WifiMode,
     scan::{ScanConfig, ScanTypeConfig},
     sta::StationConfig,
 };
@@ -63,7 +62,9 @@ async fn main(_spawner: Spawner) {
             i
         );
 
-        controller.set_mode(WifiMode::Station).unwrap();
+        controller
+            .set_config(&Config::Station(StationConfig::default()))
+            .unwrap();
         println!("Wifi stack setup (STA)");
         controller.start_async().await.unwrap();
         println!("Connecting to WiFi SSID: {}", SSID);

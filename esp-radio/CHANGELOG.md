@@ -76,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for the feature `smoltcp` has been removed (#4870)
 - The `event::EventExt` trait and its associated handler functions (`update_handler`, `take_handler`, `replace_handler`) have been removed. Use `WifiController::subscribe()` instead. (#4898)
 - `WifiController` methods `wait_for_event`, `wait_for_events`, and `wait_for_all_events` have been removed. They are replaced by `wait_for_disconnect_async`, `wait_for_access_point_connected_event_async`, or by using an `EventSubscriber`. (#4898)
+- `wifi::WifiMode` and `WifiController::set_mode` have been removed (#4991)
 
 ## [v0.17.0] - 2025-10-30
 

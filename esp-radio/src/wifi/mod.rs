@@ -325,7 +325,7 @@ impl AuthenticationMethod {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub enum WifiMode {
+enum WifiMode {
     /// Station mode.
     Station,
     /// Access Point mode.
@@ -343,7 +343,7 @@ impl WifiMode {
     }
 
     /// Returns true if this mode works as a station.
-    pub fn is_station(&self) -> bool {
+    fn is_station(&self) -> bool {
         match self {
             Self::Station | Self::AccessPointStation => true,
             Self::AccessPoint => false,
@@ -351,7 +351,7 @@ impl WifiMode {
     }
 
     /// Returns true if this mode works as an access point.
-    pub fn is_access_point(&self) -> bool {
+    fn is_access_point(&self) -> bool {
         match self {
             Self::Station => false,
             Self::AccessPoint | Self::AccessPointStation => true,
@@ -2449,16 +2449,6 @@ impl WifiController<'_> {
             // return here - they will run into futher errors this way
             unsafe { esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_NULL) };
         })?;
-
-        Ok(())
-    }
-
-    /// Set the Wi-Fi mode.
-    ///
-    /// This will override the mode inferred by [`Self::set_config`].
-    #[instability::unstable]
-    pub fn set_mode(&mut self, mode: WifiMode) -> Result<(), WifiError> {
-        esp_wifi_result!(unsafe { esp_wifi_set_mode(mode.into()) })?;
 
         Ok(())
     }
