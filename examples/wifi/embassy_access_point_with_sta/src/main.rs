@@ -116,14 +116,14 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    let station_config = Config::AccessPointStation(
+    let access_point_station_config = Config::AccessPointStation(
         StationConfig::default()
             .with_ssid(SSID)
             .with_password(PASSWORD.into()),
         AccessPointConfig::default().with_ssid("esp-radio-apsta"),
     );
     println!("Starting wifi");
-    controller.set_config(&station_config).unwrap();
+    controller.set_config(&access_point_station_config).unwrap();
     println!("Wifi started!");
 
     spawner.spawn(connection(controller)).ok();
