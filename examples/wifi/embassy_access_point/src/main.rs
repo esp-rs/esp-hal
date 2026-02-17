@@ -88,9 +88,10 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    let station_config = Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio"));
+    let access_point_config =
+        Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio"));
     println!("Starting wifi");
-    controller.set_config(&station_config).unwrap();
+    controller.set_config(&access_point_config).unwrap();
     println!("Wifi started!");
 
     spawner.spawn(connection(controller)).ok();
@@ -226,7 +227,7 @@ async fn run_dhcp(stack: Stack<'static>, gw_ip_addr: &'static str) {
 }
 
 #[embassy_executor::task]
-async fn connection(mut controller: WifiController<'static>) {
+async fn connection(controller: WifiController<'static>) {
     println!("start connection task");
     loop {
         let ev = controller
