@@ -323,32 +323,6 @@ pub fn disable(core: Cpu, interrupt: Interrupt) {
     map_raw(core, interrupt, DISABLED_CPU_INTERRUPT)
 }
 
-/// Get status of peripheral interrupts
-#[inline]
-pub fn status(_core: Cpu) -> InterruptStatus {
-    cfg_if::cfg_if! {
-        if #[cfg(interrupts_status_registers = "3")] {
-            InterruptStatus::from(
-                INTERRUPT_CORE0::regs().core_0_intr_status(0).read().bits(),
-                INTERRUPT_CORE0::regs().core_0_intr_status(1).read().bits(),
-                INTERRUPT_CORE0::regs().core_0_intr_status(2).read().bits(),
-            )
-        } else if #[cfg(interrupts_status_registers = "4")] {
-            InterruptStatus::from(
-                INTERRUPT_CORE0::regs().core_0_intr_status(0).read().bits(),
-                INTERRUPT_CORE0::regs().core_0_intr_status(1).read().bits(),
-                INTERRUPT_CORE0::regs().core_0_intr_status(2).read().bits(),
-                INTERRUPT_CORE0::regs().core_0_intr_status(3).read().bits(),
-            )
-        } else {
-            InterruptStatus::from(
-                INTERRUPT_CORE0::regs().core_0_intr_status(0).read().bits(),
-                INTERRUPT_CORE0::regs().core_0_intr_status(1).read().bits(),
-            )
-        }
-    }
-}
-
 /// Assign a peripheral interrupt to an CPU interrupt.
 ///
 /// # Safety
@@ -1089,7 +1063,7 @@ mod rt {
     #[ram]
     unsafe fn handle_interrupts(cpu_intr: CpuInterrupt) {
         let core = Cpu::current();
-        let status = status(core);
+        let status = InterruptStatus::current();
 
         // this has no effect on level interrupts, but the interrupt may be an edge one
         // so we clear it anyway

@@ -224,28 +224,6 @@ pub fn clear(_core: Cpu, which: CpuInterrupt) {
     }
 }
 
-/// Get status of peripheral interrupts
-#[cfg(any(interrupts_status_registers = "3", interrupts_status_registers = "4"))]
-pub fn status(core: Cpu) -> InterruptStatus {
-    match core {
-        Cpu::ProCpu => InterruptStatus::from(
-            INTERRUPT_CORE0::regs().core_0_intr_status(0).read().bits(),
-            INTERRUPT_CORE0::regs().core_0_intr_status(1).read().bits(),
-            INTERRUPT_CORE0::regs().core_0_intr_status(2).read().bits(),
-            #[cfg(interrupts_status_registers = "4")]
-            INTERRUPT_CORE0::regs().core_0_intr_status(3).read().bits(),
-        ),
-        #[cfg(multi_core)]
-        Cpu::AppCpu => InterruptStatus::from(
-            INTERRUPT_CORE1::regs().core_1_intr_status(0).read().bits(),
-            INTERRUPT_CORE1::regs().core_1_intr_status(1).read().bits(),
-            INTERRUPT_CORE1::regs().core_1_intr_status(2).read().bits(),
-            #[cfg(interrupts_status_registers = "4")]
-            INTERRUPT_CORE1::regs().core_1_intr_status(3).read().bits(),
-        ),
-    }
-}
-
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
         use crate::peripherals::DPORT as INTERRUPT_CORE0;
@@ -637,7 +615,7 @@ mod rt {
             } else {
                 // Finally, check level-triggered peripheral sources.
                 // These interrupts are cleared by the peripheral.
-                status(core)
+                InterruptStatus::current()
             };
 
             let configured_interrupts = configured_interrupts(core, status, LEVEL);
