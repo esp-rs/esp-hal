@@ -895,6 +895,54 @@ pub fn generate_build_script_utils() -> TokenStream {
             ($($any:tt)*) => {};
         }
 
+        #[doc(hidden)]
+        #[macro_export]
+        macro_rules! __assert_features_logic {
+            ($op:tt, $limit:expr, $msg:literal, $($feature:literal),+ $(,)?) => {{
+                let enabled: Vec<&str> = [
+                    $( if cfg!(feature = $feature) { Some($feature) } else { None }, )+
+                ]
+                .into_iter()
+                .flatten()
+                .collect();
+
+                assert!(
+                    enabled.len() $op $limit,
+                    concat!($msg, ": {}.\nCurrently enabled: {}. This might be caused by enabled default features.\n"),
+                    [$($feature),+].join(", "),
+                    if enabled.is_empty() {
+                        "none".to_string()
+                    } else {
+                        enabled.join(", ")
+                    }
+                );
+            }};
+        }
+
+        #[macro_export]
+        macro_rules! assert_unique_features {
+            ($($f:literal),+ $(,)?) => {
+                $crate::__assert_features_logic!(
+                    <=,
+                    1,
+                    "\nAt most one of the following features must be enabled",
+                    $($f),+
+                );
+            };
+        }
+
+        #[macro_export]
+        macro_rules! assert_unique_used_features {
+            ($($f:literal),+ $(,)?) => {
+                $crate::__assert_features_logic!(
+                    ==,
+                    1,
+                    "\nExactly one of the following features must be enabled",
+                    $($f),+
+                );
+            };
+        }
+
         #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
         #[cfg_attr(docsrs, doc(cfg(feature = "build-script")))]
         pub enum Chip {
@@ -906,7 +954,7 @@ pub fn generate_build_script_utils() -> TokenStream {
 
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 match s {
-                    #( #name => Ok(Self::#chip),)*
+                    #( #name => Ok(Self::#chip), )*
                     _ => Err(alloc::format!(#from_str_err)),
                 }
             }
@@ -918,10 +966,11 @@ pub fn generate_build_script_utils() -> TokenStream {
             /// Exactly one device feature must be enabled for this function to succeed.
             pub fn from_cargo_feature() -> Result<Self, &'static str> {
                 let all_chips = [
-                    #(( #feature_env, Self::#chip )),*
+                    #((#feature_env, Self::#chip)),*
                 ];
 
                 let mut chip = None;
+
                 for (env, c) in all_chips {
                     if std::env::var(env).is_ok() {
                         if chip.is_some() {
@@ -933,7 +982,7 @@ pub fn generate_build_script_utils() -> TokenStream {
 
                 match chip {
                     Some(chip) => Ok(chip),
-                    None => Err(#bail_message)
+                    None => Err(#bail_message),
                 }
             }
 
@@ -1009,12 +1058,13 @@ pub fn generate_build_script_utils() -> TokenStream {
             pub fn iter() -> impl Iterator<Item = Chip> {
                 [
                     #( Self::#chip ),*
-                ].into_iter()
+                ]
+                .into_iter()
             }
 
             fn config(self) -> Config {
                 match self {
-                    #(Self::#chip => #config),*
+                    #( Self::#chip => #config ),*
                 }
             }
         }
@@ -1044,7 +1094,9 @@ pub fn generate_build_script_utils() -> TokenStream {
         impl MemoryLayout {
             /// Returns the memory region with the given name.
             pub fn region(&self, name: &str) -> Option<&'static MemoryRegion> {
-                self.regions.iter().find_map(|(n, r)| if *n == name { Some(r) } else { None })
+                self.regions
+                    .iter()
+                    .find_map(|(n, r)| if *n == name { Some(r) } else { None })
             }
         }
 
@@ -1080,7 +1132,7 @@ pub fn generate_build_script_utils() -> TokenStream {
 
         /// Prints `cargo:rustc-check-cfg` lines.
         pub fn emit_check_cfg_directives() {
-            #(println!(#check_cfgs);)*
+            #( println!(#check_cfgs); )*
         }
     }
 }

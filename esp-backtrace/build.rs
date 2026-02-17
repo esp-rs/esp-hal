@@ -1,28 +1,7 @@
 use std::error::Error;
 
 use esp_config::generate_config_from_yaml_definition;
-
-#[macro_export]
-macro_rules! assert_unique_features {
-    ($($feature:literal),+ $(,)?) => {
-        assert!(
-            (0 $(+ cfg!(feature = $feature) as usize)+ ) <= 1,
-            "At most one of the following features must be enabled: {}",
-            [$($feature),+].join(", ")
-        );
-    };
-}
-
-#[macro_export]
-macro_rules! assert_unique_used_features {
-    ($($feature:literal),+ $(,)?) => {
-        assert!(
-            (0 $(+ cfg!(feature = $feature) as usize)+ ) == 1,
-            "Exactly one of the following features must be enabled: {}",
-            [$($feature),+].join(", ")
-        );
-    };
-}
+use esp_metadata_generated::{assert_unique_features, assert_unique_used_features};
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Ensure that exactly one chip has been specified:

@@ -7,6 +7,32 @@ extern crate alloc;
 macro_rules! println {
     ($($any:tt)*) => {};
 }
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __assert_features_logic {
+    ($op:tt, $limit:expr, $msg:literal, $($feature:literal),+ $(,)?) => {
+        { let enabled : Vec < & str > = [$(if cfg!(feature = $feature) { Some($feature) }
+        else { None },)+].into_iter().flatten().collect(); assert!(enabled.len() $op
+        $limit, concat!($msg,
+        ": {}.\nCurrently enabled: {}. This might be caused by enabled default features.\n"),
+        [$($feature),+].join(", "), if enabled.is_empty() { "none".to_string() } else {
+        enabled.join(", ") }); }
+    };
+}
+#[macro_export]
+macro_rules! assert_unique_features {
+    ($($f:literal),+ $(,)?) => {
+        $crate::__assert_features_logic!(<=, 1,
+        "\nAt most one of the following features must be enabled", $($f),+);
+    };
+}
+#[macro_export]
+macro_rules! assert_unique_used_features {
+    ($($f:literal),+ $(,)?) => {
+        $crate::__assert_features_logic!(==, 1,
+        "\nExactly one of the following features must be enabled", $($f),+);
+    };
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(docsrs, doc(cfg(feature = "build-script")))]
 pub enum Chip {

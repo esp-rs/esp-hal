@@ -1,16 +1,5 @@
 use std::{error::Error, path::Path};
 
-#[macro_export]
-macro_rules! assert_unique_features {
-    ($($feature:literal),+ $(,)?) => {
-        assert!(
-            (0 $(+ cfg!(feature = $feature) as usize)+ ) <= 1,
-            "Exactly zero or one of the following features must be enabled: {}",
-            [$($feature),+].join(", ")
-        );
-    };
-}
-
 fn main() -> Result<(), Box<dyn Error>> {
     let self_version = std::env::var("CARGO_PKG_VERSION")?;
     let self_version: Vec<&str> = self_version.split('.').collect();
