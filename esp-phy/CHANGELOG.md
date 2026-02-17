@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `last_calibration_result` to get the result of the last calibration (#4479)
+- Support for ESP32-C5 (#5003)
 
 ### Changed
 
