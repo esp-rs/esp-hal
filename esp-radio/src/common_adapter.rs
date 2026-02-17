@@ -133,6 +133,7 @@ pub unsafe extern "C" fn random() -> c_ulong {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> c_int {
+    trace!("read_mac {:?} {}", mac, type_);
     use hal::efuse::MacForRadio;
 
     let kind = match type_ {
