@@ -6,7 +6,7 @@ mod tests {
         peripherals::Peripherals,
         timer::timg::TimerGroup,
     };
-    use esp_radio::wifi::scan::ScanConfig;
+    use esp_radio::wifi::{Config, scan::ScanConfig, sta::StationConfig};
 
     #[init]
     fn init() -> Peripherals {
@@ -28,11 +28,8 @@ mod tests {
             esp_radio::wifi::new(p.WIFI, Default::default()).unwrap();
 
         controller
-            .set_config(&esp_radio::wifi::Config::Station(
-                esp_radio::wifi::sta::StationConfig::default(),
-            ))
+            .set_config(&Config::Station(StationConfig::default()))
             .unwrap();
-        controller.start_async().await.unwrap();
     }
 
     // If this turns out to be too flaky or time-consuming,
@@ -48,11 +45,8 @@ mod tests {
             esp_radio::wifi::new(p.WIFI, Default::default()).unwrap();
 
         controller
-            .set_config(&esp_radio::wifi::Config::Station(
-                esp_radio::wifi::sta::StationConfig::default(),
-            ))
+            .set_config(&Config::Station(StationConfig::default()))
             .unwrap();
-        controller.start_async().await.unwrap();
 
         let scan_config = ScanConfig::default().with_max(1);
         let _ = controller.scan_async(&scan_config).await.unwrap();

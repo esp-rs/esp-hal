@@ -53,7 +53,6 @@ async fn main(_spawner: Spawner) {
                 .with_password(PASSWORD.into()),
         );
         controller.set_config(&station_config).unwrap();
-        controller.start_async().await.unwrap();
         controller.connect_async().await.unwrap();
 
         let token = wifi_interface.transmit();
@@ -83,7 +82,6 @@ async fn main(_spawner: Spawner) {
                 .with_password(PASSWORD.into()),
         );
         controller.set_config(&station_config).unwrap();
-        controller.start_async().await.unwrap();
         controller.connect_async().await.unwrap();
 
         let mut wifi_interface = interfaces.station;

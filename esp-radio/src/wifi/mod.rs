@@ -2171,6 +2171,9 @@ pub fn new<'d>(
 }
 
 /// Wi-Fi controller.
+///
+/// After initial creation via [new] the controller is in stopped state.
+/// Use [WifiController::set_config] to set the configuration and start the controller.
 #[non_exhaustive]
 pub struct WifiController<'d> {
     _guard: RadioRefGuard,
@@ -2386,7 +2389,7 @@ impl WifiController<'_> {
     }
 
     #[procmacros::doc_replace]
-    /// Set the configuration.
+    /// Set the configuration and (re)start the controller as needed.
     ///
     /// This will set the mode accordingly.
     /// You need to use [`Self::connect_async`] for connecting to an access point.
@@ -2412,6 +2415,9 @@ impl WifiController<'_> {
     pub fn set_config(&mut self, conf: &Config) -> Result<(), WifiError> {
         conf.validate()?;
 
+        let mut previous_mode = 0u32;
+        esp_wifi_result!(unsafe { esp_wifi_get_mode(&mut previous_mode) })?;
+
         let mode = match conf {
             Config::Station(_) => wifi_mode_t_WIFI_MODE_STA,
             Config::AccessPoint(_) => wifi_mode_t_WIFI_MODE_AP,
@@ -2419,6 +2425,10 @@ impl WifiController<'_> {
             #[cfg(feature = "wifi-eap")]
             Config::EapStation(_) => wifi_mode_t_WIFI_MODE_STA,
         };
+
+        if previous_mode != mode {
+            self.stop_impl()?;
+        }
 
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) })?;
 
@@ -2449,6 +2459,18 @@ impl WifiController<'_> {
             // return here - they will run into futher errors this way
             unsafe { esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_NULL) };
         })?;
+
+        if previous_mode != mode {
+            set_access_point_state(WifiAccessPointState::Starting);
+            set_station_state(WifiStationState::Starting);
+
+            // `esp_wifi_start` is actually not async - i.e. we get the even before it returns
+            let res = esp_wifi_result!(unsafe { esp_wifi_start() });
+            if res.is_err() {
+                unsafe { esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_NULL) };
+                return res;
+            }
+        }
 
         Ok(())
     }
@@ -2670,148 +2692,6 @@ impl WifiController<'_> {
         guard.defuse();
 
         Ok(ScanResults::new(self)?.collect::<Vec<_>>())
-    }
-
-    #[procmacros::doc_replace]
-    /// Starts the Wi-Fi controller.
-    ///
-    /// This function will wait for the Wi-Fi controller to start before returning.
-    ///
-    /// ## Example
-    ///
-    /// ```rust,no_run
-    /// # {before_snippet}
-    /// # use esp_radio::wifi::{Config, sta::StationConfig};
-    /// # let (mut controller, _interfaces) =
-    /// #    esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
-    /// controller.start_async().await?;
-    ///
-    /// # {after_snippet}
-    pub async fn start_async(&mut self) -> Result<(), WifiError> {
-        let mut expected_events = 0;
-        let mode = self.mode()?;
-        if mode.is_access_point() {
-            expected_events += 1;
-        }
-        if mode.is_station() {
-            expected_events += 1;
-        }
-
-        let mut subscriber = EVENT_CHANNEL
-            .subscriber()
-            .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
-
-        set_access_point_state(WifiAccessPointState::Starting);
-        set_station_state(WifiStationState::Starting);
-
-        unsafe {
-            esp_wifi_result!(esp_wifi_start())?;
-
-            let mode = WifiMode::current()?;
-
-            // This is not an if-else because in AccessPoint-Station mode, both are true
-            if mode.is_access_point() {
-                esp_wifi_result!(include::esp_wifi_set_inactive_time(
-                    wifi_interface_t_WIFI_IF_AP,
-                    self.ap_beacon_timeout
-                ))?;
-            }
-            if mode.is_station() {
-                esp_wifi_result!(include::esp_wifi_set_inactive_time(
-                    wifi_interface_t_WIFI_IF_STA,
-                    self.beacon_timeout
-                ))?;
-            }
-        }
-
-        loop {
-            let event = subscriber.next_message_pure().await;
-
-            match event {
-                event::EventInfo::StationStart => {
-                    expected_events -= 1;
-                }
-                event::EventInfo::AccessPointStart => {
-                    expected_events -= 1;
-                }
-                _ => (),
-            }
-
-            if expected_events == 0 {
-                break;
-            }
-        }
-
-        Ok(())
-    }
-
-    #[procmacros::doc_replace]
-    /// Stops the Wi-Fi controller.
-    ///
-    /// This function will wait for the Wi-Fi controller to stop before returning.
-    ///
-    /// ## Example
-    ///
-    /// ```rust,no_run
-    /// # {before_snippet}
-    /// # use esp_radio::wifi::WifiError;
-    /// # let (mut controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
-    ///
-    /// match controller.stop_async().await {
-    ///     Ok(()) => {
-    ///         println!("Wi-Fi stopped successfully");
-    ///     }
-    ///     Err(WifiError::NotStarted) => {
-    ///         println!("Wi-Fi was not running");
-    ///     }
-    ///     Err(e) => {
-    ///         println!("Failed to stop Wi-Fi: {e:?}");
-    ///     }
-    /// }
-    /// # {after_snippet}
-    /// ```
-    pub async fn stop_async(&mut self) -> Result<(), WifiError> {
-        // TODO: This might be racey when there is a start operation in progress but it didn't made
-        // it to the state where the driver emits the Started event?
-        // https://github.com/esp-rs/esp-hal/pull/4504#discussion_r2533184425
-        if !self.is_started() {
-            return Err(WifiError::NotStarted);
-        }
-
-        let mut subscriber = EVENT_CHANNEL
-            .subscriber()
-            .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
-
-        let mut expected_events = 0;
-        let mode = self.mode()?;
-        if mode.is_access_point() {
-            expected_events += 1;
-        }
-        if mode.is_station() {
-            expected_events += 1;
-        }
-
-        self.stop_impl()?;
-
-        loop {
-            let event = subscriber.next_message_pure().await;
-
-            match event {
-                event::EventInfo::StationStop => {
-                    expected_events -= 1;
-                }
-                event::EventInfo::AccessPointStop => {
-                    expected_events -= 1;
-                }
-                _ => (),
-            }
-
-            if expected_events == 0 {
-                break;
-            }
-        }
-
-        Ok(())
     }
 
     #[procmacros::doc_replace]

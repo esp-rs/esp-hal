@@ -18,7 +18,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi;
+use esp_radio::wifi::{Config, sta::StationConfig};
 use ieee80211::{
     common::{CapabilitiesInformation, FCFFlags},
     element_chain,
@@ -53,10 +53,10 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     let (mut controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
+    // start the controller in station mode
     controller
-        .set_config(&wifi::Config::Station(wifi::sta::StationConfig::default()))
+        .set_config(&Config::Station(StationConfig::default()))
         .unwrap();
-    controller.start_async().await.unwrap();
 
     let mut sniffer = interfaces.sniffer;
 

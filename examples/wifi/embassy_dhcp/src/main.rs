@@ -79,15 +79,11 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    let station_config = Config::Station(
-        StationConfig::default()
-            .with_ssid(SSID)
-            .with_password(PASSWORD.into()),
-    );
-    controller.set_config(&station_config).unwrap();
+    // make sure WiFi is started before scanning
     println!("Starting wifi");
-    controller.start_async().await.unwrap();
-    println!("Wifi started!");
+    controller
+        .set_config(&Config::Station(StationConfig::default()))
+        .unwrap();
 
     println!("Scan");
     let scan_config = ScanConfig::default().with_max(10);
@@ -95,6 +91,14 @@ async fn main(spawner: Spawner) -> ! {
     for ap in result {
         println!("{:?}", ap);
     }
+
+    let station_config = Config::Station(
+        StationConfig::default()
+            .with_ssid(SSID)
+            .with_password(PASSWORD.into()),
+    );
+    controller.set_config(&station_config).unwrap();
+    println!("Wifi configured and started!");
 
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(runner)).ok();

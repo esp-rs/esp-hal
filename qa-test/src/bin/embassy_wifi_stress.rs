@@ -46,9 +46,6 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let (mut controller, _interfaces) =
-        esp_radio::wifi::new(peripherals.WIFI.reborrow(), Default::default()).unwrap();
-
     let mut i = 0;
     loop {
         println!("{}", esp_alloc::HEAP.stats());
@@ -62,75 +59,74 @@ async fn main(_spawner: Spawner) {
             i
         );
 
-        controller
-            .set_config(&Config::Station(StationConfig::default()))
-            .unwrap();
         println!("Wifi stack setup (STA)");
-        controller.start_async().await.unwrap();
-        println!("Connecting to WiFi SSID: {}", SSID);
-        let scan_config =
-            ScanConfig::default()
-                .with_ssid(SSID)
-                .with_scan_type(ScanTypeConfig::Active {
-                    min: esp_hal::time::Duration::from_millis(5),
-                    max: esp_hal::time::Duration::from_millis(20),
-                });
-        println!("Scanning for WiFi networks");
-        let aps = controller
-            .scan_async(&scan_config)
-            .with_timeout(Duration::from_secs(5))
-            .await
-            .unwrap();
-        if aps.is_err() {
-            println!("Failed to scan wifi networks, timeout hit!");
-            Timer::after(Duration::from_secs(2)).await;
-            continue;
+        let (mut controller, _interfaces) =
+            esp_radio::wifi::new(peripherals.WIFI.reborrow(), Default::default()).unwrap();
+
+        {
+            controller
+                .set_config(&Config::Station(StationConfig::default()))
+                .unwrap();
+
+            println!("Connecting to WiFi SSID: {}", SSID);
+            let scan_config =
+                ScanConfig::default()
+                    .with_ssid(SSID)
+                    .with_scan_type(ScanTypeConfig::Active {
+                        min: esp_hal::time::Duration::from_millis(5),
+                        max: esp_hal::time::Duration::from_millis(20),
+                    });
+            println!("Scanning for WiFi networks");
+            let aps = controller
+                .scan_async(&scan_config)
+                .with_timeout(Duration::from_secs(5))
+                .await
+                .unwrap();
+            if aps.is_err() {
+                println!("Failed to scan wifi networks, timeout hit!");
+                Timer::after(Duration::from_secs(2)).await;
+                continue;
+            }
+
+            let mut aps = aps.unwrap();
+            println!("Found {} access points", aps.len());
+            if aps.is_empty() {
+                println!("No access points found.");
+                Timer::after(Duration::from_secs(2)).await;
+                continue;
+            }
+            aps.sort_by(|x, y| y.signal_strength.cmp(&x.signal_strength));
+            let best_one = aps.first().unwrap();
+            println!("Best AP found: {:?}", best_one);
+            println!("Connecting to WiFi SSID: {}", SSID);
+
+            let station_config = Config::Station(
+                StationConfig::default()
+                    .with_ssid(best_one.ssid.clone())
+                    .with_bssid(best_one.bssid)
+                    .with_auth_method(best_one.auth_method.unwrap())
+                    .with_password(PASSWORD.to_string())
+                    .with_channel(best_one.channel),
+            );
+            controller.set_config(&station_config).unwrap();
+
+            let err = controller
+                .connect_async()
+                .with_timeout(Duration::from_secs(10))
+                .await;
+
+            if err.is_err() {
+                println!("Failed to connect to Wifi, timeout hit!");
+                Timer::after(Duration::from_secs(2)).await;
+                continue;
+            }
+            let err = err.unwrap();
+            if err.is_err() {
+                println!("Failed to connect to WiFi: {:?}", err);
+                Timer::after(Duration::from_secs(2)).await;
+            } else {
+                println!("Connect OK");
+            }
         }
-
-        let mut aps = aps.unwrap();
-        println!("Found {} access points", aps.len());
-        if aps.is_empty() {
-            println!("No access points found.");
-            Timer::after(Duration::from_secs(2)).await;
-            controller.stop_async().await.unwrap();
-            continue;
-        }
-        aps.sort_by(|x, y| y.signal_strength.cmp(&x.signal_strength));
-        let best_one = aps.first().unwrap();
-        println!("Best AP found: {:?}", best_one);
-        println!("Connecting to WiFi SSID: {}", SSID);
-
-        let station_config = Config::Station(
-            StationConfig::default()
-                .with_ssid(best_one.ssid.clone())
-                .with_bssid(best_one.bssid)
-                .with_auth_method(best_one.auth_method.unwrap())
-                .with_password(PASSWORD.to_string())
-                .with_channel(best_one.channel),
-        );
-        controller.set_config(&station_config).unwrap();
-
-        let err = controller
-            .connect_async()
-            .with_timeout(Duration::from_secs(10))
-            .await;
-
-        if err.is_err() {
-            println!("Failed to connect to Wifi, timeout hit!");
-            Timer::after(Duration::from_secs(2)).await;
-            continue;
-        }
-        let err = err.unwrap();
-        if err.is_err() {
-            println!("Failed to connect to WiFi: {:?}", err);
-            Timer::after(Duration::from_secs(2)).await;
-        } else {
-            println!("Connect OK");
-        }
-
-        // Timer::after(Duration::from_secs(10)).await; // These sleeps delay reproducing the
-        // bug, but do not prevent it
-        controller.stop_async().await.unwrap();
-        // Timer::after(Duration::from_secs(10)).await;
     }
 }
