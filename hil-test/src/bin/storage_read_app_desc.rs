@@ -1,7 +1,7 @@
 //! Test we place the app descriptor at the right position in the image and we
 //! can read it
 
-//% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
+//% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c5 esp32c6 esp32h2
 //% FEATURES: unstable esp-storage
 
 #![no_std]
