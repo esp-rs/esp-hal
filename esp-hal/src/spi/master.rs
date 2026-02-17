@@ -47,6 +47,7 @@ use core::{
 #[cfg(spi_master_supports_dma)]
 pub use dma::*;
 use enumset::{EnumSet, EnumSetType};
+use esp_sync::RawMutex;
 use procmacros::doc_replace;
 
 use super::{BitOrder, Error, Mode};
@@ -3951,6 +3952,7 @@ for_each_spi_master! {
 
                 static STATE: State = State {
                     waker: AtomicWaker::new(),
+                    mutex: RawMutex::new(),
                     #[cfg(esp32)]
                     esp32_hack: Esp32Hack {
                         timing_miso_delay: Cell::new(None),
@@ -3976,6 +3978,10 @@ impl QspiInstance for AnySpi<'_> {}
 pub struct State {
     waker: AtomicWaker,
 
+    // Ensures that register operations in Futures and interrupt handlers can't run concurrently.
+    // TODO: if we expose an interrupt-focused API, we'll need to protect its operations, too.
+    mutex: RawMutex,
+
     #[cfg(esp32)]
     esp32_hack: Esp32Hack,
 }
@@ -3991,11 +3997,13 @@ unsafe impl Sync for Esp32Hack {}
 
 #[ram]
 fn handle_async(info: &'static Info, state: &'static State) {
-    let driver = Driver { info, state };
-    if driver.interrupts().contains(SpiInterrupt::TransferDone) {
-        driver.enable_listen(SpiInterrupt::TransferDone.into(), false);
-        state.waker.wake();
-    }
+    state.mutex.lock(|| {
+        let driver = Driver { info, state };
+        if driver.interrupts().contains(SpiInterrupt::TransferDone) {
+            driver.enable_listen(SpiInterrupt::TransferDone.into(), false);
+            state.waker.wake();
+        }
+    })
 }
 
 /// SPI data mode
@@ -4055,6 +4063,7 @@ impl AnySpi<'_> {
 
 struct SpiFuture<'a> {
     driver: &'a Driver,
+    listening: bool,
 }
 
 impl<'a> SpiFuture<'a> {
@@ -4062,11 +4071,18 @@ impl<'a> SpiFuture<'a> {
     fn setup(driver: &'a Driver) -> impl Future<Output = Self> {
         // Make sure this is called before starting an async operation. On the ESP32,
         // calling after may cause the interrupt to not fire.
+        // FIXME: flush() should not clear the interrupt, and has no option to listen
+        // before starting the transfer. Do we have sufficient tests around this?
         core::future::poll_fn(move |cx| {
-            driver.state.waker.register(cx.waker());
-            driver.clear_interrupts(SpiInterrupt::TransferDone.into());
-            driver.enable_listen(SpiInterrupt::TransferDone.into(), true);
-            Poll::Ready(Self { driver })
+            driver.state.mutex.lock(|| {
+                driver.state.waker.register(cx.waker());
+                driver.clear_interrupts(SpiInterrupt::TransferDone.into());
+                driver.enable_listen(SpiInterrupt::TransferDone.into(), true);
+            });
+            Poll::Ready(Self {
+                driver,
+                listening: true,
+            })
         })
     }
 }
@@ -4074,14 +4090,20 @@ impl<'a> SpiFuture<'a> {
 impl Future for SpiFuture<'_> {
     type Output = ();
 
-    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
         if self
             .driver
             .interrupts()
             .contains(SpiInterrupt::TransferDone)
         {
-            self.driver
-                .clear_interrupts(SpiInterrupt::TransferDone.into());
+            self.driver.state.mutex.lock(|| {
+                self.driver
+                    .enable_listen(SpiInterrupt::TransferDone.into(), false);
+                self.driver
+                    .clear_interrupts(SpiInterrupt::TransferDone.into());
+            });
+
+            self.listening = false;
             return Poll::Ready(());
         }
 
@@ -4091,7 +4113,11 @@ impl Future for SpiFuture<'_> {
 
 impl Drop for SpiFuture<'_> {
     fn drop(&mut self) {
-        self.driver
-            .enable_listen(SpiInterrupt::TransferDone.into(), false);
+        if self.listening {
+            self.driver.state.mutex.lock(|| {
+                self.driver
+                    .enable_listen(SpiInterrupt::TransferDone.into(), false);
+            });
+        }
     }
 }

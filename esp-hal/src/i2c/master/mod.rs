@@ -122,6 +122,7 @@ use core::{
 
 use embedded_hal::i2c::Operation as EhalOperation;
 use enumset::{EnumSet, EnumSetType};
+use esp_sync::RawMutex;
 
 use crate::{
     Async,
@@ -835,29 +836,11 @@ struct I2cFuture<'a> {
 
 impl<'a> I2cFuture<'a> {
     pub fn new(events: EnumSet<Event>, driver: Driver<'a>, deadline: Option<Instant>) -> Self {
-        driver.regs().int_ena().modify(|_, w| {
-            for event in events {
-                match event {
-                    Event::EndDetect => w.end_detect().set_bit(),
-                    Event::TxComplete => w.trans_complete().set_bit(),
-                    #[cfg(i2c_master_has_tx_fifo_watermark)]
-                    Event::TxFifoWatermark => w.txfifo_wm().set_bit(),
-                };
-            }
-
-            w.arbitration_lost().set_bit();
-            w.time_out().set_bit();
-            w.nack().set_bit();
-            #[cfg(i2c_master_has_fsm_timeouts)]
-            {
-                w.scl_main_st_to().set_bit();
-                w.scl_st_to().set_bit();
-            }
-
-            w
+        let mut this = Self::new_blocking(events, driver, deadline);
+        this.driver.state.mutex.lock(|| {
+            this.listen(true);
         });
-
-        Self::new_blocking(events, driver, deadline)
+        this
     }
 
     pub fn new_blocking(
@@ -871,6 +854,30 @@ impl<'a> I2cFuture<'a> {
             deadline,
             finished: false,
         }
+    }
+
+    fn listen(&mut self, enabled: bool) {
+        self.driver.regs().int_ena().modify(|_, w| {
+            for event in self.events {
+                match event {
+                    Event::EndDetect => w.end_detect().bit(enabled),
+                    Event::TxComplete => w.trans_complete().bit(enabled),
+                    #[cfg(i2c_master_has_tx_fifo_watermark)]
+                    Event::TxFifoWatermark => w.txfifo_wm().bit(enabled),
+                };
+            }
+
+            w.arbitration_lost().bit(enabled);
+            w.time_out().bit(enabled);
+            w.nack().bit(enabled);
+            #[cfg(i2c_master_has_fsm_timeouts)]
+            {
+                w.scl_main_st_to().bit(enabled);
+                w.scl_st_to().bit(enabled);
+            }
+
+            w
+        });
     }
 
     fn is_done(&self) -> bool {
@@ -910,6 +917,10 @@ impl<'a> I2cFuture<'a> {
         };
 
         if result.is_ready() {
+            self.driver.state.mutex.lock(|| {
+                self.listen(false);
+                self.driver.clear_all_interrupts();
+            });
             self.finished = true;
         }
 
@@ -936,6 +947,7 @@ impl core::future::Future for I2cFuture<'_> {
 impl Drop for I2cFuture<'_> {
     fn drop(&mut self) {
         if !self.finished {
+            self.driver.state.mutex.lock(|| self.listen(false));
             let result = self.poll_completion();
             if result.is_pending() || result == Poll::Ready(Err(Error::Timeout)) {
                 self.driver.reset_fsm(true);
@@ -1357,11 +1369,15 @@ impl embedded_hal_async::i2c::I2c for I2c<'_, Async> {
 
 #[ram]
 fn async_handler(info: &Info, state: &State) {
-    // Disable all interrupts. The I2C Future will check events based on the
-    // interrupt status bits.
-    info.regs().int_ena().write(|w| unsafe { w.bits(0) });
-
-    state.waker.wake();
+    state.mutex.lock(|| {
+        let pending = info.regs().int_st().read().bits();
+        if pending != 0 {
+            // Disable pending interrupts. The I2C Future will check events based on the
+            // interrupt status bits.
+            info.regs().int_ena().write(|w| unsafe { w.bits(!pending) });
+            state.waker.wake();
+        }
+    });
 }
 
 /// Sets the filter with a supplied threshold in clock cycles for which a
@@ -3211,6 +3227,10 @@ impl Future for ClearBusFuture<'_> {
 pub struct State {
     /// Waker for the asynchronous operations.
     pub waker: AtomicWaker,
+
+    /// Ensures that register operations in Futures and interrupt handlers can't run concurrently.
+    /// TODO: if we expose an interrupt-focused API, we'll need to protect its operations, too.
+    pub mutex: RawMutex,
 }
 
 /// A peripheral singleton compatible with the I2C master driver.
@@ -3329,6 +3349,7 @@ for_each_i2c_master!(
 
                 static STATE: State = State {
                     waker: AtomicWaker::new(),
+                    mutex: RawMutex::new(),
                 };
 
                 static PERIPHERAL: Info = Info {

@@ -278,8 +278,6 @@ macro_rules! unstable_driver {
     };
 }
 
-use core::marker::PhantomData;
-
 pub use esp_metadata_generated::chip;
 use esp_rom_sys as _;
 pub(crate) use unstable_driver;
@@ -510,16 +508,12 @@ pub struct Blocking;
 /// When initializing an async driver, the driver disables user-specified
 /// interrupt handlers, and sets up internal interrupt handlers that drive the
 /// driver's async API. The driver's interrupt handlers run on the same core as
-/// the driver was initialized on. This means that the driver can not be sent
-/// across threads, to prevent incorrect concurrent access to the peripheral.
+/// the driver was initialized on.
 ///
-/// Switching back to blocking mode will disable the interrupt handlers and
-/// return the driver to a state where it can be sent across threads.
+/// Switching back to blocking mode will disable the interrupt handlers.
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct Async(PhantomData<*const ()>);
-
-unsafe impl Sync for Async {}
+pub struct Async;
 
 impl crate::DriverMode for Blocking {}
 impl crate::DriverMode for Async {}

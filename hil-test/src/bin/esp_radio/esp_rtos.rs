@@ -578,7 +578,7 @@ mod tests {
 
         static SIGNAL: Signal<RawMutex, ()> = Signal::new();
 
-        let _gaurd = esp_hal::system::CpuControl::new(ctx.cpu_cntl)
+        let _guard = esp_hal::system::CpuControl::new(ctx.cpu_cntl)
             .start_app_core(
                 #[allow(static_mut_refs)]
                 unsafe {

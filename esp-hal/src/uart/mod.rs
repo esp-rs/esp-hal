@@ -50,6 +50,7 @@ crate::unstable_driver! {
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
 use enumset::{EnumSet, EnumSetType};
+use esp_sync::RawMutex;
 use portable_atomic::AtomicBool;
 
 use crate::{
@@ -793,6 +794,7 @@ where
     /// supported by the hardware.
     #[instability::unstable]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        // FIXME: thread safety
         self.uart
             .info()
             .set_tx_fifo_empty_threshold(config.tx.fifo_empty_threshold)?;
@@ -1265,6 +1267,7 @@ where
     /// supported by the hardware.
     #[instability::unstable]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        // FIXME: thread safety
         self.uart
             .info()
             .set_rx_fifo_full_threshold(config.rx.fifo_full_threshold)?;
@@ -2495,7 +2498,9 @@ impl core::future::Future for UartRxFuture {
         } else {
             self.state.rx_waker.register(cx.waker());
             if !self.registered {
-                self.uart.enable_listen_rx(self.events, true);
+                self.state.mutex.lock(|| {
+                    self.uart.enable_listen_rx(self.events, true);
+                });
                 self.registered = true;
             }
             Poll::Pending
@@ -2508,7 +2513,11 @@ impl Drop for UartRxFuture {
         // Although the isr disables the interrupt that occurred directly, we need to
         // disable the other interrupts (= the ones that did not occur), as
         // soon as this future goes out of scope.
-        self.uart.enable_listen_rx(self.events, false);
+        if self.registered {
+            self.state.mutex.lock(|| {
+                self.uart.enable_listen_rx(self.events, false);
+            });
+        }
     }
 }
 
@@ -2545,7 +2554,9 @@ impl core::future::Future for UartTxFuture {
         } else {
             self.state.tx_waker.register(cx.waker());
             if !self.registered {
-                self.uart.enable_listen_tx(self.events, true);
+                self.state.mutex.lock(|| {
+                    self.uart.enable_listen_tx(self.events, true);
+                });
                 self.registered = true;
             }
             Poll::Pending
@@ -2558,7 +2569,11 @@ impl Drop for UartTxFuture {
         // Although the isr disables the interrupt that occurred directly, we need to
         // disable the other interrupts (= the ones that did not occur), as
         // soon as this future goes out of scope.
-        self.uart.enable_listen_tx(self.events, false);
+        if self.registered {
+            self.state.mutex.lock(|| {
+                self.uart.enable_listen_tx(self.events, false);
+            });
+        }
     }
 }
 
@@ -2687,16 +2702,18 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
         | interrupts.parity_err().bit_is_set();
     let tx_wake = interrupts.tx_done().bit_is_set() | interrupts.txfifo_empty().bit_is_set();
 
-    uart.regs()
-        .int_ena()
-        .modify(|r, w| unsafe { w.bits(r.bits() & !interrupt_bits) });
+    state.mutex.lock(|| {
+        uart.regs()
+            .int_ena()
+            .modify(|r, w| unsafe { w.bits(r.bits() & !interrupt_bits) });
 
-    if tx_wake {
-        state.tx_waker.wake();
-    }
-    if rx_wake {
-        state.rx_waker.wake();
-    }
+        if tx_wake {
+            state.tx_waker.wake();
+        }
+        if rx_wake {
+            state.rx_waker.wake();
+        }
+    });
 }
 
 /// Low-power UART
@@ -3022,6 +3039,9 @@ pub struct State {
 
     /// Stores whether the RX half is configured for async operation.
     pub is_tx_async: AtomicBool,
+
+    /// Mutex for the UART instance.
+    pub mutex: RawMutex,
 }
 
 impl Info {
@@ -3757,6 +3777,7 @@ for_each_uart! {
                     rx_waker: AtomicWaker::new(),
                     is_rx_async: AtomicBool::new(false),
                     is_tx_async: AtomicBool::new(false),
+                    mutex: RawMutex::new(),
                 };
 
                 fn request_uart_clks(clocks: &mut ClockTree) {

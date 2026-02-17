@@ -1,7 +1,7 @@
 //! SPI Full Duplex test suite.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES(unstable): unstable
+//% FEATURES(unstable): unstable embassy
 //% FEATURES(stable):
 
 // FIXME: add async test cases that don't rely on PCNT
@@ -98,6 +98,14 @@ mod tests {
                 let tx_buffer = unsafe { (&raw mut TX_BUFFER).as_mut().unwrap() };
                 let rx_buffer = unsafe { (&raw mut RX_BUFFER).as_mut().unwrap() };
             }
+        }
+
+        #[cfg(feature = "embassy")]
+        {
+            use esp_hal::{interrupt::software::SoftwareInterruptControl, timer::timg::TimerGroup};
+            let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+            let timg0 = TimerGroup::new(peripherals.TIMG0);
+            esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
         }
 
         // Need to set miso first so that mosi can overwrite the
@@ -928,5 +936,62 @@ mod tests {
 
             assert_eq!(actual, expectation);
         }
+    }
+
+    #[test]
+    #[cfg(all(multi_core, feature = "embassy"))]
+    async fn async_operation_on_different_core(ctx: Context) {
+        use embassy_sync::signal::Signal;
+        use esp_hal::{
+            Async,
+            interrupt::software::SoftwareInterrupt,
+            system::{Cpu, Stack},
+        };
+        use esp_sync::RawMutex;
+        use hil_test::Executor;
+        use static_cell::StaticCell;
+
+        const TEST_DATA: [u8; 4] = [0xde, 0xad, 0xbe, 0xef];
+        static SIGNAL: Signal<RawMutex, [u8; 4]> = Signal::new();
+
+        static mut APP_CORE_STACK: Stack<8192> = Stack::new();
+
+        #[embassy_executor::task]
+        async fn spi_task(mut spi: Spi<'static, Async>) {
+            let mut read: [u8; 4] = [0x00u8; 4];
+
+            SpiBusAsync::transfer(&mut spi, &mut read[..], &TEST_DATA)
+                .await
+                .expect("Symmetric transfer failed");
+
+            SIGNAL.signal(read);
+        }
+
+        let cpu_cntl = unsafe { esp_hal::peripherals::CPU_CTRL::steal() };
+
+        // Create async SPI on the first core. This will register its interrupt handler there.
+        let spi = ctx.spi.into_async();
+        esp_rtos::start_second_core(
+            unsafe { cpu_cntl.clone_unchecked() },
+            unsafe { SoftwareInterrupt::<1>::steal() },
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut APP_CORE_STACK
+            },
+            move || {
+                static CORE1_EXECUTOR: StaticCell<Executor> = StaticCell::new();
+                let executor = CORE1_EXECUTOR.init(Executor::new());
+                executor.run(|spawner| {
+                    spawner.must_spawn(spi_task(spi));
+                });
+            },
+        );
+
+        let result = SIGNAL.wait().await;
+
+        assert_eq!(TEST_DATA, result);
+
+        // Park the second core, we don't need it anymore
+        unsafe { esp_hal::system::CpuControl::new(cpu_cntl).park_core(Cpu::AppCpu) };
     }
 }
