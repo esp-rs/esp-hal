@@ -908,7 +908,7 @@ pub fn generate_build_script_utils() -> TokenStream {
 
                 assert!(
                     enabled.len() $op $limit,
-                    concat!($msg, ": {}.\nCurrently enabled: {}"),
+                    concat!($msg, ": {}.\nCurrently enabled: {}. This might be caused by enabled default features.\n"),
                     [$($feature),+].join(", "),
                     if enabled.is_empty() {
                         "none".to_string()
@@ -925,7 +925,7 @@ pub fn generate_build_script_utils() -> TokenStream {
                 $crate::__assert_features_logic!(
                     <=,
                     1,
-                    "At most one of the following features must be enabled",
+                    "\nAt most one of the following features must be enabled",
                     $($f),+
                 );
             };
@@ -937,7 +937,7 @@ pub fn generate_build_script_utils() -> TokenStream {
                 $crate::__assert_features_logic!(
                     ==,
                     1,
-                    "Exactly one of the following features must be enabled",
+                    "\nExactly one of the following features must be enabled",
                     $($f),+
                 );
             };
