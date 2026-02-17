@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WifiController::is_connected()` and `WifiController::is_started()` now return a simple `bool` instead of `Result<bool, WifiError>` and are marked as unstable (#4971)
 - `ScanMethod` has been moved to `wifi::sta` (#5033)
 - `set_protocols` / `set_bandwidths` changed to support 5G-band (#5023)
+- MAC addresses now should be obtained from `esp_hal::efuse::radio_mac_address(MacForRadio::)`. (#5002)
 
 ### Fixed
 
@@ -83,6 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WifiController` methods `wait_for_event`, `wait_for_events`, and `wait_for_all_events` have been removed. They are replaced by `wait_for_disconnect_async`, `wait_for_access_point_connected_event_async`, or by using an `EventSubscriber`. (#4898)
 - `wifi::WifiMode` and `WifiController::set_mode` have been removed (#4991)
 - `WifiController` methods `start_async` and `stop_async` have been removed. `set_config` will now make sure that the controller is started / re-started as needed. Dropping the controller will stop it first. (#4984)
+- MAC address getters: `access_point_mac()`, `station_mac()` and `ble::mac()`. (#5002)
 
 ## [v0.17.0] - 2025-10-30
 
