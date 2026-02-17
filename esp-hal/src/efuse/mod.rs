@@ -260,3 +260,49 @@ pub enum SetMacError {
     /// The MAC address has already been set and cannot be changed.
     AlreadySet,
 }
+
+/// Get the MAC address for the desired radio interface, derived from the base MAC.
+pub fn radio_mac_address(kind: MacForRadio) -> [u8; 6] {
+    let mut mac = Efuse::mac_address();
+
+    match kind {
+        MacForRadio::Station => {
+            // base MAC
+        }
+        MacForRadio::AccessPoint => {
+            derive_local_mac(&mut mac);
+        }
+        MacForRadio::Bluetooth => {
+            derive_local_mac(&mut mac);
+
+            mac[5] = mac[5].wrapping_add(1);
+        }
+    }
+    mac
+}
+
+/// Helper function.
+/// Serves to derive a local MAC by adjusting the first octet of the given base MAC.
+/// See https://github.com/esp-rs/esp-hal/blob/0881d747c53e43ee847bef3068076a48ce8d27f0/esp-radio/src/common_adapter.rs#L151-L159
+fn derive_local_mac(mac: &mut [u8; 6]) {
+    let base = mac[0];
+
+    for i in 0..64 {
+        let derived = (base | 0x02) ^ (i << 2);
+        if derived != base {
+            mac[0] = derived;
+            break;
+        }
+    }
+}
+
+/// Radio interface options for obtaining their MAC address.
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+pub enum MacForRadio {
+    /// Wi-Fi station (Sta).
+    Station,
+    /// Wi-Fi access point (SoftAP).
+    AccessPoint,
+    /// Bluetooth (BT/BLE).
+    Bluetooth,
+}
