@@ -1,0 +1,18 @@
+name: "Merge Conflict Monitor"
+on:
+  push:
+    branches: [main]
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  conflict-monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Label & Notify Conflicts
+        uses: eps1lon/actions-label-merge-conflict@v3
+        with:
+          repoToken: "${{ secrets.GITHUB_TOKEN }}"
+          dirtyLabel: "merge-conflict"
+          removeOnDirtyLabel: true
+          commentOnDirty: "Notification about merge conflicts. Please resolve the conflicts."
