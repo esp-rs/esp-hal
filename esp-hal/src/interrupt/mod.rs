@@ -70,7 +70,7 @@
 //! }
 //! ```
 
-use core::{num::NonZeroUsize, ops::BitAnd};
+use core::num::NonZeroUsize;
 
 #[cfg(riscv)]
 pub use self::riscv::*;
@@ -306,16 +306,6 @@ impl InterruptStatus {
         InterruptStatusIterator {
             status: *self,
             idx: 0,
-        }
-    }
-}
-
-impl BitAnd for InterruptStatus {
-    type Output = InterruptStatus;
-
-    fn bitand(self, rhs: Self) -> Self::Output {
-        Self::Output {
-            status: core::array::from_fn(|i| self.status[i] & rhs.status[i]),
         }
     }
 }
