@@ -96,10 +96,12 @@ impl<'d> FlashStorage<'d> {
     ///
     /// Panics if called more than once.
     pub fn new(flash: Flash<'d>) -> Self {
-        #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
+        #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32c5")))]
         const ADDR: u32 = 0x0000;
         #[cfg(any(feature = "esp32", feature = "esp32s2"))]
         const ADDR: u32 = 0x1000;
+        #[cfg(feature = "esp32c5")]
+        const ADDR: u32 = 0x2000;
 
         let mut storage = Self {
             capacity: 0,

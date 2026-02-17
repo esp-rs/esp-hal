@@ -62,6 +62,8 @@ esp32c2   = ["esp-hal/esp32c2", "esp-hal/unstable", "esp-rom-sys/esp32c2", "esp-
 ##
 esp32c3   = ["esp-hal/esp32c3", "esp-hal/unstable", "esp-rom-sys/esp32c3", "esp-sync/esp32c3"]
 ##
+esp32c5   = ["esp-hal/esp32c5", "esp-hal/unstable", "esp-rom-sys/esp32c5", "esp-sync/esp32c5"]
+##
 esp32c6   = ["esp-hal/esp32c6", "esp-hal/unstable", "esp-rom-sys/esp32c6", "esp-sync/esp32c6"]
 ##
 esp32h2   = ["esp-hal/esp32h2", "esp-hal/unstable", "esp-rom-sys/esp32h2", "esp-sync/esp32h2"]
