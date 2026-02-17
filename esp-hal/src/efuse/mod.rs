@@ -281,7 +281,6 @@ pub enum SetMacError {
     AlreadySet,
 }
 
-
 /// Helper function.
 /// Serves to derive a local MAC by adjusting the first octet of the given base MAC.
 /// See https://github.com/esp-rs/esp-hal/blob/0881d747c53e43ee847bef3068076a48ce8d27f0/esp-radio/src/common_adapter.rs#L151-L159
