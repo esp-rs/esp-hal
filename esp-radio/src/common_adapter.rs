@@ -143,7 +143,7 @@ pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> c_int {
         _ => return -1,
     };
 
-    let addr = hal::efuse::radio_mac_address(kind);
+    let addr = hal::efuse::Efuse::radio_mac_address(kind);
 
     unsafe {
         core::ptr::copy_nonoverlapping(addr.as_ptr(), mac, 6);

@@ -1262,10 +1262,10 @@ enum InterfaceType {
 
 impl InterfaceType {
     fn mac_address(&self) -> [u8; 6] {
-        use esp_hal::efuse::{MacForRadio, radio_mac_address};
+        use esp_hal::efuse::{MacForRadio, Efuse};
         match self {
-            InterfaceType::Station => radio_mac_address(MacForRadio::Station),
-            InterfaceType::AccessPoint => radio_mac_address(MacForRadio::AccessPoint),
+            InterfaceType::Station => Efuse::radio_mac_address(MacForRadio::Station),
+            InterfaceType::AccessPoint => Efuse::radio_mac_address(MacForRadio::AccessPoint),
         }
     }
 

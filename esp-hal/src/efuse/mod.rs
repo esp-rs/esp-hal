@@ -231,6 +231,26 @@ impl Efuse {
         }
     }
 
+    /// Get the MAC address for the desired radio interface, derived from the base MAC.
+    pub fn radio_mac_address(kind: MacForRadio) -> [u8; 6] {
+        let mut mac = Self::mac_address();
+
+        match kind {
+            MacForRadio::Station => {
+                // base MAC
+            }
+            MacForRadio::AccessPoint => {
+                derive_local_mac(&mut mac);
+            }
+            MacForRadio::Bluetooth => {
+                derive_local_mac(&mut mac);
+
+                mac[5] = mac[5].wrapping_add(1);
+            }
+        }
+        mac
+    }
+
     /// Returns the hardware revision
     ///
     /// The chip version is calculated using the following
@@ -261,25 +281,6 @@ pub enum SetMacError {
     AlreadySet,
 }
 
-/// Get the MAC address for the desired radio interface, derived from the base MAC.
-pub fn radio_mac_address(kind: MacForRadio) -> [u8; 6] {
-    let mut mac = Efuse::mac_address();
-
-    match kind {
-        MacForRadio::Station => {
-            // base MAC
-        }
-        MacForRadio::AccessPoint => {
-            derive_local_mac(&mut mac);
-        }
-        MacForRadio::Bluetooth => {
-            derive_local_mac(&mut mac);
-
-            mac[5] = mac[5].wrapping_add(1);
-        }
-    }
-    mac
-}
 
 /// Helper function.
 /// Serves to derive a local MAC by adjusting the first octet of the given base MAC.
