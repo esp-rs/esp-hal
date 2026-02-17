@@ -96,12 +96,18 @@ impl<'d> FlashStorage<'d> {
     ///
     /// Panics if called more than once.
     pub fn new(flash: Flash<'d>) -> Self {
-        #[cfg(not(any(feature = "esp32", feature = "esp32s2", feature = "esp32c5")))]
-        const ADDR: u32 = 0x0000;
-        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-        const ADDR: u32 = 0x1000;
-        #[cfg(feature = "esp32c5")]
-        const ADDR: u32 = 0x2000;
+        // get the flash size from the bootloader
+        // we might want to find a better way for this (i.e. read the chip ID)
+        // since this assumed the ESP-IDF bootloader
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "esp32c5")] {
+                const ADDR: u32 = 0x2000;
+            } else if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
+                const ADDR: u32 = 0x1000;
+            } else {
+                const ADDR: u32 = 0x0000;
+            }
+        };
 
         let mut storage = Self {
             capacity: 0,
