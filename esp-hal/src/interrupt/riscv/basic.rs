@@ -1,4 +1,4 @@
-use super::{InterruptKind, Priority};
+use super::{InterruptKind, Priority, RunLevel};
 use crate::peripherals::INTERRUPT_CORE0;
 
 pub(super) fn init() {}
@@ -53,14 +53,14 @@ pub(super) fn current_runlevel() -> u8 {
         .saturating_sub(1) as u8
 }
 
-pub(super) fn change_current_runlevel(level: Priority) -> u8 {
+pub(super) fn change_current_runlevel(level: RunLevel) -> u8 {
     let prev_interrupt_priority = current_runlevel();
 
     // The CPU responds to interrupts `>= level`, but we want to also disable
     // interrupts at `level` so we set the threshold to `level + 1`.
     INTERRUPT_CORE0::regs()
         .cpu_int_thresh()
-        .write(|w| unsafe { w.bits(level as u32 + 1) });
+        .write(|w| unsafe { w.bits(u32::from(level) + 1) });
 
     prev_interrupt_priority
 }

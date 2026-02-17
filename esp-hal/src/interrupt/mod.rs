@@ -405,3 +405,68 @@ pub fn status(core: Cpu) -> InterruptStatus {
         ),
     }
 }
+
+/// Represents the priority level of running code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum RunLevel {
+    /// The base level
+    ThreadMode,
+
+    /// An elevated level, usually an interrupt handler's.
+    Interrupt(Priority),
+}
+
+impl RunLevel {
+    /// Get the current run level (the level below which interrupts are masked).
+    #[inline]
+    pub fn current() -> Self {
+        current_runlevel()
+    }
+
+    /// Changes the current run level to the specified level and returns the previous level.
+    #[inline]
+    pub unsafe fn change(to: Self) -> Self {
+        unsafe { change_current_runlevel(to) }
+    }
+
+    /// Checks if the run level indicates thread mode.
+    #[inline]
+    pub fn is_thread(&self) -> bool {
+        matches!(self, RunLevel::ThreadMode)
+    }
+}
+
+impl PartialEq<Priority> for RunLevel {
+    fn eq(&self, other: &Priority) -> bool {
+        *self == RunLevel::Interrupt(*other)
+    }
+}
+
+impl From<RunLevel> for u32 {
+    fn from(level: RunLevel) -> Self {
+        match level {
+            RunLevel::ThreadMode => 0,
+            RunLevel::Interrupt(priority) => priority as u32,
+        }
+    }
+}
+
+/// Priority Level Error
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum PriorityError {
+    /// The priority is not valid
+    InvalidInterruptPriority,
+}
+
+impl TryFrom<u32> for RunLevel {
+    type Error = PriorityError;
+
+    fn try_from(priority: u32) -> Result<Self, Self::Error> {
+        if priority == 0 {
+            Ok(RunLevel::ThreadMode)
+        } else {
+            Priority::try_from(priority).map(RunLevel::Interrupt)
+        }
+    }
+}

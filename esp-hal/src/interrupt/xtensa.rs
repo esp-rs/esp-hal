@@ -9,7 +9,12 @@ use xtensa_lx_rt::exception::Context;
 
 pub use self::vectored::*;
 use super::InterruptStatus;
-use crate::{interrupt::IsrCallback, pac, peripherals::Interrupt, system::Cpu};
+use crate::{
+    interrupt::{IsrCallback, PriorityError, RunLevel},
+    pac,
+    peripherals::Interrupt,
+    system::Cpu,
+};
 
 /// Interrupt Error
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -30,69 +35,54 @@ pub enum Error {
 #[repr(u32)]
 pub enum CpuInterrupt {
     /// Level-triggered interrupt with priority 1.
-    Interrupt0LevelPriority1 = 0,
+    Interrupt0LevelPriority1      = 0,
     /// Level-triggered interrupt with priority 1.
-    Interrupt1LevelPriority1,
+    Interrupt1LevelPriority1      = 1,
     /// Level-triggered interrupt with priority 1.
-    Interrupt2LevelPriority1,
+    Interrupt2LevelPriority1      = 2,
     /// Level-triggered interrupt with priority 1.
-    Interrupt3LevelPriority1,
+    Interrupt3LevelPriority1      = 3,
     /// Level-triggered interrupt with priority 1.
-    Interrupt4LevelPriority1,
+    Interrupt4LevelPriority1      = 4,
     /// Level-triggered interrupt with priority 1.
-    Interrupt5LevelPriority1,
+    Interrupt5LevelPriority1      = 5,
     /// Timer 0 interrupt with priority 1.
-    Interrupt6Timer0Priority1,
+    Interrupt6Timer0Priority1     = 6,
     /// Software-triggered interrupt with priority 1.
-    Interrupt7SoftwarePriority1,
+    Interrupt7SoftwarePriority1   = 7,
     /// Level-triggered interrupt with priority 1.
-    Interrupt8LevelPriority1,
+    Interrupt8LevelPriority1      = 8,
     /// Level-triggered interrupt with priority 1.
-    Interrupt9LevelPriority1,
+    Interrupt9LevelPriority1      = 9,
     /// Edge-triggered interrupt with priority 1.
-    Interrupt10EdgePriority1,
+    Interrupt10EdgePriority1      = 10,
     /// Profiling-related interrupt with priority 3.
-    Interrupt11ProfilingPriority3,
+    Interrupt11ProfilingPriority3 = 11,
     /// Level-triggered interrupt with priority 1.
-    Interrupt12LevelPriority1,
+    Interrupt12LevelPriority1     = 12,
     /// Level-triggered interrupt with priority 1.
-    Interrupt13LevelPriority1,
-    /// Non-maskable interrupt (NMI) with priority 7.
-    Interrupt14NmiPriority7,
+    Interrupt13LevelPriority1     = 13,
     /// Timer 1 interrupt with priority 3.
-    Interrupt15Timer1Priority3,
-    /// Timer 2 interrupt with priority 5.
-    Interrupt16Timer2Priority5,
+    Interrupt15Timer1Priority3    = 15,
     /// Level-triggered interrupt with priority 1.
-    Interrupt17LevelPriority1,
+    Interrupt17LevelPriority1     = 17,
     /// Level-triggered interrupt with priority 1.
-    Interrupt18LevelPriority1,
+    Interrupt18LevelPriority1     = 18,
     /// Level-triggered interrupt with priority 2.
-    Interrupt19LevelPriority2,
+    Interrupt19LevelPriority2     = 19,
     /// Level-triggered interrupt with priority 2.
-    Interrupt20LevelPriority2,
+    Interrupt20LevelPriority2     = 20,
     /// Level-triggered interrupt with priority 2.
-    Interrupt21LevelPriority2,
+    Interrupt21LevelPriority2     = 21,
     /// Edge-triggered interrupt with priority 3.
-    Interrupt22EdgePriority3,
+    Interrupt22EdgePriority3      = 22,
     /// Level-triggered interrupt with priority 3.
-    Interrupt23LevelPriority3,
-    /// Level-triggered interrupt with priority 4.
-    Interrupt24LevelPriority4,
-    /// Level-triggered interrupt with priority 4.
-    Interrupt25LevelPriority4,
-    /// Level-triggered interrupt with priority 5.
-    Interrupt26LevelPriority5,
+    Interrupt23LevelPriority3     = 23,
     /// Level-triggered interrupt with priority 3.
-    Interrupt27LevelPriority3,
-    /// Edge-triggered interrupt with priority 4.
-    Interrupt28EdgePriority4,
+    Interrupt27LevelPriority3     = 27,
     /// Software-triggered interrupt with priority 3.
-    Interrupt29SoftwarePriority3,
-    /// Edge-triggered interrupt with priority 4.
-    Interrupt30EdgePriority4,
-    /// Edge-triggered interrupt with priority 5.
-    Interrupt31EdgePriority5,
+    Interrupt29SoftwarePriority3  = 29,
+    // TODO: re-add higher level interrupts
 }
 
 impl CpuInterrupt {
@@ -111,7 +101,6 @@ impl CpuInterrupt {
                 | Self::Interrupt7SoftwarePriority1
                 | Self::Interrupt11ProfilingPriority3
                 | Self::Interrupt15Timer1Priority3
-                | Self::Interrupt16Timer2Priority5
                 | Self::Interrupt29SoftwarePriority3
         )
     }
@@ -121,7 +110,7 @@ impl CpuInterrupt {
     }
 }
 
-pub(super) const DISABLED_CPU_INTERRUPT: u32 = CpuInterrupt::Interrupt16Timer2Priority5 as u32;
+pub(super) const DISABLED_CPU_INTERRUPT: u32 = 16;
 
 /// Clear the given CPU interrupt
 pub fn clear(_core: Cpu, which: CpuInterrupt) {
@@ -131,11 +120,11 @@ pub fn clear(_core: Cpu, which: CpuInterrupt) {
 }
 
 /// Get the current run level (the level below which interrupts are masked).
-pub fn current_runlevel() -> Priority {
+pub fn current_runlevel() -> RunLevel {
     let ps: u32;
     unsafe { core::arch::asm!("rsr.ps {0}", out(reg) ps) };
 
-    unwrap!(Priority::try_from(ps & 0x0F))
+    unwrap!(RunLevel::try_from(ps & 0x0F))
 }
 
 /// Changes the current run level (the level below which interrupts are
@@ -146,18 +135,24 @@ pub fn current_runlevel() -> Priority {
 /// This function must only be used to raise the runlevel and to restore it
 /// to a previous value. It must not be used to arbitrarily lower the
 /// runlevel.
-pub(crate) unsafe fn change_current_runlevel(level: Priority) -> Priority {
+pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
     let token: u32;
     unsafe {
         match level {
-            Priority::None => core::arch::asm!("rsil {0}, 0", out(reg) token),
-            Priority::Priority1 => core::arch::asm!("rsil {0}, 1", out(reg) token),
-            Priority::Priority2 => core::arch::asm!("rsil {0}, 2", out(reg) token),
-            Priority::Priority3 => core::arch::asm!("rsil {0}, 3", out(reg) token),
+            RunLevel::ThreadMode => core::arch::asm!("rsil {0}, 0", out(reg) token),
+            RunLevel::Interrupt(Priority::Priority1) => {
+                core::arch::asm!("rsil {0}, 1", out(reg) token)
+            }
+            RunLevel::Interrupt(Priority::Priority2) => {
+                core::arch::asm!("rsil {0}, 2", out(reg) token)
+            }
+            RunLevel::Interrupt(Priority::Priority3) => {
+                core::arch::asm!("rsil {0}, 3", out(reg) token)
+            }
         };
     }
 
-    unwrap!(Priority::try_from(token & 0x0F))
+    unwrap!(RunLevel::try_from(token & 0x0F))
 }
 
 /// Wait for an interrupt to occur.
@@ -178,14 +173,14 @@ mod vectored {
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[repr(u8)]
     pub enum Priority {
-        /// No priority.
-        None = 0,
         /// Priority level 1.
-        Priority1,
+        Priority1 = 1,
         /// Priority level 2.
-        Priority2,
+        Priority2 = 2,
         /// Priority level 3.
-        Priority3,
+        Priority3 = 3,
+        // TODO: Xtensa has 7 priority levels, the higher ones are only not recommended for use.
+        // We should add these levels, and a mechanism to bind assembly-written handlers for them.
     }
 
     impl Priority {
@@ -201,21 +196,20 @@ mod vectored {
     }
 
     impl TryFrom<u32> for Priority {
-        type Error = Error;
+        type Error = PriorityError;
 
         fn try_from(value: u32) -> Result<Self, Self::Error> {
             match value {
-                0 => Ok(Priority::None),
                 1 => Ok(Priority::Priority1),
                 2 => Ok(Priority::Priority2),
                 3 => Ok(Priority::Priority3),
-                _ => Err(Error::InvalidInterrupt),
+                _ => Err(PriorityError::InvalidInterruptPriority),
             }
         }
     }
 
     impl TryFrom<u8> for Priority {
-        type Error = Error;
+        type Error = PriorityError;
 
         fn try_from(value: u8) -> Result<Self, Self::Error> {
             Self::try_from(value as u32)
@@ -252,17 +246,6 @@ mod vectored {
                 | CpuInterrupt::Interrupt27LevelPriority3
                 | CpuInterrupt::Interrupt29SoftwarePriority3
                 | CpuInterrupt::Interrupt23LevelPriority3 => Priority::Priority3,
-
-                // we direct these to None because we do not support interrupts at this level
-                // through Rust
-                CpuInterrupt::Interrupt24LevelPriority4
-                | CpuInterrupt::Interrupt25LevelPriority4
-                | CpuInterrupt::Interrupt28EdgePriority4
-                | CpuInterrupt::Interrupt30EdgePriority4
-                | CpuInterrupt::Interrupt31EdgePriority5
-                | CpuInterrupt::Interrupt16Timer2Priority5
-                | CpuInterrupt::Interrupt26LevelPriority5
-                | CpuInterrupt::Interrupt14NmiPriority7 => Priority::None,
             }
         }
 
@@ -328,14 +311,12 @@ mod vectored {
     ) -> Result<CpuInterrupt, Error> {
         Ok(if is_edge {
             match level {
-                Priority::None => return Err(Error::InvalidInterrupt),
                 Priority::Priority1 => CpuInterrupt::Interrupt10EdgePriority1,
                 Priority::Priority2 => return Err(Error::InvalidInterrupt),
                 Priority::Priority3 => CpuInterrupt::Interrupt22EdgePriority3,
             }
         } else {
             match level {
-                Priority::None => return Err(Error::InvalidInterrupt),
                 Priority::Priority1 => CpuInterrupt::Interrupt1LevelPriority1,
                 Priority::Priority2 => CpuInterrupt::Interrupt19LevelPriority2,
                 Priority::Priority3 => CpuInterrupt::Interrupt23LevelPriority3,

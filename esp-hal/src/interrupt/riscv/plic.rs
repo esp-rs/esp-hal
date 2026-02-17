@@ -1,4 +1,4 @@
-use super::{InterruptKind, Priority};
+use super::{InterruptKind, Priority, RunLevel};
 use crate::peripherals::PLIC_MX;
 
 pub(super) fn init() {}
@@ -62,14 +62,14 @@ pub(super) fn current_runlevel() -> u8 {
 /// This function must only be used to raise the runlevel and to restore it
 /// to a previous value. It must not be used to arbitrarily lower the
 /// runlevel.
-pub(crate) fn change_current_runlevel(level: Priority) -> u8 {
+pub(crate) fn change_current_runlevel(level: RunLevel) -> u8 {
     let prev_interrupt_priority = current_runlevel();
 
     // The CPU responds to interrupts `>= level`, but we want to also disable
     // interrupts at `level` so we set the threshold to `level + 1`.
     PLIC_MX::regs()
         .mxint_thresh()
-        .write(|w| unsafe { w.cpu_mxint_thresh().bits(level as u8 + 1) });
+        .write(|w| unsafe { w.cpu_mxint_thresh().bits(u32::from(level) as u8 + 1) });
 
     prev_interrupt_priority
 }

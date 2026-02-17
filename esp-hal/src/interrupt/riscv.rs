@@ -20,7 +20,12 @@ use riscv::register::{mcause, mtvec};
 mod cpu_int;
 
 pub use self::vectored::*;
-use crate::{pac, peripherals::Interrupt, system::Cpu};
+use crate::{
+    interrupt::{PriorityError, RunLevel},
+    pac,
+    peripherals::Interrupt,
+    system::Cpu,
+};
 
 /// Interrupt Error
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -93,11 +98,9 @@ for_each_interrupt_priority!(
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         #[repr(u8)]
         pub enum Priority {
-            /// No priority.
-            None = 0,
             $(
                 #[doc = concat!(" Priority level ", stringify!($n), ".")]
-                $ident,
+                $ident = $n,
             )*
         }
 
@@ -131,16 +134,15 @@ impl Priority {
 }
 
 impl TryFrom<u32> for Priority {
-    type Error = Error;
+    type Error = PriorityError;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         let result;
         for_each_interrupt_priority!(
             (all $( ($idx:literal, $n:literal, $ident:ident) ),*) => {
                 result = match value {
-                    0 => Ok(Priority::None),
                     $($n => Ok(Priority::$ident),)*
-                    _ => Err(Error::InvalidInterruptPriority),
+                    _ => Err(PriorityError::InvalidInterruptPriority),
                 }
             };
         );
@@ -222,12 +224,12 @@ const INTERRUPT_COUNT: usize = const {
 /// Maps interrupt numbers to their vector priority levels.
 #[cfg(not(interrupt_controller = "clic"))]
 #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-pub(super) static INTERRUPT_TO_PRIORITY: [Priority; INTERRUPT_COUNT] = const {
-    let mut priorities = [Priority::None; INTERRUPT_COUNT];
+pub(super) static INTERRUPT_TO_PRIORITY: [Option<Priority>; INTERRUPT_COUNT] = const {
+    let mut priorities = [None; INTERRUPT_COUNT];
 
     for_each_interrupt!(
         ([vector $n:tt] $int:literal) => {
-            for_each_interrupt_priority!(($n, $__:tt, $ident:ident) => { priorities[$int] = Priority::$ident };);
+            for_each_interrupt_priority!(($n, $__:tt, $ident:ident) => { priorities[$int] = Some(Priority::$ident); };);
         };
     );
 
@@ -260,9 +262,6 @@ pub fn enable_direct(
 ) -> Result<(), Error> {
     if RESERVED_INTERRUPTS.contains(&(cpu_interrupt as _)) {
         return Err(Error::CpuInterruptReserved);
-    }
-    if matches!(level, Priority::None) {
-        return Err(Error::InvalidInterruptPriority);
     }
 
     super::map_raw(Cpu::current(), interrupt, cpu_interrupt as u32);
@@ -385,9 +384,9 @@ pub fn cpu_interrupt_priority(cpu_interrupt: CpuInterrupt) -> Priority {
 
 /// Get the current run level (the level below which interrupts are masked).
 #[inline]
-pub fn current_runlevel() -> Priority {
+pub fn current_runlevel() -> RunLevel {
     let priority = cpu_int::current_runlevel();
-    unwrap!(Priority::try_from(priority as u32))
+    unwrap!(RunLevel::try_from(priority as u32))
 }
 
 /// Changes the current run level (the level below which interrupts are
@@ -399,9 +398,9 @@ pub fn current_runlevel() -> Priority {
 /// to a previous value. It must not be used to arbitrarily lower the
 /// runlevel.
 #[inline]
-pub(crate) unsafe fn change_current_runlevel(level: Priority) -> Priority {
+pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
     let previous = cpu_int::change_current_runlevel(level);
-    unwrap!(Priority::try_from(previous as u32))
+    unwrap!(RunLevel::try_from(previous as u32))
 }
 
 // Peripheral interrupt API. These take a core, because the interrupt matrix is SOC-global.
@@ -466,10 +465,6 @@ mod vectored {
         interrupt: Interrupt,
         level: Priority,
     ) -> Result<(), Error> {
-        if matches!(level, Priority::None) {
-            return Err(Error::InvalidInterruptPriority);
-        }
-
         let cpu_interrupt = PRIORITY_TO_INTERRUPT[(level as usize) - 1];
         crate::interrupt::map_raw(cpu, interrupt, cpu_interrupt);
         cpu_int::enable_cpu_interrupt_raw(cpu_interrupt);
@@ -600,8 +595,8 @@ mod rt {
                 let mcause = riscv::register::mcause::read();
             } else {
                 // Change the current runlevel so that interrupt handlers can access the correct runlevel.
-                let prio = INTERRUPT_TO_PRIORITY[cpu_intr as usize];
-                let level = unsafe { change_current_runlevel(prio) };
+                let prio = unwrap!(INTERRUPT_TO_PRIORITY[cpu_intr as usize]);
+                let level = unsafe { change_current_runlevel(RunLevel::Interrupt(prio)) };
             }
         }
 

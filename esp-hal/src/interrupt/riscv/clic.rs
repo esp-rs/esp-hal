@@ -1,4 +1,4 @@
-use super::{InterruptKind, Priority};
+use super::{InterruptKind, Priority, RunLevel};
 use crate::soc::pac::CLIC;
 
 /// Set up CLIC.
@@ -38,7 +38,7 @@ pub(super) fn set_kind_raw(cpu_interrupt: u32, kind: InterruptKind) {
 pub(super) fn set_priority_raw(cpu_interrupt: u32, priority: Priority) {
     // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
     let clic = unsafe { CLIC::steal() };
-    let prio_bits = prio_to_bits(priority);
+    let prio_bits = prio_to_bits(RunLevel::Interrupt(priority));
     // The `ctl` field would only write the 3 programmable bits, but we have the correct final
     // value anyway so let's write it directly.
     clic.int_ctl(cpu_interrupt as usize)
@@ -61,7 +61,7 @@ pub(super) fn cpu_interrupt_priority_raw(cpu_interrupt: u32) -> u8 {
 
 /// Changes the current interrupt runlevel (the level below which interrupts are masked),
 /// and returns the previous runlevel.
-pub(super) fn change_current_runlevel(level: Priority) -> u8 {
+pub(super) fn change_current_runlevel(level: RunLevel) -> u8 {
     let current_runlevel = current_runlevel();
 
     // All machine mode pending interrupts with levels less than or equal
@@ -86,11 +86,11 @@ pub(super) fn current_runlevel() -> u8 {
     bits_to_prio(level)
 }
 
-fn prio_to_bits(priority: Priority) -> u8 {
-    if priority == Priority::None {
+fn prio_to_bits(priority: RunLevel) -> u8 {
+    if priority.is_thread() {
         0
     } else {
-        0x1F | ((priority as u8 - 1) << 5)
+        0x1F | ((u32::from(priority) as u8 - 1) << 5)
     }
 }
 

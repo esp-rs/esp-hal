@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C5: Add initial ECC support (#4983)
 - C5: Add AES support (#4983)
 - C5: Add USB Serial/JTAG support (#5008)
+- `esp_hal::interrupt::RunLevel` (#4996)
 
 ### Changed
 

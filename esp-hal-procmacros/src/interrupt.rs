@@ -61,16 +61,7 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
     );
 
     let priority = match priority {
-        Some(ref priority) => quote::quote!( {
-            const {
-                core::assert!(
-                    !matches!(#priority, #root::interrupt::Priority::None),
-                    "Priority::None is not supported",
-                );
-            };
-
-            #priority
-        } ),
+        Some(ref priority) => quote::quote! { #priority },
         _ => quote::quote! { #root::interrupt::Priority::min() },
     };
 
@@ -220,18 +211,10 @@ mod tests {
                 extern "C" fn __esp_hal_internal_foo() {}
                 #[allow(non_upper_case_globals)]
                 const foo: crate::interrupt::InterruptHandler =
-                    crate::interrupt::InterruptHandler::new(__esp_hal_internal_foo, {
-                        const {
-                            core::assert!(
-                                !matches!(
-                                    esp_hal::interrupt::Priority::Priority2,
-                                    crate::interrupt::Priority::None
-                                ),
-                                "Priority::None is not supported",
-                            );
-                        };
+                    crate::interrupt::InterruptHandler::new(
+                        __esp_hal_internal_foo,
                         esp_hal::interrupt::Priority::Priority2
-                    });
+                    );
             }
             .to_string()
         );
