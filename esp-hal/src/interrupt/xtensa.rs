@@ -7,10 +7,9 @@ pub(crate) use xtensa_lx::interrupt::free;
 #[cfg(feature = "rt")]
 use xtensa_lx_rt::exception::Context;
 
-pub use self::vectored::*;
 use super::InterruptStatus;
 use crate::{
-    interrupt::{IsrCallback, PriorityError, RunLevel},
+    interrupt::{PriorityError, RunLevel},
     pac,
     peripherals::Interrupt,
     system::Cpu,
@@ -20,8 +19,6 @@ use crate::{
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
-    /// The given interrupt is not a valid interrupt
-    InvalidInterrupt,
     /// The CPU interrupt is a reserved interrupt
     CpuInterruptReserved,
 }
@@ -87,37 +84,141 @@ pub enum CpuInterrupt {
 
 impl CpuInterrupt {
     pub(super) fn from_u32(n: u32) -> Option<Self> {
-        if n < 32 {
-            Some(unsafe { core::mem::transmute::<u32, Self>(n) })
-        } else {
-            None
+        match n {
+            0 => Some(Self::Interrupt0LevelPriority1),
+            1 => Some(Self::Interrupt1LevelPriority1),
+            2 => Some(Self::Interrupt2LevelPriority1),
+            3 => Some(Self::Interrupt3LevelPriority1),
+            4 => Some(Self::Interrupt4LevelPriority1),
+            5 => Some(Self::Interrupt5LevelPriority1),
+            6 => Some(Self::Interrupt6Timer0Priority1),
+            7 => Some(Self::Interrupt7SoftwarePriority1),
+            8 => Some(Self::Interrupt8LevelPriority1),
+            9 => Some(Self::Interrupt9LevelPriority1),
+            10 => Some(Self::Interrupt10EdgePriority1),
+            11 => Some(Self::Interrupt11ProfilingPriority3),
+            12 => Some(Self::Interrupt12LevelPriority1),
+            13 => Some(Self::Interrupt13LevelPriority1),
+            15 => Some(Self::Interrupt15Timer1Priority3),
+            17 => Some(Self::Interrupt17LevelPriority1),
+            18 => Some(Self::Interrupt18LevelPriority1),
+            19 => Some(Self::Interrupt19LevelPriority2),
+            20 => Some(Self::Interrupt20LevelPriority2),
+            21 => Some(Self::Interrupt21LevelPriority2),
+            22 => Some(Self::Interrupt22EdgePriority3),
+            23 => Some(Self::Interrupt23LevelPriority3),
+            27 => Some(Self::Interrupt27LevelPriority3),
+            29 => Some(Self::Interrupt29SoftwarePriority3),
+            _ => None,
         }
     }
 
-    fn is_internal(self) -> bool {
-        matches!(
-            self,
-            Self::Interrupt6Timer0Priority1
-                | Self::Interrupt7SoftwarePriority1
-                | Self::Interrupt11ProfilingPriority3
-                | Self::Interrupt15Timer1Priority3
-                | Self::Interrupt29SoftwarePriority3
-        )
+    #[inline]
+    pub(crate) fn level(&self) -> Priority {
+        match self {
+            CpuInterrupt::Interrupt0LevelPriority1
+            | CpuInterrupt::Interrupt1LevelPriority1
+            | CpuInterrupt::Interrupt2LevelPriority1
+            | CpuInterrupt::Interrupt3LevelPriority1
+            | CpuInterrupt::Interrupt4LevelPriority1
+            | CpuInterrupt::Interrupt5LevelPriority1
+            | CpuInterrupt::Interrupt6Timer0Priority1
+            | CpuInterrupt::Interrupt7SoftwarePriority1
+            | CpuInterrupt::Interrupt8LevelPriority1
+            | CpuInterrupt::Interrupt9LevelPriority1
+            | CpuInterrupt::Interrupt10EdgePriority1
+            | CpuInterrupt::Interrupt12LevelPriority1
+            | CpuInterrupt::Interrupt13LevelPriority1
+            | CpuInterrupt::Interrupt17LevelPriority1
+            | CpuInterrupt::Interrupt18LevelPriority1 => Priority::Priority1,
+
+            CpuInterrupt::Interrupt19LevelPriority2
+            | CpuInterrupt::Interrupt20LevelPriority2
+            | CpuInterrupt::Interrupt21LevelPriority2 => Priority::Priority2,
+
+            CpuInterrupt::Interrupt11ProfilingPriority3
+            | CpuInterrupt::Interrupt15Timer1Priority3
+            | CpuInterrupt::Interrupt22EdgePriority3
+            | CpuInterrupt::Interrupt27LevelPriority3
+            | CpuInterrupt::Interrupt29SoftwarePriority3
+            | CpuInterrupt::Interrupt23LevelPriority3 => Priority::Priority3,
+        }
     }
 
-    pub(super) fn is_mappable(self) -> bool {
-        !self.is_internal()
+    #[inline]
+    pub(crate) fn is_vectored(self) -> bool {
+        // Even "direct bound" interrupts go through the vectored interrupt handler
+        true
+    }
+}
+
+/// Interrupt priority levels.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[repr(u8)]
+pub enum Priority {
+    /// Priority level 1.
+    Priority1 = 1,
+    /// Priority level 2.
+    Priority2 = 2,
+    /// Priority level 3.
+    Priority3 = 3,
+    // TODO: Xtensa has 7 priority levels, the higher ones are only not recommended for use.
+    // We should add these levels, and a mechanism to bind assembly-written handlers for them.
+}
+
+impl Priority {
+    /// Maximum interrupt priority
+    pub const fn max() -> Priority {
+        Priority::Priority3
+    }
+
+    /// Minimum interrupt priority
+    pub const fn min() -> Priority {
+        Priority::Priority1
+    }
+}
+
+impl TryFrom<u32> for Priority {
+    type Error = PriorityError;
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(Priority::Priority1),
+            2 => Ok(Priority::Priority2),
+            3 => Ok(Priority::Priority3),
+            _ => Err(PriorityError::InvalidInterruptPriority),
+        }
+    }
+}
+
+impl TryFrom<u8> for Priority {
+    type Error = PriorityError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Self::try_from(value as u32)
     }
 }
 
 pub(super) const DISABLED_CPU_INTERRUPT: u32 = 16;
 
+// CPU interrupt API. These don't take a core, because the control mechanisms are generally
+// core-local.
+
+pub(crate) fn enable_cpu_interrupt(cpu_interrupt: CpuInterrupt) {
+    enable_cpu_interrupt_raw(cpu_interrupt as u32);
+}
+
+pub(crate) fn enable_cpu_interrupt_raw(cpu_interrupt: u32) {
+    unsafe { xtensa_lx::interrupt::enable_mask(1 << cpu_interrupt) };
+}
+
 /// Clear the given CPU interrupt
 pub fn clear(_core: Cpu, which: CpuInterrupt) {
-    unsafe {
-        xtensa_lx::interrupt::clear(1 << which as u32);
-    }
+    unsafe { xtensa_lx::interrupt::clear(1 << which as u32) };
 }
+
+// Runlevel APIs
 
 /// Get the current run level (the level below which interrupts are masked).
 pub fn current_runlevel() -> RunLevel {
@@ -165,201 +266,60 @@ pub fn wait_for_interrupt() {
     unsafe { core::arch::asm!("waiti 0") };
 }
 
-mod vectored {
-    use super::*;
-
-    /// Interrupt priority levels.
-    #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    #[repr(u8)]
-    pub enum Priority {
-        /// Priority level 1.
-        Priority1 = 1,
-        /// Priority level 2.
-        Priority2 = 2,
-        /// Priority level 3.
-        Priority3 = 3,
-        // TODO: Xtensa has 7 priority levels, the higher ones are only not recommended for use.
-        // We should add these levels, and a mechanism to bind assembly-written handlers for them.
-    }
-
-    impl Priority {
-        /// Maximum interrupt priority
-        pub const fn max() -> Priority {
-            Priority::Priority3
-        }
-
-        /// Minimum interrupt priority
-        pub const fn min() -> Priority {
-            Priority::Priority1
-        }
-    }
-
-    impl TryFrom<u32> for Priority {
-        type Error = PriorityError;
-
-        fn try_from(value: u32) -> Result<Self, Self::Error> {
-            match value {
-                1 => Ok(Priority::Priority1),
-                2 => Ok(Priority::Priority2),
-                3 => Ok(Priority::Priority3),
-                _ => Err(PriorityError::InvalidInterruptPriority),
+pub(crate) fn priority_to_cpu_interrupt(interrupt: Interrupt, level: Priority) -> CpuInterrupt {
+    if EDGE_INTERRUPTS.contains(&interrupt) {
+        match level {
+            Priority::Priority1 => CpuInterrupt::Interrupt10EdgePriority1,
+            Priority::Priority2 => {
+                warn!("Priority 2 edge interrupts are not supported, using Priority 1 instead");
+                CpuInterrupt::Interrupt10EdgePriority1
             }
+            Priority::Priority3 => CpuInterrupt::Interrupt22EdgePriority3,
         }
-    }
-
-    impl TryFrom<u8> for Priority {
-        type Error = PriorityError;
-
-        fn try_from(value: u8) -> Result<Self, Self::Error> {
-            Self::try_from(value as u32)
-        }
-    }
-
-    impl CpuInterrupt {
-        #[inline]
-        pub(crate) fn level(&self) -> Priority {
-            match self {
-                CpuInterrupt::Interrupt0LevelPriority1
-                | CpuInterrupt::Interrupt1LevelPriority1
-                | CpuInterrupt::Interrupt2LevelPriority1
-                | CpuInterrupt::Interrupt3LevelPriority1
-                | CpuInterrupt::Interrupt4LevelPriority1
-                | CpuInterrupt::Interrupt5LevelPriority1
-                | CpuInterrupt::Interrupt6Timer0Priority1
-                | CpuInterrupt::Interrupt7SoftwarePriority1
-                | CpuInterrupt::Interrupt8LevelPriority1
-                | CpuInterrupt::Interrupt9LevelPriority1
-                | CpuInterrupt::Interrupt10EdgePriority1
-                | CpuInterrupt::Interrupt12LevelPriority1
-                | CpuInterrupt::Interrupt13LevelPriority1
-                | CpuInterrupt::Interrupt17LevelPriority1
-                | CpuInterrupt::Interrupt18LevelPriority1 => Priority::Priority1,
-
-                CpuInterrupt::Interrupt19LevelPriority2
-                | CpuInterrupt::Interrupt20LevelPriority2
-                | CpuInterrupt::Interrupt21LevelPriority2 => Priority::Priority2,
-
-                CpuInterrupt::Interrupt11ProfilingPriority3
-                | CpuInterrupt::Interrupt15Timer1Priority3
-                | CpuInterrupt::Interrupt22EdgePriority3
-                | CpuInterrupt::Interrupt27LevelPriority3
-                | CpuInterrupt::Interrupt29SoftwarePriority3
-                | CpuInterrupt::Interrupt23LevelPriority3 => Priority::Priority3,
-            }
-        }
-
-        #[inline]
-        pub(crate) fn is_vectored(self) -> bool {
-            // Even "direct bound" interrupts go through the vectored interrupt handler
-            true
-        }
-    }
-
-    /// Enable the given peripheral interrupt
-    pub fn enable(interrupt: Interrupt, level: Priority) -> Result<(), Error> {
-        enable_on_cpu(Cpu::current(), interrupt, level)
-    }
-
-    pub(crate) fn enable_on_cpu(
-        cpu: Cpu,
-        interrupt: Interrupt,
-        level: Priority,
-    ) -> Result<(), Error> {
-        let cpu_interrupt =
-            interrupt_level_to_cpu_interrupt(level, EDGE_INTERRUPTS.contains(&interrupt))?;
-
-        crate::interrupt::map(cpu, interrupt, cpu_interrupt);
-
-        unsafe {
-            xtensa_lx::interrupt::enable_mask(1 << cpu_interrupt as u32);
-        }
-        Ok(())
-    }
-
-    /// Binds the given interrupt to the given handler.
-    ///
-    /// # Safety
-    ///
-    /// This will replace any previously bound interrupt handler
-    pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: IsrCallback) {
-        let ptr =
-            unsafe { &pac::__INTERRUPTS[interrupt as usize]._handler as *const _ as *mut usize };
-        unsafe {
-            ptr.write_volatile(handler.address());
-        }
-    }
-
-    /// Returns the currently bound interrupt handler.
-    pub fn bound_handler(interrupt: Interrupt) -> Option<IsrCallback> {
-        unsafe {
-            let func = pac::__INTERRUPTS[interrupt as usize]._handler;
-            if func as usize == 0 {
-                return None;
-            }
-
-            Some(IsrCallback::new(core::mem::transmute::<
-                unsafe extern "C" fn(),
-                extern "C" fn(),
-            >(func)))
-        }
-    }
-
-    fn interrupt_level_to_cpu_interrupt(
-        level: Priority,
-        is_edge: bool,
-    ) -> Result<CpuInterrupt, Error> {
-        Ok(if is_edge {
-            match level {
-                Priority::Priority1 => CpuInterrupt::Interrupt10EdgePriority1,
-                Priority::Priority2 => return Err(Error::InvalidInterrupt),
-                Priority::Priority3 => CpuInterrupt::Interrupt22EdgePriority3,
-            }
-        } else {
-            match level {
-                Priority::Priority1 => CpuInterrupt::Interrupt1LevelPriority1,
-                Priority::Priority2 => CpuInterrupt::Interrupt19LevelPriority2,
-                Priority::Priority3 => CpuInterrupt::Interrupt23LevelPriority3,
-            }
-        })
-    }
-
-    cfg_if::cfg_if! {
-        if #[cfg(esp32)] {
-            pub(crate) const EDGE_INTERRUPTS: [Interrupt; 8] = [
-                Interrupt::TG0_T0_EDGE,
-                Interrupt::TG0_T1_EDGE,
-                Interrupt::TG0_WDT_EDGE,
-                Interrupt::TG0_LACT_EDGE,
-                Interrupt::TG1_T0_EDGE,
-                Interrupt::TG1_T1_EDGE,
-                Interrupt::TG1_WDT_EDGE,
-                Interrupt::TG1_LACT_EDGE,
-            ];
-        } else if #[cfg(esp32s2)] {
-            pub(crate) const EDGE_INTERRUPTS: [Interrupt; 11] = [
-                Interrupt::TG0_T0_EDGE,
-                Interrupt::TG0_T1_EDGE,
-                Interrupt::TG0_WDT_EDGE,
-                Interrupt::TG0_LACT_EDGE,
-                Interrupt::TG1_T0_EDGE,
-                Interrupt::TG1_T1_EDGE,
-                Interrupt::TG1_WDT_EDGE,
-                Interrupt::TG1_LACT_EDGE,
-                Interrupt::SYSTIMER_TARGET0,
-                Interrupt::SYSTIMER_TARGET1,
-                Interrupt::SYSTIMER_TARGET2,
-            ];
-        } else if #[cfg(esp32s3)] {
-            pub(crate) const EDGE_INTERRUPTS: [Interrupt; 0] = [];
-        } else {
-            compile_error!("Unsupported chip");
+    } else {
+        match level {
+            Priority::Priority1 => CpuInterrupt::Interrupt1LevelPriority1,
+            Priority::Priority2 => CpuInterrupt::Interrupt19LevelPriority2,
+            Priority::Priority3 => CpuInterrupt::Interrupt23LevelPriority3,
         }
     }
 }
 
+cfg_if::cfg_if! {
+    if #[cfg(esp32)] {
+        pub(crate) const EDGE_INTERRUPTS: [Interrupt; 8] = [
+            Interrupt::TG0_T0_EDGE,
+            Interrupt::TG0_T1_EDGE,
+            Interrupt::TG0_WDT_EDGE,
+            Interrupt::TG0_LACT_EDGE,
+            Interrupt::TG1_T0_EDGE,
+            Interrupt::TG1_T1_EDGE,
+            Interrupt::TG1_WDT_EDGE,
+            Interrupt::TG1_LACT_EDGE,
+        ];
+    } else if #[cfg(esp32s2)] {
+        pub(crate) const EDGE_INTERRUPTS: [Interrupt; 11] = [
+            Interrupt::TG0_T0_EDGE,
+            Interrupt::TG0_T1_EDGE,
+            Interrupt::TG0_WDT_EDGE,
+            Interrupt::TG0_LACT_EDGE,
+            Interrupt::TG1_T0_EDGE,
+            Interrupt::TG1_T1_EDGE,
+            Interrupt::TG1_WDT_EDGE,
+            Interrupt::TG1_LACT_EDGE,
+            Interrupt::SYSTIMER_TARGET0,
+            Interrupt::SYSTIMER_TARGET1,
+            Interrupt::SYSTIMER_TARGET2,
+        ];
+    } else if #[cfg(esp32s3)] {
+        pub(crate) const EDGE_INTERRUPTS: [Interrupt; 0] = [];
+    } else {
+        compile_error!("Unsupported chip");
+    }
+}
+
 #[cfg(feature = "rt")]
-mod rt {
+pub(crate) mod rt {
     use xtensa_lx_rt::interrupt::CpuInterruptLevel;
 
     use super::*;
@@ -397,6 +357,19 @@ mod rt {
 
         InterruptStatus { status: masks }
     };
+
+    // Setup interrupts ready for vectoring
+    pub(crate) unsafe fn init_vectoring() {
+        for cpu_int in [
+            CpuInterrupt::Interrupt10EdgePriority1,
+            CpuInterrupt::Interrupt22EdgePriority3,
+            CpuInterrupt::Interrupt1LevelPriority1,
+            CpuInterrupt::Interrupt19LevelPriority2,
+            CpuInterrupt::Interrupt23LevelPriority3,
+        ] {
+            enable_cpu_interrupt(cpu_int);
+        }
+    }
 
     #[unsafe(no_mangle)]
     #[ram]

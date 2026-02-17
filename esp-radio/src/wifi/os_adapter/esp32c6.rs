@@ -78,13 +78,13 @@ pub unsafe extern "C" fn set_isr(
     }
     #[cfg(feature = "wifi")]
     {
-        unwrap!(interrupt::enable(
+        interrupt::enable(
             peripherals::Interrupt::WIFI_MAC,
-            interrupt::Priority::Priority1
-        ));
-        unwrap!(interrupt::enable(
+            interrupt::Priority::Priority1,
+        );
+        interrupt::enable(
             peripherals::Interrupt::WIFI_PWR,
-            interrupt::Priority::Priority1
-        ));
+            interrupt::Priority::Priority1,
+        );
     }
 }

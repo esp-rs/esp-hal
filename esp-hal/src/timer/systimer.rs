@@ -596,7 +596,7 @@ impl Alarm<'_> {
                 interrupt::bind_interrupt(interrupt, crate::interrupt::IsrCallback::new(handler));
             }
         }
-        unwrap!(interrupt::enable(interrupt, handler.priority()));
+        interrupt::enable(interrupt, handler.priority());
     }
 }
 

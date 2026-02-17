@@ -373,17 +373,11 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
         match source {
             3 => {
                 ISR_INTERRUPT_3 = (handler, arg);
-                unwrap!(interrupt::enable(
-                    Interrupt::LP_BLE_TIMER,
-                    interrupt::Priority::Priority1
-                ));
+                interrupt::enable(Interrupt::LP_BLE_TIMER, interrupt::Priority::Priority1);
             }
             15 => {
                 ISR_INTERRUPT_15 = (handler, arg);
-                unwrap!(interrupt::enable(
-                    Interrupt::BT_MAC,
-                    interrupt::Priority::Priority1
-                ));
+                interrupt::enable(Interrupt::BT_MAC, interrupt::Priority::Priority1);
             }
             _ => panic!("Unexpected interrupt source {}", source),
         }

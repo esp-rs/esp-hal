@@ -440,7 +440,7 @@ impl<'d> Rtc<'d> {
             crate::interrupt::disable(core, interrupt);
         }
         unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
-        unwrap!(interrupt::enable(interrupt, handler.priority()));
+        interrupt::enable(interrupt, handler.priority());
     }
 }
 

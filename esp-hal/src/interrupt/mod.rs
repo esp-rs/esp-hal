@@ -77,7 +77,7 @@ We reserve a number of CPU interrupts, which cannot be used; see
 pub use self::riscv::*;
 #[cfg(xtensa)]
 pub use self::xtensa::*;
-use crate::system::Cpu;
+use crate::{peripherals::Interrupt, system::Cpu};
 
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
@@ -94,6 +94,8 @@ cfg_if::cfg_if! {
 mod riscv;
 #[cfg(xtensa)]
 mod xtensa;
+
+use crate::pac;
 
 pub mod software;
 
@@ -285,35 +287,72 @@ impl Iterator for InterruptStatusIterator {
 
 // Peripheral interrupt API.
 
-use crate::{peripherals::Interrupt, system::Cpu};
-
-cfg_if::cfg_if! {
-    if #[cfg(esp32)] {
-        use crate::peripherals::DPORT as INTERRUPT_CORE0;
-        use crate::peripherals::DPORT as INTERRUPT_CORE1;
-    } else {
-        use crate::peripherals::INTERRUPT_CORE0;
-        #[cfg(multi_core)]
-        use crate::peripherals::INTERRUPT_CORE1;
-    }
-}
-
-pub(crate) fn setup_interrupts() {
-    // disable all known peripheral interrupts
-    for peripheral_interrupt in 0..255 {
-        crate::peripherals::Interrupt::try_from(peripheral_interrupt)
-            .map(|intr| {
-                #[cfg(multi_core)]
-                disable(Cpu::AppCpu, intr);
-                disable(Cpu::ProCpu, intr);
-            })
-            .ok();
-    }
-}
-
 /// Assign a peripheral interrupt to a CPU interrupt.
 pub(crate) fn map(core: Cpu, interrupt: Interrupt, cpu_interrupt: CpuInterrupt) {
     map_raw(core, interrupt, cpu_interrupt as u32)
+}
+
+/// Enables a peripheral interrupt at a given priority, using vectored CPU interrupts.
+///
+/// Note that interrupts still need to be enabled globally for interrupts
+/// to be serviced.
+pub fn enable(interrupt: Interrupt, level: Priority) {
+    enable_on_cpu(Cpu::current(), interrupt, level);
+}
+
+pub(crate) fn enable_on_cpu(cpu: Cpu, interrupt: Interrupt, level: Priority) {
+    let cpu_interrupt = priority_to_cpu_interrupt(interrupt, level);
+    unsafe { crate::interrupt::map(cpu, interrupt, cpu_interrupt) };
+    enable_cpu_interrupt(cpu_interrupt);
+}
+
+fn vector_entry(interrupt: Interrupt) -> &'static pac::Vector {
+    cfg_if::cfg_if! {
+        if #[cfg(xtensa)] {
+            &pac::__INTERRUPTS[interrupt as usize]
+        } else {
+            &pac::__EXTERNAL_INTERRUPTS[interrupt as usize]
+        }
+    }
+}
+
+/// Returns the currently bound interrupt handler.
+pub fn bound_handler(interrupt: Interrupt) -> Option<IsrCallback> {
+    unsafe {
+        let vector = vector_entry(interrupt);
+
+        let addr = vector._handler as usize;
+        if addr == 0 {
+            return None;
+        }
+
+        Some(IsrCallback::from_raw(addr))
+    }
+}
+
+/// Binds the given handler to a peripheral interrupt.
+///
+/// # Safety
+///
+/// This will replace any previously bound interrupt handler
+pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: IsrCallback) {
+    unsafe {
+        let vector = vector_entry(interrupt);
+
+        let ptr = (&raw const vector._handler).cast::<usize>().cast_mut();
+
+        #[cfg(riscv)]
+        if !crate::debugger::debugger_connected() {
+            crate::debugger::DEBUGGER_LOCK.lock(|| {
+                let wp = crate::debugger::clear_watchpoint(1);
+                ptr.write_volatile(handler.raw_value());
+                crate::debugger::restore_watchpoint(1, wp);
+            });
+            return;
+        }
+
+        ptr.write_volatile(handler.raw_value());
+    }
 }
 
 /// Disable the given peripheral interrupt.
@@ -355,13 +394,7 @@ pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
             .read()
             .bits(),
     };
-    let cpu_intr = CpuInterrupt::from_u32(cpu_intr)?;
-
-    if cpu_intr.is_mappable() {
-        Some(cpu_intr)
-    } else {
-        None
-    }
+    CpuInterrupt::from_u32(cpu_intr)
 }
 
 /// Get the vectored peripheral interrupts configured for the core at the given priority
@@ -386,23 +419,23 @@ pub(crate) fn configured_interrupts(status: InterruptStatus, level: u32) -> Inte
 #[inline]
 pub fn status(core: Cpu) -> InterruptStatus {
     match core {
-        Cpu::ProCpu => InterruptStatus::from(
-            INTERRUPT_CORE0::regs().core_0_intr_status(0).read().bits(),
-            INTERRUPT_CORE0::regs().core_0_intr_status(1).read().bits(),
-            #[cfg(any(interrupts_status_registers = "3", interrupts_status_registers = "4"))]
-            INTERRUPT_CORE0::regs().core_0_intr_status(2).read().bits(),
-            #[cfg(interrupts_status_registers = "4")]
-            INTERRUPT_CORE0::regs().core_0_intr_status(3).read().bits(),
-        ),
+        Cpu::ProCpu => InterruptStatus {
+            status: core::array::from_fn(|idx| {
+                INTERRUPT_CORE0::regs()
+                    .core_0_intr_status(idx)
+                    .read()
+                    .bits()
+            }),
+        },
         #[cfg(multi_core)]
-        Cpu::AppCpu => InterruptStatus::from(
-            INTERRUPT_CORE1::regs().core_1_intr_status(0).read().bits(),
-            INTERRUPT_CORE1::regs().core_1_intr_status(1).read().bits(),
-            #[cfg(any(interrupts_status_registers = "3", interrupts_status_registers = "4"))]
-            INTERRUPT_CORE1::regs().core_1_intr_status(2).read().bits(),
-            #[cfg(interrupts_status_registers = "4")]
-            INTERRUPT_CORE1::regs().core_1_intr_status(3).read().bits(),
-        ),
+        Cpu::AppCpu => InterruptStatus {
+            status: core::array::from_fn(|idx| {
+                INTERRUPT_CORE1::regs()
+                    .core_1_intr_status(idx)
+                    .read()
+                    .bits()
+            }),
+        },
     }
 }
 
@@ -424,6 +457,12 @@ impl RunLevel {
     }
 
     /// Changes the current run level to the specified level and returns the previous level.
+    ///
+    /// # Safety
+    ///
+    /// This function must only be used to raise the runlevel and to restore it
+    /// to a previous value. It must not be used to arbitrarily lower the
+    /// runlevel.
     #[inline]
     pub unsafe fn change(to: Self) -> Self {
         unsafe { change_current_runlevel(to) }
@@ -469,4 +508,20 @@ impl TryFrom<u32> for RunLevel {
             Priority::try_from(priority).map(RunLevel::Interrupt)
         }
     }
+}
+
+#[cfg(feature = "rt")]
+pub(crate) fn setup_interrupts() {
+    // disable all known peripheral interrupts
+    for peripheral_interrupt in 0..255 {
+        crate::peripherals::Interrupt::try_from(peripheral_interrupt)
+            .map(|intr| {
+                #[cfg(multi_core)]
+                disable(Cpu::AppCpu, intr);
+                disable(Cpu::ProCpu, intr);
+            })
+            .ok();
+    }
+
+    unsafe { crate::interrupt::rt::init_vectoring() };
 }

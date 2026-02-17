@@ -285,10 +285,10 @@ pub mod asynch {
                     interrupt_handler.handler(),
                 );
             }
-            unwrap!(crate::interrupt::enable(
+            crate::interrupt::enable(
                 crate::peripherals::Interrupt::USB,
                 interrupt_handler.priority(),
-            ));
+            );
         }
 
         fn disable(&mut self) {

@@ -1781,7 +1781,7 @@ where
                 crate::interrupt::disable(core, interrupt);
             }
             unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
-            unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
+            crate::interrupt::enable(interrupt, handler.priority());
         }
     }
 }
@@ -2044,7 +2044,7 @@ where
                 crate::interrupt::disable(core, interrupt);
             }
             unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
-            unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
+            crate::interrupt::enable(interrupt, handler.priority());
         }
     }
 }

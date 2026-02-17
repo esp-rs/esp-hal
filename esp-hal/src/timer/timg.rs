@@ -443,7 +443,7 @@ impl Timer<'_> {
             crate::interrupt::disable(core, interrupt);
         }
         unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
-        unwrap!(interrupt::enable(interrupt, handler.priority()));
+        interrupt::enable(interrupt, handler.priority());
     }
 
     fn register_block(&self) -> &RegisterBlock {
@@ -836,7 +836,7 @@ where
         let interrupt = TG::wdt_interrupt();
         unsafe {
             interrupt::bind_interrupt(interrupt, handler.handler());
-            interrupt::enable(interrupt, handler.priority()).unwrap();
+            interrupt::enable(interrupt, handler.priority());
         }
     }
 }

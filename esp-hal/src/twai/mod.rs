@@ -764,10 +764,7 @@ where
         }
         unsafe { crate::interrupt::bind_interrupt(self.twai.interrupt(), handler.handler()) };
 
-        unwrap!(crate::interrupt::enable(
-            self.twai.interrupt(),
-            handler.priority()
-        ));
+        crate::interrupt::enable(self.twai.interrupt(), handler.priority());
     }
 
     /// Set the bitrate of the bus.

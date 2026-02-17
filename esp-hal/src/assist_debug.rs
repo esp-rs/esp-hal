@@ -53,10 +53,7 @@ impl<'d> DebugAssist<'d> {
             crate::interrupt::disable(core, Interrupt::ASSIST_DEBUG);
         }
         unsafe { crate::interrupt::bind_interrupt(Interrupt::ASSIST_DEBUG, handler.handler()) };
-        unwrap!(crate::interrupt::enable(
-            Interrupt::ASSIST_DEBUG,
-            handler.priority()
-        ));
+        crate::interrupt::enable(Interrupt::ASSIST_DEBUG, handler.priority());
     }
 
     fn regs(&self) -> &pac::assist_debug::RegisterBlock {

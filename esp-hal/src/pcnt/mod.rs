@@ -185,7 +185,7 @@ impl<'d> Pcnt<'d> {
             crate::interrupt::disable(core, Interrupt::PCNT);
         }
         unsafe { interrupt::bind_interrupt(Interrupt::PCNT, handler.handler()) };
-        unwrap!(interrupt::enable(Interrupt::PCNT, handler.priority()));
+        interrupt::enable(Interrupt::PCNT, handler.priority());
     }
 }
 

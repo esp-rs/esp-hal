@@ -735,7 +735,7 @@ mod twai {
                 block!(ctx.twai.transmit(&frame)).unwrap();
             }
 
-            let _ = interrupt::enable(TWAI0, Priority3);
+            interrupt::enable(TWAI0, Priority3);
 
             const NUM_ASYNC_SENT_FRAMES: usize = 20;
             transmit_frames(&mut ctx, &frame, NUM_ASYNC_SENT_FRAMES).await;

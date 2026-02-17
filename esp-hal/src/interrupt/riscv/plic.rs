@@ -44,7 +44,6 @@ pub(super) fn cpu_interrupt_priority_raw(cpu_interrupt: u32) -> u8 {
         .bits()
 }
 
-/// Get the current run level (the level below which interrupts are masked).
 pub(super) fn current_runlevel() -> u8 {
     PLIC_MX::regs()
         .mxint_thresh()

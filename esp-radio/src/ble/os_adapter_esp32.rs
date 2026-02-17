@@ -654,14 +654,8 @@ pub(crate) unsafe extern "C" fn set_isr(n: i32, f: unsafe extern "C" fn(), arg: 
             unsafe {
                 ISR_INTERRUPT_5 = (f as *mut c_void, arg as *mut c_void);
             }
-            unwrap!(interrupt::enable(
-                Interrupt::RWBT,
-                interrupt::Priority::Priority1
-            ));
-            unwrap!(interrupt::enable(
-                Interrupt::RWBLE,
-                interrupt::Priority::Priority1
-            ));
+            interrupt::enable(Interrupt::RWBT, interrupt::Priority::Priority1);
+            interrupt::enable(Interrupt::RWBLE, interrupt::Priority::Priority1);
         }
         7 => unsafe {
             ISR_INTERRUPT_7 = (f as *mut c_void, arg as *mut c_void);
@@ -670,10 +664,7 @@ pub(crate) unsafe extern "C" fn set_isr(n: i32, f: unsafe extern "C" fn(), arg: 
             unsafe {
                 ISR_INTERRUPT_8 = (f as *mut c_void, arg as *mut c_void);
             }
-            unwrap!(interrupt::enable(
-                Interrupt::BT_BB,
-                interrupt::Priority::Priority1,
-            ));
+            interrupt::enable(Interrupt::BT_BB, interrupt::Priority::Priority1);
         }
         _ => panic!("set_isr - unsupported interrupt number {}", n),
     }

@@ -143,17 +143,7 @@ fn ieee802154_mac_init() {
     // memset(s_rx_frame, 0, sizeof(s_rx_frame));
     // s_ieee802154_state = IEEE802154_STATE_IDLE;
 
-    unsafe {
-        esp_hal::interrupt::bind_interrupt(
-            esp_hal::peripherals::Interrupt::ZB_MAC,
-            zb_mac_handler.handler(),
-        );
-    }
-    esp_hal::interrupt::enable(
-        esp_hal::peripherals::Interrupt::ZB_MAC,
-        zb_mac_handler.priority(),
-    )
-    .unwrap();
+    esp_hal::interrupt::bind_handler(esp_hal::peripherals::Interrupt::ZB_MAC, zb_mac_handler);
 }
 
 fn ieee802154_set_txrx_pti(txrx_scene: Ieee802154TxRxScene) {

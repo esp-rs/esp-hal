@@ -934,7 +934,7 @@ impl<'rmt> Rmt<'rmt, Blocking> {
             crate::interrupt::disable(core, Interrupt::RMT);
         }
         unsafe { crate::interrupt::bind_interrupt(Interrupt::RMT, handler.handler()) };
-        unwrap!(crate::interrupt::enable(Interrupt::RMT, handler.priority()));
+        crate::interrupt::enable(Interrupt::RMT, handler.priority());
     }
 }
 

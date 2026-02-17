@@ -424,10 +424,7 @@ impl<ADCI> InterruptConfigurable for Adc<'_, ADCI, Blocking> {
             crate::interrupt::disable(core, InterruptSource);
         }
         unsafe { crate::interrupt::bind_interrupt(InterruptSource, handler.handler()) };
-        unwrap!(crate::interrupt::enable(
-            InterruptSource,
-            handler.priority()
-        ));
+        crate::interrupt::enable(InterruptSource, handler.priority());
     }
 }
 

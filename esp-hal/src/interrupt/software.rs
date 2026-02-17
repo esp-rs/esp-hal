@@ -104,7 +104,7 @@ impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
             interrupt::disable(core, interrupt);
         }
         unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
-        unwrap!(interrupt::enable(interrupt, handler.priority()));
+        interrupt::enable(interrupt, handler.priority());
     }
 
     /// Trigger this software-interrupt

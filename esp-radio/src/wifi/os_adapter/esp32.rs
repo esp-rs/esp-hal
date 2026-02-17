@@ -66,10 +66,8 @@ pub unsafe extern "C" fn set_isr(
         _ => panic!("set_isr - unsupported interrupt number {}", n),
     }
     #[cfg(feature = "wifi")]
-    {
-        unwrap!(interrupt::enable(
-            peripherals::Interrupt::WIFI_MAC,
-            interrupt::Priority::Priority1,
-        ));
-    }
+    interrupt::enable(
+        peripherals::Interrupt::WIFI_MAC,
+        interrupt::Priority::Priority1,
+    );
 }

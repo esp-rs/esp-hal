@@ -676,21 +676,12 @@ pub(crate) unsafe extern "C" fn interrupt_handler_set(
             5 => {
                 ISR_INTERRUPT_5 = (func as *mut c_void, arg as *mut c_void);
                 #[cfg(esp32c3)]
-                unwrap!(interrupt::enable(
-                    Interrupt::RWBT,
-                    interrupt::Priority::Priority1
-                ));
-                unwrap!(interrupt::enable(
-                    Interrupt::BT_BB,
-                    interrupt::Priority::Priority1
-                ));
+                interrupt::enable(Interrupt::RWBT, interrupt::Priority::Priority1);
+                interrupt::enable(Interrupt::BT_BB, interrupt::Priority::Priority1);
             }
             8 => {
                 ISR_INTERRUPT_8 = (func as *mut c_void, arg as *mut c_void);
-                unwrap!(interrupt::enable(
-                    Interrupt::RWBLE,
-                    interrupt::Priority::Priority1
-                ));
+                interrupt::enable(Interrupt::RWBLE, interrupt::Priority::Priority1);
             }
             _ => panic!("Unsupported interrupt number {}", interrupt_no),
         }

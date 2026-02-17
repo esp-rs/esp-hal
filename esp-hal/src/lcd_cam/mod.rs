@@ -71,10 +71,7 @@ impl<'d> LcdCam<'d, Blocking> {
             crate::interrupt::disable(core, Interrupt::LCD_CAM);
         }
         unsafe { crate::interrupt::bind_interrupt(Interrupt::LCD_CAM, handler.handler()) };
-        unwrap!(crate::interrupt::enable(
-            Interrupt::LCD_CAM,
-            handler.priority()
-        ));
+        crate::interrupt::enable(Interrupt::LCD_CAM, handler.priority());
     }
 }
 
