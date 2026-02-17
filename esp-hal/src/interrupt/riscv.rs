@@ -489,11 +489,11 @@ mod vectored {
                 &pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as *const _ as *mut usize;
 
             if crate::debugger::debugger_connected() {
-                ptr.write_volatile(handler.raw_value());
+                ptr.write_volatile(handler.address());
             } else {
                 crate::debugger::DEBUGGER_LOCK.lock(|| {
                     let wp = crate::debugger::clear_watchpoint(1);
-                    ptr.write_volatile(handler.raw_value());
+                    ptr.write_volatile(handler.address());
                     crate::debugger::restore_watchpoint(1, wp);
                 });
             }
@@ -503,12 +503,15 @@ mod vectored {
     /// Returns the currently bound interrupt handler.
     pub fn bound_handler(interrupt: Interrupt) -> Option<IsrCallback> {
         unsafe {
-            let addr = pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as usize;
-            if addr == 0 {
+            let func = pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
+            if func as usize == 0 {
                 return None;
             }
 
-            Some(IsrCallback::from_raw(addr))
+            Some(IsrCallback::new(core::mem::transmute::<
+                unsafe extern "C" fn(),
+                extern "C" fn(),
+            >(func)))
         }
     }
 }
@@ -1082,55 +1085,39 @@ mod rt {
 
         let configured_interrupts = vectored::configured_interrupts(core, status, prio);
 
-        // When nesting is possible, we run the nestable interrupts first. This ensures that we
-        // don't violate assumptions made by non-nestable handlers.
+        let handle_interrupts = || unsafe {
+            for interrupt_nr in configured_interrupts.iterator() {
+                let handler = pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler as usize;
 
-        const NOT_NESTED_BIT: usize = 1;
-        if prio != Priority::max() {
-            unsafe {
-                riscv::interrupt::nested(|| {
-                    for interrupt_nr in configured_interrupts.iterator() {
-                        let handler =
-                            pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler as usize;
-
-                        let nested = (handler & NOT_NESTED_BIT) == 0;
-                        if nested {
-                            let handler: fn() =
-                                core::mem::transmute::<usize, fn()>(handler & !NOT_NESTED_BIT);
-
-                            handler();
-                        }
-                    }
-                });
-            }
-        }
-
-        // Now we can run the non-nestable interrupt handlers.
-
-        for interrupt_nr in configured_interrupts.iterator() {
-            let handler =
-                unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler } as usize;
-            let not_nested = (handler & NOT_NESTED_BIT) == 1;
-            if not_nested || prio == Priority::max() {
-                let handler: fn() =
-                    unsafe { core::mem::transmute::<usize, fn()>(handler & !NOT_NESTED_BIT) };
+                let handler: fn() = core::mem::transmute::<usize, fn()>(handler);
 
                 handler();
             }
-        }
-
-        #[cfg(not(interrupt_controller = "clic"))]
-        unsafe {
-            change_current_runlevel(level)
         };
 
-        #[cfg(interrupt_controller = "clic")]
-        // In case the target uses the CLIC, it is mandatory to restore `mcause` register
-        // since it contains the former CPU priority. When executing `mret`,
-        // the hardware will restore the former threshold, from `mcause` to
-        // `mintstatus` CSR
-        unsafe {
-            core::arch::asm!("csrw 0x342, {}", in(reg) mcause.bits())
+        // Do not enable nesting on the highest priority level. Older interrupt controllers couldn't
+        // properly mask the highest priority interrupt, and for CLIC we don't want to waste
+        // the cycles it takes to enable nesting unnecessarily.
+        if prio != Priority::max() {
+            unsafe {
+                riscv::interrupt::nested(handle_interrupts);
+            }
+        } else {
+            handle_interrupts();
+        }
+
+        cfg_if::cfg_if! {
+            if #[cfg(interrupt_controller = "clic")] {
+                // In case the target uses the CLIC, it is mandatory to restore `mcause` register
+                // since it contains the former CPU priority. When executing `mret`,
+                // the hardware will restore the former threshold, from `mcause` to
+                // `mintstatus` CSR
+                unsafe {
+                    core::arch::asm!("csrw 0x342, {}", in(reg) mcause.bits())
+                }
+            } else {
+                unsafe { change_current_runlevel(level) };
+            }
         }
     }
 }

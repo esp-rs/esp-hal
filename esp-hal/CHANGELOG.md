@@ -85,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Rtc::estimate_xtal_frequency()` (#4851)
 - `RtcFastClock`, `RtcSlowClock` (#4851)
 - `esp_hal::interrupt::{map, enable_direct, RESERVED_INTERRUPTS}` from ESP32, ESP32-S2 and ESP32-S3 (#5007)
+- `InterruptHandler::new_not_nested` (#5000)
 
 ## [v1.0.0] - 2025-10-30
 

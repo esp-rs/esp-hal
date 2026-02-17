@@ -13,7 +13,7 @@
 //! generated square waves are 90 degrees out of phase. DO NOT CONNECT GPIO2 and
 //! GPIO4 - they read back themselves.
 
-//% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
+//% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c5 esp32c6 esp32h2
 
 #![no_std]
 #![no_main]
