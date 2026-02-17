@@ -2389,7 +2389,7 @@ impl WifiController<'_> {
     }
 
     #[procmacros::doc_replace]
-    /// Set the configuration and start / re-start the controller as needed.
+    /// Set the configuration and (re)start the controller as needed.
     ///
     /// This will set the mode accordingly.
     /// You need to use [`Self::connect_async`] for connecting to an access point.
