@@ -15,4 +15,4 @@ jobs:
           repoToken: "${{ secrets.GITHUB_TOKEN }}"
           dirtyLabel: "merge-conflict"
           removeOnDirtyLabel: true
-          commentOnDirty: "Notification about merge conflicts. Please resolve the conflicts."
+          commentOnDirty: "New commits in main has made this PR unmergable. Please resolve the conflicts."
