@@ -237,12 +237,6 @@ impl InterruptStatus {
         }
     }
 
-    const fn empty() -> Self {
-        InterruptStatus {
-            status: [0u32; STATUS_WORDS],
-        }
-    }
-
     /// Is the given interrupt bit set
     pub fn is_set(&self, interrupt: u8) -> bool {
         (self.status[interrupt as usize / 32] & (1 << (interrupt % 32))) != 0
@@ -263,6 +257,7 @@ impl InterruptStatus {
 }
 
 /// Iterator over set interrupt status bits
+#[derive(Debug, Clone)]
 pub struct InterruptStatusIterator {
     status: InterruptStatus,
     idx: usize,
@@ -397,48 +392,6 @@ pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
     CpuInterrupt::from_u32(cpu_intr)
 }
 
-/// Get the vectored peripheral interrupts configured for the core at the given priority
-/// matching the given status.
-#[inline]
-pub(crate) fn configured_interrupts(status: InterruptStatus, level: u32) -> InterruptStatus {
-    let core = Cpu::current();
-    let mut res = InterruptStatus::empty();
-
-    for interrupt_nr in status.iterator() {
-        if let Some(cpu_interrupt) = crate::interrupt::mapped_to_raw(core, interrupt_nr as u32)
-            && cpu_interrupt.is_vectored()
-            && cpu_interrupt.level() as u32 == level
-        {
-            res.set(interrupt_nr);
-        }
-    }
-    res
-}
-
-/// Get status of peripheral interrupts
-#[inline]
-pub fn status(core: Cpu) -> InterruptStatus {
-    match core {
-        Cpu::ProCpu => InterruptStatus {
-            status: core::array::from_fn(|idx| {
-                INTERRUPT_CORE0::regs()
-                    .core_0_intr_status(idx)
-                    .read()
-                    .bits()
-            }),
-        },
-        #[cfg(multi_core)]
-        Cpu::AppCpu => InterruptStatus {
-            status: core::array::from_fn(|idx| {
-                INTERRUPT_CORE1::regs()
-                    .core_1_intr_status(idx)
-                    .read()
-                    .bits()
-            }),
-        },
-    }
-}
-
 /// Represents the priority level of running code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RunLevel {
@@ -524,4 +477,16 @@ pub(crate) fn setup_interrupts() {
     }
 
     unsafe { crate::interrupt::rt::init_vectoring() };
+}
+
+#[inline(always)]
+fn should_handle(core: Cpu, interrupt_nr: u32, level: u32) -> bool {
+    if let Some(cpu_interrupt) = crate::interrupt::mapped_to_raw(core, interrupt_nr)
+        && cpu_interrupt.is_vectored()
+        && cpu_interrupt.level() == level
+    {
+        true
+    } else {
+        false
+    }
 }

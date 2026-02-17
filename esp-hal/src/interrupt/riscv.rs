@@ -63,7 +63,7 @@ for_each_interrupt!(
                 #[inline]
                 pub(crate) fn from_u32(n: u32) -> Option<Self> {
                     match n {
-                        $(n if n == $n => Some(Self:: [<Interrupt $n>]),)*
+                        $(n if n == $n && n != DISABLED_CPU_INTERRUPT => Some(Self:: [<Interrupt $n>]),)*
                         _ => None
                     }
                 }
@@ -533,10 +533,10 @@ pub(crate) mod rt {
             }
         }
 
-        let configured_interrupts = vectored::configured_interrupts(core, status, prio);
-
         let handle_interrupts = || unsafe {
-            for interrupt_nr in configured_interrupts.iterator() {
+            for interrupt_nr in configured_interrupts.iterator().filter(|&interrupt_nr| {
+                crate::interrupt::should_handle(Cpu::current(), interrupt_nr as u32, prio as u32)
+            }) {
                 let handler = pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler as usize;
 
                 let handler: fn() = core::mem::transmute::<usize, fn()>(handler);

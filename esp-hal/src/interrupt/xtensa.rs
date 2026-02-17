@@ -114,7 +114,7 @@ impl CpuInterrupt {
     }
 
     #[inline]
-    pub(crate) fn level(&self) -> Priority {
+    pub(crate) fn level(&self) -> u32 {
         match self {
             CpuInterrupt::Interrupt0LevelPriority1
             | CpuInterrupt::Interrupt1LevelPriority1
@@ -130,18 +130,18 @@ impl CpuInterrupt {
             | CpuInterrupt::Interrupt12LevelPriority1
             | CpuInterrupt::Interrupt13LevelPriority1
             | CpuInterrupt::Interrupt17LevelPriority1
-            | CpuInterrupt::Interrupt18LevelPriority1 => Priority::Priority1,
+            | CpuInterrupt::Interrupt18LevelPriority1 => Priority::Priority1 as u32,
 
             CpuInterrupt::Interrupt19LevelPriority2
             | CpuInterrupt::Interrupt20LevelPriority2
-            | CpuInterrupt::Interrupt21LevelPriority2 => Priority::Priority2,
+            | CpuInterrupt::Interrupt21LevelPriority2 => Priority::Priority2 as u32,
 
             CpuInterrupt::Interrupt11ProfilingPriority3
             | CpuInterrupt::Interrupt15Timer1Priority3
             | CpuInterrupt::Interrupt22EdgePriority3
             | CpuInterrupt::Interrupt27LevelPriority3
             | CpuInterrupt::Interrupt29SoftwarePriority3
-            | CpuInterrupt::Interrupt23LevelPriority3 => Priority::Priority3,
+            | CpuInterrupt::Interrupt23LevelPriority3 => Priority::Priority3 as u32,
         }
     }
 
@@ -439,8 +439,10 @@ pub(crate) mod rt {
                 InterruptStatus::current()
             };
 
-            let configured_interrupts = crate::interrupt::configured_interrupts(status, LEVEL);
-            for interrupt_nr in configured_interrupts.iterator() {
+            let core = Cpu::current();
+            for interrupt_nr in status.iterator().filter(|&interrupt_nr| {
+                crate::interrupt::should_handle(core, interrupt_nr as u32, LEVEL)
+            }) {
                 let handler = unsafe { pac::__INTERRUPTS[interrupt_nr as usize]._handler };
                 let handler: fn(&mut Context) = unsafe {
                     core::mem::transmute::<unsafe extern "C" fn(), fn(&mut Context)>(handler)
