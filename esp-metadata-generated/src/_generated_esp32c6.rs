@@ -84,6 +84,12 @@ macro_rules! property {
     ("dma.gdma_version", str) => {
         stringify!(1)
     };
+    ("ecc.working_modes") => {
+        8
+    };
+    ("ecc.working_modes", str) => {
+        stringify!(8)
+    };
     ("gpio.has_bank_1") => {
         false
     };

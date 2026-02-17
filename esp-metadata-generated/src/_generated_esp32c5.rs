@@ -36,6 +36,15 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp32-c5_technical_reference_manual_en.pdf"
     };
+    ("aes.dma") => {
+        true
+    };
+    ("aes.has_split_text_registers") => {
+        true
+    };
+    ("aes.endianness_configurable") => {
+        false
+    };
     ("bt.controller") => {
         "npl"
     };
@@ -68,6 +77,12 @@ macro_rules! property {
     };
     ("dma.gdma_version", str) => {
         stringify!(2)
+    };
+    ("ecc.working_modes") => {
+        11
+    };
+    ("ecc.working_modes", str) => {
+        stringify!(11)
     };
     ("gpio.has_bank_1") => {
         false
@@ -311,6 +326,18 @@ macro_rules! property {
     };
     ("wifi.has_wifi6") => {
         false
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_aes_key_length {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_aes_key_length { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_aes_key_length!((128));
+        _for_each_inner_aes_key_length!((256)); _for_each_inner_aes_key_length!((128, 0,
+        4)); _for_each_inner_aes_key_length!((256, 2, 6));
+        _for_each_inner_aes_key_length!((bits(128), (256)));
+        _for_each_inner_aes_key_length!((modes(128, 0, 4), (256, 2, 6)));
     };
 }
 #[macro_export]
