@@ -560,42 +560,10 @@ impl Alarm<'_> {
             crate::interrupt::disable(core, interrupt);
         }
 
-        #[cfg(not(esp32s2))]
         unsafe {
             interrupt::bind_interrupt(interrupt, handler.handler());
         }
 
-        #[cfg(esp32s2)]
-        {
-            // ESP32-S2 Systimer interrupts are edge triggered. Our interrupt
-            // handler calls each of the handlers, regardless of which one triggered the
-            // interrupt. This mess registers an intermediate handler that
-            // checks if an interrupt is active before calling the associated
-            // handler functions.
-
-            static mut HANDLERS: [Option<crate::interrupt::IsrCallback>; 3] = [None, None, None];
-
-            #[crate::ram]
-            extern "C" fn _handle_interrupt<const CH: u8>() {
-                if SYSTIMER::regs().int_raw().read().target(CH).bit_is_set() {
-                    let handler = unsafe { HANDLERS[CH as usize] };
-                    if let Some(handler) = handler {
-                        (handler.aligned_ptr())();
-                    }
-                }
-            }
-
-            unsafe {
-                HANDLERS[self.channel() as usize] = Some(handler.handler());
-                let handler = match self.channel() {
-                    0 => _handle_interrupt::<0>,
-                    1 => _handle_interrupt::<1>,
-                    2 => _handle_interrupt::<2>,
-                    _ => unreachable!(),
-                };
-                interrupt::bind_interrupt(interrupt, crate::interrupt::IsrCallback::new(handler));
-            }
-        }
         unwrap!(interrupt::enable(interrupt, handler.priority()));
     }
 }
@@ -758,7 +726,7 @@ static INT_ENA_LOCK: RawMutex = RawMutex::new();
 mod asynch {
     use core::marker::PhantomData;
 
-    use procmacros::handler;
+    use procmacros::{handler, ram};
 
     use super::*;
     use crate::asynch::AtomicWaker;
@@ -772,27 +740,38 @@ mod asynch {
 
     #[inline]
     fn handle_alarm(comp: Comparator) {
-        Alarm {
-            comp,
-            unit: Unit::Unit0,
-            _lifetime: PhantomData,
-        }
-        .enable_interrupt(false);
+        if cfg!(not(esp32s2)) // Other MCUs bind to a level interrupt so don't need to check
+            || SYSTIMER::regs()
+                .int_raw()
+                .read()
+                .target(comp as u8)
+                .bit_is_set()
+        {
+            let alarm = Alarm {
+                comp,
+                unit: Unit::Unit0,
+                _lifetime: PhantomData,
+            };
+            alarm.enable_interrupt(false);
 
-        WAKERS[comp as usize].wake();
+            waker(&alarm).wake();
+        }
     }
 
     #[handler]
+    #[ram]
     pub(crate) fn target0_handler() {
         handle_alarm(Comparator::Comparator0);
     }
 
     #[handler]
+    #[ram]
     pub(crate) fn target1_handler() {
         handle_alarm(Comparator::Comparator1);
     }
 
     #[handler]
+    #[ram]
     pub(crate) fn target2_handler() {
         handle_alarm(Comparator::Comparator2);
     }
