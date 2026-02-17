@@ -91,7 +91,9 @@ fn main() -> ! {
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
             let button = peripherals.GPIO0;
-        } else {
+        } else if #[cfg(any(feature = "esp32c5"))] {
+            let button = peripherals.GPIO28;
+        }else {
             let button = peripherals.GPIO9;
         }
     }
