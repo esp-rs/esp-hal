@@ -5,7 +5,7 @@
 //!
 //! The following wiring is assumed:
 //! - LED => GPIO2
-//! - BUTTON => GPIO0 (ESP32, ESP32-S2, ESP32-S3) / GPIO9
+//! - BUTTON => GPIO0 (ESP32, ESP32-S2, ESP32-S3) / GPIO28 (ESP32-C5) / GPIO9
 
 #![no_std]
 #![no_main]
@@ -40,7 +40,9 @@ fn main() -> ! {
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
             let button = peripherals.GPIO0;
-        } else {
+        } else if #[cfg(any(feature = "esp32c5"))] {
+            let button = peripherals.GPIO28;
+        }else {
             let button = peripherals.GPIO9;
         }
     }
