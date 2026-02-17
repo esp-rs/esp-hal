@@ -76,6 +76,18 @@ use core::{num::NonZeroUsize, ops::BitAnd};
 pub use self::riscv::*;
 #[cfg(xtensa)]
 pub use self::xtensa::*;
+use crate::system::Cpu;
+
+cfg_if::cfg_if! {
+    if #[cfg(esp32)] {
+        use crate::peripherals::DPORT as INTERRUPT_CORE0;
+        use crate::peripherals::DPORT as INTERRUPT_CORE1;
+    } else {
+        use crate::peripherals::INTERRUPT_CORE0;
+        #[cfg(esp32s3)]
+        use crate::peripherals::INTERRUPT_CORE1;
+    }
+}
 
 #[cfg(riscv)]
 mod riscv;
@@ -250,29 +262,33 @@ pub struct InterruptStatus {
 }
 
 impl InterruptStatus {
+    /// Get status of peripheral interrupts
+    pub fn current() -> InterruptStatus {
+        match Cpu::current() {
+            Cpu::ProCpu => InterruptStatus {
+                status: core::array::from_fn(|idx| {
+                    INTERRUPT_CORE0::regs()
+                        .core_0_intr_status(idx)
+                        .read()
+                        .bits()
+                }),
+            },
+            #[cfg(multi_core)]
+            Cpu::AppCpu => InterruptStatus {
+                status: core::array::from_fn(|idx| {
+                    INTERRUPT_CORE1::regs()
+                        .core_1_intr_status(idx)
+                        .read()
+                        .bits()
+                }),
+            },
+        }
+    }
+
     const fn empty() -> Self {
         InterruptStatus {
             status: [0u32; STATUS_WORDS],
         }
-    }
-
-    #[cfg(interrupts_status_registers = "3")]
-    const fn from(w0: u32, w1: u32, w2: u32) -> Self {
-        Self {
-            status: [w0, w1, w2],
-        }
-    }
-
-    #[cfg(interrupts_status_registers = "4")]
-    const fn from(w0: u32, w1: u32, w2: u32, w3: u32) -> Self {
-        Self {
-            status: [w0, w1, w2, w3],
-        }
-    }
-
-    #[cfg(interrupts_status_registers = "2")]
-    const fn from(w0: u32, w1: u32) -> Self {
-        Self { status: [w0, w1] }
     }
 
     /// Is the given interrupt bit set
@@ -298,32 +314,9 @@ impl BitAnd for InterruptStatus {
     type Output = InterruptStatus;
 
     fn bitand(self, rhs: Self) -> Self::Output {
-        #[cfg(interrupts_status_registers = "3")]
-        return Self::Output {
-            status: [
-                self.status[0] & rhs.status[0],
-                self.status[1] & rhs.status[1],
-                self.status[2] & rhs.status[2],
-            ],
-        };
-
-        #[cfg(interrupts_status_registers = "4")]
-        return Self::Output {
-            status: [
-                self.status[0] & rhs.status[0],
-                self.status[1] & rhs.status[1],
-                self.status[2] & rhs.status[2],
-                self.status[3] & rhs.status[3],
-            ],
-        };
-
-        #[cfg(interrupts_status_registers = "2")]
-        return Self::Output {
-            status: [
-                self.status[0] & rhs.status[0],
-                self.status[1] & rhs.status[1],
-            ],
-        };
+        Self::Output {
+            status: core::array::from_fn(|i| self.status[i] & rhs.status[i]),
+        }
     }
 }
 
