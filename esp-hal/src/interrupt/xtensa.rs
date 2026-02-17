@@ -397,8 +397,6 @@ pub(crate) mod rt {
 
     #[inline(always)]
     unsafe fn handle_interrupts<const LEVEL: u32>(save_frame: &mut Context) {
-        let core = Cpu::current();
-
         let cpu_interrupt_mask =
             interrupt::get() & interrupt::get_mask() & CPU_INTERRUPT_LEVELS[LEVEL as usize];
 
