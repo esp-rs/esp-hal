@@ -45,6 +45,12 @@ macro_rules! property {
     ("aes.endianness_configurable") => {
         false
     };
+    ("assist_debug.has_sp_monitor") => {
+        false
+    };
+    ("assist_debug.has_region_monitor") => {
+        false
+    };
     ("bt.controller") => {
         "npl"
     };
@@ -2522,6 +2528,8 @@ macro_rules! implement_peripheral_clocks {
             Ecc,
             /// I2C_EXT0 peripheral clock signal
             I2cExt0,
+            /// PARL_IO peripheral clock signal
+            ParlIo,
             /// PCNT peripheral clock signal
             Pcnt,
             /// RMT peripheral clock signal
@@ -2544,16 +2552,24 @@ macro_rules! implement_peripheral_clocks {
             Uart1,
             /// UHCI0 peripheral clock signal
             Uhci0,
+            /// USB_DEVICE peripheral clock signal
+            UsbDevice,
         }
         impl Peripheral {
-            const KEEP_ENABLED: &[Peripheral] =
-                &[Self::Systimer, Self::Timg0, Self::Uart0, Self::Uart1];
+            const KEEP_ENABLED: &[Peripheral] = &[
+                Self::Systimer,
+                Self::Timg0,
+                Self::Uart0,
+                Self::Uart1,
+                Self::UsbDevice,
+            ];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::Aes,
                 Self::Dma,
                 Self::Ecc,
                 Self::I2cExt0,
+                Self::ParlIo,
                 Self::Pcnt,
                 Self::Rmt,
                 Self::Rsa,
@@ -2565,6 +2581,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Uart0,
                 Self::Uart1,
                 Self::Uhci0,
+                Self::UsbDevice,
             ];
         }
         unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
@@ -2588,6 +2605,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .i2c0_conf()
                         .modify(|_, w| w.i2c0_clk_en().bit(enable));
+                }
+                Peripheral::ParlIo => {
+                    crate::peripherals::SYSTEM::regs()
+                        .parl_io_conf()
+                        .modify(|_, w| w.parl_clk_en().bit(enable));
                 }
                 Peripheral::Pcnt => {
                     crate::peripherals::SYSTEM::regs()
@@ -2652,6 +2674,11 @@ macro_rules! implement_peripheral_clocks {
                         .uhci_conf()
                         .modify(|_, w| w.uhci_clk_en().bit(enable));
                 }
+                Peripheral::UsbDevice => {
+                    crate::peripherals::SYSTEM::regs()
+                        .usb_device_conf()
+                        .modify(|_, w| w.usb_device_clk_en().bit(enable));
+                }
             }
         }
         unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
@@ -2675,6 +2702,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .i2c0_conf()
                         .modify(|_, w| w.i2c0_rst_en().bit(reset));
+                }
+                Peripheral::ParlIo => {
+                    crate::peripherals::SYSTEM::regs()
+                        .parl_io_conf()
+                        .modify(|_, w| w.parl_rst_en().bit(reset));
                 }
                 Peripheral::Pcnt => {
                     crate::peripherals::SYSTEM::regs()
@@ -2732,6 +2764,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::SYSTEM::regs()
                         .uhci_conf()
                         .modify(|_, w| w.uhci_rst_en().bit(reset));
+                }
+                Peripheral::UsbDevice => {
+                    crate::peripherals::SYSTEM::regs()
+                        .usb_device_conf()
+                        .modify(|_, w| w.usb_device_rst_en().bit(reset));
                 }
             }
         }

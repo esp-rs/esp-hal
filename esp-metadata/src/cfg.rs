@@ -327,7 +327,7 @@ driver_configs![
     },
     AvcProperties {
         driver: avc,
-        name: "AVC",
+        name: "Analog Voltage Comparator",
         properties: {}
     },
     BitScramblerProperties {
