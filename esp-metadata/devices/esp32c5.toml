@@ -574,8 +574,11 @@ combined_uart_selector_field = true
 [device.bit_scrambler]
 support_status = "not_supported"
 
-# [device.avc]
-# support_status = "not_supported"
+[device.assist_debug]
+support_status = "not_supported"
+
+[device.avc]
+support_status = "not_supported"
 
 [device.twai]
 support_status = "not_supported"
@@ -620,6 +623,40 @@ support_status = "not_supported"
 # [device.io_mux]
 [device.systimer]
 [device.pcnt]
+[device.usb_serial_jtag]
+support_status = "not_supported"
+
+[device.parl_io]
+support_status = "not_supported"
+
+[device.ledc]
+support_status = "not_supported"
+
+[device.mcpwm]
+support_status = "not_supported"
 
 [device.sleep]
+support_status = "not_supported"
+
+[device.etm]
+support_status = "not_supported"
+
+[device.hmac]
+support_status = "not_supported"
+
+# [device.ecdsa]
+# support_status = "not_supported"
+
+[device.i2s]
+support_status = "not_supported"
+
+[device.iomux]
+
+[device.psram]
+support_status = "not_supported"
+
+[device.sd_slave]
+support_status = "not_supported"
+
+[device.ulp_riscv]
 support_status = "not_supported"

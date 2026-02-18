@@ -45,6 +45,12 @@ macro_rules! property {
     ("aes.endianness_configurable") => {
         false
     };
+    ("assist_debug.has_sp_monitor") => {
+        false
+    };
+    ("assist_debug.has_region_monitor") => {
+        false
+    };
     ("bt.controller") => {
         "npl"
     };
