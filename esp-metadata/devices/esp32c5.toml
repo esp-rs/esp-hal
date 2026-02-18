@@ -639,7 +639,7 @@ support_status = "not_supported"
 [device.usb_serial_jtag]
 
 [device.parl_io]
-support_status = "partial"
+support_status = "not_supported" # doesn't work
 version = 2
 
 [device.ledc]
