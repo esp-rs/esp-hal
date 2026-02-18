@@ -360,6 +360,8 @@ pub(crate) mod rt {
 
     // Setup interrupts ready for vectoring
     pub(crate) unsafe fn init_vectoring() {
+        // Enable vectored interrupts. No configuration is needed because these interrupts have
+        // fixed priority and trigger mode.
         for cpu_int in [
             CpuInterrupt::Interrupt10EdgePriority1,
             CpuInterrupt::Interrupt22EdgePriority3,

@@ -473,6 +473,7 @@ pub(crate) mod rt {
             }
         };
 
+        // Configure and enable vectored interrupts
         for (int, prio) in PRIORITY_TO_INTERRUPT.iter().copied().zip(Priority::iter()) {
             let num = int as u32;
             cpu_int::set_kind_raw(num, InterruptKind::Level);

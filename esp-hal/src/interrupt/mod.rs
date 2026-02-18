@@ -282,11 +282,6 @@ impl Iterator for InterruptStatusIterator {
 
 // Peripheral interrupt API.
 
-/// Assign a peripheral interrupt to a CPU interrupt.
-pub(crate) fn map(core: Cpu, interrupt: Interrupt, cpu_interrupt: CpuInterrupt) {
-    map_raw(core, interrupt, cpu_interrupt as u32)
-}
-
 fn vector_entry(interrupt: Interrupt) -> &'static pac::Vector {
     cfg_if::cfg_if! {
         if #[cfg(xtensa)] {
@@ -316,6 +311,8 @@ pub fn bound_handler(interrupt: Interrupt) -> Option<IsrCallback> {
 
 /// Binds the given handler to a peripheral interrupt.
 ///
+/// The interrupt handler will be enabled at the specified priority level.
+///
 /// The interrupt handler will be called on the core where it is registered.
 /// Only one interrupt handler can be bound to a peripheral interrupt.
 pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
@@ -343,17 +340,22 @@ pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
 ///
 /// Note that interrupts still need to be enabled globally for interrupts
 /// to be serviced.
+///
+/// Internally, this function maps the interrupt to the appropriate CPU interrupt
+/// for the specified priority level.
+#[inline]
 pub fn enable(interrupt: Interrupt, level: Priority) {
     enable_on_cpu(Cpu::current(), interrupt, level);
 }
 
 pub(crate) fn enable_on_cpu(cpu: Cpu, interrupt: Interrupt, level: Priority) {
     let cpu_interrupt = priority_to_cpu_interrupt(interrupt, level);
-    crate::interrupt::map(cpu, interrupt, cpu_interrupt);
-    enable_cpu_interrupt(cpu_interrupt);
+    map_raw(cpu, interrupt, cpu_interrupt as u32);
 }
 
 /// Disable the given peripheral interrupt.
+///
+/// Internally, this function maps the interrupt to a disabled CPU interrupt.
 #[inline]
 pub fn disable(core: Cpu, interrupt: Interrupt) {
     map_raw(core, interrupt, DISABLED_CPU_INTERRUPT)
