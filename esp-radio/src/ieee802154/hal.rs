@@ -118,6 +118,12 @@ impl RxAbortReason {
     pub fn bit(&self) -> u32 {
         1 << (*self as u32 - 1)
     }
+
+    /// Mask of all RX abort events (bits 0-23), matching
+    /// `IEEE802154_RX_ABORT_ALL` in the C driver.
+    pub fn all() -> u32 {
+        0x00FF_FFFF
+    }
 }
 
 impl BitOr for RxAbortReason {
@@ -223,6 +229,16 @@ pub(crate) fn enable_rx_abort_events(events: u32) {
         .modify(|r, w| unsafe {
             w.rx_abort_intr_ctrl()
                 .bits(r.rx_abort_intr_ctrl().bits() | events)
+        });
+}
+
+#[inline(always)]
+pub(crate) fn disable_rx_abort_events(events: u32) {
+    IEEE802154::regs()
+        .rx_abort_intr_ctrl()
+        .modify(|r, w| unsafe {
+            w.rx_abort_intr_ctrl()
+                .bits(r.rx_abort_intr_ctrl().bits() & !events)
         });
 }
 
@@ -407,15 +423,53 @@ pub(crate) fn set_rx_addr(addr: *mut u8) {
 }
 
 #[inline(always)]
-pub(crate) fn abort_tx() {
+pub(crate) fn get_tx_abort_reason() -> u32 {
     IEEE802154::regs()
         .tx_status()
-        .modify(|_, w| unsafe { w.tx_abort_status().bits(0) });
+        .read()
+        .tx_abort_status()
+        .bits() as u32
 }
 
 #[inline(always)]
-pub(crate) fn abort_rx() {
+pub(crate) fn get_rx_abort_reason() -> u32 {
     IEEE802154::regs()
         .rx_status()
-        .modify(|_, w| unsafe { w.rx_abort_status().bits(0) });
+        .read()
+        .rx_abort_status()
+        .bits() as u32
+}
+
+#[inline(always)]
+pub(crate) fn rx_auto_ack() -> bool {
+    IEEE802154::regs()
+        .ctrl_cfg()
+        .read()
+        .hw_auto_ack_rx_en()
+        .bit_is_set()
+}
+
+/// Check if currently receiving a frame (past SFD detection).
+/// Matches the C driver's `ieee802154_ll_is_current_rx_frame()`.
+#[inline(always)]
+pub(crate) fn is_current_rx_frame() -> bool {
+    IEEE802154::regs().rx_status().read().rx_state().bits() > 1
+}
+
+#[inline(always)]
+pub(crate) fn timer0_set_threshold(threshold: u32) {
+    IEEE802154::regs()
+        .time(0)
+        .threshold()
+        .write(|w| unsafe { w.timer0_threshold().bits(threshold) });
+}
+
+#[inline(always)]
+pub(crate) fn timer0_start() {
+    set_cmd(Command::Timer0Start);
+}
+
+#[inline(always)]
+pub(crate) fn timer0_stop() {
+    set_cmd(Command::Timer0Stop);
 }
