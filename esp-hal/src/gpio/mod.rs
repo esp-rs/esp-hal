@@ -679,14 +679,12 @@ impl<'d> Io<'d> {
         for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::GPIO);
         }
-        self.set_interrupt_priority(handler.priority());
-        unsafe {
-            crate::interrupt::bind_interrupt(
-                Interrupt::GPIO,
-                crate::interrupt::IsrCallback::new(user_gpio_interrupt_handler),
-            )
-        };
         USER_INTERRUPT_HANDLER.store(handler.handler().callback());
+
+        crate::interrupt::bind_handler(
+            Interrupt::GPIO,
+            InterruptHandler::new(user_gpio_interrupt_handler, handler.priority()),
+        );
     }
 }
 

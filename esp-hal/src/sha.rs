@@ -337,9 +337,7 @@ impl crate::private::Sealed for Sha<'_> {}
 impl crate::interrupt::InterruptConfigurable for Sha<'_> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         self.sha.disable_peri_interrupt();
-
-        self.sha.bind_peri_interrupt(handler.handler());
-        self.sha.enable_peri_interrupt(handler.priority());
+        self.sha.bind_peri_interrupt(handler);
     }
 }
 

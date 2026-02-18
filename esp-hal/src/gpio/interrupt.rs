@@ -55,15 +55,18 @@
 //! break the async API. We will need to expose a way to handle async events.
 
 use portable_atomic::{AtomicPtr, Ordering};
-use procmacros::ram;
 use strum::EnumCount;
 
-#[cfg(feature = "rt")]
-use crate::interrupt::{self, DEFAULT_INTERRUPT_HANDLER};
 use crate::{
     gpio::{AnyPin, GPIO_LOCK, GpioBank, InputPin, set_int_enable},
     interrupt::Priority,
     peripherals::{GPIO, Interrupt},
+    ram,
+};
+#[cfg(feature = "rt")]
+use crate::{
+    handler,
+    interrupt::{self, DEFAULT_INTERRUPT_HANDLER},
 };
 
 /// Convenience constant for `Option::None` pin
@@ -109,15 +112,7 @@ pub(crate) fn bind_default_interrupt_handler() {
         }
     }
 
-    unsafe {
-        interrupt::bind_interrupt(
-            Interrupt::GPIO,
-            interrupt::IsrCallback::new(default_gpio_interrupt_handler),
-        )
-    };
-
-    // By default, we use lowest priority
-    set_interrupt_priority(Interrupt::GPIO, Priority::min());
+    interrupt::bind_handler(Interrupt::GPIO, default_gpio_interrupt_handler);
 }
 
 cfg_if::cfg_if! {
@@ -148,8 +143,9 @@ pub(super) fn set_interrupt_priority(interrupt: Interrupt, priority: Priority) {
 /// status bits unchanged. This enables functions like `is_interrupt_set` to
 /// work correctly.
 #[ram]
+#[handler]
 #[cfg(feature = "rt")]
-extern "C" fn default_gpio_interrupt_handler() {
+fn default_gpio_interrupt_handler() {
     GPIO_LOCK.lock(|| {
         let banks = interrupt_status();
 

@@ -1005,8 +1005,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::ECC);
         }
-        unsafe { crate::interrupt::bind_interrupt(Interrupt::ECC, handler.handler()) };
-        crate::interrupt::enable(Interrupt::ECC, handler.priority());
+        crate::interrupt::bind_handler(Interrupt::ECC, handler);
     }
 
     fn is_busy(&self) -> bool {

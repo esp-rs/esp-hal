@@ -439,8 +439,7 @@ impl<'d> Rtc<'d> {
         for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, interrupt);
         }
-        unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
-        interrupt::enable(interrupt, handler.priority());
+        interrupt::bind_handler(interrupt, handler);
     }
 }
 

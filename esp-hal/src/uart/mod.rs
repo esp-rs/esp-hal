@@ -3814,16 +3814,12 @@ impl Instance for AnyUart<'_> {
 }
 
 impl AnyUart<'_> {
-    fn bind_peri_interrupt(&self, handler: crate::interrupt::IsrCallback) {
+    fn bind_peri_interrupt(&self, handler: InterruptHandler) {
         any::delegate!(self, uart => { uart.bind_peri_interrupt(handler) })
     }
 
     fn disable_peri_interrupt(&self) {
         any::delegate!(self, uart => { uart.disable_peri_interrupt() })
-    }
-
-    fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority) {
-        any::delegate!(self, uart => { uart.enable_peri_interrupt(priority) })
     }
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
@@ -3832,8 +3828,7 @@ impl AnyUart<'_> {
         self.info().enable_listen(EnumSet::all(), false);
         self.info().clear_interrupts(EnumSet::all());
 
-        self.bind_peri_interrupt(handler.handler());
-        self.enable_peri_interrupt(handler.priority());
+        self.bind_peri_interrupt(handler);
     }
 }
 

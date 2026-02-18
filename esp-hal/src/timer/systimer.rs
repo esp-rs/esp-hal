@@ -561,9 +561,7 @@ impl Alarm<'_> {
         }
 
         #[cfg(not(esp32s2))]
-        unsafe {
-            interrupt::bind_interrupt(interrupt, handler.handler());
-        }
+        interrupt::bind_handler(interrupt, handler);
 
         #[cfg(esp32s2)]
         {
@@ -585,18 +583,21 @@ impl Alarm<'_> {
                 }
             }
 
+            let priority = handler.priority();
             unsafe {
                 HANDLERS[self.channel() as usize] = Some(handler.handler());
-                let handler = match self.channel() {
-                    0 => _handle_interrupt::<0>,
-                    1 => _handle_interrupt::<1>,
-                    2 => _handle_interrupt::<2>,
-                    _ => unreachable!(),
-                };
-                interrupt::bind_interrupt(interrupt, crate::interrupt::IsrCallback::new(handler));
             }
+            let handler = match self.channel() {
+                0 => _handle_interrupt::<0>,
+                1 => _handle_interrupt::<1>,
+                2 => _handle_interrupt::<2>,
+                _ => unreachable!(),
+            };
+            interrupt::bind_handler(
+                interrupt,
+                crate::interrupt::InterruptHandler::new(handler, priority),
+            );
         }
-        interrupt::enable(interrupt, handler.priority());
     }
 }
 

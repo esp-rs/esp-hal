@@ -129,9 +129,7 @@ impl<'d> Rsa<'d, Blocking> {
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.rsa.disable_peri_interrupt();
-
-        self.rsa.bind_peri_interrupt(handler.handler());
-        self.rsa.enable_peri_interrupt(handler.priority());
+        self.rsa.bind_peri_interrupt(handler);
     }
 }
 

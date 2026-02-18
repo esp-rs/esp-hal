@@ -534,12 +534,10 @@ pub(crate) mod rt {
         }
 
         let handle_interrupts = || unsafe {
-            for interrupt_nr in configured_interrupts.iterator().filter(|&interrupt_nr| {
+            for interrupt_nr in status.iterator().filter(|&interrupt_nr| {
                 crate::interrupt::should_handle(Cpu::current(), interrupt_nr as u32, prio as u32)
             }) {
-                let handler = pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler as usize;
-
-                let handler: fn() = core::mem::transmute::<usize, fn()>(handler);
+                let handler = pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler;
 
                 handler();
             }

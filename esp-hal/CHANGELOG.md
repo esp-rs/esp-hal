@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `MEM2MEM` peripheral singletons have been re-numbered from 0-8 (#4944)
 - The `DmaPeripheral::Mem2MemX` variants have been renamed to `Mem2memX` and re-numbered from 0-8 (#4944)
 - `esp_hal::interrupt::status` has been replaced by `esp_hal::interrupt::InterruptStatus::current()` (#4997)
-- `esp_hal::interrupt::enable` is now infallible (#4996)
+- `esp_hal::interrupt::bind_interrupt` and `enable` have been merged into `bind_handler` which is now safe and infallible (#4996)
 
 ### Fixed
 

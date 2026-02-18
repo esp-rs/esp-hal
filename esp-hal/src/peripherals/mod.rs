@@ -67,8 +67,14 @@ macro_rules! create_peripheral {
             $(
                 /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
                 #[instability::unstable]
-                pub fn $bind(&self, handler: $crate::interrupt::IsrCallback) {
-                    unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$interrupt, handler); }
+                pub fn $bind(&self, handler: $crate::interrupt::InterruptHandler) {
+                    $crate::interrupt::bind_handler($crate::peripherals::Interrupt::$interrupt, handler);
+                }
+
+                /// Enables the peripheral interrupt on the given priority level.
+                #[instability::unstable]
+                pub fn $enable(&self, priority: $crate::interrupt::Priority) {
+                    $crate::interrupt::enable($crate::peripherals::Interrupt::$interrupt, priority);
                 }
 
                 /// Disables the interrupt handler
@@ -77,12 +83,6 @@ macro_rules! create_peripheral {
                     for core in $crate::system::Cpu::other() {
                         $crate::interrupt::disable(core, $crate::peripherals::Interrupt::$interrupt);
                     }
-                }
-
-                /// Enables the interrupt handler on the given core
-                #[instability::unstable]
-                pub fn $enable(&self, priority: $crate::interrupt::Priority) {
-                    $crate::interrupt::enable($crate::peripherals::Interrupt::$interrupt, priority);
                 }
             )*
         }

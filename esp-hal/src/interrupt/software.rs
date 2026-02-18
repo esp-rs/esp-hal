@@ -103,8 +103,7 @@ impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
         for core in Cpu::other() {
             interrupt::disable(core, interrupt);
         }
-        unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
-        interrupt::enable(interrupt, handler.priority());
+        interrupt::bind_handler(interrupt, handler);
     }
 
     /// Trigger this software-interrupt

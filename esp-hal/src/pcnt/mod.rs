@@ -184,8 +184,7 @@ impl<'d> Pcnt<'d> {
         for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::PCNT);
         }
-        unsafe { interrupt::bind_interrupt(Interrupt::PCNT, handler.handler()) };
-        interrupt::enable(Interrupt::PCNT, handler.priority());
+        interrupt::bind_handler(Interrupt::PCNT, handler);
     }
 }
 

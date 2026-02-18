@@ -287,20 +287,6 @@ pub(crate) fn map(core: Cpu, interrupt: Interrupt, cpu_interrupt: CpuInterrupt) 
     map_raw(core, interrupt, cpu_interrupt as u32)
 }
 
-/// Enables a peripheral interrupt at a given priority, using vectored CPU interrupts.
-///
-/// Note that interrupts still need to be enabled globally for interrupts
-/// to be serviced.
-pub fn enable(interrupt: Interrupt, level: Priority) {
-    enable_on_cpu(Cpu::current(), interrupt, level);
-}
-
-pub(crate) fn enable_on_cpu(cpu: Cpu, interrupt: Interrupt, level: Priority) {
-    let cpu_interrupt = priority_to_cpu_interrupt(interrupt, level);
-    unsafe { crate::interrupt::map(cpu, interrupt, cpu_interrupt) };
-    enable_cpu_interrupt(cpu_interrupt);
-}
-
 fn vector_entry(interrupt: Interrupt) -> &'static pac::Vector {
     cfg_if::cfg_if! {
         if #[cfg(xtensa)] {
@@ -316,21 +302,23 @@ pub fn bound_handler(interrupt: Interrupt) -> Option<IsrCallback> {
     unsafe {
         let vector = vector_entry(interrupt);
 
-        let addr = vector._handler as usize;
-        if addr == 0 {
+        let addr = vector._handler;
+        if addr as usize == 0 {
             return None;
         }
 
-        Some(IsrCallback::from_raw(addr))
+        Some(IsrCallback::new(core::mem::transmute::<
+            unsafe extern "C" fn(),
+            extern "C" fn(),
+        >(addr)))
     }
 }
 
 /// Binds the given handler to a peripheral interrupt.
 ///
-/// # Safety
-///
-/// This will replace any previously bound interrupt handler
-pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: IsrCallback) {
+/// The interrupt handler will be called on the core where it is registered.
+/// Only one interrupt handler can be bound to a peripheral interrupt.
+pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
     unsafe {
         let vector = vector_entry(interrupt);
 
@@ -340,14 +328,29 @@ pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: IsrCallback) {
         if !crate::debugger::debugger_connected() {
             crate::debugger::DEBUGGER_LOCK.lock(|| {
                 let wp = crate::debugger::clear_watchpoint(1);
-                ptr.write_volatile(handler.raw_value());
+                ptr.write_volatile(handler.handler().address());
                 crate::debugger::restore_watchpoint(1, wp);
             });
             return;
         }
 
-        ptr.write_volatile(handler.raw_value());
+        ptr.write_volatile(handler.handler().address());
     }
+    enable(interrupt, handler.priority());
+}
+
+/// Enables a peripheral interrupt at a given priority, using vectored CPU interrupts.
+///
+/// Note that interrupts still need to be enabled globally for interrupts
+/// to be serviced.
+pub fn enable(interrupt: Interrupt, level: Priority) {
+    enable_on_cpu(Cpu::current(), interrupt, level);
+}
+
+pub(crate) fn enable_on_cpu(cpu: Cpu, interrupt: Interrupt, level: Priority) {
+    let cpu_interrupt = priority_to_cpu_interrupt(interrupt, level);
+    crate::interrupt::map(cpu, interrupt, cpu_interrupt);
+    enable_cpu_interrupt(cpu_interrupt);
 }
 
 /// Disable the given peripheral interrupt.

@@ -1780,8 +1780,7 @@ where
             for core in crate::system::Cpu::other() {
                 crate::interrupt::disable(core, interrupt);
             }
-            unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
-            crate::interrupt::enable(interrupt, handler.priority());
+            crate::interrupt::bind_handler(interrupt, handler);
         }
     }
 }
@@ -2043,8 +2042,7 @@ where
             for core in crate::system::Cpu::other() {
                 crate::interrupt::disable(core, interrupt);
             }
-            unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
-            crate::interrupt::enable(interrupt, handler.priority());
+            crate::interrupt::bind_handler(interrupt, handler);
         }
     }
 }

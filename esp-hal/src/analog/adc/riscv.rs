@@ -423,8 +423,7 @@ impl<ADCI> InterruptConfigurable for Adc<'_, ADCI, Blocking> {
         for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, InterruptSource);
         }
-        unsafe { crate::interrupt::bind_interrupt(InterruptSource, handler.handler()) };
-        crate::interrupt::enable(InterruptSource, handler.priority());
+        crate::interrupt::bind_handler(InterruptSource, handler);
     }
 }
 

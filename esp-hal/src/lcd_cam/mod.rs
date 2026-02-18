@@ -70,8 +70,7 @@ impl<'d> LcdCam<'d, Blocking> {
         for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::LCD_CAM);
         }
-        unsafe { crate::interrupt::bind_interrupt(Interrupt::LCD_CAM, handler.handler()) };
-        crate::interrupt::enable(Interrupt::LCD_CAM, handler.priority());
+        crate::interrupt::bind_handler(Interrupt::LCD_CAM, handler);
     }
 }
 
