@@ -16,7 +16,10 @@ pub(crate) mod regi2c;
 pub(crate) use esp32c5 as pac;
 
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) mod constants {}
+pub(crate) mod constants {
+    /// The clock frequency for the Parallel IO peripheral in Hertz.
+    pub const PARL_IO_SCLK: u32 = 240_000_000;
+}
 
 pub(crate) fn pre_init() {
     // Reset TEE security modes. This allows unrestricted access to TEE masters, including DMA.

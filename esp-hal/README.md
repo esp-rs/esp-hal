@@ -82,7 +82,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | LP I2C master             |       |          |          | ⚒️      | ⚒️      |          |          |          |
 | LP UART                   |       |          |          | ❌       | ⚒️      |          |          |          |
 | MCPWM                     | ⚒️   |          |          | ❌       | ⚒️      | ⚒️      |          | ⚒️      |
-| PARL_IO                   |       |          |          | ❌       | ⚒️      | ⚒️      |          |          |
+| PARL_IO                   |       |          |          | ⚒️      | ⚒️      | ⚒️      |          |          |
 | PCNT                      | ⚒️   |          |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | PHY                       | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | PSRAM                     | ⚒️   |          |          | ❌       |          |          | ⚒️      | ⚒️      |

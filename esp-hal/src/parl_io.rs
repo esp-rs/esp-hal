@@ -286,7 +286,7 @@ impl EnableMode {
     }
 }
 
-#[cfg(esp32h2)]
+#[cfg(any(esp32c5, esp32h2))]
 /// Enable Mode
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -311,7 +311,7 @@ pub enum EnableMode {
     PulseMode6,
 }
 
-#[cfg(esp32h2)]
+#[cfg(any(esp32c5, esp32h2))]
 impl EnableMode {
     fn pulse_submode_sel(&self) -> Option<u8> {
         match self {
@@ -675,7 +675,7 @@ impl NotContainsValidSignalPin for TxFourBits<'_> {}
 #[cfg(esp32c6)]
 impl NotContainsValidSignalPin for TxEightBits<'_> {}
 
-#[cfg(esp32h2)]
+#[cfg(any(esp32c5, esp32h2))]
 impl ContainsValidSignalPin for TxEightBits<'_> {}
 
 #[cfg(esp32c6)]
@@ -875,7 +875,7 @@ impl NotContainsValidSignalPin for RxFourBits<'_> {}
 #[cfg(esp32c6)]
 impl NotContainsValidSignalPin for RxEightBits<'_> {}
 
-#[cfg(esp32h2)]
+#[cfg(any(esp32c5, esp32h2))]
 impl ContainsValidSignalPin for RxEightBits<'_> {}
 
 #[cfg(esp32c6)]
@@ -989,7 +989,7 @@ fn internal_set_interrupt_handler(handler: InterruptHandler) {
 
         peri.enable_peri_interrupt(handler.priority());
     }
-    #[cfg(esp32h2)]
+    #[cfg(any(esp32c5, esp32h2))]
     {
         peri.disable_rx_interrupt();
         peri.disable_tx_interrupt();
@@ -1606,7 +1606,7 @@ mod private {
         Bits1  = 4,
     }
 
-    #[cfg(esp32h2)]
+    #[cfg(any(esp32c5, esp32h2))]
     pub(super) enum WidSel {
         Bits8 = 3,
         Bits4 = 2,
@@ -1841,7 +1841,7 @@ mod private {
         }
     }
 
-    #[cfg(esp32h2)]
+    #[cfg(any(esp32c5, esp32h2))]
     impl Instance {
         pub fn set_tx_bit_width(width: WidSel) {
             let reg_block = PARL_IO::regs();
