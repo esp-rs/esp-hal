@@ -148,7 +148,7 @@ use crate::{
     },
     interrupt::InterruptHandler,
     parl_io::asynch::interrupt_handler,
-    peripherals::{Interrupt, PARL_IO, PCR},
+    peripherals::{PARL_IO, PCR},
     system::{self, GenericPeripheralGuard},
     time::Rate,
 };
@@ -1084,41 +1084,7 @@ impl<'d> ParlIo<'d, Blocking> {
 
     /// Convert to an async version.
     pub fn into_async(self) -> ParlIo<'d, Async> {
-        for core in crate::system::Cpu::other() {
-            #[cfg(esp32c6)]
-            {
-                crate::interrupt::disable(core, Interrupt::PARL_IO);
-            }
-            #[cfg(esp32h2)]
-            {
-                crate::interrupt::disable(core, Interrupt::PARL_IO_RX);
-                crate::interrupt::disable(core, Interrupt::PARL_IO_TX);
-            }
-        }
-
-        #[cfg(esp32c6)]
-        {
-            unsafe {
-                crate::interrupt::bind_interrupt(Interrupt::PARL_IO, interrupt_handler.handler());
-            }
-            unwrap!(crate::interrupt::enable(
-                Interrupt::PARL_IO,
-                interrupt_handler.priority()
-            ));
-        }
-        #[cfg(esp32h2)]
-        {
-            unsafe {
-                crate::interrupt::bind_interrupt(
-                    Interrupt::PARL_IO_TX,
-                    interrupt_handler.handler(),
-                );
-            }
-            unwrap!(crate::interrupt::enable(
-                Interrupt::PARL_IO_TX,
-                interrupt_handler.priority()
-            ));
-        }
+        internal_set_interrupt_handler(interrupt_handler);
 
         ParlIo {
             tx: TxCreator {
