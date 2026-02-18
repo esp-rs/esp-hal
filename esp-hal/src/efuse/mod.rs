@@ -97,7 +97,7 @@ pub struct Efuse;
 impl Efuse {
     /// Reads chip's MAC address from the eFuse storage.
     #[instability::unstable]
-    pub fn read_base_mac_address() -> MacAddress<6> {
+    pub fn read_base_mac_address() -> MacAddress {
         let mut mac_addr = [0u8; 6];
 
         let mac0 = Self::read_field_le::<[u8; 4]>(crate::efuse::MAC0);
@@ -201,7 +201,7 @@ impl Efuse {
     /// Can only be called once. Returns `Err(SetMacError::AlreadySet)`
     /// otherwise.
     #[instability::unstable]
-    pub fn set_mac_address(mac: MacAddress<6>) -> Result<(), SetMacError> {
+    pub fn set_mac_address(mac: MacAddress) -> Result<(), SetMacError> {
         if MAC_OVERRIDE_STATE
             .compare_exchange(0, 1, Ordering::Relaxed, Ordering::Relaxed)
             .is_err()
@@ -223,7 +223,7 @@ impl Efuse {
     /// By default this reads the base mac address from eFuse, but it can be
     /// overridden by `set_mac_address`.
     #[instability::unstable]
-    pub fn mac_address() -> MacAddress<6> {
+    pub fn mac_address() -> MacAddress {
         if MAC_OVERRIDE_STATE.load(Ordering::Relaxed) == 2 {
             unsafe { MAC_OVERRIDE }
         } else {
@@ -232,8 +232,8 @@ impl Efuse {
     }
 
     /// Get the MAC address for the desired radio interface, derived from the base MAC.
-    pub fn radio_mac_address(kind: MacAddressType) -> MacAddress<6> {
-        let mut mac: MacAddress<6> = Self::mac_address();
+    pub fn radio_mac_address(kind: MacAddressType) -> MacAddress {
+        let mut mac: MacAddress = Self::mac_address();
 
         match kind {
             MacAddressType::Station => {
@@ -271,7 +271,7 @@ impl Efuse {
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 static MAC_OVERRIDE_STATE: AtomicU8 = AtomicU8::new(0);
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
-static mut MAC_OVERRIDE: MacAddress<6> = MacAddress::new([0; 6]);
+static mut MAC_OVERRIDE: MacAddress = MacAddress::new([0; 6]);
 
 /// Error indicating issues with setting the MAC address.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
@@ -284,7 +284,7 @@ pub enum SetMacError {
 /// Helper function.
 /// Serves to derive a local MAC by adjusting the first octet of the given base MAC.
 /// See https://github.com/esp-rs/esp-hal/blob/0881d747c53e43ee847bef3068076a48ce8d27f0/esp-radio/src/common_adapter.rs#L151-L159
-fn derive_local_mac(mac: &mut MacAddress<6>) {
+fn derive_local_mac(mac: &mut MacAddress) {
     let bytes = mac.as_bytes_mut();
     let base = bytes[0];
 
@@ -310,48 +310,46 @@ pub enum MacAddressType {
     Bluetooth,
 }
 
-/// Hardware (MAC) address stored as `N` bytes.
-///
-/// `MacAddress<6>` for classic 6-byte MAC (EUI-48) and `MacAddress<8>` for EUI-64.
+/// Hardware (MAC) address stored as 6 bytes.
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub struct MacAddress<const N: usize>([u8; N]);
+pub struct MacAddress([u8; 6]);
 
-impl<const N: usize> MacAddress<N> {
+impl MacAddress {
     /// Creates a new MAC address from raw bytes.
-    pub const fn new(bytes: [u8; N]) -> Self {
+    pub const fn new(bytes: [u8; 6]) -> Self {
         Self(bytes)
     }
 
     /// Returns a reference to the address bytes.
-    pub fn as_bytes(&self) -> &[u8; N] {
+    pub fn as_bytes(&self) -> &[u8; 6] {
         &self.0
     }
 
     /// Returns a mutable reference to the address bytes.
-    pub fn as_bytes_mut(&mut self) -> &mut [u8; N] {
+    pub fn as_bytes_mut(&mut self) -> &mut [u8; 6] {
         &mut self.0
     }
 }
 
-impl<const N: usize> From<[u8; N]> for MacAddress<N> {
-    fn from(bytes: [u8; N]) -> Self {
+impl From<[u8; 6]> for MacAddress {
+    fn from(bytes: [u8; 6]) -> Self {
         Self(bytes)
     }
 }
 
-impl<const N: usize> From<MacAddress<N>> for [u8; N] {
-    fn from(addr: MacAddress<N>) -> Self {
+impl From<MacAddress> for [u8; 6] {
+    fn from(addr: MacAddress) -> Self {
         addr.0
     }
 }
 
-impl<const N: usize> core::fmt::Display for MacAddress<N> {
+impl core::fmt::Display for MacAddress {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         for (i, b) in self.0.iter().enumerate() {
             if i != 0 {
                 f.write_str(":")?;
             }
-            write!(f, "{:02x}", b)?;
+            write!(f, "{b:02x}")?;
         }
         Ok(())
     }
