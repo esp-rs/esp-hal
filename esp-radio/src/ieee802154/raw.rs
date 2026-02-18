@@ -383,7 +383,7 @@ fn stop_rx_ack(state: &mut IeeeState) {
 
 fn receive_done(state: &mut IeeeState) {
     unsafe {
-        if state.rx_queue.len() <= state.rx_queue_size {
+        if state.rx_queue.len() < state.rx_queue_size {
             let item = RawReceived {
                 data: RX_BUFFER,
                 channel: freq_to_channel(freq()),
