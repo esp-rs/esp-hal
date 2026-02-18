@@ -307,18 +307,23 @@ const _: () = {
 pub(crate) fn init() -> Result<(), InitializationError> {
     #[cfg(esp32)]
     if try_claim_adc2(unsafe { hal::Internal::conjure() }).is_err() {
-        return Err(InitializationError::Adc2IsUsed);
+        panic!(
+            "ADC2 is currently in use by esp-hal, but esp-radio requires it for Wi-Fi operation."
+        );
     }
 
     if !preempt::initialized() {
-        return Err(InitializationError::SchedulerNotInitialized);
+        panic!("The scheduler must be initialized before initializing the radio.");
     }
 
     // A minimum clock of 80MHz is required to operate Wi-Fi module.
     const MIN_CLOCK: Rate = Rate::from_mhz(80);
     let clocks = Clocks::get();
     if clocks.cpu_clock < MIN_CLOCK {
-        return Err(InitializationError::WrongClockConfig);
+        panic!(
+            "CPU clock is too slow for Wi-Fi operation: {} MHz",
+            clocks.cpu_clock.as_mhz()
+        );
     }
 
     crate::common_adapter::enable_wifi_power_domain();
@@ -461,13 +466,6 @@ mod private {
         /// An error from the Wi-Fi driver: {0}.
         #[cfg(feature = "wifi")]
         WifiError(WifiError),
-        /// The current CPU clock frequency is too low.
-        WrongClockConfig,
-        /// The scheduler is not initialized.
-        SchedulerNotInitialized,
-        #[cfg(esp32)]
-        /// ADC2 is required by esp-radio, but it is in use by esp-hal.
-        Adc2IsUsed,
     }
 
     impl core::error::Error for InitializationError {}

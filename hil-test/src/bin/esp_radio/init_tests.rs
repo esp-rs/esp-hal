@@ -46,12 +46,11 @@ mod init_tests {
     // disabled in common ways
 
     #[test]
+    #[should_panic]
     #[cfg(soc_has_wifi)]
     fn test_init_fails_without_scheduler(p: Peripherals) {
         // esp-rtos must be initialized before esp-radio.
-        let init = esp_radio::wifi::new(p.WIFI, Default::default());
-
-        assert!(matches!(init, Err(WifiError::SchedulerNotInitialized)));
+        let _ = esp_radio::wifi::new(p.WIFI, Default::default());
     }
 
     #[test]
