@@ -29,6 +29,7 @@ use crate::{
         DmaTxBuf,
         DmaTxBuffer,
         DmaTxInterrupt,
+        asynch::{DmaRxDoneChFuture, DmaTxDoneChFuture},
     },
 };
 #[cfg(esp32s2)]
@@ -110,22 +111,24 @@ impl<'d> Mem2Mem<'d, Blocking> {
         }
     }
 
-    /// Shortcut to create a [SimpleMem2Mem]
-    pub fn with_descriptors(
-        self,
-        rx_descriptors: &'static mut [DmaDescriptor],
-        tx_descriptors: &'static mut [DmaDescriptor],
-        config: BurstConfig,
-    ) -> Result<SimpleMem2Mem<'d, Blocking>, DmaError> {
-        SimpleMem2Mem::new(self, rx_descriptors, tx_descriptors, config)
-    }
-
     /// Convert Mem2Mem to an async Mem2Mem.
     pub fn into_async(self) -> Mem2Mem<'d, Async> {
         Mem2Mem {
             rx: self.rx.into_async(),
             tx: self.tx.into_async(),
         }
+    }
+}
+
+impl<'d, Dm: DriverMode> Mem2Mem<'d, Dm> {
+    /// Shortcut to create a [SimpleMem2Mem]
+    pub fn with_descriptors(
+        self,
+        rx_descriptors: &'static mut [DmaDescriptor],
+        tx_descriptors: &'static mut [DmaDescriptor],
+        config: BurstConfig,
+    ) -> Result<SimpleMem2Mem<'d, Dm>, DmaError> {
+        SimpleMem2Mem::new(self, rx_descriptors, tx_descriptors, config)
     }
 }
 
@@ -229,6 +232,15 @@ impl<'d, M: DriverMode, BUF: DmaRxBuffer> Mem2MemRxTransfer<'d, M, BUF> {
         };
         core::mem::forget(self);
         result
+    }
+}
+
+impl<'d, BUF: DmaRxBuffer> Mem2MemRxTransfer<'d, Async, BUF> {
+    /// Waits for the transfer to stop and returns the peripheral and buffer.
+    pub async fn wait_async(self) -> (Result<(), DmaError>, Mem2MemRx<'d, Async>, BUF::Final) {
+        let (mut m2m, view) = self.release();
+        let result = DmaRxDoneChFuture::new(&mut m2m.channel).await;
+        (result, m2m, BUF::from_view(view))
     }
 }
 
@@ -357,6 +369,15 @@ impl<'d, Dm: DriverMode, BUF: DmaTxBuffer> Mem2MemTxTransfer<'d, Dm, BUF> {
         };
         core::mem::forget(self);
         result
+    }
+}
+
+impl<'d, BUF: DmaTxBuffer> Mem2MemTxTransfer<'d, Async, BUF> {
+    /// Waits for the transfer to stop and returns the peripheral and buffer.
+    pub async fn wait_async(self) -> (Result<(), DmaError>, Mem2MemTx<'d, Async>, BUF::Final) {
+        let (mut m2m, view) = self.release();
+        let result = DmaTxDoneChFuture::new(&mut m2m.channel).await;
+        (result, m2m, BUF::from_view(view))
     }
 }
 
@@ -525,11 +546,33 @@ impl<Dm: DriverMode> SimpleMem2MemTransfer<'_, '_, Dm> {
                 .pending_in_interrupts()
                 .contains(DmaRxInterrupt::SuccessfulEof)
     }
+}
 
+impl SimpleMem2MemTransfer<'_, '_, Blocking> {
     /// Wait for the transfer to finish.
     pub fn wait(self) -> Result<(), DmaError> {
         while !self.is_done() {}
         Ok(())
+    }
+}
+
+impl SimpleMem2MemTransfer<'_, '_, Async> {
+    /// Wait for the transfer to finish.
+    pub async fn wait_async(self) -> Result<(), DmaError> {
+        let State::Active(rx, _tx) = &mut self.0.state else {
+            unreachable!()
+        };
+
+        // let (rx_result, tx_result) = embassy_futures::join::join(
+        //     DmaRxDoneChFuture::new(&mut rx.m2m.channel),
+        //     DmaTxDoneChFuture::new(&mut tx.m2m.channel),
+        // )
+        // .await;
+
+        // rx_result.and(tx_result)
+
+        // I think it should be good enough to wait for the RX channel to finish.
+        DmaRxDoneChFuture::new(&mut rx.m2m.channel).await
     }
 }
 
