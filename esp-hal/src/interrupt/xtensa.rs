@@ -121,16 +121,6 @@ impl CpuInterrupt {
     }
 }
 
-/// The interrupts reserved by the HAL
-#[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-pub static RESERVED_INTERRUPTS: &[u32] = &[
-    CpuInterrupt::Interrupt1LevelPriority1 as _,
-    CpuInterrupt::Interrupt19LevelPriority2 as _,
-    CpuInterrupt::Interrupt23LevelPriority3 as _,
-    CpuInterrupt::Interrupt10EdgePriority1 as _,
-    CpuInterrupt::Interrupt22EdgePriority3 as _,
-];
-
 pub(crate) fn setup_interrupts() {
     // disable all known interrupts
     // at least after the 2nd stage bootloader there are some interrupts enabled
@@ -149,12 +139,8 @@ pub(crate) fn setup_interrupts() {
 /// Assign a peripheral interrupt to an CPU interrupt
 ///
 /// Note: this only maps the interrupt to the CPU interrupt. The CPU interrupt
-/// still needs to be enabled afterwards
-///
-/// # Safety
-///
-/// Do not use CPU interrupts in the [`RESERVED_INTERRUPTS`].
-pub unsafe fn map(cpu: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
+/// still needs to be enabled afterwards.
+fn map(cpu: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     let interrupt_number = interrupt as usize;
     let cpu_interrupt_number = which as u32;
     match cpu {
@@ -196,7 +182,7 @@ pub(crate) fn bound_cpu_interrupt_for(cpu: Cpu, interrupt: Interrupt) -> Option<
 
 /// Disable the given peripheral interrupt
 pub fn disable(core: Cpu, interrupt: Interrupt) {
-    unsafe { map(core, interrupt, CpuInterrupt::Interrupt16Timer2Priority5) }
+    map(core, interrupt, CpuInterrupt::Interrupt16Timer2Priority5);
 }
 
 /// Clear the given CPU interrupt
@@ -403,9 +389,9 @@ mod vectored {
         let cpu_interrupt =
             interrupt_level_to_cpu_interrupt(level, EDGE_INTERRUPTS.contains(&interrupt))?;
 
-        unsafe {
-            map(cpu, interrupt, cpu_interrupt);
+        map(cpu, interrupt, cpu_interrupt);
 
+        unsafe {
             xtensa_lx::interrupt::enable_mask(1 << cpu_interrupt as u32);
         }
         Ok(())

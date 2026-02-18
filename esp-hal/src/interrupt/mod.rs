@@ -17,14 +17,17 @@
 //! only meant to be used in very special situations (mostly internal to the HAL
 //! or the supporting libraries). Those are outside the scope of this
 //! documentation.
-//!
-//! It is even possible, but not recommended, to bind an interrupt directly to a
-//! CPU interrupt. This can offer lower latency, at the cost of more complexity
-//! in the interrupt handler. See the `direct_vectoring.rs` example
-//!
-//! We reserve a number of CPU interrupts, which cannot be used; see
-//! [`RESERVED_INTERRUPTS`].
-//!
+#![cfg_attr(
+    riscv,
+    doc = r#"
+It is even possible, but not recommended, to bind an interrupt directly to a
+CPU interrupt. This can offer lower latency, at the cost of more complexity
+in the interrupt handler. See the `direct_vectoring.rs` example
+
+We reserve a number of CPU interrupts, which cannot be used; see
+[`RESERVED_INTERRUPTS`].
+"#
+)]
 //! ## Examples
 //!
 //! ### Using the peripheral driver to register an interrupt handler
