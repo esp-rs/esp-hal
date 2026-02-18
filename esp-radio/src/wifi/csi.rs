@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use esp_hal::time::{Duration, Instant};
 
 use super::{WifiError, c_types::c_void, esp_wifi_result};
-#[cfg(any(esp32c5, esp32c6))]
+#[cfg(any(wifi_mac_version = "2", wifi_mac_version = "3"))]
 use crate::sys::include::wifi_csi_acquire_config_t;
 use crate::{
     sys::include::{
@@ -46,20 +46,20 @@ impl<'a> WifiCsiInfo<'_> {
 
     /// Protocol of the received packet, 0: non HT(11bg) packet; 1: HT(11n) packet; 3: VHT(11ac)
     /// packet.
-    #[cfg(not(any(esp32c5, esp32c6)))]
+    #[cfg(wifi_mac_version = "1")]
     pub fn packet_mode(&self) -> u8 {
         unsafe { (*self.inner).rx_ctrl.sig_mode() as u8 }
     }
 
     /// Modulation Coding Scheme. If is HT(11n) packet, shows the modulation, range from 0 to
     /// 76(MSC0 ~ MCS76).
-    #[cfg(not(any(esp32c5, esp32c6)))]
+    #[cfg(wifi_mac_version = "1")]
     pub fn modulation_coding_scheme(&self) -> u8 {
         unsafe { (*self.inner).rx_ctrl.mcs() as u8 }
     }
 
     /// Channel Bandwidth of the packet. 0: 20MHz; 1: 40MHz.
-    #[cfg(not(any(esp32c5, esp32c6)))]
+    #[cfg(wifi_mac_version = "1")]
     pub fn cwb(&self) -> bool {
         unsafe { (*self.inner).rx_ctrl.cwb() != 0 }
     }
@@ -67,38 +67,38 @@ impl<'a> WifiCsiInfo<'_> {
     /// Set to 1 indicates that channel estimate smoothing is recommended.
     /// Set to 0 indicates that only per-carrier independent (unsmoothed) channel estimate is
     /// recommended.
-    #[cfg(not(any(esp32c5, esp32c6)))]
+    #[cfg(wifi_mac_version = "1")]
     pub fn smoothing(&self) -> bool {
         unsafe { (*self.inner).rx_ctrl.smoothing() != 0 }
     }
 
     /// Set to 1 indicates that the PPDU is not a sounding PPDU.
     /// Set to 0 indicates that PPDU is a sounding PPDU.
-    #[cfg(not(any(esp32c5, esp32c6)))]
+    #[cfg(wifi_mac_version = "1")]
     pub fn not_sounding(&self) -> bool {
         unsafe { (*self.inner).rx_ctrl.not_sounding() != 0 }
     }
 
     /// Aggregation. 0: MPDU packet; 1: AMPDU packet.
-    #[cfg(not(any(esp32c5, esp32c6)))]
+    #[cfg(wifi_mac_version = "1")]
     pub fn aggregation(&self) -> bool {
         unsafe { (*self.inner).rx_ctrl.aggregation() != 0 }
     }
 
     /// Space Time Block Code(STBC). 0: non STBC packet; 1: STBC packet.
-    #[cfg(not(any(esp32c5, esp32c6)))]
+    #[cfg(wifi_mac_version = "1")]
     pub fn space_time_block_code(&self) -> u8 {
         unsafe { (*self.inner).rx_ctrl.stbc() as u8 }
     }
 
     /// Forward Error Correction(FEC). Flag is set for 11n packets which are LDPC.
-    #[cfg(not(any(esp32c5, esp32c6)))]
+    #[cfg(wifi_mac_version = "1")]
     pub fn forward_error_correction_coding(&self) -> bool {
         unsafe { (*self.inner).rx_ctrl.fec_coding() != 0 }
     }
 
     /// Short Guide Interval(SGI). 0: Long GI; 1: Short GI.
-    #[cfg(not(any(esp32c5, esp32c6)))]
+    #[cfg(wifi_mac_version = "1")]
     pub fn short_guide_interval(&self) -> bool {
         unsafe { (*self.inner).rx_ctrl.sgi() != 0 }
     }
@@ -109,7 +109,7 @@ impl<'a> WifiCsiInfo<'_> {
     }
 
     /// The number of subframes aggregated in AMPDU.
-    #[cfg(not(any(esp32c5, esp32c6)))]
+    #[cfg(wifi_mac_version = "1")]
     pub fn ampdu_count(&self) -> u8 {
         unsafe { (*self.inner).rx_ctrl.ampdu_cnt() as u8 }
     }
@@ -122,7 +122,7 @@ impl<'a> WifiCsiInfo<'_> {
     /// [`SecondaryChannel`] on which this packet is received.
     pub fn secondary_channel(&self) -> SecondaryChannel {
         cfg_if::cfg_if! {
-            if #[cfg(not(any(esp32c5,esp32c6)))] {
+            if #[cfg(wifi_mac_version = "1")] {
                 SecondaryChannel::from_raw(unsafe {
                     (*self.inner).rx_ctrl.secondary_channel()
                 })
@@ -144,7 +144,7 @@ impl<'a> WifiCsiInfo<'_> {
 
     /// Antenna number from which this packet is received.
     /// 0: Wi-Fi antenna 0; 1: Wi-Fi antenna 1.
-    #[cfg(not(any(esp32c5, esp32c6)))]
+    #[cfg(wifi_mac_version = "1")]
     pub fn antenna(&self) -> u8 {
         unsafe { (*self.inner).rx_ctrl.ant() as u8 }
     }
@@ -167,79 +167,79 @@ impl<'a> WifiCsiInfo<'_> {
     }
 
     /// Indicate whether the reception frame is from interface 1.
-    #[cfg(esp32c6)]
+    #[cfg(not(wifi_mac_version = "1"))]
     pub fn rx_match1(&self) -> bool {
         unsafe { (*self.inner).rx_ctrl.rxmatch1() != 0 }
     }
 
     /// Indicate whether the reception frame is from interface 2.
-    #[cfg(esp32c6)]
+    #[cfg(not(wifi_mac_version = "1"))]
     pub fn rx_match2(&self) -> bool {
         unsafe { (*self.inner).rx_ctrl.rxmatch2() != 0 }
     }
 
     /// Indicate whether the reception frame is from interface 3.
-    #[cfg(esp32c6)]
+    #[cfg(not(wifi_mac_version = "1"))]
     pub fn rx_match3(&self) -> bool {
         unsafe { (*self.inner).rx_ctrl.rxmatch3() != 0 }
     }
 
     /// HE-SIGA1 or HT-SIG.
-    #[cfg(esp32c6)]
+    #[cfg(not(wifi_mac_version = "1"))]
     pub fn he_siga1(&self) -> u32 {
         unsafe { (*self.inner).rx_ctrl.he_siga1 }
     }
 
     /// Reception state, 0: successful, others: failure.
-    #[cfg(esp32c6)]
+    #[cfg(not(wifi_mac_version = "1"))]
     pub fn rx_end_state(&self) -> u8 {
         unsafe { (*self.inner).rx_ctrl.rxend_state() as u8 }
     }
 
     /// HE-SIGA2.
-    #[cfg(esp32c6)]
+    #[cfg(not(wifi_mac_version = "1"))]
     pub fn he_siga2(&self) -> u16 {
         unsafe { (*self.inner).rx_ctrl.he_siga2 }
     }
 
     /// Indicate whether the reception is a group addressed frame.
-    #[cfg(esp32c6)]
+    #[cfg(not(wifi_mac_version = "1"))]
     pub fn is_group(&self) -> bool {
         unsafe { (*self.inner).rx_ctrl.is_group() != 0 }
     }
 
     /// The length of the channel information.
-    #[cfg(esp32c6)]
+    #[cfg(not(wifi_mac_version = "1"))]
     pub fn rx_channel_estimate_length(&self) -> u32 {
         unsafe { (*self.inner).rx_ctrl.rx_channel_estimate_len() }
     }
 
     /// Indicate the channel information is valid.
-    #[cfg(esp32c6)]
+    #[cfg(not(wifi_mac_version = "1"))]
     pub fn rx_channel_estimate_info_valid(&self) -> bool {
         unsafe { (*self.inner).rx_ctrl.rx_channel_estimate_info_vld() != 0 }
     }
 
     /// The format of the reception frame.
-    #[cfg(esp32c6)]
+    #[cfg(not(wifi_mac_version = "1"))]
     pub fn cur_bb_format(&self) -> u8 {
         unsafe { (*self.inner).rx_ctrl.cur_bb_format() as u8 }
     }
 
     /// Indicate whether the reception MPDU is a S-MPDU.
-    #[cfg(esp32c6)]
+    #[cfg(wifi_mac_version = "2")]
     pub fn cur_single_mpdu(&self) -> bool {
         unsafe { (*self.inner).rx_ctrl.cur_single_mpdu() != 0 }
     }
 
     /// The length of HE-SIGB.
-    #[cfg(esp32c6)]
+    #[cfg(wifi_mac_version = "2")]
     pub fn he_sigb_length(&self) -> u8 {
         unsafe { (*self.inner).rx_ctrl.he_sigb_len() as u8 }
     }
 
     /// The length of the reception MPDU excluding the FCS.
-    #[cfg(esp32c6)]
+    #[cfg(not(wifi_mac_version = "1"))]
     pub fn dump_length(&self) -> u32 {
         unsafe { (*self.inner).rx_ctrl.dump_len() }
     }
@@ -321,7 +321,7 @@ unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(ctx: *mut c_void, data: *mut wifi
 
 /// Channel state information (CSI) configuration.
 #[derive(Clone, PartialEq, Eq)]
-#[cfg(not(any(esp32c5, esp32c6)))]
+#[cfg(wifi_mac_version = "1")]
 pub struct CsiConfig {
     /// Enable to receive legacy long training field(lltf) data.
     pub lltf_en: bool,
@@ -349,7 +349,7 @@ pub struct CsiConfig {
 
 /// Channel state information (CSI) configuration.
 #[derive(Clone, PartialEq, Eq)]
-#[cfg(any(esp32c5, esp32c6))]
+#[cfg(wifi_mac_version = "2")]
 pub struct CsiConfig {
     /// Enable to acquire CSI.
     pub enable: u32,
@@ -359,6 +359,42 @@ pub struct CsiConfig {
     pub acquire_csi_ht20: u32,
     /// Enable to acquire HT-LTF when receiving an HT40 PPDU.
     pub acquire_csi_ht40: u32,
+    /// Enable to acquire HE-LTF when receiving an HE20 SU PPDU.
+    pub acquire_csi_su: u32,
+    /// Enable to acquire HE-LTF when receiving an HE20 MU PPDU.
+    pub acquire_csi_mu: u32,
+    /// Enable to acquire HE-LTF when receiving an HE20 DCM applied PPDU.
+    pub acquire_csi_dcm: u32,
+    /// Enable to acquire HE-LTF when receiving an HE20 Beamformed applied PPDU.
+    pub acquire_csi_beamformed: u32,
+    /// When receiving an STBC applied HE PPDU, 0- acquire the complete
+    /// HE-LTF1,  1- acquire the complete HE-LTF2, 2- sample evenly among the
+    /// HE-LTF1 and HE-LTF2.
+    pub acquire_csi_he_stbc: u32,
+    /// Value 0-3.
+    pub val_scale_cfg: u32,
+    /// Enable to dump 802.11 ACK frame, default disabled.
+    pub dump_ack_en: u32,
+    /// Reserved.
+    pub reserved: u32,
+}
+
+/// Channel state information (CSI) configuration.
+#[derive(Clone, PartialEq, Eq)]
+#[cfg(wifi_mac_version = "3")]
+pub struct CsiConfig {
+    /// Enable to acquire CSI.
+    pub enable: u32,
+    /// Enable to acquire L-LTF.
+    pub acquire_csi_legacy: u32,
+    /// Enable to acquire L-LTF.
+    pub acquire_csi_force_lltf: bool,
+    /// Enable to acquire HT-LTF when receiving an HT20 PPDU.
+    pub acquire_csi_ht20: u32,
+    /// Enable to acquire HT-LTF when receiving an HT40 PPDU.
+    pub acquire_csi_ht40: u32,
+    /// Enable to acquire VHT-LTF when receiving an VHT20 PPDU.
+    pub acquire_csi_vht: bool,
     /// Enable to acquire HE-LTF when receiving an HE20 SU PPDU.
     pub acquire_csi_su: u32,
     /// Enable to acquire HE-LTF when receiving an HE20 MU PPDU.
@@ -409,7 +445,7 @@ impl CsiConfig {
 }
 
 impl Default for CsiConfig {
-    #[cfg(not(any(esp32c5, esp32c6)))]
+    #[cfg(wifi_mac_version = "1")]
     fn default() -> Self {
         Self {
             lltf_en: true,
@@ -423,7 +459,7 @@ impl Default for CsiConfig {
         }
     }
 
-    #[cfg(any(esp32c5, esp32c6))]
+    #[cfg(wifi_mac_version = "2")]
     fn default() -> Self {
         // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi_he_types.h#L67-L82
         Self {
@@ -441,12 +477,33 @@ impl Default for CsiConfig {
             reserved: 19,
         }
     }
+
+    #[cfg(wifi_mac_version = "3")]
+    fn default() -> Self {
+        // https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/headers/esp_wifi_he_types.h
+        Self {
+            enable: 1,
+            acquire_csi_legacy: 1,
+            acquire_csi_force_lltf: true,
+            acquire_csi_ht20: 1,
+            acquire_csi_ht40: 1,
+            acquire_csi_vht: true,
+            acquire_csi_su: 1,
+            acquire_csi_mu: 1,
+            acquire_csi_dcm: 1,
+            acquire_csi_beamformed: 1,
+            acquire_csi_he_stbc: 2,
+            val_scale_cfg: 2,
+            dump_ack_en: 1,
+            reserved: 0,
+        }
+    }
 }
 
 #[doc(hidden)]
 impl From<CsiConfig> for wifi_csi_config_t {
     fn from(config: CsiConfig) -> Self {
-        #[cfg(not(any(esp32c5, esp32c6)))]
+        #[cfg(wifi_mac_version = "1")]
         {
             wifi_csi_config_t {
                 lltf_en: config.lltf_en,
@@ -459,7 +516,7 @@ impl From<CsiConfig> for wifi_csi_config_t {
                 dump_ack_en: config.dump_ack_en,
             }
         }
-        #[cfg(any(esp32c5, esp32c6))]
+        #[cfg(wifi_mac_version = "2")]
         {
             wifi_csi_acquire_config_t {
                 _bitfield_align_1: [0; 0],
@@ -476,9 +533,27 @@ impl From<CsiConfig> for wifi_csi_config_t {
                     config.val_scale_cfg,
                     config.dump_ack_en,
                     config.reserved,
-                    #[cfg(esp32c5)]
+                ),
+            }
+        }
+        #[cfg(wifi_mac_version = "3")]
+        {
+            wifi_csi_acquire_config_t {
+                _bitfield_align_1: [0; 0],
+                _bitfield_1: wifi_csi_acquire_config_t::new_bitfield_1(
+                    config.enable,
+                    config.acquire_csi_legacy,
+                    config.acquire_csi_ht20,
+                    config.acquire_csi_ht40,
+                    config.acquire_csi_su,
+                    config.acquire_csi_mu,
+                    config.acquire_csi_dcm,
+                    config.acquire_csi_beamformed,
+                    config.acquire_csi_he_stbc,
+                    config.val_scale_cfg,
+                    config.dump_ack_en,
+                    config.reserved,
                     0, // dump_ack_en
-                    #[cfg(esp32c5)]
                     0, // reserved
                 ),
             }

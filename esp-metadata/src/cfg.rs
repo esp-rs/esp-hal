@@ -740,6 +740,9 @@ driver_configs![
         properties: {
             #[serde(default)]
             has_wifi6: bool,
+            mac_version: u32,
+            #[serde(default)]
+            has_5g: bool,
         }
     },
 ];

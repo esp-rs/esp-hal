@@ -609,6 +609,8 @@ apb_cycle_wait_num = 16 # TODO
 
 ## Radio
 [device.wifi]
+mac_version = 3
+has_5g = true
 
 [device.bt]
 support_status = "not_supported"

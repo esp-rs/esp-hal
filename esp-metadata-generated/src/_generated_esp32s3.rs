@@ -312,6 +312,15 @@ macro_rules! property {
     ("wifi.has_wifi6") => {
         false
     };
+    ("wifi.mac_version") => {
+        1
+    };
+    ("wifi.mac_version", str) => {
+        stringify!(1)
+    };
+    ("wifi.has_5g") => {
+        false
+    };
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
