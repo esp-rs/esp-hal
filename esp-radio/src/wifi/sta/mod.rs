@@ -6,7 +6,7 @@ use core::fmt;
 use enumset::EnumSet;
 use procmacros::BuilderLite;
 
-use super::{AuthenticationMethod, Protocol, Ssid, scan::ScanMethod};
+use super::{AuthenticationMethod, Protocol, Ssid};
 use crate::WifiError;
 
 unstable_module!(
@@ -46,15 +46,15 @@ pub struct StationConfig {
     pub(crate) beacon_timeout: u16,
     /// Number of connection retries station will do before moving to next access point.
     ///
-    /// `scan_method` should be set as [`ScanMethod::AllChannels`] to use this config.
+    /// `fast_scan` should be set to `false` to use this config.
     ///
     /// Note: Enabling this may cause connection time to increase in case the best access point
     /// doesn't behave properly.
     #[builder_lite(unstable)]
     pub(crate) failure_retry_cnt: u8,
-    /// Scan method.
+    /// Use a fast scan instead of a full channel scan.
     #[builder_lite(unstable)]
-    pub(crate) scan_method: ScanMethod,
+    pub(crate) fast_scan: bool,
 }
 
 impl StationConfig {
@@ -93,7 +93,7 @@ impl Default for StationConfig {
             listen_interval: 3,
             beacon_timeout: 6,
             failure_retry_cnt: 1,
-            scan_method: ScanMethod::Fast,
+            fast_scan: true,
         }
     }
 }
@@ -110,7 +110,7 @@ impl fmt::Debug for StationConfig {
             .field("listen_interval", &self.listen_interval)
             .field("beacon_timeout", &self.beacon_timeout)
             .field("failure_retry_cnt", &self.failure_retry_cnt)
-            .field("scan_method", &self.scan_method)
+            .field("fast_scan", &self.fast_scan)
             .finish()
     }
 }
@@ -130,7 +130,7 @@ impl defmt::Format for StationConfig {
             listen_interval: {}, \
             beacon_timeout: {}, \
             failure_retry_cnt: {}, \
-            scan_method: {} \
+            fast_scan: {} \
             }}",
             self.ssid.as_str(),
             self.bssid,
@@ -140,7 +140,7 @@ impl defmt::Format for StationConfig {
             self.listen_interval,
             self.beacon_timeout,
             self.failure_retry_cnt,
-            self.scan_method
+            self.fast_scan
         )
     }
 }

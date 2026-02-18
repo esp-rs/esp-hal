@@ -16,18 +16,6 @@ use crate::{
     },
 };
 
-/// Wi-Fi scan method.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[repr(u8)]
-#[instability::unstable]
-pub enum ScanMethod {
-    /// Fast scan.
-    Fast,
-    /// Scan all channels.
-    AllChannels,
-}
-
 /// Configuration for active or passive scan.
 ///
 /// # Comparison of active and passive scan
