@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `set_protocols` / `set_bandwidths` changed to support 5G-band (#5023)
 - `CountryInfo` is now unstable (#4981)
 - MAC addresses now should be obtained from `esp_hal::efuse::Efuse::interface_mac_address(InterfaceMacAddress::...)`. (#5002)
+- `WifiError::Unknown(i32)` has been renamed to `WifiError::Internal(i32)` (#5018)
 
 ### Fixed
 
@@ -87,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WifiController` methods `start_async` and `stop_async` have been removed. `set_config` will now make sure that the controller is started / re-started as needed. Dropping the controller will stop it first. (#4984)
 - `power_save` has been dropped from `ControllerConfig` (#4981)
 - MAC address getters: `access_point_mac()`, `station_mac()` and `ble::mac()`. (#5002)
+- `WifiError::{Interface, Nvs, InvalidMac, WakeFailed, WouldBlock, PostFail, UnknownWifiMode, NotInitialized, NotStopped, Mode, State, ControlBlock, Timeout, InvalidInitState, StopState, NotAssociated, TxDisallowed, Internal(i32), WrongClockConfig, SchedulerNotInitialized, AdcIsUsed}` have been removed (#5018)
 
 ## [v0.17.0] - 2025-10-30
 
