@@ -10,6 +10,7 @@
 #![cfg_attr(esp32s3, doc = "**ESP32-S3**")]
 #![cfg_attr(esp32c2, doc = "**ESP32-C2**")]
 #![cfg_attr(esp32c3, doc = "**ESP32-C3**")]
+#![cfg_attr(esp32c5, doc = "**ESP32-C5**")]
 #![cfg_attr(esp32c6, doc = "**ESP32-C6**")]
 #![cfg_attr(esp32h2, doc = "**ESP32-H2**")]
 //! . Please ensure you are reading the correct documentation for your target
@@ -205,6 +206,8 @@ pub(crate) mod sys {
     pub use esp_wifi_sys_esp32c2::*;
     #[cfg(esp32c3)]
     pub use esp_wifi_sys_esp32c3::*;
+    #[cfg(esp32c5)]
+    pub use esp_wifi_sys_esp32c5::*;
     #[cfg(esp32c6)]
     pub use esp_wifi_sys_esp32c6::*;
     #[cfg(esp32h2)]

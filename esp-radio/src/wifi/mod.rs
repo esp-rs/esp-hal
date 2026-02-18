@@ -141,6 +141,7 @@ pub enum Protocol {
     /// 802.11b/g protocol.
     P802D11BG,
 
+    // TODO this is not a working default for the 5GHz band
     /// 802.11b/g/n protocol (default).
     #[default]
     P802D11BGN,
@@ -176,7 +177,6 @@ impl Protocol {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, PartialOrd, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SecondaryChannel {
-    // TODO: Need to extend that for 5GHz
     /// No secondary channel (default).
     #[default]
     None,
@@ -1368,7 +1368,7 @@ pub enum Bandwidth {
 
 /// The radio metadata header of the received packet, which is the common header
 /// at the beginning of all RX callback buffers in promiscuous mode.
-#[cfg(not(esp32c6))]
+#[cfg(wifi_mac_version = "1")]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
@@ -1427,7 +1427,7 @@ pub struct RxControlInfo {
 
 /// The radio metadata header of the received packet, which is the common header
 /// at the beginning of all RX callback buffers in promiscuous mode.
-#[cfg(esp32c6)]
+#[cfg(wifi_mac_version = "2")]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
@@ -1478,6 +1478,57 @@ pub struct RxControlInfo {
     pub timestamp: Instant,
 }
 
+/// The radio metadata header of the received packet, which is the common header
+/// at the beginning of all RX callback buffers in promiscuous mode.
+#[cfg(wifi_mac_version = "3")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
+#[instability::unstable]
+pub struct RxControlInfo {
+    /// Received Signal Strength Indicator (RSSI) of the packet, in dBm.
+    pub rssi: i32,
+    /// PHY rate encoding of the packet. Only valid for non-HT (802.11b/g)
+    /// packets.
+    pub rate: u32,
+    /// Length of the received packet including the Frame Check Sequence (FCS).
+    pub sig_len: u32,
+    /// Reception state of the packet: 0 for no error, others indicate error
+    /// codes.
+    pub rx_state: u32,
+    /// Length of the dump buffer.
+    pub dump_len: u32,
+    /// Length of HE-SIG-B field (802.11ax).
+    pub he_sigb_len: u32,
+    /// Current baseband format.
+    pub cur_bb_format: u32,
+    /// Channel estimation validity.
+    pub rx_channel_estimate_info_vld: u32,
+    /// Length of the channel estimation.
+    pub rx_channel_estimate_len: u32,
+    /// The secondary channel if in HT40.
+    pub secondary_channel: SecondaryChannel,
+    /// Primary channel on which the packet is received.
+    pub channel: u32,
+    /// Noise floor of the Radio Frequency module, in dBm.
+    pub noise_floor: i32,
+    /// Indicates if this is a group-addressed frame.
+    pub is_group: u32,
+    /// End state of the packet reception.
+    pub rxend_state: u32,
+    /// Indicate whether the reception frame is from interface 3.
+    pub rxmatch3: u32,
+    /// Indicate whether the reception frame is from interface 2.
+    pub rxmatch2: u32,
+    /// Indicate whether the reception frame is from interface 1.
+    pub rxmatch1: u32,
+    /// Indicate whether the reception frame is from interface 0.
+    pub rxmatch0: u32,
+    /// The local time when this packet is received. It is precise only if modem sleep or light
+    /// sleep is not enabled. unit: microsecond.
+    pub timestamp: Instant,
+}
+
 #[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
 impl RxControlInfo {
     /// Create an instance from a raw pointer to [wifi_pkt_rx_ctrl_t].
@@ -1486,7 +1537,7 @@ impl RxControlInfo {
     /// When calling this, you must ensure, that `rx_cntl` points to a valid
     /// instance of [wifi_pkt_rx_ctrl_t].
     pub(super) unsafe fn from_raw(rx_cntl: *const wifi_pkt_rx_ctrl_t) -> Self {
-        #[cfg(not(esp32c6))]
+        #[cfg(wifi_mac_version = "1")]
         let rx_control_info = unsafe {
             RxControlInfo {
                 rssi: (*rx_cntl).rssi(),
@@ -1510,7 +1561,7 @@ impl RxControlInfo {
                 rx_state: (*rx_cntl).rx_state(),
             }
         };
-        #[cfg(esp32c6)]
+        #[cfg(wifi_mac_version = "2")]
         let rx_control_info = unsafe {
             RxControlInfo {
                 rssi: (*rx_cntl).rssi(),
@@ -1525,7 +1576,31 @@ impl RxControlInfo {
                 rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
                 secondary_channel: SecondaryChannel::from_raw((*rx_cntl).second()),
                 channel: (*rx_cntl).channel(),
-                noise_floor: (*rx_cntl).noise_floor(),
+                noise_floor: (*rx_cntl).noise_floor() as _,
+                is_group: (*rx_cntl).is_group(),
+                rxend_state: (*rx_cntl).rxend_state(),
+                rxmatch3: (*rx_cntl).rxmatch3(),
+                rxmatch2: (*rx_cntl).rxmatch2(),
+                rxmatch1: (*rx_cntl).rxmatch1(),
+                rxmatch0: (*rx_cntl).rxmatch0(),
+                timestamp: Instant::EPOCH + Duration::from_micros((*rx_cntl).timestamp() as u64),
+            }
+        };
+        #[cfg(wifi_mac_version = "3")]
+        let rx_control_info = unsafe {
+            RxControlInfo {
+                rssi: (*rx_cntl).rssi(),
+                rate: (*rx_cntl).rate(),
+                sig_len: (*rx_cntl).sig_len(),
+                rx_state: (*rx_cntl).rx_state(),
+                dump_len: (*rx_cntl).dump_len(),
+                he_sigb_len: (*rx_cntl).sigb_len(),
+                cur_bb_format: (*rx_cntl).cur_bb_format(),
+                rx_channel_estimate_info_vld: (*rx_cntl).rx_channel_estimate_info_vld(),
+                rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
+                secondary_channel: SecondaryChannel::from_raw((*rx_cntl).second()),
+                channel: (*rx_cntl).channel(),
+                noise_floor: (*rx_cntl).noise_floor() as _,
                 is_group: (*rx_cntl).is_group(),
                 rxend_state: (*rx_cntl).rxend_state(),
                 rxmatch3: (*rx_cntl).rxmatch3(),
@@ -1899,6 +1974,9 @@ impl CountryInfo {
             nchan: 13,
             max_tx_power: 20,
             policy: wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
+
+            #[cfg(wifi_has_5g)]
+            wifi_5g_channel_mask: 0,
         }
     }
 
@@ -2138,7 +2216,10 @@ pub fn new<'d>(
     }
 
     // At some point the "High-speed ADC" entropy source became available.
-    unsafe { esp_hal::rng::TrngSource::increase_entropy_source_counter() };
+    #[cfg(not(esp32c5))]
+    unsafe {
+        esp_hal::rng::TrngSource::increase_entropy_source_counter()
+    };
 
     // Only create WifiController after we've enabled TRNG - otherwise returning an error from this
     // function will cause panic because WifiController::drop tries to disable the TRNG.
@@ -2193,6 +2274,7 @@ impl Drop for WifiController<'_> {
             set_access_point_state(WifiAccessPointState::Uninitialized);
             set_station_state(WifiStationState::Uninitialized);
 
+            #[cfg(not(esp32c5))]
             esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
                 esp_hal::Internal::conjure()
             });
@@ -2285,7 +2367,17 @@ impl WifiController<'_> {
     ) -> Result<(), WifiError> {
         let mask = protocols.iter().fold(0, |acc, p| acc | p.to_mask());
         debug!("Setting protocols with mask {:b}", mask);
-        esp_wifi_result!(unsafe { esp_wifi_set_protocol(iface, mask as u8) })
+        let mut band_mode = 0u32;
+        esp_wifi_result!(unsafe { esp_wifi_get_band_mode(&mut band_mode) })?;
+
+        if band_mode != wifi_band_mode_t_WIFI_BAND_MODE_AUTO {
+            // setting the protocol with WIFI_BAND_MODE_AUTO will error
+            esp_wifi_result!(unsafe { esp_wifi_set_protocol(iface, mask as u8) })?;
+        } else {
+            warn!("NOT applying protocols with WIFI_BAND_MODE_AUTO");
+        }
+
+        Ok(())
     }
 
     #[procmacros::doc_replace]
@@ -2471,6 +2563,13 @@ impl WifiController<'_> {
                 return res;
             }
         }
+
+        // WiFi needs to be started in order to change the band mode
+        // TODO support 5GHz band via config
+        // esp_wifi_result!(unsafe {
+        //     esp_wifi_set_band_mode(wifi_band_mode_t_WIFI_BAND_MODE_2G_ONLY)
+        // })?;
+        // esp_wifi_result!(unsafe { esp_wifi_set_band(wifi_band_t_WIFI_BAND_2G) })?;
 
         Ok(())
     }

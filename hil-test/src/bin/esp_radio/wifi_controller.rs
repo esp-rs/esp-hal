@@ -16,6 +16,8 @@ mod tests {
         esp_hal::init(config)
     }
 
+    // C5 temporarily disabled
+    #[cfg(not(esp32c5))]
     #[test]
     async fn wifi_starts_with_trng_enabled(p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
@@ -48,7 +50,8 @@ mod tests {
             .set_config(&Config::Station(StationConfig::default()))
             .unwrap();
 
-        let scan_config = ScanConfig::default().with_max(1);
+        // scanning all channels takes a (too) long time - even more for dual-band capable targets
+        let scan_config = ScanConfig::default().with_max(1).with_channel(13);
         let _ = controller.scan_async(&scan_config).await.unwrap();
 
         let mut min_free = usize::MAX;

@@ -731,6 +731,7 @@ deep_sleep = true
 [device.wifi]
 support_status = "partial"
 has_wifi6 = true
+mac_version = 2
 
 [device.bt]
 support_status = "partial"

@@ -1,6 +1,6 @@
 INCLUDE "rom/esp32c5.rom.api.ld"
 INCLUDE "rom/esp32c5.rom.coexist.ld"
-INCLUDE "rom/esp32c5.rom.eco3.ld"
+#INCLUDE "rom/esp32c5.rom.eco3.ld"
 INCLUDE "rom/esp32c5.rom.heap.ld"
 INCLUDE "rom/esp32c5.rom.ld"
 INCLUDE "rom/esp32c5.rom.libgcc.ld"
