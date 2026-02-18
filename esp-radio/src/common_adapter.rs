@@ -134,16 +134,22 @@ pub unsafe extern "C" fn random() -> c_ulong {
 /// *************************************************************************
 pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> c_int {
     trace!("read_mac {:?} {}", mac, type_);
-    use hal::efuse::MacForRadio;
+    use hal::efuse::MacAddressType;
 
     let kind = match type_ {
-        0 => MacForRadio::Station,
-        1 => MacForRadio::AccessPoint,
-        2 => MacForRadio::Bluetooth,
-        _ => return -1,
+        0 => MacAddressType::Station,
+        1 => MacAddressType::AccessPoint,
+        2 => MacAddressType::Bluetooth,
+        _ => {
+            warn!(
+                "Invalid interface type: {} (expected 0=STA, 1=AP, 2=BT)",
+                type_
+            );
+            return -1;
+        }
     };
 
-    let addr = hal::efuse::Efuse::radio_mac_address(kind);
+    let addr: [u8; 6] = hal::efuse::Efuse::radio_mac_address(kind).into();
 
     unsafe {
         core::ptr::copy_nonoverlapping(addr.as_ptr(), mac, 6);

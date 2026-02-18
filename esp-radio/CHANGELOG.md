@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `set_protocols` / `set_bandwidths` changed to support 5G-band (#5023)
 - MAC addresses now should be obtained from `esp_hal::efuse::radio_mac_address(MacForRadio::)`. (#5002)
 - MAC addresses now should be obtained from `esp_hal::efuse::Efuse::radio_mac_address(MacForRadio::...)`. (#5002)
+- MAC addresses now should be obtained from `esp_hal::efuse::Efuse::radio_mac_address(MacAddressType::...)`. (#5002)
 
 ### Fixed
 

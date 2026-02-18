@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp_hal::interrupt::RunLevel` (#4996)
 - MAC addresses for radio interfaces getter: `esp_hal::efuse::radio_mac_address(MacForRadio::)`. (#5002)
 - MAC addresses for radio interfaces getter: `esp_hal::efuse::Efuse::radio_mac_address(MacForRadio::...)`. (#5002)
+- MAC addresses for radio interfaces getter: `esp_hal::efuse::Efuse::radio_mac_address(MacAddressType::...)`. (#5002)
 
 ### Changed
 
