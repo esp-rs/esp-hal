@@ -1834,6 +1834,7 @@ impl Chip {
                     "interrupt_controller=\"clic\"",
                     "lp_i2c_master_fifo_size=\"16\"",
                     "lp_uart_ram_size=\"32\"",
+                    "parl_io_version=\"2\"",
                     "rmt_ram_start=\"1610638336\"",
                     "rmt_channel_ram_size=\"48\"",
                     "rmt_has_tx_immediate_stop",
@@ -2053,6 +2054,7 @@ impl Chip {
                     "cargo:rustc-cfg=interrupt_controller=\"clic\"",
                     "cargo:rustc-cfg=lp_i2c_master_fifo_size=\"16\"",
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
+                    "cargo:rustc-cfg=parl_io_version=\"2\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610638336\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
                     "cargo:rustc-cfg=rmt_has_tx_immediate_stop",
@@ -2419,6 +2421,7 @@ impl Chip {
                     "interrupt_controller=\"plic\"",
                     "lp_i2c_master_fifo_size=\"16\"",
                     "lp_uart_ram_size=\"32\"",
+                    "parl_io_version=\"1\"",
                     "phy_combo_module",
                     "rmt_ram_start=\"1610638336\"",
                     "rmt_channel_ram_size=\"48\"",
@@ -2690,6 +2693,7 @@ impl Chip {
                     "cargo:rustc-cfg=interrupt_controller=\"plic\"",
                     "cargo:rustc-cfg=lp_i2c_master_fifo_size=\"16\"",
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
+                    "cargo:rustc-cfg=parl_io_version=\"1\"",
                     "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610638336\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
@@ -3082,6 +3086,7 @@ impl Chip {
                     "i2c_master_fifo_size=\"32\"",
                     "interrupts_status_registers=\"2\"",
                     "interrupt_controller=\"plic\"",
+                    "parl_io_version=\"2\"",
                     "rmt_ram_start=\"1610642432\"",
                     "rmt_channel_ram_size=\"48\"",
                     "rmt_has_tx_immediate_stop",
@@ -3314,6 +3319,7 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"2\"",
                     "cargo:rustc-cfg=interrupt_controller=\"plic\"",
+                    "cargo:rustc-cfg=parl_io_version=\"2\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610642432\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
                     "cargo:rustc-cfg=rmt_has_tx_immediate_stop",
@@ -5308,5 +5314,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(phy_backed_up_digital_register_count, values(\"21\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_fifo_size, values(\"16\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_uart_ram_size, values(\"32\"))");
+    println!("cargo:rustc-check-cfg=cfg(parl_io_version, values(\"2\",\"1\"))");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_csr_prv_mode, values(\"2064\",\"3088\"))");
 }

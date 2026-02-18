@@ -600,6 +600,10 @@ support_status = "partial"
 trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 
+[device.parl_io]
+support_status = "partial"
+version = 2
+
 [device.sleep]
 support_status = "partial"
 light_sleep = true
@@ -614,7 +618,6 @@ deep_sleep = true
 [device.i2s]
 [device.ledc]
 [device.mcpwm]
-[device.parl_io]
 [device.pcnt]
 [device.twai]
 [device.usb_serial_jtag]

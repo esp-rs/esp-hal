@@ -640,6 +640,7 @@ support_status = "not_supported"
 
 [device.parl_io]
 support_status = "partial"
+version = 2
 
 [device.ledc]
 support_status = "not_supported"

@@ -516,7 +516,9 @@ driver_configs![
     ParlIoProperties {
         driver: parl_io,
         name: "PARL_IO",
-        properties: {}
+        properties: {
+            version: u32,
+        }
     },
     PcntProperties {
         driver: pcnt,

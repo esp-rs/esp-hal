@@ -201,6 +201,12 @@ macro_rules! property {
     ("lp_uart.ram_size", str) => {
         stringify!(32)
     };
+    ("parl_io.version") => {
+        2
+    };
+    ("parl_io.version", str) => {
+        stringify!(2)
+    };
     ("phy.combo_module") => {
         false
     };

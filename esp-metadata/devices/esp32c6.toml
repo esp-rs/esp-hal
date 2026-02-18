@@ -717,6 +717,10 @@ support_status = "partial"
 light_sleep = true
 deep_sleep = true
 
+[device.parl_io]
+support_status = "partial"
+version = 1
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
@@ -726,7 +730,7 @@ deep_sleep = true
 [device.i2s]
 [device.ledc]
 [device.mcpwm]
-[device.parl_io]
+
 [device.pcnt]
 [device.sd_slave]
 [device.twai]
