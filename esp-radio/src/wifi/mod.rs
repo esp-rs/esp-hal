@@ -2972,7 +2972,11 @@ impl WifiController<'_> {
             sta: wifi_sta_config_t {
                 ssid: [0; 32],
                 password: [0; 64],
-                scan_method: if config.fast_scan { wifi_scan_method_t_WIFI_FAST_SCAN } else { wifi_scan_method_t_WIFI_ALL_CHANNEL_SCAN },
+                scan_method: if config.fast_scan {
+                    wifi_scan_method_t_WIFI_FAST_SCAN
+                } else {
+                    wifi_scan_method_t_WIFI_ALL_CHANNEL_SCAN
+                },
                 bssid_set: config.bssid.is_some(),
                 bssid: config.bssid.unwrap_or_default(),
                 channel: config.channel.unwrap_or(0),
@@ -3019,7 +3023,11 @@ impl WifiController<'_> {
             sta: wifi_sta_config_t {
                 ssid: [0; 32],
                 password: [0; 64],
-                scan_method: if config.fast_scan { wifi_scan_method_t_WIFI_FAST_SCAN } else { wifi_scan_method_t_WIFI_ALL_CHANNEL_SCAN },
+                scan_method: if config.fast_scan {
+                    wifi_scan_method_t_WIFI_FAST_SCAN
+                } else {
+                    wifi_scan_method_t_WIFI_ALL_CHANNEL_SCAN
+                },
                 bssid_set: config.bssid.is_some(),
                 bssid: config.bssid.unwrap_or_default(),
                 channel: config.channel.unwrap_or(0),
