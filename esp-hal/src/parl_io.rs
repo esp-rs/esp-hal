@@ -1334,9 +1334,6 @@ where
         PCR::regs()
             .parl_clk_rx_conf()
             .modify(|_, w| w.parl_rx_rst_en().set_bit());
-        PCR::regs()
-            .parl_clk_rx_conf()
-            .modify(|_, w| w.parl_rx_rst_en().clear_bit());
 
         Instance::clear_rx_interrupts();
         if let Some(number_of_bytes) = number_of_bytes {
@@ -1361,6 +1358,10 @@ where
         Instance::set_rx_reg_update();
 
         Instance::set_rx_start(true);
+
+        PCR::regs()
+            .parl_clk_rx_conf()
+            .modify(|_, w| w.parl_rx_rst_en().clear_bit());
 
         Ok(ParlIoRxTransfer {
             parl_io: ManuallyDrop::new(self),
