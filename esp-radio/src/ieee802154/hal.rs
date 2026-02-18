@@ -119,10 +119,10 @@ impl RxAbortReason {
         1 << (*self as u32 - 1)
     }
 
-    /// Mask of all RX abort events (bits 0-23), matching
+    /// Mask of all RX abort events (bits 0-25), matching
     /// `IEEE802154_RX_ABORT_ALL` in the C driver.
     pub fn all() -> u32 {
-        0x00FF_FFFF
+        0x03FF_FFFF
     }
 }
 

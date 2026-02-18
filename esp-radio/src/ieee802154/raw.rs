@@ -763,7 +763,7 @@ fn isr_handle_tx_abort(tx_abort_reason: u32, needs_next_op: &mut bool) {
         r if r == TxAbortReason::RxAckStop as u32 || r == TxAbortReason::TxStop as u32 => {
             // do nothing
         }
-        // RX ACK errors while waiting for ACK - invalid ACK, don't need next_op
+        // RX ACK errors while waiting for ACK - invalid ACK, need next_op
         r if r == TxAbortReason::RxAckSfdTimeout as u32
             || r == TxAbortReason::RxAckCrcError as u32
             || r == TxAbortReason::RxAckInvalidLen as u32
@@ -774,7 +774,7 @@ fn isr_handle_tx_abort(tx_abort_reason: u32, needs_next_op: &mut bool) {
             || r == TxAbortReason::RxAckRestart as u32 =>
         {
             super::tx_failed();
-            *needs_next_op = false;
+            *needs_next_op = true;
         }
         // RX ACK timeout - no ACK received
         r if r == TxAbortReason::RxAckTimeout as u32 => {
