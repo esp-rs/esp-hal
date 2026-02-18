@@ -28,10 +28,10 @@ use crate::{
     system::Cpu,
 };
 
-/// Interrupt Error
+/// Errors related to direct binding of interrupts
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Error {
+pub enum DirectBindingError {
     /// The CPU interrupt is a reserved interrupt
     CpuInterruptReserved,
 }
@@ -286,9 +286,9 @@ pub fn enable_direct(
     level: Priority,
     cpu_interrupt: CpuInterrupt,
     handler: unsafe extern "C" fn(),
-) -> Result<(), Error> {
+) -> Result<(), DirectBindingError> {
     if RESERVED_INTERRUPTS.contains(&(cpu_interrupt as _)) {
-        return Err(Error::CpuInterruptReserved);
+        return Err(DirectBindingError::CpuInterruptReserved);
     }
 
     super::map_raw(Cpu::current(), interrupt, cpu_interrupt as u32);
@@ -324,7 +324,7 @@ pub fn enable_direct(
 
             let int_slot = base_addr.wrapping_add((cpu_interrupt as usize) * 4) as *mut u32;
 
-            let instr = encode_jal_x0(handler as usize, int_slot as usize)?;
+            let instr = encode_jal_x0(handler as usize, int_slot as usize);
         }
     }
 
@@ -347,7 +347,7 @@ pub fn enable_direct(
 
 // helper: returns correctly encoded RISC-V `jal` instruction
 #[cfg(not(interrupt_controller = "clic"))]
-fn encode_jal_x0(target: usize, pc: usize) -> Result<u32, Error> {
+fn encode_jal_x0(target: usize, pc: usize) -> u32 {
     let offset = (target as isize) - (pc as isize);
 
     const MIN: isize = -(1isize << 20);
@@ -361,14 +361,12 @@ fn encode_jal_x0(target: usize, pc: usize) -> Result<u32, Error> {
     let imm11 = (imm >> 11) & 0x1;
     let imm19_12 = (imm >> 12) & 0xff;
 
-    let instr = (imm20 << 31)
+    (imm20 << 31)
         | (imm19_12 << 12)
         | (imm11 << 20)
         | (imm10_1 << 21)
         // https://lhtin.github.io/01world/app/riscv-isa/?xlen=32&insn_name=jal
-        | 0b1101111u32;
-
-    Ok(instr)
+        | 0b1101111u32
 }
 
 // Runlevel APIs

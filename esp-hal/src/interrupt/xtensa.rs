@@ -15,14 +15,6 @@ use crate::{
     system::Cpu,
 };
 
-/// Interrupt Error
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Error {
-    /// The CPU interrupt is a reserved interrupt
-    CpuInterruptReserved,
-}
-
 /// Enumeration of available CPU interrupts
 ///
 /// It's possible to create one handler per priority level. (e.g
