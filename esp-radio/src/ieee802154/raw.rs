@@ -305,10 +305,10 @@ fn stop_current_operation_inner(state: &mut IeeeState) {
         Ieee802154State::Receive => {
             stop_rx(state);
         }
-        Ieee802154State::TxAck | Ieee802154State::TxEnhAck => {
+        Ieee802154State::TxAck => {
             stop_tx_ack();
         }
-        Ieee802154State::Transmit => {
+        Ieee802154State::Transmit | Ieee802154State::TxEnhAck => {
             stop_tx(state);
         }
         Ieee802154State::RxAck => {
