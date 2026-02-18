@@ -35,10 +35,6 @@ const ACK_TIMEOUT_US: u32 = 200_000;
 
 static mut RX_BUFFER: [u8; FRAME_SIZE] = [0u8; FRAME_SIZE];
 
-/// Stores the last received ACK frame (populated during isr_handle_ack_rx_done
-/// and stop_rx_ack). Cleared at the start of each transmit.
-static mut ACK_FRAME: Option<RawReceived> = None;
-
 struct PendingTx {
     frame: *const u8,
     cca: bool,
@@ -53,6 +49,10 @@ struct IeeeState {
     rx_queue: Queue<RawReceived>,
     rx_queue_size: usize,
     pending_tx: Option<PendingTx>,
+    /// Stores the last received ACK frame (populated during
+    /// isr_handle_ack_rx_done and stop_rx_ack). Cleared at the start of
+    /// each transmit.
+    ack_frame: Option<RawReceived>,
 }
 
 static STATE: NonReentrantMutex<IeeeState> = NonReentrantMutex::new(IeeeState {
@@ -60,6 +60,7 @@ static STATE: NonReentrantMutex<IeeeState> = NonReentrantMutex::new(IeeeState {
     rx_queue: Queue::new(),
     rx_queue_size: 10,
     pending_tx: None,
+    ack_frame: None,
 });
 
 unsafe extern "C" {
@@ -196,7 +197,7 @@ fn tx_init(state: &mut IeeeState, frame: *const u8) {
     ieee802154_pib_update();
     set_transmit_security(false);
 
-    unsafe { ACK_FRAME = None };
+    state.ack_frame = None;
 
     set_tx_addr(frame);
 
@@ -278,7 +279,7 @@ pub fn ieee802154_poll() -> Option<RawReceived> {
 /// or ACK was not received before timeout).
 /// The C driver passes this via `esp_ieee802154_transmit_done(frame, ack, ack_info)`.
 pub fn get_ack_frame() -> Option<RawReceived> {
-    unsafe { ACK_FRAME }
+    STATE.with(|state| state.ack_frame)
 }
 
 fn rx_init(state: &mut IeeeState) {
@@ -311,7 +312,7 @@ fn stop_current_operation_inner(state: &mut IeeeState) {
             stop_tx(state);
         }
         Ieee802154State::RxAck => {
-            stop_rx_ack();
+            stop_rx_ack(state);
         }
     }
 }
@@ -358,7 +359,7 @@ fn stop_tx(state: &mut IeeeState) {
     clear_events(Event::TxDone | Event::TxAbort | Event::TxSfdDone);
 }
 
-fn stop_rx_ack() {
+fn stop_rx_ack(state: &mut IeeeState) {
     set_cmd(Command::Stop);
 
     let evts = events();
@@ -368,12 +369,10 @@ fn stop_rx_ack() {
 
     if evts & Event::AckRxDone != 0 {
         // Capture the received ACK frame
-        unsafe {
-            ACK_FRAME = Some(RawReceived {
-                data: RX_BUFFER,
-                channel: freq_to_channel(freq()),
-            });
-        }
+        state.ack_frame = Some(RawReceived {
+            data: unsafe { RX_BUFFER },
+            channel: freq_to_channel(freq()),
+        });
         super::tx_done();
     } else {
         super::tx_failed();
@@ -656,12 +655,12 @@ fn isr_handle_ack_rx_done(needs_next_op: &mut bool) {
     timer0_stop();
     disable_events(Event::Timer0Overflow as u16);
     // Capture the received ACK frame before RX buffer is reused
-    unsafe {
-        ACK_FRAME = Some(RawReceived {
-            data: RX_BUFFER,
+    STATE.with(|state| {
+        state.ack_frame = Some(RawReceived {
+            data: unsafe { RX_BUFFER },
             channel: freq_to_channel(freq()),
         });
-    }
+    });
     // ACK received for our transmitted frame
     super::tx_done();
     *needs_next_op = true;
