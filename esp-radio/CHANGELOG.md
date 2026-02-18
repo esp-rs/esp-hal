@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced `ScanMethod` with a `fast_scan` boolean field in `ScanConfig` (#5019)
+
 ### Added
 
 - It's now possible to obtain the access point info of the currently connected AP, by using `WifiController::ap_info(&self)` (#4405)

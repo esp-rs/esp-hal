@@ -242,3 +242,22 @@ If you previously only set the WiFi mode and then started the controller, you mu
 +       .set_config(&Config::Station(StationConfig::default()))
 +       .unwrap();
 ```
+
+## `ScanMethod` has been replaced by a `fast_scan` boolean
+
+The `ScanMethod` enum has been removed. Instead, `ScanConfig` now has a `fast_scan` boolean field.
+
+```diff
+- use esp_radio::wifi::scan::ScanMethod;
+-
+- let scan_config = ScanConfig {
+-     scan_method: ScanMethod::Fast,
+-     ..Default::default()
+- };
++ let scan_config = ScanConfig {
++     fast_scan: true,
++     ..Default::default()
++ };
+```
+
+If you were using `ScanMethod::AllChannels`, set `fast_scan: false` instead.
