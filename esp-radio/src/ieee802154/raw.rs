@@ -748,6 +748,8 @@ fn isr_handle_tx_ack_phase_rx_abort(rx_abort_reason: u32, needs_next_op: &mut bo
 /// which calls ieee802154_rx_ack_timeout_callback
 fn isr_handle_timer0_done(needs_next_op: &mut bool) {
     // Timer0 fired while waiting for ACK - TX failed with no ACK
+    timer0_stop();
+    disable_events(Event::Timer0Overflow as u16);
     super::tx_failed();
     *needs_next_op = true;
 }
