@@ -321,8 +321,10 @@ pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
 
         let ptr = (&raw const vector._handler).cast::<usize>().cast_mut();
 
-        #[cfg(riscv)]
-        if !crate::debugger::debugger_connected() {
+        // On RISC-V MCUs we may be protecting the trap section using a watchpoint.
+        // If we do, we need to temporarily disable this protection.
+        #[cfg(all(riscv, write_vec_table_monitoring))]
+        if crate::soc::trap_section_protected() {
             crate::debugger::DEBUGGER_LOCK.lock(|| {
                 let wp = crate::debugger::clear_watchpoint(1);
                 ptr.write_volatile(handler.handler().address());

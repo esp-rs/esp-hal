@@ -266,10 +266,13 @@ pub(crate) fn enable_main_stack_guard_monitoring() {
 }
 
 #[cfg(all(riscv, write_vec_table_monitoring))]
+pub(crate) fn trap_section_protected() -> bool {
+    cfg!(stack_guard_monitoring_with_debugger_connected) || !crate::debugger::debugger_connected()
+}
+
+#[cfg(all(riscv, write_vec_table_monitoring))]
 pub(crate) fn setup_trap_section_protection() {
-    if !cfg!(stack_guard_monitoring_with_debugger_connected)
-        && crate::debugger::debugger_connected()
-    {
+    if !trap_section_protected() {
         return;
     }
 
