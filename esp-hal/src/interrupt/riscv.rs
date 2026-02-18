@@ -378,8 +378,7 @@ pub fn cpu_interrupt_priority(cpu_interrupt: CpuInterrupt) -> Priority {
 // Runlevel APIs
 
 /// Get the current run level (the level below which interrupts are masked).
-#[inline]
-pub fn current_runlevel() -> RunLevel {
+pub(crate) fn current_runlevel() -> RunLevel {
     let priority = cpu_int::current_runlevel();
     unwrap!(RunLevel::try_from(priority as u32))
 }
@@ -392,7 +391,6 @@ pub fn current_runlevel() -> RunLevel {
 /// This function must only be used to raise the runlevel and to restore it
 /// to a previous value. It must not be used to arbitrarily lower the
 /// runlevel.
-#[inline]
 pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
     let previous = cpu_int::change_current_runlevel(level);
     unwrap!(RunLevel::try_from(previous as u32))

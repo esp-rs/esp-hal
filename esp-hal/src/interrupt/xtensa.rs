@@ -221,7 +221,7 @@ pub fn clear(_core: Cpu, which: CpuInterrupt) {
 // Runlevel APIs
 
 /// Get the current run level (the level below which interrupts are masked).
-pub fn current_runlevel() -> RunLevel {
+pub(crate) fn current_runlevel() -> RunLevel {
     let ps: u32;
     unsafe { core::arch::asm!("rsr.ps {0}", out(reg) ps) };
 
