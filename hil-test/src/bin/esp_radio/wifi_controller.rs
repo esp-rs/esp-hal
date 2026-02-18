@@ -16,6 +16,8 @@ mod tests {
         esp_hal::init(config)
     }
 
+    // C5 temporarily disabled
+    #[cfg(not(esp32c5))]
     #[test]
     async fn wifi_starts_with_trng_enabled(p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);

@@ -14,7 +14,7 @@ mod init_tests {
         peripherals::Peripherals,
         timer::timg::TimerGroup,
     };
-    #[cfg(soc_has_bt)]
+    #[cfg(bt_driver_supported)]
     use esp_radio::ble::controller::BleConnector;
     #[cfg(soc_has_wifi)]
     use esp_radio::wifi::WifiError;
@@ -123,7 +123,7 @@ mod init_tests {
 
     #[test]
     #[cfg(soc_has_wifi)]
-    #[cfg(soc_has_bt)]
+    #[cfg(bt_driver_supported)]
     fn test_init_and_drop(mut p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
@@ -142,7 +142,7 @@ mod init_tests {
 
     #[test]
     #[cfg(soc_has_wifi)]
-    #[cfg(soc_has_bt)]
+    #[cfg(bt_driver_supported)]
     fn test_create_ble_wifi_drop_ble_wifi_create_wifi_ble(mut p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
