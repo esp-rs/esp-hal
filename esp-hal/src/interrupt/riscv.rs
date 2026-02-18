@@ -69,15 +69,49 @@ for_each_interrupt!(
                 }
 
                 #[inline]
-                pub(crate) fn level(self) -> u32 {
-                    cpu_int::cpu_interrupt_priority_raw(self as u32) as u32
-                }
-
-                #[inline]
                 pub(crate) fn is_vectored(self) -> bool {
                     const VECTORED_CPU_INTERRUPT_RANGE: core::ops::Range<u32> =
                         PRIORITY_TO_INTERRUPT[0] as u32..PRIORITY_TO_INTERRUPT[PRIORITY_TO_INTERRUPT.len() - 1] as u32;
                     VECTORED_CPU_INTERRUPT_RANGE.contains(&(self as u32))
+                }
+
+                /// Enable the CPU interrupt
+                #[inline]
+                pub fn enable(self) {
+                    cpu_int::enable_cpu_interrupt_raw(self as u32);
+                }
+
+                /// Clear the CPU interrupt status bit
+                #[inline]
+                pub fn clear(self) {
+                    cpu_int::clear_raw(self as u32);
+                }
+
+                /// Set the interrupt kind (i.e. level or edge) of an CPU interrupt
+                ///
+                /// This is safe to call when the `vectored` feature is enabled. The
+                /// vectored interrupt handler will take care of clearing edge interrupt
+                /// bits.
+                #[inline]
+                pub fn set_kind(self, kind: InterruptKind) {
+                    cpu_int::set_kind_raw(self as u32, kind);
+                }
+
+                /// Set the priority level of a CPU interrupt
+                #[inline]
+                pub fn set_priority(self, priority: Priority) {
+                    cpu_int::set_priority_raw(self as u32, priority);
+                }
+
+                /// Get interrupt priority for the CPU
+                #[inline]
+                pub fn priority(self) -> Priority {
+                    unwrap!(Priority::try_from(self.level()))
+                }
+
+                #[inline]
+                pub(crate) fn level(self) -> u32 {
+                    cpu_int::cpu_interrupt_priority_raw(self as u32) as u32
                 }
             }
         }
@@ -337,44 +371,6 @@ fn encode_jal_x0(target: usize, pc: usize) -> Result<u32, Error> {
     Ok(instr)
 }
 
-// CPU interrupt API. These don't take a core, because the control mechanisms are generally
-// core-local.
-
-/// Enable a CPU interrupt
-#[inline]
-pub fn enable_cpu_interrupt(cpu_interrupt: CpuInterrupt) {
-    cpu_int::enable_cpu_interrupt_raw(cpu_interrupt as u32);
-}
-
-/// Set the interrupt kind (i.e. level or edge) of an CPU interrupt
-///
-/// This is safe to call when the `vectored` feature is enabled. The
-/// vectored interrupt handler will take care of clearing edge interrupt
-/// bits.
-#[inline]
-pub fn set_kind(cpu_interrupt: CpuInterrupt, kind: InterruptKind) {
-    cpu_int::set_kind_raw(cpu_interrupt as u32, kind);
-}
-
-/// Clear a CPU interrupt
-#[inline]
-pub fn clear(cpu_interrupt: CpuInterrupt) {
-    cpu_int::clear_raw(cpu_interrupt as u32);
-}
-
-/// Set the priority level of a CPU interrupt
-#[inline]
-pub fn set_priority(cpu_interrupt: CpuInterrupt, priority: Priority) {
-    cpu_int::set_priority_raw(cpu_interrupt as u32, priority);
-}
-
-/// Get interrupt priority for the CPU
-#[inline]
-pub fn cpu_interrupt_priority(cpu_interrupt: CpuInterrupt) -> Priority {
-    let priority = cpu_int::cpu_interrupt_priority_raw(cpu_interrupt as u32);
-    unwrap!(Priority::try_from(priority as u32))
-}
-
 // Runlevel APIs
 
 /// Get the current run level (the level below which interrupts are masked).
@@ -519,7 +515,7 @@ pub(crate) mod rt {
 
         // this has no effect on level interrupts, but the interrupt may be an edge one
         // so we clear it anyway
-        clear(cpu_intr);
+        cpu_intr.clear();
 
         cfg_if::cfg_if! {
             if #[cfg(interrupt_controller = "clic")] {

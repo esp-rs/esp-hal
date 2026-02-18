@@ -114,7 +114,26 @@ impl CpuInterrupt {
     }
 
     #[inline]
-    pub(crate) fn level(&self) -> u32 {
+    pub(crate) fn is_vectored(self) -> bool {
+        // Even "direct bound" interrupts go through the vectored interrupt handler
+        true
+    }
+
+    /// Enable the CPU interrupt
+    #[inline]
+    pub fn enable(self) {
+        enable_cpu_interrupt_raw(self as u32);
+    }
+
+    /// Clear the CPU interrupt status bit
+    #[inline]
+    pub fn clear(self) {
+        unsafe { xtensa_lx::interrupt::clear(1 << self as u32) };
+    }
+
+    /// Get interrupt priority for the CPU
+    #[inline]
+    pub fn priority(self) -> Priority {
         match self {
             CpuInterrupt::Interrupt0LevelPriority1
             | CpuInterrupt::Interrupt1LevelPriority1
@@ -130,25 +149,24 @@ impl CpuInterrupt {
             | CpuInterrupt::Interrupt12LevelPriority1
             | CpuInterrupt::Interrupt13LevelPriority1
             | CpuInterrupt::Interrupt17LevelPriority1
-            | CpuInterrupt::Interrupt18LevelPriority1 => Priority::Priority1 as u32,
+            | CpuInterrupt::Interrupt18LevelPriority1 => Priority::Priority1,
 
             CpuInterrupt::Interrupt19LevelPriority2
             | CpuInterrupt::Interrupt20LevelPriority2
-            | CpuInterrupt::Interrupt21LevelPriority2 => Priority::Priority2 as u32,
+            | CpuInterrupt::Interrupt21LevelPriority2 => Priority::Priority2,
 
             CpuInterrupt::Interrupt11ProfilingPriority3
             | CpuInterrupt::Interrupt15Timer1Priority3
             | CpuInterrupt::Interrupt22EdgePriority3
             | CpuInterrupt::Interrupt27LevelPriority3
             | CpuInterrupt::Interrupt29SoftwarePriority3
-            | CpuInterrupt::Interrupt23LevelPriority3 => Priority::Priority3 as u32,
+            | CpuInterrupt::Interrupt23LevelPriority3 => Priority::Priority3,
         }
     }
 
     #[inline]
-    pub(crate) fn is_vectored(self) -> bool {
-        // Even "direct bound" interrupts go through the vectored interrupt handler
-        true
+    pub(crate) fn level(self) -> u32 {
+        self.priority() as u32
     }
 }
 
@@ -205,17 +223,8 @@ pub(super) const DISABLED_CPU_INTERRUPT: u32 = 16;
 // CPU interrupt API. These don't take a core, because the control mechanisms are generally
 // core-local.
 
-pub(crate) fn enable_cpu_interrupt(cpu_interrupt: CpuInterrupt) {
-    enable_cpu_interrupt_raw(cpu_interrupt as u32);
-}
-
 pub(crate) fn enable_cpu_interrupt_raw(cpu_interrupt: u32) {
     unsafe { xtensa_lx::interrupt::enable_mask(1 << cpu_interrupt) };
-}
-
-/// Clear the given CPU interrupt
-pub fn clear(_core: Cpu, which: CpuInterrupt) {
-    unsafe { xtensa_lx::interrupt::clear(1 << which as u32) };
 }
 
 // Runlevel APIs
@@ -369,7 +378,7 @@ pub(crate) mod rt {
             CpuInterrupt::Interrupt19LevelPriority2,
             CpuInterrupt::Interrupt23LevelPriority3,
         ] {
-            enable_cpu_interrupt(cpu_int);
+            cpu_int.enable();
         }
     }
 
@@ -430,7 +439,7 @@ pub(crate) mod rt {
 
                 // If the interrupt is edge triggered, we need to clear the
                 // request on the CPU's side
-                unsafe { interrupt::clear(cpu_interrupt_mask & CPU_INTERRUPT_EDGE) };
+                unsafe { xtensa_lx::interrupt::clear(cpu_interrupt_mask & CPU_INTERRUPT_EDGE) };
 
                 // For edge interrupts we cannot rely on the peripherals' interrupt status
                 // registers, therefore call all registered handlers for current level.
