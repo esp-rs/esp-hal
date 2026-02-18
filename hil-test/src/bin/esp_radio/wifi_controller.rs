@@ -50,7 +50,8 @@ mod tests {
             .set_config(&Config::Station(StationConfig::default()))
             .unwrap();
 
-        let scan_config = ScanConfig::default().with_max(1);
+        // scanning all channels takes a (too) long time - even more for dual-band capable targets
+        let scan_config = ScanConfig::default().with_max(1).with_channel(13);
         let _ = controller.scan_async(&scan_config).await.unwrap();
 
         let mut min_free = usize::MAX;
