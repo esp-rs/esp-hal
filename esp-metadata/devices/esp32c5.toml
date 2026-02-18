@@ -247,6 +247,7 @@ clocks = { system_clocks = { clock_tree = [
         ] },
     ] },
     { name = "Systimer", keep_enabled = true }, # can be clocked from XTAL_CLK or RC_FAST_CLK, the latter has no divider?
+    { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" } },
     { name = "Dma", template_params = { peripheral = "gdma" } },
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
     { name = "Spi2" },
@@ -254,6 +255,7 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Sha" },
     { name = "Rsa" },
     { name = "Ecc" },
+    { name = "UsbDevice", keep_enabled = true },
 ] } }
 
 # TODO: define functionality for PSEUDO register
@@ -620,11 +622,9 @@ support_status = "not_supported"
 support_status = "not_supported"
 
 # ## Miscellaneous
-# [device.io_mux]
 [device.systimer]
 [device.pcnt]
 [device.usb_serial_jtag]
-support_status = "not_supported"
 
 [device.parl_io]
 support_status = "not_supported"
@@ -650,7 +650,7 @@ support_status = "not_supported"
 [device.i2s]
 support_status = "not_supported"
 
-[device.iomux]
+[device.io_mux]
 
 [device.psram]
 support_status = "not_supported"

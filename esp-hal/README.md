@@ -76,7 +76,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | I2S                       | ⚒️   |          | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | IEEE 802.15.4             |       |          |          | ❌       | ⚒️      | ⚒️      |          |          |
 | Interrupts                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| IOMUX                     | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| IOMUX                     | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Key Manager               |       |          |          | ❌       |          |          |          |          |
 | LEDC                      | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | LP I2C master             |       |          |          | ⚒️      | ⚒️      |          |          |          |
@@ -106,7 +106,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ULP (FSM)                 | ⚒️   |          |          |          |          |          | ⚒️      | ⚒️      |
 | ULP (RISC-V)              |       |          |          | ❌       | ⚒️      |          | ⚒️      | ⚒️      |
 | USB OTG FS                |       |          |          |          |          |          | ⚒️      | ⚒️      |
-| USB Serial/JTAG           |       |          | ⚒️      | ❌       | ⚒️      | ⚒️      |          | ⚒️      |
+| USB Serial/JTAG           |       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |          | ⚒️      |
 | WIFI                      | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      |          | ⚒️      | ⚒️      |
 
  * Empty cell: not available
