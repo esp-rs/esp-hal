@@ -243,7 +243,7 @@ pub(super) static INTERRUPT_TO_PRIORITY: [Option<Priority>; INTERRUPT_COUNT] = c
 ///   prologue/epilogue for the user, normal Rust `fn` will result in an error.
 ///
 /// Unless you are sure that you need such low-level control to achieve the lowest possible latency,
-/// you most likely want to use [`enable`] instead.
+/// you most likely want to use [`enable`][crate::interrupt::enable] instead.
 ///
 /// Trying using a reserved interrupt from [`RESERVED_INTERRUPTS`] will return
 /// an error.
