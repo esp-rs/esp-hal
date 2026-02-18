@@ -146,24 +146,6 @@ pub(crate) fn setup_interrupts() {
     }
 }
 
-/// Enable an interrupt by directly binding it to a available CPU interrupt
-///
-/// Unless you are sure, you most likely want to use [`enable`] instead.
-///
-/// Trying using a reserved interrupt from [`RESERVED_INTERRUPTS`] will return
-/// an error.
-pub fn enable_direct(interrupt: Interrupt, cpu_interrupt: CpuInterrupt) -> Result<(), Error> {
-    if RESERVED_INTERRUPTS.contains(&(cpu_interrupt as _)) {
-        return Err(Error::CpuInterruptReserved);
-    }
-    unsafe {
-        map(Cpu::current(), interrupt, cpu_interrupt);
-
-        xtensa_lx::interrupt::enable_mask(1 << cpu_interrupt as u32);
-    }
-    Ok(())
-}
-
 /// Assign a peripheral interrupt to an CPU interrupt
 ///
 /// Note: this only maps the interrupt to the CPU interrupt. The CPU interrupt
