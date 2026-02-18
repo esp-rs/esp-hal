@@ -57,7 +57,7 @@ fn main() -> ! {
                 content: FrameContent::Data,
                 payload: b"Hello World".to_vec(),
                 footer: [0u8; 2],
-            })
+            }, false)
             .ok();
 
         println!("Send frame with sequence number {seq_number}");
