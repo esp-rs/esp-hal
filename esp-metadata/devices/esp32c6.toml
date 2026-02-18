@@ -269,7 +269,19 @@ clocks = { system_clocks = { clock_tree = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
         ] },
     ] },
-    { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" } },
+    { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" }, clocks = [
+        { name = "RX_CLOCK", type = "mux", default = "PLL_F240M", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "PLL_F240M",   outputs = "PLL_F240M" },
+            # TODO: external clock
+        ] },
+        { name = "TX_CLOCK", type = "mux", default = "PLL_F240M", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "PLL_F240M",   outputs = "PLL_F240M" },
+        ] },
+    ] },
     { name = "SdioSlave" },
     { name = "Dma", template_params = { peripheral = "gdma" } },
     { name = "Spi2" },

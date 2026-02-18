@@ -844,6 +844,34 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
+/// // PARLIO_RX_CLOCK
+///
+/// fn enable_parlio_rx_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_parlio_rx_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<ParlioRxClockConfig>,
+///     _new_selector: ParlioRxClockConfig,
+/// ) {
+///     todo!()
+/// }
+///
+/// // PARLIO_TX_CLOCK
+///
+/// fn enable_parlio_tx_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_parlio_tx_clock_impl(
+///     _clocks: &mut ClockTree,
+///     _old_selector: Option<ParlioTxClockConfig>,
+///     _new_selector: ParlioTxClockConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // RMT_SCLK
 ///
 /// fn enable_rmt_sclk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -1087,6 +1115,30 @@ macro_rules! define_clock_tree_types {
             /// Selects `XTAL_CLK`.
             XtalClk,
         }
+        /// The list of clock signals that the `PARLIO_RX_CLOCK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum ParlioRxClockConfig {
+            /// Selects `XTAL_CLK`.
+            XtalClk,
+            /// Selects `RC_FAST_CLK`.
+            RcFastClk,
+            #[default]
+            /// Selects `PLL_F96M_CLK`.
+            PllF96m,
+        }
+        /// The list of clock signals that the `PARLIO_TX_CLOCK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum ParlioTxClockConfig {
+            /// Selects `XTAL_CLK`.
+            XtalClk,
+            /// Selects `RC_FAST_CLK`.
+            RcFastClk,
+            #[default]
+            /// Selects `PLL_F96M_CLK`.
+            PllF96m,
+        }
         /// The list of clock signals that the `RMT_SCLK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1154,6 +1206,8 @@ macro_rules! define_clock_tree_types {
             lp_fast_clk: Option<LpFastClkConfig>,
             lp_slow_clk: Option<LpSlowClkConfig>,
             mcpwm0_function_clock: Option<Mcpwm0FunctionClockConfig>,
+            parlio_rx_clock: Option<ParlioRxClockConfig>,
+            parlio_tx_clock: Option<ParlioTxClockConfig>,
             rmt_sclk: Option<RmtSclkConfig>,
             timg0_function_clock: Option<Timg0FunctionClockConfig>,
             timg0_calibration_clock: Option<Timg0CalibrationClockConfig>,
@@ -1173,6 +1227,8 @@ macro_rules! define_clock_tree_types {
             lp_fast_clk_refcount: u32,
             lp_slow_clk_refcount: u32,
             mcpwm0_function_clock_refcount: u32,
+            parlio_rx_clock_refcount: u32,
+            parlio_tx_clock_refcount: u32,
             rmt_sclk_refcount: u32,
             timg0_function_clock_refcount: u32,
             timg0_calibration_clock_refcount: u32,
@@ -1219,6 +1275,14 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the MCPWM0_FUNCTION_CLOCK clock tree node
             pub fn mcpwm0_function_clock(&self) -> Option<Mcpwm0FunctionClockConfig> {
                 self.mcpwm0_function_clock
+            }
+            /// Returns the current configuration of the PARLIO_RX_CLOCK clock tree node
+            pub fn parlio_rx_clock(&self) -> Option<ParlioRxClockConfig> {
+                self.parlio_rx_clock
+            }
+            /// Returns the current configuration of the PARLIO_TX_CLOCK clock tree node
+            pub fn parlio_tx_clock(&self) -> Option<ParlioTxClockConfig> {
+                self.parlio_tx_clock
             }
             /// Returns the current configuration of the RMT_SCLK clock tree node
             pub fn rmt_sclk(&self) -> Option<RmtSclkConfig> {
@@ -1267,6 +1331,8 @@ macro_rules! define_clock_tree_types {
                 lp_fast_clk: None,
                 lp_slow_clk: None,
                 mcpwm0_function_clock: None,
+                parlio_rx_clock: None,
+                parlio_tx_clock: None,
                 rmt_sclk: None,
                 timg0_function_clock: None,
                 timg0_calibration_clock: None,
@@ -1286,6 +1352,8 @@ macro_rules! define_clock_tree_types {
                 lp_fast_clk_refcount: 0,
                 lp_slow_clk_refcount: 0,
                 mcpwm0_function_clock_refcount: 0,
+                parlio_rx_clock_refcount: 0,
+                parlio_tx_clock_refcount: 0,
                 rmt_sclk_refcount: 0,
                 timg0_function_clock_refcount: 0,
                 timg0_calibration_clock_refcount: 0,
@@ -1749,6 +1817,120 @@ macro_rules! define_clock_tree_types {
                 Mcpwm0FunctionClockConfig::PllF96m => pll_f96m_clk_frequency(clocks),
                 Mcpwm0FunctionClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
                 Mcpwm0FunctionClockConfig::XtalClk => xtal_clk_frequency(clocks),
+            }
+        }
+        pub fn configure_parlio_rx_clock(
+            clocks: &mut ClockTree,
+            new_selector: ParlioRxClockConfig,
+        ) {
+            let old_selector = clocks.parlio_rx_clock.replace(new_selector);
+            if clocks.parlio_rx_clock_refcount > 0 {
+                match new_selector {
+                    ParlioRxClockConfig::XtalClk => request_xtal_clk(clocks),
+                    ParlioRxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    ParlioRxClockConfig::PllF96m => request_pll_f96m_clk(clocks),
+                }
+                configure_parlio_rx_clock_impl(clocks, old_selector, new_selector);
+                if let Some(old_selector) = old_selector {
+                    match old_selector {
+                        ParlioRxClockConfig::XtalClk => release_xtal_clk(clocks),
+                        ParlioRxClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        ParlioRxClockConfig::PllF96m => release_pll_f96m_clk(clocks),
+                    }
+                }
+            } else {
+                configure_parlio_rx_clock_impl(clocks, old_selector, new_selector);
+            }
+        }
+        pub fn parlio_rx_clock_config(clocks: &mut ClockTree) -> Option<ParlioRxClockConfig> {
+            clocks.parlio_rx_clock
+        }
+        pub fn request_parlio_rx_clock(clocks: &mut ClockTree) {
+            trace!("Requesting PARLIO_RX_CLOCK");
+            if increment_reference_count(&mut clocks.parlio_rx_clock_refcount) {
+                trace!("Enabling PARLIO_RX_CLOCK");
+                match unwrap!(clocks.parlio_rx_clock) {
+                    ParlioRxClockConfig::XtalClk => request_xtal_clk(clocks),
+                    ParlioRxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    ParlioRxClockConfig::PllF96m => request_pll_f96m_clk(clocks),
+                }
+                enable_parlio_rx_clock_impl(clocks, true);
+            }
+        }
+        pub fn release_parlio_rx_clock(clocks: &mut ClockTree) {
+            trace!("Releasing PARLIO_RX_CLOCK");
+            if decrement_reference_count(&mut clocks.parlio_rx_clock_refcount) {
+                trace!("Disabling PARLIO_RX_CLOCK");
+                enable_parlio_rx_clock_impl(clocks, false);
+                match unwrap!(clocks.parlio_rx_clock) {
+                    ParlioRxClockConfig::XtalClk => release_xtal_clk(clocks),
+                    ParlioRxClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    ParlioRxClockConfig::PllF96m => release_pll_f96m_clk(clocks),
+                }
+            }
+        }
+        pub fn parlio_rx_clock_frequency(clocks: &mut ClockTree) -> u32 {
+            match unwrap!(clocks.parlio_rx_clock) {
+                ParlioRxClockConfig::XtalClk => xtal_clk_frequency(clocks),
+                ParlioRxClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
+                ParlioRxClockConfig::PllF96m => pll_f96m_clk_frequency(clocks),
+            }
+        }
+        pub fn configure_parlio_tx_clock(
+            clocks: &mut ClockTree,
+            new_selector: ParlioTxClockConfig,
+        ) {
+            let old_selector = clocks.parlio_tx_clock.replace(new_selector);
+            if clocks.parlio_tx_clock_refcount > 0 {
+                match new_selector {
+                    ParlioTxClockConfig::XtalClk => request_xtal_clk(clocks),
+                    ParlioTxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    ParlioTxClockConfig::PllF96m => request_pll_f96m_clk(clocks),
+                }
+                configure_parlio_tx_clock_impl(clocks, old_selector, new_selector);
+                if let Some(old_selector) = old_selector {
+                    match old_selector {
+                        ParlioTxClockConfig::XtalClk => release_xtal_clk(clocks),
+                        ParlioTxClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        ParlioTxClockConfig::PllF96m => release_pll_f96m_clk(clocks),
+                    }
+                }
+            } else {
+                configure_parlio_tx_clock_impl(clocks, old_selector, new_selector);
+            }
+        }
+        pub fn parlio_tx_clock_config(clocks: &mut ClockTree) -> Option<ParlioTxClockConfig> {
+            clocks.parlio_tx_clock
+        }
+        pub fn request_parlio_tx_clock(clocks: &mut ClockTree) {
+            trace!("Requesting PARLIO_TX_CLOCK");
+            if increment_reference_count(&mut clocks.parlio_tx_clock_refcount) {
+                trace!("Enabling PARLIO_TX_CLOCK");
+                match unwrap!(clocks.parlio_tx_clock) {
+                    ParlioTxClockConfig::XtalClk => request_xtal_clk(clocks),
+                    ParlioTxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    ParlioTxClockConfig::PllF96m => request_pll_f96m_clk(clocks),
+                }
+                enable_parlio_tx_clock_impl(clocks, true);
+            }
+        }
+        pub fn release_parlio_tx_clock(clocks: &mut ClockTree) {
+            trace!("Releasing PARLIO_TX_CLOCK");
+            if decrement_reference_count(&mut clocks.parlio_tx_clock_refcount) {
+                trace!("Disabling PARLIO_TX_CLOCK");
+                enable_parlio_tx_clock_impl(clocks, false);
+                match unwrap!(clocks.parlio_tx_clock) {
+                    ParlioTxClockConfig::XtalClk => release_xtal_clk(clocks),
+                    ParlioTxClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    ParlioTxClockConfig::PllF96m => release_pll_f96m_clk(clocks),
+                }
+            }
+        }
+        pub fn parlio_tx_clock_frequency(clocks: &mut ClockTree) -> u32 {
+            match unwrap!(clocks.parlio_tx_clock) {
+                ParlioTxClockConfig::XtalClk => xtal_clk_frequency(clocks),
+                ParlioTxClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
+                ParlioTxClockConfig::PllF96m => pll_f96m_clk_frequency(clocks),
             }
         }
         pub fn configure_rmt_sclk(clocks: &mut ClockTree, new_selector: RmtSclkConfig) {

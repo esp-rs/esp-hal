@@ -247,7 +247,19 @@ clocks = { system_clocks = { clock_tree = [
         ] },
     ] },
     { name = "Systimer", keep_enabled = true }, # can be clocked from XTAL_CLK or RC_FAST_CLK, the latter has no divider?
-    { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" } },
+    { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" }, clocks = [
+        { name = "RX_CLOCK", type = "mux", default = "PLL_F240M", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "PLL_F240M",   outputs = "PLL_F240M" },
+            # TODO: external clock
+        ] },
+        { name = "TX_CLOCK", type = "mux", default = "PLL_F240M", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "PLL_F240M",   outputs = "PLL_F240M" },
+        ] },
+    ] },
     { name = "Dma", template_params = { peripheral = "gdma" } },
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
     { name = "Spi2" },
