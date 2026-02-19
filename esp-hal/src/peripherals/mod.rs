@@ -65,7 +65,7 @@ macro_rules! create_peripheral {
             }
 
             $(
-                /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
+                /// Binds an interrupt handler to the corresponding interrupt for this peripheral, and enables the interrupt.
                 #[instability::unstable]
                 pub fn $bind(&self, handler: $crate::interrupt::InterruptHandler) {
                     $crate::interrupt::bind_handler($crate::peripherals::Interrupt::$interrupt, handler);

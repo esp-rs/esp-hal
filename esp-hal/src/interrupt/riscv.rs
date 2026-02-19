@@ -70,8 +70,8 @@ for_each_interrupt!(
 
                 #[inline]
                 pub(crate) fn is_vectored(self) -> bool {
-                    const VECTORED_CPU_INTERRUPT_RANGE: core::ops::Range<u32> =
-                        PRIORITY_TO_INTERRUPT[0] as u32..PRIORITY_TO_INTERRUPT[PRIORITY_TO_INTERRUPT.len() - 1] as u32;
+                    const VECTORED_CPU_INTERRUPT_RANGE: core::ops::RangeInclusive<u32> =
+                        PRIORITY_TO_INTERRUPT[0] as u32..=PRIORITY_TO_INTERRUPT[PRIORITY_TO_INTERRUPT.len() - 1] as u32;
                     VECTORED_CPU_INTERRUPT_RANGE.contains(&(self as u32))
                 }
 

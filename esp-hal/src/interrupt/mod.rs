@@ -330,6 +330,7 @@ pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
                 ptr.write_volatile(handler.handler().address());
                 crate::debugger::restore_watchpoint(1, wp);
             });
+            enable(interrupt, handler.priority());
             return;
         }
 
