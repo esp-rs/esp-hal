@@ -73,7 +73,7 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
         let field_ident = field.ident.as_ref().unwrap();
         let field_type = &field.ty;
 
-        let function_ident = format_ident!("with_{}", field_ident);
+        let function_ident = format_ident!("{}", format!("with_{field_ident}").replace("__", "_"));
 
         let maybe_path_type = extract_type_path(field_type)
             .and_then(|path| extract_option_segment(path))
@@ -110,7 +110,7 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
             });
 
             if maybe_path_type.is_some() {
-                let function_ident = format_ident!("with_{}_none", field_ident);
+                let function_ident = format_ident!("{}_none", function_ident);
                 fns.push(quote! {
                     #[doc = concat!(" Set the value of `", stringify!(#field_ident), "` to `None`.")]
                     #unstable

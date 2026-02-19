@@ -130,47 +130,87 @@ pub enum AuthenticationMethod {
     WpaEnterprise,
 }
 
+/// Supported Wi-Fi protocols for each band.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct Protocols {
+    /// Protocol for 2.4 GHz band.
+    _2_4: EnumSet<Protocol>,
+    /// Protocol for 5 GHz band.
+    #[cfg(wifi_has_5g)]
+    _5: EnumSet<Protocol>,
+}
+
+impl Default for Protocols {
+    fn default() -> Self {
+        Self {
+            _2_4: Protocol::B | Protocol::G | Protocol::N,
+            #[cfg(wifi_has_5g)]
+            _5: Protocol::AC | Protocol::A | Protocol::AX,
+        }
+    }
+}
+
+impl Protocols {
+    fn to_raw(self) -> wifi_protocols_t {
+        wifi_protocols_t {
+            ghz_2g: to_mask(self._2_4),
+            #[cfg(wifi_has_5g)]
+            ghz_5g: to_mask(self._5),
+            #[cfg(not(wifi_has_5g))]
+            ghz_5g: 0,
+        }
+    }
+}
+
 /// Supported Wi-Fi protocols.
-#[derive(Debug, Default, PartialOrd, Hash, EnumSetType)]
+///
+/// The default protocol is B/G/N for band mode 2.4G.
+/// the default protocol is AC/A/AX for band mode 5G.
+#[derive(Debug, PartialOrd, Hash, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum Protocol {
-    /// 802.11b protocol.
-    P802D11B,
+    /// 802.11b protocol
+    B,
 
-    /// 802.11b/g protocol.
-    P802D11BG,
+    /// 802.11g protocol
+    G,
 
-    // TODO this is not a working default for the 5GHz band
-    /// 802.11b/g/n protocol (default).
-    #[default]
-    P802D11BGN,
+    /// 802.11n protocol
+    N,
 
-    /// 802.11b/g/n long-range (LR) protocol.
-    P802D11BGNLR,
+    /// Low Rate protocol
+    LR,
 
-    /// 802.11 long-range (LR) protocol.
-    P802D11LR,
+    /// 802.11a protocol
+    A,
 
-    /// 802.11b/g/n/ax protocol.
-    P802D11BGNAX,
+    /// 802.11ac protocol
+    AC,
+
+    /// 802.11ax protocol
+    AX,
 }
 
 impl Protocol {
-    fn to_mask(self) -> u32 {
-        match self {
-            Protocol::P802D11B => WIFI_PROTOCOL_11B,
-            Protocol::P802D11BG => WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G,
-            Protocol::P802D11BGN => WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N,
-            Protocol::P802D11BGNLR => {
-                WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_LR
-            }
-            Protocol::P802D11LR => WIFI_PROTOCOL_LR,
-            Protocol::P802D11BGNAX => {
-                WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_11AX
-            }
-        }
+    fn to_mask(self) -> u16 {
+        let mask = match self {
+            Protocol::B => WIFI_PROTOCOL_11B,
+            Protocol::G => WIFI_PROTOCOL_11G,
+            Protocol::N => WIFI_PROTOCOL_11N,
+            Protocol::LR => WIFI_PROTOCOL_LR,
+            Protocol::A => WIFI_PROTOCOL_11A,
+            Protocol::AC => WIFI_PROTOCOL_11AC,
+            Protocol::AX => WIFI_PROTOCOL_11AX,
+        };
+        mask as _
     }
+}
+
+fn to_mask(protocols: EnumSet<Protocol>) -> u16 {
+    protocols.iter().fold(0, |acc, p| acc | p.to_mask())
 }
 
 /// Secondary Wi-Fi channels.
@@ -195,6 +235,34 @@ impl SecondaryChannel {
             1 => SecondaryChannel::Above,
             2 => SecondaryChannel::Below,
             _ => panic!("Invalid secondary channel value: {}", raw),
+        }
+    }
+}
+
+/// Wi-Fi band mode.
+///
+/// For targets supporting 5GHz Wi-Fi the default is [BandMode::Auto] otherwise [BandMode::_2_4G]
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum BandMode {
+    /// Wi-Fi band mode is 2.4 GHz only.
+    #[cfg_attr(not(wifi_has_5g), default)]
+    _2_4G,
+    /// Wi-Fi band mode is 5 GHz only.
+    _5G,
+    /// Wi-Fi band mode is 2.4 GHz + 5 GHz.
+    #[cfg_attr(wifi_has_5g, default)]
+    Auto,
+}
+
+impl BandMode {
+    fn to_raw(&self) -> u32 {
+        match self {
+            BandMode::_2_4G => wifi_band_mode_t_WIFI_BAND_MODE_2G_ONLY,
+            BandMode::_5G => wifi_band_mode_t_WIFI_BAND_MODE_5G_ONLY,
+            BandMode::Auto => wifi_band_mode_t_WIFI_BAND_MODE_AUTO,
         }
     }
 }
@@ -1345,8 +1413,32 @@ impl Interface<'_> {
     }
 }
 
+/// Supported Wi-Fi protocols for each band.
+#[derive(Debug, Clone, Copy, PartialEq, Hash, BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct Bandwidths {
+    /// Bandwidth for 2.4 GHz band.
+    _2_4: Bandwidth,
+    /// Bandwidth for 5 GHz band.
+    #[cfg(wifi_has_5g)]
+    _5: Bandwidth,
+}
+
+impl Bandwidths {
+    fn to_raw(self) -> wifi_bandwidths_t {
+        wifi_bandwidths_t {
+            ghz_2g: self._2_4.to_raw(),
+            #[cfg(wifi_has_5g)]
+            ghz_5g: self._5.to_raw(),
+            #[cfg(not(wifi_has_5g))]
+            ghz_5g: 0,
+        }
+    }
+}
+
 /// Wi-Fi bandwidth options.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[allow(
     clippy::enum_variant_names,
@@ -1364,6 +1456,29 @@ pub enum Bandwidth {
     _160MHz,
     /// 80+80 MHz bandwidth.
     _80_80MHz,
+}
+
+impl Bandwidth {
+    fn to_raw(self) -> wifi_bandwidth_t {
+        match self {
+            Bandwidth::_20MHz => wifi_bandwidth_t_WIFI_BW_HT20,
+            Bandwidth::_40MHz => wifi_bandwidth_t_WIFI_BW_HT40,
+            Bandwidth::_80MHz => wifi_bandwidth_t_WIFI_BW80,
+            Bandwidth::_160MHz => wifi_bandwidth_t_WIFI_BW160,
+            Bandwidth::_80_80MHz => wifi_bandwidth_t_WIFI_BW80_BW80,
+        }
+    }
+
+    fn from_raw(raw: wifi_bandwidth_t) -> Self {
+        match raw {
+            raw if raw == wifi_bandwidth_t_WIFI_BW_HT20 => Bandwidth::_20MHz,
+            raw if raw == wifi_bandwidth_t_WIFI_BW_HT40 => Bandwidth::_40MHz,
+            raw if raw == wifi_bandwidth_t_WIFI_BW80 => Bandwidth::_80MHz,
+            raw if raw == wifi_bandwidth_t_WIFI_BW160 => Bandwidth::_160MHz,
+            raw if raw == wifi_bandwidth_t_WIFI_BW80_BW80 => Bandwidth::_80_80MHz,
+            _ => Bandwidth::_20MHz,
+        }
+    }
 }
 
 /// The radio metadata header of the received packet, which is the common header
@@ -2301,8 +2416,7 @@ impl WifiController<'_> {
     #[procmacros::doc_replace]
     /// Set the Wi-Fi protocol.
     ///
-    /// This will set the wifi protocol to the desired protocol, the default for
-    /// this is: `WIFI_PROTOCOL_11B|WIFI_PROTOCOL_11G|WIFI_PROTOCOL_11N`
+    /// This will set the desired protocols.
     ///
     /// # Arguments:
     ///
@@ -2313,7 +2427,7 @@ impl WifiController<'_> {
     /// ```rust,no_run
     /// # {before_snippet}
     /// # use esp_radio::wifi::{ap::AccessPointConfig, Config};
-    /// use esp_radio::wifi::Protocol;
+    /// use esp_radio::wifi::Protocols;
     ///
     /// let (mut wifi_controller, _interfaces) =
     ///     esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
@@ -2322,61 +2436,32 @@ impl WifiController<'_> {
     ///     AccessPointConfig::default().with_ssid("esp-radio"),
     /// ))?;
     ///
-    /// wifi_controller.set_protocol(Protocol::P802D11BGNLR.into());
+    /// wifi_controller.set_protocols(Protocols::default());
     /// # {after_snippet}
     /// ```
     ///
     /// # Note
     ///
     /// Calling this function before `set_config` will return an error.
-    pub fn set_protocol(&mut self, protocols: EnumSet<Protocol>) -> Result<(), WifiError> {
-        let protocol = protocols
-            .into_iter()
-            .map(|v| match v {
-                Protocol::P802D11B => WIFI_PROTOCOL_11B,
-                Protocol::P802D11BG => WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G,
-                Protocol::P802D11BGN => WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N,
-                Protocol::P802D11BGNLR => {
-                    WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_LR
-                }
-                Protocol::P802D11LR => WIFI_PROTOCOL_LR,
-                Protocol::P802D11BGNAX => {
-                    WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_11AX
-                }
-            })
-            .fold(0, |combined, protocol| combined | protocol) as u8;
-
+    #[instability::unstable]
+    pub fn set_protocols(&mut self, protocols: Protocols) -> Result<(), WifiError> {
         let mode = self.mode()?;
         if mode.is_station() {
             esp_wifi_result!(unsafe {
-                esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_STA, protocol)
+                esp_wifi_set_protocols(wifi_interface_t_WIFI_IF_STA, &mut protocols.to_raw())
             })?;
         }
         if mode.is_access_point() {
             esp_wifi_result!(unsafe {
-                esp_wifi_set_protocol(wifi_interface_t_WIFI_IF_AP, protocol)
+                esp_wifi_set_protocols(wifi_interface_t_WIFI_IF_AP, &mut protocols.to_raw())
             })?;
         }
 
         Ok(())
     }
 
-    fn apply_protocols(
-        iface: wifi_interface_t,
-        protocols: &EnumSet<Protocol>,
-    ) -> Result<(), WifiError> {
-        let mask = protocols.iter().fold(0, |acc, p| acc | p.to_mask());
-        debug!("Setting protocols with mask {:b}", mask);
-        let mut band_mode = 0u32;
-        esp_wifi_result!(unsafe { esp_wifi_get_band_mode(&mut band_mode) })?;
-
-        if band_mode != wifi_band_mode_t_WIFI_BAND_MODE_AUTO {
-            // setting the protocol with WIFI_BAND_MODE_AUTO will error
-            esp_wifi_result!(unsafe { esp_wifi_set_protocol(iface, mask as u8) })?;
-        } else {
-            warn!("NOT applying protocols with WIFI_BAND_MODE_AUTO");
-        }
-
+    fn apply_protocols(iface: wifi_interface_t, protocols: &Protocols) -> Result<(), WifiError> {
+        esp_wifi_result!(unsafe { esp_wifi_set_protocols(iface, &mut protocols.to_raw()) })?;
         Ok(())
     }
 
@@ -2564,14 +2649,35 @@ impl WifiController<'_> {
             }
         }
 
-        // WiFi needs to be started in order to change the band mode
-        // TODO support 5GHz band via config
-        // esp_wifi_result!(unsafe {
-        //     esp_wifi_set_band_mode(wifi_band_mode_t_WIFI_BAND_MODE_2G_ONLY)
-        // })?;
-        // esp_wifi_result!(unsafe { esp_wifi_set_band(wifi_band_t_WIFI_BAND_2G) })?;
-
         Ok(())
+    }
+
+    /// Set WiFi band mode.
+    ///
+    /// When the WiFi band mode is set to [BandMode::_2_4G], it operates exclusively on the 2.4GHz
+    /// channels.
+    ///
+    /// When the WiFi band mode is set to [BandMode::_5G], it operates exclusively on the 5GHz
+    /// channels.
+    ///
+    /// When the WiFi band mode is set to [BandMode::Auto], it can operate on both the 2.4GHz and
+    /// 5GHz channels.
+    ///
+    /// WiFi band mode can be set to [BandMode::_5G] only or [BandMode::Auto] on supported targets.
+    ///
+    /// When a WiFi band mode change triggers a band change, if no channel is set for the current
+    /// band, a default channel will be assigned: channel 1 for 2.4G band and channel 36 for 5G
+    /// band.
+    ///
+    /// The controller needs to be configured and started before setting the band mode.
+    #[instability::unstable]
+    pub fn set_band_mode(&mut self, band_mode: BandMode) -> Result<(), WifiError> {
+        // Wi-Fi needs to be started in order to set the band mode
+        if !self.is_started() {
+            return Err(WifiError::NotStarted);
+        }
+
+        esp_wifi_result!(unsafe { esp_wifi_set_band_mode(band_mode.to_raw()) })
     }
 
     /// Sets the Wi-Fi channel bandwidth for the currently active interface(s).
@@ -2580,16 +2686,16 @@ impl WifiController<'_> {
     /// Station interface. If operating in access point mode, it is applied to the Access Point
     /// interface. In Station+Access Point mode, the bandwidth is set for both interfaces.
     #[instability::unstable]
-    pub fn set_bandwidth(&mut self, bandwidth: Bandwidth) -> Result<(), WifiError> {
+    pub fn set_bandwidths(&mut self, bandwidths: Bandwidths) -> Result<(), WifiError> {
         let mode = self.mode()?;
         if mode.is_station() {
             esp_wifi_result!(unsafe {
-                esp_wifi_set_bandwidth(wifi_interface_t_WIFI_IF_STA, bandwidth as u32)
+                esp_wifi_set_bandwidths(wifi_interface_t_WIFI_IF_STA, &mut bandwidths.to_raw())
             })?;
         }
         if mode.is_access_point() {
             esp_wifi_result!(unsafe {
-                esp_wifi_set_bandwidth(wifi_interface_t_WIFI_IF_AP, bandwidth as u32)
+                esp_wifi_set_bandwidths(wifi_interface_t_WIFI_IF_AP, &mut bandwidths.to_raw())
             })?;
         }
 
@@ -2603,29 +2709,29 @@ impl WifiController<'_> {
     /// of the Access Point interface is returned. In Station+Access Point mode, the bandwidth of
     /// the Access Point interface is returned.
     #[instability::unstable]
-    pub fn bandwidth(&self) -> Result<Bandwidth, WifiError> {
-        let mut bw = 0;
+    pub fn bandwidths(&self) -> Result<Bandwidths, WifiError> {
+        let mut bw = wifi_bandwidths_t {
+            ghz_2g: 0,
+            ghz_5g: 0,
+        };
 
         let mode = self.mode()?;
         if mode.is_station() {
             esp_wifi_result!(unsafe {
-                esp_wifi_get_bandwidth(wifi_interface_t_WIFI_IF_STA, &mut bw)
+                esp_wifi_get_bandwidths(wifi_interface_t_WIFI_IF_STA, &mut bw)
             })?;
         }
         if mode.is_access_point() {
             esp_wifi_result!(unsafe {
-                esp_wifi_get_bandwidth(wifi_interface_t_WIFI_IF_AP, &mut bw)
+                esp_wifi_get_bandwidths(wifi_interface_t_WIFI_IF_AP, &mut bw)
             })?;
         }
 
-        match bw {
-            1 => Ok(Bandwidth::_20MHz),
-            2 => Ok(Bandwidth::_40MHz),
-            3 => Ok(Bandwidth::_80MHz),
-            4 => Ok(Bandwidth::_160MHz),
-            5 => Ok(Bandwidth::_80_80MHz),
-            _ => panic!("Invalid bandwidth value: {}", bw),
-        }
+        Ok(Bandwidths {
+            _2_4: Bandwidth::from_raw(bw.ghz_2g),
+            #[cfg(wifi_has_5g)]
+            _5: Bandwidth::from_raw(bw.ghz_5g),
+        })
     }
 
     /// Returns the current Wi-Fi channel configuration.
@@ -2640,6 +2746,10 @@ impl WifiController<'_> {
     }
 
     /// Sets the primary and secondary Wi-Fi channel.
+    ///
+    /// When operating in 5 GHz band, the second channel is automatically determined by the primary
+    /// channel according to the 802.11 standard. Any manually configured second channel will be
+    /// ignored.
     #[instability::unstable]
     pub fn set_channel(
         &mut self,
