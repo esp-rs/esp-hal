@@ -580,7 +580,7 @@ impl Alarm<'_> {
                 if SYSTIMER::regs().int_raw().read().target(CH).bit_is_set() {
                     let handler = unsafe { HANDLERS[CH as usize] };
                     if let Some(handler) = handler {
-                        (handler.aligned_ptr())();
+                        (handler.callback())();
                     }
                 }
             }

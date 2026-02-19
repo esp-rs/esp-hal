@@ -686,7 +686,7 @@ impl<'d> Io<'d> {
                 crate::interrupt::IsrCallback::new(user_gpio_interrupt_handler),
             )
         };
-        USER_INTERRUPT_HANDLER.store(handler.handler().aligned_ptr());
+        USER_INTERRUPT_HANDLER.store(handler.handler().callback());
     }
 }
 

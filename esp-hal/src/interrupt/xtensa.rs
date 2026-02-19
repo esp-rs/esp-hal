@@ -406,18 +406,22 @@ mod vectored {
         let ptr =
             unsafe { &pac::__INTERRUPTS[interrupt as usize]._handler as *const _ as *mut usize };
         unsafe {
-            ptr.write_volatile(handler.raw_value());
+            ptr.write_volatile(handler.address());
         }
     }
 
     /// Returns the currently bound interrupt handler.
     pub fn bound_handler(interrupt: Interrupt) -> Option<IsrCallback> {
         unsafe {
-            let addr = pac::__INTERRUPTS[interrupt as usize]._handler as usize;
-            if addr == 0 {
+            let func = pac::__INTERRUPTS[interrupt as usize]._handler;
+            if func as usize == 0 {
                 return None;
             }
-            Some(IsrCallback::from_raw(addr))
+
+            Some(IsrCallback::new(core::mem::transmute::<
+                unsafe extern "C" fn(),
+                extern "C" fn(),
+            >(func)))
         }
     }
 
