@@ -263,3 +263,63 @@ The CCA parameter is a boolean:
 ```
 
 In most cases, you'll want to use `false` to maintain the previous behavior (transmit without CCA). Use `true` if you need the radio to check for channel availability before transmitting, which can help avoid collisions in busy environments.
+
+## Wi-Fi Protocol API Refactored for 5GHz Support
+
+The Wi-Fi protocol API has been refactored to properly support 5GHz bands. The `Protocol` enum and related types have been restructured.
+
+### `Protocol` Enum Variants Renamed
+
+The `Protocol` enum variants have been simplified:
+
+```diff
+- Protocol::P802D11B
+- Protocol::P802D11BG
+- Protocol::P802D11BGN
+- Protocol::P802D11BGNLR
+- Protocol::P802D11LR
+- Protocol::P802D11BGNAX
++ Protocol::B
++ Protocol::G
++ Protocol::N
++ Protocol::LR
++ Protocol::A
++ Protocol::AC
++ Protocol::AX
+```
+
+### `WifiController::set_protocol` Renamed to `set_protocols`
+
+The `set_protocol` method has been renamed to `set_protocols` and now takes a `Protocols` struct:
+
+```diff
+- wifi_controller.set_protocol(Protocol::P802D11BGN.into())?;
++ wifi_controller.set_protocols(Protocols::default())?;
+```
+
+### `WifiController::set_bandwidth` Renamed to `set_bandwidths`
+
+```diff
+- use esp_radio::wifi::Bandwidth;
++ use esp_radio::wifi::{Bandwidths, Bandwidth};
+
+- controller.set_bandwidth(Bandwidth::_80MHz)?;
++ let bandwidths = Bandwidths::default()
++     .with_2_4(Bandwidth::_20MHz)
++     .with_5(Bandwidth::_80MHz);
++ controller.set_bandwidths(bandwidths)?;
+```
+
+### Configuration Structs Updated
+
+The `protocols` field in `AccessPointConfig`, `StationConfig`, and `EapStationConfig` now uses `Protocols` instead of `EnumSet<Protocol>`:
+
+```diff
+- use enumset::EnumSet;
+  use esp_radio::wifi::{ap::AccessPointConfig, Protocols};
+
+  let config = AccessPointConfig::default()
+      .with_ssid("my-ssid")
+-     .with_protocols(Protocol::P802D11BGN.into());
++     .with_protocols(Protocols::default());
+```
