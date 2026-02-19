@@ -1262,13 +1262,17 @@ enum InterfaceType {
 
 impl InterfaceType {
     fn mac_address(&self) -> [u8; 6] {
-        use esp_hal::efuse::{Efuse, MacAddressType};
-        match self {
-            InterfaceType::Station => Efuse::radio_mac_address(MacAddressType::Station).into(),
+        use esp_hal::efuse::{Efuse, InterfaceMacAddress};
+        let mac = match self {
+            InterfaceType::Station => Efuse::interface_mac_address(InterfaceMacAddress::Station),
             InterfaceType::AccessPoint => {
-                Efuse::radio_mac_address(MacAddressType::AccessPoint).into()
+                Efuse::interface_mac_address(InterfaceMacAddress::AccessPoint)
             }
-        }
+        };
+
+        let mut out = [0u8; 6];
+        out.copy_from_slice(mac.as_bytes());
+        out
     }
 
     fn data_queue_rx(&self) -> &'static NonReentrantMutex<VecDeque<PacketBuffer>> {

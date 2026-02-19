@@ -26,16 +26,7 @@
 //!
 //! let mac_address = Efuse::read_base_mac_address();
 //!
-//! println!(
-//!     "MAC: {:#X}:{:#X}:{:#X}:{:#X}:{:#X}:{:#X}",
-//!     mac_address[0],
-//!     mac_address[1],
-//!     mac_address[2],
-//!     mac_address[3],
-//!     mac_address[4],
-//!     mac_address[5]
-//! );
-//!
+//! println!("MAC: {mac}");
 //! println!("MAC address {:02x?}", Efuse::mac_address());
 //! println!("Flash Encryption {:?}", Efuse::flash_encryption());
 //!
@@ -111,7 +102,7 @@ impl Efuse {
         mac_addr[4] = mac0[1];
         mac_addr[5] = mac0[0];
 
-        MacAddress::new(mac_addr)
+        MacAddress::new_eui48_internal(mac_addr)
     }
 
     /// Read field value in a little-endian order
@@ -232,17 +223,17 @@ impl Efuse {
     }
 
     /// Get the MAC address for the desired radio interface, derived from the base MAC.
-    pub fn radio_mac_address(kind: MacAddressType) -> MacAddress {
+    pub fn interface_mac_address(kind: InterfaceMacAddress) -> MacAddress {
         let mut mac: MacAddress = Self::mac_address();
 
         match kind {
-            MacAddressType::Station => {
+            InterfaceMacAddress::Station => {
                 // base MAC
             }
-            MacAddressType::AccessPoint => {
+            InterfaceMacAddress::AccessPoint => {
                 derive_local_mac(&mut mac);
             }
-            MacAddressType::Bluetooth => {
+            InterfaceMacAddress::Bluetooth => {
                 derive_local_mac(&mut mac);
 
                 mac.as_bytes_mut()[5] = mac.as_bytes_mut()[5].wrapping_add(1);
@@ -271,7 +262,7 @@ impl Efuse {
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 static MAC_OVERRIDE_STATE: AtomicU8 = AtomicU8::new(0);
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
-static mut MAC_OVERRIDE: MacAddress = MacAddress::new([0; 6]);
+static mut MAC_OVERRIDE: MacAddress = MacAddress::new_eui48_internal([0; 6]);
 
 /// Error indicating issues with setting the MAC address.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
@@ -301,7 +292,7 @@ fn derive_local_mac(mac: &mut MacAddress) {
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub enum MacAddressType {
+pub enum InterfaceMacAddress {
     /// Wi-Fi station (Sta).
     Station,
     /// Wi-Fi access point (SoftAP).
@@ -310,36 +301,40 @@ pub enum MacAddressType {
     Bluetooth,
 }
 
-/// Hardware (MAC) address stored as 6 bytes.
+/// Hardware (MAC) address.
+///
+/// Currently represents an 6-byte address, but the public API is
+/// slice-based to allow future extension.
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct MacAddress([u8; 6]);
 
 impl MacAddress {
-    /// Creates a new MAC address from raw bytes.
-    pub const fn new(bytes: [u8; 6]) -> Self {
+    /// Creates a MAC address from a byte slice.
+    pub fn from_slice(bytes: &[u8]) -> Option<Self> {
+        // temporary - will be changed when we support 8-byte MAC
+        if bytes.len() == 6 {
+            let mut out = [0u8; 6];
+            out.copy_from_slice(bytes);
+            Some(Self(out))
+        } else {
+            None
+        }
+    }
+
+    // Internal constructor for statics.
+    pub(crate) const fn new_eui48_internal(bytes: [u8; 6]) -> Self {
         Self(bytes)
     }
 
-    /// Returns a reference to the address bytes.
-    pub fn as_bytes(&self) -> &[u8; 6] {
+    /// Returns the address bytes.
+    pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
 
-    /// Returns a mutable reference to the address bytes.
-    pub fn as_bytes_mut(&mut self) -> &mut [u8; 6] {
+    /// Returns the address bytes mutably.
+    pub fn as_bytes_mut(&mut self) -> &mut [u8] {
         &mut self.0
-    }
-}
-
-impl From<[u8; 6]> for MacAddress {
-    fn from(bytes: [u8; 6]) -> Self {
-        Self(bytes)
-    }
-}
-
-impl From<MacAddress> for [u8; 6] {
-    fn from(addr: MacAddress) -> Self {
-        addr.0
     }
 }
 

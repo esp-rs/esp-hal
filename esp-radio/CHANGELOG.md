@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MAC addresses now should be obtained from `esp_hal::efuse::radio_mac_address(MacForRadio::)`. (#5002)
 - MAC addresses now should be obtained from `esp_hal::efuse::Efuse::radio_mac_address(MacForRadio::...)`. (#5002)
 - MAC addresses now should be obtained from `esp_hal::efuse::Efuse::radio_mac_address(MacAddressType::...)`. (#5002)
+- MAC addresses now should be obtained from `esp_hal::efuse::Efuse::interface_mac_address(InterfaceMacAddress::...)`. (#5002)
 
 ### Fixed
 
