@@ -3323,7 +3323,6 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((DMA(unstable)));
         _for_each_inner_peripheral!((DS(unstable)));
         _for_each_inner_peripheral!((ECC(unstable)));
-        _for_each_inner_peripheral!((EFUSE(unstable)));
         _for_each_inner_peripheral!((GPIO(unstable)));
         _for_each_inner_peripheral!((GPIO_SD(unstable)));
         _for_each_inner_peripheral!((HMAC(unstable)));
@@ -3588,11 +3587,11 @@ macro_rules! for_each_peripheral {
         (GPIO11), (GPIO12), (GPIO13), (GPIO14), (GPIO22), (GPIO23), (GPIO24), (GPIO25),
         (GPIO26), (GPIO27), (AES(unstable)), (APB_SARADC(unstable)),
         (ASSIST_DEBUG(unstable)), (DMA(unstable)), (DS(unstable)), (ECC(unstable)),
-        (EFUSE(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)), (HMAC(unstable)),
-        (HP_APM(unstable)), (HP_SYS(unstable)), (I2C_ANA_MST(unstable)), (I2C0), (I2C1),
-        (I2S0(unstable)), (IEEE802154(unstable)), (INTERRUPT_CORE0(unstable)),
-        (INTPRI(unstable)), (IO_MUX(unstable)), (LEDC(unstable)), (LPWR(unstable)),
-        (LP_ANA(unstable)), (LP_AON(unstable)), (LP_APM(unstable)), (LP_APM0(unstable)),
+        (GPIO(unstable)), (GPIO_SD(unstable)), (HMAC(unstable)), (HP_APM(unstable)),
+        (HP_SYS(unstable)), (I2C_ANA_MST(unstable)), (I2C0), (I2C1), (I2S0(unstable)),
+        (IEEE802154(unstable)), (INTERRUPT_CORE0(unstable)), (INTPRI(unstable)),
+        (IO_MUX(unstable)), (LEDC(unstable)), (LPWR(unstable)), (LP_ANA(unstable)),
+        (LP_AON(unstable)), (LP_APM(unstable)), (LP_APM0(unstable)),
         (LP_CLKRST(unstable)), (LP_PERI(unstable)), (LP_TIMER(unstable)),
         (LP_WDT(unstable)), (MCPWM0(unstable)), (MEM_MONITOR(unstable)),
         (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)), (OTP_DEBUG(unstable)),

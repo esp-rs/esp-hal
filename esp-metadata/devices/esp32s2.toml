@@ -17,7 +17,7 @@ peripherals = [
     { name = "APB_SARADC" },
     { name = "DEDICATED_GPIO" },
     { name = "DS" },
-    { name = "EFUSE" },
+    { name = "EFUSE", hidden = true },
     { name = "EXTMEM" },
     { name = "FE" },
     { name = "FE2" },

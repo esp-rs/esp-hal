@@ -25,7 +25,7 @@ peripherals = [
     { name = "DS" },
     { name = "ECC" },
     { name = "ECDSA" },
-    { name = "EFUSE" },
+    { name = "EFUSE", hidden = true },
     { name = "ETM", pac = "SOC_ETM" },
     { name = "GPIO" },
     { name = "GPIO_SD", pac = "GPIO_EXT" },

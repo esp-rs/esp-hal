@@ -4159,7 +4159,6 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((DMA(unstable)));
         _for_each_inner_peripheral!((DS(unstable)));
         _for_each_inner_peripheral!((ECC(unstable)));
-        _for_each_inner_peripheral!((EFUSE(unstable)));
         _for_each_inner_peripheral!((EXTMEM(unstable)));
         _for_each_inner_peripheral!((GPIO(unstable)));
         _for_each_inner_peripheral!((GPIO_SD(unstable)));
@@ -4487,15 +4486,15 @@ macro_rules! for_each_peripheral {
         (GPIO20), (GPIO21), (GPIO22), (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27),
         (GPIO28), (GPIO29), (GPIO30), (AES(unstable)), (APB_SARADC(unstable)),
         (ASSIST_DEBUG(unstable)), (ATOMIC(unstable)), (DMA(unstable)), (DS(unstable)),
-        (ECC(unstable)), (EFUSE(unstable)), (EXTMEM(unstable)), (GPIO(unstable)),
-        (GPIO_SD(unstable)), (HINF(unstable)), (HMAC(unstable)), (HP_APM(unstable)),
-        (HP_SYS(unstable)), (I2C_ANA_MST(unstable)), (I2C0), (I2S0(unstable)),
-        (IEEE802154(unstable)), (INTERRUPT_CORE0(unstable)), (INTPRI(unstable)),
-        (IO_MUX(unstable)), (LEDC(unstable)), (LP_ANA(unstable)), (LP_AON(unstable)),
-        (LP_APM(unstable)), (LP_APM0(unstable)), (LP_CLKRST(unstable)),
-        (LP_I2C0(unstable)), (LP_I2C_ANA_MST(unstable)), (LP_IO(unstable)),
-        (LP_PERI(unstable)), (LP_TEE(unstable)), (LP_TIMER(unstable)),
-        (LP_UART(unstable)), (LP_WDT(unstable)), (LPWR(unstable)), (MCPWM0(unstable)),
+        (ECC(unstable)), (EXTMEM(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)),
+        (HINF(unstable)), (HMAC(unstable)), (HP_APM(unstable)), (HP_SYS(unstable)),
+        (I2C_ANA_MST(unstable)), (I2C0), (I2S0(unstable)), (IEEE802154(unstable)),
+        (INTERRUPT_CORE0(unstable)), (INTPRI(unstable)), (IO_MUX(unstable)),
+        (LEDC(unstable)), (LP_ANA(unstable)), (LP_AON(unstable)), (LP_APM(unstable)),
+        (LP_APM0(unstable)), (LP_CLKRST(unstable)), (LP_I2C0(unstable)),
+        (LP_I2C_ANA_MST(unstable)), (LP_IO(unstable)), (LP_PERI(unstable)),
+        (LP_TEE(unstable)), (LP_TIMER(unstable)), (LP_UART(unstable)),
+        (LP_WDT(unstable)), (LPWR(unstable)), (MCPWM0(unstable)),
         (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)),
         (OTP_DEBUG(unstable)), (PARL_IO(unstable)), (PAU(unstable)), (PCNT(unstable)),
         (PCR(unstable)), (PLIC_MX(unstable)), (PMU(unstable)), (RMT(unstable)),

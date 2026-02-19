@@ -3381,7 +3381,6 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((BB(unstable)));
         _for_each_inner_peripheral!((DMA(unstable)));
         _for_each_inner_peripheral!((DS(unstable)));
-        _for_each_inner_peripheral!((EFUSE(unstable)));
         _for_each_inner_peripheral!((EXTMEM(unstable)));
         _for_each_inner_peripheral!((FE(unstable)));
         _for_each_inner_peripheral!((FE2(unstable)));
@@ -3601,15 +3600,14 @@ macro_rules! for_each_peripheral {
         (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19),
         (GPIO20), (GPIO21), (AES(unstable)), (APB_CTRL(unstable)),
         (APB_SARADC(unstable)), (ASSIST_DEBUG(unstable)), (BB(unstable)),
-        (DMA(unstable)), (DS(unstable)), (EFUSE(unstable)), (EXTMEM(unstable)),
-        (FE(unstable)), (FE2(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)),
-        (HMAC(unstable)), (I2C_ANA_MST(unstable)), (I2C0), (I2S0(unstable)),
-        (INTERRUPT_CORE0(unstable)), (IO_MUX(unstable)), (LEDC(unstable)),
-        (NRX(unstable)), (RMT(unstable)), (RNG(unstable)), (RSA(unstable)),
-        (LPWR(unstable)), (SENSITIVE(unstable)), (SHA(unstable)), (SPI0(unstable)),
-        (SPI1(unstable)), (SPI2), (SYSTEM(unstable)), (SYSTIMER(unstable)),
-        (TIMG0(unstable)), (TIMG1(unstable)), (TWAI0(unstable)), (UART0), (UART1),
-        (UHCI0(unstable)), (USB_DEVICE(unstable)), (XTS_AES(unstable)),
+        (DMA(unstable)), (DS(unstable)), (EXTMEM(unstable)), (FE(unstable)),
+        (FE2(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)), (HMAC(unstable)),
+        (I2C_ANA_MST(unstable)), (I2C0), (I2S0(unstable)), (INTERRUPT_CORE0(unstable)),
+        (IO_MUX(unstable)), (LEDC(unstable)), (NRX(unstable)), (RMT(unstable)),
+        (RNG(unstable)), (RSA(unstable)), (LPWR(unstable)), (SENSITIVE(unstable)),
+        (SHA(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SYSTEM(unstable)),
+        (SYSTIMER(unstable)), (TIMG0(unstable)), (TIMG1(unstable)), (TWAI0(unstable)),
+        (UART0), (UART1), (UHCI0(unstable)), (USB_DEVICE(unstable)), (XTS_AES(unstable)),
         (DMA_CH0(unstable)), (DMA_CH1(unstable)), (DMA_CH2(unstable)), (ADC1(unstable)),
         (ADC2(unstable)), (BT(unstable)), (FLASH(unstable)), (GPIO_DEDICATED(unstable)),
         (SW_INTERRUPT(unstable)), (TSENS(unstable)), (WIFI(unstable))));

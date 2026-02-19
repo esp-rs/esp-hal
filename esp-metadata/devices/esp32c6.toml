@@ -20,7 +20,7 @@ peripherals = [
     { name = "DMA" },
     { name = "DS" },
     { name = "ECC" },
-    { name = "EFUSE" },
+    { name = "EFUSE", hidden = true },
     { name = "EXTMEM" },
     { name = "GPIO" },
     { name = "GPIO_SD" },

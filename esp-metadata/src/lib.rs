@@ -284,6 +284,9 @@ pub struct PeripheralDef {
     /// If the peripheral is DMA eligible, this defines the peripheral selector value.
     #[serde(default)]
     dma_peripheral: Option<u32>,
+    /// Set to true to hide a peripheral from the Peripherals struct.
+    #[serde(default)]
+    hidden: bool,
 }
 
 impl PeripheralDef {
@@ -686,10 +689,14 @@ This pin may be available with certain limitations. Check your hardware to make 
                 .any(|p| peri.name.eq_ignore_ascii_case(p))
             {
                 all_peripherals.push(quote! { @peri_type #tokens });
-                singleton_peripherals.push(quote! { #hal });
+                if !peri.hidden {
+                    singleton_peripherals.push(quote! { #hal });
+                }
             } else {
                 all_peripherals.push(quote! { @peri_type #tokens (unstable) });
-                singleton_peripherals.push(quote! { #hal (unstable) });
+                if !peri.hidden {
+                    singleton_peripherals.push(quote! { #hal (unstable) });
+                }
             }
 
             if let Some(dma_peripheral) = peri.dma_peripheral {
