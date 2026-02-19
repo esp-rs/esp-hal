@@ -29,7 +29,7 @@ peripherals = [
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" } },
     { name = "I2C1", interrupts = { peri = "I2C_EXT1" } },
     { name = "I2S0", interrupts = { peri = "I2S0" }, dma_peripheral = 3 },
-    { name = "IEEE802154" },
+    { name = "IEEE802154", interrupts = { mac = "ZB_MAC" } },
     { name = "INTERRUPT_CORE0" },
     { name = "INTPRI" },
     { name = "IO_MUX" },
@@ -79,7 +79,7 @@ peripherals = [
     { name = "DMA_CH2", virtual = true },
 
     { name = "ADC1", virtual = true },
-    { name = "BT", virtual = true },
+    { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_BLE_TIMER" } },
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },

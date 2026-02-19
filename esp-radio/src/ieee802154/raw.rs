@@ -115,7 +115,7 @@ pub(crate) fn esp_ieee802154_enable(
     let phy_init_guard = radio.enable_phy();
 
     esp_btbb_enable();
-    ieee802154_mac_init();
+    ieee802154_mac_init(radio);
 
     info!("date={:x}", mac_date());
     (phy_clock_guard, phy_init_guard)
@@ -125,7 +125,7 @@ fn esp_btbb_enable() {
     unsafe { bt_bb_v2_init_cmplx(PHY_ENABLE_VERSION_PRINT) };
 }
 
-fn ieee802154_mac_init() {
+fn ieee802154_mac_init(radio: IEEE802154<'_>) {
     #[cfg(feature = "esp32c6")]
     unsafe {
         unsafe extern "C" {
@@ -164,7 +164,7 @@ fn ieee802154_mac_init() {
     // memset(s_rx_frame, 0, sizeof(s_rx_frame));
     // s_ieee802154_state = IEEE802154_STATE_IDLE;
 
-    esp_hal::interrupt::bind_handler(esp_hal::peripherals::Interrupt::ZB_MAC, zb_mac_handler);
+    radio.bind_mac_interrupt(zb_mac_handler);
 }
 
 fn ieee802154_set_txrx_pti(txrx_scene: Ieee802154TxRxScene) {

@@ -1,25 +1,19 @@
-use crate::hal::peripherals::{INTERRUPT_CORE0, Interrupt};
+use crate::hal::peripherals;
 #[cfg(any(feature = "wifi", feature = "ble"))]
-#[allow(unused_imports)]
-use crate::{hal::interrupt, sys};
+use crate::sys;
 
 pub(crate) fn setup_radio_isr() {
-    // make sure to disable WIFI_BB/MODEM_PERI_TIMEOUT by mapping it to CPU
-    // interrupt 31 which is masked by default for some reason for this
-    // interrupt, mapping it to 0 doesn't deactivate it
-    INTERRUPT_CORE0::regs()
-        .core_0_intr_map(Interrupt::WIFI_BB as usize)
-        .write(|w| unsafe { w.bits(31) });
-    // INTERRUPT_CORE0::regs()
-    //     .core_0_intr_map(Interrupt::MODEM_PERI_TIMEOUT as usize)
-    //     .write(|w| unsafe { w.bits(31) });
+    unsafe {
+        peripherals::WIFI::steal().disable_bb_interrupt();
+        // peripherals::WIFI::steal().disable_modem_lp_timer_interrupt();
+    }
 }
 
 pub(crate) fn shutdown_radio_isr() {
     #[cfg(feature = "ble")]
-    {
-        interrupt::disable(crate::hal::system::Cpu::ProCpu, Interrupt::LP_TIMER);
-        interrupt::disable(crate::hal::system::Cpu::ProCpu, Interrupt::BT_MAC);
+    unsafe {
+        peripherals::BT::steal().disable_lp_timer_interrupt();
+        peripherals::BT::steal().disable_mac_interrupt();
     }
 }
 

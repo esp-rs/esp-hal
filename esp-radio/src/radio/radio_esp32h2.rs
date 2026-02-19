@@ -1,8 +1,5 @@
 #[cfg(feature = "ble")]
-use crate::{
-    hal::{interrupt, peripherals::Interrupt},
-    sys,
-};
+use crate::{hal::peripherals, sys};
 
 pub(crate) fn setup_radio_isr() {
     // no-op
@@ -10,9 +7,9 @@ pub(crate) fn setup_radio_isr() {
 
 pub(crate) fn shutdown_radio_isr() {
     #[cfg(feature = "ble")]
-    {
-        interrupt::disable(crate::hal::system::Cpu::ProCpu, Interrupt::LP_BLE_TIMER);
-        interrupt::disable(crate::hal::system::Cpu::ProCpu, Interrupt::BT_MAC);
+    unsafe {
+        peripherals::BT::steal().disable_lp_timer_interrupt();
+        peripherals::BT::steal().disable_mac_interrupt();
     }
 }
 
