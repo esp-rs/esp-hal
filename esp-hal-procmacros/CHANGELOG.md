@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `handler` macro no longer generates code to check the Priority (#4996)
 
 ### Fixed
 - Fixed the logic for determining which sections should be loaded in `load_lp_code!` macro (#4612)
