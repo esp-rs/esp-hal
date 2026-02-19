@@ -113,6 +113,16 @@ pub(crate) fn bind_default_interrupt_handler() {
     }
 
     interrupt::bind_handler(Interrupt::GPIO, default_gpio_interrupt_handler);
+
+    // On ESP32, there are separate interrupt status registers for each core, we need to enable the
+    // interrupt handler on each core otherwise GPIOs listening on the App CPU will not receive
+    // interrupts.
+    #[cfg(esp32)]
+    crate::interrupt::enable_on_cpu(
+        crate::system::Cpu::AppCpu,
+        Interrupt::GPIO,
+        Priority::Priority1,
+    );
 }
 
 cfg_if::cfg_if! {
