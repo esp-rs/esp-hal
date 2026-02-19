@@ -1,6 +1,5 @@
 //! Interrupt handling
 
-use procmacros::ram;
 use xtensa_lx::interrupt;
 #[cfg(esp32)]
 pub(crate) use xtensa_lx::interrupt::free;
@@ -341,6 +340,7 @@ pub(crate) unsafe fn init_vectoring() {
 
 #[cfg(feature = "rt")]
 pub(crate) mod rt {
+    use procmacros::ram;
     use xtensa_lx_rt::interrupt::CpuInterruptLevel;
 
     use super::*;

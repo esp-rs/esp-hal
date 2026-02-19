@@ -139,11 +139,13 @@ cfg_if::cfg_if! {
 }
 
 /// Configures the given peripheral interrupt to trigger the vectored handler of given priority.
-// FIXME: naming
 pub(super) fn set_interrupt_priority(interrupt: Interrupt, priority: Priority) {
-    // FIXME: set on current core only?
     for cpu in cores() {
-        crate::interrupt::enable_on_cpu(cpu, interrupt, priority);
+        // Only change priority if the interrupt is mapped to the core, otherwise we would enable
+        // the interrupt unconditionally, which we don't want to do.
+        if crate::interrupt::mapped_to(cpu, interrupt).is_some() {
+            crate::interrupt::enable_on_cpu(cpu, interrupt, priority);
+        }
     }
 }
 
