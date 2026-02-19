@@ -319,6 +319,26 @@ cfg_if::cfg_if! {
     }
 }
 
+/// Setup interrupts ready for vectoring
+///
+/// # Safety
+///
+/// This function must be called only during core startup.
+#[cfg(any(feature = "rt", all(feature = "unstable", multi_core)))]
+pub(crate) unsafe fn init_vectoring() {
+    // Enable vectored interrupts. No configuration is needed because these interrupts have
+    // fixed priority and trigger mode.
+    for cpu_int in [
+        CpuInterrupt::Interrupt10EdgePriority1,
+        CpuInterrupt::Interrupt22EdgePriority3,
+        CpuInterrupt::Interrupt1LevelPriority1,
+        CpuInterrupt::Interrupt19LevelPriority2,
+        CpuInterrupt::Interrupt23LevelPriority3,
+    ] {
+        cpu_int.enable();
+    }
+}
+
 #[cfg(feature = "rt")]
 pub(crate) mod rt {
     use xtensa_lx_rt::interrupt::CpuInterruptLevel;
@@ -358,21 +378,6 @@ pub(crate) mod rt {
 
         InterruptStatus { status: masks }
     };
-
-    // Setup interrupts ready for vectoring
-    pub(crate) unsafe fn init_vectoring() {
-        // Enable vectored interrupts. No configuration is needed because these interrupts have
-        // fixed priority and trigger mode.
-        for cpu_int in [
-            CpuInterrupt::Interrupt10EdgePriority1,
-            CpuInterrupt::Interrupt22EdgePriority3,
-            CpuInterrupt::Interrupt1LevelPriority1,
-            CpuInterrupt::Interrupt19LevelPriority2,
-            CpuInterrupt::Interrupt23LevelPriority3,
-        ] {
-            cpu_int.enable();
-        }
-    }
 
     #[unsafe(no_mangle)]
     #[ram]

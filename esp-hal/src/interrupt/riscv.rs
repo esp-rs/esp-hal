@@ -427,52 +427,57 @@ pub(crate) fn priority_to_cpu_interrupt(_interrupt: Interrupt, level: Priority) 
     PRIORITY_TO_INTERRUPT[(level as usize) - 1]
 }
 
+/// Setup interrupts ready for vectoring
+///
+/// # Safety
+///
+/// This function must be called only during core startup.
+#[cfg(any(feature = "rt", all(feature = "unstable", multi_core)))]
+pub(crate) unsafe fn init_vectoring() {
+    unsafe extern "C" {
+        static _vector_table: u32;
+        #[cfg(interrupt_controller = "clic")]
+        static _mtvt_table: u32;
+    }
+
+    unsafe {
+        let vec_table = (&raw const _vector_table).addr();
+
+        #[cfg(not(interrupt_controller = "clic"))]
+        mtvec::write({
+            let mut mtvec = mtvec::Mtvec::from_bits(0);
+            mtvec.set_trap_mode(mtvec::TrapMode::Vectored);
+            mtvec.set_address(vec_table);
+            mtvec
+        });
+        #[cfg(interrupt_controller = "clic")]
+        {
+            mtvec::write({
+                let mut mtvec = mtvec::Mtvec::from_bits(0x03); // MODE = CLIC
+                mtvec.set_address(vec_table);
+                mtvec
+            });
+
+            // set mtvt (hardware vector base)
+            let mtvt_table = (&raw const _mtvt_table).addr();
+            core::arch::asm!("csrw 0x307, {0}", in(reg) mtvt_table);
+        }
+    };
+
+    // Configure and enable vectored interrupts
+    for (int, prio) in PRIORITY_TO_INTERRUPT.iter().copied().zip(Priority::iter()) {
+        let num = int as u32;
+        cpu_int::set_kind_raw(num, InterruptKind::Level);
+        cpu_int::set_priority_raw(num, prio);
+        cpu_int::enable_cpu_interrupt_raw(num);
+    }
+}
+
 #[cfg(feature = "rt")]
 pub(crate) mod rt {
     use esp_riscv_rt::TrapFrame;
 
     use super::*;
-
-    // Setup interrupts ready for vectoring
-    pub(crate) unsafe fn init_vectoring() {
-        unsafe extern "C" {
-            static _vector_table: u32;
-            #[cfg(interrupt_controller = "clic")]
-            static _mtvt_table: u32;
-        }
-
-        unsafe {
-            let vec_table = (&raw const _vector_table).addr();
-
-            #[cfg(not(interrupt_controller = "clic"))]
-            mtvec::write({
-                let mut mtvec = mtvec::Mtvec::from_bits(0);
-                mtvec.set_trap_mode(mtvec::TrapMode::Vectored);
-                mtvec.set_address(vec_table);
-                mtvec
-            });
-            #[cfg(interrupt_controller = "clic")]
-            {
-                mtvec::write({
-                    let mut mtvec = mtvec::Mtvec::from_bits(0x03); // MODE = CLIC
-                    mtvec.set_address(vec_table);
-                    mtvec
-                });
-
-                // set mtvt (hardware vector base)
-                let mtvt_table = (&raw const _mtvt_table).addr();
-                core::arch::asm!("csrw 0x307, {0}", in(reg) mtvt_table);
-            }
-        };
-
-        // Configure and enable vectored interrupts
-        for (int, prio) in PRIORITY_TO_INTERRUPT.iter().copied().zip(Priority::iter()) {
-            let num = int as u32;
-            cpu_int::set_kind_raw(num, InterruptKind::Level);
-            cpu_int::set_priority_raw(num, prio);
-            cpu_int::enable_cpu_interrupt_raw(num);
-        }
-    }
 
     /// # Safety
     ///

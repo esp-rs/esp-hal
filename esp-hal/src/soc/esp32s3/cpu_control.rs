@@ -132,7 +132,7 @@ where
     }
 
     // Do not call setup_interrupts as that would disable peripheral interrupts, too.
-    unsafe { crate::interrupt::rt::init_vectoring() };
+    unsafe { crate::interrupt::init_vectoring() };
 
     // Trampoline to run from the new stack.
     // start_core1_run should _NEVER_ be inlined

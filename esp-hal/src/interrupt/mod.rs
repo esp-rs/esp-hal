@@ -484,7 +484,7 @@ pub(crate) fn setup_interrupts() {
             .ok();
     }
 
-    unsafe { crate::interrupt::rt::init_vectoring() };
+    unsafe { crate::interrupt::init_vectoring() };
 }
 
 #[inline(always)]
