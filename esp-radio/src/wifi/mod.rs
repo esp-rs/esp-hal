@@ -2074,6 +2074,7 @@ impl OperatingClass {
 /// For more information, see the [Wi-Fi Country Code in the ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub struct CountryInfo {
     /// Country code.
     #[builder_lite(skip)]
@@ -2112,6 +2113,7 @@ impl CountryInfo {
         }
     }
 
+    #[cfg_attr(not(feature = "unstable"), expect(dead_code))]
     fn try_from_c(info: &wifi_country_t) -> Option<Self> {
         let cc = &info.cc;
         let operating_class = OperatingClass::from_code(cc[2])?;
