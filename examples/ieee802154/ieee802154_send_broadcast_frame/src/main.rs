@@ -40,24 +40,27 @@ fn main() -> ! {
     let mut seq_number = 0u8;
     loop {
         ieee802154
-            .transmit(&Frame {
-                header: Header {
-                    frame_type: FrameType::Data,
-                    frame_pending: false,
-                    ack_request: false,
-                    pan_id_compress: false,
-                    seq_no_suppress: false,
-                    ie_present: false,
-                    version: FrameVersion::Ieee802154_2003,
-                    seq: seq_number,
-                    destination: Some(Address::Short(PanId(0xffff), ShortAddress(0xffff))),
-                    source: None,
-                    auxiliary_security_header: None,
+            .transmit(
+                &Frame {
+                    header: Header {
+                        frame_type: FrameType::Data,
+                        frame_pending: false,
+                        ack_request: false,
+                        pan_id_compress: false,
+                        seq_no_suppress: false,
+                        ie_present: false,
+                        version: FrameVersion::Ieee802154_2003,
+                        seq: seq_number,
+                        destination: Some(Address::Short(PanId(0xffff), ShortAddress(0xffff))),
+                        source: None,
+                        auxiliary_security_header: None,
+                    },
+                    content: FrameContent::Data,
+                    payload: b"Hello World".to_vec(),
+                    footer: [0u8; 2],
                 },
-                content: FrameContent::Data,
-                payload: b"Hello World".to_vec(),
-                footer: [0u8; 2],
-            })
+                true,
+            )
             .ok();
 
         println!("Send frame with sequence number {seq_number}");

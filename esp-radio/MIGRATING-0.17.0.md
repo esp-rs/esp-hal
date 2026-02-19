@@ -242,3 +242,23 @@ If you previously only set the WiFi mode and then started the controller, you mu
 +       .set_config(&Config::Station(StationConfig::default()))
 +       .unwrap();
 ```
+
+## IEEE 802.15.4 `transmit` and `transmit_raw` Methods Now Require CCA Parameter
+
+The `transmit()` and `transmit_raw()` methods in the IEEE 802.15.4 driver now require a `cca` (Clear Channel Assessment) parameter. This parameter controls whether the driver should check if the channel is clear before transmitting.
+
+The CCA parameter is a boolean:
+- `true` - Perform Clear Channel Assessment before transmitting. The transmission is aborted if the channel is busy.
+- `false` - Transmit immediately without checking if the channel is clear.
+
+```diff
+ // For structured frames
+-radio.transmit(&frame)?;
++radio.transmit(&frame, false)?;  // Or `true` if you want CCA enabled
+
+ // For raw byte frames
+-radio.transmit_raw(&raw_frame)?;
++radio.transmit_raw(&raw_frame, false)?;  // Or `true` if you want CCA enabled
+```
+
+In most cases, you'll want to use `false` to maintain the previous behavior (transmit without CCA). Use `true` if you need the radio to check for channel availability before transmitting, which can help avoid collisions in busy environments.

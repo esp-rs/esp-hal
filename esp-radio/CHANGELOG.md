@@ -61,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-C2: Disable BLE controller before deinitializing the stack (#4606)
 - Fix a crash after shutting down WiFi (#4761)
 - Fix a crash when trying to handle an unknown WiFi event (#4942)
+- Align IEEE 802.15.4 driver with ESP-IDF 5.5.2 C driver: overhauled ISR event handling, added timer0-based ACK timeout, per-state stop dispatch, TX deferral with pending TX mechanism, CCA support, ACK frame return, and fixed TX power default (20 dBm) (#5006)
 
 ### Removed
 
