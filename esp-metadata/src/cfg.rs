@@ -516,7 +516,10 @@ driver_configs![
     ParlIoProperties {
         driver: parl_io,
         name: "PARL_IO",
-        properties: {}
+        properties: {
+            version: u32,
+            // TODO: model signal counts, RC CLK out capability, etc.
+        }
     },
     PcntProperties {
         driver: pcnt,

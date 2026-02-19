@@ -25,10 +25,6 @@ pub(crate) mod constants {
     pub const I2S_DEFAULT_CLK_SRC: u8 = 1;
     /// Clock frequency for the I2S peripheral, in Hertz.
     pub const I2S_SCLK: u32 = 96_000_000;
-
-    /// System clock frequency for the parallel I/O (PARL IO) peripheral, in
-    /// Hertz.
-    pub const PARL_IO_SCLK: u32 = 96_000_000;
 }
 
 pub(crate) fn pre_init() {

@@ -479,6 +479,50 @@ fn configure_timg_calibration_clock_impl(
     });
 }
 
+// PARLIO_RX_CLOCK
+
+fn enable_parlio_rx_clock_impl(_clocks: &mut ClockTree, en: bool) {
+    PCR::regs()
+        .parl_clk_rx_conf()
+        .modify(|_, w| w.parl_clk_rx_en().bit(en));
+}
+
+fn configure_parlio_rx_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<ParlioRxClockConfig>,
+    new_selector: ParlioRxClockConfig,
+) {
+    PCR::regs().parl_clk_rx_conf().modify(|_, w| unsafe {
+        w.parl_clk_rx_sel().bits(match new_selector {
+            ParlioRxClockConfig::XtalClk => 0,
+            ParlioRxClockConfig::RcFastClk => 1,
+            ParlioRxClockConfig::PllF240m => 2,
+        })
+    });
+}
+
+// PARLIO_TX_CLOCK
+
+fn enable_parlio_tx_clock_impl(_clocks: &mut ClockTree, en: bool) {
+    PCR::regs()
+        .parl_clk_tx_conf()
+        .modify(|_, w| w.parl_clk_tx_en().bit(en));
+}
+
+fn configure_parlio_tx_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_selector: Option<ParlioTxClockConfig>,
+    new_selector: ParlioTxClockConfig,
+) {
+    PCR::regs().parl_clk_tx_conf().modify(|_, w| unsafe {
+        w.parl_clk_tx_sel().bits(match new_selector {
+            ParlioTxClockConfig::XtalClk => 0,
+            ParlioTxClockConfig::RcFastClk => 1,
+            ParlioTxClockConfig::PllF240m => 2,
+        })
+    });
+}
+
 // RMT_SCLK
 
 fn enable_rmt_sclk_impl(_clocks: &mut ClockTree, en: bool) {

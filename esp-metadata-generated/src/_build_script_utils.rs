@@ -1840,6 +1840,7 @@ impl Chip {
                     "interrupt_controller=\"clic\"",
                     "lp_i2c_master_fifo_size=\"16\"",
                     "lp_uart_ram_size=\"32\"",
+                    "parl_io_version=\"2\"",
                     "rmt_ram_start=\"1610638336\"",
                     "rmt_channel_ram_size=\"48\"",
                     "rmt_has_tx_immediate_stop",
@@ -1885,6 +1886,8 @@ impl Chip {
                     "soc_has_clock_node_lp_slow_clk",
                     "soc_has_clock_node_crypto_clk",
                     "soc_has_clock_node_timg_calibration_clock",
+                    "soc_has_clock_node_parlio_rx_clock",
+                    "soc_has_clock_node_parlio_tx_clock",
                     "soc_has_clock_node_rmt_sclk",
                     "soc_has_clock_node_timg0_function_clock",
                     "soc_has_clock_node_timg0_wdt_clock",
@@ -2059,6 +2062,7 @@ impl Chip {
                     "cargo:rustc-cfg=interrupt_controller=\"clic\"",
                     "cargo:rustc-cfg=lp_i2c_master_fifo_size=\"16\"",
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
+                    "cargo:rustc-cfg=parl_io_version=\"2\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610638336\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
                     "cargo:rustc-cfg=rmt_has_tx_immediate_stop",
@@ -2104,6 +2108,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_lp_slow_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_crypto_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_timg_calibration_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_parlio_rx_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_parlio_tx_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_rmt_sclk",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_wdt_clock",
@@ -2425,6 +2431,7 @@ impl Chip {
                     "interrupt_controller=\"plic\"",
                     "lp_i2c_master_fifo_size=\"16\"",
                     "lp_uart_ram_size=\"32\"",
+                    "parl_io_version=\"1\"",
                     "phy_combo_module",
                     "rmt_ram_start=\"1610638336\"",
                     "rmt_channel_ram_size=\"48\"",
@@ -2478,6 +2485,8 @@ impl Chip {
                     "soc_has_clock_node_lp_fast_clk",
                     "soc_has_clock_node_lp_slow_clk",
                     "soc_has_clock_node_mcpwm0_function_clock",
+                    "soc_has_clock_node_parlio_rx_clock",
+                    "soc_has_clock_node_parlio_tx_clock",
                     "soc_has_clock_node_rmt_sclk",
                     "soc_has_clock_node_timg0_function_clock",
                     "soc_has_clock_node_timg0_calibration_clock",
@@ -2695,6 +2704,7 @@ impl Chip {
                     "cargo:rustc-cfg=interrupt_controller=\"plic\"",
                     "cargo:rustc-cfg=lp_i2c_master_fifo_size=\"16\"",
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
+                    "cargo:rustc-cfg=parl_io_version=\"1\"",
                     "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610638336\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
@@ -2748,6 +2758,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_lp_fast_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_lp_slow_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_mcpwm0_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_parlio_rx_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_parlio_tx_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_rmt_sclk",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_calibration_clock",
@@ -3086,6 +3098,7 @@ impl Chip {
                     "i2c_master_fifo_size=\"32\"",
                     "interrupts_status_registers=\"2\"",
                     "interrupt_controller=\"plic\"",
+                    "parl_io_version=\"2\"",
                     "rmt_ram_start=\"1610642432\"",
                     "rmt_channel_ram_size=\"48\"",
                     "rmt_has_tx_immediate_stop",
@@ -3126,6 +3139,8 @@ impl Chip {
                     "soc_has_clock_node_lp_fast_clk",
                     "soc_has_clock_node_lp_slow_clk",
                     "soc_has_clock_node_mcpwm0_function_clock",
+                    "soc_has_clock_node_parlio_rx_clock",
+                    "soc_has_clock_node_parlio_tx_clock",
                     "soc_has_clock_node_rmt_sclk",
                     "soc_has_clock_node_timg0_function_clock",
                     "soc_has_clock_node_timg0_calibration_clock",
@@ -3316,6 +3331,7 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"2\"",
                     "cargo:rustc-cfg=interrupt_controller=\"plic\"",
+                    "cargo:rustc-cfg=parl_io_version=\"2\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610642432\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
                     "cargo:rustc-cfg=rmt_has_tx_immediate_stop",
@@ -3356,6 +3372,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_lp_fast_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_lp_slow_clk",
                     "cargo:rustc-cfg=soc_has_clock_node_mcpwm0_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_parlio_rx_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_parlio_tx_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_rmt_sclk",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_calibration_clock",
@@ -5197,6 +5215,8 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_lp_fast_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_lp_slow_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg_calibration_clock)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_parlio_rx_clock)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_parlio_tx_clock)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_has_clk_pre_div)");
     println!("cargo:rustc-check-cfg=cfg(uart_peripheral_controls_mem_clk)");
     println!("cargo:rustc-check-cfg=cfg(uhci_combined_uart_selector_field)");
@@ -5312,5 +5332,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(phy_backed_up_digital_register_count, values(\"21\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_fifo_size, values(\"16\"))");
     println!("cargo:rustc-check-cfg=cfg(lp_uart_ram_size, values(\"32\"))");
+    println!("cargo:rustc-check-cfg=cfg(parl_io_version, values(\"2\",\"1\"))");
     println!("cargo:rustc-check-cfg=cfg(soc_cpu_csr_prv_mode, values(\"2064\",\"3088\"))");
 }

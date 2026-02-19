@@ -54,27 +54,58 @@ mod tests {
 
         let parl_io = peripherals.PARL_IO;
 
+        cfg_if::cfg_if! {
+            if #[cfg(esp32c5)] {
+                // 27 is RGB, 9 and 10 are connected, 13 and 14 is USB
+                let valid_pin = peripherals.GPIO0.degrade();
+                let clock_pin = peripherals.GPIO1.degrade();
+                let data_pins = [
+                    peripherals.GPIO2.degrade(),
+                    peripherals.GPIO3.degrade(),
+                    peripherals.GPIO4.degrade(),
+                    peripherals.GPIO5.degrade(),
+                    peripherals.GPIO6.degrade(),
+                    peripherals.GPIO7.degrade(),
+                    peripherals.GPIO8.degrade(),
+                    peripherals.GPIO9.degrade(),
+                ];
+            } else if #[cfg(esp32c6)] {
+                // 8 is RGB, 2 and 3 are connected, 12 and 13 is USB
+                let valid_pin = peripherals.GPIO0.degrade();
+                let clock_pin = peripherals.GPIO1.degrade();
+                let data_pins = [
+                    peripherals.GPIO2.degrade(),
+                    peripherals.GPIO4.degrade(),
+                    peripherals.GPIO5.degrade(),
+                    peripherals.GPIO6.degrade(),
+                    peripherals.GPIO7.degrade(),
+                    peripherals.GPIO8.degrade(),
+                    peripherals.GPIO9.degrade(),
+                    peripherals.GPIO10.degrade(),
+                ];
+            } else if #[cfg(esp32h2)] {
+                // 8 is RGB, 2 and 3 are connected, 26 and 27 is USB
+                let valid_pin = peripherals.GPIO0.degrade();
+                let clock_pin = peripherals.GPIO1.degrade();
+                let data_pins = [
+                    peripherals.GPIO2.degrade(),
+                    peripherals.GPIO4.degrade(),
+                    peripherals.GPIO5.degrade(),
+                    peripherals.GPIO8.degrade(),
+                    peripherals.GPIO9.degrade(),
+                    peripherals.GPIO10.degrade(),
+                    peripherals.GPIO11.degrade(),
+                    peripherals.GPIO23.degrade(),
+                ];
+            }
+        }
+
         Context {
             parl_io,
             dma_channel,
-            #[cfg(esp32h2)]
-            clock_pin: peripherals.GPIO13.degrade(),
-            #[cfg(esp32h2)]
-            valid_pin: peripherals.GPIO24.degrade(),
-            #[cfg(esp32c6)]
-            clock_pin: peripherals.GPIO16.degrade(),
-            #[cfg(esp32c6)]
-            valid_pin: peripherals.GPIO17.degrade(),
-            data_pins: [
-                peripherals.GPIO2.degrade(),
-                peripherals.GPIO4.degrade(),
-                peripherals.GPIO10.degrade(),
-                peripherals.GPIO11.degrade(),
-                peripherals.GPIO14.degrade(),
-                peripherals.GPIO23.degrade(),
-                peripherals.GPIO0.degrade(),
-                peripherals.GPIO1.degrade(),
-            ],
+            clock_pin,
+            valid_pin,
+            data_pins,
         }
     }
 
@@ -277,7 +308,7 @@ mod tests {
     // enable pin to indicate when data is valid. The C6 has the same issue in
     // 16-bit mode. The test would have to be written differently for it to work
     // reliably. See https://github.com/esp-rs/esp-hal/pull/3339.
-    #[cfg(not(esp32h2))]
+    #[cfg(esp32c6)]
     #[test]
     fn test_parl_io_rx_can_read_tx_in_8_bit_mode(ctx: Context) {
         const BUFFER_SIZE: usize = 250;
@@ -479,13 +510,13 @@ mod tx {
             NoPin,
             NoPin,
             NoPin,
-            #[cfg(esp32h2)]
+            #[cfg(any(esp32c5, esp32h2))]
             ctx.valid,
             #[cfg(esp32c6)]
             NoPin,
         );
 
-        #[cfg(esp32h2)]
+        #[cfg(any(esp32c5, esp32h2))]
         let pins = TxPinConfigIncludingValidPin::new(pins);
         #[cfg(esp32c6)]
         let pins = TxPinConfigWithValidPin::new(pins, ctx.valid);
@@ -660,13 +691,13 @@ mod async_tx {
             NoPin,
             NoPin,
             NoPin,
-            #[cfg(esp32h2)]
+            #[cfg(any(esp32c5, esp32h2))]
             ctx.valid,
             #[cfg(esp32c6)]
             NoPin,
         );
 
-        #[cfg(esp32h2)]
+        #[cfg(any(esp32c5, esp32h2))]
         let pins = TxPinConfigIncludingValidPin::new(pins);
         #[cfg(esp32c6)]
         let pins = TxPinConfigWithValidPin::new(pins, ctx.valid);

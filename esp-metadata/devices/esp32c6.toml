@@ -269,7 +269,19 @@ clocks = { system_clocks = { clock_tree = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
         ] },
     ] },
-    { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" } },
+    { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" }, clocks = [
+        { name = "RX_CLOCK", type = "mux", default = "PLL_F240M", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "PLL_F240M",   outputs = "PLL_F240M" },
+            # TODO: external clock
+        ] },
+        { name = "TX_CLOCK", type = "mux", default = "PLL_F240M", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "PLL_F240M",   outputs = "PLL_F240M" },
+        ] },
+    ] },
     { name = "SdioSlave" },
     { name = "Dma", template_params = { peripheral = "gdma" } },
     { name = "Spi2" },
@@ -705,6 +717,10 @@ support_status = "partial"
 light_sleep = true
 deep_sleep = true
 
+[device.parl_io]
+support_status = "partial"
+version = 1
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
@@ -714,7 +730,7 @@ deep_sleep = true
 [device.i2s]
 [device.ledc]
 [device.mcpwm]
-[device.parl_io]
+
 [device.pcnt]
 [device.sd_slave]
 [device.twai]
