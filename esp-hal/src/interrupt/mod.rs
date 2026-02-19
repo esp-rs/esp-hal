@@ -77,7 +77,7 @@ We reserve a number of CPU interrupts, which cannot be used; see
 pub use self::riscv::*;
 #[cfg(xtensa)]
 pub use self::xtensa::*;
-use crate::system::Cpu;
+use crate::{peripherals::Interrupt, system::Cpu};
 
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
@@ -94,6 +94,8 @@ cfg_if::cfg_if! {
 mod riscv;
 #[cfg(xtensa)]
 mod xtensa;
+
+use crate::pac;
 
 pub mod software;
 
@@ -235,12 +237,6 @@ impl InterruptStatus {
         }
     }
 
-    const fn empty() -> Self {
-        InterruptStatus {
-            status: [0u32; STATUS_WORDS],
-        }
-    }
-
     /// Is the given interrupt bit set
     pub fn is_set(&self, interrupt: u8) -> bool {
         (self.status[interrupt as usize / 32] & (1 << (interrupt % 32))) != 0
@@ -261,6 +257,7 @@ impl InterruptStatus {
 }
 
 /// Iterator over set interrupt status bits
+#[derive(Debug, Clone)]
 pub struct InterruptStatusIterator {
     status: InterruptStatus,
     idx: usize,
@@ -273,12 +270,233 @@ impl Iterator for InterruptStatusIterator {
         for i in self.idx..STATUS_WORDS {
             if self.status.status[i] != 0 {
                 let bit = self.status.status[i].trailing_zeros();
+                self.status.status[i] ^= 1 << bit;
                 self.idx = i;
-                self.status.status[i] &= !1 << bit;
                 return Some((bit + 32 * i as u32) as u8);
             }
         }
         self.idx = usize::MAX;
         None
+    }
+}
+
+// Peripheral interrupt API.
+
+fn vector_entry(interrupt: Interrupt) -> &'static pac::Vector {
+    cfg_if::cfg_if! {
+        if #[cfg(xtensa)] {
+            &pac::__INTERRUPTS[interrupt as usize]
+        } else {
+            &pac::__EXTERNAL_INTERRUPTS[interrupt as usize]
+        }
+    }
+}
+
+/// Returns the currently bound interrupt handler.
+pub fn bound_handler(interrupt: Interrupt) -> Option<IsrCallback> {
+    unsafe {
+        let vector = vector_entry(interrupt);
+
+        let addr = vector._handler;
+        if addr as usize == 0 {
+            return None;
+        }
+
+        Some(IsrCallback::new(core::mem::transmute::<
+            unsafe extern "C" fn(),
+            extern "C" fn(),
+        >(addr)))
+    }
+}
+
+/// Binds the given handler to a peripheral interrupt.
+///
+/// The interrupt handler will be enabled at the specified priority level.
+///
+/// The interrupt handler will be called on the core where it is registered.
+/// Only one interrupt handler can be bound to a peripheral interrupt.
+pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
+    unsafe {
+        let vector = vector_entry(interrupt);
+
+        let ptr = (&raw const vector._handler).cast::<usize>().cast_mut();
+
+        // On RISC-V MCUs we may be protecting the trap section using a watchpoint.
+        // If we do, we need to temporarily disable this protection.
+        #[cfg(all(riscv, write_vec_table_monitoring))]
+        if crate::soc::trap_section_protected() {
+            crate::debugger::DEBUGGER_LOCK.lock(|| {
+                let wp = crate::debugger::clear_watchpoint(1);
+                ptr.write_volatile(handler.handler().address());
+                crate::debugger::restore_watchpoint(1, wp);
+            });
+            enable(interrupt, handler.priority());
+            return;
+        }
+
+        ptr.write_volatile(handler.handler().address());
+    }
+    enable(interrupt, handler.priority());
+}
+
+/// Enables a peripheral interrupt at a given priority, using vectored CPU interrupts.
+///
+/// Note that interrupts still need to be enabled globally for interrupts
+/// to be serviced.
+///
+/// Internally, this function maps the interrupt to the appropriate CPU interrupt
+/// for the specified priority level.
+#[inline]
+pub fn enable(interrupt: Interrupt, level: Priority) {
+    enable_on_cpu(Cpu::current(), interrupt, level);
+}
+
+pub(crate) fn enable_on_cpu(cpu: Cpu, interrupt: Interrupt, level: Priority) {
+    let cpu_interrupt = priority_to_cpu_interrupt(interrupt, level);
+    map_raw(cpu, interrupt, cpu_interrupt as u32);
+}
+
+/// Disable the given peripheral interrupt.
+///
+/// Internally, this function maps the interrupt to a disabled CPU interrupt.
+#[inline]
+pub fn disable(core: Cpu, interrupt: Interrupt) {
+    map_raw(core, interrupt, DISABLED_CPU_INTERRUPT)
+}
+
+pub(super) fn map_raw(core: Cpu, interrupt: Interrupt, cpu_interrupt: u32) {
+    match core {
+        Cpu::ProCpu => {
+            INTERRUPT_CORE0::regs()
+                .core_0_intr_map(interrupt as usize)
+                .write(|w| unsafe { w.bits(cpu_interrupt) });
+        }
+        #[cfg(multi_core)]
+        Cpu::AppCpu => {
+            INTERRUPT_CORE1::regs()
+                .core_1_intr_map(interrupt as usize)
+                .write(|w| unsafe { w.bits(cpu_interrupt) });
+        }
+    }
+}
+
+/// Get cpu interrupt assigned to peripheral interrupt
+pub(crate) fn mapped_to(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
+    mapped_to_raw(cpu, interrupt as u32)
+}
+
+pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
+    let cpu_intr = match cpu {
+        Cpu::ProCpu => INTERRUPT_CORE0::regs()
+            .core_0_intr_map(interrupt as usize)
+            .read()
+            .bits(),
+        #[cfg(multi_core)]
+        Cpu::AppCpu => INTERRUPT_CORE1::regs()
+            .core_1_intr_map(interrupt as usize)
+            .read()
+            .bits(),
+    };
+    CpuInterrupt::from_u32(cpu_intr)
+}
+
+/// Represents the priority level of running code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum RunLevel {
+    /// The base level
+    ThreadMode,
+
+    /// An elevated level, usually an interrupt handler's.
+    Interrupt(Priority),
+}
+
+impl RunLevel {
+    /// Get the current run level (the level below which interrupts are masked).
+    #[inline]
+    pub fn current() -> Self {
+        current_runlevel()
+    }
+
+    /// Changes the current run level to the specified level and returns the previous level.
+    ///
+    /// # Safety
+    ///
+    /// This function must only be used to raise the runlevel and to restore it
+    /// to a previous value. It must not be used to arbitrarily lower the
+    /// runlevel.
+    #[inline]
+    pub unsafe fn change(to: Self) -> Self {
+        unsafe { change_current_runlevel(to) }
+    }
+
+    /// Checks if the run level indicates thread mode.
+    #[inline]
+    pub fn is_thread(&self) -> bool {
+        matches!(self, RunLevel::ThreadMode)
+    }
+}
+
+impl PartialEq<Priority> for RunLevel {
+    fn eq(&self, other: &Priority) -> bool {
+        *self == RunLevel::Interrupt(*other)
+    }
+}
+
+impl From<RunLevel> for u32 {
+    fn from(level: RunLevel) -> Self {
+        match level {
+            RunLevel::ThreadMode => 0,
+            RunLevel::Interrupt(priority) => priority as u32,
+        }
+    }
+}
+
+/// Priority Level Error
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum PriorityError {
+    /// The priority is not valid
+    InvalidInterruptPriority,
+}
+
+impl TryFrom<u32> for RunLevel {
+    type Error = PriorityError;
+
+    fn try_from(priority: u32) -> Result<Self, Self::Error> {
+        if priority == 0 {
+            Ok(RunLevel::ThreadMode)
+        } else {
+            Priority::try_from(priority).map(RunLevel::Interrupt)
+        }
+    }
+}
+
+#[cfg(feature = "rt")]
+pub(crate) fn setup_interrupts() {
+    // disable all known peripheral interrupts
+    for peripheral_interrupt in 0..255 {
+        crate::peripherals::Interrupt::try_from(peripheral_interrupt)
+            .map(|intr| {
+                #[cfg(multi_core)]
+                disable(Cpu::AppCpu, intr);
+                disable(Cpu::ProCpu, intr);
+            })
+            .ok();
+    }
+
+    unsafe { crate::interrupt::init_vectoring() };
+}
+
+#[inline(always)]
+fn should_handle(core: Cpu, interrupt_nr: u32, level: u32) -> bool {
+    if let Some(cpu_interrupt) = crate::interrupt::mapped_to_raw(core, interrupt_nr)
+        && cpu_interrupt.is_vectored()
+        && cpu_interrupt.level() == level
+    {
+        true
+    } else {
+        false
     }
 }

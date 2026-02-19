@@ -153,7 +153,10 @@ mod tests {
         let io = Io::new(peripherals.IO_MUX);
 
         #[cfg(feature = "unstable")]
-        #[cfg_attr(single_core, expect(unused_variables))]
+        #[cfg_attr(
+            any(single_core, not(dedicated_gpio_driver_supported)),
+            expect(unused_variables)
+        )]
         let int1 = {
             let sw_int = esp_hal::interrupt::software::SoftwareInterruptControl::new(
                 peripherals.SW_INTERRUPT,

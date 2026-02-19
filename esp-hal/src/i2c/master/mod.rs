@@ -138,7 +138,7 @@ use crate::{
         interconnect::{self, PeripheralOutput},
     },
     handler,
-    interrupt::{self, InterruptHandler},
+    interrupt::InterruptHandler,
     pac::i2c0::{COMD, RegisterBlock},
     private,
     ram,
@@ -3365,16 +3365,12 @@ impl Instance for AnyI2c<'_> {
 }
 
 impl AnyI2c<'_> {
-    fn bind_peri_interrupt(&self, handler: interrupt::IsrCallback) {
+    fn bind_peri_interrupt(&self, handler: InterruptHandler) {
         any::delegate!(self, i2c => { i2c.bind_peri_interrupt(handler) })
     }
 
     fn disable_peri_interrupt(&self) {
         any::delegate!(self, i2c => { i2c.disable_peri_interrupt() })
-    }
-
-    fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority) {
-        any::delegate!(self, i2c => { i2c.enable_peri_interrupt(priority) })
     }
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
@@ -3383,7 +3379,6 @@ impl AnyI2c<'_> {
         self.info().enable_listen(EnumSet::all(), false);
         self.info().clear_interrupts(EnumSet::all());
 
-        self.bind_peri_interrupt(handler.handler());
-        self.enable_peri_interrupt(handler.priority());
+        self.bind_peri_interrupt(handler);
     }
 }

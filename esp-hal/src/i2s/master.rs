@@ -2359,16 +2359,14 @@ mod private {
                 #[cfg(soc_has_i2s1)]
                 AnyI2sInner::I2s1(i2s) => i2s,
             } {
-                fn bind_peri_interrupt(&self, handler: crate::interrupt::IsrCallback);
+                fn bind_peri_interrupt(&self, handler: InterruptHandler);
                 fn disable_peri_interrupt(&self);
-                fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority);
             }
         }
 
         pub(super) fn set_interrupt_handler(&self, handler: InterruptHandler) {
             self.disable_peri_interrupt();
-            self.bind_peri_interrupt(handler.handler());
-            self.enable_peri_interrupt(handler.priority());
+            self.bind_peri_interrupt(handler);
         }
     }
 

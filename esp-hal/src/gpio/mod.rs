@@ -635,13 +635,11 @@ impl<'d> Io<'d> {
     }
 
     /// Set the interrupt priority for GPIO interrupts.
-    ///
-    /// # Panics
-    ///
-    /// Panics if passed interrupt handler is invalid (e.g. has priority
-    /// `None`)
     #[instability::unstable]
     pub fn set_interrupt_priority(&self, prio: Priority) {
+        // FIXME: this sets priority on all cores where the handler may be running. Should we only
+        // change it on the current core? Should that enable the interrupt if it's not already
+        // enabled?
         interrupt::set_interrupt_priority(Interrupt::GPIO, prio);
     }
 
@@ -651,7 +649,7 @@ impl<'d> Io<'d> {
     )]
     #[cfg_attr(
         multi_core,
-        doc = "Registers an interrupt handler for all GPIO pins on the current core."
+        doc = "Registers an interrupt handler for all GPIO pins. Enables the interrupt on the current core."
     )]
     #[doc = ""]
     /// Note that when using interrupt handlers registered by this function, or
@@ -669,24 +667,17 @@ impl<'d> Io<'d> {
     ///
     /// [`listen()`]: Input::listen
     /// [`is_interrupt_set()`]: Input::is_interrupt_set
-    ///
-    /// # Panics
-    ///
-    /// Panics if passed interrupt handler is invalid (e.g. has priority
-    /// `None`)
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::GPIO);
         }
-        self.set_interrupt_priority(handler.priority());
-        unsafe {
-            crate::interrupt::bind_interrupt(
-                Interrupt::GPIO,
-                crate::interrupt::IsrCallback::new(user_gpio_interrupt_handler),
-            )
-        };
         USER_INTERRUPT_HANDLER.store(handler.handler().callback());
+
+        crate::interrupt::bind_handler(
+            Interrupt::GPIO,
+            InterruptHandler::new(user_gpio_interrupt_handler, handler.priority()),
+        );
     }
 }
 

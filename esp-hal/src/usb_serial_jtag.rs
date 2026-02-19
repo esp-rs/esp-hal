@@ -436,8 +436,7 @@ where
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         self.rx.peripheral.disable_peri_interrupt();
-        self.rx.peripheral.bind_peri_interrupt(handler.handler());
-        self.rx.peripheral.enable_peri_interrupt(handler.priority());
+        self.rx.peripheral.bind_peri_interrupt(handler);
     }
 }
 

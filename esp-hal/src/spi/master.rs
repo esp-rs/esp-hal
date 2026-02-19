@@ -4034,7 +4034,7 @@ impl Instance for AnySpi<'_> {
 }
 
 impl AnySpi<'_> {
-    fn bind_peri_interrupt(&self, handler: crate::interrupt::IsrCallback) {
+    fn bind_peri_interrupt(&self, handler: InterruptHandler) {
         any::delegate!(self, spi => { spi.bind_peri_interrupt(handler) })
     }
 
@@ -4042,14 +4042,9 @@ impl AnySpi<'_> {
         any::delegate!(self, spi => { spi.disable_peri_interrupt() })
     }
 
-    fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority) {
-        any::delegate!(self, spi => { spi.enable_peri_interrupt(priority) })
-    }
-
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
         self.disable_peri_interrupt();
-        self.bind_peri_interrupt(handler.handler());
-        self.enable_peri_interrupt(handler.priority());
+        self.bind_peri_interrupt(handler);
     }
 }
 

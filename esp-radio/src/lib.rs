@@ -417,7 +417,7 @@ fn is_interrupts_disabled() -> bool {
 
     #[cfg(target_arch = "riscv32")]
     return !hal::riscv::register::mstatus::read().mie()
-        || hal::interrupt::current_runlevel() >= hal::interrupt::Priority::Priority1;
+        || !hal::interrupt::RunLevel::current().is_thread();
 }
 
 /// Enable verbose logging within the Wi-Fi driver

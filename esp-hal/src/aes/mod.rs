@@ -838,14 +838,7 @@ pub mod dma {
                     let dma = unsafe { self.dma.clone_unchecked() };
                     let driver = super::Aes::new(peri).with_dma(dma);
 
-                    driver
-                        .aes
-                        .aes
-                        .bind_peri_interrupt(interrupt_handler.handler());
-                    driver
-                        .aes
-                        .aes
-                        .enable_peri_interrupt(interrupt_handler.priority());
+                    driver.aes.aes.bind_peri_interrupt(interrupt_handler);
 
                     driver
                 }

@@ -7,20 +7,20 @@ use core::sync::atomic::{Ordering, compiler_fence};
 use esp_sync::raw::SingleCoreInterruptLock;
 use esp_sync::{GenericRawMutex, RestoreState, raw::RawLock};
 
-use crate::interrupt::Priority;
+use crate::interrupt::{Priority, RunLevel};
 
 /// A lock that disables interrupts below a certain priority.
-pub struct PriorityLock(pub Priority);
+pub struct PriorityLock(pub RunLevel);
 
 impl PriorityLock {
-    fn current_priority() -> Priority {
-        crate::interrupt::current_runlevel()
+    fn current_priority() -> RunLevel {
+        RunLevel::current()
     }
 
     /// Prevents interrupts above `level` from firing and returns the
     /// current run level.
-    unsafe fn change_current_level(level: Priority) -> Priority {
-        unsafe { crate::interrupt::change_current_runlevel(level) }
+    unsafe fn change_current_level(level: RunLevel) -> RunLevel {
+        unsafe { RunLevel::change(level) }
     }
 }
 
@@ -31,14 +31,14 @@ impl RawLock for PriorityLock {
             return unsafe { SingleCoreInterruptLock.enter() };
         }
 
-        let prev_interrupt_priority = unsafe { Self::change_current_level(self.0) };
-        assert!(prev_interrupt_priority <= self.0);
+        let prev_level = unsafe { Self::change_current_level(self.0) };
+        assert!(prev_level <= self.0);
 
         // Ensure no subsequent memory accesses are reordered to before interrupts are
         // disabled.
         compiler_fence(Ordering::SeqCst);
 
-        unsafe { RestoreState::new(prev_interrupt_priority as _) }
+        unsafe { RestoreState::new(u32::from(prev_level)) }
     }
 
     unsafe fn exit(&self, token: RestoreState) {
@@ -51,10 +51,8 @@ impl RawLock for PriorityLock {
         // enabled.
         compiler_fence(Ordering::SeqCst);
 
-        let priority = unwrap!(Priority::try_from(token.inner()));
-        unsafe {
-            Self::change_current_level(priority);
-        }
+        let level = unwrap!(RunLevel::try_from(token.inner()));
+        unsafe { Self::change_current_level(level) };
     }
 }
 
@@ -70,7 +68,7 @@ impl RawPriorityLimitedMutex {
     /// Create a new lock that is accessible at or below the given `priority`.
     pub const fn new(priority: Priority) -> Self {
         Self {
-            inner: GenericRawMutex::new(PriorityLock(priority)),
+            inner: GenericRawMutex::new(PriorityLock(RunLevel::Interrupt(priority))),
         }
     }
 

@@ -762,12 +762,7 @@ where
         for core in Cpu::other() {
             crate::interrupt::disable(core, self.twai.interrupt());
         }
-        unsafe { crate::interrupt::bind_interrupt(self.twai.interrupt(), handler.handler()) };
-
-        unwrap!(crate::interrupt::enable(
-            self.twai.interrupt(),
-            handler.priority()
-        ));
+        crate::interrupt::bind_handler(self.twai.interrupt(), handler);
     }
 
     /// Set the bitrate of the bus.

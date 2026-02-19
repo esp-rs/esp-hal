@@ -933,8 +933,7 @@ impl<'rmt> Rmt<'rmt, Blocking> {
         for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::RMT);
         }
-        unsafe { crate::interrupt::bind_interrupt(Interrupt::RMT, handler.handler()) };
-        unwrap!(crate::interrupt::enable(Interrupt::RMT, handler.priority()));
+        crate::interrupt::bind_handler(Interrupt::RMT, handler);
     }
 }
 

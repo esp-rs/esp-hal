@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C5: Add initial ECC support (#4983)
 - C5: Add AES support (#4983)
 - C5: Add USB Serial/JTAG support (#5008)
+- `esp_hal::interrupt::RunLevel` (#4996)
 
 ### Changed
 
@@ -54,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `MEM2MEM` peripheral singletons have been re-numbered from 0-8 (#4944)
 - The `DmaPeripheral::Mem2MemX` variants have been renamed to `Mem2memX` and re-numbered from 0-8 (#4944)
 - `esp_hal::interrupt::status` has been replaced by `esp_hal::interrupt::InterruptStatus::current()` (#4997)
+- `esp_hal::interrupt::bind_interrupt` and `enable` have been merged into `bind_handler` which is now safe and infallible (#4996)
 
 ### Fixed
 
@@ -85,8 +87,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RtcClock::xtal_freq()` and the `XtalClock` enum (#4724)
 - `Rtc::estimate_xtal_frequency()` (#4851)
 - `RtcFastClock`, `RtcSlowClock` (#4851)
-- `esp_hal::interrupt::{map, enable_direct, RESERVED_INTERRUPTS}` from ESP32, ESP32-S2 and ESP32-S3 (#5007)
+- `esp_hal::interrupt::{enable_direct, RESERVED_INTERRUPTS}` from ESP32, ESP32-S2 and ESP32-S3 (#5007)
+- `esp_hal::interrupt::map` (#4996, #5007)
 - `InterruptHandler::new_not_nested` (#5000)
+- `esp_hal::interrupt::Priority::None` (#4996)
 
 ## [v1.0.0] - 2025-10-30
 

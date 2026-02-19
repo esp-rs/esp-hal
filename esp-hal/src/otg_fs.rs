@@ -279,16 +279,7 @@ pub mod asynch {
             // Enable PHY clock
             r.pcgcctl().write(|w| w.0 = 0);
 
-            unsafe {
-                crate::interrupt::bind_interrupt(
-                    crate::peripherals::Interrupt::USB,
-                    interrupt_handler.handler(),
-                );
-            }
-            unwrap!(crate::interrupt::enable(
-                crate::peripherals::Interrupt::USB,
-                interrupt_handler.priority(),
-            ));
+            crate::interrupt::bind_handler(crate::peripherals::Interrupt::USB, interrupt_handler);
         }
 
         fn disable(&mut self) {

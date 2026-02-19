@@ -442,8 +442,7 @@ impl Timer<'_> {
         for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, interrupt);
         }
-        unsafe { interrupt::bind_interrupt(interrupt, handler.handler()) };
-        unwrap!(interrupt::enable(interrupt, handler.priority()));
+        interrupt::bind_handler(interrupt, handler);
     }
 
     fn register_block(&self) -> &RegisterBlock {
@@ -834,10 +833,7 @@ where
 {
     fn set_interrupt_handler(&mut self, handler: interrupt::InterruptHandler) {
         let interrupt = TG::wdt_interrupt();
-        unsafe {
-            interrupt::bind_interrupt(interrupt, handler.handler());
-            interrupt::enable(interrupt, handler.priority()).unwrap();
-        }
+        interrupt::bind_handler(interrupt, handler);
     }
 }
 

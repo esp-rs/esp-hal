@@ -987,9 +987,7 @@ fn internal_set_interrupt_handler(handler: InterruptHandler) {
         peri.disable_peri_interrupt();
         internal_listen(EnumSet::all(), false);
         internal_clear_interrupts(EnumSet::all());
-        peri.bind_peri_interrupt(handler.handler());
-
-        peri.enable_peri_interrupt(handler.priority());
+        peri.bind_peri_interrupt(handler);
     }
     #[cfg(parl_io_version = "2")]
     {
@@ -997,11 +995,8 @@ fn internal_set_interrupt_handler(handler: InterruptHandler) {
         peri.disable_tx_interrupt();
         internal_listen(EnumSet::all(), false);
         internal_clear_interrupts(EnumSet::all());
-        peri.bind_rx_interrupt(handler.handler());
-        peri.bind_tx_interrupt(handler.handler());
-
-        peri.enable_rx_interrupt(handler.priority());
-        peri.enable_tx_interrupt(handler.priority());
+        peri.bind_rx_interrupt(handler);
+        peri.bind_tx_interrupt(handler);
     }
 }
 

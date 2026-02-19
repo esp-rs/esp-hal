@@ -297,11 +297,7 @@ pub fn start_with_idle_hook(
     }
 
     fn is_thread_mode() -> bool {
-        #[cfg(xtensa)]
-        return esp_hal::xtensa_lx::interrupt::get_level() == 0;
-
-        #[cfg(riscv)]
-        return esp_hal::interrupt::current_runlevel() == esp_hal::interrupt::Priority::None;
+        esp_hal::interrupt::RunLevel::current().is_thread()
     }
 
     trace!("Starting scheduler for the first core");
