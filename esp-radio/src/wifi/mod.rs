@@ -2491,20 +2491,7 @@ impl WifiController<'_> {
         apply_power_saving(ps)
     }
 
-    #[procmacros::doc_replace]
-    /// Configures Country Code.
-    ///
-    /// ## Example
-    ///
-    /// ```rust,no_run
-    /// # {before_snippet}
-    /// # use esp_radio::wifi::CountryInfo;
-    /// let (mut controller, _interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())?;
-    /// controller.set_country_info(&CountryInfo::from(*b"CN"))?;
-    /// # {after_snippet}
-    /// ```
-    #[instability::unstable]
-    pub fn set_country_info(&mut self, country: &CountryInfo) -> Result<(), WifiError> {
+    fn set_country_info(&mut self, country: &CountryInfo) -> Result<(), WifiError> {
         unsafe {
             let country = country.into_blob();
             esp_wifi_result!(esp_wifi_set_country(&country))?;
