@@ -287,6 +287,10 @@ pub struct PeripheralDef {
     /// Set to true to hide a peripheral from the Peripherals struct.
     #[serde(default)]
     hidden: bool,
+    /// If the peripheral isn't specifically named by a driver, this field can be used to mark it
+    /// as stable.
+    #[serde(default)]
+    stable: bool,
 }
 
 impl PeripheralDef {
@@ -607,6 +611,12 @@ impl Config {
                         stable_peris.push(p);
                     }
                 }
+            }
+        }
+
+        for p in self.device.peripherals.iter() {
+            if p.stable && !stable_peris.contains(&p.name.as_str()) {
+                stable_peris.push(p.name.as_str());
             }
         }
 

@@ -3335,8 +3335,8 @@ macro_rules! for_each_peripheral {
         WIFI <= virtual(WIFI_BB : { bind_bb_interrupt, enable_bb_interrupt,
         disable_bb_interrupt }, WIFI_MAC : { bind_mac_interrupt, enable_mac_interrupt,
         disable_mac_interrupt }, WIFI_PWR : { bind_pwr_interrupt, enable_pwr_interrupt,
-        disable_pwr_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "MEM2MEM0 peripheral singleton"] MEM2MEM0 <= virtual() (unstable)));
+        disable_pwr_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "MEM2MEM0 peripheral singleton"] MEM2MEM0 <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "MEM2MEM1 peripheral singleton"]
         MEM2MEM1 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type
         #[doc = "MEM2MEM2 peripheral singleton"] MEM2MEM2 <= virtual() (unstable)));
@@ -3426,7 +3426,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((GPIO_DEDICATED(unstable)));
         _for_each_inner_peripheral!((LP_CORE(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
-        _for_each_inner_peripheral!((WIFI(unstable)));
+        _for_each_inner_peripheral!((WIFI));
         _for_each_inner_peripheral!((MEM2MEM0(unstable)));
         _for_each_inner_peripheral!((MEM2MEM1(unstable)));
         _for_each_inner_peripheral!((MEM2MEM2(unstable)));
@@ -3625,7 +3625,7 @@ macro_rules! for_each_peripheral {
         "WIFI peripheral singleton"] WIFI <= virtual(WIFI_BB : { bind_bb_interrupt,
         enable_bb_interrupt, disable_bb_interrupt }, WIFI_MAC : { bind_mac_interrupt,
         enable_mac_interrupt, disable_mac_interrupt }, WIFI_PWR : { bind_pwr_interrupt,
-        enable_pwr_interrupt, disable_pwr_interrupt }) (unstable)), (@ peri_type #[doc =
+        enable_pwr_interrupt, disable_pwr_interrupt })), (@ peri_type #[doc =
         "MEM2MEM0 peripheral singleton"] MEM2MEM0 <= virtual() (unstable)), (@ peri_type
         #[doc = "MEM2MEM1 peripheral singleton"] MEM2MEM1 <= virtual() (unstable)), (@
         peri_type #[doc = "MEM2MEM2 peripheral singleton"] MEM2MEM2 <= virtual()
@@ -3657,15 +3657,15 @@ macro_rules! for_each_peripheral {
         (USB_DEVICE(unstable)), (DMA_CH0(unstable)), (DMA_CH1(unstable)),
         (DMA_CH2(unstable)), (BT(unstable)), (FLASH(unstable)),
         (GPIO_DEDICATED(unstable)), (LP_CORE(unstable)), (SW_INTERRUPT(unstable)),
-        (WIFI(unstable)), (MEM2MEM0(unstable)), (MEM2MEM1(unstable)),
-        (MEM2MEM2(unstable)), (MEM2MEM3(unstable)), (MEM2MEM4(unstable)),
-        (MEM2MEM5(unstable)), (MEM2MEM6(unstable)), (MEM2MEM7(unstable)),
-        (MEM2MEM8(unstable)))); _for_each_inner_peripheral!((dma_eligible(MEM2MEM0,
-        Mem2mem0, 0), (SPI2, Spi2, 1), (UHCI0, Uhci0, 2), (I2S0, I2s0, 3), (MEM2MEM1,
-        Mem2mem1, 4), (MEM2MEM2, Mem2mem2, 5), (AES, Aes, 6), (SHA, Sha, 7), (APB_SARADC,
-        ApbSaradc, 8), (PARL_IO, ParlIo, 9), (MEM2MEM3, Mem2mem3, 10), (MEM2MEM4,
-        Mem2mem4, 11), (MEM2MEM5, Mem2mem5, 12), (MEM2MEM6, Mem2mem6, 13), (MEM2MEM7,
-        Mem2mem7, 14), (MEM2MEM8, Mem2mem8, 15)));
+        (WIFI), (MEM2MEM0(unstable)), (MEM2MEM1(unstable)), (MEM2MEM2(unstable)),
+        (MEM2MEM3(unstable)), (MEM2MEM4(unstable)), (MEM2MEM5(unstable)),
+        (MEM2MEM6(unstable)), (MEM2MEM7(unstable)), (MEM2MEM8(unstable))));
+        _for_each_inner_peripheral!((dma_eligible(MEM2MEM0, Mem2mem0, 0), (SPI2, Spi2,
+        1), (UHCI0, Uhci0, 2), (I2S0, I2s0, 3), (MEM2MEM1, Mem2mem1, 4), (MEM2MEM2,
+        Mem2mem2, 5), (AES, Aes, 6), (SHA, Sha, 7), (APB_SARADC, ApbSaradc, 8), (PARL_IO,
+        ParlIo, 9), (MEM2MEM3, Mem2mem3, 10), (MEM2MEM4, Mem2mem4, 11), (MEM2MEM5,
+        Mem2mem5, 12), (MEM2MEM6, Mem2mem6, 13), (MEM2MEM7, Mem2mem7, 14), (MEM2MEM8,
+        Mem2mem8, 15)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

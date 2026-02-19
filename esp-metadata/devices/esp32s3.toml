@@ -83,7 +83,7 @@ peripherals = [
     { name = "PSRAM", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "ULP_RISCV_CORE", virtual = true },
-    { name = "WIFI", virtual = true, interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" } },
+    { name = "WIFI", virtual = true, interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true },
 ]
 
 symbols = [
