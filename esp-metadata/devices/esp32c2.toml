@@ -19,7 +19,7 @@ peripherals = [
     { name = "ASSIST_DEBUG" },
     { name = "DMA" },
     { name = "ECC" },
-    { name = "EFUSE" },
+    { name = "EFUSE", hidden = true },
     { name = "EXTMEM" },
     { name = "GPIO" },
     { name = "I2C_ANA_MST" },

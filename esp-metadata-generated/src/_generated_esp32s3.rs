@@ -3804,7 +3804,6 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((ASSIST_DEBUG(unstable)));
         _for_each_inner_peripheral!((DMA(unstable)));
         _for_each_inner_peripheral!((DS(unstable)));
-        _for_each_inner_peripheral!((EFUSE(unstable)));
         _for_each_inner_peripheral!((EXTMEM(unstable)));
         _for_each_inner_peripheral!((GPIO(unstable)));
         _for_each_inner_peripheral!((GPIO_SD(unstable)));
@@ -4134,13 +4133,13 @@ macro_rules! for_each_peripheral {
         (GPIO39), (GPIO40), (GPIO41), (GPIO42), (GPIO43), (GPIO44), (GPIO45), (GPIO46),
         (GPIO47), (GPIO48), (AES(unstable)), (APB_CTRL(unstable)),
         (APB_SARADC(unstable)), (ASSIST_DEBUG(unstable)), (DMA(unstable)),
-        (DS(unstable)), (EFUSE(unstable)), (EXTMEM(unstable)), (GPIO(unstable)),
-        (GPIO_SD(unstable)), (HMAC(unstable)), (I2C_ANA_MST(unstable)), (I2C0), (I2C1),
-        (I2S0(unstable)), (I2S1(unstable)), (INTERRUPT_CORE0(unstable)),
-        (INTERRUPT_CORE1(unstable)), (IO_MUX(unstable)), (LCD_CAM(unstable)),
-        (LEDC(unstable)), (LPWR(unstable)), (MCPWM0(unstable)), (MCPWM1(unstable)),
-        (PCNT(unstable)), (PERI_BACKUP(unstable)), (RMT(unstable)), (RNG(unstable)),
-        (RSA(unstable)), (RTC_CNTL(unstable)), (RTC_I2C(unstable)), (RTC_IO(unstable)),
+        (DS(unstable)), (EXTMEM(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)),
+        (HMAC(unstable)), (I2C_ANA_MST(unstable)), (I2C0), (I2C1), (I2S0(unstable)),
+        (I2S1(unstable)), (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)),
+        (IO_MUX(unstable)), (LCD_CAM(unstable)), (LEDC(unstable)), (LPWR(unstable)),
+        (MCPWM0(unstable)), (MCPWM1(unstable)), (PCNT(unstable)),
+        (PERI_BACKUP(unstable)), (RMT(unstable)), (RNG(unstable)), (RSA(unstable)),
+        (RTC_CNTL(unstable)), (RTC_I2C(unstable)), (RTC_IO(unstable)),
         (SDHOST(unstable)), (SENS(unstable)), (SENSITIVE(unstable)), (SHA(unstable)),
         (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3), (SYSTEM(unstable)),
         (SYSTIMER(unstable)), (TIMG0(unstable)), (TIMG1(unstable)), (TWAI0(unstable)),

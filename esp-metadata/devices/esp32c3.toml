@@ -20,7 +20,7 @@ peripherals = [
     { name = "BB" },
     { name = "DMA" },
     { name = "DS" },
-    { name = "EFUSE" },
+    { name = "EFUSE", hidden = true },
     { name = "EXTMEM" },
     { name = "FE" },
     { name = "FE2" },

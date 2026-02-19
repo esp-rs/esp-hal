@@ -3495,7 +3495,6 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((APB_SARADC(unstable)));
         _for_each_inner_peripheral!((DEDICATED_GPIO(unstable)));
         _for_each_inner_peripheral!((DS(unstable)));
-        _for_each_inner_peripheral!((EFUSE(unstable)));
         _for_each_inner_peripheral!((EXTMEM(unstable)));
         _for_each_inner_peripheral!((FE(unstable)));
         _for_each_inner_peripheral!((FE2(unstable)));
@@ -3794,23 +3793,23 @@ macro_rules! for_each_peripheral {
         (GPIO31), (GPIO32), (GPIO33), (GPIO34), (GPIO35), (GPIO36), (GPIO37), (GPIO38),
         (GPIO39), (GPIO40), (GPIO41), (GPIO42), (GPIO43), (GPIO44), (GPIO45), (GPIO46),
         (AES(unstable)), (APB_SARADC(unstable)), (DEDICATED_GPIO(unstable)),
-        (DS(unstable)), (EFUSE(unstable)), (EXTMEM(unstable)), (FE(unstable)),
-        (FE2(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)), (HMAC(unstable)),
-        (I2C_ANA_MST(unstable)), (I2C0), (I2C1), (I2S0(unstable)),
-        (INTERRUPT_CORE0(unstable)), (IO_MUX(unstable)), (LEDC(unstable)),
-        (NRX(unstable)), (PCNT(unstable)), (PMS(unstable)), (RMT(unstable)),
-        (RNG(unstable)), (RSA(unstable)), (LPWR(unstable)), (RTC_I2C(unstable)),
-        (RTC_IO(unstable)), (SENS(unstable)), (SHA(unstable)), (SPI0(unstable)),
-        (SPI1(unstable)), (SPI2), (SPI3), (SYSCON(unstable)), (SYSTEM(unstable)),
-        (SYSTIMER(unstable)), (TIMG0(unstable)), (TIMG1(unstable)), (TWAI0(unstable)),
-        (UART0), (UART1), (UHCI0(unstable)), (USB0(unstable)), (USB_WRAP(unstable)),
-        (XTS_AES(unstable)), (WIFI(unstable)), (DMA_SPI2(unstable)),
-        (DMA_SPI3(unstable)), (DMA_I2S0(unstable)), (DMA_CRYPTO(unstable)),
-        (DMA_COPY(unstable)), (ADC1(unstable)), (ADC2(unstable)), (DAC1(unstable)),
-        (DAC2(unstable)), (FLASH(unstable)), (GPIO_DEDICATED(unstable)),
-        (PSRAM(unstable)), (SW_INTERRUPT(unstable)), (ULP_RISCV_CORE(unstable))));
-        _for_each_inner_peripheral!((dma_eligible(I2S0, I2s0, 0), (SPI2, Spi2, 1), (SPI3,
-        Spi3, 2), (UHCI0, Uhci0, 3), (AES, Aes, 4), (SHA, Sha, 5)));
+        (DS(unstable)), (EXTMEM(unstable)), (FE(unstable)), (FE2(unstable)),
+        (GPIO(unstable)), (GPIO_SD(unstable)), (HMAC(unstable)), (I2C_ANA_MST(unstable)),
+        (I2C0), (I2C1), (I2S0(unstable)), (INTERRUPT_CORE0(unstable)),
+        (IO_MUX(unstable)), (LEDC(unstable)), (NRX(unstable)), (PCNT(unstable)),
+        (PMS(unstable)), (RMT(unstable)), (RNG(unstable)), (RSA(unstable)),
+        (LPWR(unstable)), (RTC_I2C(unstable)), (RTC_IO(unstable)), (SENS(unstable)),
+        (SHA(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3),
+        (SYSCON(unstable)), (SYSTEM(unstable)), (SYSTIMER(unstable)), (TIMG0(unstable)),
+        (TIMG1(unstable)), (TWAI0(unstable)), (UART0), (UART1), (UHCI0(unstable)),
+        (USB0(unstable)), (USB_WRAP(unstable)), (XTS_AES(unstable)), (WIFI(unstable)),
+        (DMA_SPI2(unstable)), (DMA_SPI3(unstable)), (DMA_I2S0(unstable)),
+        (DMA_CRYPTO(unstable)), (DMA_COPY(unstable)), (ADC1(unstable)), (ADC2(unstable)),
+        (DAC1(unstable)), (DAC2(unstable)), (FLASH(unstable)),
+        (GPIO_DEDICATED(unstable)), (PSRAM(unstable)), (SW_INTERRUPT(unstable)),
+        (ULP_RISCV_CORE(unstable)))); _for_each_inner_peripheral!((dma_eligible(I2S0,
+        I2s0, 0), (SPI2, Spi2, 1), (SPI3, Spi3, 2), (UHCI0, Uhci0, 3), (AES, Aes, 4),
+        (SHA, Sha, 5)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

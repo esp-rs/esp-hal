@@ -18,7 +18,7 @@ peripherals = [
     { name = "BB" },
     { name = "DPORT" },
     { name = "SYSTEM", pac = "DPORT" },
-    { name = "EFUSE" },
+    { name = "EFUSE", hidden = true },
     { name = "EMAC_DMA" },
     { name = "EMAC_EXT" },
     { name = "EMAC_MAC" },
