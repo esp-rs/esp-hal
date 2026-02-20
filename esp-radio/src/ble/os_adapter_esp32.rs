@@ -6,7 +6,8 @@ use super::*;
 use crate::{
     ble::InvalidConfigError,
     common_adapter::*,
-    hal::{interrupt, peripherals::BT},
+    hal::{interrupt::Priority, peripherals::BT},
+    interrupt_dispatch::Handler,
     sys::include::{
         esp_bt_controller_config_t,
         esp_bt_mode_t,
@@ -17,14 +18,9 @@ use crate::{
     },
 };
 
-pub(crate) static mut ISR_INTERRUPT_5: (*mut c_void, *mut c_void) =
-    (core::ptr::null_mut(), core::ptr::null_mut());
-
-pub(crate) static mut ISR_INTERRUPT_8: (*mut c_void, *mut c_void) =
-    (core::ptr::null_mut(), core::ptr::null_mut());
-
-pub(crate) static mut ISR_INTERRUPT_7: (*mut c_void, *mut c_void) =
-    (core::ptr::null_mut(), core::ptr::null_mut());
+static ISR_INTERRUPT_5: Handler = Handler::new();
+static ISR_INTERRUPT_7: Handler = Handler::new();
+static ISR_INTERRUPT_8: Handler = Handler::new();
 
 #[repr(C)]
 pub(super) struct osi_funcs_s {
@@ -651,16 +647,14 @@ pub(crate) unsafe extern "C" fn set_isr(n: i32, f: unsafe extern "C" fn(), arg: 
 
     match n {
         5 => unsafe {
-            ISR_INTERRUPT_5 = (f as *mut c_void, arg as *mut c_void);
-            BT::steal().enable_rwbt_interrupt(interrupt::Priority::Priority1);
-            BT::steal().enable_rwble_interrupt(interrupt::Priority::Priority1);
+            ISR_INTERRUPT_5.set(f as *const c_void, arg.cast());
+            BT::steal().enable_rwbt_interrupt(Priority::Priority1);
+            BT::steal().enable_rwble_interrupt(Priority::Priority1);
         },
-        7 => unsafe {
-            ISR_INTERRUPT_7 = (f as *mut c_void, arg as *mut c_void);
-        },
+        7 => ISR_INTERRUPT_7.set(f as *const c_void, arg.cast()),
         8 => unsafe {
-            ISR_INTERRUPT_8 = (f as *mut c_void, arg as *mut c_void);
-            BT::steal().enable_bb_interrupt(interrupt::Priority::Priority1);
+            ISR_INTERRUPT_8.set(f as *const c_void, arg.cast());
+            BT::steal().enable_bb_interrupt(Priority::Priority1);
         },
         _ => panic!("set_isr - unsupported interrupt number {}", n),
     }
@@ -767,55 +761,27 @@ pub(crate) fn async_wakeup_request_end(event: i32) {
 
 #[allow(non_snake_case)]
 #[unsafe(no_mangle)]
+#[crate::hal::ram]
 fn Software0() {
-    unsafe {
-        let (fnc, arg) = ISR_INTERRUPT_7;
-        trace!("interrupt Software0 {:?} {:?}", fnc, arg);
-
-        if !fnc.is_null() {
-            let fnc: fn(*mut c_void) = core::mem::transmute(fnc);
-            fnc(arg);
-        }
-    }
+    ISR_INTERRUPT_7.dispatch();
 }
 
 #[unsafe(no_mangle)]
+#[crate::hal::ram]
 extern "C" fn RWBT() {
-    unsafe {
-        let (fnc, arg) = ISR_INTERRUPT_5;
-        trace!("interrupt RWBT {:?} {:?}", fnc, arg);
-
-        if !fnc.is_null() {
-            let fnc: fn(*mut c_void) = core::mem::transmute(fnc);
-            fnc(arg);
-        }
-    }
+    ISR_INTERRUPT_5.dispatch();
 }
 
 #[unsafe(no_mangle)]
+#[crate::hal::ram]
 extern "C" fn RWBLE() {
-    unsafe {
-        let (fnc, arg) = ISR_INTERRUPT_5;
-        trace!("interrupt RWBLE {:?} {:?}", fnc, arg);
-
-        if !fnc.is_null() {
-            let fnc: fn(*mut c_void) = core::mem::transmute(fnc);
-            fnc(arg);
-        }
-    }
+    ISR_INTERRUPT_5.dispatch();
 }
 
 #[unsafe(no_mangle)]
+#[crate::hal::ram]
 extern "C" fn BT_BB() {
-    unsafe {
-        let (fnc, arg) = ISR_INTERRUPT_8;
-        trace!("interrupt BT_BB {:?} {:?}", fnc, arg);
-
-        if !fnc.is_null() {
-            let fnc: fn(*mut c_void) = core::mem::transmute(fnc);
-            fnc(arg);
-        }
-    }
+    ISR_INTERRUPT_8.dispatch();
 }
 
 pub(crate) fn shutdown_ble_isr() {

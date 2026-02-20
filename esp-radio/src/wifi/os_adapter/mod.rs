@@ -88,9 +88,6 @@ pub unsafe extern "C" fn clear_intr(intr_source: u32, intr_num: u32) {
     trace!("clear_intr called {} {}", intr_source, intr_num);
 }
 
-pub static mut ISR_INTERRUPT_1: (*mut c_void, *mut c_void) =
-    (core::ptr::null_mut(), core::ptr::null_mut());
-
 /// **************************************************************************
 /// Name: esp32c3_ints_on
 ///

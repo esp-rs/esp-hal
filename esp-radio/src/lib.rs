@@ -238,6 +238,7 @@ macro_rules! unstable_module {
 }
 
 mod compat;
+mod interrupt_dispatch;
 mod time;
 
 #[cfg(feature = "wifi")]
