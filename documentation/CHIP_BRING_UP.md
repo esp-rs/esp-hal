@@ -111,7 +111,7 @@ To complete the linker-related bring-up, handle the `esp-rom-sys` crate.
 
 ## esp-metadata
 
-Next important milestone in chip bring up in adding the to-be-supported device to the metadata. A good starting point to begin with will be to create a new file in `esp-metadata/devices/<chip>.toml`, paste this template there and fill out all the placeholder values:
+The next milestone is adding the new device to metadata. Create a new file (`esp-metadata/devices/<chip>.toml`) and paste the template below, filling in the placeholders:
 
 ```
 # <CHIP> Device Metadata
@@ -167,38 +167,74 @@ clocks = { system_clocks = { clock_tree = [
 
 ```
 
-Then, declare new chip in `esp-metadata-generated` package: define feature 
+Then, declare new chip in `esp-metadata-generated`: 
+- Define the feature in it's Cargo.toml
+    ```
+    <CHIP> = ["_device-selected"]`
+    ```
+- Add it to the other chips in `lib.rs` of this crate.
+
+And ***that's it***. The rest will be generated after you run `cargo xtask update-metadata`.
+
+#### Adding first peripherals
+
+To determine which peripherals to include, try building a simple example and observe compilation failures. For initial bring-up, enable only essential components:
+
+- `MODEM_SYSCON` / `LPCON`
+- `SYSTEM`
+- `SYSTIMER`
+- Interrupt core
+
+Avoid enabling advanced peripherals (e.g., `i2c`, `spi`, LP peripherals) at this stage.
+
+***Important note***: During initial support, it is acceptable to `cfg`-gate or temporarily disable some functionality. For example, many parts depend on DMA, and proper isolation is not yet fully implemented. This will be addressed once issue [#4901](https://github.com/esp-rs/esp-hal/issues/4901) is resolved.
+
+
+## HAL
+### clocks_ll
+
+You don't need to **implement** clocks at this phase, however fake-defining them and at least using some blinding placeholders is required. Refer to the previous [C5 support PR ](https://github.com/esp-rs/esp-hal/pull/4859/changes#diff-75a5e847ec368b58a227b16ea788a0007a569040ed5793bf8cdda6f37676f0f5) as guidance.
+
+### esp-hal/src/efuse
+
+Open `espflash` in a workspace and run:
+```bash
+cargo xgenerate-efuse-fields /PATH/TO/LOCAL/esptool/
 ```
-<CHIP> = ["_device-selected"]`
-```
- in it's Cargo.toml and add it to the other chips in `lib.rs` of this crate and ***that's it***. The rest will be generated after you run `cargo xtask update-metadata`.
 
-To understand which peripherals should be added into `peripherals` list, you can try building some simple example and see which parts of the esp-hal are failing. Definitely do not enable anything advanced like `i2c` or `spi`, `LP`-peripherals, for initial bringup only essential parts like `MODEM_SYSCON/LPCON`, `SYSTEM`, `SYSTIMER`, interrupt core are necessary. 
+This generates Rust definitions for eFuse fields based on `esptool`.
 
-***Important note***: for now, while adding chip support, it is fine and you will eventually have to `cfg`-out some parts of the code. For example, many parts of our code depend on `DMA`, and we have not yet fully implemented a mechanism for isolating it. This will be fixed when https://github.com/esp-rs/esp-hal/issues/4901 is closed.
+Copy the generated file (without modification) to `efuse/<chip>/fields.rs`. Then implement required eFuse functions in `efuse/<chip>/mod.rs`
 
-### HAL
-##### clocks_ll
+Use other chips as reference and verify field names and operations against ESP-IDF and `esptool`.
 
-You don't need to **implement** clocks at this phase, however fake-defining them and at least using some blinding placeholders is required. You might use our already [existing experience with adding C5 support](https://github.com/esp-rs/esp-hal/pull/4859/changes#diff-75a5e847ec368b58a227b16ea788a0007a569040ed5793bf8cdda6f37676f0f5) as a reference   
-##### esp-hal/src/efuse
 
-Open `espflash` in a workspace and use `cargo xgenerate-efuse-fields /PATH/TO/LOCAL/esptool/` to parse `efuse` fields  for your chip from `esptool` to Rust, copy the generated file (without changing it) to `efuse/<chip>/fields.rs` and implement all needed `efuse`-related functions in `efuse/<chip>/mod.rs`. Take already existing implemented functions for other chips as a reference, double check all the operations and correct field names using `esp-idf` and `esptool`. 
 ### Auxiliary crates
 
-You might also need to add support for your new chip in some of `esp-hal`'s auxiliary crates for initial bring up: `esp-backtrace`, `esp-bootloader-esp-idf`, `esp-sync`, and `esp-println` as a bonus if you desire to achieve a first "Hello World". Thankfully, this crates are mostly responsible for some exact set of tasks and are reasonably platform-independent and usually adding a feature to `Cargo.toml` will be enough. Where some simple chip-specific tweaks needed (e.g. `esp-println` or `esp-bootloader-esp-idf`), please make sure to look up the correct values in `esp-idf`. 
+For initial bring-up, you may also need to add support in:
 
-##### Interrupts
+- `esp-backtrace`
+- `esp-bootloader-esp-idf`
+- `esp-sync`
+- `esp-println` (optional, for a basic "Hello World")
 
-Specifying the flavour of RISC-V interrupt controller in `[device.interrupt]` of `metadata` plus a couple of cfg-gates for the new chips (see what already exists for the others) should be enough to get the needed functionality for the bring up. 
-##### RTC_CNTL
+These crates are mostly platform-independent. In many cases, adding a feature flag in `Cargo.toml` is enough. Where chip-specific adjustments are required (e.g., `esp-println`, `esp-bootloader-esp-idf`), verify values against ESP-IDF.
 
-For this part of the driver, you need to look up for `SocResetReasons` and build an enumeration of them for the new chip. These are usually also enumerated in `esp-idf` in [`reset_reason.h`](https://github.com/espressif/esp-idf/blob/release/v6.0/components/soc/esp32c5/include/soc/reset_reasons.h).
-In `rtc_cntl/mod.rs` make sure, that watchdog-related code is active for your new chip (`feed`(), `wakeup_cause()`). You can `cfg`-out the rest, if needed (TODO: update after https://github.com/esp-rs/esp-hal/issues/4901 is closed)
+### Interrupts
 
-##### SOC
+Specify the correct RISC-V interrupt controller flavour in `[device.interrupt]` within metadata. Add necessary `cfg` gates for the new chip (refer to existing implementations).
 
-Make sure to add a primitive `clocks` implementation (at least with a placeholder and a default clock value) in `soc/<chip>/clocks.rs` and implement `regi2c` functions, reference is `esp-idf` correct implementation
+### RTC_CNTL
+
+Identify `SocResetReasons` for the new chip and implement the corresponding enumeration. These are typically defined in ESP-IDF under [`reset_reasons.h`](https://github.com/espressif/esp-idf/blob/release/v6.0/components/soc/esp32c5/include/soc/reset_reasons.h).
+
+In `rtc_cntl/mod.rs`, ensure watchdog-related functionality (`feed()`, `wakeup_cause()`) is enabled for the new chip. Other parts may be `cfg`-gated if necessary (will be simplified after [#4901](https://github.com/esp-rs/esp-hal/issues/4901) is resolved).
+
+### SOC
+
+Add a minimal clocks implementation (placeholder + default clock value) in `soc/<chip>/clocks.rs`.
+
+Also implement `regi2c` functions using `ESP-IDF` as reference.
 
 ### Troubleshooting
 
