@@ -10,6 +10,7 @@
 //! The configuration of vectored interrupt handlers cannot be changed in runtime.
 
 #[cfg(feature = "rt")]
+#[instability::unstable]
 pub use esp_riscv_rt::TrapFrame;
 use procmacros::ram;
 use riscv::register::{mcause, mtvec};
@@ -31,6 +32,7 @@ use crate::{
 /// Errors related to direct binding of interrupts
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum DirectBindingError {
     /// The CPU interrupt is a reserved interrupt
     CpuInterruptReserved,
@@ -38,6 +40,7 @@ pub enum DirectBindingError {
 
 /// Interrupt kind
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum InterruptKind {
     /// Level interrupt
     Level,
@@ -52,6 +55,7 @@ for_each_interrupt!(
             #[repr(u32)]
             #[derive(Debug, Copy, Clone)]
             #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+            #[instability::unstable]
             pub enum CpuInterrupt {
                 $(
                     #[doc = concat!(" Interrupt number ", stringify!($n), ".")]
@@ -142,6 +146,7 @@ for_each_interrupt_priority!(
 impl Priority {
     /// Maximum interrupt priority
     #[allow(unused_assignments)]
+    #[instability::unstable]
     pub const fn max() -> Priority {
         const {
             let mut last = Self::min();
@@ -160,6 +165,7 @@ impl Priority {
     }
 }
 
+#[instability::unstable]
 impl TryFrom<u32> for Priority {
     type Error = PriorityError;
 
@@ -194,6 +200,7 @@ const RESERVED_COUNT: usize = const {
 
 /// The interrupts reserved by the HAL
 #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
+#[instability::unstable]
 pub static RESERVED_INTERRUPTS: [u32; RESERVED_COUNT] = const {
     let mut counter = 0;
     let mut reserved = [0; RESERVED_COUNT];
@@ -281,6 +288,7 @@ pub(super) static INTERRUPT_TO_PRIORITY: [Option<Priority>; INTERRUPT_COUNT] = c
 ///
 /// Trying using a reserved interrupt from [`RESERVED_INTERRUPTS`] will return
 /// an error.
+#[instability::unstable]
 pub fn enable_direct(
     interrupt: Interrupt,
     level: Priority,
@@ -413,6 +421,7 @@ fn cpu_wait_mode_on() -> bool {
 /// This function will return immediately when a debugger is attached, so it is intended to be
 /// called in a loop.
 #[inline(always)]
+#[instability::unstable]
 pub fn wait_for_interrupt() {
     if crate::debugger::debugger_connected() && !cpu_wait_mode_on() {
         // when SYSTEM_CPU_WAIT_MODE_FORCE_ON is disabled in WFI mode SBA access to memory does not

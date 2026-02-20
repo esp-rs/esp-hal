@@ -45,11 +45,11 @@ peripherals = [
     { name = "DMA_CH0", virtual = true },
 
     { name = "ADC1", virtual = true },
-    { name = "BT", virtual = true },
+    { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_TIMER" } },
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
-    { name = "WIFI", virtual = true },
+    { name = "WIFI", virtual = true, interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" } },
 ]
 
 symbols = [

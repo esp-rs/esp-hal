@@ -4,19 +4,13 @@ use procmacros::BuilderLite;
 use super::*;
 use crate::{
     ble::InvalidConfigError,
-    hal::{
-        clock::ModemClockController,
-        interrupt,
-        peripherals::{BT, Interrupt},
-    },
+    hal::{clock::ModemClockController, interrupt, peripherals::BT},
+    interrupt_dispatch::Handler,
     sys::include::esp_bt_controller_config_t,
 };
 
-pub(crate) static mut ISR_INTERRUPT_4: (*mut c_void, *mut c_void) =
-    (core::ptr::null_mut(), core::ptr::null_mut());
-
-pub(crate) static mut ISR_INTERRUPT_7: (*mut c_void, *mut c_void) =
-    (core::ptr::null_mut(), core::ptr::null_mut());
+static ISR_INTERRUPT_4: Handler = Handler::new();
+static ISR_INTERRUPT_7: Handler = Handler::new();
 
 /// Transmission Power Level
 #[derive(Default, Clone, Copy, Eq, PartialEq)]
@@ -356,18 +350,16 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
         source, flags, handler, arg, ret_handle
     );
 
-    unsafe {
-        match source {
-            4 => {
-                ISR_INTERRUPT_4 = (handler, arg);
-                interrupt::enable(Interrupt::BT_MAC, interrupt::Priority::Priority1);
-            }
-            7 => {
-                ISR_INTERRUPT_7 = (handler, arg);
-                interrupt::enable(Interrupt::LP_TIMER, interrupt::Priority::Priority1);
-            }
-            _ => panic!("Unexpected interrupt source {}", source),
-        }
+    match source {
+        4 => unsafe {
+            ISR_INTERRUPT_4.set(handler, arg);
+            BT::steal().enable_mac_interrupt(interrupt::Priority::Priority1);
+        },
+        7 => unsafe {
+            ISR_INTERRUPT_7.set(handler, arg);
+            BT::steal().enable_lp_timer_interrupt(interrupt::Priority::Priority1);
+        },
+        _ => panic!("Unexpected interrupt source {}", source),
     }
 
     0
@@ -386,4 +378,23 @@ pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     // controller.
     let mut bt = unsafe { BT::steal() };
     bt.reset_rpa();
+}
+
+#[unsafe(no_mangle)]
+#[crate::hal::ram]
+extern "C" fn LP_TIMER() {
+    ISR_INTERRUPT_7.dispatch();
+}
+
+#[unsafe(no_mangle)]
+#[crate::hal::ram]
+extern "C" fn BT_MAC() {
+    ISR_INTERRUPT_4.dispatch();
+}
+
+pub(crate) fn shutdown_ble_isr() {
+    unsafe {
+        BT::steal().disable_lp_timer_interrupt();
+        BT::steal().disable_mac_interrupt();
+    }
 }
