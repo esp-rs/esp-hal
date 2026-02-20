@@ -37,7 +37,6 @@ use self::{
 use crate::{
     InitializationError,
     RadioRefGuard,
-    common_adapter::*,
     esp_wifi_result,
     hal::ram,
     sys::{
@@ -986,24 +985,6 @@ impl From<InitializationError> for WifiError {
     }
 }
 
-/// Get the access point MAC address of the device.
-pub fn access_point_mac() -> [u8; 6] {
-    let mut mac = [0u8; 6];
-    unsafe {
-        read_mac(mac.as_mut_ptr(), 1);
-    }
-    mac
-}
-
-/// Get the station MAC address of the device.
-pub fn station_mac() -> [u8; 6] {
-    let mut mac = [0u8; 6];
-    unsafe {
-        read_mac(mac.as_mut_ptr(), 0);
-    }
-    mac
-}
-
 #[cfg(esp32)]
 fn set_mac_time_update_cb(wifi: crate::hal::peripherals::WIFI<'_>) {
     use esp_phy::MacTimeExt;
@@ -1281,10 +1262,17 @@ enum InterfaceType {
 
 impl InterfaceType {
     fn mac_address(&self) -> [u8; 6] {
-        match self {
-            InterfaceType::Station => station_mac(),
-            InterfaceType::AccessPoint => access_point_mac(),
-        }
+        use esp_hal::efuse::{Efuse, InterfaceMacAddress};
+        let mac = match self {
+            InterfaceType::Station => Efuse::interface_mac_address(InterfaceMacAddress::Station),
+            InterfaceType::AccessPoint => {
+                Efuse::interface_mac_address(InterfaceMacAddress::AccessPoint)
+            }
+        };
+
+        let mut out = [0u8; 6];
+        out.copy_from_slice(mac.as_bytes());
+        out
     }
 
     fn data_queue_rx(&self) -> &'static NonReentrantMutex<VecDeque<PacketBuffer>> {

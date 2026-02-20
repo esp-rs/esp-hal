@@ -134,47 +134,25 @@ pub unsafe extern "C" fn random() -> c_ulong {
 /// *************************************************************************
 pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> c_int {
     trace!("read_mac {:?} {}", mac, type_);
+    use hal::efuse::InterfaceMacAddress;
 
-    let base_mac = hal::efuse::Efuse::mac_address();
-
-    for (i, &byte) in base_mac.iter().enumerate() {
-        unsafe {
-            mac.add(i).write_volatile(byte);
-        }
-    }
-
-    const ESP_MAC_WIFI_SOFTAP: u32 = 1;
-    const ESP_MAC_BT: u32 = 2;
-
-    unsafe {
-        if type_ == ESP_MAC_WIFI_SOFTAP {
-            let tmp = mac.offset(0).read_volatile();
-            for i in 0..64 {
-                mac.offset(0).write_volatile(tmp | 0x02);
-                mac.offset(0)
-                    .write_volatile(mac.offset(0).read_volatile() ^ (i << 2));
-
-                if mac.offset(0).read_volatile() != tmp {
-                    break;
-                }
-            }
-        } else if type_ == ESP_MAC_BT {
-            let tmp = mac.offset(0).read_volatile();
-            for i in 0..64 {
-                mac.offset(0).write_volatile(tmp | 0x02);
-                mac.offset(0)
-                    .write_volatile(mac.offset(0).read_volatile() ^ (i << 2));
-
-                if mac.offset(0).read_volatile() != tmp {
-                    break;
-                }
-            }
-
-            mac.offset(5)
-                .write_volatile(mac.offset(5).read_volatile() + 1);
-        } else {
+    let kind = match type_ {
+        0 => InterfaceMacAddress::Station,
+        1 => InterfaceMacAddress::AccessPoint,
+        2 => InterfaceMacAddress::Bluetooth,
+        _ => {
+            warn!(
+                "Invalid interface type: {} (expected 0=STA, 1=AP, 2=BT)",
+                type_
+            );
             return -1;
         }
+    };
+
+    let addr = hal::efuse::Efuse::interface_mac_address(kind);
+
+    unsafe {
+        core::ptr::copy_nonoverlapping(addr.as_bytes().as_ptr(), mac, 6);
     }
 
     0
