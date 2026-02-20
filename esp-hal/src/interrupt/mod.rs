@@ -97,7 +97,9 @@ mod xtensa;
 
 use crate::pac;
 
-pub mod software;
+unstable_driver! {
+    pub mod software;
+}
 
 #[cfg(feature = "rt")]
 #[unsafe(no_mangle)]
@@ -106,6 +108,7 @@ extern "C" fn EspDefaultHandler() {
 }
 
 /// Default (unhandled) interrupt handler
+#[instability::unstable]
 pub const DEFAULT_INTERRUPT_HANDLER: InterruptHandler = InterruptHandler::new(
     {
         unsafe extern "C" {
@@ -121,6 +124,7 @@ pub const DEFAULT_INTERRUPT_HANDLER: InterruptHandler = InterruptHandler::new(
 
 /// Trait implemented by drivers which allow the user to set an
 /// [InterruptHandler]
+#[instability::unstable]
 pub trait InterruptConfigurable: crate::private::Sealed {
     #[cfg_attr(
         not(multi_core),
@@ -143,6 +147,7 @@ pub trait InterruptConfigurable: crate::private::Sealed {
 /// Represents an ISR callback function
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub struct IsrCallback {
     f: extern "C" fn(),
 }
@@ -180,6 +185,7 @@ impl PartialEq for IsrCallback {
 )]
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub struct InterruptHandler {
     f: extern "C" fn(),
     prio: Priority,
@@ -209,6 +215,7 @@ const STATUS_WORDS: usize = property!("interrupts.status_registers");
 
 /// Representation of peripheral-interrupt status bits.
 #[derive(Clone, Copy, Default, Debug)]
+#[instability::unstable]
 pub struct InterruptStatus {
     status: [u32; STATUS_WORDS],
 }
@@ -258,6 +265,7 @@ impl InterruptStatus {
 
 /// Iterator over set interrupt status bits
 #[derive(Debug, Clone)]
+#[instability::unstable]
 pub struct InterruptStatusIterator {
     status: InterruptStatus,
     idx: usize,
@@ -293,6 +301,7 @@ fn vector_entry(interrupt: Interrupt) -> &'static pac::Vector {
 }
 
 /// Returns the currently bound interrupt handler.
+#[instability::unstable]
 pub fn bound_handler(interrupt: Interrupt) -> Option<IsrCallback> {
     unsafe {
         let vector = vector_entry(interrupt);
@@ -315,6 +324,7 @@ pub fn bound_handler(interrupt: Interrupt) -> Option<IsrCallback> {
 ///
 /// The interrupt handler will be called on the core where it is registered.
 /// Only one interrupt handler can be bound to a peripheral interrupt.
+#[instability::unstable]
 pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
     unsafe {
         let vector = vector_entry(interrupt);
@@ -347,6 +357,7 @@ pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
 /// Internally, this function maps the interrupt to the appropriate CPU interrupt
 /// for the specified priority level.
 #[inline]
+#[instability::unstable]
 pub fn enable(interrupt: Interrupt, level: Priority) {
     enable_on_cpu(Cpu::current(), interrupt, level);
 }
@@ -360,6 +371,7 @@ pub(crate) fn enable_on_cpu(cpu: Cpu, interrupt: Interrupt, level: Priority) {
 ///
 /// Internally, this function maps the interrupt to a disabled CPU interrupt.
 #[inline]
+#[instability::unstable]
 pub fn disable(core: Cpu, interrupt: Interrupt) {
     map_raw(core, interrupt, DISABLED_CPU_INTERRUPT)
 }
@@ -404,6 +416,7 @@ pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
+#[instability::unstable]
 pub enum RunLevel {
     /// The base level
     ThreadMode,
@@ -456,6 +469,7 @@ impl From<RunLevel> for u32 {
 /// Priority Level Error
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum PriorityError {
     /// The priority is not valid
     InvalidInterruptPriority,
