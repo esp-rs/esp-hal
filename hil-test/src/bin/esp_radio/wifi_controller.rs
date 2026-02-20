@@ -26,11 +26,10 @@ mod tests {
 
         let _source = esp_hal::rng::TrngSource::new(p.RNG, p.ADC1);
 
-        let (mut controller, _interfaces) =
-            esp_radio::wifi::new(p.WIFI, Default::default()).unwrap();
+        let (controller, _interfaces) = esp_radio::wifi::new(p.WIFI, Default::default()).unwrap();
 
-        controller
-            .set_config(&Config::Station(StationConfig::default()))
+        let _ = controller
+            .start(&Config::Station(StationConfig::default()))
             .unwrap();
     }
 
@@ -43,25 +42,24 @@ mod tests {
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
-        let (mut controller, _interfaces) =
-            esp_radio::wifi::new(p.WIFI, Default::default()).unwrap();
+        let (controller, _interfaces) = esp_radio::wifi::new(p.WIFI, Default::default()).unwrap();
 
-        controller
-            .set_config(&Config::Station(StationConfig::default()))
+        let mut running_controller = controller
+            .start(&Config::Station(StationConfig::default()))
             .unwrap();
 
         // scanning all channels takes a (too) long time - even more for dual-band capable targets
         let scan_config = ScanConfig::default().with_max(1).with_channel(13);
-        let _ = controller.scan_async(&scan_config).await.unwrap();
+        let _ = running_controller.scan_async(&scan_config).await.unwrap();
 
         let mut min_free = usize::MAX;
         for _ in 0..30 {
-            let _ = controller.scan_async(&scan_config).await.unwrap();
+            let _ = running_controller.scan_async(&scan_config).await.unwrap();
             min_free = usize::min(min_free, esp_alloc::HEAP.free());
         }
 
         for _ in 0..10 {
-            let _ = controller.scan_async(&scan_config).await.unwrap();
+            let _ = running_controller.scan_async(&scan_config).await.unwrap();
             assert!(
                 esp_alloc::HEAP.free() >= min_free,
                 "current free: {}, min free: {}",

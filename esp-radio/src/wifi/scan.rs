@@ -9,8 +9,8 @@ use crate::{
     esp_wifi_result,
     sys::include,
     wifi::{
+        RunningWifiController,
         Ssid,
-        WifiController,
         WifiError,
         ap::{AccessPointInfo, convert_ap_info},
     },
@@ -130,7 +130,7 @@ pub struct ScanResults<'d> {
 
 impl<'d> ScanResults<'d> {
     /// Create new Wi-Fi scan results.
-    pub fn new(_controller: &'d mut WifiController<'_>) -> Result<Self, WifiError> {
+    pub fn new(_controller: &'d mut RunningWifiController<'_>) -> Result<Self, WifiError> {
         // Construct Self first. This ensures we'll free the result list even if `get_ap_num`
         // returns an error.
         let mut this = Self {

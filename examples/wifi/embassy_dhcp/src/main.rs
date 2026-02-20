@@ -27,7 +27,13 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{Config, Interface, WifiController, scan::ScanConfig, sta::StationConfig};
+use esp_radio::wifi::{
+    Config,
+    Interface,
+    RunningWifiController,
+    scan::ScanConfig,
+    sta::StationConfig,
+};
 use reqwless::{
     client::HttpClient,
     request::{Method, RequestBuilder},
@@ -61,7 +67,7 @@ async fn main(spawner: Spawner) -> ! {
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let (mut controller, interfaces) =
+    let (controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
 
     let wifi_interface = interfaces.station;
@@ -81,13 +87,13 @@ async fn main(spawner: Spawner) -> ! {
 
     // make sure WiFi is started before scanning
     println!("Starting wifi");
-    controller
-        .set_config(&Config::Station(StationConfig::default()))
+    let mut running_controller = controller
+        .start(&Config::Station(StationConfig::default()))
         .unwrap();
 
     println!("Scan");
     let scan_config = ScanConfig::default().with_max(10);
-    let result = controller.scan_async(&scan_config).await.unwrap();
+    let result = running_controller.scan_async(&scan_config).await.unwrap();
     for ap in result {
         println!("{:?}", ap);
     }
@@ -97,10 +103,10 @@ async fn main(spawner: Spawner) -> ! {
             .with_ssid(SSID)
             .with_password(PASSWORD.into()),
     );
-    controller.set_config(&station_config).unwrap();
+    running_controller.set_config(&station_config).unwrap();
     println!("Wifi configured and started!");
 
-    spawner.spawn(connection(controller)).ok();
+    spawner.spawn(connection(running_controller)).ok();
     spawner.spawn(net_task(runner)).ok();
 
     stack.wait_config_up().await;
@@ -147,7 +153,7 @@ async fn main(spawner: Spawner) -> ! {
 }
 
 #[embassy_executor::task]
-async fn connection(mut controller: WifiController<'static>) {
+async fn connection(mut controller: RunningWifiController<'static>) {
     println!("start connection task");
 
     loop {
