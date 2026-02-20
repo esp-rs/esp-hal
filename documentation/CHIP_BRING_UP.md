@@ -1,3 +1,4 @@
+# Chip Support Guidelines
 
 This guide aims to reach a chip bring-up state where basic examples build and flash successfully (even if they do nothing) and watchdogs reboot the chip.
 
