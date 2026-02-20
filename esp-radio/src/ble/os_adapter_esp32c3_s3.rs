@@ -6,14 +6,12 @@ use crate::hal::system::Cpu;
 use crate::{
     ble::InvalidConfigError,
     common_adapter::*,
-    hal::{interrupt, peripherals::Interrupt},
+    hal::{interrupt::Priority, peripherals::BT},
+    interrupt_dispatch::Handler,
 };
 
-pub(crate) static mut ISR_INTERRUPT_5: (*mut c_void, *mut c_void) =
-    (core::ptr::null_mut(), core::ptr::null_mut());
-
-pub(crate) static mut ISR_INTERRUPT_8: (*mut c_void, *mut c_void) =
-    (core::ptr::null_mut(), core::ptr::null_mut());
+static ISR_INTERRUPT_5: Handler = Handler::new();
+static ISR_INTERRUPT_8: Handler = Handler::new();
 
 #[repr(C)]
 pub(super) struct osi_funcs_s {
@@ -671,20 +669,19 @@ pub(crate) unsafe extern "C" fn interrupt_handler_set(
         "interrupt_handler_set {} {:?} {:?}",
         interrupt_no, func, arg
     );
-    unsafe {
-        match interrupt_no {
-            5 => {
-                ISR_INTERRUPT_5 = (func as *mut c_void, arg as *mut c_void);
-                #[cfg(esp32c3)]
-                interrupt::enable(Interrupt::RWBT, interrupt::Priority::Priority1);
-                interrupt::enable(Interrupt::BT_BB, interrupt::Priority::Priority1);
-            }
-            8 => {
-                ISR_INTERRUPT_8 = (func as *mut c_void, arg as *mut c_void);
-                interrupt::enable(Interrupt::RWBLE, interrupt::Priority::Priority1);
-            }
-            _ => panic!("Unsupported interrupt number {}", interrupt_no),
-        }
+
+    match interrupt_no {
+        5 => unsafe {
+            ISR_INTERRUPT_5.set(func as *const c_void, arg.cast());
+            #[cfg(esp32c3)]
+            BT::steal().enable_rwbt_interrupt(Priority::Priority1);
+            BT::steal().enable_bb_interrupt(Priority::Priority1);
+        },
+        8 => unsafe {
+            ISR_INTERRUPT_8.set(func as *const c_void, arg.cast());
+            BT::steal().enable_rwble_interrupt(Priority::Priority1);
+        },
+        _ => panic!("Unsupported interrupt number {}", interrupt_no),
     }
 }
 
@@ -727,4 +724,32 @@ pub(crate) unsafe extern "C" fn ets_backup_dma_copy(
     _to_rem: i32,
 ) {
     todo!();
+}
+
+#[cfg(esp32c3)]
+#[unsafe(no_mangle)]
+#[crate::hal::ram]
+extern "C" fn RWBT() {
+    ISR_INTERRUPT_5.dispatch();
+}
+
+#[unsafe(no_mangle)]
+#[crate::hal::ram]
+extern "C" fn RWBLE() {
+    ISR_INTERRUPT_8.dispatch();
+}
+
+#[unsafe(no_mangle)]
+#[crate::hal::ram]
+extern "C" fn BT_BB() {
+    ISR_INTERRUPT_5.dispatch();
+}
+
+pub(crate) fn shutdown_ble_isr() {
+    unsafe {
+        #[cfg(esp32c3)]
+        BT::steal().disable_rwbt_interrupt();
+        BT::steal().disable_rwble_interrupt();
+        BT::steal().disable_bb_interrupt();
+    }
 }

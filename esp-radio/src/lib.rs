@@ -150,12 +150,7 @@ if let Ok(controller) = BleConnector::new(peripherals.BT, Default::default()) {}
 #![no_std]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![cfg_attr(feature = "print-logs-from-driver", feature(c_variadic))]
-#![deny(rust_2018_idioms, rustdoc::all)]
-#![allow(rustdoc::bare_urls)]
-// allow until num-derive doesn't generate this warning anymore (unknown_lints because Xtensa
-// toolchain doesn't know about that lint, yet)
-#![allow(unknown_lints)]
-#![allow(non_local_definitions)]
+#![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
 #![cfg_attr(
     not(any(feature = "wifi", feature = "ble")),
     allow(
@@ -184,7 +179,6 @@ pub use esp_phy::CalibrationResult;
 #[cfg(not(feature = "unstable"))]
 use esp_phy::CalibrationResult;
 use esp_radio_rtos_driver as preempt;
-use esp_sync::RawMutex;
 #[cfg(esp32)]
 use hal::analog::adc::{release_adc2, try_claim_adc2};
 #[cfg(feature = "wifi")]
@@ -218,7 +212,6 @@ pub(crate) mod sys {
     pub use esp_wifi_sys_esp32s3::*;
 }
 
-use crate::radio::{setup_radio_isr, shutdown_radio_isr};
 #[cfg(feature = "wifi")]
 use crate::wifi::WifiError;
 
@@ -245,8 +238,7 @@ macro_rules! unstable_module {
 }
 
 mod compat;
-
-mod radio;
+mod interrupt_dispatch;
 mod time;
 
 #[cfg(feature = "wifi")]
@@ -266,16 +258,16 @@ unstable_module! {
 
 pub(crate) mod common_adapter;
 
-pub(crate) static ESP_RADIO_LOCK: RawMutex = RawMutex::new();
+#[cfg(all(feature = "ble", bt_controller = "npl"))]
+pub(crate) static ESP_RADIO_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 
-static RADIO_REFCOUNT: critical_section::Mutex<core::cell::Cell<u32>> =
-    critical_section::Mutex::new(core::cell::Cell::new(0));
+static RADIO_REFCOUNT: esp_sync::NonReentrantMutex<u32> = esp_sync::NonReentrantMutex::new(0);
 
 // this is just to verify that we use the correct defaults in `build.rs`
 #[allow(clippy::assertions_on_constants)] // TODO: try assert_eq once it's usable in const context
 const _: () = {
     cfg_if::cfg_if! {
-        if #[cfg(not(esp32h2))] {
+        if #[cfg(wifi_driver_supported)] {
             core::assert!(sys::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM == 10);
             core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
             core::assert!(sys::include::WIFI_STATIC_TX_BUFFER_NUM == 0);
@@ -329,8 +321,6 @@ pub(crate) fn init() -> Result<(), InitializationError> {
 
     crate::common_adapter::enable_wifi_power_domain();
 
-    setup_radio_isr();
-
     wifi_set_log_verbose();
     init_radio_clocks();
 
@@ -353,7 +343,10 @@ pub(crate) fn deinit() {
         unsafe { crate::wifi::os_adapter::coex_deinit() };
     }
 
-    shutdown_radio_isr();
+    #[cfg(feature = "wifi")]
+    wifi::shutdown_wifi_isr();
+    #[cfg(feature = "ble")]
+    ble::shutdown_ble_isr();
 
     #[cfg(esp32)]
     // Allow using `ADC2` again
@@ -371,20 +364,14 @@ impl RadioRefGuard {
     /// Increments the refcount. If the old count was 0, it performs hardware init.
     /// If hardware init fails, it rolls back the refcount only once.
     fn new() -> Result<Self, InitializationError> {
-        critical_section::with(|cs| {
+        RADIO_REFCOUNT.with(|rc| {
             debug!("Creating RadioRefGuard");
-            let rc = RADIO_REFCOUNT.borrow(cs);
 
-            let prev = rc.get();
-            rc.set(prev + 1);
-
-            if prev == 0
-                && let Err(e) = init()
-            {
-                rc.set(prev);
-                return Err(e);
+            if *rc == 0 {
+                init()?;
             }
 
+            *rc += 1;
             Ok(RadioRefGuard)
         })
     }
@@ -393,18 +380,14 @@ impl RadioRefGuard {
 impl Drop for RadioRefGuard {
     /// Decrements the refcount. If the count drops to 0, it performs hardware de-init.
     fn drop(&mut self) {
-        critical_section::with(|cs| {
+        RADIO_REFCOUNT.with(|rc| {
             debug!("Dropping RadioRefGuard");
-            let rc = RADIO_REFCOUNT.borrow(cs);
 
-            let prev = rc.get();
-            rc.set(prev - 1);
-
-            if prev == 1 {
-                // Last user dropped, run de-initialization
+            *rc -= 1;
+            if *rc == 0 {
                 deinit();
             }
-        });
+        })
     }
 }
 

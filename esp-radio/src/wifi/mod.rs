@@ -1,7 +1,5 @@
 //! Wi-Fi
 
-#![deny(missing_docs)]
-
 use alloc::{borrow::ToOwned, collections::vec_deque::VecDeque, str, vec::Vec};
 use core::{
     fmt::{Debug, Write},
