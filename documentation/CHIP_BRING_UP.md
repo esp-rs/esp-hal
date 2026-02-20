@@ -172,10 +172,11 @@ clocks = { system_clocks = { clock_tree = [
 ```
 
 Then, declare new chip in `esp-metadata-generated`: 
-- Define the feature in it's Cargo.toml
-    ```
-    <CHIP> = ["_device-selected"]`
-    ```
+- Define the feature in it's Cargo.toml:
+   ```
+   <CHIP> = ["_device-selected"]
+   ```
+
 - Add it to the other chips in `lib.rs` of this crate.
 
 And ***that's it***. The rest will be generated after you run `cargo xtask update-metadata`.
@@ -265,3 +266,4 @@ Implementing further peripheral support boils down to a relatively simple loop o
 
 - **A huge number of errors**
   Sometimes this process does indeed cause dozens or even hundreds of errors, but it is worth checking again to see if most of them can be corrected with a couple of `cfg`-gates.
+  
