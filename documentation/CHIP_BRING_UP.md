@@ -104,7 +104,7 @@ Those *.ld files are the complete, final linker scripts produced by the build sy
 
 To complete the linker-related bring-up, handle the `esp-rom-sys` crate.
 
-1. Copy all `.ld` files from `esp-idf/components/esp-rom/<CHIP>/ld` except files containing `.libc*` or `.newlib*`.
+1. Copy all `.ld` files from `esp-idf/components/esp-rom/<CHIP>/ld` except files containing `.libc*` or `.newlib*`. It would be ideal to document which `ESP-IDF` commit you are specifically taking these linker scripts from. The future wireless drivers implementation for [esp-wireless-drivers-3rdparty](https://github.com/esp-rs/esp-wireless-drivers-3rdparty/tree/master) should be taken from the same commit.
 
 2. Place them into:
    `esp-rom-sys/ld/<chip>/rom`
@@ -266,4 +266,3 @@ Implementing further peripheral support boils down to a relatively simple loop o
 
 - **A huge number of errors**
   Sometimes this process does indeed cause dozens or even hundreds of errors, but it is worth checking again to see if most of them can be corrected with a couple of `cfg`-gates.
-  
