@@ -303,9 +303,10 @@ pub enum InterfaceMacAddress {
 
 /// Hardware (MAC) address.
 ///
-/// Currently represents an 6-byte address, but the public API is
-/// slice-based to allow future extension.
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+/// Currently represents an 6-byte address, with expansion expected in the future to support 8-byte
+/// addresses.
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct MacAddress([u8; 6]);
 
 impl MacAddress {
