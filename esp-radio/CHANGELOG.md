@@ -55,9 +55,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WifiController::is_connected()` and `WifiController::is_started()` now return a simple `bool` instead of `Result<bool, WifiError>` and are marked as unstable (#4971)
 - `ScanMethod` has been moved to `wifi::sta` (#5033)
 - `set_protocols` / `set_bandwidths` changed to support 5G-band (#5023)
-- MAC addresses now should be obtained from `esp_hal::efuse::radio_mac_address(MacForRadio::)`. (#5002)
-- MAC addresses now should be obtained from `esp_hal::efuse::Efuse::radio_mac_address(MacForRadio::...)`. (#5002)
-- MAC addresses now should be obtained from `esp_hal::efuse::Efuse::radio_mac_address(MacAddressType::...)`. (#5002)
 - MAC addresses now should be obtained from `esp_hal::efuse::Efuse::interface_mac_address(InterfaceMacAddress::...)`. (#5002)
 
 ### Fixed
