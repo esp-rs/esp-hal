@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ScanMethod` has been moved to `wifi::sta` (#5033)
 - `set_protocols` / `set_bandwidths` changed to support 5G-band (#5023)
 - `CountryInfo` is now unstable (#4981)
+- MAC addresses now should be obtained from `esp_hal::efuse::Efuse::interface_mac_address(InterfaceMacAddress::...)`. (#5002)
 
 ### Fixed
 
@@ -85,6 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `wifi::WifiMode` and `WifiController::set_mode` have been removed (#4991)
 - `WifiController` methods `start_async` and `stop_async` have been removed. `set_config` will now make sure that the controller is started / re-started as needed. Dropping the controller will stop it first. (#4984)
 - `power_save` has been dropped from `ControllerConfig` (#4981)
+- MAC address getters: `access_point_mac()`, `station_mac()` and `ble::mac()`. (#5002)
 
 ## [v0.17.0] - 2025-10-30
 
