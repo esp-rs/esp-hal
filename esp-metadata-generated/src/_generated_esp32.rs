@@ -3362,8 +3362,9 @@ macro_rules! for_each_peripheral {
         UHCI0 <= UHCI0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "UHCI1 peripheral singleton"] UHCI1 <= UHCI1() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "WIFI peripheral singleton"]
-        WIFI <= WIFI() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "DMA_SPI2 peripheral singleton"] DMA_SPI2 <= SPI2() (unstable)));
+        WIFI <= WIFI(WIFI_MAC : { bind_mac_interrupt, enable_mac_interrupt,
+        disable_mac_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "DMA_SPI2 peripheral singleton"] DMA_SPI2 <= SPI2() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "DMA_SPI3 peripheral singleton"]
         DMA_SPI3 <= SPI3() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "DMA_I2S0 peripheral singleton"] DMA_I2S0 <= I2S0() (unstable)));
@@ -3372,7 +3373,10 @@ macro_rules! for_each_peripheral {
         "ADC1 peripheral singleton"] ADC1 <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "ADC2 peripheral singleton"]
         ADC2 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "BT peripheral singleton"] BT <= virtual() (unstable)));
+        "BT peripheral singleton"] BT <= virtual(BT_BB : { bind_bb_interrupt,
+        enable_bb_interrupt, disable_bb_interrupt }, RWBLE : { bind_rwble_interrupt,
+        enable_rwble_interrupt, disable_rwble_interrupt }, RWBT : { bind_rwbt_interrupt,
+        enable_rwbt_interrupt, disable_rwbt_interrupt }) (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "CPU_CTRL peripheral singleton"]
         CPU_CTRL <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type
         #[doc = "DAC1 peripheral singleton"] DAC1 <= virtual() (unstable)));
@@ -3684,16 +3688,20 @@ macro_rules! for_each_peripheral {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
         peri_type #[doc = "UHCI0 peripheral singleton"] UHCI0 <= UHCI0() (unstable)), (@
         peri_type #[doc = "UHCI1 peripheral singleton"] UHCI1 <= UHCI1() (unstable)), (@
-        peri_type #[doc = "WIFI peripheral singleton"] WIFI <= WIFI() (unstable)), (@
-        peri_type #[doc = "DMA_SPI2 peripheral singleton"] DMA_SPI2 <= SPI2()
+        peri_type #[doc = "WIFI peripheral singleton"] WIFI <= WIFI(WIFI_MAC : {
+        bind_mac_interrupt, enable_mac_interrupt, disable_mac_interrupt }) (unstable)),
+        (@ peri_type #[doc = "DMA_SPI2 peripheral singleton"] DMA_SPI2 <= SPI2()
         (unstable)), (@ peri_type #[doc = "DMA_SPI3 peripheral singleton"] DMA_SPI3 <=
         SPI3() (unstable)), (@ peri_type #[doc = "DMA_I2S0 peripheral singleton"]
         DMA_I2S0 <= I2S0() (unstable)), (@ peri_type #[doc =
         "DMA_I2S1 peripheral singleton"] DMA_I2S1 <= I2S1() (unstable)), (@ peri_type
         #[doc = "ADC1 peripheral singleton"] ADC1 <= virtual() (unstable)), (@ peri_type
         #[doc = "ADC2 peripheral singleton"] ADC2 <= virtual() (unstable)), (@ peri_type
-        #[doc = "BT peripheral singleton"] BT <= virtual() (unstable)), (@ peri_type
-        #[doc = "CPU_CTRL peripheral singleton"] CPU_CTRL <= virtual() (unstable)), (@
+        #[doc = "BT peripheral singleton"] BT <= virtual(BT_BB : { bind_bb_interrupt,
+        enable_bb_interrupt, disable_bb_interrupt }, RWBLE : { bind_rwble_interrupt,
+        enable_rwble_interrupt, disable_rwble_interrupt }, RWBT : { bind_rwbt_interrupt,
+        enable_rwbt_interrupt, disable_rwbt_interrupt }) (unstable)), (@ peri_type #[doc
+        = "CPU_CTRL peripheral singleton"] CPU_CTRL <= virtual() (unstable)), (@
         peri_type #[doc = "DAC1 peripheral singleton"] DAC1 <= virtual() (unstable)), (@
         peri_type #[doc = "DAC2 peripheral singleton"] DAC2 <= virtual() (unstable)), (@
         peri_type #[doc = "FLASH peripheral singleton"] FLASH <= virtual() (unstable)),

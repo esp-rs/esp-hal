@@ -1,4 +1,4 @@
-use crate::hal::{interrupt, peripherals};
+use crate::hal::peripherals;
 
 pub(crate) fn chip_ints_on(mask: u32) {
     unsafe {

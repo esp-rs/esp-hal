@@ -1,7 +1,3 @@
-#[cfg(feature = "wifi")]
-#[allow(unused_imports)]
-use crate::hal::{interrupt, peripherals};
-
 pub(crate) fn setup_radio_isr() {
     // wifi enabled in set_isr
     // ble not supported

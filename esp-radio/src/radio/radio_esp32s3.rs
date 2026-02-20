@@ -1,9 +1,5 @@
-#[cfg(any(feature = "wifi", feature = "ble"))]
-#[allow(unused_imports)]
-use crate::{
-    ESP_RADIO_LOCK,
-    hal::{interrupt, peripherals::Interrupt},
-};
+#[cfg(feature = "ble")]
+use crate::{ESP_RADIO_LOCK, hal::peripherals};
 
 pub(crate) fn setup_radio_isr() {
     // no-op
@@ -11,9 +7,9 @@ pub(crate) fn setup_radio_isr() {
 
 pub(crate) fn shutdown_radio_isr() {
     #[cfg(feature = "ble")]
-    {
-        interrupt::disable(crate::hal::system::Cpu::ProCpu, Interrupt::BT_BB);
-        interrupt::disable(crate::hal::system::Cpu::ProCpu, Interrupt::RWBLE);
+    unsafe {
+        peripherals::BT::steal().disable_bb_interrupt();
+        peripherals::BT::steal().disable_rwble_interrupt();
     }
 }
 
@@ -65,7 +61,7 @@ extern "C" fn RWBLE() {
 extern "C" fn BT_BB() {
     ESP_RADIO_LOCK.lock(|| unsafe {
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_5;
-        trace!("interrupt RWBT {:?} {:?}", fnc, arg);
+        trace!("interrupt BT_BB {:?} {:?}", fnc, arg);
 
         if !fnc.is_null() {
             let fnc: fn(*mut crate::sys::c_types::c_void) = core::mem::transmute(fnc);

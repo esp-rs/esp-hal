@@ -60,7 +60,7 @@ peripherals = [
     { name = "UART2", interrupts = { peri = "UART2" } },
     { name = "UHCI0", dma_peripheral = 4 },
     { name = "UHCI1", dma_peripheral = 5 },
-    { name = "WIFI" },
+    { name = "WIFI", interrupts = { mac = "WIFI_MAC" } },
 
     { name = "DMA_SPI2", pac = "SPI2" },
     { name = "DMA_SPI3", pac = "SPI3" },
@@ -69,7 +69,7 @@ peripherals = [
 
     { name = "ADC1", virtual = true },
     { name = "ADC2", virtual = true },
-    { name = "BT", virtual = true },
+    { name = "BT", virtual = true, interrupts = { rwbt = "RWBT", rwble = "RWBLE", bb = "BT_BB" } },
     { name = "CPU_CTRL", virtual = true },
     { name = "DAC1", virtual = true },
     { name = "DAC2", virtual = true },

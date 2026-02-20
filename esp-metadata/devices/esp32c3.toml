@@ -60,12 +60,12 @@ peripherals = [
 
     { name = "ADC1", virtual = true },
     { name = "ADC2", virtual = true },
-    { name = "BT", virtual = true },
+    { name = "BT", virtual = true, interrupts = { rwbt = "RWBT", rwble = "RWBLE", bb = "BT_BB" } },
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "TSENS", virtual = true },
-    { name = "WIFI", virtual = true },
+    { name = "WIFI", virtual = true, interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" } },
 ]
 
 symbols = [

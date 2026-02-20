@@ -1,5 +1,3 @@
-use crate::hal::{interrupt, peripherals};
-
 pub(crate) fn chip_ints_on(mask: u32) {
     unsafe { crate::hal::xtensa_lx::interrupt::enable_mask(mask) };
 }
@@ -66,8 +64,9 @@ pub unsafe extern "C" fn set_isr(
         _ => panic!("set_isr - unsupported interrupt number {}", n),
     }
     #[cfg(feature = "wifi")]
-    interrupt::enable(
-        peripherals::Interrupt::WIFI_MAC,
-        interrupt::Priority::Priority1,
-    );
+    unsafe {
+        use crate::hal::{interrupt::Priority, peripherals::WIFI};
+
+        WIFI::steal().enable_mac_interrupt(Priority::Priority1);
+    }
 }

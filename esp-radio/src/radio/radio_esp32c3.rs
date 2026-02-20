@@ -1,9 +1,7 @@
+#[cfg(feature = "ble")]
+use crate::hal::peripherals;
 #[cfg(any(feature = "wifi", feature = "ble"))]
-#[allow(unused_imports)]
-use crate::{
-    hal::{interrupt, peripherals::Interrupt},
-    sys,
-};
+use crate::sys;
 
 pub(crate) fn setup_radio_isr() {
     // no-op
@@ -11,10 +9,10 @@ pub(crate) fn setup_radio_isr() {
 
 pub(crate) fn shutdown_radio_isr() {
     #[cfg(feature = "ble")]
-    {
-        interrupt::disable(crate::hal::system::Cpu::ProCpu, Interrupt::RWBT);
-        interrupt::disable(crate::hal::system::Cpu::ProCpu, Interrupt::RWBLE);
-        interrupt::disable(crate::hal::system::Cpu::ProCpu, Interrupt::BT_BB);
+    unsafe {
+        peripherals::BT::steal().disable_rwbt_interrupt();
+        peripherals::BT::steal().disable_rwble_interrupt();
+        peripherals::BT::steal().disable_bb_interrupt();
     }
 }
 

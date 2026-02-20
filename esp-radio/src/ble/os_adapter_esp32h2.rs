@@ -3,11 +3,7 @@ use procmacros::BuilderLite;
 use super::*;
 use crate::{
     ble::InvalidConfigError,
-    hal::{
-        clock::ModemClockController,
-        interrupt,
-        peripherals::{BT, Interrupt},
-    },
+    hal::{clock::ModemClockController, interrupt, peripherals::BT},
     sys::include::esp_bt_controller_config_t,
 };
 
@@ -373,11 +369,11 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
         match source {
             3 => {
                 ISR_INTERRUPT_3 = (handler, arg);
-                interrupt::enable(Interrupt::LP_BLE_TIMER, interrupt::Priority::Priority1);
+                BT::steal().enable_lp_timer_interrupt(interrupt::Priority::Priority1);
             }
             15 => {
                 ISR_INTERRUPT_15 = (handler, arg);
-                interrupt::enable(Interrupt::BT_MAC, interrupt::Priority::Priority1);
+                BT::steal().enable_mac_interrupt(interrupt::Priority::Priority1);
             }
             _ => panic!("Unexpected interrupt source {}", source),
         }
