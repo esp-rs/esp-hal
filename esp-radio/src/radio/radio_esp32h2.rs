@@ -1,10 +1,6 @@
 #[cfg(feature = "ble")]
 use crate::{hal::peripherals, sys};
 
-pub(crate) fn setup_radio_isr() {
-    // no-op
-}
-
 pub(crate) fn shutdown_radio_isr() {
     #[cfg(feature = "ble")]
     unsafe {

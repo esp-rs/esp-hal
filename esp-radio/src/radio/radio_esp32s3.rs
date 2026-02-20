@@ -1,15 +1,9 @@
-#[cfg(feature = "ble")]
-use crate::hal::peripherals;
-
-pub(crate) fn setup_radio_isr() {
-    // no-op
-}
-
 pub(crate) fn shutdown_radio_isr() {
     #[cfg(feature = "ble")]
     unsafe {
-        peripherals::BT::steal().disable_bb_interrupt();
-        peripherals::BT::steal().disable_rwble_interrupt();
+        use crate::hal::peripherals::BT;
+        BT::steal().disable_bb_interrupt();
+        BT::steal().disable_rwble_interrupt();
     }
 }
 
