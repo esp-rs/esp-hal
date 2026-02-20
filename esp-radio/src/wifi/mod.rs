@@ -2770,11 +2770,18 @@ band.
         Ok((primary, SecondaryChannel::from_raw(secondary)))
     }
 
+    #[cfg_attr(docsrs, procmacros::doc_replace(
+        "hint_5g" => {
+            cfg(wifi_has_5g) => "
+When operating in 5 GHz band, the second channel is automatically determined by the primary
+channel according to the 802.11 standard. Any manually configured second channel will be
+ignored.",
+            _ => ""
+        },
+    ))]
     /// Sets the primary and secondary Wi-Fi channel.
     ///
-    /// When operating in 5 GHz band, the second channel is automatically determined by the primary
-    /// channel according to the 802.11 standard. Any manually configured second channel will be
-    /// ignored.
+    /// # {hint_5g}
     #[instability::unstable]
     pub fn set_channel(
         &mut self,
