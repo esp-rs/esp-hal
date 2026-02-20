@@ -28,14 +28,6 @@ use crate::{
     system::Cpu,
 };
 
-/// Errors related to direct binding of interrupts
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum DirectBindingError {
-    /// The CPU interrupt is a reserved interrupt
-    CpuInterruptReserved,
-}
-
 /// Interrupt kind
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum InterruptKind {
@@ -50,7 +42,7 @@ for_each_interrupt!(
         paste::paste! {
             /// Enumeration of available CPU interrupts.
             #[repr(u32)]
-            #[derive(Debug, Copy, Clone)]
+            #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
             #[cfg_attr(feature = "defmt", derive(defmt::Format))]
             pub enum CpuInterrupt {
                 $(
@@ -65,6 +57,34 @@ for_each_interrupt!(
                     match n {
                         $(n if n == $n && n != DISABLED_CPU_INTERRUPT => Some(Self:: [<Interrupt $n>]),)*
                         _ => None
+                    }
+                }
+            }
+        }
+    };
+);
+
+for_each_classified_interrupt!(
+    (direct_bindable $( ([$class:ident $idx_in_class:literal] $n:literal) ),*) => {
+        paste::paste! {
+            /// Enumeration of CPU interrupts available for direct binding.
+            #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+            pub enum DirectBindableCpuInterrupt {
+                $(
+                    #[doc = concat!(" Direct bindable CPU interrupt number ", stringify!($idx_in_class), ".")]
+                    #[doc = " "]
+                    #[doc = concat!(" Corresponds to CPU interrupt ", stringify!($n), ".")]
+                    [<Interrupt $idx_in_class>] = $n,
+                )*
+            }
+
+            impl From<DirectBindableCpuInterrupt> for CpuInterrupt {
+                fn from(bindable: DirectBindableCpuInterrupt) -> CpuInterrupt {
+                    match bindable {
+                        $(
+                            DirectBindableCpuInterrupt::[<Interrupt $idx_in_class>] => CpuInterrupt::[<Interrupt $n>],
+                        )*
                     }
                 }
             }
@@ -181,43 +201,8 @@ impl TryFrom<u32> for Priority {
     }
 }
 
-// TODO: provide a `DirectBoundInterrupt` enum that lists the available options. This enables
-// portable direct binding.
-
 #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
 pub(super) static DISABLED_CPU_INTERRUPT: u32 = property!("interrupts.disabled_interrupt");
-
-/// The number of reserved (not directly bindable) interrupts.
-const RESERVED_COUNT: usize = const {
-    let mut count = 0;
-    for_each_interrupt!(([disabled $n:tt] $_:literal) => { count += 1; };);
-    for_each_interrupt!(([reserved $n:tt] $_:literal) => { count += 1; };);
-    for_each_interrupt!(([vector $n:tt] $_:literal) => { count += 1; };);
-    count
-};
-
-/// The interrupts reserved by the HAL
-#[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-pub static RESERVED_INTERRUPTS: [u32; RESERVED_COUNT] = const {
-    let mut counter = 0;
-    let mut reserved = [0; RESERVED_COUNT];
-    for_each_interrupt!(
-        ([disabled $_n:tt] $interrupt:literal) => {
-            reserved[counter] = $interrupt as u32;
-            counter += 1;
-        };
-        ([reserved $_n:tt] $interrupt:literal) => {
-            reserved[counter] = $interrupt as u32;
-            counter += 1;
-        };
-        ([vector $_n:tt] $interrupt:literal) => {
-            reserved[counter] = $interrupt as u32;
-            counter += 1;
-        };
-    );
-
-    reserved
-};
 
 /// The number of vectored interrupts / The number of priority levels.
 const VECTOR_COUNT: usize = const {
@@ -267,7 +252,7 @@ pub(super) static INTERRUPT_TO_PRIORITY: [Option<Priority>; INTERRUPT_COUNT] = c
     priorities
 };
 
-/// Enable an interrupt by directly binding it to a available CPU interrupt
+/// Enable an interrupt by directly binding it to an available CPU interrupt
 ///
 /// ⚠️ This installs a *raw trap handler*, the `handler` user provides is written directly into the
 /// CPU interrupt vector table. That means:
@@ -282,19 +267,12 @@ pub(super) static INTERRUPT_TO_PRIORITY: [Option<Priority>; INTERRUPT_COUNT] = c
 ///
 /// Unless you are sure that you need such low-level control to achieve the lowest possible latency,
 /// you most likely want to use [`enable`][crate::interrupt::enable] instead.
-///
-/// Trying using a reserved interrupt from [`RESERVED_INTERRUPTS`] will return
-/// an error.
 pub fn enable_direct(
     interrupt: Interrupt,
     level: Priority,
-    cpu_interrupt: CpuInterrupt,
+    cpu_interrupt: DirectBindableCpuInterrupt,
     handler: unsafe extern "C" fn(),
-) -> Result<(), DirectBindingError> {
-    if RESERVED_INTERRUPTS.contains(&(cpu_interrupt as _)) {
-        return Err(DirectBindingError::CpuInterruptReserved);
-    }
-
+) {
     super::map_raw(Cpu::current(), interrupt, cpu_interrupt as u32);
     cpu_int::set_priority_raw(cpu_interrupt as u32, level);
 
@@ -346,7 +324,6 @@ pub fn enable_direct(
     }
 
     cpu_int::enable_cpu_interrupt_raw(cpu_interrupt as u32);
-    Ok(())
 }
 
 // helper: returns correctly encoded RISC-V `jal` instruction

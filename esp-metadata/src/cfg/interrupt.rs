@@ -198,6 +198,14 @@ impl GenericProperty for InterruptControllerProperties {
         }
 
         let for_each_interrupt = generate_for_each_macro("interrupt", &[("all", &all)]);
+        let for_each_direct_bindable_interrupt = generate_for_each_macro(
+            "classified_interrupt",
+            &[
+                ("direct_bindable", &direct_bindable),
+                ("vector", &vector),
+                ("reserved", &reserved),
+            ],
+        );
 
         let all_priorities = (0..properties.priority_levels)
             .map(|p| {
@@ -216,6 +224,7 @@ impl GenericProperty for InterruptControllerProperties {
 
         Some(quote! {
             #for_each_interrupt
+            #for_each_direct_bindable_interrupt
             #for_each_priority
         })
     }
@@ -257,5 +266,5 @@ fn is_contiguous(mut iter: impl Iterator<Item = usize>) -> bool {
             prev = next;
         }
     }
-    return true;
+    true
 }
