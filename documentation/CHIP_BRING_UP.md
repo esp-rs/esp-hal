@@ -5,8 +5,6 @@ In general, comparison and existing knowledge are key to obtaining all required 
 
 We prefer to trust `ESP-IDF` first and `TRM` second. The reason is simple: `TRM`, unfortunately, might sometimes contain inaccuracies, while `ESP-IDF` code is proven to work — operability is our main priority. As a side task, you may look for inconsistencies in the TRM and report them via GitHub issues (if you are an external contributor) or in the `Documentation` channel (if you are a team member).
 
----
-
 ## Linker Scripts
 The process usually begins with linker scripts.
 
@@ -95,6 +93,12 @@ For C5 specifically:
 - `IROM` / `DROM` also share the same address range  
 
 For `<chip>.x`, refer to similar chips (`c6`, `h2`, `c2`) and copy as needed, adjusting addresses where required. In recent Espressif chips, linker structures are typically similar.
+
+--- 
+
+If you want to see the fully expanded linker scripts, build an example `ESP-IDF` project (`hello-world` is enough) for the same chip, then search inside the project’s build/ directory for *.ld.
+
+Those *.ld files are the complete, final linker scripts produced by the build system and passed to the linker. Use them as the “ground truth”, and compare them to the corresponding *.ld.in template inputs to verify your #defines, memory regions, and section placement match what ESP-IDF ends up generating.
 
 ### esp-rom-sys
 
@@ -236,6 +240,28 @@ Add a minimal clocks implementation (placeholder + default clock value) in `soc/
 
 Also implement `regi2c` functions using `ESP-IDF` as reference.
 
-### Troubleshooting
+## Subsequent Addition Of Peripherals
+Implementing further peripheral support boils down to a relatively simple loop of actions:
+- Define the driver in `metadata`:
+   - Describe the peripheral via [device.<peripheral>] following the example of other chips
+   - Add the corresponding entry to the clock tree (check if needed clocks are defined).
+- Check the driver in `esp-hal` for the presence of `cfg`-gates that restrict your chip, or implement the missing parts of the functionality for it.
+- Enable and run the relevant tests and examples.
+- If it didn't work and errors were returned, fix them. 
 
-TO BE FINISHED
+## Troubleshooting
+
+- **Clocks are not enabled**  
+  Make sure the required peripheral clocks are enabled and the module is taken out of reset. Ensure the clock source itself is defined correctly in `metadata`
+
+- **Registers do not match hardware (old ECO / TRM issue)**  
+  If register layout or behavior does not match expectations, the `TRM` may be outdated or based on an older ECO. Cross-check against `ESP-IDF` and fix the PAC definitions if necessary.
+
+- **Chip does not boot**  
+  Verify basic system configuration. Ensure `UART_SCLK` is enabled. 
+
+- **DMA does not work**  
+  Confirm that DMA clocks are enabled and that the memory region used is accessible. Check whether `APM` prevents `DMA` from reading or writing memory.
+
+- **A huge number of errors**
+  Sometimes this process does indeed cause dozens or even hundreds of errors, but it is worth checking again to see if most of them can be corrected with a couple of `cfg`-gates.
