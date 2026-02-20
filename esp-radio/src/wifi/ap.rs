@@ -5,7 +5,9 @@ use core::fmt;
 
 use procmacros::BuilderLite;
 
-use super::{AuthenticationMethod, CountryInfo, Protocols, SecondaryChannel, Ssid};
+#[cfg(feature = "unstable")]
+use super::CountryInfo;
+use super::{AuthenticationMethod, Protocols, SecondaryChannel, Ssid};
 use crate::{WifiError, sys::include::wifi_ap_record_t};
 
 /// Information about a detected Wi-Fi access point.
@@ -25,6 +27,8 @@ pub struct AccessPointInfo {
     pub signal_strength: i8,
     /// The authentication method used by the access point.
     pub auth_method: Option<AuthenticationMethod>,
+    #[cfg(feature = "unstable")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     /// The country information of the access point (if available from beacon frames).
     pub country: Option<CountryInfo>,
 }
@@ -161,6 +165,8 @@ pub(crate) fn convert_ap_info(record: &wifi_ap_record_t) -> AccessPointInfo {
         secondary_channel: SecondaryChannel::from_raw(record.second),
         signal_strength: record.rssi,
         auth_method: Some(AuthenticationMethod::from_raw(record.authmode)),
+        #[cfg(feature = "unstable")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
         country: CountryInfo::try_from_c(&record.country),
     }
 }

@@ -323,3 +323,12 @@ The `protocols` field in `AccessPointConfig`, `StationConfig`, and `EapStationCo
 -     .with_protocols(Protocol::P802D11BGN.into());
 +     .with_protocols(Protocols::default());
 ```
+
+## Controller config changes
+
+`PowerSaveMode` is not longer part of `ControllerConfig`. Use the setter on the controller, once created.
+
+```diff
+- `ControllerConfig::default().with_power_save(PowerSaveMode::default())`
++ `controller.set_power_save(PowerSaveMode::default())`
+```
