@@ -37,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WifiController::set_mode` is now unstable (#4570)
 - `ScanTypeConfig` now uses `esp_hal::time::Duration` instead of `core::time::Duration` (#4609)
 - The `CsiConfig` struct has been moved to the `wifi::csi` module (#4588)
-- The `ScanMethod`, `ScanTypeConfig`, and `ScanConfig` types have been moved to `wifi::scan` (#4588)
+- The `ScanTypeConfig`, and `ScanConfig` types have been moved to `wifi::scan` (#4588)
 - `esp-alloc` dependency no longer enables default features (#4721)
 - `sys-logs` feature has been renamed to `print-logs-from-driver` and has been marked unstable (#4810)
 - Unstable features now require the `unstable` feature flag to be enabled (#4810)
@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Various structs now use the `Ssid` type to represent SSIDs instead of `String` (#4953)
 - Update to `bt-hci` version 0.8 and `trouble-host` version 0.6 (#4962)
 - `WifiController::is_connected()` and `WifiController::is_started()` now return a simple `bool` instead of `Result<bool, WifiError>` and are marked as unstable (#4971)
+- `ScanMethod` has been moved to `wifi::sta` (#5033)
 
 ### Fixed
 
