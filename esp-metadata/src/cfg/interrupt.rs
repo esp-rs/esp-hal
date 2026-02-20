@@ -94,14 +94,19 @@ impl RiscvControllerProperties {
             RiscvFlavour::Basic | RiscvFlavour::Plic => {
                 // Vectoring uses high interrupt lines, as higher IDs are serviced later.
                 // Allocate the last interrupt lines, that are not reserved or disabled.
-                (0..self.interrupts as usize)
+                let mut interrupts = (0..self.interrupts as usize)
                     .rev()
                     .filter(|&intr| {
                         self.disabled_interrupt() != intr
                             && self.reserved_interrupts().all(|reserved| reserved != intr)
                     })
                     .take(self.priority_levels as usize)
-                    .collect::<Vec<_>>()
+                    .collect::<Vec<_>>();
+
+                // We want to return an ascending order
+                interrupts.reverse();
+
+                interrupts
             }
             RiscvFlavour::Clic => {
                 // After CLINT interrupts. Lower IDs are serviced later.
@@ -146,6 +151,9 @@ impl GenericProperty for InterruptControllerProperties {
         let mut classes = (0..properties.interrupts)
             .map(|_| Class::Interrupt)
             .collect::<Vec<_>>();
+
+        // Implementation assumes contiguous range of interrupts
+        assert!(is_contiguous(properties.vector_interrupts()));
 
         for intr in properties.vector_interrupts() {
             assert_eq!(classes[intr], Class::Interrupt);
@@ -238,4 +246,16 @@ impl GenericProperty for InterruptControllerProperties {
             }
         }
     }
+}
+
+fn is_contiguous(mut iter: impl Iterator<Item = usize>) -> bool {
+    if let Some(mut prev) = iter.next() {
+        for next in iter {
+            if next - prev != 1 {
+                return false;
+            }
+            prev = next;
+        }
+    }
+    return true;
 }
