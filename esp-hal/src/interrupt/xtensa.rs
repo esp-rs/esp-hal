@@ -21,6 +21,7 @@ use crate::{
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u32)]
+#[instability::unstable]
 pub enum CpuInterrupt {
     /// Level-triggered interrupt with priority 1.
     Interrupt0LevelPriority1      = 0,
@@ -165,6 +166,7 @@ impl CpuInterrupt {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum Priority {
     /// Priority level 1.
     Priority1 = 1,
@@ -178,6 +180,7 @@ pub enum Priority {
 
 impl Priority {
     /// Maximum interrupt priority
+    #[instability::unstable]
     pub const fn max() -> Priority {
         Priority::Priority3
     }
@@ -188,6 +191,7 @@ impl Priority {
     }
 }
 
+#[instability::unstable]
 impl TryFrom<u32> for Priority {
     type Error = PriorityError;
 
@@ -201,6 +205,7 @@ impl TryFrom<u32> for Priority {
     }
 }
 
+#[instability::unstable]
 impl TryFrom<u8> for Priority {
     type Error = PriorityError;
 
@@ -262,6 +267,7 @@ pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
 /// (WFI or equivalent) instruction. After executing this function, the CPU core
 /// will stop execution until an interrupt occurs.
 #[inline(always)]
+#[instability::unstable]
 pub fn wait_for_interrupt() {
     unsafe { core::arch::asm!("waiti 0") };
 }
