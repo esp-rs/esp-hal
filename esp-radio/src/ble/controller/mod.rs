@@ -1,3 +1,4 @@
+//! BLE controller
 use core::task::Poll;
 
 use bt_hci::{

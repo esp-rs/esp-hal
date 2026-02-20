@@ -1,25 +1,4 @@
-#![allow(unused)]
-
-use alloc::{boxed::Box, vec::Vec};
-use core::{
-    cell::RefCell,
-    fmt::Write,
-    mem::size_of_val,
-    ptr::{self, addr_of, addr_of_mut},
-};
-
-use esp_hal::time::{Duration, Instant};
-use esp_sync::NonReentrantMutex;
-
-use super::{OSI_FUNCS_TIME_BLOCKING, malloc::free};
-use crate::{
-    ESP_RADIO_LOCK,
-    preempt::{current_task, yield_task},
-    sys::{
-        c_types::{c_char, c_int, c_uint, c_void},
-        include::malloc,
-    },
-};
+use crate::sys::c_types::{c_char, c_int, c_uint, c_void};
 
 #[derive(Clone, Copy, Debug)]
 struct Mutex {
