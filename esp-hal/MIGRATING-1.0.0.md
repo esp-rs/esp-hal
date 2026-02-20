@@ -107,3 +107,24 @@ The `RtcClock::xtal_freq()` function and the `XtalClock` enum have been removed.
 ```rust
 let xtal_clock = esp_hal::clock::Clocks::get().xtal_clock;
 ```
+
+## Interrupt handling changes
+
+### Direct binding interrupt handlers
+
+On Xtensa MCUs (ESP32, ESP32-S2, ESP32-S3) the direct binding option has been removed.
+
+On RISC-V MCUs, the `interrupt::enable_direct` function now takes a `DirectBindableCpuInterrupt` and is infallible:
+
+```diff
+ interrupt::enable_direct(
+     peripheral_interrupt,
+     interrupt_priority,
+-    CpuInterrupt::Interrupt25,
++    DirectBindableCpuInterrupt::Interrupt0,
+     handler_function,
+-).unwrap();
++);
+```
+
+`DirectBindableCpuInterrupt` is numbered from 0, and corresponds to CPU interrupt numbers that are not disabled or reserved for vectoring.

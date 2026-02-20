@@ -99,10 +99,9 @@ mod tests {
         interrupt::enable_direct(
             Interrupt::FROM_CPU_INTR0,
             Priority::Priority3,
-            CpuInterrupt::Interrupt5,
+            interrupt::DirectBindableCpuInterrupt::Interrupt0,
             interrupt_handler,
-        )
-        .unwrap();
+        );
 
         Context { sw0_trigger_addr }
     }

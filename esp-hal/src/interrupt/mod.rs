@@ -22,10 +22,7 @@
     doc = r#"
 It is even possible, but not recommended, to bind an interrupt directly to a
 CPU interrupt. This can offer lower latency, at the cost of more complexity
-in the interrupt handler. See the `direct_vectoring.rs` example
-
-We reserve a number of CPU interrupts, which cannot be used; see
-[`RESERVED_INTERRUPTS`].
+in the interrupt handler.
 "#
 )]
 //! ## Examples

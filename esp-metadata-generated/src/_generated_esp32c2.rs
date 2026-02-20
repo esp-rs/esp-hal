@@ -331,6 +331,55 @@ macro_rules! for_each_interrupt {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_classified_interrupt {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_classified_interrupt { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_classified_interrupt!(([direct_bindable 0]
+        1)); _for_each_inner_classified_interrupt!(([direct_bindable 1] 2));
+        _for_each_inner_classified_interrupt!(([direct_bindable 2] 3));
+        _for_each_inner_classified_interrupt!(([direct_bindable 3] 4));
+        _for_each_inner_classified_interrupt!(([direct_bindable 4] 5));
+        _for_each_inner_classified_interrupt!(([direct_bindable 5] 6));
+        _for_each_inner_classified_interrupt!(([direct_bindable 6] 7));
+        _for_each_inner_classified_interrupt!(([direct_bindable 7] 8));
+        _for_each_inner_classified_interrupt!(([direct_bindable 8] 9));
+        _for_each_inner_classified_interrupt!(([direct_bindable 9] 10));
+        _for_each_inner_classified_interrupt!(([direct_bindable 10] 11));
+        _for_each_inner_classified_interrupt!(([direct_bindable 11] 12));
+        _for_each_inner_classified_interrupt!(([direct_bindable 12] 13));
+        _for_each_inner_classified_interrupt!(([direct_bindable 13] 14));
+        _for_each_inner_classified_interrupt!(([direct_bindable 14] 15));
+        _for_each_inner_classified_interrupt!(([direct_bindable 15] 16));
+        _for_each_inner_classified_interrupt!(([vector 0] 17));
+        _for_each_inner_classified_interrupt!(([vector 1] 18));
+        _for_each_inner_classified_interrupt!(([vector 2] 19));
+        _for_each_inner_classified_interrupt!(([vector 3] 20));
+        _for_each_inner_classified_interrupt!(([vector 4] 21));
+        _for_each_inner_classified_interrupt!(([vector 5] 22));
+        _for_each_inner_classified_interrupt!(([vector 6] 23));
+        _for_each_inner_classified_interrupt!(([vector 7] 24));
+        _for_each_inner_classified_interrupt!(([vector 8] 25));
+        _for_each_inner_classified_interrupt!(([vector 9] 26));
+        _for_each_inner_classified_interrupt!(([vector 10] 27));
+        _for_each_inner_classified_interrupt!(([vector 11] 28));
+        _for_each_inner_classified_interrupt!(([vector 12] 29));
+        _for_each_inner_classified_interrupt!(([vector 13] 30));
+        _for_each_inner_classified_interrupt!(([vector 14] 31));
+        _for_each_inner_classified_interrupt!((direct_bindable([direct_bindable 0] 1),
+        ([direct_bindable 1] 2), ([direct_bindable 2] 3), ([direct_bindable 3] 4),
+        ([direct_bindable 4] 5), ([direct_bindable 5] 6), ([direct_bindable 6] 7),
+        ([direct_bindable 7] 8), ([direct_bindable 8] 9), ([direct_bindable 9] 10),
+        ([direct_bindable 10] 11), ([direct_bindable 11] 12), ([direct_bindable 12] 13),
+        ([direct_bindable 13] 14), ([direct_bindable 14] 15), ([direct_bindable 15]
+        16))); _for_each_inner_classified_interrupt!((vector([vector 0] 17), ([vector 1]
+        18), ([vector 2] 19), ([vector 3] 20), ([vector 4] 21), ([vector 5] 22), ([vector
+        6] 23), ([vector 7] 24), ([vector 8] 25), ([vector 9] 26), ([vector 10] 27),
+        ([vector 11] 28), ([vector 12] 29), ([vector 13] 30), ([vector 14] 31)));
+        _for_each_inner_classified_interrupt!((reserved));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_interrupt_priority {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_interrupt_priority { $(($pattern) => $code;)*
