@@ -35,7 +35,8 @@ impl From<ScanMethod> for esp_radio::wifi::ScanMethod {
 - `ClientConfig` is now located in `wifi::sta`.
 - `EapFastConfig`, `TlsPhase2Method` and `EapClientConfig` are now located in `wifi::ap::eap`.
 - The `CsiConfig` struct is now located in `wifi::csi`.
-- The `ScanMethod`, `ScanTypeConfig`, and `ScanConfig` types are now located in `wifi::scan`.
+- The `ScanTypeConfig` and `ScanConfig` types are now located in `wifi::scan`.
+- The `ScanMethod` type has been moved from `wifi::scan` to `wifi::sta`.
 
 You will need to update any imports in your project accordingly.
 

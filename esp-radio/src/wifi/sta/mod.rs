@@ -6,7 +6,7 @@ use core::fmt;
 use enumset::EnumSet;
 use procmacros::BuilderLite;
 
-use super::{AuthenticationMethod, Protocol, Ssid, scan::ScanMethod};
+use super::{AuthenticationMethod, Protocol, Ssid};
 use crate::WifiError;
 
 unstable_module!(
@@ -14,6 +14,19 @@ unstable_module!(
     #[cfg_attr(docsrs, doc(cfg(feature = "wifi-eap")))]
     pub mod eap;
 );
+
+/// Wi-Fi scan method.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[repr(u8)]
+#[instability::unstable]
+pub enum ScanMethod {
+    /// Fast scan.
+    Fast,
+    /// Scan all channels.
+    AllChannels,
+}
 
 /// Station configuration for a Wi-Fi connection.
 #[derive(BuilderLite, Clone, Eq, PartialEq, Hash)]

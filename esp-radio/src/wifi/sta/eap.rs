@@ -6,10 +6,10 @@ use core::fmt;
 use enumset::EnumSet;
 use procmacros::BuilderLite;
 
-use super::Ssid;
+use super::ScanMethod;
 use crate::{
     WifiError,
-    wifi::{AuthenticationMethod, Protocol, scan::ScanMethod},
+    wifi::{AuthenticationMethod, Protocol, Ssid},
 };
 
 /// Configuration for EAP-FAST authentication protocol.
