@@ -329,10 +329,11 @@ pub(crate) struct ExtFuncsT {
 }
 
 static G_OSI_FUNCS: ExtFuncsT = ExtFuncsT {
-    #[cfg(not(esp32c2))]
-    ext_version: 0x20250415,
-    #[cfg(esp32c2)]
-    ext_version: 0x20221122,
+    ext_version: if cfg!(esp32c2) {
+        0x20221122
+    } else {
+        0x20250415
+    },
 
     esp_intr_alloc: Some(self::ble_os_adapter_chip_specific::esp_intr_alloc),
     esp_intr_free: Some(esp_intr_free),
