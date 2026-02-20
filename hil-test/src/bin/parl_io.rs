@@ -1,7 +1,7 @@
 //! PARL_IO test
 
 //% CHIPS: esp32c5 esp32c6 esp32h2
-//% FEATURES: unstable defmt
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]

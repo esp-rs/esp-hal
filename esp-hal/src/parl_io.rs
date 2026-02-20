@@ -555,7 +555,8 @@ where
                 &mut self.valid_pin,
                 OutputSignal::new_level(crate::gpio::Level::Low),
             );
-            self.valid_pin = valid_pin.with_output_inverter(true);
+            let was_inverted = valid_pin.is_output_inverted();
+            self.valid_pin = valid_pin.with_output_inverter(!was_inverted);
         }
 
         Instance::tx_valid_pin_signal().connect_to(&self.valid_pin);
