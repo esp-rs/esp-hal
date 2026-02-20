@@ -3268,7 +3268,7 @@ mod chip_specific {
             // 1) setting the mem_owner to an invalid value. This doesn't seem to trigger an error
             //    immediately, so presumably the error only occurs when a new pulse code would be
             //    written.
-            // 2) lowering the idle treshold and change other settings to make exceeding the
+            // 2) lowering the idle threshold and change other settings to make exceeding the
             //    threshold more likely (lower clock divider, enable and set an input filter that is
             //    longer than the idle threshold). The latter should have the same effect as
             //    reconnecting the pin to a constant level, but that tricky to do since we'd also

@@ -50,15 +50,15 @@ pub fn get_stack_pointer() -> *const u32 {
 pub unsafe fn set_stack_pointer(stack: *mut u32) {
     unsafe {
         // FIXME: this function relies on it getting inlined - if it doesn't inline it
-        // will try and return from this function using the adress in `a0` which has
+        // will try and return from this function using the address in `a0` which has
         // just been trashed... According to https://nnethercote.github.io/perf-book/inlining.html:
         // "Inline attributes do not guarantee that a function is inlined or not
         // inlined, but in practice, #[inline(always)] will cause inlining in all but
         // the most exceptional cases." Is this good enough? Should we rewrite these
-        // as a macro to guarentee inlining?
+        // as a macro to guarantee inlining?
 
         // NOTE: modification of the `sp` & `a0` is not typically allowed inside inline
-        // asm!, but because we *need* to modify it we can do so by ommiting it from
+        // asm!, but because we *need* to modify it we can do so by omitting it from
         // the clobber
         asm!(
             "movi a0, 0", // trash return register

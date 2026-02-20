@@ -12,7 +12,7 @@ As previously stated, we use the [cargo-xtask] pattern for automation. Commands 
 
 ## Running Tests
 
-You can build and then subsequently flash and run an test using the `run example` subcommand. With a target device connected to your host system, run:
+You can build and then subsequently flash and run a test using the `run example` subcommand. With a target device connected to your host system, run:
 
 ```shell
 cargo xtask run example --package qa-test --chip esp32c6 sleep_timer
@@ -22,18 +22,18 @@ Again, note that we must specify which package to build the test from, plus whic
 
 ## Adding Tests
 
-If you are contributing to `esp-hal` and would like to add an test, the process is generally the same as any other project.
+If you are contributing to `esp-hal` and would like to add a test, the process is generally the same as any other project.
 
-One major difference in our case is the metadata comments which state the compatible devices and required features for an test. Both of these designators are optional; if `//% CHIPS:` is omitted then all devices considered to be supported, and if `//% FEATURES:` is omitted then no features are enabled at build time.
+One major difference in our case is the metadata comments which state the compatible devices and required features for a test. Both of these designators are optional; if `//% CHIPS:` is omitted then all devices are considered to be supported, and if `//% FEATURES:` is omitted then no features are enabled at build time.
 
-To demonstrated, in `src/bin/psram.rs` you will see the following:
+To demonstrate, in `src/bin/psram.rs` you will see the following:
 
 ```rust
 //% CHIPS: esp32 esp32s2 esp32s3
 //% FEATURES: esp-hal/psram esp-alloc/internal-heap-stats
 ```
 
-Another thing to be aware of is the GPIO pins being used. We have tried to use pins available the DevKit-C boards from Espressif, however this is being done on a best-effort basis.
+Another thing to be aware of is the GPIO pins being used. We have tried to use pins available on the DevKit-C boards from Espressif, however this is being done on a best-effort basis.
 
 In general, the following GPIO are recommended for use, though be conscious of whether certain pins are used for UART, strapping pins, etc. on some devices:
 

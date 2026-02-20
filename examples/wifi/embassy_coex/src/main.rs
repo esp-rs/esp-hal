@@ -234,7 +234,7 @@ pub async fn ble_task(controller: ExternalController<BleConnector<'static>, 1>) 
                         println!("got connection");
                         gatt_events_task(&server, &conn).await.unwrap();
                     }
-                    Err(err) => println!("Error occured: {:?}", err),
+                    Err(err) => println!("Error occurred: {:?}", err),
                 },
                 Err(e) => {
                     panic!("[adv] error: {:?}", e);

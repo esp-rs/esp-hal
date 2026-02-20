@@ -8,7 +8,7 @@
 
 A WiFi, BLE and ESP-NOW driver for Espressif microcontrollers.
 
-This package also includes low-level [IEEE 802.15.4] driver for the ESP32-C6 and ESP32-H2
+This package also includes a low-level [IEEE 802.15.4] driver for the ESP32-C6 and ESP32-H2
 
 Note that this crate currently requires you to enable the `unstable` feature on `esp-hal`.
 

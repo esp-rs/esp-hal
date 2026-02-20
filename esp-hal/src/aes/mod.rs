@@ -677,7 +677,7 @@ pub mod dma {
             // cipher's state.
         },
         stop: |driver| {
-            // Drop the AES driver to conserve power when there is nothig to do (or when the driver
+            // Drop the AES driver to conserve power when there is nothing to do (or when the driver
             // was stopped).
             let driver = unsafe { AesDmaBackend::from_raw(driver) };
             driver.deinitialize()
@@ -1348,7 +1348,7 @@ const BLOCKING_AES_VTABLE: VTable<AesOperation> = VTable {
         // manner and so they can't be cancelled.
     },
     stop: |driver| {
-        // Drop the AES driver to conserve power when there is nothig to do (or when the driver was
+        // Drop the AES driver to conserve power when there is nothing to do (or when the driver was
         // stopped).
         let driver = unsafe { AesBackend::from_raw(driver) };
         driver.deinitialize()

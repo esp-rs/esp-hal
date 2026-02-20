@@ -163,7 +163,7 @@ Reset:
 );
 
 // According to 4.4.7.2 of the xtensa isa, ccount and compare are undefined on
-// reset, set all values to zero to disable. ("timer interupts are cleared by writing CCOMPARE[i]")
+// reset, set all values to zero to disable. ("timer interrupts are cleared by writing CCOMPARE[i]")
 #[cfg(any(
     XCHAL_HAVE_TIMER0,
     XCHAL_HAVE_TIMER1,

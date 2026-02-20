@@ -18,7 +18,7 @@ cargo install probe-rs-tools \
   --force --locked
 ```
 
-Target device **MUST** connected via its USB-Serial-JTAG port, or if unavailable (eg. ESP32, ESP32-C2, ESP32-S2) then you must connect a compatible debug probe such as an [ESP-Prog].
+Target device **MUST** be connected via its USB-Serial-JTAG port, or if unavailable (eg. ESP32, ESP32-C2, ESP32-S2) then you must connect a compatible debug probe such as an [ESP-Prog].
 
 You can run all tests for a given device by running the following command from the workspace root:
 
@@ -46,7 +46,7 @@ Some tests will require physical connections, please see the current [configurat
 [ESP-Prog]: https://docs.espressif.com/projects/esp-dev-kits/en/latest/other/esp-prog/user_guide.html
 [configuration in our runners]: #running-tests-remotes-ie-on-self-hosted-runners
 
-### Running Tests Remotes (ie. on Self-Hosted Runners)
+### Running Tests Remotely (ie. on Self-Hosted Runners)
 The [`hil.yml`] workflow builds the test suite for all our available targets and executes them.
 
 Our self-hosted runners have the following setup:
@@ -137,7 +137,7 @@ sudo reboot
 ## Adding New Tests
 
 1. Create a new integration test file (`tests/$PERIPHERAL.rs`)
-2. Add a corresponding `[[test]]` entry to `Cargol.toml` (**MUST** set `harness = false`)
+2. Add a corresponding `[[test]]` entry to `Cargo.toml` (**MUST** set `harness = false`)
 3. Write the tests
 4. Document any necessary physical connections on boards connected to self-hosted runners
 5. Add a header in the test stating which targets support the given tests. Eg:
