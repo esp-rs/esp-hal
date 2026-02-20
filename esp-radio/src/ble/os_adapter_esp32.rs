@@ -764,3 +764,64 @@ pub(crate) fn async_wakeup_request_end(event: i32) {
         unsafe { btdm_in_wakeup_requesting_set(false) };
     }
 }
+
+#[allow(non_snake_case)]
+#[unsafe(no_mangle)]
+fn Software0() {
+    unsafe {
+        let (fnc, arg) = ISR_INTERRUPT_7;
+        trace!("interrupt Software0 {:?} {:?}", fnc, arg);
+
+        if !fnc.is_null() {
+            let fnc: fn(*mut c_void) = core::mem::transmute(fnc);
+            fnc(arg);
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn RWBT() {
+    unsafe {
+        let (fnc, arg) = ISR_INTERRUPT_5;
+        trace!("interrupt RWBT {:?} {:?}", fnc, arg);
+
+        if !fnc.is_null() {
+            let fnc: fn(*mut c_void) = core::mem::transmute(fnc);
+            fnc(arg);
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn RWBLE() {
+    unsafe {
+        let (fnc, arg) = ISR_INTERRUPT_5;
+        trace!("interrupt RWBLE {:?} {:?}", fnc, arg);
+
+        if !fnc.is_null() {
+            let fnc: fn(*mut c_void) = core::mem::transmute(fnc);
+            fnc(arg);
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn BT_BB() {
+    unsafe {
+        let (fnc, arg) = ISR_INTERRUPT_8;
+        trace!("interrupt BT_BB {:?} {:?}", fnc, arg);
+
+        if !fnc.is_null() {
+            let fnc: fn(*mut c_void) = core::mem::transmute(fnc);
+            fnc(arg);
+        }
+    }
+}
+
+pub(crate) fn shutdown_ble_isr() {
+    unsafe {
+        BT::steal().disable_rwbt_interrupt();
+        BT::steal().disable_rwble_interrupt();
+        BT::steal().disable_bb_interrupt();
+    }
+}
