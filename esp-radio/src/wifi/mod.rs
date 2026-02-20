@@ -164,10 +164,16 @@ impl Protocols {
     }
 }
 
+#[cfg_attr(docsrs, procmacros::doc_replace(
+    "hint_5g" => {
+        cfg(wifi_has_5g) => "The default protocol is AC/A/AX for band mode 5G.",
+        _ => ""
+    },
+))]
 /// Supported Wi-Fi protocols.
 ///
 /// The default protocol is B/G/N for band mode 2.4G.
-/// the default protocol is AC/A/AX for band mode 5G.
+/// # {hint_5g}
 #[derive(Debug, PartialOrd, Hash, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -239,9 +245,15 @@ impl SecondaryChannel {
     }
 }
 
+#[cfg_attr(docsrs, procmacros::doc_replace(
+    "hint_5g" => {
+        cfg(wifi_has_5g) => "The default is [BandMode::Auto].",
+        _ => "The default is [BandMode::_2_4G]"
+    },
+))]
 /// Wi-Fi band mode.
 ///
-/// For targets supporting 5GHz Wi-Fi the default is [BandMode::Auto] otherwise [BandMode::_2_4G]
+/// # {hint_5g}
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -251,9 +263,11 @@ pub enum BandMode {
     #[cfg_attr(not(wifi_has_5g), default)]
     _2_4G,
     /// Wi-Fi band mode is 5 GHz only.
+    #[cfg(wifi_has_5g)]
     _5G,
     /// Wi-Fi band mode is 2.4 GHz + 5 GHz.
     #[cfg_attr(wifi_has_5g, default)]
+    #[cfg(wifi_has_5g)]
     Auto,
 }
 
@@ -261,7 +275,9 @@ impl BandMode {
     fn to_raw(&self) -> u32 {
         match self {
             BandMode::_2_4G => wifi_band_mode_t_WIFI_BAND_MODE_2G_ONLY,
+            #[cfg(wifi_has_5g)]
             BandMode::_5G => wifi_band_mode_t_WIFI_BAND_MODE_5G_ONLY,
+            #[cfg(wifi_has_5g)]
             BandMode::Auto => wifi_band_mode_t_WIFI_BAND_MODE_AUTO,
         }
     }
@@ -2652,22 +2668,31 @@ impl WifiController<'_> {
         Ok(())
     }
 
+    #[cfg_attr(docsrs, procmacros::doc_replace(
+        "hint_5g" => {
+            cfg(wifi_has_5g) => "
+When the WiFi band mode is set to [BandMode::_5G], it operates exclusively on the 5GHz channels.
+
+When the WiFi band mode is set to [BandMode::Auto], it can operate on both the 2.4GHz and
+5GHz channels.
+
+When a WiFi band mode change triggers a band change, if no channel is set for the current
+band, a default channel will be assigned: channel 1 for 2.4G band and channel 36 for 5G
+band.
+
+When a WiFi band mode change triggers a band change, if no channel is set for the current
+band, a default channel will be assigned: channel 1 for 2.4G band and channel 36 for 5G
+band.
+            ",
+            _ => ""
+        },
+    ))]
     /// Set WiFi band mode.
     ///
     /// When the WiFi band mode is set to [BandMode::_2_4G], it operates exclusively on the 2.4GHz
     /// channels.
     ///
-    /// When the WiFi band mode is set to [BandMode::_5G], it operates exclusively on the 5GHz
-    /// channels.
-    ///
-    /// When the WiFi band mode is set to [BandMode::Auto], it can operate on both the 2.4GHz and
-    /// 5GHz channels.
-    ///
-    /// WiFi band mode can be set to [BandMode::_5G] only or [BandMode::Auto] on supported targets.
-    ///
-    /// When a WiFi band mode change triggers a band change, if no channel is set for the current
-    /// band, a default channel will be assigned: channel 1 for 2.4G band and channel 36 for 5G
-    /// band.
+    /// # {hint_5g}
     ///
     /// The controller needs to be configured and started before setting the band mode.
     #[instability::unstable]
