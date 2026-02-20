@@ -1,19 +1,12 @@
-use crate::hal::peripherals;
 #[cfg(any(feature = "wifi", feature = "ble"))]
 use crate::sys;
-
-pub(crate) fn setup_radio_isr() {
-    unsafe {
-        peripherals::WIFI::steal().disable_bb_interrupt();
-        peripherals::WIFI::steal().disable_modem_peri_timeout_interrupt();
-    }
-}
 
 pub(crate) fn shutdown_radio_isr() {
     #[cfg(feature = "ble")]
     unsafe {
-        peripherals::BT::steal().disable_lp_timer_interrupt();
-        peripherals::BT::steal().disable_mac_interrupt();
+        use crate::hal::peripherals::BT;
+        BT::steal().disable_lp_timer_interrupt();
+        BT::steal().disable_mac_interrupt();
     }
 }
 

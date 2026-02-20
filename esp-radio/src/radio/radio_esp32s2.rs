@@ -1,8 +1,3 @@
-pub(crate) fn setup_radio_isr() {
-    // wifi enabled in set_isr
-    // ble not supported
-}
-
 pub(crate) fn shutdown_radio_isr() {
     // ble not supported
 }

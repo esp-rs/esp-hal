@@ -212,7 +212,7 @@ pub(crate) mod sys {
     pub use esp_wifi_sys_esp32s3::*;
 }
 
-use crate::radio::{setup_radio_isr, shutdown_radio_isr};
+use crate::radio::shutdown_radio_isr;
 #[cfg(feature = "wifi")]
 use crate::wifi::WifiError;
 
@@ -322,8 +322,6 @@ pub(crate) fn init() -> Result<(), InitializationError> {
     }
 
     crate::common_adapter::enable_wifi_power_domain();
-
-    setup_radio_isr();
 
     wifi_set_log_verbose();
     init_radio_clocks();

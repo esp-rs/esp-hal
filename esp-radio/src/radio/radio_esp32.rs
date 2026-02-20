@@ -1,27 +1,9 @@
-#[cfg(feature = "ble")]
-use crate::hal::{interrupt, peripherals};
-
-pub(crate) fn setup_radio_isr() {
-    #[cfg(feature = "ble")]
-    {
-        // It's a mystery why these interrupts are enabled now since it worked without
-        // this before Now at least without disabling these nothing will work
-        interrupt::disable(
-            crate::hal::system::Cpu::ProCpu,
-            peripherals::Interrupt::ETH_MAC,
-        );
-        interrupt::disable(
-            crate::hal::system::Cpu::ProCpu,
-            peripherals::Interrupt::UART0,
-        );
-    }
-}
-
 pub(crate) fn shutdown_radio_isr() {
     #[cfg(feature = "ble")]
     unsafe {
-        peripherals::BT::steal().disable_rwbt_interrupt();
-        peripherals::BT::steal().disable_bb_interrupt();
+        use crate::hal::peripherals::BT;
+        BT::steal().disable_rwbt_interrupt();
+        BT::steal().disable_bb_interrupt();
     }
 }
 
