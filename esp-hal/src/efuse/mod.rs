@@ -306,22 +306,9 @@ pub enum InterfaceMacAddress {
 /// Currently represents an 6-byte address, but the public API is
 /// slice-based to allow future extension.
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
-#[non_exhaustive]
 pub struct MacAddress([u8; 6]);
 
 impl MacAddress {
-    /// Creates a MAC address from a byte slice.
-    pub fn from_slice(bytes: &[u8]) -> Option<Self> {
-        // temporary - will be changed when we support 8-byte MAC
-        if bytes.len() == 6 {
-            let mut out = [0u8; 6];
-            out.copy_from_slice(bytes);
-            Some(Self(out))
-        } else {
-            None
-        }
-    }
-
     // Internal constructor for statics.
     pub(crate) const fn new_eui48_internal(bytes: [u8; 6]) -> Self {
         Self(bytes)
