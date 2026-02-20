@@ -7,7 +7,7 @@
 //! frame for security. ESP-NOW is widely used in smart light, remote
 //! controlling, sensor, etc.
 //!
-//! For more information see https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html
+//! For more information see <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html>
 
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 use core::{
