@@ -326,7 +326,7 @@ The `protocols` field in `AccessPointConfig`, `StationConfig`, and `EapStationCo
 
 ## Controller config changes
 
-`PowerSaveMode` is not longer part of `ControllerConfig`. Use the setter on controller, once created.
+`PowerSaveMode` is not longer part of `ControllerConfig`. Use the setter on the controller, once created.
 
 ```diff
 - `ControllerConfig::default().with_power_save(PowerSaveMode::default())`

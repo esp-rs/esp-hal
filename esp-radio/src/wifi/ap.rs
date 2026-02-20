@@ -4,6 +4,7 @@ use alloc::string::String;
 use core::fmt;
 
 use procmacros::BuilderLite;
+
 #[cfg(feature = "unstable")]
 use super::CountryInfo;
 use super::{AuthenticationMethod, Protocols, SecondaryChannel, Ssid};
