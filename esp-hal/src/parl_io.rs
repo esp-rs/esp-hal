@@ -544,6 +544,20 @@ where
             .apply_output_config(&gpio::OutputConfig::default());
         self.valid_pin.set_output_enable(true);
 
+        #[cfg(esp32c5)]
+        {
+            // C5 has a dedicated chip select signal. This signal is active low, and we need to
+            // invert it to end up with the same behaviour as older chips.
+            // TODO: this needs to be turned into metadata.
+            use crate::gpio::interconnect::OutputSignal;
+
+            let valid_pin = core::mem::replace(
+                &mut self.valid_pin,
+                OutputSignal::new_level(crate::gpio::Level::Low),
+            );
+            self.valid_pin = valid_pin.with_output_inverter(true);
+        }
+
         Instance::tx_valid_pin_signal().connect_to(&self.valid_pin);
         Instance::set_tx_hw_valid_en(true);
     }
@@ -1912,7 +1926,13 @@ mod private {
         }
 
         pub fn tx_valid_pin_signal() -> OutputSignal {
-            OutputSignal::PARL_TX_DATA7
+            cfg_if::cfg_if! {
+                if #[cfg(esp32c5)] {
+                    OutputSignal::PARL_TX_CS
+                } else {
+                    OutputSignal::PARL_TX_DATA7
+                }
+            }
         }
 
         pub fn set_tx_hw_valid_en(value: bool) {
