@@ -521,6 +521,10 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         )
     });
 
+    runner.run("Check proc macro expansion doc coverage", || {
+        check_proc_macro_expansion_doc_coverage(workspace, args.chip)
+    });
+
     if !args.no_docs {
         runner.run("Build Docs", || {
             build_documentation(
@@ -702,6 +706,72 @@ fn host_tests(workspace: &Path, args: HostTestsArgs) -> Result<()> {
         if package.has_host_tests(workspace) {
             xtask::run_host_tests(workspace, package)?;
         }
+    }
+
+    Ok(())
+}
+
+/// Ensures proc macro expansion items are documented or hidden.
+fn check_proc_macro_expansion_doc_coverage(workspace: &Path, chip: Chip) -> Result<()> {
+    let target = Package::Examples.target_triple(&chip)?;
+    let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };
+    let example_path = workspace
+        .join("examples")
+        .join("async")
+        .join("embassy_hello_world");
+
+    let cargo_args = CargoArgsBuilder::default()
+        .toolchain(toolchain)
+        .subcommand("rustdoc")
+        .manifest_path(example_path.join("Cargo.toml"))
+        .config_path(example_path.join(".cargo").join("config.toml"))
+        .target(target)
+        .arg(format!("--features={}", chip.as_ref()))
+        .arg("--")
+        .arg("-Z")
+        .arg("unstable-options")
+        .arg("--document-private-items")
+        .arg("--show-coverage")
+        .build();
+
+    let stdout =
+        xtask::cargo::run_with_env::<[(&str, &str); 0], _, _>(&cargo_args, &example_path, [], true)
+            .with_context(|| "Failed to run rustdoc for proc macro expansion doc coverage check")?;
+
+    // Expected output:
+    // +-------------------------------------+------------+------------+------------+------------+
+    // | File                                | Documented | Percentage |   Examples | Percentage |
+    // +-------------------------------------+------------+------------+------------+------------+
+    // | src/main.rs                         |          3 |     100.0% |          0 |       0.0% |
+    // +-------------------------------------+------------+------------+------------+------------+
+    // | Total                               |          3 |     100.0% |          0 |       0.0% |
+    // +-------------------------------------+------------+------------+------------+------------+
+    let has_full_coverage = stdout
+        .lines()
+        .find(|line| line.contains("| Total"))
+        .and_then(|line| {
+            let cols: Vec<_> = line.split('|').map(str::trim).collect();
+            // Expected columns:
+            // 0: ""
+            // 1: "Total"
+            // 2: documented count
+            // 3: documented percentage
+            // 4: examples count
+            // 5: examples percentage
+            if cols.len() > 3 {
+                Some(cols[3] == "100.0%")
+            } else {
+                None
+            }
+        })
+        .unwrap_or(false);
+
+    if !has_full_coverage {
+        bail!(
+            "Proc macro expansion doc coverage check failed for {}:\n{}",
+            example_path.strip_prefix(workspace).unwrap().display(),
+            stdout
+        );
     }
 
     Ok(())
