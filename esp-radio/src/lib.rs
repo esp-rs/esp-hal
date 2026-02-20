@@ -150,11 +150,8 @@ if let Ok(controller) = BleConnector::new(peripherals.BT, Default::default()) {}
 #![no_std]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![cfg_attr(feature = "print-logs-from-driver", feature(c_variadic))]
-#![deny(rust_2018_idioms, rustdoc::all)]
+#![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
 #![allow(rustdoc::bare_urls)]
-// allow until num-derive doesn't generate this warning anymore (unknown_lints because Xtensa
-// toolchain doesn't know about that lint, yet)
-#![allow(unknown_lints)]
 #![allow(non_local_definitions)]
 #![cfg_attr(
     not(any(feature = "wifi", feature = "ble")),

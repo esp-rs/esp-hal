@@ -4,7 +4,7 @@
 //! supports sending and receiving of raw frames.
 //!
 //! This module is intended to be used to implement support for higher-level
-//! communication protocols, for example [esp-openthread].
+//! communication protocols, for example [openthread].
 //!
 //! Note that this module currently requires you to enable the `unstable` feature
 //! on `esp-hal`.
@@ -13,7 +13,9 @@
 //! things will break.
 //!
 //! [IEEE 802.15.4]: https://en.wikipedia.org/wiki/IEEE_802.15.4
-//! [esp-openthread]: https://github.com/esp-rs/esp-openthread
+//! [openthread]: https://github.com/esp-rs/openthread
+
+#![allow(missing_docs)]
 
 use byte::{BytesExt, TryRead};
 use docsplay::Display;
