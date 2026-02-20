@@ -728,3 +728,61 @@ pub(crate) unsafe extern "C" fn ets_backup_dma_copy(
 ) {
     todo!();
 }
+
+#[cfg(esp32c3)]
+#[unsafe(no_mangle)]
+extern "C" fn RWBT() {
+    unsafe {
+        let (fnc, arg) = ISR_INTERRUPT_5;
+
+        trace!("interrupt RWBT {:?} {:?}", fnc, arg);
+
+        if !fnc.is_null() {
+            let fnc: fn(*mut c_void) = core::mem::transmute(fnc);
+            fnc(arg);
+        }
+
+        trace!("interrupt 5 done");
+    };
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn RWBLE() {
+    unsafe {
+        let (fnc, arg) = ISR_INTERRUPT_8;
+
+        trace!("interrupt RWBLE {:?} {:?}", fnc, arg);
+
+        if !fnc.is_null() {
+            let fnc: fn(*mut c_void) = core::mem::transmute(fnc);
+            fnc(arg);
+        }
+
+        trace!("interrupt 5 done");
+    };
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn BT_BB() {
+    unsafe {
+        let (fnc, arg) = ISR_INTERRUPT_5;
+
+        trace!("interrupt BT_BB {:?} {:?}", fnc, arg);
+
+        if !fnc.is_null() {
+            let fnc: fn(*mut c_void) = core::mem::transmute(fnc);
+            fnc(arg);
+        }
+
+        trace!("interrupt 8 done");
+    };
+}
+
+pub(crate) fn shutdown_ble_isr() {
+    unsafe {
+        #[cfg(esp32c3)]
+        BT::steal().disable_rwbt_interrupt();
+        BT::steal().disable_rwble_interrupt();
+        BT::steal().disable_bb_interrupt();
+    }
+}
