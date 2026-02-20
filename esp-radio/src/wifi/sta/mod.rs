@@ -3,10 +3,9 @@
 use alloc::string::String;
 use core::fmt;
 
-use enumset::EnumSet;
 use procmacros::BuilderLite;
 
-use super::{AuthenticationMethod, Protocol, Ssid};
+use super::{AuthenticationMethod, Protocols, Ssid};
 use crate::WifiError;
 
 unstable_module!(
@@ -44,7 +43,7 @@ pub struct StationConfig {
     /// The Wi-Fi channel to connect to.
     pub(crate) channel: Option<u8>,
     /// The set of protocols supported by the access point.
-    pub(crate) protocols: EnumSet<Protocol>,
+    pub(crate) protocols: Protocols,
     /// Interval for station to listen to beacon from access point.
     ///
     /// The unit of listen interval is one beacon interval.
@@ -102,7 +101,7 @@ impl Default for StationConfig {
             auth_method: AuthenticationMethod::Wpa2Personal,
             password: String::new(),
             channel: None,
-            protocols: (Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
+            protocols: Protocols::default(),
             listen_interval: 3,
             beacon_timeout: 6,
             failure_retry_cnt: 1,

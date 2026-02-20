@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `enable_wifi_events` and `disable_wifi_events` functions to control which Wi-Fi events are processed. (#4898)
 - Added `WifiController::set_max_tx_power`, allowing the configuration of the maximum Wi-Fi transmitting power. (#4906)
 - Basic WiFi support for ESP32-C5 (#5003)
+- `set_band_mode` to support 5G-band (#5023)
 
 ### Changed
 
@@ -53,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update to `bt-hci` version 0.8 and `trouble-host` version 0.6 (#4962)
 - `WifiController::is_connected()` and `WifiController::is_started()` now return a simple `bool` instead of `Result<bool, WifiError>` and are marked as unstable (#4971)
 - `ScanMethod` has been moved to `wifi::sta` (#5033)
+- `set_protocols` / `set_bandwidths` changed to support 5G-band (#5023)
 
 ### Fixed
 

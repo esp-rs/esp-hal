@@ -3,13 +3,12 @@
 use alloc::string::String;
 use core::fmt;
 
-use enumset::EnumSet;
 use procmacros::BuilderLite;
 
 use super::ScanMethod;
 use crate::{
     WifiError,
-    wifi::{AuthenticationMethod, Protocol, Ssid},
+    wifi::{AuthenticationMethod, Protocols, Ssid},
 };
 
 /// Configuration for EAP-FAST authentication protocol.
@@ -112,7 +111,7 @@ pub struct EapStationConfig {
     /// The specific Wi-Fi channel to use for the connection.
     pub(crate) channel: Option<u8>,
     /// The set of protocols supported by the access point.
-    pub(crate) protocols: EnumSet<Protocol>,
+    pub(crate) protocols: Protocols,
     /// Interval for station to listen to beacon from access point.
     ///
     /// The unit of listen interval is one beacon interval.
@@ -191,7 +190,7 @@ impl Default for EapStationConfig {
             ca_cert: None,
             certificate_and_key: None,
             ttls_phase2_method: None,
-            protocols: (Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
+            protocols: Protocols::default(),
             listen_interval: 3,
             beacon_timeout: 6,
             failure_retry_cnt: 1,

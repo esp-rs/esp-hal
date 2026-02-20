@@ -3,10 +3,9 @@
 use alloc::string::String;
 use core::fmt;
 
-use enumset::EnumSet;
 use procmacros::BuilderLite;
 
-use super::{AuthenticationMethod, CountryInfo, Protocol, SecondaryChannel, Ssid};
+use super::{AuthenticationMethod, CountryInfo, Protocols, SecondaryChannel, Ssid};
 use crate::{WifiError, sys::include::wifi_ap_record_t};
 
 /// Information about a detected Wi-Fi access point.
@@ -43,7 +42,7 @@ pub struct AccessPointConfig {
     /// The secondary channel configuration.
     pub(crate) secondary_channel: Option<SecondaryChannel>,
     /// The set of protocols supported by the access point.
-    pub(crate) protocols: EnumSet<Protocol>,
+    pub(crate) protocols: Protocols,
     /// The authentication method to be used by the access point.
     pub(crate) auth_method: AuthenticationMethod,
     /// The password for securing the access point (if applicable).
@@ -89,7 +88,7 @@ impl Default for AccessPointConfig {
             ssid_hidden: false,
             channel: 1,
             secondary_channel: None,
-            protocols: (Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
+            protocols: Protocols::default(),
             auth_method: AuthenticationMethod::None,
             password: String::new(),
             max_connections: 255,
