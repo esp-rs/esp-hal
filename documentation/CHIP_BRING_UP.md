@@ -1,21 +1,29 @@
 
-This guide aims to achieve the state of chip bringup where “basic examples are built and flashed, even if they do nothing, watchdogs reboot the chip”
+This guide aims to reach a chip bring-up state where basic examples build and flash successfully (even if they do nothing) and watchdogs reboot the chip.
 
-Overall, comparison and already existing knowledge base is the key to get all the needed data. So as a first step, we should figure out which chip is the closest similar chip to the one being added. In my case of esp32c5, this will be esp32c6 (more) and esp32h2(less). Even if there's no obviously similar chip - it's not a big problem. We will just pick some chip for the reference and work basing off of that. 
-I prefer to trust ESP-IDF over any other knowledge source (e.g. TRM) for one simple reason - we all know for a fact that TRM might lie and often does, whilst ESP-IDF code just ***works***, which is our main interest. As a side-quest, you might try to look for inconsistencies in the TRM and report them in `GitHub` issues if you're an external contributor or to `Documentation` channel if you are our team member
+In general, comparison and existing knowledge are key to obtaining all required data. As a first step, determine which already supported chip is most similar to the one being added. In the case of the `ESP32-C5`, the closest references were `ESP32-C6` and/or `ESP32-H2`. Even if no clearly similar chip exists — simply choose one as a reference and work based on that.
 
+We prefer to trust `ESP-IDF` first and `TRM` second. The reason is simple: `TRM`, unfortunately, might sometimes contain inaccuracies, while `ESP-IDF` code is proven to work — operability is our main priority. As a side task, you may look for inconsistencies in the TRM and report them via GitHub issues (if you are an external contributor) or in the `Documentation` channel (if you are a team member).
+
+---
 
 ## Linker Scripts
-The process in  usually starts from linker scripts. 
+The process usually begins with linker scripts.
 
-#### memory.x
+### `memory.x`
 
-Let's start from memory.x. I need to find the source from which I'll get my data for all the memory mappings. I'll pick `esp32c6` as a reference. you see this "definition" first:
+First, determine the source of truth for memory mappings. For example, using `esp32c6` as a reference, you will see the following definition:
 ```
 RAM : ORIGIN = 0x40800000 , LENGTH = 0x6E610
 ```
 
-In `esp-idf` (preferably `master` or latest release) lookup for `6E610`, it seems to be unique enough. Search will lead you to `components/bootloader/subproject/main/ld/esp32c6/bootloader.ld.in` and `components/esp_system/ld/esp32c6/memory.ld.in`. In `memory.ld.in` file we find these definitions: 
+In `ESP-IDF` (preferably `master` or the `latest` release), search for `6E610` — it is unique enough to find relevant matches. The search will lead to:
+
+- `components/bootloader/subproject/main/ld/esp32c6/bootloader.ld.in`
+- `components/esp_system/ld/esp32c6/memory.ld.in`
+
+Inside `memory.ld.in`, you will find:
+
 ```c
 #if !CONFIG_SECURE_ENABLE_TEE
 #define SRAM_SEG_START        (0x40800000)
@@ -28,9 +36,11 @@ In `esp-idf` (preferably `master` or latest release) lookup for `6E610`, it seem
 #define SRAM_SEG_SIZE      SRAM_SEG_END - SRAM_SEG_START
 ```
 
-SRAM_SEG_START is our ORIGIN and LENGTH its obviously SRAM_SEG_END - SRAM_SEG_START. Now, let's lookup for definitions of these things for our chip (C5 in our case)
+Here, `SRAM_SEG_START` corresponds to our `ORIGIN`, and `LENGTH` is `SRAM_SEG_END` - `SRAM_SEG_START`.
+Now look up the corresponding definitions for your new chip.
 
-`memory.ld.in` says: 
+As an example, in `memory.ld.in` for C5:
+
 ```c
 #if !CONFIG_SECURE_ENABLE_TEE
 #define SRAM_SEG_START        (0x40800000)
@@ -43,29 +53,61 @@ SRAM_SEG_START is our ORIGIN and LENGTH its obviously SRAM_SEG_END - SRAM_SEG_ST
 #define SRAM_SEG_SIZE      SRAM_SEG_END - SRAM_SEG_START
 ```
 
-which means our ORIGIN is the same (0x40800000), but LENGTH will be 0x4084E5A0 - ORIGIN = ***0x4E5A0***
-Just to confirm everything is fine, you can check search for `bootloader_iram_loader_seg_start == ` assertion, it should be your ORIGIN + LENGTH
-Next, you need to fill out a correct address in dram2_seg len "formula", there you need to set value of SOC_ROM_STACK_START from `esp-idf`, for `c5` it's 0x4085e5a0, so the final line will be:
+This means:
+- `ORIGIN = 0x40800000`
+- `LENGTH = 0x4084E5A0 - 0x40800000 = 0x4E5A0`
+
+To verify correctness, search for the `bootloader_iram_loader_seg_start == assertion`. It should match ORIGIN + LENGTH.
+
+Next, update the `dram2_seg` length formula. You need the value of `SOC_ROM_STACK_START` from ESP-IDF. For C5, this value is `0x4085e5a0`. The final definition becomes:
 ```
     dram2_seg ( RW )       : ORIGIN = ORIGIN(RAM) + LENGTH(RAM), len = 0x4085e5a0 - (ORIGIN(RAM) + LENGTH(RAM))
 ```
 
-For  `ROM` definition look for `drom_seg (R)` and `irom_seg (R)` definitions in `memory.ld.in`. Definitions of the segments and comments there are enough to figure out what are the correct values for `ORIGIN` and `LENGTH` and why we need an offset of `0x20`
+---
 
-For `RTC_FAST` memory mappings, you can either look for `LP RAM (RTC Memory) Layout` comment in the same file or `lp_ram_seg(RW)` segment definition, which maps both origin address and length of the memory segment
+For `ROM` definitions, inspect `drom_seg (R)` and `irom_seg (R)` in `memory.ld.in`. The segment definitions and comments there are sufficient to determine the correct values for `ORIGIN` and `LENGTH`, as well as to understand why an offset of `0x20` is required. The comments in `memory.ld.in` typically explain how flash segments are mapped and why the offset is applied.
 
-Next linker files are a bit trickier: `<chip>.x` and `linkall.x` .
+For `RTC_FAST` memory mappings, either:
 
-it is recommended to copy-paste this script from already existing one (e.g. `esp32c6.x`). If 
-In `linkall.x` you should include the other linker scripts in a way such file does for the other chips and also `PROVIDE_ALIAS` to `ROTEXT/RODATA` and `RWTEXT/RWDATA` for the memory segments you defined in `memory`. In case of C5, it has `RTC_FAST` memory and `IRAM/DRAM` (sitting on the same address) and `IROM/DROM` (also on the same address). 
+- Look for the `LP RAM (RTC Memory) Layout` comment in `memory.ld.in`, or  
+- Inspect the `lp_ram_seg(RW)` definition.
 
-For `<chip>.x`, it is highly recommended to look at similar scripts from already existing chips (`c6`/`h2`/`c2`) and copying them. Same works with `linkall.x` and `memory.x` , with further tweaks here and there, e.g. in terms of addresses. In following Espressif chips, these linker-related parts are unlikely to be very different from above mentioned chips.
+These provide both the origin address and length of the segment.
 
+### `<chip>.x` and `linkall.x`
 
-#### esp-rom-sys
+These linker files are slightly more involved.
 
-In order to finish linker-related part of the bring up, we need to handle `esp-rom-sys` crate. Copy `.ld` all the files from `esp-idf/components/esp-rom/<CHIP>/ld`  except the ones which contain `.libc*` and `.newlib*` in their names to the `esp-rom-sys/ld/<chip>/rom`. Copy the `additional.ld` file from `esp32c6`'s one. Then, in `esp-idf` codebase, code-search for all the defined ROM functions in `additional.ld` for your chip and update the addresses of these functions. Example of search:
-![[Pasted image 20260218131822.png]]
+It is recommended to copy an existing script (e.g., `esp32c6.x`) and adjust it as needed.
+
+In `linkall.x`, include the required linker scripts as done for other chips, and `PROVIDE_ALIAS` for:
+
+- `ROTEXT` / `RODATA`
+- `RWTEXT` / `RWDATA`
+
+Ensure these map correctly to the memory segments defined in `memory.x`.
+
+For C5 specifically:
+
+- `RTC_FAST` exists  
+- `IRAM` / `DRAM` share the same address range  
+- `IROM` / `DROM` also share the same address range  
+
+For `<chip>.x`, refer to similar chips (`c6`, `h2`, `c2`) and copy as needed, adjusting addresses where required. In recent Espressif chips, linker structures are typically similar.
+
+### esp-rom-sys
+
+To complete the linker-related bring-up, handle the `esp-rom-sys` crate.
+
+1. Copy all `.ld` files from `esp-idf/components/esp-rom/<CHIP>/ld` except files containing `.libc*` or `.newlib*`.
+
+2. Place them into:
+   `esp-rom-sys/ld/<chip>/rom`
+
+3. Copy `additional.ld` from some existing implementation for other chip.
+
+4. In `ESP-IDF`, code-search for all `ROM` functions defined in `additional.ld` and update their addresses for your chip.
 
 ## esp-metadata
 
