@@ -49,7 +49,7 @@ enumset = { version = "1.1", default-features = false, optional = true }
 
 # ⚠️ Unstable dependencies
 esp-radio-rtos-driver = { version = "0.2.0", path = "../esp-radio-rtos-driver" }
-instability = "0.3.9"
+instability = { version = "0.3.9", git = "https://github.com/bugadani/instability", branch = "reexport" }
 
 # Unstable dependencies that are not (strictly) part of the public API
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
