@@ -1,3 +1,8 @@
+use crate::{
+    hal::{interrupt::Priority, peripherals::WIFI},
+    sys::c_types::c_void,
+};
+
 pub(crate) fn chip_ints_on(mask: u32) {
     unsafe { crate::hal::xtensa_lx::interrupt::enable_mask(mask) };
 }
@@ -48,11 +53,7 @@ pub(crate) unsafe extern "C" fn set_intr(
 ///   None
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn set_isr(
-    n: i32,
-    f: *mut crate::sys::c_types::c_void,
-    arg: *mut crate::sys::c_types::c_void,
-) {
+pub unsafe extern "C" fn set_isr(n: i32, f: *mut c_void, arg: *mut c_void) {
     trace!("set_isr - interrupt {} function {:?} arg {:?}", n, f, arg);
     match n {
         0 => unsafe {
@@ -63,10 +64,27 @@ pub unsafe extern "C" fn set_isr(
         },
         _ => panic!("set_isr - unsupported interrupt number {}", n),
     }
-    #[cfg(feature = "wifi")]
-    unsafe {
-        use crate::hal::{interrupt::Priority, peripherals::WIFI};
 
+    unsafe {
         WIFI::steal().enable_mac_interrupt(Priority::Priority1);
+    }
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn WIFI_MAC() {
+    unsafe {
+        let (fnc, arg) = crate::wifi::ISR_INTERRUPT_1;
+        trace!("interrupt WIFI_MAC {:?} {:?}", fnc, arg);
+
+        if !fnc.is_null() {
+            let fnc: fn(*mut c_void) = core::mem::transmute(fnc);
+            fnc(arg);
+        }
+    }
+}
+
+pub(crate) fn shutdown_wifi_isr() {
+    unsafe {
+        WIFI::steal().disable_mac_interrupt();
     }
 }

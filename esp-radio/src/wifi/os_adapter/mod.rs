@@ -27,6 +27,10 @@ use crate::{
 
 static WIFI_LOCK: RawMutex = RawMutex::new();
 
+pub(crate) fn shutdown_wifi_isr() {
+    os_adapter_chip_specific::shutdown_wifi_isr();
+}
+
 /// **************************************************************************
 /// Name: wifi_env_is_chip
 ///

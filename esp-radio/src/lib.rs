@@ -212,7 +212,6 @@ pub(crate) mod sys {
     pub use esp_wifi_sys_esp32s3::*;
 }
 
-use crate::radio::{setup_radio_isr, shutdown_radio_isr};
 #[cfg(feature = "wifi")]
 use crate::wifi::WifiError;
 
@@ -239,8 +238,6 @@ macro_rules! unstable_module {
 }
 
 mod compat;
-
-mod radio;
 mod time;
 
 #[cfg(feature = "wifi")]
@@ -323,8 +320,6 @@ pub(crate) fn init() -> Result<(), InitializationError> {
 
     crate::common_adapter::enable_wifi_power_domain();
 
-    setup_radio_isr();
-
     wifi_set_log_verbose();
     init_radio_clocks();
 
@@ -347,7 +342,10 @@ pub(crate) fn deinit() {
         unsafe { crate::wifi::os_adapter::coex_deinit() };
     }
 
-    shutdown_radio_isr();
+    #[cfg(feature = "wifi")]
+    wifi::shutdown_wifi_isr();
+    #[cfg(feature = "ble")]
+    ble::shutdown_ble_isr();
 
     #[cfg(esp32)]
     // Allow using `ADC2` again

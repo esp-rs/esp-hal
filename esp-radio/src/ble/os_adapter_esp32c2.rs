@@ -389,7 +389,56 @@ pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
 
 // Provide the symbol for < eco4 to make the linker happy
 #[unsafe(no_mangle)]
-unsafe fn g_ble_lll_rfmgmt_env_p() -> *mut crate::sys::c_types::c_void {
+unsafe fn g_ble_lll_rfmgmt_env_p() -> *mut c_void {
     // prevent "undefined symbol: g_ble_lll_rfmgmt_env_p" for ESP32-C2 < eco4
     unreachable!()
+}
+
+pub(crate) fn shutdown_ble_isr() {
+    unsafe {
+        BT::steal().disable_lp_timer_interrupt();
+        BT::steal().disable_mac_interrupt();
+    }
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn LP_TIMER() {
+    unsafe {
+        trace!("LP_TIMER interrupt");
+
+        let (fnc, arg) = ISR_INTERRUPT_7;
+
+        trace!("interrupt LP_TIMER {:?} {:?}", fnc, arg);
+
+        if !fnc.is_null() {
+            trace!("interrupt LP_TIMER call");
+
+            let fnc: fn(*mut c_void) = core::mem::transmute(fnc);
+            fnc(arg);
+            trace!("LP_TIMER done");
+        }
+
+        trace!("interrupt LP_TIMER done");
+    };
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn BT_MAC() {
+    unsafe {
+        trace!("BT_MAC interrupt");
+
+        let (fnc, arg) = ISR_INTERRUPT_4;
+
+        trace!("interrupt BT_MAC {:?} {:?}", fnc, arg);
+
+        if !fnc.is_null() {
+            trace!("interrupt BT_MAC call");
+
+            let fnc: fn(*mut c_void) = core::mem::transmute(fnc);
+            fnc(arg);
+            trace!("BT_MAC done");
+        }
+
+        trace!("interrupt BT_MAC done");
+    };
 }
