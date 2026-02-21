@@ -94,14 +94,19 @@ impl RiscvControllerProperties {
             RiscvFlavour::Basic | RiscvFlavour::Plic => {
                 // Vectoring uses high interrupt lines, as higher IDs are serviced later.
                 // Allocate the last interrupt lines, that are not reserved or disabled.
-                (0..self.interrupts as usize)
+                let mut interrupts = (0..self.interrupts as usize)
                     .rev()
                     .filter(|&intr| {
                         self.disabled_interrupt() != intr
                             && self.reserved_interrupts().all(|reserved| reserved != intr)
                     })
                     .take(self.priority_levels as usize)
-                    .collect::<Vec<_>>()
+                    .collect::<Vec<_>>();
+
+                // We want to return an ascending order
+                interrupts.reverse();
+
+                interrupts
             }
             RiscvFlavour::Clic => {
                 // After CLINT interrupts. Lower IDs are serviced later.
@@ -147,6 +152,9 @@ impl GenericProperty for InterruptControllerProperties {
             .map(|_| Class::Interrupt)
             .collect::<Vec<_>>();
 
+        // Implementation assumes contiguous range of interrupts
+        assert!(is_contiguous(properties.vector_interrupts()));
+
         for intr in properties.vector_interrupts() {
             assert_eq!(classes[intr], Class::Interrupt);
             classes[intr] = Class::Vector;
@@ -190,6 +198,14 @@ impl GenericProperty for InterruptControllerProperties {
         }
 
         let for_each_interrupt = generate_for_each_macro("interrupt", &[("all", &all)]);
+        let for_each_direct_bindable_interrupt = generate_for_each_macro(
+            "classified_interrupt",
+            &[
+                ("direct_bindable", &direct_bindable),
+                ("vector", &vector),
+                ("reserved", &reserved),
+            ],
+        );
 
         let all_priorities = (0..properties.priority_levels)
             .map(|p| {
@@ -208,6 +224,7 @@ impl GenericProperty for InterruptControllerProperties {
 
         Some(quote! {
             #for_each_interrupt
+            #for_each_direct_bindable_interrupt
             #for_each_priority
         })
     }
@@ -238,4 +255,16 @@ impl GenericProperty for InterruptControllerProperties {
             }
         }
     }
+}
+
+fn is_contiguous(mut iter: impl Iterator<Item = usize>) -> bool {
+    if let Some(mut prev) = iter.next() {
+        for next in iter {
+            if next - prev != 1 {
+                return false;
+            }
+            prev = next;
+        }
+    }
+    true
 }

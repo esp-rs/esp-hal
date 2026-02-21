@@ -159,19 +159,12 @@ pub(crate) fn setup_multitasking<const IRQ: u8>(_irq: SoftwareInterrupt<'static,
         _ => panic!("Invalid IRQ number"),
     };
 
-    let cpu_interrupt = if cfg!(interrupt_controller = "clic") {
-        interrupt::CpuInterrupt::Interrupt25
-    } else {
-        interrupt::CpuInterrupt::Interrupt15
-    };
-
-    // TODO: perhaps we need to provide an enum for the direct vector-able interrupts
-    unwrap!(interrupt::enable_direct(
+    interrupt::enable_direct(
         interrupt,
         interrupt::Priority::min(),
-        cpu_interrupt,
+        interrupt::DirectBindableCpuInterrupt::Interrupt0,
         swint_handler_trampoline,
-    ));
+    );
 }
 
 #[cfg(multi_core)]
