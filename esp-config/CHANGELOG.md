@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `ConfigOption` struct (#3362)
-- `Stabiliy` to specify unstable options, and the version in which they became stable (#3365)
+- `Stability` to specify unstable options, and the version in which they became stable (#3365)
 
 ### Changed
 

@@ -113,7 +113,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- A reimplemntation of the `assign_resources!` macro (#3809)
+- A reimplementation of the `assign_resources!` macro (#3809)
 - `TrngSource` to manage random number generator entropy (#3829)
 - On RISC-V you can opt-out of nested interrupts for an interrupt handler by using `new_not_nested` (#3875)
 - A new default feature `exception-handler` was added (#3887)
@@ -306,7 +306,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implemented `embedded_io::ReadReady` for `Uart` and `UartRx` (#3423)
 - Implemented `embedded_io::WriteReady` for `Uart` and `UartTx` (#3423)
 - ESP32-H2: Support for ADC calibration (#3414)
-- Expose ADC asynchrounous functionalities where applicable (#3443)
+- Expose ADC asynchronous functionalities where applicable (#3443)
 - Added `UartInterrupt::RxTimeout` support (#3493)
 - UART: Added HW and SW flow control config option (#3435)
 - I2C master: `SoftwareTimeout` and `Config::with_software_timeout`. (#3577)
@@ -406,7 +406,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp_hal::time::{Rate, Duration, Instant}` (#3083)
 - Async support for ADC oneshot reads for ESP32C2, ESP32C3, ESP32C6 and ESP32H2 (#2925, #3082)
 - `ESP_HAL_CONFIG_XTAL_FREQUENCY` configuration. For now, chips other than ESP32 and ESP32-C2 have a single option only. (#3054)
-- Added more validation to UART and SPI. User can now specify the baudrate tolerance of UART config (#3074)
+- Added more validation to UART and SPI. The user can now specify the baudrate tolerance of UART config (#3074)
 - Add auto-writeback support to DMA buffers (#3107)
 
 ### Changed
@@ -477,7 +477,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `set_priority` to the `DmaChannel` trait on GDMA devices (#2403, #2526)
 - Added `into_async` and `into_blocking` functions for `ParlIoTxOnly`, `ParlIoRxOnly` (#2526)
 - ESP32-C6, H2, S3: Added `split` function to the `DmaChannel` trait. (#2526, #2532)
-- DMA: `PeripheralDmaChannel` type aliasses and `DmaChannelFor` traits to improve usability. (#2532)
+- DMA: `PeripheralDmaChannel` type aliases and `DmaChannelFor` traits to improve usability. (#2532)
 - `dma::{Channel, ChannelRx, ChannelTx}::set_priority` for GDMA devices (#2403)
 - `esp_hal::asynch::AtomicWaker` that does not hold a global critical section (#2555)
 - `esp_hal::sync::RawMutex` for embassy-sync. (#2555)
@@ -502,7 +502,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `uart::ConfigError` now implements `Eq` (#2825)
 - `i2c::master::Error` now implements `Eq` and `Hash` (#2825)
 - `i2c::master::Operation` now implements `Debug`, `PartialEq`, `Eq`, `Hash`, and `Display` (#2825)
-- `i2c::master::Config` now implements `PartialEq`, `Eq`, ans `Hash` (#2825)
+- `i2c::master::Config` now implements `PartialEq`, `Eq`, and `Hash` (#2825)
 - `i2c::master::I2c` now implements `Debug`, `PartialEq`, and `Eq` (#2825)
 - `i2c::master::Info` now implements `Debug` (#2825)
 - `spi::master::Config` now implements `Hash` (#2823)
@@ -580,7 +580,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Xtensa devices now correctly enable the `esp-hal-procmacros/rtc-slow` feature (#2594)
 - User-bound GPIO interrupt handlers should no longer interfere with async pins. (#2625)
-- `spi::master::Spi::{into_async, into_blocking}` are now correctly available on the typed driver, to. (#2674)
+- `spi::master::Spi::{into_async, into_blocking}` are now correctly available on the typed driver, too. (#2674)
 - It is no longer possible to safely conjure `GpioPin` instances (#2688)
 - UART: Public API follows `C-WORD_ORDER` Rust API standard (`VerbObject` order) (#2851)
 - `DmaRxStreamBuf` now correctly resets the descriptors the next time it's used (#2890)
@@ -1231,7 +1231,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Direct boot support has been removed (#903)
 - Removed the `mcu-boot` feature from `esp32c3-hal` (#938)
-- Removed SpiBusController and SpiBusDevice in favour of embedded-hal-bus and embassy-embedded-hal implementataions. (#978)
+- Removed SpiBusController and SpiBusDevice in favour of embedded-hal-bus and embassy-embedded-hal implementations. (#978)
 
 ## [0.13.1] - 2023-11-02
 
@@ -1436,7 +1436,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sometimes half-duplex non-DMA SPI reads were reading garbage in non-release mode (#552)
 - ESP32-C3: Fix GPIO5 ADC channel id (#562)
 - ESP32-H2: Fix direct-boot feature (#570)
-- Fix Async GPIO not disabling interupts on chips with multiple banks (#572)
+- Fix Async GPIO not disabling interrupts on chips with multiple banks (#572)
 - ESP32-C6: Support FOSC CLK calibration for ECO1+ chip revisions (#593)
 - Fixed CI by pinning the log crate to 0.4.18 (#600)
 - ESP32-S3: Fix calculation of PSRAM start address (#601)
