@@ -58,7 +58,7 @@ peripherals = [
     { name = "USB0" },
     { name = "USB_WRAP" },
     { name = "XTS_AES" },
-    { name = "WIFI", interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" } },
+    { name = "WIFI", interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true },
 
     { name = "DMA_SPI2", pac = "SPI2" },
     { name = "DMA_SPI3", pac = "SPI3" },

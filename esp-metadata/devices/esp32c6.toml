@@ -94,7 +94,7 @@ peripherals = [
     { name = "LP_CORE", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "TSENS", virtual = true },
-    { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR", modem_peri_timeout = "MODEM_PERI_TIMEOUT" } },
+    { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR", modem_peri_timeout = "MODEM_PERI_TIMEOUT" }, stable = true },
     { name = "MEM2MEM0", virtual = true, dma_peripheral = 1 },
     { name = "MEM2MEM1", virtual = true, dma_peripheral = 4 },
     { name = "MEM2MEM2", virtual = true, dma_peripheral = 5 },

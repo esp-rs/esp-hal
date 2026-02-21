@@ -60,7 +60,7 @@ peripherals = [
     { name = "UART2", interrupts = { peri = "UART2" } },
     { name = "UHCI0", dma_peripheral = 4 },
     { name = "UHCI1", dma_peripheral = 5 },
-    { name = "WIFI", interrupts = { mac = "WIFI_MAC" } },
+    { name = "WIFI", interrupts = { mac = "WIFI_MAC" }, stable = true },
 
     { name = "DMA_SPI2", pac = "SPI2" },
     { name = "DMA_SPI3", pac = "SPI3" },

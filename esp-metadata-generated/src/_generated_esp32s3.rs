@@ -3779,7 +3779,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "WIFI peripheral singleton"]
         WIFI <= virtual(WIFI_MAC : { bind_mac_interrupt, enable_mac_interrupt,
         disable_mac_interrupt }, WIFI_PWR : { bind_pwr_interrupt, enable_pwr_interrupt,
-        disable_pwr_interrupt }) (unstable))); _for_each_inner_peripheral!((GPIO0));
+        disable_pwr_interrupt }))); _for_each_inner_peripheral!((GPIO0));
         _for_each_inner_peripheral!((GPIO1)); _for_each_inner_peripheral!((GPIO2));
         _for_each_inner_peripheral!((GPIO3)); _for_each_inner_peripheral!((GPIO4));
         _for_each_inner_peripheral!((GPIO5)); _for_each_inner_peripheral!((GPIO6));
@@ -3866,8 +3866,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((PSRAM(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
         _for_each_inner_peripheral!((ULP_RISCV_CORE(unstable)));
-        _for_each_inner_peripheral!((WIFI(unstable))); _for_each_inner_peripheral!((SPI2,
-        Spi2, 0)); _for_each_inner_peripheral!((SPI3, Spi3, 1));
+        _for_each_inner_peripheral!((WIFI)); _for_each_inner_peripheral!((SPI2, Spi2,
+        0)); _for_each_inner_peripheral!((SPI3, Spi3, 1));
         _for_each_inner_peripheral!((UHCI0, Uhci0, 2));
         _for_each_inner_peripheral!((I2S0, I2s0, 3)); _for_each_inner_peripheral!((I2S1,
         I2s1, 4)); _for_each_inner_peripheral!((LCD_CAM, LcdCam, 5));
@@ -4132,7 +4132,7 @@ macro_rules! for_each_peripheral {
         "ULP_RISCV_CORE peripheral singleton"] ULP_RISCV_CORE <= virtual() (unstable)),
         (@ peri_type #[doc = "WIFI peripheral singleton"] WIFI <= virtual(WIFI_MAC : {
         bind_mac_interrupt, enable_mac_interrupt, disable_mac_interrupt }, WIFI_PWR : {
-        bind_pwr_interrupt, enable_pwr_interrupt, disable_pwr_interrupt }) (unstable))));
+        bind_pwr_interrupt, enable_pwr_interrupt, disable_pwr_interrupt }))));
         _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
         (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11),
         (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19),
@@ -4156,7 +4156,7 @@ macro_rules! for_each_peripheral {
         (DMA_CH2(unstable)), (DMA_CH3(unstable)), (DMA_CH4(unstable)), (ADC1(unstable)),
         (ADC2(unstable)), (BT(unstable)), (CPU_CTRL(unstable)), (FLASH(unstable)),
         (GPIO_DEDICATED(unstable)), (PSRAM(unstable)), (SW_INTERRUPT(unstable)),
-        (ULP_RISCV_CORE(unstable)), (WIFI(unstable))));
+        (ULP_RISCV_CORE(unstable)), (WIFI)));
         _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0), (SPI3, Spi3, 1),
         (UHCI0, Uhci0, 2), (I2S0, I2s0, 3), (I2S1, I2s1, 4), (LCD_CAM, LcdCam, 5), (AES,
         Aes, 6), (SHA, Sha, 7), (APB_SARADC, ApbSaradc, 8), (RMT, Rmt, 9)));
