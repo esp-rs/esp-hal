@@ -93,6 +93,7 @@ pub fn run(
 
     let result = quote! {
         #(#lint_attrs)*
+        #[doc(hidden)]
         pub(crate) mod __main {
             use super::*;
 

@@ -585,6 +585,10 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         )
     });
 
+    runner.run("Check generated doc artifacts", || {
+        check_generated_doc_artifacts(workspace, args.chip)
+    });
+
     if !args.no_docs {
         runner.run("Build Docs", || {
             build_documentation(
@@ -766,6 +770,72 @@ fn host_tests(workspace: &Path, args: HostTestsArgs) -> Result<()> {
         if package.has_host_tests(workspace) {
             xtask::run_host_tests(workspace, package)?;
         }
+    }
+
+    Ok(())
+}
+
+/// Ensures proc-macro generated artifacts are documented or hidden in end-user app.
+fn check_generated_doc_artifacts(workspace: &Path, chip: Chip) -> Result<()> {
+    let target = Package::Examples.target_triple(&chip)?;
+    let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };
+
+    let output = Command::new("cargo")
+        .arg(format!("+{toolchain}"))
+        .arg("rustdoc")
+        .arg("--manifest-path")
+        .arg(
+            workspace
+                .join("examples")
+                .join("async")
+                .join("embassy_hello_world")
+                .join("Cargo.toml"),
+        )
+        .args([
+            "--features",
+            chip.as_ref(),
+            "--target",
+            &target,
+            "-Zbuild-std=core",
+            "--",
+            "-Z",
+            "unstable-options",
+            "--document-private-items",
+            "--show-coverage",
+        ])
+        .current_dir(workspace)
+        .output()
+        .with_context(|| "Failed to run rustdoc for generated doc artifact check")?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if !output.status.success() {
+        bail!(
+            "Generated doc artifact check failed:\nstdout:\n{}\nstderr:\n{}",
+            stdout,
+            stderr
+        );
+    }
+
+    // Expected output:
+    // +-------------------------------------+------------+------------+------------+------------+
+    // | File                                | Documented | Percentage |   Examples | Percentage |
+    // +-------------------------------------+------------+------------+------------+------------+
+    // | src/main.rs                         |          3 |     100.0% |          0 |       0.0% |
+    // +-------------------------------------+------------+------------+------------+------------+
+    // | Total                               |          3 |     100.0% |          0 |       0.0% |
+    // +-------------------------------------+------------+------------+------------+------------+
+    let has_full_coverage = stdout
+        .lines()
+        .find(|line| line.contains("| Total"))
+        .map(|line| line.contains("100.0%"))
+        .unwrap_or(false);
+
+    if !has_full_coverage {
+        bail!(
+            "Private-item rustdoc coverage check failed for examples/async/embassy_hello_world:\n{}",
+            stdout
+        );
     }
 
     Ok(())
