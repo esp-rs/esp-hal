@@ -2840,27 +2840,143 @@ pub(crate) mod asynch {
 
     use super::*;
 
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub struct DmaTxFuture<'a, CH>
-    where
-        CH: DmaTxChannel,
-    {
-        pub(crate) tx: &'a mut ChannelTx<Async, CH>,
+    /// Defines which interrupts `DmaRxFuture` and `DmaTxFuture` should resolve
+    /// to a ready value on.
+    pub trait DmaFutureInterrupts<DmaInterrupt: EnumSetType> {
+        /// These interrupts resolve to `Ok(())`.
+        fn success() -> EnumSet<DmaInterrupt>;
+
+        /// These interrupts resolve to `Err(DmaError::DescriptorError)`.
+        fn failure() -> EnumSet<DmaInterrupt>;
     }
 
-    impl<'a, CH> DmaTxFuture<'a, CH>
+    pub trait DmaFutureInterruptsExt<DmaInterrupt: EnumSetType>:
+        DmaFutureInterrupts<DmaInterrupt>
+    {
+        /// All interrupts the future should listen for.
+        fn all() -> EnumSet<DmaInterrupt>;
+    }
+
+    impl<DmaInterrupt, T> DmaFutureInterruptsExt<DmaInterrupt> for T
+    where
+        DmaInterrupt: EnumSetType,
+        T: DmaFutureInterrupts<DmaInterrupt>,
+    {
+        fn all() -> EnumSet<DmaInterrupt> {
+            Self::success() | Self::failure()
+        }
+    }
+
+    pub struct DmaTxDefaultInterrupts;
+
+    impl DmaFutureInterrupts<DmaTxInterrupt> for DmaTxDefaultInterrupts {
+        fn success() -> EnumSet<DmaTxInterrupt> {
+            DmaTxInterrupt::TotalEof.into()
+        }
+
+        fn failure() -> EnumSet<DmaTxInterrupt> {
+            DmaTxInterrupt::DescriptorError.into()
+        }
+    }
+
+    pub struct DmaRxDefaultInterrupts;
+
+    impl DmaFutureInterrupts<DmaRxInterrupt> for DmaRxDefaultInterrupts {
+        fn success() -> EnumSet<DmaRxInterrupt> {
+            DmaRxInterrupt::SuccessfulEof.into()
+        }
+
+        fn failure() -> EnumSet<DmaRxInterrupt> {
+            DmaRxInterrupt::DescriptorError
+                | DmaRxInterrupt::DescriptorEmpty
+                | DmaRxInterrupt::ErrorEof
+        }
+    }
+
+    pub struct DmaTxWaitInterrupts;
+
+    impl DmaFutureInterrupts<DmaTxInterrupt> for DmaTxWaitInterrupts {
+        fn success() -> EnumSet<DmaTxInterrupt> {
+            DmaTxInterrupt::TotalEof.into()
+        }
+
+        fn failure() -> EnumSet<DmaTxInterrupt> {
+            DmaTxInterrupt::DescriptorError.into()
+        }
+    }
+
+    pub struct DmaRxWaitInterrupts;
+
+    impl DmaFutureInterrupts<DmaRxInterrupt> for DmaRxWaitInterrupts {
+        fn success() -> EnumSet<DmaRxInterrupt> {
+            DmaRxInterrupt::DescriptorEmpty.into()
+        }
+
+        fn failure() -> EnumSet<DmaRxInterrupt> {
+            DmaRxInterrupt::DescriptorError.into()
+        }
+    }
+
+    /// For a future that waits for `DmaTxInterrupt::Done`.
+    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
+    pub struct DmaTxDoneInterrupts;
+
+    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
+    impl DmaFutureInterrupts<DmaTxInterrupt> for DmaTxDoneInterrupts {
+        fn success() -> EnumSet<DmaTxInterrupt> {
+            DmaTxInterrupt::Done.into()
+        }
+
+        fn failure() -> EnumSet<DmaTxInterrupt> {
+            DmaTxInterrupt::DescriptorError.into()
+        }
+    }
+
+    /// For a future that waits for `DmaRxInterrupt::Done`.
+    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
+    pub struct DmaRxDoneInterrupts;
+
+    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
+    impl DmaFutureInterrupts<DmaRxInterrupt> for DmaRxDoneInterrupts {
+        fn success() -> EnumSet<DmaRxInterrupt> {
+            DmaRxInterrupt::Done.into()
+        }
+
+        fn failure() -> EnumSet<DmaRxInterrupt> {
+            DmaRxInterrupt::DescriptorError
+                | DmaRxInterrupt::DescriptorEmpty
+                | DmaRxInterrupt::ErrorEof
+        }
+    }
+
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub struct DmaTxFutureWithInterrupts<'a, CH, Interrupts>
     where
         CH: DmaTxChannel,
+        Interrupts: DmaFutureInterrupts<DmaTxInterrupt>,
+    {
+        pub(crate) tx: &'a mut ChannelTx<Async, CH>,
+        _marker: PhantomData<Interrupts>,
+    }
+
+    impl<'a, CH, Interrupts> DmaTxFutureWithInterrupts<'a, CH, Interrupts>
+    where
+        CH: DmaTxChannel,
+        Interrupts: DmaFutureInterrupts<DmaTxInterrupt>,
     {
         #[cfg_attr(esp32c2, allow(dead_code))]
         pub fn new(tx: &'a mut ChannelTx<Async, CH>) -> Self {
-            Self { tx }
+            Self {
+                tx,
+                _marker: PhantomData,
+            }
         }
     }
 
-    impl<CH> core::future::Future for DmaTxFuture<'_, CH>
+    impl<CH, Interrupts> core::future::Future for DmaTxFutureWithInterrupts<'_, CH, Interrupts>
     where
         CH: DmaTxChannel,
+        Interrupts: DmaFutureInterrupts<DmaTxInterrupt>,
     {
         type Output = Result<(), DmaError>;
 
@@ -2868,320 +2984,65 @@ pub(crate) mod asynch {
             self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
         ) -> Poll<Self::Output> {
-            if self.tx.is_done() {
-                self.tx.clear_interrupts();
-                Poll::Ready(Ok(()))
-            } else if self
+            if !self
                 .tx
                 .pending_out_interrupts()
-                .contains(DmaTxInterrupt::DescriptorError)
+                .is_disjoint(Interrupts::success())
+            {
+                self.tx.clear_interrupts();
+                Poll::Ready(Ok(()))
+            } else if !self
+                .tx
+                .pending_out_interrupts()
+                .is_disjoint(Interrupts::failure())
             {
                 self.tx.clear_interrupts();
                 Poll::Ready(Err(DmaError::DescriptorError))
             } else {
                 self.tx.waker().register(cx.waker());
-                self.tx
-                    .listen_out(DmaTxInterrupt::TotalEof | DmaTxInterrupt::DescriptorError);
+                self.tx.listen_out(Interrupts::all());
                 Poll::Pending
             }
         }
     }
 
-    impl<CH> Drop for DmaTxFuture<'_, CH>
+    impl<CH, Interrupts> Drop for DmaTxFutureWithInterrupts<'_, CH, Interrupts>
     where
         CH: DmaTxChannel,
+        Interrupts: DmaFutureInterrupts<DmaTxInterrupt>,
     {
         fn drop(&mut self) {
-            self.tx
-                .unlisten_out(DmaTxInterrupt::TotalEof | DmaTxInterrupt::DescriptorError);
+            self.tx.unlisten_out(Interrupts::all());
         }
     }
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub struct DmaRxFuture<'a, CH>
+    pub struct DmaRxFutureWithInterrupts<'a, CH, Interrupts>
     where
         CH: DmaRxChannel,
+        Interrupts: DmaFutureInterrupts<DmaRxInterrupt>,
     {
         pub(crate) rx: &'a mut ChannelRx<Async, CH>,
+        _marker: PhantomData<Interrupts>,
     }
 
-    impl<'a, CH> DmaRxFuture<'a, CH>
+    impl<'a, CH, Interrupts> DmaRxFutureWithInterrupts<'a, CH, Interrupts>
     where
         CH: DmaRxChannel,
+        Interrupts: DmaFutureInterrupts<DmaRxInterrupt>,
     {
         pub fn new(rx: &'a mut ChannelRx<Async, CH>) -> Self {
-            Self { rx }
-        }
-    }
-
-    impl<CH> core::future::Future for DmaRxFuture<'_, CH>
-    where
-        CH: DmaRxChannel,
-    {
-        type Output = Result<(), DmaError>;
-
-        fn poll(
-            self: core::pin::Pin<&mut Self>,
-            cx: &mut core::task::Context<'_>,
-        ) -> Poll<Self::Output> {
-            if self.rx.is_done() {
-                self.rx.clear_interrupts();
-                Poll::Ready(Ok(()))
-            } else if !self.rx.pending_in_interrupts().is_disjoint(
-                DmaRxInterrupt::DescriptorError
-                    | DmaRxInterrupt::DescriptorEmpty
-                    | DmaRxInterrupt::ErrorEof,
-            ) {
-                self.rx.clear_interrupts();
-                Poll::Ready(Err(DmaError::DescriptorError))
-            } else {
-                self.rx.waker().register(cx.waker());
-                self.rx.listen_in(
-                    DmaRxInterrupt::SuccessfulEof
-                        | DmaRxInterrupt::DescriptorError
-                        | DmaRxInterrupt::DescriptorEmpty
-                        | DmaRxInterrupt::ErrorEof,
-                );
-                Poll::Pending
+            Self {
+                rx,
+                _marker: PhantomData,
             }
         }
     }
 
-    impl<CH> Drop for DmaRxFuture<'_, CH>
+    impl<CH, Interrupts> core::future::Future for DmaRxFutureWithInterrupts<'_, CH, Interrupts>
     where
         CH: DmaRxChannel,
-    {
-        fn drop(&mut self) {
-            self.rx.unlisten_in(
-                DmaRxInterrupt::DescriptorError
-                    | DmaRxInterrupt::DescriptorEmpty
-                    | DmaRxInterrupt::ErrorEof,
-            );
-        }
-    }
-
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
-    pub struct DmaTxDoneChFuture<'a, CH>
-    where
-        CH: DmaTxChannel,
-    {
-        pub(crate) tx: &'a mut ChannelTx<Async, CH>,
-        _a: (),
-    }
-
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
-    impl<'a, CH> DmaTxDoneChFuture<'a, CH>
-    where
-        CH: DmaTxChannel,
-    {
-        pub fn new(tx: &'a mut ChannelTx<Async, CH>) -> Self {
-            Self { tx, _a: () }
-        }
-    }
-
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
-    impl<CH> core::future::Future for DmaTxDoneChFuture<'_, CH>
-    where
-        CH: DmaTxChannel,
-    {
-        type Output = Result<(), DmaError>;
-
-        fn poll(
-            self: core::pin::Pin<&mut Self>,
-            cx: &mut core::task::Context<'_>,
-        ) -> Poll<Self::Output> {
-            if self
-                .tx
-                .pending_out_interrupts()
-                .contains(DmaTxInterrupt::Done)
-            {
-                self.tx.clear_out(DmaTxInterrupt::Done);
-                Poll::Ready(Ok(()))
-            } else if self
-                .tx
-                .pending_out_interrupts()
-                .contains(DmaTxInterrupt::DescriptorError)
-            {
-                self.tx.clear_interrupts();
-                Poll::Ready(Err(DmaError::DescriptorError))
-            } else {
-                self.tx.waker().register(cx.waker());
-                self.tx
-                    .listen_out(DmaTxInterrupt::Done | DmaTxInterrupt::DescriptorError);
-                Poll::Pending
-            }
-        }
-    }
-
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
-    impl<CH> Drop for DmaTxDoneChFuture<'_, CH>
-    where
-        CH: DmaTxChannel,
-    {
-        fn drop(&mut self) {
-            self.tx
-                .unlisten_out(DmaTxInterrupt::Done | DmaTxInterrupt::DescriptorError);
-        }
-    }
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
-    pub struct DmaTxDescErrOrTotalEofChFuture<'a, CH>
-    where
-        CH: DmaTxChannel,
-    {
-        pub(crate) tx: &'a mut ChannelTx<Async, CH>,
-        _a: (),
-    }
-
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
-    impl<'a, CH> DmaTxDescErrOrTotalEofChFuture<'a, CH>
-    where
-        CH: DmaTxChannel,
-    {
-        pub fn new(tx: &'a mut ChannelTx<Async, CH>) -> Self {
-            Self { tx, _a: () }
-        }
-    }
-
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
-    impl<CH> core::future::Future for DmaTxDescErrOrTotalEofChFuture<'_, CH>
-    where
-        CH: DmaTxChannel,
-    {
-        type Output = Result<(), DmaError>;
-
-        fn poll(
-            self: core::pin::Pin<&mut Self>,
-            cx: &mut core::task::Context<'_>,
-        ) -> Poll<Self::Output> {
-            if self
-                .tx
-                .pending_out_interrupts()
-                .contains(DmaTxInterrupt::DescriptorError)
-            {
-                self.tx.clear_interrupts();
-                Poll::Ready(Err(DmaError::DescriptorError))
-            } else if self
-                .tx
-                .pending_out_interrupts()
-                .contains(DmaTxInterrupt::TotalEof)
-            {
-                self.tx.clear_out(DmaTxInterrupt::TotalEof);
-                Poll::Ready(Ok(()))
-            } else {
-                self.tx.waker().register(cx.waker());
-                self.tx
-                    .listen_out(DmaTxInterrupt::DescriptorError | DmaTxInterrupt::TotalEof);
-                Poll::Pending
-            }
-        }
-    }
-
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
-    impl<CH> Drop for DmaTxDescErrOrTotalEofChFuture<'_, CH>
-    where
-        CH: DmaTxChannel,
-    {
-        fn drop(&mut self) {
-            self.tx
-                .unlisten_out(DmaTxInterrupt::DescriptorError | DmaTxInterrupt::TotalEof);
-        }
-    }
-
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
-    pub struct DmaRxDoneChFuture<'a, CH>
-    where
-        CH: DmaRxChannel,
-    {
-        pub(crate) rx: &'a mut ChannelRx<Async, CH>,
-        _a: (),
-    }
-
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
-    impl<'a, CH> DmaRxDoneChFuture<'a, CH>
-    where
-        CH: DmaRxChannel,
-    {
-        pub fn new(rx: &'a mut ChannelRx<Async, CH>) -> Self {
-            Self { rx, _a: () }
-        }
-    }
-
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
-    impl<CH> core::future::Future for DmaRxDoneChFuture<'_, CH>
-    where
-        CH: DmaRxChannel,
-    {
-        type Output = Result<(), DmaError>;
-
-        fn poll(
-            self: core::pin::Pin<&mut Self>,
-            cx: &mut core::task::Context<'_>,
-        ) -> Poll<Self::Output> {
-            if self
-                .rx
-                .pending_in_interrupts()
-                .contains(DmaRxInterrupt::Done)
-            {
-                self.rx.clear_in(DmaRxInterrupt::Done);
-                Poll::Ready(Ok(()))
-            } else if !self.rx.pending_in_interrupts().is_disjoint(
-                DmaRxInterrupt::DescriptorError
-                    | DmaRxInterrupt::DescriptorEmpty
-                    | DmaRxInterrupt::ErrorEof,
-            ) {
-                self.rx.clear_interrupts();
-                Poll::Ready(Err(DmaError::DescriptorError))
-            } else {
-                self.rx.waker().register(cx.waker());
-                self.rx.listen_in(
-                    DmaRxInterrupt::Done
-                        | DmaRxInterrupt::DescriptorError
-                        | DmaRxInterrupt::DescriptorEmpty
-                        | DmaRxInterrupt::ErrorEof,
-                );
-                Poll::Pending
-            }
-        }
-    }
-
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
-    impl<CH> Drop for DmaRxDoneChFuture<'_, CH>
-    where
-        CH: DmaRxChannel,
-    {
-        fn drop(&mut self) {
-            self.rx.unlisten_in(
-                DmaRxInterrupt::Done
-                    | DmaRxInterrupt::DescriptorError
-                    | DmaRxInterrupt::DescriptorEmpty
-                    | DmaRxInterrupt::ErrorEof,
-            );
-        }
-    }
-
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
-    pub struct DmaRxDescEmptyOrErrChFuture<'a, CH>
-    where
-        CH: DmaRxChannel,
-    {
-        pub(crate) rx: &'a mut ChannelRx<Async, CH>,
-        _a: (),
-    }
-
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
-    impl<'a, CH> DmaRxDescEmptyOrErrChFuture<'a, CH>
-    where
-        CH: DmaRxChannel,
-    {
-        pub fn new(rx: &'a mut ChannelRx<Async, CH>) -> Self {
-            Self { rx, _a: () }
-        }
-    }
-
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
-    impl<CH> core::future::Future for DmaRxDescEmptyOrErrChFuture<'_, CH>
-    where
-        CH: DmaRxChannel,
+        Interrupts: DmaFutureInterrupts<DmaRxInterrupt>,
     {
         type Output = Result<(), DmaError>;
 
@@ -3192,41 +3053,45 @@ pub(crate) mod asynch {
             if !self
                 .rx
                 .pending_in_interrupts()
-                .is_disjoint(DmaRxInterrupt::DescriptorError | DmaRxInterrupt::ErrorEof)
+                .is_disjoint(Interrupts::success())
+            {
+                self.rx.clear_interrupts();
+                Poll::Ready(Ok(()))
+            } else if !self
+                .rx
+                .pending_in_interrupts()
+                .is_disjoint(Interrupts::failure())
             {
                 self.rx.clear_interrupts();
                 Poll::Ready(Err(DmaError::DescriptorError))
-            } else if self
-                .rx
-                .pending_in_interrupts()
-                .contains(DmaRxInterrupt::DescriptorEmpty)
-            {
-                Poll::Ready(Ok(()))
             } else {
                 self.rx.waker().register(cx.waker());
-                self.rx.listen_in(
-                    DmaRxInterrupt::DescriptorError
-                        | DmaRxInterrupt::DescriptorEmpty
-                        | DmaRxInterrupt::ErrorEof,
-                );
+                self.rx.listen_in(Interrupts::all());
                 Poll::Pending
             }
         }
     }
 
-    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
-    impl<CH> Drop for DmaRxDescEmptyOrErrChFuture<'_, CH>
+    impl<CH, Interrupts> Drop for DmaRxFutureWithInterrupts<'_, CH, Interrupts>
     where
         CH: DmaRxChannel,
+        Interrupts: DmaFutureInterrupts<DmaRxInterrupt>,
     {
         fn drop(&mut self) {
-            self.rx.unlisten_in(
-                DmaRxInterrupt::DescriptorError
-                    | DmaRxInterrupt::DescriptorEmpty
-                    | DmaRxInterrupt::ErrorEof,
-            );
+            self.rx.unlisten_in(Interrupts::all());
         }
     }
+
+    pub type DmaTxFuture<'a, CH> = DmaTxFutureWithInterrupts<'a, CH, DmaTxDefaultInterrupts>;
+    pub type DmaRxFuture<'a, CH> = DmaRxFutureWithInterrupts<'a, CH, DmaRxDefaultInterrupts>;
+    pub type DmaTxWaitFuture<'a, CH> = DmaTxFutureWithInterrupts<'a, CH, DmaTxWaitInterrupts>;
+    pub type DmaRxWaitFuture<'a, CH> = DmaRxFutureWithInterrupts<'a, CH, DmaRxWaitInterrupts>;
+
+    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
+    pub type DmaTxDoneChFuture<'a, CH> = DmaTxFutureWithInterrupts<'a, CH, DmaTxDoneInterrupts>;
+
+    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
+    pub type DmaRxDoneChFuture<'a, CH> = DmaRxFutureWithInterrupts<'a, CH, DmaRxDoneInterrupts>;
 
     pub(super) fn handle_in_interrupt<CH: DmaChannelExt>() {
         let rx = CH::rx_interrupts();

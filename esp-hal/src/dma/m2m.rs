@@ -29,7 +29,7 @@ use crate::{
         DmaTxBuf,
         DmaTxBuffer,
         DmaTxInterrupt,
-        asynch::{DmaRxDescEmptyOrErrChFuture, DmaTxDescErrOrTotalEofChFuture},
+        asynch::{DmaRxWaitFuture, DmaTxWaitFuture},
     },
 };
 #[cfg(esp32s2)]
@@ -239,7 +239,7 @@ impl<'d, BUF: DmaRxBuffer> Mem2MemRxTransfer<'d, Async, BUF> {
     /// Waits for the transfer to stop and returns the peripheral and buffer.
     pub async fn wait_async(self) -> (Result<(), DmaError>, Mem2MemRx<'d, Async>, BUF::Final) {
         let (mut m2m, view) = self.release();
-        let result = DmaRxDescEmptyOrErrChFuture::new(&mut m2m.channel).await;
+        let result = DmaRxWaitFuture::new(&mut m2m.channel).await;
         (result, m2m, BUF::from_view(view))
     }
 }
@@ -376,7 +376,7 @@ impl<'d, BUF: DmaTxBuffer> Mem2MemTxTransfer<'d, Async, BUF> {
     /// Waits for the transfer to stop and returns the peripheral and buffer.
     pub async fn wait_async(self) -> (Result<(), DmaError>, Mem2MemTx<'d, Async>, BUF::Final) {
         let (mut m2m, view) = self.release();
-        let result = DmaTxDescErrOrTotalEofChFuture::new(&mut m2m.channel).await;
+        let result = DmaTxWaitFuture::new(&mut m2m.channel).await;
         (result, m2m, BUF::from_view(view))
     }
 }
@@ -556,21 +556,38 @@ impl<Dm: DriverMode> SimpleMem2MemTransfer<'_, '_, Dm> {
 
 impl SimpleMem2MemTransfer<'_, '_, Async> {
     /// Wait for the transfer to finish.
-    pub async fn wait_async(self) -> Result<(), DmaError> {
-        let State::Active(rx, _tx) = &mut self.0.state else {
+    pub async fn wait_async(
+        self,
+        // rx_done: impl FnOnce(),
+        // tx_done: impl FnOnce(),
+    ) -> Result<(), DmaError> {
+        let State::Active(rx, tx) = &mut self.0.state else {
             unreachable!()
         };
 
+        // Wait for transmission to finish, and wait for the RX channel to receive the
+        // one and only EOF that DmaTxBuf will send.
+        let (rx_result, tx_result) = embassy_futures::join::join(
+            DmaRxWaitFuture::new(&mut rx.m2m.channel),
+            DmaTxWaitFuture::new(&mut tx.m2m.channel),
+        )
+        .await;
+
         // let (rx_result, tx_result) = embassy_futures::join::join(
-        //     DmaRxDescEmptyOrErrChFuture::new(&mut rx.m2m.channel),
-        //     DmaTxDescErrOrTotalEofChFuture::new(&mut tx.m2m.channel),
+        //     async {
+        //         let result = DmaRxWaitFuture::new(&mut rx.m2m.channel).await;
+        //         (rx_done)();
+        //         result
+        //     },
+        //     async {
+        //         let result = DmaTxWaitFuture::new(&mut tx.m2m.channel).await;
+        //         (tx_done)();
+        //         result
+        //     },
         // )
         // .await;
 
-        // rx_result.and(tx_result)
-
-        // I think it should be good enough to wait for the RX channel to finish.
-        DmaRxDescEmptyOrErrChFuture::new(&mut rx.m2m.channel).await
+        rx_result.and(tx_result)
     }
 }
 
