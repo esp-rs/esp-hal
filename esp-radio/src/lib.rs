@@ -318,7 +318,10 @@ pub(crate) fn init() -> Result<(), InitializationError> {
     const MIN_CLOCK: Rate = Rate::from_mhz(80);
     let clocks = Clocks::get();
     if clocks.cpu_clock < MIN_CLOCK {
-        return Err(InitializationError::WrongClockConfig);
+        panic!(
+            "CPU clock is too slow for Wi-Fi operation: {} MHz",
+            clocks.cpu_clock.as_mhz()
+        );
     }
 
     crate::common_adapter::enable_wifi_power_domain();
@@ -461,8 +464,6 @@ mod private {
         /// An error from the Wi-Fi driver: {0}.
         #[cfg(feature = "wifi")]
         WifiError(WifiError),
-        /// The current CPU clock frequency is too low.
-        WrongClockConfig,
         /// The scheduler is not initialized.
         SchedulerNotInitialized,
         #[cfg(esp32)]
