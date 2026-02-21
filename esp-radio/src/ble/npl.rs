@@ -136,7 +136,7 @@ impl OsMbufPool {
 pub(crate) struct OsMbuf {
     /// Current pointer to data in the structure
     om_data: *const u8,
-    /// Flags associated with this buffer, see OS_MBUF_F_* defintions
+    /// Flags associated with this buffer, see OS_MBUF_F_* definitions
     om_flags: u8,
     /// Length of packet header
     om_pkthdr_len: u8,

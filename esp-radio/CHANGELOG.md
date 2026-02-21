@@ -124,7 +124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update bt-hci version to add additional HCI commands (#3920)
 - `AuthMethod`, `Protocol`, `AccessPointInfo`, `AccessPointConfiguration`, `ClientConfiguration`, `Capability`, `Configuration`, `WifiEvent`, `InternalWifiError`, `ScanTypeConfig`, `WifiState`, and `WifiMode` have been marked as `#[non_exhaustive]` (#3981, #4017)
 - The `Configuration`, `ClientConfiguration`, `AccessPointConfiguration`, and `EapClientConfiguration` enums have been renamed to `ModeConfig`, `ClientConfig`, `AccessPointConfig`, and `EapClientConfig` (#3994, #4278)
-- Error types implements `core::error:Error` (#3994, #4278)
+- Error types implement `core::error::Error` (#3994, #4278)
 - Use `esp-phy` internally for PHY initialization (#3892)
 - `ap_state()` and `sta_state()` marked as stable (#4017)
 - `wifi_state()` marked as unstable (#4017)

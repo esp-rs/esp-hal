@@ -121,7 +121,7 @@ impl<'d> BleConnector<'d> {
 /// Error type for the BLE connector.
 #[instability::unstable]
 pub enum BleConnectorError {
-    /// Unknown BLE error occured.
+    /// Unknown BLE error occurred.
     Unknown,
 }
 

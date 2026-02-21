@@ -54,7 +54,7 @@ In this case the following environment variables are used:
 
 - `ESP_LOG` log messages you want to show, similar to `RUST_LOG`. RegEx is not supported. e.g. `warn,test::foo=info,test::foo::bar=debug`
 
-If this simple logger implementation isn't sufficient for your needs, you can implement your own logger on top of `esp-println`. See [Implementing a Logger section log documentaion]
+If this simple logger implementation isn't sufficient for your needs, you can implement your own logger on top of `esp-println`. See [Implementing a Logger section log documentation]
 
 ## `defmt`
 
@@ -73,7 +73,7 @@ https://github.com/knurling-rs/defmt?tab=readme-ov-file#msrv
 [`log` crate]: https://github.com/rust-lang/log
 [rzCOBS]: https://github.com/Dirbaio/rzcobs
 [`espflash`]: https://github.com/esp-rs/espflash
-[Implementing a Logger section log documentaion]: https://docs.rs/log/0.4.17/log/#implementing-a-logger
+[Implementing a Logger section log documentation]: https://docs.rs/log/0.4.17/log/#implementing-a-logger
 [`defmt` book's setup instructions]: https://defmt.ferrous-systems.com/setup
 
 # Troubleshooting linker errors

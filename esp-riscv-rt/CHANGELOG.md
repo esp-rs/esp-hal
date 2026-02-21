@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- the `pre_init` macro got removed - it's usage was always discouraged (#3857)
+- the `pre_init` macro got removed - its usage was always discouraged (#3857)
 
 ## [v0.12.0] - 2025-07-16
 

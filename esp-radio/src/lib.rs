@@ -47,7 +47,7 @@
 //! let sw_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 //!
 //! // THIS IS IMPORTANT FOR WIFI AND BLE: You MUST start the scheduler
-//! // before initiallizing the radio!
+//! // before initializing the radio!
 //! esp_rtos::start(timg0.timer0, sw_interrupt.software_interrupt0);
 #![cfg_attr(
     wifi_driver_supported,

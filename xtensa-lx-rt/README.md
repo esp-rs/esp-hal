@@ -16,7 +16,7 @@ Minimal runtime/startup for Xtensa LX processors. This crate currently supports 
 
 ## I get linker errors when I build for debug
 
-Xtensa only provides a small code space for exceptions to fit inside, when building an unoptimized build the code size of a exception handler may exceed that size, causing a linker error. To fix this, you should always optimize this crate, even in debug builds. Adding the following to your projects `Cargo.toml` should do the trick.
+Xtensa only provides a small code space for exceptions to fit inside, when building an unoptimized build the code size of an exception handler may exceed that size, causing a linker error. To fix this, you should always optimize this crate, even in debug builds. Adding the following to your projects `Cargo.toml` should do the trick.
 
 ```toml
 [profile.dev.package.xtensa-lx-rt]

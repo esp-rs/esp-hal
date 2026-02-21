@@ -122,7 +122,7 @@ same name are merged.
 ### `//% CARGO-CONFIG`
 
 The value of this key will be passed as a `--config` argument to `cargo`. Any amount
-of configuration can be specfied this way.
+of configuration can be specified this way.
 
 ```
 //% CARGO-CONFIG: target.'cfg(target_arch = "riscv32")'.rustflags = [ "-Z", "stack-protector=all" ]
@@ -150,8 +150,8 @@ option, while the other will select `multiple-integrated`.
 //% ENV(multiple_integrated): ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE = multiple-integrated
 ```
 
-You can specifiy a test or example by file, or by configuration. If the
-parameters match multiple files, they will be built or executed in sucession.
+You can specify a test or example by file, or by configuration. If the
+parameters match multiple files, they will be built or executed in succession.
 
 For example, running `cargo xtask run tests esp32 embassy_test` will run both
 `embassy_test_single_integrated` and `embassy_test_multiple_integrated`, but you can also

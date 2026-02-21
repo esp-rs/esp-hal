@@ -15,7 +15,7 @@
 - Emitting rustc cfg's for boolean keys
 - Emitting environment variables for numbers
   - Along with decimal parsing, it supports Hex, Octal and Binary with the respective `0x`, `0o` and `0b` prefixes.
-- Emitting environment variables string values
+- Emitting environment variables for string values
 
 ### Viewing the configuration
 

@@ -811,7 +811,7 @@ const BLOCKING_SHA_VTABLE: VTable<ShaOperation> = VTable {
         // manner and so they can't be cancelled.
     },
     stop: |driver| {
-        // Drop the SHA driver to conserve power when there is nothig to do (or when the driver was
+        // Drop the SHA driver to conserve power when there is nothing to do (or when the driver was
         // stopped).
         let driver = unsafe { ShaBackend::from_raw(driver) };
         driver.deinitialize()

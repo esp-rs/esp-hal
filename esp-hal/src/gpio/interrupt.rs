@@ -199,7 +199,7 @@ pub(super) extern "C" fn user_gpio_interrupt_handler() {
 
         // Call the user handler before clearing interrupts. The user can use the enable
         // bits to determine which interrupts they are interested in. Clearing the
-        // interupt status or enable bits have no effect on the rest of the
+        // interrupt status or enable bits have no effect on the rest of the
         // interrupt handler.
         USER_INTERRUPT_HANDLER.call();
 

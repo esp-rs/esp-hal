@@ -2,7 +2,7 @@
 
 This document describes all comments-based CI controls available on pull requests.
 
-By default, only `esp-rs` organization **members**s and **owners**s can trigger HIL or binary-size jobs. However, they may grant similar rights to other users, see [Trust Management Commands] section for details
+By default, only `esp-rs` organization **members** and **owners** can trigger HIL or binary-size jobs. However, they may grant similar rights to other users, see [Trust Management Commands] section for details
 
 [Trust Management Commands]: #trust-management-commands
 
@@ -86,4 +86,4 @@ After revocation, the user loses access to the commands above for that PR.
 
 ## Help / Usage Hints
 
-If you will request for `/hil help` or `/hil` without a valid variant or chips, the bot will respond with a short usage explanation, and a reminder that the requester must be a maintainer or trusted author.
+If you request `/hil help` or `/hil` without a valid variant or chips, the bot will respond with a short usage explanation, and a reminder that the requester must be a maintainer or trusted author.
