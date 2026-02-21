@@ -2917,6 +2917,18 @@ pub(crate) mod asynch {
         }
     }
 
+    pub struct DmaRxWaitEofInterrupts;
+
+    impl DmaFutureInterrupts<DmaRxInterrupt> for DmaRxWaitEofInterrupts {
+        fn success() -> EnumSet<DmaRxInterrupt> {
+            DmaRxInterrupt::DescriptorEmpty | DmaRxInterrupt::SuccessfulEof
+        }
+
+        fn failure() -> EnumSet<DmaRxInterrupt> {
+            DmaRxInterrupt::DescriptorError.into()
+        }
+    }
+
     /// For a future that waits for `DmaTxInterrupt::Done`.
     #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
     pub struct DmaTxDoneInterrupts;
@@ -3086,6 +3098,7 @@ pub(crate) mod asynch {
     pub type DmaRxFuture<'a, CH> = DmaRxFutureWithInterrupts<'a, CH, DmaRxDefaultInterrupts>;
     pub type DmaTxWaitFuture<'a, CH> = DmaTxFutureWithInterrupts<'a, CH, DmaTxWaitInterrupts>;
     pub type DmaRxWaitFuture<'a, CH> = DmaRxFutureWithInterrupts<'a, CH, DmaRxWaitInterrupts>;
+    pub type DmaRxWaitEofFuture<'a, CH> = DmaRxFutureWithInterrupts<'a, CH, DmaRxWaitEofInterrupts>;
 
     #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
     pub type DmaTxDoneChFuture<'a, CH> = DmaTxFutureWithInterrupts<'a, CH, DmaTxDoneInterrupts>;

@@ -29,7 +29,7 @@ use crate::{
         DmaTxBuf,
         DmaTxBuffer,
         DmaTxInterrupt,
-        asynch::{DmaRxWaitFuture, DmaTxWaitFuture},
+        asynch::{DmaRxWaitEofFuture, DmaRxWaitFuture, DmaTxWaitFuture},
     },
 };
 #[cfg(esp32s2)]
@@ -532,6 +532,7 @@ pub struct SimpleMem2MemTransfer<'a, 'd, Dm: DriverMode>(&'a mut SimpleMem2Mem<'
 
 impl<Dm: DriverMode> SimpleMem2MemTransfer<'_, '_, Dm> {
     /// Returns true when [Self::wait] will not block.
+    /// This assumes that the TX buffer has the EOF flag set only on the last descriptor.
     pub fn is_done(&self) -> bool {
         let State::Active(rx, tx) = &self.0.state else {
             unreachable!()
@@ -548,6 +549,7 @@ impl<Dm: DriverMode> SimpleMem2MemTransfer<'_, '_, Dm> {
     }
 
     /// Wait for the transfer to finish.
+    /// This assumes that the TX buffer has the EOF flag set only on the last descriptor.
     pub fn wait(self) -> Result<(), DmaError> {
         while !self.is_done() {}
         Ok(())
@@ -556,11 +558,8 @@ impl<Dm: DriverMode> SimpleMem2MemTransfer<'_, '_, Dm> {
 
 impl SimpleMem2MemTransfer<'_, '_, Async> {
     /// Wait for the transfer to finish.
-    pub async fn wait_async(
-        self,
-        // rx_done: impl FnOnce(),
-        // tx_done: impl FnOnce(),
-    ) -> Result<(), DmaError> {
+    /// This assumes that the TX buffer has the EOF flag set only on the last descriptor.
+    pub async fn wait_async(self) -> Result<(), DmaError> {
         let State::Active(rx, tx) = &mut self.0.state else {
             unreachable!()
         };
@@ -568,24 +567,10 @@ impl SimpleMem2MemTransfer<'_, '_, Async> {
         // Wait for transmission to finish, and wait for the RX channel to receive the
         // one and only EOF that DmaTxBuf will send.
         let (rx_result, tx_result) = embassy_futures::join::join(
-            DmaRxWaitFuture::new(&mut rx.m2m.channel),
+            DmaRxWaitEofFuture::new(&mut rx.m2m.channel),
             DmaTxWaitFuture::new(&mut tx.m2m.channel),
         )
         .await;
-
-        // let (rx_result, tx_result) = embassy_futures::join::join(
-        //     async {
-        //         let result = DmaRxWaitFuture::new(&mut rx.m2m.channel).await;
-        //         (rx_done)();
-        //         result
-        //     },
-        //     async {
-        //         let result = DmaTxWaitFuture::new(&mut tx.m2m.channel).await;
-        //         (tx_done)();
-        //         result
-        //     },
-        // )
-        // .await;
 
         rx_result.and(tx_result)
     }
