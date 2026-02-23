@@ -80,11 +80,13 @@ pub enum Error {
 }
 
 /// Represents supported elliptic curves for cryptographic operations.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EllipticCurve {
     /// The P-192 elliptic curve, a 192-bit curve.
-    P192 = 0,
+    P192,
     /// The P-256 elliptic curve. a 256-bit curve.
-    P256 = 1,
+    P256,
 }
 
 #[derive(Clone, Copy)]
@@ -170,7 +172,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     /// from the bitlength of the prime fields of the curve.
     pub fn affine_point_multiplication(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         k: &[u8],
         x: &mut [u8],
         y: &mut [u8],
@@ -244,7 +246,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     #[cfg(esp32c2)]
     pub fn finite_field_division(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         k: &[u8],
         y: &mut [u8],
     ) -> Result<(), Error> {
@@ -308,7 +310,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     /// elliptic curve.
     pub fn affine_point_verification(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         x: &[u8],
         y: &[u8],
     ) -> Result<(), Error> {
@@ -377,7 +379,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     #[cfg(not(ecc_working_modes = "11"))]
     pub fn affine_point_verification_multiplication(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         k: &[u8],
         x: &mut [u8],
         y: &mut [u8],
@@ -463,7 +465,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     #[cfg(ecc_working_modes = "11")]
     pub fn affine_point_verification_multiplication(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         k: &[u8],
         px: &mut [u8],
         py: &mut [u8],
@@ -553,7 +555,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     /// from the bitlength of the prime fields of the curve.
     pub fn jacobian_point_multiplication(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         k: &mut [u8],
         x: &mut [u8],
         y: &mut [u8],
@@ -643,7 +645,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     /// elliptic curve.
     pub fn jacobian_point_verification(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         x: &[u8],
         y: &[u8],
         z: &[u8],
@@ -723,7 +725,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     /// elliptic curve.
     pub fn affine_point_verification_jacobian_multiplication(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         k: &mut [u8],
         x: &mut [u8],
         y: &mut [u8],
@@ -831,7 +833,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     #[cfg(ecc_working_modes = "11")]
     pub fn affine_point_addition(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         px: &mut [u8],
         py: &mut [u8],
         qx: &mut [u8],
@@ -934,7 +936,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     #[cfg(ecc_working_modes = "11")]
     pub fn mod_operations(
         &mut self,
-        curve: &EllipticCurve,
+        curve: EllipticCurve,
         a: &mut [u8],
         b: &mut [u8],
         work_mode: WorkMode,

@@ -102,7 +102,7 @@ mod ecc_tests {
                                 .y()
                                 .unwrap(),
                         );
-                        &EllipticCurve::P192
+                        EllipticCurve::P192
                     }
                     32 => {
                         x.copy_from_slice(
@@ -117,7 +117,7 @@ mod ecc_tests {
                                 .y()
                                 .unwrap(),
                         );
-                        &EllipticCurve::P256
+                        EllipticCurve::P256
                     }
                     _ => unimplemented!(),
                 };
@@ -197,7 +197,7 @@ mod ecc_tests {
                             .to_encoded_point(false);
                         x.copy_from_slice(q.x().unwrap().as_slice());
                         y.copy_from_slice(q.y().unwrap().as_slice());
-                        &EllipticCurve::P192
+                        EllipticCurve::P192
                     }
                     32 => {
                         let sw_k = p256::Scalar::from(
@@ -209,12 +209,12 @@ mod ecc_tests {
                             .to_encoded_point(false);
                         x.copy_from_slice(q.x().unwrap().as_slice());
                         y.copy_from_slice(q.y().unwrap().as_slice());
-                        &EllipticCurve::P256
+                        EllipticCurve::P256
                     }
                     _ => unimplemented!(),
                 };
 
-                match ctx.ecc.affine_point_verification(&curve, x, y) {
+                match ctx.ecc.affine_point_verification(curve, x, y) {
                     Err(Error::SizeMismatchCurve) => {
                         assert!(false, "Inputs data doesn't match the key length selected.")
                     }
@@ -268,7 +268,7 @@ mod ecc_tests {
                                 .y()
                                 .unwrap(),
                         );
-                        &EllipticCurve::P192
+                        EllipticCurve::P192
                     }
                     32 => {
                         px.copy_from_slice(
@@ -283,7 +283,7 @@ mod ecc_tests {
                                 .y()
                                 .unwrap(),
                         );
-                        &EllipticCurve::P256
+                        EllipticCurve::P256
                     }
                     _ => unimplemented!(),
                 };
@@ -388,7 +388,7 @@ mod ecc_tests {
                                 .y()
                                 .unwrap(),
                         );
-                        &EllipticCurve::P192
+                        EllipticCurve::P192
                     }
                     32 => {
                         x.copy_from_slice(
@@ -403,7 +403,7 @@ mod ecc_tests {
                                 .y()
                                 .unwrap(),
                         );
-                        &EllipticCurve::P256
+                        EllipticCurve::P256
                     }
                     _ => unimplemented!(),
                 };
@@ -516,7 +516,7 @@ mod ecc_tests {
                         let y_jacobian = y_affine * z * z * z;
                         x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_slice());
                         y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
-                        &EllipticCurve::P192
+                        EllipticCurve::P192
                     }
                     32 => {
                         let sw_k = p256::Scalar::from(
@@ -540,12 +540,12 @@ mod ecc_tests {
                         let y_jacobian = y_affine * z * z * z;
                         x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_slice());
                         y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
-                        &EllipticCurve::P256
+                        EllipticCurve::P256
                     }
                     _ => unimplemented!(),
                 };
 
-                match ctx.ecc.jacobian_point_verification(&curve, x, y, z) {
+                match ctx.ecc.jacobian_point_verification(curve, x, y, z) {
                     Err(Error::SizeMismatchCurve) => {
                         assert!(false, "Inputs data doesn't match the key length selected.")
                     }
@@ -598,7 +598,7 @@ mod ecc_tests {
                                 .y()
                                 .unwrap(),
                         );
-                        &EllipticCurve::P192
+                        EllipticCurve::P192
                     }
                     32 => {
                         x.copy_from_slice(
@@ -613,7 +613,7 @@ mod ecc_tests {
                                 .y()
                                 .unwrap(),
                         );
-                        &EllipticCurve::P256
+                        EllipticCurve::P256
                     }
                     _ => unimplemented!(),
                 };
@@ -720,8 +720,8 @@ mod ecc_tests {
                 sw_y.copy_from_slice(y);
                 sw_k.copy_from_slice(k);
                 let curve = match prime_field.len() {
-                    24 => &EllipticCurve::P192,
-                    32 => &EllipticCurve::P256,
+                    24 => EllipticCurve::P192,
+                    32 => EllipticCurve::P256,
                     _ => unimplemented!(),
                 };
 
@@ -802,7 +802,7 @@ mod ecc_tests {
 
         ctx.ecc
             .affine_point_addition(
-                &EllipticCurve::P256,
+                EllipticCurve::P256,
                 &mut x_256,
                 &mut y_256,
                 &mut x_256_1,
@@ -854,7 +854,7 @@ mod ecc_tests {
 
         ctx.ecc
             .affine_point_addition(
-                &EllipticCurve::P192,
+                EllipticCurve::P192,
                 &mut x_192,
                 &mut y_192,
                 &mut x_192_1,
@@ -924,7 +924,7 @@ mod ecc_tests {
 
         ctx.ecc
             .mod_operations(
-                &EllipticCurve::P256,
+                EllipticCurve::P256,
                 &mut x_256,
                 &mut y_256,
                 WorkMode::ModAdd,
@@ -936,7 +936,7 @@ mod ecc_tests {
         let mut y_256 = ECC_256_Y.clone();
         ctx.ecc
             .mod_operations(
-                &EllipticCurve::P256,
+                EllipticCurve::P256,
                 &mut x_256,
                 &mut y_256,
                 WorkMode::ModSub,
@@ -948,7 +948,7 @@ mod ecc_tests {
         let mut y_256 = ECC_256_Y.clone();
         ctx.ecc
             .mod_operations(
-                &EllipticCurve::P256,
+                EllipticCurve::P256,
                 &mut x_256,
                 &mut y_256,
                 WorkMode::ModMulti,
@@ -960,7 +960,7 @@ mod ecc_tests {
         let mut y_256 = ECC_256_DEN.clone();
         ctx.ecc
             .mod_operations(
-                &EllipticCurve::P256,
+                EllipticCurve::P256,
                 &mut x_256,
                 &mut y_256,
                 WorkMode::ModDiv,
@@ -1017,7 +1017,7 @@ mod ecc_tests {
 
         ctx.ecc
             .mod_operations(
-                &EllipticCurve::P192,
+                EllipticCurve::P192,
                 &mut x_192,
                 &mut y_192,
                 WorkMode::ModAdd,
@@ -1029,7 +1029,7 @@ mod ecc_tests {
         let mut y_192 = ECC_192_Y.clone();
         ctx.ecc
             .mod_operations(
-                &EllipticCurve::P192,
+                EllipticCurve::P192,
                 &mut x_192,
                 &mut y_192,
                 WorkMode::ModSub,
@@ -1041,7 +1041,7 @@ mod ecc_tests {
         let mut y_192 = ECC_192_Y.clone();
         ctx.ecc
             .mod_operations(
-                &EllipticCurve::P192,
+                EllipticCurve::P192,
                 &mut x_192,
                 &mut y_192,
                 WorkMode::ModMulti,
@@ -1053,7 +1053,7 @@ mod ecc_tests {
         let mut y_192 = ECC_192_DEN.clone();
         ctx.ecc
             .mod_operations(
-                &EllipticCurve::P192,
+                EllipticCurve::P192,
                 &mut x_192,
                 &mut y_192,
                 WorkMode::ModDiv,
