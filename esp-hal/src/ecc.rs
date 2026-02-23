@@ -199,39 +199,16 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         y: &mut [u8],
     ) -> Result<(), Error> {
         curve.size_check([k, x, y])?;
-        let mode = WorkMode::PointMultiMode;
 
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().k_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(x, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
+        self.write_mem_reversed(self.k_mem(), k);
+        self.write_mem_reversed(self.px_mem(), x);
+        self.write_mem_reversed(self.py_mem(), y);
 
-        self.start_operation(mode, curve);
-
-        // wait for interrupt
+        self.start_operation(WorkMode::PointMultiMode, curve);
         while self.is_busy() {}
 
-        self.alignment_helper
-            .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), x);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), y);
+        self.read_mem_reversed(self.px_mem(), x);
+        self.read_mem_reversed(self.py_mem(), y);
 
         Ok(())
     }
@@ -255,30 +232,16 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         y: &mut [u8],
     ) -> Result<(), Error> {
         curve.size_check([k, y])?;
-        let mode = WorkMode::DivisionMode;
 
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().k_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
+        self.write_mem_reversed(self.k_mem(), k);
+        self.write_mem_reversed(self.py_mem(), y);
 
-        self.start_operation(mode, curve);
+        self.start_operation(WorkMode::DivisionMode, curve);
 
         // wait for interrupt
         while self.is_busy() {}
 
-        self.alignment_helper
-            .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), y);
+        self.read_mem_reversed(self.py_mem(), y);
 
         Ok(())
     }
@@ -302,31 +265,15 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         y: &[u8],
     ) -> Result<(), Error> {
         curve.size_check([x, y])?;
-        let mode = WorkMode::PointVerif;
 
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(x, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
+        self.write_mem_reversed(self.px_mem(), x);
+        self.write_mem_reversed(self.py_mem(), y);
 
-        self.start_operation(mode, curve);
+        self.start_operation(WorkMode::PointVerif, curve);
 
         // wait for interrupt
         while self.is_busy() {}
-
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
-        }
+        self.check_point_verification_result()?;
 
         Ok(())
     }
@@ -355,44 +302,19 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         y: &mut [u8],
     ) -> Result<(), Error> {
         curve.size_check([k, x, y])?;
-        let mode = WorkMode::PointVerifMulti;
 
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().k_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(x, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
+        self.write_mem_reversed(self.k_mem(), k);
+        self.write_mem_reversed(self.px_mem(), x);
+        self.write_mem_reversed(self.py_mem(), y);
 
-        self.start_operation(mode, curve);
+        self.start_operation(WorkMode::PointVerifMulti, curve);
 
         // wait for interrupt
         while self.is_busy() {}
+        self.check_point_verification_result()?;
 
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
-        }
-
-        self.alignment_helper
-            .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), x);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), y);
+        self.read_mem_reversed(self.px_mem(), x);
+        self.read_mem_reversed(self.py_mem(), y);
 
         Ok(())
     }
@@ -427,53 +349,22 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         qz: &mut [u8],
     ) -> Result<(), Error> {
         curve.size_check([k, px, py])?; //Q?
-        let mode = WorkMode::PointVerifMulti;
 
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().k_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(px, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(py, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
+        self.write_mem_reversed(self.k_mem(), k);
+        self.write_mem_reversed(self.px_mem(), px);
+        self.write_mem_reversed(self.py_mem(), py);
 
-        self.start_operation(mode, curve);
+        self.start_operation(WorkMode::PointVerifMulti, curve);
 
         // wait for interrupt
         while self.is_busy() {}
+        self.check_point_verification_result()?;
 
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
-        }
-
-        self.alignment_helper
-            .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), px);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), py);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qx_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), qx);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qy_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), qy);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qz_mem(0).as_ptr(), &mut tmp, 32);
-        self.reverse_words(tmp.as_ref(), qz);
+        self.read_mem_reversed(self.px_mem(), px);
+        self.read_mem_reversed(self.py_mem(), py);
+        self.read_mem_reversed(self.qx_mem(), qx);
+        self.read_mem_reversed(self.qy_mem(), qy);
+        self.read_mem_reversed(self.qz_mem(), qz);
 
         Ok(())
     }
@@ -497,53 +388,24 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         y: &mut [u8],
     ) -> Result<(), Error> {
         curve.size_check([k, x, y])?;
-        let mode = WorkMode::JacobianPointMulti;
 
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().k_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(x, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
+        self.write_mem_reversed(self.k_mem(), k);
+        self.write_mem_reversed(self.px_mem(), x);
+        self.write_mem_reversed(self.py_mem(), y);
 
-        self.start_operation(mode, curve);
+        self.start_operation(WorkMode::JacobianPointMulti, curve);
 
         while self.is_busy() {}
 
         cfg_if::cfg_if! {
             if #[cfg(not(ecc_working_modes = "11"))] {
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), x);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), y);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().k_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), k);
+                self.read_mem_reversed(self.px_mem(), x);
+                self.read_mem_reversed(self.py_mem(), y);
+                self.read_mem_reversed(self.k_mem(), k);
             } else {
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().qx_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), x);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().qy_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), y);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().qz_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), k);
+                self.read_mem_reversed(self.qx_mem(), x);
+                self.read_mem_reversed(self.qy_mem(), y);
+                self.read_mem_reversed(self.qz_mem(), k);
             }
         }
 
@@ -570,42 +432,24 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         z: &[u8],
     ) -> Result<(), Error> {
         curve.size_check([x, y, z])?;
-        let mode = WorkMode::JacobianPointVerif;
-
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(x, &mut tmp);
 
         cfg_if::cfg_if! {
             if #[cfg(not(ecc_working_modes = "11"))] {
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().px_mem(0).as_ptr(), tmp.as_ref(), 32);
-                self.reverse_words(y, &mut tmp);
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().py_mem(0).as_ptr(), tmp.as_ref(), 32);
-                self.reverse_words(z, &mut tmp);
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().k_mem(0).as_ptr(), tmp.as_ref(), 32);
+                self.write_mem_reversed(self.px_mem(), x);
+                self.write_mem_reversed(self.py_mem(), y);
+                self.write_mem_reversed(self.k_mem(), z);
             } else {
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().qx_mem(0).as_ptr(), tmp.as_ref(), 32);
-                self.reverse_words(y, &mut tmp);
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().qy_mem(0).as_ptr(), tmp.as_ref(), 32);
-                self.reverse_words(z, &mut tmp);
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().qz_mem(0).as_ptr(), tmp.as_ref(), 32);
+                self.write_mem_reversed(self.qx_mem(), x);
+                self.write_mem_reversed(self.qy_mem(), y);
+                self.write_mem_reversed(self.qz_mem(), z);
             }
         }
 
-        self.start_operation(mode, curve);
+        self.start_operation(WorkMode::JacobianPointVerif, curve);
 
         // wait for interrupt
         while self.is_busy() {}
-
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
-        }
+        self.check_point_verification_result()?;
 
         Ok(())
     }
@@ -633,64 +477,26 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         y: &mut [u8],
     ) -> Result<(), Error> {
         curve.size_check([k, x, y])?;
-        let mode = WorkMode::PointVerifJacobianMulti;
 
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().k_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(x, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            32,
-        );
+        self.write_mem_reversed(self.k_mem(), k);
+        self.write_mem_reversed(self.px_mem(), x);
+        self.write_mem_reversed(self.py_mem(), y);
 
-        self.start_operation(mode, curve);
+        self.start_operation(WorkMode::PointVerifJacobianMulti, curve);
 
         // wait for interrupt
         while self.is_busy() {}
-
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
-        }
-
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
-        }
+        self.check_point_verification_result()?;
 
         cfg_if::cfg_if! {
             if #[cfg(not(ecc_working_modes = "11"))] {
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), x);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), y);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().k_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), k);
+                self.read_mem_reversed(self.px_mem(), x);
+                self.read_mem_reversed(self.py_mem(), y);
+                self.read_mem_reversed(self.k_mem(), k);
             } else {
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().qx_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), x);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().qy_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), y);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().qz_mem(0).as_ptr(), &mut tmp, 32);
-                self.reverse_words(tmp.as_ref(), k);
+                self.read_mem_reversed(self.qx_mem(), x);
+                self.read_mem_reversed(self.qy_mem(), y);
+                self.read_mem_reversed(self.qz_mem(), k);
             }
         }
 
@@ -726,51 +532,23 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         qz: &mut [u8],
     ) -> Result<(), Error> {
         curve.size_check([px, py, qx, qy, qz])?;
-        let mode = WorkMode::PointAdd;
 
-        let mut tmp = [0_u8; 32];
+        self.write_mem(self.px_mem(), px);
+        self.write_mem(self.py_mem(), py);
+        self.write_mem(self.qx_mem(), qx);
+        self.write_mem(self.qy_mem(), qy);
+        self.write_mem(self.qz_mem(), qz);
 
-        tmp[0..px.len()].copy_from_slice(px);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().px_mem(0).as_ptr(), &tmp, 32);
-        tmp[0..py.len()].copy_from_slice(py);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().py_mem(0).as_ptr(), &tmp, 32);
-        tmp[0..qx.len()].copy_from_slice(qx);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().qx_mem(0).as_ptr(), &tmp, 32);
-        tmp[0..qy.len()].copy_from_slice(qy);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().qy_mem(0).as_ptr(), &tmp, 32);
-        tmp[0..qz.len()].copy_from_slice(qz);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().qz_mem(0).as_ptr(), &tmp, 32);
-
-        self.start_operation(mode, curve);
+        self.start_operation(WorkMode::PointAdd, curve);
 
         // wait for interrupt
         while self.is_busy() {}
 
-        self.alignment_helper
-            .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 32);
-        let mut tmp_len = px.len();
-        px[..].copy_from_slice(&tmp[..tmp_len]);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 32);
-        tmp_len = py.len();
-        py[..].copy_from_slice(&tmp[..tmp_len]);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qx_mem(0).as_ptr(), &mut tmp, 32);
-        tmp_len = qx.len();
-        qx[..].copy_from_slice(&tmp[..tmp_len]);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qy_mem(0).as_ptr(), &mut tmp, 32);
-        tmp_len = qy.len();
-        qy[..].copy_from_slice(&tmp[..tmp_len]);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qz_mem(0).as_ptr(), &mut tmp, 32);
-        tmp_len = qz.len();
-        qz[..].copy_from_slice(&tmp[..tmp_len]);
+        self.read_mem(self.px_mem(), px);
+        self.read_mem(self.py_mem(), py);
+        self.read_mem(self.qx_mem(), qx);
+        self.read_mem(self.qy_mem(), qy);
+        self.read_mem(self.qz_mem(), qz);
 
         Ok(())
     }
@@ -801,13 +579,8 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     ) -> Result<(), Error> {
         curve.size_check([a, b])?;
 
-        let mut tmp = [0_u8; 32];
-        tmp[0..a.len()].copy_from_slice(a);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().px_mem(0).as_ptr(), &tmp, 32);
-        tmp[0..b.len()].copy_from_slice(b);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().py_mem(0).as_ptr(), &tmp, 32);
+        self.write_mem(self.px_mem(), a);
+        self.write_mem(self.py_mem(), b);
 
         self.start_operation(work_mode, curve);
 
@@ -815,24 +588,8 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         while self.is_busy() {}
 
         match work_mode {
-            WorkMode::ModAdd | WorkMode::ModSub => {
-                self.alignment_helper.volatile_read_regset(
-                    self.regs().px_mem(0).as_ptr(),
-                    &mut tmp,
-                    32,
-                );
-                let tmp_len = a.len();
-                a[..].copy_from_slice(&tmp[..tmp_len]);
-            }
-            WorkMode::ModMulti | WorkMode::ModDiv => {
-                self.alignment_helper.volatile_read_regset(
-                    self.regs().py_mem(0).as_ptr(),
-                    &mut tmp,
-                    32,
-                );
-                let tmp_len = b.len();
-                b[..].copy_from_slice(&tmp[..tmp_len]);
-            }
+            WorkMode::ModAdd | WorkMode::ModSub => self.read_mem(self.px_mem(), a),
+            WorkMode::ModMulti | WorkMode::ModDiv => self.read_mem(self.py_mem(), b),
             _ => unreachable!(),
         }
 
@@ -878,5 +635,73 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
             w.key_length().variant(curve.into_pac());
             w.start().set_bit()
         });
+    }
+
+    fn check_point_verification_result(&self) -> Result<(), Error> {
+        if self
+            .regs()
+            .mult_conf()
+            .read()
+            .verification_result()
+            .bit_is_set()
+        {
+            Ok(())
+        } else {
+            self.regs().mult_conf().reset();
+            Err(Error::PointNotOnSelectedCurve)
+        }
+    }
+
+    #[cfg(ecc_working_modes = "11")]
+    fn write_mem(&mut self, ptr: *mut u32, data: &[u8]) {
+        self.alignment_helper
+            .volatile_write_regset(ptr, data, data.len());
+    }
+
+    fn write_mem_reversed(&mut self, ptr: *mut u32, data: &[u8]) {
+        let mut tmp = [0_u8; 32];
+        self.reverse_words(data, &mut tmp);
+        self.alignment_helper
+            .volatile_write_regset(ptr, tmp.as_ref(), 32);
+    }
+
+    #[cfg(ecc_working_modes = "11")]
+    fn read_mem(&mut self, reg: *const u32, out: &mut [u8]) {
+        self.alignment_helper
+            .volatile_read_regset(reg, out, out.len());
+    }
+
+    fn read_mem_reversed(&mut self, reg: *const u32, out: &mut [u8]) {
+        let mut tmp = [0_u8; 32];
+        self.alignment_helper
+            .volatile_read_regset(reg, &mut tmp, 32);
+        self.reverse_words(tmp.as_ref(), out);
+    }
+
+    fn k_mem(&self) -> *mut u32 {
+        self.regs().k_mem(0).as_ptr()
+    }
+
+    fn px_mem(&self) -> *mut u32 {
+        self.regs().px_mem(0).as_ptr()
+    }
+
+    fn py_mem(&self) -> *mut u32 {
+        self.regs().py_mem(0).as_ptr()
+    }
+
+    #[cfg(ecc_working_modes = "11")]
+    fn qx_mem(&self) -> *mut u32 {
+        self.regs().qx_mem(0).as_ptr()
+    }
+
+    #[cfg(ecc_working_modes = "11")]
+    fn qy_mem(&self) -> *mut u32 {
+        self.regs().qy_mem(0).as_ptr()
+    }
+
+    #[cfg(ecc_working_modes = "11")]
+    fn qz_mem(&self) -> *mut u32 {
+        self.regs().qz_mem(0).as_ptr()
     }
 }
