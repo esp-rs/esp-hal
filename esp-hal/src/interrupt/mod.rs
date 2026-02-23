@@ -9,11 +9,11 @@
 //! through the interrupt matrix, which maps peripheral interrupts to CPU interrupts. There are
 //! more peripheral interrupt signals than CPU interrupts, and multiple peripheral interrupts can
 //! be routed to the same CPU interrupt. A set of CPU interrupts are configured to run a default
-//! handler routine, which poll the interrupt controller and call the appropriate handlers for the
+//! handler routine, which polls the interrupt controller and calls the appropriate handlers for the
 //! pending peripheral interrupts.
 //!
 //! This default handler implements interrupt nesting - meaning a higher [`Priority`] interrupt can
-//! preempt a lower priority interrupt handler.
+//! preempt a lower priority interrupt handler. The number of priorities is a chip-specific detail.
 //!
 //! ## Usage
 //!
@@ -38,8 +38,7 @@
 //! The [`software`] module implements software interrupts using peripheral interrupt signals.
 #![cfg_attr(
     multi_core,
-    doc = "This mechanism can be used to implement efficient cross-core
-communication."
+    doc = "This mechanism can be used to implement efficient cross-core communication."
 )]
 
 #[cfg(riscv)]

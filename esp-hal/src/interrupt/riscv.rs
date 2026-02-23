@@ -148,6 +148,9 @@ impl CpuInterrupt {
 for_each_interrupt_priority!(
     (all $( ($idx:literal, $n:literal, $ident:ident) ),*) => {
         /// Interrupt priority levels.
+        ///
+        /// A higher numeric value means higher priority. Interrupt requests at higher priority
+        /// levels will be able to preempt code running at a lower [`RunLevel`][super::RunLevel].
         #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         #[repr(u8)]
