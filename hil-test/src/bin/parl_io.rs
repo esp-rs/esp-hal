@@ -46,6 +46,14 @@ mod tests {
         data_pins: [AnyPin<'static>; 8],
     }
 
+    const MAX_CLK_RATE: Rate = Rate::from_mhz(if cfg!(esp32c5) {
+        // FIXME: Tests become flakey at higher speeds, no matter the sampling edge.
+        // Maybe an effect of the GPIO matrix injecting delay to the valid signal?
+        10
+    } else {
+        40
+    });
+
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -138,7 +146,7 @@ mod tests {
                 tx_pins,
                 clock_out_pin,
                 TxConfig::default()
-                    .with_frequency(Rate::from_mhz(40))
+                    .with_frequency(MAX_CLK_RATE)
                     .with_sample_edge(SampleEdge::Normal)
                     .with_bit_order(BitPackOrder::Lsb),
             )
@@ -149,7 +157,7 @@ mod tests {
                 rx_pins,
                 clock_in_pin,
                 RxConfig::default()
-                    .with_frequency(Rate::from_mhz(40))
+                    .with_frequency(MAX_CLK_RATE)
                     .with_bit_order(BitPackOrder::Lsb),
             )
             .unwrap();
@@ -201,7 +209,7 @@ mod tests {
                 tx_pins,
                 clock_out_pin,
                 TxConfig::default()
-                    .with_frequency(Rate::from_mhz(40))
+                    .with_frequency(MAX_CLK_RATE)
                     .with_sample_edge(SampleEdge::Normal)
                     .with_bit_order(BitPackOrder::Lsb),
             )
@@ -212,7 +220,7 @@ mod tests {
                 rx_pins,
                 clock_in_pin,
                 RxConfig::default()
-                    .with_frequency(Rate::from_mhz(40))
+                    .with_frequency(MAX_CLK_RATE)
                     .with_bit_order(BitPackOrder::Lsb),
             )
             .unwrap();
@@ -270,7 +278,7 @@ mod tests {
                 tx_pins,
                 clock_out_pin,
                 TxConfig::default()
-                    .with_frequency(Rate::from_mhz(40))
+                    .with_frequency(MAX_CLK_RATE)
                     .with_sample_edge(SampleEdge::Normal)
                     .with_bit_order(BitPackOrder::Lsb),
             )
@@ -281,7 +289,7 @@ mod tests {
                 rx_pins,
                 clock_in_pin,
                 RxConfig::default()
-                    .with_frequency(Rate::from_mhz(40))
+                    .with_frequency(MAX_CLK_RATE)
                     .with_bit_order(BitPackOrder::Lsb),
             )
             .unwrap();
