@@ -1,74 +1,46 @@
 #![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Interrupt support
 //!
+//! This module contains code to configure and handle peripheral interrupts.
+//!
 //! ## Overview
-//! This module routes one or more peripheral interrupt sources to any one
-//! of the CPU’s peripheral interrupts.
 //!
-//! ## Configuration
-//! Usually peripheral drivers offer a mechanism to register your interrupt
-//! handler. e.g. the systimer offers `set_interrupt_handler` to register a
-//! handler for a specific alarm. Other drivers might take an interrupt handler
-//! as an optional parameter to their constructor.
+//! Peripheral interrupt requests are not handled by the CPU directly. Instead, they are routed
+//! through the interrupt matrix, which maps peripheral interrupts to CPU interrupts. There are
+//! more peripheral interrupt signals than CPU interrupts, and multiple peripheral interrupts can
+//! be routed to the same CPU interrupt. A set of CPU interrupts are configured to run a default
+//! handler routine, which poll the interrupt controller and call the appropriate handlers for the
+//! pending peripheral interrupts.
 //!
-//! This is the preferred way to register handlers.
+//! This default handler implements interrupt nesting - meaning a higher [`Priority`] interrupt can
+//! preempt a lower priority interrupt handler.
 //!
-//! There are additional ways to register interrupt handlers which are generally
-//! only meant to be used in very special situations (mostly internal to the HAL
-//! or the supporting libraries). Those are outside the scope of this
-//! documentation.
+//! ## Usage
+//!
+//! Peripheral drivers manage interrupts for you. Where appropriate, a `set_interrupt_handler`
+//! function is provided, which allows you to register a function to handle interrupts at a priority
+//! level of your choosing. Interrupt handler functions need to be marked by the [`#[handler]`]
+//! attribute. These drivers also provide `listen` and `unlisten` functions that control whether an
+//! interrupt will be generated for the matching event or not. For more information and examples,
+//! consult the documentation of the specific peripheral drivers.
+//!
+//! If you are writing your own peripheral driver, you will need to first register interrupt
+//! handlers using the [peripheral singletons'] `bind_X_interrupt` functions. You can use the
+//! matching `enable` and `disable` functions to control the peripheral interrupt in the interrupt
+//! matrix, or you can, depending on the peripheral, set or clear the appropriate enable bits in the
+//! `int_ena` register.
+//!
+//! [`#[handler]`]: crate::handler
+//! [peripheral singletons']: crate::peripherals::I2C0
+//!
+//! ## Software interrupts
+//!
+//! The [`software`] module implements software interrupts using peripheral interrupt signals.
 #![cfg_attr(
-    riscv,
-    doc = r#"
-It is even possible, but not recommended, to bind an interrupt directly to a
-CPU interrupt. This can offer lower latency, at the cost of more complexity
-in the interrupt handler.
-"#
+    multi_core,
+    doc = "This mechanism can be used to implement efficient cross-core
+communication."
 )]
-//! ## Examples
-//!
-//! ### Using the peripheral driver to register an interrupt handler
-//!
-//! ```rust, no_run
-//! # {before_snippet}
-//! let mut sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-//! critical_section::with(|cs| {
-//!     sw_int
-//!         .software_interrupt0
-//!         .set_interrupt_handler(swint0_handler);
-//!     SWINT0
-//!         .borrow_ref_mut(cs)
-//!         .replace(sw_int.software_interrupt0);
-//! });
-//!
-//! critical_section::with(|cs| {
-//!     if let Some(swint) = SWINT0.borrow_ref(cs).as_ref() {
-//!         swint.raise();
-//!     }
-//! });
-//! #
-//! # loop {}
-//! # }
-//!
-//! # use core::cell::RefCell;
-//! #
-//! # use critical_section::Mutex;
-//! # use esp_hal::interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl};
-//! # use esp_hal::interrupt::Priority;
-//! # use esp_hal::interrupt::InterruptHandler;
-//! #
-//! static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell::new(None));
-//!
-//! #[handler(priority = Priority::Priority1)]
-//! fn swint0_handler() {
-//!     println!("SW interrupt0");
-//!     critical_section::with(|cs| {
-//!         if let Some(swint) = SWINT0.borrow_ref(cs).as_ref() {
-//!             swint.reset();
-//!         }
-//!     });
-//! }
-//! ```
 
 #[cfg(riscv)]
 pub use self::riscv::*;
@@ -178,7 +150,10 @@ impl PartialEq for IsrCallback {
 /// An interrupt handler
 #[cfg_attr(
     multi_core,
-    doc = "**Note**: Interrupts are handled on the core they were setup on, if a driver is initialized on core 0, and moved to core 1, core 0 will still handle the interrupt."
+    doc = r"
+
+**Note**: Interrupts are handled on the core they were setup on. If a driver is initialized
+on core 0, and moved to core 1, core 0 will still handle the interrupt."
 )]
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
