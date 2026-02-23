@@ -67,6 +67,26 @@ mod ecc_tests {
         }
     }
 
+    fn encode_affine_point(x: &mut [u8], y: &mut [u8]) -> EllipticCurve {
+        assert_eq!(x.len(), y.len());
+
+        match x.len() {
+            24 => {
+                let encoded_point = p192::AffinePoint::GENERATOR.to_encoded_point(false);
+                x.copy_from_slice(encoded_point.x().unwrap());
+                y.copy_from_slice(encoded_point.y().unwrap());
+                EllipticCurve::P192
+            }
+            32 => {
+                let encoded_point = p256::AffinePoint::GENERATOR.to_encoded_point(false);
+                x.copy_from_slice(encoded_point.x().unwrap());
+                y.copy_from_slice(encoded_point.y().unwrap());
+                EllipticCurve::P256
+            }
+            _ => unimplemented!(),
+        }
+    }
+
     #[test]
     fn test_ecc_affine_point_multiplication(mut ctx: Context<'static>) {
         let rng = Rng::new();
@@ -84,39 +104,7 @@ mod ecc_tests {
                         break;
                     }
                 }
-                let curve = match prime_field.len() {
-                    24 => {
-                        x.copy_from_slice(
-                            p192::AffinePoint::GENERATOR
-                                .to_encoded_point(false)
-                                .x()
-                                .unwrap(),
-                        );
-                        y.copy_from_slice(
-                            p192::AffinePoint::GENERATOR
-                                .to_encoded_point(false)
-                                .y()
-                                .unwrap(),
-                        );
-                        EllipticCurve::P192
-                    }
-                    32 => {
-                        x.copy_from_slice(
-                            p256::AffinePoint::GENERATOR
-                                .to_encoded_point(false)
-                                .x()
-                                .unwrap(),
-                        );
-                        y.copy_from_slice(
-                            p256::AffinePoint::GENERATOR
-                                .to_encoded_point(false)
-                                .y()
-                                .unwrap(),
-                        );
-                        EllipticCurve::P256
-                    }
-                    _ => unimplemented!(),
-                };
+                let curve = encode_affine_point(x, y);
 
                 ctx.ecc
                     .affine_point_multiplication(curve, k, x, y)
@@ -244,39 +232,7 @@ mod ecc_tests {
                         break;
                     }
                 }
-                let curve = match prime_field.len() {
-                    24 => {
-                        px.copy_from_slice(
-                            p192::AffinePoint::GENERATOR
-                                .to_encoded_point(false)
-                                .x()
-                                .unwrap(),
-                        );
-                        py.copy_from_slice(
-                            p192::AffinePoint::GENERATOR
-                                .to_encoded_point(false)
-                                .y()
-                                .unwrap(),
-                        );
-                        EllipticCurve::P192
-                    }
-                    32 => {
-                        px.copy_from_slice(
-                            p256::AffinePoint::GENERATOR
-                                .to_encoded_point(false)
-                                .x()
-                                .unwrap(),
-                        );
-                        py.copy_from_slice(
-                            p256::AffinePoint::GENERATOR
-                                .to_encoded_point(false)
-                                .y()
-                                .unwrap(),
-                        );
-                        EllipticCurve::P256
-                    }
-                    _ => unimplemented!(),
-                };
+                let curve = encode_affine_point(px, py);
 
                 #[cfg(not(ecc_working_modes = "11"))]
                 let result = ctx
@@ -358,39 +314,7 @@ mod ecc_tests {
                     }
                 }
                 sw_k.copy_from_slice(k);
-                let curve = match prime_field.len() {
-                    24 => {
-                        x.copy_from_slice(
-                            p192::AffinePoint::GENERATOR
-                                .to_encoded_point(false)
-                                .x()
-                                .unwrap(),
-                        );
-                        y.copy_from_slice(
-                            p192::AffinePoint::GENERATOR
-                                .to_encoded_point(false)
-                                .y()
-                                .unwrap(),
-                        );
-                        EllipticCurve::P192
-                    }
-                    32 => {
-                        x.copy_from_slice(
-                            p256::AffinePoint::GENERATOR
-                                .to_encoded_point(false)
-                                .x()
-                                .unwrap(),
-                        );
-                        y.copy_from_slice(
-                            p256::AffinePoint::GENERATOR
-                                .to_encoded_point(false)
-                                .y()
-                                .unwrap(),
-                        );
-                        EllipticCurve::P256
-                    }
-                    _ => unimplemented!(),
-                };
+                let curve = encode_affine_point(x, y);
 
                 ctx.ecc
                     .jacobian_point_multiplication(curve, k, x, y)
@@ -562,39 +486,7 @@ mod ecc_tests {
                     }
                 }
                 sw_k.copy_from_slice(k);
-                let curve = match prime_field.len() {
-                    24 => {
-                        x.copy_from_slice(
-                            p192::AffinePoint::GENERATOR
-                                .to_encoded_point(false)
-                                .x()
-                                .unwrap(),
-                        );
-                        y.copy_from_slice(
-                            p192::AffinePoint::GENERATOR
-                                .to_encoded_point(false)
-                                .y()
-                                .unwrap(),
-                        );
-                        EllipticCurve::P192
-                    }
-                    32 => {
-                        x.copy_from_slice(
-                            p256::AffinePoint::GENERATOR
-                                .to_encoded_point(false)
-                                .x()
-                                .unwrap(),
-                        );
-                        y.copy_from_slice(
-                            p256::AffinePoint::GENERATOR
-                                .to_encoded_point(false)
-                                .y()
-                                .unwrap(),
-                        );
-                        EllipticCurve::P256
-                    }
-                    _ => unimplemented!(),
-                };
+                let curve = encode_affine_point(x, y);
 
                 match ctx
                     .ecc
