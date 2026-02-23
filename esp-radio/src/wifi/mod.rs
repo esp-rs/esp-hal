@@ -1702,9 +1702,8 @@ pub(crate) fn esp_wifi_send_data(interface: wifi_interface_t, data: &mut [u8]) {
 
         let res = unsafe { esp_wifi_internal_tx(interface, ptr, len) };
 
-        if res == include::ESP_OK as i32 {
-            trace!("esp_wifi_internal_tx ok");
-        } else {
+        if res != include::ESP_OK as i32 {
+            warn!("esp_wifi_internal_tx returned error: {}", res);
             decrement_inflight_counter();
         }
     })
