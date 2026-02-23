@@ -689,10 +689,10 @@ impl NotContainsValidSignalPin for TxOneBit<'_> {}
 impl NotContainsValidSignalPin for TxTwoBits<'_> {}
 impl NotContainsValidSignalPin for TxFourBits<'_> {}
 
-#[cfg(parl_io_version = "1")]
+#[cfg(any(esp32c5, esp32c6))]
 impl NotContainsValidSignalPin for TxEightBits<'_> {}
 
-#[cfg(parl_io_version = "2")]
+#[cfg(esp32h2)]
 impl ContainsValidSignalPin for TxEightBits<'_> {}
 
 #[cfg(parl_io_version = "1")]
@@ -889,10 +889,10 @@ impl NotContainsValidSignalPin for RxOneBit<'_> {}
 impl NotContainsValidSignalPin for RxTwoBits<'_> {}
 impl NotContainsValidSignalPin for RxFourBits<'_> {}
 
-#[cfg(parl_io_version = "1")]
+#[cfg(any(esp32c5, esp32c6))]
 impl NotContainsValidSignalPin for RxEightBits<'_> {}
 
-#[cfg(parl_io_version = "2")]
+#[cfg(esp32h2)]
 impl ContainsValidSignalPin for RxEightBits<'_> {}
 
 #[cfg(parl_io_version = "1")]

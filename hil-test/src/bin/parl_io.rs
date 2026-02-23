@@ -139,7 +139,7 @@ mod tests {
                 clock_out_pin,
                 TxConfig::default()
                     .with_frequency(Rate::from_mhz(40))
-                    .with_sample_edge(SampleEdge::Invert)
+                    .with_sample_edge(SampleEdge::Normal)
                     .with_bit_order(BitPackOrder::Lsb),
             )
             .unwrap();
@@ -202,7 +202,7 @@ mod tests {
                 clock_out_pin,
                 TxConfig::default()
                     .with_frequency(Rate::from_mhz(40))
-                    .with_sample_edge(SampleEdge::Invert)
+                    .with_sample_edge(SampleEdge::Normal)
                     .with_bit_order(BitPackOrder::Lsb),
             )
             .unwrap();
@@ -271,7 +271,7 @@ mod tests {
                 clock_out_pin,
                 TxConfig::default()
                     .with_frequency(Rate::from_mhz(40))
-                    .with_sample_edge(SampleEdge::Invert)
+                    .with_sample_edge(SampleEdge::Normal)
                     .with_bit_order(BitPackOrder::Lsb),
             )
             .unwrap();
@@ -348,7 +348,7 @@ mod tests {
                 clock_out_pin,
                 TxConfig::default()
                     .with_frequency(Rate::from_khz(100))
-                    .with_sample_edge(SampleEdge::Invert)
+                    .with_sample_edge(SampleEdge::Normal)
                     .with_bit_order(BitPackOrder::Msb),
             )
             .unwrap();
@@ -385,8 +385,12 @@ mod tests {
 #[embedded_test::tests(default_timeout = 3)]
 mod tx {
     use defmt::info;
+    #[cfg(any(esp32c6, esp32h2))]
+    use esp_hal::parl_io::TxPinConfigIncludingValidPin;
+    #[cfg(any(esp32c5, esp32c6))]
+    use esp_hal::parl_io::TxPinConfigWithValidPin;
     #[cfg(esp32c6)]
-    use esp_hal::parl_io::{TxPinConfigWithValidPin, TxSixteenBits};
+    use esp_hal::parl_io::TxSixteenBits;
     use esp_hal::{
         dma::DmaTxBuf,
         dma_tx_buffer,
@@ -394,15 +398,7 @@ mod tx {
             NoPin,
             interconnect::{InputSignal, OutputSignal},
         },
-        parl_io::{
-            BitPackOrder,
-            ClkOutPin,
-            ParlIo,
-            SampleEdge,
-            TxConfig,
-            TxEightBits,
-            TxPinConfigIncludingValidPin,
-        },
+        parl_io::{BitPackOrder, ClkOutPin, ParlIo, SampleEdge, TxConfig, TxEightBits},
         pcnt::{
             Pcnt,
             channel::{CtrlMode, EdgeMode},
@@ -469,7 +465,7 @@ mod tx {
                 clock_pin,
                 TxConfig::default()
                     .with_frequency(Rate::from_mhz(10))
-                    .with_sample_edge(SampleEdge::Invert)
+                    .with_sample_edge(SampleEdge::Normal)
                     .with_bit_order(BitPackOrder::Msb),
             )
             .unwrap(); // TODO: handle error
@@ -510,15 +506,15 @@ mod tx {
             NoPin,
             NoPin,
             NoPin,
-            #[cfg(any(esp32c5, esp32h2))]
+            #[cfg(esp32h2)]
             ctx.valid,
-            #[cfg(esp32c6)]
+            #[cfg(any(esp32c5, esp32c6))]
             NoPin,
         );
 
-        #[cfg(any(esp32c5, esp32h2))]
+        #[cfg(esp32h2)]
         let pins = TxPinConfigIncludingValidPin::new(pins);
-        #[cfg(esp32c6)]
+        #[cfg(any(esp32c5, esp32c6))]
         let pins = TxPinConfigWithValidPin::new(pins, ctx.valid);
 
         let clock_pin = ClkOutPin::new(ctx.clock);
@@ -532,7 +528,7 @@ mod tx {
                 clock_pin,
                 TxConfig::default()
                     .with_frequency(Rate::from_mhz(10))
-                    .with_sample_edge(SampleEdge::Invert)
+                    .with_sample_edge(SampleEdge::Normal)
                     .with_bit_order(BitPackOrder::Msb),
             )
             .unwrap(); // TODO: handle error
@@ -563,8 +559,12 @@ mod tx {
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod async_tx {
     use defmt::info;
+    #[cfg(any(esp32c6, esp32h2))]
+    use esp_hal::parl_io::TxPinConfigIncludingValidPin;
+    #[cfg(any(esp32c5, esp32c6))]
+    use esp_hal::parl_io::TxPinConfigWithValidPin;
     #[cfg(esp32c6)]
-    use esp_hal::parl_io::{TxPinConfigWithValidPin, TxSixteenBits};
+    use esp_hal::parl_io::TxSixteenBits;
     use esp_hal::{
         dma::DmaTxBuf,
         dma_tx_buffer,
@@ -572,15 +572,7 @@ mod async_tx {
             NoPin,
             interconnect::{InputSignal, OutputSignal},
         },
-        parl_io::{
-            BitPackOrder,
-            ClkOutPin,
-            ParlIo,
-            SampleEdge,
-            TxConfig,
-            TxEightBits,
-            TxPinConfigIncludingValidPin,
-        },
+        parl_io::{BitPackOrder, ClkOutPin, ParlIo, SampleEdge, TxConfig, TxEightBits},
         pcnt::{
             Pcnt,
             channel::{CtrlMode, EdgeMode},
@@ -648,7 +640,7 @@ mod async_tx {
                 clock_pin,
                 TxConfig::default()
                     .with_frequency(Rate::from_mhz(10))
-                    .with_sample_edge(SampleEdge::Invert)
+                    .with_sample_edge(SampleEdge::Normal)
                     .with_bit_order(BitPackOrder::Msb),
             )
             .unwrap();
@@ -691,15 +683,15 @@ mod async_tx {
             NoPin,
             NoPin,
             NoPin,
-            #[cfg(any(esp32c5, esp32h2))]
+            #[cfg(esp32h2)]
             ctx.valid,
-            #[cfg(esp32c6)]
+            #[cfg(any(esp32c5, esp32c6))]
             NoPin,
         );
 
-        #[cfg(any(esp32c5, esp32h2))]
+        #[cfg(esp32h2)]
         let pins = TxPinConfigIncludingValidPin::new(pins);
-        #[cfg(esp32c6)]
+        #[cfg(any(esp32c5, esp32c6))]
         let pins = TxPinConfigWithValidPin::new(pins, ctx.valid);
 
         let clock_pin = ClkOutPin::new(ctx.clock);
@@ -715,7 +707,7 @@ mod async_tx {
                 clock_pin,
                 TxConfig::default()
                     .with_frequency(Rate::from_mhz(10))
-                    .with_sample_edge(SampleEdge::Invert)
+                    .with_sample_edge(SampleEdge::Normal)
                     .with_bit_order(BitPackOrder::Msb),
             )
             .unwrap();
