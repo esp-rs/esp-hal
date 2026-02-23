@@ -208,7 +208,7 @@ macro_rules! property {
         stringify!(2)
     };
     ("phy.combo_module") => {
-        false
+        true
     };
     ("rmt.ram_start") => {
         1610638336

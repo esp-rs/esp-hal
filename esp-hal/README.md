@@ -84,7 +84,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | MCPWM                     | ⚒️   |          |          | ❌       | ⚒️      | ⚒️      |          | ⚒️      |
 | PARL_IO                   |       |          |          | ❌       | ⚒️      | ⚒️      |          |          |
 | PCNT                      | ⚒️   |          |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| PHY                       | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| PHY                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | PSRAM                     | ⚒️   |          |          | ❌       |          |          | ⚒️      | ⚒️      |
 | RGB display               | ⚒️   |          |          |          |          |          | ❌       | ⚒️      |
 | RMT                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |

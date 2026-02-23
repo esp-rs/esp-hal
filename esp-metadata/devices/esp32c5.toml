@@ -632,7 +632,8 @@ controller = "npl"
 support_status = "not_supported"
 
 [device.phy]
-support_status = "not_supported"
+support_status = "partial"
+combo_module = true
 
 # ## Miscellaneous
 [device.systimer]
