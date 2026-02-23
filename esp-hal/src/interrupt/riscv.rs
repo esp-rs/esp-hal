@@ -273,9 +273,6 @@ pub fn enable_direct(
     cpu_interrupt: DirectBindableCpuInterrupt,
     handler: unsafe extern "C" fn(),
 ) {
-    super::map_raw(Cpu::current(), interrupt, cpu_interrupt as u32);
-    cpu_int::set_priority_raw(cpu_interrupt as u32, level);
-
     cfg_if::cfg_if! {
         if #[cfg(interrupt_controller = "clic")] {
             let clic = unsafe { crate::soc::pac::CLIC::steal() };
@@ -323,6 +320,9 @@ pub fn enable_direct(
         core::arch::asm!("fence.i");
     }
 
+    super::map_raw(Cpu::current(), interrupt, cpu_interrupt as u32);
+    cpu_int::set_priority_raw(cpu_interrupt as u32, level);
+    cpu_int::set_kind_raw(cpu_interrupt as u32, InterruptKind::Level);
     cpu_int::enable_cpu_interrupt_raw(cpu_interrupt as u32);
 }
 

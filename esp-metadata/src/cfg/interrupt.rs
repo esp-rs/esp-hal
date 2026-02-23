@@ -57,7 +57,10 @@ impl RiscvFlavour {
     /// Interrupt lines reserved by hardware.
     fn reserved_interrupts(&self) -> impl Iterator<Item = usize> {
         let reserved: &[_] = match self {
-            RiscvFlavour::Basic => &[0], // Disabled interrupt
+            RiscvFlavour::Basic => &[
+                0, // Permanently disabled
+                1, // Either disabled or reserved for Wi-Fi, unclear
+            ],
             RiscvFlavour::Plic => {
                 // Some CLINT interrupts
                 &[0, 3, 4, 7]
