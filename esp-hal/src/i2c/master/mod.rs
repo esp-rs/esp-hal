@@ -1499,7 +1499,7 @@ fn configure_clock(
 #[doc(hidden)]
 #[derive(Debug)]
 #[non_exhaustive]
-#[warn(private_interfaces)]
+#[allow(private_interfaces, reason = "Unstable details")]
 pub struct Info {
     /// Numeric instance id (0 = I2C0, 1 = I2C1, ...)
     #[cfg(soc_has_i2c1)]

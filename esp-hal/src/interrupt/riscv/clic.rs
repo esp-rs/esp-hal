@@ -1,7 +1,7 @@
 use super::{InterruptKind, Priority, RunLevel};
 use crate::soc::pac::CLIC;
 
-/// Set up CLIC.
+#[cfg(feature = "rt")]
 pub(super) fn init() {
     let clic = unsafe { CLIC::steal() };
 

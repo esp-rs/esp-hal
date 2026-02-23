@@ -13,7 +13,6 @@
 #[instability::unstable]
 pub use esp_riscv_rt::TrapFrame;
 use procmacros::ram;
-use riscv::register::{mcause, mtvec};
 
 use crate::interrupt::InterruptStatus;
 
@@ -97,6 +96,7 @@ for_each_classified_interrupt!(
 
 impl CpuInterrupt {
     #[inline]
+    #[cfg(feature = "rt")]
     pub(crate) fn is_vectored(self) -> bool {
         // Assumes contiguous interrupt allocation.
         const VECTORED_CPU_INTERRUPT_RANGE: core::ops::RangeInclusive<u32> = PRIORITY_TO_INTERRUPT
@@ -107,12 +107,14 @@ impl CpuInterrupt {
 
     /// Enable the CPU interrupt
     #[inline]
+    #[instability::unstable]
     pub fn enable(self) {
         cpu_int::enable_cpu_interrupt_raw(self as u32);
     }
 
     /// Clear the CPU interrupt status bit
     #[inline]
+    #[instability::unstable]
     pub fn clear(self) {
         cpu_int::clear_raw(self as u32);
     }
@@ -123,18 +125,21 @@ impl CpuInterrupt {
     /// vectored interrupt handler will take care of clearing edge interrupt
     /// bits.
     #[inline]
+    #[instability::unstable]
     pub fn set_kind(self, kind: InterruptKind) {
         cpu_int::set_kind_raw(self as u32, kind);
     }
 
     /// Set the priority level of a CPU interrupt
     #[inline]
+    #[instability::unstable]
     pub fn set_priority(self, priority: Priority) {
         cpu_int::set_priority_raw(self as u32, priority);
     }
 
     /// Get interrupt priority for the CPU
     #[inline]
+    #[instability::unstable]
     pub fn priority(self) -> Priority {
         unwrap!(Priority::try_from_u32(self.level()))
     }
@@ -305,6 +310,7 @@ pub fn enable_direct(
 
             let instr = handler as usize as u32;
         } else {
+            use riscv::register::mtvec;
             let mt = mtvec::read();
 
             assert_eq!(
@@ -429,6 +435,8 @@ pub(crate) fn priority_to_cpu_interrupt(_interrupt: Interrupt, level: Priority) 
 /// This function must be called only during core startup.
 #[cfg(any(feature = "rt", all(feature = "unstable", multi_core)))]
 pub(crate) unsafe fn init_vectoring() {
+    use riscv::register::mtvec;
+
     unsafe extern "C" {
         static _vector_table: u32;
         #[cfg(interrupt_controller = "clic")]
@@ -439,12 +447,15 @@ pub(crate) unsafe fn init_vectoring() {
         let vec_table = (&raw const _vector_table).addr();
 
         #[cfg(not(interrupt_controller = "clic"))]
-        mtvec::write({
-            let mut mtvec = mtvec::Mtvec::from_bits(0);
-            mtvec.set_trap_mode(mtvec::TrapMode::Vectored);
-            mtvec.set_address(vec_table);
-            mtvec
-        });
+        {
+            mtvec::write({
+                let mut mtvec = mtvec::Mtvec::from_bits(0);
+                mtvec.set_trap_mode(mtvec::TrapMode::Vectored);
+                mtvec.set_address(vec_table);
+                mtvec
+            });
+        }
+
         #[cfg(interrupt_controller = "clic")]
         {
             mtvec::write({
@@ -471,6 +482,7 @@ pub(crate) unsafe fn init_vectoring() {
 #[cfg(feature = "rt")]
 pub(crate) mod rt {
     use esp_riscv_rt::TrapFrame;
+    use riscv::register::mcause;
 
     use super::*;
 

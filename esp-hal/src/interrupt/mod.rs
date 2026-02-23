@@ -193,6 +193,7 @@ pub struct InterruptStatus {
 
 impl InterruptStatus {
     /// Get status of peripheral interrupts
+    #[instability::unstable]
     pub fn current() -> InterruptStatus {
         match Cpu::current() {
             Cpu::ProCpu => InterruptStatus {
@@ -216,16 +217,19 @@ impl InterruptStatus {
     }
 
     /// Is the given interrupt bit set
+    #[instability::unstable]
     pub fn is_set(&self, interrupt: u8) -> bool {
         (self.status[interrupt as usize / 32] & (1 << (interrupt % 32))) != 0
     }
 
     /// Set the given interrupt status bit
+    #[instability::unstable]
     pub fn set(&mut self, interrupt: u8) {
         self.status[interrupt as usize / 32] |= 1 << (interrupt % 32);
     }
 
     /// Return an iterator over the set interrupt status bits
+    #[instability::unstable]
     pub fn iterator(&self) -> InterruptStatusIterator {
         InterruptStatusIterator {
             status: *self,
@@ -399,6 +403,7 @@ pub enum RunLevel {
 impl RunLevel {
     /// Get the current run level (the level below which interrupts are masked).
     #[inline]
+    #[instability::unstable]
     pub fn current() -> Self {
         current_runlevel()
     }
@@ -411,12 +416,14 @@ impl RunLevel {
     /// to a previous value. It must not be used to arbitrarily lower the
     /// runlevel.
     #[inline]
+    #[instability::unstable]
     pub unsafe fn change(to: Self) -> Self {
         unsafe { change_current_runlevel(to) }
     }
 
     /// Checks if the run level indicates thread mode.
     #[inline]
+    #[instability::unstable]
     pub fn is_thread(&self) -> bool {
         matches!(self, RunLevel::ThreadMode)
     }
@@ -480,6 +487,7 @@ pub(crate) fn setup_interrupts() {
 }
 
 #[inline(always)]
+#[cfg(feature = "rt")]
 fn should_handle(core: Cpu, interrupt_nr: u32, level: u32) -> bool {
     if let Some(cpu_interrupt) = crate::interrupt::mapped_to_raw(core, interrupt_nr)
         && cpu_interrupt.is_vectored()

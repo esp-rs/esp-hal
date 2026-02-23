@@ -1,17 +1,11 @@
 //! Interrupt handling
 
-use xtensa_lx::interrupt;
 #[cfg(esp32)]
 pub(crate) use xtensa_lx::interrupt::free;
-#[cfg(feature = "rt")]
-use xtensa_lx_rt::exception::Context;
 
-use super::InterruptStatus;
 use crate::{
     interrupt::{PriorityError, RunLevel},
-    pac,
     peripherals::Interrupt,
-    system::Cpu,
 };
 
 /// Enumeration of available CPU interrupts
@@ -106,6 +100,7 @@ impl CpuInterrupt {
     }
 
     #[inline]
+    #[cfg(feature = "rt")]
     pub(crate) fn is_vectored(self) -> bool {
         // Even "direct bound" interrupts go through the vectored interrupt handler
         true
@@ -113,18 +108,21 @@ impl CpuInterrupt {
 
     /// Enable the CPU interrupt
     #[inline]
+    #[instability::unstable]
     pub fn enable(self) {
         enable_cpu_interrupt_raw(self as u32);
     }
 
     /// Clear the CPU interrupt status bit
     #[inline]
+    #[instability::unstable]
     pub fn clear(self) {
         unsafe { xtensa_lx::interrupt::clear(1 << self as u32) };
     }
 
     /// Get interrupt priority for the CPU
     #[inline]
+    #[instability::unstable]
     pub fn priority(self) -> Priority {
         match self {
             CpuInterrupt::Interrupt0LevelPriority1
@@ -157,6 +155,7 @@ impl CpuInterrupt {
     }
 
     #[inline]
+    #[cfg(feature = "rt")]
     pub(crate) fn level(self) -> u32 {
         self.priority() as u32
     }
@@ -354,9 +353,10 @@ pub(crate) unsafe fn init_vectoring() {
 #[cfg(feature = "rt")]
 pub(crate) mod rt {
     use procmacros::ram;
-    use xtensa_lx_rt::interrupt::CpuInterruptLevel;
+    use xtensa_lx_rt::{exception::Context, interrupt::CpuInterruptLevel};
 
     use super::*;
+    use crate::{interrupt::InterruptStatus, system::Cpu};
 
     #[cfg_attr(place_switch_tables_in_ram, ram)]
     pub(crate) static CPU_INTERRUPT_INTERNAL: u32 = 0b_0010_0000_0000_0001_1000_1000_1100_0000;
@@ -418,8 +418,9 @@ pub(crate) mod rt {
 
     #[inline(always)]
     unsafe fn handle_interrupts<const LEVEL: u32>(save_frame: &mut Context) {
-        let cpu_interrupt_mask =
-            interrupt::get() & interrupt::get_mask() & CPU_INTERRUPT_LEVELS[LEVEL as usize];
+        let cpu_interrupt_mask = xtensa_lx::interrupt::get()
+            & xtensa_lx::interrupt::get_mask()
+            & CPU_INTERRUPT_LEVELS[LEVEL as usize];
 
         if cpu_interrupt_mask & CPU_INTERRUPT_INTERNAL != 0 {
             // Let's handle CPU-internal interrupts (NMI, Timer, Software, Profiling).
@@ -435,7 +436,7 @@ pub(crate) mod rt {
             // side.
             if ((1 << cpu_interrupt_nr) & CPU_INTERRUPT_EDGE) != 0 {
                 unsafe {
-                    interrupt::clear(1 << cpu_interrupt_nr);
+                    xtensa_lx::interrupt::clear(1 << cpu_interrupt_nr);
                 }
             }
 
@@ -464,7 +465,7 @@ pub(crate) mod rt {
             for interrupt_nr in status.iterator().filter(|&interrupt_nr| {
                 crate::interrupt::should_handle(core, interrupt_nr as u32, LEVEL)
             }) {
-                let handler = unsafe { pac::__INTERRUPTS[interrupt_nr as usize]._handler };
+                let handler = unsafe { crate::pac::__INTERRUPTS[interrupt_nr as usize]._handler };
                 let handler: fn(&mut Context) = unsafe {
                     core::mem::transmute::<unsafe extern "C" fn(), fn(&mut Context)>(handler)
                 };

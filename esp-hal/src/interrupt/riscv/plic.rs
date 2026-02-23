@@ -1,6 +1,7 @@
 use super::{InterruptKind, Priority, RunLevel};
 use crate::peripherals::PLIC_MX;
 
+#[cfg(feature = "rt")]
 pub(super) fn init() {}
 
 pub(super) fn enable_cpu_interrupt_raw(cpu_interrupt: u32) {

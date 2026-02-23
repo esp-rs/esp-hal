@@ -104,6 +104,7 @@ macro_rules! create_peripheral {
                 #[doc = concat!("peripherals.", stringify!($name), ".", stringify!($disable), "();")]
                 /// # {after_snippet}
                 /// ```
+                #[allow(dead_code, reason = "Peripheral may be unstable")]
                 pub fn $enable(&self, priority: $crate::interrupt::Priority) {
                     $crate::interrupt::enable($crate::peripherals::Interrupt::$interrupt, priority);
                 }
@@ -115,6 +116,7 @@ macro_rules! create_peripheral {
                 /// <section class="warning">
                 /// This function is a very low-level way to work with interrupts. Unless you're writing drivers, this is probably not the interrupt API you want to use.
                 /// </section>
+                #[allow(dead_code, reason = "Peripheral may be unstable")]
                 pub fn $disable(&self) {
                     for core in $crate::system::Cpu::all() {
                         $crate::interrupt::disable(core, $crate::peripherals::Interrupt::$interrupt);
