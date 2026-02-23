@@ -17,7 +17,7 @@
 //! * Low-Power Management
 //! * Handling Watchdog Timers
 #![cfg_attr(
-    not(rtc_timekeeping_driver_supported), // TODO: these examples need to be feature-gated instead of chip-gated
+    not(rtc_timekeeping_driver_supported),
     doc = r#"
 ## Examples
 
