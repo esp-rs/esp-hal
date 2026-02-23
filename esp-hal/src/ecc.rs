@@ -88,6 +88,27 @@ pub enum EllipticCurve {
     /// The P-256 elliptic curve. a 256-bit curve.
     P256,
 }
+impl EllipticCurve {
+    fn size_check<const N: usize>(&self, params: [&[u8]; N]) -> Result<(), Error> {
+        let bytes = match self {
+            EllipticCurve::P192 => 24,
+            EllipticCurve::P256 => 32,
+        };
+
+        if params.iter().any(|p| p.len() != bytes) {
+            return Err(Error::SizeMismatchCurve);
+        }
+
+        Ok(())
+    }
+
+    fn into_pac(&self) -> KEY_LENGTH {
+        match self {
+            EllipticCurve::P192 => KEY_LENGTH::P192,
+            EllipticCurve::P256 => KEY_LENGTH::P256,
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 /// Represents the operational modes for elliptic curve or modular arithmetic
@@ -177,20 +198,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         x: &mut [u8],
         y: &mut [u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || x.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || x.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
+        curve.size_check([k, x, y])?;
         let mode = WorkMode::PointMultiMode;
 
         let mut tmp = [0_u8; 32];
@@ -215,7 +223,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
 
         self.regs().mult_conf().write(|w| unsafe {
             w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
+            w.key_length().variant(curve.into_pac());
             w.start().set_bit()
         });
 
@@ -250,20 +258,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         k: &[u8],
         y: &mut [u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
+        curve.size_check([k, y])?;
         let mode = WorkMode::DivisionMode;
 
         let mut tmp = [0_u8; 32];
@@ -282,7 +277,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
 
         self.regs().mult_conf().write(|w| unsafe {
             w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
+            w.key_length().variant(curve.into_pac());
             w.start().set_bit()
         });
 
@@ -314,20 +309,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         x: &[u8],
         y: &[u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if x.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if x.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
+        curve.size_check([x, y])?;
         let mode = WorkMode::PointVerif;
 
         let mut tmp = [0_u8; 32];
@@ -346,7 +328,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
 
         self.regs().mult_conf().write(|w| unsafe {
             w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
+            w.key_length().variant(curve.into_pac());
             w.start().set_bit()
         });
 
@@ -384,20 +366,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         x: &mut [u8],
         y: &mut [u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || x.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || x.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
+        curve.size_check([k, x, y])?;
         let mode = WorkMode::PointVerifMulti;
 
         let mut tmp = [0_u8; 32];
@@ -422,7 +391,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
 
         self.regs().mult_conf().write(|w| unsafe {
             w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
+            w.key_length().variant(curve.into_pac());
             w.start().set_bit()
         });
 
@@ -473,20 +442,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         qy: &mut [u8],
         qz: &mut [u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || px.len() != 24 || py.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || px.len() != 32 || py.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
+        curve.size_check([k, px, py])?; //Q?
         let mode = WorkMode::PointVerifMulti;
 
         let mut tmp = [0_u8; 32];
@@ -511,7 +467,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
 
         self.regs().mult_conf().write(|w| unsafe {
             w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
+            w.key_length().variant(curve.into_pac());
             w.start().set_bit()
         });
 
@@ -560,20 +516,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         x: &mut [u8],
         y: &mut [u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || x.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || x.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
+        curve.size_check([k, x, y])?;
         let mode = WorkMode::JacobianPointMulti;
 
         let mut tmp = [0_u8; 32];
@@ -598,7 +541,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
 
         self.regs().mult_conf().write(|w| unsafe {
             w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
+            w.key_length().variant(curve.into_pac());
             w.start().set_bit()
         });
 
@@ -650,20 +593,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         y: &[u8],
         z: &[u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if x.len() != 24 || y.len() != 24 || z.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if x.len() != 32 || y.len() != 32 || z.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
+        curve.size_check([x, y, z])?;
         let mode = WorkMode::JacobianPointVerif;
 
         let mut tmp = [0_u8; 32];
@@ -693,7 +623,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
 
         self.regs().mult_conf().write(|w| unsafe {
             w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
+            w.key_length().variant(curve.into_pac());
             w.start().set_bit()
         });
 
@@ -730,20 +660,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         x: &mut [u8],
         y: &mut [u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || x.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || x.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
+        curve.size_check([k, x, y])?;
         let mode = WorkMode::PointVerifJacobianMulti;
 
         let mut tmp = [0_u8; 32];
@@ -768,7 +685,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
 
         self.regs().mult_conf().write(|w| unsafe {
             w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
+            w.key_length().variant(curve.into_pac());
             w.start().set_bit()
         });
 
@@ -840,30 +757,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         qy: &mut [u8],
         qz: &mut [u8],
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if px.len() != 24
-                    || py.len() != 24
-                    || qx.len() != 24
-                    || qy.len() != 24
-                    || qz.len() != 24
-                {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if px.len() != 32
-                    || py.len() != 32
-                    || qx.len() != 32
-                    || qy.len() != 32
-                    || qz.len() != 32
-                {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
+        curve.size_check([px, py, qx, qy, qz])?;
         let mode = WorkMode::PointAdd;
 
         let mut tmp = [0_u8; 32];
@@ -886,7 +780,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
 
         self.regs().mult_conf().write(|w| unsafe {
             w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve);
+            w.key_length().variant(curve.into_pac());
             w.start().set_bit()
         });
 
@@ -941,20 +835,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         b: &mut [u8],
         work_mode: WorkMode,
     ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if a.len() != 24 || b.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P192
-            }
-            EllipticCurve::P256 => {
-                if a.len() != 32 || b.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                KEY_LENGTH::P256
-            }
-        };
+        curve.size_check([a, b])?;
 
         let mut tmp = [0_u8; 32];
         tmp[0..a.len()].copy_from_slice(a);
@@ -966,7 +847,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
 
         self.regs().mult_conf().write(|w| unsafe {
             w.work_mode().bits(work_mode as u8);
-            w.key_length().variant(curve);
+            w.key_length().variant(curve.into_pac());
             w.start().set_bit()
         });
 
