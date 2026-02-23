@@ -71,10 +71,6 @@ mod ecc_tests {
     fn test_ecc_affine_point_multiplication(mut ctx: Context<'static>) {
         let rng = Rng::new();
         for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
-            match prime_field.len() {
-                24 => (),
-                _ => (),
-            };
             let t1 = &mut [0_u8; 96];
             let (k, x) = t1.split_at_mut(prime_field.len());
             let (x, y) = x.split_at_mut(prime_field.len());
@@ -157,13 +153,8 @@ mod ecc_tests {
                     _ => unimplemented!(),
                 };
 
-                for (a, b) in x.iter().zip(sw_x) {
-                    assert_eq!(a, b);
-                }
-
-                for (a, b) in y.iter().zip(sw_y) {
-                    assert_eq!(a, b);
-                }
+                assert_eq!(x, sw_x);
+                assert_eq!(y, sw_y);
             }
         }
     }
@@ -216,10 +207,9 @@ mod ecc_tests {
 
                 match ctx.ecc.affine_point_verification(curve, x, y) {
                     Err(Error::SizeMismatchCurve) => {
-                        assert!(false, "Inputs data doesn't match the key length selected.")
+                        panic!("Inputs data doesn't match the key length selected.")
                     }
-                    Err(Error::PointNotOnSelectedCurve) => assert!(
-                        false,
+                    Err(Error::PointNotOnSelectedCurve) => panic!(
                         "ECC failed while affine point verification with x = {:02X?} and y = {:02X?}.",
                         x, y,
                     ),
@@ -298,10 +288,9 @@ mod ecc_tests {
                     .affine_point_verification_multiplication(curve, k, px, py, qx, qy, qz);
                 match result {
                     Err(Error::SizeMismatchCurve) => {
-                        assert!(false, "Inputs data doesn't match the key length selected.")
+                        panic!("Inputs data doesn't match the key length selected.")
                     }
-                    Err(Error::PointNotOnSelectedCurve) => assert!(
-                        false,
+                    Err(Error::PointNotOnSelectedCurve) => panic!(
                         "ECC failed while affine point verification + multiplication with x = {:02X?} and y = {:02X?}.",
                         px, py,
                     ),
@@ -339,13 +328,8 @@ mod ecc_tests {
                     _ => unimplemented!(),
                 };
 
-                for (a, b) in px.iter().zip(sw_x) {
-                    assert_eq!(a, b);
-                }
-
-                for (a, b) in py.iter().zip(sw_y) {
-                    assert_eq!(a, b);
-                }
+                assert_eq!(px, sw_x);
+                assert_eq!(py, sw_y);
             }
         }
     }
@@ -461,13 +445,8 @@ mod ecc_tests {
                     _ => unimplemented!(),
                 };
 
-                for (a, b) in x.iter().zip(sw_x.iter()) {
-                    assert_eq!(a, b);
-                }
-
-                for (a, b) in y.iter().zip(sw_y.iter()) {
-                    assert_eq!(a, b);
-                }
+                assert_eq!(x, sw_x);
+                assert_eq!(y, sw_y);
             }
         }
     }
@@ -547,10 +526,9 @@ mod ecc_tests {
 
                 match ctx.ecc.jacobian_point_verification(curve, x, y, z) {
                     Err(Error::SizeMismatchCurve) => {
-                        assert!(false, "Inputs data doesn't match the key length selected.")
+                        panic!("Inputs data doesn't match the key length selected.")
                     }
-                    Err(Error::PointNotOnSelectedCurve) => assert!(
-                        false,
+                    Err(Error::PointNotOnSelectedCurve) => panic!(
                         "ECC failed while base point verification with x = {:02X?} and y = {:02X?}.",
                         x, y,
                     ),
@@ -623,10 +601,9 @@ mod ecc_tests {
                     .affine_point_verification_jacobian_multiplication(curve, k, x, y)
                 {
                     Err(Error::SizeMismatchCurve) => {
-                        assert!(false, "Inputs data doesn't match the key length selected.")
+                        panic!("Inputs data doesn't match the key length selected.")
                     }
-                    Err(Error::PointNotOnSelectedCurve) => assert!(
-                        false,
+                    Err(Error::PointNotOnSelectedCurve) => panic!(
                         "ECC failed while affine point verification + multiplication with x = {:02X?} and y = {:02X?}.",
                         x, y,
                     ),
@@ -683,13 +660,8 @@ mod ecc_tests {
                     _ => unimplemented!(),
                 };
 
-                for (a, b) in x.iter().zip(sw_x.iter()) {
-                    assert_eq!(a, b);
-                }
-
-                for (a, b) in y.iter().zip(sw_y.iter()) {
-                    assert_eq!(a, b);
-                }
+                assert_eq!(x, sw_x);
+                assert_eq!(y, sw_y);
             }
         }
     }
@@ -751,9 +723,7 @@ mod ecc_tests {
                     _ => unimplemented!(),
                 };
 
-                for (a, b) in y.iter().zip(sw_res) {
-                    assert_eq!(a, b);
-                }
+                assert_eq!(y, sw_res);
             }
         }
     }
