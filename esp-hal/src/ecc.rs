@@ -31,6 +31,8 @@ use crate::{
     system::{self, GenericPeripheralGuard},
 };
 
+const MEM_BLOCK_SIZE: usize = 32;
+
 /// The ECC Accelerator driver instance
 pub struct Ecc<'d, Dm: DriverMode> {
     ecc: ECC<'d>,
@@ -659,10 +661,10 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     }
 
     fn write_mem_reversed(&mut self, ptr: *mut u32, data: &[u8]) {
-        let mut tmp = [0_u8; 32];
+        let mut tmp = [0_u8; MEM_BLOCK_SIZE];
         self.reverse_words(data, &mut tmp);
         self.alignment_helper
-            .volatile_write_regset(ptr, tmp.as_ref(), 32);
+            .volatile_write_regset(ptr, tmp.as_ref(), MEM_BLOCK_SIZE);
     }
 
     #[cfg(ecc_working_modes = "11")]
@@ -672,9 +674,9 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     }
 
     fn read_mem_reversed(&mut self, reg: *const u32, out: &mut [u8]) {
-        let mut tmp = [0_u8; 32];
+        let mut tmp = [0_u8; MEM_BLOCK_SIZE];
         self.alignment_helper
-            .volatile_read_regset(reg, &mut tmp, 32);
+            .volatile_read_regset(reg, &mut tmp, MEM_BLOCK_SIZE);
         self.reverse_words(tmp.as_ref(), out);
     }
 
