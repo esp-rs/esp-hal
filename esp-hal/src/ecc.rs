@@ -221,11 +221,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
             32,
         );
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve.into_pac());
-            w.start().set_bit()
-        });
+        self.start_operation(mode, curve);
 
         // wait for interrupt
         while self.is_busy() {}
@@ -275,11 +271,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
             32,
         );
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve.into_pac());
-            w.start().set_bit()
-        });
+        self.start_operation(mode, curve);
 
         // wait for interrupt
         while self.is_busy() {}
@@ -326,11 +318,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
             32,
         );
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve.into_pac());
-            w.start().set_bit()
-        });
+        self.start_operation(mode, curve);
 
         // wait for interrupt
         while self.is_busy() {}
@@ -389,11 +377,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
             32,
         );
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve.into_pac());
-            w.start().set_bit()
-        });
+        self.start_operation(mode, curve);
 
         // wait for interrupt
         while self.is_busy() {}
@@ -465,11 +449,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
             32,
         );
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve.into_pac());
-            w.start().set_bit()
-        });
+        self.start_operation(mode, curve);
 
         // wait for interrupt
         while self.is_busy() {}
@@ -539,11 +519,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
             32,
         );
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve.into_pac());
-            w.start().set_bit()
-        });
+        self.start_operation(mode, curve);
 
         while self.is_busy() {}
 
@@ -621,11 +597,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
             }
         }
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve.into_pac());
-            w.start().set_bit()
-        });
+        self.start_operation(mode, curve);
 
         // wait for interrupt
         while self.is_busy() {}
@@ -683,11 +655,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
             32,
         );
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve.into_pac());
-            w.start().set_bit()
-        });
+        self.start_operation(mode, curve);
 
         // wait for interrupt
         while self.is_busy() {}
@@ -778,11 +746,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.alignment_helper
             .volatile_write_regset(self.regs().qz_mem(0).as_ptr(), &tmp, 32);
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve.into_pac());
-            w.start().set_bit()
-        });
+        self.start_operation(mode, curve);
 
         // wait for interrupt
         while self.is_busy() {}
@@ -845,11 +809,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.alignment_helper
             .volatile_write_regset(self.regs().py_mem(0).as_ptr(), &tmp, 32);
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode().bits(work_mode as u8);
-            w.key_length().variant(curve.into_pac());
-            w.start().set_bit()
-        });
+        self.start_operation(work_mode, curve);
 
         // wait for interrupt
         while self.is_busy() {}
@@ -910,5 +870,13 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         for (a, b) in nsrc.chunks_exact(4).zip(ndst.rchunks_exact_mut(4)) {
             b.copy_from_slice(&u32::from_be_bytes(a.try_into().unwrap()).to_ne_bytes());
         }
+    }
+
+    fn start_operation(&self, mode: WorkMode, curve: EllipticCurve) {
+        self.regs().mult_conf().write(|w| unsafe {
+            w.work_mode().bits(mode as u8);
+            w.key_length().variant(curve.into_pac());
+            w.start().set_bit()
+        });
     }
 }
