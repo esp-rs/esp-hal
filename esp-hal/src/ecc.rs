@@ -658,6 +658,15 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     fn write_mem(&mut self, ptr: *mut u32, data: &[u8]) {
         self.alignment_helper
             .volatile_write_regset(ptr, data, data.len());
+        #[cfg(ecc_zero_extend_writes)]
+        if data.len() < MEM_BLOCK_SIZE {
+            let pad = MEM_BLOCK_SIZE - data.len();
+            self.alignment_helper.volatile_write_regset(
+                ptr.wrapping_byte_add(data.len()),
+                &[0; MEM_BLOCK_SIZE][..pad],
+                pad,
+            );
+        }
     }
 
     fn write_mem_reversed(&mut self, ptr: *mut u32, data: &[u8]) {

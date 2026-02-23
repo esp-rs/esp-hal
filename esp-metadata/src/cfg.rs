@@ -379,6 +379,8 @@ driver_configs![
         name: "ECC",
         properties: {
             working_modes: u32, // TODO: list instead of count
+            #[serde(default)]
+            zero_extend_writes: bool,
         }
     },
     EthernetProperties {

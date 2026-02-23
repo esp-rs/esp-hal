@@ -90,6 +90,9 @@ macro_rules! property {
     ("ecc.working_modes", str) => {
         stringify!(11)
     };
+    ("ecc.zero_extend_writes") => {
+        false
+    };
     ("gpio.has_bank_1") => {
         false
     };

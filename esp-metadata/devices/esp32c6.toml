@@ -335,6 +335,7 @@ max_priority = 9
 [device.ecc]
 support_status = "partial"
 working_modes = 8
+zero_extend_writes = true
 
 [device.gpio]
 support_status = "supported"
