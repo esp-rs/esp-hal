@@ -627,6 +627,7 @@ deep_sleep = true
 [device.io_mux]
 [device.systimer]
 [device.temp_sensor]
+[device.rtc_timekeeping]
 
 ## Radio
 [device.bt]

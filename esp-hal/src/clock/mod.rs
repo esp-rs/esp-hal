@@ -46,6 +46,7 @@
 #![cfg_attr(not(feature = "rt"), expect(unused))]
 
 #[cfg(soc_has_clock_node_lp_slow_clk)]
+#[cfg_attr(not(rtc_timekeeping_driver_supported), expect(unused))]
 use clocks::LpSlowClkConfig;
 #[cfg(all(not(esp32s2), soc_has_clock_node_rtc_slow_clk))]
 use clocks::RtcSlowClkConfig;
@@ -142,6 +143,7 @@ impl RtcClock {
     /// may happen if 32k XTAL is being calibrated, but the oscillator has
     /// not started up (due to incorrect loading capacitance, board design
     /// issue, or lack of 32 XTAL on board).
+    #[cfg_attr(not(rtc_timekeeping_driver_supported), expect(unused))]
     pub(crate) fn calibrate(cal_clk: TimgCalibrationClockConfig, slowclk_cycles: u32) -> u32 {
         ClockTree::with(|clocks| {
             let xtal_freq = Rate::from_hz(clocks::xtal_clk_frequency(clocks));
@@ -173,24 +175,6 @@ impl RtcClock {
 
             (period_64 & u32::MAX as u64) as u32
         })
-    }
-
-    /// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
-    pub(crate) fn cycles_to_1ms() -> u16 {
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_lp_aon)] {
-                use crate::peripherals::LP_AON;
-            } else {
-                use crate::peripherals::LPWR as LP_AON;
-            }
-        }
-
-        let period_13q19 = LP_AON::regs().store1().read().bits();
-
-        // 100_000_000 is used to get rid of `float` calculations
-        let period = (100_000_000 * period_13q19 as u64) / (1 << RtcClock::CAL_FRACT);
-
-        (100_000_000 * 1000 / period) as u16
     }
 }
 
@@ -225,6 +209,7 @@ impl Clocks {
             unsafe { ACTIVE_CLOCKS = Some(config) };
         });
 
+        #[cfg(rtc_timekeeping_driver_supported)]
         Clocks::calibrate_rtc_slow_clock();
     }
 
@@ -429,6 +414,7 @@ impl Clocks {
         (cali_value, Rate::from_hz(calibration_clock_frequency))
     }
 
+    #[cfg(rtc_timekeeping_driver_supported)]
     pub(crate) fn calibrate_rtc_slow_clock() {
         // Unfortunate device specific mapping.
         // TODO: fix it by generating cfgs for each mux input?
@@ -642,3 +628,21 @@ mod modem {
     any(soc_has_bt, soc_has_ieee802154, soc_has_wifi)
 ))]
 pub use modem::*;
+
+/// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
+pub(crate) fn cycles_to_1ms() -> u16 {
+    cfg_if::cfg_if! {
+        if #[cfg(soc_has_lp_aon)] {
+            use crate::peripherals::LP_AON;
+        } else {
+            use crate::peripherals::LPWR as LP_AON;
+        }
+    }
+
+    let period_13q19 = LP_AON::regs().store1().read().bits();
+
+    // 100_000_000 is used to get rid of `float` calculations
+    let period = (100_000_000 * period_13q19 as u64) / (1 << RtcClock::CAL_FRACT);
+
+    (100_000_000 * 1000 / period) as u16
+}

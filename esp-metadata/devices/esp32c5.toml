@@ -88,7 +88,7 @@ peripherals = [
     { name = "TEE" },
     { name = "TIMG0" },
     { name = "TIMG1" },
-    { name = "TRACE0", pac = "TRACE" },
+    # { name = "TRACE0", pac = "TRACE" },
     # { name = "TWAI0" }, # TODO: too different from what we know
     # { name = "TWAI1" }, # TODO: too different from what we know
     { name = "UART0", interrupts = { peri = "UART0" } },
@@ -674,4 +674,7 @@ support_status = "not_supported"
 support_status = "not_supported"
 
 [device.ulp_riscv]
+support_status = "not_supported"
+
+[device.rtc_timekeeping]
 support_status = "not_supported"

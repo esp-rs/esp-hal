@@ -280,6 +280,7 @@ impl Chip {
                     "rmt_driver_supported",
                     "rng_driver_supported",
                     "rsa_driver_supported",
+                    "rtc_timekeeping_driver_supported",
                     "sd_host_driver_supported",
                     "sd_slave_driver_supported",
                     "sha_driver_supported",
@@ -482,6 +483,7 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_driver_supported",
                     "cargo:rustc-cfg=rng_driver_supported",
                     "cargo:rustc-cfg=rsa_driver_supported",
+                    "cargo:rustc-cfg=rtc_timekeeping_driver_supported",
                     "cargo:rustc-cfg=sd_host_driver_supported",
                     "cargo:rustc-cfg=sd_slave_driver_supported",
                     "cargo:rustc-cfg=sha_driver_supported",
@@ -812,6 +814,7 @@ impl Chip {
                     "ledc_driver_supported",
                     "phy_driver_supported",
                     "rng_driver_supported",
+                    "rtc_timekeeping_driver_supported",
                     "sha_driver_supported",
                     "sleep_driver_supported",
                     "soc_driver_supported",
@@ -967,6 +970,7 @@ impl Chip {
                     "cargo:rustc-cfg=ledc_driver_supported",
                     "cargo:rustc-cfg=phy_driver_supported",
                     "cargo:rustc-cfg=rng_driver_supported",
+                    "cargo:rustc-cfg=rtc_timekeeping_driver_supported",
                     "cargo:rustc-cfg=sha_driver_supported",
                     "cargo:rustc-cfg=sleep_driver_supported",
                     "cargo:rustc-cfg=soc_driver_supported",
@@ -1248,6 +1252,7 @@ impl Chip {
                     "rmt_driver_supported",
                     "rng_driver_supported",
                     "rsa_driver_supported",
+                    "rtc_timekeeping_driver_supported",
                     "sha_driver_supported",
                     "sleep_driver_supported",
                     "soc_driver_supported",
@@ -1453,6 +1458,7 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_driver_supported",
                     "cargo:rustc-cfg=rng_driver_supported",
                     "cargo:rustc-cfg=rsa_driver_supported",
+                    "cargo:rustc-cfg=rtc_timekeeping_driver_supported",
                     "cargo:rustc-cfg=sha_driver_supported",
                     "cargo:rustc-cfg=sleep_driver_supported",
                     "cargo:rustc-cfg=soc_driver_supported",
@@ -1746,7 +1752,6 @@ impl Chip {
                     "soc_has_tee",
                     "soc_has_timg0",
                     "soc_has_timg1",
-                    "soc_has_trace0",
                     "soc_has_uart0",
                     "soc_has_uart1",
                     "soc_has_uhci0",
@@ -1970,7 +1975,6 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_tee",
                     "cargo:rustc-cfg=soc_has_timg0",
                     "cargo:rustc-cfg=soc_has_timg1",
-                    "cargo:rustc-cfg=soc_has_trace0",
                     "cargo:rustc-cfg=soc_has_uart0",
                     "cargo:rustc-cfg=soc_has_uart1",
                     "cargo:rustc-cfg=soc_has_uhci0",
@@ -2371,6 +2375,7 @@ impl Chip {
                     "rmt_driver_supported",
                     "rng_driver_supported",
                     "rsa_driver_supported",
+                    "rtc_timekeeping_driver_supported",
                     "sd_slave_driver_supported",
                     "sha_driver_supported",
                     "sleep_driver_supported",
@@ -2644,6 +2649,7 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_driver_supported",
                     "cargo:rustc-cfg=rng_driver_supported",
                     "cargo:rustc-cfg=rsa_driver_supported",
+                    "cargo:rustc-cfg=rtc_timekeeping_driver_supported",
                     "cargo:rustc-cfg=sd_slave_driver_supported",
                     "cargo:rustc-cfg=sha_driver_supported",
                     "cargo:rustc-cfg=sleep_driver_supported",
@@ -3042,6 +3048,7 @@ impl Chip {
                     "rmt_driver_supported",
                     "rng_driver_supported",
                     "rsa_driver_supported",
+                    "rtc_timekeeping_driver_supported",
                     "sha_driver_supported",
                     "sleep_driver_supported",
                     "soc_driver_supported",
@@ -3275,6 +3282,7 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_driver_supported",
                     "cargo:rustc-cfg=rng_driver_supported",
                     "cargo:rustc-cfg=rsa_driver_supported",
+                    "cargo:rustc-cfg=rtc_timekeeping_driver_supported",
                     "cargo:rustc-cfg=sha_driver_supported",
                     "cargo:rustc-cfg=sleep_driver_supported",
                     "cargo:rustc-cfg=soc_driver_supported",
@@ -3600,6 +3608,7 @@ impl Chip {
                     "rmt_driver_supported",
                     "rng_driver_supported",
                     "rsa_driver_supported",
+                    "rtc_timekeeping_driver_supported",
                     "sha_driver_supported",
                     "sleep_driver_supported",
                     "soc_driver_supported",
@@ -3813,6 +3822,7 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_driver_supported",
                     "cargo:rustc-cfg=rng_driver_supported",
                     "cargo:rustc-cfg=rsa_driver_supported",
+                    "cargo:rustc-cfg=rtc_timekeeping_driver_supported",
                     "cargo:rustc-cfg=sha_driver_supported",
                     "cargo:rustc-cfg=sleep_driver_supported",
                     "cargo:rustc-cfg=soc_driver_supported",
@@ -4237,6 +4247,7 @@ impl Chip {
                     "rmt_driver_supported",
                     "rng_driver_supported",
                     "rsa_driver_supported",
+                    "rtc_timekeeping_driver_supported",
                     "sd_host_driver_supported",
                     "sha_driver_supported",
                     "sleep_driver_supported",
@@ -4489,6 +4500,7 @@ impl Chip {
                     "cargo:rustc-cfg=rmt_driver_supported",
                     "cargo:rustc-cfg=rng_driver_supported",
                     "cargo:rustc-cfg=rsa_driver_supported",
+                    "cargo:rustc-cfg=rtc_timekeeping_driver_supported",
                     "cargo:rustc-cfg=sd_host_driver_supported",
                     "cargo:rustc-cfg=sha_driver_supported",
                     "cargo:rustc-cfg=sleep_driver_supported",
@@ -4981,6 +4993,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(rmt_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(rng_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(rsa_driver_supported)");
+    println!("cargo:rustc-check-cfg=cfg(rtc_timekeeping_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(sd_host_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(sd_slave_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(sha_driver_supported)");
@@ -5185,7 +5198,6 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_pmu)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_pvt_monitor)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_tee)");
-    println!("cargo:rustc-check-cfg=cfg(soc_has_trace0)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_core)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem0)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem1)");
@@ -5233,6 +5245,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_lp_io)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_otp_debug)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_plic_mx)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_trace0)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_twai1)");
     println!("cargo:rustc-check-cfg=cfg(lp_core)");
     println!("cargo:rustc-check-cfg=cfg(pm_support_beacon_wakeup)");

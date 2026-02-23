@@ -875,6 +875,7 @@ deep_sleep = true
 [device.temp_sensor]
 [device.ulp_fsm]
 [device.ulp_riscv]
+[device.rtc_timekeeping]
 
 ## Radio
 [device.wifi]
