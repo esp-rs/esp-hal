@@ -171,7 +171,6 @@ extern crate alloc;
 // MUST be the first module
 mod fmt;
 
-use docsplay::Display;
 use esp_hal as hal;
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
@@ -189,10 +188,6 @@ use hal::{
 };
 use sys::include::esp_phy_calibration_data_t;
 
-#[cfg(feature = "ble")]
-pub use crate::private::InitializationError;
-#[cfg(not(feature = "ble"))]
-use crate::private::InitializationError;
 pub(crate) mod sys {
     #[cfg(esp32)]
     pub use esp_wifi_sys_esp32::*;
@@ -304,7 +299,7 @@ const _: () = {
 )]
 /// - The function may return an error if interrupts are disabled.
 /// - The function may return an error if initializing the underlying driver fails.
-pub(crate) fn init() -> Result<(), InitializationError> {
+pub(crate) fn init() {
     #[cfg(esp32)]
     if try_claim_adc2(unsafe { hal::Internal::conjure() }).is_err() {
         panic!(
@@ -340,8 +335,6 @@ pub(crate) fn init() -> Result<(), InitializationError> {
     }
 
     debug!("Radio initialized");
-
-    Ok(())
 }
 
 pub(crate) fn deinit() {
@@ -369,16 +362,16 @@ pub(crate) struct RadioRefGuard;
 impl RadioRefGuard {
     /// Increments the refcount. If the old count was 0, it performs hardware init.
     /// If hardware init fails, it rolls back the refcount only once.
-    fn new() -> Result<Self, InitializationError> {
+    fn new() -> Self {
         RADIO_REFCOUNT.with(|rc| {
             debug!("Creating RadioRefGuard");
 
             if *rc == 0 {
-                init()?;
+                init();
             }
 
             *rc += 1;
-            Ok(RadioRefGuard)
+            RadioRefGuard
         })
     }
 }
@@ -452,28 +445,4 @@ pub fn set_phy_calibration_data(data: &[u8; core::mem::size_of::<esp_phy_calibra
 #[instability::unstable]
 pub fn last_calibration_result() -> Option<CalibrationResult> {
     esp_phy::last_calibration_result()
-}
-
-mod private {
-    use super::Display;
-    #[cfg(feature = "wifi")]
-    use crate::wifi::WifiError;
-    #[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    /// Error which can be returned during radio initialization.
-    #[non_exhaustive]
-    pub enum InitializationError {
-        /// An error from the Wi-Fi driver: {0}.
-        #[cfg(feature = "wifi")]
-        WifiError(WifiError),
-    }
-
-    impl core::error::Error for InitializationError {}
-
-    #[cfg(feature = "wifi")]
-    impl From<WifiError> for InitializationError {
-        fn from(value: WifiError) -> Self {
-            InitializationError::WifiError(value)
-        }
-    }
 }

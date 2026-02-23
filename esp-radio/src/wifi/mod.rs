@@ -33,7 +33,6 @@ use self::{
     state::*,
 };
 use crate::{
-    InitializationError,
     RadioRefGuard,
     esp_wifi_result,
     hal::ram,
@@ -870,14 +869,6 @@ impl WifiError {
 }
 
 impl core::error::Error for WifiError {}
-
-impl From<InitializationError> for WifiError {
-    fn from(err: InitializationError) -> Self {
-        match err {
-            InitializationError::WifiError(e) => e,
-        }
-    }
-}
 
 #[cfg(esp32)]
 fn set_mac_time_update_cb(wifi: crate::hal::peripherals::WIFI<'_>) {
@@ -2160,7 +2151,7 @@ pub fn new<'d>(
     device: crate::hal::peripherals::WIFI<'d>,
     config: ControllerConfig,
 ) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
-    let _guard = RadioRefGuard::new()?;
+    let _guard = RadioRefGuard::new();
 
     // TODO: Re-check, if not having interrupts disabled pre-condition is still true
     if crate::is_interrupts_disabled() {

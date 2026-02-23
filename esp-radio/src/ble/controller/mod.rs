@@ -14,7 +14,6 @@ use esp_hal::asynch::AtomicWaker;
 use esp_phy::PhyInitGuard;
 
 use crate::{
-    InitializationError,
     RadioRefGuard,
     ble::{Config, InvalidConfigError, have_hci_read_data, read_hci, read_next, send_hci},
 };
@@ -25,9 +24,6 @@ use crate::{
 pub enum BleInitError {
     /// Failure during initial validation of the provided configuration: {0}.
     Config(InvalidConfigError),
-
-    /// Failure during the acquisition or initialization of the global radio hardware: {0}.
-    RadioInit(InitializationError),
 }
 
 impl core::error::Error for BleInitError {}
@@ -59,7 +55,7 @@ impl<'d> BleConnector<'d> {
         device: crate::hal::peripherals::BT<'d>,
         config: Config,
     ) -> Result<BleConnector<'d>, BleInitError> {
-        let _guard = RadioRefGuard::new().map_err(BleInitError::RadioInit)?;
+        let _guard = RadioRefGuard::new();
 
         config.validate()?;
 
