@@ -3056,6 +3056,7 @@ pub trait QspiInstance: Instance {}
 /// Peripheral data describing a particular SPI instance.
 #[doc(hidden)]
 #[non_exhaustive]
+#[allow(private_interfaces, reason = "Unstable details")]
 pub struct Info {
     /// Pointer to the register block for this SPI instance.
     ///

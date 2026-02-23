@@ -2977,6 +2977,7 @@ pub trait Instance: crate::private::Sealed + any::Degrade {
 /// Peripheral data describing a particular UART instance.
 #[doc(hidden)]
 #[non_exhaustive]
+#[allow(private_interfaces, reason = "Unstable details")]
 pub struct Info {
     /// Pointer to the register block for this UART instance.
     ///

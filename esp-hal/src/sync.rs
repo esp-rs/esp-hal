@@ -51,7 +51,7 @@ impl RawLock for PriorityLock {
         // enabled.
         compiler_fence(Ordering::SeqCst);
 
-        let level = unwrap!(RunLevel::try_from(token.inner()));
+        let level = unwrap!(RunLevel::try_from_u32(token.inner()));
         unsafe { Self::change_current_level(level) };
     }
 }

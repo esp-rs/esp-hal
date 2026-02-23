@@ -136,7 +136,7 @@ impl CpuInterrupt {
     /// Get interrupt priority for the CPU
     #[inline]
     pub fn priority(self) -> Priority {
-        unwrap!(Priority::try_from(self.level()))
+        unwrap!(Priority::try_from_u32(self.level()))
     }
 
     #[inline]
@@ -189,6 +189,19 @@ impl Priority {
     pub const fn min() -> Priority {
         Priority::Priority1
     }
+
+    pub(crate) fn try_from_u32(priority: u32) -> Result<Self, PriorityError> {
+        let result;
+        for_each_interrupt_priority!(
+            (all $( ($idx:literal, $n:literal, $ident:ident) ),*) => {
+                result = match priority {
+                    $($n => Ok(Priority::$ident),)*
+                    _ => Err(PriorityError::InvalidInterruptPriority),
+                }
+            };
+        );
+        result
+    }
 }
 
 #[instability::unstable]
@@ -196,16 +209,7 @@ impl TryFrom<u32> for Priority {
     type Error = PriorityError;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
-        let result;
-        for_each_interrupt_priority!(
-            (all $( ($idx:literal, $n:literal, $ident:ident) ),*) => {
-                result = match value {
-                    $($n => Ok(Priority::$ident),)*
-                    _ => Err(PriorityError::InvalidInterruptPriority),
-                }
-            };
-        );
-        result
+        Self::try_from_u32(value)
     }
 }
 
@@ -364,7 +368,7 @@ fn encode_jal_x0(target: usize, pc: usize) -> u32 {
 /// Get the current run level (the level below which interrupts are masked).
 pub(crate) fn current_runlevel() -> RunLevel {
     let priority = cpu_int::current_runlevel();
-    unwrap!(RunLevel::try_from(priority as u32))
+    unwrap!(RunLevel::try_from_u32(priority as u32))
 }
 
 /// Changes the current run level (the level below which interrupts are
@@ -377,7 +381,7 @@ pub(crate) fn current_runlevel() -> RunLevel {
 /// runlevel.
 pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
     let previous = cpu_int::change_current_runlevel(level);
-    unwrap!(RunLevel::try_from(previous as u32))
+    unwrap!(RunLevel::try_from_u32(previous as u32))
 }
 
 fn cpu_wait_mode_on() -> bool {
@@ -513,7 +517,7 @@ pub(crate) mod rt {
 
         cfg_if::cfg_if! {
             if #[cfg(interrupt_controller = "clic")] {
-                let prio = unwrap!(Priority::try_from(cpu_int::current_runlevel() as u32));
+                let prio = unwrap!(Priority::try_from_u32(cpu_int::current_runlevel() as u32));
                 let mcause = riscv::register::mcause::read();
             } else {
                 // Change the current runlevel so that interrupt handlers can access the correct runlevel.

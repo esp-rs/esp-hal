@@ -192,6 +192,15 @@ impl Priority {
     pub const fn min() -> Priority {
         Priority::Priority1
     }
+
+    pub(crate) fn try_from_u32(priority: u32) -> Result<Self, PriorityError> {
+        match priority {
+            1 => Ok(Priority::Priority1),
+            2 => Ok(Priority::Priority2),
+            3 => Ok(Priority::Priority3),
+            _ => Err(PriorityError::InvalidInterruptPriority),
+        }
+    }
 }
 
 #[instability::unstable]
@@ -199,12 +208,7 @@ impl TryFrom<u32> for Priority {
     type Error = PriorityError;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
-        match value {
-            1 => Ok(Priority::Priority1),
-            2 => Ok(Priority::Priority2),
-            3 => Ok(Priority::Priority3),
-            _ => Err(PriorityError::InvalidInterruptPriority),
-        }
+        Self::try_from_u32(value)
     }
 }
 
@@ -233,7 +237,7 @@ pub(crate) fn current_runlevel() -> RunLevel {
     let ps: u32;
     unsafe { core::arch::asm!("rsr.ps {0}", out(reg) ps) };
 
-    unwrap!(RunLevel::try_from(ps & 0x0F))
+    unwrap!(RunLevel::try_from_u32(ps & 0x0F))
 }
 
 /// Changes the current run level (the level below which interrupts are
@@ -261,7 +265,7 @@ pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
         };
     }
 
-    unwrap!(RunLevel::try_from(token & 0x0F))
+    unwrap!(RunLevel::try_from_u32(token & 0x0F))
 }
 
 /// Wait for an interrupt to occur.

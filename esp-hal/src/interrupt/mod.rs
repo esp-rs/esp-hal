@@ -420,6 +420,14 @@ impl RunLevel {
     pub fn is_thread(&self) -> bool {
         matches!(self, RunLevel::ThreadMode)
     }
+
+    pub(crate) fn try_from_u32(priority: u32) -> Result<Self, PriorityError> {
+        if priority == 0 {
+            Ok(RunLevel::ThreadMode)
+        } else {
+            Priority::try_from_u32(priority).map(RunLevel::Interrupt)
+        }
+    }
 }
 
 impl PartialEq<Priority> for RunLevel {
@@ -451,11 +459,7 @@ impl TryFrom<u32> for RunLevel {
     type Error = PriorityError;
 
     fn try_from(priority: u32) -> Result<Self, Self::Error> {
-        if priority == 0 {
-            Ok(RunLevel::ThreadMode)
-        } else {
-            Priority::try_from(priority).map(RunLevel::Interrupt)
-        }
+        Self::try_from_u32(priority)
     }
 }
 
