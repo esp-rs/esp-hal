@@ -446,7 +446,7 @@ deep_sleep = true
 [device.io_mux]
 [device.temp_sensor]
 [device.systimer]
-[device.rtc_timekeeping]
+[device.lp_timer]
 
 ## Radio
 [device.wifi]

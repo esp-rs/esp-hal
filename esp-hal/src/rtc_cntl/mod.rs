@@ -17,7 +17,7 @@
 //! * Low-Power Management
 //! * Handling Watchdog Timers
 #![cfg_attr(
-    not(rtc_timekeeping_driver_supported),
+    not(lp_timer_driver_supported),
     doc = r#"
 ## Examples
 
@@ -114,11 +114,11 @@ loop {
 "#
 )]
 pub use self::rtc::SocResetReason;
-#[cfg_attr(not(rtc_timekeeping_driver_supported), expect(unused))]
+#[cfg_attr(not(lp_timer_driver_supported), expect(unused))]
 use crate::clock::RtcClock;
 #[cfg(sleep_driver_supported)]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
-#[cfg_attr(not(rtc_timekeeping_driver_supported), expect(unused))]
+#[cfg_attr(not(lp_timer_driver_supported), expect(unused))]
 use crate::{
     interrupt::{self, InterruptHandler},
     peripherals::Interrupt,
@@ -220,7 +220,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// Get the time since boot in the raw register units.
-    #[cfg(rtc_timekeeping_driver_supported)]
+    #[cfg(lp_timer_driver_supported)]
     fn time_since_boot_raw(&self) -> u64 {
         let rtc_cntl = LP_TIMER::regs();
 
@@ -258,7 +258,7 @@ impl<'d> Rtc<'d> {
     ///
     /// It should be noted that any reset or sleep, other than a power-up reset, will not stop or
     /// reset the RTC timer.
-    #[cfg(rtc_timekeeping_driver_supported)]
+    #[cfg(lp_timer_driver_supported)]
     pub fn time_since_power_up(&self) -> Duration {
         Duration::from_micros(
             self.time_since_boot_raw() * 1_000_000 / RtcClock::slow_freq().as_hz() as u64,
@@ -266,7 +266,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// Read the current value of the boot time registers in microseconds.
-    #[cfg(rtc_timekeeping_driver_supported)]
+    #[cfg(lp_timer_driver_supported)]
     fn boot_time_us(&self) -> u64 {
         // For more info on about how RTC setting works and what it has to do with boot time, see https://github.com/esp-rs/esp-hal/pull/1883
 
@@ -292,7 +292,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// Set the current value of the boot time registers in microseconds.
-    #[cfg(rtc_timekeeping_driver_supported)]
+    #[cfg(lp_timer_driver_supported)]
     fn set_boot_time_us(&self, boot_time_us: u64) {
         // Please see `boot_time_us` for documentation on registers and peripherals
         // used for certain SOCs.
@@ -332,7 +332,7 @@ impl<'d> Rtc<'d> {
     /// let weekday_in_new_york = now.to_zoned(TZ.clone()).weekday();
     /// # {after_snippet}
     /// ```
-    #[cfg(rtc_timekeeping_driver_supported)]
+    #[cfg(lp_timer_driver_supported)]
     pub fn current_time_us(&self) -> u64 {
         // Current time is boot time + time since boot
 
@@ -351,7 +351,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// Set the current time in microseconds.
-    #[cfg(rtc_timekeeping_driver_supported)]
+    #[cfg(lp_timer_driver_supported)]
     pub fn set_current_time_us(&self, current_time_us: u64) {
         // Current time is boot time + time since boot (rtc time)
         // So boot time = current time - time since boot (rtc time)
@@ -428,7 +428,7 @@ impl<'d> Rtc<'d> {
     /// Note that this will replace any previously registered interrupt
     /// handlers.
     #[instability::unstable]
-    #[cfg(rtc_timekeeping_driver_supported)]
+    #[cfg(lp_timer_driver_supported)]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c6, esp32h2))] {
@@ -447,7 +447,7 @@ impl<'d> Rtc<'d> {
 impl crate::private::Sealed for Rtc<'_> {}
 
 #[instability::unstable]
-#[cfg(rtc_timekeeping_driver_supported)]
+#[cfg(lp_timer_driver_supported)]
 impl crate::interrupt::InterruptConfigurable for Rtc<'_> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler);

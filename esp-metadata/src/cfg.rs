@@ -592,8 +592,8 @@ driver_configs![
             memory_size_bytes: u32,
         }
     },
-    RtcTimekeeping {
-        driver: rtc_timekeeping,
+    LpTimer {
+        driver: lp_timer,
         name: "RTC Timekeeping",
         properties: {}
     },

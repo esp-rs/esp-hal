@@ -46,7 +46,7 @@
 #![cfg_attr(not(feature = "rt"), expect(unused))]
 
 #[cfg(soc_has_clock_node_lp_slow_clk)]
-#[cfg_attr(not(rtc_timekeeping_driver_supported), expect(unused))]
+#[cfg_attr(not(lp_timer_driver_supported), expect(unused))]
 use clocks::LpSlowClkConfig;
 #[cfg(all(not(esp32s2), soc_has_clock_node_rtc_slow_clk))]
 use clocks::RtcSlowClkConfig;
@@ -143,7 +143,7 @@ impl RtcClock {
     /// may happen if 32k XTAL is being calibrated, but the oscillator has
     /// not started up (due to incorrect loading capacitance, board design
     /// issue, or lack of 32 XTAL on board).
-    #[cfg_attr(not(rtc_timekeeping_driver_supported), expect(unused))]
+    #[cfg_attr(not(lp_timer_driver_supported), expect(unused))]
     pub(crate) fn calibrate(cal_clk: TimgCalibrationClockConfig, slowclk_cycles: u32) -> u32 {
         ClockTree::with(|clocks| {
             let xtal_freq = Rate::from_hz(clocks::xtal_clk_frequency(clocks));
@@ -209,7 +209,7 @@ impl Clocks {
             unsafe { ACTIVE_CLOCKS = Some(config) };
         });
 
-        #[cfg(rtc_timekeeping_driver_supported)]
+        #[cfg(lp_timer_driver_supported)]
         Clocks::calibrate_rtc_slow_clock();
     }
 
@@ -414,7 +414,7 @@ impl Clocks {
         (cali_value, Rate::from_hz(calibration_clock_frequency))
     }
 
-    #[cfg(rtc_timekeeping_driver_supported)]
+    #[cfg(lp_timer_driver_supported)]
     pub(crate) fn calibrate_rtc_slow_clock() {
         // Unfortunate device specific mapping.
         // TODO: fix it by generating cfgs for each mux input?

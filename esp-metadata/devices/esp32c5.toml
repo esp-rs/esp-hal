@@ -676,5 +676,5 @@ support_status = "not_supported"
 [device.ulp_riscv]
 support_status = "not_supported"
 
-[device.rtc_timekeeping]
+[device.lp_timer]
 support_status = "not_supported"
