@@ -1700,12 +1700,12 @@ pub(crate) fn esp_wifi_send_data(interface: wifi_interface_t, data: &mut [u8]) {
         let len = data.len() as u16;
         let ptr = data.as_mut_ptr().cast();
 
-        let res = unsafe { esp_wifi_result!(esp_wifi_internal_tx(interface, ptr, len)) };
+        let res = unsafe { esp_wifi_internal_tx(interface, ptr, len) };
 
-        if res.is_err() {
-            decrement_inflight_counter();
-        } else {
+        if res == include::ESP_OK as i32 {
             trace!("esp_wifi_internal_tx ok");
+        } else {
+            decrement_inflight_counter();
         }
     })
 }

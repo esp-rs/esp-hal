@@ -316,8 +316,9 @@ pub(crate) fn init() {
     let clocks = Clocks::get();
     if clocks.cpu_clock < MIN_CLOCK {
         panic!(
-            "CPU clock is too slow for Wi-Fi operation: {} MHz",
-            clocks.cpu_clock.as_mhz()
+            "CPU clock {} MHz is too slow for Wi-Fi operation, minimum required is {} MHz",
+            clocks.cpu_clock.as_mhz(),
+            MIN_CLOCK.as_mhz()
         );
     }
 
