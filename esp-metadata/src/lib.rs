@@ -602,18 +602,6 @@ impl Config {
 
         let mut stable_peris = vec![];
 
-        for item in PeriConfig::drivers() {
-            if self.device.peri_config.support_status(item.config_group)
-                == Some(SupportStatus::Supported)
-            {
-                for p in self.device.peri_config.driver_peris(item.config_group) {
-                    if !stable_peris.contains(&p) {
-                        stable_peris.push(p);
-                    }
-                }
-            }
-        }
-
         for p in self.device.peripherals.iter() {
             if p.stable && !stable_peris.contains(&p.name.as_str()) {
                 stable_peris.push(p.name.as_str());

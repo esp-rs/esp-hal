@@ -35,7 +35,7 @@ peripherals = [
     { name = "HP_SYS" },
     { name = "HUK" },
     { name = "I2C_ANA_MST" },
-    { name = "I2C0", interrupts = { peri = "I2C_EXT0" } },
+    { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true },
     { name = "I2S0", interrupts = { peri = "I2S0" }, dma_peripheral = 3 },
     # { name = "IEEE802154", interrupts = { mac = "ZB_MAC" } },
     { name = "INTERRUPT_CORE0" },
@@ -82,7 +82,7 @@ peripherals = [
     # { name = "SLCHOST" }, TODO: add PAC manually later
     # { name = "SPI0" },
     # { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "SPI2" }, dma_peripheral = 1 },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, dma_peripheral = 1, stable = true },
     { name = "SYSTEM", pac = "PCR" },
     { name = "SYSTIMER" },
     { name = "TEE" },
@@ -91,8 +91,8 @@ peripherals = [
     { name = "TRACE0", pac = "TRACE" },
     # { name = "TWAI0" }, # TODO: too different from what we know
     # { name = "TWAI1" }, # TODO: too different from what we know
-    { name = "UART0", interrupts = { peri = "UART0" } },
-    { name = "UART1", interrupts = { peri = "UART1" } },
+    { name = "UART0", interrupts = { peri = "UART0" }, stable = true },
+    { name = "UART1", interrupts = { peri = "UART1" }, stable = true },
     { name = "UHCI0", dma_peripheral = 2 },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
 

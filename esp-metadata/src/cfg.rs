@@ -283,14 +283,6 @@ macro_rules! driver_configs {
                     _ => None, // If the peripheral is not found, return None.
                 }
             }
-
-            /// Returns the peripheral instances used by the given driver.
-            pub fn driver_peris<'a>(&'a self, driver: &str) -> Vec<&'a str> {
-                match driver {
-                    $(stringify!($driver) => self.$driver.iter().flat_map(|p| p.instances.iter().map(|i| i.name.as_str())).collect::<Vec<_>>(),)*
-                    _ => vec![],
-                }
-            }
         }
     };
 }
