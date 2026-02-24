@@ -6,6 +6,31 @@ In general, comparison and existing knowledge are key to obtaining all required 
 
 We prefer to trust `ESP-IDF` first and `TRM` second. The reason is simple: `TRM`, unfortunately, might sometimes contain inaccuracies, while `ESP-IDF` code is proven to work — operability is our main priority. As a side task, you may look for inconsistencies in the TRM and report them via GitHub issues (if you are an external contributor) or in the `Documentation` channel (if you are a team member).
 
+## `espflash` And Test Tooling
+
+For bring-up, you will typically need to add support in tooling, otherwise testing will be blocked.
+
+### espflash Support
+
+Do **not** guess which ESP-IDF revision the bootloaders/stubs come from. Instead, refer to the corresponding [`README`](https://github.com/esp-rs/espflash/blob/main/espflash/resources/README.md) in `espflash`, which documents the exact source commit and related build assumptions:
+
+In particular, this page specifies:
+- which ESP-IDF branch/commit the bootloaders were built from
+- the current MMU page size assumptions (and any resulting flash size configuration requirements)
+- where flasher stubs are sourced from
+
+Also, you will need to implement and define a couple of chip-specific functions in `espflash/src/targets/<chip>.rs`. It is sufficient to use the implementation of already supported chips as a reference.
+
+### probe-rs Support (optional)
+
+If CI testing or debugger are in scope, the new chip must also be supported in [`probe-rs`](https://github.com/probe-rs/probe-rs).
+
+As a reference, see the [PR](https://github.com/probe-rs/probe-rs/pull/3635), which added `ESP32-C5` support.
+
+Adding probe-rs support requires a flash loader. You will need to use `esp-flash-loader` to add one. This project has a [guide](https://github.com/esp-rs/esp-flash-loader?tab=readme-ov-file#adding-new-chips) on how to add new chips and build a flash loader. 
+
+Once completed, probe-rs can be used for flashing, debugging, and automated tests.
+
 ## Linker Scripts
 The process usually begins with linker scripts.
 
