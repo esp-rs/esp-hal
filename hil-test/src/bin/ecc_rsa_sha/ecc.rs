@@ -72,22 +72,27 @@ mod tests {
         }
     }
 
+    fn fill_random(prime_field: &[u8], buf: &mut [u8]) {
+        let rng = Rng::new();
+        loop {
+            rng.read(buf);
+            let is_zero = buf.iter().all(|&elt| elt == 0);
+            let is_modulus = buf == prime_field;
+            if !is_zero && !is_modulus {
+                break;
+            }
+        }
+    }
+
     #[test]
     fn test_ecc_affine_point_multiplication(mut ctx: Context<'static>) {
         for_each_test_case(|prime_field| {
-            let rng = Rng::new();
             let t1 = &mut [0_u8; 96];
             let (k, x) = t1.split_at_mut(prime_field.len());
             let (x, y) = x.split_at_mut(prime_field.len());
             let (y, _) = y.split_at_mut(prime_field.len());
-            loop {
-                rng.read(k);
-                let is_zero = k.iter().all(|&elt| elt == 0);
-                let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
-                if is_zero == false && is_modulus == false {
-                    break;
-                }
-            }
+
+            fill_random(prime_field, k);
             let curve = encode_affine_point(x, y);
 
             ctx.ecc
@@ -131,19 +136,11 @@ mod tests {
     #[test]
     fn test_ecc_affine_point_verification(mut ctx: Context<'static>) {
         for_each_test_case(|prime_field| {
-            let rng = Rng::new();
             let t1 = &mut [0_u8; 96];
             let (k, x) = t1.split_at_mut(prime_field.len());
             let (x, y) = x.split_at_mut(prime_field.len());
             let (y, _) = y.split_at_mut(prime_field.len());
-            loop {
-                rng.read(k);
-                let is_zero = k.iter().all(|&elt| elt == 0);
-                let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
-                if is_zero == false && is_modulus == false {
-                    break;
-                }
-            }
+            fill_random(prime_field, k);
 
             let curve = match prime_field.len() {
                 24 => {
@@ -187,7 +184,6 @@ mod tests {
     #[test]
     fn test_ecc_affine_point_verification_multiplication(mut ctx: Context<'static>) {
         for_each_test_case(|prime_field| {
-            let rng = Rng::new();
             let t1 = &mut [0_u8; 96];
             let (k, px) = t1.split_at_mut(prime_field.len());
             let (px, py) = px.split_at_mut(prime_field.len());
@@ -200,14 +196,7 @@ mod tests {
                 }
             }
 
-            loop {
-                rng.read(k);
-                let is_zero = k.iter().all(|&elt| elt == 0);
-                let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
-                if is_zero == false && is_modulus == false {
-                    break;
-                }
-            }
+            fill_random(prime_field, k);
             let curve = encode_affine_point(px, py);
 
             #[cfg(not(ecc_working_modes = "11"))]
@@ -266,7 +255,6 @@ mod tests {
     #[test]
     fn test_ecc_jacobian_point_multiplication(mut ctx: Context<'static>) {
         for_each_test_case(|prime_field| {
-            let rng = Rng::new();
             let t1 = &mut [0_u8; 96];
             let (k, x) = t1.split_at_mut(prime_field.len());
             let (x, y) = x.split_at_mut(prime_field.len());
@@ -278,14 +266,7 @@ mod tests {
             let (sw_y, sw_k) = sw_y.split_at_mut(prime_field.len());
             let (sw_k, _) = sw_k.split_at_mut(prime_field.len());
 
-            loop {
-                rng.read(k);
-                let is_zero = k.iter().all(|&elt| elt == 0);
-                let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
-                if is_zero == false && is_modulus == false {
-                    break;
-                }
-            }
+            fill_random(prime_field, k);
             sw_k.copy_from_slice(k);
             let curve = encode_affine_point(x, y);
 
@@ -342,22 +323,13 @@ mod tests {
     #[test]
     fn test_jacobian_point_verification(mut ctx: Context<'static>) {
         for_each_test_case(|prime_field| {
-            let rng = Rng::new();
             let t1 = &mut [0_u8; 128];
             let (k, x) = t1.split_at_mut(prime_field.len());
             let (x, y) = x.split_at_mut(prime_field.len());
             let (y, z) = y.split_at_mut(prime_field.len());
             let (z, _) = z.split_at_mut(prime_field.len());
-            loop {
-                rng.read(k);
-                rng.read(z);
-                let is_zero = k.iter().all(|&elt| elt == 0) || z.iter().all(|&elt| elt == 0);
-                let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b)
-                    || z.iter().zip(prime_field).all(|(&a, &b)| a == b);
-                if is_zero == false && is_modulus == false {
-                    break;
-                }
-            }
+            fill_random(prime_field, k);
+            fill_random(prime_field, z);
 
             let curve = match prime_field.len() {
                 24 => {
@@ -417,8 +389,6 @@ mod tests {
     #[test]
     fn test_ecc_affine_point_verification_jacobian_multiplication(mut ctx: Context<'static>) {
         for_each_test_case(|prime_field| {
-            let rng = Rng::new();
-
             let t1 = &mut [0_u8; 96];
             let (k, x) = t1.split_at_mut(prime_field.len());
             let (x, y) = x.split_at_mut(prime_field.len());
@@ -430,14 +400,7 @@ mod tests {
             let (sw_y, sw_k) = sw_y.split_at_mut(prime_field.len());
             let (sw_k, _) = sw_k.split_at_mut(prime_field.len());
 
-            loop {
-                rng.read(k);
-                let is_zero = k.iter().all(|&elt| elt == 0);
-                let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
-                if is_zero == false && is_modulus == false {
-                    break;
-                }
-            }
+            fill_random(prime_field, k);
             sw_k.copy_from_slice(k);
             let curve = encode_affine_point(x, y);
 
@@ -506,22 +469,12 @@ mod tests {
     #[cfg(ecc_working_modes = "7")]
     fn test_ecc_finite_field_division(mut ctx: Context<'static>) {
         for_each_test_case(|prime_field| {
-            let rng = Rng::new();
-
             let t1 = &mut [0_u8; 64];
             let (k, y) = t1.split_at_mut(prime_field.len());
             let (y, _) = y.split_at_mut(prime_field.len());
 
-            loop {
-                rng.read(k);
-                rng.read(y);
-                let is_zero = k.iter().all(|&elt| elt == 0) || y.iter().all(|&elt| elt == 0);
-                let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b)
-                    || y.iter().zip(prime_field).all(|(&a, &b)| a == b);
-                if is_zero == false && is_modulus == false {
-                    break;
-                }
-            }
+            fill_random(prime_field, k);
+            fill_random(prime_field, y);
             let t2 = &mut [0_u8; 96];
             let (sw_y, sw_k) = t2.split_at_mut(prime_field.len());
             let (sw_k, sw_res) = sw_k.split_at_mut(prime_field.len());
