@@ -435,7 +435,7 @@ where
     /// handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        self.rx.peripheral.disable_peri_interrupt();
+        self.rx.peripheral.disable_peri_interrupt_on_all_cores();
         self.rx.peripheral.bind_peri_interrupt(handler);
     }
 }
@@ -787,7 +787,7 @@ impl<'d> UsbSerialJtag<'d, Async> {
     /// Reconfigure the USB Serial JTAG peripheral to operate in blocking
     /// mode.
     pub fn into_blocking(self) -> UsbSerialJtag<'d, Blocking> {
-        self.rx.peripheral.disable_peri_interrupt();
+        self.rx.peripheral.disable_peri_interrupt_on_all_cores();
         UsbSerialJtag {
             rx: UsbSerialJtagRx {
                 peripheral: self.rx.peripheral,

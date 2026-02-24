@@ -399,7 +399,7 @@ extern "C" fn BT_MAC() {
 
 pub(crate) fn shutdown_ble_isr() {
     unsafe {
-        BT::steal().disable_lp_timer_interrupt();
-        BT::steal().disable_mac_interrupt();
+        BT::steal().disable_lp_timer_interrupt_on_all_cores();
+        BT::steal().disable_mac_interrupt_on_all_cores();
     }
 }

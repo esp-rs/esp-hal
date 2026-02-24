@@ -76,6 +76,6 @@ extern "C" fn WIFI_MAC() {
 
 pub(crate) fn shutdown_wifi_isr() {
     unsafe {
-        WIFI::steal().disable_mac_interrupt();
+        WIFI::steal().disable_mac_interrupt_on_all_cores();
     }
 }

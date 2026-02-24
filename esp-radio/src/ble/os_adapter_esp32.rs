@@ -786,8 +786,8 @@ extern "C" fn BT_BB() {
 
 pub(crate) fn shutdown_ble_isr() {
     unsafe {
-        BT::steal().disable_rwbt_interrupt();
-        BT::steal().disable_rwble_interrupt();
-        BT::steal().disable_bb_interrupt();
+        BT::steal().disable_rwbt_interrupt_on_all_cores();
+        BT::steal().disable_rwble_interrupt_on_all_cores();
+        BT::steal().disable_bb_interrupt_on_all_cores();
     }
 }

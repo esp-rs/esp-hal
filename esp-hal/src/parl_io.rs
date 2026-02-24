@@ -999,15 +999,15 @@ fn internal_set_interrupt_handler(handler: InterruptHandler) {
     let peri = unsafe { PARL_IO::steal() };
     #[cfg(parl_io_version = "1")]
     {
-        peri.disable_peri_interrupt();
+        peri.disable_peri_interrupt_on_all_cores();
         internal_listen(EnumSet::all(), false);
         internal_clear_interrupts(EnumSet::all());
         peri.bind_peri_interrupt(handler);
     }
     #[cfg(parl_io_version = "2")]
     {
-        peri.disable_rx_interrupt();
-        peri.disable_tx_interrupt();
+        peri.disable_rx_interrupt_on_all_cores();
+        peri.disable_tx_interrupt_on_all_cores();
         internal_listen(EnumSet::all(), false);
         internal_clear_interrupts(EnumSet::all());
         peri.bind_rx_interrupt(handler);

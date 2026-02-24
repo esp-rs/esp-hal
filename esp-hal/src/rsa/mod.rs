@@ -128,7 +128,7 @@ impl<'d> Rsa<'d, Blocking> {
     /// handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.rsa.disable_peri_interrupt();
+        self.rsa.disable_peri_interrupt_on_all_cores();
         self.rsa.bind_peri_interrupt(handler);
     }
 }
@@ -146,7 +146,7 @@ impl<'d> Rsa<'d, Async> {
     /// Create a new instance in [crate::Blocking] mode.
     pub fn into_blocking(self) -> Rsa<'d, Blocking> {
         self.internal_enable_disable_interrupt(false);
-        self.rsa.disable_peri_interrupt();
+        self.rsa.disable_peri_interrupt_on_all_cores();
 
         crate::interrupt::disable(Cpu::current(), Interrupt::RSA);
         Rsa {

@@ -2360,12 +2360,12 @@ mod private {
                 AnyI2sInner::I2s1(i2s) => i2s,
             } {
                 fn bind_peri_interrupt(&self, handler: InterruptHandler);
-                fn disable_peri_interrupt(&self);
+                fn disable_peri_interrupt_on_all_cores(&self);
             }
         }
 
         pub(super) fn set_interrupt_handler(&self, handler: InterruptHandler) {
-            self.disable_peri_interrupt();
+            self.disable_peri_interrupt_on_all_cores();
             self.bind_peri_interrupt(handler);
         }
     }

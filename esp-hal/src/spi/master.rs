@@ -813,7 +813,7 @@ impl<'d> Spi<'d, Async> {
     /// See the [`Blocking`] documentation for an example on how to use this
     /// method.
     pub fn into_blocking(self) -> Spi<'d, Blocking> {
-        self.spi.disable_peri_interrupt();
+        self.spi.disable_peri_interrupt_on_all_cores();
         Spi {
             spi: self.spi,
             _mode: PhantomData,
@@ -1582,7 +1582,7 @@ mod dma {
         /// Converts the SPI instance into async mode.
         #[instability::unstable]
         pub fn into_blocking(self) -> SpiDma<'d, Blocking> {
-            self.spi.disable_peri_interrupt();
+            self.spi.disable_peri_interrupt_on_all_cores();
             SpiDma {
                 spi: self.spi,
                 channel: self.channel.into_blocking(),
@@ -4039,12 +4039,12 @@ impl AnySpi<'_> {
         any::delegate!(self, spi => { spi.bind_peri_interrupt(handler) })
     }
 
-    fn disable_peri_interrupt(&self) {
-        any::delegate!(self, spi => { spi.disable_peri_interrupt() })
+    fn disable_peri_interrupt_on_all_cores(&self) {
+        any::delegate!(self, spi => { spi.disable_peri_interrupt_on_all_cores() })
     }
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
-        self.disable_peri_interrupt();
+        self.disable_peri_interrupt_on_all_cores();
         self.bind_peri_interrupt(handler);
     }
 }

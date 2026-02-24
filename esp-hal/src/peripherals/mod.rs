@@ -109,17 +109,29 @@ macro_rules! create_peripheral {
                     $crate::interrupt::enable($crate::peripherals::Interrupt::$interrupt, priority);
                 }
 
-                #[procmacros::doc_replace]
-                #[cfg_attr(single_core, doc = concat!(" Disables the ",  stringify!($interrupt), " peripheral interrupt handler."))]
-                #[cfg_attr(multi_core, doc = concat!(" Disables the ",  stringify!($interrupt), " peripheral interrupt handler on all cores."))]
-                ///
-                /// <section class="warning">
-                /// This function is a very low-level way to work with interrupts. Unless you're writing drivers, this is probably not the interrupt API you want to use.
-                /// </section>
-                #[allow(dead_code, reason = "Peripheral may be unstable")]
-                pub fn $disable(&self) {
-                    for core in $crate::system::Cpu::all() {
-                        $crate::interrupt::disable(core, $crate::peripherals::Interrupt::$interrupt);
+                paste::paste! {
+                    #[procmacros::doc_replace]
+                    #[doc = concat!("Disables the ",  stringify!($interrupt), " peripheral interrupt handler on the current CPU core.")]
+                    ///
+                    /// <section class="warning">
+                    /// This function is a very low-level way to work with interrupts. Unless you're writing drivers, this is probably not the interrupt API you want to use.
+                    /// </section>
+                    #[instability::unstable]
+                    pub fn $disable(&self) {
+                        $crate::interrupt::disable($crate::system::Cpu::current(), $crate::peripherals::Interrupt::$interrupt);
+                    }
+
+                    #[procmacros::doc_replace]
+                    #[doc = concat!("Disables the ",  stringify!($interrupt), " peripheral interrupt handler on all cores.")]
+                    ///
+                    /// <section class="warning">
+                    /// This function is a very low-level way to work with interrupts. Unless you're writing drivers, this is probably not the interrupt API you want to use.
+                    /// </section>
+                    #[allow(dead_code, reason = "Peripheral may be unstable")]
+                    pub fn [<$disable _on_all_cores>](&self) {
+                        for core in $crate::system::Cpu::all() {
+                            $crate::interrupt::disable(core, $crate::peripherals::Interrupt::$interrupt);
+                        }
                     }
                 }
             )*
