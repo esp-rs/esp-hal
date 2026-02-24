@@ -214,6 +214,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
+                #[doc(hidden)]
                 pub (crate) mod __main {
                     use super::*;
                     #[doc(hidden)]
@@ -369,6 +370,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
+                #[doc(hidden)]
                 pub (crate) mod __main {
                     use super::*;
                     #[doc(hidden)]
@@ -409,6 +411,7 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote::quote! {
+                #[doc(hidden)]
                 pub (crate) mod __main {
                     use super::*;
                     #[doc(hidden)]
@@ -456,6 +459,7 @@ mod tests {
                 #[allow(allowed)]
                 #[deny(denied)]
                 #[warn (warning)]
+                #[doc(hidden)]
                 pub (crate) mod __main {
                     use super::*;
                     #[doc(hidden)]
