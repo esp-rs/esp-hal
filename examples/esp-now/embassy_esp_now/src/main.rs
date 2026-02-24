@@ -16,10 +16,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::{
-    esp_now::{BROADCAST_ADDRESS, PeerInfo},
-    wifi::{Config, sta::StationConfig},
-};
+use esp_radio::esp_now::{BROADCAST_ADDRESS, PeerInfo};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -36,12 +33,9 @@ async fn main(_spawner: Spawner) -> ! {
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let wifi = peripherals.WIFI;
-    let (mut controller, interfaces) = esp_radio::wifi::new(wifi, Default::default()).unwrap();
-
-    // start the controller in station mode
-    controller
-        .set_config(&Config::Station(StationConfig::default()))
-        .unwrap();
+    // We don't need the controller but using `_` instead of `_controller` causes the
+    // `WifiContoller` to be dropped immediately.
+    let (_controller, interfaces) = esp_radio::wifi::new(wifi, Default::default()).unwrap();
 
     let mut esp_now = interfaces.esp_now;
     esp_now.set_channel(11).unwrap();

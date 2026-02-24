@@ -21,7 +21,6 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{Config, sta::StationConfig};
 use ieee80211::{match_frames, mgmt_frame::BeaconFrame};
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -41,12 +40,8 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     // We must initialize some kind of interface and start it.
-    let (mut controller, interfaces) =
+    let (_controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
-
-    controller
-        .set_config(&Config::Station(StationConfig::default()))
-        .unwrap();
 
     let mut sniffer = interfaces.sniffer;
     sniffer.set_promiscuous_mode(true).unwrap();

@@ -22,7 +22,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{Config, Interface, WifiController, sta::StationConfig};
+use esp_radio::wifi::{Config, ControllerConfig, Interface, WifiController, sta::StationConfig};
 use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -200,8 +200,20 @@ async fn main(spawner: Spawner) {
         .build(rx_descriptors);
 
     // WiFi + network stack
-    let (mut controller, interfaces) =
-        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
+    let station_config = Config::Station(
+        StationConfig::default()
+            .with_ssid(SSID)
+            .with_password(PASSWORD.into()),
+    );
+
+    println!("Starting wifi");
+    let (controller, interfaces) = esp_radio::wifi::new(
+        peripherals.WIFI,
+        ControllerConfig::default().with_initial_config(station_config),
+    )
+    .unwrap();
+    println!("Wifi configured and started!");
+
     let wifi_interface = interfaces.station;
 
     let config = embassy_net::Config::dhcpv4(Default::default());
@@ -218,15 +230,6 @@ async fn main(spawner: Spawner) {
     static CONNECTED_SIGNAL: StaticCell<Signal<NoopRawMutex, bool>> = StaticCell::new();
 
     let connected_signal = &*CONNECTED_SIGNAL.init(Signal::new());
-
-    let station_config = Config::Station(
-        StationConfig::default()
-            .with_ssid(SSID)
-            .with_password(PASSWORD.into()),
-    );
-    println!("Starting wifi");
-    controller.set_config(&station_config).unwrap();
-    println!("Wifi started!");
 
     // Tasks
     spawner.spawn(net_task(runner)).ok();

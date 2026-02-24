@@ -64,10 +64,6 @@ async fn main(_spawner: Spawner) {
             esp_radio::wifi::new(peripherals.WIFI.reborrow(), Default::default()).unwrap();
 
         {
-            controller
-                .set_config(&Config::Station(StationConfig::default()))
-                .unwrap();
-
             println!("Connecting to WiFi SSID: {}", SSID);
             let scan_config =
                 ScanConfig::default()

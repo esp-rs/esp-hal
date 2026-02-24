@@ -13,7 +13,6 @@ use esp_alloc;
 use esp_backtrace as _;
 use esp_hal::{interrupt::software::SoftwareInterruptControl, timer::timg::TimerGroup};
 use esp_println::println;
-use esp_radio::wifi::sta::StationConfig;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -53,10 +52,6 @@ async fn main(_spawner: Spawner) {
     // WiFi
     let (mut controller, _interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
-
-    controller
-        .set_config(&esp_radio::wifi::Config::Station(StationConfig::default()))
-        .unwrap();
 
     let res = controller
         .scan_async(&esp_radio::wifi::scan::ScanConfig::default())

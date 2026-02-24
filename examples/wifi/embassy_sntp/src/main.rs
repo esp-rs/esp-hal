@@ -30,7 +30,14 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{Config, Interface, WifiController, scan::ScanConfig, sta::StationConfig};
+use esp_radio::wifi::{
+    Config,
+    ControllerConfig,
+    Interface,
+    WifiController,
+    scan::ScanConfig,
+    sta::StationConfig,
+};
 use log::{error, info};
 use sntpc::{NtpContext, NtpTimestampGenerator, get_time};
 
@@ -87,8 +94,19 @@ async fn main(spawner: Spawner) -> ! {
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let (mut controller, interfaces) =
-        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
+    let station_config = Config::Station(
+        StationConfig::default()
+            .with_ssid(SSID)
+            .with_password(PASSWORD.into()),
+    );
+
+    println!("Starting wifi");
+    let (mut controller, interfaces) = esp_radio::wifi::new(
+        peripherals.WIFI,
+        ControllerConfig::default().with_initial_config(station_config),
+    )
+    .unwrap();
+    println!("Wifi configured and started!");
 
     let wifi_interface = interfaces.station;
 
@@ -104,15 +122,6 @@ async fn main(spawner: Spawner) -> ! {
         mk_static!(StackResources<3>, StackResources::<3>::new()),
         seed,
     );
-
-    let station_config = Config::Station(
-        StationConfig::default()
-            .with_ssid(SSID)
-            .with_password(PASSWORD.into()),
-    );
-    println!("Starting wifi");
-    controller.set_config(&station_config).unwrap();
-    println!("Wifi started!");
 
     println!("Scan");
     let scan_config = ScanConfig::default().with_max(10);

@@ -18,7 +18,6 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{Config, sta::StationConfig};
 use ieee80211::{
     common::{CapabilitiesInformation, FCFFlags},
     element_chain,
@@ -49,14 +48,10 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    // We must initialize some kind of interface and start it.
-    let (mut controller, interfaces) =
+    // We must initialize some kind of interface and start it and start the controller in station
+    // mode.
+    let (_controller, interfaces) =
         esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
-
-    // start the controller in station mode
-    controller
-        .set_config(&Config::Station(StationConfig::default()))
-        .unwrap();
 
     let mut sniffer = interfaces.sniffer;
 

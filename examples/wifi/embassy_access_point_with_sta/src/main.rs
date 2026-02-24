@@ -49,6 +49,7 @@ use esp_hal::{
 use esp_println::{print, println};
 use esp_radio::wifi::{
     Config,
+    ControllerConfig,
     Interface,
     WifiController,
     ap::AccessPointConfig,
@@ -86,8 +87,20 @@ async fn main(spawner: Spawner) -> ! {
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let (mut controller, interfaces) =
-        esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
+    let access_point_station_config = Config::AccessPointStation(
+        StationConfig::default()
+            .with_ssid(SSID)
+            .with_password(PASSWORD.into()),
+        AccessPointConfig::default().with_ssid("esp-radio-apsta"),
+    );
+
+    println!("Starting wifi");
+    let (controller, interfaces) = esp_radio::wifi::new(
+        peripherals.WIFI,
+        ControllerConfig::default().with_initial_config(access_point_station_config),
+    )
+    .unwrap();
+    println!("Wifi started!");
 
     let wifi_ap_device = interfaces.access_point;
     let wifi_sta_device = interfaces.station;
@@ -115,16 +128,6 @@ async fn main(spawner: Spawner) -> ! {
         mk_static!(StackResources<4>, StackResources::<4>::new()),
         seed,
     );
-
-    let access_point_station_config = Config::AccessPointStation(
-        StationConfig::default()
-            .with_ssid(SSID)
-            .with_password(PASSWORD.into()),
-        AccessPointConfig::default().with_ssid("esp-radio-apsta"),
-    );
-    println!("Starting wifi");
-    controller.set_config(&access_point_station_config).unwrap();
-    println!("Wifi started!");
 
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(ap_runner)).ok();

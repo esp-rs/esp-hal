@@ -89,6 +89,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `power_save` has been dropped from `ControllerConfig` (#4981)
 - MAC address getters: `access_point_mac()`, `station_mac()` and `ble::mac()`. (#5002)
 - `WifiError::{Interface, Nvs, InvalidMac, WakeFailed, WouldBlock, PostFail, UnknownWifiMode, NotInitialized, NotStopped, Mode, State, ControlBlock, Timeout, InvalidInitState, StopState, NotAssociated, TxDisallowed, Internal(i32), WrongClockConfig, SchedulerNotInitialized, AdcIsUsed}` have been removed (#5018)
+- `WifiError::{Interface, Nvs, InvalidMac, WakeFailed, WouldBlock, PostFail, UnknownWifiMode, NotInitialized, NotStopped, Mode, State, ControlBlock, Timeout, InvalidInitState, StopState, NotAssociated, TxDisallowed, Internal(i32), WrongClockConfig, SchedulerNotInitialized, AdcIsUsed, NotStarted}` have been removed (#5018, #5039)
+- `WifiController::is_started()` has been removed (#5039)
 
 ## [v0.17.0] - 2025-10-30
 
