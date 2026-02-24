@@ -57,7 +57,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ------------------------- |:-----:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|
 | ADC                       | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | AES                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| ASSIST_DEBUG              |       | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      |          | ⚒️      |
+| ASSIST_DEBUG              |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |          | ⚒️      |
 | Analog Voltage Comparator |       |          |          | ❌       |          |          |          |          |
 | Bit Scrambler             |       |          |          | ❌       |          |          |          |          |
 | Bluetooth                 | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      |          | ⚒️      |

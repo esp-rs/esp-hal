@@ -14,7 +14,7 @@ trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c5_t
 
 peripherals = [
     { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 6 },
-    #{ name = "ASSIST_DEBUG" },
+    { name = "ASSIST_DEBUG" },
     { name = "APB_SARADC", dma_peripheral = 8 },
     # { name = "AVC" },
     # { name = "BITSCRAMBLER" },
@@ -589,7 +589,9 @@ combined_uart_selector_field = true
 support_status = "not_supported"
 
 [device.assist_debug]
-support_status = "not_supported"
+support_status = "partial"
+has_sp_monitor = true
+has_region_monitor = true
 
 [device.avc]
 support_status = "not_supported"

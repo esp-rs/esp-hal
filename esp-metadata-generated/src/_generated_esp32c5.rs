@@ -46,10 +46,10 @@ macro_rules! property {
         false
     };
     ("assist_debug.has_sp_monitor") => {
-        false
+        true
     };
     ("assist_debug.has_region_monitor") => {
-        false
+        true
     };
     ("bt.controller") => {
         "npl"
@@ -3288,6 +3288,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "AES peripheral singleton"] AES
         <= AES(AES : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
         }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "ASSIST_DEBUG peripheral singleton"] ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "APB_SARADC peripheral singleton"] APB_SARADC <= APB_SARADC() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "CLINT peripheral singleton"]
         CLINT <= CLINT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -3433,6 +3435,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((GPIO26)); _for_each_inner_peripheral!((GPIO27));
         _for_each_inner_peripheral!((GPIO28));
         _for_each_inner_peripheral!((AES(unstable)));
+        _for_each_inner_peripheral!((ASSIST_DEBUG(unstable)));
         _for_each_inner_peripheral!((APB_SARADC(unstable)));
         _for_each_inner_peripheral!((CLINT(unstable)));
         _for_each_inner_peripheral!((DMA(unstable)));
@@ -3604,27 +3607,28 @@ macro_rules! for_each_peripheral {
         = "</ul>"] #[doc = "</section>"] GPIO28 <= virtual()), (@ peri_type #[doc =
         "AES peripheral singleton"] AES <= AES(AES : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "APB_SARADC peripheral singleton"] APB_SARADC <= APB_SARADC() (unstable)), (@
-        peri_type #[doc = "CLINT peripheral singleton"] CLINT <= CLINT() (unstable)), (@
-        peri_type #[doc = "DMA peripheral singleton"] DMA <= DMA() (unstable)), (@
-        peri_type #[doc = "DS peripheral singleton"] DS <= DS() (unstable)), (@ peri_type
-        #[doc = "ECC peripheral singleton"] ECC <= ECC() (unstable)), (@ peri_type #[doc
-        = "ECDSA peripheral singleton"] ECDSA <= ECDSA() (unstable)), (@ peri_type #[doc
-        = "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)), (@ peri_type #[doc
-        = "ETM peripheral singleton"] ETM <= SOC_ETM() (unstable)), (@ peri_type #[doc =
-        "GPIO peripheral singleton"] GPIO <= GPIO() (unstable)), (@ peri_type #[doc =
-        "GPIO_SD peripheral singleton"] GPIO_SD <= GPIO_EXT() (unstable)), (@ peri_type
-        #[doc = "HMAC peripheral singleton"] HMAC <= HMAC() (unstable)), (@ peri_type
-        #[doc = "HP_APM peripheral singleton"] HP_APM <= HP_APM() (unstable)), (@
-        peri_type #[doc = "HP_SYS peripheral singleton"] HP_SYS <= HP_SYS() (unstable)),
-        (@ peri_type #[doc = "HUK peripheral singleton"] HUK <= HUK() (unstable)), (@
-        peri_type #[doc = "I2C_ANA_MST peripheral singleton"] I2C_ANA_MST <=
-        I2C_ANA_MST() (unstable)), (@ peri_type #[doc = "I2C0 peripheral singleton"] I2C0
-        <= I2C0(I2C_EXT0 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt })), (@ peri_type #[doc = "I2S0 peripheral singleton"]
-        I2S0 <= I2S0(I2S0 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
-        "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
+        = "ASSIST_DEBUG peripheral singleton"] ASSIST_DEBUG <= ASSIST_DEBUG()
+        (unstable)), (@ peri_type #[doc = "APB_SARADC peripheral singleton"] APB_SARADC
+        <= APB_SARADC() (unstable)), (@ peri_type #[doc = "CLINT peripheral singleton"]
+        CLINT <= CLINT() (unstable)), (@ peri_type #[doc = "DMA peripheral singleton"]
+        DMA <= DMA() (unstable)), (@ peri_type #[doc = "DS peripheral singleton"] DS <=
+        DS() (unstable)), (@ peri_type #[doc = "ECC peripheral singleton"] ECC <= ECC()
+        (unstable)), (@ peri_type #[doc = "ECDSA peripheral singleton"] ECDSA <= ECDSA()
+        (unstable)), (@ peri_type #[doc = "EFUSE peripheral singleton"] EFUSE <= EFUSE()
+        (unstable)), (@ peri_type #[doc = "ETM peripheral singleton"] ETM <= SOC_ETM()
+        (unstable)), (@ peri_type #[doc = "GPIO peripheral singleton"] GPIO <= GPIO()
+        (unstable)), (@ peri_type #[doc = "GPIO_SD peripheral singleton"] GPIO_SD <=
+        GPIO_EXT() (unstable)), (@ peri_type #[doc = "HMAC peripheral singleton"] HMAC <=
+        HMAC() (unstable)), (@ peri_type #[doc = "HP_APM peripheral singleton"] HP_APM <=
+        HP_APM() (unstable)), (@ peri_type #[doc = "HP_SYS peripheral singleton"] HP_SYS
+        <= HP_SYS() (unstable)), (@ peri_type #[doc = "HUK peripheral singleton"] HUK <=
+        HUK() (unstable)), (@ peri_type #[doc = "I2C_ANA_MST peripheral singleton"]
+        I2C_ANA_MST <= I2C_ANA_MST() (unstable)), (@ peri_type #[doc =
+        "I2C0 peripheral singleton"] I2C0 <= I2C0(I2C_EXT0 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt })), (@ peri_type #[doc =
+        "I2S0 peripheral singleton"] I2S0 <= I2S0(I2S0 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
+        = "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
         (unstable)), (@ peri_type #[doc = "INTPRI peripheral singleton"] INTPRI <=
         INTPRI() (unstable)), (@ peri_type #[doc = "IO_MUX peripheral singleton"] IO_MUX
         <= IO_MUX() (unstable)), (@ peri_type #[doc = "KEYMNG peripheral singleton"]
