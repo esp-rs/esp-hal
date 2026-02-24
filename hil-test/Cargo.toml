@@ -125,6 +125,7 @@ trouble-host = { version = "0.6.0", features = [
     "scan",
 ], optional = true }
 
+primeorder          = { version = "0.13.0", default-features = false }
 crypto-bigint       = { version = "0.5.5", default-features = false }
 digest              = { version = "0.10.7", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
