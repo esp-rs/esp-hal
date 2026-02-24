@@ -59,6 +59,7 @@
 
 use esp_backtrace as _;
 use esp_hal::{
+    clock::CpuClock,
     hmac::{Hmac, HmacPurpose, KeyId},
     main,
     rng::Rng,
@@ -77,7 +78,7 @@ type HmacSha256 = HmacSw<Sha256>;
 #[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-    let mut peripherals = esp_hal::init(esp_hal::Config::default());
+    let mut peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
 
     let rng = Rng::new();
     let mut sha_backend = ShaBackend::new(peripherals.SHA.reborrow());
