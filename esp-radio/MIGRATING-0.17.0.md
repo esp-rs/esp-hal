@@ -52,6 +52,7 @@ WiFi initialization:
 ```
 
 BLE initialization:
+
 ```diff
 -    static RADIO: StaticCell<esp_radio::Controller<'static>> = StaticCell::new();
 -    let radio = RADIO.init(esp_radio::init().unwrap());
@@ -97,7 +98,7 @@ BLE initialization:
 
 ## `ap_state` and `sta_state` are removed (together with the `WifiApState`/`WifiStaState`)
 
-Use `WifiController::is_started` and `WifiController::is_connected` instead.
+Use `WifiController::is_connected` instead.
 
 ```diff
 -      if esp_radio::wifi::station_state() == WifiStationState::Connected {
@@ -106,7 +107,7 @@ Use `WifiController::is_started` and `WifiController::is_connected` instead.
 
 ## Support for non-async `start`,`stop`,`scan`,`connect` and `disconnect` in `WifiController` has been removed
 
-WiFi is intended to be used in an async environment. 
+WiFi is intended to be used in an async environment.
 
 Therefore the following functions have been removed from `WifiController`:
 
@@ -189,14 +190,14 @@ e.g.
 Migration Steps
 
 1. Remove `.into()` calls: Remove .into() calls when passing SSIDs to configuration methods:
-    - Change .with_ssid("network".into()) to .with_ssid("network")
+   - Change .with_ssid("network".into()) to .with_ssid("network")
 
 2. Update SSID access: When retrieving SSIDs from structs or events, use .as_str() to get the string representation:
-    - Change ssid_value to ssid_value.as_str() when you need a string slice
+   - Change ssid_value to ssid_value.as_str() when you need a string slice
 
 ## Simplified WiFi Connection State Functions
 
-The `is_connected()` and `is_started()` functions in `WifiController` have been simplified to return a plain boolean instead of a `Result<bool, WifiError>`.
+The `is_connected()` function in `WifiController` has been simplified to return a plain boolean instead of a `Result<bool, WifiError>`.
 
 This change removes the need to handle potential errors when checking connection states, making the API simpler to use.
 
@@ -204,11 +205,6 @@ This change removes the need to handle potential errors when checking connection
 - if matches!(controller.is_connected(), Ok(true)) {
 + if controller.is_connected() {
       println!("Station is connected");
-  }
-
-- if matches!(controller.is_started(), Ok(true)) {
-+ if controller.is_started() {
-      println!("Wi-Fi is started");
   }
 ```
 
@@ -249,6 +245,7 @@ If you previously only set the WiFi mode and then started the controller, you mu
 The `transmit()` and `transmit_raw()` methods in the IEEE 802.15.4 driver now require a `cca` (Clear Channel Assessment) parameter. This parameter controls whether the driver should check if the channel is clear before transmitting.
 
 The CCA parameter is a boolean:
+
 - `true` - Perform Clear Channel Assessment before transmitting. The transmission is aborted if the channel is busy.
 - `false` - Transmit immediately without checking if the channel is clear.
 
@@ -331,4 +328,34 @@ The `protocols` field in `AccessPointConfig`, `StationConfig`, and `EapStationCo
 ```diff
 - `ControllerConfig::default().with_power_save(PowerSaveMode::default())`
 + `controller.set_power_save(PowerSaveMode::default())`
+```
+
+## The `WifiController` initialization has been changed
+
+```diff
+-   let (mut controller, interfaces) =
+-           esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
+-
+-           let station_config = Config::Station(
+-           StationConfig::default()
+-               .with_ssid(SSID)
+-               .with_password(PASSWORD.into()),
+-       );
+-       println!("Starting wifi");
+-       controller.set_config(&station_config).unwrap();
+-       println!("Wifi started!");
+
++   let station_config = Config::Station(
++           StationConfig::default()
++               .with_ssid(SSID)
++               .with_password(PASSWORD.into()),
++       );
++
++       println!("Starting wifi");
++       let (mut controller, interfaces) = esp_radio::wifi::new(
++           peripherals.WIFI,
++           ControllerConfig::default().with_operation_mode(station_config),
++       )
++       .unwrap();
++       println!("Wifi configured and started!");
 ```
