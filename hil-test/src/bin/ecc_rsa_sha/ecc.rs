@@ -21,19 +21,6 @@ mod tests {
     };
     use hex_literal::hex;
 
-    struct TestParams<'a> {
-        prime_fields: &'a [&'a [u8]],
-        loop_count: usize,
-    }
-
-    const TEST_PARAMS_VECTOR: TestParams = TestParams {
-        prime_fields: &[
-            &hex!("fffffffffffffffffffffffffffffffeffffffffffffffff"),
-            &hex!("ffffffff00000001000000000000000000000000ffffffffffffffffffffffff"),
-        ],
-        loop_count: 10,
-    };
-
     struct Context<'a> {
         ecc: Ecc<'a, Blocking>,
         #[cfg(rng_trng_supported)]
@@ -72,130 +59,135 @@ mod tests {
         }
     }
 
+    fn for_each_test_case(mut test: impl FnMut(&[u8])) {
+        let prime_fields: &[&[u8]] = &[
+            &hex!("fffffffffffffffffffffffffffffffeffffffffffffffff"),
+            &hex!("ffffffff00000001000000000000000000000000ffffffffffffffffffffffff"),
+        ];
+
+        for &prime_field in prime_fields {
+            for _ in 0..10 {
+                test(prime_field)
+            }
+        }
+    }
+
     #[test]
     fn test_ecc_affine_point_multiplication(mut ctx: Context<'static>) {
-        let rng = Rng::new();
-        for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
+        for_each_test_case(|prime_field| {
+            let rng = Rng::new();
             let t1 = &mut [0_u8; 96];
             let (k, x) = t1.split_at_mut(prime_field.len());
             let (x, y) = x.split_at_mut(prime_field.len());
             let (y, _) = y.split_at_mut(prime_field.len());
-            for _ in 0..TEST_PARAMS_VECTOR.loop_count {
-                loop {
-                    rng.read(k);
-                    let is_zero = k.iter().all(|&elt| elt == 0);
-                    let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
-                    if is_zero == false && is_modulus == false {
-                        break;
-                    }
+            loop {
+                rng.read(k);
+                let is_zero = k.iter().all(|&elt| elt == 0);
+                let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
+                if is_zero == false && is_modulus == false {
+                    break;
                 }
-                let curve = encode_affine_point(x, y);
-
-                ctx.ecc
-                    .affine_point_multiplication(curve, k, x, y)
-                    .expect("Inputs data doesn't match the key length selected.");
-
-                let t2 = &mut [0_u8; 64];
-
-                let (sw_x, sw_y) = t2.split_at_mut(prime_field.len());
-                let (sw_y, _) = sw_y.split_at_mut(prime_field.len());
-
-                match prime_field.len() {
-                    24 => {
-                        let sw_k = p192::Scalar::from(
-                            elliptic_curve::ScalarPrimitive::from_slice(k).unwrap(),
-                        );
-                        let q = p192::AffinePoint::GENERATOR
-                            .mul(sw_k)
-                            .to_affine()
-                            .to_encoded_point(false);
-                        sw_x.copy_from_slice(q.x().unwrap().as_slice());
-                        sw_y.copy_from_slice(q.y().unwrap().as_slice());
-                    }
-                    32 => {
-                        let sw_k = p256::Scalar::from(
-                            elliptic_curve::ScalarPrimitive::from_slice(k).unwrap(),
-                        );
-                        let q = p256::AffinePoint::GENERATOR
-                            .mul(sw_k)
-                            .to_affine()
-                            .to_encoded_point(false);
-                        sw_x.copy_from_slice(q.x().unwrap().as_slice());
-                        sw_y.copy_from_slice(q.y().unwrap().as_slice());
-                    }
-                    _ => unimplemented!(),
-                };
-
-                assert_eq!(x, sw_x);
-                assert_eq!(y, sw_y);
             }
-        }
+            let curve = encode_affine_point(x, y);
+
+            ctx.ecc
+                .affine_point_multiplication(curve, k, x, y)
+                .expect("Inputs data doesn't match the key length selected.");
+
+            let t2 = &mut [0_u8; 64];
+
+            let (sw_x, sw_y) = t2.split_at_mut(prime_field.len());
+            let (sw_y, _) = sw_y.split_at_mut(prime_field.len());
+
+            match prime_field.len() {
+                24 => {
+                    let sw_k =
+                        p192::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
+                    let q = p192::AffinePoint::GENERATOR
+                        .mul(sw_k)
+                        .to_affine()
+                        .to_encoded_point(false);
+                    sw_x.copy_from_slice(q.x().unwrap().as_slice());
+                    sw_y.copy_from_slice(q.y().unwrap().as_slice());
+                }
+                32 => {
+                    let sw_k =
+                        p256::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
+                    let q = p256::AffinePoint::GENERATOR
+                        .mul(sw_k)
+                        .to_affine()
+                        .to_encoded_point(false);
+                    sw_x.copy_from_slice(q.x().unwrap().as_slice());
+                    sw_y.copy_from_slice(q.y().unwrap().as_slice());
+                }
+                _ => unimplemented!(),
+            };
+
+            assert_eq!(x, sw_x);
+            assert_eq!(y, sw_y);
+        })
     }
 
     #[test]
     fn test_ecc_affine_point_verification(mut ctx: Context<'static>) {
-        let rng = Rng::new();
-        for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
+        for_each_test_case(|prime_field| {
+            let rng = Rng::new();
             let t1 = &mut [0_u8; 96];
             let (k, x) = t1.split_at_mut(prime_field.len());
             let (x, y) = x.split_at_mut(prime_field.len());
             let (y, _) = y.split_at_mut(prime_field.len());
-            for _ in 0..TEST_PARAMS_VECTOR.loop_count {
-                loop {
-                    rng.read(k);
-                    let is_zero = k.iter().all(|&elt| elt == 0);
-                    let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
-                    if is_zero == false && is_modulus == false {
-                        break;
-                    }
-                }
-
-                let curve = match prime_field.len() {
-                    24 => {
-                        let sw_k = p192::Scalar::from(
-                            elliptic_curve::ScalarPrimitive::from_slice(k).unwrap(),
-                        );
-                        let q = p192::AffinePoint::GENERATOR
-                            .mul(sw_k)
-                            .to_affine()
-                            .to_encoded_point(false);
-                        x.copy_from_slice(q.x().unwrap().as_slice());
-                        y.copy_from_slice(q.y().unwrap().as_slice());
-                        EllipticCurve::P192
-                    }
-                    32 => {
-                        let sw_k = p256::Scalar::from(
-                            elliptic_curve::ScalarPrimitive::from_slice(k).unwrap(),
-                        );
-                        let q = p256::AffinePoint::GENERATOR
-                            .mul(sw_k)
-                            .to_affine()
-                            .to_encoded_point(false);
-                        x.copy_from_slice(q.x().unwrap().as_slice());
-                        y.copy_from_slice(q.y().unwrap().as_slice());
-                        EllipticCurve::P256
-                    }
-                    _ => unimplemented!(),
-                };
-
-                match ctx.ecc.affine_point_verification(curve, x, y) {
-                    Err(Error::SizeMismatchCurve) => {
-                        panic!("Inputs data doesn't match the key length selected.")
-                    }
-                    Err(Error::PointNotOnSelectedCurve) => panic!(
-                        "ECC failed while affine point verification with x = {:02X?} and y = {:02X?}.",
-                        x, y,
-                    ),
-                    _ => {}
+            loop {
+                rng.read(k);
+                let is_zero = k.iter().all(|&elt| elt == 0);
+                let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
+                if is_zero == false && is_modulus == false {
+                    break;
                 }
             }
-        }
+
+            let curve = match prime_field.len() {
+                24 => {
+                    let sw_k =
+                        p192::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
+                    let q = p192::AffinePoint::GENERATOR
+                        .mul(sw_k)
+                        .to_affine()
+                        .to_encoded_point(false);
+                    x.copy_from_slice(q.x().unwrap().as_slice());
+                    y.copy_from_slice(q.y().unwrap().as_slice());
+                    EllipticCurve::P192
+                }
+                32 => {
+                    let sw_k =
+                        p256::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
+                    let q = p256::AffinePoint::GENERATOR
+                        .mul(sw_k)
+                        .to_affine()
+                        .to_encoded_point(false);
+                    x.copy_from_slice(q.x().unwrap().as_slice());
+                    y.copy_from_slice(q.y().unwrap().as_slice());
+                    EllipticCurve::P256
+                }
+                _ => unimplemented!(),
+            };
+
+            match ctx.ecc.affine_point_verification(curve, x, y) {
+                Err(Error::SizeMismatchCurve) => {
+                    panic!("Inputs data doesn't match the key length selected.")
+                }
+                Err(Error::PointNotOnSelectedCurve) => panic!(
+                    "ECC failed while affine point verification with x = {:02X?} and y = {:02X?}.",
+                    x, y,
+                ),
+                _ => {}
+            }
+        })
     }
 
     #[test]
     fn test_ecc_affine_point_verification_multiplication(mut ctx: Context<'static>) {
-        let rng = Rng::new();
-        for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
+        for_each_test_case(|prime_field| {
+            let rng = Rng::new();
             let t1 = &mut [0_u8; 96];
             let (k, px) = t1.split_at_mut(prime_field.len());
             let (px, py) = px.split_at_mut(prime_field.len());
@@ -208,401 +200,364 @@ mod tests {
                 }
             }
 
-            for _ in 0..TEST_PARAMS_VECTOR.loop_count {
-                loop {
-                    rng.read(k);
-                    let is_zero = k.iter().all(|&elt| elt == 0);
-                    let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
-                    if is_zero == false && is_modulus == false {
-                        break;
-                    }
+            loop {
+                rng.read(k);
+                let is_zero = k.iter().all(|&elt| elt == 0);
+                let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
+                if is_zero == false && is_modulus == false {
+                    break;
                 }
-                let curve = encode_affine_point(px, py);
-
-                #[cfg(not(ecc_working_modes = "11"))]
-                let result = ctx
-                    .ecc
-                    .affine_point_verification_multiplication(curve, k, px, py);
-                #[cfg(ecc_working_modes = "11")]
-                let result = ctx
-                    .ecc
-                    .affine_point_verification_multiplication(curve, k, px, py, qx, qy, qz);
-                match result {
-                    Err(Error::SizeMismatchCurve) => {
-                        panic!("Inputs data doesn't match the key length selected.")
-                    }
-                    Err(Error::PointNotOnSelectedCurve) => panic!(
-                        "ECC failed while affine point verification + multiplication with x = {:02X?} and y = {:02X?}.",
-                        px, py,
-                    ),
-                    _ => {}
-                }
-
-                let t2 = &mut [0_u8; 64];
-
-                let (sw_x, sw_y) = t2.split_at_mut(prime_field.len());
-                let (sw_y, _) = sw_y.split_at_mut(prime_field.len());
-
-                match prime_field.len() {
-                    24 => {
-                        let sw_k = p192::Scalar::from(
-                            elliptic_curve::ScalarPrimitive::from_slice(k).unwrap(),
-                        );
-                        let q = p192::AffinePoint::GENERATOR
-                            .mul(sw_k)
-                            .to_affine()
-                            .to_encoded_point(false);
-                        sw_x.copy_from_slice(q.x().unwrap().as_slice());
-                        sw_y.copy_from_slice(q.y().unwrap().as_slice());
-                    }
-                    32 => {
-                        let sw_k = p256::Scalar::from(
-                            elliptic_curve::ScalarPrimitive::from_slice(k).unwrap(),
-                        );
-                        let q = p256::AffinePoint::GENERATOR
-                            .mul(sw_k)
-                            .to_affine()
-                            .to_encoded_point(false);
-                        sw_x.copy_from_slice(q.x().unwrap().as_slice());
-                        sw_y.copy_from_slice(q.y().unwrap().as_slice());
-                    }
-                    _ => unimplemented!(),
-                };
-
-                assert_eq!(px, sw_x);
-                assert_eq!(py, sw_y);
             }
-        }
+            let curve = encode_affine_point(px, py);
+
+            #[cfg(not(ecc_working_modes = "11"))]
+            let result = ctx
+                .ecc
+                .affine_point_verification_multiplication(curve, k, px, py);
+            #[cfg(ecc_working_modes = "11")]
+            let result = ctx
+                .ecc
+                .affine_point_verification_multiplication(curve, k, px, py, qx, qy, qz);
+            match result {
+                Err(Error::SizeMismatchCurve) => {
+                    panic!("Inputs data doesn't match the key length selected.")
+                }
+                Err(Error::PointNotOnSelectedCurve) => panic!(
+                    "ECC failed while affine point verification + multiplication with x = {:02X?} and y = {:02X?}.",
+                    px, py,
+                ),
+                _ => {}
+            }
+
+            let t2 = &mut [0_u8; 64];
+
+            let (sw_x, sw_y) = t2.split_at_mut(prime_field.len());
+            let (sw_y, _) = sw_y.split_at_mut(prime_field.len());
+
+            match prime_field.len() {
+                24 => {
+                    let sw_k =
+                        p192::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
+                    let q = p192::AffinePoint::GENERATOR
+                        .mul(sw_k)
+                        .to_affine()
+                        .to_encoded_point(false);
+                    sw_x.copy_from_slice(q.x().unwrap().as_slice());
+                    sw_y.copy_from_slice(q.y().unwrap().as_slice());
+                }
+                32 => {
+                    let sw_k =
+                        p256::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
+                    let q = p256::AffinePoint::GENERATOR
+                        .mul(sw_k)
+                        .to_affine()
+                        .to_encoded_point(false);
+                    sw_x.copy_from_slice(q.x().unwrap().as_slice());
+                    sw_y.copy_from_slice(q.y().unwrap().as_slice());
+                }
+                _ => unimplemented!(),
+            };
+
+            assert_eq!(px, sw_x);
+            assert_eq!(py, sw_y);
+        })
     }
 
     #[test]
     fn test_ecc_jacobian_point_multiplication(mut ctx: Context<'static>) {
-        let rng = Rng::new();
-        for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
+        for_each_test_case(|prime_field| {
+            let rng = Rng::new();
             let t1 = &mut [0_u8; 96];
             let (k, x) = t1.split_at_mut(prime_field.len());
             let (x, y) = x.split_at_mut(prime_field.len());
             let (y, _) = y.split_at_mut(prime_field.len());
-            for _ in 0..TEST_PARAMS_VECTOR.loop_count {
-                let t2 = &mut [0_u8; 96];
 
-                let (sw_x, sw_y) = t2.split_at_mut(prime_field.len());
-                let (sw_y, sw_k) = sw_y.split_at_mut(prime_field.len());
-                let (sw_k, _) = sw_k.split_at_mut(prime_field.len());
+            let t2 = &mut [0_u8; 96];
 
-                loop {
-                    rng.read(k);
-                    let is_zero = k.iter().all(|&elt| elt == 0);
-                    let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
-                    if is_zero == false && is_modulus == false {
-                        break;
-                    }
+            let (sw_x, sw_y) = t2.split_at_mut(prime_field.len());
+            let (sw_y, sw_k) = sw_y.split_at_mut(prime_field.len());
+            let (sw_k, _) = sw_k.split_at_mut(prime_field.len());
+
+            loop {
+                rng.read(k);
+                let is_zero = k.iter().all(|&elt| elt == 0);
+                let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
+                if is_zero == false && is_modulus == false {
+                    break;
                 }
-                sw_k.copy_from_slice(k);
-                let curve = encode_affine_point(x, y);
-
-                ctx.ecc
-                    .jacobian_point_multiplication(curve, k, x, y)
-                    .expect("Inputs data doesn't match the key length selected.");
-                match prime_field.len() {
-                    24 => {
-                        let sw_k = p192::Scalar::from(
-                            elliptic_curve::ScalarPrimitive::from_slice(sw_k).unwrap(),
-                        );
-                        let q = p192::AffinePoint::GENERATOR
-                            .mul(sw_k)
-                            .to_affine()
-                            .to_encoded_point(false);
-                        let modulus = DynResidueParams::new(&U192::from_be_slice(prime_field));
-                        let x_affine = DynResidue::new(
-                            &U192::from_be_slice(q.x().unwrap().as_slice()),
-                            modulus,
-                        );
-                        let y_affine = DynResidue::new(
-                            &U192::from_be_slice(q.y().unwrap().as_slice()),
-                            modulus,
-                        );
-                        let z = DynResidue::new(&U192::from_be_slice(k), modulus);
-                        let x_jacobian = x_affine * z * z;
-                        let y_jacobian = y_affine * z * z * z;
-                        sw_x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_slice());
-                        sw_y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
-                    }
-                    32 => {
-                        let sw_k = p256::Scalar::from(
-                            elliptic_curve::ScalarPrimitive::from_slice(sw_k).unwrap(),
-                        );
-                        let q = p256::AffinePoint::GENERATOR
-                            .mul(sw_k)
-                            .to_affine()
-                            .to_encoded_point(false);
-                        let modulus = DynResidueParams::new(&U256::from_be_slice(prime_field));
-                        let x_affine = DynResidue::new(
-                            &U256::from_be_slice(q.x().unwrap().as_slice()),
-                            modulus,
-                        );
-                        let y_affine = DynResidue::new(
-                            &U256::from_be_slice(q.y().unwrap().as_slice()),
-                            modulus,
-                        );
-                        let z = DynResidue::new(&U256::from_be_slice(k), modulus);
-                        let x_jacobian = x_affine * z * z;
-                        let y_jacobian = y_affine * z * z * z;
-                        sw_x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_slice());
-                        sw_y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
-                    }
-                    _ => unimplemented!(),
-                };
-
-                assert_eq!(x, sw_x);
-                assert_eq!(y, sw_y);
             }
-        }
+            sw_k.copy_from_slice(k);
+            let curve = encode_affine_point(x, y);
+
+            ctx.ecc
+                .jacobian_point_multiplication(curve, k, x, y)
+                .expect("Inputs data doesn't match the key length selected.");
+            match prime_field.len() {
+                24 => {
+                    let sw_k = p192::Scalar::from(
+                        elliptic_curve::ScalarPrimitive::from_slice(sw_k).unwrap(),
+                    );
+                    let q = p192::AffinePoint::GENERATOR
+                        .mul(sw_k)
+                        .to_affine()
+                        .to_encoded_point(false);
+                    let modulus = DynResidueParams::new(&U192::from_be_slice(prime_field));
+                    let x_affine =
+                        DynResidue::new(&U192::from_be_slice(q.x().unwrap().as_slice()), modulus);
+                    let y_affine =
+                        DynResidue::new(&U192::from_be_slice(q.y().unwrap().as_slice()), modulus);
+                    let z = DynResidue::new(&U192::from_be_slice(k), modulus);
+                    let x_jacobian = x_affine * z * z;
+                    let y_jacobian = y_affine * z * z * z;
+                    sw_x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_slice());
+                    sw_y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
+                }
+                32 => {
+                    let sw_k = p256::Scalar::from(
+                        elliptic_curve::ScalarPrimitive::from_slice(sw_k).unwrap(),
+                    );
+                    let q = p256::AffinePoint::GENERATOR
+                        .mul(sw_k)
+                        .to_affine()
+                        .to_encoded_point(false);
+                    let modulus = DynResidueParams::new(&U256::from_be_slice(prime_field));
+                    let x_affine =
+                        DynResidue::new(&U256::from_be_slice(q.x().unwrap().as_slice()), modulus);
+                    let y_affine =
+                        DynResidue::new(&U256::from_be_slice(q.y().unwrap().as_slice()), modulus);
+                    let z = DynResidue::new(&U256::from_be_slice(k), modulus);
+                    let x_jacobian = x_affine * z * z;
+                    let y_jacobian = y_affine * z * z * z;
+                    sw_x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_slice());
+                    sw_y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
+                }
+                _ => unimplemented!(),
+            };
+
+            assert_eq!(x, sw_x);
+            assert_eq!(y, sw_y);
+        })
     }
 
     #[test]
     fn test_jacobian_point_verification(mut ctx: Context<'static>) {
-        let rng = Rng::new();
-        for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
+        for_each_test_case(|prime_field| {
+            let rng = Rng::new();
             let t1 = &mut [0_u8; 128];
             let (k, x) = t1.split_at_mut(prime_field.len());
             let (x, y) = x.split_at_mut(prime_field.len());
             let (y, z) = y.split_at_mut(prime_field.len());
             let (z, _) = z.split_at_mut(prime_field.len());
-            for _ in 0..TEST_PARAMS_VECTOR.loop_count {
-                loop {
-                    rng.read(k);
-                    rng.read(z);
-                    let is_zero = k.iter().all(|&elt| elt == 0) || z.iter().all(|&elt| elt == 0);
-                    let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b)
-                        || z.iter().zip(prime_field).all(|(&a, &b)| a == b);
-                    if is_zero == false && is_modulus == false {
-                        break;
-                    }
-                }
-
-                let curve = match prime_field.len() {
-                    24 => {
-                        let sw_k = p192::Scalar::from(
-                            elliptic_curve::ScalarPrimitive::from_slice(k).unwrap(),
-                        );
-                        let q = p192::AffinePoint::GENERATOR
-                            .mul(sw_k)
-                            .to_affine()
-                            .to_encoded_point(false);
-                        let modulus = DynResidueParams::new(&U192::from_be_slice(prime_field));
-                        let x_affine = DynResidue::new(
-                            &U192::from_be_slice(q.x().unwrap().as_slice()),
-                            modulus,
-                        );
-                        let y_affine = DynResidue::new(
-                            &U192::from_be_slice(q.y().unwrap().as_slice()),
-                            modulus,
-                        );
-                        let z = DynResidue::new(&U192::from_be_slice(z), modulus);
-                        let x_jacobian = x_affine * z * z;
-                        let y_jacobian = y_affine * z * z * z;
-                        x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_slice());
-                        y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
-                        EllipticCurve::P192
-                    }
-                    32 => {
-                        let sw_k = p256::Scalar::from(
-                            elliptic_curve::ScalarPrimitive::from_slice(k).unwrap(),
-                        );
-                        let q = p256::AffinePoint::GENERATOR
-                            .mul(sw_k)
-                            .to_affine()
-                            .to_encoded_point(false);
-                        let modulus = DynResidueParams::new(&U256::from_be_slice(prime_field));
-                        let x_affine = DynResidue::new(
-                            &U256::from_be_slice(q.x().unwrap().as_slice()),
-                            modulus,
-                        );
-                        let y_affine = DynResidue::new(
-                            &U256::from_be_slice(q.y().unwrap().as_slice()),
-                            modulus,
-                        );
-                        let z = DynResidue::new(&U256::from_be_slice(z), modulus);
-                        let x_jacobian = x_affine * z * z;
-                        let y_jacobian = y_affine * z * z * z;
-                        x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_slice());
-                        y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
-                        EllipticCurve::P256
-                    }
-                    _ => unimplemented!(),
-                };
-
-                match ctx.ecc.jacobian_point_verification(curve, x, y, z) {
-                    Err(Error::SizeMismatchCurve) => {
-                        panic!("Inputs data doesn't match the key length selected.")
-                    }
-                    Err(Error::PointNotOnSelectedCurve) => panic!(
-                        "ECC failed while base point verification with x = {:02X?} and y = {:02X?}.",
-                        x, y,
-                    ),
-                    _ => {}
+            loop {
+                rng.read(k);
+                rng.read(z);
+                let is_zero = k.iter().all(|&elt| elt == 0) || z.iter().all(|&elt| elt == 0);
+                let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b)
+                    || z.iter().zip(prime_field).all(|(&a, &b)| a == b);
+                if is_zero == false && is_modulus == false {
+                    break;
                 }
             }
-        }
+
+            let curve = match prime_field.len() {
+                24 => {
+                    let sw_k =
+                        p192::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
+                    let q = p192::AffinePoint::GENERATOR
+                        .mul(sw_k)
+                        .to_affine()
+                        .to_encoded_point(false);
+                    let modulus = DynResidueParams::new(&U192::from_be_slice(prime_field));
+                    let x_affine =
+                        DynResidue::new(&U192::from_be_slice(q.x().unwrap().as_slice()), modulus);
+                    let y_affine =
+                        DynResidue::new(&U192::from_be_slice(q.y().unwrap().as_slice()), modulus);
+                    let z = DynResidue::new(&U192::from_be_slice(z), modulus);
+                    let x_jacobian = x_affine * z * z;
+                    let y_jacobian = y_affine * z * z * z;
+                    x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_slice());
+                    y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
+                    EllipticCurve::P192
+                }
+                32 => {
+                    let sw_k =
+                        p256::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
+                    let q = p256::AffinePoint::GENERATOR
+                        .mul(sw_k)
+                        .to_affine()
+                        .to_encoded_point(false);
+                    let modulus = DynResidueParams::new(&U256::from_be_slice(prime_field));
+                    let x_affine =
+                        DynResidue::new(&U256::from_be_slice(q.x().unwrap().as_slice()), modulus);
+                    let y_affine =
+                        DynResidue::new(&U256::from_be_slice(q.y().unwrap().as_slice()), modulus);
+                    let z = DynResidue::new(&U256::from_be_slice(z), modulus);
+                    let x_jacobian = x_affine * z * z;
+                    let y_jacobian = y_affine * z * z * z;
+                    x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_slice());
+                    y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
+                    EllipticCurve::P256
+                }
+                _ => unimplemented!(),
+            };
+
+            match ctx.ecc.jacobian_point_verification(curve, x, y, z) {
+                Err(Error::SizeMismatchCurve) => {
+                    panic!("Inputs data doesn't match the key length selected.")
+                }
+                Err(Error::PointNotOnSelectedCurve) => panic!(
+                    "ECC failed while base point verification with x = {:02X?} and y = {:02X?}.",
+                    x, y,
+                ),
+                _ => {}
+            }
+        })
     }
 
     #[test]
     fn test_ecc_affine_point_verification_jacobian_multiplication(mut ctx: Context<'static>) {
-        let rng = Rng::new();
-        for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
+        for_each_test_case(|prime_field| {
+            let rng = Rng::new();
+
             let t1 = &mut [0_u8; 96];
             let (k, x) = t1.split_at_mut(prime_field.len());
             let (x, y) = x.split_at_mut(prime_field.len());
             let (y, _) = y.split_at_mut(prime_field.len());
-            for _ in 0..TEST_PARAMS_VECTOR.loop_count {
-                let t2 = &mut [0_u8; 96];
 
-                let (sw_x, sw_y) = t2.split_at_mut(prime_field.len());
-                let (sw_y, sw_k) = sw_y.split_at_mut(prime_field.len());
-                let (sw_k, _) = sw_k.split_at_mut(prime_field.len());
+            let t2 = &mut [0_u8; 96];
 
-                loop {
-                    rng.read(k);
-                    let is_zero = k.iter().all(|&elt| elt == 0);
-                    let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
-                    if is_zero == false && is_modulus == false {
-                        break;
-                    }
+            let (sw_x, sw_y) = t2.split_at_mut(prime_field.len());
+            let (sw_y, sw_k) = sw_y.split_at_mut(prime_field.len());
+            let (sw_k, _) = sw_k.split_at_mut(prime_field.len());
+
+            loop {
+                rng.read(k);
+                let is_zero = k.iter().all(|&elt| elt == 0);
+                let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b);
+                if is_zero == false && is_modulus == false {
+                    break;
                 }
-                sw_k.copy_from_slice(k);
-                let curve = encode_affine_point(x, y);
-
-                match ctx
-                    .ecc
-                    .affine_point_verification_jacobian_multiplication(curve, k, x, y)
-                {
-                    Err(Error::SizeMismatchCurve) => {
-                        panic!("Inputs data doesn't match the key length selected.")
-                    }
-                    Err(Error::PointNotOnSelectedCurve) => panic!(
-                        "ECC failed while affine point verification + multiplication with x = {:02X?} and y = {:02X?}.",
-                        x, y,
-                    ),
-                    _ => {}
-                }
-
-                match prime_field.len() {
-                    24 => {
-                        let sw_k = p192::Scalar::from(
-                            elliptic_curve::ScalarPrimitive::from_slice(sw_k).unwrap(),
-                        );
-                        let q = p192::AffinePoint::GENERATOR
-                            .mul(sw_k)
-                            .to_affine()
-                            .to_encoded_point(false);
-                        let modulus = DynResidueParams::new(&U192::from_be_slice(prime_field));
-                        let x_affine = DynResidue::new(
-                            &U192::from_be_slice(q.x().unwrap().as_slice()),
-                            modulus,
-                        );
-                        let y_affine = DynResidue::new(
-                            &U192::from_be_slice(q.y().unwrap().as_slice()),
-                            modulus,
-                        );
-                        let z = DynResidue::new(&U192::from_be_slice(k), modulus);
-                        let x_jacobian = x_affine * z * z;
-                        let y_jacobian = y_affine * z * z * z;
-                        sw_x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_slice());
-                        sw_y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
-                    }
-                    32 => {
-                        let sw_k = p256::Scalar::from(
-                            elliptic_curve::ScalarPrimitive::from_slice(sw_k).unwrap(),
-                        );
-                        let q = p256::AffinePoint::GENERATOR
-                            .mul(sw_k)
-                            .to_affine()
-                            .to_encoded_point(false);
-                        let modulus = DynResidueParams::new(&U256::from_be_slice(prime_field));
-                        let x_affine = DynResidue::new(
-                            &U256::from_be_slice(q.x().unwrap().as_slice()),
-                            modulus,
-                        );
-                        let y_affine = DynResidue::new(
-                            &U256::from_be_slice(q.y().unwrap().as_slice()),
-                            modulus,
-                        );
-                        let z = DynResidue::new(&U256::from_be_slice(k), modulus);
-                        let x_jacobian = x_affine * z * z;
-                        let y_jacobian = y_affine * z * z * z;
-                        sw_x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_slice());
-                        sw_y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
-                    }
-                    _ => unimplemented!(),
-                };
-
-                assert_eq!(x, sw_x);
-                assert_eq!(y, sw_y);
             }
-        }
+            sw_k.copy_from_slice(k);
+            let curve = encode_affine_point(x, y);
+
+            match ctx
+                .ecc
+                .affine_point_verification_jacobian_multiplication(curve, k, x, y)
+            {
+                Err(Error::SizeMismatchCurve) => {
+                    panic!("Inputs data doesn't match the key length selected.")
+                }
+                Err(Error::PointNotOnSelectedCurve) => panic!(
+                    "ECC failed while affine point verification + multiplication with x = {:02X?} and y = {:02X?}.",
+                    x, y,
+                ),
+                _ => {}
+            }
+
+            match prime_field.len() {
+                24 => {
+                    let sw_k = p192::Scalar::from(
+                        elliptic_curve::ScalarPrimitive::from_slice(sw_k).unwrap(),
+                    );
+                    let q = p192::AffinePoint::GENERATOR
+                        .mul(sw_k)
+                        .to_affine()
+                        .to_encoded_point(false);
+                    let modulus = DynResidueParams::new(&U192::from_be_slice(prime_field));
+                    let x_affine =
+                        DynResidue::new(&U192::from_be_slice(q.x().unwrap().as_slice()), modulus);
+                    let y_affine =
+                        DynResidue::new(&U192::from_be_slice(q.y().unwrap().as_slice()), modulus);
+                    let z = DynResidue::new(&U192::from_be_slice(k), modulus);
+                    let x_jacobian = x_affine * z * z;
+                    let y_jacobian = y_affine * z * z * z;
+                    sw_x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_slice());
+                    sw_y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
+                }
+                32 => {
+                    let sw_k = p256::Scalar::from(
+                        elliptic_curve::ScalarPrimitive::from_slice(sw_k).unwrap(),
+                    );
+                    let q = p256::AffinePoint::GENERATOR
+                        .mul(sw_k)
+                        .to_affine()
+                        .to_encoded_point(false);
+                    let modulus = DynResidueParams::new(&U256::from_be_slice(prime_field));
+                    let x_affine =
+                        DynResidue::new(&U256::from_be_slice(q.x().unwrap().as_slice()), modulus);
+                    let y_affine =
+                        DynResidue::new(&U256::from_be_slice(q.y().unwrap().as_slice()), modulus);
+                    let z = DynResidue::new(&U256::from_be_slice(k), modulus);
+                    let x_jacobian = x_affine * z * z;
+                    let y_jacobian = y_affine * z * z * z;
+                    sw_x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_slice());
+                    sw_y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
+                }
+                _ => unimplemented!(),
+            };
+
+            assert_eq!(x, sw_x);
+            assert_eq!(y, sw_y);
+        })
     }
 
     #[test]
     #[cfg(ecc_working_modes = "7")]
     fn test_ecc_finite_field_division(mut ctx: Context<'static>) {
-        let rng = Rng::new();
-        for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
+        for_each_test_case(|prime_field| {
+            let rng = Rng::new();
+
             let t1 = &mut [0_u8; 64];
             let (k, y) = t1.split_at_mut(prime_field.len());
             let (y, _) = y.split_at_mut(prime_field.len());
-            for _ in 0..TEST_PARAMS_VECTOR.loop_count {
-                loop {
-                    rng.read(k);
-                    rng.read(y);
-                    let is_zero = k.iter().all(|&elt| elt == 0) || y.iter().all(|&elt| elt == 0);
-                    let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b)
-                        || y.iter().zip(prime_field).all(|(&a, &b)| a == b);
-                    if is_zero == false && is_modulus == false {
-                        break;
-                    }
+
+            loop {
+                rng.read(k);
+                rng.read(y);
+                let is_zero = k.iter().all(|&elt| elt == 0) || y.iter().all(|&elt| elt == 0);
+                let is_modulus = k.iter().zip(prime_field).all(|(&a, &b)| a == b)
+                    || y.iter().zip(prime_field).all(|(&a, &b)| a == b);
+                if is_zero == false && is_modulus == false {
+                    break;
                 }
-                let t2 = &mut [0_u8; 96];
-                let (sw_y, sw_k) = t2.split_at_mut(prime_field.len());
-                let (sw_k, sw_res) = sw_k.split_at_mut(prime_field.len());
-                let (sw_res, _) = sw_res.split_at_mut(prime_field.len());
-                sw_y.copy_from_slice(y);
-                sw_k.copy_from_slice(k);
-                let curve = match prime_field.len() {
-                    24 => EllipticCurve::P192,
-                    32 => EllipticCurve::P256,
-                    _ => unimplemented!(),
-                };
-
-                ctx.ecc
-                    .finite_field_division(curve, k, y)
-                    .expect("Inputs data doesn't match the key length selected.");
-
-                match prime_field.len() {
-                    24 => {
-                        let modulus = DynResidueParams::new(&U192::from_be_slice(prime_field));
-                        let sw_y = DynResidue::new(&U192::from_be_slice(sw_y), modulus);
-                        let sw_k = DynResidue::new(&U192::from_be_slice(sw_k), modulus);
-                        let sw_inv_k = sw_k.invert().0;
-                        sw_res.copy_from_slice(
-                            sw_y.mul(&sw_inv_k).retrieve().to_be_bytes().as_slice(),
-                        );
-                    }
-                    32 => {
-                        let modulus = DynResidueParams::new(&U256::from_be_slice(prime_field));
-                        let sw_y = DynResidue::new(&U256::from_be_slice(sw_y), modulus);
-                        let sw_k = DynResidue::new(&U256::from_be_slice(sw_k), modulus);
-                        let sw_inv_k = sw_k.invert().0;
-                        sw_res.copy_from_slice(
-                            sw_y.mul(&sw_inv_k).retrieve().to_be_bytes().as_slice(),
-                        );
-                    }
-                    _ => unimplemented!(),
-                };
-
-                assert_eq!(y, sw_res);
             }
-        }
+            let t2 = &mut [0_u8; 96];
+            let (sw_y, sw_k) = t2.split_at_mut(prime_field.len());
+            let (sw_k, sw_res) = sw_k.split_at_mut(prime_field.len());
+            let (sw_res, _) = sw_res.split_at_mut(prime_field.len());
+            sw_y.copy_from_slice(y);
+            sw_k.copy_from_slice(k);
+            let curve = match prime_field.len() {
+                24 => EllipticCurve::P192,
+                32 => EllipticCurve::P256,
+                _ => unimplemented!(),
+            };
+
+            ctx.ecc
+                .finite_field_division(curve, k, y)
+                .expect("Inputs data doesn't match the key length selected.");
+
+            match prime_field.len() {
+                24 => {
+                    let modulus = DynResidueParams::new(&U192::from_be_slice(prime_field));
+                    let sw_y = DynResidue::new(&U192::from_be_slice(sw_y), modulus);
+                    let sw_k = DynResidue::new(&U192::from_be_slice(sw_k), modulus);
+                    let sw_inv_k = sw_k.invert().0;
+                    sw_res.copy_from_slice(sw_y.mul(&sw_inv_k).retrieve().to_be_bytes().as_slice());
+                }
+                32 => {
+                    let modulus = DynResidueParams::new(&U256::from_be_slice(prime_field));
+                    let sw_y = DynResidue::new(&U256::from_be_slice(sw_y), modulus);
+                    let sw_k = DynResidue::new(&U256::from_be_slice(sw_k), modulus);
+                    let sw_inv_k = sw_k.invert().0;
+                    sw_res.copy_from_slice(sw_y.mul(&sw_inv_k).retrieve().to_be_bytes().as_slice());
+                }
+                _ => unimplemented!(),
+            };
+
+            assert_eq!(y, sw_res);
+        })
     }
 
     #[test]
