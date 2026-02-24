@@ -103,13 +103,6 @@ impl EllipticCurve {
 
         Ok(())
     }
-
-    fn into_pac(&self) -> KEY_LENGTH {
-        match self {
-            EllipticCurve::P192 => KEY_LENGTH::P192,
-            EllipticCurve::P256 => KEY_LENGTH::P256,
-        }
-    }
 }
 
 #[derive(Clone, Copy)]
@@ -634,7 +627,10 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     fn start_operation(&self, mode: WorkMode, curve: EllipticCurve) {
         self.regs().mult_conf().write(|w| unsafe {
             w.work_mode().bits(mode as u8);
-            w.key_length().variant(curve.into_pac());
+            w.key_length().variant(match curve {
+                EllipticCurve::P192 => KEY_LENGTH::P192,
+                EllipticCurve::P256 => KEY_LENGTH::P256,
+            });
             w.start().set_bit()
         });
     }
