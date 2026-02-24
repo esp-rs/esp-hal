@@ -258,20 +258,14 @@ mod tests {
             ctx.ecc
                 .jacobian_point_multiplication(curve, k, x, y)
                 .expect("Inputs data doesn't match the key length selected.");
+
+            affine_point_multiplication(curve, sw_k, sw_x, sw_y);
+
             match curve {
                 EllipticCurve::P192 => {
-                    let sw_k = p192::Scalar::from(
-                        elliptic_curve::ScalarPrimitive::from_slice(sw_k).unwrap(),
-                    );
-                    let q = p192::AffinePoint::GENERATOR
-                        .mul(sw_k)
-                        .to_affine()
-                        .to_encoded_point(false);
                     let modulus = DynResidueParams::new(&U192::from_be_slice(prime_field));
-                    let x_affine =
-                        DynResidue::new(&U192::from_be_slice(q.x().unwrap().as_slice()), modulus);
-                    let y_affine =
-                        DynResidue::new(&U192::from_be_slice(q.y().unwrap().as_slice()), modulus);
+                    let x_affine = DynResidue::new(&U192::from_be_slice(sw_x), modulus);
+                    let y_affine = DynResidue::new(&U192::from_be_slice(sw_y), modulus);
                     let z = DynResidue::new(&U192::from_be_slice(k), modulus);
                     let x_jacobian = x_affine * z * z;
                     let y_jacobian = y_affine * z * z * z;
@@ -279,18 +273,9 @@ mod tests {
                     sw_y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
                 }
                 EllipticCurve::P256 => {
-                    let sw_k = p256::Scalar::from(
-                        elliptic_curve::ScalarPrimitive::from_slice(sw_k).unwrap(),
-                    );
-                    let q = p256::AffinePoint::GENERATOR
-                        .mul(sw_k)
-                        .to_affine()
-                        .to_encoded_point(false);
                     let modulus = DynResidueParams::new(&U256::from_be_slice(prime_field));
-                    let x_affine =
-                        DynResidue::new(&U256::from_be_slice(q.x().unwrap().as_slice()), modulus);
-                    let y_affine =
-                        DynResidue::new(&U256::from_be_slice(q.y().unwrap().as_slice()), modulus);
+                    let x_affine = DynResidue::new(&U256::from_be_slice(sw_x), modulus);
+                    let y_affine = DynResidue::new(&U256::from_be_slice(sw_y), modulus);
                     let z = DynResidue::new(&U256::from_be_slice(k), modulus);
                     let x_jacobian = x_affine * z * z;
                     let y_jacobian = y_affine * z * z * z;
@@ -315,19 +300,12 @@ mod tests {
             fill_random(prime_field, k);
             fill_random(prime_field, z);
 
+            affine_point_multiplication(curve, k, x, y);
             match curve {
                 EllipticCurve::P192 => {
-                    let sw_k =
-                        p192::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
-                    let q = p192::AffinePoint::GENERATOR
-                        .mul(sw_k)
-                        .to_affine()
-                        .to_encoded_point(false);
                     let modulus = DynResidueParams::new(&U192::from_be_slice(prime_field));
-                    let x_affine =
-                        DynResidue::new(&U192::from_be_slice(q.x().unwrap().as_slice()), modulus);
-                    let y_affine =
-                        DynResidue::new(&U192::from_be_slice(q.y().unwrap().as_slice()), modulus);
+                    let x_affine = DynResidue::new(&U192::from_be_slice(x), modulus);
+                    let y_affine = DynResidue::new(&U192::from_be_slice(y), modulus);
                     let z = DynResidue::new(&U192::from_be_slice(z), modulus);
                     let x_jacobian = x_affine * z * z;
                     let y_jacobian = y_affine * z * z * z;
@@ -335,24 +313,16 @@ mod tests {
                     y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
                 }
                 EllipticCurve::P256 => {
-                    let sw_k =
-                        p256::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
-                    let q = p256::AffinePoint::GENERATOR
-                        .mul(sw_k)
-                        .to_affine()
-                        .to_encoded_point(false);
                     let modulus = DynResidueParams::new(&U256::from_be_slice(prime_field));
-                    let x_affine =
-                        DynResidue::new(&U256::from_be_slice(q.x().unwrap().as_slice()), modulus);
-                    let y_affine =
-                        DynResidue::new(&U256::from_be_slice(q.y().unwrap().as_slice()), modulus);
+                    let x_affine = DynResidue::new(&U256::from_be_slice(x), modulus);
+                    let y_affine = DynResidue::new(&U256::from_be_slice(y), modulus);
                     let z = DynResidue::new(&U256::from_be_slice(z), modulus);
                     let x_jacobian = x_affine * z * z;
                     let y_jacobian = y_affine * z * z * z;
                     x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_slice());
                     y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
                 }
-            };
+            }
 
             match ctx.ecc.jacobian_point_verification(curve, x, y, z) {
                 Err(Error::SizeMismatchCurve) => {
@@ -399,20 +369,12 @@ mod tests {
                 _ => {}
             }
 
+            affine_point_multiplication(curve, sw_k, sw_x, sw_y);
             match curve {
                 EllipticCurve::P192 => {
-                    let sw_k = p192::Scalar::from(
-                        elliptic_curve::ScalarPrimitive::from_slice(sw_k).unwrap(),
-                    );
-                    let q = p192::AffinePoint::GENERATOR
-                        .mul(sw_k)
-                        .to_affine()
-                        .to_encoded_point(false);
                     let modulus = DynResidueParams::new(&U192::from_be_slice(prime_field));
-                    let x_affine =
-                        DynResidue::new(&U192::from_be_slice(q.x().unwrap().as_slice()), modulus);
-                    let y_affine =
-                        DynResidue::new(&U192::from_be_slice(q.y().unwrap().as_slice()), modulus);
+                    let x_affine = DynResidue::new(&U192::from_be_slice(sw_x), modulus);
+                    let y_affine = DynResidue::new(&U192::from_be_slice(sw_y), modulus);
                     let z = DynResidue::new(&U192::from_be_slice(k), modulus);
                     let x_jacobian = x_affine * z * z;
                     let y_jacobian = y_affine * z * z * z;
@@ -420,25 +382,16 @@ mod tests {
                     sw_y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
                 }
                 EllipticCurve::P256 => {
-                    let sw_k = p256::Scalar::from(
-                        elliptic_curve::ScalarPrimitive::from_slice(sw_k).unwrap(),
-                    );
-                    let q = p256::AffinePoint::GENERATOR
-                        .mul(sw_k)
-                        .to_affine()
-                        .to_encoded_point(false);
                     let modulus = DynResidueParams::new(&U256::from_be_slice(prime_field));
-                    let x_affine =
-                        DynResidue::new(&U256::from_be_slice(q.x().unwrap().as_slice()), modulus);
-                    let y_affine =
-                        DynResidue::new(&U256::from_be_slice(q.y().unwrap().as_slice()), modulus);
+                    let x_affine = DynResidue::new(&U256::from_be_slice(sw_x), modulus);
+                    let y_affine = DynResidue::new(&U256::from_be_slice(sw_y), modulus);
                     let z = DynResidue::new(&U256::from_be_slice(k), modulus);
                     let x_jacobian = x_affine * z * z;
                     let y_jacobian = y_affine * z * z * z;
                     sw_x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_slice());
                     sw_y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_slice());
                 }
-            };
+            }
 
             assert_eq!(x, sw_x);
             assert_eq!(y, sw_y);
