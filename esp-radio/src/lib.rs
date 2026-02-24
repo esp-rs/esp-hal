@@ -178,7 +178,7 @@ pub use esp_phy::CalibrationResult;
 #[cfg(not(feature = "unstable"))]
 use esp_phy::CalibrationResult;
 use esp_radio_rtos_driver as preempt;
-#[cfg(esp32)]
+#[cfg(all(esp32, feature = "unstable"))]
 use hal::analog::adc::{release_adc2, try_claim_adc2};
 #[cfg(feature = "wifi")]
 use hal::{after_snippet, before_snippet};
@@ -298,7 +298,7 @@ const _: () = {
 /// - The function may return an error if interrupts are disabled.
 /// - The function may return an error if initializing the underlying driver fails.
 pub(crate) fn init() {
-    #[cfg(esp32)]
+    #[cfg(all(esp32, feature = "unstable"))]
     if try_claim_adc2(unsafe { hal::Internal::conjure() }).is_err() {
         panic!(
             "ADC2 is currently in use by esp-hal, but esp-radio requires it for Wi-Fi operation."
@@ -347,7 +347,7 @@ pub(crate) fn deinit() {
     #[cfg(feature = "ble")]
     ble::shutdown_ble_isr();
 
-    #[cfg(esp32)]
+    #[cfg(all(esp32, feature = "unstable"))]
     // Allow using `ADC2` again
     release_adc2(unsafe { esp_hal::Internal::conjure() });
 
