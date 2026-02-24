@@ -52,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WifiController::scan_with_config_async` has been changed to `WifiController::scan_async` (#4946)
 - Various structs now use the `Ssid` type to represent SSIDs instead of `String` (#4953)
 - Update to `bt-hci` version 0.8 and `trouble-host` version 0.6 (#4962)
-- `WifiController::is_connected()` and `WifiController::is_started()` now return a simple `bool` instead of `Result<bool, WifiError>` and are marked as unstable (#4971)
+- `WifiController::is_connected()` now returns a simple `bool` instead of `Result<bool, WifiError>` and is marked as unstable (#4971)
 - `ScanMethod` has been moved to `wifi::sta` (#5033)
 - `set_protocols` / `set_bandwidths` changed to support 5G-band (#5023)
 - `CountryInfo` is now unstable (#4981)
@@ -63,7 +63,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Avoid panicking in WiFi scan if an access point with using an unmapped auth-method is found (#4458)
 - Fixed a linker error (about missing symbols) when the `wifi` feature is selected but the code doesn't use it (#4513)
-- `Controller::stop_async()` now returns `WifiError::NotStarted` when the `Controller` has not been started (#4504)
 - ESP32-C2: Disable BLE controller before deinitializing the stack (#4606)
 - Fix a crash after shutting down WiFi (#4761)
 - Fix a crash when trying to handle an unknown WiFi event (#4942)
@@ -88,9 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WifiController` methods `start_async` and `stop_async` have been removed. `set_config` will now make sure that the controller is started / re-started as needed. Dropping the controller will stop it first. (#4984)
 - `power_save` has been dropped from `ControllerConfig` (#4981)
 - MAC address getters: `access_point_mac()`, `station_mac()` and `ble::mac()`. (#5002)
-- `WifiError::{Interface, Nvs, InvalidMac, WakeFailed, WouldBlock, PostFail, UnknownWifiMode, NotInitialized, NotStopped, Mode, State, ControlBlock, Timeout, InvalidInitState, StopState, NotAssociated, TxDisallowed, Internal(i32), WrongClockConfig, SchedulerNotInitialized, AdcIsUsed}` have been removed (#5018)
-- `WifiError::{Interface, Nvs, InvalidMac, WakeFailed, WouldBlock, PostFail, UnknownWifiMode, NotInitialized, NotStopped, Mode, State, ControlBlock, Timeout, InvalidInitState, StopState, NotAssociated, TxDisallowed, Internal(i32), WrongClockConfig, SchedulerNotInitialized, AdcIsUsed, NotStarted}` have been removed (#5018, #5039)
 - `WifiController::is_started()` has been removed (#5039)
+- `WifiError::{Interface, Nvs, InvalidMac, WakeFailed, WouldBlock, PostFail, UnknownWifiMode, NotInitialized, NotStopped, Mode, State, ControlBlock, Timeout, InvalidInitState, StopState, NotAssociated, TxDisallowed, Internal(i32), WrongClockConfig, SchedulerNotInitialized, AdcIsUsed, NotStarted}` have been removed (#5018, #5039)
 
 ## [v0.17.0] - 2025-10-30
 
