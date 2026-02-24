@@ -60,6 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp_hal::interrupt::bind_interrupt` and `enable` have been merged into `bind_handler` which is now safe and infallible (#4996)
 - `esp_hal::peripherals::Peripherals.WIFI` and `esp_hal::peripherals::WIFI` are now stable (#5026)
 - RISC-V: `esp_hal::interrupt::enable_direct` now takes a `DirectBindableCpuInterrupt` and is infallible (#5037)
+- The `ecc` driver now takes the curve by value (#5055)
+- `EllipticCurve` now implements common traits (#5055)
 
 ### Fixed
 
