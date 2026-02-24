@@ -17,7 +17,7 @@
 //! * Low-Power Management
 //! * Handling Watchdog Timers
 #![cfg_attr(
-    not(lp_timer_driver_supported),
+    lp_timer_driver_supported,
     doc = r#"
 ## Examples
 
