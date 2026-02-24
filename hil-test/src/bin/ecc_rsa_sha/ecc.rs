@@ -23,9 +23,7 @@ mod tests {
 
     struct TestParams<'a> {
         prime_fields: &'a [&'a [u8]],
-        nb_loop_mul: usize,
-        #[cfg(esp32c2)]
-        nb_loop_inv: usize,
+        loop_count: usize,
     }
 
     const TEST_PARAMS_VECTOR: TestParams = TestParams {
@@ -33,9 +31,7 @@ mod tests {
             &hex!("fffffffffffffffffffffffffffffffeffffffffffffffff"),
             &hex!("ffffffff00000001000000000000000000000000ffffffffffffffffffffffff"),
         ],
-        nb_loop_mul: 10,
-        #[cfg(esp32c2)]
-        nb_loop_inv: 20,
+        loop_count: 10,
     };
 
     struct Context<'a> {
@@ -84,7 +80,7 @@ mod tests {
             let (k, x) = t1.split_at_mut(prime_field.len());
             let (x, y) = x.split_at_mut(prime_field.len());
             let (y, _) = y.split_at_mut(prime_field.len());
-            for _ in 0..TEST_PARAMS_VECTOR.nb_loop_mul {
+            for _ in 0..TEST_PARAMS_VECTOR.loop_count {
                 loop {
                     rng.read(k);
                     let is_zero = k.iter().all(|&elt| elt == 0);
@@ -144,7 +140,7 @@ mod tests {
             let (k, x) = t1.split_at_mut(prime_field.len());
             let (x, y) = x.split_at_mut(prime_field.len());
             let (y, _) = y.split_at_mut(prime_field.len());
-            for _ in 0..TEST_PARAMS_VECTOR.nb_loop_mul {
+            for _ in 0..TEST_PARAMS_VECTOR.loop_count {
                 loop {
                     rng.read(k);
                     let is_zero = k.iter().all(|&elt| elt == 0);
@@ -212,7 +208,7 @@ mod tests {
                 }
             }
 
-            for _ in 0..TEST_PARAMS_VECTOR.nb_loop_mul {
+            for _ in 0..TEST_PARAMS_VECTOR.loop_count {
                 loop {
                     rng.read(k);
                     let is_zero = k.iter().all(|&elt| elt == 0);
@@ -287,7 +283,7 @@ mod tests {
             let (k, x) = t1.split_at_mut(prime_field.len());
             let (x, y) = x.split_at_mut(prime_field.len());
             let (y, _) = y.split_at_mut(prime_field.len());
-            for _ in 0..TEST_PARAMS_VECTOR.nb_loop_mul {
+            for _ in 0..TEST_PARAMS_VECTOR.loop_count {
                 let t2 = &mut [0_u8; 96];
 
                 let (sw_x, sw_y) = t2.split_at_mut(prime_field.len());
@@ -373,7 +369,7 @@ mod tests {
             let (x, y) = x.split_at_mut(prime_field.len());
             let (y, z) = y.split_at_mut(prime_field.len());
             let (z, _) = z.split_at_mut(prime_field.len());
-            for _ in 0..TEST_PARAMS_VECTOR.nb_loop_mul {
+            for _ in 0..TEST_PARAMS_VECTOR.loop_count {
                 loop {
                     rng.read(k);
                     rng.read(z);
@@ -459,7 +455,7 @@ mod tests {
             let (k, x) = t1.split_at_mut(prime_field.len());
             let (x, y) = x.split_at_mut(prime_field.len());
             let (y, _) = y.split_at_mut(prime_field.len());
-            for _ in 0..TEST_PARAMS_VECTOR.nb_loop_mul {
+            for _ in 0..TEST_PARAMS_VECTOR.loop_count {
                 let t2 = &mut [0_u8; 96];
 
                 let (sw_x, sw_y) = t2.split_at_mut(prime_field.len());
@@ -555,7 +551,7 @@ mod tests {
             let t1 = &mut [0_u8; 64];
             let (k, y) = t1.split_at_mut(prime_field.len());
             let (y, _) = y.split_at_mut(prime_field.len());
-            for _ in 0..TEST_PARAMS_VECTOR.nb_loop_inv {
+            for _ in 0..TEST_PARAMS_VECTOR.loop_count {
                 loop {
                     rng.read(k);
                     rng.read(y);
