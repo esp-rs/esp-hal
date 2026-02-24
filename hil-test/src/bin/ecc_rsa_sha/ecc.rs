@@ -9,7 +9,8 @@ mod tests {
         modular::runtime_mod::{DynResidue, DynResidueParams},
     };
     use elliptic_curve::{
-        AffinePoint,
+        Curve,
+        ScalarPrimitive,
         sec1::{ModulusSize, ToEncodedPoint},
     };
     #[cfg(ecc_working_modes = "11")]
@@ -23,7 +24,9 @@ mod tests {
         rng::Rng,
     };
     use hex_literal::hex;
-    use primeorder::PrimeCurveParams;
+    use p192::NistP192;
+    use p256::NistP256;
+    use primeorder::{AffinePoint, PrimeCurveParams, ProjectivePoint};
 
     struct Context<'a> {
         ecc: Ecc<'a, Blocking>,
@@ -41,19 +44,6 @@ mod tests {
             #[cfg(rng_trng_supported)]
             _rng_source: TrngSource::new(p.RNG, p.ADC1),
         }
-    }
-
-    fn encode_affine_point<C>(p: primeorder::AffinePoint<C>, x: &mut [u8], y: &mut [u8])
-    where
-        C: PrimeCurveParams,
-        <C as elliptic_curve::Curve>::FieldBytesSize: ModulusSize,
-        AffinePoint<C>: ToEncodedPoint<C>,
-    {
-        assert_eq!(x.len(), y.len());
-
-        let p = p.to_encoded_point(false);
-        x.copy_from_slice(p.x().unwrap());
-        y.copy_from_slice(p.y().unwrap());
     }
 
     fn for_each_test_case(mut test: impl FnMut(&[u8], EllipticCurve)) {
@@ -87,6 +77,66 @@ mod tests {
         }
     }
 
+    trait Types: Curve<FieldBytesSize: ModulusSize> + PrimeCurveParams {
+        type Scalar: From<ScalarPrimitive<Self>>;
+    }
+
+    impl Types for NistP192 {
+        type Scalar = p192::Scalar;
+    }
+
+    impl Types for NistP256 {
+        type Scalar = p256::Scalar;
+    }
+
+    fn encode_affine_point<T: Types>(p: AffinePoint<T>, x: &mut [u8], y: &mut [u8])
+    where
+        AffinePoint<T>: ToEncodedPoint<T>,
+    {
+        assert_eq!(x.len(), y.len());
+
+        let p = p.to_encoded_point(false);
+        x.copy_from_slice(p.x().unwrap());
+        y.copy_from_slice(p.y().unwrap());
+    }
+
+    fn multiply<T: Types>(p: AffinePoint<T>, k: &[u8], x: &mut [u8], y: &mut [u8])
+    where
+        AffinePoint<T>: ToEncodedPoint<T>,
+        AffinePoint<T>: Mul<<T as Types>::Scalar, Output = ProjectivePoint<T>>,
+    {
+        let sw_k =
+            <T as Types>::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
+        encode_affine_point::<T>(p.mul(sw_k).to_affine(), x, y);
+    }
+
+    fn affine_point_coords(curve: EllipticCurve, x: &mut [u8], y: &mut [u8]) {
+        match curve {
+            EllipticCurve::P192 => {
+                encode_affine_point(p192::AffinePoint::GENERATOR, x, y);
+            }
+            EllipticCurve::P256 => {
+                encode_affine_point(p256::AffinePoint::GENERATOR, x, y);
+            }
+        }
+    }
+
+    fn affine_point_multiplication(
+        curve: EllipticCurve,
+        k: &[u8],
+        sw_x: &mut [u8],
+        sw_y: &mut [u8],
+    ) {
+        match curve {
+            EllipticCurve::P192 => {
+                multiply(p192::AffinePoint::GENERATOR, k, sw_x, sw_y);
+            }
+            EllipticCurve::P256 => {
+                multiply(p256::AffinePoint::GENERATOR, k, sw_x, sw_y);
+            }
+        };
+    }
+
     #[test]
     fn test_ecc_affine_point_multiplication(mut ctx: Context<'static>) {
         for_each_test_case(|prime_field, curve| {
@@ -96,11 +146,7 @@ mod tests {
             let (y, _) = y.split_at_mut(prime_field.len());
 
             fill_random(prime_field, k);
-
-            match curve {
-                EllipticCurve::P192 => encode_affine_point(p192::AffinePoint::GENERATOR, x, y),
-                EllipticCurve::P256 => encode_affine_point(p256::AffinePoint::GENERATOR, x, y),
-            };
+            affine_point_coords(curve, x, y);
 
             ctx.ecc
                 .affine_point_multiplication(curve, k, x, y)
@@ -111,20 +157,7 @@ mod tests {
             let (sw_x, sw_y) = t2.split_at_mut(prime_field.len());
             let (sw_y, _) = sw_y.split_at_mut(prime_field.len());
 
-            match curve {
-                EllipticCurve::P192 => {
-                    let sw_k =
-                        p192::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
-                    let q = p192::AffinePoint::GENERATOR.mul(sw_k).to_affine();
-                    encode_affine_point(q, sw_x, sw_y);
-                }
-                EllipticCurve::P256 => {
-                    let sw_k =
-                        p256::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
-                    let q = p256::AffinePoint::GENERATOR.mul(sw_k).to_affine();
-                    encode_affine_point(q, sw_x, sw_y);
-                }
-            };
+            affine_point_multiplication(curve, k, sw_x, sw_y);
 
             assert_eq!(x, sw_x);
             assert_eq!(y, sw_y);
@@ -140,20 +173,7 @@ mod tests {
             let (y, _) = y.split_at_mut(prime_field.len());
             fill_random(prime_field, k);
 
-            match curve {
-                EllipticCurve::P192 => {
-                    let sw_k =
-                        p192::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
-                    let q = p192::AffinePoint::GENERATOR.mul(sw_k).to_affine();
-                    encode_affine_point(q, x, y);
-                }
-                EllipticCurve::P256 => {
-                    let sw_k =
-                        p256::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
-                    let q = p256::AffinePoint::GENERATOR.mul(sw_k).to_affine();
-                    encode_affine_point(q, x, y);
-                }
-            };
+            affine_point_multiplication(curve, k, x, y);
 
             match ctx.ecc.affine_point_verification(curve, x, y) {
                 Err(Error::SizeMismatchCurve) => {
@@ -184,10 +204,7 @@ mod tests {
             }
 
             fill_random(prime_field, k);
-            match curve {
-                EllipticCurve::P192 => encode_affine_point(p192::AffinePoint::GENERATOR, px, py),
-                EllipticCurve::P256 => encode_affine_point(p256::AffinePoint::GENERATOR, px, py),
-            };
+            affine_point_coords(curve, px, py);
 
             #[cfg(not(ecc_working_modes = "11"))]
             let result = ctx
@@ -213,20 +230,7 @@ mod tests {
             let (sw_x, sw_y) = t2.split_at_mut(prime_field.len());
             let (sw_y, _) = sw_y.split_at_mut(prime_field.len());
 
-            match curve {
-                EllipticCurve::P192 => {
-                    let sw_k =
-                        p192::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
-                    let q = p192::AffinePoint::GENERATOR.mul(sw_k).to_affine();
-                    encode_affine_point(q, sw_x, sw_y);
-                }
-                EllipticCurve::P256 => {
-                    let sw_k =
-                        p256::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
-                    let q = p256::AffinePoint::GENERATOR.mul(sw_k).to_affine();
-                    encode_affine_point(q, sw_x, sw_y);
-                }
-            };
+            affine_point_multiplication(curve, k, sw_x, sw_y);
 
             assert_eq!(px, sw_x);
             assert_eq!(py, sw_y);
@@ -249,10 +253,7 @@ mod tests {
 
             fill_random(prime_field, k);
             sw_k.copy_from_slice(k);
-            match curve {
-                EllipticCurve::P192 => encode_affine_point(p192::AffinePoint::GENERATOR, x, y),
-                EllipticCurve::P256 => encode_affine_point(p256::AffinePoint::GENERATOR, x, y),
-            };
+            affine_point_coords(curve, x, y);
 
             ctx.ecc
                 .jacobian_point_multiplication(curve, k, x, y)
@@ -382,10 +383,7 @@ mod tests {
 
             fill_random(prime_field, k);
             sw_k.copy_from_slice(k);
-            match curve {
-                EllipticCurve::P192 => encode_affine_point(p192::AffinePoint::GENERATOR, x, y),
-                EllipticCurve::P256 => encode_affine_point(p256::AffinePoint::GENERATOR, x, y),
-            };
+            affine_point_coords(curve, x, y);
 
             match ctx
                 .ecc
