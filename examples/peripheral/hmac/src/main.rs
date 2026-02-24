@@ -1,5 +1,8 @@
-//! Demonstrates the use of the HMAC peripheral and compares the speed of
-//! hardware-accelerated and pure software hashing.
+//! Demonstrates the two possible ways to use hardware acceleration for HMAC operations and compares
+//! the speed of hardware-accelerated and pure software hashing.
+//!
+//! - Use of the SHA peripheral with a software HMAC implementation
+//! - Use of the HMAC peripheral (optional if required setup is skipped)
 //!
 //! # Writing key
 //! Before using the HMAC accelerator in upstream mode, you first need to
@@ -59,9 +62,11 @@ use esp_hal::{
     hmac::{Hmac, HmacPurpose, KeyId},
     main,
     rng::Rng,
+    sha::{Sha256Context, ShaBackend},
+    time::Instant,
 };
-use esp_println::println;
-use hmac::{Hmac as HmacSw, Mac};
+use esp_println::{print, println};
+use hmac::{Hmac as HmacSw, Mac, SimpleHmac};
 use nb::block;
 use sha2::Sha256;
 
@@ -72,14 +77,13 @@ type HmacSha256 = HmacSw<Sha256>;
 #[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
-    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let mut peripherals = esp_hal::init(esp_hal::Config::default());
 
     let rng = Rng::new();
+    let mut sha_backend = ShaBackend::new(peripherals.SHA.reborrow());
 
     // Set sw key
     let key = [0_u8; 32].as_ref();
-
-    let mut hw_hmac = Hmac::new(peripherals.HMAC);
 
     let mut src = [0_u8; 1024];
     rng.read(src.as_mut_slice());
@@ -89,33 +93,56 @@ fn main() -> ! {
     println!("Beginning stress tests...");
     println!("Testing length from 0 to {:?} bytes for HMAC...", src.len());
     for i in 0..src.len() + 1 {
+        print!("Testing for length: {:>4}", i);
         let (nsrc, _) = src.split_at(i);
         let mut remaining = nsrc;
-        hw_hmac.init();
-        block!(hw_hmac.configure(HmacPurpose::ToUser, KeyId::Key0)).expect("Key purpose mismatch");
-        let pre_hw_hmac = esp_hal::time::Instant::now();
-        while remaining.len() > 0 {
-            remaining = block!(hw_hmac.update(remaining)).unwrap();
-        }
-        block!(hw_hmac.finalize(output.as_mut_slice())).unwrap();
-        let hw_time = pre_hw_hmac.elapsed();
 
+        // Use a software algorithm to generate the expected value, and timing baseline
         let mut sw_hmac = HmacSha256::new_from_slice(key).expect("HMAC can take key of any size");
-        let pre_sw_hash = esp_hal::time::Instant::now();
+        let pre_sw_hash = Instant::now();
         sw_hmac.update(nsrc);
         let soft_result = sw_hmac.finalize().into_bytes();
-
         let soft_time = pre_sw_hash.elapsed();
-        for (a, b) in output.iter().zip(soft_result) {
-            assert_eq!(*a, b);
-        }
-        println!(
-            "Testing for length: {:>4} | HW: {:>6} cycles, SW: {:>7} cycles (HW HMAC is {:>2}x faster)",
-            i,
-            hw_time,
-            soft_time,
-            soft_time / hw_time
+        print!(" SW: {:>7}", soft_time);
+
+        // Use the hardware to see if we can get the same result, and compare the timing
+        let mut hw_hmac = Hmac::new(peripherals.HMAC.reborrow());
+        hw_hmac.init();
+        if block!(hw_hmac.configure(HmacPurpose::ToUser, KeyId::Key0)).is_ok() {
+            let pre_hw_hmac = Instant::now();
+            while remaining.len() > 0 {
+                remaining = block!(hw_hmac.update(remaining)).unwrap();
+            }
+            block!(hw_hmac.finalize(output.as_mut_slice())).unwrap();
+
+            assert_eq!(output, soft_result.as_slice());
+
+            let hw_time = pre_hw_hmac.elapsed();
+
+            print!(", HW: {:>6} ({:>2}x faster)", hw_time, soft_time / hw_time);
+        } else {
+            print!(", HW HMAC skipped (Key not burned)");
+        };
+        core::mem::drop(hw_hmac);
+
+        // Now let's try a hybrid approach using the SHA peripheral with a software HMAC
+        // implementation
+        let _sha_backend = sha_backend.start();
+
+        let mut hyb_hmac = SimpleHmac::<Sha256Context>::new_from_slice(key)
+            .expect("HMAC can take key of any size");
+        let pre_hyb_hash = Instant::now();
+        hyb_hmac.update(nsrc);
+        let hybrid_result = hyb_hmac.finalize().into_bytes();
+        let hybrid_time = pre_hyb_hash.elapsed();
+        print!(
+            ", SW+HW: {:>7} ({:>2}x faster)",
+            hybrid_time,
+            soft_time / hybrid_time
         );
+        assert_eq!(hybrid_result, soft_result);
+
+        println!();
     }
     println!("Finished stress tests!");
 

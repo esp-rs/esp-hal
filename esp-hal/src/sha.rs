@@ -1340,7 +1340,7 @@ pub enum FinalizeError {
 // Now implement the actual public types.
 // Helper macro to limit the scope of `paste`
 macro_rules! impl_worker_context {
-    ($name:ident, $full_name:literal, $algo:expr, $digest_len:literal ) => {
+    ($name:ident, $full_name:literal, $algo:expr, $digest_len:literal, $block_size:literal ) => {
         #[doc = concat!("A ", $full_name, " context.")]
         #[cfg_attr(not(esp32), derive(Clone))]
         pub struct $name(ShaContext<{ $algo.chunk_length() }, { $algo.digest_length() / 4 }>);
@@ -1414,13 +1414,21 @@ macro_rules! impl_worker_context {
                 Self::finalize(&mut self, out.as_mut()).wait_blocking();
             }
         }
+
+        impl digest::core_api::BlockSizeUser for $name {
+            type BlockSize = paste::paste!(digest::consts::[< U $block_size >]);
+
+            fn block_size() -> usize {
+                $block_size
+            }
+        }
     };
 }
 
 for_each_sha_algorithm! {
     ( $name:ident, $full_name:literal (sizes: $block_size:literal, $digest_len:literal, $message_length_bytes:literal) $security:tt, $mode_bits:literal ) => {
         paste::paste! {
-            impl_worker_context!( [<$name Context>], $full_name, ShaAlgorithmKind::$name, $digest_len );
+            impl_worker_context!( [<$name Context>], $full_name, ShaAlgorithmKind::$name, $digest_len, $block_size );
         }
     };
 }
