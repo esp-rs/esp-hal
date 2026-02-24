@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp_hal::interrupt::RunLevel` (#4996)
 - MAC addresses for radio interfaces getter: `esp_hal::efuse::Efuse::interface_mac_address(InterfaceMacAddress::)`. (#5002)
 - `ShaXContext` objects now implement `digest::core_api::BlockSizeUser` (and thus they can be used with the `hmac` crate) (#5050)
+- C5: Add ASSIST_DEBUG support (#5058)
 
 ### Changed
 
