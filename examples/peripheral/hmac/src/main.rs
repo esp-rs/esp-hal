@@ -116,9 +116,9 @@ fn main() -> ! {
             }
             block!(hw_hmac.finalize(output.as_mut_slice())).unwrap();
 
-            assert_eq!(output, soft_result.as_slice());
-
             let hw_time = pre_hw_hmac.elapsed();
+
+            assert_eq!(output, soft_result.as_slice());
 
             print!(", HW: {:>6} ({:>2}x faster)", hw_time, soft_time / hw_time);
         } else {
