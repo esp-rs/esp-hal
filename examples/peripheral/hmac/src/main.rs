@@ -80,14 +80,13 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let mut peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
 
-    let rng = Rng::new();
     let mut sha_backend = ShaBackend::new(peripherals.SHA.reborrow());
 
     // Set sw key
     let key = [0_u8; 32].as_ref();
 
     let mut src = [0_u8; 1024];
-    rng.read(src.as_mut_slice());
+    Rng::new().read(src.as_mut_slice());
 
     let mut output = [0u8; 32];
 
@@ -96,7 +95,6 @@ fn main() -> ! {
     for i in 0..src.len() + 1 {
         print!("Testing for length: {:>4}", i);
         let (nsrc, _) = src.split_at(i);
-        let mut remaining = nsrc;
 
         // Use a software algorithm to generate the expected value, and timing baseline
         let mut sw_hmac = HmacSha256::new_from_slice(key).expect("HMAC can take key of any size");
@@ -111,7 +109,8 @@ fn main() -> ! {
         hw_hmac.init();
         if block!(hw_hmac.configure(HmacPurpose::ToUser, KeyId::Key0)).is_ok() {
             let pre_hw_hmac = Instant::now();
-            while remaining.len() > 0 {
+            let mut remaining = nsrc;
+            while !remaining.is_empty() {
                 remaining = block!(hw_hmac.update(remaining)).unwrap();
             }
             block!(hw_hmac.finalize(output.as_mut_slice())).unwrap();
