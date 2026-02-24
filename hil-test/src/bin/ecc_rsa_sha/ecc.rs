@@ -109,12 +109,8 @@ mod tests {
 
     fn affine_point_coords(curve: EllipticCurve, x: &mut [u8], y: &mut [u8]) {
         match curve {
-            EllipticCurve::P192 => {
-                encode_affine_point(p192::AffinePoint::GENERATOR, x, y);
-            }
-            EllipticCurve::P256 => {
-                encode_affine_point(p256::AffinePoint::GENERATOR, x, y);
-            }
+            EllipticCurve::P192 => encode_affine_point(p192::AffinePoint::GENERATOR, x, y),
+            EllipticCurve::P256 => encode_affine_point(p256::AffinePoint::GENERATOR, x, y),
         }
     }
 
@@ -135,12 +131,8 @@ mod tests {
         }
 
         match curve {
-            EllipticCurve::P192 => {
-                multiply(p192::AffinePoint::GENERATOR, k, sw_x, sw_y);
-            }
-            EllipticCurve::P256 => {
-                multiply(p256::AffinePoint::GENERATOR, k, sw_x, sw_y);
-            }
+            EllipticCurve::P192 => multiply(p192::AffinePoint::GENERATOR, k, sw_x, sw_y),
+            EllipticCurve::P256 => multiply(p256::AffinePoint::GENERATOR, k, sw_x, sw_y),
         };
     }
 
@@ -214,22 +206,38 @@ mod tests {
         }
 
         match curve {
-            EllipticCurve::P192 => {
-                div::<{ <NistP192 as Types>::LIMBS }>(prime_field, sw_k, sw_y);
-            }
-            EllipticCurve::P256 => {
-                div::<{ <NistP256 as Types>::LIMBS }>(prime_field, sw_k, sw_y);
-            }
+            EllipticCurve::P192 => div::<{ <NistP192 as Types>::LIMBS }>(prime_field, sw_k, sw_y),
+            EllipticCurve::P256 => div::<{ <NistP256 as Types>::LIMBS }>(prime_field, sw_k, sw_y),
+        }
+    }
+
+    const MAX_MEM_BLOCK_SIZE: usize = 32;
+
+    /// Creates the requested buffers that are large enough to hold the parameters of the given
+    /// curve.
+    macro_rules! buffers {
+        ($curve:ident => { $($buff:ident),* }) => {
+            const COUNT: usize = const { 0 $(+ { stringify!($buff);1 })* };
+
+            let len = match $curve {
+                EllipticCurve::P192 => 24,
+                EllipticCurve::P256 => 32,
+            };
+
+            let mut mem = &mut [0u8; COUNT * MAX_MEM_BLOCK_SIZE][..];
+            $(
+            let $buff = mem.split_off_mut(..len).unwrap();
+            )*
         }
     }
 
     #[test]
     fn test_ecc_affine_point_multiplication(mut ctx: Context<'static>) {
         for_each_test_case(|prime_field, curve| {
-            let t1 = &mut [0_u8; 96];
-            let (k, x) = t1.split_at_mut(prime_field.len());
-            let (x, y) = x.split_at_mut(prime_field.len());
-            let (y, _) = y.split_at_mut(prime_field.len());
+            buffers!(curve => {
+                k, x, y,
+                sw_x, sw_y
+            });
 
             fill_random(prime_field, k);
             affine_point_coords(curve, x, y);
@@ -237,11 +245,6 @@ mod tests {
             ctx.ecc
                 .affine_point_multiplication(curve, k, x, y)
                 .expect("Inputs data doesn't match the key length selected.");
-
-            let t2 = &mut [0_u8; 64];
-
-            let (sw_x, sw_y) = t2.split_at_mut(prime_field.len());
-            let (sw_y, _) = sw_y.split_at_mut(prime_field.len());
 
             affine_point_multiplication(curve, k, sw_x, sw_y);
 
@@ -253,10 +256,8 @@ mod tests {
     #[test]
     fn test_ecc_affine_point_verification(mut ctx: Context<'static>) {
         for_each_test_case(|prime_field, curve| {
-            let t1 = &mut [0_u8; 96];
-            let (k, x) = t1.split_at_mut(prime_field.len());
-            let (x, y) = x.split_at_mut(prime_field.len());
-            let (y, _) = y.split_at_mut(prime_field.len());
+            buffers!(curve => { k, x, y });
+
             fill_random(prime_field, k);
 
             affine_point_multiplication(curve, k, x, y);
@@ -277,10 +278,11 @@ mod tests {
     #[test]
     fn test_ecc_affine_point_verification_multiplication(mut ctx: Context<'static>) {
         for_each_test_case(|prime_field, curve| {
-            let t1 = &mut [0_u8; 96];
-            let (k, px) = t1.split_at_mut(prime_field.len());
-            let (px, py) = px.split_at_mut(prime_field.len());
-            let (py, _) = py.split_at_mut(prime_field.len());
+            buffers!(curve => {
+                k, px, py,
+                sw_x, sw_y
+            });
+
             cfg_if::cfg_if! {
                 if #[cfg(ecc_working_modes = "11")] {
                     let qx = &mut [0u8; 8];
@@ -296,10 +298,12 @@ mod tests {
             let result = ctx
                 .ecc
                 .affine_point_verification_multiplication(curve, k, px, py);
+
             #[cfg(ecc_working_modes = "11")]
             let result = ctx
                 .ecc
                 .affine_point_verification_multiplication(curve, k, px, py, qx, qy, qz);
+
             match result {
                 Err(Error::SizeMismatchCurve) => {
                     panic!("Inputs data doesn't match the key length selected.")
@@ -311,11 +315,6 @@ mod tests {
                 _ => {}
             }
 
-            let t2 = &mut [0_u8; 64];
-
-            let (sw_x, sw_y) = t2.split_at_mut(prime_field.len());
-            let (sw_y, _) = sw_y.split_at_mut(prime_field.len());
-
             affine_point_multiplication(curve, k, sw_x, sw_y);
 
             assert_eq!(px, sw_x);
@@ -326,16 +325,10 @@ mod tests {
     #[test]
     fn test_ecc_jacobian_point_multiplication(mut ctx: Context<'static>) {
         for_each_test_case(|prime_field, curve| {
-            let t1 = &mut [0_u8; 96];
-            let (k, x) = t1.split_at_mut(prime_field.len());
-            let (x, y) = x.split_at_mut(prime_field.len());
-            let (y, _) = y.split_at_mut(prime_field.len());
-
-            let t2 = &mut [0_u8; 96];
-
-            let (sw_x, sw_y) = t2.split_at_mut(prime_field.len());
-            let (sw_y, sw_k) = sw_y.split_at_mut(prime_field.len());
-            let (sw_k, _) = sw_k.split_at_mut(prime_field.len());
+            buffers!(curve => {
+                k, x, y,
+                sw_k, sw_x, sw_y
+            });
 
             fill_random(prime_field, k);
             sw_k.copy_from_slice(k);
@@ -356,11 +349,8 @@ mod tests {
     #[test]
     fn test_jacobian_point_verification(mut ctx: Context<'static>) {
         for_each_test_case(|prime_field, curve| {
-            let t1 = &mut [0_u8; 128];
-            let (k, x) = t1.split_at_mut(prime_field.len());
-            let (x, y) = x.split_at_mut(prime_field.len());
-            let (y, z) = y.split_at_mut(prime_field.len());
-            let (z, _) = z.split_at_mut(prime_field.len());
+            buffers!(curve => { k, x, y, z });
+
             fill_random(prime_field, k);
             fill_random(prime_field, z);
 
@@ -383,16 +373,10 @@ mod tests {
     #[test]
     fn test_ecc_affine_point_verification_jacobian_multiplication(mut ctx: Context<'static>) {
         for_each_test_case(|prime_field, curve| {
-            let t1 = &mut [0_u8; 96];
-            let (k, x) = t1.split_at_mut(prime_field.len());
-            let (x, y) = x.split_at_mut(prime_field.len());
-            let (y, _) = y.split_at_mut(prime_field.len());
-
-            let t2 = &mut [0_u8; 96];
-
-            let (sw_x, sw_y) = t2.split_at_mut(prime_field.len());
-            let (sw_y, sw_k) = sw_y.split_at_mut(prime_field.len());
-            let (sw_k, _) = sw_k.split_at_mut(prime_field.len());
+            buffers!(curve => {
+                k, x, y,
+                sw_k, sw_x, sw_y
+            });
 
             fill_random(prime_field, k);
             sw_k.copy_from_slice(k);
@@ -424,15 +408,14 @@ mod tests {
     #[cfg(ecc_working_modes = "7")]
     fn test_ecc_finite_field_division(mut ctx: Context<'static>) {
         for_each_test_case(|prime_field, curve| {
-            let t1 = &mut [0_u8; 64];
-            let (k, y) = t1.split_at_mut(prime_field.len());
-            let (y, _) = y.split_at_mut(prime_field.len());
+            buffers!(curve => {
+                k, y,
+                sw_k, sw_y
+            });
 
             fill_random(prime_field, k);
             fill_random(prime_field, y);
-            let t2 = &mut [0_u8; 96];
-            let (sw_y, sw_k) = t2.split_at_mut(prime_field.len());
-            let (sw_k, sw_res) = sw_k.split_at_mut(prime_field.len());
+
             sw_y.copy_from_slice(y);
             sw_k.copy_from_slice(k);
 
