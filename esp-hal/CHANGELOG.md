@@ -64,7 +64,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RISC-V: `esp_hal::interrupt::enable_direct` now takes a `DirectBindableCpuInterrupt` and is infallible (#5037)
 - The `ecc` driver now takes the curve by value (#5055)
 - `EllipticCurve` now implements common traits (#5055)
-- The `interrupt` module, `esp_hal::interrupt::Priority`, `PERI::enable_X_interrupt` and `PERI::disable_X_interrupt` have been stabilized (#5040)
 - The `interrupt` module, `esp_hal::interrupt::Priority`, `PERI::enable_X_interrupt` and `PERI::disable_X_interrupt_on_all_cores` have been stabilized (#5040)
 
 ### Fixed

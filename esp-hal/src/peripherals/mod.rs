@@ -101,7 +101,7 @@ macro_rules! create_peripheral {
                 /// }
                 ///
                 #[doc = concat!("peripherals.", stringify!($name), ".", stringify!($enable), "(Priority::Priority1);")]
-                #[doc = concat!("peripherals.", stringify!($name), ".", stringify!($disable), "();")]
+                #[doc = concat!("peripherals.", stringify!($name), ".", stringify!($disable), "_on_all_cores();")]
                 /// # {after_snippet}
                 /// ```
                 #[allow(dead_code, reason = "Peripheral may be unstable")]
