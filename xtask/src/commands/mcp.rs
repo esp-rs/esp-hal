@@ -52,7 +52,7 @@ pub fn run_xtask_subprocess(args: &[String]) -> Result<String> {
     if output.status.success() {
         Ok(combined)
     } else {
-        anyhow::bail!("Exit {}\n\n{combined}", output.status)
+        anyhow::bail!("Command failed ({})\n\n{combined}", output.status)
     }
 }
 
@@ -79,8 +79,22 @@ struct EspHalServer;
 
 impl ServerHandler for EspHalServer {
     fn get_info(&self) -> ServerInfo {
+        use strum::IntoEnumIterator;
+
+        let chips: Vec<String> = esp_metadata::Chip::iter().map(|c| c.to_string()).collect();
+        let packages: Vec<String> = crate::Package::iter().map(|p| p.to_string()).collect();
+
+        let instructions = format!(
+            "esp-hal xtask automation tools. Use these to build, lint, format, test, \
+             and check the esp-hal workspace.\n\n\
+             Valid chip values: {}\n\n\
+             Valid package values: {}",
+            chips.join(", "),
+            packages.join(", "),
+        );
+
         ServerInfo {
-            instructions: Some("esp-hal xtask automation tools. Use these to build, lint, format, test, and check the esp-hal workspace.".into()),
+            instructions: Some(instructions.into()),
             capabilities: ServerCapabilities::builder()
                 .enable_tools()
                 .build(),

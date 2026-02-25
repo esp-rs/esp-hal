@@ -142,3 +142,55 @@ Key reference paths (where to look first)
 
 Final note to the agent
 - Follow this file as your primary orientation. It condenses the commands and checks CI runs and reduces unnecessary repository exploration. Only search further when a commanded step fails or when the task requires additional context not documented here.
+
+## MCP Tools
+
+This repository has an MCP server (`cargo xmcp`) that exposes xtask commands as tools.
+Available automatically when using Claude Code (configured in `.mcp.json`).
+
+### Available tools
+
+| Tool | Description |
+|------|-------------|
+| `ci` | Run CI checks for a given chip |
+| `check_packages` | `cargo check` all packages |
+| `lint_packages` | `cargo clippy` all packages |
+| `fmt_packages` | `cargo fmt` all packages |
+| `run_tests` | Build or run HIL tests |
+| `run_doc_tests` | Run doc tests |
+| `run_example` | Run examples for a chip and package |
+| `run_elfs` | Run ELFs via probe-rs |
+| `build_package` | Build a specific package |
+| `build_documentation` | Build documentation |
+| `host_tests` | Run host-side unit tests |
+| `clean` | `cargo clean` for packages |
+| `update_metadata` | Regenerate chip metadata and README table |
+
+### Valid values for tool parameters
+
+**Chips:** esp32, esp32c2, esp32c3, esp32c5, esp32c6, esp32h2, esp32s2, esp32s3
+
+**Packages:** esp-alloc, esp-backtrace, esp-bootloader-esp-idf, esp-config, esp-hal,
+esp-hal-procmacros, esp-rom-sys, esp-lp-hal, esp-metadata, esp-metadata-generated,
+esp-phy, esp-println, esp-riscv-rt, esp-storage, esp-sync, esp-radio,
+esp-radio-rtos-driver, esp-rtos, examples, hil-test, qa-test, xtensa-lx,
+xtensa-lx-rt, xtensa-lx-rt-proc-macros
+
+## Adding MCP support to a new xtask command
+
+1. Add the attribute above your `Args` struct:
+   ```rust
+   #[cfg_attr(feature = "mcp", xtask_mcp_macros::mcp_tool(
+       description = "Human-readable description of the tool",
+       command = "subcommand path"  // e.g. "ci", "run tests", "build documentation"
+   ))]
+   ```
+2. The struct **must** live in the library crate tree (`xtask/src/commands/`), not in `main.rs`
+3. The `command` string maps to the CLI subcommand path (space-separated for nested commands)
+4. Build with `cargo build --package xtask --features=mcp` to verify
+
+## Commands intentionally NOT exposed via MCP
+
+- `semver-check` — release-specific tooling, not useful for AI-assisted development
+- `check-changelog` — release checklist validation
+- `release` — publishing workflow

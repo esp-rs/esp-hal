@@ -184,7 +184,7 @@ pub struct UpdateMetadataArgs {
 #[cfg_attr(
     feature = "mcp",
     xtask_mcp_macros::mcp_tool(
-        description = "Build or run examples for the specified chip and package",
+        description = "Run examples for the specified chip and package",
         command = "run example"
     )
 )]
