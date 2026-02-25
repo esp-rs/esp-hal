@@ -11,7 +11,7 @@ struct WorkingModeEntry {
     mode: WorkingMode,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, strum::Display)]
 #[serde(rename_all = "snake_case")]
 enum WorkingMode {
     AffinePointMultiplication,
@@ -20,7 +20,7 @@ enum WorkingMode {
     AffinePointAddition,
     JacobianPointMultiplication,
     JacobianPointVerification,
-    JacobianPointVerificationAndMultiplication,
+    AffinePointVerificationAndJacobianPointMultiplication,
     FiniteFieldDivision,
     ModularAddition,
     ModularSubtraction,
@@ -34,5 +34,25 @@ impl super::GenericProperty for EccDriverProperties {
             "ecc_working_modes = \"{}\"",
             self.working_modes.len()
         )])
+    }
+
+    fn macros(&self) -> Option<proc_macro2::TokenStream> {
+        let branches = self
+            .working_modes
+            .iter()
+            .map(|entry| {
+                let id = crate::number(entry.id);
+                let mode = quote::format_ident!("{}", entry.mode.to_string());
+
+                quote::quote! {
+                    #id, #mode
+                }
+            })
+            .collect::<Vec<_>>();
+        let for_each_working_mode =
+            crate::generate_for_each_macro("working_mode", &[("all", &branches)]);
+        Some(quote::quote! {
+            #for_each_working_mode
+        })
     }
 }

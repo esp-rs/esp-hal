@@ -301,7 +301,7 @@ working_modes = [
     { id = 4, mode = "jacobian_point_multiplication" },
     { id = 5, mode = "affine_point_addition" },
     { id = 6, mode = "jacobian_point_verification" },
-    { id = 7, mode = "jacobian_point_verification_and_multiplication" },
+    { id = 7, mode = "affine_point_verification_and_jacobian_point_multiplication" },
     { id = 8, mode = "modular_addition" },
     { id = 9, mode = "modular_subtraction" },
     { id = 10, mode = "modular_multiplication" },

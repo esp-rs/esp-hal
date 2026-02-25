@@ -368,6 +368,31 @@ macro_rules! for_each_dedicated_gpio {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_working_mode {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_working_mode { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_working_mode!((0, AffinePointMultiplication));
+        _for_each_inner_working_mode!((2, AffinePointVerification));
+        _for_each_inner_working_mode!((3, AffinePointVerificationAndMultiplication));
+        _for_each_inner_working_mode!((4, JacobianPointMultiplication));
+        _for_each_inner_working_mode!((5, AffinePointAddition));
+        _for_each_inner_working_mode!((6, JacobianPointVerification));
+        _for_each_inner_working_mode!((7,
+        AffinePointVerificationAndJacobianPointMultiplication));
+        _for_each_inner_working_mode!((8, ModularAddition));
+        _for_each_inner_working_mode!((9, ModularSubtraction));
+        _for_each_inner_working_mode!((10, ModularMultiplication));
+        _for_each_inner_working_mode!((11, ModularDivision));
+        _for_each_inner_working_mode!((all(0, AffinePointMultiplication), (2,
+        AffinePointVerification), (3, AffinePointVerificationAndMultiplication), (4,
+        JacobianPointMultiplication), (5, AffinePointAddition), (6,
+        JacobianPointVerification), (7,
+        AffinePointVerificationAndJacobianPointMultiplication), (8, ModularAddition), (9,
+        ModularSubtraction), (10, ModularMultiplication), (11, ModularDivision)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_interrupt {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_interrupt { $(($pattern) => $code;)* ($other : tt)

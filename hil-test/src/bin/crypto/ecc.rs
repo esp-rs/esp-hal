@@ -635,7 +635,7 @@ mod tests {
                 EllipticCurve::P256,
                 &mut x_256,
                 &mut y_256,
-                WorkMode::ModAdd,
+                WorkMode::ModularAddition,
             )
             .unwrap();
         assert_eq!(x_256, ECC_256_ADD_RES);
@@ -647,7 +647,7 @@ mod tests {
                 EllipticCurve::P256,
                 &mut x_256,
                 &mut y_256,
-                WorkMode::ModSub,
+                WorkMode::ModularSubtraction,
             )
             .unwrap();
         assert_eq!(x_256, ECC_256_SUB_RES);
@@ -659,7 +659,7 @@ mod tests {
                 EllipticCurve::P256,
                 &mut x_256,
                 &mut y_256,
-                WorkMode::ModMulti,
+                WorkMode::ModularMultiplication,
             )
             .unwrap();
         assert_eq!(y_256, ECC_256_MUL_RES);
@@ -671,7 +671,7 @@ mod tests {
                 EllipticCurve::P256,
                 &mut x_256,
                 &mut y_256,
-                WorkMode::ModDiv,
+                WorkMode::ModularDivision,
             )
             .unwrap();
         assert_eq!(y_256, ECC_256_INV_MUL_RES);
@@ -728,7 +728,7 @@ mod tests {
                 EllipticCurve::P192,
                 &mut x_192,
                 &mut y_192,
-                WorkMode::ModAdd,
+                WorkMode::ModularAddition,
             )
             .unwrap();
         assert_eq!(x_192, ECC_192_ADD_RES);
@@ -740,7 +740,7 @@ mod tests {
                 EllipticCurve::P192,
                 &mut x_192,
                 &mut y_192,
-                WorkMode::ModSub,
+                WorkMode::ModularSubtraction,
             )
             .unwrap();
         assert_eq!(x_192, ECC_192_SUB_RES);
@@ -752,7 +752,7 @@ mod tests {
                 EllipticCurve::P192,
                 &mut x_192,
                 &mut y_192,
-                WorkMode::ModMulti,
+                WorkMode::ModularMultiplication,
             )
             .unwrap();
         assert_eq!(y_192, ECC_192_MUL_RES);
@@ -764,7 +764,7 @@ mod tests {
                 EllipticCurve::P192,
                 &mut x_192,
                 &mut y_192,
-                WorkMode::ModDiv,
+                WorkMode::ModularDivision,
             )
             .unwrap();
         assert_eq!(y_192, ECC_192_INV_MUL_RES);

@@ -340,7 +340,7 @@ working_modes = [
     { id = 3, mode = "affine_point_verification_and_multiplication" },
     { id = 4, mode = "jacobian_point_multiplication" },
     { id = 6, mode = "jacobian_point_verification" },
-    { id = 7, mode = "jacobian_point_verification_and_multiplication" }
+    { id = 7, mode = "affine_point_verification_and_jacobian_point_multiplication" }
 ]
 zero_extend_writes = true
 

@@ -104,40 +104,57 @@ impl EllipticCurve {
     }
 }
 
-#[derive(Clone, Copy)]
-/// Represents the operational modes for elliptic curve or modular arithmetic
-/// computations.
-pub enum WorkMode {
-    /// Point multiplication mode.
-    PointMultiMode          = 0,
-    #[cfg(ecc_working_modes = "7")]
-    /// Division mode.
-    DivisionMode            = 1,
-    /// Point verification mode.
-    PointVerif              = 2,
-    /// Point verification and multiplication mode.
-    PointVerifMulti         = 3,
-    /// Jacobian point multiplication mode.
-    JacobianPointMulti      = 4,
-    #[cfg(ecc_working_modes = "11")]
-    /// Point addition mode.
-    PointAdd                = 5,
-    /// Jacobian point verification mode.
-    JacobianPointVerif      = 6,
-    /// Point verification and multiplication in Jacobian coordinates.
-    PointVerifJacobianMulti = 7,
-    #[cfg(ecc_working_modes = "11")]
-    /// Modular addition mode.
-    ModAdd                  = 8,
-    #[cfg(ecc_working_modes = "11")]
-    /// Modular subtraction mode.
-    ModSub                  = 9,
-    #[cfg(ecc_working_modes = "11")]
-    /// Modular multiplication mode.
-    ModMulti                = 10,
-    #[cfg(ecc_working_modes = "11")]
-    /// Modular division mode.
-    ModDiv                  = 11,
+macro_rules! working_mode_doc {
+    (AffinePointMultiplication) => {
+        r"Point multiplication mode."
+    };
+    (AffinePointVerification) => {
+        r"Point verification mode."
+    };
+    (AffinePointVerificationAndMultiplication) => {
+        r"Point verification and multiplication mode."
+    };
+    (AffinePointAddition) => {
+        r"Point addition mode."
+    };
+    (JacobianPointMultiplication) => {
+        r"Jacobian point multiplication mode."
+    };
+    (JacobianPointVerification) => {
+        r"Jacobian point verification mode."
+    };
+    (AffinePointVerificationAndJacobianPointMultiplication) => {
+        r"Point verification and multiplication in Jacobian coordinates."
+    };
+    (FiniteFieldDivision) => {
+        r"Division mode."
+    };
+    (ModularAddition) => {
+        r"Modular addition"
+    };
+    (ModularSubtraction) => {
+        r"Modular subtraction mode."
+    };
+    (ModularMultiplication) => {
+        r"Modular multiplication mode."
+    };
+    (ModularDivision) => {
+        r"Modular division mode."
+    };
+}
+
+for_each_working_mode! {
+    (all $(( $id:literal, $mode:tt )),*) => {
+        #[derive(Clone, Copy)]
+        /// Represents the operational modes for elliptic curve or modular arithmetic
+        /// computations.
+        pub enum WorkMode {
+            $(
+                #[doc = working_mode_doc!($mode)]
+                $mode = $id,
+            )*
+        }
+    };
 }
 
 impl<'d> Ecc<'d, Blocking> {
@@ -197,7 +214,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.write_mem(self.px_mem(), x);
         self.write_mem(self.py_mem(), y);
 
-        self.start_operation(WorkMode::PointMultiMode, curve);
+        self.start_operation(WorkMode::AffinePointMultiplication, curve);
         while self.is_busy() {}
 
         self.read_point_result(x, y);
@@ -227,7 +244,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.write_mem(self.k_mem(), k);
         self.write_mem(self.py_mem(), y);
 
-        self.start_operation(WorkMode::DivisionMode, curve);
+        self.start_operation(WorkMode::FiniteFieldDivision, curve);
         while self.is_busy() {}
 
         self.read_scalar_result(y);
@@ -258,7 +275,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.write_mem(self.px_mem(), x);
         self.write_mem(self.py_mem(), y);
 
-        self.start_operation(WorkMode::PointVerif, curve);
+        self.start_operation(WorkMode::AffinePointVerification, curve);
         while self.is_busy() {}
 
         self.check_point_verification_result()?;
@@ -295,7 +312,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.write_mem(self.px_mem(), x);
         self.write_mem(self.py_mem(), y);
 
-        self.start_operation(WorkMode::PointVerifMulti, curve);
+        self.start_operation(WorkMode::AffinePointVerificationAndMultiplication, curve);
         while self.is_busy() {}
 
         self.check_point_verification_result()?;
@@ -339,7 +356,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.write_mem(self.px_mem(), px);
         self.write_mem(self.py_mem(), py);
 
-        self.start_operation(WorkMode::PointVerifMulti, curve);
+        self.start_operation(WorkMode::AffinePointVerificationAndMultiplication, curve);
         while self.is_busy() {}
 
         self.check_point_verification_result()?;
@@ -373,7 +390,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.write_mem(self.px_mem(), x);
         self.write_mem(self.py_mem(), y);
 
-        self.start_operation(WorkMode::JacobianPointMulti, curve);
+        self.start_operation(WorkMode::JacobianPointMultiplication, curve);
         while self.is_busy() {}
 
         self.read_jacobian_result(x, y, k);
@@ -414,7 +431,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
             }
         }
 
-        self.start_operation(WorkMode::JacobianPointVerif, curve);
+        self.start_operation(WorkMode::JacobianPointVerification, curve);
 
         // wait for interrupt
         while self.is_busy() {}
@@ -451,7 +468,10 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.write_mem(self.px_mem(), x);
         self.write_mem(self.py_mem(), y);
 
-        self.start_operation(WorkMode::PointVerifJacobianMulti, curve);
+        self.start_operation(
+            WorkMode::AffinePointVerificationAndJacobianPointMultiplication,
+            curve,
+        );
 
         // wait for interrupt
         while self.is_busy() {}
@@ -498,7 +518,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.write_mem(self.qy_mem(), qy);
         self.write_mem(self.qz_mem(), qz);
 
-        self.start_operation(WorkMode::PointAdd, curve);
+        self.start_operation(WorkMode::AffinePointAddition, curve);
         while self.is_busy() {}
 
         self.read_point_result(px, py);
@@ -542,8 +562,12 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         while self.is_busy() {}
 
         match work_mode {
-            WorkMode::ModAdd | WorkMode::ModSub => self.read_mem(self.px_mem(), a),
-            WorkMode::ModMulti | WorkMode::ModDiv => self.read_mem(self.py_mem(), b),
+            WorkMode::ModularAddition | WorkMode::ModularSubtraction => {
+                self.read_mem(self.px_mem(), a)
+            }
+            WorkMode::ModularMultiplication | WorkMode::ModularDivision => {
+                self.read_mem(self.py_mem(), b)
+            }
             _ => unreachable!(),
         }
 
