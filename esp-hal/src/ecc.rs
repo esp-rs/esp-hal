@@ -200,9 +200,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.start_operation(WorkMode::PointMultiMode, curve);
         while self.is_busy() {}
 
-        self.read_mem(self.px_mem(), x);
-        self.read_mem(self.py_mem(), y);
-
+        self.read_point_result(x, y);
         Ok(())
     }
 
@@ -230,11 +228,9 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.write_mem(self.py_mem(), y);
 
         self.start_operation(WorkMode::DivisionMode, curve);
-
-        // wait for interrupt
         while self.is_busy() {}
 
-        self.read_mem(self.py_mem(), y);
+        self.read_scalar_result(y);
 
         Ok(())
     }
@@ -263,9 +259,8 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.write_mem(self.py_mem(), y);
 
         self.start_operation(WorkMode::PointVerif, curve);
-
-        // wait for interrupt
         while self.is_busy() {}
+
         self.check_point_verification_result()?;
 
         Ok(())
@@ -301,13 +296,10 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.write_mem(self.py_mem(), y);
 
         self.start_operation(WorkMode::PointVerifMulti, curve);
-
-        // wait for interrupt
         while self.is_busy() {}
-        self.check_point_verification_result()?;
 
-        self.read_mem(self.px_mem(), x);
-        self.read_mem(self.py_mem(), y);
+        self.check_point_verification_result()?;
+        self.read_point_result(x, y);
 
         Ok(())
     }
@@ -348,16 +340,11 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.write_mem(self.py_mem(), py);
 
         self.start_operation(WorkMode::PointVerifMulti, curve);
-
-        // wait for interrupt
         while self.is_busy() {}
-        self.check_point_verification_result()?;
 
-        self.read_mem(self.px_mem(), px);
-        self.read_mem(self.py_mem(), py);
-        self.read_mem(self.qx_mem(), qx);
-        self.read_mem(self.qy_mem(), qy);
-        self.read_mem(self.qz_mem(), qz);
+        self.check_point_verification_result()?;
+        self.read_point_result(px, py);
+        self.read_jacobian_result(qx, qy, qz);
 
         Ok(())
     }
@@ -387,20 +374,9 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.write_mem(self.py_mem(), y);
 
         self.start_operation(WorkMode::JacobianPointMulti, curve);
-
         while self.is_busy() {}
 
-        cfg_if::cfg_if! {
-            if #[cfg(not(ecc_working_modes = "11"))] {
-                self.read_mem(self.px_mem(), x);
-                self.read_mem(self.py_mem(), y);
-                self.read_mem(self.k_mem(), k);
-            } else {
-                self.read_mem(self.qx_mem(), x);
-                self.read_mem(self.qy_mem(), y);
-                self.read_mem(self.qz_mem(), k);
-            }
-        }
+        self.read_jacobian_result(x, y, k);
 
         Ok(())
     }
@@ -481,17 +457,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         while self.is_busy() {}
         self.check_point_verification_result()?;
 
-        cfg_if::cfg_if! {
-            if #[cfg(not(ecc_working_modes = "11"))] {
-                self.read_mem(self.px_mem(), x);
-                self.read_mem(self.py_mem(), y);
-                self.read_mem(self.k_mem(), k);
-            } else {
-                self.read_mem(self.qx_mem(), x);
-                self.read_mem(self.qy_mem(), y);
-                self.read_mem(self.qz_mem(), k);
-            }
-        }
+        self.read_jacobian_result(x, y, k);
 
         Ok(())
     }
@@ -533,15 +499,10 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.write_mem(self.qz_mem(), qz);
 
         self.start_operation(WorkMode::PointAdd, curve);
-
-        // wait for interrupt
         while self.is_busy() {}
 
-        self.read_mem(self.px_mem(), px);
-        self.read_mem(self.py_mem(), py);
-        self.read_mem(self.qx_mem(), qx);
-        self.read_mem(self.qy_mem(), qy);
-        self.read_mem(self.qz_mem(), qz);
+        self.read_point_result(px, py);
+        self.read_jacobian_result(qx, qy, qz);
 
         Ok(())
     }
@@ -679,5 +640,29 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     #[cfg(ecc_working_modes = "11")]
     fn qz_mem(&self) -> *mut u32 {
         self.regs().qz_mem(0).as_ptr()
+    }
+
+    fn read_point_result(&mut self, x: &mut [u8], y: &mut [u8]) {
+        self.read_mem(self.px_mem(), x);
+        self.read_mem(self.py_mem(), y);
+    }
+
+    fn read_jacobian_result(&mut self, qx: &mut [u8], qy: &mut [u8], qz: &mut [u8]) {
+        cfg_if::cfg_if! {
+            if #[cfg(not(ecc_working_modes = "11"))] {
+                self.read_mem(self.px_mem(), qx);
+                self.read_mem(self.py_mem(), qy);
+                self.read_mem(self.k_mem(), qz);
+            } else {
+                self.read_mem(self.qx_mem(), qx);
+                self.read_mem(self.qy_mem(), qy);
+                self.read_mem(self.qz_mem(), qz);
+            }
+        }
+    }
+
+    #[cfg(ecc_working_modes = "7")]
+    fn read_scalar_result(&mut self, y: &mut [u8]) {
+        self.read_mem(self.py_mem(), y);
     }
 }
