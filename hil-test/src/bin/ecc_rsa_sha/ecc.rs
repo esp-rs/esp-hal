@@ -183,6 +183,7 @@ mod tests {
         };
     }
 
+    #[cfg(ecc_working_modes = "7")]
     fn finite_field_division(
         curve: EllipticCurve,
         prime_field: &[u8],
@@ -334,6 +335,7 @@ mod tests {
             sw_k.copy_from_slice(k);
             affine_point_coords(curve, x, y);
 
+            // FIXME: Overwrites k, its value should also be checked
             ctx.ecc
                 .jacobian_point_multiplication(curve, k, x, y)
                 .expect("Inputs data doesn't match the key length selected.");
@@ -349,6 +351,7 @@ mod tests {
     #[test]
     fn test_jacobian_point_verification(mut ctx: Context<'static>) {
         for_each_test_case(|prime_field, curve| {
+            // TODO: we should have a failure case here
             buffers!(curve => { k, x, y, z });
 
             fill_random(prime_field, k);
@@ -382,6 +385,7 @@ mod tests {
             sw_k.copy_from_slice(k);
             affine_point_coords(curve, x, y);
 
+            // FIXME: overwrites k, its value should also be checked
             match ctx
                 .ecc
                 .affine_point_verification_jacobian_multiplication(curve, k, x, y)
@@ -397,6 +401,8 @@ mod tests {
             }
 
             affine_point_multiplication(curve, sw_k, sw_x, sw_y);
+            // FIXME: k comes from the hardware result, it's surprising. We should compute it
+            // in software to verify the result.
             affine_to_jacobian(curve, prime_field, k, sw_x, sw_y);
 
             assert_eq!(x, sw_x);
