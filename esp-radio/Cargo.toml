@@ -79,6 +79,15 @@ esp-wifi-sys-esp32h2 = { version = "0.1.0", optional = true, git = "https://gith
 esp-wifi-sys-esp32s2 = { version = "0.1.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys", rev = "e7b72a1" }
 esp-wifi-sys-esp32s3 = { version = "0.1.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys", rev = "e7b72a1" }
 
+esp32   = { version = "0.39", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "284111a" }
+esp32c2 = { version = "0.28", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "284111a" }
+esp32c3 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "284111a" }
+esp32c5 = { version = "0.1",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "284111a" }
+esp32c6 = { version = "0.22", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "284111a" }
+esp32h2 = { version = "0.18", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "284111a" }
+esp32s2 = { version = "0.30", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "284111a" }
+esp32s3 = { version = "0.34", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "284111a" }
+
 # Optional dependencies enabling ecosystem features
 embedded-io-06 = { package = "embedded-io", version = "0.6", default-features = false, optional = true }
 embedded-io-async-06 = { package = "embedded-io-async", version = "0.6", default-features = false, optional = true }
@@ -141,6 +150,7 @@ print-logs-from-driver = [
 
 ##
 esp32 = [
+  "dep:esp32",
   "esp-hal/esp32",
   "esp-rtos/esp32",
   "esp-radio-rtos-driver/esp32",
@@ -151,6 +161,7 @@ esp32 = [
 ]
 ##
 esp32c2 = [
+  "dep:esp32c2",
   "esp-hal/esp32c2",
   "esp-rtos/esp32c2",
   "esp-radio-rtos-driver/esp32c2",
@@ -160,6 +171,7 @@ esp32c2 = [
 ]
 ##
 esp32c3 = [
+  "dep:esp32c3",
   "esp-hal/esp32c3",
   "esp-rtos/esp32c3",
   "esp-radio-rtos-driver/esp32c3",
@@ -169,6 +181,7 @@ esp32c3 = [
 ]
 ##
 esp32c5 = [
+  "dep:esp32c5",
   "esp-hal/esp32c5",
   "esp-rtos/esp32c5",
   "esp-radio-rtos-driver/esp32c5",
@@ -178,6 +191,7 @@ esp32c5 = [
 ]
 ##
 esp32c6 = [
+  "dep:esp32c6",
   "esp-hal/esp32c6",
   "esp-rtos/esp32c6",
   "esp-radio-rtos-driver/esp32c6",
@@ -187,6 +201,7 @@ esp32c6 = [
 ]
 ##
 esp32h2 = [
+  "dep:esp32h2",
   "esp-hal/esp32h2",
   "esp-rtos/esp32h2",
   "esp-radio-rtos-driver/esp32h2",
@@ -196,6 +211,7 @@ esp32h2 = [
 ]
 ##
 esp32s2 = [
+  "dep:esp32s2",
   "esp-hal/esp32s2",
   "esp-rtos/esp32s2",
   "esp-radio-rtos-driver/esp32s2",
@@ -206,6 +222,7 @@ esp32s2 = [
 ]
 ##
 esp32s3 = [
+  "dep:esp32s3",
   "esp-hal/esp32s3",
   "esp-rtos/esp32s3",
   "esp-radio-rtos-driver/esp32s3",

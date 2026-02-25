@@ -252,6 +252,7 @@ unstable_module! {
 }
 
 pub(crate) mod common_adapter;
+pub(crate) mod reg_access;
 
 #[cfg(all(feature = "ble", bt_controller = "npl"))]
 pub(crate) static ESP_RADIO_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
