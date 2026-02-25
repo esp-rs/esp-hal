@@ -1,13 +1,10 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
-    "analog_pin" => {
-        cfg(esp32) => "let analog_pin = peripherals.GPIO32;",
-        cfg(not(esp32)) => "let analog_pin = peripherals.GPIO3;"
-    },
     "documentation" => concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", chip!(), "/api-reference/system/random.html)")
 ))]
 //! # Random Number Generator (RNG)
 //!
 //! ## Overview
+//!
 //! The Random Number Generator (RNG) module provides an interface to generate
 //! random numbers using the RNG peripheral on ESP chips. This driver allows you
 //! to generate random numbers that can be used for various cryptographic,
@@ -53,9 +50,10 @@ is alive."
 //! [`rand_core`]: https://crates.io/crates/rand_core
 //!
 //! ## Compatibility with [`getrandom`]
+//!
 //! The driver can be used to implement a custom backend for `getrandom`.
 //!
-//! ### Example
+//! ## Example
 //!
 //! The following example demonstrates how to set up a [custom backend] using `getrandom v0.3.3`:
 //!
@@ -95,52 +93,6 @@ is alive."
 //! loop {}
 //! # }
 //! ```
-#![cfg_attr(
-    rng_trng_supported,
-    doc = r"
-### TRNG operation
-```rust, no_run
-# {before_snippet}
-# use esp_hal::Blocking;
-# use esp_hal::peripherals::ADC1;
-# use esp_hal::analog::adc::{AdcConfig, Attenuation, Adc};
-#
-use esp_hal::rng::{Trng, TrngSource};
-
-let mut buf = [0u8; 16];
-
-// ADC is not available from now
-let trng_source = TrngSource::new(peripherals.RNG, peripherals.ADC1.reborrow());
-
-let trng = Trng::try_new().unwrap(); // Unwrap is safe as we have enabled TrngSource.
-
-// Generate true random numbers
-trng.read(&mut buf);
-let true_random_number = trng.random();
-
-// Downgrade to Rng to allow disabling the TrngSource
-let rng = trng.downgrade();
-
-// Drop the true random number source. ADC is available now.
-core::mem::drop(trng_source);
-
-# {analog_pin}
-
-let mut adc1_config = AdcConfig::new();
-let mut adc1_pin = adc1_config.enable_pin(analog_pin, Attenuation::_11dB);
-let mut adc1 = Adc::<ADC1, Blocking>::new(peripherals.ADC1, adc1_config);
-let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin))?;
-
-// Now we can only generate pseudo-random numbers...
-rng.read(&mut buf);
-let pseudo_random_number = rng.random();
-
-// ... but the ADC is available for use.
-let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin))?;
-# {after_snippet}
-```
-"
-)]
 
 mod ll;
 
