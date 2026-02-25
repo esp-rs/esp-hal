@@ -214,6 +214,16 @@ mod tests {
 
     const MAX_MEM_BLOCK_SIZE: usize = 32;
 
+    // ECC hardware works on little endian data, but the standard encoding (and thus, the bytes we
+    // get out of the elliptic_curve crates) is big endian.
+    macro_rules! reverse {
+        ($($buff:ident),*) => {
+            $(
+            $buff.reverse();
+            )*
+        }
+    }
+
     /// Creates the requested buffers that are large enough to hold the parameters of the given
     /// curve.
     macro_rules! buffers {
@@ -240,14 +250,19 @@ mod tests {
                 sw_x, sw_y
             });
 
+            // Generate test data
             fill_random(prime_field, k);
             affine_point_coords(curve, x, y);
 
+            // Run software algorithm
+            affine_point_multiplication(curve, k, sw_x, sw_y);
+
+            // Run hardware algorithm
+            reverse!(k, x, y);
             ctx.ecc
                 .affine_point_multiplication(curve, k, x, y)
                 .expect("Inputs data doesn't match the key length selected.");
-
-            affine_point_multiplication(curve, k, sw_x, sw_y);
+            reverse!(x, y);
 
             assert_eq!(x, sw_x);
             assert_eq!(y, sw_y);
@@ -259,18 +274,19 @@ mod tests {
         for_each_test_case(|prime_field, curve| {
             buffers!(curve => { k, x, y });
 
+            // Generate test data
             fill_random(prime_field, k);
-
             affine_point_multiplication(curve, k, x, y);
 
+            // Run hardware algorithm
+            reverse!(x, y);
             match ctx.ecc.affine_point_verification(curve, x, y) {
                 Err(Error::SizeMismatchCurve) => {
                     panic!("Inputs data doesn't match the key length selected.")
                 }
-                Err(Error::PointNotOnSelectedCurve) => panic!(
-                    "ECC failed while affine point verification with x = {:02X?} and y = {:02X?}.",
-                    x, y,
-                ),
+                Err(Error::PointNotOnSelectedCurve) => {
+                    panic!("x = {:02X?} and y = {:02X?} is not on the curve", x, y)
+                }
                 _ => {}
             }
         })
@@ -292,8 +308,15 @@ mod tests {
                 }
             }
 
+            // Generate test data
             fill_random(prime_field, k);
             affine_point_coords(curve, px, py);
+
+            // Run software algorithm
+            affine_point_multiplication(curve, k, sw_x, sw_y);
+
+            // Run hardware algorithm
+            reverse!(k, px, py);
 
             #[cfg(not(ecc_working_modes = "11"))]
             let result = ctx
@@ -305,18 +328,19 @@ mod tests {
                 .ecc
                 .affine_point_verification_multiplication(curve, k, px, py, qx, qy, qz);
 
+            reverse!(px, py);
+            #[cfg(ecc_working_modes = "11")]
+            reverse!(qx, qy, qz);
+
             match result {
                 Err(Error::SizeMismatchCurve) => {
                     panic!("Inputs data doesn't match the key length selected.")
                 }
-                Err(Error::PointNotOnSelectedCurve) => panic!(
-                    "ECC failed while affine point verification + multiplication with x = {:02X?} and y = {:02X?}.",
-                    px, py,
-                ),
+                Err(Error::PointNotOnSelectedCurve) => {
+                    panic!("x = {:02X?} and y = {:02X?} is not on the curve", px, py)
+                }
                 _ => {}
             }
-
-            affine_point_multiplication(curve, k, sw_x, sw_y);
 
             assert_eq!(px, sw_x);
             assert_eq!(py, sw_y);
@@ -336,11 +360,15 @@ mod tests {
             affine_point_coords(curve, x, y);
 
             // FIXME: Overwrites k, its value should also be checked
+            reverse!(k, x, y);
             ctx.ecc
                 .jacobian_point_multiplication(curve, k, x, y)
                 .expect("Inputs data doesn't match the key length selected.");
+            reverse!(k, x, y);
 
             affine_point_multiplication(curve, sw_k, sw_x, sw_y);
+            // FIXME: k comes from the hardware result, it's surprising. We should compute it
+            // in software to verify the result.
             affine_to_jacobian(curve, prime_field, k, sw_x, sw_y);
 
             assert_eq!(x, sw_x);
@@ -360,14 +388,14 @@ mod tests {
             affine_point_multiplication(curve, k, x, y);
             affine_to_jacobian(curve, prime_field, z, x, y);
 
+            reverse!(x, y, z);
             match ctx.ecc.jacobian_point_verification(curve, x, y, z) {
                 Err(Error::SizeMismatchCurve) => {
                     panic!("Inputs data doesn't match the key length selected.")
                 }
-                Err(Error::PointNotOnSelectedCurve) => panic!(
-                    "ECC failed while base point verification with x = {:02X?} and y = {:02X?}.",
-                    x, y,
-                ),
+                Err(Error::PointNotOnSelectedCurve) => {
+                    panic!("x = {:02X?} and y = {:02X?} is not on the curve", x, y)
+                }
                 _ => {}
             }
         })
@@ -386,6 +414,7 @@ mod tests {
             affine_point_coords(curve, x, y);
 
             // FIXME: overwrites k, its value should also be checked
+            reverse!(k, x, y);
             match ctx
                 .ecc
                 .affine_point_verification_jacobian_multiplication(curve, k, x, y)
@@ -393,12 +422,12 @@ mod tests {
                 Err(Error::SizeMismatchCurve) => {
                     panic!("Inputs data doesn't match the key length selected.")
                 }
-                Err(Error::PointNotOnSelectedCurve) => panic!(
-                    "ECC failed while affine point verification + multiplication with x = {:02X?} and y = {:02X?}.",
-                    x, y,
-                ),
+                Err(Error::PointNotOnSelectedCurve) => {
+                    panic!("x = {:02X?} and y = {:02X?} is not on the curve", x, y)
+                }
                 _ => {}
             }
+            reverse!(k, x, y);
 
             affine_point_multiplication(curve, sw_k, sw_x, sw_y);
             // FIXME: k comes from the hardware result, it's surprising. We should compute it
@@ -425,9 +454,11 @@ mod tests {
             sw_y.copy_from_slice(y);
             sw_k.copy_from_slice(k);
 
+            reverse!(k, y);
             ctx.ecc
                 .finite_field_division(curve, k, y)
                 .expect("Inputs data doesn't match the key length selected.");
+            reverse!(y);
 
             finite_field_division(curve, prime_field, sw_k, sw_y);
 

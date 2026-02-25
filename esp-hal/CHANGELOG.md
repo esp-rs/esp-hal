@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `ecc` driver now takes the curve by value (#5055)
 - `EllipticCurve` now implements common traits (#5055)
 - The `interrupt` module, `esp_hal::interrupt::Priority`, `PERI::enable_X_interrupt` and `PERI::disable_X_interrupt_on_all_cores` have been stabilized (#5040)
+- The `Ecc` driver no longer expects some operations to receive big-endian input (#5061)
 
 ### Fixed
 

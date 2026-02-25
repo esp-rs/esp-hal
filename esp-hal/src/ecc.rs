@@ -31,6 +31,7 @@ use crate::{
     system::{self, GenericPeripheralGuard},
 };
 
+#[cfg(ecc_zero_extend_writes)]
 const MEM_BLOCK_SIZE: usize = 32;
 
 /// The ECC Accelerator driver instance
@@ -195,15 +196,15 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     ) -> Result<(), Error> {
         curve.size_check([k, x, y])?;
 
-        self.write_mem_reversed(self.k_mem(), k);
-        self.write_mem_reversed(self.px_mem(), x);
-        self.write_mem_reversed(self.py_mem(), y);
+        self.write_mem(self.k_mem(), k);
+        self.write_mem(self.px_mem(), x);
+        self.write_mem(self.py_mem(), y);
 
         self.start_operation(WorkMode::PointMultiMode, curve);
         while self.is_busy() {}
 
-        self.read_mem_reversed(self.px_mem(), x);
-        self.read_mem_reversed(self.py_mem(), y);
+        self.read_mem(self.px_mem(), x);
+        self.read_mem(self.py_mem(), y);
 
         Ok(())
     }
@@ -228,15 +229,15 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     ) -> Result<(), Error> {
         curve.size_check([k, y])?;
 
-        self.write_mem_reversed(self.k_mem(), k);
-        self.write_mem_reversed(self.py_mem(), y);
+        self.write_mem(self.k_mem(), k);
+        self.write_mem(self.py_mem(), y);
 
         self.start_operation(WorkMode::DivisionMode, curve);
 
         // wait for interrupt
         while self.is_busy() {}
 
-        self.read_mem_reversed(self.py_mem(), y);
+        self.read_mem(self.py_mem(), y);
 
         Ok(())
     }
@@ -261,8 +262,8 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     ) -> Result<(), Error> {
         curve.size_check([x, y])?;
 
-        self.write_mem_reversed(self.px_mem(), x);
-        self.write_mem_reversed(self.py_mem(), y);
+        self.write_mem(self.px_mem(), x);
+        self.write_mem(self.py_mem(), y);
 
         self.start_operation(WorkMode::PointVerif, curve);
 
@@ -298,9 +299,9 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     ) -> Result<(), Error> {
         curve.size_check([k, x, y])?;
 
-        self.write_mem_reversed(self.k_mem(), k);
-        self.write_mem_reversed(self.px_mem(), x);
-        self.write_mem_reversed(self.py_mem(), y);
+        self.write_mem(self.k_mem(), k);
+        self.write_mem(self.px_mem(), x);
+        self.write_mem(self.py_mem(), y);
 
         self.start_operation(WorkMode::PointVerifMulti, curve);
 
@@ -308,8 +309,8 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         while self.is_busy() {}
         self.check_point_verification_result()?;
 
-        self.read_mem_reversed(self.px_mem(), x);
-        self.read_mem_reversed(self.py_mem(), y);
+        self.read_mem(self.px_mem(), x);
+        self.read_mem(self.py_mem(), y);
 
         Ok(())
     }
@@ -345,9 +346,9 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     ) -> Result<(), Error> {
         curve.size_check([k, px, py])?; //Q?
 
-        self.write_mem_reversed(self.k_mem(), k);
-        self.write_mem_reversed(self.px_mem(), px);
-        self.write_mem_reversed(self.py_mem(), py);
+        self.write_mem(self.k_mem(), k);
+        self.write_mem(self.px_mem(), px);
+        self.write_mem(self.py_mem(), py);
 
         self.start_operation(WorkMode::PointVerifMulti, curve);
 
@@ -355,11 +356,11 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         while self.is_busy() {}
         self.check_point_verification_result()?;
 
-        self.read_mem_reversed(self.px_mem(), px);
-        self.read_mem_reversed(self.py_mem(), py);
-        self.read_mem_reversed(self.qx_mem(), qx);
-        self.read_mem_reversed(self.qy_mem(), qy);
-        self.read_mem_reversed(self.qz_mem(), qz);
+        self.read_mem(self.px_mem(), px);
+        self.read_mem(self.py_mem(), py);
+        self.read_mem(self.qx_mem(), qx);
+        self.read_mem(self.qy_mem(), qy);
+        self.read_mem(self.qz_mem(), qz);
 
         Ok(())
     }
@@ -384,9 +385,9 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     ) -> Result<(), Error> {
         curve.size_check([k, x, y])?;
 
-        self.write_mem_reversed(self.k_mem(), k);
-        self.write_mem_reversed(self.px_mem(), x);
-        self.write_mem_reversed(self.py_mem(), y);
+        self.write_mem(self.k_mem(), k);
+        self.write_mem(self.px_mem(), x);
+        self.write_mem(self.py_mem(), y);
 
         self.start_operation(WorkMode::JacobianPointMulti, curve);
 
@@ -394,13 +395,13 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
 
         cfg_if::cfg_if! {
             if #[cfg(not(ecc_working_modes = "11"))] {
-                self.read_mem_reversed(self.px_mem(), x);
-                self.read_mem_reversed(self.py_mem(), y);
-                self.read_mem_reversed(self.k_mem(), k);
+                self.read_mem(self.px_mem(), x);
+                self.read_mem(self.py_mem(), y);
+                self.read_mem(self.k_mem(), k);
             } else {
-                self.read_mem_reversed(self.qx_mem(), x);
-                self.read_mem_reversed(self.qy_mem(), y);
-                self.read_mem_reversed(self.qz_mem(), k);
+                self.read_mem(self.qx_mem(), x);
+                self.read_mem(self.qy_mem(), y);
+                self.read_mem(self.qz_mem(), k);
             }
         }
 
@@ -430,13 +431,13 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
 
         cfg_if::cfg_if! {
             if #[cfg(not(ecc_working_modes = "11"))] {
-                self.write_mem_reversed(self.px_mem(), x);
-                self.write_mem_reversed(self.py_mem(), y);
-                self.write_mem_reversed(self.k_mem(), z);
+                self.write_mem(self.px_mem(), x);
+                self.write_mem(self.py_mem(), y);
+                self.write_mem(self.k_mem(), z);
             } else {
-                self.write_mem_reversed(self.qx_mem(), x);
-                self.write_mem_reversed(self.qy_mem(), y);
-                self.write_mem_reversed(self.qz_mem(), z);
+                self.write_mem(self.qx_mem(), x);
+                self.write_mem(self.qy_mem(), y);
+                self.write_mem(self.qz_mem(), z);
             }
         }
 
@@ -473,9 +474,9 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     ) -> Result<(), Error> {
         curve.size_check([k, x, y])?;
 
-        self.write_mem_reversed(self.k_mem(), k);
-        self.write_mem_reversed(self.px_mem(), x);
-        self.write_mem_reversed(self.py_mem(), y);
+        self.write_mem(self.k_mem(), k);
+        self.write_mem(self.px_mem(), x);
+        self.write_mem(self.py_mem(), y);
 
         self.start_operation(WorkMode::PointVerifJacobianMulti, curve);
 
@@ -485,13 +486,13 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
 
         cfg_if::cfg_if! {
             if #[cfg(not(ecc_working_modes = "11"))] {
-                self.read_mem_reversed(self.px_mem(), x);
-                self.read_mem_reversed(self.py_mem(), y);
-                self.read_mem_reversed(self.k_mem(), k);
+                self.read_mem(self.px_mem(), x);
+                self.read_mem(self.py_mem(), y);
+                self.read_mem(self.k_mem(), k);
             } else {
-                self.read_mem_reversed(self.qx_mem(), x);
-                self.read_mem_reversed(self.qy_mem(), y);
-                self.read_mem_reversed(self.qz_mem(), k);
+                self.read_mem(self.qx_mem(), x);
+                self.read_mem(self.qy_mem(), y);
+                self.read_mem(self.qz_mem(), k);
             }
         }
 
@@ -607,23 +608,6 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.regs().mult_conf().read().start().bit_is_set()
     }
 
-    fn reverse_words(&self, src: &[u8], dst: &mut [u8]) {
-        let n = core::cmp::min(src.len(), dst.len());
-        let nsrc = if src.len() > n {
-            src.split_at(n).0
-        } else {
-            src
-        };
-        let ndst = if dst.len() > n {
-            dst.split_at_mut(n).0
-        } else {
-            dst
-        };
-        for (a, b) in nsrc.chunks_exact(4).zip(ndst.rchunks_exact_mut(4)) {
-            b.copy_from_slice(&u32::from_be_bytes(a.try_into().unwrap()).to_ne_bytes());
-        }
-    }
-
     fn start_operation(&self, mode: WorkMode, curve: EllipticCurve) {
         self.regs().mult_conf().write(|w| unsafe {
             w.work_mode().bits(mode as u8);
@@ -650,7 +634,6 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         }
     }
 
-    #[cfg(ecc_working_modes = "11")]
     fn write_mem(&mut self, ptr: *mut u32, data: &[u8]) {
         self.alignment_helper
             .volatile_write_regset(ptr, data, data.len());
@@ -665,24 +648,9 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         }
     }
 
-    fn write_mem_reversed(&mut self, ptr: *mut u32, data: &[u8]) {
-        let mut tmp = [0_u8; MEM_BLOCK_SIZE];
-        self.reverse_words(data, &mut tmp);
-        self.alignment_helper
-            .volatile_write_regset(ptr, tmp.as_ref(), MEM_BLOCK_SIZE);
-    }
-
-    #[cfg(ecc_working_modes = "11")]
     fn read_mem(&mut self, reg: *const u32, out: &mut [u8]) {
         self.alignment_helper
             .volatile_read_regset(reg, out, out.len());
-    }
-
-    fn read_mem_reversed(&mut self, reg: *const u32, out: &mut [u8]) {
-        let mut tmp = [0_u8; MEM_BLOCK_SIZE];
-        self.alignment_helper
-            .volatile_read_regset(reg, &mut tmp, MEM_BLOCK_SIZE);
-        self.reverse_words(tmp.as_ref(), out);
     }
 
     fn k_mem(&self) -> *mut u32 {

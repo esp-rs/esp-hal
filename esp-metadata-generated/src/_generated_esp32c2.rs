@@ -82,7 +82,7 @@ macro_rules! property {
         stringify!(7)
     };
     ("ecc.zero_extend_writes") => {
-        false
+        true
     };
     ("gpio.has_bank_1") => {
         false
