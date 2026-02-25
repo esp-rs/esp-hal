@@ -1,196 +1,115 @@
-# Copilot agent onboarding for `esp-hal`
+# esp-hal agent instructions
 
-Purpose
-- Give a coding agent the essential context, commands, and checks so PRs build cleanly and validate locally before proposing changes.
-- Trust these instructions first — search the repo only when an instruction is missing or fails.
+Bare-metal `no_std` Rust HAL for Espressif SoCs. MSRV: **1.88.0** (source: `MSRV` env in `.github/workflows/ci.yml`).
 
-High-level summary
-- `esp-hal` is a Rust, bare-metal (`no_std`) hardware abstraction layer for Espressif SoCs (ESP32 family, RISC-V/XTensa variants). The repository contains many crates (HALs, drivers, examples, tests) plus an `xtask` automation crate used to build, test, lint, format, and run CI-like workflows locally.
-- Languages / runtimes: Rust (embedded, no_std), some host tests run on x86_64. Primary tooling is `cargo` + `cargo xtask`. CI uses GitHub Actions.
+## Chip reference
 
-Important facts (quick)
-- Primary automation hub: `xtask/` (see `xtask/README.md`). Use `cargo xtask <command>` for repository-level tasks.
-- GitHub workflows live in `.github/workflows/*.yml`. The canonical source-of-truth for the Minimum Supported Rust Version (MSRV) is the `MSRV` environment variable in `.github/workflows/ci.yml`. Always read it from that file before selecting which toolchain to use for MSRV validation.
-  - Example: to inspect the workflow for the MSRV value, check `.github/workflows/ci.yml` (look for the `MSRV:` env). You can extract it with a quick grep locally:
-```esp-hal/.github/workflows/ci.yml#L1-200
-grep -E '^\s*MSRV:\s*' .github/workflows/ci.yml || true
+| Chip | Arch | Target | Toolchain flag |
+|------|------|--------|----------------|
+| esp32 | Xtensa | `xtensa-esp32-none-elf` | `--toolchain esp` |
+| esp32s2 | Xtensa | `xtensa-esp32s2-none-elf` | `--toolchain esp` |
+| esp32s3 | Xtensa | `xtensa-esp32s3-none-elf` | `--toolchain esp` |
+| esp32c2 | RISC-V | `riscv32imc-unknown-none-elf` | `--toolchain stable` |
+| esp32c3 | RISC-V | `riscv32imc-unknown-none-elf` | `--toolchain stable` |
+| esp32c5 | RISC-V | `riscv32imac-unknown-none-elf` | `--toolchain stable` |
+| esp32c6 | RISC-V | `riscv32imac-unknown-none-elf` | `--toolchain stable` |
+| esp32h2 | RISC-V | `riscv32imac-unknown-none-elf` | `--toolchain stable` |
+
+## Commands
+
+All automation goes through `cargo xtask`. Use `--packages` and `--chips` to scope.
+
+| Task | Command |
+|------|---------|
+| Format (required before PR) | `cargo xtask fmt-packages` |
+| Lint | `cargo xtask lint-packages [--chips X --packages Y]` |
+| Full CI check for one chip | `cargo xtask ci <chip>` |
+| Host-side unit tests | `cargo xtask host-tests` |
+| HIL tests (needs hardware) | `cargo xtask run tests <chip> [--test name]` |
+| Run an example | `cargo xtask run example [name] --chip <chip>` |
+| Build docs | `cargo xtask build documentation --chips <list>` |
+| Validate metadata | `cargo xtask update-metadata --check` |
+| Validate changelog | `cargo xtask check-changelog` |
+
+## Test & example metadata
+
+Tests and examples use `//% KEY: value` comments to control xtask builds (full docs: `xtask/README.md`).
+
+| Annotation | Purpose | Example |
+|------------|---------|---------|
+| `//% CHIPS:` | Restrict to specific chips | `//% CHIPS: esp32c6 esp32s3` |
+| `//% FEATURES:` | Enable cargo features | `//% FEATURES: unstable embassy` |
+| `//% ENV:` | Set environment variables | `//% ENV: ESP_HAL_CONFIG_STACK_GUARD_OFFSET=4` |
+| `//% CARGO-CONFIG:` | Cargo `--config` passthrough | `//% CARGO-CONFIG: ...` |
+
+Named configs build the same file with different settings:
 ```
-- `xtask`'s `main()` will set `CARGO_TARGET_DIR` to `<workspace>/target` if that env var is not already set — do not rely on a different target dir unless intentional.
-
-Top-level files and directories (priority)
-- `Cargo.toml` (workspace)
-- `README.md` (project overview)
-- `xtask/` (automation; primary place to run builds, lint, tests)
-- `.github/` (workflows and PR template)
-- `.cargo/config.toml` (useful aliases, e.g. `cargo xtask`)
-- `documentation/` (contrib guides like `CONTRIBUTING.md`, `DEVELOPER-GUIDELINES.md`)
-- Crate directories: `esp-hal`, `esp-alloc`, `esp-println`, `esp-lp-hal`, `esp-phy`, `esp-radio`, `esp-rtos`, `esp-storage`, `esp-metadata*`, `examples`, `extras`, `hil-test`, `qa-test`
-- Configs: `rustfmt.toml`
-- Licenses: `LICENSE-APACHE`, `LICENSE-MIT`
-
-Developer / contributor expectations (must-dos before a PR)
-- Always run formatting across changed crates: `cargo xtask fmt-packages` (this is required by the PR template). Reviewer agent: do not comment on formatting issues in Rust source code.
-- Add/adjust changelog entries where relevant (changelog checks are automated).
-- Follow `documentation/CONTRIBUTING.md` and `documentation/DEVELOPER-GUIDELINES.md` for API changes, HIL updates, and release guidance.
-- Make sure examples affected by changes still build.
-
-Recommended local environment bootstrap (what to install)
-- Install Rust toolchains (determine MSRV by reading `.github/workflows/ci.yml` first):
-  - Read MSRV from the workflow and install it. Example (inspect file first):
-```esp-hal/.github/workflows/ci.yml#L1-200
-# Look for a line like: MSRV: "1.88.0" in the workflow and then install that toolchain
-grep -E '^\s*MSRV:\s*' .github/workflows/ci.yml || true
+//% CHIPS(wifi): esp32 esp32c3 esp32c6 esp32s3
+//% CHIPS(ble_only): esp32h2
+//% FEATURES(wifi): esp-radio/wifi
+//% FEATURES(ble_only): esp-radio/ble
 ```
-  - Then install the MSRV toolchain (example shown uses the discovered version):
-```/dev/null/commands.md#L1-2
-rustup toolchain install <MSRV_VERSION>
-rustup component add rustfmt clippy --toolchain <MSRV_VERSION>
+
+## The `unstable` feature
+
+- **Libraries** must never enable `unstable`. Use `requires-unstable` instead.
+- **Applications** (examples, tests) may enable `unstable` freely.
+- Mark new unstable APIs with `#[instability::unstable]`.
+- `unstable_module!` macro: makes a module `pub` when `unstable` is enabled, `pub(crate)` otherwise.
+- Features prefixed with `__` (e.g. `__bluetooth`) are private — never enable directly.
+
+## esp-config
+
+Build-time configuration defined in `esp_config.yml` per crate. Override via environment variables.
+
+```rust
+esp_config::esp_config_bool!("ESP_HAL_CONFIG_PLACE_SPI_MASTER_DRIVER_IN_RAM");
+esp_config::esp_config_int!(u32, "ESP_HAL_CONFIG_STACK_GUARD_OFFSET");
+esp_config::esp_config_str!("ESP_HAL_CONFIG_PSRAM_MODE");
 ```
-- Set up the Espressif `esp` toolchain using `espup`. Prefer the `esp` toolchain version documented in CI or project docs when available. Install it like this (replace <VERSION> with the desired esp toolchain version):
-```/dev/null/commands.md#L3-3
-cargo install espup
-espup install # optionally -v <VERSION>
-```
-  - Note: the `esp` toolchain may be required to reproduce Xtensa builds locally. If the CI workflow uses an `esp` toolchain, mirror that version.
-- Nightly (optional) for some doc/tests/format checks if required: `rustup toolchain install nightly` and `rustup component add rustfmt miri --toolchain nightly`
-- Add common components:
-  - For MSRV: `rustup component add rustfmt clippy --toolchain <MSRV>`
-  - For nightly checks (if you use them): `rustup component add rustfmt miri --toolchain nightly`
-- Recommended: make sure `rust-src` is available for cross-target builds where CI uses it:
-  - `rustup component add rust-src --toolchain <MSRV>`
 
-Primary commands (bootstrap → build → test → lint → docs)
-- Bootstrap (one-time / ensure toolchain and components installed)
-  - Set up rust toolchains and components as above.
-  - Optional: create a consistent `CARGO_TARGET_DIR` if you have multi-repo workflows. By default `xtask` sets it to `<workspace>/target`.
-- Formatting (always before commit)
-  - `cargo xtask fmt-packages`
-- Linting (recommended before PR)
-  - `cargo xtask lint-packages`
-  - For targeted linting: `cargo xtask lint-packages --packages <comma-separated>`
-- Build examples / tests / packages
-  - See `cargo xtask build --help` or `cargo xtask build examples --help`. Typical patterns:
-    - Build an example: `cargo xtask build examples <EXAMPLE> --chips <chip>` (use `--chips` to limit targets)
-    - Build tests: `cargo xtask build tests <package-or-test> --chips <chip>`
-  - To run host-side tests: `cargo xtask host-tests` (some host tests are executed inside `xtask` itself; in CI they `cd xtask && cargo test --features release`).
-- Running examples/tests
-  - `cargo xtask run tests <chip> <testname>` or `cargo xtask run example <chip> <example-name>`
-- Documentation
-  - Build docs (heavy): `cargo xtask build documentation --chips <chip-list>`
-  - Run doctests: `cargo xtask run doc-tests <CHIP>`
-  - Use `--packages` and `--chips` to reduce scope and build time during development.
-- Metadata & changelog checks (CI enforces)
-  - `cargo xtask check-changelog`
-  - `cargo xtask update-metadata` / `cargo xtask update-metadata --check` (CI runs metadata checks)
-- Quick clean
-  - `cargo xtask clean`
-  - There's also alias support in `.cargo/config.toml` (e.g. `cargo xclean` if installed).
+Config options must not alter the public API surface.
 
-CI / validation notes (what GH Actions runs)
-- CI workflows are in `.github/workflows/` and include `ci.yml`, `ci_nightly.yml`, `hil.yml`, and various helper workflows that:
-  - Run builds for multiple chips and targets (XTENSA / RISCV combinations).
-  - Use MSRV (read from `.github/workflows/ci.yml`) for many jobs; some jobs run on `nightly` (format/miri).
-  - Run `cargo xtask` subcommands to format, lint, run host-tests, build documentation, generate reports, and run HIL tests.
-- To mirror CI locally, run the same `cargo xtask` commands the workflows run:
-  - Format check: `cargo xtask fmt-packages --check`
-  - Metadata check: `cargo xtask update-metadata --check`
-  - Host tests: `cargo xtask host-tests`
-  - Changelog check: `cargo xtask check-changelog`
+## Driver conventions
 
-Common pitfalls and tips
-- Long-running builds: documentation builds and building all examples for all chips is time-consuming. Use `--packages` and `--chips` to scope work.
-- `CARGO_TARGET_DIR`: `xtask` will set the target dir to `<workspace>/target` if unset. If you set `CARGO_TARGET_DIR` externally, `xtask` will not override it — prefer leaving it unset unless you know why.
-- Formatting & linting: maintainers expect `cargo xtask fmt-packages` and `cargo xtask lint-packages` to pass; include formatting changes in the PR.
-- Changelog & migration guide: if your change modifies public APIs, update changelogs and migration documentation. CI checks will reject PRs missing required changelog entries.
-- HIL and hardware-related changes: hardware behavior can differ from CI — prefer testing on actual hardware for critical changes and mark in PR if hardware testing is pending.
+From `documentation/DEVELOPER-GUIDELINES.md` (read it for full details):
 
-Where to make code changes (architecture overview)
-- Crates are organized under root directories named after crates (e.g. `esp-hal/`, `esp-alloc/`, `esp-println/`). Many crates implement chip-specific HALs and drivers.
-- Examples: `examples/` contains usage examples that CI builds for compatibility verification.
-- Tests & hardware-in-the-loop: `hil-test/` and `qa-test/` contain HIL tests and QA harnesses.
-- Automation: `xtask/` is the authoritative entrypoint for repository-wide tasks; prefer using or extending `xtask` for CI-like operations or new automation.
+- **Pins**: `fn with_signal_name(self, pin: impl PeripheralInput) -> Self`
+- **Constructor**: takes `impl Instance + 'd`, returns `Result<Self, ConfigError>`
+- **Config**: `Config` struct with `procmacros::BuilderLite` derive + separate `ConfigError` enum
+- **Modes**: `DriverMode` type param; default `Blocking`; provide `into_async`/`into_blocking`
+- **Drop**: must reset peripheral to idle state
+- **Derives**: drivers: `Debug`; configs: `Default, Debug, PartialEq, Eq, Clone, Copy, Hash`
+- **Doc examples**: use `#[doc = crate::before_snippet!()]`, `no_run`, `?` operator (not unwrap)
 
-Agent workflow recommendations (how you should act)
-1. Read this file and trust it. Do not run a full repo search unless an instruction is missing or an executed command fails.
-2. Before producing a PR:
-   - Run `cargo xtask fmt-packages`
-   - Run `cargo xtask lint-packages` (or targeted linting)
-   - Run `cargo xtask check-changelog`
-   - Run any impacted example builds: `cargo xtask build examples <EXAMPLE> --chips <chip>` (use `--chips` to limit)
-   - If you modify metadata, run `cargo xtask update-metadata --check`
-3. If any of the above commands fail, surface the exact error and only then search or open files to locate the cause.
-4. Keep changes small and focused (one logical change per PR), include changelog entries, and respect style changes produced by `fmt-packages` (do not hand-edit formatting diffs).
+## Conditional compilation
 
-If something in these instructions is incorrect or incomplete
-- Only then perform targeted searches: prefer `xtask/` and `.github/workflows/ci.yml` first, then `documentation/` files.
-- When uncertain about toolchain constraints, prefer the MSRV value read from `.github/workflows/ci.yml`.
+Chip properties come from `esp-metadata/devices/*.toml`, generated into `esp-metadata-generated/`.
 
-Short checklist for PRs (agent-friendly)
-- [ ] Ran `cargo xtask fmt-packages`
-- [ ] Ran `cargo xtask lint-packages` (or targeted equivalent) and fixed issues
-- [ ] Added/updated changelog entry if API behavior changed
-- [ ] Ran `cargo xtask update-metadata --check` if package metadata changed
-- [ ] Built relevant examples/tests with `cargo xtask build ... --chips ...`
-- [ ] Verified host-tests if you changed host-side code: `cargo xtask host-tests`
+Key symbols: `riscv` / `xtensa`, `single_core` / `multi_core`, `soc_has_<peripheral>`, `<driver>_driver_supported`.
 
-Key reference paths (where to look first)
-- `xtask/README.md` — xtask usage and metadata annotations (examples/tests)
-- `documentation/CONTRIBUTING.md` and `documentation/DEVELOPER-GUIDELINES.md` — contribution rules
-- `.github/workflows/ci.yml` — canonical CI steps and toolchain versions
-- `.cargo/config.toml` — helpful cargo aliases (`xtask`, `xfmt`, etc.)
-- `README.md` — project overview and links
+Prefer these over `#[cfg(feature = "esp32c3")]` where possible.
 
-Final note to the agent
-- Follow this file as your primary orientation. It condenses the commands and checks CI runs and reduces unnecessary repository exploration. Only search further when a commanded step fails or when the task requires additional context not documented here.
+## Changelog & migration
 
-## MCP Tools
+- Add entries to `CHANGELOG.md` under `## [Unreleased]` > `### Added/Changed/Fixed/Removed`
+- Format: `- Description. (#PR_NUMBER)` — amend existing entries when modifying same feature: `(#789, #1234)`
+- Breaking changes: add migration steps to `MIGRATING-*.md` in the affected crate root
+- Breaking changes to stable API require a `breaking-change-<crate-name>` PR label
 
-This repository has an MCP server (`cargo xmcp`) that exposes xtask commands as tools.
-Available automatically when using Claude Code (configured in `.mcp.json`).
+## PR checklist
 
-### Available tools
+1. `cargo xtask fmt-packages`
+2. `cargo xtask lint-packages --chips <affected>` — fix all warnings
+3. `cargo xtask update-metadata --check` — if metadata changed
+4. `cargo xtask check-changelog` — add changelog entry if API changed
+5. Build affected examples/tests for relevant chips
+6. `cargo xtask host-tests` — if host-side code changed
 
-| Tool | Description |
-|------|-------------|
-| `ci` | Run CI checks for a given chip |
-| `check_packages` | `cargo check` all packages |
-| `lint_packages` | `cargo clippy` all packages |
-| `fmt_packages` | `cargo fmt` all packages |
-| `run_tests` | Build or run HIL tests |
-| `run_doc_tests` | Run doc tests |
-| `run_example` | Run examples for a chip and package |
-| `run_elfs` | Run ELFs via probe-rs |
-| `build_package` | Build a specific package |
-| `build_documentation` | Build documentation |
-| `host_tests` | Run host-side unit tests |
-| `clean` | `cargo clean` for packages |
-| `update_metadata` | Regenerate chip metadata and README table |
+## Key references
 
-### Valid values for tool parameters
-
-**Chips:** esp32, esp32c2, esp32c3, esp32c5, esp32c6, esp32h2, esp32s2, esp32s3
-
-**Packages:** esp-alloc, esp-backtrace, esp-bootloader-esp-idf, esp-config, esp-hal,
-esp-hal-procmacros, esp-rom-sys, esp-lp-hal, esp-metadata, esp-metadata-generated,
-esp-phy, esp-println, esp-riscv-rt, esp-storage, esp-sync, esp-radio,
-esp-radio-rtos-driver, esp-rtos, examples, hil-test, qa-test, xtensa-lx,
-xtensa-lx-rt, xtensa-lx-rt-proc-macros
-
-## Adding MCP support to a new xtask command
-
-1. Add the attribute above your `Args` struct:
-   ```rust
-   #[cfg_attr(feature = "mcp", xtask_mcp_macros::mcp_tool(
-       description = "Human-readable description of the tool",
-       command = "subcommand path"  // e.g. "ci", "run tests", "build documentation"
-   ))]
-   ```
-2. The struct **must** live in the library crate tree (`xtask/src/commands/`), not in `main.rs`
-3. The `command` string maps to the CLI subcommand path (space-separated for nested commands)
-4. Build with `cargo build --package xtask --features=mcp` to verify
-
-## Commands intentionally NOT exposed via MCP
-
-- `semver-check` — release-specific tooling, not useful for AI-assisted development
-- `check-changelog` — release checklist validation
-- `release` — publishing workflow
+- `documentation/DEVELOPER-GUIDELINES.md` — full API design rules
+- `documentation/CONTRIBUTING.md` — contribution workflow
+- `xtask/README.md` — metadata annotations and xtask usage
+- `.github/workflows/ci.yml` — CI steps and MSRV
+- `esp-metadata/devices/*.toml` — per-chip peripheral definitions
