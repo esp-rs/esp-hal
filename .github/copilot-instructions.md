@@ -19,17 +19,19 @@ Bare-metal `no_std` Rust HAL for Espressif SoCs. MSRV: **1.88.0** (source: `MSRV
 
 All automation goes through `cargo xtask`. Use `--packages` and `--chips` to scope.
 
-| Task | Command |
-|------|---------|
-| Format (required before PR) | `cargo xtask fmt-packages` |
-| Lint | `cargo xtask lint-packages [--chips X --packages Y]` |
-| Full CI check for one chip | `cargo xtask ci <chip>` |
-| Host-side unit tests | `cargo xtask host-tests` |
-| HIL tests (needs hardware) | `cargo xtask run tests <chip> [--test name]` |
-| Run an example | `cargo xtask run example [name] --chip <chip>` |
-| Build docs | `cargo xtask build documentation --chips <list>` |
-| Validate metadata | `cargo xtask update-metadata --check` |
-| Validate changelog | `cargo xtask check-changelog` |
+| Task | Command | Notes |
+|------|---------|-------|
+| Format (required before PR) | `cargo xtask fmt-packages` | Fast |
+| Lint | `cargo xtask lint-packages [--chips X --packages Y]` | Always scope with `--chips`/`--packages` |
+| Host-side unit tests | `cargo xtask host-tests` | Fast, runs on host |
+| Validate metadata | `cargo xtask update-metadata --check` | Fast |
+| Validate changelog | `cargo xtask check-changelog` | Fast |
+| Build an example | `cargo xtask run example [name] --chip <chip>` | |
+| Build docs | `cargo xtask build documentation --chips <list>` | Slow — scope to affected chips |
+| HIL tests (needs hardware) | `cargo xtask run tests <chip> [--test name]` | Requires connected device |
+| Full CI check for one chip | `cargo xtask ci <chip>` | **Very slow** — use only as final check before opening a PR |
+
+**Prefer targeted commands** (`lint-packages --chips X --packages Y`, `run example ... --chip X`) during development. Only run `ci` as a final validation pass.
 
 ## Test & example metadata
 
