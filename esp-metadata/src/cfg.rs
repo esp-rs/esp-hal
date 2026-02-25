@@ -381,6 +381,8 @@ driver_configs![
             working_modes: u32, // TODO: list instead of count
             #[serde(default)]
             zero_extend_writes: bool,
+            #[serde(default)]
+            separate_jacobian_point_memory: bool,
         }
     },
     EthernetProperties {

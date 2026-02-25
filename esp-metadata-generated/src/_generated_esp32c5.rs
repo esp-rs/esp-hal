@@ -93,6 +93,9 @@ macro_rules! property {
     ("ecc.zero_extend_writes") => {
         false
     };
+    ("ecc.separate_jacobian_point_memory") => {
+        true
+    };
     ("gpio.has_bank_1") => {
         false
     };

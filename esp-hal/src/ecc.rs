@@ -281,7 +281,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     ///
     /// This function will return an error if the point is not on the selected
     /// elliptic curve.
-    #[cfg(not(ecc_working_modes = "11"))]
+    #[cfg(not(ecc_separate_jacobian_point_memory))]
     pub fn affine_point_verification_multiplication(
         &mut self,
         curve: EllipticCurve,
@@ -322,7 +322,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     /// This function will return an error if the point is not on the selected
     /// elliptic curve.
     #[expect(clippy::too_many_arguments)]
-    #[cfg(ecc_working_modes = "11")]
+    #[cfg(ecc_separate_jacobian_point_memory)]
     pub fn affine_point_verification_multiplication(
         &mut self,
         curve: EllipticCurve,
@@ -403,7 +403,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         curve.size_check([x, y, z])?;
 
         cfg_if::cfg_if! {
-            if #[cfg(not(ecc_working_modes = "11"))] {
+            if #[cfg(not(ecc_separate_jacobian_point_memory))] {
                 self.write_mem(self.px_mem(), x);
                 self.write_mem(self.py_mem(), y);
                 self.write_mem(self.k_mem(), z);
@@ -627,17 +627,17 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
         self.regs().py_mem(0).as_ptr()
     }
 
-    #[cfg(ecc_working_modes = "11")]
+    #[cfg(ecc_separate_jacobian_point_memory)]
     fn qx_mem(&self) -> *mut u32 {
         self.regs().qx_mem(0).as_ptr()
     }
 
-    #[cfg(ecc_working_modes = "11")]
+    #[cfg(ecc_separate_jacobian_point_memory)]
     fn qy_mem(&self) -> *mut u32 {
         self.regs().qy_mem(0).as_ptr()
     }
 
-    #[cfg(ecc_working_modes = "11")]
+    #[cfg(ecc_separate_jacobian_point_memory)]
     fn qz_mem(&self) -> *mut u32 {
         self.regs().qz_mem(0).as_ptr()
     }
@@ -649,7 +649,7 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
 
     fn read_jacobian_result(&mut self, qx: &mut [u8], qy: &mut [u8], qz: &mut [u8]) {
         cfg_if::cfg_if! {
-            if #[cfg(not(ecc_working_modes = "11"))] {
+            if #[cfg(not(ecc_separate_jacobian_point_memory))] {
                 self.read_mem(self.px_mem(), qx);
                 self.read_mem(self.py_mem(), qy);
                 self.read_mem(self.k_mem(), qz);

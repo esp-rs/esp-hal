@@ -289,6 +289,7 @@ max_priority = 5
 support_status = "partial"
 working_modes = 11
 zero_extend_writes = true
+separate_jacobian_point_memory = true
 
 [device.gpio]
 support_status = "supported"

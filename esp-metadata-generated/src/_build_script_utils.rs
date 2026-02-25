@@ -1832,6 +1832,7 @@ impl Chip {
                     "dma_gdma_version=\"2\"",
                     "dma_gdma_version_is_set",
                     "ecc_working_modes=\"11\"",
+                    "ecc_separate_jacobian_point_memory",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"96\"",
                     "gpio_constant_1_input=\"64\"",
@@ -2060,6 +2061,7 @@ impl Chip {
                     "cargo:rustc-cfg=dma_gdma_version=\"2\"",
                     "cargo:rustc-cfg=dma_gdma_version_is_set",
                     "cargo:rustc-cfg=ecc_working_modes=\"11\"",
+                    "cargo:rustc-cfg=ecc_separate_jacobian_point_memory",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"96\"",
                     "cargo:rustc-cfg=gpio_constant_1_input=\"64\"",
@@ -3104,6 +3106,7 @@ impl Chip {
                     "dma_gdma_version_is_set",
                     "ecc_working_modes=\"11\"",
                     "ecc_zero_extend_writes",
+                    "ecc_separate_jacobian_point_memory",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"60\"",
                     "gpio_constant_1_input=\"56\"",
@@ -3339,6 +3342,7 @@ impl Chip {
                     "cargo:rustc-cfg=dma_gdma_version_is_set",
                     "cargo:rustc-cfg=ecc_working_modes=\"11\"",
                     "cargo:rustc-cfg=ecc_zero_extend_writes",
+                    "cargo:rustc-cfg=ecc_separate_jacobian_point_memory",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"60\"",
                     "cargo:rustc-cfg=gpio_constant_1_input=\"56\"",
@@ -5228,6 +5232,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(parl_io_driver_supported)");
     println!("cargo:rustc-check-cfg=cfg(dma_separate_in_out_interrupts)");
+    println!("cargo:rustc-check-cfg=cfg(ecc_separate_jacobian_point_memory)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_can_estimate_nack_reason)");
     println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
     println!("cargo:rustc-check-cfg=cfg(rmt_has_tx_loop_auto_stop)");
