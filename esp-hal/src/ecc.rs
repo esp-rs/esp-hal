@@ -27,7 +27,6 @@ use crate::{
     interrupt::InterruptHandler,
     pac::{self, ecc::mult_conf::KEY_LENGTH},
     peripherals::{ECC, Interrupt},
-    reg_access::{AlignmentHelper, SocDependentEndianess},
     system::{self, GenericPeripheralGuard},
 };
 
@@ -37,7 +36,6 @@ const MEM_BLOCK_SIZE: usize = 32;
 /// The ECC Accelerator driver instance
 pub struct Ecc<'d, Dm: DriverMode> {
     ecc: ECC<'d>,
-    alignment_helper: AlignmentHelper<SocDependentEndianess>,
     phantom: PhantomData<Dm>,
     _memory_guard: EccMemoryPowerGuard,
     _guard: GenericPeripheralGuard<{ system::Peripheral::Ecc as u8 }>,
@@ -149,7 +147,6 @@ impl<'d> Ecc<'d, Blocking> {
 
         Self {
             ecc,
-            alignment_helper: AlignmentHelper::default(),
             phantom: PhantomData,
             _memory_guard: EccMemoryPowerGuard::new(),
             _guard: guard,
@@ -635,22 +632,26 @@ impl<Dm: DriverMode> Ecc<'_, Dm> {
     }
 
     fn write_mem(&mut self, ptr: *mut u32, data: &[u8]) {
-        self.alignment_helper
-            .volatile_write_regset(ptr, data, data.len());
-        #[cfg(ecc_zero_extend_writes)]
-        if data.len() < MEM_BLOCK_SIZE {
-            let pad = MEM_BLOCK_SIZE - data.len();
-            self.alignment_helper.volatile_write_regset(
-                ptr.wrapping_byte_add(data.len()),
-                &[0; MEM_BLOCK_SIZE][..pad],
-                pad,
-            );
-        }
+        unsafe {
+            ptr.cast::<u8>()
+                .copy_from_nonoverlapping(data.as_ptr(), data.len());
+
+            #[cfg(ecc_zero_extend_writes)]
+            if data.len() < MEM_BLOCK_SIZE {
+                let pad = MEM_BLOCK_SIZE - data.len();
+
+                ptr.cast::<u8>()
+                    .wrapping_byte_add(data.len())
+                    .write_bytes(0, pad);
+            }
+        };
     }
 
     fn read_mem(&mut self, reg: *const u32, out: &mut [u8]) {
-        self.alignment_helper
-            .volatile_read_regset(reg, out, out.len());
+        unsafe {
+            reg.cast::<u8>()
+                .copy_to_nonoverlapping(out.as_mut_ptr(), out.len())
+        };
     }
 
     fn k_mem(&self) -> *mut u32 {
