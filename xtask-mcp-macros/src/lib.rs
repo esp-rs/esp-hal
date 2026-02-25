@@ -170,6 +170,10 @@ struct FieldDesc {
     flag: String,
     /// How to emit CLI args for this field.
     cli_kind: CliKind,
+    /// Any `#[cfg(...)]` attributes on the original field, propagated onto
+    /// the generated MCP field and CLI push code so feature-gated fields
+    /// are only present when the corresponding feature is active.
+    cfg_attrs: Vec<TokenStream2>,
 }
 
 enum CliKind {
@@ -198,6 +202,14 @@ fn build_field_desc(
     let arg = parse_arg_attrs(&field.attrs);
     let doc = extract_doc(&field.attrs);
     let tc = classify_type(&field.ty);
+
+    // Collect any #[cfg(...)] attributes to propagate onto generated code.
+    let cfg_attrs: Vec<TokenStream2> = field
+        .attrs
+        .iter()
+        .filter(|a| a.path().is_ident("cfg"))
+        .map(|a| quote! { #a })
+        .collect();
 
     // Derive the CLI flag name.
     let flag_name = if arg.long_name.is_empty() {
@@ -255,6 +267,7 @@ fn build_field_desc(
         doc,
         flag,
         cli_kind,
+        cfg_attrs,
     })
 }
 
@@ -264,11 +277,16 @@ fn build_field_desc(
 fn gen_mcp_field(fd: &FieldDesc) -> TokenStream2 {
     let ident = &fd.ident;
     let ty = &fd.mcp_ty;
+    let cfgs = &fd.cfg_attrs;
     if fd.doc.is_empty() {
-        quote! { pub #ident: #ty, }
+        quote! {
+            #(#cfgs)*
+            pub #ident: #ty,
+        }
     } else {
         let doc = &fd.doc;
         quote! {
+            #(#cfgs)*
             #[doc = #doc]
             pub #ident: #ty,
         }
@@ -278,8 +296,9 @@ fn gen_mcp_field(fd: &FieldDesc) -> TokenStream2 {
 fn gen_cli_push(fd: &FieldDesc) -> TokenStream2 {
     let ident = &fd.ident;
     let flag = &fd.flag;
+    let cfgs = &fd.cfg_attrs;
 
-    match &fd.cli_kind {
+    let body = match &fd.cli_kind {
         CliKind::BoolFlag => quote! {
             if input.#ident.unwrap_or(false) {
                 args.push(#flag.to_string());
@@ -331,6 +350,15 @@ fn gen_cli_push(fd: &FieldDesc) -> TokenStream2 {
         CliKind::RequiredPositional => quote! {
             args.push(input.#ident.clone());
         },
+    };
+
+    if cfgs.is_empty() {
+        body
+    } else {
+        quote! {
+            #(#cfgs)*
+            { #body }
+        }
     }
 }
 
@@ -429,8 +457,6 @@ fn expand_mcp_tool(
     let mut cli_pushes = Vec::new();
 
     for field in &fields.named {
-        // Skip cfg-gated fields we can see but want to ignore at the MCP level —
-        // we simply include all visible fields.
         let Some(fd) = build_field_desc(field) else {
             continue;
         };
@@ -461,7 +487,7 @@ fn expand_mcp_tool(
         fn #schema_fn() -> ::serde_json::Value {
             let schema = ::schemars::schema_for!(#input_type_name);
             ::serde_json::to_value(&schema)
-                .unwrap_or(::serde_json::Value::Object(::serde_json::Map::new()))
+                .expect("schemars Schema serialization cannot fail")
         }
 
         // 4. Inventory registration

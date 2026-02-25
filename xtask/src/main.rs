@@ -165,7 +165,10 @@ fn main() -> Result<()> {
 
         #[cfg(feature = "mcp")]
         Cli::Mcp => {
-            tokio::runtime::Runtime::new()?.block_on(xtask::commands::mcp::run_mcp_server())
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()?
+                .block_on(xtask::commands::mcp::run_mcp_server())
         }
     }
 }

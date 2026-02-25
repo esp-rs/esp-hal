@@ -36,19 +36,24 @@ pub fn run_xtask_subprocess(args: &[String]) -> Result<String> {
         .stderr(std::process::Stdio::piped())
         .spawn()?;
 
-    // Dismiss any interactive prompts with newlines.
+    // Send newlines then drop to close stdin — this dismisses interactive
+    // `inquire` prompts so MCP calls don't hang. Once stdin is dropped the
+    // subprocess sees EOF and any remaining prompts fail gracefully.
     if let Some(mut stdin) = child.stdin.take() {
-        let newlines = b"\n".repeat(20);
-        let _ = stdin.write_all(&newlines);
+        let _ = stdin.write_all(&b"\n".repeat(20));
+        // stdin dropped here, subprocess sees EOF
     }
 
     let output = child.wait_with_output()?;
-    Ok(format!(
-        "Exit: {}\n\nSTDOUT:\n{}\nSTDERR:\n{}",
-        output.status,
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr),
-    ))
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let combined = format!("STDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+
+    if output.status.success() {
+        Ok(combined)
+    } else {
+        anyhow::bail!("Exit {}\n\n{combined}", output.status)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -60,7 +65,10 @@ pub fn run_xtask_subprocess(args: &[String]) -> Result<String> {
 fn value_to_json_object(val: Value) -> serde_json::Map<String, Value> {
     match val {
         Value::Object(m) => m,
-        _ => serde_json::Map::new(),
+        other => {
+            log::warn!("Expected JSON object for schema, got: {other}");
+            serde_json::Map::new()
+        }
     }
 }
 
