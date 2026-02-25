@@ -6,7 +6,12 @@ use esp_metadata::Chip;
 use inquire::Select;
 use strum::IntoEnumIterator;
 
-pub use self::{build::*, check_changelog::*, release::*, run::*};
+pub use self::{
+    build::*,
+    check_changelog::*,
+    release::*,
+    run::*,
+};
 use crate::{
     Package,
     cargo::{CargoAction, CargoCommandBatcher},
@@ -17,15 +22,172 @@ mod check_changelog;
 pub mod generate_report;
 #[cfg(feature = "semver-checks")]
 pub(crate) mod generate_rom_symbols;
-mod release;
-mod run;
+#[cfg(feature = "mcp")]
+pub mod mcp;
 #[cfg(feature = "rel-check")]
 pub mod relcheck;
+mod release;
+mod run;
+
+// ----------------------------------------------------------------------------
+// Top level command and subcommand definitions
+
+/// Arguments for the `ci` subcommand.
+#[cfg_attr(
+    feature = "mcp",
+    xtask_mcp_macros::mcp_tool(
+        description = "Perform (parts of) the checks done in CI for a given chip",
+        command = "ci"
+    )
+)]
+#[derive(Debug, Args)]
+pub struct CiArgs {
+    /// Chip to target.
+    #[arg(value_enum)]
+    pub chip: Chip,
+
+    /// The toolchain used to run the lints
+    #[arg(long)]
+    pub toolchain: Option<String>,
+
+    /// Whether to skip running lints
+    #[arg(long)]
+    pub no_lint: bool,
+
+    /// Whether to skip building documentation
+    #[arg(long)]
+    pub no_docs: bool,
+
+    /// Whether to skip checking the crates itself
+    #[arg(long)]
+    pub no_check_crates: bool,
+}
+
+/// Arguments for the `fmt-packages` subcommand.
+#[cfg_attr(
+    feature = "mcp",
+    xtask_mcp_macros::mcp_tool(
+        description = "Format all packages in the workspace with rustfmt",
+        command = "fmt-packages"
+    )
+)]
+#[derive(Debug, Args)]
+pub struct FmtPackagesArgs {
+    /// Run in 'check' mode; exits with 0 if formatted correctly, 1 otherwise
+    #[arg(long)]
+    pub check: bool,
+
+    /// Package(s) to target.
+    #[arg(value_enum, default_values_t = Package::iter())]
+    pub packages: Vec<Package>,
+}
+
+/// Arguments for the `clean` subcommand.
+#[cfg_attr(
+    feature = "mcp",
+    xtask_mcp_macros::mcp_tool(
+        description = "Run cargo clean for the specified packages",
+        command = "clean"
+    )
+)]
+#[derive(Debug, Args)]
+pub struct CleanArgs {
+    /// Package(s) to target.
+    #[arg(value_enum, default_values_t = Package::iter())]
+    pub packages: Vec<Package>,
+}
+
+/// Arguments for the `host-tests` subcommand.
+#[cfg_attr(
+    feature = "mcp",
+    xtask_mcp_macros::mcp_tool(
+        description = "Run host-tests in the workspace with cargo test",
+        command = "host-tests"
+    )
+)]
+#[derive(Debug, Args)]
+pub struct HostTestsArgs {
+    /// Package(s) to target.
+    #[arg(value_enum, default_values_t = Package::iter())]
+    pub packages: Vec<Package>,
+}
+
+/// Arguments for the `check-packages` subcommand.
+#[cfg_attr(
+    feature = "mcp",
+    xtask_mcp_macros::mcp_tool(
+        description = "Check all packages in the workspace with cargo check",
+        command = "check-packages"
+    )
+)]
+#[derive(Debug, Args)]
+pub struct CheckPackagesArgs {
+    /// Package(s) to target.
+    #[arg(value_enum, default_values_t = Package::iter())]
+    pub packages: Vec<Package>,
+
+    /// Check for a specific chip
+    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
+    pub chips: Vec<Chip>,
+
+    /// The toolchain used to run the checks
+    #[arg(long)]
+    pub toolchain: Option<String>,
+}
+
+/// Arguments for the `lint-packages` subcommand.
+#[cfg_attr(
+    feature = "mcp",
+    xtask_mcp_macros::mcp_tool(
+        description = "Lint all packages in the workspace with clippy",
+        command = "lint-packages"
+    )
+)]
+#[derive(Debug, Args)]
+pub struct LintPackagesArgs {
+    /// Package(s) to target.
+    #[arg(value_enum, default_values_t = Package::iter())]
+    pub packages: Vec<Package>,
+
+    /// Lint for a specific chip
+    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
+    pub chips: Vec<Chip>,
+
+    /// Automatically apply fixes
+    #[arg(long)]
+    pub fix: bool,
+
+    /// The toolchain used to run the lints
+    #[arg(long)]
+    pub toolchain: Option<String>,
+}
+
+/// Arguments for the `update-metadata` subcommand.
+#[cfg_attr(
+    feature = "mcp",
+    xtask_mcp_macros::mcp_tool(
+        description = "Re-generate metadata and the chip support table in the esp-hal README",
+        command = "update-metadata"
+    )
+)]
+#[derive(Debug, Args)]
+pub struct UpdateMetadataArgs {
+    /// Run in 'check' mode; exits with 0 if formatted correctly, 1 otherwise
+    #[arg(long)]
+    pub check: bool,
+}
 
 // ----------------------------------------------------------------------------
 // Subcommand Arguments
 
 /// Arguments common to commands which act on examples.
+#[cfg_attr(
+    feature = "mcp",
+    xtask_mcp_macros::mcp_tool(
+        description = "Build or run examples for the specified chip and package",
+        command = "run example"
+    )
+)]
 #[derive(Debug, Args)]
 pub struct ExamplesArgs {
     /// Example to act on ("all" will execute every example).
@@ -50,6 +212,13 @@ pub struct ExamplesArgs {
 }
 
 /// Arguments common to commands which act on doctests.
+#[cfg_attr(
+    feature = "mcp",
+    xtask_mcp_macros::mcp_tool(
+        description = "Run doc tests for the specified chip and packages",
+        command = "run doc-tests"
+    )
+)]
 #[derive(Debug, Args)]
 pub struct DocTestArgs {
     /// Package(s) where we wish to run doc tests.
@@ -61,6 +230,13 @@ pub struct DocTestArgs {
 }
 
 /// Arguments common to commands which act on tests.
+#[cfg_attr(
+    feature = "mcp",
+    xtask_mcp_macros::mcp_tool(
+        description = "Build or run HIL tests for the specified chip",
+        command = "run tests"
+    )
+)]
 #[derive(Debug, Args)]
 pub struct TestsArgs {
     /// Chip to target.

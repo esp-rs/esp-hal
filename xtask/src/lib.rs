@@ -25,6 +25,28 @@ pub mod documentation;
 pub mod firmware;
 pub mod git;
 
+// ---------------------------------------------------------------------------
+// MCP tool registration
+
+/// Registration record for a single MCP tool.
+///
+/// Populated by the `#[mcp_tool]` attribute macro via `inventory::submit!`.
+#[cfg(feature = "mcp")]
+pub struct McpToolRegistration {
+    /// Tool name exposed over MCP (snake_case, matches the subcommand).
+    pub name: &'static str,
+    /// Human-readable description shown in `tools/list`.
+    pub description: &'static str,
+    /// Returns the JSON Schema for the tool's input as a `serde_json::Value`.
+    pub input_schema_fn: fn() -> serde_json::Value,
+    /// Deserialises `json` into the tool's input type and executes the tool as
+    /// a subprocess, returning captured stdout/stderr.
+    pub execute_fn: fn(serde_json::Value) -> anyhow::Result<String>,
+}
+
+#[cfg(feature = "mcp")]
+inventory::collect!(McpToolRegistration);
+
 #[cfg(feature = "semver-checks")]
 pub mod semver_check;
 

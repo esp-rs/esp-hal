@@ -1,0 +1,128 @@
+use std::io::Write as _;
+
+use anyhow::Result;
+use rmcp::{
+    RoleServer,
+    ServerHandler,
+    ServiceExt,
+    model::{
+        CallToolRequestParams,
+        CallToolResult,
+        Content,
+        ErrorData,
+        ListToolsResult,
+        PaginatedRequestParams,
+        ServerCapabilities,
+        ServerInfo,
+        Tool,
+    },
+    service::RequestContext,
+    transport::stdio,
+};
+use serde_json::Value;
+
+// ---------------------------------------------------------------------------
+// Subprocess helper
+
+/// Spawn the current xtask executable with `args`, feed newlines into its
+/// stdin (to silently dismiss any interactive `inquire` prompts), and capture
+/// stdout + stderr.
+pub fn run_xtask_subprocess(args: &[String]) -> Result<String> {
+    let exe = std::env::current_exe()?;
+    let mut child = std::process::Command::new(&exe)
+        .args(args)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()?;
+
+    // Dismiss any interactive prompts with newlines.
+    if let Some(mut stdin) = child.stdin.take() {
+        let newlines = b"\n".repeat(20);
+        let _ = stdin.write_all(&newlines);
+    }
+
+    let output = child.wait_with_output()?;
+    Ok(format!(
+        "Exit: {}\n\nSTDOUT:\n{}\nSTDERR:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    ))
+}
+
+// ---------------------------------------------------------------------------
+// Schema conversion
+
+/// Convert a `serde_json::Value` (expected to be an Object produced by
+/// `schemars::schema_for!`) into the `Arc<JsonObject>` that `Tool::new`
+/// expects.
+fn value_to_json_object(val: Value) -> serde_json::Map<String, Value> {
+    match val {
+        Value::Object(m) => m,
+        _ => serde_json::Map::new(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic MCP server
+
+struct EspHalServer;
+
+impl ServerHandler for EspHalServer {
+    fn get_info(&self) -> ServerInfo {
+        ServerInfo {
+            instructions: Some("esp-hal xtask automation tools. Use these to build, lint, format, test, and check the esp-hal workspace.".into()),
+            capabilities: ServerCapabilities::builder()
+                .enable_tools()
+                .build(),
+            ..Default::default()
+        }
+    }
+
+    async fn list_tools(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<ListToolsResult, ErrorData> {
+        let tools: Vec<Tool> = inventory::iter::<crate::McpToolRegistration>()
+            .map(|r| {
+                let schema_val = (r.input_schema_fn)();
+                let schema_obj = std::sync::Arc::new(value_to_json_object(schema_val));
+                Tool::new(r.name, r.description, schema_obj)
+            })
+            .collect();
+        Ok(ListToolsResult::with_all_items(tools))
+    }
+
+    async fn call_tool(
+        &self,
+        request: CallToolRequestParams,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let tool_name = request.name.as_ref();
+        let reg = inventory::iter::<crate::McpToolRegistration>()
+            .find(|r| r.name == tool_name)
+            .ok_or_else(|| {
+                ErrorData::invalid_params(
+                    format!("Unknown tool: {tool_name}"),
+                    None,
+                )
+            })?;
+
+        let json = Value::Object(request.arguments.unwrap_or_default());
+        let result = (reg.execute_fn)(json)
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Entry point
+
+pub async fn run_mcp_server() -> Result<()> {
+    let service = EspHalServer.serve(stdio()).await?;
+    service.waiting().await?;
+    Ok(())
+}

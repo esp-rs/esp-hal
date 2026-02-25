@@ -61,88 +61,10 @@ enum Cli {
     #[cfg(feature = "rel-check")]
     #[clap(subcommand)]
     RelCheck(relcheck::RelCheckCmds),
-}
 
-#[derive(Debug, Args)]
-struct CiArgs {
-    /// Chip to target.
-    #[arg(value_enum)]
-    chip: Chip,
-
-    /// The toolchain used to run the lints
-    #[arg(long)]
-    toolchain: Option<String>,
-
-    /// Whether to skip running lints
-    #[arg(long)]
-    no_lint: bool,
-
-    /// Whether to skip building documentation
-    #[arg(long)]
-    no_docs: bool,
-
-    /// Whether to skip checking the crates itself
-    #[arg(long)]
-    no_check_crates: bool,
-}
-
-#[derive(Debug, Args)]
-struct FmtPackagesArgs {
-    /// Run in 'check' mode; exists with 0 if formatted correctly, 1 otherwise
-    #[arg(long)]
-    check: bool,
-
-    /// Package(s) to target.
-    #[arg(value_enum, default_values_t = Package::iter())]
-    packages: Vec<Package>,
-}
-
-#[derive(Debug, Args)]
-struct CleanArgs {
-    /// Package(s) to target.
-    #[arg(value_enum, default_values_t = Package::iter())]
-    packages: Vec<Package>,
-}
-
-#[derive(Debug, Args)]
-struct HostTestsArgs {
-    /// Package(s) to target.
-    #[arg(value_enum, default_values_t = Package::iter())]
-    packages: Vec<Package>,
-}
-
-#[derive(Debug, Args)]
-struct CheckPackagesArgs {
-    /// Package(s) to target.
-    #[arg(value_enum, default_values_t = Package::iter())]
-    packages: Vec<Package>,
-
-    /// Check for a specific chip
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
-    chips: Vec<Chip>,
-
-    /// The toolchain used to run the checks
-    #[arg(long)]
-    toolchain: Option<String>,
-}
-
-#[derive(Debug, Args)]
-struct LintPackagesArgs {
-    /// Package(s) to target.
-    #[arg(value_enum, default_values_t = Package::iter())]
-    packages: Vec<Package>,
-
-    /// Lint for a specific chip
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
-    chips: Vec<Chip>,
-
-    /// Automatically apply fixes
-    #[arg(long)]
-    fix: bool,
-
-    /// The toolchain used to run the lints
-    #[arg(long)]
-    toolchain: Option<String>,
+    /// Start the MCP server (stdio transport, for use with Claude Code).
+    #[cfg(feature = "mcp")]
+    Mcp,
 }
 
 #[derive(Debug, Args)]
@@ -156,20 +78,26 @@ struct CheckChangelogArgs {
     normalize: bool,
 }
 
-#[derive(Debug, Args)]
-struct UpdateMetadataArgs {
-    /// Run in 'check' mode; exists with 0 if formatted correctly, 1 otherwise
-    #[arg(long)]
-    check: bool,
-}
 
 // ----------------------------------------------------------------------------
 // Application
 
 fn main() -> Result<()> {
+    // In MCP mode stdout is the JSON-RPC channel — log to stderr instead so
+    // we don't corrupt the protocol.  We detect MCP early (before clap parse)
+    // so the logger is set up correctly before anything else runs.
+    #[cfg(feature = "mcp")]
+    let is_mcp = std::env::args().any(|a| a == "mcp");
+    #[cfg(not(feature = "mcp"))]
+    let is_mcp = false;
+
     let mut builder =
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"));
-    builder.target(env_logger::Target::Stdout);
+    if is_mcp {
+        builder.target(env_logger::Target::Stderr);
+    } else {
+        builder.target(env_logger::Target::Stdout);
+    }
     builder.init();
 
     let workspace =
@@ -234,6 +162,11 @@ fn main() -> Result<()> {
         Cli::GenerateReport(args) => generate_report::generate_report(&workspace, args),
         #[cfg(feature = "rel-check")]
         Cli::RelCheck(relcheck) => relcheck::run_rel_check(relcheck),
+
+        #[cfg(feature = "mcp")]
+        Cli::Mcp => {
+            tokio::runtime::Runtime::new()?.block_on(xtask::commands::mcp::run_mcp_server())
+        }
     }
 }
 

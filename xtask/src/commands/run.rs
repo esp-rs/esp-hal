@@ -34,6 +34,10 @@ pub enum Run {
 // Subcommand Arguments
 
 /// Arguments for running ELFs.
+#[cfg_attr(feature = "mcp", xtask_mcp_macros::mcp_tool(
+    description = "Run all ELFs in a folder using probe-rs",
+    command = "run elfs"
+))]
 #[derive(Debug, Args)]
 pub struct RunElfsArgs {
     /// Which chip to run the tests for.
