@@ -11,7 +11,7 @@ struct WorkingModeEntry {
     mode: WorkingMode,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, strum::Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, strum::Display)]
 #[serde(rename_all = "snake_case")]
 enum WorkingMode {
     AffinePointMultiplication,
@@ -30,10 +30,27 @@ enum WorkingMode {
 
 impl super::GenericProperty for EccDriverProperties {
     fn cfgs(&self) -> Option<Vec<String>> {
-        Some(vec![format!(
-            "ecc_working_modes = \"{}\"",
-            self.working_modes.len()
-        )])
+        let mut cfgs = vec![];
+
+        let features = [
+            (WorkingMode::FiniteFieldDivision, "finite_field_division"),
+            (WorkingMode::ModularAddition, "modular_arithmetic"),
+            (WorkingMode::ModularSubtraction, "modular_arithmetic"),
+            (WorkingMode::ModularMultiplication, "modular_arithmetic"),
+            (WorkingMode::ModularDivision, "modular_arithmetic"),
+            (WorkingMode::AffinePointAddition, "point_addition"),
+        ];
+
+        for feature in features {
+            if self.working_modes.iter().any(|mode| mode.mode == feature.0) {
+                let cfg = format!("ecc_has_{}", feature.1);
+                if !cfgs.contains(&cfg) {
+                    cfgs.push(cfg);
+                }
+            }
+        }
+
+        Some(cfgs)
     }
 
     fn macros(&self) -> Option<proc_macro2::TokenStream> {
@@ -50,7 +67,7 @@ impl super::GenericProperty for EccDriverProperties {
             })
             .collect::<Vec<_>>();
         let for_each_working_mode =
-            crate::generate_for_each_macro("working_mode", &[("all", &branches)]);
+            crate::generate_for_each_macro("ecc_working_mode", &[("all", &branches)]);
         Some(quote::quote! {
             #for_each_working_mode
         })

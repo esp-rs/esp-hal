@@ -66,6 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `EllipticCurve` now implements common traits (#5055)
 - The `interrupt` module, `esp_hal::interrupt::Priority`, `PERI::enable_X_interrupt` and `PERI::disable_X_interrupt_on_all_cores` have been stabilized (#5040)
 - The `Ecc` driver no longer expects some operations to receive big-endian input (#5061)
+- `Ecc::mod_operations` has been replaced by `modular_addition`, `modular_subtraction`, `modular_multiplication` and `modular_division` (#5061)
+- `Ecc` methods now return a result handle that can be used to retrieve the result of the operation. (#5061)
 
 ### Fixed
 

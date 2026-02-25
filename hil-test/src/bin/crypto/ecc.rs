@@ -14,14 +14,12 @@ mod tests {
         ScalarPrimitive,
         sec1::{ModulusSize, ToEncodedPoint},
     };
-    #[cfg(ecc_working_modes = "11")]
-    use esp_hal::ecc::WorkMode;
     #[cfg(rng_trng_supported)]
     use esp_hal::rng::TrngSource;
     use esp_hal::{
         Blocking,
         clock::CpuClock,
-        ecc::{Ecc, EllipticCurve, Error},
+        ecc::{Ecc, EllipticCurve, OperationError},
         rng::Rng,
     };
     use hex_literal::hex;
@@ -183,7 +181,7 @@ mod tests {
         };
     }
 
-    #[cfg(ecc_working_modes = "7")]
+    #[cfg(ecc_has_finite_field_division)]
     fn finite_field_division(
         curve: EllipticCurve,
         prime_field: &[u8],
@@ -228,14 +226,12 @@ mod tests {
     /// curve.
     macro_rules! buffers {
         ($curve:ident => { $($buff:ident),* }) => {
-            const COUNT: usize = const { 0 $(+ { stringify!($buff);1 })* };
-
             let len = match $curve {
                 EllipticCurve::P192 => 24,
                 EllipticCurve::P256 => 32,
             };
 
-            let mut mem = &mut [0u8; COUNT * MAX_MEM_BLOCK_SIZE][..];
+            let mut mem = &mut [0u8; (0 $(+ { stringify!($buff);1 })* ) * MAX_MEM_BLOCK_SIZE][..];
             $(
             let $buff = mem.split_off_mut(..len).unwrap();
             )*
@@ -259,9 +255,13 @@ mod tests {
 
             // Run hardware algorithm
             reverse!(k, x, y);
-            ctx.ecc
+            let result = ctx
+                .ecc
                 .affine_point_multiplication(curve, k, x, y)
-                .expect("Inputs data doesn't match the key length selected.");
+                .expect("Input data doesn't match the key length");
+            result
+                .read_affine_point_result(x, y)
+                .expect("Output data doesn't match the key length selected.");
             reverse!(x, y);
 
             assert_eq!(x, sw_x);
@@ -280,15 +280,17 @@ mod tests {
 
             // Run hardware algorithm
             reverse!(x, y);
-            match ctx.ecc.affine_point_verification(curve, x, y) {
-                Err(Error::SizeMismatchCurve) => {
-                    panic!("Inputs data doesn't match the key length selected.")
-                }
-                Err(Error::PointNotOnSelectedCurve) => {
-                    panic!("x = {:02X?} and y = {:02X?} is not on the curve", x, y)
-                }
-                _ => {}
-            }
+            let result = ctx
+                .ecc
+                .affine_point_verification(curve, x, y)
+                .expect("Input data doesn't match the key length");
+
+            assert!(
+                result.success(),
+                "x = {:02X?} y = {:02X?} is not on the curve",
+                x,
+                y
+            );
         })
     }
 
@@ -300,13 +302,8 @@ mod tests {
                 sw_x, sw_y
             });
 
-            cfg_if::cfg_if! {
-                if #[cfg(ecc_working_modes = "11")] {
-                    let qx = &mut [0u8; 8];
-                    let qy = &mut [0u8; 8];
-                    let qz = &mut [0u8; 8];
-                }
-            }
+            #[cfg(ecc_separate_jacobian_point_memory)]
+            buffers!(curve => { qx, qy, qz });
 
             // Generate test data
             fill_random(prime_field, k);
@@ -318,29 +315,29 @@ mod tests {
             // Run hardware algorithm
             reverse!(k, px, py);
 
-            #[cfg(not(ecc_working_modes = "11"))]
             let result = ctx
                 .ecc
-                .affine_point_verification_multiplication(curve, k, px, py);
+                .affine_point_verification_multiplication(curve, k, px, py)
+                .expect("Input data doesn't match the key length");
 
-            #[cfg(ecc_working_modes = "11")]
-            let result = ctx
-                .ecc
-                .affine_point_verification_multiplication(curve, k, px, py, qx, qy, qz);
-
-            reverse!(px, py);
-            #[cfg(ecc_working_modes = "11")]
-            reverse!(qx, qy, qz);
-
-            match result {
-                Err(Error::SizeMismatchCurve) => {
-                    panic!("Inputs data doesn't match the key length selected.")
+            match result.read_affine_point_result(px, py) {
+                Err(OperationError::ParameterLengthMismatch) => {
+                    panic!("Output data doesn't match the key length")
                 }
-                Err(Error::PointNotOnSelectedCurve) => {
-                    panic!("x = {:02X?} and y = {:02X?} is not on the curve", px, py)
+                Err(OperationError::PointNotOnCurve) => {
+                    panic!("x = {:02X?} y = {:02X?} is not on the curve", px, py)
                 }
                 _ => {}
             }
+            reverse!(px, py);
+
+            #[cfg(ecc_separate_jacobian_point_memory)]
+            result
+                .read_jacobian_point_result(qx, qy, qz)
+                .expect("Output data doesn't match the key length");
+
+            #[cfg(ecc_separate_jacobian_point_memory)]
+            reverse!(qx, qy, qz);
 
             assert_eq!(px, sw_x);
             assert_eq!(py, sw_y);
@@ -361,9 +358,13 @@ mod tests {
 
             // FIXME: Overwrites k, its value should also be checked
             reverse!(k, x, y);
-            ctx.ecc
+            let result = ctx
+                .ecc
                 .jacobian_point_multiplication(curve, k, x, y)
-                .expect("Inputs data doesn't match the key length selected.");
+                .expect("Input data doesn't match the key length");
+            result
+                .read_jacobian_point_result(x, y, k)
+                .expect("Output data doesn't match the key length");
             reverse!(k, x, y);
 
             affine_point_multiplication(curve, sw_k, sw_x, sw_y);
@@ -389,15 +390,18 @@ mod tests {
             affine_to_jacobian(curve, prime_field, z, x, y);
 
             reverse!(x, y, z);
-            match ctx.ecc.jacobian_point_verification(curve, x, y, z) {
-                Err(Error::SizeMismatchCurve) => {
-                    panic!("Inputs data doesn't match the key length selected.")
-                }
-                Err(Error::PointNotOnSelectedCurve) => {
-                    panic!("x = {:02X?} and y = {:02X?} is not on the curve", x, y)
-                }
-                _ => {}
-            }
+            let result = ctx
+                .ecc
+                .jacobian_point_verification(curve, x, y, z)
+                .expect("Input data doesn't match the key length");
+
+            assert!(
+                result.success(),
+                "x = {:02X?}, y = {:02X?}, z = {:02X?} is not on the curve",
+                x,
+                y,
+                z,
+            )
         })
     }
 
@@ -419,13 +423,18 @@ mod tests {
                 .ecc
                 .affine_point_verification_jacobian_multiplication(curve, k, x, y)
             {
-                Err(Error::SizeMismatchCurve) => {
-                    panic!("Inputs data doesn't match the key length selected.")
+                Err(_) => panic!("Input data doesn't match the key length"),
+                Ok(result) => {
+                    assert!(
+                        result.success(),
+                        "x = {:02X?} y = {:02X?} is not on the curve",
+                        x,
+                        y
+                    );
+                    result
+                        .read_jacobian_point_result(x, y, k)
+                        .expect("Output data doesn't match the key length")
                 }
-                Err(Error::PointNotOnSelectedCurve) => {
-                    panic!("x = {:02X?} and y = {:02X?} is not on the curve", x, y)
-                }
-                _ => {}
             }
             reverse!(k, x, y);
 
@@ -440,7 +449,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(ecc_working_modes = "7")]
+    #[cfg(ecc_has_finite_field_division)]
     fn test_ecc_finite_field_division(mut ctx: Context<'static>) {
         for_each_test_case(|prime_field, curve| {
             buffers!(curve => {
@@ -455,9 +464,13 @@ mod tests {
             sw_k.copy_from_slice(k);
 
             reverse!(k, y);
-            ctx.ecc
+            let result = ctx
+                .ecc
                 .finite_field_division(curve, k, y)
-                .expect("Inputs data doesn't match the key length selected.");
+                .expect("Input data doesn't match the key length selected.");
+            result
+                .read_scalar_result(y)
+                .expect("Output data doesn't match the key length selected.");
             reverse!(y);
 
             finite_field_division(curve, prime_field, sw_k, sw_y);
@@ -467,7 +480,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(ecc_working_modes = "11")]
+    #[cfg(ecc_has_point_addition)]
     fn test_ecc_point_addition_256(mut ctx: Context<'static>) {
         const ECC_256_X: [u8; 32] = [
             0x96, 0xC2, 0x98, 0xD8, 0x45, 0x39, 0xA1, 0xF4, 0xA0, 0x33, 0xEB, 0x2D, 0x81, 0x7D,
@@ -508,7 +521,8 @@ mod tests {
         let mut x_256_1 = ECC_256_X.clone();
         let mut y_256_1 = ECC_256_Y.clone();
 
-        ctx.ecc
+        let result = ctx
+            .ecc
             .affine_point_addition(
                 EllipticCurve::P256,
                 &mut x_256,
@@ -519,13 +533,17 @@ mod tests {
             )
             .unwrap();
 
+        result
+            .read_jacobian_point_result(&mut x_256_1, &mut y_256_1, &mut z)
+            .unwrap();
+
         assert_eq!(x_256_1, ECC_256_RES_X);
         assert_eq!(y_256_1, ECC_256_RES_Y);
         assert_eq!(z, ECC_256_RES_Z);
     }
 
     #[test]
-    #[cfg(ecc_working_modes = "11")]
+    #[cfg(ecc_has_point_addition)]
     fn test_ecc_point_addition_192(mut ctx: Context<'static>) {
         const ECC_192_X: [u8; 24] = [
             0x12, 0x10, 0xFF, 0x82, 0xFD, 0x0A, 0xFF, 0xF4, 0x00, 0x88, 0xA1, 0x43, 0xEB, 0x20,
@@ -560,7 +578,8 @@ mod tests {
         let mut x_192_1 = ECC_192_X.clone();
         let mut y_192_1 = ECC_192_Y.clone();
 
-        ctx.ecc
+        let result = ctx
+            .ecc
             .affine_point_addition(
                 EllipticCurve::P192,
                 &mut x_192,
@@ -571,202 +590,152 @@ mod tests {
             )
             .unwrap();
 
+        result
+            .read_jacobian_point_result(&mut x_192_1, &mut y_192_1, &mut z)
+            .unwrap();
+
         assert_eq!(x_192_1, ECC_192_RES_X);
         assert_eq!(y_192_1, ECC_192_RES_Y);
         assert_eq!(z, ECC_192_RES_Z);
     }
 
-    #[test]
-    #[cfg(ecc_working_modes = "11")]
-    fn test_ecc_mod_operations_256(mut ctx: Context<'static>) {
-        const ECC_256_X: [u8; 32] = [
-            0x96, 0xC2, 0x98, 0xD8, 0x45, 0x39, 0xA1, 0xF4, 0xA0, 0x33, 0xEB, 0x2D, 0x81, 0x7D,
-            0x03, 0x77, 0xF2, 0x40, 0xA4, 0x63, 0xE5, 0xE6, 0xBC, 0xF8, 0x47, 0x42, 0x2C, 0xE1,
-            0xF2, 0xD1, 0x17, 0x6B,
-        ];
+    #[cfg(ecc_has_modular_arithmetic)]
+    struct ModOpTestCase<const N: usize> {
+        curve: EllipticCurve,
+        x: [u8; N],
+        y: [u8; N],
+        num: [u8; N],
+        den: [u8; N],
+        expected_sum: [u8; N],
+        expected_diff: [u8; N],
+        expected_prod: [u8; N],
+        expected_div: [u8; N],
+    }
 
-        const ECC_256_Y: [u8; 32] = [
-            0xF5, 0x51, 0xBF, 0x37, 0x68, 0x40, 0xB6, 0xCB, 0xCE, 0x5E, 0x31, 0x6B, 0x57, 0x33,
-            0xCE, 0x2B, 0x16, 0x9E, 0x0F, 0x7C, 0x4A, 0xEB, 0xE7, 0x8E, 0x9B, 0x7F, 0x1A, 0xFE,
-            0xE2, 0x42, 0xE3, 0x4F,
-        ];
-
-        const ECC_256_NUM: [u8; 32] = [
-            0x20, 0x56, 0x14, 0xB6, 0xAF, 0x94, 0xA0, 0xB6, 0x0C, 0xDF, 0x13, 0x1A, 0xE6, 0xBF,
-            0x57, 0x87, 0xF1, 0x02, 0x73, 0x96, 0x53, 0x1A, 0xBC, 0xA9, 0x0F, 0x5E, 0xA1, 0xFC,
-            0x0E, 0xFC, 0x9D, 0x9B,
-        ];
-
-        const ECC_256_DEN: [u8; 32] = [
-            0x54, 0x3B, 0x11, 0x78, 0xC4, 0xCA, 0x52, 0xFD, 0xCC, 0x89, 0x51, 0x0F, 0xFE, 0x7D,
-            0x37, 0x83, 0x81, 0xD5, 0x2E, 0x58, 0x42, 0xF9, 0x4F, 0x19, 0x9A, 0x79, 0x78, 0x98,
-            0xFA, 0x95, 0x40, 0x2E,
-        ];
-
-        const ECC_256_ADD_RES: [u8; 32] = [
-            0x8B, 0x14, 0x58, 0x10, 0xAE, 0x79, 0x57, 0xC0, 0x6F, 0x92, 0x1C, 0x99, 0xD8, 0xB0,
-            0xD1, 0xA2, 0x08, 0xDF, 0xB3, 0xDF, 0x2F, 0xD2, 0xA4, 0x87, 0xE3, 0xC1, 0x46, 0xDF,
-            0xD5, 0x14, 0xFB, 0xBA,
-        ];
-
-        const ECC_256_SUB_RES: [u8; 32] = [
-            0xA1, 0x70, 0xD9, 0xA0, 0xDD, 0xF8, 0xEA, 0x28, 0xD2, 0xD4, 0xB9, 0xC2, 0x29, 0x4A,
-            0x35, 0x4B, 0xDC, 0xA2, 0x94, 0xE7, 0x9A, 0xFB, 0xD4, 0x69, 0xAC, 0xC2, 0x11, 0xE3,
-            0x0F, 0x8F, 0x34, 0x1B,
-        ];
-
-        const ECC_256_MUL_RES: [u8; 32] = [
-            0x18, 0x4D, 0xCE, 0xCC, 0x1A, 0xA8, 0xEC, 0x72, 0xD7, 0x31, 0xDA, 0x41, 0x8C, 0x75,
-            0x6B, 0xF1, 0x2A, 0x2E, 0x5B, 0x53, 0x8D, 0xCA, 0x79, 0x61, 0x6B, 0x46, 0xF9, 0x2E,
-            0x27, 0xB5, 0x43, 0x15,
-        ];
-
-        const ECC_256_INV_MUL_RES: [u8; 32] = [
-            0x33, 0xF3, 0x55, 0x3B, 0x46, 0x8A, 0x13, 0xC0, 0x1D, 0x7E, 0x41, 0xA6, 0xFF, 0x53,
-            0xFD, 0x78, 0xD5, 0xC0, 0xE5, 0x9F, 0x78, 0xD1, 0x86, 0x66, 0x77, 0x3C, 0x6E, 0xEF,
-            0x58, 0xF6, 0x29, 0x34,
-        ];
-
-        let mut x_256 = ECC_256_X.clone();
-        let mut y_256 = ECC_256_Y.clone();
+    #[cfg(ecc_has_modular_arithmetic)]
+    fn run_mod_tests<const N: usize>(mut ctx: Context<'static>, test_case: ModOpTestCase<N>) {
+        let result = &mut [0; 32][..N];
 
         ctx.ecc
-            .mod_operations(
-                EllipticCurve::P256,
-                &mut x_256,
-                &mut y_256,
-                WorkMode::ModularAddition,
-            )
+            .modular_addition(test_case.curve, &test_case.x, &test_case.y)
+            .unwrap()
+            .read_scalar_result(result)
             .unwrap();
-        assert_eq!(x_256, ECC_256_ADD_RES);
+        assert_eq!(result, test_case.expected_sum);
 
-        let mut x_256 = ECC_256_X.clone();
-        let mut y_256 = ECC_256_Y.clone();
         ctx.ecc
-            .mod_operations(
-                EllipticCurve::P256,
-                &mut x_256,
-                &mut y_256,
-                WorkMode::ModularSubtraction,
-            )
+            .modular_subtraction(test_case.curve, &test_case.x, &test_case.y)
+            .unwrap()
+            .read_scalar_result(result)
             .unwrap();
-        assert_eq!(x_256, ECC_256_SUB_RES);
+        assert_eq!(result, test_case.expected_diff);
 
-        let mut x_256 = ECC_256_X.clone();
-        let mut y_256 = ECC_256_Y.clone();
         ctx.ecc
-            .mod_operations(
-                EllipticCurve::P256,
-                &mut x_256,
-                &mut y_256,
-                WorkMode::ModularMultiplication,
-            )
+            .modular_multiplication(test_case.curve, &test_case.x, &test_case.y)
+            .unwrap()
+            .read_scalar_result(result)
             .unwrap();
-        assert_eq!(y_256, ECC_256_MUL_RES);
+        assert_eq!(result, test_case.expected_prod);
 
-        let mut x_256 = ECC_256_NUM.clone();
-        let mut y_256 = ECC_256_DEN.clone();
         ctx.ecc
-            .mod_operations(
-                EllipticCurve::P256,
-                &mut x_256,
-                &mut y_256,
-                WorkMode::ModularDivision,
-            )
+            .modular_division(test_case.curve, &test_case.num, &test_case.den)
+            .unwrap()
+            .read_scalar_result(result)
             .unwrap();
-        assert_eq!(y_256, ECC_256_INV_MUL_RES);
+        assert_eq!(result, test_case.expected_div);
     }
 
     #[test]
-    #[cfg(ecc_working_modes = "11")]
-    fn test_ecc_mod_operations_192(mut ctx: Context<'static>) {
-        const ECC_192_X: [u8; 24] = [
-            0x1A, 0x80, 0xA1, 0x5F, 0x1F, 0xB7, 0x59, 0x1B, 0x9F, 0xD7, 0xFB, 0xAE, 0xA9, 0xF9,
-            0x1E, 0xBA, 0x67, 0xAE, 0x57, 0xB7, 0x27, 0x80, 0x9E, 0x1A,
-        ];
+    #[cfg(ecc_has_modular_arithmetic)]
+    fn test_ecc_mod_operations_256(ctx: Context<'static>) {
+        run_mod_tests::<32>(
+            ctx,
+            ModOpTestCase {
+                curve: EllipticCurve::P256,
+                x: [
+                    0x96, 0xC2, 0x98, 0xD8, 0x45, 0x39, 0xA1, 0xF4, 0xA0, 0x33, 0xEB, 0x2D, 0x81,
+                    0x7D, 0x03, 0x77, 0xF2, 0x40, 0xA4, 0x63, 0xE5, 0xE6, 0xBC, 0xF8, 0x47, 0x42,
+                    0x2C, 0xE1, 0xF2, 0xD1, 0x17, 0x6B,
+                ],
+                y: [
+                    0xF5, 0x51, 0xBF, 0x37, 0x68, 0x40, 0xB6, 0xCB, 0xCE, 0x5E, 0x31, 0x6B, 0x57,
+                    0x33, 0xCE, 0x2B, 0x16, 0x9E, 0x0F, 0x7C, 0x4A, 0xEB, 0xE7, 0x8E, 0x9B, 0x7F,
+                    0x1A, 0xFE, 0xE2, 0x42, 0xE3, 0x4F,
+                ],
+                num: [
+                    0x20, 0x56, 0x14, 0xB6, 0xAF, 0x94, 0xA0, 0xB6, 0x0C, 0xDF, 0x13, 0x1A, 0xE6,
+                    0xBF, 0x57, 0x87, 0xF1, 0x02, 0x73, 0x96, 0x53, 0x1A, 0xBC, 0xA9, 0x0F, 0x5E,
+                    0xA1, 0xFC, 0x0E, 0xFC, 0x9D, 0x9B,
+                ],
+                den: [
+                    0x54, 0x3B, 0x11, 0x78, 0xC4, 0xCA, 0x52, 0xFD, 0xCC, 0x89, 0x51, 0x0F, 0xFE,
+                    0x7D, 0x37, 0x83, 0x81, 0xD5, 0x2E, 0x58, 0x42, 0xF9, 0x4F, 0x19, 0x9A, 0x79,
+                    0x78, 0x98, 0xFA, 0x95, 0x40, 0x2E,
+                ],
+                expected_sum: [
+                    0x8B, 0x14, 0x58, 0x10, 0xAE, 0x79, 0x57, 0xC0, 0x6F, 0x92, 0x1C, 0x99, 0xD8,
+                    0xB0, 0xD1, 0xA2, 0x08, 0xDF, 0xB3, 0xDF, 0x2F, 0xD2, 0xA4, 0x87, 0xE3, 0xC1,
+                    0x46, 0xDF, 0xD5, 0x14, 0xFB, 0xBA,
+                ],
+                expected_diff: [
+                    0xA1, 0x70, 0xD9, 0xA0, 0xDD, 0xF8, 0xEA, 0x28, 0xD2, 0xD4, 0xB9, 0xC2, 0x29,
+                    0x4A, 0x35, 0x4B, 0xDC, 0xA2, 0x94, 0xE7, 0x9A, 0xFB, 0xD4, 0x69, 0xAC, 0xC2,
+                    0x11, 0xE3, 0x0F, 0x8F, 0x34, 0x1B,
+                ],
+                expected_prod: [
+                    0x18, 0x4D, 0xCE, 0xCC, 0x1A, 0xA8, 0xEC, 0x72, 0xD7, 0x31, 0xDA, 0x41, 0x8C,
+                    0x75, 0x6B, 0xF1, 0x2A, 0x2E, 0x5B, 0x53, 0x8D, 0xCA, 0x79, 0x61, 0x6B, 0x46,
+                    0xF9, 0x2E, 0x27, 0xB5, 0x43, 0x15,
+                ],
+                expected_div: [
+                    0x33, 0xF3, 0x55, 0x3B, 0x46, 0x8A, 0x13, 0xC0, 0x1D, 0x7E, 0x41, 0xA6, 0xFF,
+                    0x53, 0xFD, 0x78, 0xD5, 0xC0, 0xE5, 0x9F, 0x78, 0xD1, 0x86, 0x66, 0x77, 0x3C,
+                    0x6E, 0xEF, 0x58, 0xF6, 0x29, 0x34,
+                ],
+            },
+        );
+    }
 
-        const ECC_192_Y: [u8; 24] = [
-            0x59, 0xC6, 0x3D, 0xD3, 0xD7, 0xDF, 0xA3, 0x44, 0x7C, 0x75, 0x52, 0xB4, 0x42, 0xF3,
-            0xFC, 0xA6, 0x0F, 0xA8, 0x8A, 0x8D, 0x1F, 0xA3, 0xDF, 0x54,
-        ];
-
-        const ECC_192_NUM: [u8; 24] = [
-            0xBA, 0x0F, 0x2C, 0xD8, 0xBE, 0xCC, 0x2D, 0xD3, 0xD5, 0x74, 0xBD, 0x8C, 0xF3, 0x3E,
-            0x3B, 0x7A, 0xA4, 0xD0, 0x71, 0xEC, 0x85, 0xF6, 0x70, 0x00,
-        ];
-
-        const ECC_192_DEN: [u8; 24] = [
-            0x15, 0xF9, 0x20, 0xD8, 0x46, 0x5C, 0x03, 0x97, 0x4A, 0x10, 0xEF, 0x8A, 0xFB, 0x12,
-            0x2E, 0x65, 0x6E, 0xD6, 0x79, 0x1E, 0x65, 0x6F, 0x3E, 0x64,
-        ];
-
-        const ECC_192_ADD_RES: [u8; 24] = [
-            0x73, 0x46, 0xDF, 0x32, 0xF7, 0x96, 0xFD, 0x5F, 0x1B, 0x4D, 0x4E, 0x63, 0xEC, 0xEC,
-            0x1B, 0x61, 0x77, 0x56, 0xE2, 0x44, 0x47, 0x23, 0x7E, 0x6F,
-        ];
-
-        const ECC_192_SUB_RES: [u8; 24] = [
-            0xF2, 0xE1, 0x35, 0x41, 0xF9, 0xA0, 0x21, 0xEB, 0x58, 0x5A, 0x88, 0x94, 0x66, 0x06,
-            0x22, 0x13, 0x58, 0x06, 0xCD, 0x29, 0x08, 0xDD, 0xBE, 0xC5,
-        ];
-
-        const ECC_192_MUL_RES: [u8; 24] = [
-            0xB5, 0xB9, 0xFF, 0xBC, 0x52, 0xC8, 0xB8, 0x36, 0x8C, 0xFB, 0xA5, 0xCE, 0x1E, 0x7B,
-            0xE6, 0xF3, 0x8F, 0x79, 0x71, 0xCF, 0xD6, 0xF3, 0x41, 0xE6,
-        ];
-
-        const ECC_192_INV_MUL_RES: [u8; 24] = [
-            0x6B, 0xB3, 0x6B, 0x2B, 0x56, 0x6A, 0xE5, 0xF7, 0x75, 0x82, 0xF0, 0xCC, 0x93, 0x63,
-            0x40, 0xF8, 0xEF, 0x35, 0x2A, 0xAF, 0xBD, 0x56, 0xE9, 0x29,
-        ];
-
-        let mut x_192 = ECC_192_X.clone();
-        let mut y_192 = ECC_192_Y.clone();
-
-        ctx.ecc
-            .mod_operations(
-                EllipticCurve::P192,
-                &mut x_192,
-                &mut y_192,
-                WorkMode::ModularAddition,
-            )
-            .unwrap();
-        assert_eq!(x_192, ECC_192_ADD_RES);
-
-        let mut x_192 = ECC_192_X.clone();
-        let mut y_192 = ECC_192_Y.clone();
-        ctx.ecc
-            .mod_operations(
-                EllipticCurve::P192,
-                &mut x_192,
-                &mut y_192,
-                WorkMode::ModularSubtraction,
-            )
-            .unwrap();
-        assert_eq!(x_192, ECC_192_SUB_RES);
-
-        let mut x_192 = ECC_192_X.clone();
-        let mut y_192 = ECC_192_Y.clone();
-        ctx.ecc
-            .mod_operations(
-                EllipticCurve::P192,
-                &mut x_192,
-                &mut y_192,
-                WorkMode::ModularMultiplication,
-            )
-            .unwrap();
-        assert_eq!(y_192, ECC_192_MUL_RES);
-
-        let mut x_192 = ECC_192_NUM.clone();
-        let mut y_192 = ECC_192_DEN.clone();
-        ctx.ecc
-            .mod_operations(
-                EllipticCurve::P192,
-                &mut x_192,
-                &mut y_192,
-                WorkMode::ModularDivision,
-            )
-            .unwrap();
-        assert_eq!(y_192, ECC_192_INV_MUL_RES);
+    #[test]
+    #[cfg(ecc_has_modular_arithmetic)]
+    fn test_ecc_mod_operations_192(ctx: Context<'static>) {
+        run_mod_tests::<24>(
+            ctx,
+            ModOpTestCase {
+                curve: EllipticCurve::P192,
+                x: [
+                    0x1A, 0x80, 0xA1, 0x5F, 0x1F, 0xB7, 0x59, 0x1B, 0x9F, 0xD7, 0xFB, 0xAE, 0xA9,
+                    0xF9, 0x1E, 0xBA, 0x67, 0xAE, 0x57, 0xB7, 0x27, 0x80, 0x9E, 0x1A,
+                ],
+                y: [
+                    0x59, 0xC6, 0x3D, 0xD3, 0xD7, 0xDF, 0xA3, 0x44, 0x7C, 0x75, 0x52, 0xB4, 0x42,
+                    0xF3, 0xFC, 0xA6, 0x0F, 0xA8, 0x8A, 0x8D, 0x1F, 0xA3, 0xDF, 0x54,
+                ],
+                num: [
+                    0xBA, 0x0F, 0x2C, 0xD8, 0xBE, 0xCC, 0x2D, 0xD3, 0xD5, 0x74, 0xBD, 0x8C, 0xF3,
+                    0x3E, 0x3B, 0x7A, 0xA4, 0xD0, 0x71, 0xEC, 0x85, 0xF6, 0x70, 0x00,
+                ],
+                den: [
+                    0x15, 0xF9, 0x20, 0xD8, 0x46, 0x5C, 0x03, 0x97, 0x4A, 0x10, 0xEF, 0x8A, 0xFB,
+                    0x12, 0x2E, 0x65, 0x6E, 0xD6, 0x79, 0x1E, 0x65, 0x6F, 0x3E, 0x64,
+                ],
+                expected_sum: [
+                    0x73, 0x46, 0xDF, 0x32, 0xF7, 0x96, 0xFD, 0x5F, 0x1B, 0x4D, 0x4E, 0x63, 0xEC,
+                    0xEC, 0x1B, 0x61, 0x77, 0x56, 0xE2, 0x44, 0x47, 0x23, 0x7E, 0x6F,
+                ],
+                expected_diff: [
+                    0xF2, 0xE1, 0x35, 0x41, 0xF9, 0xA0, 0x21, 0xEB, 0x58, 0x5A, 0x88, 0x94, 0x66,
+                    0x06, 0x22, 0x13, 0x58, 0x06, 0xCD, 0x29, 0x08, 0xDD, 0xBE, 0xC5,
+                ],
+                expected_prod: [
+                    0xB5, 0xB9, 0xFF, 0xBC, 0x52, 0xC8, 0xB8, 0x36, 0x8C, 0xFB, 0xA5, 0xCE, 0x1E,
+                    0x7B, 0xE6, 0xF3, 0x8F, 0x79, 0x71, 0xCF, 0xD6, 0xF3, 0x41, 0xE6,
+                ],
+                expected_div: [
+                    0x6B, 0xB3, 0x6B, 0x2B, 0x56, 0x6A, 0xE5, 0xF7, 0x75, 0x82, 0xF0, 0xCC, 0x93,
+                    0x63, 0x40, 0xF8, 0xEF, 0x35, 0x2A, 0xAF, 0xBD, 0x56, 0xE9, 0x29,
+                ],
+            },
+        );
     }
 }

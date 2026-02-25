@@ -128,3 +128,19 @@ On RISC-V MCUs, the `interrupt::enable_direct` function now takes a `DirectBinda
 ```
 
 `DirectBindableCpuInterrupt` is numbered from 0, and corresponds to CPU interrupt numbers that are not disabled or reserved for vectoring.
+
+## ECC changes
+
+ECC methods now return a result handle instead of writing data back directly. These handles can be used to retrieve the result of the operation.
+
+```diff
+ let mut ecc = Ecc::new(peripherals.ECC);
+-ecc.mod_operations(EllipticCurve::P256, &mut a, &mut b, WorkMode::ModAdd).unwrap();
++let result = ecc.modular_addition(EllipticCurve::P256, &a, &b).unwrap();
++result.read_scalar_result(&mut a).unwrap();
+```
+
+The method that performs the operation now only returns an error if the parameters are of incorrect
+length. Point verification errors are now returned by the result handle. If a particular operation
+only does point verification and does not perform any other operations, the verification result
+can be read using the `success` method.
