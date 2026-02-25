@@ -159,3 +159,85 @@ run `cargo xtask run tests esp32 embassy_test_multiple_integrated` to select onl
 
 In this example, running the `cargo xtask build tests esp32 embassy_test` command creates an
 `embassy_test_single_integrated` and an `embassy_test_multiple_integrated` binary.
+
+## MCP server
+
+The xtask includes an [MCP](https://modelcontextprotocol.io/) server that exposes xtask commands as tools for AI agents. It runs over stdio and is built with the `mcp` cargo feature.
+
+### Claude Code
+
+Create `.mcp.json` in the repository root (it is gitignored):
+
+```json
+{
+  "mcpServers": {
+    "esp-hal-xtask": {
+      "command": "cargo",
+      "args": ["xmcp"]
+    }
+  }
+}
+```
+
+### VS Code (GitHub Copilot / Copilot Chat)
+
+Add to `.vscode/mcp.json` (create if it doesn't exist):
+
+```json
+{
+  "servers": {
+    "esp-hal-xtask": {
+      "command": "cargo",
+      "args": ["xmcp"]
+    }
+  }
+}
+```
+
+### Zed
+
+Add to Zed's settings (`settings.json`):
+
+```json
+{
+  "context_servers": {
+    "esp-hal-xtask": {
+      "command": {
+        "path": "cargo",
+        "args": ["xmcp"]
+      }
+    }
+  }
+}
+```
+
+### Gemini Code Assist (CLI)
+
+Run with `--mcp-server` flag:
+
+```bash
+gemini --mcp-server="cargo xmcp"
+```
+
+Or add to `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "esp-hal-xtask": {
+      "command": "cargo",
+      "args": ["xmcp"]
+    }
+  }
+}
+```
+
+### Other MCP clients
+
+The server is a standard stdio MCP server. Launch it with:
+
+```bash
+cargo xmcp
+```
+
+Point any MCP-compatible client at this command.
