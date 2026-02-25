@@ -18,10 +18,8 @@ pub(crate) use esp32s2 as pac;
 #[cfg(esp32s3)]
 pub(crate) use esp32s3 as pac;
 
-/// Get a peripheral register block reference from the PAC. 
+/// Get a peripheral register block reference from the PAC.
 #[macro_export]
-macro_rules! periph {
-    ($P:ident) => {{
-        unsafe { &*$crate::reg_access::pac::$P::ptr() }
-    }};
+macro_rules! regs {
+    ($P:ident) => {{ unsafe { &*$crate::reg_access::pac::$P::ptr() } }};
 }

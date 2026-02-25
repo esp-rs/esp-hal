@@ -1,8 +1,5 @@
 use crate::{
-    hal::{
-        interrupt::Priority,
-        peripherals::{WIFI},
-    },
+    hal::{interrupt::Priority, peripherals::WIFI},
     interrupt_dispatch::Handler,
     sys::c_types::c_void,
 };
@@ -10,19 +7,15 @@ use crate::{
 static ISR_INTERRUPT_1: Handler = Handler::new();
 
 pub(crate) fn chip_ints_on(mask: u32) {
-    unsafe {
-        crate::periph!(INTERRUPT_CORE0)
-            .cpu_int_enable()
-            .modify(|r, w| w.bits(r.bits() | mask));
-    }
+    crate::regs!(INTERRUPT_CORE0)
+        .cpu_int_enable()
+        .modify(|r, w| unsafe { w.bits(r.bits() | mask) });
 }
 
 pub(crate) fn chip_ints_off(mask: u32) {
-    unsafe {
-        crate::periph!(INTERRUPT_CORE0)
-            .cpu_int_enable()
-            .modify(|r, w| w.bits(r.bits() & !mask));
-    }
+    crate::regs!(INTERRUPT_CORE0)
+        .cpu_int_enable()
+        .modify(|r, w| unsafe { w.bits(r.bits() & !mask) });
 }
 
 pub(crate) unsafe extern "C" fn set_intr(
