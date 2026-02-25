@@ -8,16 +8,12 @@ publish = false
 name = "hil_test"
 
 [[bin]]
-name              = "aes"
-harness           = false
-
-[[bin]]
 name              = "alloc_psram"
 harness           = false
 required-features = ["psram"]
 
 [[bin]]
-name              = "ecc_rsa_sha"
+name              = "crypto"
 harness           = false
 
 [[bin]]
