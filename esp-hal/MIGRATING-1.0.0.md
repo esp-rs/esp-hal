@@ -131,7 +131,9 @@ On RISC-V MCUs, the `interrupt::enable_direct` function now takes a `DirectBinda
 
 ## ECC changes
 
-ECC methods now return a result handle instead of writing data back directly. These handles can be used to retrieve the result of the operation.
+All `Ecc` methods now expect little endian input, and produce little endian output.
+
+`Ecc` methods now return a result handle instead of writing data back directly. These handles can be used to retrieve the result of the operation.
 
 ```diff
  let mut ecc = Ecc::new(peripherals.ECC);
