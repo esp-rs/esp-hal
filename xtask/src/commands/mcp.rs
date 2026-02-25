@@ -119,10 +119,10 @@ impl ServerHandler for EspHalServer {
             })?;
 
         let json = Value::Object(request.arguments.unwrap_or_default());
-        let result = (reg.execute_fn)(json)
-            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-
-        Ok(CallToolResult::success(vec![Content::text(result)]))
+        match (reg.execute_fn)(json) {
+            Ok(output) => Ok(CallToolResult::success(vec![Content::text(output)])),
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(e.to_string())])),
+        }
     }
 }
 

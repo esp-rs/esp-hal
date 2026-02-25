@@ -19,10 +19,6 @@ struct ArgInfo {
     long_name: String,
     /// `value_delimiter = ','` character, if specified.
     value_delimiter: Option<char>,
-    /// True if `default_values_t = ...` was present (Vec with defaults).
-    has_default_values_t: bool,
-    /// True if `default_value_t = ...` was present (single-value with default).
-    has_default_value_t: bool,
 }
 
 impl Default for ArgInfo {
@@ -31,8 +27,6 @@ impl Default for ArgInfo {
             has_long: false,
             long_name: String::new(),
             value_delimiter: None,
-            has_default_values_t: false,
-            has_default_value_t: false,
         }
     }
 }
@@ -109,12 +103,6 @@ fn parse_arg_attrs(attrs: &[Attribute]) -> ArgInfo {
                     if let Some(c) = expr_lit_char(&nv.value) {
                         info.value_delimiter = Some(c);
                     }
-                }
-                Meta::NameValue(nv) if nv.path.is_ident("default_values_t") => {
-                    info.has_default_values_t = true;
-                }
-                Meta::NameValue(nv) if nv.path.is_ident("default_value_t") => {
-                    info.has_default_value_t = true;
                 }
                 _ => {}
             }
