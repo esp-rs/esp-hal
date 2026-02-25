@@ -75,12 +75,6 @@ macro_rules! property {
     ("dma.gdma_version", str) => {
         stringify!(1)
     };
-    ("ecc.working_modes") => {
-        7
-    };
-    ("ecc.working_modes", str) => {
-        stringify!(7)
-    };
     ("ecc.zero_extend_writes") => {
         true
     };

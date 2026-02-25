@@ -1,4 +1,5 @@
 pub(crate) mod aes;
+pub(crate) mod ecc;
 pub(crate) mod gpio;
 pub(crate) mod i2c_master;
 pub(crate) mod interrupt;
@@ -12,6 +13,7 @@ pub(crate) mod timergroup;
 pub(crate) mod uart;
 
 pub(crate) use aes::*;
+pub(crate) use ecc::*;
 pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
 pub(crate) use interrupt::*;
@@ -378,11 +380,12 @@ driver_configs![
         driver: ecc,
         name: "ECC",
         properties: {
-            working_modes: u32, // TODO: list instead of count
             #[serde(default)]
             zero_extend_writes: bool,
             #[serde(default)]
             separate_jacobian_point_memory: bool,
+            #[serde(flatten)]
+            extras: EccDriverProperties,
         }
     },
     EthernetProperties {
