@@ -207,7 +207,9 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            task_priority: crate::preempt::max_task_priority().saturating_sub(2) as u8,
+            task_priority: crate::preempt::max_task_priority()
+                .saturating_sub(2)
+                .min(255) as u8,
             task_stack_size: 4096,
             max_connections: 2,
             qa_test_mode: false,
@@ -246,7 +248,7 @@ impl Config {
             self,
             task_priority,
             0,
-            crate::preempt::max_task_priority() as u8
+            crate::preempt::max_task_priority().min(255) as u8
         );
         crate::ble::validate_range!(self, max_connections, 1, 70);
         crate::ble::validate_range!(self, ll_sync_cnt, 0, 3);

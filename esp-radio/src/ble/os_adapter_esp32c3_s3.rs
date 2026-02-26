@@ -485,7 +485,9 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            task_priority: crate::preempt::max_task_priority().saturating_sub(2) as u8,
+            task_priority: crate::preempt::max_task_priority()
+                .saturating_sub(2)
+                .min(255) as u8,
             task_stack_size: 8192, // 4096?
             #[cfg(multi_core)]
             task_cpu: Cpu::ProCpu,
@@ -522,7 +524,7 @@ impl Config {
             self,
             task_priority,
             0,
-            crate::preempt::max_task_priority() as u8
+            crate::preempt::max_task_priority().min(255) as u8
         );
         crate::ble::validate_range!(self, max_connections, 1, 10);
         crate::ble::validate_range!(self, scan_duplicate_list_count, 10, 1000);
