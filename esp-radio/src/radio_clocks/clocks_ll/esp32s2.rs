@@ -2,7 +2,7 @@
 const DPORT_WIFI_CLK_WIFI_BT_COMMON_M: u32 = 0x000003c9;
 const DPORT_WIFI_CLK_WIFI_EN_M: u32 = 0x000007cf;
 
-pub(super) fn enable_phy(enable: bool) {
+pub(crate) fn enable_phy(enable: bool) {
     // `periph_ll_wifi_bt_module_enable_clk_clear_rst`
     // `periph_ll_wifi_bt_module_disable_clk_set_rst`
     regs!(SYSCON).wifi_clk_en().modify(|r, w| unsafe {
@@ -15,7 +15,7 @@ pub(super) fn enable_phy(enable: bool) {
 }
 
 #[cfg_attr(not(feature = "unstable"), expect(unused))]
-pub(super) fn enable_wifi(enable: bool) {
+pub(crate) fn enable_wifi(enable: bool) {
     // `periph_ll_wifi_module_enable_clk_clear_rst`
     // `periph_ll_wifi_module_disable_clk_set_rst`
     regs!(SYSCON).wifi_clk_en().modify(|r, w| unsafe {
@@ -27,7 +27,7 @@ pub(super) fn enable_wifi(enable: bool) {
     });
 }
 
-pub(super) fn reset_wifi_mac() {
+pub(crate) fn reset_wifi_mac() {
     regs!(SYSCON)
         .wifi_rst_en()
         .modify(|_, w| w.mac_rst().set_bit());
@@ -36,7 +36,7 @@ pub(super) fn reset_wifi_mac() {
         .modify(|_, w| w.mac_rst().clear_bit());
 }
 
-pub(super) fn init_clocks() {
+pub(crate) fn init_clocks() {
     const DPORT_WIFI_CLK_WIFI_EN: u32 = 0x003807cf;
     const DPORT_WIFI_CLK_BT_EN_M: u32 = 0x61 << 11;
     const DPORT_WIFI_CLK_SDIOSLAVE_EN: u32 = 1 << 4;

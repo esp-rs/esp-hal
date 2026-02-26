@@ -1,4 +1,4 @@
-pub(super) fn enable_phy(en: bool) {
+pub(crate) fn enable_phy(en: bool) {
     regs!(MODEM_LPCON)
         .clk_conf()
         .modify(|_, w| w.clk_i2c_mst_en().bit(en));
@@ -26,16 +26,16 @@ fn ble_ieee802154_clock_enable(en: bool) {
 }
 
 #[cfg_attr(not(feature = "unstable"), expect(unused))]
-pub(super) fn enable_bt(en: bool) {
+pub(crate) fn enable_bt(en: bool) {
     ble_ieee802154_clock_enable(en);
 }
 
 #[cfg_attr(not(feature = "unstable"), expect(unused))]
-pub(super) fn enable_ieee802154(en: bool) {
+pub(crate) fn enable_ieee802154(en: bool) {
     ble_ieee802154_clock_enable(en);
 }
 
-pub(super) fn init_clocks() {
+pub(crate) fn init_clocks() {
     regs!(PMU)
         .hp_sleep_icg_modem()
         .modify(|_, w| unsafe { w.hp_sleep_dig_icg_modem_code().bits(0) });
@@ -59,10 +59,10 @@ pub(super) fn init_clocks() {
     });
 }
 
-pub(super) fn ble_rtc_clk_init() {
+pub(crate) fn ble_rtc_clk_init() {
     // nothing for this target (yet)
 }
 
-pub(super) fn reset_rpa() {
+pub(crate) fn reset_rpa() {
     // nothing for this target (yet)
 }

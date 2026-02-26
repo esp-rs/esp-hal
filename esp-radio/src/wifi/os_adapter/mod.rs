@@ -24,7 +24,6 @@ use crate::{
     sys::c_types::*,
     time::{blob_ticks_to_micros, millis_to_blob_ticks},
 };
-use crate::radio_clocks::ModemClockController as _;
 
 static WIFI_LOCK: RawMutex = RawMutex::new();
 
@@ -868,7 +867,8 @@ pub unsafe extern "C" fn wifi_clock_enable() {
     trace!("wifi_clock_enable");
     // stealing WIFI is safe, since it is passed into the initialization function of the BLE
     // controller.
-    unsafe { WIFI::steal() }.enable_modem_clock(true);
+    // unsafe { WIFI::steal() }.enable_modem_clock(true);
+    crate::radio_clocks::clocks_ll::enable_wifi(true);
 }
 
 /// **************************************************************************
@@ -888,7 +888,8 @@ pub unsafe extern "C" fn wifi_clock_disable() {
     trace!("wifi_clock_disable");
     // stealing WIFI is safe, since it is passed into the initialization function of the BLE
     // controller.
-    unsafe { WIFI::steal() }.enable_modem_clock(false);
+    // unsafe { WIFI::steal() }.enable_modem_clock(false);
+    crate::radio_clocks::clocks_ll::enable_wifi(false);
 }
 
 /// **************************************************************************

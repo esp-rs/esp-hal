@@ -1,4 +1,4 @@
-pub(super) fn enable_phy(en: bool) {
+pub(crate) fn enable_phy(en: bool) {
     regs!(MODEM_LPCON)
         .clk_conf()
         .modify(|_, w| w.clk_i2c_mst_en().bit(en));
@@ -8,7 +8,7 @@ pub(super) fn enable_phy(en: bool) {
 }
 
 #[cfg_attr(not(feature = "unstable"), expect(unused))]
-pub(super) fn enable_wifi(en: bool) {
+pub(crate) fn enable_wifi(en: bool) {
     regs!(MODEM_SYSCON).clk_conf1().modify(|_, w| {
         w.clk_wifi_apb_en().bit(en);
         w.clk_wifimac_en().bit(en);
@@ -34,7 +34,7 @@ pub(super) fn enable_wifi(en: bool) {
 }
 
 #[cfg_attr(not(feature = "unstable"), expect(unused))]
-pub(super) fn enable_ieee802154(en: bool) {
+pub(crate) fn enable_ieee802154(en: bool) {
     regs!(MODEM_SYSCON).clk_conf().modify(|_, w| {
         w.clk_zb_apb_en().bit(en);
         w.clk_zb_mac_en().bit(en)
@@ -64,7 +64,7 @@ pub(super) fn enable_ieee802154(en: bool) {
 }
 
 #[cfg_attr(not(feature = "unstable"), expect(unused))]
-pub(super) fn enable_bt(en: bool) {
+pub(crate) fn enable_bt(en: bool) {
     regs!(MODEM_SYSCON).clk_conf().modify(|_, w| {
         w.clk_etm_en().bit(en);
         w.clk_modem_sec_en().bit(en);
@@ -89,11 +89,11 @@ pub(super) fn enable_bt(en: bool) {
         .modify(|_, w| w.clk_coex_en().bit(en));
 }
 
-pub(super) fn reset_wifi_mac() {
+pub(crate) fn reset_wifi_mac() {
     // empty
 }
 
-pub(super) fn init_clocks() {
+pub(crate) fn init_clocks() {
     unsafe {
         regs!(PMU)
             .hp_sleep_icg_modem()
@@ -144,10 +144,10 @@ pub(super) fn init_clocks() {
     }
 }
 
-pub(super) fn ble_rtc_clk_init() {
+pub(crate) fn ble_rtc_clk_init() {
     // nothing for this target (yet)
 }
 
-pub(super) fn reset_rpa() {
+pub(crate) fn reset_rpa() {
     // nothing for this target (yet)
 }

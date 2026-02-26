@@ -3,7 +3,7 @@ const DPORT_WIFI_CLK_WIFI_BT_COMMON_M: u32 = 0x000003c9;
 const DPORT_WIFI_CLK_WIFI_EN_M: u32 = 0x00000406;
 const DPORT_WIFI_CLK_BT_EN_M: u32 = 0x00030800;
 
-pub(super) fn enable_phy(enable: bool) {
+pub(crate) fn enable_phy(enable: bool) {
     // `periph_ll_wifi_bt_module_enable_clk_clear_rst`
     // `periph_ll_wifi_bt_module_disable_clk_set_rst`
     regs!(DPORT).wifi_clk_en().modify(|r, w| unsafe {
@@ -16,7 +16,7 @@ pub(super) fn enable_phy(enable: bool) {
 }
 
 #[cfg_attr(not(feature = "unstable"), expect(unused))]
-pub(super) fn enable_bt(enable: bool) {
+pub(crate) fn enable_bt(enable: bool) {
     regs!(DPORT).wifi_clk_en().modify(|r, w| unsafe {
         if enable {
             w.bits(r.bits() | DPORT_WIFI_CLK_BT_EN_M)
@@ -27,7 +27,7 @@ pub(super) fn enable_bt(enable: bool) {
 }
 
 #[cfg_attr(not(feature = "unstable"), expect(unused))]
-pub(super) fn enable_wifi(enable: bool) {
+pub(crate) fn enable_wifi(enable: bool) {
     // `periph_ll_wifi_module_enable_clk_clear_rst`
     // `periph_ll_wifi_module_disable_clk_set_rst`
     regs!(DPORT).wifi_clk_en().modify(|r, w| unsafe {
@@ -39,7 +39,7 @@ pub(super) fn enable_wifi(enable: bool) {
     });
 }
 
-pub(super) fn reset_wifi_mac() {
+pub(crate) fn reset_wifi_mac() {
     regs!(DPORT)
         .wifi_rst_en()
         .modify(|_, w| w.mac_rst().set_bit());
@@ -48,7 +48,7 @@ pub(super) fn reset_wifi_mac() {
         .modify(|_, w| w.mac_rst().clear_bit());
 }
 
-pub(super) fn init_clocks() {
+pub(crate) fn init_clocks() {
     // esp-idf assumes all clocks are enabled by default, and disables the following
     // bits:
     //
@@ -77,10 +77,10 @@ pub(super) fn init_clocks() {
         .write(|w| unsafe { w.bits(u32::MAX) });
 }
 
-pub(super) fn ble_rtc_clk_init() {
+pub(crate) fn ble_rtc_clk_init() {
     // nothing for this target
 }
 
-pub(super) fn reset_rpa() {
+pub(crate) fn reset_rpa() {
     // nothing for this target
 }

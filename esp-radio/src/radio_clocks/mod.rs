@@ -126,81 +126,11 @@ impl<'d> ModemClockController<'d> for WIFI<'d> {
     }
 }
 
-#[cfg(soc_has_wifi)]
-pub struct Wifi<'d>(pub esp_hal::peripherals::WIFI<'d>);
-
-#[cfg(soc_has_wifi)]
-impl<'d> Wifi<'d> {
-    pub fn reset_wifi_mac(&mut self) { clocks_ll::reset_wifi_mac(); }
-    pub fn enable_modem_clock(&mut self, enable: bool) { clocks_ll::enable_wifi(enable); }
-}
-
-// #[cfg(soc_has_wifi)]
-// impl WIFI<'_> {
-//     #[instability::unstable]
-//     /// Reset the Wi-Fi MAC.
-//     pub fn reset_wifi_mac(&mut self) {
-//         clocks_ll::reset_wifi_mac();
-//     }
-// }
-
-#[cfg(soc_has_wifi)]
-pub trait WifiClockExt {
-    fn reset_wifi_mac(&mut self);
-}
-
-#[cfg(soc_has_wifi)]
-impl WifiClockExt for WIFI<'_> {
-    #[instability::unstable]
-    #[inline]
-    fn reset_wifi_mac(&mut self) {
-        clocks_ll::reset_wifi_mac();
-    }
-}
-
 #[cfg(soc_has_bt)]
 #[instability::unstable]
 impl<'d> ModemClockController<'d> for BT<'d> {
     fn enable_modem_clock(&mut self, enable: bool) {
         clocks_ll::enable_bt(enable);
-    }
-}
-
-// #[cfg(soc_has_bt)]
-// impl BT<'_> {
-//     /// Reset the Bluetooth Resolvable Private Address (RPA).
-//     #[instability::unstable]
-//     #[inline]
-//     pub fn reset_rpa(&mut self) {
-//         clocks_ll::reset_rpa();
-//     }
-
-//     /// Initialize BLE RTC clocks
-//     #[instability::unstable]
-//     #[inline]
-//     pub fn ble_rtc_clk_init(&mut self) {
-//         clocks_ll::ble_rtc_clk_init();
-//     }
-// }
-
-#[cfg(soc_has_bt)]
-pub trait BtClockExt {
-    fn reset_rpa(&mut self);
-    fn ble_rtc_clk_init(&mut self);
-}
-
-#[cfg(soc_has_bt)]
-impl BtClockExt for BT<'_> {
-    #[instability::unstable] 
-    #[inline]
-    fn reset_rpa(&mut self) {
-        clocks_ll::reset_rpa(); 
-    }
-
-    #[instability::unstable] 
-    #[inline]
-    fn ble_rtc_clk_init(&mut self) {
-        clocks_ll::ble_rtc_clk_init();
     }
 }
 
