@@ -28,7 +28,10 @@ use crate::{
 #[cfg(ecc_zero_extend_writes)]
 const MEM_BLOCK_SIZE: usize = 32;
 
-/// The ECC Accelerator driver instance
+/// The ECC Accelerator driver.
+///
+/// Note that as opposed to commonly used standards, this driver operates on
+/// **little-endian** data.
 pub struct Ecc<'d, Dm: DriverMode> {
     _ecc: ECC<'d>,
     phantom: PhantomData<Dm>,
