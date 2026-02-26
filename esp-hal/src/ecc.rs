@@ -26,7 +26,7 @@ use crate::{
 };
 
 #[cfg(ecc_zero_extend_writes)]
-const MEM_BLOCK_SIZE: usize = 32;
+const MEM_BLOCK_SIZE: usize = property!("ecc.mem_block_size");
 
 /// The ECC Accelerator driver.
 ///

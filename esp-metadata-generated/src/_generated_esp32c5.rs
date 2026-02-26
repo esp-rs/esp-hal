@@ -90,6 +90,9 @@ macro_rules! property {
     ("ecc.separate_jacobian_point_memory") => {
         true
     };
+    ("ecc.mem_block_size") => {
+        48
+    };
     ("gpio.has_bank_1") => {
         false
     };

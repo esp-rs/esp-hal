@@ -64,6 +64,23 @@ impl super::GenericProperty for EccDriverProperties {
         Some(cfgs)
     }
 
+    fn property_macro_branches(&self) -> proc_macro2::TokenStream {
+        let mem_block_size = self
+            .curves
+            .iter()
+            .map(|entry| entry.curve / 8)
+            .max()
+            .unwrap();
+
+        let mem_block_size = crate::number(mem_block_size);
+
+        quote::quote! {
+            ("ecc.mem_block_size") => {
+                #mem_block_size
+            };
+        }
+    }
+
     fn macros(&self) -> Option<proc_macro2::TokenStream> {
         let working_mode_branches = self
             .working_modes

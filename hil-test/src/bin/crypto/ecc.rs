@@ -205,7 +205,7 @@ mod tests {
         };
     }
 
-    const MAX_MEM_BLOCK_SIZE: usize = 32;
+    const MAX_MEM_BLOCK_SIZE: usize = property!("ecc.mem_block_size");
 
     // ECC hardware works on little endian data, but the standard encoding (and thus, the bytes we
     // get out of the elliptic_curve crates) is big endian.
