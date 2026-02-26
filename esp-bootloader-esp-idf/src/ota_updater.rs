@@ -37,19 +37,18 @@ where
         let mut has_ota_data = false;
         for part in pt.iter() {
             match part.partition_type() {
-                crate::partitions::PartitionType::App(subtype) => {
+                crate::partitions::PartitionType::App(subtype)
                     if subtype != crate::partitions::AppPartitionSubType::Factory
-                        && subtype != crate::partitions::AppPartitionSubType::Test
-                    {
-                        ota_count += 1;
-                    }
+                        && subtype != crate::partitions::AppPartitionSubType::Test =>
+                {
+                    ota_count += 1;
                 }
                 crate::partitions::PartitionType::Data(
                     crate::partitions::DataPartitionSubType::Ota,
                 ) => {
                     has_ota_data = true;
                 }
-                _ => (),
+                _ => {}
             }
         }
 
