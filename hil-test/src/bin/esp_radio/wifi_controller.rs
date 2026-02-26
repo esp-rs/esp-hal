@@ -6,7 +6,7 @@ mod tests {
         peripherals::Peripherals,
         timer::timg::TimerGroup,
     };
-    use esp_radio::wifi::{Config, scan::ScanConfig, sta::StationConfig};
+    use esp_radio::wifi::scan::ScanConfig;
 
     #[init]
     fn init() -> Peripherals {
@@ -26,12 +26,7 @@ mod tests {
 
         let _source = esp_hal::rng::TrngSource::new(p.RNG, p.ADC1);
 
-        let (mut controller, _interfaces) =
-            esp_radio::wifi::new(p.WIFI, Default::default()).unwrap();
-
-        controller
-            .set_config(&Config::Station(StationConfig::default()))
-            .unwrap();
+        let (_controller, _interfaces) = esp_radio::wifi::new(p.WIFI, Default::default()).unwrap();
     }
 
     // If this turns out to be too flaky or time-consuming,
@@ -45,10 +40,6 @@ mod tests {
 
         let (mut controller, _interfaces) =
             esp_radio::wifi::new(p.WIFI, Default::default()).unwrap();
-
-        controller
-            .set_config(&Config::Station(StationConfig::default()))
-            .unwrap();
 
         // scanning all channels takes a (too) long time - even more for dual-band capable targets
         let scan_config = ScanConfig::default().with_max(1).with_channel(13);
