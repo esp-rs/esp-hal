@@ -88,28 +88,38 @@ impl From<KeyLengthMismatch> for OperationError {
     }
 }
 
-/// Represents supported elliptic curves for cryptographic operations.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum EllipticCurve {
-    /// The P-192 elliptic curve, a 192-bit curve.
-    P192,
-    /// The P-256 elliptic curve. a 256-bit curve.
-    P256,
-}
-impl EllipticCurve {
-    fn size_check<const N: usize>(&self, params: [&[u8]; N]) -> Result<(), KeyLengthMismatch> {
-        let bytes = match self {
-            EllipticCurve::P192 => 24,
-            EllipticCurve::P256 => 32,
-        };
-
-        if params.iter().any(|p| p.len() != bytes) {
-            return Err(KeyLengthMismatch);
+for_each_ecc_curve! {
+    (all $(( $id:literal, $name:ident, $bits:literal )),*) => {
+        /// Represents supported elliptic curves for cryptographic operations.
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum EllipticCurve {
+            $(
+                #[doc = concat!("The ", stringify!($name), " elliptic curve, a ", $bits, "-bit curve.")]
+                $name,
+            )*
         }
+        impl EllipticCurve {
+            fn size_check<const N: usize>(&self, params: [&[u8]; N]) -> Result<(), KeyLengthMismatch> {
+                let bytes = self.size();
 
-        Ok(())
-    }
+                if params.iter().any(|p| p.len() != bytes) {
+                    return Err(KeyLengthMismatch);
+                }
+
+                Ok(())
+            }
+
+            /// Returns the size of the elliptic curve in bytes.
+            pub const fn size(self) -> usize {
+                match self {
+                    $(
+                        EllipticCurve::$name => $bits / 8,
+                    )*
+                }
+            }
+        }
+    };
 }
 
 macro_rules! op_method {
@@ -568,12 +578,17 @@ impl Info {
     }
 
     fn start_operation(&self, mode: WorkMode, curve: EllipticCurve) {
+        let curve_variant;
+        for_each_ecc_curve! {
+            (all $(($_id:tt, $name:ident, $_bits:tt)),*) => {
+                curve_variant = match curve {
+                    $(EllipticCurve::$name => KEY_LENGTH::$name,)*
+                }
+            };
+        };
         self.regs.mult_conf().write(|w| unsafe {
             w.work_mode().bits(mode as u8);
-            w.key_length().variant(match curve {
-                EllipticCurve::P192 => KEY_LENGTH::P192,
-                EllipticCurve::P256 => KEY_LENGTH::P256,
-            });
+            w.key_length().variant(curve_variant);
             w.start().set_bit()
         });
     }

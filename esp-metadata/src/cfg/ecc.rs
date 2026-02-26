@@ -3,12 +3,19 @@ use serde::{Deserialize, Serialize};
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct EccDriverProperties {
     working_modes: Vec<WorkingModeEntry>,
+    curves: Vec<CurveEntry>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 struct WorkingModeEntry {
     id: u32,
     mode: WorkingMode,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+struct CurveEntry {
+    id: u32,
+    curve: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, strum::Display)]
@@ -50,11 +57,15 @@ impl super::GenericProperty for EccDriverProperties {
             }
         }
 
+        for curve in self.curves.iter() {
+            cfgs.push(format!("ecc_has_curve_p{}", curve.curve));
+        }
+
         Some(cfgs)
     }
 
     fn macros(&self) -> Option<proc_macro2::TokenStream> {
-        let branches = self
+        let working_mode_branches = self
             .working_modes
             .iter()
             .map(|entry| {
@@ -66,10 +77,27 @@ impl super::GenericProperty for EccDriverProperties {
                 }
             })
             .collect::<Vec<_>>();
+
+        let curve_branches = self
+            .curves
+            .iter()
+            .map(|entry| {
+                let name = quote::format_ident!("P{}", entry.curve);
+                let id = crate::number(entry.id);
+                let curve = crate::number(entry.curve);
+                quote::quote! {
+                    #id, #name, #curve
+                }
+            })
+            .collect::<Vec<_>>();
+
         let for_each_working_mode =
-            crate::generate_for_each_macro("ecc_working_mode", &[("all", &branches)]);
+            crate::generate_for_each_macro("ecc_working_mode", &[("all", &working_mode_branches)]);
+        let for_each_curve =
+            crate::generate_for_each_macro("ecc_curve", &[("all", &curve_branches)]);
         Some(quote::quote! {
             #for_each_working_mode
+            #for_each_curve
         })
     }
 }

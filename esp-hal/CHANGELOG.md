@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C5: Add I2C support (#4975)
 - C5: Add basic RNG support (#4978)
 - C5: Add SHA, RSA support (#4979)
-- C5: Add initial ECC support (#4983)
+- C5: Add ECC support (#4983, #5071)
 - C5: Add AES support (#4983)
 - C5: Add USB Serial/JTAG support (#5008)
 - C5: Add PARL_IO support (#5042)

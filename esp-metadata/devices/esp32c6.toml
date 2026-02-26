@@ -342,6 +342,10 @@ working_modes = [
     { id = 6, mode = "jacobian_point_verification" },
     { id = 7, mode = "affine_point_verification_and_jacobian_point_multiplication" }
 ]
+curves = [
+    { id = 0, curve = 192 },
+    { id = 1, curve = 256 }
+]
 zero_extend_writes = true
 
 [device.gpio]

@@ -16,6 +16,9 @@
 
 use hil_test as _;
 
+#[macro_use]
+extern crate esp_metadata_generated;
+
 #[cfg(aes_driver_supported)]
 #[path = "crypto/aes.rs"]
 mod aes;

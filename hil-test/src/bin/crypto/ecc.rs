@@ -4,14 +4,10 @@ mod tests {
 
     use crypto_bigint::{
         Encoding,
-        U192,
-        U256,
-        Uint,
         modular::runtime_mod::{DynResidue, DynResidueParams},
     };
     use elliptic_curve::{
         Curve,
-        ScalarPrimitive,
         sec1::{ModulusSize, ToEncodedPoint},
     };
     #[cfg(rng_trng_supported)]
@@ -23,9 +19,7 @@ mod tests {
         rng::Rng,
     };
     use hex_literal::hex;
-    use p192::NistP192;
-    use p256::NistP256;
-    use primeorder::{AffinePoint, PrimeCurveParams, ProjectivePoint};
+    use primeorder::{AffinePoint, PrimeCurveParams};
 
     struct Context<'a> {
         ecc: Ecc<'a, Blocking>,
@@ -52,10 +46,16 @@ mod tests {
         ];
 
         for &prime_field in prime_fields {
-            let curve = match prime_field.len() {
-                24 => EllipticCurve::P192,
-                32 => EllipticCurve::P256,
-                _ => unimplemented!(),
+            let curve;
+            for_each_ecc_curve! {
+                (all $(($_id:tt, $name:tt, $bits:literal)),*) => {
+                    curve = match prime_field.len() {
+                        $(
+                            v if v == $bits / 8 => EllipticCurve::$name,
+                        )*
+                        _ => unimplemented!(),
+                    }
+                };
             };
 
             for _ in 0..10 {
@@ -76,26 +76,11 @@ mod tests {
         }
     }
 
-    trait Types: Curve<FieldBytesSize: ModulusSize> + PrimeCurveParams {
-        type Scalar: From<ScalarPrimitive<Self>>;
-
-        const LIMBS: usize;
-    }
-
-    impl Types for NistP192 {
-        type Scalar = p192::Scalar;
-
-        const LIMBS: usize = U192::LIMBS;
-    }
-
-    impl Types for NistP256 {
-        type Scalar = p256::Scalar;
-
-        const LIMBS: usize = U256::LIMBS;
-    }
-
-    fn encode_affine_point<T: Types>(p: AffinePoint<T>, x: &mut [u8], y: &mut [u8])
-    where
+    fn encode_affine_point<T: Curve<FieldBytesSize: ModulusSize> + PrimeCurveParams>(
+        p: AffinePoint<T>,
+        x: &mut [u8],
+        y: &mut [u8],
+    ) where
         AffinePoint<T>: ToEncodedPoint<T>,
     {
         assert_eq!(x.len(), y.len());
@@ -105,11 +90,40 @@ mod tests {
         y.copy_from_slice(p.y().unwrap());
     }
 
+    macro_rules! curve_crate {
+        (P192 $($rest:tt)*) => {
+            p192 $($rest)*
+        };
+        (P256 $($rest:tt)*) => {
+            p256 $($rest)*
+        };
+        (P384 $($rest:tt)*) => {
+            p384 $($rest)*
+        };
+    }
+
+    macro_rules! uint {
+        (P192) => {
+            crypto_bigint::U192
+        };
+        (P256) => {
+            crypto_bigint::U256
+        };
+        (P384) => {
+            crypto_bigint::U384
+        };
+    }
+
     fn affine_point_coords(curve: EllipticCurve, x: &mut [u8], y: &mut [u8]) {
-        match curve {
-            EllipticCurve::P192 => encode_affine_point(p192::AffinePoint::GENERATOR, x, y),
-            EllipticCurve::P256 => encode_affine_point(p256::AffinePoint::GENERATOR, x, y),
-        }
+        for_each_ecc_curve! {
+            (all $(($_id:tt, $name:tt, $bits:literal)),*) => {
+                match curve {
+                    $(
+                        EllipticCurve::$name => encode_affine_point(curve_crate!($name::AffinePoint::GENERATOR), x, y),
+                    )*
+                }
+            };
+        };
     }
 
     fn affine_point_multiplication(
@@ -118,19 +132,18 @@ mod tests {
         sw_x: &mut [u8],
         sw_y: &mut [u8],
     ) {
-        fn multiply<T: Types>(p: AffinePoint<T>, k: &[u8], x: &mut [u8], y: &mut [u8])
-        where
-            AffinePoint<T>: ToEncodedPoint<T>,
-            AffinePoint<T>: Mul<<T as Types>::Scalar, Output = ProjectivePoint<T>>,
-        {
-            let sw_k =
-                <T as Types>::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap());
-            encode_affine_point::<T>(p.mul(sw_k).to_affine(), x, y);
-        }
-
-        match curve {
-            EllipticCurve::P192 => multiply(p192::AffinePoint::GENERATOR, k, sw_x, sw_y),
-            EllipticCurve::P256 => multiply(p256::AffinePoint::GENERATOR, k, sw_x, sw_y),
+        for_each_ecc_curve! {
+            (all $(($_id:tt, $name:tt, $bits:literal)),*) => {
+                match curve {
+                    $(
+                        EllipticCurve::$name => {
+                            let p = curve_crate!($name::AffinePoint::GENERATOR);
+                            let sw_k = curve_crate!($name::Scalar::from(elliptic_curve::ScalarPrimitive::from_slice(k).unwrap()));
+                            encode_affine_point(p.mul(sw_k).to_affine(), sw_x, sw_y);
+                        }
+                    )*
+                }
+            };
         };
     }
 
@@ -141,43 +154,25 @@ mod tests {
         sw_x: &mut [u8],
         sw_y: &mut [u8],
     ) {
-        fn convert_affine_to_jacobian<const LIMBS: usize>(
-            prime_field: &[u8],
-            k: &[u8],
-            sw_x: &mut [u8],
-            sw_y: &mut [u8],
-        ) where
-            Uint<LIMBS>: Encoding,
-        {
-            let modulus = DynResidueParams::new(&Uint::<{ LIMBS }>::from_be_slice(prime_field));
-            let z = DynResidue::new(&Uint::<{ LIMBS }>::from_be_slice(k), modulus);
+        for_each_ecc_curve! {
+            (all $(($_id:tt, $name:tt, $bits:literal)),*) => {
+                match curve {
+                    $(
+                        EllipticCurve::$name => {
+                            let modulus = DynResidueParams::new(&< uint!($name) >::from_be_slice(prime_field));
+                            let z = DynResidue::new(&< uint!($name) >::from_be_slice(k), modulus);
 
-            let x_affine = DynResidue::new(&Uint::<{ LIMBS }>::from_be_slice(sw_x), modulus);
-            let x_jacobian = x_affine * z * z;
-            sw_x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_ref());
+                            let x_affine = DynResidue::new(&< uint!($name) >::from_be_slice(sw_x), modulus);
+                            let x_jacobian = x_affine * z * z;
+                            sw_x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_ref());
 
-            let y_affine = DynResidue::new(&Uint::<{ LIMBS }>::from_be_slice(sw_y), modulus);
-            let y_jacobian = y_affine * z * z * z;
-            sw_y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_ref());
-        }
-
-        match curve {
-            EllipticCurve::P192 => {
-                convert_affine_to_jacobian::<{ <NistP192 as Types>::LIMBS }>(
-                    prime_field,
-                    k,
-                    sw_x,
-                    sw_y,
-                );
-            }
-            EllipticCurve::P256 => {
-                convert_affine_to_jacobian::<{ <NistP256 as Types>::LIMBS }>(
-                    prime_field,
-                    k,
-                    sw_x,
-                    sw_y,
-                );
-            }
+                            let y_affine = DynResidue::new(&< uint!($name) >::from_be_slice(sw_y), modulus);
+                            let y_jacobian = y_affine * z * z * z;
+                            sw_y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_ref());
+                        },
+                    )*
+                }
+            };
         };
     }
 
@@ -188,26 +183,26 @@ mod tests {
         sw_k: &mut [u8],
         sw_y: &mut [u8],
     ) {
-        fn div<const LIMBS: usize>(prime_field: &[u8], k: &[u8], y: &mut [u8])
-        where
-            Uint<LIMBS>: Encoding,
-        {
-            let modulus = DynResidueParams::new(&Uint::<LIMBS>::from_be_slice(prime_field));
-            let y_res = DynResidue::new(&Uint::<LIMBS>::from_be_slice(y), modulus);
-            let k_res = DynResidue::new(&Uint::<LIMBS>::from_be_slice(k), modulus);
-            y.copy_from_slice(
-                y_res
-                    .mul(&(k_res.invert().0))
-                    .retrieve()
-                    .to_be_bytes()
-                    .as_ref(),
-            );
-        }
-
-        match curve {
-            EllipticCurve::P192 => div::<{ <NistP192 as Types>::LIMBS }>(prime_field, sw_k, sw_y),
-            EllipticCurve::P256 => div::<{ <NistP256 as Types>::LIMBS }>(prime_field, sw_k, sw_y),
-        }
+        for_each_ecc_curve! {
+            (all $(($_id:tt, $name:tt, $bits:literal)),*) => {
+                match curve {
+                    $(
+                        EllipticCurve::$name => {
+                            let modulus = DynResidueParams::new(&< uint!($name) >::from_be_slice(prime_field));
+                            let y_res = DynResidue::new(&< uint!($name) >::from_be_slice(sw_y), modulus);
+                            let k_res = DynResidue::new(&< uint!($name) >::from_be_slice(sw_k), modulus);
+                            sw_y.copy_from_slice(
+                                y_res
+                                    .mul(&(k_res.invert().0))
+                                    .retrieve()
+                                    .to_be_bytes()
+                                    .as_ref(),
+                            );
+                        },
+                    )*
+                }
+            };
+        };
     }
 
     const MAX_MEM_BLOCK_SIZE: usize = 32;
@@ -226,10 +221,7 @@ mod tests {
     /// curve.
     macro_rules! buffers {
         ($curve:ident => { $($buff:ident),* }) => {
-            let len = match $curve {
-                EllipticCurve::P192 => 24,
-                EllipticCurve::P256 => 32,
-            };
+            let len = $curve.size();
 
             let mut mem = &mut [0u8; (0 $(+ { stringify!($buff);1 })* ) * MAX_MEM_BLOCK_SIZE][..];
             $(
@@ -479,124 +471,145 @@ mod tests {
         })
     }
 
-    #[test]
     #[cfg(ecc_has_point_addition)]
-    fn test_ecc_point_addition_256(mut ctx: Context<'static>) {
-        const ECC_256_X: [u8; 32] = [
-            0x96, 0xC2, 0x98, 0xD8, 0x45, 0x39, 0xA1, 0xF4, 0xA0, 0x33, 0xEB, 0x2D, 0x81, 0x7D,
-            0x03, 0x77, 0xF2, 0x40, 0xA4, 0x63, 0xE5, 0xE6, 0xBC, 0xF8, 0x47, 0x42, 0x2C, 0xE1,
-            0xF2, 0xD1, 0x17, 0x6B,
-        ];
+    struct PointAddTestCase<const N: usize> {
+        curve: EllipticCurve,
+        x: [u8; N],
+        y: [u8; N],
+    }
 
-        const ECC_256_Y: [u8; 32] = [
-            0xF5, 0x51, 0xBF, 0x37, 0x68, 0x40, 0xB6, 0xCB, 0xCE, 0x5E, 0x31, 0x6B, 0x57, 0x33,
-            0xCE, 0x2B, 0x16, 0x9E, 0x0F, 0x7C, 0x4A, 0xEB, 0xE7, 0x8E, 0x9B, 0x7F, 0x1A, 0xFE,
-            0xE2, 0x42, 0xE3, 0x4F,
-        ];
+    #[cfg(ecc_has_point_addition)]
+    fn test_ecc_point_addition<const N: usize>(
+        mut ctx: Context<'static>,
+        test_case: PointAddTestCase<N>,
+    ) {
+        let mut one = [0u8; N];
+        one[0] = 1;
 
-        const ECC_256_RES_X: [u8; 32] = [
-            0xf, 0xc7, 0xd6, 0x91, 0x83, 0x84, 0x7d, 0x1e, 0xcf, 0xdd, 0x61, 0x4f, 0x27, 0x42,
-            0x4b, 0x80, 0x43, 0xde, 0xfc, 0xdc, 0x52, 0x7d, 0x0e, 0x57, 0xad, 0xb5, 0xd1, 0xac,
-            0x59, 0x8f, 0x97, 0x9a,
-        ];
-
-        const ECC_256_RES_Y: [u8; 32] = [
-            0xd1, 0xf5, 0xd2, 0x90, 0x31, 0xbe, 0x59, 0xfd, 0xd0, 0x8b, 0x66, 0x88, 0x63, 0xc4,
-            0x7f, 0xe7, 0x5f, 0x6d, 0x34, 0xe5, 0x38, 0x82, 0x33, 0x05, 0xf9, 0x6a, 0x78, 0x7f,
-            0x5e, 0x88, 0x26, 0x41,
-        ];
-
-        const ECC_256_RES_Z: [u8; 32] = [
-            0xea, 0xa3, 0x7e, 0x6f, 0xd0, 0x80, 0x6c, 0x97, 0x9d, 0xbd, 0x62, 0xd6, 0xae, 0x66,
-            0x9c, 0x57, 0x2c, 0x3c, 0x1f, 0xf8, 0x94, 0xd6, 0xcf, 0x1d, 0x37, 0xff, 0x34, 0xfc,
-            0xc5, 0x85, 0xc6, 0x9f,
-        ];
-
-        let mut x_256 = ECC_256_X.clone();
-        let mut y_256 = ECC_256_Y.clone();
-
-        let mut z: [u8; 32] = [0u8; 32];
-        z[0] = 0x1;
-
-        let mut x_256_1 = ECC_256_X.clone();
-        let mut y_256_1 = ECC_256_Y.clone();
+        let mut two = [0u8; N];
+        two[0] = 2;
 
         let result = ctx
             .ecc
             .affine_point_addition(
-                EllipticCurve::P256,
-                &mut x_256,
-                &mut y_256,
-                &mut x_256_1,
-                &mut y_256_1,
-                &mut z,
+                test_case.curve,
+                &test_case.x,
+                &test_case.y,
+                &test_case.x,
+                &test_case.y,
+                &one,
             )
             .unwrap();
 
+        let mut result_px = [0; N];
+        let mut result_py = [0; N];
+        let mut result_qx = [0; N];
+        let mut result_qy = [0; N];
+        let mut result_qz = [0; N];
+
         result
-            .read_jacobian_point_result(&mut x_256_1, &mut y_256_1, &mut z)
+            .read_affine_point_result(&mut result_px, &mut result_py)
             .unwrap();
 
-        assert_eq!(x_256_1, ECC_256_RES_X);
-        assert_eq!(y_256_1, ECC_256_RES_Y);
-        assert_eq!(z, ECC_256_RES_Z);
+        result
+            .read_jacobian_point_result(&mut result_qx, &mut result_qy, &mut result_qz)
+            .unwrap();
+
+        // Now verify that P + P = 2*P
+
+        let mut mul_result_px = [0; N];
+        let mut mul_result_py = [0; N];
+        let mut mul_result_qx = [0; N];
+        let mut mul_result_qy = [0; N];
+        let mut mul_result_qz = [0; N];
+
+        let result = ctx
+            .ecc
+            .affine_point_multiplication(test_case.curve, &two, &test_case.x, &test_case.y)
+            .unwrap();
+
+        result
+            .read_affine_point_result(&mut mul_result_px, &mut mul_result_py)
+            .unwrap();
+
+        let result = ctx
+            .ecc
+            .jacobian_point_multiplication(test_case.curve, &two, &test_case.x, &test_case.y)
+            .unwrap();
+
+        result
+            .read_jacobian_point_result(&mut mul_result_qx, &mut mul_result_qy, &mut mul_result_qz)
+            .unwrap();
+
+        assert_eq!(result_px, mul_result_px);
+        assert_eq!(result_py, mul_result_py);
+
+        assert_eq!(result_qx, mul_result_qx);
+        assert_eq!(result_qy, mul_result_qy);
+        assert_eq!(result_qz, mul_result_qz);
     }
 
     #[test]
     #[cfg(ecc_has_point_addition)]
-    fn test_ecc_point_addition_192(mut ctx: Context<'static>) {
-        const ECC_192_X: [u8; 24] = [
-            0x12, 0x10, 0xFF, 0x82, 0xFD, 0x0A, 0xFF, 0xF4, 0x00, 0x88, 0xA1, 0x43, 0xEB, 0x20,
-            0xBF, 0x7C, 0xF6, 0x90, 0x30, 0xB0, 0x0E, 0xA8, 0x8D, 0x18,
-        ];
+    fn test_ecc_point_addition_192(ctx: Context<'static>) {
+        test_ecc_point_addition(
+            ctx,
+            PointAddTestCase {
+                curve: EllipticCurve::P192,
+                x: [
+                    0x12, 0x10, 0xFF, 0x82, 0xFD, 0x0A, 0xFF, 0xF4, 0x00, 0x88, 0xA1, 0x43, 0xEB,
+                    0x20, 0xBF, 0x7C, 0xF6, 0x90, 0x30, 0xB0, 0x0E, 0xA8, 0x8D, 0x18,
+                ],
+                y: [
+                    0x11, 0x48, 0x79, 0x1E, 0xA1, 0x77, 0xF9, 0x73, 0xD5, 0xCD, 0x24, 0x6B, 0xED,
+                    0x11, 0x10, 0x63, 0x78, 0xDA, 0xC8, 0xFF, 0x95, 0x2B, 0x19, 0x07,
+                ],
+            },
+        );
+    }
 
-        const ECC_192_Y: [u8; 24] = [
-            0x11, 0x48, 0x79, 0x1E, 0xA1, 0x77, 0xF9, 0x73, 0xD5, 0xCD, 0x24, 0x6B, 0xED, 0x11,
-            0x10, 0x63, 0x78, 0xDA, 0xC8, 0xFF, 0x95, 0x2B, 0x19, 0x07,
-        ];
+    #[test]
+    #[cfg(ecc_has_point_addition)]
+    fn test_ecc_point_addition_256(ctx: Context<'static>) {
+        test_ecc_point_addition(
+            ctx,
+            PointAddTestCase {
+                curve: EllipticCurve::P256,
+                x: [
+                    0x96, 0xC2, 0x98, 0xD8, 0x45, 0x39, 0xA1, 0xF4, 0xA0, 0x33, 0xEB, 0x2D, 0x81,
+                    0x7D, 0x03, 0x77, 0xF2, 0x40, 0xA4, 0x63, 0xE5, 0xE6, 0xBC, 0xF8, 0x47, 0x42,
+                    0x2C, 0xE1, 0xF2, 0xD1, 0x17, 0x6B,
+                ],
+                y: [
+                    0xF5, 0x51, 0xBF, 0x37, 0x68, 0x40, 0xB6, 0xCB, 0xCE, 0x5E, 0x31, 0x6B, 0x57,
+                    0x33, 0xCE, 0x2B, 0x16, 0x9E, 0x0F, 0x7C, 0x4A, 0xEB, 0xE7, 0x8E, 0x9B, 0x7F,
+                    0x1A, 0xFE, 0xE2, 0x42, 0xE3, 0x4F,
+                ],
+            },
+        );
+    }
 
-        const ECC_192_RES_X: [u8; 24] = [
-            0x6, 0x6c, 0xd8, 0x6e, 0x9b, 0xef, 0x62, 0x7a, 0x54, 0xd3, 0x75, 0xfa, 0xdb, 0x36,
-            0x83, 0xc1, 0x8f, 0x2b, 0xeb, 0xbd, 0x18, 0x1, 0xf, 0xe1,
-        ];
-
-        const ECC_192_RES_Y: [u8; 24] = [
-            0x42, 0xc0, 0x1d, 0x71, 0x0c, 0x1e, 0x4e, 0x29, 0x22, 0x69, 0x21, 0x5b, 0x05, 0x91,
-            0xea, 0x60, 0xcf, 0x05, 0x07, 0xfd, 0x79, 0x29, 0x6c, 0x19,
-        ];
-
-        const ECC_192_RES_Z: [u8; 24] = [
-            0x22, 0x90, 0xf2, 0x3c, 0x42, 0xef, 0xf2, 0xe7, 0xaa, 0x9b, 0x49, 0xd6, 0xda, 0x23,
-            0x20, 0xc6, 0xf0, 0xb4, 0x91, 0xff, 0x2b, 0x57, 0x32, 0xe,
-        ];
-
-        let mut x_192 = ECC_192_X.clone();
-        let mut y_192 = ECC_192_Y.clone();
-        let mut z: [u8; 24] = [0u8; 24];
-        z[0] = 0x1;
-
-        let mut x_192_1 = ECC_192_X.clone();
-        let mut y_192_1 = ECC_192_Y.clone();
-
-        let result = ctx
-            .ecc
-            .affine_point_addition(
-                EllipticCurve::P192,
-                &mut x_192,
-                &mut y_192,
-                &mut x_192_1,
-                &mut y_192_1,
-                &mut z,
-            )
-            .unwrap();
-
-        result
-            .read_jacobian_point_result(&mut x_192_1, &mut y_192_1, &mut z)
-            .unwrap();
-
-        assert_eq!(x_192_1, ECC_192_RES_X);
-        assert_eq!(y_192_1, ECC_192_RES_Y);
-        assert_eq!(z, ECC_192_RES_Z);
+    #[test]
+    #[cfg(all(ecc_has_point_addition, ecc_has_curve_p384))]
+    fn test_ecc_point_addition_384(ctx: Context<'static>) {
+        test_ecc_point_addition(
+            ctx,
+            PointAddTestCase {
+                curve: EllipticCurve::P384,
+                x: [
+                    0xaa, 0x87, 0xca, 0x22, 0xbe, 0x8b, 0x05, 0x37, 0x8e, 0xb1, 0xc7, 0x1e, 0xf3,
+                    0x20, 0xad, 0x74, 0x6e, 0x1d, 0x3b, 0x62, 0x8b, 0xa7, 0x9b, 0x98, 0x59, 0xf7,
+                    0x41, 0xe0, 0x82, 0x54, 0x2a, 0x38, 0x55, 0x02, 0xf2, 0x5d, 0xbf, 0x55, 0x29,
+                    0x6c, 0x3a, 0x54, 0x5e, 0x38, 0x72, 0x76, 0x0a, 0xb7,
+                ],
+                y: [
+                    0x36, 0x17, 0xde, 0x4a, 0x96, 0x26, 0x2c, 0x6f, 0x5d, 0x9e, 0x98, 0xbf, 0x92,
+                    0x92, 0xdc, 0x29, 0xf8, 0xf4, 0x1d, 0xbd, 0x28, 0x9a, 0x14, 0x7c, 0xe9, 0xda,
+                    0x31, 0x13, 0xb5, 0xf0, 0xb8, 0xc0, 0x0a, 0x60, 0xb1, 0xce, 0x1d, 0x7e, 0x81,
+                    0x9d, 0x7a, 0x43, 0x1d, 0x7c, 0x90, 0xea, 0x0e, 0x5f,
+                ],
+            },
+        );
     }
 
     #[cfg(ecc_has_modular_arithmetic)]
@@ -614,7 +627,7 @@ mod tests {
 
     #[cfg(ecc_has_modular_arithmetic)]
     fn run_mod_tests<const N: usize>(mut ctx: Context<'static>, test_case: ModOpTestCase<N>) {
-        let result = &mut [0; 32][..N];
+        let result = &mut [0; N][..];
 
         ctx.ecc
             .modular_addition(test_case.curve, &test_case.x, &test_case.y)
@@ -648,7 +661,7 @@ mod tests {
     #[test]
     #[cfg(ecc_has_modular_arithmetic)]
     fn test_ecc_mod_operations_256(ctx: Context<'static>) {
-        run_mod_tests::<32>(
+        run_mod_tests(
             ctx,
             ModOpTestCase {
                 curve: EllipticCurve::P256,
@@ -734,6 +747,65 @@ mod tests {
                 expected_div: [
                     0x6B, 0xB3, 0x6B, 0x2B, 0x56, 0x6A, 0xE5, 0xF7, 0x75, 0x82, 0xF0, 0xCC, 0x93,
                     0x63, 0x40, 0xF8, 0xEF, 0x35, 0x2A, 0xAF, 0xBD, 0x56, 0xE9, 0x29,
+                ],
+            },
+        );
+    }
+
+    #[test]
+    #[cfg(all(ecc_has_modular_arithmetic, ecc_has_curve_p384))]
+    fn test_ecc_mod_operations_384(ctx: Context<'static>) {
+        run_mod_tests::<48>(
+            ctx,
+            ModOpTestCase {
+                curve: EllipticCurve::P384,
+                x: [
+                    0xaa, 0x87, 0xca, 0x22, 0xbe, 0x8b, 0x05, 0x37, 0x8e, 0xb1, 0xc7, 0x1e, 0xf3,
+                    0x20, 0xad, 0x74, 0x6e, 0x1d, 0x3b, 0x62, 0x8b, 0xa7, 0x9b, 0x98, 0x59, 0xf7,
+                    0x41, 0xe0, 0x82, 0x54, 0x2a, 0x38, 0x55, 0x02, 0xf2, 0x5d, 0xbf, 0x55, 0x29,
+                    0x6c, 0x3a, 0x54, 0x5e, 0x38, 0x72, 0x76, 0x0a, 0xb7,
+                ],
+                y: [
+                    0x36, 0x17, 0xde, 0x4a, 0x96, 0x26, 0x2c, 0x6f, 0x5d, 0x9e, 0x98, 0xbf, 0x92,
+                    0x92, 0xdc, 0x29, 0xf8, 0xf4, 0x1d, 0xbd, 0x28, 0x9a, 0x14, 0x7c, 0xe9, 0xda,
+                    0x31, 0x13, 0xb5, 0xf0, 0xb8, 0xc0, 0x0a, 0x60, 0xb1, 0xce, 0x1d, 0x7e, 0x81,
+                    0x9d, 0x7a, 0x43, 0x1d, 0x7c, 0x90, 0xea, 0x0e, 0x5f,
+                ],
+                num: [
+                    0x68, 0xd1, 0x09, 0xa7, 0xc7, 0x7e, 0xeb, 0xbd, 0x43, 0x18, 0x7e, 0xdd, 0x69,
+                    0x23, 0x7e, 0x0a, 0xef, 0x07, 0xc2, 0x0e, 0xc5, 0x3d, 0xe7, 0xcb, 0xd4, 0x36,
+                    0xad, 0x9b, 0xdc, 0xf8, 0x6c, 0x5c, 0x0c, 0x3d, 0xce, 0x45, 0xcd, 0x6f, 0x7f,
+                    0x18, 0x40, 0xc5, 0x29, 0xf3, 0xcd, 0x12, 0x1d, 0xc2,
+                ],
+                den: [
+                    0x68, 0xd1, 0x09, 0xa7, 0xc7, 0x7e, 0xeb, 0xbd, 0x43, 0x18, 0x7e, 0xdd, 0x69,
+                    0x23, 0x7e, 0x0a, 0xef, 0x07, 0xc2, 0x0e, 0xc5, 0x3d, 0xe7, 0xcb, 0xd4, 0x36,
+                    0xad, 0x9b, 0xdc, 0xf8, 0x6c, 0x5c, 0x0c, 0x3d, 0xce, 0x45, 0xcd, 0x6f, 0x7f,
+                    0x18, 0x40, 0xc5, 0x8c, 0x56, 0x68, 0xb7, 0xb8, 0x67,
+                ],
+                expected_sum: [
+                    0x6D, 0x75, 0xE3, 0xA0, 0xE9, 0x98, 0x45, 0xB9, 0x70, 0xA8, 0xAF, 0x95, 0xD3,
+                    0xA5, 0x6F, 0x46, 0x87, 0xE4, 0x21, 0x2B, 0x32, 0xF4, 0x4C, 0x4D, 0x43, 0xD2,
+                    0x73, 0xF3, 0x37, 0x45, 0xE3, 0xF8, 0x5F, 0x62, 0xA3, 0x2C, 0xDD, 0xD3, 0xAA,
+                    0x09, 0xB5, 0x97, 0x7B, 0xB4, 0x02, 0x61, 0x19, 0x16,
+                ],
+                expected_diff: [
+                    0x74, 0x70, 0xEC, 0xD7, 0x27, 0x65, 0xD9, 0xC7, 0x30, 0x13, 0x2F, 0x5F, 0x60,
+                    0x8E, 0xD0, 0x4A, 0x76, 0x28, 0x1D, 0xA5, 0x62, 0x0D, 0x87, 0x1C, 0x70, 0x1C,
+                    0x10, 0xCD, 0xCD, 0x63, 0x71, 0x77, 0x4A, 0xA2, 0x40, 0x8F, 0xA1, 0xD7, 0xA7,
+                    0xCE, 0xBF, 0x10, 0x41, 0xBC, 0xE1, 0x8B, 0xFB, 0x57,
+                ],
+                expected_prod: [
+                    0x63, 0x67, 0x7D, 0x8B, 0x32, 0x4C, 0x13, 0xE6, 0x49, 0xAB, 0xDE, 0x9F, 0xDB,
+                    0x68, 0x57, 0x49, 0xDE, 0x88, 0x77, 0x56, 0x45, 0xB0, 0x7B, 0xD7, 0xAB, 0xFB,
+                    0xF4, 0x55, 0xC0, 0xD3, 0xD0, 0x2D, 0x37, 0x14, 0x8F, 0x3A, 0x1E, 0x72, 0x7E,
+                    0x49, 0x77, 0xA0, 0xB9, 0xC8, 0xD0, 0x44, 0xDD, 0x16,
+                ],
+                expected_div: [
+                    0x05, 0x35, 0xe1, 0x77, 0xd0, 0xd0, 0x47, 0x38, 0x65, 0xe8, 0x4c, 0xeb, 0x31,
+                    0x96, 0xd9, 0xfc, 0x18, 0x0a, 0xe2, 0xd9, 0x5d, 0x40, 0xf4, 0x89, 0x8a, 0xc6,
+                    0xfc, 0x32, 0x5f, 0xd8, 0xc7, 0x74, 0x15, 0x44, 0xa5, 0xd6, 0xca, 0x72, 0xc1,
+                    0x2f, 0xd7, 0xb3, 0x17, 0xda, 0x6f, 0x49, 0x17, 0xb7,
                 ],
             },
         );
