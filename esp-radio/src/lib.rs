@@ -170,6 +170,7 @@ extern crate alloc;
 
 // MUST be the first module
 mod fmt;
+pub(crate) mod reg_access;
 
 use esp_hal as hal;
 #[cfg(feature = "unstable")]
@@ -252,7 +253,6 @@ unstable_module! {
 }
 
 pub(crate) mod common_adapter;
-pub(crate) mod reg_access;
 
 #[cfg(all(feature = "ble", bt_controller = "npl"))]
 pub(crate) static ESP_RADIO_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();

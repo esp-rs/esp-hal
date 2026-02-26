@@ -185,39 +185,34 @@ impl From<usize> for MultipanIndex {
 }
 
 #[inline(always)]
-fn ieee802154_regs() -> &'static crate::reg_access::pac::ieee802154::RegisterBlock {
-    crate::regs!(IEEE802154)
-}
-
-#[inline(always)]
 pub(crate) fn mac_date() -> u32 {
-    ieee802154_regs().mac_date().read().bits()
+    regs!(IEEE802154).mac_date().read().bits()
 }
 
 #[inline(always)]
 pub(crate) fn set_rx_on_delay(delay: u16) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .rxon_delay()
         .modify(|_, w| unsafe { w.rxon_delay().bits(delay) });
 }
 
 #[inline(always)]
 pub(crate) fn enable_events(events: u16) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .event_en()
         .modify(|r, w| unsafe { w.event_en().bits(r.event_en().bits() | events) });
 }
 
 #[inline(always)]
 pub(crate) fn disable_events(events: u16) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .event_en()
         .modify(|r, w| unsafe { w.event_en().bits(r.event_en().bits() & !events) });
 }
 
 #[inline(always)]
 pub(crate) fn enable_tx_abort_events(events: u32) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .tx_abort_interrupt_control()
         .modify(|r, w| unsafe {
             w.tx_abort_interrupt_control()
@@ -227,7 +222,7 @@ pub(crate) fn enable_tx_abort_events(events: u32) {
 
 #[inline(always)]
 pub(crate) fn enable_rx_abort_events(events: u32) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .rx_abort_intr_ctrl()
         .modify(|r, w| unsafe {
             w.rx_abort_intr_ctrl()
@@ -237,7 +232,7 @@ pub(crate) fn enable_rx_abort_events(events: u32) {
 
 #[inline(always)]
 pub(crate) fn disable_rx_abort_events(events: u32) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .rx_abort_intr_ctrl()
         .modify(|r, w| unsafe {
             w.rx_abort_intr_ctrl()
@@ -247,40 +242,40 @@ pub(crate) fn disable_rx_abort_events(events: u32) {
 
 #[inline(always)]
 pub(crate) fn set_ed_sample_mode(ed_sample_mode: EdSampleMode) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .ed_scan_cfg()
         .modify(|_, w| unsafe { w.ed_sample_mode().bits(ed_sample_mode as u8) });
 }
 
 #[inline(always)]
 pub(crate) fn set_tx_addr(addr: *const u8) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .txdma_addr()
         .modify(|_, w| unsafe { w.txdma_addr().bits(addr as u32) });
 }
 
 #[inline(always)]
 pub(crate) fn set_cmd(cmd: Command) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .command()
         .modify(|_, w| unsafe { w.opcode().bits(cmd as u8) });
 }
 
 #[inline(always)]
 pub(crate) fn set_freq(freq: u8) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .channel()
         .modify(|_, w| unsafe { w.hop().bits(freq) });
 }
 
 #[inline(always)]
 pub(crate) fn freq() -> u8 {
-    ieee802154_regs().channel().read().hop().bits()
+    regs!(IEEE802154).channel().read().hop().bits()
 }
 
 #[inline(always)]
 pub(crate) fn set_power(power: u8) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .tx_power()
         .modify(|_, w| unsafe { w.tx_power().bits(power) });
 }
@@ -288,14 +283,14 @@ pub(crate) fn set_power(power: u8) {
 #[inline(always)]
 pub(crate) fn set_multipan_enable_mask(mask: u8) {
     // apparently the REGS are garbage and the struct is right?
-    ieee802154_regs()
+    regs!(IEEE802154)
         .ctrl_cfg()
         .modify(|r, w| unsafe { w.bits(r.bits() & !(0b1111 << 29) | ((mask as u32) << 29)) });
 }
 
 #[inline(always)]
 pub(crate) fn set_multipan_panid(index: MultipanIndex, panid: u16) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .inf(index as usize)
         .pan_id()
         .write(|w| unsafe { w.pan_id().bits(panid) });
@@ -303,7 +298,7 @@ pub(crate) fn set_multipan_panid(index: MultipanIndex, panid: u16) {
 
 #[inline(always)]
 pub(crate) fn set_multipan_short_addr(index: MultipanIndex, value: u16) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .inf(index as usize)
         .short_addr()
         .write(|w| unsafe { w.short_addr().bits(value) });
@@ -314,7 +309,7 @@ pub(crate) fn set_multipan_ext_addr(
     index: MultipanIndex,
     ext_addr: [u8; IEEE802154_FRAME_EXT_ADDR_SIZE],
 ) {
-    let inf = ieee802154_regs().inf(index as usize);
+    let inf = regs!(IEEE802154).inf(index as usize);
 
     let ext_addr0 = u32::from_le_bytes(unwrap!(ext_addr[0..4].try_into()));
     let ext_addr1 = u32::from_le_bytes(unwrap!(ext_addr[4..8].try_into()));
@@ -327,28 +322,28 @@ pub(crate) fn set_multipan_ext_addr(
 
 #[inline(always)]
 pub(crate) fn set_cca_mode(cca_mode: CcaMode) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .ed_scan_cfg()
         .modify(|_, w| unsafe { w.cca_mode().bits(cca_mode as u8) });
 }
 
 #[inline(always)]
 pub(crate) fn set_cca_threshold(cca_threshold: i8) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .ed_scan_cfg()
         .modify(|_, w| unsafe { w.cca_ed_threshold().bits(cca_threshold as u8) });
 }
 
 #[inline(always)]
 pub(crate) fn set_tx_auto_ack(enable: bool) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .ctrl_cfg()
         .modify(|_, w| w.hw_auto_ack_tx_en().bit(enable));
 }
 
 #[inline(always)]
 pub(crate) fn tx_auto_ack() -> bool {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .ctrl_cfg()
         .read()
         .hw_auto_ack_tx_en()
@@ -357,21 +352,21 @@ pub(crate) fn tx_auto_ack() -> bool {
 
 #[inline(always)]
 pub(crate) fn set_rx_auto_ack(enable: bool) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .ctrl_cfg()
         .modify(|_, w| w.hw_auto_ack_rx_en().bit(enable));
 }
 
 #[inline(always)]
 pub(crate) fn set_tx_enhance_ack(enable: bool) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .ctrl_cfg()
         .modify(|_, w| w.hw_enhance_ack_tx_en().bit(enable));
 }
 
 #[inline(always)]
 pub(crate) fn tx_enhance_ack() -> bool {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .ctrl_cfg()
         .read()
         .hw_enhance_ack_tx_en()
@@ -380,54 +375,54 @@ pub(crate) fn tx_enhance_ack() -> bool {
 
 #[inline(always)]
 pub(crate) fn set_coordinator(enable: bool) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .ctrl_cfg()
         .modify(|_, w| w.pan_coordinator().bit(enable));
 }
 
 #[inline(always)]
 pub(crate) fn set_promiscuous(enable: bool) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .ctrl_cfg()
         .modify(|_, w| w.promiscuous_mode().bit(enable));
 }
 
 #[inline(always)]
 pub(crate) fn set_pending_mode(enable: bool) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .ctrl_cfg()
         .modify(|_, w| w.autopend_enhance().bit(enable));
 }
 
 #[inline(always)]
 pub(crate) fn events() -> u16 {
-    ieee802154_regs().event_status().read().bits() as u16
+    regs!(IEEE802154).event_status().read().bits() as u16
 }
 
 #[inline(always)]
 pub(crate) fn clear_events(events: u16) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .event_status()
         .modify(|r, w| unsafe { w.event_status().bits(r.event_status().bits() & events) });
 }
 
 #[inline(always)]
 pub(crate) fn set_transmit_security(enable: bool) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .sec_ctrl()
         .modify(|_, w| w.sec_en().bit(enable));
 }
 
 #[inline(always)]
 pub(crate) fn set_rx_addr(addr: *mut u8) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .rxdma_addr()
         .modify(|_, w| unsafe { w.rxdma_addr().bits(addr as u32) });
 }
 
 #[inline(always)]
 pub(crate) fn get_tx_abort_reason() -> u32 {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .tx_status()
         .read()
         .tx_abort_status()
@@ -436,7 +431,7 @@ pub(crate) fn get_tx_abort_reason() -> u32 {
 
 #[inline(always)]
 pub(crate) fn get_rx_abort_reason() -> u32 {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .rx_status()
         .read()
         .rx_abort_status()
@@ -445,7 +440,7 @@ pub(crate) fn get_rx_abort_reason() -> u32 {
 
 #[inline(always)]
 pub(crate) fn rx_auto_ack() -> bool {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .ctrl_cfg()
         .read()
         .hw_auto_ack_rx_en()
@@ -456,12 +451,12 @@ pub(crate) fn rx_auto_ack() -> bool {
 /// Matches the C driver's `ieee802154_ll_is_current_rx_frame()`.
 #[inline(always)]
 pub(crate) fn is_current_rx_frame() -> bool {
-    ieee802154_regs().rx_status().read().rx_state().bits() > 1
+    regs!(IEEE802154).rx_status().read().rx_state().bits() > 1
 }
 
 #[inline(always)]
 pub(crate) fn timer0_set_threshold(threshold: u32) {
-    ieee802154_regs()
+    regs!(IEEE802154)
         .time(0)
         .threshold()
         .write(|w| unsafe { w.timer0_threshold().bits(threshold) });

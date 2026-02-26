@@ -320,7 +320,7 @@ pub(crate) fn enable_wifi_power_domain() {
     #[cfg(not(any(soc_has_pmu, esp32c2)))]
     {
         // C5, C6 and H2 have `LP_CLKRST`, but they're cfg'd out with `not(soc_has_pmu)``
-        let rtc_cntl = crate::regs!(RTC_CNTL);
+        let rtc_cntl = regs!(RTC_CNTL);
 
         rtc_cntl
             .dig_pwc()
@@ -329,9 +329,9 @@ pub(crate) fn enable_wifi_power_domain() {
         #[cfg(not(esp32))]
         cfg_if::cfg_if! {
             if #[cfg(soc_has_apb_ctrl)] {
-                let syscon = crate::regs!(APB_CTRL);
+                let syscon = regs!(APB_CTRL);
             } else { // S2
-                let syscon = crate::regs!(SYSCON);
+                let syscon = regs!(SYSCON);
             }
         }
         unsafe {

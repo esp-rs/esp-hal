@@ -1,4 +1,6 @@
 //! Minimal chip-agnostic access to PAC register blocks.
+#![macro_use]
+#![allow(unused_macros)]
 
 /// Chip-selected PAC crate re-export.
 #[cfg(esp32)]
@@ -19,7 +21,6 @@ pub(crate) use esp32s2 as pac;
 pub(crate) use esp32s3 as pac;
 
 /// Get a peripheral register block reference from the PAC.
-#[macro_export]
 macro_rules! regs {
     ($P:ident) => {{ unsafe { &*$crate::reg_access::pac::$P::ptr() } }};
 }
