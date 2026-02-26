@@ -218,8 +218,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            // same priority as the wifi task, when using esp-rtos (I'm assuming it's MAX_PRIO - 2)
-            task_priority: 29,
+            task_priority: crate::preempt::max_task_priority().saturating_sub(2) as u8,
             task_stack_size: CONFIG_BT_LE_CONTROLLER_TASK_STACK_SIZE as _,
             max_connections: CONFIG_BT_LE_MAX_CONNECTIONS as _,
             qa_test_mode: false,
@@ -254,6 +253,12 @@ impl Default for Config {
 
 impl Config {
     pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
+        crate::ble::validate_range!(
+            self,
+            task_priority,
+            0,
+            crate::preempt::max_task_priority() as u8
+        );
         crate::ble::validate_range!(self, max_connections, 1, 35);
         crate::ble::validate_range!(self, ll_rsp_dup_list_count, 1, 100);
         crate::ble::validate_range!(self, ll_adv_dup_list_count, 1, 100);

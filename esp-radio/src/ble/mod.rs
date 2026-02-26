@@ -178,7 +178,7 @@ fn dump_packet_info(_buffer: &[u8]) {
 }
 
 macro_rules! validate_range {
-    ($this:ident, $field:ident, $min:literal, $max:literal) => {
+    ($this:ident, $field:ident, $min:expr, $max:expr) => {
         if !($min..=$max).contains(&$this.$field) {
             error!(
                 "{} must be between {} and {}, current value is {}",
