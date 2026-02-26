@@ -9,15 +9,6 @@
 //! ECC Accelerator can complete various calculation based on different
 //! elliptic curves, thus accelerating ECC algorithm and ECC-derived
 //! algorithms (such as ECDSA).
-//!
-//! ## Configuration
-//! ECC Accelerator supports:
-//! - Two different elliptic curves, namely P-192 and P-256 defined in FIPS 186-3.
-//! - Seven working modes.
-//! - Interrupt upon completion of calculation.
-//!
-//! Inputs of the ECC hardware accelerator must be provided in big-endian
-//! representation. The driver handles the inner representation of the blocks.
 
 use core::{
     marker::PhantomData,
