@@ -195,7 +195,9 @@ macro_rules! define_operations {
         function_kind: $function_kind:ident,
         // Whether the operation does point verification first.
         verifies_point: $verifies_point:tt,
-        // Input parameters.
+        // Input parameters. This determines the name and order of the function arguments,
+        // as well as which memory block they will be written to. Depending on the value of
+        // cfg(ecc_separate_jacobian_point_memory), qx, qy and qz may be mapped to px, py and k.
         inputs: $inputs:tt,
         // What data does the output contain?
         // - Scalar (and which memory block contains the scalar)
