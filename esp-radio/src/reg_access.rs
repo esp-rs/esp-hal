@@ -10,6 +10,7 @@ pub(crate) use esp32c2 as pac;
 #[cfg(esp32c3)]
 pub(crate) use esp32c3 as pac;
 #[cfg(esp32c5)]
+#[expect(unused_imports)] // will be removed when clock_ll stuff is transplanted to esp-radio
 pub(crate) use esp32c5 as pac;
 #[cfg(esp32c6)]
 pub(crate) use esp32c6 as pac;

@@ -319,7 +319,8 @@ pub(crate) unsafe fn phy_disable_clock() {
 pub(crate) fn enable_wifi_power_domain() {
     #[cfg(not(any(soc_has_pmu, esp32c2)))]
     {
-        // C5, C6 and H2 have `LP_CLKRST`, but they're cfg'd out with `not(soc_has_pmu)``
+        // C5, C6 have `LP_CLKRST`, but they're cfg'd out with `not(soc_has_pmu)`
+        // TODO: revisit this code (https://github.com/esp-rs/esp-hal/pull/5066#discussion_r2858978902)
         let rtc_cntl = regs!(RTC_CNTL);
 
         rtc_cntl
@@ -334,6 +335,7 @@ pub(crate) fn enable_wifi_power_domain() {
                 let syscon = regs!(SYSCON);
             }
         }
+        #[cfg(not(esp32))]
         unsafe {
             const WIFIBB_RST: u32 = 1 << 0; // Wi-Fi baseband
             const FE_RST: u32 = 1 << 1; // RF Frontend RST
