@@ -1,13 +1,13 @@
 use alloc::collections::VecDeque as Queue;
 
 use esp_hal::{
-    clock::{ModemClockController, PhyClockGuard, init_radio_clocks},
     handler,
     interrupt::Priority,
     peripherals::IEEE802154,
 };
 use esp_phy::{PhyController, PhyInitGuard};
 use esp_sync::NonReentrantMutex;
+use crate::radio_clocks::{ModemClockController, PhyClockGuard, init_radio_clocks};
 
 use super::{
     frame::{

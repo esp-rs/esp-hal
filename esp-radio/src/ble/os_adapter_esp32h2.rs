@@ -3,10 +3,11 @@ use procmacros::BuilderLite;
 use super::*;
 use crate::{
     ble::InvalidConfigError,
-    hal::{clock::ModemClockController, interrupt, peripherals::BT},
+    hal::{interrupt, peripherals::BT},
     interrupt_dispatch::Handler,
     sys::include::esp_bt_controller_config_t,
 };
+use crate::radio_clocks::ModemClockController;
 
 static ISR_INTERRUPT_3: Handler = Handler::new();
 static ISR_INTERRUPT_15: Handler = Handler::new();

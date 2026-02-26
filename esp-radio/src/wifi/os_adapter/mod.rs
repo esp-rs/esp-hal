@@ -20,10 +20,11 @@ use crate::{
         common::{str_from_c, thread_sem_get},
         malloc::{InternalMemory, calloc_internal},
     },
-    hal::{clock::ModemClockController, peripherals::WIFI},
+    hal::peripherals::WIFI,
     sys::c_types::*,
     time::{blob_ticks_to_micros, millis_to_blob_ticks},
 };
+use crate::radio_clocks::ModemClockController as _;
 
 static WIFI_LOCK: RawMutex = RawMutex::new();
 

@@ -169,7 +169,6 @@ use hal::clock::init_radio_clocks;
 #[cfg(feature = "wifi")]
 use hal::{after_snippet, before_snippet};
 use sys::include::esp_phy_calibration_data_t;
-
 pub(crate) mod sys {
     #[cfg(esp32)]
     pub use esp_wifi_sys_esp32::*;
@@ -191,6 +190,10 @@ pub(crate) mod sys {
 
 #[cfg(feature = "wifi")]
 use crate::wifi::WifiError;
+
+pub(crate) mod private {
+    pub trait Sealed {}
+}
 
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 #[doc(hidden)]
@@ -217,6 +220,7 @@ macro_rules! unstable_module {
 mod compat;
 mod interrupt_dispatch;
 mod time;
+mod radio_clocks;
 
 #[cfg(feature = "wifi")]
 pub mod wifi;
@@ -304,7 +308,7 @@ pub(crate) fn init() {
     crate::common_adapter::enable_wifi_power_domain();
 
     wifi_set_log_verbose();
-    init_radio_clocks();
+    crate::radio_clocks::init_radio_clocks();
 
     #[cfg(feature = "coex")]
     match crate::wifi::coex_initialize() {
