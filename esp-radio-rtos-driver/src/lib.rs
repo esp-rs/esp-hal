@@ -462,6 +462,7 @@ pub unsafe fn task_create(
     pin_to_core: Option<u32>,
     task_stack_size: usize,
 ) -> ThreadPtr {
+    let priority = priority.min(max_task_priority());
     unsafe { esp_rtos_task_create(name, task, param, priority, pin_to_core, task_stack_size) }
 }
 

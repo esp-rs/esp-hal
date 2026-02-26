@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `register_queue_implementation` no longer requires `QueuePtr` to be in scope (#4559)
+- `task_create` now saturates the priority to the maximum supported by the OS (#5074)
 
 ### Removed
 
