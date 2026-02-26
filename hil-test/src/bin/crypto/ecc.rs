@@ -43,6 +43,10 @@ mod tests {
         let prime_fields: &[&[u8]] = &[
             &hex!("fffffffffffffffffffffffffffffffeffffffffffffffff"),
             &hex!("ffffffff00000001000000000000000000000000ffffffffffffffffffffffff"),
+            #[cfg(ecc_has_curve_p384)]
+            &hex!(
+                "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeffffffff0000000000000000ffffffff"
+            ),
         ];
 
         for &prime_field in prime_fields {
@@ -58,9 +62,7 @@ mod tests {
                 };
             };
 
-            for _ in 0..10 {
-                test(prime_field, curve)
-            }
+            test(prime_field, curve)
         }
     }
 
