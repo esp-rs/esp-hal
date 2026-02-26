@@ -10,6 +10,8 @@ mod tests {
         Curve,
         sec1::{ModulusSize, ToEncodedPoint},
     };
+    #[cfg(ecc_has_modular_arithmetic)]
+    use esp_hal::ecc::EccModBase;
     #[cfg(rng_trng_supported)]
     use esp_hal::rng::TrngSource;
     use esp_hal::{
@@ -617,6 +619,7 @@ mod tests {
     #[cfg(ecc_has_modular_arithmetic)]
     struct ModOpTestCase<const N: usize> {
         curve: EllipticCurve,
+        mod_base: EccModBase,
         x: [u8; N],
         y: [u8; N],
         num: [u8; N],
@@ -632,28 +635,48 @@ mod tests {
         let result = &mut [0; N][..];
 
         ctx.ecc
-            .modular_addition(test_case.curve, &test_case.x, &test_case.y)
+            .modular_addition(
+                test_case.curve,
+                test_case.mod_base,
+                &test_case.x,
+                &test_case.y,
+            )
             .unwrap()
             .read_scalar_result(result)
             .unwrap();
         assert_eq!(result, test_case.expected_sum);
 
         ctx.ecc
-            .modular_subtraction(test_case.curve, &test_case.x, &test_case.y)
+            .modular_subtraction(
+                test_case.curve,
+                test_case.mod_base,
+                &test_case.x,
+                &test_case.y,
+            )
             .unwrap()
             .read_scalar_result(result)
             .unwrap();
         assert_eq!(result, test_case.expected_diff);
 
         ctx.ecc
-            .modular_multiplication(test_case.curve, &test_case.x, &test_case.y)
+            .modular_multiplication(
+                test_case.curve,
+                test_case.mod_base,
+                &test_case.x,
+                &test_case.y,
+            )
             .unwrap()
             .read_scalar_result(result)
             .unwrap();
         assert_eq!(result, test_case.expected_prod);
 
         ctx.ecc
-            .modular_division(test_case.curve, &test_case.num, &test_case.den)
+            .modular_division(
+                test_case.curve,
+                test_case.mod_base,
+                &test_case.num,
+                &test_case.den,
+            )
             .unwrap()
             .read_scalar_result(result)
             .unwrap();
@@ -667,6 +690,7 @@ mod tests {
             ctx,
             ModOpTestCase {
                 curve: EllipticCurve::P256,
+                mod_base: EccModBase::OrderOfCurve,
                 x: [
                     0x96, 0xC2, 0x98, 0xD8, 0x45, 0x39, 0xA1, 0xF4, 0xA0, 0x33, 0xEB, 0x2D, 0x81,
                     0x7D, 0x03, 0x77, 0xF2, 0x40, 0xA4, 0x63, 0xE5, 0xE6, 0xBC, 0xF8, 0x47, 0x42,
@@ -718,6 +742,7 @@ mod tests {
             ctx,
             ModOpTestCase {
                 curve: EllipticCurve::P192,
+                mod_base: EccModBase::OrderOfCurve,
                 x: [
                     0x1A, 0x80, 0xA1, 0x5F, 0x1F, 0xB7, 0x59, 0x1B, 0x9F, 0xD7, 0xFB, 0xAE, 0xA9,
                     0xF9, 0x1E, 0xBA, 0x67, 0xAE, 0x57, 0xB7, 0x27, 0x80, 0x9E, 0x1A,
@@ -761,6 +786,7 @@ mod tests {
             ctx,
             ModOpTestCase {
                 curve: EllipticCurve::P384,
+                mod_base: EccModBase::OrderOfCurve,
                 x: [
                     0xaa, 0x87, 0xca, 0x22, 0xbe, 0x8b, 0x05, 0x37, 0x8e, 0xb1, 0xc7, 0x1e, 0xf3,
                     0x20, 0xad, 0x74, 0x6e, 0x1d, 0x3b, 0x62, 0x8b, 0xa7, 0x9b, 0x98, 0x59, 0xf7,

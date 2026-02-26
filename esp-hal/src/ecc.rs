@@ -82,6 +82,17 @@ pub enum OperationError {
     PointNotOnCurve,
 }
 
+/// Modulus base.
+#[cfg(ecc_has_modular_arithmetic)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EccModBase {
+    /// The order of the curve.
+    OrderOfCurve = 0,
+
+    /// Prime modulus.
+    PrimeModulus = 1,
+}
+
 impl From<KeyLengthMismatch> for OperationError {
     fn from(_: KeyLengthMismatch) -> Self {
         OperationError::ParameterLengthMismatch
@@ -122,72 +133,6 @@ for_each_ecc_curve! {
     };
 }
 
-macro_rules! op_method {
-    ($op:ident {
-        doc: [$first_line:literal $(,$doc:literal)*],
-        function: $function:ident,
-        inputs: [$($input:ident),*]
-    }) => {
-        #[doc = concat!("# ", $first_line)]
-        $(#[doc = $doc])*
-        #[doc = r"
-
-## Errors
-
-This function will return an error if the bitlength of the parameters is different
-from the bitlength of the prime fields of the curve."]
-        pub fn $function<'op>(
-            &'op mut self,
-            curve: EllipticCurve,
-            $($input: &[u8],)*
-        ) -> Result<EccResultHandle<'op, $op>, KeyLengthMismatch> {
-            curve.size_check([$($input),*])?;
-
-            paste::paste! {
-                $(
-                    self.info().write_mem(self.info().[<$input _mem>](), $input);
-                )*
-            };
-
-            Ok(self.run_operation::<$op>(curve))
-        }
-    };
-}
-
-#[cfg(ecc_has_modular_arithmetic)]
-macro_rules! modular_op_method {
-    ($op:ident {
-        doc: [$first_line:literal $(,$doc:literal)*],
-        function: $function:ident,
-        inputs: [$($input:ident),*]
-    }) => {
-        #[doc = concat!("# ", $first_line)]
-        $(#[doc = $doc])*
-        #[doc = r"
-
-## Errors
-
-This function will return an error if the bitlength of the parameters is different
-from the bitlength of the prime fields of the curve."]
-        pub fn $function<'op>(
-            &'op mut self,
-            curve: EllipticCurve,
-            // TODO: modulus parameter
-            $($input: &[u8],)*
-        ) -> Result<EccResultHandle<'op, $op>, KeyLengthMismatch> {
-            curve.size_check([$($input),*])?;
-
-            paste::paste! {
-                $(
-                    self.info().write_mem(self.info().[<$input _mem>](), $input);
-                )*
-            };
-
-            Ok(self.run_operation::<$op>(curve))
-        }
-    };
-}
-
 /// This macro defines 3 other macros:
 /// - `doc_summary` that takes the first line of the documentation and returns it as a string
 /// - `result_type` that generates the return types for each operation
@@ -201,14 +146,14 @@ macro_rules! define_operations {
         docs: [$first_line:literal $(, $lines:literal)*],
         // The driver method name
         function: $function:ident,
-        // Which macro will generate the method - either `op_method` or `modular_op_method`.
-        function_kind: $function_kind:ident,
+        // Whether the operation is modular, i.e. whether it needs a modulus argument.
+        $(modular_arithmetic_method: $is_modular:literal,)?
         // Whether the operation does point verification first.
         verifies_point: $verifies_point:tt,
         // Input parameters. This determines the name and order of the function arguments,
         // as well as which memory block they will be written to. Depending on the value of
         // cfg(ecc_separate_jacobian_point_memory), qx, qy and qz may be mapped to px, py and k.
-        inputs: $inputs:tt,
+        inputs: [$($input:ident),*],
         // What data does the output contain?
         // - Scalar (and which memory block contains the scalar)
         // - AffinePoint
@@ -256,11 +201,45 @@ macro_rules! define_operations {
         macro_rules! driver_method {
             $(
                 ($op) => {
-                    $function_kind!($op {
-                        doc: [$first_line $(, $lines)*],
-                        function: $function,
-                        inputs: $inputs
-                    });
+                    #[doc = concat!("# ", $first_line)]
+                    $(#[doc = $lines])*
+                    #[doc = r"
+
+## Errors
+
+This function will return an error if the bitlength of the parameters is different
+from the bitlength of the prime fields of the curve."]
+                    pub fn $function<'op>(
+                        &'op mut self,
+                        curve: EllipticCurve,
+                        $(#[cfg($is_modular)] modulus: EccModBase,)?
+                        $($input: &[u8],)*
+                    ) -> Result<EccResultHandle<'op, $op>, KeyLengthMismatch> {
+                        curve.size_check([$($input),*])?;
+
+                        paste::paste! {
+                            $(
+                                self.info().write_mem(self.info().[<$input _mem>](), $input);
+                            )*
+                        };
+
+                        #[cfg(ecc_has_modular_arithmetic)]
+                        let mod_base = $crate::if_set! {
+                            $(
+                                {
+                                    $crate::ignore!($is_modular);
+                                    modulus
+                                }
+                            )?,
+                            // else
+                            EccModBase::OrderOfCurve
+                        };
+
+                        Ok(self.run_operation::<$op>(
+                            curve,
+                            #[cfg(ecc_has_modular_arithmetic)] mod_base,
+                        ))
+                    }
                 };
             )*
         }
@@ -275,7 +254,6 @@ define_operations! {
             "This method performs `(Qx, Qy) = k * (Px, Py)`."
         ],
         function: affine_point_multiplication,
-        function_kind: op_method,
         verifies_point: false,
         inputs: [k, px, py],
         returns: [AffinePoint]
@@ -288,7 +266,6 @@ define_operations! {
             "This method verifies whether Point (Px, Py) is on the selected elliptic curve."
         ],
         function: affine_point_verification,
-        function_kind: op_method,
         verifies_point: true,
         inputs: [px, py],
         returns: []
@@ -301,7 +278,6 @@ define_operations! {
             "This method verifies whether Point (Px, Py) is on the selected elliptic curve and performs `(Qx, Qy) = k * (Px, Py)`."
         ],
         function: affine_point_verification_multiplication,
-        function_kind: op_method,
         verifies_point: true,
         inputs: [k, px, py],
         returns: [
@@ -318,7 +294,6 @@ define_operations! {
             "This method performs `(Rx, Ry) = (Jx, Jy, Jz) = (Px, Py, 1) + (Qx, Qy, Qz)`."
         ],
         function: affine_point_addition,
-        function_kind: op_method,
         verifies_point: false,
         inputs: [px, py, qx, qy, qz],
         returns: [
@@ -335,7 +310,6 @@ define_operations! {
             "This method performs `(Qx, Qy, Qz) = k * (Px, Py, 1)`."
         ],
         function: jacobian_point_multiplication,
-        function_kind: op_method,
         verifies_point: false,
         inputs: [k, px, py],
         returns: [
@@ -350,7 +324,6 @@ define_operations! {
             "This method verifies whether Point (Qx, Qy, Qz) is on the selected elliptic curve."
         ],
         function: jacobian_point_verification,
-        function_kind: op_method,
         verifies_point: true,
         inputs: [qx, qy, qz],
         returns: [
@@ -365,7 +338,6 @@ define_operations! {
             "This method first verifies whether Point (Px, Py) is on the selected elliptic curve. If yes, it performs `(Qx, Qy, Qz) = k * (Px, Py, 1)`."
         ],
         function: affine_point_verification_jacobian_multiplication,
-        function_kind: op_method,
         verifies_point: true,
         inputs: [k, px, py],
         returns: [
@@ -380,7 +352,6 @@ define_operations! {
             "This method performs `R = Py * k^{−1} mod p`."
         ],
         function: finite_field_division,
-        function_kind: op_method,
         verifies_point: false,
         inputs: [k, py],
         returns: [
@@ -395,7 +366,7 @@ define_operations! {
             "This method performs `R = Px + Py mod p`."
         ],
         function: modular_addition,
-        function_kind: modular_op_method,
+        modular_arithmetic_method: true,
         verifies_point: false,
         inputs: [px, py],
         returns: [
@@ -410,7 +381,7 @@ define_operations! {
             "This method performs `R = Px - Py mod p`."
         ],
         function: modular_subtraction,
-        function_kind: modular_op_method,
+        modular_arithmetic_method: true,
         verifies_point: false,
         inputs: [px, py],
         returns: [
@@ -425,7 +396,7 @@ define_operations! {
             "This method performs `R = Px * Py mod p`."
         ],
         function: modular_multiplication,
-        function_kind: modular_op_method,
+        modular_arithmetic_method: true,
         verifies_point: false,
         inputs: [px, py],
         returns: [
@@ -440,7 +411,7 @@ define_operations! {
             "This method performs `R = Px * Py^{−1} mod p`."
         ],
         function: modular_division,
-        function_kind: modular_op_method,
+        modular_arithmetic_method: true,
         verifies_point: false,
         inputs: [px, py],
         returns: [
@@ -577,7 +548,12 @@ impl Info {
         self.regs.mult_conf().read().start().bit_is_set()
     }
 
-    fn start_operation(&self, mode: WorkMode, curve: EllipticCurve) {
+    fn start_operation(
+        &self,
+        mode: WorkMode,
+        curve: EllipticCurve,
+        #[cfg(ecc_has_modular_arithmetic)] mod_base: EccModBase,
+    ) {
         let curve_variant;
         for_each_ecc_curve! {
             (all $(($_id:tt, $name:ident, $_bits:tt)),*) => {
@@ -589,6 +565,10 @@ impl Info {
         self.regs.mult_conf().write(|w| unsafe {
             w.work_mode().bits(mode as u8);
             w.key_length().variant(curve_variant);
+
+            #[cfg(ecc_has_modular_arithmetic)]
+            w.mod_base().bit(mod_base as u8 == 1);
+
             w.start().set_bit()
         });
     }
@@ -620,8 +600,15 @@ for_each_ecc_working_mode! {
             fn run_operation<'op, O: EccOperation>(
                 &'op mut self,
                 curve: EllipticCurve,
+
+                #[cfg(ecc_has_modular_arithmetic)]
+                mod_base: EccModBase,
             ) -> EccResultHandle<'op, O> {
-                self.info().start_operation(O::WORK_MODE, curve);
+                self.info().start_operation(
+                    O::WORK_MODE,
+                    curve,
+                    #[cfg(ecc_has_modular_arithmetic)] mod_base,
+                );
 
                 // wait for interrupt
                 while self.info().is_busy() {}

@@ -133,12 +133,12 @@ On RISC-V MCUs, the `interrupt::enable_direct` function now takes a `DirectBinda
 
 All `Ecc` methods now expect little endian input, and produce little endian output.
 
-`Ecc` methods now return a result handle instead of writing data back directly. These handles can be used to retrieve the result of the operation.
+`Ecc` methods now return a result handle instead of writing data back directly. These handles can be used to retrieve the result of the operation. Modular arithmetic methods now take the modulus as an argument.
 
 ```diff
  let mut ecc = Ecc::new(peripherals.ECC);
 -ecc.mod_operations(EllipticCurve::P256, &mut a, &mut b, WorkMode::ModAdd).unwrap();
-+let result = ecc.modular_addition(EllipticCurve::P256, &a, &b).unwrap();
++let result = ecc.modular_addition(EllipticCurve::P256, EccModBase::OrderOfCurve, &a, &b).unwrap();
 +result.read_scalar_result(&mut a).unwrap();
 ```
 
