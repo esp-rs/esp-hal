@@ -5,6 +5,7 @@ pub use fields::*;
 
 impl super::Efuse {
     /// Get status of SPI boot encryption.
+    #[instability::unstable]
     pub fn flash_encryption() -> bool {
         !Self::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT)
             .count_ones()
@@ -12,6 +13,7 @@ impl super::Efuse {
     }
 
     /// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
+    #[instability::unstable]
     pub fn rwdt_multiplier() -> u8 {
         Self::read_field_le::<u8>(WDT_DELAY_SEL)
     }
@@ -19,6 +21,7 @@ impl super::Efuse {
     /// Get efuse block version
     ///
     /// see <https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/efuse_hal.c#L27-L30>
+    #[instability::unstable]
     pub fn block_version() -> (u8, u8) {
         // see <https://github.com/espressif/esp-idf/blob/caf1a18/components/hal/esp32c5/include/hal/efuse_ll.h#L77-L85>
         // <https://github.com/espressif/esp-idf/blob/caf1a18/components/efuse/esp32c5/esp_efuse_table.csv#L156>
@@ -31,22 +34,26 @@ impl super::Efuse {
     /// Get version of RTC calibration block
     ///
     /// see <https://github.com/espressif/esp-idf/blob/caf1a18/components/efuse/esp32c5/esp_efuse_rtc_calib.c#L20>
+    #[instability::unstable]
     pub fn rtc_calib_version() -> u8 {
         let (_major, minor) = Self::block_version();
         if minor >= 1 { 1 } else { 0 }
     }
 
     /// Returns the major hardware revision
+    #[instability::unstable]
     pub fn major_chip_version() -> u8 {
         Self::read_field_le(WAFER_VERSION_MAJOR)
     }
 
     /// Returns the minor hardware revision
+    #[instability::unstable]
     pub fn minor_chip_version() -> u8 {
         Self::read_field_le(WAFER_VERSION_MINOR)
     }
 
     /// Returns the frequency of the crystal oscillator in MHz
+    #[instability::unstable]
     pub fn xtal_frequency_mhz() -> u32 {
         let sel = Self::read_field_le::<u8>(XTAL_48M_SEL);
         if sel.count_ones().is_multiple_of(2) {

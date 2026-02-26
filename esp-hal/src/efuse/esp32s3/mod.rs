@@ -4,6 +4,7 @@ mod fields;
 pub use fields::*;
 
 /// Selects which ADC we are interested in the efuse calibration data for
+#[instability::unstable]
 pub enum AdcCalibUnit {
     /// Select efuse calibration data for ADC1
     ADC1,
@@ -13,6 +14,7 @@ pub enum AdcCalibUnit {
 
 impl super::Efuse {
     /// Get status of SPI boot encryption.
+    #[instability::unstable]
     pub fn flash_encryption() -> bool {
         !Self::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT)
             .count_ones()
@@ -20,6 +22,7 @@ impl super::Efuse {
     }
 
     /// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
+    #[instability::unstable]
     pub fn rwdt_multiplier() -> u8 {
         Self::read_field_le::<u8>(WDT_DELAY_SEL)
     }
@@ -27,6 +30,7 @@ impl super::Efuse {
     /// Get efuse block version
     ///
     /// see <https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/efuse_hal.c#L27-L30>
+    #[instability::unstable]
     pub fn block_version() -> (u8, u8) {
         // see <https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/esp32s3/include/hal/efuse_ll.h#L65-L73>
         // <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_table.csv#L196>
@@ -39,6 +43,7 @@ impl super::Efuse {
     /// Get version of RTC calibration block
     ///
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L15>
+    #[instability::unstable]
     pub fn rtc_calib_version() -> u8 {
         let (major, _minor) = Self::block_version();
 
@@ -48,6 +53,7 @@ impl super::Efuse {
     /// Get ADC initial code for specified attenuation from efuse
     ///
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L28>
+    #[instability::unstable]
     pub fn rtc_calib_init_code(unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
         let version = Self::rtc_calib_version();
 
@@ -101,6 +107,7 @@ impl super::Efuse {
     /// Get ADC reference point voltage for specified attenuation in millivolts
     ///
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L63>
+    #[instability::unstable]
     pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, _atten: Attenuation) -> u16 {
         850
     }
@@ -108,6 +115,7 @@ impl super::Efuse {
     /// Get ADC reference point digital code for specified attenuation
     ///
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L63>
+    #[instability::unstable]
     pub fn rtc_calib_cal_code(unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
         let version = Self::rtc_calib_version();
 
@@ -151,11 +159,13 @@ impl super::Efuse {
     }
 
     /// Returns the major hardware revision
+    #[instability::unstable]
     pub fn major_chip_version() -> u8 {
         Self::read_field_le(WAFER_VERSION_MAJOR)
     }
 
     /// Returns the minor hardware revision
+    #[instability::unstable]
     pub fn minor_chip_version() -> u8 {
         Self::read_field_le::<u8>(WAFER_VERSION_MINOR_HI) << 3
             | Self::read_field_le::<u8>(WAFER_VERSION_MINOR_LO)

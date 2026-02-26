@@ -5,6 +5,7 @@ pub use fields::*;
 
 /// Representing different types of ESP32 chips.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[instability::unstable]
 pub enum ChipType {
     /// Represents the ESP32 D0WDQ6 chip variant.
     Esp32D0wdq6,
@@ -28,6 +29,7 @@ impl super::Efuse {
     /// While ESP32 chips usually come with two mostly equivalent CPUs (protocol
     /// CPU and application CPU), the application CPU is unavailable on
     /// some.
+    #[instability::unstable]
     pub fn core_count() -> u32 {
         if Self::read_bit(DISABLE_APP_CPU) {
             1
@@ -40,6 +42,7 @@ impl super::Efuse {
     ///
     /// Note that the actual clock may be lower, depending on the current power
     /// configuration of the chip, clock source, and other settings.
+    #[instability::unstable]
     pub fn max_cpu_frequency() -> Rate {
         let has_rating = Self::read_bit(CHIP_CPU_FREQ_RATED);
         let has_low_rating = Self::read_bit(CHIP_CPU_FREQ_LOW);
@@ -52,11 +55,13 @@ impl super::Efuse {
     }
 
     /// Returns the CHIP_VER_DIS_BT eFuse value.
+    #[instability::unstable]
     pub fn is_bluetooth_enabled() -> bool {
         !Self::read_bit(DISABLE_BT)
     }
 
     /// Returns the CHIP_VER_PKG eFuse value.
+    #[instability::unstable]
     pub fn chip_type() -> ChipType {
         let chip_ver = Self::read_field_le::<u8>(CHIP_PACKAGE)
             | (Self::read_field_le::<u8>(CHIP_PACKAGE_4BIT) << 4);
@@ -73,11 +78,13 @@ impl super::Efuse {
     }
 
     /// Get status of SPI boot encryption.
+    #[instability::unstable]
     pub fn flash_encryption() -> bool {
         (Self::read_field_le::<u8>(FLASH_CRYPT_CNT).count_ones() % 2) != 0
     }
 
     /// Returns the major hardware revision
+    #[instability::unstable]
     pub fn major_chip_version() -> u8 {
         let eco_bit0 = Self::read_field_le::<u32>(CHIP_VER_REV1);
         let eco_bit1 = Self::read_field_le::<u32>(CHIP_VER_REV2);
@@ -93,6 +100,7 @@ impl super::Efuse {
     }
 
     /// Returns the minor hardware revision
+    #[instability::unstable]
     pub fn minor_chip_version() -> u8 {
         Self::read_field_le(WAFER_VERSION_MINOR)
     }

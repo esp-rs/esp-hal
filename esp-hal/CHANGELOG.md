@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `Efuse`, `Efuse::mac_address`, and `Efuse::interface_mac_address` have been stabilized (#5020)
 - UART: `read_ready` and `write_ready` are now stable (#4600)
 - RMT: `SingleShotTxTransaction` has been renamed to `TxTransaction`. (#4302)
 - RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` now take the configuration by reference. (#4302)
@@ -104,6 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- `Efuse::read_base_mac_address` has been removed. Use `Efuse::mac_address` instead. (#5020)
 - The `ESP_HAL_CONFIG_XTAL_FREQUENCY` configuration option has been removed (#4517)
 - `Clocks::{i2c_clock, pwm_clock, crypto_clock}` fields (#4636, #4647)
 - `RtcClock::xtal_freq()` and the `XtalClock` enum (#4724)

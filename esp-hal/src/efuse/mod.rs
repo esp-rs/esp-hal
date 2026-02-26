@@ -22,20 +22,9 @@
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! use esp_hal::efuse::{Efuse, SECURE_VERSION};
+//! use esp_hal::efuse::Efuse;
 //!
-//! let mac_address = Efuse::read_base_mac_address();
-//!
-//! println!("MAC: {mac}");
 //! println!("MAC address {:02x?}", Efuse::mac_address());
-//! println!("Flash Encryption {:?}", Efuse::flash_encryption());
-//!
-//! // Besides the helper methods, various eFuse field constants can also be read with a lower-level API:
-//!
-//! println!(
-//!     "Secure version {:?}",
-//!     Efuse::read_field_le::<u16>(SECURE_VERSION)
-//! );
 //! # {after_snippet}
 //! ```
 
@@ -82,13 +71,11 @@ impl EfuseField {
 }
 
 /// A struct representing the eFuse functionality of the chip.
-#[instability::unstable]
 pub struct Efuse;
 
 impl Efuse {
     /// Reads chip's MAC address from the eFuse storage.
-    #[instability::unstable]
-    pub fn read_base_mac_address() -> MacAddress {
+    fn read_base_mac_address() -> MacAddress {
         let mut mac_addr = [0u8; 6];
 
         let mac0 = Self::read_field_le::<[u8; 4]>(crate::efuse::MAC0);
@@ -213,7 +200,6 @@ impl Efuse {
     ///
     /// By default this reads the base mac address from eFuse, but it can be
     /// overridden by `set_mac_address`.
-    #[instability::unstable]
     pub fn mac_address() -> MacAddress {
         if MAC_OVERRIDE_STATE.load(Ordering::Relaxed) == 2 {
             unsafe { MAC_OVERRIDE }
@@ -246,6 +232,7 @@ impl Efuse {
     ///
     /// The chip version is calculated using the following
     /// formula: MAJOR * 100 + MINOR. (if the result is 1, then version is v0.1)
+    #[instability::unstable]
     pub fn chip_revision() -> u16 {
         Self::major_chip_version() as u16 * 100 + Self::minor_chip_version() as u16
     }
@@ -259,9 +246,7 @@ impl Efuse {
 // Values other than 0 indicate that we cannot attempt setting the mac address
 // again, and values other than 2 indicate that we should read the mac address
 // from eFuse.
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
 static MAC_OVERRIDE_STATE: AtomicU8 = AtomicU8::new(0);
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
 static mut MAC_OVERRIDE: MacAddress = MacAddress::new_eui48_internal([0; 6]);
 
 /// Error indicating issues with setting the MAC address.
