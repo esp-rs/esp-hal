@@ -618,6 +618,9 @@ impl Info {
     }
 }
 
+// Broken into separate macro invocations per item, to make the "Expand macro" LSP output more
+// readable
+
 for_each_ecc_working_mode! {
     (all $(( $id:literal, $mode:tt )),*) => {
         #[derive(Clone, Copy)]
@@ -629,13 +632,21 @@ for_each_ecc_working_mode! {
                 $mode = $id,
             )*
         }
+    };
+}
 
-        // Result type for each operation
+// Result type for each operation
+for_each_ecc_working_mode! {
+    (all $(( $id:literal, $mode:tt )),*) => {
         $(
             result_type!($mode);
         )*
+    };
+}
 
-        // The main driver implementation
+// The main driver implementation
+for_each_ecc_working_mode! {
+    (all $(( $id:literal, $mode:tt )),*) => {
         impl<'d, Dm: DriverMode> Ecc<'d, Dm> {
             fn info(&self) -> Info {
                 Info { regs: ECC::regs() }
@@ -644,9 +655,7 @@ for_each_ecc_working_mode! {
             fn run_operation<'op, O: EccOperation>(
                 &'op mut self,
                 curve: EllipticCurve,
-
-                #[cfg(ecc_has_modular_arithmetic)]
-                mod_base: EccModBase,
+                #[cfg(ecc_has_modular_arithmetic)] mod_base: EccModBase,
             ) -> EccResultHandle<'op, O> {
                 self.info().start_operation(
                     O::WORK_MODE,
