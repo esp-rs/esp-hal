@@ -10,10 +10,7 @@
 //! elliptic curves, thus accelerating ECC algorithm and ECC-derived
 //! algorithms (such as ECDSA).
 
-use core::{
-    marker::PhantomData,
-    sync::atomic::{Ordering, compiler_fence},
-};
+use core::marker::PhantomData;
 
 use procmacros::BuilderLite;
 
@@ -27,7 +24,6 @@ use crate::{
     system::{self, GenericPeripheralGuard},
 };
 
-#[cfg(ecc_zero_extend_writes)]
 const MEM_BLOCK_SIZE: usize = property!("ecc.mem_block_size");
 
 /// The ECC Accelerator driver.
@@ -234,6 +230,7 @@ macro_rules! define_operations {
 
 This function will return an error if the bitlength of the parameters is different
 from the bitlength of the prime fields of the curve."]
+                    #[inline]
                     pub fn $function<'op>(
                         &'op mut self,
                         curve: EllipticCurve,
@@ -510,29 +507,37 @@ impl Info {
         }
     }
 
-    fn write_mem(&self, ptr: *mut u32, data: &[u8]) {
-        unsafe {
-            ptr.cast::<u8>()
-                .copy_from_nonoverlapping(data.as_ptr(), data.len());
+    #[inline]
+    fn write_mem(&self, mut word_ptr: *mut u32, data: &[u8]) {
+        // Note that at least the C2 requires writing this memory in words.
 
-            #[cfg(ecc_zero_extend_writes)]
-            if data.len() < MEM_BLOCK_SIZE {
-                let pad = MEM_BLOCK_SIZE - data.len();
+        debug_assert!(data.len() <= MEM_BLOCK_SIZE);
 
-                ptr.cast::<u8>()
-                    .wrapping_byte_add(data.len())
-                    .write_bytes(0, pad);
-            }
-        };
-        compiler_fence(Ordering::Release);
+        #[cfg(ecc_zero_extend_writes)]
+        let end = word_ptr.wrapping_byte_add(MEM_BLOCK_SIZE);
+
+        let (chunks, remainder) = data.as_chunks::<4>();
+        debug_assert!(remainder.is_empty());
+
+        for word_bytes in chunks {
+            unsafe { word_ptr.write_volatile(u32::from_le_bytes(*word_bytes)) };
+            word_ptr = word_ptr.wrapping_add(1);
+        }
+
+        #[cfg(ecc_zero_extend_writes)]
+        while word_ptr < end {
+            unsafe { word_ptr.write_volatile(0) };
+            word_ptr = word_ptr.wrapping_add(1);
+        }
     }
 
-    fn read_mem(&self, reg: *const u32, out: &mut [u8]) {
-        compiler_fence(Ordering::Acquire);
-        unsafe {
-            reg.cast::<u8>()
-                .copy_to_nonoverlapping(out.as_mut_ptr(), out.len())
-        };
+    #[inline]
+    fn read_mem(&self, mut word_ptr: *const u32, out: &mut [u8]) {
+        for word_bytes in out.chunks_exact_mut(4) {
+            let word = unsafe { word_ptr.read_volatile() };
+            word_ptr = word_ptr.wrapping_add(1);
+            word_bytes.copy_from_slice(&word.to_le_bytes());
+        }
     }
 
     fn k_mem(&self) -> *mut u32 {
