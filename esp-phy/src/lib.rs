@@ -24,11 +24,69 @@ mod fmt;
 #[cfg(esp32)]
 use esp_hal::time::{Duration, Instant};
 use esp_hal::{
-    clock::{ModemClockController, PhyClockGuard},
     rtc_cntl::{SocResetReason, reset_reason},
     system::Cpu,
 };
 use esp_sync::{NonReentrantMutex, RawMutex};
+
+use core::{cell::Cell, marker::PhantomData};
+
+static PHY_CLOCK_REF_COUNTER: embassy_sync::blocking_mutex::Mutex<RawMutex, Cell<u8>> =
+    embassy_sync::blocking_mutex::Mutex::new(Cell::new(0));
+
+#[derive(Debug)]
+/// Prevents the PHY clock from being disabled.
+///
+/// As long as at least one [PhyClockGuard] exists, the PHY clock will remain
+/// active. To release this guard, you can either let it go out of scope or use
+/// [PhyClockGuard::release] to explicitly release it.
+pub struct PhyClockGuard<'d> {
+    _phantom: PhantomData<&'d ()>,
+}
+
+impl Drop for PhyClockGuard<'_> {
+    fn drop(&mut self) {
+        PHY_CLOCK_REF_COUNTER.lock(|c| {
+            let new_n = unwrap!(
+                c.get().checked_sub(1),
+                "PHY clock ref count underflowed."
+            );
+            if new_n == 0 {
+                phy_init_data::chip_phy_init_data::enable_phy(false);
+            }
+            c.set(new_n);
+        });
+    }
+}
+
+impl<'d> PhyClockGuard<'d> {
+    fn new() -> Self {
+        PHY_CLOCK_REF_COUNTER.lock(|c| {
+            let n = c.get();
+            if n == 0 {
+                phy_init_data::chip_phy_init_data::enable_phy(true);
+            }
+            let new_n = unwrap!(n.checked_add(1), "PHY clock ref count overflowed.");
+            c.set(new_n);
+        });
+
+        Self { _phantom: PhantomData }
+    }
+}
+
+/// Force-decrement PHY clock refcount ignoring alive guards (matches previous semantics).
+fn decrease_phy_clock_ref_count_internal() {
+    PHY_CLOCK_REF_COUNTER.lock(|c| {
+        let new_n = unwrap!(
+            c.get().checked_sub(1),
+            "PHY clock ref count underflowed (forced)."
+        );
+        if new_n == 0 {
+            phy_init_data::chip_phy_init_data::enable_phy(false);
+        }
+        c.set(new_n);
+    });
+}
 
 pub(crate) mod sys {
     #[cfg(esp32)]
@@ -313,7 +371,7 @@ impl Drop for PhyInitGuard<'_> {
 }
 
 /// Common functionality for controlling PHY initialization.
-pub trait PhyController<'d>: private::Sealed + ModemClockController<'d> {
+pub trait PhyController<'d>: private::Sealed {
     /// Enable the PHY.
     ///
     /// If no other [PhyInitGuard] is currently alive, this will also initialize the PHY, which
@@ -322,7 +380,7 @@ pub trait PhyController<'d>: private::Sealed + ModemClockController<'d> {
     fn enable_phy(&self) -> PhyInitGuard<'d> {
         // In esp-idf, this is done after calculating the MAC time delta, but it shouldn't make
         // much of a difference.
-        let _phy_clock_guard = self.enable_phy_clock();
+        let _phy_clock_guard = PhyClockGuard::new();
 
         PHY_STATE.with(|phy_state| phy_state.increase_ref_count());
 
@@ -339,7 +397,7 @@ pub trait PhyController<'d>: private::Sealed + ModemClockController<'d> {
     /// now panic.
     fn decrease_phy_ref_count(&self) {
         PHY_STATE.with(|phy_state| phy_state.decrease_ref_count());
-        self.decrease_phy_clock_ref_count();
+        decrease_phy_clock_ref_count_internal();
     }
 }
 macro_rules! impl_phy_controller {
