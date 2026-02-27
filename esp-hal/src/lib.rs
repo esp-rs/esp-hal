@@ -372,7 +372,12 @@ unstable_module! {
     pub mod efuse;
 }
 
-#[cfg(any(sha_driver_supported, rsa_driver_supported, aes_driver_supported))]
+#[cfg(any(
+    sha_driver_supported,
+    rsa_driver_supported,
+    aes_driver_supported,
+    ecc_driver_supported
+))]
 mod work_queue;
 
 unstable_driver! {
