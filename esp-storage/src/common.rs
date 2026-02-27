@@ -89,6 +89,8 @@ impl<'d> FlashStorage<'d> {
     pub const WORD_SIZE: u32 = 4;
     /// Flash sector size in bytes.
     pub const SECTOR_SIZE: u32 = 4096;
+    /// Flash block size in bytes.
+    pub const BLOCK_SIZE: u32 = 65536;
 
     /// Create a new flash storage instance.
     ///
@@ -178,12 +180,25 @@ impl<'d> FlashStorage<'d> {
         Ok(())
     }
 
-    pub(crate) fn internal_erase(&mut self, sector: u32) -> Result<(), FlashStorageError> {
+    pub(crate) fn internal_erase_sector(&mut self, sector: u32) -> Result<(), FlashStorageError> {
         #[cfg(multi_core)]
         let unpark = self.multi_core_strategy.pre_write()?;
 
         self.unlock_once()?;
         check_rc(chip_specific::spiflash_erase_sector(sector))?;
+
+        #[cfg(multi_core)]
+        self.multi_core_strategy.post_write(unpark);
+
+        Ok(())
+    }
+
+    pub(crate) fn internal_erase_block(&mut self, block: u32) -> Result<(), FlashStorageError> {
+        #[cfg(multi_core)]
+        let unpark = self.multi_core_strategy.pre_write()?;
+
+        self.unlock_once()?;
+        check_rc(chip_specific::spiflash_erase_block(block))?;
 
         #[cfg(multi_core)]
         self.multi_core_strategy.post_write(unpark);

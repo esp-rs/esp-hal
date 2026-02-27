@@ -20,6 +20,11 @@ pub(crate) fn spiflash_erase_sector(sector_number: u32) -> i32 {
 }
 
 #[ram]
+pub(crate) fn spiflash_erase_block(block_number: u32) -> i32 {
+    maybe_with_critical_section(|| unsafe { esp_rom_spiflash_erase_block(block_number) })
+}
+
+#[ram]
 pub(crate) fn spiflash_write(dest_addr: u32, data: *const u32, len: u32) -> i32 {
     maybe_with_critical_section(|| unsafe { esp_rom_spiflash_write(dest_addr, data, len) })
 }
