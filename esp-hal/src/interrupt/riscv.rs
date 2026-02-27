@@ -12,9 +12,6 @@
 #[cfg(feature = "rt")]
 #[instability::unstable]
 pub use esp_riscv_rt::TrapFrame;
-use procmacros::ram;
-
-use crate::interrupt::InterruptStatus;
 
 #[cfg_attr(interrupt_controller = "riscv_basic", path = "riscv/basic.rs")]
 #[cfg_attr(interrupt_controller = "plic", path = "riscv/plic.rs")]
@@ -23,7 +20,6 @@ mod cpu_int;
 
 use crate::{
     interrupt::{PriorityError, RunLevel},
-    pac,
     peripherals::Interrupt,
     system::Cpu,
 };
@@ -246,29 +242,6 @@ pub(super) static PRIORITY_TO_INTERRUPT: [CpuInterrupt; VECTOR_COUNT] = const {
     vector
 };
 
-/// The total number of interrupts.
-#[cfg(not(interrupt_controller = "clic"))]
-const INTERRUPT_COUNT: usize = const {
-    let mut count = 0;
-    for_each_interrupt!(([$_class:tt $n:tt] $_:literal) => { count += 1; };);
-    count
-};
-
-/// Maps interrupt numbers to their vector priority levels.
-#[cfg(not(interrupt_controller = "clic"))]
-#[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-pub(super) static INTERRUPT_TO_PRIORITY: [Option<Priority>; INTERRUPT_COUNT] = const {
-    let mut priorities = [None; INTERRUPT_COUNT];
-
-    for_each_interrupt!(
-        ([vector $n:tt] $int:literal) => {
-            for_each_interrupt_priority!(($n, $__:tt, $ident:ident) => { priorities[$int] = Some(Priority::$ident); };);
-        };
-    );
-
-    priorities
-};
-
 /// Enable an interrupt by directly binding it to an available CPU interrupt
 ///
 /// ⚠️ This installs a *raw trap handler*, the `handler` user provides is written directly into the
@@ -485,6 +458,30 @@ pub(crate) mod rt {
     use riscv::register::mcause;
 
     use super::*;
+    use crate::interrupt::InterruptStatus;
+
+    /// The total number of interrupts.
+    #[cfg(not(interrupt_controller = "clic"))]
+    const INTERRUPT_COUNT: usize = const {
+        let mut count = 0;
+        for_each_interrupt!(([$_class:tt $n:tt] $_:literal) => { count += 1; };);
+        count
+    };
+
+    /// Maps interrupt numbers to their vector priority levels.
+    #[cfg(not(interrupt_controller = "clic"))]
+    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
+    pub(super) static INTERRUPT_TO_PRIORITY: [Option<Priority>; INTERRUPT_COUNT] = const {
+        let mut priorities = [None; INTERRUPT_COUNT];
+
+        for_each_interrupt!(
+            ([vector $n:tt] $int:literal) => {
+                for_each_interrupt_priority!(($n, $__:tt, $ident:ident) => { priorities[$int] = Some(Priority::$ident); };);
+            };
+        );
+
+        priorities
+    };
 
     /// # Safety
     ///
@@ -519,7 +516,7 @@ pub(crate) mod rt {
     }
 
     #[unsafe(no_mangle)]
-    #[ram]
+    #[crate::ram]
     unsafe fn handle_interrupts(cpu_intr: CpuInterrupt) {
         let status = InterruptStatus::current();
 
@@ -542,7 +539,8 @@ pub(crate) mod rt {
             for interrupt_nr in status.iterator().filter(|&interrupt_nr| {
                 crate::interrupt::should_handle(Cpu::current(), interrupt_nr as u32, prio as u32)
             }) {
-                let handler = pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler;
+                let handler =
+                    crate::soc::pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler;
 
                 handler();
             }
