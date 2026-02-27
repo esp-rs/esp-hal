@@ -66,3 +66,7 @@ release = ["semver-checks", "dep:opener", "dep:urlencoding", "dep:regex"]
 report = ["dep:regex"]
 rel-check = ["dep:regex"]
 mcp = ["dep:inventory", "dep:rmcp", "dep:schemars", "dep:tokio", "dep:xtask-mcp-macros"]
+
+# schemars is being used in `xtask_mcp_macros` and it's incorrectly detected as unused.
+[package.metadata.cargo-machete]
+ignored = ["schemars"]
