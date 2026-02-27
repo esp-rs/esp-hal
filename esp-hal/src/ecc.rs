@@ -170,7 +170,7 @@ macro_rules! define_operations {
         // Whether the operation is modular, i.e. whether it needs a modulus argument.
         $(modular_arithmetic_method: $is_modular:literal,)?
         // Whether the operation does point verification first.
-        verifies_point: $verifies_point:tt,
+        $(verifies_point: $verifies_point:literal,)?
         // Input parameters. This determines the name and order of the function arguments,
         // as well as which memory block they will be written to. Depending on the value of
         // cfg(ecc_separate_jacobian_point_memory), qx, qy and qz may be mapped to px, py and k.
@@ -203,7 +203,7 @@ macro_rules! define_operations {
 
                     impl EccOperation for $op {
                         const WORK_MODE: WorkMode = WorkMode::$op;
-                        const VERIFIES_POINT: bool = $verifies_point;
+                        const VERIFIES_POINT: bool = $crate::if_set!($($verifies_point)?, false);
                     }
 
                     paste::paste! {
@@ -271,12 +271,11 @@ from the bitlength of the prime fields of the curve."]
 define_operations! {
     AffinePointMultiplication {
         docs: [
-            "Base point multiplication",
+            "Base Point Multiplication",
             "",
-            "This method performs `(Qx, Qy) = k * (Px, Py)`."
+            "This operation performs `(Qx, Qy) = k * (Px, Py)`."
         ],
         function: affine_point_multiplication,
-        verifies_point: false,
         inputs: [k, px, py],
         returns: [AffinePoint]
     },
@@ -285,7 +284,7 @@ define_operations! {
         docs: [
             "Base Point Verification",
             "",
-            "This method verifies whether Point (Px, Py) is on the selected elliptic curve."
+            "This operation verifies whether Point (Px, Py) is on the selected elliptic curve."
         ],
         function: affine_point_verification,
         verifies_point: true,
@@ -297,7 +296,7 @@ define_operations! {
         docs: [
             "Base Point Verification and Multiplication",
             "",
-            "This method verifies whether Point (Px, Py) is on the selected elliptic curve and performs `(Qx, Qy) = k * (Px, Py)`."
+            "This operation verifies whether Point (Px, Py) is on the selected elliptic curve and performs `(Qx, Qy) = k * (Px, Py)`."
         ],
         function: affine_point_verification_multiplication,
         verifies_point: true,
@@ -313,10 +312,9 @@ define_operations! {
         docs: [
             "Point Addition",
             "",
-            "This method performs `(Rx, Ry) = (Jx, Jy, Jz) = (Px, Py, 1) + (Qx, Qy, Qz)`."
+            "This operation performs `(Rx, Ry) = (Jx, Jy, Jz) = (Px, Py, 1) + (Qx, Qy, Qz)`."
         ],
         function: affine_point_addition,
-        verifies_point: false,
         inputs: [px, py, qx, qy, qz],
         returns: [
             AffinePoint,
@@ -329,10 +327,9 @@ define_operations! {
         docs: [
             "Jacobian Point Multiplication",
             "",
-            "This method performs `(Qx, Qy, Qz) = k * (Px, Py, 1)`."
+            "This operation performs `(Qx, Qy, Qz) = k * (Px, Py, 1)`."
         ],
         function: jacobian_point_multiplication,
-        verifies_point: false,
         inputs: [k, px, py],
         returns: [
             JacobianPoint
@@ -343,7 +340,7 @@ define_operations! {
         docs: [
             "Jacobian Point Verification",
             "",
-            "This method verifies whether Point (Qx, Qy, Qz) is on the selected elliptic curve."
+            "This operation verifies whether Point (Qx, Qy, Qz) is on the selected elliptic curve."
         ],
         function: jacobian_point_verification,
         verifies_point: true,
@@ -357,7 +354,7 @@ define_operations! {
         docs: [
             "Base Point Verification + Jacobian Point Multiplication",
             "",
-            "This method first verifies whether Point (Px, Py) is on the selected elliptic curve. If yes, it performs `(Qx, Qy, Qz) = k * (Px, Py, 1)`."
+            "This operation first verifies whether Point (Px, Py) is on the selected elliptic curve. If yes, it performs `(Qx, Qy, Qz) = k * (Px, Py, 1)`."
         ],
         function: affine_point_verification_jacobian_multiplication,
         verifies_point: true,
@@ -371,10 +368,9 @@ define_operations! {
         docs: [
             "Finite Field Division",
             "",
-            "This method performs `R = Py * k^{−1} mod p`."
+            "This operation performs `R = Py * k^{−1} mod p`."
         ],
         function: finite_field_division,
-        verifies_point: false,
         inputs: [k, py],
         returns: [
             Scalar { const LOCATION: ScalarResultLocation = ScalarResultLocation::Py }
@@ -385,11 +381,10 @@ define_operations! {
         docs: [
             "Modular Addition",
             "",
-            "This method performs `R = Px + Py mod p`."
+            "This operation performs `R = Px + Py mod p`."
         ],
         function: modular_addition,
         modular_arithmetic_method: true,
-        verifies_point: false,
         inputs: [px, py],
         returns: [
             Scalar { const LOCATION: ScalarResultLocation = ScalarResultLocation::Px }
@@ -400,11 +395,10 @@ define_operations! {
         docs: [
             "Modular Subtraction",
             "",
-            "This method performs `R = Px - Py mod p`."
+            "This operation performs `R = Px - Py mod p`."
         ],
         function: modular_subtraction,
         modular_arithmetic_method: true,
-        verifies_point: false,
         inputs: [px, py],
         returns: [
             Scalar { const LOCATION: ScalarResultLocation = ScalarResultLocation::Px }
@@ -415,11 +409,10 @@ define_operations! {
         docs: [
             "Modular Multiplication",
             "",
-            "This method performs `R = Px * Py mod p`."
+            "This operation performs `R = Px * Py mod p`."
         ],
         function: modular_multiplication,
         modular_arithmetic_method: true,
-        verifies_point: false,
         inputs: [px, py],
         returns: [
             Scalar { const LOCATION: ScalarResultLocation = ScalarResultLocation::Py }
@@ -430,11 +423,10 @@ define_operations! {
         docs: [
             "Modular Division",
             "",
-            "This method performs `R = Px * Py^{−1} mod p`."
+            "This operation performs `R = Px * Py^{−1} mod p`."
         ],
         function: modular_division,
         modular_arithmetic_method: true,
-        verifies_point: false,
         inputs: [px, py],
         returns: [
             Scalar { const LOCATION: ScalarResultLocation = ScalarResultLocation::Py }
