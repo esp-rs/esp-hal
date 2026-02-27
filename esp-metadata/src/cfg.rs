@@ -383,7 +383,11 @@ driver_configs![
             #[serde(default)]
             zero_extend_writes: bool,
             #[serde(default)]
-            separate_jacobian_point_memory: bool,
+            separate_jacobian_point_memory: bool, // Qx, Qy, Qz memory blocks
+            #[serde(default)]
+            has_memory_clock_gate: bool, // ECC_MULT_MEM_CLOCK_GATE_FORCE_ON
+            #[serde(default)]
+            supports_enhanced_security: bool, // ECC_MULT_SECURITY_MODE
             #[serde(flatten)]
             extras: EccDriverProperties,
         }

@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MAC addresses for radio interfaces getter: `esp_hal::efuse::Efuse::interface_mac_address(InterfaceMacAddress::)`. (#5002)
 - `ShaXContext` objects now implement `digest::core_api::BlockSizeUser` (and thus they can be used with the `hmac` crate) (#5050)
 - C5: Add ASSIST_DEBUG support (#5058)
+- `Ecc::apply_config` and `esp_hal::ecc::Config` (#5073)
 
 ### Changed
 
@@ -69,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Ecc::mod_operations` has been replaced by `modular_addition`, `modular_subtraction`, `modular_multiplication` and `modular_division` (#5061)
 - `Ecc` methods now return a result handle that can be used to retrieve the result of the operation. (#5061)
 - `Ecc` modular arithmetic methods now take the modulus as an argument (#5073)
+- `Ecc::new` now takes a configuration parameter (#5073)
 
 ### Fixed
 

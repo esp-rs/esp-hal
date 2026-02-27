@@ -347,6 +347,7 @@ curves = [
     { id = 1, curve = 256 }
 ]
 zero_extend_writes = true
+has_memory_clock_gate = true
 
 [device.gpio]
 support_status = "supported"

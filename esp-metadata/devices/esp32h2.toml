@@ -306,6 +306,8 @@ curves = [
 ]
 zero_extend_writes = true
 separate_jacobian_point_memory = true
+has_memory_clock_gate = true
+supports_enhanced_security = true # only after revision 1.2
 
 [device.gpio]
 support_status = "supported"

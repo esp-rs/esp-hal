@@ -313,8 +313,8 @@ curves = [
     { id = 2, curve = 384 }
 ]
 separate_jacobian_point_memory = true
-# TODO: 3 curve parameters
-# TODO: different memory size
+has_memory_clock_gate = true
+supports_enhanced_security = true
 
 [device.gpio]
 support_status = "partial"

@@ -35,7 +35,7 @@ mod tests {
         let p = esp_hal::init(config);
 
         Context {
-            ecc: Ecc::new(p.ECC),
+            ecc: Ecc::new(p.ECC, Default::default()),
             #[cfg(rng_trng_supported)]
             _rng_source: TrngSource::new(p.RNG, p.ADC1),
         }

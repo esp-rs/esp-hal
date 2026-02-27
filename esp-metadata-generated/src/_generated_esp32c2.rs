@@ -81,6 +81,12 @@ macro_rules! property {
     ("ecc.separate_jacobian_point_memory") => {
         false
     };
+    ("ecc.has_memory_clock_gate") => {
+        false
+    };
+    ("ecc.supports_enhanced_security") => {
+        false
+    };
     ("ecc.mem_block_size") => {
         32
     };

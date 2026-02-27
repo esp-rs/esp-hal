@@ -15,6 +15,8 @@ use core::{
     sync::atomic::{Ordering, compiler_fence},
 };
 
+use procmacros::BuilderLite;
+
 use crate::{
     Blocking,
     DriverMode,
@@ -66,6 +68,29 @@ impl Drop for EccMemoryPowerGuard {
                 w.ecc_mem_pd().set_bit()
             });
     }
+}
+
+/// ECC peripheral configuration.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Config {
+    /// Force enable register clock.
+    force_enable_reg_clock: bool,
+
+    /// Force enable memory clock.
+    #[cfg(ecc_has_memory_clock_gate)]
+    force_enable_mem_clock: bool,
+
+    /// Enable constant time operation and minimized power consumption variation for
+    /// point-multiplication operations.
+    #[cfg_attr(
+        esp32h2,
+        doc = r"
+
+Only available on chip revision 1.2 and above."
+    )]
+    #[cfg(ecc_supports_enhanced_security)]
+    enhanced_security: bool,
 }
 
 /// The length of the arguments do not match the length required by the curve.
@@ -422,15 +447,17 @@ define_operations! {
 
 impl<'d> Ecc<'d, Blocking> {
     /// Create a new instance in [Blocking] mode.
-    pub fn new(ecc: ECC<'d>) -> Self {
-        let guard = GenericPeripheralGuard::new();
-
-        Self {
+    pub fn new(ecc: ECC<'d>, config: Config) -> Self {
+        let this = Self {
             _ecc: ecc,
             phantom: PhantomData,
             _memory_guard: EccMemoryPowerGuard::new(),
-            _guard: guard,
-        }
+            _guard: GenericPeripheralGuard::new(),
+        };
+
+        this.info().apply_config(&config);
+
+        this
     }
 }
 
@@ -450,6 +477,23 @@ struct Info {
 impl Info {
     fn reset(&self) {
         self.regs.mult_conf().reset()
+    }
+
+    fn apply_config(&self, config: &Config) {
+        self.regs.mult_conf().modify(|_, w| {
+            w.clk_en().bit(config.force_enable_reg_clock);
+
+            #[cfg(ecc_has_memory_clock_gate)]
+            w.mem_clock_gate_force_on()
+                .bit(config.force_enable_mem_clock);
+
+            #[cfg(ecc_supports_enhanced_security)]
+            if !cfg!(esp32h2) || crate::soc::chip_revision_above(102) {
+                w.security_mode().bit(config.enhanced_security);
+            }
+
+            w
+        });
     }
 
     fn check_point_verification_result(&self) -> Result<(), OperationError> {
@@ -562,7 +606,7 @@ impl Info {
                 }
             };
         };
-        self.regs.mult_conf().write(|w| unsafe {
+        self.regs.mult_conf().modify(|_, w| unsafe {
             w.work_mode().bits(mode as u8);
             w.key_length().variant(curve_variant);
 
@@ -614,6 +658,11 @@ for_each_ecc_working_mode! {
                 while self.info().is_busy() {}
 
                 EccResultHandle::new(curve, self)
+            }
+
+            /// Applies the given configuration to the ECC peripheral.
+            pub fn apply_config(&mut self, config: &Config) {
+                self.info().apply_config(config);
             }
 
             /// Resets the ECC peripheral.
