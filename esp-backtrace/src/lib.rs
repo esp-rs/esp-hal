@@ -41,6 +41,7 @@ use esp_println as _;
 const MAX_BACKTRACE_ADDRESSES: usize =
     esp_config::esp_config_int!(usize, "ESP_BACKTRACE_CONFIG_BACKTRACE_FRAMES");
 
+#[derive(Clone)]
 pub struct Backtrace(pub(crate) heapless::Vec<BacktraceFrame, MAX_BACKTRACE_ADDRESSES>);
 
 impl Backtrace {
@@ -57,6 +58,7 @@ impl Backtrace {
     }
 }
 
+#[derive(Clone)]
 pub struct BacktraceFrame {
     pub(crate) pc: usize,
 }
