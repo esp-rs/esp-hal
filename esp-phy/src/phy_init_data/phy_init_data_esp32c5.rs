@@ -28,27 +28,31 @@ pub(crate) fn enable_phy(en: bool) {
         .clk_conf()
         .modify(|_, w| w.clk_coex_en().bit(en));
 
-    esp_hal::peripherals::MODEM_SYSCON::regs().clk_conf1().modify(|_, w| {
-        w.clk_wifi_apb_en().bit(en);
-        w.clk_wifibb_22m_en().bit(en);
-        w.clk_fe_40m_en().bit(en);
-        w.clk_fe_80m_en().bit(en);
-        w.clk_wifibb_44m_en().bit(en);
-        w.clk_wifimac_en().bit(en)
-    });
+    esp_hal::peripherals::MODEM_SYSCON::regs()
+        .clk_conf1()
+        .modify(|_, w| {
+            w.clk_wifi_apb_en().bit(en);
+            w.clk_wifibb_22m_en().bit(en);
+            w.clk_fe_40m_en().bit(en);
+            w.clk_fe_80m_en().bit(en);
+            w.clk_wifibb_44m_en().bit(en);
+            w.clk_wifimac_en().bit(en)
+        });
 
     esp_hal::peripherals::MODEM_SYSCON::regs()
         .clk_conf1()
         .modify(|r, w| unsafe { w.bits(r.bits() | 0x1fb) });
 
-    esp_hal::peripherals::MODEM_SYSCON::regs().clk_conf1().modify(|_, w| {
-        w.clk_fe_apb_en().bit(en);
-        w.clk_fe_80m_en().bit(en);
-        w.clk_fe_160m_en().bit(en);
-        w.clk_fe_dac_en().bit(en);
-        w.clk_fe_pwdet_adc_en().bit(en);
-        w.clk_fe_adc_en().bit(en)
-    });
+    esp_hal::peripherals::MODEM_SYSCON::regs()
+        .clk_conf1()
+        .modify(|_, w| {
+            w.clk_fe_apb_en().bit(en);
+            w.clk_fe_80m_en().bit(en);
+            w.clk_fe_160m_en().bit(en);
+            w.clk_fe_dac_en().bit(en);
+            w.clk_fe_pwdet_adc_en().bit(en);
+            w.clk_fe_adc_en().bit(en)
+        });
 }
 
 const fn limit(val: u8, low: u8, high: u8) -> u8 {

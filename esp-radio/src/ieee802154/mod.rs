@@ -20,10 +20,9 @@
 use byte::{BytesExt, TryRead};
 use docsplay::Display;
 use esp_hal::peripherals::IEEE802154;
-use esp_phy::PhyInitGuard;
+use esp_phy::{PhyClockGuard, PhyInitGuard};
 use esp_sync::NonReentrantMutex;
 use ieee802154::mac::{self, FooterMode, FrameSerDesContext};
-use crate::radio_clocks::PhyClockGuard;
 
 use self::{
     frame::FRAME_SIZE,

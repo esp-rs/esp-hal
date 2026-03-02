@@ -53,13 +53,6 @@ use clocks::RtcSlowClkConfig;
 use clocks::Timg0FunctionClockConfig;
 use esp_rom_sys::rom::ets_delay_us;
 
-use crate::{
-    ESP_HAL_LOCK,
-    peripherals::TIMG0,
-    soc::clocks::{self, ClockTree},
-    time::Rate,
-};
-
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub mod ll {
@@ -74,6 +67,12 @@ pub use crate::soc::clocks::ClockConfig;
 #[cfg(not(feature = "unstable"))]
 pub(crate) use crate::soc::clocks::ClockConfig;
 pub use crate::soc::clocks::CpuClock;
+use crate::{
+    ESP_HAL_LOCK,
+    peripherals::TIMG0,
+    soc::clocks::{self, ClockTree},
+    time::Rate,
+};
 
 impl CpuClock {
     #[procmacros::doc_replace]

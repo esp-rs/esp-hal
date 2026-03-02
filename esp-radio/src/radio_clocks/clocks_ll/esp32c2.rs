@@ -1,6 +1,4 @@
-use crate::{
-    clock::Clocks,
-};
+use crate::clock::Clocks;
 
 // Mask for clock bits used by both WIFI and Bluetooth, 0, 1, 2, 3, 7, 8, 9, 10,
 // 19, 20, 21, 22, 23

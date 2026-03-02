@@ -21,11 +21,10 @@ use crate::{
         malloc::{InternalMemory, calloc_internal},
     },
     hal::peripherals::WIFI,
+    radio_clocks::ModemClockController,
     sys::c_types::*,
     time::{blob_ticks_to_micros, millis_to_blob_ticks},
 };
-
-use crate::radio_clocks::ModemClockController;
 
 static WIFI_LOCK: RawMutex = RawMutex::new();
 

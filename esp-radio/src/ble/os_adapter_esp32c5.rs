@@ -5,9 +5,9 @@ use crate::{
     ble::InvalidConfigError,
     hal::{interrupt, peripherals::BT},
     interrupt_dispatch::Handler,
+    radio_clocks::ModemClockController,
     sys::include::esp_bt_controller_config_t,
 };
-use crate::radio_clocks::ModemClockController;
 
 static ISR_INTERRUPT_4: Handler = Handler::new();
 static ISR_INTERRUPT_7: Handler = Handler::new();

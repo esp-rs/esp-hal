@@ -191,10 +191,6 @@ pub(crate) mod sys {
 #[cfg(feature = "wifi")]
 use crate::wifi::WifiError;
 
-pub(crate) mod private {
-    pub trait Sealed {}
-}
-
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 #[doc(hidden)]
 macro_rules! unstable_module {
@@ -219,13 +215,8 @@ macro_rules! unstable_module {
 
 mod compat;
 mod interrupt_dispatch;
-mod time;
-#[cfg(any(
-    soc_has_bt,
-    all(feature = "unstable", soc_has_ieee802154),
-    soc_has_wifi
-))]
 mod radio_clocks;
+mod time;
 
 #[cfg(feature = "wifi")]
 pub mod wifi;
