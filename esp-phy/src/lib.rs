@@ -420,7 +420,7 @@ pub trait PhyController<'d>: private::Sealed {
     /// now panic.
     fn decrease_phy_ref_count(&self) {
         PHY_STATE.with(|phy_state| phy_state.decrease_ref_count());
-        decrease_phy_clock_ref_count_internal();
+        self.decrease_phy_clock_ref_count();
     }
 }
 macro_rules! impl_phy_controller {
