@@ -220,6 +220,11 @@ macro_rules! unstable_module {
 mod compat;
 mod interrupt_dispatch;
 mod time;
+#[cfg(any(
+    soc_has_bt,
+    all(feature = "unstable", soc_has_ieee802154),
+    soc_has_wifi
+))]
 mod radio_clocks;
 
 #[cfg(feature = "wifi")]

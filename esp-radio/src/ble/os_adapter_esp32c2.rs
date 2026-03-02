@@ -378,8 +378,7 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
 pub(super) fn ble_rtc_clk_init() {
     // stealing BT is safe, since it is passed into the initialization function of the BLE
     // controller.
-    let mut bt = unsafe { BT::steal() };
-    bt.ble_rtc_clk_init();
+    crate::radio_clocks::clocks_ll::ble_rtc_clk_init();
 }
 
 pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {

@@ -2,7 +2,6 @@ use core::{cell::Cell, marker::PhantomData};
 
 use esp_sync::RawMutex;
 
-use super::*;
 #[cfg(soc_has_bt)]
 use esp_hal::peripherals::BT;
 #[cfg(all(feature = "unstable", soc_has_ieee802154))]
@@ -89,7 +88,7 @@ impl Drop for PhyClockGuard<'_> {
     }
 }
 
-#[instability::unstable]
+// #[instability::unstable]
 /// This trait provides common clock functionality for all modem peripherals.
 pub trait ModemClockController<'d>: Sealed + 'd {
     /// Enable the modem clock for this controller.
@@ -119,7 +118,14 @@ pub trait ModemClockController<'d>: Sealed + 'd {
 }
 
 #[cfg(soc_has_wifi)]
-#[instability::unstable]
+impl crate::private::Sealed for esp_hal::peripherals::WIFI<'_> {}
+#[cfg(soc_has_bt)]
+impl crate::private::Sealed for esp_hal::peripherals::BT<'_> {}
+#[cfg(all(feature = "unstable", soc_has_ieee802154))]
+impl crate::private::Sealed for esp_hal::peripherals::IEEE802154<'_> {}
+
+#[cfg(soc_has_wifi)]
+// #[instability::unstable]
 impl<'d> ModemClockController<'d> for WIFI<'d> {
     fn enable_modem_clock(&mut self, enable: bool) {
         clocks_ll::enable_wifi(enable);
@@ -127,7 +133,7 @@ impl<'d> ModemClockController<'d> for WIFI<'d> {
 }
 
 #[cfg(soc_has_bt)]
-#[instability::unstable]
+// #[instability::unstable]
 impl<'d> ModemClockController<'d> for BT<'d> {
     fn enable_modem_clock(&mut self, enable: bool) {
         clocks_ll::enable_bt(enable);
@@ -135,7 +141,7 @@ impl<'d> ModemClockController<'d> for BT<'d> {
 }
 
 #[cfg(all(feature = "unstable", soc_has_ieee802154))]
-#[instability::unstable]
+// #[instability::unstable]
 impl<'d> ModemClockController<'d> for IEEE802154<'d> {
     fn enable_modem_clock(&mut self, enable: bool) {
         clocks_ll::enable_ieee802154(enable);
