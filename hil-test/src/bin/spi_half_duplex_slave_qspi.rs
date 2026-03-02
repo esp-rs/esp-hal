@@ -271,7 +271,7 @@ mod read {
 mod write {
     use esp_hal::{
         Blocking,
-        gpio::interconnect::InputSignal,
+        gpio::{Flex, interconnect::InputSignal},
         pcnt::{Pcnt, channel::EdgeMode, unit::Unit},
         spi::{
             Mode,
@@ -321,7 +321,12 @@ mod write {
             }
         }
 
-        let (mosi_loopback, mosi) = unsafe { mosi.split() };
+        let mut mosi = Flex::new(mosi);
+
+        mosi.set_input_enable(true);
+        mosi.set_output_enable(true);
+
+        let mosi_loopback = mosi.peripheral_input();
 
         let spi = Spi::new(
             peripherals.SPI2,
@@ -691,7 +696,7 @@ mod qspi {
         Blocking,
         dma::{DmaRxBuf, DmaTxBuf},
         dma_buffers,
-        gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pull},
+        gpio::{AnyPin, Flex, Input, InputConfig, Level, Output, OutputConfig, Pull},
         spi::{
             Mode,
             master::{Address, Command, Config, DataMode, Spi, SpiDma},
@@ -990,7 +995,10 @@ mod qspi {
         let unit0 = pcnt.unit0;
         let unit1 = pcnt.unit1;
 
-        let (mosi_loopback, mosi) = unsafe { mosi.split() };
+        let mut mosi = Flex::new(mosi);
+        mosi.set_input_enable(true);
+        mosi.set_output_enable(true);
+        let mosi_loopback = mosi.peripheral_input();
 
         unit0.channel0.set_edge_signal(mosi_loopback);
         unit0
@@ -1013,15 +1021,22 @@ mod qspi {
         let unit0 = pcnt.unit0;
         let unit1 = pcnt.unit1;
 
-        let (mosi_loopback, mosi) = unsafe { mosi.split() };
-        let (gpio_loopback, gpio) = unsafe { gpio.split() };
+        let mut mosi = Flex::new(mosi);
+        mosi.set_input_enable(true);
+        mosi.set_output_enable(true);
+        let mosi_loopback = mosi.peripheral_input();
+
+        let mut sio1 = Flex::new(gpio);
+        sio1.set_input_enable(true);
+        sio1.set_output_enable(true);
+        let sio1_loopback = sio1.peripheral_input();
 
         unit0.channel0.set_edge_signal(mosi_loopback);
         unit0
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        unit1.channel0.set_edge_signal(gpio_loopback);
+        unit1.channel0.set_edge_signal(sio1_loopback);
         unit1
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
@@ -1029,7 +1044,7 @@ mod qspi {
         let spi = ctx
             .spi
             .with_sio0(mosi)
-            .with_sio1(gpio)
+            .with_sio1(sio1)
             .with_dma(ctx.dma_channel);
 
         execute_write(unit0, unit1, spi, 0b0000_0010, true);
@@ -1042,19 +1057,26 @@ mod qspi {
         // up by a resistor if the command phase doesn't drive its line.
         let [gpio, _, mosi] = ctx.gpios;
 
+        let mut mosi = Flex::new(mosi);
+        mosi.set_input_enable(true);
+        mosi.set_output_enable(true);
+        let mosi_loopback = mosi.peripheral_input();
+
+        let mut sio2 = Flex::new(gpio);
+        sio2.set_input_enable(true);
+        sio2.set_output_enable(true);
+        let sio2_loopback = sio2.peripheral_input();
+
         let pcnt = Pcnt::new(ctx.pcnt);
         let unit0 = pcnt.unit0;
         let unit1 = pcnt.unit1;
-
-        let (mosi_loopback, mosi) = unsafe { mosi.split() };
-        let (gpio_loopback, gpio) = unsafe { gpio.split() };
 
         unit0.channel0.set_edge_signal(mosi_loopback);
         unit0
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        unit1.channel0.set_edge_signal(gpio_loopback);
+        unit1.channel0.set_edge_signal(sio2_loopback);
         unit1
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
@@ -1062,7 +1084,7 @@ mod qspi {
         let spi = ctx
             .spi
             .with_sio0(mosi)
-            .with_sio2(gpio)
+            .with_sio2(sio2)
             .with_dma(ctx.dma_channel);
 
         execute_write(unit0, unit1, spi, 0b0000_0100, true);
@@ -1079,15 +1101,22 @@ mod qspi {
         let unit0 = pcnt.unit0;
         let unit1 = pcnt.unit1;
 
-        let (mosi_loopback, mosi) = unsafe { mosi.split() };
-        let (gpio_loopback, gpio) = unsafe { gpio.split() };
+        let mut mosi = Flex::new(mosi);
+        mosi.set_input_enable(true);
+        mosi.set_output_enable(true);
+        let mosi_loopback = mosi.peripheral_input();
+
+        let mut sio3 = Flex::new(gpio);
+        sio3.set_input_enable(true);
+        sio3.set_output_enable(true);
+        let sio3_loopback = sio3.peripheral_input();
 
         unit0.channel0.set_edge_signal(mosi_loopback);
         unit0
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        unit1.channel0.set_edge_signal(gpio_loopback);
+        unit1.channel0.set_edge_signal(sio3_loopback);
         unit1
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
@@ -1095,7 +1124,7 @@ mod qspi {
         let spi = ctx
             .spi
             .with_sio0(mosi)
-            .with_sio3(gpio)
+            .with_sio3(sio3)
             .with_dma(ctx.dma_channel);
 
         execute_write(unit0, unit1, spi, 0b0000_1000, true);

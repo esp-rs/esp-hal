@@ -892,7 +892,7 @@ macro_rules! def_with_sio_pin {
         #[doc = " Enables both input and output functionality for the pin, and connects it"]
         #[doc = concat!(" to the SIO", stringify!($n), " output and input signals.")]
         #[instability::unstable]
-        pub fn $fn(mut self, sio: impl PeripheralOutput<'d>) -> Self {
+        pub fn $fn(mut self, sio: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
             self.pins.$field = self.connect_sio_pin(sio.into(), $n);
 
             self
@@ -1034,7 +1034,7 @@ where
     /// See also [Self::with_mosi] when you only need a one-directional MOSI
     /// signal.
     #[instability::unstable]
-    pub fn with_sio0(mut self, mosi: impl PeripheralOutput<'d>) -> Self {
+    pub fn with_sio0(mut self, mosi: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
         self.pins.sio0_pin = self.connect_sio_pin(mosi.into(), 0);
 
         self
@@ -1052,7 +1052,7 @@ where
     /// See also [Self::with_miso] when you only need a one-directional MISO
     /// signal.
     #[instability::unstable]
-    pub fn with_sio1(mut self, sio1: impl PeripheralOutput<'d>) -> Self {
+    pub fn with_sio1(mut self, sio1: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
         self.pins.sio1_pin = self.connect_sio_pin(sio1.into(), 1);
 
         self

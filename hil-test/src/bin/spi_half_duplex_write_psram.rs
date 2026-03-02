@@ -14,7 +14,7 @@ use esp_hal::{
     dma::{DmaRxBuf, DmaTxBuf, ExternalBurstConfig},
     dma_buffers,
     dma_descriptors_chunk_size,
-    gpio::interconnect::InputSignal,
+    gpio::{Flex, interconnect::InputSignal},
     pcnt::{Pcnt, channel::EdgeMode, unit::Unit},
     spi::{
         Mode,
@@ -47,6 +47,7 @@ struct Context {
 
 #[embedded_test::tests(default_timeout = 3)]
 mod tests {
+
     use super::*;
 
     #[init]
@@ -63,7 +64,10 @@ mod tests {
 
         let dma_channel = peripherals.DMA_CH0;
 
-        let (mosi_loopback, mosi) = unsafe { mosi.split() };
+        let mut mosi = Flex::new(mosi);
+        mosi.set_input_enable(true);
+        mosi.set_output_enable(true);
+        let mosi_loopback = mosi.peripheral_input();
 
         let spi = Spi::new(
             peripherals.SPI2,
