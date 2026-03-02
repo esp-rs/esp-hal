@@ -1,6 +1,5 @@
 const DPORT_WIFI_CLK_WIFI_EN_M: u32 = 0x000007cf;
 
-#[cfg_attr(not(feature = "unstable"), expect(unused))]
 pub(crate) fn enable_wifi(enable: bool) {
     // `periph_ll_wifi_module_enable_clk_clear_rst`
     // `periph_ll_wifi_module_disable_clk_set_rst`

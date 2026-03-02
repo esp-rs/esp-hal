@@ -2,7 +2,6 @@
 const DPORT_WIFI_CLK_WIFI_EN_M: u32 = 0x00000406;
 const DPORT_WIFI_CLK_BT_EN_M: u32 = 0x00030800;
 
-#[cfg_attr(not(feature = "unstable"), expect(unused))]
 pub(crate) fn enable_bt(enable: bool) {
     regs!(DPORT).wifi_clk_en().modify(|r, w| unsafe {
         if enable {
@@ -13,7 +12,6 @@ pub(crate) fn enable_bt(enable: bool) {
     });
 }
 
-#[cfg_attr(not(feature = "unstable"), expect(unused))]
 pub(crate) fn enable_wifi(enable: bool) {
     // `periph_ll_wifi_module_enable_clk_clear_rst`
     // `periph_ll_wifi_module_disable_clk_set_rst`

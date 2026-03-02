@@ -19,12 +19,10 @@ fn ble_ieee802154_clock_enable(en: bool) {
         .modify(|_, w| w.clk_coex_en().bit(en));
 }
 
-#[cfg_attr(not(feature = "unstable"), expect(unused))]
 pub(crate) fn enable_bt(en: bool) {
     ble_ieee802154_clock_enable(en);
 }
 
-#[cfg_attr(not(feature = "unstable"), expect(unused))]
 pub(crate) fn enable_ieee802154(en: bool) {
     ble_ieee802154_clock_enable(en);
 }

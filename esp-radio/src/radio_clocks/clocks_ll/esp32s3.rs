@@ -1,13 +1,11 @@
 // SYSTEM_WIFI_CLK_EN : R/W ;bitpos:[31:0] ;default: 32'hfffce030
 const SYSTEM_WIFI_CLK_EN: u32 = 0x00FB9FCF;
 
-#[cfg_attr(not(feature = "unstable"), expect(unused))]
 pub(crate) fn enable_bt(_: bool) {
     // `periph_ll_wifi_module_enable_clk_clear_rst`. does nothing
     // `periph_ll_wifi_module_disable_clk_set_rst`. does nothing
 }
 
-#[cfg_attr(not(feature = "unstable"), expect(unused))]
 pub(crate) fn enable_wifi(_: bool) {
     // `periph_ll_wifi_module_enable_clk_clear_rst`. does nothing
     // `periph_ll_wifi_module_disable_clk_set_rst`. does nothing

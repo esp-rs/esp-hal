@@ -13,6 +13,7 @@ use esp_hal::peripherals::WIFI;
 #[cfg_attr(esp32h2, path = "clocks_ll/esp32h2.rs")]
 #[cfg_attr(esp32s2, path = "clocks_ll/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "clocks_ll/esp32s3.rs")]
+#[allow(unused)]
 pub(crate) mod clocks_ll;
 
 #[inline]

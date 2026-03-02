@@ -846,8 +846,6 @@ pub unsafe extern "C" fn phy_update_country_info(country: *const c_char) -> c_in
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_reset_mac() {
     trace!("wifi_reset_mac");
-    // stealing WIFI is safe, since it is passed into the initialization function of the BLE
-    // controller.
     crate::radio_clocks::clocks_ll::reset_wifi_mac();
 }
 

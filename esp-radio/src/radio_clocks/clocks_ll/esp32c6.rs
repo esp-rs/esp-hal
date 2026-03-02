@@ -1,4 +1,3 @@
-#[cfg_attr(not(feature = "unstable"), expect(unused))]
 pub(crate) fn enable_wifi(en: bool) {
     regs!(MODEM_SYSCON).clk_conf1().modify(|_, w| {
         w.clk_wifi_apb_en().bit(en);
@@ -24,7 +23,6 @@ pub(crate) fn enable_wifi(en: bool) {
     });
 }
 
-#[cfg_attr(not(feature = "unstable"), expect(unused))]
 pub(crate) fn enable_ieee802154(en: bool) {
     regs!(MODEM_SYSCON).clk_conf().modify(|_, w| {
         w.clk_zb_apb_en().bit(en);
@@ -54,7 +52,6 @@ pub(crate) fn enable_ieee802154(en: bool) {
         .modify(|_, w| w.clk_coex_en().set_bit());
 }
 
-#[cfg_attr(not(feature = "unstable"), expect(unused))]
 pub(crate) fn enable_bt(en: bool) {
     regs!(MODEM_SYSCON).clk_conf().modify(|_, w| {
         w.clk_etm_en().bit(en);
