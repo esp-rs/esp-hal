@@ -11,6 +11,7 @@
 //! - Some of the SOC capabilities are not implemented: using external 32K oscillator instead of a
 //!   crystal, divider for CLK8M and possibly more.
 #![allow(dead_code, reason = "Some of this is bound to be unused")]
+#![allow(missing_docs, reason = "Experimental")]
 
 // TODO: This is a temporary place for this, should probably be moved into clocks_ll.
 
