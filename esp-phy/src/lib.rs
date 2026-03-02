@@ -40,7 +40,7 @@ fn increase_phy_clock_ref_count_internal() {
         let phy_clock_ref_count = phy_clock_ref_counter.get();
 
         if phy_clock_ref_count == 0 {
-            phy_init_data::chip_phy_init_data::enable_phy(true);
+            phy_clocks::enable_phy(true);
         }
         let new_phy_clock_ref_count = unwrap!(
             phy_clock_ref_count.checked_add(1),
@@ -59,7 +59,7 @@ fn decrease_phy_clock_ref_count_internal() {
         );
 
         if new_phy_clock_ref_count == 0 {
-            phy_init_data::chip_phy_init_data::enable_phy(false);
+            phy_clocks::enable_phy(false);
         }
 
         phy_clock_ref_counter.set(new_phy_clock_ref_count);
@@ -109,6 +109,7 @@ pub(crate) mod sys {
 }
 
 mod common_adapter;
+mod phy_clocks;
 mod phy_init_data;
 
 pub(crate) mod private {

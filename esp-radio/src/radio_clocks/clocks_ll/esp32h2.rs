@@ -1,9 +1,3 @@
-pub(crate) fn enable_phy(en: bool) {
-    regs!(MODEM_LPCON)
-        .clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_en().bit(en));
-}
-
 fn ble_ieee802154_clock_enable(en: bool) {
     regs!(MODEM_SYSCON).clk_conf().modify(|_, w| {
         w.clk_zb_apb_en().bit(en);

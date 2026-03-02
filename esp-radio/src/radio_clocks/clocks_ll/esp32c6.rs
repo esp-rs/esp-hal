@@ -1,12 +1,3 @@
-pub(crate) fn enable_phy(en: bool) {
-    regs!(MODEM_LPCON)
-        .clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_en().bit(en));
-    regs!(MODEM_LPCON)
-        .i2c_mst_clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_sel_160m().bit(en));
-}
-
 #[cfg_attr(not(feature = "unstable"), expect(unused))]
 pub(crate) fn enable_wifi(en: bool) {
     regs!(MODEM_SYSCON).clk_conf1().modify(|_, w| {
