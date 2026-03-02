@@ -1,6 +1,3 @@
-#![cfg_attr(docsrs, procmacros::doc_replace(
-    "chip" => "foo"
-))]
 //! Wi-Fi
 //!
 //! ## Introduction
