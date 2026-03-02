@@ -50,12 +50,6 @@ jobs:
         shell: bash
         run: cargo xtask ci ${{ matrix.device }} --toolchain nightly
 
-      # Check for unused dependencies through esp-hal packages
-      - name: Install and run cargo machete
-        run: |
-          cargo install cargo-machete
-          cargo machete
-
   check-global-symbols:
     name: Check Global Symbols in esp-hal
     runs-on: ubuntu-latest
@@ -86,6 +80,5 @@ jobs:
             gh issue create \
               --title "Nightly CI Failure" \
               --body "One or more jobs failed! [View the failed workflow](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})." \
-              --label "ci-nightly" \
               --assignee JurajSadel
           fi

@@ -286,6 +286,32 @@ jobs:
       # Run host tests for all applicable packages:
       - run: cargo xtask host-tests
 
+      # Check for unused dependencies
+      - name: Machete
+        uses: bnjbvr/cargo-machete@main
+        with:
+          args: >
+            esp-alloc
+            esp-backtrace
+            esp-bootloader-esp-idf
+            esp-config
+            esp-hal
+            esp-hal-procmacros
+            esp-lp-hal
+            esp-metadata
+            esp-phy
+            esp-println
+            esp-radio
+            esp-radio-rtos-driver
+            esp-riscv-rt
+            esp-rom-sys
+            esp-rtos
+            esp-storage
+            esp-sync
+            examples
+            extras
+            xtask
+
   # --------------------------------------------------------------------------
   # Check links in .rs, .md, and .toml files
 
