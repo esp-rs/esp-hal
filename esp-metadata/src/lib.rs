@@ -487,6 +487,10 @@ impl Config {
 
     fn generate_properties(&self) -> TokenStream {
         let chip_name = self.name();
+        let chip_pretty_name = Chip::from_str(&chip_name)
+            .expect("Valid chip name")
+            .pretty_name()
+            .to_string();
 
         // Translate the chip properties into a macro that can be used in esp-hal:
         let arch = self.device.arch.as_ref();
@@ -546,6 +550,21 @@ impl Config {
             #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
             macro_rules! chip {
                 () => { #chip_name };
+            }
+
+            /// The pretty name of the chip as `&str`
+            ///
+            /// # Example
+            ///
+            /// ```rust, no_run
+            /// use esp_hal::chip;
+            /// let chip_name = chip_pretty!();
+            #[doc = concat!("assert_eq!(chip_name, ", chip_pretty!(), ")")]
+            /// ```
+            #[macro_export]
+            #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+            macro_rules! chip_pretty {
+                () => { #chip_pretty_name };
             }
 
             /// The properties of this chip and its drivers.
