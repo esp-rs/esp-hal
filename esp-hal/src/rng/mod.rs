@@ -150,37 +150,57 @@ mod trng;
 #[cfg(all(feature = "unstable", rng_trng_supported))]
 pub use trng::*;
 
-/// (Pseudo-)Random Number Generator
+/// (Pseudo-)Random Number Generator.
 #[derive(Clone, Copy, Default, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-#[instability::unstable]
 pub struct Rng;
 
 impl Rng {
     /// Creates a new random number generator instance.
     #[inline]
-    #[instability::unstable]
     pub fn new() -> Self {
         Self
     }
 
+    #[procmacros::doc_replace]
     /// Reads currently available `u32` integer from `RNG`.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::rng::Rng;
+    ///
+    /// let rng = Rng::new();
+    /// let random_number = rng.random();
+    /// # {after_snippet}
+    /// ```
     #[inline]
-    #[instability::unstable]
     pub fn random(&self) -> u32 {
         let mut n = [0; 4];
         self.read(&mut n);
         u32::from_le_bytes(n)
     }
 
+    #[procmacros::doc_replace]
     /// Reads enough bytes from hardware random number generator to fill
     /// `buffer`.
     ///
     /// If any error is encountered then this function immediately returns. The
     /// contents of buf are unspecified in this case.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::rng::Rng;
+    ///
+    /// let rng = Rng::new();
+    /// let mut rng_values = [0; 10];
+    /// rng.read(&mut rng_values);
+    /// # {after_snippet}
     #[inline]
-    #[instability::unstable]
     pub fn read(&self, buffer: &mut [u8]) {
         unsafe { self.read_into_raw(buffer.as_mut_ptr(), buffer.len()) };
     }
