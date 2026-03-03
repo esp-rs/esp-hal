@@ -472,6 +472,16 @@ impl Clocks {
     }
 }
 
+/// The CPU clock frequency.
+pub fn cpu_clock() -> Rate {
+    Clocks::get().cpu_clock
+}
+
+/// The XTAL clock frequency.
+pub fn xtal_clock() -> Rate {
+    Clocks::get().xtal_clock
+}
+
 #[cfg(any(
     soc_has_bt,
     all(feature = "unstable", soc_has_ieee802154),

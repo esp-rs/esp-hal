@@ -165,12 +165,9 @@ use esp_phy::CalibrationResult;
 use esp_radio_rtos_driver as preempt;
 #[cfg(all(esp32, feature = "unstable"))]
 use hal::analog::adc::{release_adc2, try_claim_adc2};
+use hal::clock::init_radio_clocks;
 #[cfg(feature = "wifi")]
 use hal::{after_snippet, before_snippet};
-use hal::{
-    clock::{Clocks, init_radio_clocks},
-    time::Rate,
-};
 use sys::include::esp_phy_calibration_data_t;
 
 pub(crate) mod sys {
@@ -295,13 +292,12 @@ pub(crate) fn init() {
     }
 
     // A minimum clock of 80MHz is required to operate Wi-Fi module.
-    const MIN_CLOCK: Rate = Rate::from_mhz(80);
-    let clocks = Clocks::get();
-    if clocks.cpu_clock < MIN_CLOCK {
+    const MIN_CLOCK: u32 = 80;
+    let cpu_clock = esp_hal::clock::cpu_clock().as_mhz();
+    if cpu_clock < MIN_CLOCK {
         panic!(
             "CPU clock {} MHz is too slow for Wi-Fi operation, minimum required is {} MHz",
-            clocks.cpu_clock.as_mhz(),
-            MIN_CLOCK.as_mhz()
+            cpu_clock, MIN_CLOCK
         );
     }
 
