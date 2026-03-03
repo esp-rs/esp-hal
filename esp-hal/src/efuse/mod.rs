@@ -15,15 +15,10 @@
 //!
 //! Each chip is programmed with a unique base MAC address during manufacturing.
 //! Different interfaces (Wi-Fi Station, SoftAP, Bluetooth, etc.) each use a
-//! MAC address derived from this base address. The [`Station`] interface uses
+//! MAC address derived from this base address. The Station interface uses
 //! the base MAC directly, while others use locally administered variants
 //! produced by modifying the first octet to set the local-admin bit and
 //! incrementing the last octet to distinguish each interface.
-//!
-//! The `Efuse` struct represents the eFuse peripheral and is responsible for
-//! reading various eFuse fields and values.
-//!
-//! [`Station`]: InterfaceMacAddress::Station
 //!
 //! ## Examples
 //!
@@ -31,13 +26,17 @@
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! use esp_hal::efuse::{Efuse, InterfaceMacAddress};
+//! use esp_hal::efuse;
+//! #[cfg(soc_has_bt)]
+//! use esp_hal::efuse::InterfaceMacAddress;
 //!
-//! let mac = Efuse::mac_address();
+//! let mac = efuse::mac_address();
 //! println!("Base MAC address: {mac}");
 //! println!("MAC bytes: {:02x?}", mac.as_bytes());
 //!
-//! let bt_mac = Efuse::interface_mac_address(InterfaceMacAddress::Bluetooth);
+//! # #[cfg(soc_has_bt)]
+//! let bt_mac = efuse::interface_mac_address(InterfaceMacAddress::Bluetooth);
+//! # #[cfg(soc_has_bt)]
 //! println!("Bluetooth MAC: {bt_mac}");
 //! # {after_snippet}
 //! ```
@@ -84,218 +83,200 @@ impl EfuseField {
     }
 }
 
-#[procmacros::doc_replace]
-/// The eFuse peripheral.
+/// Reads chip's MAC address from the eFuse storage.
+fn read_base_mac_address() -> MacAddress {
+    let mut mac_addr = [0u8; 6];
+
+    let mac0 = read_field_le::<[u8; 4]>(crate::efuse::MAC0);
+    let mac1 = read_field_le::<[u8; 2]>(crate::efuse::MAC1);
+
+    // MAC address is stored in big endian, so load the bytes in reverse:
+    mac_addr[0] = mac1[1];
+    mac_addr[1] = mac1[0];
+    mac_addr[2] = mac0[3];
+    mac_addr[3] = mac0[2];
+    mac_addr[4] = mac0[1];
+    mac_addr[5] = mac0[0];
+
+    MacAddress::new_eui48_internal(mac_addr)
+}
+
+/// Read field value in a little-endian order
+#[inline(always)]
+#[instability::unstable]
+pub fn read_field_le<T: AnyBitPattern>(field: EfuseField) -> T {
+    let EfuseField {
+        block,
+        bit_start,
+        bit_count,
+        ..
+    } = field;
+
+    // Represent output value as a bytes slice:
+    let mut output = mem::MaybeUninit::<T>::uninit();
+    let mut bytes =
+        unsafe { slice::from_raw_parts_mut(output.as_mut_ptr() as *mut u8, mem::size_of::<T>()) };
+
+    let bit_off = bit_start as usize;
+    let bit_end = cmp::min(bit_count as usize, bytes.len() * 8) + bit_off;
+
+    let mut last_word_off = bit_off / 32;
+    let mut last_word = unsafe { block.address().add(last_word_off).read_volatile() };
+
+    let word_bit_off = bit_off % 32;
+    let word_bit_ext = 32 - word_bit_off;
+
+    let mut word_off = last_word_off;
+    for bit_off in (bit_off..bit_end).step_by(32) {
+        if word_off != last_word_off {
+            // Read a new word:
+            last_word_off = word_off;
+            last_word = unsafe { block.address().add(last_word_off).read_volatile() };
+        }
+
+        let mut word = last_word >> word_bit_off;
+        word_off += 1;
+
+        let word_bit_len = cmp::min(bit_end - bit_off, 32);
+        if word_bit_len > word_bit_ext {
+            // Read the next word:
+            last_word_off = word_off;
+            last_word = unsafe { block.address().add(last_word_off).read_volatile() };
+            // Append bits from a beginning of the next word:
+            word |= last_word.wrapping_shl((32 - word_bit_off) as u32);
+        };
+
+        if word_bit_len < 32 {
+            // Mask only needed bits of a word:
+            word &= u32::MAX >> (32 - word_bit_len);
+        }
+
+        // Represent word as a byte slice:
+        let byte_len = word_bit_len.div_ceil(8);
+        let word_bytes =
+            unsafe { slice::from_raw_parts(&word as *const u32 as *const u8, byte_len) };
+
+        // Copy word bytes to output value bytes:
+        bytes[..byte_len].copy_from_slice(word_bytes);
+
+        // Move read window forward:
+        bytes = &mut bytes[byte_len..];
+    }
+
+    // Fill untouched bytes with zeros:
+    bytes.fill(0);
+
+    unsafe { output.assume_init() }
+}
+
+/// Read bit value.
 ///
-/// Provides access to chip-specific data programmed into one-time programmable
-/// (OTP) memory during manufacturing, including the unique base MAC address and
-/// chip revision information.
+/// This function panics if the field's bit length is not equal to 1.
+#[inline(always)]
+#[instability::unstable]
+pub fn read_bit(field: EfuseField) -> bool {
+    assert_eq!(field.bit_count, 1);
+    read_field_le::<u8>(field) != 0
+}
+
+/// Set the base mac address
+///
+/// The new value will be returned by [`mac_address`] instead of the one
+/// hard-coded in eFuse. This does not persist across device resets.
+///
+/// Can only be called once. Returns `Err(SetMacError::AlreadySet)`
+/// otherwise.
+#[instability::unstable]
+pub fn set_mac_address(mac: MacAddress) -> Result<(), SetMacError> {
+    if MAC_OVERRIDE_STATE
+        .compare_exchange(0, 1, Ordering::Relaxed, Ordering::Relaxed)
+        .is_err()
+    {
+        return Err(SetMacError::AlreadySet);
+    }
+
+    unsafe {
+        MAC_OVERRIDE = mac;
+    }
+
+    MAC_OVERRIDE_STATE.store(2, Ordering::Relaxed);
+
+    Ok(())
+}
+
+#[procmacros::doc_replace]
+/// Returns the base MAC address of the device.
+///
+/// This is the factory MAC programmed into eFuse during manufacturing.
+/// Can be overridden at runtime via [`set_mac_address`].
 ///
 /// ## Example
 ///
 /// ```rust, no_run
 /// # {before_snippet}
-/// use esp_hal::efuse::Efuse;
+/// use esp_hal::efuse;
 ///
-/// let mac = Efuse::mac_address();
-/// println!("MAC address: {mac}");
+/// let mac = efuse::mac_address();
+/// println!("Base MAC: {mac}");
 /// # {after_snippet}
 /// ```
-#[derive(Debug)]
-pub struct Efuse;
-
-impl Efuse {
-    /// Reads chip's MAC address from the eFuse storage.
-    fn read_base_mac_address() -> MacAddress {
-        let mut mac_addr = [0u8; 6];
-
-        let mac0 = Self::read_field_le::<[u8; 4]>(crate::efuse::MAC0);
-        let mac1 = Self::read_field_le::<[u8; 2]>(crate::efuse::MAC1);
-
-        // MAC address is stored in big endian, so load the bytes in reverse:
-        mac_addr[0] = mac1[1];
-        mac_addr[1] = mac1[0];
-        mac_addr[2] = mac0[3];
-        mac_addr[3] = mac0[2];
-        mac_addr[4] = mac0[1];
-        mac_addr[5] = mac0[0];
-
-        MacAddress::new_eui48_internal(mac_addr)
+pub fn mac_address() -> MacAddress {
+    if MAC_OVERRIDE_STATE.load(Ordering::Relaxed) == 2 {
+        unsafe { MAC_OVERRIDE }
+    } else {
+        read_base_mac_address()
     }
+}
 
-    /// Read field value in a little-endian order
-    #[inline(always)]
-    #[instability::unstable]
-    pub fn read_field_le<T: AnyBitPattern>(field: EfuseField) -> T {
-        let EfuseField {
-            block,
-            bit_start,
-            bit_count,
-            ..
-        } = field;
+#[procmacros::doc_replace]
+/// Returns the MAC address for a specific interface, derived from the base
+/// MAC.
+///
+/// See [`InterfaceMacAddress`] for the available interfaces and how each
+/// address is derived.
+///
+/// ## Example
+///
+/// ```rust, no_run
+/// # {before_snippet}
+/// use esp_hal::efuse::{self, InterfaceMacAddress};
+///
+/// # #[cfg(soc_has_bt)]
+/// let bt_mac = efuse::interface_mac_address(InterfaceMacAddress::Bluetooth);
+/// # #[cfg(soc_has_bt)]
+/// println!("Bluetooth MAC: {bt_mac}");
+/// # {after_snippet}
+/// ```
+#[cfg(any(soc_has_wifi, soc_has_bt))]
+pub fn interface_mac_address(kind: InterfaceMacAddress) -> MacAddress {
+    let mut mac: MacAddress = mac_address();
 
-        // Represent output value as a bytes slice:
-        let mut output = mem::MaybeUninit::<T>::uninit();
-        let mut bytes = unsafe {
-            slice::from_raw_parts_mut(output.as_mut_ptr() as *mut u8, mem::size_of::<T>())
-        };
-
-        let bit_off = bit_start as usize;
-        let bit_end = cmp::min(bit_count as usize, bytes.len() * 8) + bit_off;
-
-        let mut last_word_off = bit_off / 32;
-        let mut last_word = unsafe { block.address().add(last_word_off).read_volatile() };
-
-        let word_bit_off = bit_off % 32;
-        let word_bit_ext = 32 - word_bit_off;
-
-        let mut word_off = last_word_off;
-        for bit_off in (bit_off..bit_end).step_by(32) {
-            if word_off != last_word_off {
-                // Read a new word:
-                last_word_off = word_off;
-                last_word = unsafe { block.address().add(last_word_off).read_volatile() };
-            }
-
-            let mut word = last_word >> word_bit_off;
-            word_off += 1;
-
-            let word_bit_len = cmp::min(bit_end - bit_off, 32);
-            if word_bit_len > word_bit_ext {
-                // Read the next word:
-                last_word_off = word_off;
-                last_word = unsafe { block.address().add(last_word_off).read_volatile() };
-                // Append bits from a beginning of the next word:
-                word |= last_word.wrapping_shl((32 - word_bit_off) as u32);
-            };
-
-            if word_bit_len < 32 {
-                // Mask only needed bits of a word:
-                word &= u32::MAX >> (32 - word_bit_len);
-            }
-
-            // Represent word as a byte slice:
-            let byte_len = word_bit_len.div_ceil(8);
-            let word_bytes =
-                unsafe { slice::from_raw_parts(&word as *const u32 as *const u8, byte_len) };
-
-            // Copy word bytes to output value bytes:
-            bytes[..byte_len].copy_from_slice(word_bytes);
-
-            // Move read window forward:
-            bytes = &mut bytes[byte_len..];
+    match kind {
+        #[cfg(soc_has_wifi)]
+        InterfaceMacAddress::Station => {
+            // base MAC
         }
-
-        // Fill untouched bytes with zeros:
-        bytes.fill(0);
-
-        unsafe { output.assume_init() }
-    }
-
-    /// Read bit value.
-    ///
-    /// This function panics if the field's bit length is not equal to 1.
-    #[inline(always)]
-    #[instability::unstable]
-    pub fn read_bit(field: EfuseField) -> bool {
-        assert_eq!(field.bit_count, 1);
-        Self::read_field_le::<u8>(field) != 0
-    }
-
-    /// Set the base mac address
-    ///
-    /// The new value will be returned by `read_mac_address` instead of the one
-    /// hard-coded in eFuse. This does not persist across device resets.
-    ///
-    /// Can only be called once. Returns `Err(SetMacError::AlreadySet)`
-    /// otherwise.
-    #[instability::unstable]
-    pub fn set_mac_address(mac: MacAddress) -> Result<(), SetMacError> {
-        if MAC_OVERRIDE_STATE
-            .compare_exchange(0, 1, Ordering::Relaxed, Ordering::Relaxed)
-            .is_err()
-        {
-            return Err(SetMacError::AlreadySet);
+        #[cfg(soc_has_wifi)]
+        InterfaceMacAddress::AccessPoint => {
+            derive_local_mac(&mut mac);
         }
+        #[cfg(soc_has_bt)]
+        InterfaceMacAddress::Bluetooth => {
+            derive_local_mac(&mut mac);
 
-        unsafe {
-            MAC_OVERRIDE = mac;
-        }
-
-        MAC_OVERRIDE_STATE.store(2, Ordering::Relaxed);
-
-        Ok(())
-    }
-
-    #[procmacros::doc_replace]
-    /// Returns the base MAC address of the device.
-    ///
-    /// This is the factory MAC programmed into eFuse during manufacturing.
-    /// Can be overridden at runtime via
-    /// [`set_mac_address`](Self::set_mac_address).
-    ///
-    /// ## Example
-    ///
-    /// ```rust, no_run
-    /// # {before_snippet}
-    /// use esp_hal::efuse::Efuse;
-    ///
-    /// let mac = Efuse::mac_address();
-    /// println!("Base MAC: {mac}");
-    /// # {after_snippet}
-    /// ```
-    pub fn mac_address() -> MacAddress {
-        if MAC_OVERRIDE_STATE.load(Ordering::Relaxed) == 2 {
-            unsafe { MAC_OVERRIDE }
-        } else {
-            Self::read_base_mac_address()
+            mac.0[5] = mac.0[5].wrapping_add(1);
         }
     }
+    mac
+}
 
-    #[procmacros::doc_replace]
-    /// Returns the MAC address for a specific interface, derived from the base
-    /// MAC.
-    ///
-    /// See [`InterfaceMacAddress`] for the available interfaces and how each
-    /// address is derived.
-    ///
-    /// ## Example
-    ///
-    /// ```rust, no_run
-    /// # {before_snippet}
-    /// use esp_hal::efuse::{Efuse, InterfaceMacAddress};
-    ///
-    /// let bt_mac = Efuse::interface_mac_address(InterfaceMacAddress::Bluetooth);
-    /// println!("Bluetooth MAC: {bt_mac}");
-    /// # {after_snippet}
-    /// ```
-    pub fn interface_mac_address(kind: InterfaceMacAddress) -> MacAddress {
-        let mut mac: MacAddress = Self::mac_address();
-
-        match kind {
-            InterfaceMacAddress::Station => {
-                // base MAC
-            }
-            InterfaceMacAddress::AccessPoint => {
-                derive_local_mac(&mut mac);
-            }
-            InterfaceMacAddress::Bluetooth => {
-                derive_local_mac(&mut mac);
-
-                mac.0[5] = mac.0[5].wrapping_add(1);
-            }
-        }
-        mac
-    }
-
-    /// Returns the hardware revision
-    ///
-    /// The chip version is calculated using the following
-    /// formula: MAJOR * 100 + MINOR. (if the result is 1, then version is v0.1)
-    #[instability::unstable]
-    pub fn chip_revision() -> u16 {
-        Self::major_chip_version() as u16 * 100 + Self::minor_chip_version() as u16
-    }
+/// Returns the hardware revision
+///
+/// The chip version is calculated using the following
+/// formula: MAJOR * 100 + MINOR. (if the result is 1, then version is v0.1)
+#[instability::unstable]
+pub fn chip_revision() -> u16 {
+    major_chip_version() as u16 * 100 + minor_chip_version() as u16
 }
 
 // Indicates the state of setting the mac address
@@ -331,6 +312,7 @@ impl core::error::Error for SetMacError {}
 /// Helper function.
 /// Serves to derive a local MAC by adjusting the first octet of the given base MAC.
 /// See https://github.com/esp-rs/esp-hal/blob/0881d747c53e43ee847bef3068076a48ce8d27f0/esp-radio/src/common_adapter.rs#L151-L159
+#[cfg(any(soc_has_wifi, soc_has_bt))]
 fn derive_local_mac(mac: &mut MacAddress) {
     let bytes = &mut mac.0;
     let base = bytes[0];
@@ -344,19 +326,23 @@ fn derive_local_mac(mac: &mut MacAddress) {
     }
 }
 
-/// Interface selection for [`Efuse::interface_mac_address`].
+/// Interface selection for [`interface_mac_address`].
 ///
 /// Each interface uses a distinct MAC address derived from the base MAC.
 /// See the [module-level docs](self) for an overview of the derivation scheme.
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg(any(soc_has_wifi, soc_has_bt))]
 #[non_exhaustive]
 pub enum InterfaceMacAddress {
     /// Wi-Fi station.
+    #[cfg(soc_has_wifi)]
     Station,
     /// Wi-Fi SoftAP.
+    #[cfg(soc_has_wifi)]
     AccessPoint,
     /// Bluetooth (BT/BLE).
+    #[cfg(soc_has_bt)]
     Bluetooth,
 }
 

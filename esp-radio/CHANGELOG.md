@@ -58,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ScanMethod` has been moved to `wifi::sta` (#5033)
 - `set_protocols` / `set_bandwidths` changed to support 5G-band (#5023)
 - `CountryInfo` is now unstable (#4981)
-- MAC addresses now should be obtained from `esp_hal::efuse::Efuse::interface_mac_address(InterfaceMacAddress::...)`. (#5002)
+- MAC addresses now should be obtained from `esp_hal::efuse::interface_mac_address(InterfaceMacAddress::...)`. (#5002)
 - `WifiError::Unknown(i32)` has been renamed to `WifiError::Internal(i32)` (#5018)
 - The default BLE task priority is no longer higher than the maximum priority supported by the OS (#5074)
 

@@ -325,7 +325,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ignore_wl_for_direct_adv: 0,
         cpu_freq_mhz: 96,
         enable_pcl: 0,
-        // version_num: Efuse::minor_chip_version(),
+        // version_num: esp_hal::efuse::minor_chip_version(),
         csa2_select: CONFIG_BT_LE_50_FEATURE_SUPPORT as _,
         enable_csr: 0,
         ble_aa_check: config.verify_access_address as u8,

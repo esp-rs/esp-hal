@@ -202,8 +202,7 @@ impl PhyState {
     fn calibrate(&mut self) {
         #[cfg(esp32s2)]
         unsafe {
-            use esp_hal::efuse::Efuse;
-            sys::include::phy_eco_version_sel(Efuse::major_chip_version());
+            sys::include::phy_eco_version_sel(esp_hal::efuse::major_chip_version());
         }
         // Causes headaches for some reason.
         // See: https://github.com/esp-rs/esp-hal/issues/4015

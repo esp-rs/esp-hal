@@ -3,7 +3,7 @@ use procmacros::BuilderLite;
 use super::*;
 use crate::{
     ble::InvalidConfigError,
-    hal::{efuse::Efuse, interrupt, peripherals::BT},
+    hal::{interrupt, peripherals::BT},
     interrupt_dispatch::Handler,
     sys::include::esp_bt_controller_config_t,
 };
@@ -327,7 +327,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         cca_drop_mode: 0,  //???
         cca_low_tx_pwr: 0, //???
         main_xtal_freq,
-        version_num: Efuse::minor_chip_version(),
+        version_num: crate::hal::efuse::minor_chip_version(),
         ignore_wl_for_direct_adv: 0,
         csa2_select: CONFIG_BT_LE_50_FEATURE_SUPPORT as _,
         ble_aa_check: config.verify_access_address as u8,

@@ -456,7 +456,7 @@ const V_DIG_MID_MUL10000: i32 = 10841;
 const K_RTC_MID_MUL10000: i32 = 198;
 const K_DIG_MID_MUL10000: i32 = 211;
 
-use crate::efuse::{self, Efuse};
+use crate::efuse;
 
 const fn sign_extend(value: u8, bits: u8) -> i32 {
     let sign_bit = 1 << (bits - 1);
@@ -470,15 +470,15 @@ const fn sign_extend(value: u8, bits: u8) -> i32 {
 }
 
 fn dig_dbias_v1() -> u8 {
-    Efuse::read_field_le(efuse::DIG_DBIAS_HVT)
+    efuse::read_field_le(efuse::DIG_DBIAS_HVT)
 }
 fn rtc_dbias_v1(dig_dbias: u8) -> u8 {
     // 7-bit two's complement
-    let k_rtc_ldo = Efuse::read_field_le::<u8>(efuse::K_RTC_LDO);
-    let k_dig_ldo = Efuse::read_field_le::<u8>(efuse::K_DIG_LDO);
+    let k_rtc_ldo = efuse::read_field_le::<u8>(efuse::K_RTC_LDO);
+    let k_dig_ldo = efuse::read_field_le::<u8>(efuse::K_DIG_LDO);
     // 8-bit two's complement
-    let v_rtc_bias20 = Efuse::read_field_le::<u8>(efuse::V_RTC_DBIAS20);
-    let v_dig_bias20 = Efuse::read_field_le::<u8>(efuse::V_DIG_DBIAS20);
+    let v_rtc_bias20 = efuse::read_field_le::<u8>(efuse::V_RTC_DBIAS20);
+    let v_dig_bias20 = efuse::read_field_le::<u8>(efuse::V_DIG_DBIAS20);
 
     // Sign extend values:
     let k_rtc_ldo = sign_extend(k_rtc_ldo, 7);
@@ -502,9 +502,9 @@ fn rtc_dbias_v1(dig_dbias: u8) -> u8 {
 }
 fn dig1v3_dbias_v1() -> u8 {
     // 7-bit two's complement
-    let k_dig_ldo = Efuse::read_field_le::<u8>(efuse::K_DIG_LDO);
+    let k_dig_ldo = efuse::read_field_le::<u8>(efuse::K_DIG_LDO);
     // 8-bit two's complement
-    let v_dig_bias20 = Efuse::read_field_le::<u8>(efuse::V_DIG_DBIAS20);
+    let v_dig_bias20 = efuse::read_field_le::<u8>(efuse::V_DIG_DBIAS20);
 
     // Sign extend values:
     let k_dig_ldo = sign_extend(k_dig_ldo, 7);
@@ -535,7 +535,7 @@ fn search_nearest(v: i32, k: i32, max: i32) -> u8 {
 /// search for `dbias` values which produce the closest minimum voltage applied to the RTC
 /// and digital power domains.
 fn pvt_supported() -> bool {
-    let (blk_major, blk_minor) = Efuse::block_version();
+    let (blk_major, blk_minor) = efuse::block_version();
 
     // Block version was introduced at v1.2, above which the PVT are all supported.
     // Before that, blk1_ver (a.k.a. blk_minor now) == 1 indicates the support of PVT.

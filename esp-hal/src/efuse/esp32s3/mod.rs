@@ -13,164 +13,162 @@ pub enum AdcCalibUnit {
     ADC2,
 }
 
-impl super::Efuse {
-    /// Get status of SPI boot encryption.
-    #[instability::unstable]
-    pub fn flash_encryption() -> bool {
-        !Self::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT)
-            .count_ones()
-            .is_multiple_of(2)
+/// Get status of SPI boot encryption.
+#[instability::unstable]
+pub fn flash_encryption() -> bool {
+    !super::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT)
+        .count_ones()
+        .is_multiple_of(2)
+}
+
+/// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
+#[instability::unstable]
+pub fn rwdt_multiplier() -> u8 {
+    super::read_field_le::<u8>(WDT_DELAY_SEL)
+}
+
+/// Get efuse block version
+///
+/// see <https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/efuse_hal.c#L27-L30>
+#[instability::unstable]
+pub fn block_version() -> (u8, u8) {
+    // see <https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/esp32s3/include/hal/efuse_ll.h#L65-L73>
+    // <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_table.csv#L196>
+    (
+        super::read_field_le::<u8>(BLK_VERSION_MAJOR),
+        super::read_field_le::<u8>(BLK_VERSION_MINOR),
+    )
+}
+
+/// Get version of RTC calibration block
+///
+/// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L15>
+#[instability::unstable]
+pub fn rtc_calib_version() -> u8 {
+    let (major, _minor) = block_version();
+
+    if major == 1 { 1 } else { 0 }
+}
+
+/// Get ADC initial code for specified attenuation from efuse
+///
+/// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L28>
+#[instability::unstable]
+pub fn rtc_calib_init_code(unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
+    let version = rtc_calib_version();
+
+    if version != 1 {
+        return None;
     }
 
-    /// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
-    #[instability::unstable]
-    pub fn rwdt_multiplier() -> u8 {
-        Self::read_field_le::<u8>(WDT_DELAY_SEL)
-    }
+    let adc_icode_diff: [u16; 4] = match unit {
+        AdcCalibUnit::ADC1 => [
+            super::read_field_le(ADC1_INIT_CODE_ATTEN0),
+            super::read_field_le(ADC1_INIT_CODE_ATTEN1),
+            super::read_field_le(ADC1_INIT_CODE_ATTEN2),
+            super::read_field_le(ADC1_INIT_CODE_ATTEN3),
+        ],
+        AdcCalibUnit::ADC2 => [
+            super::read_field_le(ADC2_INIT_CODE_ATTEN0),
+            super::read_field_le(ADC2_INIT_CODE_ATTEN1),
+            super::read_field_le(ADC2_INIT_CODE_ATTEN2),
+            super::read_field_le(ADC2_INIT_CODE_ATTEN3),
+        ],
+    };
 
-    /// Get efuse block version
-    ///
-    /// see <https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/efuse_hal.c#L27-L30>
-    #[instability::unstable]
-    pub fn block_version() -> (u8, u8) {
-        // see <https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/esp32s3/include/hal/efuse_ll.h#L65-L73>
-        // <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_table.csv#L196>
-        (
-            Self::read_field_le::<u8>(BLK_VERSION_MAJOR),
-            Self::read_field_le::<u8>(BLK_VERSION_MINOR),
-        )
-    }
+    // Version 1 logic for calculating ADC ICode based on EFUSE burnt value
 
-    /// Get version of RTC calibration block
-    ///
-    /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L15>
-    #[instability::unstable]
-    pub fn rtc_calib_version() -> u8 {
-        let (major, _minor) = Self::block_version();
-
-        if major == 1 { 1 } else { 0 }
-    }
-
-    /// Get ADC initial code for specified attenuation from efuse
-    ///
-    /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L28>
-    #[instability::unstable]
-    pub fn rtc_calib_init_code(unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
-        let version = Self::rtc_calib_version();
-
-        if version != 1 {
-            return None;
+    let mut adc_icode = [0; 4];
+    match unit {
+        AdcCalibUnit::ADC1 => {
+            adc_icode[0] = adc_icode_diff[0] + 1850;
+            adc_icode[1] = adc_icode_diff[1] + adc_icode[0] + 90;
+            adc_icode[2] = adc_icode_diff[2] + adc_icode[1];
+            adc_icode[3] = adc_icode_diff[3] + adc_icode[2] + 70;
         }
-
-        let adc_icode_diff: [u16; 4] = match unit {
-            AdcCalibUnit::ADC1 => [
-                Self::read_field_le(ADC1_INIT_CODE_ATTEN0),
-                Self::read_field_le(ADC1_INIT_CODE_ATTEN1),
-                Self::read_field_le(ADC1_INIT_CODE_ATTEN2),
-                Self::read_field_le(ADC1_INIT_CODE_ATTEN3),
-            ],
-            AdcCalibUnit::ADC2 => [
-                Self::read_field_le(ADC2_INIT_CODE_ATTEN0),
-                Self::read_field_le(ADC2_INIT_CODE_ATTEN1),
-                Self::read_field_le(ADC2_INIT_CODE_ATTEN2),
-                Self::read_field_le(ADC2_INIT_CODE_ATTEN3),
-            ],
-        };
-
-        // Version 1 logic for calculating ADC ICode based on EFUSE burnt value
-
-        let mut adc_icode = [0; 4];
-        match unit {
-            AdcCalibUnit::ADC1 => {
-                adc_icode[0] = adc_icode_diff[0] + 1850;
-                adc_icode[1] = adc_icode_diff[1] + adc_icode[0] + 90;
-                adc_icode[2] = adc_icode_diff[2] + adc_icode[1];
-                adc_icode[3] = adc_icode_diff[3] + adc_icode[2] + 70;
-            }
-            AdcCalibUnit::ADC2 => {
-                adc_icode[0] = adc_icode_diff[0] + 2020;
-                adc_icode[1] = adc_icode_diff[1] + adc_icode[0];
-                adc_icode[2] = adc_icode_diff[2] + adc_icode[1];
-                adc_icode[3] = adc_icode_diff[3] + adc_icode[2];
-            }
+        AdcCalibUnit::ADC2 => {
+            adc_icode[0] = adc_icode_diff[0] + 2020;
+            adc_icode[1] = adc_icode_diff[1] + adc_icode[0];
+            adc_icode[2] = adc_icode_diff[2] + adc_icode[1];
+            adc_icode[3] = adc_icode_diff[3] + adc_icode[2];
         }
-
-        Some(
-            adc_icode[match atten {
-                Attenuation::_0dB => 0,
-                Attenuation::_2p5dB => 1,
-                Attenuation::_6dB => 2,
-                Attenuation::_11dB => 3,
-            }],
-        )
     }
 
-    /// Get ADC reference point voltage for specified attenuation in millivolts
-    ///
-    /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L63>
-    #[instability::unstable]
-    pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, _atten: Attenuation) -> u16 {
-        850
-    }
-
-    /// Get ADC reference point digital code for specified attenuation
-    ///
-    /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L63>
-    #[instability::unstable]
-    pub fn rtc_calib_cal_code(unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
-        let version = Self::rtc_calib_version();
-
-        if version != 1 {
-            return None;
-        }
-
-        let adc_vol_diff: [u16; 8] = [
-            Self::read_field_le(ADC1_CAL_VOL_ATTEN0),
-            Self::read_field_le(ADC1_CAL_VOL_ATTEN1),
-            Self::read_field_le(ADC1_CAL_VOL_ATTEN2),
-            Self::read_field_le(ADC1_CAL_VOL_ATTEN3),
-            Self::read_field_le(ADC2_CAL_VOL_ATTEN0),
-            Self::read_field_le(ADC2_CAL_VOL_ATTEN1),
-            Self::read_field_le(ADC2_CAL_VOL_ATTEN2),
-            Self::read_field_le(ADC2_CAL_VOL_ATTEN3),
-        ];
-
-        let mut adc1_vol = [0; 4];
-        let mut adc2_vol = [0; 4];
-        adc1_vol[3] = adc_vol_diff[3] + 900;
-        adc1_vol[2] = adc_vol_diff[2] + adc1_vol[3] + 800;
-        adc1_vol[1] = adc_vol_diff[1] + adc1_vol[2] + 700;
-        adc1_vol[0] = adc_vol_diff[0] + adc1_vol[1] + 800;
-        adc2_vol[3] = adc1_vol[3] - adc_vol_diff[7] + 15;
-        adc2_vol[2] = adc1_vol[2] - adc_vol_diff[6] + 20;
-        adc2_vol[1] = adc1_vol[1] - adc_vol_diff[5] + 10;
-        adc2_vol[0] = adc1_vol[0] - adc_vol_diff[4] + 40;
-
-        let atten = match atten {
+    Some(
+        adc_icode[match atten {
             Attenuation::_0dB => 0,
             Attenuation::_2p5dB => 1,
             Attenuation::_6dB => 2,
             Attenuation::_11dB => 3,
-        };
+        }],
+    )
+}
 
-        Some(match unit {
-            AdcCalibUnit::ADC1 => adc1_vol[atten],
-            AdcCalibUnit::ADC2 => adc2_vol[atten],
-        })
+/// Get ADC reference point voltage for specified attenuation in millivolts
+///
+/// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L63>
+#[instability::unstable]
+pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, _atten: Attenuation) -> u16 {
+    850
+}
+
+/// Get ADC reference point digital code for specified attenuation
+///
+/// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L63>
+#[instability::unstable]
+pub fn rtc_calib_cal_code(unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
+    let version = rtc_calib_version();
+
+    if version != 1 {
+        return None;
     }
 
-    /// Returns the major hardware revision
-    #[instability::unstable]
-    pub fn major_chip_version() -> u8 {
-        Self::read_field_le(WAFER_VERSION_MAJOR)
-    }
+    let adc_vol_diff: [u16; 8] = [
+        super::read_field_le(ADC1_CAL_VOL_ATTEN0),
+        super::read_field_le(ADC1_CAL_VOL_ATTEN1),
+        super::read_field_le(ADC1_CAL_VOL_ATTEN2),
+        super::read_field_le(ADC1_CAL_VOL_ATTEN3),
+        super::read_field_le(ADC2_CAL_VOL_ATTEN0),
+        super::read_field_le(ADC2_CAL_VOL_ATTEN1),
+        super::read_field_le(ADC2_CAL_VOL_ATTEN2),
+        super::read_field_le(ADC2_CAL_VOL_ATTEN3),
+    ];
 
-    /// Returns the minor hardware revision
-    #[instability::unstable]
-    pub fn minor_chip_version() -> u8 {
-        Self::read_field_le::<u8>(WAFER_VERSION_MINOR_HI) << 3
-            | Self::read_field_le::<u8>(WAFER_VERSION_MINOR_LO)
-    }
+    let mut adc1_vol = [0; 4];
+    let mut adc2_vol = [0; 4];
+    adc1_vol[3] = adc_vol_diff[3] + 900;
+    adc1_vol[2] = adc_vol_diff[2] + adc1_vol[3] + 800;
+    adc1_vol[1] = adc_vol_diff[1] + adc1_vol[2] + 700;
+    adc1_vol[0] = adc_vol_diff[0] + adc1_vol[1] + 800;
+    adc2_vol[3] = adc1_vol[3] - adc_vol_diff[7] + 15;
+    adc2_vol[2] = adc1_vol[2] - adc_vol_diff[6] + 20;
+    adc2_vol[1] = adc1_vol[1] - adc_vol_diff[5] + 10;
+    adc2_vol[0] = adc1_vol[0] - adc_vol_diff[4] + 40;
+
+    let atten = match atten {
+        Attenuation::_0dB => 0,
+        Attenuation::_2p5dB => 1,
+        Attenuation::_6dB => 2,
+        Attenuation::_11dB => 3,
+    };
+
+    Some(match unit {
+        AdcCalibUnit::ADC1 => adc1_vol[atten],
+        AdcCalibUnit::ADC2 => adc2_vol[atten],
+    })
+}
+
+/// Returns the major hardware revision
+#[instability::unstable]
+pub fn major_chip_version() -> u8 {
+    super::read_field_le(WAFER_VERSION_MAJOR)
+}
+
+/// Returns the minor hardware revision
+#[instability::unstable]
+pub fn minor_chip_version() -> u8 {
+    super::read_field_le::<u8>(WAFER_VERSION_MINOR_HI) << 3
+        | super::read_field_le::<u8>(WAFER_VERSION_MINOR_LO)
 }
 
 #[derive(Debug, Clone, Copy, strum::FromRepr)]

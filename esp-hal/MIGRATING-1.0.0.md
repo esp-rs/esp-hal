@@ -150,4 +150,16 @@ can be read using the `success` method.
 
 ## eFuse Changes
 
-`Efuse::read_base_mac_address()` has been removed. Use `Efuse::mac_address()` instead, which returns the same value unless overridden by `Efuse::set_mac_address()`.
+The `Efuse` struct has been removed. All methods are now free-standing functions
+in the `efuse` module:
+
+- `Efuse::mac_address()` → `efuse::mac_address()`
+- `Efuse::interface_mac_address(kind)` → `efuse::interface_mac_address(kind)`
+- `Efuse::set_mac_address(mac)` → `efuse::set_mac_address(mac)`
+- `Efuse::read_field_le(field)` → `efuse::read_field_le(field)`
+- `Efuse::read_bit(field)` → `efuse::read_bit(field)`
+- `Efuse::chip_revision()` → `efuse::chip_revision()`
+
+The `InterfaceMacAddress` enum variants are now feature-gated by chip capability:
+- `Station` and `AccessPoint` require WiFi (`soc_has_wifi`) — not available on ESP32-H2
+- `Bluetooth` requires Bluetooth (`soc_has_bt`) — not available on ESP32-S2

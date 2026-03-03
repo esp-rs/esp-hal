@@ -24,87 +24,86 @@ pub enum ChipType {
     Unknown,
 }
 
-impl super::Efuse {
-    /// Returns the number of CPUs available on the chip.
-    ///
-    /// While ESP32 chips usually come with two mostly equivalent CPUs (protocol
-    /// CPU and application CPU), the application CPU is unavailable on
-    /// some.
-    #[instability::unstable]
-    pub fn core_count() -> u32 {
-        if Self::read_bit(DISABLE_APP_CPU) {
-            1
-        } else {
-            2
-        }
+/// Returns the number of CPUs available on the chip.
+///
+/// While ESP32 chips usually come with two mostly equivalent CPUs (protocol
+/// CPU and application CPU), the application CPU is unavailable on
+/// some.
+#[instability::unstable]
+pub fn core_count() -> u32 {
+    if super::read_bit(DISABLE_APP_CPU) {
+        1
+    } else {
+        2
     }
+}
 
-    /// Returns the maximum rated clock of the CPU in MHz.
-    ///
-    /// Note that the actual clock may be lower, depending on the current power
-    /// configuration of the chip, clock source, and other settings.
-    #[instability::unstable]
-    pub fn max_cpu_frequency() -> Rate {
-        let has_rating = Self::read_bit(CHIP_CPU_FREQ_RATED);
-        let has_low_rating = Self::read_bit(CHIP_CPU_FREQ_LOW);
+/// Returns the maximum rated clock of the CPU in MHz.
+///
+/// Note that the actual clock may be lower, depending on the current power
+/// configuration of the chip, clock source, and other settings.
+#[instability::unstable]
+pub fn max_cpu_frequency() -> Rate {
+    let has_rating = super::read_bit(CHIP_CPU_FREQ_RATED);
+    let has_low_rating = super::read_bit(CHIP_CPU_FREQ_LOW);
 
-        if has_rating && has_low_rating {
-            Rate::from_mhz(160)
-        } else {
-            Rate::from_mhz(240)
-        }
+    if has_rating && has_low_rating {
+        Rate::from_mhz(160)
+    } else {
+        Rate::from_mhz(240)
     }
+}
 
-    /// Returns the CHIP_VER_DIS_BT eFuse value.
-    #[instability::unstable]
-    pub fn is_bluetooth_enabled() -> bool {
-        !Self::read_bit(DISABLE_BT)
+/// Returns the CHIP_VER_DIS_BT eFuse value.
+#[instability::unstable]
+pub fn is_bluetooth_enabled() -> bool {
+    !super::read_bit(DISABLE_BT)
+}
+
+/// Returns the CHIP_VER_PKG eFuse value.
+#[instability::unstable]
+pub fn chip_type() -> ChipType {
+    let chip_ver = super::read_field_le::<u8>(CHIP_PACKAGE)
+        | (super::read_field_le::<u8>(CHIP_PACKAGE_4BIT) << 4);
+
+    match chip_ver {
+        0 => ChipType::Esp32D0wdq6,
+        1 => ChipType::Esp32D0wdq5,
+        2 => ChipType::Esp32D2wdq5,
+        4 => ChipType::Esp32Picod2,
+        5 => ChipType::Esp32Picod4,
+        6 => ChipType::Esp32Picov302,
+        _ => ChipType::Unknown,
     }
+}
 
-    /// Returns the CHIP_VER_PKG eFuse value.
-    #[instability::unstable]
-    pub fn chip_type() -> ChipType {
-        let chip_ver = Self::read_field_le::<u8>(CHIP_PACKAGE)
-            | (Self::read_field_le::<u8>(CHIP_PACKAGE_4BIT) << 4);
+/// Get status of SPI boot encryption.
+#[instability::unstable]
+pub fn flash_encryption() -> bool {
+    !super::read_field_le::<u8>(FLASH_CRYPT_CNT)
+        .count_ones()
+        .is_multiple_of(2)
+}
 
-        match chip_ver {
-            0 => ChipType::Esp32D0wdq6,
-            1 => ChipType::Esp32D0wdq5,
-            2 => ChipType::Esp32D2wdq5,
-            4 => ChipType::Esp32Picod2,
-            5 => ChipType::Esp32Picod4,
-            6 => ChipType::Esp32Picov302,
-            _ => ChipType::Unknown,
-        }
+/// Returns the major hardware revision
+#[instability::unstable]
+pub fn major_chip_version() -> u8 {
+    let eco_bit0 = super::read_field_le::<u32>(CHIP_VER_REV1);
+    let eco_bit1 = super::read_field_le::<u32>(CHIP_VER_REV2);
+    let eco_bit2 = (crate::peripherals::APB_CTRL::regs().date().read().bits() & 0x80000000) >> 31;
+
+    match (eco_bit2 << 2) | (eco_bit1 << 1) | eco_bit0 {
+        1 => 1,
+        3 => 2,
+        7 => 3,
+        _ => 0,
     }
+}
 
-    /// Get status of SPI boot encryption.
-    #[instability::unstable]
-    pub fn flash_encryption() -> bool {
-        (Self::read_field_le::<u8>(FLASH_CRYPT_CNT).count_ones() % 2) != 0
-    }
-
-    /// Returns the major hardware revision
-    #[instability::unstable]
-    pub fn major_chip_version() -> u8 {
-        let eco_bit0 = Self::read_field_le::<u32>(CHIP_VER_REV1);
-        let eco_bit1 = Self::read_field_le::<u32>(CHIP_VER_REV2);
-        let eco_bit2 =
-            (crate::peripherals::APB_CTRL::regs().date().read().bits() & 0x80000000) >> 31;
-
-        match (eco_bit2 << 2) | (eco_bit1 << 1) | eco_bit0 {
-            1 => 1,
-            3 => 2,
-            7 => 3,
-            _ => 0,
-        }
-    }
-
-    /// Returns the minor hardware revision
-    #[instability::unstable]
-    pub fn minor_chip_version() -> u8 {
-        Self::read_field_le(WAFER_VERSION_MINOR)
-    }
+/// Returns the minor hardware revision
+#[instability::unstable]
+pub fn minor_chip_version() -> u8 {
+    super::read_field_le(WAFER_VERSION_MINOR)
 }
 
 #[derive(Debug, Clone, Copy, strum::FromRepr)]
