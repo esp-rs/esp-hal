@@ -2574,10 +2574,6 @@ When the WiFi band mode is set to [BandMode::Auto], it can operate on both the 2
 When a WiFi band mode change triggers a band change, if no channel is set for the current
 band, a default channel will be assigned: channel 1 for 2.4G band and channel 36 for 5G
 band.
-
-When a WiFi band mode change triggers a band change, if no channel is set for the current
-band, a default channel will be assigned: channel 1 for 2.4G band and channel 36 for 5G
-band.
             ",
             _ => ""
         },
