@@ -1224,20 +1224,16 @@ impl InterfaceType {
 
         if self.can_send() {
             // even checking for !Uninitialized would be enough to not crash
-            match self {
+            let can_send = match self {
                 InterfaceType::Station => {
-                    if !matches!(station_state(), WifiStationState::Connected) {
-                        return None;
-                    }
+                    matches!(station_state(), WifiStationState::Connected)
                 }
                 InterfaceType::AccessPoint => {
-                    if !matches!(access_point_state(), WifiAccessPointState::Started) {
-                        return None;
-                    }
+                    matches!(access_point_state(), WifiAccessPointState::Started)
                 }
-            }
+            };
 
-            Some(WifiTxToken { mode: *self })
+            can_send.then_some(WifiTxToken { mode: *self })
         } else {
             None
         }
