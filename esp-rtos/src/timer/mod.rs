@@ -177,10 +177,16 @@ impl TimeDriver {
     }
 
     pub(crate) fn schedule_wakeup(&mut self, mut current_task: TaskPtr, at: Instant) -> bool {
+        // FIXME: repeated call of this function is currently not supported.
+        // This function can be called in a critical section - usually it's paired with a yield,
+        // that will trigger a context switch when exiting the critical section. However, some
+        // callers will loop and if _they_ are called in a critical section, they will never make
+        // progress. This function will then first set the task state to `Sleeping` in the
+        // first iteration, then crash here in the next one.
         debug_assert_eq!(
             current_task.state(),
             TaskState::Ready,
-            "task: {:?}",
+            "Task {:?} is in an unexpected state. This can happen if OS methods are called inside a critical section.",
             current_task
         );
 
