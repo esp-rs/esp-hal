@@ -95,23 +95,6 @@ if let Ok(controller) = BleConnector::new(peripherals.BT, Default::default()) {}
 //! For maximum performance you might want to disable logging via
 //! a feature flag of the `log` crate. See [documentation](https://docs.rs/log/0.4.19/log/#compile-time-filters).
 //! You should set it to `release_max_level_off`.
-//!
-//! ### Wi-Fi performance considerations
-//!
-//! The default configuration is quite conservative to reduce power and memory consumption.
-//!
-//! There are a number of settings which influence the general performance. Optimal settings are chip and applications specific.
-//! You can get inspiration from the [ESP-IDF examples](https://github.com/espressif/esp-idf/tree/release/v5.3/examples/wifi/iperf)
-//!
-//! Please note that the configuration keys are usually named slightly different and not all configuration keys apply.
-#![cfg_attr(
-    feature = "wifi",
-    doc = "By default the power-saving mode is [`PowerSaveMode::None`](crate::wifi::PowerSaveMode::None) and `ESP_PHY_CONFIG_PHY_ENABLE_USB` is enabled by default."
-)]
-//! In addition pay attention to these configuration keys:
-//! - `ESP_RADIO_CONFIG_RX_QUEUE_SIZE`
-//! - `ESP_RADIO_CONFIG_TX_QUEUE_SIZE`
-//! - `ESP_RADIO_CONFIG_MAX_BURST_SIZE`
 #![cfg_attr(
     multi_core,
     doc = concat!(
