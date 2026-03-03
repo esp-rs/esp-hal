@@ -1224,20 +1224,16 @@ impl InterfaceType {
 
         if self.can_send() {
             // even checking for !Uninitialized would be enough to not crash
-            match self {
+            let can_send = match self {
                 InterfaceType::Station => {
-                    if !matches!(station_state(), WifiStationState::Connected) {
-                        return None;
-                    }
+                    matches!(station_state(), WifiStationState::Connected)
                 }
                 InterfaceType::AccessPoint => {
-                    if !matches!(access_point_state(), WifiAccessPointState::Started) {
-                        return None;
-                    }
+                    matches!(access_point_state(), WifiAccessPointState::Started)
                 }
-            }
+            };
 
-            Some(WifiTxToken { mode: *self })
+            can_send.then_some(WifiTxToken { mode: *self })
         } else {
             None
         }
@@ -1285,21 +1281,19 @@ impl InterfaceType {
     }
 
     fn link_state(&self) -> embassy_net_driver::LinkState {
-        match self {
+        let is_up = match self {
             InterfaceType::Station => {
-                if matches!(station_state(), WifiStationState::Connected) {
-                    embassy_net_driver::LinkState::Up
-                } else {
-                    embassy_net_driver::LinkState::Down
-                }
+                matches!(station_state(), WifiStationState::Connected)
             }
             InterfaceType::AccessPoint => {
-                if matches!(access_point_state(), WifiAccessPointState::Started) {
-                    embassy_net_driver::LinkState::Up
-                } else {
-                    embassy_net_driver::LinkState::Down
-                }
+                matches!(access_point_state(), WifiAccessPointState::Started)
             }
+        };
+
+        if is_up {
+            embassy_net_driver::LinkState::Up
+        } else {
+            embassy_net_driver::LinkState::Down
         }
     }
 }
@@ -2198,11 +2192,6 @@ pub fn new<'d>(
     config: ControllerConfig,
 ) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
     let _guard = RadioRefGuard::new();
-
-    // TODO: Re-check, if not having interrupts disabled pre-condition is still true
-    if crate::is_interrupts_disabled() {
-        return Err(WifiError::Unsupported);
-    }
 
     config.validate();
 
