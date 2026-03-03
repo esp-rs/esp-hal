@@ -180,8 +180,23 @@ impl NorFlash for FlashStorage<'_> {
         self.check_alignment::<{ SZ }>(from, len)?;
         self.check_bounds(from, len)?;
 
-        for sector in from / Self::SECTOR_SIZE..to / Self::SECTOR_SIZE {
-            self.internal_erase(sector)?;
+        // First erase by sector up to the block boundary.
+        let mut address = from;
+        while address < to && (address % Self::BLOCK_SIZE) != 0 {
+            self.internal_erase_sector(address / Self::SECTOR_SIZE)?;
+            address += Self::SECTOR_SIZE;
+        }
+
+        // Then erase as much as possible by blocks.
+        while (to - address) >= Self::BLOCK_SIZE {
+            self.internal_erase_block(address / Self::BLOCK_SIZE)?;
+            address += Self::BLOCK_SIZE;
+        }
+
+        // Finally, erase any remaining sectors.
+        while address < to {
+            self.internal_erase_sector(address / Self::SECTOR_SIZE)?;
+            address += Self::SECTOR_SIZE;
         }
 
         Ok(())
@@ -198,8 +213,9 @@ mod tests {
 
     const WORD_SIZE: u32 = 4;
     const SECTOR_SIZE: u32 = 4 << 10;
-    const NUM_SECTORS: u32 = 3;
-    const FLASH_SIZE: u32 = SECTOR_SIZE * NUM_SECTORS;
+    const BLOCK_SIZE: u32 = 4 << 14;
+    const NUM_BLOCKS: u32 = 3;
+    const FLASH_SIZE: u32 = BLOCK_SIZE * NUM_BLOCKS;
     const MAX_OFFSET: u32 = SECTOR_SIZE * 1;
     const MAX_LENGTH: u32 = SECTOR_SIZE * 2;
 
@@ -269,7 +285,7 @@ mod tests {
     #[cfg(not(feature = "bytewise-read"))]
     fn aligned_read() {
         let mut flash = FlashStorage::new(Flash::new());
-        flash.capacity = 4 * 4096;
+        flash.capacity = FLASH_SIZE as usize;
         let src = TestBuffer::seq();
         let mut data = TestBuffer::default();
 
@@ -289,7 +305,7 @@ mod tests {
     #[cfg(not(feature = "bytewise-read"))]
     fn not_aligned_read_aligned_buffer() {
         let mut flash = FlashStorage::new(Flash::new());
-        flash.capacity = 4 * 4096;
+        flash.capacity = FLASH_SIZE as usize;
         let mut data = TestBuffer::default();
 
         for (off, len) in range_gen::<WORD_SIZE, MAX_OFFSET, MAX_LENGTH>(Some(false)) {
@@ -301,7 +317,7 @@ mod tests {
     #[cfg(not(feature = "bytewise-read"))]
     fn aligned_read_not_aligned_buffer() {
         let mut flash = FlashStorage::new(Flash::new());
-        flash.capacity = 4 * 4096;
+        flash.capacity = FLASH_SIZE as usize;
         let src = TestBuffer::seq();
         let mut data = TestBuffer::default();
 
@@ -324,7 +340,7 @@ mod tests {
     fn bytewise_read_aligned_buffer() {
         let mut flash = FlashStorage::new(Flash::new());
 
-        flash.capacity = 4 * 4096;
+        flash.capacity = FLASH_SIZE as usize;
         let src = TestBuffer::seq();
         let mut data = TestBuffer::default();
 
@@ -345,7 +361,7 @@ mod tests {
     fn bytewise_read_not_aligned_buffer() {
         let mut flash = FlashStorage::new(Flash::new());
 
-        flash.capacity = 4 * 4096;
+        flash.capacity = FLASH_SIZE as usize;
         let src = TestBuffer::seq();
         let mut data = TestBuffer::default();
 
@@ -366,7 +382,7 @@ mod tests {
     #[test]
     fn write_not_aligned_buffer() {
         let mut flash = FlashStorage::new(Flash::new());
-        flash.capacity = 4 * 4096;
+        flash.capacity = FLASH_SIZE as usize;
         let mut read_data = TestBuffer::default();
         let write_data = TestBuffer::seq();
 
@@ -376,5 +392,32 @@ mod tests {
         flash.read(0, &mut read_data.data[..128]).unwrap();
 
         assert_eq!(&read_data.data[..128], &write_data.data[1..129]);
+    }
+
+    #[test]
+    fn erase_across_blocks() {
+        let mut flash = FlashStorage::new(Flash::new());
+        flash.capacity = FLASH_SIZE as usize;
+        let mut read_data = TestBuffer::default();
+        let write_data = [0u8; SECTOR_SIZE as usize];
+
+        // An entire block and some sectors before and after
+        let from = BLOCK_SIZE - (2 * SECTOR_SIZE);
+        let to = (2 * BLOCK_SIZE) + (1 * SECTOR_SIZE);
+
+        // Clear area before and after erase
+        flash.erase(from - SECTOR_SIZE, from).unwrap();
+        flash.write(from - SECTOR_SIZE, &write_data).unwrap();
+        flash.erase(to, to + SECTOR_SIZE).unwrap();
+        flash.write(to, &write_data).unwrap();
+
+        // Erase and verify that only the desired parts were touched
+        flash.erase(from, to).unwrap();
+        flash.read(0, &mut read_data.data).unwrap();
+        for i in from..to {
+            assert_eq!(read_data.data[i as usize], 0xFF);
+        }
+        assert_eq!(read_data.data[(from - 1) as usize], 0x0);
+        assert_eq!(read_data.data[to as usize], 0x0);
     }
 }

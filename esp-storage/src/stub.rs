@@ -7,8 +7,10 @@ const ERROR_CODE: i32 = 1;
 const ERASE_BYTE: u8 = 0xff;
 const WORD_SIZE: u32 = 4;
 const SECTOR_SIZE: u32 = 4 << 10;
-const NUM_SECTORS: u32 = 4;
-const FLASH_SIZE: u32 = SECTOR_SIZE * NUM_SECTORS;
+const BLOCK_SIZE: u32 = 4 << 14;
+const NUM_BLOCKS: u32 = 4;
+const FLASH_SIZE: u32 = BLOCK_SIZE * NUM_BLOCKS;
+const NUM_SECTORS: u32 = FLASH_SIZE / SECTOR_SIZE;
 
 static mut FLASH_LOCK: bool = true;
 static mut FLASH_DATA: [u8; FLASH_SIZE as usize] = [0u8; FLASH_SIZE as usize];
@@ -82,6 +84,19 @@ pub(crate) fn spiflash_erase_sector(sector_number: u32) -> i32 {
         maybe_with_critical_section(|| {
             let dst_addr = sector_number * SECTOR_SIZE;
             let len = SECTOR_SIZE;
+            unsafe { FLASH_DATA[dst_addr as usize..][..len as usize].fill(ERASE_BYTE) };
+        });
+        SUCCESS_CODE
+    } else {
+        ERROR_CODE
+    }
+}
+
+pub(crate) fn spiflash_erase_block(block_number: u32) -> i32 {
+    if check::<1, NUM_BLOCKS, 1>(block_number, 1, ptr::null(), true) {
+        maybe_with_critical_section(|| {
+            let dst_addr = block_number * BLOCK_SIZE;
+            let len = BLOCK_SIZE;
             unsafe { FLASH_DATA[dst_addr as usize..][..len as usize].fill(ERASE_BYTE) };
         });
         SUCCESS_CODE

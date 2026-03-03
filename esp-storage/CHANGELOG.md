@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Speed up erase by erasing entire blocks when possible (#5079)
+
 
 ### Fixed
 

@@ -61,7 +61,7 @@ impl Storage for FlashStorage<'_> {
             let len = bytes.len().min((Self::SECTOR_SIZE - data_offset) as _);
 
             sector_data[data_offset as usize..][..len].copy_from_slice(&bytes[..len]);
-            self.internal_erase(aligned_offset / Self::SECTOR_SIZE)?;
+            self.internal_erase_sector(aligned_offset / Self::SECTOR_SIZE)?;
             self.internal_write(aligned_offset, sector_data)?;
 
             aligned_offset += Self::SECTOR_SIZE;

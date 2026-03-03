@@ -22,6 +22,9 @@ unsafe extern "C" {
     /// Erase a sector of flash. Uses SPI flash command 20H.
     pub fn esp_rom_spiflash_erase_sector(sector_number: u32) -> i32;
 
+    /// Erase a block of flash.
+    pub fn esp_rom_spiflash_erase_block(block_number: u32) -> i32;
+
     /// Write Data to Flash, you should Erase it yourself if need.
     ///
     /// `dest_addr` should be 4 bytes aligned.

@@ -32,13 +32,25 @@ pub unsafe fn spiflash_unlock() -> Result<(), i32> {
     }
 }
 
-/// Low-level SPI NOR Flash erase
+/// Low-level SPI NOR Flash sector erase
 ///
 /// # Safety
 ///
 /// The `sector_number` * sector_size should not exceeds the size of flash.
 pub unsafe fn spiflash_erase_sector(sector_number: u32) -> Result<(), i32> {
     match chip_specific::spiflash_erase_sector(sector_number) {
+        0 => Ok(()),
+        value => Err(value),
+    }
+}
+
+/// Low-level SPI NOR Flash block erase
+///
+/// # Safety
+///
+/// The `block_number` * block_size should not exceeds the size of flash.
+pub unsafe fn spiflash_erase_block(block_number: u32) -> Result<(), i32> {
+    match chip_specific::spiflash_erase_block(block_number) {
         0 => Ok(()),
         value => Err(value),
     }
