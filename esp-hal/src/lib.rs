@@ -346,8 +346,8 @@ unstable_reexport! {
 #[cfg(all(feature = "rt", feature = "exception-handler"))]
 mod exception_handler;
 
-pub mod interrupt;
 pub mod efuse;
+pub mod interrupt;
 
 unstable_module! {
     pub mod asynch;

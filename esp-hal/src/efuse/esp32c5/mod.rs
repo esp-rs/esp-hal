@@ -1,6 +1,7 @@
 use crate::peripherals::EFUSE;
 
 mod fields;
+#[instability::unstable]
 pub use fields::*;
 
 impl super::Efuse {

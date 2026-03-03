@@ -1,6 +1,7 @@
 use crate::{analog::adc::Attenuation, peripherals::EFUSE};
 
 mod fields;
+#[instability::unstable]
 pub use fields::*;
 
 /// Selects which ADC we are interested in the efuse calibration data for

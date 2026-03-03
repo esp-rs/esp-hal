@@ -1,6 +1,7 @@
 use crate::{peripherals::EFUSE, time::Rate};
 
 mod fields;
+#[instability::unstable]
 pub use fields::*;
 
 /// Representing different types of ESP32 chips.
