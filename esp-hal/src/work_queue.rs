@@ -705,6 +705,7 @@ pub(crate) struct WorkQueueFrontend<T: Sync + Send> {
 }
 
 impl<T: Sync + Send> WorkQueueFrontend<T> {
+    /// Creates a new work queue frontend with the given initial value.
     pub fn new(initial: T) -> Self {
         Self {
             work_item: WorkItem {
@@ -716,10 +717,20 @@ impl<T: Sync + Send> WorkQueueFrontend<T> {
         }
     }
 
+    /// Returns a reference to the work item's data.
+    #[cfg(ecc_driver_supported)]
+    pub fn data(&self) -> &T {
+        &self.work_item.data
+    }
+
+    /// Returns a mutable reference to the work item's data.
     pub fn data_mut(&mut self) -> &mut T {
         &mut self.work_item.data
     }
 
+    /// Posts the work item to the queue.
+    ///
+    /// Returns a [`Handle`] that can be used to wait for the work item to complete.
     pub fn post<'t>(&'t mut self, queue: &'t WorkQueue<T>) -> Handle<'t, T> {
         queue.post_work(&mut self.work_item)
     }

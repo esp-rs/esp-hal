@@ -10,7 +10,7 @@
 //! elliptic curves, thus accelerating ECC algorithm and ECC-derived
 //! algorithms (such as ECDSA).
 
-use core::marker::PhantomData;
+use core::{marker::PhantomData, ptr::NonNull};
 
 use procmacros::BuilderLite;
 
@@ -22,142 +22,14 @@ use crate::{
     peripherals::{ECC, Interrupt},
     private::Sealed,
     system::{self, GenericPeripheralGuard},
+    work_queue::{Handle, Poll, Status, VTable, WorkQueue, WorkQueueDriver, WorkQueueFrontend},
 };
 
-const MEM_BLOCK_SIZE: usize = property!("ecc.mem_block_size");
-
-/// The ECC Accelerator driver.
-///
-/// Note that as opposed to commonly used standards, this driver operates on
-/// **little-endian** data.
-pub struct Ecc<'d, Dm: DriverMode> {
-    _ecc: ECC<'d>,
-    phantom: PhantomData<Dm>,
-    _memory_guard: EccMemoryPowerGuard,
-    _guard: GenericPeripheralGuard<{ system::Peripheral::Ecc as u8 }>,
-}
-
-struct EccMemoryPowerGuard;
-
-impl EccMemoryPowerGuard {
-    fn new() -> Self {
-        #[cfg(soc_has_pcr)]
-        crate::peripherals::PCR::regs()
-            .ecc_pd_ctrl()
-            .modify(|_, w| {
-                w.ecc_mem_force_pd().clear_bit();
-                w.ecc_mem_force_pu().set_bit();
-                w.ecc_mem_pd().clear_bit()
-            });
-        Self
-    }
-}
-
-impl Drop for EccMemoryPowerGuard {
-    fn drop(&mut self) {
-        #[cfg(soc_has_pcr)]
-        crate::peripherals::PCR::regs()
-            .ecc_pd_ctrl()
-            .modify(|_, w| {
-                w.ecc_mem_force_pd().clear_bit();
-                w.ecc_mem_force_pu().clear_bit();
-                w.ecc_mem_pd().set_bit()
-            });
-    }
-}
-
-/// ECC peripheral configuration.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, BuilderLite)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Config {
-    /// Force enable register clock.
-    force_enable_reg_clock: bool,
-
-    /// Force enable memory clock.
-    #[cfg(ecc_has_memory_clock_gate)]
-    force_enable_mem_clock: bool,
-
-    /// Enable constant time operation and minimized power consumption variation for
-    /// point-multiplication operations.
-    #[cfg_attr(
-        esp32h2,
-        doc = r"
-
-Only available on chip revision 1.2 and above."
-    )]
-    #[cfg(ecc_supports_enhanced_security)]
-    enhanced_security: bool,
-}
-
-/// The length of the arguments do not match the length required by the curve.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct KeyLengthMismatch;
-
-/// ECC operation error.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OperationError {
-    /// The length of the arguments do not match the length required by the curve.
-    ParameterLengthMismatch,
-
-    /// Point verification failed.
-    PointNotOnCurve,
-}
-
-/// Modulus base.
-#[cfg(ecc_has_modular_arithmetic)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EccModBase {
-    /// The order of the curve.
-    OrderOfCurve = 0,
-
-    /// Prime modulus.
-    PrimeModulus = 1,
-}
-
-impl From<KeyLengthMismatch> for OperationError {
-    fn from(_: KeyLengthMismatch) -> Self {
-        OperationError::ParameterLengthMismatch
-    }
-}
-
-for_each_ecc_curve! {
-    (all $(( $id:literal, $name:ident, $bits:literal )),*) => {
-        /// Represents supported elliptic curves for cryptographic operations.
-        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum EllipticCurve {
-            $(
-                #[doc = concat!("The ", stringify!($name), " elliptic curve, a ", $bits, "-bit curve.")]
-                $name,
-            )*
-        }
-        impl EllipticCurve {
-            fn size_check<const N: usize>(&self, params: [&[u8]; N]) -> Result<(), KeyLengthMismatch> {
-                let bytes = self.size();
-
-                if params.iter().any(|p| p.len() != bytes) {
-                    return Err(KeyLengthMismatch);
-                }
-
-                Ok(())
-            }
-
-            /// Returns the size of the elliptic curve in bytes.
-            pub const fn size(self) -> usize {
-                match self {
-                    $(
-                        EllipticCurve::$name => $bits / 8,
-                    )*
-                }
-            }
-        }
-    };
-}
-
-/// This macro defines 3 other macros:
+/// This macro defines 4 other macros:
 /// - `doc_summary` that takes the first line of the documentation and returns it as a string
 /// - `result_type` that generates the return types for each operation
 /// - `operation` that generates the operation function
+/// - `backend_operation` that generates the backend operation function
 ///
 /// These generated macros can then be fed to `for_each_ecc_working_mode!` to generate operations
 /// the device supports.
@@ -183,7 +55,7 @@ macro_rules! define_operations {
             $(
                 // What data is computed may be device specific.
                 $(#[$returns_meta:meta])*
-                $returns:ident $({ const $c:ident: $t:ty = $v:expr })?
+                $returns:ident $({ const $c:ident: $t:tt = $v:expr })?
             ),*
         ]
     }),*) => {
@@ -215,6 +87,11 @@ macro_rules! define_operations {
                                 )?
                             }
                         )*
+
+                        $(
+                            const _: bool = $verifies_point; // I just need this ignored.
+                            impl OperationVerifiesPoint for $op {}
+                        )?
                     }
                 };
             )*
@@ -261,6 +138,56 @@ from the bitlength of the prime fields of the curve."]
                             curve,
                             #[cfg(ecc_has_modular_arithmetic)] mod_base,
                         ))
+                    }
+                };
+            )*
+        }
+
+        macro_rules! backend_operation {
+            $(
+                ($op) => {
+                    #[doc = concat!("Configures a new ", $first_line, " operation with the given inputs, to be executed on [`EccBackend`].")]
+                    ///
+                    /// Outputs need to be assigned separately before executing the operation.
+                    pub fn $function<'op>(
+                        self,
+                        $(#[cfg($is_modular)] modulus: EccModBase,)?
+                        $($input: &'op [u8],)*
+                    ) -> Result<EccBackendOperation<'op, $op>, KeyLengthMismatch> {
+                        self.size_check([&$($input,)*])?;
+
+                        #[cfg(ecc_has_modular_arithmetic)]
+                        let mod_base = $crate::if_set! {
+                            $(
+                                {
+                                    $crate::ignore!($is_modular);
+                                    modulus
+                                }
+                            )?,
+                            // else
+                            EccModBase::OrderOfCurve
+                        };
+
+                        let work_item = EccWorkItem {
+                            curve: self,
+                            operation: WorkMode::$op,
+                            cancelled: false,
+                            #[cfg(ecc_has_modular_arithmetic)]
+                            mod_base,
+                            inputs: {
+                                let mut inputs = MemoryPointers::default();
+                                $(
+                                    paste::paste! {
+                                        inputs.[<set_ $input>](NonNull::from($input));
+                                    };
+                                )*
+                                inputs
+                            },
+                            point_verification_result: false,
+                            outputs: MemoryPointers::default(),
+                        };
+
+                        Ok(EccBackendOperation::new(work_item))
                     }
                 };
             )*
@@ -432,6 +359,149 @@ define_operations! {
             Scalar { const LOCATION: ScalarResultLocation = ScalarResultLocation::Py }
         ]
     }
+}
+
+const MEM_BLOCK_SIZE: usize = property!("ecc.mem_block_size");
+
+/// The ECC Accelerator driver.
+///
+/// Note that as opposed to commonly used standards, this driver operates on
+/// **little-endian** data.
+pub struct Ecc<'d, Dm: DriverMode> {
+    _ecc: ECC<'d>,
+    phantom: PhantomData<Dm>,
+    _memory_guard: EccMemoryPowerGuard,
+    _guard: GenericPeripheralGuard<{ system::Peripheral::Ecc as u8 }>,
+}
+
+struct EccMemoryPowerGuard;
+
+impl EccMemoryPowerGuard {
+    fn new() -> Self {
+        #[cfg(soc_has_pcr)]
+        crate::peripherals::PCR::regs()
+            .ecc_pd_ctrl()
+            .modify(|_, w| {
+                w.ecc_mem_force_pd().clear_bit();
+                w.ecc_mem_force_pu().set_bit();
+                w.ecc_mem_pd().clear_bit()
+            });
+        Self
+    }
+}
+
+impl Drop for EccMemoryPowerGuard {
+    fn drop(&mut self) {
+        #[cfg(soc_has_pcr)]
+        crate::peripherals::PCR::regs()
+            .ecc_pd_ctrl()
+            .modify(|_, w| {
+                w.ecc_mem_force_pd().clear_bit();
+                w.ecc_mem_force_pu().clear_bit();
+                w.ecc_mem_pd().set_bit()
+            });
+    }
+}
+
+/// ECC peripheral configuration.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Config {
+    /// Force enable register clock.
+    force_enable_reg_clock: bool,
+
+    /// Force enable memory clock.
+    #[cfg(ecc_has_memory_clock_gate)]
+    force_enable_mem_clock: bool,
+
+    /// Enable constant time operation and minimized power consumption variation for
+    /// point-multiplication operations.
+    #[cfg_attr(
+        esp32h2,
+        doc = r"
+
+Only available on chip revision 1.2 and above."
+    )]
+    #[cfg(ecc_supports_enhanced_security)]
+    enhanced_security: bool,
+}
+
+/// The length of the arguments do not match the length required by the curve.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KeyLengthMismatch;
+
+/// ECC operation error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OperationError {
+    /// The length of the arguments do not match the length required by the curve.
+    ParameterLengthMismatch,
+
+    /// Point verification failed.
+    PointNotOnCurve,
+}
+
+/// Modulus base.
+#[cfg(ecc_has_modular_arithmetic)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EccModBase {
+    /// The order of the curve.
+    OrderOfCurve = 0,
+
+    /// Prime modulus.
+    PrimeModulus = 1,
+}
+
+impl From<KeyLengthMismatch> for OperationError {
+    fn from(_: KeyLengthMismatch) -> Self {
+        OperationError::ParameterLengthMismatch
+    }
+}
+
+for_each_ecc_curve! {
+    (all $(( $id:literal, $name:ident, $bits:literal )),*) => {
+        /// Represents supported elliptic curves for cryptographic operations.
+        ///
+        /// The methods that represent operations require the `EccBackend` to be started before use.
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum EllipticCurve {
+            $(
+                #[doc = concat!("The ", stringify!($name), " elliptic curve, a ", $bits, "-bit curve.")]
+                $name,
+            )*
+        }
+        impl EllipticCurve {
+            /// Returns the size of the elliptic curve in bytes.
+            pub const fn size(self) -> usize {
+                match self {
+                    $(
+                        EllipticCurve::$name => $bits / 8,
+                    )*
+                }
+            }
+        }
+    };
+}
+
+for_each_ecc_working_mode! {
+    (all $(($wm_id:literal, $op:tt)),*) => {
+        impl EllipticCurve {
+            fn size_check<const N: usize>(&self, params: [&[u8]; N]) -> Result<(), KeyLengthMismatch> {
+                let bytes = self.size();
+
+                if params.iter().any(|p| p.len() != bytes) {
+                    return Err(KeyLengthMismatch);
+                }
+
+                Ok(())
+            }
+
+            $(
+                // Macro defined by `define_operations`
+                backend_operation!($op);
+            )*
+        }
+    };
 }
 
 impl<'d> Ecc<'d, Blocking> {
@@ -729,6 +799,9 @@ pub trait OperationReturnsAffinePoint: EccOperation {}
 /// Marks operations that return a point in Jacobian format.
 pub trait OperationReturnsJacobianPoint: EccOperation {}
 
+/// Marks operations that verify that the input point is on the curve.
+pub trait OperationVerifiesPoint: EccOperation {}
+
 /// The result of an ECC operation.
 ///
 /// This struct can be used to read the result of an ECC operation. The methods which can be used
@@ -829,5 +902,417 @@ where
         self.run_checks([x, y, z])?;
         self.info.read_jacobian_result(x, y, z);
         Ok(())
+    }
+}
+
+struct EccWorkItem {
+    curve: EllipticCurve,
+    operation: WorkMode,
+    cancelled: bool,
+    #[cfg(ecc_has_modular_arithmetic)]
+    mod_base: EccModBase,
+    inputs: MemoryPointers,
+    point_verification_result: bool,
+    outputs: MemoryPointers,
+}
+
+#[derive(Default)]
+struct MemoryPointers {
+    // All of these pointers point to slices with curve-appropriate lengths.
+    k: Option<NonNull<u8>>,
+    px: Option<NonNull<u8>>,
+    py: Option<NonNull<u8>>,
+    #[cfg(ecc_separate_jacobian_point_memory)]
+    qx: Option<NonNull<u8>>,
+    #[cfg(ecc_separate_jacobian_point_memory)]
+    qy: Option<NonNull<u8>>,
+    #[cfg(ecc_separate_jacobian_point_memory)]
+    qz: Option<NonNull<u8>>,
+}
+
+impl MemoryPointers {
+    fn set_scalar(&mut self, location: ScalarResultLocation, ptr: NonNull<[u8]>) {
+        match location {
+            ScalarResultLocation::Px => self.set_px(ptr),
+            ScalarResultLocation::Py => self.set_py(ptr),
+            ScalarResultLocation::K => self.set_k(ptr),
+        }
+    }
+
+    fn set_k(&mut self, ptr: NonNull<[u8]>) {
+        self.k = Some(ptr.cast());
+    }
+
+    fn set_px(&mut self, ptr: NonNull<[u8]>) {
+        self.px = Some(ptr.cast());
+    }
+
+    fn set_py(&mut self, ptr: NonNull<[u8]>) {
+        self.py = Some(ptr.cast());
+    }
+
+    fn set_qx(&mut self, ptr: NonNull<[u8]>) {
+        cfg_if::cfg_if! {
+            if #[cfg(ecc_separate_jacobian_point_memory)] {
+                self.qx = Some(ptr.cast());
+            } else {
+                self.px = Some(ptr.cast());
+            }
+        }
+    }
+
+    fn set_qy(&mut self, ptr: NonNull<[u8]>) {
+        cfg_if::cfg_if! {
+            if #[cfg(ecc_separate_jacobian_point_memory)] {
+                self.qy = Some(ptr.cast());
+            } else {
+                self.py = Some(ptr.cast());
+            }
+        }
+    }
+
+    fn set_qz(&mut self, ptr: NonNull<[u8]>) {
+        cfg_if::cfg_if! {
+            if #[cfg(ecc_separate_jacobian_point_memory)] {
+                self.qz = Some(ptr.cast());
+            } else {
+                self.k = Some(ptr.cast());
+            }
+        }
+    }
+}
+
+// Safety: MemoryPointers is safe to share between threads, in the context of a WorkQueue. The
+// WorkQueue ensures that only a single location can access the data. All the internals, except
+// for the pointers, are Sync. The pointers are safe to share because they point at data that the
+// ECC driver ensures can be accessed safely and soundly.
+unsafe impl Sync for MemoryPointers {}
+// Safety: we will not hold on to the pointers when the work item leaves the queue.
+unsafe impl Send for MemoryPointers {}
+
+static ECC_WORK_QUEUE: WorkQueue<EccWorkItem> = WorkQueue::new();
+
+const ECC_VTABLE: VTable<EccWorkItem> = VTable {
+    post: |driver, item| {
+        let driver = unsafe { EccBackend::from_raw(driver) };
+
+        // Ensure driver is initialized
+        if let DriverState::Uninitialized(ecc) = &driver.driver {
+            let mut ecc = Ecc::new(unsafe { ecc.clone_unchecked() }, driver.config);
+            ecc.set_interrupt_handler(ecc_work_queue_handler);
+            driver.driver = DriverState::Initialized(ecc);
+        };
+
+        Some(driver.process(item))
+    },
+    poll: |driver, item| {
+        let driver = unsafe { EccBackend::from_raw(driver) };
+        driver.poll(item)
+    },
+    cancel: |driver, item| {
+        let driver = unsafe { EccBackend::from_raw(driver) };
+        driver.cancel(item);
+    },
+    stop: |driver| {
+        let driver = unsafe { EccBackend::from_raw(driver) };
+        driver.deinitialize()
+    },
+};
+
+enum DriverState<'d> {
+    Uninitialized(ECC<'d>),
+    Initialized(Ecc<'d, Blocking>),
+}
+
+/// ECC processing backend.
+///
+/// This struct enables shared access to the device's ECC hardware using a work queue.
+pub struct EccBackend<'d> {
+    driver: DriverState<'d>,
+    config: Config,
+}
+
+impl<'d> EccBackend<'d> {
+    /// Creates a new ECC backend.
+    ///
+    /// The backend needs to be [`start`][Self::start]ed before it can execute ECC operations.
+    pub fn new(ecc: ECC<'d>, config: Config) -> Self {
+        Self {
+            driver: DriverState::Uninitialized(ecc),
+            config,
+        }
+    }
+
+    /// Registers the ECC driver to process ECC operations.
+    ///
+    /// The driver stops operating when the returned object is dropped.
+    pub fn start(&mut self) -> EccWorkQueueDriver<'_, 'd> {
+        EccWorkQueueDriver {
+            inner: WorkQueueDriver::new(self, ECC_VTABLE, &ECC_WORK_QUEUE),
+        }
+    }
+
+    // WorkQueue callbacks. They may run in any context.
+
+    unsafe fn from_raw<'any>(ptr: NonNull<()>) -> &'any mut Self {
+        unsafe { ptr.cast::<EccBackend<'_>>().as_mut() }
+    }
+
+    fn process(&mut self, item: &mut EccWorkItem) -> Poll {
+        let DriverState::Initialized(driver) = &mut self.driver else {
+            unreachable!()
+        };
+
+        let bytes = item.curve.size();
+
+        macro_rules! set_input {
+            ($input:ident, $input_mem:ident) => {
+                if let Some($input) = item.inputs.$input {
+                    driver.info().write_mem(driver.info().$input_mem(), unsafe {
+                        core::slice::from_raw_parts($input.as_ptr(), bytes)
+                    });
+                }
+            };
+        }
+
+        set_input!(k, k_mem);
+        set_input!(px, px_mem);
+        set_input!(py, py_mem);
+
+        #[cfg(ecc_separate_jacobian_point_memory)]
+        {
+            set_input!(qx, qx_mem);
+            set_input!(qy, qy_mem);
+            set_input!(qz, qz_mem);
+        }
+
+        driver.info().start_operation(
+            item.operation,
+            item.curve,
+            #[cfg(ecc_has_modular_arithmetic)]
+            item.mod_base,
+        );
+        Poll::Pending(false)
+    }
+
+    fn poll(&mut self, item: &mut EccWorkItem) -> Poll {
+        let DriverState::Initialized(driver) = &mut self.driver else {
+            unreachable!()
+        };
+
+        if driver.info().is_busy() {
+            return Poll::Pending(false);
+        }
+        if item.cancelled {
+            return Poll::Ready(Status::Cancelled);
+        }
+
+        let bytes = item.curve.size();
+
+        macro_rules! read_output {
+            ($output:ident, $output_mem:ident) => {
+                if let Some($output) = item.outputs.$output {
+                    driver.info().read_mem(driver.info().$output_mem(), unsafe {
+                        core::slice::from_raw_parts_mut($output.as_ptr(), bytes)
+                    });
+                }
+            };
+        }
+
+        read_output!(k, k_mem);
+        read_output!(px, px_mem);
+        read_output!(py, py_mem);
+
+        #[cfg(ecc_separate_jacobian_point_memory)]
+        {
+            read_output!(qx, qx_mem);
+            read_output!(qy, qy_mem);
+            read_output!(qz, qz_mem);
+        }
+
+        item.point_verification_result = driver.info().check_point_verification_result().is_ok();
+
+        Poll::Ready(Status::Completed)
+    }
+
+    fn cancel(&mut self, item: &mut EccWorkItem) {
+        let DriverState::Initialized(driver) = &mut self.driver else {
+            unreachable!()
+        };
+        driver.reset();
+        item.cancelled = true;
+    }
+
+    fn deinitialize(&mut self) {
+        if let DriverState::Initialized(ref ecc) = self.driver {
+            self.driver = DriverState::Uninitialized(unsafe { ecc._ecc.clone_unchecked() });
+        }
+    }
+}
+
+/// An active work queue driver.
+///
+/// This object must be kept around, otherwise ECC operations will never complete.
+pub struct EccWorkQueueDriver<'t, 'd> {
+    inner: WorkQueueDriver<'t, EccBackend<'d>, EccWorkItem>,
+}
+
+impl<'t, 'd> EccWorkQueueDriver<'t, 'd> {
+    /// Finishes processing the current work queue item, then stops the driver.
+    pub fn stop(self) -> impl Future<Output = ()> {
+        self.inner.stop()
+    }
+}
+
+#[crate::ram]
+#[crate::handler]
+fn ecc_work_queue_handler() {
+    if !ECC_WORK_QUEUE.process() {
+        // The queue may indicate that it needs to be polled again. In this case, we do not clear
+        // the interrupt bit, which causes the interrupt to be re-handled.
+        cfg_if::cfg_if! {
+            if #[cfg(esp32c5)] {
+                let reg = ECC::regs().int_clr();
+            } else {
+                let reg = ECC::regs().mult_int_clr();
+            }
+        }
+        reg.write(|w| w.calc_done().clear_bit_by_one());
+    }
+}
+
+/// An ECC operation that can be enqueued on the work queue.
+pub struct EccBackendOperation<'op, O: EccOperation> {
+    frontend: WorkQueueFrontend<EccWorkItem>,
+    _marker: PhantomData<(&'op mut (), O)>,
+}
+
+impl<'op, O: EccOperation> EccBackendOperation<'op, O> {
+    fn new(work_item: EccWorkItem) -> Self {
+        Self {
+            frontend: WorkQueueFrontend::new(work_item),
+            _marker: PhantomData,
+        }
+    }
+
+    /// Designate a buffer for the scalar result of the operation.
+    ///
+    /// Once the operation is processed, the result can be retrieved from the designated buffer.
+    ///
+    /// ## Errors
+    ///
+    /// Returns an error if `out` is not the correct size.
+    pub fn with_scalar_result(mut self, out: &'op mut [u8]) -> Result<Self, KeyLengthMismatch>
+    where
+        O: OperationReturnsScalar,
+    {
+        self.frontend.data().curve.size_check([out])?;
+
+        self.frontend
+            .data_mut()
+            .outputs
+            .set_scalar(O::LOCATION, NonNull::from(out));
+
+        Ok(self)
+    }
+
+    /// Designate buffers for the affine point result of the operation.
+    ///
+    /// Once the operation is processed, the result can be retrieved from the designated buffers.
+    ///
+    /// ## Errors
+    ///
+    /// Returns an error if `x` or `y` are not the correct size.
+    pub fn with_affine_point_result(
+        mut self,
+        px: &'op mut [u8],
+        py: &'op mut [u8],
+    ) -> Result<Self, KeyLengthMismatch>
+    where
+        O: OperationReturnsAffinePoint,
+    {
+        self.frontend.data().curve.size_check([px, py])?;
+
+        self.frontend.data_mut().outputs.set_px(NonNull::from(px));
+        self.frontend.data_mut().outputs.set_py(NonNull::from(py));
+
+        Ok(self)
+    }
+
+    /// Designate buffers for the Jacobian point result of the operation.
+    ///
+    /// Once the operation is processed, the result can be retrieved from the designated buffers.
+    ///
+    /// ## Errors
+    ///
+    /// Returns an error if `x`, `y`, or `z` are not the correct size.
+    pub fn with_jacobian_point_result(
+        mut self,
+        qx: &'op mut [u8],
+        qy: &'op mut [u8],
+        qz: &'op mut [u8],
+    ) -> Result<Self, KeyLengthMismatch>
+    where
+        O: OperationReturnsJacobianPoint,
+    {
+        self.frontend.data().curve.size_check([qx, qy, qz])?;
+
+        self.frontend.data_mut().outputs.set_qx(NonNull::from(qx));
+        self.frontend.data_mut().outputs.set_qy(NonNull::from(qy));
+        self.frontend.data_mut().outputs.set_qz(NonNull::from(qz));
+
+        Ok(self)
+    }
+
+    /// Returns `true` if the input point is on the curve.
+    ///
+    /// The operation must be processed before this method returns a meaningful value.
+    pub fn point_on_curve(&self) -> bool
+    where
+        O: OperationVerifiesPoint,
+    {
+        self.frontend.data().point_verification_result
+    }
+
+    /// Starts processing the operation.
+    ///
+    /// The returned [`EccHandle`] must be polled to completion before the operation is considered
+    /// complete.
+    pub fn process(&mut self) -> EccHandle<'_> {
+        EccHandle(self.frontend.post(&ECC_WORK_QUEUE))
+    }
+}
+
+/// A handle for an in-progress operation.
+#[must_use]
+pub struct EccHandle<'t>(Handle<'t, EccWorkItem>);
+
+impl EccHandle<'_> {
+    /// Polls the status of the work item.
+    ///
+    /// This function returns `true` if the item has been processed.
+    #[inline]
+    pub fn poll(&mut self) -> bool {
+        self.0.poll()
+    }
+
+    /// Polls the work item to completion, by busy-looping.
+    ///
+    /// This function returns immediately if `poll` returns `true`.
+    #[inline]
+    pub fn wait_blocking(self) -> Status {
+        self.0.wait_blocking()
+    }
+
+    /// Waits until the work item is completed.
+    #[inline]
+    pub fn wait(&mut self) -> impl Future<Output = Status> {
+        self.0.wait()
+    }
+
+    /// Cancels the work item and asynchronously waits until it is removed from the work queue.
+    #[inline]
+    pub fn cancel(&mut self) -> impl Future<Output = ()> {
+        self.0.cancel()
     }
 }
