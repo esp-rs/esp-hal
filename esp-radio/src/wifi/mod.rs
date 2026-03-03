@@ -2487,7 +2487,7 @@ impl WifiController<'_> {
     ///
     /// ## Errors
     ///
-    /// If this function fails to apply the new configuratoin, the Wi-Fi mode is reset to `NULL` and
+    /// If this function returns an error, the Wi-Fi mode is reset to `NULL` and
     /// the controller is stopped.
     ///
     /// ## Example
@@ -2508,11 +2508,11 @@ impl WifiController<'_> {
     pub fn set_config(&mut self, conf: &Config) -> Result<(), WifiError> {
         // We/the driver might have applied a partial configuration so we better disable
         // AccessPoint/Station just in case the caller ignores the error we return here -
-        // they will run into futher errors this way.
-        pub(super) struct ResetModeOnDrop;
+        // they will run into further errors this way.
+        struct ResetModeOnDrop;
         impl ResetModeOnDrop {
-            /// Do not automatically free the AP list when the guard is dropped.
-            pub fn defuse(self) {
+            /// Prevent resetting the Wi-Fi mode when the guard is dropped.
+            fn defuse(self) {
                 core::mem::forget(self);
             }
         }

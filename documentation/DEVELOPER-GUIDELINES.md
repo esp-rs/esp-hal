@@ -218,6 +218,7 @@ You can find the complete list of available symbols in `esp-metadata-generated/s
 - The author is encouraged to return a static shared reference to an `Info` and a `State` structure from the `Instance` trait.
   - The `Info` struct should describe the peripheral. Do not use any interior mutability.
   - The `State` struct should contain counters, wakers and other, mutable state. As this is accessed via a shared reference, interior mutability and atomic variables are preferred.
+- When applying configuration, consider using a drop guard to reset a consistent default state on error.
 
 ## Modules Documentation
 
