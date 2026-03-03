@@ -13,8 +13,17 @@
 //! and more. It is useful for retrieving chip-specific configuration and
 //! identification data during runtime.
 //!
+//! Each chip is programmed with a unique base MAC address during manufacturing.
+//! Different interfaces (Wi-Fi Station, SoftAP, Bluetooth, etc.) each use a
+//! MAC address derived from this base address. The [`Station`] interface uses
+//! the base MAC directly, while others use locally administered variants
+//! produced by modifying the first octet to set the local-admin bit and
+//! incrementing the last octet to distinguish each interface.
+//!
 //! The `Efuse` struct represents the eFuse peripheral and is responsible for
 //! reading various eFuse fields and values.
+//!
+//! [`Station`]: InterfaceMacAddress::Station
 //!
 //! ## Examples
 //!
@@ -22,9 +31,14 @@
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! use esp_hal::efuse::Efuse;
+//! use esp_hal::efuse::{Efuse, InterfaceMacAddress};
 //!
-//! println!("MAC address {:02x?}", Efuse::mac_address());
+//! let mac = Efuse::mac_address();
+//! println!("Base MAC address: {mac}");
+//! println!("MAC bytes: {:02x?}", mac.as_bytes());
+//!
+//! let bt_mac = Efuse::interface_mac_address(InterfaceMacAddress::Bluetooth);
+//! println!("Bluetooth MAC: {bt_mac}");
 //! # {after_snippet}
 //! ```
 
@@ -70,7 +84,23 @@ impl EfuseField {
     }
 }
 
-/// A struct representing the eFuse functionality of the chip.
+#[procmacros::doc_replace]
+/// The eFuse peripheral.
+///
+/// Provides access to chip-specific data programmed into one-time programmable
+/// (OTP) memory during manufacturing, including the unique base MAC address and
+/// chip revision information.
+///
+/// ## Example
+///
+/// ```rust, no_run
+/// # {before_snippet}
+/// use esp_hal::efuse::Efuse;
+///
+/// let mac = Efuse::mac_address();
+/// println!("MAC address: {mac}");
+/// # {after_snippet}
+/// ```
 #[derive(Debug)]
 pub struct Efuse;
 
@@ -197,10 +227,23 @@ impl Efuse {
         Ok(())
     }
 
-    /// Get base mac address
+    #[procmacros::doc_replace]
+    /// Returns the base MAC address of the device.
     ///
-    /// By default this reads the base mac address from eFuse, but it can be
-    /// overridden by `set_mac_address`.
+    /// This is the factory MAC programmed into eFuse during manufacturing.
+    /// Can be overridden at runtime via
+    /// [`set_mac_address`](Self::set_mac_address).
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::efuse::Efuse;
+    ///
+    /// let mac = Efuse::mac_address();
+    /// println!("Base MAC: {mac}");
+    /// # {after_snippet}
+    /// ```
     pub fn mac_address() -> MacAddress {
         if MAC_OVERRIDE_STATE.load(Ordering::Relaxed) == 2 {
             unsafe { MAC_OVERRIDE }
@@ -209,7 +252,23 @@ impl Efuse {
         }
     }
 
-    /// Get the MAC address for the desired radio interface, derived from the base MAC.
+    #[procmacros::doc_replace]
+    /// Returns the MAC address for a specific interface, derived from the base
+    /// MAC.
+    ///
+    /// See [`InterfaceMacAddress`] for the available interfaces and how each
+    /// address is derived.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::efuse::{Efuse, InterfaceMacAddress};
+    ///
+    /// let bt_mac = Efuse::interface_mac_address(InterfaceMacAddress::Bluetooth);
+    /// println!("Bluetooth MAC: {bt_mac}");
+    /// # {after_snippet}
+    /// ```
     pub fn interface_mac_address(kind: InterfaceMacAddress) -> MacAddress {
         let mut mac: MacAddress = Self::mac_address();
 
@@ -285,14 +344,17 @@ fn derive_local_mac(mac: &mut MacAddress) {
     }
 }
 
-/// Radio interface options for obtaining their MAC address.
+/// Interface selection for [`Efuse::interface_mac_address`].
+///
+/// Each interface uses a distinct MAC address derived from the base MAC.
+/// See the [module-level docs](self) for an overview of the derivation scheme.
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum InterfaceMacAddress {
-    /// Wi-Fi station (Sta).
+    /// Wi-Fi station.
     Station,
-    /// Wi-Fi access point (SoftAP).
+    /// Wi-Fi SoftAP.
     AccessPoint,
     /// Bluetooth (BT/BLE).
     Bluetooth,
@@ -300,8 +362,9 @@ pub enum InterfaceMacAddress {
 
 /// Hardware (MAC) address.
 ///
-/// Currently represents a 6-byte address, with expansion expected in the future to support 8-byte
-/// addresses.
+/// Use [`as_bytes`](Self::as_bytes) for raw access, or the
+/// [`Display`](core::fmt::Display) impl for colon-separated hex
+/// (e.g. `aa:bb:cc:dd:ee:ff`).
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct MacAddress([u8; 6]);
