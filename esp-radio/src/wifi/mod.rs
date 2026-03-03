@@ -25,12 +25,14 @@
 //! * Station: 47 - 57k
 //! * Open Access Point: 53 - 63k
 //!
-//! ### Wi-Fi performance considerations
+//! ## Wi-Fi performance considerations
 //!
 //! The default configuration is quite conservative to reduce power and memory consumption.
 //!
-//! There are a number of settings which influence the general performance. Optimal settings are
-//! chip and applications specific. You can get inspiration from the [ESP-IDF examples](https://github.com/espressif/esp-idf/tree/release/v5.3/examples/wifi/iperf)
+//! There are a number of settings which influence the general performance (at the cost of memory
+//! usage).
+//!
+//! Optimal settings are chip and applications specific. You can get inspiration from the [ESP-IDF examples](https://github.com/espressif/esp-idf/tree/release/v5.3/examples/wifi/iperf)
 //!
 //! Please note that the configuration keys are usually named slightly different and not all
 //! configuration keys apply.
