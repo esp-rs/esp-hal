@@ -2516,6 +2516,11 @@ impl WifiController<'_> {
     /// If you don't intend to use Wi-Fi anymore at all consider tearing down
     /// Wi-Fi completely.
     ///
+    /// ## Errors
+    ///
+    /// If this function returns an error, the Wi-Fi mode is reset to `NULL` and
+    /// the controller is stopped.
+    ///
     /// ## Example
     ///
     /// ```rust,no_run
@@ -2532,6 +2537,25 @@ impl WifiController<'_> {
     /// controller.set_config(&station_config)?;
     /// # {after_snippet}
     pub fn set_config(&mut self, conf: &Config) -> Result<(), WifiError> {
+        // We/the driver might have applied a partial configuration so we better disable
+        // AccessPoint/Station just in case the caller ignores the error we return here -
+        // they will run into further errors this way.
+        struct ResetModeOnDrop;
+        impl ResetModeOnDrop {
+            /// Prevent resetting the Wi-Fi mode when the guard is dropped.
+            fn defuse(self) {
+                core::mem::forget(self);
+            }
+        }
+        impl Drop for ResetModeOnDrop {
+            fn drop(&mut self) {
+                unsafe { esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_NULL) };
+                unwrap!(WifiController::stop_impl());
+            }
+        }
+
+        let reset_mode_on_error = ResetModeOnDrop;
+
         conf.validate()?;
 
         let mut previous_mode = 0u32;
@@ -2546,7 +2570,7 @@ impl WifiController<'_> {
         };
 
         if previous_mode != mode {
-            self.stop_impl()?;
+            Self::stop_impl()?;
         }
 
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) })?;
@@ -2554,42 +2578,34 @@ impl WifiController<'_> {
         match conf {
             Config::Station(config) => {
                 self.apply_sta_config(config)?;
-                Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)
+                Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)?;
             }
             Config::AccessPoint(config) => {
                 self.apply_ap_config(config)?;
-                Self::apply_protocols(wifi_interface_t_WIFI_IF_AP, &config.protocols)
+                Self::apply_protocols(wifi_interface_t_WIFI_IF_AP, &config.protocols)?;
             }
             Config::AccessPointStation(sta_config, ap_config) => {
                 self.apply_ap_config(ap_config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_AP, &ap_config.protocols)?;
                 self.apply_sta_config(sta_config)?;
-                Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &sta_config.protocols)
+                Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &sta_config.protocols)?;
             }
             #[cfg(feature = "wifi-eap")]
             Config::EapStation(config) => {
                 self.apply_sta_eap_config(config)?;
-                Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)
+                Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)?;
             }
         }
-        .inspect_err(|_| {
-            // we/the driver might have applied a partial configuration
-            // so we better disable AccessPoint/Station just in case the caller ignores the error we
-            // return here - they will run into futher errors this way
-            unsafe { esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_NULL) };
-        })?;
 
         if previous_mode != mode {
             set_access_point_state(WifiAccessPointState::Starting);
             set_station_state(WifiStationState::Starting);
 
             // `esp_wifi_start` is actually not async - i.e. we get the even before it returns
-            let res = esp_wifi_result!(unsafe { esp_wifi_start() });
-            if res.is_err() {
-                unsafe { esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_NULL) };
-                return res;
-            }
+            esp_wifi_result!(unsafe { esp_wifi_start() })?;
         }
+
+        reset_mode_on_error.defuse();
 
         Ok(())
     }
@@ -2719,7 +2735,7 @@ ignored.",
         esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(power) })
     }
 
-    fn stop_impl(&mut self) -> Result<(), WifiError> {
+    fn stop_impl() -> Result<(), WifiError> {
         set_access_point_state(WifiAccessPointState::Stopping);
         set_station_state(WifiStationState::Stopping);
 
