@@ -233,10 +233,7 @@ pub(crate) fn enable_cpu_interrupt_raw(cpu_interrupt: u32) {
 
 /// Get the current run level (the level below which interrupts are masked).
 pub(crate) fn current_runlevel() -> RunLevel {
-    let ps: u32;
-    unsafe { core::arch::asm!("rsr.ps {0}", out(reg) ps) };
-
-    unwrap!(RunLevel::try_from_u32(ps & 0x0F))
+    unwrap!(RunLevel::try_from_u32(xtensa_lx::interrupt::get_level()))
 }
 
 /// Changes the current run level (the level below which interrupts are

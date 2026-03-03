@@ -2193,11 +2193,6 @@ pub fn new<'d>(
 ) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
     let _guard = RadioRefGuard::new();
 
-    // TODO: Re-check, if not having interrupts disabled pre-condition is still true
-    if crate::is_interrupts_disabled() {
-        return Err(WifiError::Unsupported);
-    }
-
     config.validate();
 
     event::enable_wifi_events(

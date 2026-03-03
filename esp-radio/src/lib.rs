@@ -375,18 +375,6 @@ impl Drop for RadioRefGuard {
     }
 }
 
-/// Returns true if at least some interrupt levels are disabled.
-#[cfg(any(feature = "wifi", all(feature = "ble", bt_controller = "btdm")))]
-fn is_interrupts_disabled() -> bool {
-    #[cfg(target_arch = "xtensa")]
-    return hal::xtensa_lx::interrupt::get_level() != 0
-        || hal::xtensa_lx::interrupt::get_mask() == 0;
-
-    #[cfg(target_arch = "riscv32")]
-    return !hal::riscv::register::mstatus::read().mie()
-        || !hal::interrupt::RunLevel::current().is_thread();
-}
-
 /// Enable verbose logging within the Wi-Fi driver
 /// Does nothing unless the `print-logs-from-driver` feature is enabled.
 #[instability::unstable]
