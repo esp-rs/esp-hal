@@ -71,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Ecc` methods now return a result handle that can be used to retrieve the result of the operation. (#5061)
 - `Ecc` modular arithmetic methods now take the modulus as an argument (#5073)
 - `Ecc::new` now takes a configuration parameter (#5073)
+- `Rng`, `Rng::{random, read}` have been marked stable (#5098)
 
 ### Fixed
 
@@ -120,7 +121,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `work_queue` is no longer public (#4357)
 - UART memory is now powered down when the driver is no longer in use. (#4354)
-
 
 ### Removed
 
