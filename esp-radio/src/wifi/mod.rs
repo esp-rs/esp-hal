@@ -1285,21 +1285,19 @@ impl InterfaceType {
     }
 
     fn link_state(&self) -> embassy_net_driver::LinkState {
-        match self {
+        let is_up = match self {
             InterfaceType::Station => {
-                if matches!(station_state(), WifiStationState::Connected) {
-                    embassy_net_driver::LinkState::Up
-                } else {
-                    embassy_net_driver::LinkState::Down
-                }
+                matches!(station_state(), WifiStationState::Connected)
             }
             InterfaceType::AccessPoint => {
-                if matches!(access_point_state(), WifiAccessPointState::Started) {
-                    embassy_net_driver::LinkState::Up
-                } else {
-                    embassy_net_driver::LinkState::Down
-                }
+                matches!(access_point_state(), WifiAccessPointState::Started)
             }
+        };
+
+        if is_up {
+            embassy_net_driver::LinkState::Up
+        } else {
+            embassy_net_driver::LinkState::Down
         }
     }
 }
