@@ -55,7 +55,7 @@ fn decrease_phy_clock_ref_count_internal() {
     PHY_CLOCK_REF_COUNTER.lock(|phy_clock_ref_counter| {
         let new_phy_clock_ref_count = unwrap!(
             phy_clock_ref_counter.get().checked_sub(1),
-            "PHY clock ref count underflowed. Either you forgot a PhyClockGuard, or used ModemClockController::decrease_phy_clock_ref_count incorrectly."
+            "PHY clock ref count underflowed. Either you forgot a PhyClockGuard, or used PhyController::decrease_phy_clock_ref_count incorrectly."
         );
 
         if new_phy_clock_ref_count == 0 {

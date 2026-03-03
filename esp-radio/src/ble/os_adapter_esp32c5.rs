@@ -5,7 +5,6 @@ use crate::{
     ble::InvalidConfigError,
     hal::{interrupt, peripherals::BT},
     interrupt_dispatch::Handler,
-    radio_clocks::ModemClockController,
     sys::include::esp_bt_controller_config_t,
 };
 
@@ -334,10 +333,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
 }
 
 pub(crate) fn bt_periph_module_enable() {
-    // stealing BT is safe, since it is passed into the initialization function of the BLE
-    // controller.
-    let mut bt = unsafe { BT::steal() };
-    bt.enable_modem_clock(true);
+    crate::radio_clocks::clocks_ll::enable_bt(true);
 }
 
 pub(crate) fn disable_sleep_mode() {

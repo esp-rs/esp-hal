@@ -304,7 +304,7 @@ pub(crate) fn init() {
     crate::common_adapter::enable_wifi_power_domain();
 
     wifi_set_log_verbose();
-    crate::radio_clocks::init_radio_clocks();
+    radio_clocks::init_radio_clocks();
 
     #[cfg(feature = "coex")]
     match crate::wifi::coex_initialize() {

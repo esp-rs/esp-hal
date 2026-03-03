@@ -16,7 +16,7 @@ use super::{
     pib::*,
 };
 use crate::{
-    radio_clocks::{ModemClockController, init_radio_clocks},
+    radio_clocks::{clocks_ll::enable_ieee802154, init_radio_clocks},
     sys::include::{
         ieee802154_coex_event_t,
         ieee802154_coex_event_t_IEEE802154_IDLE,
@@ -108,7 +108,7 @@ pub(crate) fn esp_ieee802154_enable(
 ) -> (PhyClockGuard<'_>, PhyInitGuard<'_>) {
     init_radio_clocks();
     let phy_clock_guard = radio.enable_phy_clock();
-    radio.enable_modem_clock(true);
+    enable_ieee802154(true);
 
     let phy_init_guard = radio.enable_phy();
 
