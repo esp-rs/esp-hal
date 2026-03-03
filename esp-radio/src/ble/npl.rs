@@ -1083,7 +1083,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             assert!(res == 0, "esp_ble_rom_func_ptr_init_all returned {}", res);
         }
 
-        #[cfg(coex)]
+        #[cfg(feature = "coex")]
         {
             let res = crate::wifi::coex_init();
             assert!(res == 0, "coex_init failed");
@@ -1133,7 +1133,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
         coex_pti_v2();
 
-        #[cfg(coex)]
+        #[cfg(feature = "coex")]
         {
             let rc = ble_osi_coex_funcs_register(&G_COEX_FUNCS as *const OsiCoexFuncsT);
             assert!(rc == 0, "ble_osi_coex_funcs_register returned {}", rc);
@@ -1192,7 +1192,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             assert!(res == 0, "esp_ble_msys_init returned {}", res);
         }
 
-        #[cfg(coex)]
+        #[cfg(feature = "coex")]
         crate::sys::include::coex_enable();
 
         let mut mac = [0u8; 6];
