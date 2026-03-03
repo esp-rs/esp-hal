@@ -83,24 +83,6 @@ impl EfuseField {
     }
 }
 
-/// Reads chip's MAC address from the eFuse storage.
-fn read_base_mac_address() -> MacAddress {
-    let mut mac_addr = [0u8; 6];
-
-    let mac0 = read_field_le::<[u8; 4]>(crate::efuse::MAC0);
-    let mac1 = read_field_le::<[u8; 2]>(crate::efuse::MAC1);
-
-    // MAC address is stored in big endian, so load the bytes in reverse:
-    mac_addr[0] = mac1[1];
-    mac_addr[1] = mac1[0];
-    mac_addr[2] = mac0[3];
-    mac_addr[3] = mac0[2];
-    mac_addr[4] = mac0[1];
-    mac_addr[5] = mac0[0];
-
-    MacAddress::new_eui48_internal(mac_addr)
-}
-
 /// Read field value in a little-endian order
 #[inline(always)]
 #[instability::unstable]
@@ -179,11 +161,14 @@ pub fn read_bit(field: EfuseField) -> bool {
     read_field_le::<u8>(field) != 0
 }
 
-/// Set the base mac address
+/// Overrides the base MAC address used by [`interface_mac_address`].
 ///
-/// The new value will be returned by [`mac_address`] instead of the one
-/// hard-coded in eFuse. This does not persist across device resets.
+/// After a successful call, [`interface_mac_address`] will derive
+/// per-interface addresses from the overridden base instead of the factory
+/// eFuse MAC. [`mac_address`] is unaffected and continues to return the
+/// factory eFuse value.
 ///
+/// The override does not persist across device resets.
 /// Can only be called once. Returns `Err(SetMacError::AlreadySet)`
 /// otherwise.
 #[instability::unstable]
@@ -205,10 +190,11 @@ pub fn set_mac_address(mac: MacAddress) -> Result<(), SetMacError> {
 }
 
 #[procmacros::doc_replace]
-/// Returns the base MAC address of the device.
+/// Returns the base MAC address programmed into eFuse during manufacturing.
 ///
-/// This is the factory MAC programmed into eFuse during manufacturing.
-/// Can be overridden at runtime via [`set_mac_address`].
+/// This always reads directly from the hardware eFuse storage. To get the
+/// effective MAC for a specific radio interface (which may be overridden via
+/// [`set_mac_address`]), use [`interface_mac_address`] instead.
 ///
 /// ## Example
 ///
@@ -220,17 +206,31 @@ pub fn set_mac_address(mac: MacAddress) -> Result<(), SetMacError> {
 /// println!("Base MAC: {mac}");
 /// # {after_snippet}
 /// ```
+#[instability::unstable]
 pub fn mac_address() -> MacAddress {
-    if MAC_OVERRIDE_STATE.load(Ordering::Relaxed) == 2 {
-        unsafe { MAC_OVERRIDE }
-    } else {
-        read_base_mac_address()
-    }
+    let mut mac_addr = [0u8; 6];
+
+    let mac0 = read_field_le::<[u8; 4]>(crate::efuse::MAC0);
+    let mac1 = read_field_le::<[u8; 2]>(crate::efuse::MAC1);
+
+    // MAC address is stored in big endian, so load the bytes in reverse:
+    mac_addr[0] = mac1[1];
+    mac_addr[1] = mac1[0];
+    mac_addr[2] = mac0[3];
+    mac_addr[3] = mac0[2];
+    mac_addr[4] = mac0[1];
+    mac_addr[5] = mac0[0];
+
+    MacAddress::new_eui48_internal(mac_addr)
 }
 
 #[procmacros::doc_replace]
 /// Returns the MAC address for a specific interface, derived from the base
 /// MAC.
+///
+/// By default, addresses are derived from the factory eFuse MAC returned
+/// by [`mac_address`]. If [`set_mac_address`] has been called, the
+/// overridden base address is used instead.
 ///
 /// See [`InterfaceMacAddress`] for the available interfaces and how each
 /// address is derived.
@@ -249,7 +249,11 @@ pub fn mac_address() -> MacAddress {
 /// ```
 #[cfg(any(soc_has_wifi, soc_has_bt))]
 pub fn interface_mac_address(kind: InterfaceMacAddress) -> MacAddress {
-    let mut mac: MacAddress = mac_address();
+    let mut mac = if MAC_OVERRIDE_STATE.load(Ordering::Relaxed) == 2 {
+        unsafe { MAC_OVERRIDE }
+    } else {
+        mac_address()
+    };
 
     match kind {
         #[cfg(soc_has_wifi)]
