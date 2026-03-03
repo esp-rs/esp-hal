@@ -147,3 +147,7 @@ The method that performs the operation now only returns an error if the paramete
 length. Point verification errors are now returned by the result handle. If a particular operation
 only does point verification and does not perform any other operations, the verification result
 can be read using the `success` method.
+
+## eFuse Changes
+
+`Efuse::read_base_mac_address()` has been removed. Use `Efuse::mac_address()` instead, which returns the same value unless overridden by `Efuse::set_mac_address()`.

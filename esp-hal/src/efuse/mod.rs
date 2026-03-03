@@ -71,6 +71,7 @@ impl EfuseField {
 }
 
 /// A struct representing the eFuse functionality of the chip.
+#[derive(Debug)]
 pub struct Efuse;
 
 impl Efuse {
@@ -222,7 +223,7 @@ impl Efuse {
             InterfaceMacAddress::Bluetooth => {
                 derive_local_mac(&mut mac);
 
-                mac.as_bytes_mut()[5] = mac.as_bytes_mut()[5].wrapping_add(1);
+                mac.0[5] = mac.0[5].wrapping_add(1);
             }
         }
         mac
@@ -250,18 +251,29 @@ static MAC_OVERRIDE_STATE: AtomicU8 = AtomicU8::new(0);
 static mut MAC_OVERRIDE: MacAddress = MacAddress::new_eui48_internal([0; 6]);
 
 /// Error indicating issues with setting the MAC address.
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum SetMacError {
     /// The MAC address has already been set and cannot be changed.
     AlreadySet,
 }
 
+impl core::fmt::Display for SetMacError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            SetMacError::AlreadySet => write!(f, "The MAC address has already been set"),
+        }
+    }
+}
+
+impl core::error::Error for SetMacError {}
+
 /// Helper function.
 /// Serves to derive a local MAC by adjusting the first octet of the given base MAC.
 /// See https://github.com/esp-rs/esp-hal/blob/0881d747c53e43ee847bef3068076a48ce8d27f0/esp-radio/src/common_adapter.rs#L151-L159
 fn derive_local_mac(mac: &mut MacAddress) {
-    let bytes = mac.as_bytes_mut();
+    let bytes = &mut mac.0;
     let base = bytes[0];
 
     for i in 0..64 {
@@ -274,7 +286,7 @@ fn derive_local_mac(mac: &mut MacAddress) {
 }
 
 /// Radio interface options for obtaining their MAC address.
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum InterfaceMacAddress {
@@ -288,7 +300,7 @@ pub enum InterfaceMacAddress {
 
 /// Hardware (MAC) address.
 ///
-/// Currently represents an 6-byte address, with expansion expected in the future to support 8-byte
+/// Currently represents a 6-byte address, with expansion expected in the future to support 8-byte
 /// addresses.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -305,10 +317,6 @@ impl MacAddress {
         &self.0
     }
 
-    /// Returns the address bytes mutably.
-    pub fn as_bytes_mut(&mut self) -> &mut [u8] {
-        &mut self.0
-    }
 }
 
 impl core::fmt::Display for MacAddress {
