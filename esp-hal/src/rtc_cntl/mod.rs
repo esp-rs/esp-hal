@@ -114,8 +114,6 @@ loop {
 "#
 )]
 pub use self::rtc::SocResetReason;
-#[cfg_attr(not(lp_timer_driver_supported), expect(unused))]
-use crate::clock::RtcClock;
 #[cfg(sleep_driver_supported)]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 #[cfg_attr(not(lp_timer_driver_supported), expect(unused))]
@@ -260,9 +258,7 @@ impl<'d> Rtc<'d> {
     /// reset the RTC timer.
     #[cfg(lp_timer_driver_supported)]
     pub fn time_since_power_up(&self) -> Duration {
-        Duration::from_micros(
-            self.time_since_boot_raw() * 1_000_000 / RtcClock::slow_freq().as_hz() as u64,
-        )
+        Duration::from_micros(crate::clock::rtc_ticks_to_us(self.time_since_boot_raw()))
     }
 
     /// Read the current value of the boot time registers in microseconds.

@@ -661,8 +661,11 @@ mod modem {
 ))]
 pub use modem::*;
 
-/// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
-pub(crate) fn cycles_to_1ms() -> u16 {
+/// Read the calibrated RTC slow clock period from the STORE1 register.
+///
+/// Written by [`RtcClock::calibrate_rtc_slow_clock`] during clock
+/// initialization.
+fn cal_period() -> u64 {
     cfg_if::cfg_if! {
         if #[cfg(soc_has_lp_aon)] {
             use crate::peripherals::LP_AON;
@@ -671,10 +674,22 @@ pub(crate) fn cycles_to_1ms() -> u16 {
         }
     }
 
-    let period_13q19 = LP_AON::regs().store1().read().bits();
+    LP_AON::regs().store1().read().bits() as u64
+}
 
-    // 100_000_000 is used to get rid of `float` calculations
-    let period = (100_000_000 * period_13q19 as u64) / (1 << RtcClock::CAL_FRACT);
+/// Convert RTC slow clock ticks to microseconds using the calibrated period.
+pub(crate) fn rtc_ticks_to_us(ticks: u64) -> u64 {
+    let cal = cal_period();
+    (ticks * cal) >> RtcClock::CAL_FRACT
+}
 
-    (100_000_000 * 1000 / period) as u16
+/// Convert microseconds to RTC slow clock ticks using the calibrated period.
+pub(crate) fn us_to_rtc_ticks(us: u64) -> u64 {
+    let cal = cal_period();
+    (us << RtcClock::CAL_FRACT) / cal
+}
+
+/// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
+pub(crate) fn cycles_to_1ms() -> u16 {
+    us_to_rtc_ticks(1000) as u16
 }
