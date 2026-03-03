@@ -1,4 +1,15 @@
-//! Wi-Fi
+//! # Wi-Fi (Station, Access Point and Station/AP-coexistence)
+//!
+//! ## Introduction
+//!
+//! The Wi-Fi module provides support for configuring and monitoring the Wi-Fi networking
+//! functionality. This includes configuration for:
+#![doc = concat!("- Station mode (aka STA mode or Wi-Fi client mode). ", chip_pretty!(), " connects to an access point.")]
+#![doc = concat!("- AP mode (aka Soft-AP mode or Access Point mode). Stations connect to the ", chip_pretty!(),".")]
+#![doc = concat!("- Station/AP-coexistence mode (", chip_pretty!(), " is concurrently an access point and a station connected to another access point).")]
+//! - Various security modes for the above (WPA, WPA2, etc.)
+//! - Scanning for access points (active & passive scanning).
+//! - Promiscuous mode for monitoring of IEEE802.11 Wi-Fi packets.
 //!
 //! ## Expected heap memory usage
 //!
@@ -13,6 +24,26 @@
 //!
 //! * Station: 47 - 57k
 //! * Open Access Point: 53 - 63k
+//!
+//! ## Wi-Fi performance considerations
+//!
+//! The default configuration is quite conservative to reduce power and memory consumption.
+//!
+//! There are a number of settings which influence the general performance (at the cost of memory
+//! usage).
+//!
+//! Optimal settings are chip and applications specific. You can get inspiration from the [ESP-IDF examples](https://github.com/espressif/esp-idf/tree/release/v5.3/examples/wifi/iperf)
+//!
+//! Please note that the configuration keys are usually named slightly different and not all
+//! configuration keys apply.
+//!
+//! By default the power-saving mode is [PowerSaveMode::None]
+//! and `ESP_PHY_CONFIG_PHY_ENABLE_USB` is enabled by default.
+//!
+//! In addition pay attention to these configuration keys:
+//! - `ESP_RADIO_CONFIG_RX_QUEUE_SIZE`
+//! - `ESP_RADIO_CONFIG_TX_QUEUE_SIZE`
+//! - `ESP_RADIO_CONFIG_MAX_BURST_SIZE`
 
 use alloc::{borrow::ToOwned, collections::vec_deque::VecDeque, str, vec::Vec};
 use core::{
