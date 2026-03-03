@@ -12,7 +12,7 @@ use crate::{
 
 #[ram]
 #[cfg(any(feature = "coex", all(feature = "ble", bt_controller = "btdm")))]
-pub unsafe extern "C" fn is_in_isr() -> i32 {
+pub(crate) unsafe extern "C" fn is_in_isr() -> i32 {
     !hal::interrupt::RunLevel::current().is_thread() as i32
 }
 
