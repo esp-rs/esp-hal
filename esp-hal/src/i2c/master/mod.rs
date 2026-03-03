@@ -135,7 +135,7 @@ use crate::{
         OutputSignal,
         PinGuard,
         Pull,
-        interconnect::{self, PeripheralOutput},
+        interconnect::{self, PeripheralInput, PeripheralOutput},
     },
     handler,
     interrupt::InterruptHandler,
@@ -1143,10 +1143,21 @@ where
         self.driver().reset_fsm(*error == Error::Timeout)
     }
 
+    #[procmacros::doc_replace]
     /// Connect a pin to the I2C SDA signal.
     ///
     /// This will replace previous pin assignments for this signal.
-    pub fn with_sda(mut self, sda: impl PeripheralOutput<'d>) -> Self {
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::i2c::master::{Config, I2c};
+    ///
+    /// let i2c = I2c::new(peripherals.I2C0, Config::default())?.with_sda(peripherals.GPIO2);
+    /// # {after_snippet}
+    /// ```
+    pub fn with_sda(mut self, sda: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
         let info = self.driver().info;
         let input = info.sda_input;
         let output = info.sda_output;
@@ -1165,11 +1176,11 @@ where
     /// ```rust, no_run
     /// # {before_snippet}
     /// use esp_hal::i2c::master::{Config, I2c};
-    /// const DEVICE_ADDR: u8 = 0x77;
+    ///
     /// let i2c = I2c::new(peripherals.I2C0, Config::default())?.with_scl(peripherals.GPIO2);
     /// # {after_snippet}
     /// ```
-    pub fn with_scl(mut self, scl: impl PeripheralOutput<'d>) -> Self {
+    pub fn with_scl(mut self, scl: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
         let info = self.driver().info;
         let input = info.scl_input;
         let output = info.scl_output;
