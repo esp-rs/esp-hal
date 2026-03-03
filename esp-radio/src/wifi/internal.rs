@@ -24,7 +24,7 @@ pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::sys::include::coex_adapter_fu
         _semphr_give_from_isr: Some(semphr_give_from_isr_wrapper),
         _semphr_take: Some(semphr_take),
         _semphr_give: Some(semphr_give),
-        _is_in_isr: Some(is_in_isr_wrapper),
+        _is_in_isr: Some(is_in_isr),
         _malloc_internal: Some(malloc),
         _free: Some(free),
         _esp_timer_get_time: Some(__esp_radio_esp_timer_get_time),
@@ -77,11 +77,6 @@ unsafe extern "C" fn semphr_take_from_isr_wrapper(semphr: *mut c_void, hptw: *mu
 #[ram]
 unsafe extern "C" fn semphr_give_from_isr_wrapper(semphr: *mut c_void, hptw: *mut c_void) -> i32 {
     unsafe { crate::common_adapter::semphr_give_from_isr(semphr, hptw as *mut bool) }
-}
-
-#[cfg(feature = "coex")]
-unsafe extern "C" fn is_in_isr_wrapper() -> i32 {
-    crate::is_interrupts_disabled() as i32
 }
 
 #[unsafe(no_mangle)]

@@ -189,11 +189,6 @@ unsafe extern "C" fn task_delete(task: *mut ()) {
     }
 }
 
-#[ram]
-unsafe extern "C" fn is_in_isr() -> i32 {
-    crate::is_interrupts_disabled() as i32
-}
-
 #[cfg(esp32)]
 #[ram]
 unsafe extern "C" fn cause_sw_intr_to_core(_core: i32, _intr_no: i32) -> i32 {

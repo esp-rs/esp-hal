@@ -10,6 +10,12 @@ use crate::{
     time::blob_ticks_to_micros,
 };
 
+#[ram]
+#[cfg(any(feature = "coex", all(feature = "ble", bt_controller = "btdm")))]
+pub unsafe extern "C" fn is_in_isr() -> i32 {
+    crate::is_interrupts_disabled() as i32
+}
+
 /// **************************************************************************
 /// Name: esp_semphr_create
 ///
