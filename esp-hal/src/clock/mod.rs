@@ -71,6 +71,20 @@ use crate::{
 #[cfg_attr(esp32s3, path = "clocks_ll/esp32s3.rs")]
 pub(crate) mod clocks_ll;
 
+/// Low-level clock control
+///
+/// <section class="warning">
+/// This module provides experimental low-level clock control functionality. These functions
+/// can render your device temporarily unusable. Use with caution.
+/// </section>
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+pub mod ll {
+    #[cfg(feature = "unstable")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+    pub use crate::soc::clocks::*;
+}
+
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub use crate::soc::clocks::ClockConfig;

@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ShaXContext` objects now implement `digest::core_api::BlockSizeUser` (and thus they can be used with the `hmac` crate) (#5050)
 - C5: Add ASSIST_DEBUG support (#5058)
 - `Ecc::apply_config` and `esp_hal::ecc::Config` (#5073)
+- Added experimental low-level clock control functionality via `esp_hal::clock::ll` (#5092)
 
 ### Changed
 

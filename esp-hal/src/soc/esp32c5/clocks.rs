@@ -11,6 +11,7 @@
 //! - Some of the SOC capabilities are not implemented: I2S external pad clock source, external 32k
 //!   oscillator, others.
 #![allow(dead_code, reason = "Some of this is bound to be unused")]
+#![allow(missing_docs, reason = "Experimental")]
 
 // TODO: This is a temporary place for this, should probably be moved into clocks_ll.
 
