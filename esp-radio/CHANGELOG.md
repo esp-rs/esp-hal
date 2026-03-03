@@ -70,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix a crash after shutting down WiFi (#4761)
 - Fix a crash when trying to handle an unknown WiFi event (#4942)
 - Align IEEE 802.15.4 driver with ESP-IDF 5.5.2 C driver: overhauled ISR event handling, added timer0-based ACK timeout, per-state stop dispatch, TX deferral with pending TX mechanism, CCA support, ACK frame return, and fixed TX power default (20 dBm) (#5006)
+- `WifiController::set_config` now stops the Wi-Fi controller on error to avoid leaving the controller in an inconsistent state. (#5100)
 
 ### Removed
 
@@ -92,7 +93,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MAC address getters: `access_point_mac()`, `station_mac()` and `ble::mac()`. (#5002)
 - `WifiController::is_started()` has been removed (#5039)
 - `WifiError::{Interface, Nvs, InvalidMac, WakeFailed, WouldBlock, PostFail, UnknownWifiMode, NotInitialized, NotStopped, Mode, State, ControlBlock, Timeout, InvalidInitState, StopState, NotAssociated, TxDisallowed, Internal(i32), WrongClockConfig, SchedulerNotInitialized, AdcIsUsed, NotStarted}` have been removed (#5018, #5039)
-- `WifiController::set_config` now disables AccessPoint/Station mode on error to avoid leaving the controller in an inconsistent state. (#5100)
 
 ## [v0.17.0] - 2025-10-30
 

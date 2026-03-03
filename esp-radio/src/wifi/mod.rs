@@ -2519,6 +2519,7 @@ impl WifiController<'_> {
         impl Drop for ResetModeOnDrop {
             fn drop(&mut self) {
                 unsafe { esp_wifi_set_mode(wifi_mode_t_WIFI_MODE_NULL) };
+                unwrap!(WifiController::stop_impl());
             }
         }
 
@@ -2538,7 +2539,7 @@ impl WifiController<'_> {
         };
 
         if previous_mode != mode {
-            self.stop_impl()?;
+            Self::stop_impl()?;
         }
 
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) })?;
@@ -2707,7 +2708,7 @@ ignored.",
         esp_wifi_result!(unsafe { esp_wifi_set_max_tx_power(power) })
     }
 
-    fn stop_impl(&mut self) -> Result<(), WifiError> {
+    fn stop_impl() -> Result<(), WifiError> {
         set_access_point_state(WifiAccessPointState::Stopping);
         set_station_state(WifiStationState::Stopping);
 
