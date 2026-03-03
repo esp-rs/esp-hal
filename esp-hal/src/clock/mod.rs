@@ -53,6 +53,12 @@ use clocks::RtcSlowClkConfig;
 use clocks::Timg0FunctionClockConfig;
 use esp_rom_sys::rom::ets_delay_us;
 
+/// Low-level clock control
+///
+/// <section class="warning">
+/// This module provides experimental low-level clock control functionality. These functions
+/// can render your device temporarily unusable. Use with caution.
+/// </section>
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub mod ll {
