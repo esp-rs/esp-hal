@@ -54,35 +54,29 @@ mod init_tests {
     }
 
     #[test]
+    #[should_panic]
     #[cfg(soc_has_wifi)]
     fn test_init_fails_cs(p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
-        let init = critical_section::with(|_| esp_radio::wifi::new(p.WIFI, Default::default()));
-
-        match init {
-            Ok(_) => defmt::info!("Initialized wifi in critical section"),
-            Err(ref e) => defmt::info!("Failed to initialize wifi in critical section: {:?}", e),
-        }
-
-        assert!(matches!(init, Err(WifiError::Unsupported)));
+        let _ = critical_section::with(|_| esp_radio::wifi::new(p.WIFI, Default::default()));
     }
 
     #[test]
+    #[should_panic]
     #[cfg(soc_has_wifi)]
     fn test_init_fails_interrupt_free(p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
 
-        let init = interrupt_free(|| esp_radio::wifi::new(p.WIFI, Default::default()));
-
-        assert!(matches!(init, Err(WifiError::Unsupported)));
+        let _ = interrupt_free(|| esp_radio::wifi::new(p.WIFI, Default::default()));
     }
 
     #[test]
+    #[should_panic]
     #[cfg(soc_has_wifi)]
     async fn test_init_fails_in_interrupt_executor_task(p: Peripherals) {
         let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
@@ -100,9 +94,7 @@ mod init_tests {
 
         spawner.must_spawn(try_init(signal, p.WIFI));
 
-        let res = signal.wait().await;
-
-        assert!(matches!(res, Some(WifiError::Unsupported)));
+        let _ = signal.wait().await;
     }
 
     #[test]
