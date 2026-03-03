@@ -423,10 +423,7 @@ fn common_task_create(
     );
 
     unsafe {
-        let task_func = core::mem::transmute::<
-            *mut c_void,
-            extern "C" fn(*mut crate::sys::c_types::c_void),
-        >(task_func);
+        let task_func = core::mem::transmute::<*mut c_void, extern "C" fn(*mut c_void)>(task_func);
 
         let task = crate::preempt::task_create(
             task_name,
@@ -1463,53 +1460,30 @@ pub unsafe extern "C" fn wifi_delete_queue(queue: *mut c_void) {
     crate::compat::queue::queue_delete(*boxed)
 }
 
-/// **************************************************************************
-/// Name: wifi_coex_deinit
-///
-/// Description:
-///   Don't support
-///
-/// *************************************************************************
-pub unsafe extern "C" fn coex_deinit() {
-    trace!("coex_deinit");
-
-    #[cfg(coex)]
-    unsafe {
-        crate::sys::include::coex_deinit()
-    };
+coex_fns! {
+    fn coex_deinit();
+    fn coex_enable() -> i32;
+    fn coex_disable();
+    fn coex_wifi_request(event: u32, latency: u32, duration: u32) -> c_int;
+    fn coex_wifi_release(event: u32) -> c_int;
+    fn coex_wifi_channel_set(primary: u8, secondary: u8) -> c_int;
+    fn coex_event_duration_get(_event: u32, _duration: *mut u32) -> c_int;
+    #[cfg(not(any(esp32, esp32s2)))]
+    fn coex_pti_get(event: u32, pti: *mut u8) -> c_int;
+    fn coex_schm_status_bit_clear(type_: u32, status: u32);
+    fn coex_schm_status_bit_set(type_: u32, status: u32);
+    fn coex_schm_interval_set(interval: u32) -> c_int;
+    fn coex_schm_interval_get() -> u32;
+    fn coex_schm_curr_period_get() -> u8;
+    fn coex_schm_curr_phase_get() -> *mut c_void;
+    fn coex_schm_process_restart() -> c_int;
+    fn coex_register_start_cb(cb: Option<unsafe extern "C" fn() -> c_int>) -> c_int;
+    fn coex_schm_get_phase_by_idx(phase_idx: i32) -> *mut c_void;
 }
 
-/// **************************************************************************
-/// Name: wifi_coex_enable
-///
-/// Description:
-///   Don't support
-///
-/// *************************************************************************
-pub unsafe extern "C" fn coex_enable() -> c_int {
-    trace!("coex_enable");
-
-    #[cfg(coex)]
-    return unsafe { crate::sys::include::coex_enable() };
-
-    #[cfg(not(coex))]
-    0
-}
-
-/// **************************************************************************
-/// Name: wifi_coex_disable
-///
-/// Description:
-///   Don't support
-///
-/// *************************************************************************
-pub unsafe extern "C" fn coex_disable() {
-    trace!("coex_disable");
-
-    #[cfg(coex)]
-    unsafe {
-        crate::sys::include::coex_disable()
-    };
+extern_coex_fns! {
+    fn coex_schm_flexible_period_set(period: u8) -> i32;
+    fn coex_schm_flexible_period_get() -> u8;
 }
 
 /// **************************************************************************
@@ -1522,102 +1496,14 @@ pub unsafe extern "C" fn coex_disable() {
 pub unsafe extern "C" fn coex_status_get() -> u32 {
     trace!("coex_status_get");
 
-    #[cfg(coex)]
-    return unsafe { crate::sys::include::coex_status_get(0b1) }; // COEX_STATUS_GET_WIFI_BITMAP
-
-    #[cfg(not(coex))]
-    0
-}
-
-/// **************************************************************************
-/// Name: esp_coex_wifi_request
-///
-/// Description:
-///   Don't support
-///
-/// *************************************************************************
-#[cfg_attr(not(coex), allow(unused_variables))]
-pub unsafe extern "C" fn coex_wifi_request(event: u32, latency: u32, duration: u32) -> c_int {
-    trace!("coex_wifi_request");
-
-    #[cfg(coex)]
-    return unsafe { crate::sys::include::coex_wifi_request(event, latency, duration) };
-
-    #[cfg(not(coex))]
-    0
-}
-
-/// **************************************************************************
-/// Name: esp_coex_wifi_release
-///
-/// Description:
-///   Don't support
-///
-/// *************************************************************************
-#[cfg_attr(not(coex), allow(unused_variables))]
-pub unsafe extern "C" fn coex_wifi_release(event: u32) -> c_int {
-    trace!("coex_wifi_release");
-
-    #[cfg(coex)]
-    return unsafe { crate::sys::include::coex_wifi_release(event) };
-
-    #[cfg(not(coex))]
-    0
-}
-
-/// **************************************************************************
-/// Name: wifi_coex_wifi_set_channel
-///
-/// Description:
-///   Don't support
-///
-/// *************************************************************************
-#[cfg_attr(not(coex), allow(unused_variables))]
-pub unsafe extern "C" fn coex_wifi_channel_set(primary: u8, secondary: u8) -> c_int {
-    trace!("coex_wifi_channel_set");
-
-    #[cfg(coex)]
-    return unsafe { crate::sys::include::coex_wifi_channel_set(primary, secondary) };
-
-    #[cfg(not(coex))]
-    0
-}
-
-/// **************************************************************************
-/// Name: wifi_coex_get_event_duration
-///
-/// Description:
-///   Don't support
-///
-/// *************************************************************************
-#[cfg_attr(not(coex), allow(unused_variables))]
-pub unsafe extern "C" fn coex_event_duration_get(event: u32, duration: *mut u32) -> c_int {
-    trace!("coex_event_duration_get");
-
-    #[cfg(coex)]
-    return unsafe { crate::sys::include::coex_event_duration_get(event, duration) };
-
-    #[cfg(not(coex))]
-    0
-}
-
-/// **************************************************************************
-/// Name: wifi_coex_get_pti
-///
-/// Description:
-///   Don't support
-///
-/// *************************************************************************
-#[cfg(any(esp32c3, esp32c2, esp32c5, esp32c6, esp32s3))]
-#[cfg_attr(not(coex), allow(unused_variables))]
-pub unsafe extern "C" fn coex_pti_get(event: u32, pti: *mut u8) -> c_int {
-    trace!("coex_pti_get");
-
-    #[cfg(coex)]
-    return unsafe { crate::sys::include::coex_pti_get(event, pti) };
-
-    #[cfg(not(coex))]
-    0
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "coex")] {
+            const COEX_STATUS_GET_WIFI_BITMAP: u8 = 1;
+            unsafe { crate::sys::include::coex_status_get(COEX_STATUS_GET_WIFI_BITMAP) }
+        } else {
+            0
+        }
+    }
 }
 
 #[cfg(any(esp32, esp32s2))]
@@ -1626,195 +1512,25 @@ pub unsafe extern "C" fn coex_pti_get(event: u32, pti: *mut u8) -> c_int {
     0
 }
 
-/// **************************************************************************
-/// Name: wifi_coex_clear_schm_status_bit
-///
-/// Description:
-///   Don't support
-///
-/// *************************************************************************
-#[allow(unused_variables)]
-pub unsafe extern "C" fn coex_schm_status_bit_clear(type_: u32, status: u32) {
-    trace!("coex_schm_status_bit_clear");
-
-    #[cfg(coex)]
-    unsafe {
-        crate::sys::include::coex_schm_status_bit_clear(type_, status)
-    };
-}
-
-/// **************************************************************************
-/// Name: wifi_coex_set_schm_status_bit
-///
-/// Description:
-///   Don't support
-///
-/// *************************************************************************
-#[allow(unused_variables)]
-pub unsafe extern "C" fn coex_schm_status_bit_set(type_: u32, status: u32) {
-    trace!("coex_schm_status_bit_set");
-
-    #[cfg(coex)]
-    unsafe {
-        crate::sys::include::coex_schm_status_bit_set(type_, status)
-    };
-}
-
-/// **************************************************************************
-/// Name: wifi_coex_set_schm_interval
-///
-/// Description:
-///   Don't support
-///
-/// *************************************************************************
-#[allow(unused_variables)]
-pub unsafe extern "C" fn coex_schm_interval_set(interval: u32) -> c_int {
-    trace!("coex_schm_interval_set");
-
-    #[cfg(coex)]
-    return unsafe { crate::sys::include::coex_schm_interval_set(interval) };
-
-    #[cfg(not(coex))]
-    0
-}
-
-/// **************************************************************************
-/// Name: wifi_coex_get_schm_interval
-///
-/// Description:
-///   Don't support
-///
-/// *************************************************************************
-#[allow(unused_variables)]
-pub unsafe extern "C" fn coex_schm_interval_get() -> u32 {
-    trace!("coex_schm_interval_get");
-
-    #[cfg(coex)]
-    return unsafe { crate::sys::include::coex_schm_interval_get() };
-
-    #[cfg(not(coex))]
-    0
-}
-
-/// **************************************************************************
-/// Name: wifi_coex_get_schm_curr_period
-///
-/// Description:
-///   Don't support
-///
-/// *************************************************************************
-#[allow(unused_variables)]
-pub unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
-    trace!("coex_schm_curr_period_get");
-
-    #[cfg(coex)]
-    return unsafe { crate::sys::include::coex_schm_curr_period_get() };
-
-    #[cfg(not(coex))]
-    0
-}
-
-/// **************************************************************************
-/// Name: wifi_coex_get_schm_curr_phase
-///
-/// Description:
-///   Don't support
-///
-/// *************************************************************************
-#[allow(unused_variables)]
-pub unsafe extern "C" fn coex_schm_curr_phase_get() -> *mut c_void {
-    trace!("coex_schm_curr_phase_get");
-
-    #[cfg(coex)]
-    return unsafe { crate::sys::include::coex_schm_curr_phase_get() };
-
-    #[cfg(not(coex))]
-    return core::ptr::null_mut();
-}
-
-pub unsafe extern "C" fn coex_schm_process_restart_wrapper() -> crate::sys::c_types::c_int {
-    trace!("coex_schm_process_restart_wrapper");
-
-    #[cfg(not(coex))]
-    return 0;
-
-    #[cfg(coex)]
-    unsafe {
-        crate::sys::include::coex_schm_process_restart()
-    }
-}
-
 #[allow(unused_variables)]
 pub unsafe extern "C" fn coex_schm_register_cb_wrapper(
-    arg1: crate::sys::c_types::c_int,
-    cb: ::core::option::Option<
-        unsafe extern "C" fn(arg1: crate::sys::c_types::c_int) -> crate::sys::c_types::c_int,
-    >,
-) -> crate::sys::c_types::c_int {
+    arg1: c_int,
+    cb: Option<unsafe extern "C" fn(arg1: c_int) -> c_int>,
+) -> c_int {
     trace!("coex_schm_register_cb_wrapper {} {:?}", arg1, cb);
 
-    #[cfg(not(coex))]
-    return 0;
-
-    #[cfg(coex)]
-    unsafe {
-        crate::sys::include::coex_schm_register_callback(
-            arg1 as u32,
-            unwrap!(cb) as *const crate::sys::c_types::c_void as *mut crate::sys::c_types::c_void,
-        )
-    }
-}
-
-pub unsafe extern "C" fn coex_schm_flexible_period_set(period: u8) -> i32 {
-    trace!("coex_schm_flexible_period_set {}", period);
-
-    #[cfg(coex)]
-    unsafe {
-        unsafe extern "C" {
-            fn coex_schm_flexible_period_set(period: u8) -> i32;
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "coex")] {
+            unsafe {
+                crate::sys::include::coex_schm_register_callback(
+                    arg1 as u32,
+                    unwrap!(cb) as *mut c_void,
+                )
+            }
+        } else {
+            0
         }
-
-        coex_schm_flexible_period_set(period)
     }
-
-    #[cfg(not(coex))]
-    0
-}
-
-pub unsafe extern "C" fn coex_schm_flexible_period_get() -> u8 {
-    trace!("coex_schm_flexible_period_get");
-
-    #[cfg(coex)]
-    unsafe {
-        unsafe extern "C" {
-            fn coex_schm_flexible_period_get() -> u8;
-        }
-
-        coex_schm_flexible_period_get()
-    }
-
-    #[cfg(not(coex))]
-    0
-}
-
-pub unsafe extern "C" fn coex_register_start_cb(
-    _cb: Option<unsafe extern "C" fn() -> crate::sys::c_types::c_int>,
-) -> crate::sys::c_types::c_int {
-    #[cfg(coex)]
-    return unsafe { crate::sys::include::coex_register_start_cb(_cb) };
-
-    #[cfg(not(coex))]
-    0
-}
-
-pub unsafe extern "C" fn coex_schm_get_phase_by_idx(
-    _phase_idx: i32,
-) -> *mut crate::sys::c_types::c_void {
-    #[cfg(coex)]
-    return unsafe { crate::sys::include::coex_schm_get_phase_by_idx(_phase_idx) };
-
-    #[cfg(not(coex))]
-    core::ptr::null_mut()
 }
 
 /// **************************************************************************

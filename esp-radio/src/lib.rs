@@ -168,7 +168,8 @@ extern crate esp_metadata_generated;
 
 extern crate alloc;
 
-// MUST be the first module
+// These modules rely on `#[macro_use]` so they must be the first ones declared
+mod coex_utils;
 mod fmt;
 pub(crate) mod reg_access;
 
@@ -326,7 +327,7 @@ pub(crate) fn init() {
     wifi_set_log_verbose();
     init_radio_clocks();
 
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     match crate::wifi::coex_initialize() {
         0 => {}
         error => panic!("Failed to initialize coexistence, error code: {}", error),
@@ -337,7 +338,7 @@ pub(crate) fn init() {
 
 pub(crate) fn deinit() {
     // Disable coexistence
-    #[cfg(coex)]
+    #[cfg(feature = "coex")]
     {
         unsafe { crate::wifi::os_adapter::coex_disable() };
         unsafe { crate::wifi::os_adapter::coex_deinit() };

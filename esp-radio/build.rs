@@ -103,7 +103,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         print_warning(message);
     }
 
-    println!("cargo:rustc-check-cfg=cfg(coex)");
     #[cfg(feature = "coex")]
     {
         assert!(
@@ -114,9 +113,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             "#
         );
-
-        #[cfg(all(feature = "wifi", feature = "ble"))]
-        println!("cargo:rustc-cfg=coex");
 
         #[cfg(not(feature = "wifi"))]
         println!("cargo:warning=coex is enabled but wifi is not");

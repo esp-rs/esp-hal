@@ -896,7 +896,7 @@ pub(crate) fn wifi_init(_wifi: crate::hal::peripherals::WIFI<'_>) -> Result<(), 
     #[cfg(esp32)]
     set_mac_time_update_cb(_wifi);
     unsafe {
-        #[cfg(coex)]
+        #[cfg(feature = "coex")]
         esp_wifi_result!(coex_init())?;
 
         esp_wifi_result!(esp_wifi_init_internal(addr_of!(internal::G_CONFIG)))?;
@@ -921,7 +921,7 @@ pub(crate) fn wifi_init(_wifi: crate::hal::peripherals::WIFI<'_>) -> Result<(), 
     }
 }
 
-#[cfg(coex)]
+#[cfg(feature = "coex")]
 pub(crate) fn coex_initialize() -> i32 {
     debug!("call coex-initialize");
     unsafe {
@@ -942,15 +942,15 @@ pub(crate) fn coex_initialize() -> i32 {
 }
 
 pub(crate) unsafe extern "C" fn coex_init() -> i32 {
-    #[cfg(coex)]
-    {
-        debug!("coex-init");
-        #[allow(clippy::needless_return)]
-        return unsafe { crate::sys::include::coex_init() };
-    }
+    debug!("coex-init");
 
-    #[cfg(not(coex))]
-    0
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "coex")] {
+            unsafe { crate::sys::include::coex_init() }
+        } else {
+            0
+        }
+    }
 }
 
 fn wifi_deinit() -> Result<(), crate::WifiError> {
