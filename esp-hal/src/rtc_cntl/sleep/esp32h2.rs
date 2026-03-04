@@ -1,11 +1,11 @@
 use core::ops::Not;
 
 use crate::{
+    clock::RtcClock,
     gpio::{AnyPin, Input, InputConfig, Pull, RtcPin},
     peripherals::APB_SARADC,
     rtc_cntl::{
         Rtc,
-        RtcClock,
         rtc::{HpSysCntlReg, HpSysPower, LpSysPower},
         sleep::{Ext1WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel},
     },
@@ -22,11 +22,8 @@ impl WakeSource for TimerWakeupSource {
         triggers.set_timer(true);
 
         let lp_timer = unsafe { &*esp32h2::LP_TIMER::ptr() };
-        let clock_freq = RtcClock::slow_freq();
-        // TODO: maybe add sleep time adjustment like idf
         // TODO: maybe add check to prevent overflow?
-        let clock_hz = clock_freq.as_hz() as u64;
-        let ticks = self.duration.as_micros() as u64 * clock_hz / 1_000_000u64;
+        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros() as u64);
         // "alarm" time in slow rtc ticks
         let now = rtc.time_since_boot_raw();
         let time_in_ticks = now + ticks;

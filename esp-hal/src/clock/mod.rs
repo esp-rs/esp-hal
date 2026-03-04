@@ -46,7 +46,6 @@
 #![cfg_attr(not(feature = "rt"), expect(unused))]
 
 #[cfg(soc_has_clock_node_lp_slow_clk)]
-#[cfg_attr(not(lp_timer_driver_supported), expect(unused))]
 use clocks::LpSlowClkConfig;
 #[cfg(all(not(esp32s2), soc_has_clock_node_rtc_slow_clk))]
 use clocks::RtcSlowClkConfig;
@@ -157,7 +156,6 @@ impl RtcClock {
     /// may happen if 32k XTAL is being calibrated, but the oscillator has
     /// not started up (due to incorrect loading capacitance, board design
     /// issue, or lack of 32 XTAL on board).
-    #[cfg_attr(not(lp_timer_driver_supported), expect(unused))]
     pub(crate) fn calibrate(cal_clk: TimgCalibrationClockConfig, slowclk_cycles: u32) -> u32 {
         ClockTree::with(|clocks| {
             let xtal_freq = Rate::from_hz(clocks::xtal_clk_frequency(clocks));
@@ -211,7 +209,6 @@ impl Clocks {
             unsafe { ACTIVE_CLOCKS = Some(config) };
         });
 
-        #[cfg(lp_timer_driver_supported)]
         Clocks::calibrate_rtc_slow_clock();
     }
 
@@ -436,7 +433,6 @@ impl Clocks {
         (cali_value, Rate::from_hz(calibration_clock_frequency))
     }
 
-    #[cfg(lp_timer_driver_supported)]
     pub(crate) fn calibrate_rtc_slow_clock() {
         // Unfortunate device specific mapping.
         // TODO: fix it by generating cfgs for each mux input?
@@ -661,8 +657,11 @@ mod modem {
 ))]
 pub use modem::*;
 
-/// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
-pub(crate) fn cycles_to_1ms() -> u16 {
+/// Read the calibrated RTC slow clock period from the STORE1 register.
+///
+/// Written by [`Clocks::calibrate_rtc_slow_clock`] during clock
+/// initialization.
+fn cal_period() -> u64 {
     cfg_if::cfg_if! {
         if #[cfg(soc_has_lp_aon)] {
             use crate::peripherals::LP_AON;
@@ -671,10 +670,23 @@ pub(crate) fn cycles_to_1ms() -> u16 {
         }
     }
 
-    let period_13q19 = LP_AON::regs().store1().read().bits();
+    LP_AON::regs().store1().read().bits() as u64
+}
 
-    // 100_000_000 is used to get rid of `float` calculations
-    let period = (100_000_000 * period_13q19 as u64) / (1 << RtcClock::CAL_FRACT);
+/// Convert RTC slow clock ticks to microseconds using the calibrated period.
+#[cfg(lp_timer_driver_supported)]
+pub(crate) fn rtc_ticks_to_us(ticks: u64) -> u64 {
+    let cal = cal_period();
+    (ticks * cal) >> RtcClock::CAL_FRACT
+}
 
-    (100_000_000 * 1000 / period) as u16
+/// Convert microseconds to RTC slow clock ticks using the calibrated period.
+pub(crate) fn us_to_rtc_ticks(us: u64) -> u64 {
+    let cal = cal_period();
+    (us << RtcClock::CAL_FRACT) / cal
+}
+
+/// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
+pub(crate) fn cycles_to_1ms() -> u16 {
+    us_to_rtc_ticks(1000) as u16
 }

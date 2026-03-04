@@ -2,7 +2,7 @@ use super::{TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel};
 use crate::{
     gpio::{RtcFunction, RtcPinWithResistors},
     peripherals::{APB_CTRL, BB, EXTMEM, FE, FE2, GPIO, IO_MUX, LPWR, NRX, SPI0, SPI1, SYSTEM},
-    rtc_cntl::{Rtc, RtcClock, sleep::RtcioWakeupSource},
+    rtc_cntl::{Rtc, sleep::RtcioWakeupSource},
     soc::regi2c,
 };
 
@@ -96,11 +96,8 @@ impl WakeSource for TimerWakeupSource {
         _sleep_config: &mut RtcSleepConfig,
     ) {
         triggers.set_timer(true);
-        let clock_freq = RtcClock::slow_freq();
-        // TODO: maybe add sleep time adjustlemnt like idf
         // TODO: maybe add check to prevent overflow?
-        let clock_hz = clock_freq.as_hz() as u64;
-        let ticks = self.duration.as_micros() as u64 * clock_hz / 1_000_000u64;
+        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros() as u64);
         // "alarm" time in slow rtc ticks
         let now = rtc.time_since_boot_raw();
         let time_in_ticks = now + ticks;
