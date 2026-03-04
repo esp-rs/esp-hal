@@ -1239,6 +1239,7 @@ impl<'d> Input<'d> {
     ///
     /// use critical_section::Mutex;
     /// use esp_hal::gpio::Input;
+    /// use esp_hal::handler;
     ///
     /// // You will need to store the `Input` object in a static variable so
     /// // that the interrupt handler can access it.

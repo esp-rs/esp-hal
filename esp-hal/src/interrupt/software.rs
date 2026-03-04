@@ -28,6 +28,7 @@
 //! # use core::cell::RefCell;
 //! # use critical_section::Mutex;
 //! # use esp_hal::interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl};
+//! use esp_hal::handler;
 //! // ... somewhere outside of your main function
 //!
 //! // Define a shared handle to the software interrupt.

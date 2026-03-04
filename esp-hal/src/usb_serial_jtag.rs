@@ -95,6 +95,7 @@
 //! static USB_SERIAL: Mutex<RefCell<Option<UsbSerialJtag<'static, esp_hal::Blocking>>>> =
 //!     Mutex::new(RefCell::new(None));
 //!
+//! use esp_hal::handler;
 //! #[handler]
 //! fn usb_device() {
 //!     critical_section::with(|cs| {

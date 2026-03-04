@@ -1459,6 +1459,7 @@ impl<'d> Uart<'d, Blocking> {
     ///
     /// use core::fmt::Write;
     ///
+    /// use esp_hal::handler;
     /// use esp_hal::uart::UartInterrupt;
     /// #[handler]
     /// fn interrupt_handler() {
