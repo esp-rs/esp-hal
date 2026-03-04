@@ -1,11 +1,11 @@
 use core::ops::Not;
 
 use crate::{
+    clock::RtcClock,
     gpio::{AnyPin, Input, InputConfig, Pull, RtcPin},
     peripherals::APB_SARADC,
     rtc_cntl::{
         Rtc,
-        RtcClock,
         rtc::{HpSysCntlReg, HpSysPower, LpSysPower},
         sleep::{Ext1WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel},
     },

@@ -1,10 +1,10 @@
 use core::ops::Not;
 
 use crate::{
+    clock::RtcClock,
     gpio::RtcFunction,
     rtc_cntl::{
         Rtc,
-        RtcClock,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower, SavedClockConfig},
         sleep::{
             Ext1WakeupSource,
