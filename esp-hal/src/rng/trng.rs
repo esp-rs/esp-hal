@@ -133,6 +133,9 @@ pub enum TrngError {
 /// methods to generate random numbers and fill buffers with random bytes.
 /// Due to pulling the entropy source from the ADC, it uses the associated
 /// registers, so to use TRNG we need to "occupy" the ADC peripheral.
+///
+/// To generate true random numbers, an instance of [`TrngSource`] is required. Once created, you
+/// can create [`Trng`] instances at any time, as long as the [`TrngSource`] is alive.
 #[cfg_attr(docsrs, procmacros::doc_replace(
     "analog_pin" => {
         cfg(esp32) => "let analog_pin = peripherals.GPIO32;",

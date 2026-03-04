@@ -11,27 +11,26 @@
 //! security, or general-purpose applications.
 //!
 //! There are certain pre-conditions which must be met in order for the RNG to
-//! produce *true* random numbers. The hardware RNG produces true random numbers
+//! produce *true* random numbers.
+#![cfg_attr(rng_trng_supported, doc = r"For more details see [`Trng`].")]
+//! The hardware RNG produces true random numbers
 //! under any of the following conditions:
 //!
 //! <div class="warning">
 //!
 //! - RF subsystem is enabled (i.e. Wi-Fi or Bluetooth are enabled).
 //! - An ADC is used to generate entropy.
-//! - An internal entropy source has been enabled by calling `bootloader_random_enable()` and not
-//!   yet disabled by calling `bootloader_random_disable()`. As the default bootloader calls
-//!   `bootloader_random_disable()` automatically, this option requires a custom bootloader build.
 //! </div>
 //!
 //! When any of these conditions are true, samples of physical noise are
 //! continuously mixed into the internal hardware RNG state to provide entropy.
 //! If none of the above conditions are true, the output of the RNG should be
-//! considered pseudo-random only.
+//! considered pseudo-random only [`Rng`].
 //!
 //! <div class="warning">
 //!
 //! Note that, when the Wi-Fi module is enabled, the value read from the high-speed ADC can be
-//! saturated in some extreme cases, which lowers the entropy. Thus, it is advisable to also nable
+//! saturated in some extreme cases, which lowers the entropy. Thus, it is advisable to also enable
 //! the SAR ADC as the noise source for the random number generator for such cases.
 //! </div>
 //!
@@ -57,16 +56,6 @@
 //! # }
 //! ```
 //!
-//! ## Configuration
-//!
-//! To generate pseudo-random numbers, you can create [`Rng`] at any time.
-#![cfg_attr(
-    rng_trng_supported,
-    doc = r"To generate
-true random numbers, you need to create an instance of [`TrngSource`]. Once you've
-done that, you can create [`Trng`] instances at any time, as long as the [`TrngSource`]
-is alive."
-)]
 //! ## Compatibility with [`getrandom`]
 //!
 //! The driver can be used directly, or integrated as a [custom backend]
@@ -100,7 +89,13 @@ mod trng;
 #[cfg(all(feature = "unstable", rng_trng_supported))]
 pub use trng::*;
 
-/// (Pseudo-)Random Number Generator
+/// (Pseudo-)Random Number Generator.
+///
+/// To generate pseudo-random numbers, you can create [`Rng`] at any time.
+#[cfg_attr(
+    rng_trng_supported,
+    doc = r"To generate true random numbers, see [`Trng`]."
+)]
 #[derive(Clone, Copy, Default, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
