@@ -388,12 +388,15 @@ pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
 }
 
 /// Represents the priority level of running code.
+///
+/// Interrupts at or below this level are masked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-#[instability::unstable]
 pub enum RunLevel {
-    /// The base level
+    /// Thread mode.
+    ///
+    /// This is the lowest level. No interrupts are masked by the run level.
     ThreadMode,
 
     /// An elevated level, usually an interrupt handler's.
@@ -401,9 +404,20 @@ pub enum RunLevel {
 }
 
 impl RunLevel {
-    /// Get the current run level (the level below which interrupts are masked).
+    #[procmacros::doc_replace]
+    /// Returns the current run level.
+    ///
+    /// ## Examples
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::interrupt::RunLevel;
+    ///
+    /// let level = RunLevel::current();
+    /// println!("Current run level: {:?}", level);
+    /// # {after_snippet}
+    /// ```
     #[inline]
-    #[instability::unstable]
     pub fn current() -> Self {
         current_runlevel()
     }
@@ -412,18 +426,36 @@ impl RunLevel {
     ///
     /// # Safety
     ///
-    /// This function must only be used to raise the runlevel and to restore it
+    /// This function must only be used to raise the run level and to restore it
     /// to a previous value. It must not be used to arbitrarily lower the
-    /// runlevel.
+    /// run level.
     #[inline]
     #[instability::unstable]
     pub unsafe fn change(to: Self) -> Self {
         unsafe { change_current_runlevel(to) }
     }
 
+    #[procmacros::doc_replace]
     /// Checks if the run level indicates thread mode.
+    ///
+    /// This function can be used to determine if the CPU is executing an interrupt handler.
+    ///
+    /// ## Examples
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::interrupt::RunLevel;
+    ///
+    /// let level = RunLevel::current();
+    ///
+    /// if level.is_thread() {
+    ///     println!("Running in thread mode");
+    /// } else {
+    ///     println!("Running in an interrupt handler");
+    /// }
+    /// # {after_snippet}
+    /// ```
     #[inline]
-    #[instability::unstable]
     pub fn is_thread(&self) -> bool {
         matches!(self, RunLevel::ThreadMode)
     }
