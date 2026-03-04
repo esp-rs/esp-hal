@@ -1,4 +1,9 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "interface_mac" => {
+        cfg(soc_has_wifi) => "let mac = efuse::interface_mac_address(InterfaceMacAddress::Station);",
+        _ => "let mac = efuse::interface_mac_address(InterfaceMacAddress::Bluetooth);"
+    }
+))]
 //! # eFuse (one-time programmable configuration)
 //!
 //! ## Overview
@@ -22,22 +27,15 @@
 //!
 //! ## Examples
 //!
-//! ### Read data from the eFuse storage.
+//! ### Reading interface MAC addresses
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! use esp_hal::efuse;
-//! #[cfg(soc_has_bt)]
-//! use esp_hal::efuse::InterfaceMacAddress;
+//! use esp_hal::efuse::{self, InterfaceMacAddress};
 //!
-//! let mac = efuse::mac_address();
-//! println!("Base MAC address: {mac}");
+//! # {interface_mac}
+//! println!("MAC: {mac}");
 //! println!("MAC bytes: {:02x?}", mac.as_bytes());
-//!
-//! # #[cfg(soc_has_bt)]
-//! let bt_mac = efuse::interface_mac_address(InterfaceMacAddress::Bluetooth);
-//! # #[cfg(soc_has_bt)]
-//! println!("Bluetooth MAC: {bt_mac}");
 //! # {after_snippet}
 //! ```
 
@@ -363,8 +361,8 @@ pub enum InterfaceMacAddress {
 pub struct MacAddress([u8; 6]);
 
 impl MacAddress {
-    #[instability::unstable]
     /// Creates a new `MacAddress` from the given bytes, which must be in big-endian order.
+    #[instability::unstable]
     pub const fn new_eui48(bytes: [u8; 6]) -> Self {
         Self(bytes)
     }

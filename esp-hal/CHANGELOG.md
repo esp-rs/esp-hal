@@ -38,8 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C5: Add USB Serial/JTAG support (#5008)
 - C5: Add PARL_IO support (#5042)
 - `esp_hal::interrupt::RunLevel` (#4996, #5108)
-- MAC addresses for radio interfaces getter: `esp_hal::efuse::Efuse::interface_mac_address(InterfaceMacAddress::)`. (#5002)
-- `esp_hal::interrupt::RunLevel` (#4996)
 - MAC addresses for radio interfaces getter: `esp_hal::efuse::interface_mac_address(InterfaceMacAddress::)`. (#5002)
 - `ShaXContext` objects now implement `digest::core_api::BlockSizeUser` (and thus they can be used with the `hmac` crate) (#5050)
 - C5: Add ASSIST_DEBUG support (#5058)
@@ -49,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `efuse::mac_address` and `efuse::interface_mac_address` have been stabilized (#5020)
+- `efuse::interface_mac_address` has been stabilized (#5104)
 - UART: `read_ready` and `write_ready` are now stable (#4600)
 - RMT: `SingleShotTxTransaction` has been renamed to `TxTransaction`. (#4302)
 - RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` now take the configuration by reference. (#4302)
