@@ -81,7 +81,9 @@ impl PhyClockGuard<'_> {
     /// Release the clock guard.
     ///
     /// The PHY clock will be disabled, if this is the last clock guard.
-    pub fn release(self) {}
+    pub fn release(self) {
+        // Runs the Drop implementation
+    }
 }
 
 impl Drop for PhyClockGuard<'_> {
@@ -363,7 +365,9 @@ impl PhyInitGuard<'_> {
     /// Release the init guard.
     ///
     /// The PHY will be disabled, if this is the last init guard.
-    pub fn release(self) {}
+    pub fn release(self) {
+        // Runs the Drop implementation
+    }
 }
 
 impl Drop for PhyInitGuard<'_> {
