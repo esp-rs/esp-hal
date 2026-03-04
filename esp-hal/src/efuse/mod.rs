@@ -174,7 +174,7 @@ pub fn read_bit(field: EfuseField) -> bool {
 #[instability::unstable]
 pub fn set_mac_address(mac: MacAddress) -> Result<(), SetMacError> {
     if MAC_OVERRIDE_STATE
-        .compare_exchange(0, 1, Ordering::Relaxed, Ordering::Relaxed)
+        .compare_exchange(0, 1, Ordering::Acquire, Ordering::Relaxed)
         .is_err()
     {
         return Err(SetMacError::AlreadySet);
@@ -184,7 +184,7 @@ pub fn set_mac_address(mac: MacAddress) -> Result<(), SetMacError> {
         MAC_OVERRIDE = mac;
     }
 
-    MAC_OVERRIDE_STATE.store(2, Ordering::Relaxed);
+    MAC_OVERRIDE_STATE.store(2, Ordering::Release);
 
     Ok(())
 }
@@ -249,7 +249,7 @@ pub fn mac_address() -> MacAddress {
 /// ```
 #[cfg(any(soc_has_wifi, soc_has_bt))]
 pub fn interface_mac_address(kind: InterfaceMacAddress) -> MacAddress {
-    let mut mac = if MAC_OVERRIDE_STATE.load(Ordering::Relaxed) == 2 {
+    let mut mac = if MAC_OVERRIDE_STATE.load(Ordering::Acquire) == 2 {
         unsafe { MAC_OVERRIDE }
     } else {
         mac_address()
