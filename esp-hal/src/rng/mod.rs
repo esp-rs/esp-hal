@@ -1,9 +1,5 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
-    "analog_pin" => {
-        cfg(esp32) => "GPIO32",
-        _ => "GPIO3"
-    },
-    "documentation" => concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", chip!(), "/api-reference/system/random.html)")
+    "documentation" => concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", chip!(), "/api-reference/system/random.html).")
 ))]
 //! # Random Number Generator (RNG)
 //!
@@ -73,23 +69,28 @@ is alive."
 )]
 //! ## Compatibility with [`getrandom`]
 //!
-//! The driver can be used as a [custom backend] for `getrandom v0.3`:
+//! The driver can be used directly, or integrated as a [custom backend]
+//! for `getrandom` (e.g. v0.4):
 //!
-//! ```rust,ignore
-//! use getrandom::Error;
-//!
-//! #[no_mangle]
-//! unsafe extern "Rust" fn __getrandom_v03_custom(
+//! ```rust, no_run
+//! # {before_snippet}
+//! # mod getrandom {
+//! # use core::result::Result::{self, Ok};
+//! # pub struct Error;
+//! #[unsafe(no_mangle)]
+//! unsafe extern "Rust" fn __getrandom_v04_custom(
 //!     dest: *mut u8,
 //!     len: usize,
 //! ) -> Result<(), Error> {
-//!     unsafe { esp_hal::rng::Rng::new().read_into_raw(dest, len) };
-//!     Ok(())
-//! }
+//!      unsafe { esp_hal::rng::Rng::new().read_into_raw(dest, len) };
+//!      Ok(())
+//! # }
+//! # }
+//! # {after_snippet}
 //! ```
 //!
 //! [`getrandom`]: https://crates.io/crates/getrandom
-//! [custom backend]: https://github.com/rust-random/getrandom/tree/v0.3.3?tab=readme-ov-file#custom-backend
+//! [custom backend]: https://github.com/rust-random/getrandom/tree/v0.4.2?tab=readme-ov-file#custom-backend
 
 mod ll;
 
