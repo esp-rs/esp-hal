@@ -159,7 +159,3 @@ in the `efuse` module:
 - `Efuse::read_field_le(field)` → `efuse::read_field_le(field)`
 - `Efuse::read_bit(field)` → `efuse::read_bit(field)`
 - `Efuse::chip_revision()` → `efuse::chip_revision()`
-
-The `InterfaceMacAddress` enum variants are now feature-gated by chip capability:
-- `Station` and `AccessPoint` require WiFi (`soc_has_wifi`) — not available on ESP32-H2
-- `Bluetooth` requires Bluetooth (`soc_has_bt`) — not available on ESP32-S2

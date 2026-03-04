@@ -22,8 +22,9 @@
 //! Different interfaces (Wi-Fi Station, SoftAP, Bluetooth, etc.) each use a
 //! MAC address derived from this base address. The Station interface uses
 //! the base MAC directly, while others use locally administered variants
-//! produced by modifying the first octet to set the local-admin bit and
-//! incrementing the last octet to distinguish each interface.
+//! produced by modifying the first octet to set the local-admin bit; some
+//! interfaces (such as Bluetooth) additionally adjust the last octet to
+//! obtain a distinct address.
 //!
 //! ## Examples
 //!
