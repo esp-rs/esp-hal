@@ -334,7 +334,8 @@ impl Clocks {
             }
         }
 
-        let effective_calibration_clock_frequency = calibration_clock_frequency / calibration_divider;
+        let effective_calibration_clock_frequency =
+            calibration_clock_frequency / calibration_divider;
 
         // Set up timeout based on the calibration clock frequency. This is counted in XTAL_CLK
         // cycles.
