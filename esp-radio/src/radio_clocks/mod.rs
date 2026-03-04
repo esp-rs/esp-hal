@@ -10,8 +10,7 @@
 pub(crate) mod clocks_ll;
 
 #[inline]
-#[instability::unstable]
 /// Do any common initialization needed for the radio clocks
-pub fn init_radio_clocks() {
+pub(crate) fn init_radio_clocks() {
     clocks_ll::init_clocks();
 }
