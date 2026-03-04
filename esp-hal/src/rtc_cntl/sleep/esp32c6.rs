@@ -614,7 +614,18 @@ impl SleepTimeConfig {
     const RTC_CLK_CAL_FRACT: u32 = 19;
 
     fn rtc_clk_cal_fast(slowclk_cycles: u32) -> u32 {
-        RtcClock::calibrate(Timg0CalibrationClockConfig::RcFastDivClk, slowclk_cycles)
+        let period = RtcClock::calibrate(Timg0CalibrationClockConfig::RcFastDivClk, slowclk_cycles);
+
+        #[cfg(timergroup_rc_fast_calibration_divider)]
+        let period = if crate::soc::chip_revision_above(property!(
+            "timergroup.rc_fast_calibration_divider_min_rev"
+        )) {
+            period / property!("timergroup.rc_fast_calibration_divider")
+        } else {
+            period
+        };
+
+        period
     }
 
     fn new(_deep: bool) -> Self {

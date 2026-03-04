@@ -331,6 +331,16 @@ impl Clocks {
             }
         }
 
+        #[cfg(timergroup_rc_fast_calibration_divider)]
+        let calibration_clock_frequency = if rtc_clock == TimgCalibrationClockConfig::RcFastDivClk
+            && crate::soc::chip_revision_above(property!(
+                "timergroup.rc_fast_calibration_divider_min_rev"
+            )) {
+            calibration_clock_frequency / property!("timergroup.rc_fast_calibration_divider")
+        } else {
+            calibration_clock_frequency
+        };
+
         // Set up timeout based on the calibration clock frequency. This is counted in XTAL_CLK
         // cycles.
         #[cfg(not(esp32))]
