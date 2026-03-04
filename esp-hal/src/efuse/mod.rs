@@ -221,7 +221,7 @@ pub fn mac_address() -> MacAddress {
     mac_addr[4] = mac0[1];
     mac_addr[5] = mac0[0];
 
-    MacAddress::new_eui48_internal(mac_addr)
+    MacAddress::new_eui48(mac_addr)
 }
 
 #[procmacros::doc_replace]
@@ -292,7 +292,7 @@ pub fn chip_revision() -> u16 {
 // again, and values other than 2 indicate that we should read the mac address
 // from eFuse.
 static MAC_OVERRIDE_STATE: AtomicU8 = AtomicU8::new(0);
-static mut MAC_OVERRIDE: MacAddress = MacAddress::new_eui48_internal([0; 6]);
+static mut MAC_OVERRIDE: MacAddress = MacAddress::new_eui48([0; 6]);
 
 /// Error indicating issues with setting the MAC address.
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
@@ -363,7 +363,6 @@ pub enum InterfaceMacAddress {
 pub struct MacAddress([u8; 6]);
 
 impl MacAddress {
-
     #[instability::unstable]
     /// Creates a new `MacAddress` from the given bytes, which must be in big-endian order.
     pub const fn new_eui48(bytes: [u8; 6]) -> Self {
