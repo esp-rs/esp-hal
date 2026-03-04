@@ -72,6 +72,7 @@ critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
 # use esp_hal::rtc_cntl::RwdtStage;
 static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 
+use esp_hal::handler;
 // Handle the corresponding interrupt
 #[handler]
 fn interrupt_handler() {

@@ -71,6 +71,7 @@
 //!     }
 //! }
 //!
+//! use esp_hal::handler;
 //! #[handler(priority = Priority::Priority2)]
 //! fn interrupt_handler() {
 //!     critical_section::with(|cs| {
