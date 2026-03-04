@@ -99,6 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PCNT: Fixed some potential data race issues (#4932)
 - Fixed PLL reconfiguration causing garbled serial output (#5067)
 - ESP32, ESP32-S2: Fixed RC_FAST divider enable polarity (#5067)
+- ESP32-C6: RtcClock clock calibration for v0.1 (#5109)
 
 ### Removed
 
