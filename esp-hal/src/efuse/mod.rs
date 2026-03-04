@@ -363,8 +363,10 @@ pub enum InterfaceMacAddress {
 pub struct MacAddress([u8; 6]);
 
 impl MacAddress {
-    // Internal constructor for statics.
-    pub(crate) const fn new_eui48_internal(bytes: [u8; 6]) -> Self {
+
+    #[instability::unstable]
+    /// Creates a new `MacAddress` from the given bytes, which must be in big-endian order.
+    pub const fn new_eui48(bytes: [u8; 6]) -> Self {
         Self(bytes)
     }
 
