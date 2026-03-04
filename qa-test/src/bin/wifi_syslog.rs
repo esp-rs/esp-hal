@@ -1,7 +1,7 @@
 //! Check that the print-logs-from-driver feature works and doesn't crash
 //! when wifi driver blobs emit log messages.
 
-//% CHIPS: esp32 esp32c3 esp32c6 esp32s3
+//% CHIPS: esp32 esp32s2 esp32s3
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable esp-radio/print-logs-from-driver
 
 #![no_std]
