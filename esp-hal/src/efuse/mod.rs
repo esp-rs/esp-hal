@@ -332,14 +332,15 @@ fn derive_local_mac(mac: &mut MacAddress) {
 
 /// Interface selection for [`interface_mac_address`].
 ///
-/// Each interface uses a distinct MAC address derived from the base MAC.
-/// See the [module-level docs](self) for an overview of the derivation scheme.
+/// Each interface uses a distinct MAC address derived from either the base MAC or the overridden
+/// MAC if [`set_mac_address`] has been called. See the [module-level docs](self) for an overview of
+/// the derivation scheme.
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(any(soc_has_wifi, soc_has_bt))]
 #[non_exhaustive]
 pub enum InterfaceMacAddress {
-    /// Wi-Fi station.
+    /// Wi-Fi station. Equivalent to the base MAC address or overridden via [`set_mac_address`].
     #[cfg(soc_has_wifi)]
     Station,
     /// Wi-Fi SoftAP.
