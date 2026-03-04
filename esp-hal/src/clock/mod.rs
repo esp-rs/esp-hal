@@ -472,8 +472,12 @@ pub fn cpu_clock() -> Rate {
 pub fn xtal_clock() -> Rate {
     Clocks::get().xtal_clock
 }
-/// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
-pub(crate) fn cycles_to_1ms() -> u16 {
+
+/// Read the calibrated RTC slow clock period from the STORE1 register.
+///
+/// Written by [`Clocks::calibrate_rtc_slow_clock`] during clock
+/// initialization.
+fn cal_period() -> u64 {
     cfg_if::cfg_if! {
         if #[cfg(soc_has_lp_aon)] {
             use crate::peripherals::LP_AON;
