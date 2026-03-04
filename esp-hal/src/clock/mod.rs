@@ -162,18 +162,6 @@ impl RtcClock {
         ClockTree::with(|clocks| {
             let xtal_freq = Rate::from_hz(clocks::xtal_clk_frequency(clocks));
 
-            #[cfg(timergroup_rc_fast_calibration_divider)]
-            let slowclk_cycles = if cal_clk == TimgCalibrationClockConfig::RcFastDivClk
-                && crate::soc::chip_revision_above(property!(
-                    "timergroup.rc_fast_calibration_divider_min_rev"
-                )) {
-                // Avoid excessive calibration time by dividing the cycles by the divider
-                // that exists between FOSC and the calibration circuit.
-                slowclk_cycles / property!("timergroup.rc_fast_calibration_divider")
-            } else {
-                slowclk_cycles
-            };
-
             let (xtal_cycles, _) = Clocks::measure_rtc_clock(
                 clocks,
                 cal_clk,
@@ -296,6 +284,21 @@ impl Clocks {
         #[cfg(soc_has_clock_node_timg0_function_clock)] function_clock: Timg0FunctionClockConfig,
         slow_cycles: u32,
     ) -> (u32, Rate) {
+        #[cfg(timergroup_rc_fast_calibration_divider)]
+        let calibration_divider = if rtc_clock == TimgCalibrationClockConfig::RcFastDivClk
+            && crate::soc::chip_revision_above(property!(
+                "timergroup.rc_fast_calibration_divider_min_rev"
+            )) {
+            property!("timergroup.rc_fast_calibration_divider")
+        } else {
+            1
+        };
+        #[cfg(not(timergroup_rc_fast_calibration_divider))]
+        let calibration_divider = 1;
+
+        // On some revisions calibration uses a divided RC_FAST tick.
+        let calibration_cycles = (slow_cycles / calibration_divider).max(1);
+
         // By default the TIMG0 bus clock is running. Do not create a peripheral guard as dropping
         // it would reset the timer, and it would enable its WDT.
 
@@ -331,15 +334,7 @@ impl Clocks {
             }
         }
 
-        #[cfg(timergroup_rc_fast_calibration_divider)]
-        let calibration_clock_frequency = if rtc_clock == TimgCalibrationClockConfig::RcFastDivClk
-            && crate::soc::chip_revision_above(property!(
-                "timergroup.rc_fast_calibration_divider_min_rev"
-            )) {
-            calibration_clock_frequency / property!("timergroup.rc_fast_calibration_divider")
-        } else {
-            calibration_clock_frequency
-        };
+        let effective_calibration_clock_frequency = calibration_clock_frequency / calibration_divider;
 
         // Set up timeout based on the calibration clock frequency. This is counted in XTAL_CLK
         // cycles.
@@ -347,7 +342,7 @@ impl Clocks {
         {
             let function_clk_freq = clocks::timg0_function_clock_frequency(clocks) as u64;
             let expected_function_clock_cycles = (function_clk_freq * slow_cycles as u64
-                / calibration_clock_frequency as u64)
+                / effective_calibration_clock_frequency as u64)
                 as u32;
 
             TIMG0::regs().rtccalicfg2().modify(|_, w| unsafe {
@@ -359,14 +354,14 @@ impl Clocks {
         }
 
         TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
-            w.rtc_cali_max().bits(slow_cycles as u16);
+            w.rtc_cali_max().bits(calibration_cycles as u16);
             w.rtc_cali_start_cycling().clear_bit();
             w.rtc_cali_start().set_bit()
         });
 
         // Delay, otherwise the CPU may read back the previous state of the completion flag and skip
         // waiting.
-        let us_time_estimate = slow_cycles * 1_000_000 / calibration_clock_frequency;
+        let us_time_estimate = slow_cycles * 1_000_000 / effective_calibration_clock_frequency;
         ets_delay_us(us_time_estimate);
 
         #[cfg(esp32)]
