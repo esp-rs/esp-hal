@@ -24,13 +24,18 @@ use serde_json::Value;
 // ---------------------------------------------------------------------------
 // Subprocess helper
 
-/// Spawn the current xtask executable with `args`, feed newlines into its
-/// stdin (to silently dismiss any interactive `inquire` prompts), and capture
-/// stdout + stderr.
+/// Spawn xtask with `args`, feed newlines into its stdin (to silently
+/// dismiss any interactive `inquire` prompts), and capture stdout + stderr.
+///
+/// Uses `cargo xtask` rather than `current_exe()` because cargo rebuilds
+/// the binary in-place, which invalidates the `/proc/self/exe` symlink on
+/// Linux (it gets a ` (deleted)` suffix) and causes ENOENT on re-spawn.
 pub fn run_xtask_subprocess(args: &[String]) -> Result<String> {
-    let exe = std::env::current_exe()?;
-    let mut child = std::process::Command::new(&exe)
-        .args(args)
+    let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
+    let mut full_args = vec!["xtask".to_string()];
+    full_args.extend_from_slice(args);
+    let mut child = std::process::Command::new(&cargo)
+        .args(&full_args)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())

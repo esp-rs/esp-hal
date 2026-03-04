@@ -213,30 +213,34 @@ pub fn run_examples(
     examples.sort_by_key(|ex| ex.tag());
 
     let console = console::Term::stdout();
+    let interactive = console.is_term();
 
     for example in examples {
         let mut skip = false;
 
         log::info!("Running example '{}'", example.output_file_name());
-        if let Some(description) = example.description() {
-            log::info!(
-                "\n\n{}\n\nPress ENTER to run example, `s` to skip",
-                description.trim()
-            );
-        } else {
-            log::info!("\n\nPress ENTER to run example, `s` to skip");
-        }
 
-        loop {
-            let key = console.read_key();
+        if interactive {
+            if let Some(description) = example.description() {
+                log::info!(
+                    "\n\n{}\n\nPress ENTER to run example, `s` to skip",
+                    description.trim()
+                );
+            } else {
+                log::info!("\n\nPress ENTER to run example, `s` to skip");
+            }
 
-            match key {
-                Ok(console::Key::Enter) => break,
-                Ok(console::Key::Char('s')) => {
-                    skip = true;
-                    break;
+            loop {
+                let key = console.read_key();
+
+                match key {
+                    Ok(console::Key::Enter) => break,
+                    Ok(console::Key::Char('s')) => {
+                        skip = true;
+                        break;
+                    }
+                    _ => (),
                 }
-                _ => (),
             }
         }
 
@@ -255,18 +259,22 @@ pub fn run_examples(
 
             if let Err(error) = result {
                 log::error!("Failed to run example: {}", error);
-                log::info!("Retry or skip? (r/s)");
-                loop {
-                    let key = console.read_key();
+                if interactive {
+                    log::info!("Retry or skip? (r/s)");
+                    loop {
+                        let key = console.read_key();
 
-                    match key {
-                        Ok(console::Key::Char('r')) => break,
-                        Ok(console::Key::Char('s')) => {
-                            skip = true;
-                            break;
+                        match key {
+                            Ok(console::Key::Char('r')) => break,
+                            Ok(console::Key::Char('s')) => {
+                                skip = true;
+                                break;
+                            }
+                            _ => (),
                         }
-                        _ => (),
                     }
+                } else {
+                    return Err(error);
                 }
             } else {
                 break;
