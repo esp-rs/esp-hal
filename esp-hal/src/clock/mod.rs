@@ -467,8 +467,8 @@ impl Clocks {
 pub fn cpu_clock() -> Rate {
     Clocks::get().cpu_clock
 }
-/// The XTAL clock frequency.
 
+/// The XTAL clock frequency.
 pub fn xtal_clock() -> Rate {
     Clocks::get().xtal_clock
 }
