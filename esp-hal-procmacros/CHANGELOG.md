@@ -9,12 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `doc_replace` can now replace `__placeholders__` in-line (#5119)
 
 ### Changed
 
 - The `handler` macro no longer generates code to check the Priority (#4996)
 
 ### Fixed
+
 - Fixed the logic for determining which sections should be loaded in `load_lp_code!` macro (#4612)
 
 

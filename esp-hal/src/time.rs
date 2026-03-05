@@ -248,8 +248,7 @@ impl Instant {
     ///
     /// The counter won’t measure time in sleep-mode.
     ///
-    /// The timer has a 1 microsecond resolution and will wrap after
-    /// # {wrap_after}
+    /// The timer has a 1 microsecond resolution and will wrap after __wrap_after__.
     ///
     /// <section class="warning">
     /// Note that this function returns an unreliable value before <code>esp_hal::init()</code> is

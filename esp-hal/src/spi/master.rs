@@ -774,12 +774,12 @@ impl<'d> Spi<'d, Blocking> {
     }
 
     #[doc_replace(
-        "header" => {
-            cfg(multi_core) => "Registers an interrupt handler for the peripheral on the current core.",
-            _ => "Registers an interrupt handler for the peripheral.",
+        "peripheral_on" => {
+            cfg(multi_core) => "peripheral on the current core",
+            _ => "peripheral",
         }
     )]
-    /// # {header}
+    /// # Registers an interrupt handler for the __peripheral_on__.
     ///
     /// Note that this will replace any previously registered interrupt
     /// handlers.
@@ -1092,17 +1092,16 @@ where
 
     #[doc_replace(
         "max_frequency" => {
-            cfg(esp32h2) => " 48MHz",
-            _ => " 80MHz",
+            cfg(esp32h2) => "48MHz",
+            _ => "80MHz",
         }
     )]
     /// Change the bus configuration.
     ///
     /// # Errors
     ///
-    /// If frequency passed in config exceeds
-    /// # {max_frequency}
-    /// or is below 70kHz, [`ConfigError::FrequencyOutOfRange`] error will be returned.
+    /// If frequency passed in config exceeds __max_frequency__ or is below 70kHz,
+    /// [`ConfigError::FrequencyOutOfRange`] error will be returned.
     ///
     /// ## Example
     ///
@@ -1371,8 +1370,8 @@ mod dma {
     impl<'d> Spi<'d, Blocking> {
         #[doc_replace(
             "dma_channel" => {
-                cfg(any(esp32, esp32s2)) => "let dma_channel = peripherals.DMA_SPI2;",
-                _ => "let dma_channel = peripherals.DMA_CH0;",
+                cfg(any(esp32, esp32s2)) => "DMA_SPI2",
+                _ => "DMA_CH0",
             }
         )]
         /// Configures the SPI instance to use DMA with the specified channel.
@@ -1390,11 +1389,9 @@ mod dma {
         ///         master::{Config, Spi},
         ///     },
         /// };
-        /// # {dma_channel}
         /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
         ///
         /// let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer)?;
-        ///
         /// let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer)?;
         ///
         /// let mut spi = Spi::new(
@@ -1403,7 +1400,7 @@ mod dma {
         ///         .with_frequency(Rate::from_khz(100))
         ///         .with_mode(Mode::_0),
         /// )?
-        /// .with_dma(dma_channel)
+        /// .with_dma(peripherals.__dma_channel__)
         /// .with_buffers(dma_rx_buf, dma_tx_buf);
         /// # {after_snippet}
         /// ```
@@ -1415,8 +1412,8 @@ mod dma {
 
     #[doc_replace(
         "dma_channel" => {
-            cfg(any(esp32, esp32s2)) => "let dma_channel = peripherals.DMA_SPI2;",
-            _ => "let dma_channel = peripherals.DMA_CH0;",
+            cfg(any(esp32, esp32s2)) => "DMA_SPI2",
+            _ => "DMA_CH0",
         }
     )]
     /// A DMA capable SPI instance.
@@ -1436,11 +1433,9 @@ mod dma {
     ///         master::{Config, Spi},
     ///     },
     /// };
-    /// # {dma_channel}
     /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
     ///
     /// let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer)?;
-    ///
     /// let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer)?;
     ///
     /// let mut spi = Spi::new(
@@ -1449,7 +1444,7 @@ mod dma {
     ///         .with_frequency(Rate::from_khz(100))
     ///         .with_mode(Mode::_0),
     /// )?
-    /// .with_dma(dma_channel)
+    /// .with_dma(peripherals.__dma_channel__)
     /// .with_buffers(dma_rx_buf, dma_tx_buf);
     /// #
     /// # {after_snippet}

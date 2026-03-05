@@ -1,22 +1,18 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "freq" => {
-        cfg(esp32h2) => "let freq = Rate::from_mhz(32);",
-        _ => "let freq = Rate::from_mhz(80);"
+        cfg(esp32h2) => "32",
+        _ => "80"
     },
     "channel" => {
-        cfg(any(esp32, esp32s2)) => "let mut channel = rmt.channel0.configure_rx(&rx_config)?.with_pin(peripherals.GPIO4);",
-        cfg(esp32s3) => "let mut channel = rmt.channel7.configure_rx(&rx_config)?.with_pin(peripherals.GPIO4);",
-        _ => "let mut channel = rmt.channel2.configure_rx(&rx_config)?.with_pin(peripherals.GPIO4);"
+        cfg(any(esp32, esp32s2)) => "channel0",
+        cfg(esp32s3) => "channel7",
+        _ => "channel2"
     },
     "channels_desc" => {
-        cfg(esp32) => "8 channels, each of them can be either receiver or transmitter.",
-        cfg(esp32s2) => "4 channels, each of them can be either receiver or transmitter.",
-        cfg(esp32s3) => "8 channels, `Channel<0>`-`Channel<3>` hardcoded for transmitting signals and `Channel<4>`-`Channel<7>` hardcoded for receiving signals.",
-        cfg(any(esp32c3, esp32c6, esp32h2)) => "4 channels, `Channel<0>` and `Channel<1>` hardcoded for transmitting signals and `Channel<2>` and `Channel<3>` hardcoded for receiving signals.",
-    },
-    "rx_size_limit" => {
-        cfg(any(esp32, esp32s2)) => "The length of the received data cannot exceed the allocated RMT RAM.",
-        _ => ""
+        cfg(esp32) => "8 channels, each of them can be either receiver or transmitter",
+        cfg(esp32s2) => "4 channels, each of them can be either receiver or transmitter",
+        cfg(esp32s3) => "8 channels, `Channel<0>`-`Channel<3>` hardcoded for transmitting signals and `Channel<4>`-`Channel<7>` hardcoded for receiving signals",
+        cfg(any(esp32c3, esp32c5, esp32c6, esp32h2)) => "4 channels, `Channel<0>` and `Channel<1>` hardcoded for transmitting signals and `Channel<2>` and `Channel<3>` hardcoded for receiving signals",
     }
 ))]
 //! # Remote Control Peripheral (RMT)
@@ -38,8 +34,7 @@
 //!
 //! ### Channels
 //!
-//! There are
-//! # {channels_desc}
+//! There are __channels_desc__.
 //!
 //! For more information, please refer to the
 #![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", chip!(), "/api-reference/peripherals/rmt.html)")]
@@ -60,8 +55,7 @@
 //! # use esp_hal::rmt::TxChannelConfig;
 //! # use esp_hal::rmt::Rmt;
 //! # use crate::esp_hal::rmt::TxChannelCreator;
-//! # {freq}
-//! let rmt = Rmt::new(peripherals.RMT, freq)?;
+//! let rmt = Rmt::new(peripherals.RMT, Rate::from_mhz(__freq__))?;
 //! let mut channel = rmt
 //!     .channel0
 //!     .configure_tx(
@@ -84,10 +78,9 @@
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::gpio::Level;
 //! # use esp_hal::rmt::{PulseCode, Rmt, TxChannelConfig, TxChannelCreator};
-//!
+//! #
 //! // Configure frequency based on chip type
-//! # {freq}
-//! let rmt = Rmt::new(peripherals.RMT, freq)?;
+//! let rmt = Rmt::new(peripherals.RMT, Rate::from_mhz(__freq__))?;
 //!
 //! let tx_config = TxChannelConfig::default().with_clk_divider(255);
 //!
@@ -116,19 +109,21 @@
 //! # use esp_hal::rmt::{PulseCode, Rmt, RxChannelConfig, RxChannelCreator};
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::gpio::{Level, Output, OutputConfig};
-//!
+//! #
 //! const WIDTH: usize = 80;
 //!
 //! let mut out = Output::new(peripherals.GPIO5, Level::Low, OutputConfig::default());
 //!
 //! // Configure frequency based on chip type
-//! # {freq}
-//! let rmt = Rmt::new(peripherals.RMT, freq)?;
+//! let rmt = Rmt::new(peripherals.RMT, Rate::from_mhz(__freq__))?;
 //!
 //! let rx_config = RxChannelConfig::default()
 //!     .with_clk_divider(1)
 //!     .with_idle_threshold(10000);
-//! # {channel}
+//! let mut channel = rmt
+//!     .__channel__
+//!     .configure_rx(&rx_config)?
+//!     .with_pin(peripherals.GPIO4);
 //! let delay = Delay::new();
 //! let mut data: [PulseCode; 48] = [PulseCode::default(); 48];
 //!
@@ -1901,6 +1896,12 @@ impl<'ch> RxTransaction<'ch, '_> {
 
 /// Channel is RX mode
 impl<'ch> Channel<'ch, Blocking, Rx> {
+    #[procmacros::doc_replace(
+        "rx_size_limit" => {
+            cfg(any(esp32, esp32s2)) => "The length of the received data cannot exceed the allocated RMT RAM.",
+            _ => ""
+        }
+    )]
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
@@ -2088,6 +2089,12 @@ impl core::future::Future for RxFuture<'_> {
 
 /// RX channel in async mode
 impl Channel<'_, Async, Rx> {
+    #[procmacros::doc_replace(
+        "rx_size_limit" => {
+            cfg(any(esp32, esp32s2)) => "The length of the received data cannot exceed the allocated RMT RAM.",
+            _ => ""
+        }
+    )]
     /// Start receiving a pulse code sequence.
     ///
     /// # {rx_size_limit}

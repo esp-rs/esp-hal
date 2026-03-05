@@ -1,7 +1,7 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "dma_channel" => {
-        cfg(any(esp32, esp32s2)) => "let dma_channel = peripherals.DMA_I2S0;",
-        cfg(not(any(esp32, esp32s2))) => "let dma_channel = peripherals.DMA_CH0;"
+        cfg(any(esp32, esp32s2)) => "DMA_I2S0",
+        cfg(not(any(esp32, esp32s2))) => "DMA_CH0"
     },
     "mclk" => {
         cfg(not(esp32)) => "let i2s = i2s.with_mclk(peripherals.GPIO0);",
@@ -77,12 +77,11 @@
 //! # {before_snippet}
 //! # use esp_hal::i2s::master::{I2s, Channels, DataFormat, Config};
 //! # use esp_hal::dma_buffers;
-//! # {dma_channel}
 //! let (mut rx_buffer, rx_descriptors, _, _) = dma_buffers!(4 * 4092, 0);
 //!
 //! let i2s = I2s::new(
 //!     peripherals.I2S0,
-//!     dma_channel,
+//!     peripherals.__dma_channel__,
 //!     Config::new_tdm_philips()
 //!         .with_sample_rate(Rate::from_hz(44100))
 //!         .with_data_format(DataFormat::Data16Channel16)

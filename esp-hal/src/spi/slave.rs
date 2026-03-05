@@ -1,7 +1,7 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "dma_channel" => {
-        cfg(any(esp32, esp32s2)) => "let dma_channel = peripherals.DMA_SPI2;",
-        _ => "let dma_channel = peripherals.DMA_CH0;"
+        cfg(any(esp32, esp32s2)) => "DMA_SPI2",
+        _ => "DMA_CH0",
     },
 ))]
 //! # Serial Peripheral Interface - Slave Mode
@@ -27,7 +27,6 @@
 # use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
 # use esp_hal::spi::Mode;
 # use esp_hal::spi::slave::Spi;
-# {dma_channel}
 let sclk = peripherals.GPIO0;
 let miso = peripherals.GPIO1;
 let mosi = peripherals.GPIO2;
@@ -41,7 +40,7 @@ let mut spi = Spi::new(peripherals.SPI2, Mode::_0)
     .with_mosi(mosi)
     .with_miso(miso)
     .with_cs(cs)
-    .with_dma(dma_channel);
+    .with_dma(peripherals.__dma_channel__);
 
 let transfer = spi.transfer(50, dma_rx_buf, 50, dma_tx_buf)?;
 
