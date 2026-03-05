@@ -204,15 +204,20 @@ let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 //!
 //! Implementation Methods
 //!
-//! 1. For your own code: The `#[ram]` Macro For functions or data within your own crate, the
-//!    simplest method is to use the #[ram] attribute macro. This automatically handles the
-//!    placement for you.
-//! 2. For external code: Linker Hooks If you need to move code or data that you don't control
-//!    (e.g., from a third-party dependency), you can hook into the `esp-hal` linker scripts.
+//! 1. For your own code: The `#[ram]` Macro
 //!
-//!     - How it works: Enable the corresponding config options to require the linker to look for
-//!       rwdata_hook.x (for data) or rwtext_hook.x (for code).
-//!     - Syntax: These files must use the [Linker Input Section syntax](https://sourceware.org/binutils/docs/ld/Input-Section-Basics.html).
+//!    For functions or data within your own crate, the simplest method is to use the `#[ram]`
+//!    attribute macro. This automatically handles the placement for you.
+//!
+//! 2. For external code: Linker Hooks
+//!
+//!     If you need to move code or data that you don't control (e.g., from a third-party
+//!     dependency), you can hook into the `esp-hal` linker scripts.
+//!
+//!     - Enable the corresponding config options to require the linker to look for rwdata_hook.x
+//!       (for data) or rwtext_hook.x (for code). (see above)
+//!     - These files must use the [Linker Input Section syntax](https://sourceware.org/binutils/docs/ld/Input-Section-Basics.html).
+//!
 //!     Content in these files is included directly into the .data and .rwtext sections without
 //!     validation.
 //!
@@ -229,7 +234,26 @@ let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 //!
 //!     ```toml
 //!     rustflags = [
-//!           "-C", "link-args=-L./hooks",
+//!         "-C", "link-args=-L./hooks",
+//!     ]
+//!     ```
+//!
+//!     It's advised to perform a clean build after modifying the hook files to guarantee the
+//!     changes are picked up correctly.
+//!
+//!     In order to check the effects of the changes it's useful to generate a linker map file.
+//!
+//!     Xtensa:
+//!     ```toml
+//!     rustflags = [
+//!         "-C", "link-arg=-Wl,-Map=output.map",
+//!     ]
+//!     ```
+//!
+//!     RISC-V:
+//!     ```toml
+//!     rustflags = [
+//!         "-C", "link-arg=-Map=output.map",
 //!     ]
 //!     ```
 //!
