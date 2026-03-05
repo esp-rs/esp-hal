@@ -1,12 +1,7 @@
 use alloc::collections::VecDeque as Queue;
 
-use esp_hal::{
-    clock::{ModemClockController, PhyClockGuard, init_radio_clocks},
-    handler,
-    interrupt::Priority,
-    peripherals::IEEE802154,
-};
-use esp_phy::{PhyController, PhyInitGuard};
+use esp_hal::{handler, interrupt::Priority, peripherals::IEEE802154};
+use esp_phy::{PhyClockGuard, PhyController, PhyInitGuard};
 use esp_sync::NonReentrantMutex;
 
 use super::{
@@ -20,11 +15,14 @@ use super::{
     hal::*,
     pib::*,
 };
-use crate::sys::include::{
-    ieee802154_coex_event_t,
-    ieee802154_coex_event_t_IEEE802154_IDLE,
-    ieee802154_coex_event_t_IEEE802154_LOW,
-    ieee802154_coex_event_t_IEEE802154_MIDDLE,
+use crate::{
+    radio_clocks::{clocks_ll::enable_ieee802154, init_radio_clocks},
+    sys::include::{
+        ieee802154_coex_event_t,
+        ieee802154_coex_event_t_IEEE802154_IDLE,
+        ieee802154_coex_event_t_IEEE802154_LOW,
+        ieee802154_coex_event_t_IEEE802154_MIDDLE,
+    },
 };
 
 const PHY_ENABLE_VERSION_PRINT: u8 = 1;
@@ -110,7 +108,7 @@ pub(crate) fn esp_ieee802154_enable(
 ) -> (PhyClockGuard<'_>, PhyInitGuard<'_>) {
     init_radio_clocks();
     let phy_clock_guard = radio.enable_phy_clock();
-    radio.enable_modem_clock(true);
+    enable_ieee802154(true);
 
     let phy_init_guard = radio.enable_phy();
 

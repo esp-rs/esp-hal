@@ -4,7 +4,7 @@ use procmacros::BuilderLite;
 use super::*;
 use crate::{
     ble::InvalidConfigError,
-    hal::{clock::ModemClockController, interrupt, peripherals::BT},
+    hal::{interrupt, peripherals::BT},
     interrupt_dispatch::Handler,
     sys::include::esp_bt_controller_config_t,
 };
@@ -335,10 +335,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
 }
 
 pub(crate) fn bt_periph_module_enable() {
-    // stealing BT is safe, since it is passed into the initialization function of the BLE
-    // controller.
-    let mut bt = unsafe { BT::steal() };
-    bt.enable_modem_clock(true);
+    crate::radio_clocks::clocks_ll::enable_bt(true);
 }
 
 pub(crate) fn disable_sleep_mode() {
@@ -373,18 +370,12 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
 }
 
 pub(super) fn ble_rtc_clk_init() {
-    // stealing BT is safe, since it is passed into the initialization function of the BLE
-    // controller.
-    let mut bt = unsafe { BT::steal() };
-    bt.ble_rtc_clk_init();
+    crate::radio_clocks::clocks_ll::ble_rtc_clk_init();
 }
 
 pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     trace!("esp_reset_rpa_moudle");
-    // stealing BT is safe, since it is passed into the initialization function of the BLE
-    // controller.
-    let mut bt = unsafe { BT::steal() };
-    bt.reset_rpa();
+    crate::radio_clocks::clocks_ll::reset_rpa();
 }
 
 #[unsafe(no_mangle)]

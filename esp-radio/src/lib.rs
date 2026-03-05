@@ -165,11 +165,9 @@ use esp_phy::CalibrationResult;
 use esp_radio_rtos_driver as preempt;
 #[cfg(all(esp32, feature = "unstable"))]
 use hal::analog::adc::{release_adc2, try_claim_adc2};
-use hal::clock::init_radio_clocks;
 #[cfg(feature = "wifi")]
 use hal::{after_snippet, before_snippet};
 use sys::include::esp_phy_calibration_data_t;
-
 pub(crate) mod sys {
     #[cfg(esp32)]
     pub use esp_wifi_sys_esp32::*;
@@ -216,6 +214,7 @@ macro_rules! unstable_module {
 
 mod compat;
 mod interrupt_dispatch;
+mod radio_clocks;
 mod time;
 
 #[cfg(feature = "wifi")]
@@ -304,7 +303,7 @@ pub(crate) fn init() {
     crate::common_adapter::enable_wifi_power_domain();
 
     wifi_set_log_verbose();
-    init_radio_clocks();
+    radio_clocks::init_radio_clocks();
 
     #[cfg(feature = "coex")]
     match crate::wifi::coex_initialize() {

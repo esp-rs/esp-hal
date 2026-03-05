@@ -21,15 +21,76 @@
 // MUST be the first module
 mod fmt;
 
+use core::{cell::Cell, marker::PhantomData};
+
 #[cfg(esp32)]
 use esp_hal::time::{Duration, Instant};
 use esp_hal::{
-    clock::{ModemClockController, PhyClockGuard},
     rtc_cntl::{SocResetReason, reset_reason},
     system::Cpu,
 };
 use esp_sync::{NonReentrantMutex, RawMutex};
 
+/// Tracks the number of references to the PHY clock.
+static PHY_CLOCK_REF_COUNTER: embassy_sync::blocking_mutex::Mutex<RawMutex, Cell<u8>> =
+    embassy_sync::blocking_mutex::Mutex::new(Cell::new(0));
+
+fn increase_phy_clock_ref_count_internal() {
+    PHY_CLOCK_REF_COUNTER.lock(|phy_clock_ref_counter| {
+        let phy_clock_ref_count = phy_clock_ref_counter.get();
+
+        if phy_clock_ref_count == 0 {
+            phy_clocks::enable_phy(true);
+        }
+        let new_phy_clock_ref_count = unwrap!(
+            phy_clock_ref_count.checked_add(1),
+            "PHY clock ref count overflowed."
+        );
+
+        phy_clock_ref_counter.set(new_phy_clock_ref_count);
+    })
+}
+
+fn decrease_phy_clock_ref_count_internal() {
+    PHY_CLOCK_REF_COUNTER.lock(|phy_clock_ref_counter| {
+        let new_phy_clock_ref_count = unwrap!(
+            phy_clock_ref_counter.get().checked_sub(1),
+            "PHY clock ref count underflowed. Either you forgot a PhyClockGuard, or used PhyController::decrease_phy_clock_ref_count incorrectly."
+        );
+
+        if new_phy_clock_ref_count == 0 {
+            phy_clocks::enable_phy(false);
+        }
+
+        phy_clock_ref_counter.set(new_phy_clock_ref_count);
+    })
+}
+
+#[derive(Debug)]
+/// Prevents the PHY clock from being disabled.
+///
+/// As long as at least one [PhyClockGuard] exists, the PHY clock will remain
+/// active. To release this guard, you can either let it go out of scope or use
+/// [PhyClockGuard::release] to explicitly release it.
+pub struct PhyClockGuard<'d> {
+    _phantom: PhantomData<&'d ()>,
+}
+
+impl PhyClockGuard<'_> {
+    #[inline]
+    /// Release the clock guard.
+    ///
+    /// The PHY clock will be disabled, if this is the last clock guard.
+    pub fn release(self) {
+        // Runs the Drop implementation
+    }
+}
+
+impl Drop for PhyClockGuard<'_> {
+    fn drop(&mut self) {
+        decrease_phy_clock_ref_count_internal();
+    }
+}
 pub(crate) mod sys {
     #[cfg(esp32)]
     pub use esp_wifi_sys_esp32::*;
@@ -50,6 +111,7 @@ pub(crate) mod sys {
 }
 
 mod common_adapter;
+mod phy_clocks;
 mod phy_init_data;
 
 pub(crate) mod private {
@@ -303,7 +365,9 @@ impl PhyInitGuard<'_> {
     /// Release the init guard.
     ///
     /// The PHY will be disabled, if this is the last init guard.
-    pub fn release(self) {}
+    pub fn release(self) {
+        // Runs the Drop implementation
+    }
 }
 
 impl Drop for PhyInitGuard<'_> {
@@ -313,7 +377,7 @@ impl Drop for PhyInitGuard<'_> {
 }
 
 /// Common functionality for controlling PHY initialization.
-pub trait PhyController<'d>: private::Sealed + ModemClockController<'d> {
+pub trait PhyController<'d>: private::Sealed {
     /// Enable the PHY.
     ///
     /// If no other [PhyInitGuard] is currently alive, this will also initialize the PHY, which
@@ -327,6 +391,28 @@ pub trait PhyController<'d>: private::Sealed + ModemClockController<'d> {
         PHY_STATE.with(|phy_state| phy_state.increase_ref_count());
 
         PhyInitGuard { _phy_clock_guard }
+    }
+
+    /// Enable the PHY clock and acquire a [PhyClockGuard].
+    ///
+    /// The PHY clock will only be disabled, once all [PhyClockGuard]'s of all
+    /// modems were dropped.
+    fn enable_phy_clock(&self) -> PhyClockGuard<'d> {
+        increase_phy_clock_ref_count_internal();
+        PhyClockGuard {
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Decreases the PHY clock reference count for this modem ignoring
+    /// currently alive [PhyClockGuard]s.
+    ///
+    /// # Panics
+    /// This function panics if the PHY clock is inactive. If the ref count is
+    /// lower than the number of alive [PhyClockGuard]s, dropping a guard can
+    /// now panic.
+    fn decrease_phy_clock_ref_count(&self) {
+        decrease_phy_clock_ref_count_internal();
     }
 
     /// Decreases the PHY init reference count for this modem ignoring

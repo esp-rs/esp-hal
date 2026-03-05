@@ -20,7 +20,7 @@ use crate::{
         common::{str_from_c, thread_sem_get},
         malloc::{InternalMemory, calloc_internal},
     },
-    hal::{clock::ModemClockController, peripherals::WIFI},
+    hal::peripherals::WIFI,
     sys::c_types::*,
     time::{blob_ticks_to_micros, millis_to_blob_ticks},
 };
@@ -845,9 +845,7 @@ pub unsafe extern "C" fn phy_update_country_info(country: *const c_char) -> c_in
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_reset_mac() {
     trace!("wifi_reset_mac");
-    // stealing WIFI is safe, since it is passed into the initialization function of the BLE
-    // controller.
-    unsafe { WIFI::steal() }.reset_wifi_mac();
+    crate::radio_clocks::clocks_ll::reset_wifi_mac();
 }
 
 /// **************************************************************************
@@ -865,9 +863,7 @@ pub unsafe extern "C" fn wifi_reset_mac() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_enable() {
     trace!("wifi_clock_enable");
-    // stealing WIFI is safe, since it is passed into the initialization function of the BLE
-    // controller.
-    unsafe { WIFI::steal() }.enable_modem_clock(true);
+    crate::radio_clocks::clocks_ll::enable_wifi(true);
 }
 
 /// **************************************************************************
@@ -885,9 +881,7 @@ pub unsafe extern "C" fn wifi_clock_enable() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_disable() {
     trace!("wifi_clock_disable");
-    // stealing WIFI is safe, since it is passed into the initialization function of the BLE
-    // controller.
-    unsafe { WIFI::steal() }.enable_modem_clock(false);
+    crate::radio_clocks::clocks_ll::enable_wifi(false);
 }
 
 /// **************************************************************************
