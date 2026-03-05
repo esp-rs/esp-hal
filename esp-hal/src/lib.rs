@@ -195,30 +195,48 @@ let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 //!
 //! ## Feature Flags
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
-//! ## Forcing data or code to RAM
+//! ## Moving Code and Data to RAM
 //!
-//! This is an advanced feature. Use with caution.
+//! By default, static data and the majority of application code reside in Flash memory. While this
+//! saves space, accessing Flash can incur a performance penalty due to cache misses. Moving
+//! critical paths to RAM improves execution speed but consumes a very limited hardware resource.
+//! Finding the right balance is application-specific.
 //!
-//! By default static data and most of the code will be placed in flash. However due to cache misses
-//! this can come with a performance penalty. However RAM is a very limited resource so the ideal
-//! balancing is application specific.
+//! Implementation Methods
 //!
-//! For your own code you can use the `#[ram]` macro. For code which is not under your control this
-//! won't be possible.
+//! 1. For your own code: The `#[ram]` Macro For functions or data within your own crate, the
+//!    simplest method is to use the #[ram] attribute macro. This automatically handles the
+//!    placement for you.
+//! 2. For external code: Linker Hooks If you need to move code or data that you don't control
+//!    (e.g., from a third-party dependency), you can hook into the `esp-hal` linker scripts.
 //!
-//! While `esp-hal` comes with all the necessary linker scripts it also provides a way to
-//! hook into the scripts to force data and code to RAM.
+//!     - How it works: Enable the corresponding config options to require the linker to look for
+//!       rwdata_hook.x (for data) or rwtext_hook.x (for code).
+//!     - Syntax: These files must use the [Linker Input Section syntax](https://sourceware.org/binutils/docs/ld/Input-Section-Basics.html).
+//!     Content in these files is included directly into the .data and .rwtext sections without
+//!     validation.
 //!
-//! The mechanism is controlled by the corresponding config options (see above).
+//!     Example rwtext_hook.x content:
+//!     ```
+//!     /* Move all functions from the 'some_critical_lib' to RAM */
+//!     *:some_critical_lib.*(.literal .literal.* .text .text.*)
+//!     ```
 //!
-//! If enabled the user is required to provide a 'rwdata_hook.x' and/or a 'rwtext_hook.x' file which
-//! will get included into `.data` / `.rwtext` sections. Use the input section syntax ( <https://sourceware.org/binutils/docs/ld/Input-Section-Basics.html> ).
+//!     Configuration & Pathing
+//!     By default, the linker looks for these hook files in your project’s current working
+//!     directory. If you prefer to store them elsewhere, add the directory to your linker search
+//!     path in .cargo/config.toml:
 //!
-//! These files get included without any checks!
+//!     ```toml
+//!     rustflags = [
+//!           "-C", "link-args=-L./hooks",
+//!     ]
+//!     ```
 //!
-//! By default the linker will look for the hook files in the current working directory. But you can
-//! specify additional directories to the linker search path in `.cargo/config.toml` (e.g. `"-C",
-//! "link-args=-L./hooks"`).
+//!     <section class="warning">
+//!     These hooks provide direct access to the linking process. Incorrect syntax or
+//!     over-allocating RAM can lead to link-time errors or application instability.
+//!     </section>
 
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(asm_sub_register, async_fn_in_trait, stable_features)]
