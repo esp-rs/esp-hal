@@ -204,7 +204,7 @@ impl ClockTreeNodeType for Divider {
         let clock_name = &self.name;
         let ty_name = self.config_type_name()?;
 
-        if let Some(dividers) = self.list_of_fixed_dividers() {
+        if let Some(dividers) = self.params.get("divisor").and_then(|d| d.as_enum_values()) {
             let value_variants = dividers
                 .iter()
                 .map(|d| format_ident!("_{}", d))
@@ -329,10 +329,6 @@ impl Divider {
             }
         });
         result
-    }
-
-    fn list_of_fixed_dividers(&self) -> Option<Vec<u32>> {
-        self.params.get("divisor").and_then(|d| d.as_enum_values())
     }
 }
 
