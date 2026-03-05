@@ -1150,7 +1150,16 @@ macro_rules! define_clock_tree_types {
         pub struct CpuClkConfig(u32);
         impl CpuClkConfig {
             /// Creates a new divider configuration.
+            ///
+            /// # Panics
+            ///
+            /// Panics if the divisor value is outside the
+            /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
+                ::core::assert!(
+                    divisor <= 255u32,
+                    "`CPU_CLK` divisor value must be between 0 and 255 (inclusive)."
+                );
                 Self(divisor)
             }
             fn value(self) -> u32 {
@@ -1165,7 +1174,16 @@ macro_rules! define_clock_tree_types {
         pub struct AhbClkConfig(u32);
         impl AhbClkConfig {
             /// Creates a new divider configuration.
+            ///
+            /// # Panics
+            ///
+            /// Panics if the divisor value is outside the
+            /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
+                ::core::assert!(
+                    divisor <= 255u32,
+                    "`AHB_CLK` divisor value must be between 0 and 255 (inclusive)."
+                );
                 Self(divisor)
             }
             fn value(self) -> u32 {

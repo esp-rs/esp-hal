@@ -170,13 +170,13 @@ clocks = { system_clocks = { clock_tree = [
         { name = "PLL_F240M", outputs = "PLL_F240M" },
     ] },
     # CPU_CLK divider: divider = (CPU_DIV_NUM + 1), n*F_AHB
-    { name = "CPU_CLK", type = "divider", divisor = "0..256", output = "HP_ROOT_CLK / (divisor + 1)", always_on = true },
+    { name = "CPU_CLK", type = "divider", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true },
 
     # AHB_CLK divider: divider = (AHB_DIV_NUM + 1), <= 48MHz
-    { name = "AHB_CLK", type = "divider", divisor = "0..256", output = "HP_ROOT_CLK / (divisor + 1)", always_on = true },
+    { name = "AHB_CLK", type = "divider", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true },
 
     # APB_CLK divider: divider = (APB_DIV_NUM + 1)
-    { name = "APB_CLK", type = "divider", divisor = "0..256", output = "AHB_CLK / (divisor + 1)", always_on = true },
+    { name = "APB_CLK", type = "divider", params = { divisor = "0..256" }, output = "AHB_CLK / (divisor + 1)", always_on = true },
 
     # LP clocks (RTC domain)
     { name = "XTAL_D2_CLK", type = "divider", output = "XTAL_CLK / 2" },

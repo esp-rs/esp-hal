@@ -31,6 +31,7 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
+use indexmap::IndexMap;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use serde::Deserialize;
@@ -61,14 +62,14 @@ pub struct Divider {
     #[serde(default)]
     reject: Option<RejectExpression>,
 
-    /// Possible divider values. May be a list of numbers or a range. If None, the divider value is
-    /// fixed.
-    #[serde(default)]
-    divisor: Option<ValuesExpression>,
-
     /// The divider equation. The expression contains which clock is being divided. The expression
     /// may refer to clock sources, and the divider's value via `divisor`.
     output: DividerOutputExpression,
+
+    /// Possible divider parameter values. Elements may be a list of numbers or a range. If empty,
+    /// the divider value is fixed.
+    #[serde(default)]
+    params: IndexMap<String, ValuesExpression>,
 }
 
 impl ClockTreeNodeType for Divider {
@@ -86,7 +87,7 @@ impl ClockTreeNodeType for Divider {
     fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
         let mut result = Ok(());
         self.output.visit_variables(|v| {
-            if v == "divisor" {
+            if self.params.contains_key(v) {
                 return;
             }
             if !ctx.has_clock(v) && result.is_ok() {
@@ -97,15 +98,11 @@ impl ClockTreeNodeType for Divider {
     }
 
     fn is_configurable(&self) -> bool {
-        if self.divisor.is_some() {
-            true
-        } else {
-            let mut contains_divisor = false;
-            self.output.visit_variables(|var| {
-                contains_divisor |= var == "divisor";
-            });
-            contains_divisor
-        }
+        let mut contains_divisor = false;
+        self.output.visit_variables(|var| {
+            contains_divisor |= self.params.contains_key(var);
+        });
+        contains_divisor
     }
 
     fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream {
@@ -237,7 +234,7 @@ impl ClockTreeNodeType for Divider {
             })
         } else {
             let mut extra_docs = vec![];
-            let validate = self.divisor.as_ref().map(|d| {
+            let validate = self.params.get("divisor").map(|d| {
                 let (min, max) = d.as_range().expect("Invalid divisor range");
 
                 let assert_failed = format!(
@@ -326,7 +323,7 @@ impl Divider {
     }
 
     fn list_of_fixed_dividers(&self) -> Option<Vec<u32>> {
-        self.divisor.as_ref().and_then(|d| d.as_enum_values())
+        self.params.get("divisor").and_then(|d| d.as_enum_values())
     }
 }
 

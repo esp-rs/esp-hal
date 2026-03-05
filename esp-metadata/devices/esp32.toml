@@ -171,14 +171,14 @@ clocks = { system_clocks = { clock_tree = [
         { name = "PLL",  outputs = "PLL_CLK" },
         { name = "APLL", outputs = "APLL_CLK" },
     ] },
-    { name = "CPU_PLL_DIV", type = "divider", divisor = "2, 4", output = "CPU_PLL_DIV_IN / divisor", reject = "PLL_CLK == 480_000_000 && divisor == 4" },
+    { name = "CPU_PLL_DIV", type = "divider", params = { divisor = "2, 4" }, output = "CPU_PLL_DIV_IN / divisor", reject = "PLL_CLK == 480_000_000 && divisor == 4" },
 
     # DIVB Divisor for low-speed clock sources (XTAL, FOSC)
     { name = "SYSCON_PRE_DIV_IN", type = "mux", variants = [
         { name = "XTAL",    outputs = "XTAL_CLK" },
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
     ] },
-    { name = "SYSCON_PRE_DIV", type = "divider", divisor = "0 .. 1024", output = "SYSCON_PRE_DIV_IN / (divisor + 1)" },
+    { name = "SYSCON_PRE_DIV", type = "divider", params = { divisor = "0 .. 1024" }, output = "SYSCON_PRE_DIV_IN / (divisor + 1)" },
 
     # The meta-switch
     { name = "CPU_CLK", type = "mux", always_on = true, variants = [
@@ -199,10 +199,10 @@ clocks = { system_clocks = { clock_tree = [
     ] },
 
     # REF_TICK, configuring CPU clock needs to ensure this is 1MHz
-    { name = "REF_TICK_PLL",  type = "divider", divisor = "0 .. 256", output = "APB_CLK / (divisor + 1)" },
-    { name = "REF_TICK_APLL", type = "divider", divisor = "0 .. 256", output = "APB_CLK / (divisor + 1)" },
-    { name = "REF_TICK_XTAL", type = "divider", divisor = "0 .. 256", output = "APB_CLK / (divisor + 1)" },
-    { name = "REF_TICK_FOSC", type = "divider", divisor = "0 .. 256", output = "APB_CLK / (divisor + 1)" },
+    { name = "REF_TICK_PLL",  type = "divider", params = { divisor = "0 .. 256" }, output = "APB_CLK / (divisor + 1)" },
+    { name = "REF_TICK_APLL", type = "divider", params = { divisor = "0 .. 256" }, output = "APB_CLK / (divisor + 1)" },
+    { name = "REF_TICK_XTAL", type = "divider", params = { divisor = "0 .. 256" }, output = "APB_CLK / (divisor + 1)" },
+    { name = "REF_TICK_FOSC", type = "divider", params = { divisor = "0 .. 256" }, output = "APB_CLK / (divisor + 1)" },
     { name = "REF_TICK", type = "mux", variants = [
         { name = "PLL",  outputs = "REF_TICK_PLL" },
         { name = "APLL", outputs = "REF_TICK_APLL" },
