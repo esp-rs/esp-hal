@@ -315,6 +315,8 @@ jobs:
               runId: Number('${{ needs.hil-quick.outputs.run_id }}'),
               commentId: Number('${{ needs.hil-quick.outputs.comment_id }}'),
               kind: 'HIL (quick)',
+              // Quick runs can legitimately take >15min, especially with queueing.
+              maxPolls: 180,
             });
 
   hil-full:
