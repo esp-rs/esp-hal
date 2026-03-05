@@ -325,7 +325,7 @@ impl Divider {
         result
     }
 
-    pub(super) fn list_of_fixed_dividers(&self) -> Option<Vec<u32>> {
+    fn list_of_fixed_dividers(&self) -> Option<Vec<u32>> {
         self.divisors.as_ref().and_then(|d| d.as_enum_values())
     }
 }
