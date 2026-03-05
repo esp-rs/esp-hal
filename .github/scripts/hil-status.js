@@ -27,6 +27,8 @@ async function pollRun({
 
   // Poll up to ~15 minutes by default (60 * 15s)
   for (let i = 0; i < maxPolls; i++) {
+    await delay(pollIntervalMs);
+
     const { data } = await github.rest.actions.getWorkflowRun({
       owner,
       repo,
@@ -36,10 +38,6 @@ async function pollRun({
     if (data.status === "completed") {
       conclusion = data.conclusion;
       break;
-    }
-
-    if (i + 1 < maxPolls) {
-      await delay(pollIntervalMs);
     }
   }
 
