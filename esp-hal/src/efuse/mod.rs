@@ -156,14 +156,14 @@ pub fn read_bit(field: EfuseField) -> bool {
 ///
 /// After a successful call, [`interface_mac_address`] will derive
 /// per-interface addresses from the overridden base instead of the factory
-/// eFuse MAC. [`mac_address`] is unaffected and continues to return the
+/// eFuse MAC. [`base_mac_address`] is unaffected and continues to return the
 /// factory eFuse value.
 ///
 /// The override does not persist across device resets.
 /// Can only be called once. Returns `Err(SetMacError::AlreadySet)`
 /// otherwise.
 #[instability::unstable]
-pub fn set_mac_address(mac: MacAddress) -> Result<(), SetMacError> {
+pub fn set_base_mac_address(mac: MacAddress) -> Result<(), SetMacError> {
     if MAC_OVERRIDE_STATE
         .compare_exchange(0, 1, Ordering::Acquire, Ordering::Relaxed)
         .is_err()
@@ -185,7 +185,7 @@ pub fn set_mac_address(mac: MacAddress) -> Result<(), SetMacError> {
 ///
 /// This always reads directly from the hardware eFuse storage. To get the
 /// effective MAC for a specific radio interface (which may be overridden via
-/// [`set_mac_address`]), use [`interface_mac_address`] instead.
+/// [`set_base_mac_address`]), use [`interface_mac_address`] instead.
 ///
 /// ## Example
 ///
@@ -193,12 +193,12 @@ pub fn set_mac_address(mac: MacAddress) -> Result<(), SetMacError> {
 /// # {before_snippet}
 /// use esp_hal::efuse;
 ///
-/// let mac = efuse::mac_address();
+/// let mac = efuse::base_mac_address();
 /// println!("Base MAC: {mac}");
 /// # {after_snippet}
 /// ```
 #[instability::unstable]
-pub fn mac_address() -> MacAddress {
+pub fn base_mac_address() -> MacAddress {
     let mut mac_addr = [0u8; 6];
 
     let mac0 = read_field_le::<[u8; 4]>(crate::efuse::MAC0);
@@ -215,12 +215,17 @@ pub fn mac_address() -> MacAddress {
     MacAddress::new_eui48(mac_addr)
 }
 
-#[procmacros::doc_replace]
+#[procmacros::doc_replace(
+    "interface_mac_example" => {
+        cfg(soc_has_wifi) => "let mac = efuse::interface_mac_address(InterfaceMacAddress::Station);",
+        _ => "let mac = efuse::interface_mac_address(InterfaceMacAddress::Bluetooth);"
+    }
+)]
 /// Returns the MAC address for a specific interface, derived from the base
 /// MAC.
 ///
 /// By default, addresses are derived from the factory eFuse MAC returned
-/// by [`mac_address`]. If [`set_mac_address`] has been called, the
+/// by [`base_mac_address`]. If [`set_base_mac_address`] has been called, the
 /// overridden base address is used instead.
 ///
 /// Each chip is programmed with a unique base MAC address during manufacturing.
@@ -237,10 +242,8 @@ pub fn mac_address() -> MacAddress {
 /// # {before_snippet}
 /// use esp_hal::efuse::{self, InterfaceMacAddress};
 ///
-/// # #[cfg(soc_has_bt)]
-/// let bt_mac = efuse::interface_mac_address(InterfaceMacAddress::Bluetooth);
-/// # #[cfg(soc_has_bt)]
-/// println!("Bluetooth MAC: {bt_mac}");
+/// # {interface_mac_example}
+/// println!("MAC: {mac}");
 /// # {after_snippet}
 /// ```
 #[cfg(any(soc_has_wifi, soc_has_bt))]
@@ -248,7 +251,7 @@ pub fn interface_mac_address(kind: InterfaceMacAddress) -> MacAddress {
     let mut mac = if MAC_OVERRIDE_STATE.load(Ordering::Acquire) == 2 {
         unsafe { MAC_OVERRIDE }
     } else {
-        mac_address()
+        base_mac_address()
     };
 
     match kind {
@@ -329,13 +332,14 @@ fn derive_local_mac(mac: &mut MacAddress) {
 /// Interface selection for [`interface_mac_address`].
 ///
 /// Each interface uses a distinct MAC address derived from either the base MAC or the overridden
-/// MAC if [`set_mac_address`] has been called.
+/// MAC if [`set_base_mac_address`] has been called.
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(any(soc_has_wifi, soc_has_bt))]
 #[non_exhaustive]
 pub enum InterfaceMacAddress {
-    /// Wi-Fi station. Equivalent to the base MAC address or overridden via [`set_mac_address`].
+    /// Wi-Fi station. Equivalent to the base MAC address or overridden via
+    /// [`set_base_mac_address`].
     #[cfg(soc_has_wifi)]
     #[cfg_attr(soc_has_wifi, default)]
     Station,
