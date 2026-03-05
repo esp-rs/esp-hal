@@ -38,7 +38,9 @@ async function pollRun({
       break;
     }
 
-    await delay(pollIntervalMs);
+    if (i + 1 < maxPolls) {
+      await delay(pollIntervalMs);
+    }
   }
 
   const suffix = statusSuffix(kind, conclusion);
