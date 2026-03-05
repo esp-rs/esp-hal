@@ -46,9 +46,9 @@ impl CpuClock {
     const PRESET_80: ClockConfig = ClockConfig {
         xtal_clk: None,
         hp_root_clk: Some(HpRootClkConfig::PllF160m),
-        cpu_clk: Some(CpuClkConfig(1)),
-        ahb_clk: Some(AhbClkConfig(3)), // 40MHz - cannot exceed XTAL_CLK
-        apb_clk: Some(ApbClkConfig(0)),
+        cpu_clk: Some(CpuClkConfig::new(1)),
+        ahb_clk: Some(AhbClkConfig::new(3)), // 40MHz - cannot exceed XTAL_CLK
+        apb_clk: Some(ApbClkConfig::new(0)),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         crypto_clk: Some(CryptoClkConfig::PllF480m),
@@ -57,9 +57,9 @@ impl CpuClock {
     const PRESET_160: ClockConfig = ClockConfig {
         xtal_clk: None,
         hp_root_clk: Some(HpRootClkConfig::PllF160m),
-        cpu_clk: Some(CpuClkConfig(0)),
-        ahb_clk: Some(AhbClkConfig(3)), // 40MHz - cannot exceed XTAL_CLK
-        apb_clk: Some(ApbClkConfig(0)),
+        cpu_clk: Some(CpuClkConfig::new(0)),
+        ahb_clk: Some(AhbClkConfig::new(3)), // 40MHz - cannot exceed XTAL_CLK
+        apb_clk: Some(ApbClkConfig::new(0)),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         crypto_clk: Some(CryptoClkConfig::PllF480m),
@@ -68,9 +68,9 @@ impl CpuClock {
     const PRESET_240: ClockConfig = ClockConfig {
         xtal_clk: None,
         hp_root_clk: Some(HpRootClkConfig::PllF240m),
-        cpu_clk: Some(CpuClkConfig(0)),
-        ahb_clk: Some(AhbClkConfig(5)), // 40MHz - cannot exceed XTAL_CLK
-        apb_clk: Some(ApbClkConfig(0)),
+        cpu_clk: Some(CpuClkConfig::new(0)),
+        ahb_clk: Some(AhbClkConfig::new(5)), // 40MHz - cannot exceed XTAL_CLK
+        apb_clk: Some(ApbClkConfig::new(0)),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         crypto_clk: Some(CryptoClkConfig::PllF480m),

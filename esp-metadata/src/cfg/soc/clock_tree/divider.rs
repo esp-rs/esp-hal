@@ -31,6 +31,7 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
+use convert_case::{Case, Casing};
 use indexmap::IndexMap;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -204,90 +205,175 @@ impl ClockTreeNodeType for Divider {
         let clock_name = &self.name;
         let ty_name = self.config_type_name()?;
 
-        if let Some(dividers) = self.params.get("divisor").and_then(|d| d.as_enum_values()) {
-            let value_variants = dividers
-                .iter()
-                .map(|d| format_ident!("_{}", d))
-                .collect::<Vec<_>>();
-            let value_doc = dividers
-                .iter()
-                .map(|d| format!(" Selects `divisor = {d}`."));
-            let dividers = dividers.iter().map(number).collect::<Vec<_>>();
+        let mut enum_types = vec![];
+        let mut field_names = vec![];
+        let mut field_types = vec![];
+        let mut panic_docs = vec![];
+        let mut validators = vec![];
+        let mut param_values: Vec<Box<dyn Fn(TokenStream) -> TokenStream>> = vec![];
 
-            let unknown_value = format!("Invalid {clock_name} divider value");
+        let collapse_types =
+            self.params.len() == 1 && self.params.values().all(|v| v.as_enum_values().is_some());
 
-            Some(quote! {
-                #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-                #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-                pub enum #ty_name {
-                    #(
-                        #[doc = #value_doc]
-                        #value_variants = #dividers,
-                    )*
-                }
+        // Create a new type for each enum parameter.
+        // Define a field and accessor body for each parameter.
+        // Generate an assert for numeric parameters.
+        for (param_name, values) in self.params.iter() {
+            let param_name_ident = format_ident!("{param_name}");
+            if let Some(dividers) = values.as_enum_values() {
+                let value_variants = dividers
+                    .iter()
+                    .map(|d| format_ident!("_{d}"))
+                    .collect::<Vec<_>>();
+                let value_doc = dividers
+                    .iter()
+                    .map(|d| format!(" Selects `{param_name} = {d}`."));
+                let dividers = dividers.iter().map(number).collect::<Vec<_>>();
 
-                impl #ty_name {
-                    const fn new(raw: u32) -> Self {
-                        match raw {
-                            #(#dividers => #ty_name::#value_variants,)*
-                            _ => ::core::panic!(#unknown_value),
-                        }
+                let enum_ty = if collapse_types {
+                    ty_name.clone()
+                } else {
+                    // TODO
+                    let full_name = format!("{clock_name}_{}", param_name.to_uppercase());
+
+                    format_ident!(
+                        "{}Config",
+                        full_name.from_case(Case::Ada).to_case(Case::Pascal)
+                    )
+                };
+                let unknown_value = format!("Invalid {clock_name} {param_name} value");
+
+                enum_types.push(quote! {
+                    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+                    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+                    pub enum #enum_ty {
+                        #(
+                            #[doc = #value_doc]
+                            #value_variants = #dividers,
+                        )*
                     }
 
-                    fn divisor(self) -> u32 {
-                        match self {
-                            #(#ty_name::#value_variants => #dividers,)*
+                    impl #enum_ty {
+                        /// Creates a new divider configuration.
+                        pub const fn new(raw: u32) -> Self {
+                            match raw {
+                                #(#dividers => #ty_name::#value_variants,)*
+                                _ => ::core::panic!(#unknown_value),
+                            }
                         }
                     }
-                }
-            })
-        } else {
-            let mut extra_docs = vec![];
-            let validate = self.params.get("divisor").map(|d| {
-                let (min, max) = d.as_range().expect("Invalid divisor range");
+                });
+
+                field_names.push(param_name_ident.clone());
+                field_types.push(quote! { #enum_ty });
+
+                let accessor_body = move |field_access: TokenStream| -> TokenStream {
+                    quote! {
+                        match #field_access {
+                            #(#enum_ty::#value_variants => #dividers,)*
+                        }
+                    }
+                };
+                param_values.push(Box::new(accessor_body));
+            } else {
+                let (min, max) = values.as_range().expect("Invalid divisor range");
+
+                panic_docs.push(format!(
+                    r#"
+Panics if the divisor value is outside the
+valid range ({min} ..= {max})."#
+                ));
+                field_names.push(param_name_ident.clone());
+                field_types.push(quote! { u32 });
 
                 let assert_failed = format!(
-                    "`{clock_name}` divisor value must be between {min} and {max} (inclusive)."
+                    "`{clock_name}` {param_name} value must be between {min} and {max} (inclusive)."
                 );
-
-                extra_docs = format!(
-                    r#"
- # Panics
-
- Panics if the divisor value is outside the
- valid range ({min} ..= {max})."#
-                )
-                .lines()
-                .map(|l| quote! { #[doc = #l] })
-                .collect();
-
                 // Divisor is unsigned, avoid generating `>= 0`.
-                if min == 0 {
-                    quote! { ::core::assert!(divisor <= #max, #assert_failed); }
+                validators.push(if min == 0 {
+                    quote! { ::core::assert!(#param_name_ident <= #max, #assert_failed); }
                 } else {
-                    quote! { ::core::assert!(divisor >= #min && divisor <= #max, #assert_failed); }
-                }
-            });
+                    quote! { ::core::assert!(#param_name_ident >= #min && #param_name_ident <= #max, #assert_failed); }
+                });
 
-            Some(quote! {
+                let accessor_body =
+                    move |field_access: TokenStream| -> TokenStream { field_access };
+                param_values.push(Box::new(accessor_body));
+            }
+        }
+
+        // Type declaration for the clock node type. If collapsed, the enum type is used directly.
+        let node_type_decl = if collapse_types {
+            // The whole divider can be collapsed into a single enum type
+            quote! {}
+        } else {
+            // The divisor is a struct of one or more fields.
+            quote! {
                 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
                 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-                pub struct #ty_name(u32);
+                pub struct #ty_name {
+                    #(#field_names: #field_types),*
+                }
+            }
+        };
 
-                impl #ty_name {
-                    /// Creates a new divider configuration.
-                    #(#extra_docs)*
-                    pub const fn new(divisor: u32) -> Self {
-                        #validate
-                        Self(divisor)
-                    }
+        // Constructors for the clock node type. If collapsed, the enum type already defines the
+        // constructor.
+        let node_ctor = if collapse_types {
+            quote! {}
+        } else {
+            // Transform panics docs into individual doc lines and prepend heading
+            let panic_docs = if !panic_docs.is_empty() {
+                let mut docs = vec![];
+                docs.push("## Panics");
 
-                    fn divisor(self) -> u32 {
-                        self.0
+                for doc in panic_docs.iter() {
+                    docs.extend(doc.lines());
+                }
+                docs
+            } else {
+                vec![]
+            };
+
+            quote! {
+                /// Creates a new divider configuration.
+                #(#[doc = #panic_docs])*
+                pub const fn new(#(#field_names: #field_types),*) -> Self {
+                    #(#validators)*
+                    Self {
+                        #(#field_names),*
                     }
                 }
+            }
+        };
+
+        let param_accessors = param_values
+            .into_iter()
+            .zip(field_names.iter())
+            .map(|(accessor, param_name)| {
+                let field = if collapse_types {
+                    quote! { self }
+                } else {
+                    quote! { self.#param_name }
+                };
+                let body = accessor(field);
+                quote! { fn #param_name(self) -> u32 {
+                    #body
+                } }
             })
-        }
+            .collect::<Vec<_>>();
+
+        Some(quote! {
+            #(#enum_types)*
+
+            #node_type_decl
+
+            impl #ty_name {
+                #node_ctor
+
+                #(#param_accessors)*
+            }
+        })
     }
 
     fn request_direct_dependencies(
@@ -321,7 +407,7 @@ impl Divider {
     pub(super) fn find_clock_source(&self) -> Option<&str> {
         let mut result = None;
         self.output.visit_variables(|var| {
-            if var != "divisor" {
+            if !self.params.contains_key(var) {
                 if let Some(seen) = result {
                     panic!("A divider cannot combine two clock sources ({seen}, {var})");
                 }

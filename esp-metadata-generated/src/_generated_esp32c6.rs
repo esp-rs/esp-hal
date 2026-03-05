@@ -1271,13 +1271,16 @@ macro_rules! define_clock_tree_types {
             _3 = 3,
         }
         impl HpRootClkConfig {
-            const fn new(raw: u32) -> Self {
+            /// Creates a new divider configuration.
+            pub const fn new(raw: u32) -> Self {
                 match raw {
                     1 => HpRootClkConfig::_1,
                     3 => HpRootClkConfig::_3,
-                    _ => ::core::panic!("Invalid HP_ROOT_CLK divider value"),
+                    _ => ::core::panic!("Invalid HP_ROOT_CLK divisor value"),
                 }
             }
+        }
+        impl HpRootClkConfig {
             fn divisor(self) -> u32 {
                 match self {
                     HpRootClkConfig::_1 => 1,
@@ -1337,14 +1340,17 @@ macro_rules! define_clock_tree_types {
             _3 = 3,
         }
         impl CpuHsDivConfig {
-            const fn new(raw: u32) -> Self {
+            /// Creates a new divider configuration.
+            pub const fn new(raw: u32) -> Self {
                 match raw {
                     0 => CpuHsDivConfig::_0,
                     1 => CpuHsDivConfig::_1,
                     3 => CpuHsDivConfig::_3,
-                    _ => ::core::panic!("Invalid CPU_HS_DIV divider value"),
+                    _ => ::core::panic!("Invalid CPU_HS_DIV divisor value"),
                 }
             }
+        }
+        impl CpuHsDivConfig {
             fn divisor(self) -> u32 {
                 match self {
                     CpuHsDivConfig::_0 => 0,
@@ -1373,7 +1379,8 @@ macro_rules! define_clock_tree_types {
             _31 = 31,
         }
         impl CpuLsDivConfig {
-            const fn new(raw: u32) -> Self {
+            /// Creates a new divider configuration.
+            pub const fn new(raw: u32) -> Self {
                 match raw {
                     0 => CpuLsDivConfig::_0,
                     1 => CpuLsDivConfig::_1,
@@ -1381,9 +1388,11 @@ macro_rules! define_clock_tree_types {
                     7 => CpuLsDivConfig::_7,
                     15 => CpuLsDivConfig::_15,
                     31 => CpuLsDivConfig::_31,
-                    _ => ::core::panic!("Invalid CPU_LS_DIV divider value"),
+                    _ => ::core::panic!("Invalid CPU_LS_DIV divisor value"),
                 }
             }
+        }
+        impl CpuLsDivConfig {
             fn divisor(self) -> u32 {
                 match self {
                     CpuLsDivConfig::_0 => 0,
@@ -1409,14 +1418,17 @@ macro_rules! define_clock_tree_types {
             _15 = 15,
         }
         impl AhbHsDivConfig {
-            const fn new(raw: u32) -> Self {
+            /// Creates a new divider configuration.
+            pub const fn new(raw: u32) -> Self {
                 match raw {
                     3 => AhbHsDivConfig::_3,
                     7 => AhbHsDivConfig::_7,
                     15 => AhbHsDivConfig::_15,
-                    _ => ::core::panic!("Invalid AHB_HS_DIV divider value"),
+                    _ => ::core::panic!("Invalid AHB_HS_DIV divisor value"),
                 }
             }
+        }
+        impl AhbHsDivConfig {
             fn divisor(self) -> u32 {
                 match self {
                     AhbHsDivConfig::_3 => 3,
@@ -1445,7 +1457,8 @@ macro_rules! define_clock_tree_types {
             _31 = 31,
         }
         impl AhbLsDivConfig {
-            const fn new(raw: u32) -> Self {
+            /// Creates a new divider configuration.
+            pub const fn new(raw: u32) -> Self {
                 match raw {
                     0 => AhbLsDivConfig::_0,
                     1 => AhbLsDivConfig::_1,
@@ -1453,9 +1466,11 @@ macro_rules! define_clock_tree_types {
                     7 => AhbLsDivConfig::_7,
                     15 => AhbLsDivConfig::_15,
                     31 => AhbLsDivConfig::_31,
-                    _ => ::core::panic!("Invalid AHB_LS_DIV divider value"),
+                    _ => ::core::panic!("Invalid AHB_LS_DIV divisor value"),
                 }
             }
+        }
+        impl AhbLsDivConfig {
             fn divisor(self) -> u32 {
                 match self {
                     AhbLsDivConfig::_0 => 0,
@@ -1481,14 +1496,17 @@ macro_rules! define_clock_tree_types {
             _3 = 3,
         }
         impl ApbClkConfig {
-            const fn new(raw: u32) -> Self {
+            /// Creates a new divider configuration.
+            pub const fn new(raw: u32) -> Self {
                 match raw {
                     0 => ApbClkConfig::_0,
                     1 => ApbClkConfig::_1,
                     3 => ApbClkConfig::_3,
-                    _ => ::core::panic!("Invalid APB_CLK divider value"),
+                    _ => ::core::panic!("Invalid APB_CLK divisor value"),
                 }
             }
+        }
+        impl ApbClkConfig {
             fn divisor(self) -> u32 {
                 match self {
                     ApbClkConfig::_0 => 0,
@@ -1511,14 +1529,17 @@ macro_rules! define_clock_tree_types {
             _5 = 5,
         }
         impl MspiFastHsClkConfig {
-            const fn new(raw: u32) -> Self {
+            /// Creates a new divider configuration.
+            pub const fn new(raw: u32) -> Self {
                 match raw {
                     3 => MspiFastHsClkConfig::_3,
                     4 => MspiFastHsClkConfig::_4,
                     5 => MspiFastHsClkConfig::_5,
-                    _ => ::core::panic!("Invalid MSPI_FAST_HS_CLK divider value"),
+                    _ => ::core::panic!("Invalid MSPI_FAST_HS_CLK divisor value"),
                 }
             }
+        }
+        impl MspiFastHsClkConfig {
             fn divisor(self) -> u32 {
                 match self {
                     MspiFastHsClkConfig::_3 => 3,
@@ -1541,14 +1562,17 @@ macro_rules! define_clock_tree_types {
             _2 = 2,
         }
         impl MspiFastLsClkConfig {
-            const fn new(raw: u32) -> Self {
+            /// Creates a new divider configuration.
+            pub const fn new(raw: u32) -> Self {
                 match raw {
                     0 => MspiFastLsClkConfig::_0,
                     1 => MspiFastLsClkConfig::_1,
                     2 => MspiFastLsClkConfig::_2,
-                    _ => ::core::panic!("Invalid MSPI_FAST_LS_CLK divider value"),
+                    _ => ::core::panic!("Invalid MSPI_FAST_LS_CLK divisor value"),
                 }
             }
+        }
+        impl MspiFastLsClkConfig {
             fn divisor(self) -> u32 {
                 match self {
                     MspiFastLsClkConfig::_0 => 0,

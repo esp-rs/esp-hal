@@ -848,11 +848,12 @@ macro_rules! define_clock_tree_types {
         /// The output is calculated as `OUTPUT = SYSTEM_PRE_DIV_IN / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct SystemPreDivConfig(u32);
+        pub struct SystemPreDivConfig {
+            divisor: u32,
+        }
         impl SystemPreDivConfig {
             /// Creates a new divider configuration.
-            ///
-            /// # Panics
+            /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 1023).
@@ -861,10 +862,10 @@ macro_rules! define_clock_tree_types {
                     divisor <= 1023u32,
                     "`SYSTEM_PRE_DIV` divisor value must be between 0 and 1023 (inclusive)."
                 );
-                Self(divisor)
+                Self { divisor }
             }
             fn divisor(self) -> u32 {
-                self.0
+                self.divisor
             }
         }
         /// Configures the `CPU_PLL_DIV` clock divider.
@@ -879,13 +880,16 @@ macro_rules! define_clock_tree_types {
             _6 = 6,
         }
         impl CpuPllDivConfig {
-            const fn new(raw: u32) -> Self {
+            /// Creates a new divider configuration.
+            pub const fn new(raw: u32) -> Self {
                 match raw {
                     4 => CpuPllDivConfig::_4,
                     6 => CpuPllDivConfig::_6,
-                    _ => ::core::panic!("Invalid CPU_PLL_DIV divider value"),
+                    _ => ::core::panic!("Invalid CPU_PLL_DIV divisor value"),
                 }
             }
+        }
+        impl CpuPllDivConfig {
             fn divisor(self) -> u32 {
                 match self {
                     CpuPllDivConfig::_4 => 4,
@@ -936,11 +940,12 @@ macro_rules! define_clock_tree_types {
         /// The output is calculated as `OUTPUT = RC_FAST_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct RcFastClkDivNConfig(u32);
+        pub struct RcFastClkDivNConfig {
+            divisor: u32,
+        }
         impl RcFastClkDivNConfig {
             /// Creates a new divider configuration.
-            ///
-            /// # Panics
+            /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 3).
@@ -949,10 +954,10 @@ macro_rules! define_clock_tree_types {
                     divisor <= 3u32,
                     "`RC_FAST_CLK_DIV_N` divisor value must be between 0 and 3 (inclusive)."
                 );
-                Self(divisor)
+                Self { divisor }
             }
             fn divisor(self) -> u32 {
-                self.0
+                self.divisor
             }
         }
         /// The list of clock signals that the `RTC_SLOW_CLK` multiplexer can output.

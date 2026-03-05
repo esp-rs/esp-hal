@@ -909,13 +909,16 @@ macro_rules! define_clock_tree_types {
             _4 = 4,
         }
         impl CpuPllDivConfig {
-            const fn new(raw: u32) -> Self {
+            /// Creates a new divider configuration.
+            pub const fn new(raw: u32) -> Self {
                 match raw {
                     2 => CpuPllDivConfig::_2,
                     4 => CpuPllDivConfig::_4,
-                    _ => ::core::panic!("Invalid CPU_PLL_DIV divider value"),
+                    _ => ::core::panic!("Invalid CPU_PLL_DIV divisor value"),
                 }
             }
+        }
+        impl CpuPllDivConfig {
             fn divisor(self) -> u32 {
                 match self {
                     CpuPllDivConfig::_2 => 2,
@@ -937,11 +940,12 @@ macro_rules! define_clock_tree_types {
         /// The output is calculated as `OUTPUT = SYSCON_PRE_DIV_IN / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct SysconPreDivConfig(u32);
+        pub struct SysconPreDivConfig {
+            divisor: u32,
+        }
         impl SysconPreDivConfig {
             /// Creates a new divider configuration.
-            ///
-            /// # Panics
+            /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 1023).
@@ -950,10 +954,10 @@ macro_rules! define_clock_tree_types {
                     divisor <= 1023u32,
                     "`SYSCON_PRE_DIV` divisor value must be between 0 and 1023 (inclusive)."
                 );
-                Self(divisor)
+                Self { divisor }
             }
             fn divisor(self) -> u32 {
-                self.0
+                self.divisor
             }
         }
         /// The list of clock signals that the `APB_CLK` multiplexer can output.
@@ -985,11 +989,12 @@ macro_rules! define_clock_tree_types {
         /// The output is calculated as `OUTPUT = APB_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct RefTickXtalConfig(u32);
+        pub struct RefTickXtalConfig {
+            divisor: u32,
+        }
         impl RefTickXtalConfig {
             /// Creates a new divider configuration.
-            ///
-            /// # Panics
+            /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 255).
@@ -998,10 +1003,10 @@ macro_rules! define_clock_tree_types {
                     divisor <= 255u32,
                     "`REF_TICK_XTAL` divisor value must be between 0 and 255 (inclusive)."
                 );
-                Self(divisor)
+                Self { divisor }
             }
             fn divisor(self) -> u32 {
-                self.0
+                self.divisor
             }
         }
         /// Configures the `REF_TICK_FOSC` clock divider.
@@ -1009,11 +1014,12 @@ macro_rules! define_clock_tree_types {
         /// The output is calculated as `OUTPUT = APB_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct RefTickFoscConfig(u32);
+        pub struct RefTickFoscConfig {
+            divisor: u32,
+        }
         impl RefTickFoscConfig {
             /// Creates a new divider configuration.
-            ///
-            /// # Panics
+            /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 255).
@@ -1022,10 +1028,10 @@ macro_rules! define_clock_tree_types {
                     divisor <= 255u32,
                     "`REF_TICK_FOSC` divisor value must be between 0 and 255 (inclusive)."
                 );
-                Self(divisor)
+                Self { divisor }
             }
             fn divisor(self) -> u32 {
-                self.0
+                self.divisor
             }
         }
         /// Configures the `REF_TICK_APLL` clock divider.
@@ -1033,11 +1039,12 @@ macro_rules! define_clock_tree_types {
         /// The output is calculated as `OUTPUT = APB_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct RefTickApllConfig(u32);
+        pub struct RefTickApllConfig {
+            divisor: u32,
+        }
         impl RefTickApllConfig {
             /// Creates a new divider configuration.
-            ///
-            /// # Panics
+            /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 255).
@@ -1046,10 +1053,10 @@ macro_rules! define_clock_tree_types {
                     divisor <= 255u32,
                     "`REF_TICK_APLL` divisor value must be between 0 and 255 (inclusive)."
                 );
-                Self(divisor)
+                Self { divisor }
             }
             fn divisor(self) -> u32 {
-                self.0
+                self.divisor
             }
         }
         /// Configures the `REF_TICK_PLL` clock divider.
@@ -1057,11 +1064,12 @@ macro_rules! define_clock_tree_types {
         /// The output is calculated as `OUTPUT = APB_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct RefTickPllConfig(u32);
+        pub struct RefTickPllConfig {
+            divisor: u32,
+        }
         impl RefTickPllConfig {
             /// Creates a new divider configuration.
-            ///
-            /// # Panics
+            /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 255).
@@ -1070,10 +1078,10 @@ macro_rules! define_clock_tree_types {
                     divisor <= 255u32,
                     "`REF_TICK_PLL` divisor value must be between 0 and 255 (inclusive)."
                 );
-                Self(divisor)
+                Self { divisor }
             }
             fn divisor(self) -> u32 {
-                self.0
+                self.divisor
             }
         }
         /// The list of clock signals that the `CPU_CLK` multiplexer can output.

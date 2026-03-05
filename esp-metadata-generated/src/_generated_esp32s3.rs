@@ -1135,11 +1135,12 @@ macro_rules! define_clock_tree_types {
         /// The output is calculated as `OUTPUT = SYSTEM_PRE_DIV_IN / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct SystemPreDivConfig(u32);
+        pub struct SystemPreDivConfig {
+            divisor: u32,
+        }
         impl SystemPreDivConfig {
             /// Creates a new divider configuration.
-            ///
-            /// # Panics
+            /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 1023).
@@ -1148,10 +1149,10 @@ macro_rules! define_clock_tree_types {
                     divisor <= 1023u32,
                     "`SYSTEM_PRE_DIV` divisor value must be between 0 and 1023 (inclusive)."
                 );
-                Self(divisor)
+                Self { divisor }
             }
             fn divisor(self) -> u32 {
-                self.0
+                self.divisor
             }
         }
         /// Selects the output frequency of `CPU_PLL_DIV_OUT`. Depends on `PLL_CLK`.
@@ -1208,11 +1209,12 @@ macro_rules! define_clock_tree_types {
         /// The output is calculated as `OUTPUT = RC_FAST_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct RcFastClkDivNConfig(u32);
+        pub struct RcFastClkDivNConfig {
+            divisor: u32,
+        }
         impl RcFastClkDivNConfig {
             /// Creates a new divider configuration.
-            ///
-            /// # Panics
+            /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 3).
@@ -1221,10 +1223,10 @@ macro_rules! define_clock_tree_types {
                     divisor <= 3u32,
                     "`RC_FAST_CLK_DIV_N` divisor value must be between 0 and 3 (inclusive)."
                 );
-                Self(divisor)
+                Self { divisor }
             }
             fn divisor(self) -> u32 {
-                self.0
+                self.divisor
             }
         }
         /// The list of clock signals that the `RTC_SLOW_CLK` multiplexer can output.
