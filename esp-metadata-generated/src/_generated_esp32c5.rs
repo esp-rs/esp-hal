@@ -1243,7 +1243,7 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `CPU_CLK` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct CpuClkConfig(u32);
@@ -1267,7 +1267,7 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `AHB_CLK` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct AhbClkConfig(u32);
@@ -1291,7 +1291,7 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `APB_CLK` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = AHB_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = AHB_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct ApbClkConfig(u32);

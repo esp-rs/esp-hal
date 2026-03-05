@@ -1261,13 +1261,13 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `HP_ROOT_CLK` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = SOC_ROOT_CLK / DIVISOR`.
+        /// The output is calculated as `OUTPUT = SOC_ROOT_CLK / divisor`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum HpRootClkConfig {
-            /// Selects `DIVISOR = 1`.
+            /// Selects `divisor = 1`.
             _1 = 1,
-            /// Selects `DIVISOR = 3`.
+            /// Selects `divisor = 3`.
             _3 = 3,
         }
         impl HpRootClkConfig {
@@ -1325,15 +1325,15 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `CPU_HS_DIV` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum CpuHsDivConfig {
-            /// Selects `DIVISOR = 0`.
+            /// Selects `divisor = 0`.
             _0 = 0,
-            /// Selects `DIVISOR = 1`.
+            /// Selects `divisor = 1`.
             _1 = 1,
-            /// Selects `DIVISOR = 3`.
+            /// Selects `divisor = 3`.
             _3 = 3,
         }
         impl CpuHsDivConfig {
@@ -1355,21 +1355,21 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `CPU_LS_DIV` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum CpuLsDivConfig {
-            /// Selects `DIVISOR = 0`.
+            /// Selects `divisor = 0`.
             _0  = 0,
-            /// Selects `DIVISOR = 1`.
+            /// Selects `divisor = 1`.
             _1  = 1,
-            /// Selects `DIVISOR = 3`.
+            /// Selects `divisor = 3`.
             _3  = 3,
-            /// Selects `DIVISOR = 7`.
+            /// Selects `divisor = 7`.
             _7  = 7,
-            /// Selects `DIVISOR = 15`.
+            /// Selects `divisor = 15`.
             _15 = 15,
-            /// Selects `DIVISOR = 31`.
+            /// Selects `divisor = 31`.
             _31 = 31,
         }
         impl CpuLsDivConfig {
@@ -1397,15 +1397,15 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `AHB_HS_DIV` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum AhbHsDivConfig {
-            /// Selects `DIVISOR = 3`.
+            /// Selects `divisor = 3`.
             _3  = 3,
-            /// Selects `DIVISOR = 7`.
+            /// Selects `divisor = 7`.
             _7  = 7,
-            /// Selects `DIVISOR = 15`.
+            /// Selects `divisor = 15`.
             _15 = 15,
         }
         impl AhbHsDivConfig {
@@ -1427,21 +1427,21 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `AHB_LS_DIV` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum AhbLsDivConfig {
-            /// Selects `DIVISOR = 0`.
+            /// Selects `divisor = 0`.
             _0  = 0,
-            /// Selects `DIVISOR = 1`.
+            /// Selects `divisor = 1`.
             _1  = 1,
-            /// Selects `DIVISOR = 3`.
+            /// Selects `divisor = 3`.
             _3  = 3,
-            /// Selects `DIVISOR = 7`.
+            /// Selects `divisor = 7`.
             _7  = 7,
-            /// Selects `DIVISOR = 15`.
+            /// Selects `divisor = 15`.
             _15 = 15,
-            /// Selects `DIVISOR = 31`.
+            /// Selects `divisor = 31`.
             _31 = 31,
         }
         impl AhbLsDivConfig {
@@ -1469,15 +1469,15 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `APB_CLK` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = AHB_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = AHB_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum ApbClkConfig {
-            /// Selects `DIVISOR = 0`.
+            /// Selects `divisor = 0`.
             _0 = 0,
-            /// Selects `DIVISOR = 1`.
+            /// Selects `divisor = 1`.
             _1 = 1,
-            /// Selects `DIVISOR = 3`.
+            /// Selects `divisor = 3`.
             _3 = 3,
         }
         impl ApbClkConfig {
@@ -1499,15 +1499,15 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `MSPI_FAST_HS_CLK` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum MspiFastHsClkConfig {
-            /// Selects `DIVISOR = 3`.
+            /// Selects `divisor = 3`.
             _3 = 3,
-            /// Selects `DIVISOR = 4`.
+            /// Selects `divisor = 4`.
             _4 = 4,
-            /// Selects `DIVISOR = 5`.
+            /// Selects `divisor = 5`.
             _5 = 5,
         }
         impl MspiFastHsClkConfig {
@@ -1529,15 +1529,15 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `MSPI_FAST_LS_CLK` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum MspiFastLsClkConfig {
-            /// Selects `DIVISOR = 0`.
+            /// Selects `divisor = 0`.
             _0 = 0,
-            /// Selects `DIVISOR = 1`.
+            /// Selects `divisor = 1`.
             _1 = 1,
-            /// Selects `DIVISOR = 2`.
+            /// Selects `divisor = 2`.
             _2 = 2,
         }
         impl MspiFastLsClkConfig {

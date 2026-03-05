@@ -1150,7 +1150,7 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `SYSTEM_PRE_DIV` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = SYSTEM_PRE_DIV_IN / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = SYSTEM_PRE_DIV_IN / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct SystemPreDivConfig(u32);
@@ -1220,7 +1220,7 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `RC_FAST_CLK_DIV_N` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = RC_FAST_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = RC_FAST_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct RcFastClkDivNConfig(u32);

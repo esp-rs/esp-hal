@@ -136,11 +136,11 @@ clocks = { system_clocks = { clock_tree = [
         { name = "RC_FAST", outputs = "RC_FAST_CLK"  },
     ] },
 
-    { name = "CPU_CLK", type = "divider", output = "HP_ROOT_CLK / (DIVISOR + 1)", always_on = true }, # AHB_CLK * integer
-    { name = "AHB_CLK", type = "divider", output = "HP_ROOT_CLK / (DIVISOR + 1)", always_on = true }, # Max 32M
-    { name = "APB_CLK", type = "divider", divisors = "0..=255", output = "AHB_CLK / (DIVISOR + 1)" },
+    { name = "CPU_CLK", type = "divider", output = "HP_ROOT_CLK / (divisor + 1)", always_on = true }, # AHB_CLK * integer
+    { name = "AHB_CLK", type = "divider", output = "HP_ROOT_CLK / (divisor + 1)", always_on = true }, # Max 32M
+    { name = "APB_CLK", type = "divider", divisor = "0..=255", output = "AHB_CLK / (divisor + 1)" },
     # configurable, but automatic - there's no point in making APB_DECREASE_DIV part of the model as consumers will always see APB_CLK
-    # { name = "APB_DECREASE_DIV", type = "divider", output = "APB_DIV / (DIVISOR + 1)" },
+    # { name = "APB_DECREASE_DIV", type = "divider", output = "APB_DIV / (divisor + 1)" },
 
     # LP clocks
     { name = "XTAL_D2_CLK", type = "divider", output = "XTAL_CLK / 2" },

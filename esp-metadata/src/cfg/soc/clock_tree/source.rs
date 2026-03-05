@@ -61,7 +61,7 @@ pub struct Source {
     /// If set, this expression will be used to validate the clock configuration.
     ///
     /// The expression may refer to clock sources, or any of the clock tree item's properties (e.g.
-    /// `DIVISOR`).
+    /// `divisor`).
     #[serde(default)]
     reject: Option<RejectExpression>,
 

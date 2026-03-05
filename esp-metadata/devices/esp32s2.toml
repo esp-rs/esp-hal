@@ -117,14 +117,14 @@ clocks = { system_clocks = { clock_tree = [
         { name = "PLL",  outputs = "PLL_CLK" },
         { name = "APLL", outputs = "APLL_CLK" },
     ] },
-    { name = "CPU_PLL_DIV", type = "divider", divisors = "2, 3, 4, 6", output = "CPU_PLL_DIV_IN / DIVISOR" }, # TODO reject = "PLL_CLK == 320_000_000 && DIVISOR % 3 == 0"
+    { name = "CPU_PLL_DIV", type = "divider", divisor = "2, 3, 4, 6", output = "CPU_PLL_DIV_IN / divisor" }, # TODO reject = "PLL_CLK == 320_000_000 && divisor % 3 == 0"
 
     # Represents SEL0 = 0, 2
     { name = "SYSTEM_PRE_DIV_IN", type = "mux", variants = [
         { name = "XTAL",    outputs = "XTAL_CLK" },
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
     ] },
-    { name = "SYSTEM_PRE_DIV", type = "divider", divisors = "0 .. 1024", output = "SYSTEM_PRE_DIV_IN / (DIVISOR + 1)" },
+    { name = "SYSTEM_PRE_DIV", type = "divider", divisor = "0 .. 1024", output = "SYSTEM_PRE_DIV_IN / (divisor + 1)" },
 
     # The meta-switch
     { name = "CPU_CLK", type = "mux", always_on = true, variants = [
@@ -146,8 +146,8 @@ clocks = { system_clocks = { clock_tree = [
     ] },
 
     # REF_TICK, configuring CPU clock needs to ensure this is 1MHz
-    { name = "REF_TICK_XTAL", type = "divider", divisors = "0 .. 256", output = "XTAL_CLK / (DIVISOR + 1)" },
-    { name = "REF_TICK_CK8M", type = "divider", divisors = "0 .. 256", output = "RC_FAST_CLK / (DIVISOR + 1)" },
+    { name = "REF_TICK_XTAL", type = "divider", divisor = "0 .. 256", output = "XTAL_CLK / (divisor + 1)" },
+    { name = "REF_TICK_CK8M", type = "divider", divisor = "0 .. 256", output = "RC_FAST_CLK / (divisor + 1)" },
     { name = "REF_TICK", type = "mux", variants = [
         { name = "PLL",     outputs = "REF_TICK_XTAL" },
         { name = "APLL",    outputs = "REF_TICK_XTAL" },

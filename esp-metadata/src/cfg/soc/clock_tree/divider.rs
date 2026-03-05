@@ -57,17 +57,17 @@ pub struct Divider {
     /// If set, this expression will be used to validate the clock configuration.
     ///
     /// The expression may refer to clock sources, or any of the clock tree item's properties (e.g.
-    /// `DIVISOR`).
+    /// `divisor`).
     #[serde(default)]
     reject: Option<RejectExpression>,
 
     /// Possible divider values. May be a list of numbers or a range. If None, the divider value is
     /// fixed.
     #[serde(default)]
-    divisors: Option<ValuesExpression>,
+    divisor: Option<ValuesExpression>,
 
     /// The divider equation. The expression contains which clock is being divided. The expression
-    /// may refer to clock sources, and the divider's value via `DIVISOR`.
+    /// may refer to clock sources, and the divider's value via `divisor`.
     output: DividerOutputExpression,
 }
 
@@ -86,7 +86,7 @@ impl ClockTreeNodeType for Divider {
     fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
         let mut result = Ok(());
         self.output.visit_variables(|v| {
-            if v == "DIVISOR" {
+            if v == "divisor" {
                 return;
             }
             if !ctx.has_clock(v) && result.is_ok() {
@@ -97,12 +97,12 @@ impl ClockTreeNodeType for Divider {
     }
 
     fn is_configurable(&self) -> bool {
-        if self.divisors.is_some() {
+        if self.divisor.is_some() {
             true
         } else {
             let mut contains_divisor = false;
             self.output.visit_variables(|var| {
-                contains_divisor |= var == "DIVISOR";
+                contains_divisor |= var == "divisor";
             });
             contains_divisor
         }
@@ -118,9 +118,9 @@ impl ClockTreeNodeType for Divider {
 
             let mut config_fields = vec![];
 
-            variables.insert("DIVISOR", quote! { config.value() });
+            variables.insert("divisor", quote! { config.value() });
             reject.0.visit_variables(|var| {
-                if var != "DIVISOR" {
+                if var != "divisor" {
                     config_fields.push((var, tree.properties(tree.node(var)).field_name()));
                 }
             });
@@ -177,7 +177,7 @@ impl ClockTreeNodeType for Divider {
         let cfg_expr_code = self.output.to_rust({
             let mut variables = HashMap::new();
             variables.insert(parent_clock, quote! { #parent_frequency_fn(clocks) });
-            variables.insert("DIVISOR", divisor);
+            variables.insert("divisor", divisor);
             variables
         });
 
@@ -205,7 +205,7 @@ impl ClockTreeNodeType for Divider {
                 .collect::<Vec<_>>();
             let value_doc = dividers
                 .iter()
-                .map(|d| format!(" Selects `DIVISOR = {d}`."));
+                .map(|d| format!(" Selects `divisor = {d}`."));
             let dividers = dividers.iter().map(number).collect::<Vec<_>>();
 
             let unknown_value = format!("Invalid {clock_name} divider value");
@@ -237,7 +237,7 @@ impl ClockTreeNodeType for Divider {
             })
         } else {
             let mut extra_docs = vec![];
-            let validate = self.divisors.as_ref().map(|d| {
+            let validate = self.divisor.as_ref().map(|d| {
                 let (min, max) = d.as_range().expect("Invalid divisor range");
 
                 let assert_failed = format!(
@@ -315,7 +315,7 @@ impl Divider {
     pub(super) fn find_clock_source(&self) -> Option<&str> {
         let mut result = None;
         self.output.visit_variables(|var| {
-            if var != "DIVISOR" {
+            if var != "divisor" {
                 if let Some(seen) = result {
                     panic!("A divider cannot combine two clock sources ({seen}, {var})");
                 }
@@ -326,7 +326,7 @@ impl Divider {
     }
 
     fn list_of_fixed_dividers(&self) -> Option<Vec<u32>> {
-        self.divisors.as_ref().and_then(|d| d.as_enum_values())
+        self.divisor.as_ref().and_then(|d| d.as_enum_values())
     }
 }
 

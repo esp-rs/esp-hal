@@ -899,13 +899,13 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `CPU_PLL_DIV` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = CPU_PLL_DIV_IN / DIVISOR`.
+        /// The output is calculated as `OUTPUT = CPU_PLL_DIV_IN / divisor`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum CpuPllDivConfig {
-            /// Selects `DIVISOR = 2`.
+            /// Selects `divisor = 2`.
             _2 = 2,
-            /// Selects `DIVISOR = 4`.
+            /// Selects `divisor = 4`.
             _4 = 4,
         }
         impl CpuPllDivConfig {
@@ -934,7 +934,7 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `SYSCON_PRE_DIV` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = SYSCON_PRE_DIV_IN / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = SYSCON_PRE_DIV_IN / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct SysconPreDivConfig(u32);
@@ -982,7 +982,7 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `REF_TICK_XTAL` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = APB_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = APB_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct RefTickXtalConfig(u32);
@@ -1006,7 +1006,7 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `REF_TICK_FOSC` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = APB_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = APB_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct RefTickFoscConfig(u32);
@@ -1030,7 +1030,7 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `REF_TICK_APLL` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = APB_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = APB_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct RefTickApllConfig(u32);
@@ -1054,7 +1054,7 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `REF_TICK_PLL` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = APB_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = APB_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub struct RefTickPllConfig(u32);
