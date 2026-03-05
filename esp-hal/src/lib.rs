@@ -222,7 +222,7 @@ let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 //!     validation.
 //!
 //!     Example rwtext_hook.x content:
-//!     ```
+//!     ```text
 //!     /* Move all functions from the 'some_critical_lib' to RAM */
 //!     *:some_critical_lib.*(.literal .literal.* .text .text.*)
 //!     ```
