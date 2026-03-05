@@ -18,14 +18,6 @@
 //! and more. It is useful for retrieving chip-specific configuration and
 //! identification data during runtime.
 //!
-//! Each chip is programmed with a unique base MAC address during manufacturing.
-//! Different interfaces (Wi-Fi Station, SoftAP, Bluetooth, etc.) each use a
-//! MAC address derived from this base address. The Station interface uses
-//! the base MAC directly, while others use locally administered variants
-//! produced by modifying the first octet to set the local-admin bit; some
-//! interfaces (such as Bluetooth) additionally adjust the last octet to
-//! obtain a distinct address.
-//!
 //! ## Examples
 //!
 //! ### Reading interface MAC addresses
@@ -231,8 +223,13 @@ pub fn mac_address() -> MacAddress {
 /// by [`mac_address`]. If [`set_mac_address`] has been called, the
 /// overridden base address is used instead.
 ///
-/// See [`InterfaceMacAddress`] for the available interfaces and how each
-/// address is derived.
+/// Each chip is programmed with a unique base MAC address during manufacturing.
+/// Different interfaces (Wi-Fi Station, SoftAP, Bluetooth, etc.) each use a
+/// MAC address derived from this base address. The Station interface uses
+/// the base MAC directly, while others use locally administered variants
+/// produced by modifying the first octet to set the local-admin bit; some
+/// interfaces (such as Bluetooth) additionally adjust the last octet to
+/// obtain a distinct address.
 ///
 /// ## Example
 ///
@@ -332,8 +329,7 @@ fn derive_local_mac(mac: &mut MacAddress) {
 /// Interface selection for [`interface_mac_address`].
 ///
 /// Each interface uses a distinct MAC address derived from either the base MAC or the overridden
-/// MAC if [`set_mac_address`] has been called. See the [module-level docs](self) for an overview of
-/// the derivation scheme.
+/// MAC if [`set_mac_address`] has been called.
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(any(soc_has_wifi, soc_has_bt))]
@@ -362,7 +358,7 @@ pub enum InterfaceMacAddress {
 pub struct MacAddress([u8; 6]);
 
 impl MacAddress {
-    /// Creates a new `MacAddress` from the given bytes, which must be in big-endian order.
+    /// Creates a new `MacAddress` from the given bytes.
     #[instability::unstable]
     pub const fn new_eui48(bytes: [u8; 6]) -> Self {
         Self(bytes)
