@@ -32,6 +32,8 @@ document-features = "0.2"
 esp-hal = { version = "~1.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
 esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated" }
 esp-sync = { version = "0.1.1", path = "../esp-sync" }
+embassy-sync = "0.7.2"
+
 # Make sure these are aligned with esp-radio's dependencies, too!
 esp-wifi-sys-esp32 = { version = "0.1.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys", rev = "6a2522e" }
 esp-wifi-sys-esp32c2 = { version = "0.1.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys", rev = "6a2522e" }

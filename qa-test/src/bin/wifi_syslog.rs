@@ -3,7 +3,7 @@
 
 //% CHIPS: esp32 esp32s2 esp32s3
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable
-//% esp-radio/print-logs-from-driver
+//% FEATURES: esp-radio/print-logs-from-driver
 
 #![no_std]
 #![no_main]
