@@ -163,7 +163,7 @@ pub fn read_bit(field: EfuseField) -> bool {
 /// Can only be called once. Returns `Err(SetMacError::AlreadySet)`
 /// otherwise.
 #[instability::unstable]
-pub fn set_base_mac_address(mac: MacAddress) -> Result<(), SetMacError> {
+pub fn override_mac_address(mac: MacAddress) -> Result<(), SetMacError> {
     if MAC_OVERRIDE_STATE
         .compare_exchange(0, 1, Ordering::Acquire, Ordering::Relaxed)
         .is_err()
@@ -185,7 +185,7 @@ pub fn set_base_mac_address(mac: MacAddress) -> Result<(), SetMacError> {
 ///
 /// This always reads directly from the hardware eFuse storage. To get the
 /// effective MAC for a specific radio interface (which may be overridden via
-/// [`set_base_mac_address`]), use [`interface_mac_address`] instead.
+/// [`override_mac_address`]), use [`interface_mac_address`] instead.
 ///
 /// ## Example
 ///
@@ -225,7 +225,7 @@ pub fn base_mac_address() -> MacAddress {
 /// MAC.
 ///
 /// By default, addresses are derived from the factory eFuse MAC returned
-/// by [`base_mac_address`]. If [`set_base_mac_address`] has been called, the
+/// by [`base_mac_address`]. If [`override_mac_address`] has been called, the
 /// overridden base address is used instead.
 ///
 /// Each chip is programmed with a unique base MAC address during manufacturing.
@@ -332,14 +332,14 @@ fn derive_local_mac(mac: &mut MacAddress) {
 /// Interface selection for [`interface_mac_address`].
 ///
 /// Each interface uses a distinct MAC address derived from either the base MAC or the overridden
-/// MAC if [`set_base_mac_address`] has been called.
+/// MAC if [`override_mac_address`] has been called.
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(any(soc_has_wifi, soc_has_bt))]
 #[non_exhaustive]
 pub enum InterfaceMacAddress {
     /// Wi-Fi station. Equivalent to the base MAC address or overridden via
-    /// [`set_base_mac_address`].
+    /// [`override_mac_address`].
     #[cfg(soc_has_wifi)]
     #[cfg_attr(soc_has_wifi, default)]
     Station,

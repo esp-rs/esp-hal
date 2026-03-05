@@ -151,11 +151,14 @@ can be read using the `success` method.
 ## eFuse Changes
 
 The `Efuse` struct has been removed. All methods are now free-standing functions
-in the `efuse` module:
+in the `efuse` module. Some functions have been renamed:
 
-- `Efuse::mac_address()` → `efuse::mac_address()`
+- `Efuse::mac_address()` → `efuse::base_mac_address()`
+- `Efuse::set_mac_address(mac)` → `efuse::override_mac_address(mac)`
 - `Efuse::interface_mac_address(kind)` → `efuse::interface_mac_address(kind)`
-- `Efuse::set_mac_address(mac)` → `efuse::set_mac_address(mac)`
 - `Efuse::read_field_le(field)` → `efuse::read_field_le(field)`
 - `Efuse::read_bit(field)` → `efuse::read_bit(field)`
 - `Efuse::chip_revision()` → `efuse::chip_revision()`
+
+`Efuse::read_base_mac_address()` has been removed; use `efuse::base_mac_address()` instead.
+`MacAddress::as_bytes_mut()` has been removed; use `MacAddress::as_bytes()` for read access.

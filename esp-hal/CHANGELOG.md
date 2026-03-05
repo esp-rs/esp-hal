@@ -47,7 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `efuse::interface_mac_address` has been stabilized (#5104)
+- The `Efuse` struct has been replaced by free-standing functions in the `efuse` module. `efuse::interface_mac_address` and `efuse::MacAddress` have been stabilized. (#5104)
+- `efuse::read_base_mac_address()` has been renamed to `efuse::base_mac_address()` (#5104)
+- Renamed `efuse::set_mac_address` to `efuse::override_mac_address` (#5104)
 - UART: `read_ready` and `write_ready` are now stable (#4600)
 - RMT: `SingleShotTxTransaction` has been renamed to `TxTransaction`. (#4302)
 - RMT: `ChannelCreator::configure_tx` and `ChannelCreator::configure_rx` now take the configuration by reference. (#4302)
