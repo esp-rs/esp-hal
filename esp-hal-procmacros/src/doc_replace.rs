@@ -1,6 +1,7 @@
 use std::{collections::HashMap, str::FromStr};
 
 use proc_macro2::{TokenStream, TokenStream as TokenStream2};
+use quote::quote;
 use syn::{
     AttrStyle,
     Attribute,
@@ -19,57 +20,40 @@ use syn::{
 };
 
 struct Replacements {
-    replacements: HashMap<String, Vec<TokenStream2>>,
+    line_replacements: HashMap<String, Vec<TokenStream2>>,
 }
 
 impl Replacements {
     fn get(&self, lines: &str, outer: bool, span: proc_macro2::Span) -> Vec<Attribute> {
         let mut attributes = vec![];
         for line in lines.split('\n') {
-            let attrs = match line.trim() {
-                "# {before_snippet}" if outer => vec![syn::parse_quote! {
-                    #[doc = crate::before_snippet!()]
-                }],
-                "# {before_snippet}" => vec![syn::parse_quote! {
-                    #![doc = crate::before_snippet!()]
-                }],
-                "# {after_snippet}" if outer => vec![syn::parse_quote! {
-                    #[doc = crate::after_snippet!()]
-                }],
-                "# {after_snippet}" => vec![syn::parse_quote! {
-                    #![doc = crate::after_snippet!()]
-                }],
-                trimmed => {
-                    let mut attrs = vec![];
-                    if let Some(lines) = self.replacements.get(trimmed) {
-                        for line in lines {
-                            if outer {
-                                attrs.push(syn::parse_quote_spanned! { span => #[ #line ] });
-                            } else {
-                                attrs.push(syn::parse_quote_spanned! { span => #![ #line ] });
-                            }
-                        }
+            let mut attrs = vec![];
+            let trimmed = line.trim();
+            if let Some(lines) = self.line_replacements.get(trimmed) {
+                for line in lines {
+                    if outer {
+                        attrs.push(syn::parse_quote_spanned! { span => #[ #line ] });
                     } else {
-                        // Just append the line, in the expected format (`doc = r" Foobar"`)
-                        let hash = if line.contains("#\"") {
-                            "##"
-                        } else if line.contains('"') {
-                            "#"
-                        } else {
-                            ""
-                        };
-
-                        let line =
-                            TokenStream2::from_str(&format!("r{hash}\"{line}\"{hash}")).unwrap();
-                        if outer {
-                            attrs.push(syn::parse_quote_spanned! { span => #[doc = #line] });
-                        } else {
-                            attrs.push(syn::parse_quote_spanned! { span => #![doc = #line] });
-                        }
+                        attrs.push(syn::parse_quote_spanned! { span => #![ #line ] });
                     }
-                    attrs
                 }
-            };
+            } else {
+                // Just append the line, in the expected format (`doc = r" Foobar"`)
+                let hash = if line.contains("#\"") {
+                    "##"
+                } else if line.contains('"') {
+                    "#"
+                } else {
+                    ""
+                };
+
+                let line = TokenStream2::from_str(&format!("r{hash}\"{line}\"{hash}")).unwrap();
+                if outer {
+                    attrs.push(syn::parse_quote_spanned! { span => #[doc = #line] });
+                } else {
+                    attrs.push(syn::parse_quote_spanned! { span => #![doc = #line] });
+                }
+            }
             attributes.extend(attrs);
         }
 
@@ -84,7 +68,7 @@ impl Parse for Replacements {
             let args = Punctuated::<Replacement, Token![,]>::parse_terminated(input)?;
             for arg in args {
                 let replacement = match arg.replacement {
-                    ReplacementKind::Literal(expr) => vec![quote::quote! {
+                    ReplacementKind::Literal(expr) => vec![quote! {
                         doc = #expr
                     }],
                     ReplacementKind::Choice(items) => {
@@ -98,12 +82,12 @@ impl Parse for Replacements {
                                     let condition = cfg.tokens;
 
                                     cfgs.push(condition.clone());
-                                    branches.push(quote::quote! {
+                                    branches.push(quote! {
                                         cfg_attr(#condition, doc = #body)
                                     });
                                 }
                                 None => {
-                                    branches.push(quote::quote! {
+                                    branches.push(quote! {
                                         cfg_attr(not(any( #(#cfgs),*) ), doc = #body)
                                     });
                                 }
@@ -124,7 +108,9 @@ impl Parse for Replacements {
             }
         }
 
-        Ok(Self { replacements })
+        Ok(Self {
+            line_replacements: replacements,
+        })
     }
 }
 
@@ -188,10 +174,19 @@ impl Parse for Branch {
 }
 
 pub(crate) fn replace(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let replacements: Replacements = match syn::parse2(attr) {
+    let mut replacements: Replacements = match syn::parse2(attr) {
         Ok(replacements) => replacements,
         Err(e) => return e.into_compile_error(),
     };
+
+    replacements.line_replacements.insert(
+        "# {before_snippet}".to_string(),
+        vec![quote! { doc = crate::before_snippet!() }],
+    );
+    replacements.line_replacements.insert(
+        "# {after_snippet}".to_string(),
+        vec![quote! { doc = crate::after_snippet!() }],
+    );
 
     let mut item: Item = crate::unwrap_or_compile_error!(syn::parse2(input));
 
@@ -218,7 +213,7 @@ pub(crate) fn replace(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     *item.attrs_mut() = replacement_attrs;
 
-    quote::quote! { #item }
+    quote! { #item }
 }
 
 trait ItemLike {
@@ -246,8 +241,8 @@ mod tests {
     #[test]
     fn test_basic() {
         let result = replace(
-            quote::quote! {}.into(),
-            quote::quote! {
+            quote! {}.into(),
+            quote! {
                 /// # Configuration
                 ///
                 /// ## Overview
@@ -273,7 +268,7 @@ mod tests {
 
         assert_eq!(
             result.to_string(),
-            quote::quote! {
+            quote! {
                 /// # Configuration
                 ///
                 /// ## Overview
@@ -300,8 +295,8 @@ mod tests {
     #[test]
     fn test_one_doc_attr() {
         let result = replace(
-            quote::quote! {}.into(),
-            quote::quote! {
+            quote! {}.into(),
+            quote! {
                 #[doc = r#" # Configuration
  ## Overview
  This module contains the initial configuration for the system.
@@ -325,7 +320,7 @@ mod tests {
 
         assert_eq!(
             result.to_string(),
-            quote::quote! {
+            quote! {
                 /// # Configuration
                 /// ## Overview
                 /// This module contains the initial configuration for the system.
@@ -350,14 +345,14 @@ mod tests {
     #[test]
     fn test_custom_replacements() {
         let result = replace(
-            quote::quote! {
+            quote! {
                 "freq" => {
                     cfg(esp32h2) => "let freq = Rate::from_mhz(32);",
                     _ => "let freq = Rate::from_mhz(80);"
                 },
                 "other" => "replacement"
             }.into(),
-            quote::quote! {
+            quote! {
                 #[doc = " # Configuration"]
                 #[doc = " ## Overview"]
                 #[doc = " This module contains the initial configuration for the system."]
@@ -382,7 +377,7 @@ mod tests {
 
         assert_eq!(
             result.to_string(),
-            quote::quote! {
+            quote! {
                 /// # Configuration
                 /// ## Overview
                 /// This module contains the initial configuration for the system.
@@ -409,16 +404,16 @@ mod tests {
     #[test]
     fn test_custom_fail() {
         let result = replace(
-            quote::quote! {
+            quote! {
                 "freq" => {
                     abc(esp32h2) => "let freq = Rate::from_mhz(32);",
                 },
             }
             .into(),
-            quote::quote! {}.into(),
+            quote! {}.into(),
         );
 
-        assert_eq!(result.to_string(), quote::quote! {
+        assert_eq!(result.to_string(), quote! {
             ::core::compile_error!{ "Expected a cfg condition or catch-all condition using `_`" }
         }.to_string());
     }
@@ -426,8 +421,8 @@ mod tests {
     #[test]
     fn test_basic_fn() {
         let result = replace(
-            quote::quote! {}.into(),
-            quote::quote! {
+            quote! {}.into(),
+            quote! {
                 #[doc = " docs"]
                 #[doc = " # {before_snippet}"]
                 fn foo() {
@@ -438,7 +433,7 @@ mod tests {
 
         assert_eq!(
             result.to_string(),
-            quote::quote! {
+            quote! {
                 /// docs
                 #[doc = crate::before_snippet!()]
                 fn foo () { }
@@ -450,8 +445,8 @@ mod tests {
     #[test]
     fn test_basic_enum() {
         let result = replace(
-            quote::quote! {}.into(),
-            quote::quote! {
+            quote! {}.into(),
+            quote! {
                 #[doc = " docs"]
                 #[doc = " # {before_snippet}"]
                 enum Foo {
@@ -462,7 +457,7 @@ mod tests {
 
         assert_eq!(
             result.to_string(),
-            quote::quote! {
+            quote! {
                 /// docs
                 #[doc = crate::before_snippet!()]
                 enum Foo { }
@@ -474,8 +469,8 @@ mod tests {
     #[test]
     fn test_basic_trait() {
         let result = replace(
-            quote::quote! {}.into(),
-            quote::quote! {
+            quote! {}.into(),
+            quote! {
                 #[doc = " docs"]
                 #[doc = " # {before_snippet}"]
                 trait Foo {
@@ -486,7 +481,7 @@ mod tests {
 
         assert_eq!(
             result.to_string(),
-            quote::quote! {
+            quote! {
                 /// docs
                 #[doc = crate::before_snippet!()]
                 trait Foo { }
@@ -498,8 +493,8 @@ mod tests {
     #[test]
     fn test_basic_mod() {
         let result = replace(
-            quote::quote! {}.into(),
-            quote::quote! {
+            quote! {}.into(),
+            quote! {
                 #[doc = " docs"]
                 #[doc = " # {before_snippet}"]
                 mod foo {
@@ -510,7 +505,7 @@ mod tests {
 
         assert_eq!(
             result.to_string(),
-            quote::quote! {
+            quote! {
                 /// docs
                 #[doc = crate::before_snippet!()]
                 mod foo { }
@@ -522,8 +517,8 @@ mod tests {
     #[test]
     fn test_basic_macro() {
         let result = replace(
-            quote::quote! {}.into(),
-            quote::quote! {
+            quote! {}.into(),
+            quote! {
                 #[doc = " docs"]
                 #[doc = " # {before_snippet}"]
                 macro_rules! foo {
@@ -536,7 +531,7 @@ mod tests {
 
         assert_eq!(
             result.to_string(),
-            quote::quote! {
+            quote! {
                 /// docs
                 #[doc = crate::before_snippet!()]
                 macro_rules! foo {
@@ -553,8 +548,8 @@ mod tests {
     #[should_panic]
     fn test_basic_fail_wrong_item() {
         replace(
-            quote::quote! {}.into(),
-            quote::quote! {
+            quote! {}.into(),
+            quote! {
                 #[doc = " docs"]
                 #[doc = " # {before_snippet}"]
                 static FOO: u32 = 0u32;
