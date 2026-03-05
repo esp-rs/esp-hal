@@ -604,11 +604,11 @@ impl Rwdt {
         self.set_write_protection(true);
     }
 
-    /// Configure timeout value in ms for the selected stage.
+    /// Configure timeout value for the selected stage.
     pub fn set_timeout(&mut self, stage: RwdtStage, timeout: Duration) {
         let rtc_cntl = LP_WDT::regs();
 
-        let timeout_raw = (timeout.as_millis() * (crate::clock::cycles_to_1ms() as u64)) as u32;
+        let timeout_raw = crate::clock::us_to_rtc_ticks(timeout.as_micros()) as u32;
         self.set_write_protection(false);
 
         let config_reg = match stage {

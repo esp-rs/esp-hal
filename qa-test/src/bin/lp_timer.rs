@@ -1,6 +1,6 @@
-//! Demonstrates clock setup and LP_TIMER's (lack of) accuracy
+//! Demonstrates clock setup and LP_TIMER's accuracy
 
-//% CHIPS: esp32c6
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -8,10 +8,8 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::{CpuClock, ll},
-    delay::Delay,
     main,
-    rtc_cntl::{Rtc, SocResetReason, reset_reason, sleep::TimerWakeupSource, wakeup_cause},
-    system::Cpu,
+    rtc_cntl::Rtc,
     time::{Duration, Instant},
 };
 use esp_println::println;
@@ -20,14 +18,19 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
+    esp_println::logger::init_logger_from_env();
+
     let mut cpu_clock_config: ll::ClockConfig = CpuClock::default().into();
 
-    // TODO: aspirational example, not supported yet
-    // cpu_clock_config.lp_slow_clk = Some(ll::LpSlowClkConfig::Xtal32k);
+    // FIXME: this fails clock calibration
+    // #[cfg(feature = "esp32")]
+    // {
+    //     cpu_clock_config.rtc_slow_clk = Some(ll::RtcSlowClkConfig::RcFast);
+    // }
 
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(cpu_clock_config));
 
-    let mut rtc = Rtc::new(peripherals.LPWR);
+    let rtc = Rtc::new(peripherals.LPWR);
 
     let start = Instant::now();
     rtc.set_current_time_us(start.duration_since_epoch().as_micros());

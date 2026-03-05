@@ -168,6 +168,18 @@ impl RtcClock {
                 slowclk_cycles,
             );
 
+            if xtal_cycles == 0 {
+                warn!("{:?} calibration failed", cal_clk);
+            } else {
+                debug!("Counted {} XTAL cycles", xtal_cycles);
+
+                debug!(
+                    "{:?} frequency: {}",
+                    cal_clk,
+                    (xtal_freq / xtal_cycles) * slowclk_cycles
+                );
+            }
+
             let divider = xtal_freq.as_mhz() as u64 * slowclk_cycles as u64;
 
             let period_64 =
@@ -659,9 +671,12 @@ pub use modem::*;
 
 /// Read the calibrated RTC slow clock period from the STORE1 register.
 ///
+/// The period is in unit of microseconds, represented as a fixed-point number
+/// with `RtcClock::CAL_FRACT` fractional bits.
+///
 /// Written by [`Clocks::calibrate_rtc_slow_clock`] during clock
 /// initialization.
-fn cal_period() -> u64 {
+fn rtc_slow_cal_period() -> u64 {
     cfg_if::cfg_if! {
         if #[cfg(soc_has_lp_aon)] {
             use crate::peripherals::LP_AON;
@@ -676,17 +691,30 @@ fn cal_period() -> u64 {
 /// Convert RTC slow clock ticks to microseconds using the calibrated period.
 #[cfg(lp_timer_driver_supported)]
 pub(crate) fn rtc_ticks_to_us(ticks: u64) -> u64 {
-    let cal = cal_period();
-    (ticks * cal) >> RtcClock::CAL_FRACT
+    let period = rtc_slow_cal_period();
+
+    // The LP timer is a 48-bit counter running from RTC_SLOW_CLK.
+    // `period` is a fixed point number with 19 fractional bits, it may be a 24-bit value if
+    // RTC_SLOW_CLK is as low as 32768 Hz. Just multiplying the two may cause an overflow on 64
+    // bits. We use a calculation that prevents overflow unconditionally because the counter reaches
+    // 2^19 pretty quickly. We could use a larger mask (up to 40 bits), but that would make the
+    // calculation slower and more complex for perhaps too little benefit.
+
+    const MASK: u64 = (1 << RtcClock::CAL_FRACT) - 1;
+    let upper = (ticks & !MASK) >> RtcClock::CAL_FRACT;
+    let lower = ticks & MASK;
+
+    upper * period + ((lower * period) >> RtcClock::CAL_FRACT)
 }
 
 /// Convert microseconds to RTC slow clock ticks using the calibrated period.
-pub(crate) fn us_to_rtc_ticks(us: u64) -> u64 {
-    let cal = cal_period();
-    (us << RtcClock::CAL_FRACT) / cal
-}
+pub(crate) fn us_to_rtc_ticks(time_in_us: u64) -> u64 {
+    let period = rtc_slow_cal_period();
 
-/// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
-pub(crate) fn cycles_to_1ms() -> u16 {
-    us_to_rtc_ticks(1000) as u16
+    if time_in_us > (u64::MAX >> RtcClock::CAL_FRACT) {
+        ((time_in_us / period) << RtcClock::CAL_FRACT)
+            + ((time_in_us % period) << RtcClock::CAL_FRACT) / period
+    } else {
+        (time_in_us << RtcClock::CAL_FRACT) / period
+    }
 }
