@@ -34,6 +34,8 @@ enum Cli {
 
     /// Perform (parts of) the checks done in CI
     Ci(CiArgs),
+    /// Check documentation coverage for proc-macro expansion items in end-user binaries.
+    CheckDocumentationCoverage,
     /// Format all packages in the workspace with rustfmt
     #[clap(alias = "format-packages")]
     FmtPackages(FmtPackagesArgs),
@@ -77,7 +79,6 @@ struct CheckChangelogArgs {
     #[arg(long)]
     normalize: bool,
 }
-
 
 // ----------------------------------------------------------------------------
 // Application
@@ -149,6 +150,7 @@ fn main() -> Result<()> {
         },
 
         Cli::Ci(args) => run_ci_checks(&workspace, args),
+        Cli::CheckDocumentationCoverage => check_documentation_coverage(&workspace),
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
         Cli::Clean(args) => clean(&workspace, args),
         Cli::CheckPackages(args) => check_packages(&workspace, args),
@@ -521,10 +523,6 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         )
     });
 
-    runner.run("Check proc macro expansion doc coverage", || {
-        check_proc_macro_expansion_doc_coverage(workspace, args.chip)
-    });
-
     if !args.no_docs {
         runner.run("Build Docs", || {
             build_documentation(
@@ -709,6 +707,10 @@ fn host_tests(workspace: &Path, args: HostTestsArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn check_documentation_coverage(workspace: &Path) -> Result<()> {
+    check_proc_macro_expansion_doc_coverage(workspace, Chip::Esp32c6)
 }
 
 /// Ensures proc macro expansion items are documented or hidden.

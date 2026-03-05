@@ -65,6 +65,20 @@ jobs:
       - name: Run check-global-symbols
         run: cargo xtask check-global-symbols
 
+  check-documentation-coverage:
+    name: Check documentation coverage of proc-macros generated artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+        # Install the Rust toolchain for Xtensa devices:
+      - uses: esp-rs/xtensa-toolchain@v1.6
+        with:
+          version: 1.93.0.0
+
+      - name: Run check-documentation-coverage
+        run: cargo xtask check-documentation-coverage
+
   create-issue:
     name: Create GitHub Issue if any job failed
     runs-on: ubuntu-latest
