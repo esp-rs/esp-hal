@@ -100,7 +100,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed PLL reconfiguration causing garbled serial output (#5067)
 - ESP32, ESP32-S2: Fixed RC_FAST divider enable polarity (#5067)
 - ESP32-C6: RtcClock clock calibration for v0.1 (#5109)
-- Calibrate deep sleep using rtc slow clock period (#5105)
+- Improve LP timer accuracy (#5105, #5115)
 
 ### Removed
 
