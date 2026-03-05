@@ -1287,6 +1287,9 @@ macro_rules! define_clock_tree_types {
                     HpRootClkConfig::_3 => 3,
                 }
             }
+            fn value(self) -> u32 {
+                self.divisor()
+            }
         }
         /// The list of clock signals that the `CPU_CLK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1358,6 +1361,9 @@ macro_rules! define_clock_tree_types {
                     CpuHsDivConfig::_3 => 3,
                 }
             }
+            fn value(self) -> u32 {
+                self.divisor()
+            }
         }
         /// Configures the `CPU_LS_DIV` clock divider.
         ///
@@ -1403,6 +1409,9 @@ macro_rules! define_clock_tree_types {
                     CpuLsDivConfig::_31 => 31,
                 }
             }
+            fn value(self) -> u32 {
+                self.divisor()
+            }
         }
         /// Configures the `AHB_HS_DIV` clock divider.
         ///
@@ -1435,6 +1444,9 @@ macro_rules! define_clock_tree_types {
                     AhbHsDivConfig::_7 => 7,
                     AhbHsDivConfig::_15 => 15,
                 }
+            }
+            fn value(self) -> u32 {
+                self.divisor()
             }
         }
         /// Configures the `AHB_LS_DIV` clock divider.
@@ -1481,6 +1493,9 @@ macro_rules! define_clock_tree_types {
                     AhbLsDivConfig::_31 => 31,
                 }
             }
+            fn value(self) -> u32 {
+                self.divisor()
+            }
         }
         /// Configures the `APB_CLK` clock divider.
         ///
@@ -1513,6 +1528,9 @@ macro_rules! define_clock_tree_types {
                     ApbClkConfig::_1 => 1,
                     ApbClkConfig::_3 => 3,
                 }
+            }
+            fn value(self) -> u32 {
+                self.divisor()
             }
         }
         /// Configures the `MSPI_FAST_HS_CLK` clock divider.
@@ -1547,6 +1565,9 @@ macro_rules! define_clock_tree_types {
                     MspiFastHsClkConfig::_5 => 5,
                 }
             }
+            fn value(self) -> u32 {
+                self.divisor()
+            }
         }
         /// Configures the `MSPI_FAST_LS_CLK` clock divider.
         ///
@@ -1579,6 +1600,9 @@ macro_rules! define_clock_tree_types {
                     MspiFastLsClkConfig::_1 => 1,
                     MspiFastLsClkConfig::_2 => 2,
                 }
+            }
+            fn value(self) -> u32 {
+                self.divisor()
             }
         }
         /// The list of clock signals that the `LEDC_SCLK` multiplexer can output.

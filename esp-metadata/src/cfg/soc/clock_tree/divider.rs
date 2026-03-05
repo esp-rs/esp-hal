@@ -257,7 +257,7 @@ impl ClockTreeNodeType for Divider {
                         /// Creates a new divider configuration.
                         pub const fn new(raw: u32) -> Self {
                             match raw {
-                                #(#dividers => #ty_name::#value_variants,)*
+                                #(#dividers => #enum_ty::#value_variants,)*
                                 _ => ::core::panic!(#unknown_value),
                             }
                         }
@@ -363,6 +363,15 @@ valid range ({min} ..= {max})."#
             })
             .collect::<Vec<_>>();
 
+        let single_accessor = if self.params.len() == 1 {
+            let param_name = field_names.first().cloned().unwrap();
+            quote! { fn value(self) -> u32 {
+                self.#param_name()
+            } }
+        } else {
+            quote! {}
+        };
+
         Some(quote! {
             #(#enum_types)*
 
@@ -372,6 +381,8 @@ valid range ({min} ..= {max})."#
                 #node_ctor
 
                 #(#param_accessors)*
+
+                #single_accessor
             }
         })
     }

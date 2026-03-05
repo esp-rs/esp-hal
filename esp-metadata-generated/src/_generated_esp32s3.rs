@@ -1154,6 +1154,9 @@ macro_rules! define_clock_tree_types {
             fn divisor(self) -> u32 {
                 self.divisor
             }
+            fn value(self) -> u32 {
+                self.divisor()
+            }
         }
         /// Selects the output frequency of `CPU_PLL_DIV_OUT`. Depends on `PLL_CLK`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1227,6 +1230,9 @@ macro_rules! define_clock_tree_types {
             }
             fn divisor(self) -> u32 {
                 self.divisor
+            }
+            fn value(self) -> u32 {
+                self.divisor()
             }
         }
         /// The list of clock signals that the `RTC_SLOW_CLK` multiplexer can output.
