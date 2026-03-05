@@ -195,6 +195,13 @@ let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 //!
 //! ## Feature Flags
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
+//! <details>
+//! <summary>
+//!
+//! ## Additional Advanced Topics
+//!
+//! </summary>
+//!
 //! ## Moving Code and Data to RAM
 //!
 //! By default, static data and the majority of application code reside in Flash memory. While this
@@ -261,6 +268,7 @@ let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 //!     These hooks provide direct access to the linking process. Incorrect syntax or
 //!     over-allocating RAM can lead to link-time errors or application instability.
 //!     </section>
+//! </details>
 
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(asm_sub_register, async_fn_in_trait, stable_features)]
