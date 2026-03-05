@@ -902,7 +902,6 @@ fn format_package_path(
     let mut cargo_args = CargoArgsBuilder::default()
         .toolchain("nightly")
         .subcommand("fmt")
-        .arg("--all")
         .build();
 
     if check {
