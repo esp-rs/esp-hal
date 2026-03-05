@@ -1278,7 +1278,7 @@ macro_rules! define_clock_tree_types {
                     _ => ::core::panic!("Invalid HP_ROOT_CLK divider value"),
                 }
             }
-            fn value(self) -> u32 {
+            fn divisor(self) -> u32 {
                 match self {
                     HpRootClkConfig::_1 => 1,
                     HpRootClkConfig::_3 => 3,
@@ -1345,7 +1345,7 @@ macro_rules! define_clock_tree_types {
                     _ => ::core::panic!("Invalid CPU_HS_DIV divider value"),
                 }
             }
-            fn value(self) -> u32 {
+            fn divisor(self) -> u32 {
                 match self {
                     CpuHsDivConfig::_0 => 0,
                     CpuHsDivConfig::_1 => 1,
@@ -1384,7 +1384,7 @@ macro_rules! define_clock_tree_types {
                     _ => ::core::panic!("Invalid CPU_LS_DIV divider value"),
                 }
             }
-            fn value(self) -> u32 {
+            fn divisor(self) -> u32 {
                 match self {
                     CpuLsDivConfig::_0 => 0,
                     CpuLsDivConfig::_1 => 1,
@@ -1417,7 +1417,7 @@ macro_rules! define_clock_tree_types {
                     _ => ::core::panic!("Invalid AHB_HS_DIV divider value"),
                 }
             }
-            fn value(self) -> u32 {
+            fn divisor(self) -> u32 {
                 match self {
                     AhbHsDivConfig::_3 => 3,
                     AhbHsDivConfig::_7 => 7,
@@ -1456,7 +1456,7 @@ macro_rules! define_clock_tree_types {
                     _ => ::core::panic!("Invalid AHB_LS_DIV divider value"),
                 }
             }
-            fn value(self) -> u32 {
+            fn divisor(self) -> u32 {
                 match self {
                     AhbLsDivConfig::_0 => 0,
                     AhbLsDivConfig::_1 => 1,
@@ -1489,7 +1489,7 @@ macro_rules! define_clock_tree_types {
                     _ => ::core::panic!("Invalid APB_CLK divider value"),
                 }
             }
-            fn value(self) -> u32 {
+            fn divisor(self) -> u32 {
                 match self {
                     ApbClkConfig::_0 => 0,
                     ApbClkConfig::_1 => 1,
@@ -1519,7 +1519,7 @@ macro_rules! define_clock_tree_types {
                     _ => ::core::panic!("Invalid MSPI_FAST_HS_CLK divider value"),
                 }
             }
-            fn value(self) -> u32 {
+            fn divisor(self) -> u32 {
                 match self {
                     MspiFastHsClkConfig::_3 => 3,
                     MspiFastHsClkConfig::_4 => 4,
@@ -1549,7 +1549,7 @@ macro_rules! define_clock_tree_types {
                     _ => ::core::panic!("Invalid MSPI_FAST_LS_CLK divider value"),
                 }
             }
-            fn value(self) -> u32 {
+            fn divisor(self) -> u32 {
                 match self {
                     MspiFastLsClkConfig::_0 => 0,
                     MspiFastLsClkConfig::_1 => 1,
@@ -2026,7 +2026,7 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn hp_root_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            (soc_root_clk_frequency(clocks) / unwrap!(clocks.hp_root_clk).value())
+            (soc_root_clk_frequency(clocks) / unwrap!(clocks.hp_root_clk).divisor())
         }
         pub fn configure_cpu_clk(clocks: &mut ClockTree, new_selector: CpuClkConfig) {
             let old_selector = clocks.cpu_clk.replace(new_selector);
@@ -2216,7 +2216,7 @@ macro_rules! define_clock_tree_types {
             release_hp_root_clk(clocks);
         }
         pub fn cpu_hs_div_frequency(clocks: &mut ClockTree) -> u32 {
-            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.cpu_hs_div).value() + 1))
+            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.cpu_hs_div).divisor() + 1))
         }
         pub fn configure_cpu_ls_div(clocks: &mut ClockTree, config: CpuLsDivConfig) {
             clocks.cpu_ls_div = Some(config);
@@ -2238,7 +2238,7 @@ macro_rules! define_clock_tree_types {
             release_hp_root_clk(clocks);
         }
         pub fn cpu_ls_div_frequency(clocks: &mut ClockTree) -> u32 {
-            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.cpu_ls_div).value() + 1))
+            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.cpu_ls_div).divisor() + 1))
         }
         pub fn configure_ahb_hs_div(clocks: &mut ClockTree, config: AhbHsDivConfig) {
             clocks.ahb_hs_div = Some(config);
@@ -2260,7 +2260,7 @@ macro_rules! define_clock_tree_types {
             release_hp_root_clk(clocks);
         }
         pub fn ahb_hs_div_frequency(clocks: &mut ClockTree) -> u32 {
-            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.ahb_hs_div).value() + 1))
+            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.ahb_hs_div).divisor() + 1))
         }
         pub fn configure_ahb_ls_div(clocks: &mut ClockTree, config: AhbLsDivConfig) {
             clocks.ahb_ls_div = Some(config);
@@ -2282,7 +2282,7 @@ macro_rules! define_clock_tree_types {
             release_hp_root_clk(clocks);
         }
         pub fn ahb_ls_div_frequency(clocks: &mut ClockTree) -> u32 {
-            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.ahb_ls_div).value() + 1))
+            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.ahb_ls_div).divisor() + 1))
         }
         pub fn configure_apb_clk(clocks: &mut ClockTree, config: ApbClkConfig) {
             clocks.apb_clk = Some(config);
@@ -2308,7 +2308,7 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn apb_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            (ahb_clk_frequency(clocks) / (unwrap!(clocks.apb_clk).value() + 1))
+            (ahb_clk_frequency(clocks) / (unwrap!(clocks.apb_clk).divisor() + 1))
         }
         pub fn configure_mspi_fast_hs_clk(clocks: &mut ClockTree, config: MspiFastHsClkConfig) {
             clocks.mspi_fast_hs_clk = Some(config);
@@ -2330,7 +2330,7 @@ macro_rules! define_clock_tree_types {
             release_hp_root_clk(clocks);
         }
         pub fn mspi_fast_hs_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.mspi_fast_hs_clk).value() + 1))
+            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.mspi_fast_hs_clk).divisor() + 1))
         }
         pub fn configure_mspi_fast_ls_clk(clocks: &mut ClockTree, config: MspiFastLsClkConfig) {
             clocks.mspi_fast_ls_clk = Some(config);
@@ -2352,7 +2352,7 @@ macro_rules! define_clock_tree_types {
             release_hp_root_clk(clocks);
         }
         pub fn mspi_fast_ls_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.mspi_fast_ls_clk).value() + 1))
+            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.mspi_fast_ls_clk).divisor() + 1))
         }
         pub fn request_pll_f48m(clocks: &mut ClockTree) {
             trace!("Requesting PLL_F48M");

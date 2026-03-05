@@ -115,9 +115,12 @@ impl ClockTreeNodeType for Divider {
 
             let mut config_fields = vec![];
 
-            variables.insert("divisor", quote! { config.value() });
+            for var in self.params.keys() {
+                let param_fn = format_ident!("{}", var);
+                variables.insert(var.as_str(), quote! { config.#param_fn() });
+            }
             reject.0.visit_variables(|var| {
-                if var != "divisor" {
+                if !self.params.contains_key(var) {
                     config_fields.push((var, tree.properties(tree.node(var)).field_name()));
                 }
             });
@@ -169,12 +172,18 @@ impl ClockTreeNodeType for Divider {
         let state = tree.properties(self).field_name();
         let parent_clock = self.upstream_clock().unwrap();
         let parent_frequency_fn = tree.node(parent_clock).frequency_function_name();
-        let divisor = quote! { unwrap!(clocks.#state).value() };
+
+        let params = self.params.keys().map(|var| {
+            let param_fn = format_ident!("{}", var);
+            (var, quote! { unwrap!(clocks.#state).#param_fn() })
+        });
 
         let cfg_expr_code = self.output.to_rust({
             let mut variables = HashMap::new();
             variables.insert(parent_clock, quote! { #parent_frequency_fn(clocks) });
-            variables.insert("divisor", divisor);
+            for (var, param_value_accessor) in params {
+                variables.insert(var.as_str(), param_value_accessor);
+            }
             variables
         });
 
@@ -225,7 +234,7 @@ impl ClockTreeNodeType for Divider {
                         }
                     }
 
-                    fn value(self) -> u32 {
+                    fn divisor(self) -> u32 {
                         match self {
                             #(#ty_name::#value_variants => #dividers,)*
                         }
@@ -273,7 +282,7 @@ impl ClockTreeNodeType for Divider {
                         Self(divisor)
                     }
 
-                    fn value(self) -> u32 {
+                    fn divisor(self) -> u32 {
                         self.0
                     }
                 }

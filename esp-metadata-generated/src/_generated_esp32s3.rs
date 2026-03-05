@@ -1150,7 +1150,7 @@ macro_rules! define_clock_tree_types {
                 );
                 Self(divisor)
             }
-            fn value(self) -> u32 {
+            fn divisor(self) -> u32 {
                 self.0
             }
         }
@@ -1223,7 +1223,7 @@ macro_rules! define_clock_tree_types {
                 );
                 Self(divisor)
             }
-            fn value(self) -> u32 {
+            fn divisor(self) -> u32 {
                 self.0
             }
         }
@@ -1706,7 +1706,7 @@ macro_rules! define_clock_tree_types {
             release_system_pre_div_in(clocks);
         }
         pub fn system_pre_div_frequency(clocks: &mut ClockTree) -> u32 {
-            (system_pre_div_in_frequency(clocks) / (unwrap!(clocks.system_pre_div).value() + 1))
+            (system_pre_div_in_frequency(clocks) / (unwrap!(clocks.system_pre_div).divisor() + 1))
         }
         pub fn configure_cpu_pll_div_out(clocks: &mut ClockTree, config: CpuPllDivOutConfig) {
             if let Some(pll_clk) = clocks.pll_clk {
@@ -1944,7 +1944,7 @@ macro_rules! define_clock_tree_types {
             release_rc_fast_clk(clocks);
         }
         pub fn rc_fast_clk_div_n_frequency(clocks: &mut ClockTree) -> u32 {
-            (rc_fast_clk_frequency(clocks) / (unwrap!(clocks.rc_fast_clk_div_n).value() + 1))
+            (rc_fast_clk_frequency(clocks) / (unwrap!(clocks.rc_fast_clk_div_n).divisor() + 1))
         }
         pub fn request_xtal_div_clk(clocks: &mut ClockTree) {
             trace!("Requesting XTAL_DIV_CLK");

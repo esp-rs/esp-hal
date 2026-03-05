@@ -1261,7 +1261,7 @@ macro_rules! define_clock_tree_types {
                 );
                 Self(divisor)
             }
-            fn value(self) -> u32 {
+            fn divisor(self) -> u32 {
                 self.0
             }
         }
@@ -1285,7 +1285,7 @@ macro_rules! define_clock_tree_types {
                 );
                 Self(divisor)
             }
-            fn value(self) -> u32 {
+            fn divisor(self) -> u32 {
                 self.0
             }
         }
@@ -1309,7 +1309,7 @@ macro_rules! define_clock_tree_types {
                 );
                 Self(divisor)
             }
-            fn value(self) -> u32 {
+            fn divisor(self) -> u32 {
                 self.0
             }
         }
@@ -1958,7 +1958,7 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn cpu_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.cpu_clk).value() + 1))
+            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.cpu_clk).divisor() + 1))
         }
         pub fn configure_ahb_clk(clocks: &mut ClockTree, config: AhbClkConfig) {
             clocks.ahb_clk = Some(config);
@@ -1980,7 +1980,7 @@ macro_rules! define_clock_tree_types {
             release_hp_root_clk(clocks);
         }
         pub fn ahb_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.ahb_clk).value() + 1))
+            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.ahb_clk).divisor() + 1))
         }
         pub fn configure_apb_clk(clocks: &mut ClockTree, config: ApbClkConfig) {
             clocks.apb_clk = Some(config);
@@ -2006,7 +2006,7 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn apb_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            (ahb_clk_frequency(clocks) / (unwrap!(clocks.apb_clk).value() + 1))
+            (ahb_clk_frequency(clocks) / (unwrap!(clocks.apb_clk).divisor() + 1))
         }
         pub fn request_xtal_d2_clk(clocks: &mut ClockTree) {
             trace!("Requesting XTAL_D2_CLK");

@@ -1093,7 +1093,7 @@ macro_rules! define_clock_tree_types {
                     _ => ::core::panic!("Invalid CPU_PLL_DIV divider value"),
                 }
             }
-            fn value(self) -> u32 {
+            fn divisor(self) -> u32 {
                 match self {
                     CpuPllDivConfig::_2 => 2,
                     CpuPllDivConfig::_3 => 3,
@@ -1131,7 +1131,7 @@ macro_rules! define_clock_tree_types {
                 );
                 Self(divisor)
             }
-            fn value(self) -> u32 {
+            fn divisor(self) -> u32 {
                 self.0
             }
         }
@@ -1181,7 +1181,7 @@ macro_rules! define_clock_tree_types {
                 );
                 Self(divisor)
             }
-            fn value(self) -> u32 {
+            fn divisor(self) -> u32 {
                 self.0
             }
         }
@@ -1205,7 +1205,7 @@ macro_rules! define_clock_tree_types {
                 );
                 Self(divisor)
             }
-            fn value(self) -> u32 {
+            fn divisor(self) -> u32 {
                 self.0
             }
         }
@@ -1598,7 +1598,7 @@ macro_rules! define_clock_tree_types {
             release_cpu_pll_div_in(clocks);
         }
         pub fn cpu_pll_div_frequency(clocks: &mut ClockTree) -> u32 {
-            (cpu_pll_div_in_frequency(clocks) / unwrap!(clocks.cpu_pll_div).value())
+            (cpu_pll_div_in_frequency(clocks) / unwrap!(clocks.cpu_pll_div).divisor())
         }
         pub fn configure_system_pre_div_in(
             clocks: &mut ClockTree,
@@ -1664,7 +1664,7 @@ macro_rules! define_clock_tree_types {
             release_system_pre_div_in(clocks);
         }
         pub fn system_pre_div_frequency(clocks: &mut ClockTree) -> u32 {
-            (system_pre_div_in_frequency(clocks) / (unwrap!(clocks.system_pre_div).value() + 1))
+            (system_pre_div_in_frequency(clocks) / (unwrap!(clocks.system_pre_div).divisor() + 1))
         }
         pub fn configure_apb_clk(clocks: &mut ClockTree, new_selector: ApbClkConfig) {
             let old_selector = clocks.apb_clk.replace(new_selector);
@@ -1804,7 +1804,7 @@ macro_rules! define_clock_tree_types {
             release_xtal_clk(clocks);
         }
         pub fn ref_tick_xtal_frequency(clocks: &mut ClockTree) -> u32 {
-            (xtal_clk_frequency(clocks) / (unwrap!(clocks.ref_tick_xtal).value() + 1))
+            (xtal_clk_frequency(clocks) / (unwrap!(clocks.ref_tick_xtal).divisor() + 1))
         }
         pub fn configure_ref_tick_ck8m(clocks: &mut ClockTree, config: RefTickCk8mConfig) {
             clocks.ref_tick_ck8m = Some(config);
@@ -1826,7 +1826,7 @@ macro_rules! define_clock_tree_types {
             release_rc_fast_clk(clocks);
         }
         pub fn ref_tick_ck8m_frequency(clocks: &mut ClockTree) -> u32 {
-            (rc_fast_clk_frequency(clocks) / (unwrap!(clocks.ref_tick_ck8m).value() + 1))
+            (rc_fast_clk_frequency(clocks) / (unwrap!(clocks.ref_tick_ck8m).divisor() + 1))
         }
         pub fn configure_cpu_clk(clocks: &mut ClockTree, new_selector: CpuClkConfig) {
             let old_selector = clocks.cpu_clk.replace(new_selector);
