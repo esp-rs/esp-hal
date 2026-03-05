@@ -195,6 +195,31 @@ let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 //!
 //! ## Feature Flags
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
+//! ## Forcing data or code to RAM
+//!
+//! This is an advanced feature. Use with caution.
+//!
+//! By default static data and most of the code will be placed in flash. However due to cache misses
+//! this can come with a performance penalty. However RAM is a very limited resource so the ideal
+//! balancing is application specific.
+//!
+//! For your own code you can use the `#[ram]` macro. For code which is not under your control this
+//! won't be possible.
+//!
+//! While `esp-hal` comes with all the necessary linker scripts it also provides a way to
+//! hook into the scripts to force data and code to RAM.
+//!
+//! The mechanism is controlled by the corresponding config options (see above).
+//!
+//! If enabled the user is required to provide a 'rwdata_hook.x' and/or a 'rwtext_hook.x' file which
+//! will get included into `.data` / `.rwtext` sections. Use the input section syntax ( <https://sourceware.org/binutils/docs/ld/Input-Section-Basics.html> ).
+//!
+//! These files get included without any checks!
+//!
+//! By default the linker will look for the hook files in the current working directory. But you can
+//! specify additional directories to the linker search path in `.cargo/config.toml` (e.g. `"-C",
+//! "link-args=-L./hooks"`).
+
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(asm_sub_register, async_fn_in_trait, stable_features)]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
