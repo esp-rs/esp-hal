@@ -309,7 +309,7 @@ const LOADED: u32 = 1 << 31;
 
 #[cold]
 fn load_chip_revision_from_efuse() -> u16 {
-    let chip_revision = crate::efuse::Efuse::chip_revision();
+    let chip_revision = crate::efuse::chip_revision();
     CHIP_REVISION.store(chip_revision as u32 | LOADED, Ordering::Release);
     chip_revision
 }

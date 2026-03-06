@@ -19,7 +19,7 @@ use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
     clock::Clocks,
-    efuse::{Efuse, VOL_LEVEL_HP_INV},
+    efuse::VOL_LEVEL_HP_INV,
     peripherals::{APB_CTRL, LPWR, RTC_IO, SYSTEM, TIMG0, TIMG1, UART0, UART1, UART2},
     rtc_cntl::Rtc,
     soc::regi2c,
@@ -266,7 +266,7 @@ fn enable_pll_clk_impl(clocks: &mut ClockTree, en: bool) {
             bbadc_dsmp: BBPLL_BBADC_DSMP_VAL_320M,
         },
         PllClkConfig::_480 => VoltageParams {
-            dbias: RTC_CNTL_DBIAS_1V25 - Efuse::read_field_le::<u8>(VOL_LEVEL_HP_INV),
+            dbias: RTC_CNTL_DBIAS_1V25 - crate::efuse::read_field_le::<u8>(VOL_LEVEL_HP_INV),
             endiv5: BBPLL_ENDIV5_VAL_480M,
             bbadc_dsmp: BBPLL_BBADC_DSMP_VAL_480M,
         },

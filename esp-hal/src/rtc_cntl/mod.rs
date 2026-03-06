@@ -618,7 +618,7 @@ impl Rwdt {
         };
 
         #[cfg(not(esp32))]
-        let timeout_raw = timeout_raw >> (1 + crate::efuse::Efuse::rwdt_multiplier());
+        let timeout_raw = timeout_raw >> (1 + crate::efuse::rwdt_multiplier());
 
         config_reg.modify(|_, w| unsafe { w.hold().bits(timeout_raw) });
 

@@ -339,6 +339,7 @@ unstable_reexport! {
 #[cfg(all(feature = "rt", feature = "exception-handler"))]
 mod exception_handler;
 
+pub mod efuse;
 pub mod interrupt;
 
 unstable_module! {
@@ -362,7 +363,6 @@ unstable_module! {
     pub mod otg_fs;
     #[cfg(psram)] // DMA needs some things from here
     pub mod psram;
-    pub mod efuse;
 }
 
 #[cfg(any(

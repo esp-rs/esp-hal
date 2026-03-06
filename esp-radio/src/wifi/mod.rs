@@ -1188,11 +1188,13 @@ enum InterfaceType {
 
 impl InterfaceType {
     fn mac_address(&self) -> [u8; 6] {
-        use esp_hal::efuse::{Efuse, InterfaceMacAddress};
+        use esp_hal::efuse::InterfaceMacAddress;
         let mac = match self {
-            InterfaceType::Station => Efuse::interface_mac_address(InterfaceMacAddress::Station),
+            InterfaceType::Station => {
+                esp_hal::efuse::interface_mac_address(InterfaceMacAddress::Station)
+            }
             InterfaceType::AccessPoint => {
-                Efuse::interface_mac_address(InterfaceMacAddress::AccessPoint)
+                esp_hal::efuse::interface_mac_address(InterfaceMacAddress::AccessPoint)
             }
         };
 

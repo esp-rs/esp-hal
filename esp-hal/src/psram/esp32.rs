@@ -302,7 +302,7 @@ pub(crate) mod utils {
 
     #[ram]
     pub(crate) fn psram_init(config: &PsramConfig) {
-        let chip = crate::efuse::Efuse::chip_type();
+        let chip = crate::efuse::chip_type();
 
         let mode = config.cache_speed;
         let mut psram_io = PsramIo::default();

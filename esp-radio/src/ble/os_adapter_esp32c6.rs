@@ -1,4 +1,3 @@
-use esp_hal::efuse::Efuse;
 use procmacros::BuilderLite;
 
 use super::*;
@@ -312,7 +311,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ignore_wl_for_direct_adv: 0,
         cpu_freq_mhz: 160,
         enable_pcl: 0, // CONFIG_BT_LE_POWER_CONTROL_ENABLED
-        version_num: Efuse::minor_chip_version() as u32,
+        version_num: esp_hal::efuse::minor_chip_version() as u32,
         csa2_select: 1,
         enable_csr: 0,
         ble_aa_check: config.verify_access_address as u8,

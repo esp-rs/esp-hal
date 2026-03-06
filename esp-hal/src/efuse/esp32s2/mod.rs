@@ -1,31 +1,34 @@
 use crate::peripherals::EFUSE;
 
 mod fields;
+#[instability::unstable]
 pub use fields::*;
 
-impl super::Efuse {
-    /// Get status of SPI boot encryption.
-    pub fn flash_encryption() -> bool {
-        !Self::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT)
-            .count_ones()
-            .is_multiple_of(2)
-    }
+/// Get status of SPI boot encryption.
+#[instability::unstable]
+pub fn flash_encryption() -> bool {
+    !super::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT)
+        .count_ones()
+        .is_multiple_of(2)
+}
 
-    /// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
-    pub fn rwdt_multiplier() -> u8 {
-        Self::read_field_le::<u8>(WDT_DELAY_SEL)
-    }
+/// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
+#[instability::unstable]
+pub fn rwdt_multiplier() -> u8 {
+    super::read_field_le::<u8>(WDT_DELAY_SEL)
+}
 
-    /// Returns the major hardware revision
-    pub fn major_chip_version() -> u8 {
-        Self::read_field_le(WAFER_VERSION_MAJOR)
-    }
+/// Returns the major hardware revision
+#[instability::unstable]
+pub fn major_chip_version() -> u8 {
+    super::read_field_le(WAFER_VERSION_MAJOR)
+}
 
-    /// Returns the minor hardware revision
-    pub fn minor_chip_version() -> u8 {
-        Self::read_field_le::<u8>(WAFER_VERSION_MINOR_HI) << 3
-            | Self::read_field_le::<u8>(WAFER_VERSION_MINOR_LO)
-    }
+/// Returns the minor hardware revision
+#[instability::unstable]
+pub fn minor_chip_version() -> u8 {
+    super::read_field_le::<u8>(WAFER_VERSION_MINOR_HI) << 3
+        | super::read_field_le::<u8>(WAFER_VERSION_MINOR_LO)
 }
 
 #[derive(Debug, Clone, Copy, strum::FromRepr)]

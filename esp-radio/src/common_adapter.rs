@@ -143,8 +143,11 @@ pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> c_int {
     use hal::efuse::InterfaceMacAddress;
 
     let kind = match type_ {
+        #[cfg(soc_has_wifi)]
         0 => InterfaceMacAddress::Station,
+        #[cfg(soc_has_wifi)]
         1 => InterfaceMacAddress::AccessPoint,
+        #[cfg(soc_has_bt)]
         2 => InterfaceMacAddress::Bluetooth,
         _ => {
             warn!(
@@ -155,7 +158,7 @@ pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> c_int {
         }
     };
 
-    let addr = hal::efuse::Efuse::interface_mac_address(kind);
+    let addr = hal::efuse::interface_mac_address(kind);
 
     unsafe {
         core::ptr::copy_nonoverlapping(addr.as_bytes().as_ptr(), mac, 6);
