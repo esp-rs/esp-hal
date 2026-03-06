@@ -58,7 +58,7 @@ use crate::cfg::{
         mux::Multiplexer,
         source::{DerivedClockSource, Source},
     },
-    soc::ProcessedClockData,
+    soc::{ClockTreeNodeInstance, ProcessedClockData},
 };
 
 mod divider;
@@ -181,11 +181,13 @@ pub(crate) struct DependencyGraph {
 }
 
 impl DependencyGraph {
-    pub fn build_from(clock_tree: &[Box<dyn ClockTreeNodeType>]) -> Self {
+    pub(super) fn build_from<'a>(
+        clock_tree: impl Iterator<Item = &'a ClockTreeNodeInstance>,
+    ) -> Self {
         let mut dependency_graph = IndexMap::new();
         let mut reverse_dependency_graph = IndexMap::new();
 
-        for node in clock_tree.iter() {
+        for node in clock_tree {
             let node_name = node.name_str();
             dependency_graph
                 .entry(node_name.clone())

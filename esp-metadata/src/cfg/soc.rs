@@ -1,9 +1,9 @@
-use std::{collections::HashMap, ops::Range, str::FromStr};
+use std::{cell::RefCell, collections::HashMap, ops::Range, str::FromStr};
 
 use anyhow::{Context, Result};
-use convert_case::{Boundary, Case, Casing, pattern};
-use indexmap::IndexMap;
-use proc_macro2::TokenStream;
+use convert_case::{Boundary, Case, Casing, StateConverter, pattern};
+use indexmap::IndexSet;
+use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 use serde::{Deserialize, Serialize};
 
@@ -91,12 +91,8 @@ pub struct SystemClocks {
 }
 
 pub(crate) struct ProcessedClockData {
-    /// For each clock tree node, this map stores which of them are fixed, configurable, or
-    /// dependent on other nodes.
-    classified_clocks: IndexMap<String, ClockType>,
-
-    /// The device's `system_clocks` data.
-    clock_tree: Vec<Box<dyn ClockTreeNodeType>>,
+    /// All instantiated clock tree node.
+    clock_tree: Vec<ClockTreeNodeInstance>,
 
     /// Refcount/config type properties of the clock tree nodes.
     management_properties: HashMap<String, ManagementProperties>,
@@ -105,15 +101,129 @@ pub(crate) struct ProcessedClockData {
     dependency_graph: DependencyGraph,
 }
 
+pub(crate) struct ClockTreeNodeInstance {
+    node: Box<dyn ClockTreeNodeType>,
+    include_in_global_config: bool,
+}
+
+impl ClockTreeNodeType for ClockTreeNodeInstance {
+    fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
+        self.node.validate_source_data(ctx)
+    }
+
+    fn is_configurable(&self) -> bool {
+        self.node.is_configurable()
+    }
+
+    fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream {
+        self.node.config_apply_function(tree)
+    }
+
+    fn node_frequency_impl(&self, tree: &ProcessedClockData) -> TokenStream {
+        self.node.node_frequency_impl(tree)
+    }
+
+    fn name_str<'a>(&'a self) -> &'a String {
+        self.node.name_str()
+    }
+
+    fn config_type(&self) -> Option<TokenStream> {
+        self.node.config_type()
+    }
+
+    fn config_docline(&self) -> Option<String> {
+        self.node.config_docline()
+    }
+
+    fn request_direct_dependencies(
+        &self,
+        node: &dyn ClockTreeNodeType,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        self.node.request_direct_dependencies(node, tree)
+    }
+
+    fn release_direct_dependencies(
+        &self,
+        node: &dyn ClockTreeNodeType,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        self.node.release_direct_dependencies(node, tree)
+    }
+
+    fn affected_nodes<'s>(&'s self) -> Vec<&'s str> {
+        self.node.affected_nodes()
+    }
+
+    fn input_clocks(&self) -> Vec<String> {
+        self.node.input_clocks()
+    }
+
+    fn always_on(&self) -> bool {
+        self.node.always_on()
+    }
+
+    fn config_apply_impl_function(&self, tree: &ProcessedClockData) -> TokenStream {
+        self.node.config_apply_impl_function(tree)
+    }
+
+    fn name<'a>(&'a self) -> StateConverter<'a, String> {
+        self.node.name()
+    }
+
+    fn config_type_name(&self) -> Option<Ident> {
+        self.node.config_type_name()
+    }
+
+    fn config_documentation(&self) -> Option<String> {
+        self.node.config_documentation()
+    }
+
+    fn apply_configuration(
+        &self,
+        expr: &clock_tree::Expression,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        self.node.apply_configuration(expr, tree)
+    }
+
+    fn config_current_function(&self, tree: &ProcessedClockData) -> TokenStream {
+        self.node.config_current_function(tree)
+    }
+
+    fn config_apply_function_name(&self) -> Ident {
+        self.node.config_apply_function_name()
+    }
+
+    fn current_config_function_name(&self) -> Ident {
+        self.node.current_config_function_name()
+    }
+
+    fn frequency_function_name(&self) -> Ident {
+        self.node.frequency_function_name()
+    }
+
+    fn request_fn_name(&self) -> Ident {
+        self.node.request_fn_name()
+    }
+
+    fn release_fn_name(&self) -> Ident {
+        self.node.release_fn_name()
+    }
+
+    fn enable_fn_name(&self) -> Ident {
+        self.node.enable_fn_name()
+    }
+}
+
 impl ProcessedClockData {
     /// Returns a node by its name (e.g. `XTAL_CLK`).
     ///
     /// As the clock tree is stored as a vector, this method performs a linear search.
-    fn node(&self, name: &str) -> &dyn ClockTreeNodeType {
+    fn node(&self, name: &str) -> &ClockTreeNodeInstance {
         self.clock_tree
             .iter()
             .find(|item| item.name_str() == name)
-            .map(|b| b.as_ref())
             .unwrap_or_else(|| panic!("Clock node {name} not found"))
     }
 
@@ -122,22 +232,6 @@ impl ProcessedClockData {
             .get(node_name)
             .unwrap_or_else(|| panic!("Management properties for {node_name} not found"))
     }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-enum ClockType {
-    /// The clock tree item is not configurable.
-    Fixed,
-
-    /// The clock tree item is configurable.
-    Configurable,
-
-    /// The clock tree item is configured by some other item.
-    Dependent(String),
-
-    /// Peripheral clock source - may be Configurable, but shouldn't be exposed via the global clock
-    /// tree config.
-    Peripheral,
 }
 
 impl SystemClocks {
@@ -151,13 +245,7 @@ impl SystemClocks {
         let mut configurables = vec![];
         let mut system_config_steps = HashMap::new();
         let mut provided_function_doclines = vec![];
-        for (item, kind) in tree
-            .classified_clocks
-            .iter()
-            .map(|(item, kind)| (item, kind.clone()))
-        {
-            let clock_item = tree.node(item);
-
+        for clock_item in tree.clock_tree.iter() {
             // Generate code for all clock tree nodes
             if let Some(config_type) = clock_item.config_type() {
                 let doclines = clock_item.config_docline().unwrap();
@@ -202,7 +290,7 @@ impl SystemClocks {
                 }
             }
 
-            if kind == ClockType::Configurable {
+            if clock_item.is_configurable() && clock_item.include_in_global_config {
                 // Generate code for the global clock configuration
                 let config_type_name = clock_item.config_type_name();
                 let config_apply_function_name = clock_item.config_apply_function_name();
@@ -590,13 +678,17 @@ impl DeviceClocks {
             .clock_tree
             .iter()
             .map(|node| {
-                let boxed: Box<dyn ClockTreeNodeType> = match node {
-                    ClockTreeItem::Multiplexer(inner) => Box::new(inner.clone()),
-                    ClockTreeItem::Source(inner) => Box::new(inner.clone()),
-                    ClockTreeItem::Divider(inner) => Box::new(inner.clone()),
-                    ClockTreeItem::Derived(inner) => Box::new(inner.clone()),
+                let node = ClockTreeNodeInstance {
+                    node: match node {
+                        ClockTreeItem::Multiplexer(inner) => Box::new(inner.clone()),
+                        ClockTreeItem::Source(inner) => Box::new(inner.clone()),
+                        ClockTreeItem::Divider(inner) => Box::new(inner.clone()),
+                        ClockTreeItem::Derived(inner) => Box::new(inner.clone()),
+                    },
+                    include_in_global_config: true,
                 };
-                boxed
+
+                RefCell::new(node)
             })
             .collect::<Vec<_>>();
 
@@ -604,11 +696,11 @@ impl DeviceClocks {
             tree: self.system_clocks.clock_tree.as_slice(),
         };
         for node in clock_tree.iter() {
+            let node = node.borrow();
             node.validate_source_data(&validation_context)
                 .with_context(|| format!("Invalid clock tree item: {}", node.name_str()))?;
         }
 
-        let mut classified_clocks = IndexMap::new();
         let mut management_properties = HashMap::new();
 
         // Merge peripheral clock sources into the clock tree
@@ -649,39 +741,39 @@ impl DeviceClocks {
                 node.validate_source_data(&validation_context)
                     .with_context(|| format!("Invalid clock tree item: {}", node.name_str()))?;
 
-                clock_tree.push(Box::new(node));
+                clock_tree.push(RefCell::new(ClockTreeNodeInstance {
+                    node: Box::new(node),
+                    include_in_global_config: false,
+                }));
             }
         }
 
         // To compute refcount requirement and correct initialization order, we need to be able to
         // access direct dependencies (downstream clocks). As it is simpler to define
         // dependents (inputs), we have to do a bit of maths.
-        let dependency_graph = DependencyGraph::build_from(&clock_tree);
+        let dependency_graph =
+            DependencyGraph::build_from(clock_tree.iter_mut().map(|n| &*n.get_mut()));
 
-        // Classify clock tree items
-        for node in clock_tree.iter() {
+        // Apply legacy sorting to avoid reordering generated code.
+        let mut sorted_clocks = IndexSet::new();
+
+        for (idx, node) in clock_tree.iter().enumerate() {
+            let node = node.borrow();
             // If item A configures item B, then item B is a dependent clock tree item.
             for clock in node.affected_nodes() {
-                classified_clocks.insert(
-                    clock.to_string(),
-                    ClockType::Dependent(node.name_str().clone()),
-                );
+                let idx = clock_tree
+                    .iter()
+                    .position(|n| n.borrow().name_str() == clock)
+                    .unwrap();
+
+                clock_tree[idx].borrow_mut().include_in_global_config = false;
+
+                sorted_clocks.insert(idx);
             }
 
             // Each tree item tells its own clock type, except for dependent items. If something has
             // already been classified, we can only change it from its kind to dependent.
-            if classified_clocks.get(node.name_str().as_str()).is_none() {
-                classified_clocks.insert(
-                    node.name_str().clone(),
-                    if (node.as_ref() as &dyn std::any::Any).is::<PeripheralClockSource>() {
-                        ClockType::Peripheral
-                    } else if node.is_configurable() {
-                        ClockType::Configurable
-                    } else {
-                        ClockType::Fixed
-                    },
-                );
-            }
+            sorted_clocks.insert(idx);
 
             // If there's a single dependent clock, we can piggyback on its refcount.
             // Note that this is only valid if the clock node is not expected to be manually
@@ -704,9 +796,23 @@ impl DeviceClocks {
             );
         }
 
+        // Now sort the nodes according to the order we've established.
+        let clock_tree = {
+            // ClockTreeNodeInstance is not Clone, so let's turn the vector into a vector of
+            // optionals that we can take from.
+            let mut clock_tree = clock_tree
+                .into_iter()
+                .map(|n| Some(n.into_inner()))
+                .collect::<Vec<_>>();
+            let mut sorted = Vec::with_capacity(clock_tree.len());
+            for idx in sorted_clocks {
+                sorted.push(clock_tree[idx].take().unwrap());
+            }
+            sorted
+        };
+
         Ok(ProcessedClockData {
             clock_tree,
-            classified_clocks,
             management_properties,
             dependency_graph,
         })
