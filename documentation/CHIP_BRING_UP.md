@@ -19,6 +19,12 @@ In particular, this page specifies:
 - the current MMU page size assumptions (and any resulting flash size configuration requirements)
 - where flasher stubs are sourced from
 
+To build a bootloader for your chip, simply open any example folder in `esp-idf`, configure the target chip and run the appropriate command:
+```
+idf.py set-target <CHIP>
+idf.py bootloader
+``` 
+
 Also, you will need to implement and define a couple of chip-specific functions in `espflash/src/targets/<chip>.rs`. It is sufficient to use the implementation of already supported chips as a reference.
 
 ### probe-rs Support (optional)
