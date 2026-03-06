@@ -33,9 +33,6 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     // configure GPIO 1 as LP output pin
-    #[cfg(feature = "esp32c6")]
-    let lp_pin = LowPowerOutput::new(peripherals.GPIO1);
-    #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
     let lp_pin = LowPowerOutput::new(peripherals.GPIO1);
 
     #[cfg(feature = "esp32c6")]
