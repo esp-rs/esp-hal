@@ -105,6 +105,16 @@ pub(crate) struct ClockTreeNodeInstance {
     node: Box<dyn ClockTreeNodeType>,
     include_in_global_config: bool,
     is_first_instance: bool,
+    force_configurable: bool,
+}
+
+impl ClockTreeNodeInstance {
+    fn config_type(&self) -> Option<TokenStream> {
+        if !self.is_first_instance || !self.is_configurable() {
+            return None;
+        }
+        Some(ClockTreeNodeType::config_type(self))
+    }
 }
 
 impl ClockTreeNodeType for ClockTreeNodeInstance {
@@ -113,7 +123,7 @@ impl ClockTreeNodeType for ClockTreeNodeInstance {
     }
 
     fn is_configurable(&self) -> bool {
-        self.node.is_configurable()
+        self.node.is_configurable() || self.force_configurable
     }
 
     fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream {
@@ -128,11 +138,7 @@ impl ClockTreeNodeType for ClockTreeNodeInstance {
         self.node.name_str()
     }
 
-    fn config_type(&self) -> Option<TokenStream> {
-        if !self.is_first_instance {
-            return None;
-        }
-
+    fn config_type(&self) -> TokenStream {
         self.node.config_type()
     }
 
@@ -176,7 +182,7 @@ impl ClockTreeNodeType for ClockTreeNodeInstance {
         self.node.name()
     }
 
-    fn config_type_name(&self) -> Option<Ident> {
+    fn config_type_name(&self) -> Ident {
         self.node.config_type_name()
     }
 
@@ -193,7 +199,11 @@ impl ClockTreeNodeType for ClockTreeNodeInstance {
     }
 
     fn config_current_function(&self, tree: &ProcessedClockData) -> TokenStream {
-        self.node.config_current_function(tree)
+        if self.is_configurable() {
+            self.node.config_current_function(tree)
+        } else {
+            quote! {}
+        }
     }
 
     fn config_apply_function_name(&self) -> Ident {
@@ -692,6 +702,7 @@ impl DeviceClocks {
                     },
                     include_in_global_config: true,
                     is_first_instance: true,
+                    force_configurable: false,
                 };
 
                 RefCell::new(node)
@@ -748,6 +759,8 @@ impl DeviceClocks {
                     node: Box::new(node),
                     include_in_global_config: false,
                     is_first_instance: is_definition,
+                    // FIXME
+                    force_configurable: true,
                 }));
             }
         }
@@ -794,7 +807,11 @@ impl DeviceClocks {
                     // Always-on clock sources don't need enable functions.
                     has_enable: !(node.always_on()
                         && dependency_graph.inputs(node.name_str()).is_empty()),
-                    state_ty: node.config_type_name(),
+                    state_ty: if node.is_configurable() {
+                        Some(node.config_type_name())
+                    } else {
+                        None
+                    },
                     always_on: node.always_on(),
                 },
             );

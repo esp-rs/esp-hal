@@ -28,20 +28,16 @@ impl ClockTreeNodeType for PeripheralClockSource {
         &self.peripheral
     }
 
-    fn config_type_name(&self) -> Option<Ident> {
-        if self.is_configurable() {
-            let item = self
-                .template
-                .from_case(Case::Constant)
-                .to_case(Case::Pascal);
-            Some(quote::format_ident!("{}Config", item))
-        } else {
-            None
-        }
+    fn config_type_name(&self) -> Ident {
+        let item = self
+            .template
+            .from_case(Case::Constant)
+            .to_case(Case::Pascal);
+        quote::format_ident!("{}Config", item)
     }
 
     fn is_configurable(&self) -> bool {
-        true
+        self.mux.is_configurable()
     }
 
     fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream {
@@ -64,10 +60,10 @@ impl ClockTreeNodeType for PeripheralClockSource {
         self.mux.node_frequency_impl2(self, tree)
     }
 
-    fn config_type(&self) -> Option<TokenStream> {
-        let ty_name = self.config_type_name()?;
+    fn config_type(&self) -> TokenStream {
+        let ty_name = self.config_type_name();
 
-        Some(self.mux.impl_config_type(ty_name))
+        self.mux.impl_config_type(ty_name)
     }
 
     fn config_docline(&self) -> Option<String> {

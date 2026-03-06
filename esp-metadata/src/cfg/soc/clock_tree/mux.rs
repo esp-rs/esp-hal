@@ -63,7 +63,7 @@ impl ClockTreeNodeType for Multiplexer {
     fn apply_configuration(&self, expr: &Expression, _tree: &ProcessedClockData) -> TokenStream {
         let config_function = self.config_apply_function_name();
 
-        let enum_name = self.config_type_name().unwrap();
+        let enum_name = self.config_type_name();
 
         let configured_name = expr.as_name().unwrap();
         let variant = self
@@ -106,10 +106,10 @@ impl ClockTreeNodeType for Multiplexer {
         ))
     }
 
-    fn config_type(&self) -> Option<TokenStream> {
-        let ty_name = self.config_type_name()?;
+    fn config_type(&self) -> TokenStream {
+        let ty_name = self.config_type_name();
 
-        Some(self.impl_config_type(ty_name))
+        self.impl_config_type(ty_name)
     }
 
     fn affected_nodes<'s>(&'s self) -> Vec<&'s str> {
@@ -307,7 +307,7 @@ impl Multiplexer {
         config_var: TokenStream,
     ) -> TokenStream {
         if self.variants.len() > 1 {
-            let ty_name = node.config_type_name().unwrap();
+            let ty_name = node.config_type_name();
             let request_upstream_branches = self.variants.iter().map(|variant| {
                 let match_arm = variant.config_enum_variant_name();
                 let function = tree.node(&variant.outputs).request_fn_name();
@@ -341,7 +341,7 @@ impl Multiplexer {
         config_var: TokenStream,
     ) -> TokenStream {
         if self.variants.len() > 1 {
-            let ty_name = node.config_type_name().unwrap();
+            let ty_name = node.config_type_name();
             let release_upstream_branches = self.variants.iter().map(|variant| {
                 let match_arm = variant.config_enum_variant_name();
                 let function = tree.node(&variant.outputs).release_fn_name();

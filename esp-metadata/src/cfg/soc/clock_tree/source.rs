@@ -154,13 +154,9 @@ impl ClockTreeNodeType for Source {
         Some(docline)
     }
 
-    fn config_type(&self) -> Option<TokenStream> {
-        if self.values.is_none() {
-            return None;
-        }
-
+    fn config_type(&self) -> TokenStream {
         let clock_name = &self.name;
-        let ty_name = self.config_type_name()?;
+        let ty_name = self.config_type_name();
 
         if let Some(frequencies) = self.list_of_fixed_frequencies() {
             let mut eval_ctx = somni_expr::Context::new();
@@ -192,7 +188,7 @@ impl ClockTreeNodeType for Source {
                 .map(|freq| number(freq))
                 .collect::<Vec<_>>();
 
-            Some(quote! {
+            quote! {
                 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
                 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
                 pub enum #ty_name {
@@ -209,7 +205,7 @@ impl ClockTreeNodeType for Source {
                        }
                     }
                 }
-            })
+            }
         } else {
             let mut extra_docs = vec![];
             let validate = self.values.as_ref().map(|d| {
@@ -237,7 +233,7 @@ impl ClockTreeNodeType for Source {
                 }
             });
 
-            Some(quote! {
+            quote! {
                 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
                 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
                 pub struct #ty_name(u32);
@@ -256,7 +252,7 @@ impl ClockTreeNodeType for Source {
                         self.0
                     }
                 }
-            })
+            }
         }
     }
 
@@ -334,7 +330,7 @@ impl ClockTreeNodeType for DerivedClockSource {
             .map(|doc| format!("{} Depends on `{}`.", doc, self.from))
     }
 
-    fn config_type(&self) -> Option<TokenStream> {
+    fn config_type(&self) -> TokenStream {
         self.source_options.config_type()
     }
 

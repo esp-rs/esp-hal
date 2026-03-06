@@ -155,7 +155,7 @@ impl ClockTreeNodeType for Divider {
     fn apply_configuration(&self, expr: &Expression, tree: &ProcessedClockData) -> TokenStream {
         let config_function = self.config_apply_function_name();
 
-        let state = self.config_type_name().unwrap();
+        let state = self.config_type_name();
 
         let cfg_expr_code = expr.to_rust({
             let mut variables = HashMap::new();
@@ -205,9 +205,9 @@ impl ClockTreeNodeType for Divider {
         ))
     }
 
-    fn config_type(&self) -> Option<TokenStream> {
+    fn config_type(&self) -> TokenStream {
         let clock_name = &self.name;
-        let ty_name = self.config_type_name()?;
+        let ty_name = self.config_type_name();
 
         let mut enum_types = vec![];
         let mut field_names = vec![];
@@ -376,7 +376,7 @@ valid range ({min} ..= {max})."#
             quote! {}
         };
 
-        Some(quote! {
+        quote! {
             #(#enum_types)*
 
             #node_type_decl
@@ -388,7 +388,7 @@ valid range ({min} ..= {max})."#
 
                 #single_accessor
             }
-        })
+        }
     }
 
     fn request_direct_dependencies(

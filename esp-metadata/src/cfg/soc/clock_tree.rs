@@ -319,13 +319,9 @@ pub(crate) trait ClockTreeNodeType: Any {
 
     /// Returns the name of the clock configuration type. The corresponding field in the
     /// `ClockConfig` struct will have this type.
-    fn config_type_name(&self) -> Option<Ident> {
-        if self.is_configurable() {
-            let item = self.name().to_case(Case::Pascal);
-            Some(quote::format_ident!("{}Config", item))
-        } else {
-            None
-        }
+    fn config_type_name(&self) -> Ident {
+        let item = self.name().to_case(Case::Pascal);
+        quote::format_ident!("{}Config", item)
     }
 
     /// Returns the documentation for the clock configuration, which will be placed on the
@@ -343,21 +339,17 @@ pub(crate) trait ClockTreeNodeType: Any {
     }
 
     fn config_current_function(&self, tree: &ProcessedClockData) -> TokenStream {
-        if self.is_configurable() {
-            let ty_name = self.config_type_name();
-            let state = tree.properties(self.name_str()).field_name();
-            let fn_name = self.current_config_function_name();
-            quote! {
-                pub fn #fn_name(clocks: &mut ClockTree) -> Option<#ty_name> {
-                    clocks.#state
-                }
+        let ty_name = self.config_type_name();
+        let state = tree.properties(self.name_str()).field_name();
+        let fn_name = self.current_config_function_name();
+        quote! {
+            pub fn #fn_name(clocks: &mut ClockTree) -> Option<#ty_name> {
+                clocks.#state
             }
-        } else {
-            quote! {}
         }
     }
 
-    fn config_type(&self) -> Option<TokenStream>;
+    fn config_type(&self) -> TokenStream;
     fn config_docline(&self) -> Option<String>;
 
     fn config_apply_function_name(&self) -> Ident {
@@ -433,7 +425,11 @@ impl ClockTreeItem {
         node: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> ClockNodeFunctions {
-        let ty_name = node.config_type_name();
+        let ty_name = if node.is_configurable() {
+            Some(node.config_type_name())
+        } else {
+            None
+        };
 
         let request_fn_name = node.request_fn_name();
         let release_fn_name = node.release_fn_name();
@@ -448,7 +444,7 @@ impl ClockTreeItem {
 
         // Only configurables have an apply fn
         let apply_fn = ty_name.as_ref().map(|_| node.config_apply_function(tree));
-        let current_config_fn = ty_name.as_ref().map(|_| node.config_current_function(tree));
+        let current_config_fn = node.config_current_function(tree);
         let apply_fn_impl = ty_name
             .as_ref()
             .map(|_| node.config_apply_impl_function(tree))
