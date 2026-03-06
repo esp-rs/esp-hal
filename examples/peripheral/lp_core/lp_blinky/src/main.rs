@@ -27,63 +27,52 @@ use esp_println::{print, println};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-#[cfg(feature = "esp32c6")]
 #[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     // configure GPIO 1 as LP output pin
-
+    #[cfg(feature = "esp32c6")]
+    let lp_pin = LowPowerOutput::new(peripherals.GPIO1);
+    #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
     let lp_pin = LowPowerOutput::new(peripherals.GPIO1);
 
+    #[cfg(feature = "esp32c6")]
     let mut lp_core = LpCore::new(peripherals.LP_CORE);
-    lp_core.stop();
-    println!("lp core stopped");
+    #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
+    let mut lp_core = UlpCore::new(peripherals.ULP_RISCV_CORE);
 
-    // load code to LP core
-    let lp_core_code = load_lp_code!(
-        "../../../../esp-lp-hal/target/riscv32imac-unknown-none-elf/release/examples/blinky"
-    );
-
-    // start LP core
-    lp_core_code.run(&mut lp_core, LpCoreWakeupSource::HpCpu, lp_pin);
-    println!("lp core run");
-
-    let data = (0x5000_2000) as *const u32;
-    loop {
-        print!("Current {:x}           \u{000d}", unsafe {
-            data.read_volatile()
-        });
-    }
-}
-
-#[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
-#[main]
-fn main() -> ! {
-    esp_println::logger::init_logger_from_env();
-    let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    // configure GPIO 1 as LP output pin
-    let rtc_pin = LowPowerOutput::new(peripherals.GPIO1);
-
-    let mut ulp_core = UlpCore::new(peripherals.ULP_RISCV_CORE);
     #[cfg(not(feature = "esp32s2"))]
     {
-        ulp_core.stop(); // currently not implemented for ESP32-S2.
+        lp_core.stop(); // currently not implemented for ESP32-S2.
         println!("ulp core stopped");
     }
 
-    // load code to ULP coprocessor
-    let ulp_core_code = load_lp_code!(
+    // load code to LP core
+    #[cfg(feature = "esp32c6")]
+    let lp_core_code = load_lp_code!(
+        "../../../../esp-lp-hal/target/riscv32imac-unknown-none-elf/release/examples/blinky"
+    );
+    #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
+    let lp_core_code = load_lp_code!(
         "../../../../esp-lp-hal/target/riscv32imc-unknown-none-elf/release/examples/blinky"
     );
 
-    // start ULP coprocessor
-    ulp_core_code.run(&mut ulp_core, UlpCoreWakeupSource::HpCpu, rtc_pin);
-    println!("ulp core run");
+    // start LP core
+    #[cfg(feature = "esp32c6")]
+    lp_core_code.run(&mut lp_core, LpCoreWakeupSource::HpCpu, lp_pin);
+    #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
+    lp_core_code.run(&mut lp_core, UlpCoreWakeupSource::HpCpu, lp_pin);
 
-    let data = (0x5000_0400) as *const u32;
+    println!("lp core run");
+
+    #[cfg(feature = "esp32c6")]
+    const ADDR: usize = 0x5000_2000;
+    #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
+    const ADDR: usize = 0x5000_0400;
+
+    let data = (ADDR) as *const u32;
     loop {
         print!("Current {:x}           \u{000d}", unsafe {
             data.read_volatile()
