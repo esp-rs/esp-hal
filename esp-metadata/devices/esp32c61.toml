@@ -1,0 +1,51 @@
+# ESP32-C61 Device Metadata
+#
+# Empty [`device.driver`] tables imply `partial` support status.
+#
+# If you modify a driver support status, run `cargo xtask update-metadata` to
+# update the table in the esp-hal README.
+
+[device]
+name   = "esp32c61"
+arch   = "riscv"
+target = "riscv32imac-unknown-none-elf"
+cores  = 1
+trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c61_technical_reference_manual_en.pdf"
+
+peripherals = [
+    { name = "CLINT" },
+    { name = "EFUSE", hidden = true },
+    { name = "INTERRUPT_CORE0" },
+    { name = "MODEM_LPCON" },
+    { name = "MODEM_SYSCON" },
+    { name = "SYSTEM" },
+    { name = "SYSTIMER" },
+]
+
+symbols = [
+    # ROM capabilities (TODO: verify against esp-idf when implementing)
+    "rom_crc_le",
+    "rom_crc_be",
+    "rom_md5_bsd",
+]
+
+[device.soc]
+# TODO: fill from ESP-IDF / TRM when implementing clocks
+memory_map = { ranges = [
+    { name = "dram", start = 0x4080_0000, end = 0x4085_0000 },
+    { name = "dram2_uninit", start = 0, end = 0x4084_EA70 },
+] }
+
+clocks = { system_clocks = { clock_tree = [
+    # FIXME: fake definition for code to compile (per CHIP_BRING_UP.md)
+    { name = "XTAL_CLK", type = "source", output = "1", always_on = true },
+] }, peripheral_clocks = { templates = [
+    { name = "default_clk_en_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
+    { name = "clk_en_template", value = "{{default_clk_en_template}}" },
+    { name = "rst_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{rst_field}}().bit(reset));" },
+    { name = "control", value = "crate::peripherals::SYSTEM" },
+    { name = "conf_register", value = "{{peripheral}}_conf" },
+    { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
+    { name = "rst_field", value = "{{peripheral}}_rst_en" },
+], peripheral_clocks = [
+] } }

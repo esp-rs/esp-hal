@@ -41,6 +41,7 @@ pub enum Chip {
     Esp32c3,
     Esp32c5,
     Esp32c6,
+    Esp32c61,
     Esp32h2,
     Esp32s2,
     Esp32s3,
@@ -54,12 +55,13 @@ impl core::str::FromStr for Chip {
             "esp32c3" => Ok(Self::Esp32c3),
             "esp32c5" => Ok(Self::Esp32c5),
             "esp32c6" => Ok(Self::Esp32c6),
+            "esp32c61" => Ok(Self::Esp32c61),
             "esp32h2" => Ok(Self::Esp32h2),
             "esp32s2" => Ok(Self::Esp32s2),
             "esp32s3" => Ok(Self::Esp32s3),
             _ => Err(alloc::format!(
                 "Unknown chip {s}. Possible options: esp32, esp32c2, esp32c3, esp32c5, esp32c6, \
-                 esp32h2, esp32s2, esp32s3"
+                 esp32c61, esp32h2, esp32s2, esp32s3"
             )),
         }
     }
@@ -75,6 +77,7 @@ impl Chip {
             ("CARGO_FEATURE_ESP32C3", Self::Esp32c3),
             ("CARGO_FEATURE_ESP32C5", Self::Esp32c5),
             ("CARGO_FEATURE_ESP32C6", Self::Esp32c6),
+            ("CARGO_FEATURE_ESP32C61", Self::Esp32c61),
             ("CARGO_FEATURE_ESP32H2", Self::Esp32h2),
             ("CARGO_FEATURE_ESP32S2", Self::Esp32s2),
             ("CARGO_FEATURE_ESP32S3", Self::Esp32s3),
@@ -85,7 +88,7 @@ impl Chip {
                 if chip.is_some() {
                     return Err(
                         "Expected exactly one of the following features to be enabled: esp32, \
-                         esp32c2, esp32c3, esp32c5, esp32c6, esp32h2, esp32s2, esp32s3",
+                         esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32s2, esp32s3",
                     );
                 }
                 chip = Some(c);
@@ -95,7 +98,7 @@ impl Chip {
             Some(chip) => Ok(chip),
             None => Err(
                 "Expected exactly one of the following features to be enabled: esp32, esp32c2, \
-                 esp32c3, esp32c5, esp32c6, esp32h2, esp32s2, esp32s3",
+                 esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32s2, esp32s3",
             ),
         }
     }
@@ -121,6 +124,7 @@ impl Chip {
             Self::Esp32c3 => "esp32c3",
             Self::Esp32c5 => "esp32c5",
             Self::Esp32c6 => "esp32c6",
+            Self::Esp32c61 => "esp32c61",
             Self::Esp32h2 => "esp32h2",
             Self::Esp32s2 => "esp32s2",
             Self::Esp32s3 => "esp32s3",
@@ -174,6 +178,7 @@ impl Chip {
             Self::Esp32c3,
             Self::Esp32c5,
             Self::Esp32c6,
+            Self::Esp32c61,
             Self::Esp32h2,
             Self::Esp32s2,
             Self::Esp32s3,
@@ -2978,6 +2983,65 @@ impl Chip {
                     },
                 ],
             },
+            Self::Esp32c61 => Config {
+                architecture: "riscv",
+                target: "riscv32imac-unknown-none-elf",
+                symbols: &[
+                    "esp32c61",
+                    "riscv",
+                    "single_core",
+                    "soc_has_clint",
+                    "soc_has_efuse",
+                    "soc_has_interrupt_core0",
+                    "soc_has_modem_lpcon",
+                    "soc_has_modem_syscon",
+                    "soc_has_system",
+                    "soc_has_systimer",
+                    "rom_crc_le",
+                    "rom_crc_be",
+                    "rom_md5_bsd",
+                    "soc_driver_supported",
+                    "soc_has_clock_node_xtal_clk",
+                    "has_dram_region",
+                    "has_dram2_uninit_region",
+                ],
+                cfgs: &[
+                    "cargo:rustc-cfg=esp32c61",
+                    "cargo:rustc-cfg=riscv",
+                    "cargo:rustc-cfg=single_core",
+                    "cargo:rustc-cfg=soc_has_clint",
+                    "cargo:rustc-cfg=soc_has_efuse",
+                    "cargo:rustc-cfg=soc_has_interrupt_core0",
+                    "cargo:rustc-cfg=soc_has_modem_lpcon",
+                    "cargo:rustc-cfg=soc_has_modem_syscon",
+                    "cargo:rustc-cfg=soc_has_system",
+                    "cargo:rustc-cfg=soc_has_systimer",
+                    "cargo:rustc-cfg=rom_crc_le",
+                    "cargo:rustc-cfg=rom_crc_be",
+                    "cargo:rustc-cfg=rom_md5_bsd",
+                    "cargo:rustc-cfg=soc_driver_supported",
+                    "cargo:rustc-cfg=soc_has_clock_node_xtal_clk",
+                    "cargo:rustc-cfg=has_dram_region",
+                    "cargo:rustc-cfg=has_dram2_uninit_region",
+                ],
+                memory_layout: &MemoryLayout {
+                    regions: &[
+                        (
+                            "dram",
+                            MemoryRegion {
+                                address_range: 0x40800000..0x40850000,
+                            },
+                        ),
+                        (
+                            "dram2_uninit",
+                            MemoryRegion {
+                                address_range: 0x0..0x4084EA70,
+                            },
+                        ),
+                    ],
+                },
+                pins: &[],
+            },
             Self::Esp32h2 => Config {
                 architecture: "riscv",
                 target: "riscv32imac-unknown-none-elf",
@@ -5331,6 +5395,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_ledc_sclk)");
     println!("cargo:rustc-check-cfg=cfg(timergroup_rc_fast_calibration_divider)");
     println!("cargo:rustc-check-cfg=cfg(wifi_has_wifi6)");
+    println!("cargo:rustc-check-cfg=cfg(esp32c61)");
     println!("cargo:rustc-check-cfg=cfg(esp32h2)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f96m_clk)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_pll_f64m_clk)");
