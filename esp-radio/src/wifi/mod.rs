@@ -287,14 +287,14 @@ impl SecondaryChannel {
 }
 
 #[cfg_attr(docsrs, procmacros::doc_replace(
-    "hint_5g" => {
-        cfg(wifi_has_5g) => "The default is [BandMode::Auto].",
-        _ => "The default is [BandMode::_2_4G]"
+    "default_band_mode" => {
+        cfg(wifi_has_5g) => "BandMode::Auto",
+        _ => "BandMode::_2_4G"
     },
 ))]
 /// Wi-Fi band mode.
 ///
-/// # {hint_5g}
+/// The default is [`__default_band_mode__`].
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -2599,28 +2599,23 @@ impl WifiController<'_> {
         Ok(())
     }
 
-    #[cfg_attr(docsrs, procmacros::doc_replace(
-        "hint_5g" => {
-            cfg(wifi_has_5g) => "
-When the WiFi band mode is set to [BandMode::_5G], it operates exclusively on the 5GHz channels.
+    /// Set Wi-Fi band mode.
+    ///
+    /// When the Wi-Fi band mode is set to [`BandMode::_2_4G`], it operates exclusively on the
+    /// 2.4GHz channels.
+    #[cfg_attr(
+        wifi_has_5g,
+        doc = r"
+When the WiFi band mode is set to [`BandMode::_5G`], it operates exclusively on the 5GHz channels.
 
-When the WiFi band mode is set to [BandMode::Auto], it can operate on both the 2.4GHz and
+When the WiFi band mode is set to [`BandMode::Auto`], it can operate on both the 2.4GHz and
 5GHz channels.
 
 When a WiFi band mode change triggers a band change, if no channel is set for the current
 band, a default channel will be assigned: channel 1 for 2.4G band and channel 36 for 5G
 band.
-            ",
-            _ => ""
-        },
-    ))]
-    /// Set WiFi band mode.
-    ///
-    /// When the WiFi band mode is set to [BandMode::_2_4G], it operates exclusively on the 2.4GHz
-    /// channels.
-    ///
-    /// # {hint_5g}
-    ///
+"
+    )]
     /// The controller needs to be configured and started before setting the band mode.
     #[instability::unstable]
     pub fn set_band_mode(&mut self, band_mode: BandMode) -> Result<(), WifiError> {
@@ -2693,18 +2688,15 @@ band.
         Ok((primary, SecondaryChannel::from_raw(secondary)))
     }
 
-    #[cfg_attr(docsrs, procmacros::doc_replace(
-        "hint_5g" => {
-            cfg(wifi_has_5g) => "
+    /// Sets the primary and secondary Wi-Fi channel.
+    #[cfg_attr(
+        wifi_has_5g,
+        doc = r"
+
 When operating in 5 GHz band, the second channel is automatically determined by the primary
 channel according to the 802.11 standard. Any manually configured second channel will be
-ignored.",
-            _ => ""
-        },
-    ))]
-    /// Sets the primary and secondary Wi-Fi channel.
-    ///
-    /// # {hint_5g}
+ignored."
+    )]
     #[instability::unstable]
     pub fn set_channel(
         &mut self,

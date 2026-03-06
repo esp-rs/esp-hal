@@ -1,8 +1,8 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "analog_pin" => {
-        cfg(esp32) => "let analog_pin = peripherals.GPIO32;",
-        cfg(any(esp32s2, esp32s3)) => "let analog_pin = peripherals.GPIO3;",
-        cfg(not(any(esp32, esp32s2, esp32s3)))  => "let analog_pin = peripherals.GPIO2;"
+        cfg(esp32) => "GPIO32",
+        cfg(any(esp32s2, esp32s3)) => "GPIO3",
+        cfg(not(any(esp32, esp32s2, esp32s3)))  => "GPIO2"
     }
 ))]
 //! # Analog to Digital Converter (ADC)
@@ -34,9 +34,8 @@
 //! # use esp_hal::analog::adc::Attenuation;
 //! # use esp_hal::analog::adc::Adc;
 //! # use esp_hal::delay::Delay;
-//! # {analog_pin}
 //! let mut adc1_config = AdcConfig::new();
-//! let mut pin = adc1_config.enable_pin(analog_pin, Attenuation::_11dB);
+//! let mut pin = adc1_config.enable_pin(peripherals.__analog_pin__, Attenuation::_11dB);
 //! let mut adc1 = Adc::new(peripherals.ADC1, adc1_config);
 //!
 //! let mut delay = Delay::new();

@@ -441,9 +441,9 @@ impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetD
 }
 
 #[procmacros::doc_replace(
-    "clock_cfg" => {
-        cfg(not(esp32h2)) => "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(40))?;",
-        cfg(esp32h2) => "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(32))?;"
+    "mcpwm_clk" => {
+        cfg(not(esp32h2)) => "40",
+        cfg(esp32h2) => "32"
     }
 )]
 /// Two pins driven by the same timer and operator
@@ -459,10 +459,14 @@ impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetD
 /// # use esp_hal::mcpwm::operator::{DeadTimeCfg, PwmPinConfig, PWMStream};
 /// // active high complementary using PWMA input
 /// let bridge_active = DeadTimeCfg::new_ahc();
+///
 /// // use PWMB as input for both outputs
 /// let bridge_off = DeadTimeCfg::new_bypass().set_output_swap(PWMStream::PWMA, true);
-/// # {clock_cfg}
-/// let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
+///
+/// let mut mcpwm = McPwm::new(
+///     peripherals.MCPWM0,
+///     PeripheralClockConfig::with_frequency(Rate::from_mhz(__mcpwm_clk__))?,
+/// );
 ///
 /// let mut pins = mcpwm.operator0.with_linked_pins(
 ///     peripherals.GPIO0,

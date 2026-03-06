@@ -695,8 +695,8 @@ pub mod dma {
 
     #[procmacros::doc_replace(
         "dma_channel" => {
-            cfg(esp32s2) => "let dma_channel = peripherals.DMA_CRYPTO;",
-            _ => "let dma_channel = peripherals.DMA_CH0;"
+            cfg(esp32s2) => "DMA_CRYPTO",
+            _ => "DMA_CH0"
         }
     )]
     /// DMA-enabled AES processing backend.
@@ -714,9 +714,8 @@ pub mod dma {
     /// ```rust, no_run
     /// # {before_snippet}
     /// use esp_hal::aes::{AesContext, Operation, cipher_modes::Ecb, dma::AesDmaBackend};
-    /// #
-    /// # {dma_channel}
-    /// let mut aes = AesDmaBackend::new(peripherals.AES, dma_channel);
+    ///
+    /// let mut aes = AesDmaBackend::new(peripherals.AES, peripherals.__dma_channel__);
     /// // Start the backend, which allows processing AES operations.
     /// let _backend = aes.start();
     ///
@@ -767,8 +766,8 @@ pub mod dma {
     impl<'d> AesDmaBackend<'d> {
         #[procmacros::doc_replace(
             "dma_channel" => {
-                cfg(esp32s2) => "let dma_channel = peripherals.DMA_CRYPTO;",
-                _ => "let dma_channel = peripherals.DMA_CH0;"
+                cfg(esp32s2) => "DMA_CRYPTO",
+                _ => "DMA_CH0"
             }
         )]
         /// Creates a new DMA-enabled AES backend.
@@ -781,8 +780,7 @@ pub mod dma {
         /// # {before_snippet}
         /// use esp_hal::aes::dma::AesDmaBackend;
         ///
-        /// # {dma_channel}
-        /// let mut aes = AesDmaBackend::new(peripherals.AES, dma_channel);
+        /// let mut aes = AesDmaBackend::new(peripherals.AES, peripherals.__dma_channel__);
         /// # {after_snippet}
         /// ```
         pub fn new(aes: AES<'d>, dma: impl DmaChannelFor<AES<'d>>) -> Self {
@@ -800,8 +798,8 @@ pub mod dma {
 
         #[procmacros::doc_replace(
             "dma_channel" => {
-                cfg(esp32s2) => "let dma_channel = peripherals.DMA_CRYPTO;",
-                _ => "let dma_channel = peripherals.DMA_CH0;"
+                cfg(esp32s2) => "DMA_CRYPTO",
+                _ => "DMA_CH0"
             }
         )]
         /// Registers the DMA-driven AES driver to process AES operations.
@@ -814,8 +812,7 @@ pub mod dma {
         /// # {before_snippet}
         /// use esp_hal::aes::dma::AesDmaBackend;
         ///
-        /// # {dma_channel}
-        /// let mut aes = AesDmaBackend::new(peripherals.AES, dma_channel);
+        /// let mut aes = AesDmaBackend::new(peripherals.AES, peripherals.__dma_channel__);
         /// let _handle = aes.start();
         /// # {after_snippet}
         /// ```

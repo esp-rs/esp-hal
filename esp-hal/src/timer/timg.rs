@@ -104,9 +104,7 @@ cfg_if::cfg_if! {
         _ => "a general purpose timer",
     }
 )]
-/// A timer group consisting of
-/// # {timers}
-/// and a watchdog timer.
+/// A timer group consisting of __timers__ and a watchdog timer.
 pub struct TimerGroup<'d, T>
 where
     T: TimerGroupInstance + 'd,

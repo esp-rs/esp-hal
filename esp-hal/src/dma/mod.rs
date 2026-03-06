@@ -1,7 +1,7 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "dma_channel" => {
-        cfg(dma_kind = "pdma") => "let dma_channel = peripherals.DMA_SPI2;",
-        cfg(dma_kind = "gdma") => "let dma_channel = peripherals.DMA_CH0;"
+        cfg(dma_kind = "pdma") => "DMA_SPI2",
+        cfg(dma_kind = "gdma") => "DMA_CH0"
     }
 ))]
 //! # Direct Memory Access (DMA)
@@ -25,7 +25,6 @@
 //! # {before_snippet}
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::spi::{master::{Config, Spi}, Mode};
-//! # {dma_channel}
 //! let sclk = peripherals.GPIO0;
 //! let miso = peripherals.GPIO2;
 //! let mosi = peripherals.GPIO4;
@@ -41,7 +40,7 @@
 //! .with_mosi(mosi)
 //! .with_miso(miso)
 //! .with_cs(cs)
-//! .with_dma(dma_channel);
+//! .with_dma(peripherals.__dma_channel__);
 //! # {after_snippet}
 //! ```
 //!
@@ -1616,8 +1615,8 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 
 #[procmacros::doc_replace(
     "dma_channel" => {
-        cfg(dma_kind = "pdma") => "let dma_channel = peripherals.DMA_SPI2;",
-        cfg(dma_kind = "gdma") => "let dma_channel = peripherals.DMA_CH0;"
+        cfg(dma_kind = "pdma") => "DMA_SPI2",
+        cfg(dma_kind = "gdma") => "DMA_CH0"
     },
     "note" => {
         cfg(dma_kind = "pdma") => "\n\nNote that using mismatching channels (e.g. trying to use `DMA_SPI2` with SPI3) may compile, but will panic in runtime.\n\n",
@@ -1650,11 +1649,9 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 ///     spi.with_dma(channel)
 /// }
 ///
-/// # {dma_channel}
-///
 /// let spi = Spi::new(peripherals.SPI2, Config::default())?;
 ///
-/// let spi_dma = configures_spi_dma(spi, dma_channel);
+/// let spi_dma = configures_spi_dma(spi, peripherals.__dma_channel__);
 /// # {after_snippet}
 /// ```
 pub trait DmaChannelFor<P: DmaEligible>:

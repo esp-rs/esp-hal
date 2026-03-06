@@ -1,13 +1,13 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
-    "clock_cfg" => {
-        cfg(not(esp32h2)) => "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(40))?;",
-        cfg(esp32h2) => "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(32))?;"
+    "mcpwm_freq" => {
+        cfg(not(esp32h2)) => "40",
+        cfg(esp32h2) => "32"
     },
     "clock_src" => {
-        cfg(esp32) => "Clock source is PLL_F160M (160 MHz) by default.",
-        cfg(esp32s3) => "Clock source is CRYPTO_PWM_CLK (160 MHz) by default.",
-        cfg(esp32c6) => "Clock source is PLL_F160M (160 MHz) by default.",
-        cfg(esp32h2) => "Clock source is PLL_F96M_CLK (96 MHz) by default.",
+        cfg(esp32) => "PLL_F160M (160 MHz)",
+        cfg(esp32s3) => "CRYPTO_PWM_CLK (160 MHz)",
+        cfg(esp32c6) => "PLL_F160M (160 MHz)",
+        cfg(esp32h2) => "PLL_F96M_CLK (96 MHz)",
     }
 ))]
 //! # Motor Control Pulse Width Modulator (MCPWM)
@@ -46,7 +46,7 @@
 //! * Fault Detection Module (Not yet implemented)
 //! * Capture Module (Not yet implemented)
 //!
-//! # {clock_src}
+//! Clock source is __clock_src__ by default.
 //!
 //! ## Examples
 //!
@@ -62,11 +62,12 @@
 //! # let pin = peripherals.GPIO0;
 //!
 //! // initialize peripheral
-//! # {clock_cfg}
+//! let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(__mcpwm_freq__))?;
 //! let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 //!
 //! // connect operator0 to timer0
 //! mcpwm.operator0.set_timer(&mcpwm.timer0);
+//!
 //! // connect operator0 to pin
 //! let mut pwm_pin = mcpwm
 //!     .operator0

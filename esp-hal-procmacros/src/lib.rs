@@ -123,10 +123,13 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 /// documentation of the annotated item.
 ///
 /// Replacements can be placed in the documentation as `# {placeholder}`. Each
-/// replacement must be its own line, it's not possible to place a placeholder in the middle of a
-/// line. The `before_snippet` and `after_snippet` placeholders are expanded to the
-/// `esp_hal::before_snippet!()` and `esp_hal::after_snippet!()` macros, and are expected to be
-/// used in example code blocks.
+/// replacement must be its own line. The `before_snippet` and `after_snippet` placeholders are
+/// expanded to the `esp_hal::before_snippet!()` and `esp_hal::after_snippet!()` macros, and are
+/// expected to be used in example code blocks.
+///
+/// In-line replacements can be placed in the middle of a line as `__placeholder__`. Currently,
+/// only literal strings can be substituted into in-line placeholders, and only one placeholder
+/// can be used per line.
 ///
 /// You can also define custom replacements in the attribute. A replacement can be
 /// an unconditional literal (i.e. a string that is always substituted into the doc comment),
@@ -153,6 +156,8 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 /// /// # {literal_placeholder}
 /// /// // here is some more code
 /// /// # {conditional_placeholder}
+/// ///
+/// /// The macro even supports __conditional_placeholder__ replacements in-line.
 /// /// ```
 /// fn my_function() {}
 /// ```
