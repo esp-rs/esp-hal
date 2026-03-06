@@ -1,5 +1,4 @@
-use convert_case::{Case, Casing};
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::TokenStream;
 
 use crate::cfg::{
     ClockTreeNodeInstance,
@@ -23,24 +22,16 @@ impl ClockTreeNodeType for PeripheralClockSource {
         self.mux.input_clocks()
     }
 
-    fn name_str<'a>(&'a self) -> &'a String {
-        &self.peripheral
-    }
-
-    fn config_type_name(&self) -> Ident {
-        let item = self
-            .template
-            .from_case(Case::Constant)
-            .to_case(Case::Pascal);
-        quote::format_ident!("{}Config", item)
-    }
-
     fn is_configurable(&self) -> bool {
         self.mux.is_configurable()
     }
 
-    fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream {
-        self.mux.impl_config_apply_function(self, tree)
+    fn config_apply_function(
+        &self,
+        node: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        self.mux.impl_config_apply_function(node, tree)
     }
 
     fn config_apply_impl_function(
@@ -51,21 +42,24 @@ impl ClockTreeNodeType for PeripheralClockSource {
         self.mux.config_apply_impl_function(node, tree)
     }
 
-    fn node_frequency_impl(&self, tree: &ProcessedClockData) -> TokenStream {
-        self.mux.node_frequency_impl2(self, tree)
+    fn node_frequency_impl(
+        &self,
+        node: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        self.mux.node_frequency_impl2(node, tree)
     }
 
-    fn config_type(&self) -> TokenStream {
-        let ty_name = self.config_type_name();
-
-        self.mux.impl_config_type(ty_name)
+    fn config_type(&self, node: &ClockTreeNodeInstance) -> TokenStream {
+        self.mux.config_type(node)
     }
 
-    fn config_docline(&self) -> Option<String> {
-        let clock_name = self.peripheral.as_str();
-        Some(format!(
-            " The list of clock signals that the `{clock_name}` multiplexer can output."
-        ))
+    fn config_docline(&self, node: &ClockTreeNodeInstance) -> Option<String> {
+        self.mux.config_docline(node)
+        //        let clock_name = self.peripheral.as_str();
+        //        Some(format!(
+        //            " The list of clock signals that the `{clock_name}` multiplexer can output."
+        //        ))
     }
 
     fn request_direct_dependencies(

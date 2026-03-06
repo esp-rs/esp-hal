@@ -40,7 +40,6 @@
 use std::{any::Any, collections::HashMap, str::FromStr};
 
 use anyhow::Result;
-use convert_case::{Case, Casing, StateConverter};
 use indexmap::IndexMap;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
@@ -305,7 +304,11 @@ pub(crate) trait ClockTreeNodeType: Any {
     }
     fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()>;
     fn is_configurable(&self) -> bool;
-    fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream;
+    fn config_apply_function(
+        &self,
+        node: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream;
     fn config_apply_impl_function(
         &self,
         _node: &ClockTreeNodeInstance,
@@ -314,57 +317,33 @@ pub(crate) trait ClockTreeNodeType: Any {
         quote! {}
     }
 
-    fn node_frequency_impl(&self, _tree: &ProcessedClockData) -> TokenStream;
-
-    fn name_str<'a>(&'a self) -> &'a String;
-    fn name<'a>(&'a self) -> StateConverter<'a, String> {
-        self.name_str().from_case(Case::Ada)
-    }
-
-    /// Returns the name of the clock configuration type. The corresponding field in the
-    /// `ClockConfig` struct will have this type.
-    fn config_type_name(&self) -> Ident {
-        let item = self.name().to_case(Case::Pascal);
-        quote::format_ident!("{}Config", item)
-    }
+    fn node_frequency_impl(
+        &self,
+        node: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream;
 
     /// Returns the documentation for the clock configuration, which will be placed on the
     /// `ClockConfig` field.
-    fn config_documentation(&self) -> Option<String> {
-        Some(format!(" `{}` configuration.", self.name_str()))
+    fn config_documentation(&self, node: &ClockTreeNodeInstance) -> Option<String> {
+        Some(format!(" `{}` configuration.", node.name_str()))
     }
 
-    fn apply_configuration(&self, _expr: &Expression, _tree: &ProcessedClockData) -> TokenStream {
-        if self.is_configurable() {
+    fn apply_configuration(
+        &self,
+        node: &ClockTreeNodeInstance,
+        _expr: &Expression,
+        _tree: &ProcessedClockData,
+    ) -> TokenStream {
+        if node.is_configurable() {
             unimplemented!();
         } else {
             quote! {}
         }
     }
 
-    fn config_current_function(&self, tree: &ProcessedClockData) -> TokenStream {
-        let ty_name = self.config_type_name();
-        let state = tree.properties(self.name_str()).field_name();
-        let fn_name = self.current_config_function_name();
-        quote! {
-            pub fn #fn_name(clocks: &mut ClockTree) -> Option<#ty_name> {
-                clocks.#state
-            }
-        }
-    }
-
-    fn config_type(&self) -> TokenStream;
-    fn config_docline(&self) -> Option<String>;
-
-    fn config_apply_function_name(&self) -> Ident {
-        let name = self.name().to_case(Case::Snake);
-        format_ident!("configure_{}", name)
-    }
-
-    fn current_config_function_name(&self) -> Ident {
-        let name = self.name().to_case(Case::Snake);
-        format_ident!("{}_config", name)
-    }
+    fn config_type(&self, node: &ClockTreeNodeInstance) -> TokenStream;
+    fn config_docline(&self, node: &ClockTreeNodeInstance) -> Option<String>;
 
     fn request_direct_dependencies(
         &self,
@@ -398,10 +377,10 @@ pub enum ClockTreeItem {
 impl ClockTreeItem {
     pub(crate) fn name(&self) -> &str {
         match self {
-            ClockTreeItem::Multiplexer(mux) => mux.name_str().as_str(),
-            ClockTreeItem::Source(src) => src.name_str().as_str(),
-            ClockTreeItem::Divider(div) => div.name_str().as_str(),
-            ClockTreeItem::Derived(drv) => drv.name_str().as_str(),
+            ClockTreeItem::Multiplexer(mux) => mux.name.as_str(),
+            ClockTreeItem::Source(src) => src.name.as_str(),
+            ClockTreeItem::Divider(div) => div.name.as_str(),
+            ClockTreeItem::Derived(drv) => drv.source_options.name.as_str(),
         }
     }
 }

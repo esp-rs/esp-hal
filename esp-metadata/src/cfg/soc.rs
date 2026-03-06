@@ -14,6 +14,7 @@ use crate::{
             ClockTreeItem,
             ClockTreeNodeType,
             DependencyGraph,
+            Expression,
             Function,
             ManagementProperties,
             PeripheralClockSource,
@@ -108,6 +109,9 @@ pub(crate) struct ClockTreeNodeInstance {
     include_in_global_config: bool,
     is_first_instance: bool,
     force_configurable: bool,
+
+    name: String,
+    template_name: String,
 }
 
 impl ClockTreeNodeInstance {
@@ -115,11 +119,49 @@ impl ClockTreeNodeInstance {
         if !self.is_first_instance || !self.is_configurable() {
             return None;
         }
-        Some(ClockTreeNodeType::config_type(self))
+        Some(ClockTreeNodeType::config_type(self, self))
     }
 
     fn config_apply_impl_function(&self, tree: &ProcessedClockData) -> TokenStream {
         ClockTreeNodeType::config_apply_impl_function(self, self, tree)
+    }
+
+    fn config_documentation(&self) -> Option<String> {
+        ClockTreeNodeType::config_documentation(self, self)
+    }
+
+    fn config_docline(&self) -> Option<String> {
+        ClockTreeNodeType::config_docline(self, self)
+    }
+
+    fn node_frequency_impl(&self, tree: &ProcessedClockData) -> TokenStream {
+        ClockTreeNodeType::node_frequency_impl(self, self, tree)
+    }
+
+    /// Returns the name of the clock configuration type. The corresponding field in the
+    /// `ClockConfig` struct will have this type.
+    fn config_type_name(&self) -> Ident {
+        let item = self
+            .template_name
+            .from_case(Case::Ada)
+            .to_case(Case::Pascal);
+        quote::format_ident!("{}Config", item)
+    }
+
+    fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream {
+        ClockTreeNodeType::config_apply_function(self, self, tree)
+    }
+
+    fn apply_configuration(&self, expr: &Expression, tree: &ProcessedClockData) -> TokenStream {
+        ClockTreeNodeType::apply_configuration(self, self, expr, tree)
+    }
+
+    fn name(&self) -> StateConverter<'_, String> {
+        self.name_str().from_case(Case::Ada)
+    }
+
+    fn name_str<'a>(&'a self) -> &'a String {
+        &self.name
     }
 
     fn enable_fn_name(&self) -> Ident {
@@ -140,6 +182,31 @@ impl ClockTreeNodeInstance {
     fn frequency_function_name(&self) -> Ident {
         let name = self.name().to_case(Case::Snake);
         format_ident!("{}_frequency", name)
+    }
+
+    fn config_apply_function_name(&self) -> Ident {
+        let name = self.name().to_case(Case::Snake);
+        format_ident!("configure_{}", name)
+    }
+
+    fn current_config_function_name(&self) -> Ident {
+        let name = self.name().to_case(Case::Snake);
+        format_ident!("{}_config", name)
+    }
+
+    fn config_current_function(&self, tree: &ProcessedClockData) -> TokenStream {
+        if self.is_configurable() {
+            let ty_name = self.config_type_name();
+            let state = tree.properties(self.name_str()).field_name();
+            let fn_name = self.current_config_function_name();
+            quote! {
+                pub fn #fn_name(clocks: &mut ClockTree) -> Option<#ty_name> {
+                    clocks.#state
+                }
+            }
+        } else {
+            quote! {}
+        }
     }
 
     fn node_functions(&self, tree: &ProcessedClockData) -> ClockNodeFunctions {
@@ -292,24 +359,28 @@ impl ClockTreeNodeType for ClockTreeNodeInstance {
         self.node.is_configurable() || self.force_configurable
     }
 
-    fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream {
-        self.node.config_apply_function(tree)
+    fn config_apply_function(
+        &self,
+        node: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        self.node.config_apply_function(node, tree)
     }
 
-    fn node_frequency_impl(&self, tree: &ProcessedClockData) -> TokenStream {
-        self.node.node_frequency_impl(tree)
+    fn node_frequency_impl(
+        &self,
+        node: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        self.node.node_frequency_impl(node, tree)
     }
 
-    fn name_str<'a>(&'a self) -> &'a String {
-        self.node.name_str()
+    fn config_type(&self, node: &ClockTreeNodeInstance) -> TokenStream {
+        self.node.config_type(node)
     }
 
-    fn config_type(&self) -> TokenStream {
-        self.node.config_type()
-    }
-
-    fn config_docline(&self) -> Option<String> {
-        self.node.config_docline()
+    fn config_docline(&self, node: &ClockTreeNodeInstance) -> Option<String> {
+        self.node.config_docline(node)
     }
 
     fn request_direct_dependencies(
@@ -348,40 +419,17 @@ impl ClockTreeNodeType for ClockTreeNodeInstance {
         self.node.config_apply_impl_function(node, tree)
     }
 
-    fn name<'a>(&'a self) -> StateConverter<'a, String> {
-        self.node.name()
-    }
-
-    fn config_type_name(&self) -> Ident {
-        self.node.config_type_name()
-    }
-
-    fn config_documentation(&self) -> Option<String> {
-        self.node.config_documentation()
+    fn config_documentation(&self, node: &ClockTreeNodeInstance) -> Option<String> {
+        self.node.config_documentation(node)
     }
 
     fn apply_configuration(
         &self,
+        node: &ClockTreeNodeInstance,
         expr: &clock_tree::Expression,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        self.node.apply_configuration(expr, tree)
-    }
-
-    fn config_current_function(&self, tree: &ProcessedClockData) -> TokenStream {
-        if self.is_configurable() {
-            self.node.config_current_function(tree)
-        } else {
-            quote! {}
-        }
-    }
-
-    fn config_apply_function_name(&self) -> Ident {
-        self.node.config_apply_function_name()
-    }
-
-    fn current_config_function_name(&self) -> Ident {
-        self.node.current_config_function_name()
+        self.node.apply_configuration(node, expr, tree)
     }
 }
 
@@ -857,6 +905,8 @@ impl DeviceClocks {
                     include_in_global_config: true,
                     is_first_instance: true,
                     force_configurable: false,
+                    name: node.name().to_string(),
+                    template_name: node.name().to_string(),
                 };
 
                 RefCell::new(node)
@@ -892,22 +942,25 @@ impl DeviceClocks {
                         peripheral: format!(
                             "{}_{}",
                             peri.name.from_case(Case::Ada).to_case(Case::Constant),
-                            mux.name_str()
+                            &mux.name
                         ),
                         template: format!(
                             "{}_{}",
                             template_peripheral
                                 .from_case(Case::Ada)
                                 .to_case(Case::Constant),
-                            mux.name_str()
+                            &mux.name
                         ),
                         mux: mux.clone(),
                     },
                     _ => anyhow::bail!("only muxes are supported as clock source data"),
                 };
 
+                let name = node.peripheral.clone();
+                let template_name = node.template.clone();
+
                 node.validate_source_data(&validation_context)
-                    .with_context(|| format!("Invalid clock tree item: {}", node.name_str()))?;
+                    .with_context(|| format!("Invalid clock tree item: {name}"))?;
 
                 clock_tree.push(RefCell::new(ClockTreeNodeInstance {
                     node: Box::new(node),
@@ -915,6 +968,8 @@ impl DeviceClocks {
                     is_first_instance: is_definition,
                     // FIXME
                     force_configurable: true,
+                    name,
+                    template_name,
                 }));
             }
         }
