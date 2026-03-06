@@ -303,12 +303,12 @@ pub(crate) trait ClockTreeNodeType: Any {
     fn is_configurable(&self) -> bool;
     fn config_apply_function(
         &self,
-        node: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream;
     fn config_apply_impl_function(
         &self,
-        _node: &ClockTreeNodeInstance,
+        _instance: &ClockTreeNodeInstance,
         _tree: &ProcessedClockData,
     ) -> TokenStream {
         quote! {}
@@ -316,40 +316,40 @@ pub(crate) trait ClockTreeNodeType: Any {
 
     fn node_frequency_impl(
         &self,
-        node: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream;
 
     /// Returns the documentation for the clock configuration, which will be placed on the
     /// `ClockConfig` field.
-    fn config_documentation(&self, node: &ClockTreeNodeInstance) -> Option<String> {
-        Some(format!(" `{}` configuration.", node.name_str()))
+    fn config_documentation(&self, instance: &ClockTreeNodeInstance) -> Option<String> {
+        Some(format!(" `{}` configuration.", instance.name_str()))
     }
 
     fn apply_configuration(
         &self,
-        node: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         _expr: &Expression,
         _tree: &ProcessedClockData,
     ) -> TokenStream {
-        if node.is_configurable() {
+        if instance.is_configurable() {
             unimplemented!();
         } else {
             quote! {}
         }
     }
 
-    fn config_type(&self, node: &ClockTreeNodeInstance) -> TokenStream;
-    fn config_docline(&self, node: &ClockTreeNodeInstance) -> Option<String>;
+    fn config_type(&self, instance: &ClockTreeNodeInstance) -> TokenStream;
+    fn config_docline(&self, instance: &ClockTreeNodeInstance) -> Option<String>;
 
     fn request_direct_dependencies(
         &self,
-        node: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream;
     fn release_direct_dependencies(
         &self,
-        node: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream;
 }

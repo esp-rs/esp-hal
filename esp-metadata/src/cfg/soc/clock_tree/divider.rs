@@ -108,12 +108,12 @@ impl ClockTreeNodeType for Divider {
 
     fn config_apply_function(
         &self,
-        node: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let ty_name = node.config_type_name();
-        let state = tree.properties(node.name_str()).field_name();
-        let apply_fn_name = node.config_apply_function_name();
+        let ty_name = instance.config_type_name();
+        let state = tree.properties(instance.name_str()).field_name();
+        let apply_fn_name = instance.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
         let reject_exprs = self.reject.as_ref().map(|reject| {
             let mut variables = HashMap::new();
@@ -143,11 +143,11 @@ impl ClockTreeNodeType for Divider {
 
     fn config_apply_impl_function(
         &self,
-        node: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         _tree: &ProcessedClockData,
     ) -> TokenStream {
-        let ty_name = node.config_type_name();
-        let apply_fn_name = node.config_apply_function_name();
+        let ty_name = instance.config_type_name();
+        let apply_fn_name = instance.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
         quote! {
             fn #hal_impl(_clocks: &mut ClockTree, _new_config: #ty_name) {
@@ -158,12 +158,12 @@ impl ClockTreeNodeType for Divider {
 
     fn apply_configuration(
         &self,
-        node: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         expr: &Expression,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let config_function = node.config_apply_function_name();
-        let state = node.config_type_name();
+        let config_function = instance.config_apply_function_name();
+        let state = instance.config_type_name();
 
         let cfg_expr_code = expr.to_rust({
             let mut variables = HashMap::new();
@@ -183,10 +183,10 @@ impl ClockTreeNodeType for Divider {
 
     fn node_frequency_impl(
         &self,
-        node: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let state = tree.properties(node.name_str()).field_name();
+        let state = tree.properties(instance.name_str()).field_name();
         let parent_clock = self.source_clock(); // TODO get from node
         let parent_frequency_fn = tree.node(parent_clock).frequency_function_name();
 
@@ -207,8 +207,8 @@ impl ClockTreeNodeType for Divider {
         cfg_expr_code
     }
 
-    fn config_docline(&self, node: &ClockTreeNodeInstance) -> Option<String> {
-        let clock_name = node.name_str();
+    fn config_docline(&self, instance: &ClockTreeNodeInstance) -> Option<String> {
+        let clock_name = instance.name_str();
         let expr = &self.output.source();
         Some(format!(
             r#" Configures the `{clock_name}` clock divider.
@@ -217,9 +217,9 @@ impl ClockTreeNodeType for Divider {
         ))
     }
 
-    fn config_type(&self, node: &ClockTreeNodeInstance) -> TokenStream {
-        let clock_name = node.name_str();
-        let ty_name = node.config_type_name();
+    fn config_type(&self, instance: &ClockTreeNodeInstance) -> TokenStream {
+        let clock_name = instance.name_str();
+        let ty_name = instance.config_type_name();
 
         let mut enum_types = vec![];
         let mut field_names = vec![];
@@ -405,7 +405,7 @@ valid range ({min} ..= {max})."#
 
     fn request_direct_dependencies(
         &self,
-        _node: &ClockTreeNodeInstance,
+        _instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let request_fn_name = tree.node(self.source_clock()).request_fn_name();
@@ -416,7 +416,7 @@ valid range ({min} ..= {max})."#
 
     fn release_direct_dependencies(
         &self,
-        _node: &ClockTreeNodeInstance,
+        _instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let release_fn_name = tree.node(self.source_clock()).release_fn_name();

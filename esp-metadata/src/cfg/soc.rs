@@ -109,7 +109,11 @@ pub(crate) struct ClockTreeNodeInstance {
     is_first_instance: bool,
     force_configurable: bool,
 
+    /// Name of the instantiated clock tree node.
     name: String,
+
+    /// Name of the template used to instantiate this clock tree node.
+    // TODO: investigate if we could instead modify `node`'s name field.
     template_name: String,
 }
 
@@ -360,42 +364,42 @@ impl ClockTreeNodeType for ClockTreeNodeInstance {
 
     fn config_apply_function(
         &self,
-        node: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        self.node.config_apply_function(node, tree)
+        self.node.config_apply_function(instance, tree)
     }
 
     fn node_frequency_impl(
         &self,
-        node: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        self.node.node_frequency_impl(node, tree)
+        self.node.node_frequency_impl(instance, tree)
     }
 
-    fn config_type(&self, node: &ClockTreeNodeInstance) -> TokenStream {
-        self.node.config_type(node)
+    fn config_type(&self, instance: &ClockTreeNodeInstance) -> TokenStream {
+        self.node.config_type(instance)
     }
 
-    fn config_docline(&self, node: &ClockTreeNodeInstance) -> Option<String> {
-        self.node.config_docline(node)
+    fn config_docline(&self, instance: &ClockTreeNodeInstance) -> Option<String> {
+        self.node.config_docline(instance)
     }
 
     fn request_direct_dependencies(
         &self,
-        node: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        self.node.request_direct_dependencies(node, tree)
+        self.node.request_direct_dependencies(instance, tree)
     }
 
     fn release_direct_dependencies(
         &self,
-        node: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        self.node.release_direct_dependencies(node, tree)
+        self.node.release_direct_dependencies(instance, tree)
     }
 
     fn affected_nodes<'s>(&'s self) -> Vec<&'s str> {
@@ -412,23 +416,23 @@ impl ClockTreeNodeType for ClockTreeNodeInstance {
 
     fn config_apply_impl_function(
         &self,
-        node: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        self.node.config_apply_impl_function(node, tree)
+        self.node.config_apply_impl_function(instance, tree)
     }
 
-    fn config_documentation(&self, node: &ClockTreeNodeInstance) -> Option<String> {
-        self.node.config_documentation(node)
+    fn config_documentation(&self, instance: &ClockTreeNodeInstance) -> Option<String> {
+        self.node.config_documentation(instance)
     }
 
     fn apply_configuration(
         &self,
-        node: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         expr: &clock_tree::Expression,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        self.node.apply_configuration(node, expr, tree)
+        self.node.apply_configuration(instance, expr, tree)
     }
 }
 
@@ -944,7 +948,8 @@ impl DeviceClocks {
                         peri.clocks,
                         PeripheralClockTreeEntry::Definition(_)
                     ),
-                    // FIXME
+                    // FIXME peripherals force configurability because we don't have a way to
+                    // cfg them out. Decide if we can do better.
                     force_configurable: true,
                     name: format!(
                         "{}_{}",
