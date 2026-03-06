@@ -149,6 +149,7 @@ type PrinterImpl = noop::Printer;
         feature = "esp32c3",
         feature = "esp32c5",
         feature = "esp32c6",
+        feature = "esp32c61",
         feature = "esp32h2",
         feature = "esp32s3"
     )
