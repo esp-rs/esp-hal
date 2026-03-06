@@ -97,7 +97,7 @@ impl CpuClock {
         cfg_if::cfg_if! {
             if #[cfg(esp32c2)] {
                 Self::_120MHz
-            } else if #[cfg(any(esp32c3, esp32c6))] {
+            } else if #[cfg(any(esp32c3, esp32c6, esp32c61))] {
                 Self::_160MHz
             } else if #[cfg(esp32h2)] {
                 Self::_96MHz
