@@ -101,6 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32, ESP32-S2: Fixed RC_FAST divider enable polarity (#5067)
 - ESP32-C6: RtcClock clock calibration for v0.1 (#5109)
 - Improve LP timer accuracy (#5105, #5115)
+- Increase the size of `irom_seg`/`drom_seg` from 4 MB to 32 MB for the ESP32-S3 (#5121)
 
 ### Removed
 
