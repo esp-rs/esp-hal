@@ -17,7 +17,6 @@ use crate::{
             Expression,
             Function,
             ManagementProperties,
-            PeripheralClockSource,
             ValidationContext,
         },
         soc::clock_tree::PeripheralClockTreeEntry,
@@ -933,44 +932,38 @@ impl DeviceClocks {
             // nodes here.
             let template_peripheral = peri.template_peripheral_name();
             for def in peri.clock_signals(&self.peripheral_clocks) {
-                // A fake node because we need to prefix the peripheral name, and the
-                // behaviour differs slightly from the standard mutex (we generate a type
-                // for all variant counts for now).
-                let is_definition = matches!(peri.clocks, PeripheralClockTreeEntry::Definition(_));
-                let node = match def {
-                    ClockTreeItem::Multiplexer(mux) => PeripheralClockSource {
-                        peripheral: format!(
-                            "{}_{}",
-                            peri.name.from_case(Case::Ada).to_case(Case::Constant),
-                            &mux.name
-                        ),
-                        template: format!(
-                            "{}_{}",
-                            template_peripheral
-                                .from_case(Case::Ada)
-                                .to_case(Case::Constant),
-                            &mux.name
-                        ),
-                        mux: mux.clone(),
+                let node = ClockTreeNodeInstance {
+                    node: match def {
+                        ClockTreeItem::Multiplexer(inner) => Box::new(inner.clone()),
+                        ClockTreeItem::Source(inner) => Box::new(inner.clone()),
+                        ClockTreeItem::Divider(inner) => Box::new(inner.clone()),
+                        ClockTreeItem::Derived(inner) => Box::new(inner.clone()),
                     },
-                    _ => anyhow::bail!("only muxes are supported as clock source data"),
-                };
-
-                let name = node.peripheral.clone();
-                let template_name = node.template.clone();
-
-                node.validate_source_data(&validation_context)
-                    .with_context(|| format!("Invalid clock tree item: {name}"))?;
-
-                clock_tree.push(RefCell::new(ClockTreeNodeInstance {
-                    node: Box::new(node),
                     include_in_global_config: false,
-                    is_first_instance: is_definition,
+                    is_first_instance: matches!(
+                        peri.clocks,
+                        PeripheralClockTreeEntry::Definition(_)
+                    ),
                     // FIXME
                     force_configurable: true,
-                    name,
-                    template_name,
-                }));
+                    name: format!(
+                        "{}_{}",
+                        peri.name.from_case(Case::Ada).to_case(Case::Constant),
+                        def.name()
+                    ),
+                    template_name: format!(
+                        "{}_{}",
+                        template_peripheral
+                            .from_case(Case::Ada)
+                            .to_case(Case::Constant),
+                        def.name()
+                    ),
+                };
+
+                node.validate_source_data(&validation_context)
+                    .with_context(|| format!("Invalid clock tree item: {}", node.name))?;
+
+                clock_tree.push(RefCell::new(node));
             }
         }
 

@@ -63,10 +63,7 @@ use crate::cfg::{
 mod divider;
 mod expr_compiler;
 mod mux;
-mod peripheral_source;
 mod source;
-
-pub(crate) use peripheral_source::PeripheralClockSource;
 
 #[derive(Clone)]
 pub(crate) struct Function {
