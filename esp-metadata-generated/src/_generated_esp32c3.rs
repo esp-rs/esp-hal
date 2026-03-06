@@ -1150,14 +1150,15 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `SYSTEM_PRE_DIV` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = SYSTEM_PRE_DIV_IN / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = SYSTEM_PRE_DIV_IN / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct SystemPreDivConfig(u32);
+        pub struct SystemPreDivConfig {
+            divisor: u32,
+        }
         impl SystemPreDivConfig {
             /// Creates a new divider configuration.
-            ///
-            /// # Panics
+            /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 1023).
@@ -1166,10 +1167,13 @@ macro_rules! define_clock_tree_types {
                     divisor <= 1023u32,
                     "`SYSTEM_PRE_DIV` divisor value must be between 0 and 1023 (inclusive)."
                 );
-                Self(divisor)
+                Self { divisor }
+            }
+            fn divisor(self) -> u32 {
+                self.divisor
             }
             fn value(self) -> u32 {
-                self.0
+                self.divisor()
             }
         }
         /// Selects the output frequency of `CPU_PLL_DIV_OUT`. Depends on `PLL_CLK`.
@@ -1220,14 +1224,15 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `RC_FAST_CLK_DIV_N` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = RC_FAST_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = RC_FAST_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct RcFastClkDivNConfig(u32);
+        pub struct RcFastClkDivNConfig {
+            divisor: u32,
+        }
         impl RcFastClkDivNConfig {
             /// Creates a new divider configuration.
-            ///
-            /// # Panics
+            /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 3).
@@ -1236,10 +1241,13 @@ macro_rules! define_clock_tree_types {
                     divisor <= 3u32,
                     "`RC_FAST_CLK_DIV_N` divisor value must be between 0 and 3 (inclusive)."
                 );
-                Self(divisor)
+                Self { divisor }
+            }
+            fn divisor(self) -> u32 {
+                self.divisor
             }
             fn value(self) -> u32 {
-                self.0
+                self.divisor()
             }
         }
         /// The list of clock signals that the `RTC_SLOW_CLK` multiplexer can output.
@@ -1696,7 +1704,7 @@ macro_rules! define_clock_tree_types {
             release_system_pre_div_in(clocks);
         }
         pub fn system_pre_div_frequency(clocks: &mut ClockTree) -> u32 {
-            (system_pre_div_in_frequency(clocks) / (unwrap!(clocks.system_pre_div).value() + 1))
+            (system_pre_div_in_frequency(clocks) / (unwrap!(clocks.system_pre_div).divisor() + 1))
         }
         pub fn configure_cpu_pll_div_out(clocks: &mut ClockTree, config: CpuPllDivOutConfig) {
             clocks.cpu_pll_div_out = Some(config);
@@ -1912,7 +1920,7 @@ macro_rules! define_clock_tree_types {
             release_rc_fast_clk(clocks);
         }
         pub fn rc_fast_clk_div_n_frequency(clocks: &mut ClockTree) -> u32 {
-            (rc_fast_clk_frequency(clocks) / (unwrap!(clocks.rc_fast_clk_div_n).value() + 1))
+            (rc_fast_clk_frequency(clocks) / (unwrap!(clocks.rc_fast_clk_div_n).divisor() + 1))
         }
         pub fn request_xtal_div_clk(clocks: &mut ClockTree) {
             trace!("Requesting XTAL_DIV_CLK");

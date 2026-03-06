@@ -110,7 +110,7 @@ clocks = { system_clocks = { clock_tree = [
         { name = "XTAL",    outputs = "XTAL_CLK" },
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
     ] },
-    { name = "SYSTEM_PRE_DIV",  type = "divider", divisors = "0 .. 1024", output = "SYSTEM_PRE_DIV_IN / (DIVISOR + 1)" },
+    { name = "SYSTEM_PRE_DIV",  type = "divider", params = { divisor = "0 .. 1024" }, output = "SYSTEM_PRE_DIV_IN / (divisor + 1)" },
     # PLL CLK divider, modeled as a generic derived source because valid divider values depend on the PLL frequency
     { name = "CPU_PLL_DIV_OUT", type = "derived", from = "PLL_CLK", values = "80, 160", output = "VALUE * 1_000_000" },
 
@@ -136,7 +136,7 @@ clocks = { system_clocks = { clock_tree = [
     ] },
 
     # Low-power clocks
-    { name = "RC_FAST_CLK_DIV_N", type = "divider", divisors = "0 ..= 3", output = "RC_FAST_CLK / (DIVISOR + 1)" },
+    { name = "RC_FAST_CLK_DIV_N", type = "divider", params = { divisor = "0 ..= 3" }, output = "RC_FAST_CLK / (divisor + 1)" },
     { name = "XTAL_DIV_CLK",      type = "divider", output = "XTAL_CLK / 2" },
     { name = "RTC_SLOW_CLK", type = "mux", variants = [
         { name = "XTAL32K", outputs = "XTAL32K_CLK" },

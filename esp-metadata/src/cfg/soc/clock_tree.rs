@@ -780,6 +780,7 @@ impl RejectExpression {
 
         for (var, config_field) in config_fields {
             patterns.push(quote! { let Some(#config_field) = clocks.#config_field });
+            // FIXME: don't assume a clock node can be represented as a fixed value
             variables.insert(var, quote! { #config_field.value() });
         }
 

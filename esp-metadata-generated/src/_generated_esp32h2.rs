@@ -1144,44 +1144,71 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `CPU_CLK` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct CpuClkConfig(u32);
+        pub struct CpuClkConfig {
+            divisor: u32,
+        }
         impl CpuClkConfig {
             /// Creates a new divider configuration.
+            /// ## Panics
+            ///
+            /// Panics if the divisor value is outside the
+            /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
-                Self(divisor)
+                ::core::assert!(
+                    divisor <= 255u32,
+                    "`CPU_CLK` divisor value must be between 0 and 255 (inclusive)."
+                );
+                Self { divisor }
+            }
+            fn divisor(self) -> u32 {
+                self.divisor
             }
             fn value(self) -> u32 {
-                self.0
+                self.divisor()
             }
         }
         /// Configures the `AHB_CLK` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = HP_ROOT_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct AhbClkConfig(u32);
+        pub struct AhbClkConfig {
+            divisor: u32,
+        }
         impl AhbClkConfig {
             /// Creates a new divider configuration.
+            /// ## Panics
+            ///
+            /// Panics if the divisor value is outside the
+            /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
-                Self(divisor)
+                ::core::assert!(
+                    divisor <= 255u32,
+                    "`AHB_CLK` divisor value must be between 0 and 255 (inclusive)."
+                );
+                Self { divisor }
+            }
+            fn divisor(self) -> u32 {
+                self.divisor
             }
             fn value(self) -> u32 {
-                self.0
+                self.divisor()
             }
         }
         /// Configures the `APB_CLK` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = AHB_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = AHB_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct ApbClkConfig(u32);
+        pub struct ApbClkConfig {
+            divisor: u32,
+        }
         impl ApbClkConfig {
             /// Creates a new divider configuration.
-            ///
-            /// # Panics
+            /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 255).
@@ -1190,10 +1217,13 @@ macro_rules! define_clock_tree_types {
                     divisor <= 255u32,
                     "`APB_CLK` divisor value must be between 0 and 255 (inclusive)."
                 );
-                Self(divisor)
+                Self { divisor }
+            }
+            fn divisor(self) -> u32 {
+                self.divisor
             }
             fn value(self) -> u32 {
-                self.0
+                self.divisor()
             }
         }
         /// The list of clock signals that the `LP_FAST_CLK` multiplexer can output.
@@ -1702,7 +1732,7 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn cpu_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.cpu_clk).value() + 1))
+            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.cpu_clk).divisor() + 1))
         }
         pub fn configure_ahb_clk(clocks: &mut ClockTree, config: AhbClkConfig) {
             clocks.ahb_clk = Some(config);
@@ -1724,7 +1754,7 @@ macro_rules! define_clock_tree_types {
             release_hp_root_clk(clocks);
         }
         pub fn ahb_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.ahb_clk).value() + 1))
+            (hp_root_clk_frequency(clocks) / (unwrap!(clocks.ahb_clk).divisor() + 1))
         }
         pub fn configure_apb_clk(clocks: &mut ClockTree, config: ApbClkConfig) {
             clocks.apb_clk = Some(config);
@@ -1750,7 +1780,7 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn apb_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            (ahb_clk_frequency(clocks) / (unwrap!(clocks.apb_clk).value() + 1))
+            (ahb_clk_frequency(clocks) / (unwrap!(clocks.apb_clk).divisor() + 1))
         }
         pub fn request_xtal_d2_clk(clocks: &mut ClockTree) {
             trace!("Requesting XTAL_D2_CLK");

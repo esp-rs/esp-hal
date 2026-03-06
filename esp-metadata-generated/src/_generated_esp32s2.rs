@@ -1070,36 +1070,42 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `CPU_PLL_DIV` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = CPU_PLL_DIV_IN / DIVISOR`.
+        /// The output is calculated as `OUTPUT = CPU_PLL_DIV_IN / divisor`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum CpuPllDivConfig {
-            /// Selects `DIVISOR = 2`.
+            /// Selects `divisor = 2`.
             _2 = 2,
-            /// Selects `DIVISOR = 3`.
+            /// Selects `divisor = 3`.
             _3 = 3,
-            /// Selects `DIVISOR = 4`.
+            /// Selects `divisor = 4`.
             _4 = 4,
-            /// Selects `DIVISOR = 6`.
+            /// Selects `divisor = 6`.
             _6 = 6,
         }
         impl CpuPllDivConfig {
-            const fn new(raw: u32) -> Self {
+            /// Creates a new divider configuration.
+            pub const fn new(raw: u32) -> Self {
                 match raw {
                     2 => CpuPllDivConfig::_2,
                     3 => CpuPllDivConfig::_3,
                     4 => CpuPllDivConfig::_4,
                     6 => CpuPllDivConfig::_6,
-                    _ => ::core::panic!("Invalid CPU_PLL_DIV divider value"),
+                    _ => ::core::panic!("Invalid CPU_PLL_DIV divisor value"),
                 }
             }
-            fn value(self) -> u32 {
+        }
+        impl CpuPllDivConfig {
+            fn divisor(self) -> u32 {
                 match self {
                     CpuPllDivConfig::_2 => 2,
                     CpuPllDivConfig::_3 => 3,
                     CpuPllDivConfig::_4 => 4,
                     CpuPllDivConfig::_6 => 6,
                 }
+            }
+            fn value(self) -> u32 {
+                self.divisor()
             }
         }
         /// The list of clock signals that the `SYSTEM_PRE_DIV_IN` multiplexer can output.
@@ -1113,14 +1119,15 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `SYSTEM_PRE_DIV` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = SYSTEM_PRE_DIV_IN / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = SYSTEM_PRE_DIV_IN / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct SystemPreDivConfig(u32);
+        pub struct SystemPreDivConfig {
+            divisor: u32,
+        }
         impl SystemPreDivConfig {
             /// Creates a new divider configuration.
-            ///
-            /// # Panics
+            /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 1023).
@@ -1129,10 +1136,13 @@ macro_rules! define_clock_tree_types {
                     divisor <= 1023u32,
                     "`SYSTEM_PRE_DIV` divisor value must be between 0 and 1023 (inclusive)."
                 );
-                Self(divisor)
+                Self { divisor }
+            }
+            fn divisor(self) -> u32 {
+                self.divisor
             }
             fn value(self) -> u32 {
-                self.0
+                self.divisor()
             }
         }
         /// The list of clock signals that the `APB_CLK` multiplexer can output.
@@ -1163,14 +1173,15 @@ macro_rules! define_clock_tree_types {
         }
         /// Configures the `REF_TICK_XTAL` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = XTAL_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = XTAL_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct RefTickXtalConfig(u32);
+        pub struct RefTickXtalConfig {
+            divisor: u32,
+        }
         impl RefTickXtalConfig {
             /// Creates a new divider configuration.
-            ///
-            /// # Panics
+            /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 255).
@@ -1179,22 +1190,26 @@ macro_rules! define_clock_tree_types {
                     divisor <= 255u32,
                     "`REF_TICK_XTAL` divisor value must be between 0 and 255 (inclusive)."
                 );
-                Self(divisor)
+                Self { divisor }
+            }
+            fn divisor(self) -> u32 {
+                self.divisor
             }
             fn value(self) -> u32 {
-                self.0
+                self.divisor()
             }
         }
         /// Configures the `REF_TICK_CK8M` clock divider.
         ///
-        /// The output is calculated as `OUTPUT = RC_FAST_CLK / (DIVISOR + 1)`.
+        /// The output is calculated as `OUTPUT = RC_FAST_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct RefTickCk8mConfig(u32);
+        pub struct RefTickCk8mConfig {
+            divisor: u32,
+        }
         impl RefTickCk8mConfig {
             /// Creates a new divider configuration.
-            ///
-            /// # Panics
+            /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 255).
@@ -1203,10 +1218,13 @@ macro_rules! define_clock_tree_types {
                     divisor <= 255u32,
                     "`REF_TICK_CK8M` divisor value must be between 0 and 255 (inclusive)."
                 );
-                Self(divisor)
+                Self { divisor }
+            }
+            fn divisor(self) -> u32 {
+                self.divisor
             }
             fn value(self) -> u32 {
-                self.0
+                self.divisor()
             }
         }
         /// The list of clock signals that the `CPU_CLK` multiplexer can output.
@@ -1598,7 +1616,7 @@ macro_rules! define_clock_tree_types {
             release_cpu_pll_div_in(clocks);
         }
         pub fn cpu_pll_div_frequency(clocks: &mut ClockTree) -> u32 {
-            (cpu_pll_div_in_frequency(clocks) / unwrap!(clocks.cpu_pll_div).value())
+            (cpu_pll_div_in_frequency(clocks) / unwrap!(clocks.cpu_pll_div).divisor())
         }
         pub fn configure_system_pre_div_in(
             clocks: &mut ClockTree,
@@ -1664,7 +1682,7 @@ macro_rules! define_clock_tree_types {
             release_system_pre_div_in(clocks);
         }
         pub fn system_pre_div_frequency(clocks: &mut ClockTree) -> u32 {
-            (system_pre_div_in_frequency(clocks) / (unwrap!(clocks.system_pre_div).value() + 1))
+            (system_pre_div_in_frequency(clocks) / (unwrap!(clocks.system_pre_div).divisor() + 1))
         }
         pub fn configure_apb_clk(clocks: &mut ClockTree, new_selector: ApbClkConfig) {
             let old_selector = clocks.apb_clk.replace(new_selector);
@@ -1804,7 +1822,7 @@ macro_rules! define_clock_tree_types {
             release_xtal_clk(clocks);
         }
         pub fn ref_tick_xtal_frequency(clocks: &mut ClockTree) -> u32 {
-            (xtal_clk_frequency(clocks) / (unwrap!(clocks.ref_tick_xtal).value() + 1))
+            (xtal_clk_frequency(clocks) / (unwrap!(clocks.ref_tick_xtal).divisor() + 1))
         }
         pub fn configure_ref_tick_ck8m(clocks: &mut ClockTree, config: RefTickCk8mConfig) {
             clocks.ref_tick_ck8m = Some(config);
@@ -1826,7 +1844,7 @@ macro_rules! define_clock_tree_types {
             release_rc_fast_clk(clocks);
         }
         pub fn ref_tick_ck8m_frequency(clocks: &mut ClockTree) -> u32 {
-            (rc_fast_clk_frequency(clocks) / (unwrap!(clocks.ref_tick_ck8m).value() + 1))
+            (rc_fast_clk_frequency(clocks) / (unwrap!(clocks.ref_tick_ck8m).divisor() + 1))
         }
         pub fn configure_cpu_clk(clocks: &mut ClockTree, new_selector: CpuClkConfig) {
             let old_selector = clocks.cpu_clk.replace(new_selector);

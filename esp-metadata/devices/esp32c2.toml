@@ -95,8 +95,8 @@ clocks = { system_clocks = { clock_tree = [
         { name = "XTAL",    outputs = "XTAL_CLK" },
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
     ] },
-    { name = "SYSTEM_PRE_DIV", type = "divider", divisors = "0 .. 1024", output = "SYSTEM_PRE_DIV_IN / (DIVISOR + 1)" },
-    { name = "CPU_PLL_DIV",    type = "divider", divisors = "4, 6", output = "PLL_CLK / DIVISOR" },
+    { name = "SYSTEM_PRE_DIV", type = "divider", params = { divisor = "0 .. 1024" }, output = "SYSTEM_PRE_DIV_IN / (divisor + 1)" },
+    { name = "CPU_PLL_DIV",    type = "divider", params = { divisor = "4, 6" }, output = "PLL_CLK / divisor" },
 
     # The meta-switch
     { name = "CPU_CLK", type = "mux", always_on = true, variants = [
@@ -126,7 +126,7 @@ clocks = { system_clocks = { clock_tree = [
     ] },
 
     # Low-power clocks
-    { name = "RC_FAST_CLK_DIV_N", type = "divider", divisors = "0 ..= 3", output = "RC_FAST_CLK / (DIVISOR + 1)" }, # RC_DIV
+    { name = "RC_FAST_CLK_DIV_N", type = "divider", params = { divisor = "0 ..= 3" }, output = "RC_FAST_CLK / (divisor + 1)" }, # RC_DIV
     { name = "XTAL_DIV_CLK",      type = "divider", output = "XTAL_CLK / 2" }, # XTAL_DIV
     { name = "RTC_SLOW_CLK", type = "mux", variants = [ # RTC_CNTL_ANA_CLK_RTC_SEL
         { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },

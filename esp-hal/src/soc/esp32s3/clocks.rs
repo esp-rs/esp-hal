@@ -355,7 +355,7 @@ fn enable_system_pre_div_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_system_pre_div_impl(_clocks: &mut ClockTree, new_config: SystemPreDivConfig) {
     SYSTEM::regs()
         .sysclk_conf()
-        .modify(|_, w| unsafe { w.pre_div_cnt().bits(new_config.value() as u16 & 0x3FF) });
+        .modify(|_, w| unsafe { w.pre_div_cnt().bits(new_config.divisor() as u16 & 0x3FF) });
 }
 
 // CPU_PLL_DIV_OUT
@@ -631,7 +631,7 @@ fn configure_rc_fast_clk_div_n_impl(_clocks: &mut ClockTree, new_config: RcFastC
     // Update divider
     let new_value = clk_conf.write(|w| unsafe {
         w.bits(new_value);
-        w.ck8m_div_sel().bits(new_config.value() as u8)
+        w.ck8m_div_sel().bits(new_config.divisor() as u8)
     });
     // Re-synchronize
     clk_conf.write(|w| {

@@ -267,7 +267,7 @@ fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_cpu_clk_impl(_clocks: &mut ClockTree, new_config: CpuClkConfig) {
     PCR::regs()
         .cpu_freq_conf()
-        .modify(|_, w| unsafe { w.cpu_div_num().bits(new_config.value() as u8) });
+        .modify(|_, w| unsafe { w.cpu_div_num().bits(new_config.divisor() as u8) });
 
     // "When selecting the clock source of HP_ROOT_CLK, or configuring the clock divisor for CPU_CLK
     // and AHB_CLK ..."
@@ -283,7 +283,7 @@ fn enable_ahb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_ahb_clk_impl(_clocks: &mut ClockTree, new_config: AhbClkConfig) {
     PCR::regs()
         .ahb_freq_conf()
-        .modify(|_, w| unsafe { w.ahb_div_num().bits(new_config.value() as u8) });
+        .modify(|_, w| unsafe { w.ahb_div_num().bits(new_config.divisor() as u8) });
 
     // "When selecting the clock source of HP_ROOT_CLK, or configuring the clock divisor for CPU_CLK
     // and AHB_CLK ..."
@@ -299,7 +299,7 @@ fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_apb_clk_impl(_clocks: &mut ClockTree, new_config: ApbClkConfig) {
     PCR::regs()
         .apb_freq_conf()
-        .modify(|_, w| unsafe { w.apb_div_num().bits(new_config.value() as u8) });
+        .modify(|_, w| unsafe { w.apb_div_num().bits(new_config.divisor() as u8) });
 }
 
 // XTAL_D2_CLK

@@ -411,7 +411,7 @@ fn enable_syscon_pre_div_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_syscon_pre_div_impl(_clocks: &mut ClockTree, new_config: SysconPreDivConfig) {
     APB_CTRL::regs()
         .sysclk_conf()
-        .modify(|_, w| unsafe { w.pre_div_cnt().bits(new_config.value() as u16 & 0x3FF) });
+        .modify(|_, w| unsafe { w.pre_div_cnt().bits(new_config.divisor() as u16 & 0x3FF) });
 }
 
 // APB_CLK
@@ -451,7 +451,7 @@ fn enable_ref_tick_xtal_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_ref_tick_xtal_impl(_clocks: &mut ClockTree, new_config: RefTickXtalConfig) {
     APB_CTRL::regs()
         .xtal_tick_conf()
-        .write(|w| unsafe { w.xtal_tick_num().bits(new_config.value() as u8) });
+        .write(|w| unsafe { w.xtal_tick_num().bits(new_config.divisor() as u8) });
 }
 
 // REF_TICK_FOSC
@@ -463,7 +463,7 @@ fn enable_ref_tick_fosc_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_ref_tick_fosc_impl(_clocks: &mut ClockTree, new_config: RefTickFoscConfig) {
     APB_CTRL::regs()
         .ck8m_tick_conf()
-        .write(|w| unsafe { w.ck8m_tick_num().bits(new_config.value() as u8) });
+        .write(|w| unsafe { w.ck8m_tick_num().bits(new_config.divisor() as u8) });
 }
 
 // REF_TICK_APLL
@@ -475,7 +475,7 @@ fn enable_ref_tick_apll_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_ref_tick_apll_impl(_clocks: &mut ClockTree, new_config: RefTickApllConfig) {
     APB_CTRL::regs()
         .apll_tick_conf()
-        .write(|w| unsafe { w.apll_tick_num().bits(new_config.value() as u8) });
+        .write(|w| unsafe { w.apll_tick_num().bits(new_config.divisor() as u8) });
 }
 
 // REF_TICK_PLL
@@ -487,7 +487,7 @@ fn enable_ref_tick_pll_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_ref_tick_pll_impl(_clocks: &mut ClockTree, new_config: RefTickPllConfig) {
     APB_CTRL::regs()
         .pll_tick_conf()
-        .write(|w| unsafe { w.pll_tick_num().bits(new_config.value() as u8) });
+        .write(|w| unsafe { w.pll_tick_num().bits(new_config.divisor() as u8) });
 }
 
 // CPU_CLK

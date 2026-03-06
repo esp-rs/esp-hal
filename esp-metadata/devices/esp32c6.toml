@@ -152,28 +152,28 @@ clocks = { system_clocks = { clock_tree = [
         { name = "RC_FAST", outputs = "RC_FAST_CLK", configures = ["HP_ROOT_CLK = 1", "CPU_CLK = LS", "AHB_CLK = LS", "MSPI_FAST_CLK = LS"] },
         { name = "PLL",     outputs = "PLL_CLK",     configures = ["HP_ROOT_CLK = 3", "CPU_CLK = HS", "AHB_CLK = HS", "MSPI_FAST_CLK = HS"] },
     ] },
-    { name = "HP_ROOT_CLK", type = "divider", divisors = "1, 3", output = "SOC_ROOT_CLK / DIVISOR" }, # AUTO_DIV, only divides when using PLL_CLK
+    { name = "HP_ROOT_CLK", type = "divider", params = { divisor = "1, 3" }, output = "SOC_ROOT_CLK / divisor" }, # AUTO_DIV, only divides when using PLL_CLK
 
     # TODO: model by-4 divider for 120MHz CPU clock
-    { name = "CPU_HS_DIV", type = "divider", divisors = "0, 1, 3", output = "HP_ROOT_CLK / (DIVISOR + 1)" },
-    { name = "CPU_LS_DIV", type = "divider", divisors = "0, 1, 3, 7, 15, 31", output = "HP_ROOT_CLK / (DIVISOR + 1)" },
+    { name = "CPU_HS_DIV", type = "divider", params = { divisor = "0, 1, 3" }, output = "HP_ROOT_CLK / (divisor + 1)" },
+    { name = "CPU_LS_DIV", type = "divider", params = { divisor = "0, 1, 3, 7, 15, 31" }, output = "HP_ROOT_CLK / (divisor + 1)" },
     { name = "CPU_CLK",    type = "mux", always_on = true, variants = [
         { name = "HS", outputs = "CPU_HS_DIV" },
         { name = "LS", outputs = "CPU_LS_DIV" },
     ] },
 
-    { name = "AHB_HS_DIV", type = "divider", divisors = "3, 7, 15", output = "HP_ROOT_CLK / (DIVISOR + 1)" },
-    { name = "AHB_LS_DIV", type = "divider", divisors = "0, 1, 3, 7, 15, 31", output = "HP_ROOT_CLK / (DIVISOR + 1)" },
+    { name = "AHB_HS_DIV", type = "divider", params = { divisor = "3, 7, 15" }, output = "HP_ROOT_CLK / (divisor + 1)" },
+    { name = "AHB_LS_DIV", type = "divider", params = { divisor = "0, 1, 3, 7, 15, 31" }, output = "HP_ROOT_CLK / (divisor + 1)" },
     { name = "AHB_CLK",    type = "mux", always_on = true, variants = [
         { name = "HS", outputs = "AHB_HS_DIV" },
         { name = "LS", outputs = "AHB_LS_DIV" },
     ] },
-    { name = "APB_CLK", type = "divider", divisors = "0, 1, 3", output = "AHB_CLK / (DIVISOR + 1)" },
+    { name = "APB_CLK", type = "divider", params = { divisor = "0, 1, 3" }, output = "AHB_CLK / (divisor + 1)" },
     # configurable, but automatic - there's no point in making APB_DECREASE_DIV part of the model as consumers will always see APB_CLK
-    # { name = "APB_DECREASE_DIV", type = "divider", output = "APB_DIV / (DIVISOR + 1)" },
+    # { name = "APB_DECREASE_DIV", type = "divider", output = "APB_DIV / (divisor + 1)" },
 
-    { name = "MSPI_FAST_HS_CLK", type = "divider", divisors = "3, 4, 5", output = "HP_ROOT_CLK / (DIVISOR + 1)" },
-    { name = "MSPI_FAST_LS_CLK", type = "divider", divisors = "0, 1, 2", output = "HP_ROOT_CLK / (DIVISOR + 1)" },
+    { name = "MSPI_FAST_HS_CLK", type = "divider", params = { divisor = "3, 4, 5" }, output = "HP_ROOT_CLK / (divisor + 1)" },
+    { name = "MSPI_FAST_LS_CLK", type = "divider", params = { divisor = "0, 1, 2" }, output = "HP_ROOT_CLK / (divisor + 1)" },
     { name = "MSPI_FAST_CLK",    type = "mux", variants = [
         { name = "HS", outputs = "MSPI_FAST_HS_CLK" },
         { name = "LS", outputs = "MSPI_FAST_LS_CLK" },

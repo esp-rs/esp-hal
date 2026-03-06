@@ -130,9 +130,9 @@ clocks = { system_clocks = { clock_tree = [
     #  - `variants` describe the different options available for the multiplexer.
     #  - `outputs` is the name of the clock signal that will be output. Only a name is accepted, expressions are not supported.
     # `divider` is a clock divider, either fixed or configurable.
-    #  - `range`s are half-open intervals ([included, excluded]) - optional
-    #  - `divisors` is a list of options - optional
-    #  - `output` is an expression describing how the output frequency is calculated. `DIVISOR` is the divisor value.
+    #  - `params` is a map that lists the possible values for variables in the output expression.
+    #    `variable = "from .. to(inclusive)"` or `variable = "option, option, option"`
+    #  - `output` is an expression describing how the output frequency is calculated. `divisor` is the divisor value.
     # `derived` is a custom element that depends on another clock signal.
     #  - `from` describes a dependency on another clock signal, if the output expression does not indicate it.
     #  - `output` is an expression describing how the output frequency is calculated.
@@ -171,14 +171,14 @@ clocks = { system_clocks = { clock_tree = [
         { name = "PLL",  outputs = "PLL_CLK" },
         { name = "APLL", outputs = "APLL_CLK" },
     ] },
-    { name = "CPU_PLL_DIV", type = "divider", divisors = "2, 4", output = "CPU_PLL_DIV_IN / DIVISOR", reject = "PLL_CLK == 480_000_000 && DIVISOR == 4" },
+    { name = "CPU_PLL_DIV", type = "divider", params = { divisor = "2, 4" }, output = "CPU_PLL_DIV_IN / divisor", reject = "PLL_CLK == 480_000_000 && divisor == 4" },
 
     # DIVB Divisor for low-speed clock sources (XTAL, FOSC)
     { name = "SYSCON_PRE_DIV_IN", type = "mux", variants = [
         { name = "XTAL",    outputs = "XTAL_CLK" },
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
     ] },
-    { name = "SYSCON_PRE_DIV", type = "divider", divisors = "0 .. 1024", output = "SYSCON_PRE_DIV_IN / (DIVISOR + 1)" },
+    { name = "SYSCON_PRE_DIV", type = "divider", params = { divisor = "0 .. 1024" }, output = "SYSCON_PRE_DIV_IN / (divisor + 1)" },
 
     # The meta-switch
     { name = "CPU_CLK", type = "mux", always_on = true, variants = [
@@ -199,10 +199,10 @@ clocks = { system_clocks = { clock_tree = [
     ] },
 
     # REF_TICK, configuring CPU clock needs to ensure this is 1MHz
-    { name = "REF_TICK_PLL",  type = "divider", divisors = "0 .. 256", output = "APB_CLK / (DIVISOR + 1)" },
-    { name = "REF_TICK_APLL", type = "divider", divisors = "0 .. 256", output = "APB_CLK / (DIVISOR + 1)" },
-    { name = "REF_TICK_XTAL", type = "divider", divisors = "0 .. 256", output = "APB_CLK / (DIVISOR + 1)" },
-    { name = "REF_TICK_FOSC", type = "divider", divisors = "0 .. 256", output = "APB_CLK / (DIVISOR + 1)" },
+    { name = "REF_TICK_PLL",  type = "divider", params = { divisor = "0 .. 256" }, output = "APB_CLK / (divisor + 1)" },
+    { name = "REF_TICK_APLL", type = "divider", params = { divisor = "0 .. 256" }, output = "APB_CLK / (divisor + 1)" },
+    { name = "REF_TICK_XTAL", type = "divider", params = { divisor = "0 .. 256" }, output = "APB_CLK / (divisor + 1)" },
+    { name = "REF_TICK_FOSC", type = "divider", params = { divisor = "0 .. 256" }, output = "APB_CLK / (divisor + 1)" },
     { name = "REF_TICK", type = "mux", variants = [
         { name = "PLL",  outputs = "REF_TICK_PLL" },
         { name = "APLL", outputs = "REF_TICK_APLL" },

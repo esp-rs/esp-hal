@@ -340,7 +340,7 @@ fn enable_cpu_hs_div_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_cpu_hs_div_impl(_clocks: &mut ClockTree, new_config: CpuHsDivConfig) {
     PCR::regs()
         .cpu_freq_conf()
-        .modify(|_, w| unsafe { w.cpu_hs_div_num().bits(new_config.value() as u8) });
+        .modify(|_, w| unsafe { w.cpu_hs_div_num().bits(new_config.divisor() as u8) });
 }
 
 // CPU_LS_DIV
@@ -352,7 +352,7 @@ fn enable_cpu_ls_div_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_cpu_ls_div_impl(_clocks: &mut ClockTree, new_config: CpuLsDivConfig) {
     PCR::regs()
         .cpu_freq_conf()
-        .modify(|_, w| unsafe { w.cpu_ls_div_num().bits(new_config.value() as u8) });
+        .modify(|_, w| unsafe { w.cpu_ls_div_num().bits(new_config.divisor() as u8) });
 }
 
 // AHB_HS_DIV
@@ -364,7 +364,7 @@ fn enable_ahb_hs_div_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_ahb_hs_div_impl(_clocks: &mut ClockTree, new_config: AhbHsDivConfig) {
     PCR::regs()
         .ahb_freq_conf()
-        .modify(|_, w| unsafe { w.ahb_hs_div_num().bits(new_config.value() as u8) });
+        .modify(|_, w| unsafe { w.ahb_hs_div_num().bits(new_config.divisor() as u8) });
 }
 
 // AHB_LS_DIV
@@ -376,7 +376,7 @@ fn enable_ahb_ls_div_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_ahb_ls_div_impl(_clocks: &mut ClockTree, new_config: AhbLsDivConfig) {
     PCR::regs()
         .ahb_freq_conf()
-        .modify(|_, w| unsafe { w.ahb_ls_div_num().bits(new_config.value() as u8) });
+        .modify(|_, w| unsafe { w.ahb_ls_div_num().bits(new_config.divisor() as u8) });
 }
 
 // APB_CLK
@@ -388,7 +388,7 @@ fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_apb_clk_impl(_clocks: &mut ClockTree, new_config: ApbClkConfig) {
     PCR::regs()
         .apb_freq_conf()
-        .modify(|_, w| unsafe { w.apb_div_num().bits(new_config.value() as u8) });
+        .modify(|_, w| unsafe { w.apb_div_num().bits(new_config.divisor() as u8) });
 }
 
 // MSPI_FAST_HS_CLK
@@ -400,7 +400,7 @@ fn enable_mspi_fast_hs_clk_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_mspi_fast_hs_clk_impl(_clocks: &mut ClockTree, new_config: MspiFastHsClkConfig) {
     PCR::regs()
         .mspi_clk_conf()
-        .modify(|_, w| unsafe { w.mspi_fast_hs_div_num().bits(new_config.value() as u8) });
+        .modify(|_, w| unsafe { w.mspi_fast_hs_div_num().bits(new_config.divisor() as u8) });
 }
 
 // MSPI_FAST_LS_CLK
@@ -412,7 +412,7 @@ fn enable_mspi_fast_ls_clk_impl(_clocks: &mut ClockTree, _en: bool) {
 fn configure_mspi_fast_ls_clk_impl(_clocks: &mut ClockTree, new_config: MspiFastLsClkConfig) {
     PCR::regs()
         .mspi_clk_conf()
-        .modify(|_, w| unsafe { w.mspi_fast_ls_div_num().bits(new_config.value() as u8) });
+        .modify(|_, w| unsafe { w.mspi_fast_ls_div_num().bits(new_config.divisor() as u8) });
 }
 
 // PLL_F48M
