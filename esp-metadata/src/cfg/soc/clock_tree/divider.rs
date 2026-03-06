@@ -28,7 +28,7 @@
 //! - request/release functions that update the reference counts and the bitmap
 //! - A cached output frequency value.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::Result;
 use convert_case::{Case, Casing};
@@ -81,6 +81,7 @@ impl ClockTreeNodeType for Divider {
 
     fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
         let mut result = None;
+        let mut seen = HashSet::new();
         self.output.visit_variables(|v| {
             if self.params.contains_key(v) {
                 return;
@@ -91,8 +92,14 @@ impl ClockTreeNodeType for Divider {
                 )));
             }
 
-            if result.is_none() {
-                result = Some(Ok(()));
+            if seen.insert(v) {
+                result = Some(if result.is_none() {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Divider nodes cannot have more than one source clock"
+                    ))
+                });
             }
         });
         result.unwrap_or_else(|| Err(anyhow::anyhow!("Divider node has no source clock")))
@@ -428,16 +435,16 @@ valid range ({min} ..= {max})."#
 
 impl Divider {
     fn source_clock(&self) -> &str {
+        // We've validated that there exactly one clock source.
         let mut result = None;
         self.output.visit_variables(|var| {
             if !self.params.contains_key(var) {
-                if let Some(seen) = result {
-                    panic!("A divider cannot combine two clock sources ({seen}, {var})");
-                }
                 result = Some(var);
             }
         });
-        result.unwrap_or_else(|| panic!("Clock divider {} must have a source clock", self.name))
+        result.expect(
+            "Clock divider has no source clock. This should have been prevented in validation.",
+        )
     }
 }
 
