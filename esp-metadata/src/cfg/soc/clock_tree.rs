@@ -345,7 +345,7 @@ pub(crate) trait ClockTreeNodeType: Any {
     fn config_current_function(&self, tree: &ProcessedClockData) -> TokenStream {
         if self.is_configurable() {
             let ty_name = self.config_type_name();
-            let state = tree.properties(self).field_name();
+            let state = tree.properties(self.name_str()).field_name();
             let fn_name = self.current_config_function_name();
             quote! {
                 pub fn #fn_name(clocks: &mut ClockTree) -> Option<#ty_name> {
@@ -437,7 +437,7 @@ impl ClockTreeItem {
 
         let request_fn_name = node.request_fn_name();
         let release_fn_name = node.release_fn_name();
-        let properties = tree.properties(node);
+        let properties = tree.properties(node.name_str());
         let refcount_name = properties.refcount_field_name();
         let enable_fn_name = node.enable_fn_name();
         let enable_fn_impl_name = format_ident!("{}_impl", enable_fn_name);

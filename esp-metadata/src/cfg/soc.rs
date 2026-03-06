@@ -114,16 +114,13 @@ impl ProcessedClockData {
             .iter()
             .find(|item| item.name_str() == name)
             .map(|b| b.as_ref())
-            .unwrap_or_else(|| panic!("Clock node {} not found", name))
+            .unwrap_or_else(|| panic!("Clock node {name} not found"))
     }
 
-    fn properties<CTNT>(&self, node: &CTNT) -> &ManagementProperties
-    where
-        CTNT: ClockTreeNodeType + ?Sized,
-    {
+    fn properties(&self, node_name: &str) -> &ManagementProperties {
         self.management_properties
-            .get(node.name_str())
-            .unwrap_or_else(|| panic!("Management properties for {} not found", node.name_str()))
+            .get(node_name)
+            .unwrap_or_else(|| panic!("Management properties for {node_name} not found"))
     }
 }
 
@@ -171,7 +168,7 @@ impl SystemClocks {
                     #config_type
                 });
             }
-            let node_state = tree.properties(clock_item);
+            let node_state = tree.properties(clock_item.name_str());
             if let Some(type_name) = node_state.type_name() {
                 clock_tree_state_fields.push(node_state.field_name());
                 clock_tree_state_field_types.push(type_name);
