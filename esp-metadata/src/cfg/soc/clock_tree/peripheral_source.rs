@@ -3,6 +3,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 
 use crate::cfg::{
+    ClockTreeNodeInstance,
     clock_tree::{ClockTreeNodeType, ValidationContext, mux::Multiplexer},
     soc::ProcessedClockData,
 };
@@ -78,7 +79,7 @@ impl ClockTreeNodeType for PeripheralClockSource {
 
     fn request_direct_dependencies(
         &self,
-        node: &dyn ClockTreeNodeType,
+        node: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         self.mux.request_direct_dependencies(node, tree)
@@ -86,7 +87,7 @@ impl ClockTreeNodeType for PeripheralClockSource {
 
     fn release_direct_dependencies(
         &self,
-        node: &dyn ClockTreeNodeType,
+        node: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         self.mux.release_direct_dependencies(node, tree)

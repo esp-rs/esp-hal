@@ -8,6 +8,7 @@ use serde::Deserialize;
 
 use super::Expression;
 use crate::cfg::{
+    ClockTreeNodeInstance,
     clock_tree::{ClockTreeNodeType, ConfiguresExpression, ValidationContext},
     soc::ProcessedClockData,
 };
@@ -117,7 +118,7 @@ impl ClockTreeNodeType for Multiplexer {
 
     fn request_direct_dependencies(
         &self,
-        node: &dyn ClockTreeNodeType,
+        node: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let state_field = tree.properties(node.name_str()).field_name();
@@ -126,7 +127,7 @@ impl ClockTreeNodeType for Multiplexer {
 
     fn release_direct_dependencies(
         &self,
-        node: &dyn ClockTreeNodeType,
+        node: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let state_field = tree.properties(node.name_str()).field_name();

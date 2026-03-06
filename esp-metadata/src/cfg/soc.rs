@@ -142,7 +142,7 @@ impl ClockTreeNodeType for ClockTreeNodeInstance {
 
     fn request_direct_dependencies(
         &self,
-        node: &dyn ClockTreeNodeType,
+        node: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         self.node.request_direct_dependencies(node, tree)
@@ -150,7 +150,7 @@ impl ClockTreeNodeType for ClockTreeNodeInstance {
 
     fn release_direct_dependencies(
         &self,
-        node: &dyn ClockTreeNodeType,
+        node: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         self.node.release_direct_dependencies(node, tree)

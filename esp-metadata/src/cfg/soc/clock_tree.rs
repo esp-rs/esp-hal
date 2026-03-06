@@ -394,12 +394,12 @@ pub(crate) trait ClockTreeNodeType: Any {
 
     fn request_direct_dependencies(
         &self,
-        node: &dyn ClockTreeNodeType,
+        node: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream;
     fn release_direct_dependencies(
         &self,
-        node: &dyn ClockTreeNodeType,
+        node: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream;
 }
@@ -432,7 +432,7 @@ impl ClockTreeItem {
     }
 
     pub(crate) fn node_functions(
-        node: &dyn ClockTreeNodeType,
+        node: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> ClockNodeFunctions {
         let ty_name = node.config_type_name();

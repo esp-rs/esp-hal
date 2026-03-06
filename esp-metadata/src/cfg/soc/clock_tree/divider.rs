@@ -39,6 +39,7 @@ use serde::Deserialize;
 
 use crate::{
     cfg::{
+        ClockTreeNodeInstance,
         clock_tree::{
             ClockTreeNodeType,
             Expression,
@@ -392,7 +393,7 @@ valid range ({min} ..= {max})."#
 
     fn request_direct_dependencies(
         &self,
-        _node: &dyn ClockTreeNodeType,
+        _node: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let request_fn_name = tree.node(self.source_clock()).request_fn_name();
@@ -403,7 +404,7 @@ valid range ({min} ..= {max})."#
 
     fn release_direct_dependencies(
         &self,
-        _node: &dyn ClockTreeNodeType,
+        _node: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let release_fn_name = tree.node(self.source_clock()).release_fn_name();

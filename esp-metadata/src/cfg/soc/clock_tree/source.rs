@@ -37,6 +37,7 @@ use serde::Deserialize;
 
 use crate::{
     cfg::{
+        ClockTreeNodeInstance,
         clock_tree::{
             ClockTreeNodeType,
             Expression,
@@ -261,7 +262,7 @@ impl ClockTreeNodeType for Source {
 
     fn request_direct_dependencies(
         &self,
-        _node: &dyn ClockTreeNodeType,
+        _node: &ClockTreeNodeInstance,
         _tree: &ProcessedClockData,
     ) -> TokenStream {
         // Normal sources don't have dependencies
@@ -270,7 +271,7 @@ impl ClockTreeNodeType for Source {
 
     fn release_direct_dependencies(
         &self,
-        _node: &dyn ClockTreeNodeType,
+        _node: &ClockTreeNodeInstance,
         _tree: &ProcessedClockData,
     ) -> TokenStream {
         // Normal sources don't have dependencies
@@ -339,7 +340,7 @@ impl ClockTreeNodeType for DerivedClockSource {
 
     fn request_direct_dependencies(
         &self,
-        _node: &dyn ClockTreeNodeType,
+        _node: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let request_fn_name = tree.node(&self.from).request_fn_name();
@@ -350,7 +351,7 @@ impl ClockTreeNodeType for DerivedClockSource {
 
     fn release_direct_dependencies(
         &self,
-        _node: &dyn ClockTreeNodeType,
+        _node: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let release_fn_name = tree.node(&self.from).release_fn_name();
