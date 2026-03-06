@@ -366,26 +366,6 @@ pub(crate) trait ClockTreeNodeType: Any {
         format_ident!("{}_config", name)
     }
 
-    fn frequency_function_name(&self) -> Ident {
-        let name = self.name().to_case(Case::Snake);
-        format_ident!("{}_frequency", name)
-    }
-
-    fn request_fn_name(&self) -> Ident {
-        let name = self.name().to_case(Case::Snake);
-        format_ident!("request_{}", name)
-    }
-
-    fn release_fn_name(&self) -> Ident {
-        let name = self.name().to_case(Case::Snake);
-        format_ident!("release_{}", name)
-    }
-
-    fn enable_fn_name(&self) -> Ident {
-        let name = self.name().to_case(Case::Snake);
-        format_ident!("enable_{}", name)
-    }
-
     fn request_direct_dependencies(
         &self,
         node: &ClockTreeNodeInstance,

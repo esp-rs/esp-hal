@@ -119,6 +119,26 @@ impl ClockTreeNodeInstance {
     fn config_apply_impl_function(&self, tree: &ProcessedClockData) -> TokenStream {
         ClockTreeNodeType::config_apply_impl_function(self, self, tree)
     }
+
+    fn enable_fn_name(&self) -> Ident {
+        let name = self.name().to_case(Case::Snake);
+        format_ident!("enable_{}", name)
+    }
+
+    fn request_fn_name(&self) -> Ident {
+        let name = self.name().to_case(Case::Snake);
+        format_ident!("request_{}", name)
+    }
+
+    fn release_fn_name(&self) -> Ident {
+        let name = self.name().to_case(Case::Snake);
+        format_ident!("release_{}", name)
+    }
+
+    fn frequency_function_name(&self) -> Ident {
+        let name = self.name().to_case(Case::Snake);
+        format_ident!("{}_frequency", name)
+    }
 }
 
 impl ClockTreeNodeType for ClockTreeNodeInstance {
@@ -220,22 +240,6 @@ impl ClockTreeNodeType for ClockTreeNodeInstance {
 
     fn current_config_function_name(&self) -> Ident {
         self.node.current_config_function_name()
-    }
-
-    fn frequency_function_name(&self) -> Ident {
-        self.node.frequency_function_name()
-    }
-
-    fn request_fn_name(&self) -> Ident {
-        self.node.request_fn_name()
-    }
-
-    fn release_fn_name(&self) -> Ident {
-        self.node.release_fn_name()
-    }
-
-    fn enable_fn_name(&self) -> Ident {
-        self.node.enable_fn_name()
     }
 }
 
