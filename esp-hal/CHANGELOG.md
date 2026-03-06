@@ -74,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Ecc` modular arithmetic methods now take the modulus as an argument (#5073)
 - `Ecc::new` now takes a configuration parameter (#5073)
 - It's no longer possible to pass `esp_hal::gpio::Output` to bidirectional peripheral signals (half-duplex SPI, I2C) (#5093)
+- S3: SPI1 is no longer initialized if PSRAM is not correctly detected. The warning message now includes PSRAM mode config (#5122)
 
 ### Fixed
 
