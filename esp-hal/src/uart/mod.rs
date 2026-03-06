@@ -1460,7 +1460,7 @@ impl<'d> Uart<'d, Blocking> {
     /// use core::fmt::Write;
     ///
     /// use esp_hal::uart::UartInterrupt;
-    /// #[handler]
+    /// #[esp_hal::handler]
     /// fn interrupt_handler() {
     ///     critical_section::with(|cs| {
     ///         let mut serial = SERIAL.borrow_ref_mut(cs);

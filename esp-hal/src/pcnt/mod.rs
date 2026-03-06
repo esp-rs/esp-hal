@@ -71,7 +71,7 @@
 //!     }
 //! }
 //!
-//! #[handler(priority = Priority::Priority2)]
+//! #[esp_hal::handler]
 //! fn interrupt_handler() {
 //!     critical_section::with(|cs| {
 //!         let mut u0 = UNIT0.borrow_ref_mut(cs);

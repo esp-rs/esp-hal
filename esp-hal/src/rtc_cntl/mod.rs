@@ -73,7 +73,7 @@ critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
 static RWDT: Mutex<RefCell<Option<Rwdt>>> = Mutex::new(RefCell::new(None));
 
 // Handle the corresponding interrupt
-#[handler]
+#[esp_hal::handler]
 fn interrupt_handler() {
     critical_section::with(|cs| {
         println!("RWDT Interrupt");
@@ -94,7 +94,6 @@ fn interrupt_handler() {
 ### Get time in ms from the RTC Timer
 ```rust, no_run
 # {before_snippet}
-# use core::time::Duration;
 # use esp_hal::{delay::Delay, rtc_cntl::Rtc};
 
 let rtc = Rtc::new(peripherals.LPWR);
