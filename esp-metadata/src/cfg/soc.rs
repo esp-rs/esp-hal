@@ -104,6 +104,7 @@ pub(crate) struct ProcessedClockData {
 pub(crate) struct ClockTreeNodeInstance {
     node: Box<dyn ClockTreeNodeType>,
     include_in_global_config: bool,
+    is_first_instance: bool,
 }
 
 impl ClockTreeNodeType for ClockTreeNodeInstance {
@@ -128,6 +129,10 @@ impl ClockTreeNodeType for ClockTreeNodeInstance {
     }
 
     fn config_type(&self) -> Option<TokenStream> {
+        if !self.is_first_instance {
+            return None;
+        }
+
         self.node.config_type()
     }
 
@@ -686,6 +691,7 @@ impl DeviceClocks {
                         ClockTreeItem::Derived(inner) => Box::new(inner.clone()),
                     },
                     include_in_global_config: true,
+                    is_first_instance: true,
                 };
 
                 RefCell::new(node)
@@ -715,16 +721,13 @@ impl DeviceClocks {
                 // A fake node because we need to prefix the peripheral name, and the
                 // behaviour differs slightly from the standard mutex (we generate a type
                 // for all variant counts for now).
+                let is_definition = matches!(peri.clocks, PeripheralClockTreeEntry::Definition(_));
                 let node = match def {
                     ClockTreeItem::Multiplexer(mux) => PeripheralClockSource {
                         peripheral: format!(
                             "{}_{}",
                             peri.name.from_case(Case::Ada).to_case(Case::Constant),
                             mux.name_str()
-                        ),
-                        is_definition: matches!(
-                            peri.clocks,
-                            PeripheralClockTreeEntry::Definition(_)
                         ),
                         template: format!(
                             "{}_{}",
@@ -744,6 +747,7 @@ impl DeviceClocks {
                 clock_tree.push(RefCell::new(ClockTreeNodeInstance {
                     node: Box::new(node),
                     include_in_global_config: false,
+                    is_first_instance: is_definition,
                 }));
             }
         }
