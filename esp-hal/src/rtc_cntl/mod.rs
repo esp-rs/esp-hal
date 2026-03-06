@@ -141,7 +141,7 @@ pub mod sleep;
 pub(crate) mod rtc;
 
 cfg_if::cfg_if! {
-    if #[cfg(any(esp32c6, esp32h2, esp32c5))] {
+    if #[cfg(any(esp32c6, esp32c61, esp32h2, esp32c5))] {
         use crate::peripherals::LP_WDT;
         #[cfg(not(esp32c5))]
         use crate::peripherals::LP_TIMER;
