@@ -167,9 +167,7 @@ impl ValidationContext<'_> {
     }
 
     fn clock(&self, clk: &str) -> Option<&ClockTreeItem> {
-        self.tree
-            .iter()
-            .find(|item| item.as_dyn_ref().name_str() == clk)
+        self.tree.iter().find(|item| item.name() == clk)
     }
 }
 
@@ -422,12 +420,12 @@ pub enum ClockTreeItem {
 }
 
 impl ClockTreeItem {
-    pub(crate) fn as_dyn_ref(&self) -> &dyn ClockTreeNodeType {
+    pub(crate) fn name(&self) -> &str {
         match self {
-            ClockTreeItem::Multiplexer(mux) => mux,
-            ClockTreeItem::Source(src) => src,
-            ClockTreeItem::Divider(div) => div,
-            ClockTreeItem::Derived(drv) => drv,
+            ClockTreeItem::Multiplexer(mux) => mux.name_str().as_str(),
+            ClockTreeItem::Source(src) => src.name_str().as_str(),
+            ClockTreeItem::Divider(div) => div.name_str().as_str(),
+            ClockTreeItem::Derived(drv) => drv.name_str().as_str(),
         }
     }
 
@@ -615,7 +613,7 @@ impl ConfiguresExpression {
             anyhow::bail!("Clock source {} not found", self.target);
         };
 
-        let clock_name = clock.as_dyn_ref().name().to_case(Case::Ada);
+        let clock_name = clock.name();
         match clock {
             ClockTreeItem::Multiplexer(multiplexer) => {
                 if let Some(name) = self.value.as_name() {
