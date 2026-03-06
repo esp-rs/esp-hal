@@ -46,17 +46,17 @@ mod tests {
 
     /// Exercises the override flow using unstable helpers:
     /// 1. Station defaults to the eFuse base MAC.
-    /// 2. After `set_mac_address`, Station reflects the override.
-    /// 3. A second `set_mac_address` returns `AlreadySet`.
+    /// 2. After `override_mac_address`, Station reflects the override.
+    /// 3. A second `override_mac_address` returns `AlreadySet`.
     #[cfg(soc_has_wifi)]
     #[test]
     fn set_mac_override_updates_interface_mac() {
-        let base = efuse::mac_address();
+        let base = efuse::base_mac_address();
         let sta_before = efuse::interface_mac_address(InterfaceMacAddress::Station);
         assert_eq!(sta_before, base);
 
         let custom = MacAddress::new_eui48([0x02, 0x00, 0x00, 0x00, 0x00, 0x01]);
-        efuse::set_mac_address(custom).expect("first set_mac_address should succeed");
+        efuse::override_mac_address(custom).expect("first override_mac_address should succeed");
 
         // Station must now return the overridden MAC
         let sta_after = efuse::interface_mac_address(InterfaceMacAddress::Station);
@@ -64,10 +64,10 @@ mod tests {
         assert_ne!(sta_after, base);
 
         // mac_address() must still return the factory eFuse value
-        assert_eq!(efuse::mac_address(), base);
+        assert_eq!(efuse::base_mac_address(), base);
 
         // Second set must fail
         let another = MacAddress::new_eui48([0x02, 0x00, 0x00, 0x00, 0x00, 0x02]);
-        assert!(efuse::set_mac_address(another).is_err());
+        assert!(efuse::override_mac_address(another).is_err());
     }
 }
