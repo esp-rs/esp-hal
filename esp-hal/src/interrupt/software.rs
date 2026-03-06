@@ -33,7 +33,7 @@
 //! // Define a shared handle to the software interrupt.
 //! static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell::new(None));
 //!
-//! #[handler]
+//! #[esp_hal::handler]
 //! fn swint0_handler() {
 //!     println!("SW interrupt0 handled");
 //!

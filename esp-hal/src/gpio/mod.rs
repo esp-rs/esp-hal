@@ -1244,7 +1244,7 @@ impl<'d> Input<'d> {
     /// // that the interrupt handler can access it.
     /// static BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
     ///
-    /// #[handler]
+    /// #[esp_hal::handler]
     /// fn handler() {
     ///     critical_section::with(|cs| {
     ///         let mut button = BUTTON.borrow_ref_mut(cs);

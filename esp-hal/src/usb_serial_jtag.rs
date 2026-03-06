@@ -95,7 +95,7 @@
 //! static USB_SERIAL: Mutex<RefCell<Option<UsbSerialJtag<'static, esp_hal::Blocking>>>> =
 //!     Mutex::new(RefCell::new(None));
 //!
-//! #[handler]
+//! #[esp_hal::handler]
 //! fn usb_device() {
 //!     critical_section::with(|cs| {
 //!         let mut usb_serial = USB_SERIAL.borrow_ref_mut(cs);
