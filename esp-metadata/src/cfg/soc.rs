@@ -113,7 +113,10 @@ pub(crate) struct ClockTreeNodeInstance {
     name: String,
 
     /// Name of the template used to instantiate this clock tree node.
-    // TODO: investigate if we could instead modify `node`'s name field.
+    // TODO: this should be empty for system nodes
+    // TODO: we should have methods to modify names in implemntation code
+    // (e.g. to make them able to first refer to a peripheral-local clock node, then fall back to a
+    // system node) - fn resolve_clock_node(&self, tree: &ProcessedClockData, name: &str) -> &str
     template_name: String,
 }
 

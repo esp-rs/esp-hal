@@ -435,7 +435,7 @@ valid range ({min} ..= {max})."#
 
 impl Divider {
     fn source_clock(&self) -> &str {
-        // We've validated that there exactly one clock source.
+        // We've validated that there is exactly one clock source.
         let mut result = None;
         self.output.visit_variables(|var| {
             if !self.params.contains_key(var) {

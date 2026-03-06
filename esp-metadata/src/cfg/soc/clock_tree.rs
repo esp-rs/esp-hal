@@ -288,10 +288,14 @@ impl ManagementProperties {
 
 pub(crate) trait ClockTreeNodeType: Any {
     /// Returns which clock nodes' configurations are affected when this node is configured.
+    // TODO: pass instance to apply template naming scheme to returned clocks
+    // (e.g. FUNCTION_CLOCK -> UART0_FUNCTION_CLOCK)
     fn affected_nodes<'s>(&'s self) -> Vec<&'s str> {
         vec![]
     }
 
+    // TODO: pass instance to apply template naming scheme to returned clocks
+    // (e.g. FUNCTION_CLOCK -> UART0_FUNCTION_CLOCK)
     fn input_clocks(&self) -> Vec<String> {
         vec![]
     }
@@ -299,6 +303,8 @@ pub(crate) trait ClockTreeNodeType: Any {
     fn always_on(&self) -> bool {
         false
     }
+    // TODO: pass instance to apply template naming scheme to returned clocks
+    // (e.g. FUNCTION_CLOCK -> UART0_FUNCTION_CLOCK)
     fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()>;
     fn is_configurable(&self) -> bool;
     fn config_apply_function(
