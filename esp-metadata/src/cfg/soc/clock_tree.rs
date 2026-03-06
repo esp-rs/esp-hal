@@ -306,7 +306,11 @@ pub(crate) trait ClockTreeNodeType: Any {
     fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()>;
     fn is_configurable(&self) -> bool;
     fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream;
-    fn config_apply_impl_function(&self, _tree: &ProcessedClockData) -> TokenStream {
+    fn config_apply_impl_function(
+        &self,
+        _node: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> TokenStream {
         quote! {}
     }
 

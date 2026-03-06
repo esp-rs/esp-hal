@@ -118,9 +118,13 @@ impl ClockTreeNodeType for Source {
         }
     }
 
-    fn config_apply_impl_function(&self, _tree: &ProcessedClockData) -> TokenStream {
-        let ty_name = self.config_type_name();
-        let apply_fn_name = self.config_apply_function_name();
+    fn config_apply_impl_function(
+        &self,
+        node: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> TokenStream {
+        let ty_name = node.config_type_name();
+        let apply_fn_name = node.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
         quote! {
             fn #hal_impl(_clocks: &mut ClockTree, _config: #ty_name) {
@@ -316,8 +320,12 @@ impl ClockTreeNodeType for DerivedClockSource {
         self.source_options.config_apply_function(tree)
     }
 
-    fn config_apply_impl_function(&self, tree: &ProcessedClockData) -> TokenStream {
-        self.source_options.config_apply_impl_function(tree)
+    fn config_apply_impl_function(
+        &self,
+        node: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        self.source_options.config_apply_impl_function(node, tree)
     }
 
     fn node_frequency_impl(&self, tree: &ProcessedClockData) -> TokenStream {

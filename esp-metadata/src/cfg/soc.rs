@@ -115,6 +115,10 @@ impl ClockTreeNodeInstance {
         }
         Some(ClockTreeNodeType::config_type(self))
     }
+
+    fn config_apply_impl_function(&self, tree: &ProcessedClockData) -> TokenStream {
+        ClockTreeNodeType::config_apply_impl_function(self, self, tree)
+    }
 }
 
 impl ClockTreeNodeType for ClockTreeNodeInstance {
@@ -174,8 +178,12 @@ impl ClockTreeNodeType for ClockTreeNodeInstance {
         self.node.always_on()
     }
 
-    fn config_apply_impl_function(&self, tree: &ProcessedClockData) -> TokenStream {
-        self.node.config_apply_impl_function(tree)
+    fn config_apply_impl_function(
+        &self,
+        node: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        self.node.config_apply_impl_function(node, tree)
     }
 
     fn name<'a>(&'a self) -> StateConverter<'a, String> {

@@ -1,6 +1,5 @@
 use convert_case::{Case, Casing};
 use proc_macro2::{Ident, TokenStream};
-use quote::{format_ident, quote};
 
 use crate::cfg::{
     ClockTreeNodeInstance,
@@ -44,16 +43,12 @@ impl ClockTreeNodeType for PeripheralClockSource {
         self.mux.impl_config_apply_function(self, tree)
     }
 
-    fn config_apply_impl_function(&self, _tree: &ProcessedClockData) -> TokenStream {
-        let ty_name = self.config_type_name();
-        let apply_fn_name = self.config_apply_function_name();
-        let hal_impl = format_ident!("{}_impl", apply_fn_name);
-
-        quote! {
-            fn #hal_impl(_clocks: &mut ClockTree, _old_selector: Option<#ty_name>, _new_selector: #ty_name) {
-                todo!()
-            }
-        }
+    fn config_apply_impl_function(
+        &self,
+        node: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        self.mux.config_apply_impl_function(node, tree)
     }
 
     fn node_frequency_impl(&self, tree: &ProcessedClockData) -> TokenStream {
