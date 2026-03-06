@@ -550,9 +550,7 @@ impl Rwdt {
     /// Feed the watchdog timer.
     pub fn feed(&mut self) {
         self.set_write_protection(false);
-        LP_WDT::regs().wdtfeed().write(|w| {  
-            w.wdt_feed().set_bit()
-        });
+        LP_WDT::regs().wdtfeed().write(|w| w.wdt_feed().set_bit());
         self.set_write_protection(true);
     }
 
