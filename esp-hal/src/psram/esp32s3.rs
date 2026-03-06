@@ -215,27 +215,31 @@ pub(crate) mod utils {
                 CS_PSRAM_SEL, // cs bit mask
                 false,
             );
+            if dev_id == 0xffffff {
+                warn!(
+                    "Unknown PSRAM chip ID: {:x}. PSRAM chip not found or not supported. Check if ESP_HAL_CONFIG_PSRAM_MODE is configured correctly.",
+                    dev_id
+                );
+                return;
+            }
+
             info!("chip id = {:x}", dev_id);
 
-            let size = if dev_id != 0xffffff {
-                const PSRAM_ID_EID_S: u32 = 16;
-                const PSRAM_ID_EID_M: u32 = 0xff;
-                const PSRAM_EID_SIZE_M: u32 = 0x07;
-                const PSRAM_EID_SIZE_S: u32 = 5;
+            const PSRAM_ID_EID_S: u32 = 16;
+            const PSRAM_ID_EID_M: u32 = 0xff;
+            const PSRAM_EID_SIZE_M: u32 = 0x07;
+            const PSRAM_EID_SIZE_S: u32 = 5;
 
-                let size_id = ((((dev_id) >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S)
-                    & PSRAM_EID_SIZE_M;
+            let size_id = ((((dev_id) >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S)
+                & PSRAM_EID_SIZE_M;
 
-                const PSRAM_EID_SIZE_32MBITS: u32 = 1;
-                const PSRAM_EID_SIZE_64MBITS: u32 = 2;
+            const PSRAM_EID_SIZE_32MBITS: u32 = 1;
+            const PSRAM_EID_SIZE_64MBITS: u32 = 2;
 
-                match size_id {
-                    PSRAM_EID_SIZE_64MBITS => 64 / 8 * 1024 * 1024,
-                    PSRAM_EID_SIZE_32MBITS => 32 / 8 * 1024 * 1024,
-                    _ => 16 / 8 * 1024 * 1024,
-                }
-            } else {
-                0
+            let size = match size_id {
+                PSRAM_EID_SIZE_64MBITS => 64 / 8 * 1024 * 1024,
+                PSRAM_EID_SIZE_32MBITS => 32 / 8 * 1024 * 1024,
+                _ => 16 / 8 * 1024 * 1024,
             };
 
             info!("size is {}", size);
@@ -1088,7 +1092,7 @@ pub(crate) mod utils {
 
         if mode_reg.vendor_id() != OCT_PSRAM_VENDOR_ID {
             warn!(
-                "PSRAM ID read error: {:x}, PSRAM chip not found or not supported, or wrong PSRAM line mode",
+                "Unknown PSRAM vendor ID: {:x}. PSRAM chip not found or not supported. Check if ESP_HAL_CONFIG_PSRAM_MODE is configured correctly.",
                 mode_reg.vendor_id()
             );
             return;
