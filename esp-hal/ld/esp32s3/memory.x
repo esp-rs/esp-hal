@@ -38,8 +38,8 @@ MEMORY
      header. Setting this offset makes it simple to meet the flash cache MMU's
      constraint that (paddr % 64KB == vaddr % 64KB).)
   */
-  irom_seg ( RX )        : ORIGIN = 0x42000020, len = 4M - 0x20
-  drom_seg ( R )         : ORIGIN = 0x3C000020, len = 4M - 0x20
+  irom_seg ( RX )        : ORIGIN = 0x42000020, len = 32M - 0x20
+  drom_seg ( R )         : ORIGIN = 0x3C000020, len = 32M - 0x20
 
 
   /* RTC fast memory (executable). Persists over deep sleep. Only for core 0 (PRO_CPU) */
