@@ -53,12 +53,16 @@ pub enum UlpCoreWakeupSource {
 /// Structure representing the ULP (Ultra-Low Power) core.
 pub struct UlpCore<'d> {
     _lp_core: crate::peripherals::ULP_RISCV_CORE<'d>,
+    _sleep_cycles: u32,
 }
 
 impl<'d> UlpCore<'d> {
     /// Creates a new instance of the `UlpCore` struct.
     pub fn new(lp_core: crate::peripherals::ULP_RISCV_CORE<'d>) -> Self {
-        let mut this = Self { _lp_core: lp_core };
+        let mut this = Self {
+            _lp_core: lp_core,
+            _sleep_cycles: 200,
+        };
         this.stop();
 
         // clear all of RTC_SLOW_RAM - this makes sure .bss is cleared without relying
@@ -69,6 +73,13 @@ impl<'d> UlpCore<'d> {
         this
     }
 
+    /// Changes the timer rate used to wake-up the ULP core periodically
+    pub fn with_sleep_cycles(self, cycles: u32) -> Self {
+        let mut x = self;
+        x._sleep_cycles = cycles;
+        x
+    }
+
     /// Stops the ULP core.
     pub fn stop(&mut self) {
         ulp_stop();
@@ -76,8 +87,17 @@ impl<'d> UlpCore<'d> {
 
     /// Runs the ULP core with the specified wakeup source.
     pub fn run(&mut self, wakeup_src: UlpCoreWakeupSource) {
+        ulp_set_wakeup_period(self._sleep_cycles);
         ulp_run(wakeup_src);
     }
+}
+
+fn ulp_set_wakeup_period(sleep_cycles: u32) {
+    let mut cycles = sleep_cycles;
+    cycles = cycles.clamp(1, 0xFFFFFF) << 8;
+    LPWR::regs()
+        .ulp_cp_timer_1()
+        .write(|w| unsafe { w.ulp_cp_timer_slp_cycle().bits(cycles) });
 }
 
 fn ulp_stop() {

@@ -44,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Ecc::apply_config` and `esp_hal::ecc::Config` (#5073)
 - Added experimental low-level clock control functionality via `esp_hal::clock::ll` (#5092)
 - Work queue support for ECC operations (#5084)
+- Added support for running ULP RISCV code off the ULP_CP_TIMER_1 timer, using `UlpCore.with_sleep_cycles(cycles : u32)`
+- Added early support for ULP interrupt handling, using assembler context saving routine from ESP-IDF.
 
 ### Changed
 
@@ -78,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Ecc::new` now takes a configuration parameter (#5073)
 - It's no longer possible to pass `esp_hal::gpio::Output` to bidirectional peripheral signals (half-duplex SPI, I2C) (#5093)
 - S3: SPI1 is no longer initialized if PSRAM is not correctly detected. The warning message now includes PSRAM mode config (#5122)
+- Changed ULP entrypoint function signature to allow the `main()` function to return, instead of running indefinitely.
 
 ### Fixed
 
@@ -106,6 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-C6: RtcClock clock calibration for v0.1 (#5109)
 - Improve LP timer accuracy (#5105, #5115)
 - Increase the size of `irom_seg`/`drom_seg` from 4 MB to 32 MB for the ESP32-S3 (#5121)
+- Re-wrote `ulp_riscv_halt()` in RISC-V assembly, to squash a rare bug where halting while using the ULP timer would hang. 
 
 ### Removed
 

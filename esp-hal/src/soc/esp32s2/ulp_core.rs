@@ -51,6 +51,7 @@ pub enum UlpCoreWakeupSource {
 /// Structure representing the ULP (Ultra-Low Power) core.
 pub struct UlpCore<'d> {
     _lp_core: crate::peripherals::ULP_RISCV_CORE<'d>,
+    _sleep_cycles: u32,
 }
 
 impl<'d> UlpCore<'d> {
@@ -61,7 +62,17 @@ impl<'d> UlpCore<'d> {
             unsafe { core::slice::from_raw_parts_mut(0x5000_0000 as *mut u32, 8 * 1024 / 4) };
         lp_ram.fill(0u32);
 
-        Self { _lp_core: lp_core }
+        Self {
+            _lp_core: lp_core,
+            _sleep_cycles: 200,
+        }
+    }
+
+    /// Changes the timer rate used to wake-up the ULP core periodically
+    pub fn with_sleep_cycles(self, cycles: u32) -> Self {
+        let mut x = self;
+        x._sleep_cycles = cycles;
+        x
     }
 
     // currently stopping the ULP doesn't work (while following the procedures
@@ -73,8 +84,17 @@ impl<'d> UlpCore<'d> {
 
     /// Runs the ULP core with the specified wakeup source.
     pub fn run(&mut self, wakeup_src: UlpCoreWakeupSource) {
+        ulp_set_wakeup_period(self._sleep_cycles);
         ulp_run(wakeup_src);
     }
+}
+
+fn ulp_set_wakeup_period(sleep_cycles: u32) {
+    let mut cycles = sleep_cycles;
+    cycles = cycles.clamp(1, 0xFFFFFF) << 8;
+    LPWR::regs()
+        .ulp_cp_timer_1()
+        .write(|w| unsafe { w.ulp_cp_timer_slp_cycle().bits(cycles) });
 }
 
 #[allow(unused)] // TODO: remove cfg when implementation is corrected
