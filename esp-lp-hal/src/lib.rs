@@ -65,6 +65,40 @@ pub fn wake_hp_core() {
         .write(|w| w.lp_trigger_hp().set_bit());
 }
 
+/// Wake up the HP core
+#[cfg(esp32s2)]
+#[unsafe(link_section = ".init.rust")]
+pub fn ulp_wake_hp_core() {
+    // The line below may be used when this commit:
+    // https://github.com/esp-rs/esp-pacs/commit/b71c83e1a66575f3921f9b9b7ab3b2eed77fbf7e
+    // is released to crates.io.
+    // unsafe { &*esp32s2_ulp::RTC_CNTL::PTR }.rtc_state0().write(|w| w.rtc_sw_cpu_int().set_bit());
+
+    // Until then, the raw register address RTC_CNTL STATE0_REG must be used to raise the CPU
+    // interrupt. ESP32-S2 TRM, Register 9.8. RTC_CNTL_STATE0_REG (0x0018).
+    // Bit 0. RTC_CNTL_RTC_SW_CPU_INT Sends a SW RTC interrupt to CPU. (WO)
+    let rtc_cntl_state0_reg = esp32s2_ulp::RTC_CNTL::PTR.addr() + 0x18;
+    let ptr = rtc_cntl_state0_reg as *mut u32;
+    unsafe { ptr.write_volatile(0b1) }
+}
+
+/// Wake up the HP core
+#[cfg(esp32s3)]
+#[unsafe(link_section = ".init.rust")]
+pub fn ulp_wake_hp_core() {
+    // The line below may be used when this commit:
+    // https://github.com/esp-rs/esp-pacs/commit/b71c83e1a66575f3921f9b9b7ab3b2eed77fbf7e
+    // is released to crates.io.
+    // unsafe { &*esp32s3_ulp::RTC_CNTL::PTR }.rtc_state0().write(|w| w.rtc_sw_cpu_int().set_bit());
+
+    // Until then, the raw register address RTC_CNTL STATE0_REG must be used to raise the CPU
+    // interrupt. ESP32-S3 TRM, Register 10.7. RTC_CNTL_RTC_STATE0_REG (0x0018)
+    // Bit 0. RTC_CNTL_RTC_SW_CPU_INT Sends a SW RTC interrupt to CPU. (WO)
+    let rtc_cntl_rtc_state0_reg = esp32s3_ulp::RTC_CNTL::PTR.addr() + 0x18;
+    let ptr = rtc_cntl_rtc_state0_reg as *mut u32;
+    unsafe { ptr.write_volatile(0b1) }
+}
+
 #[cfg(esp32c6)]
 global_asm!(
     r#"

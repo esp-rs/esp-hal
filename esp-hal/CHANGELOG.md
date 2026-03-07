@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Ecc::apply_config` and `esp_hal::ecc::Config` (#5073)
 - Added experimental low-level clock control functionality via `esp_hal::clock::ll` (#5092)
 - Work queue support for ECC operations (#5084)
+- Added `esp_lp_hal::ulp_wake_hp_core()` so ULP cores can trigger `UlpWakeupSource` on high-power cores
 
 ### Changed
 
