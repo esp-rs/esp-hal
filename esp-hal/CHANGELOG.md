@@ -46,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Work queue support for ECC operations (#5084)
 - Added support for running ULP RISCV code off the ULP_CP_TIMER_1 timer, using `UlpCore.with_sleep_cycles(cycles : u32)`
 - Added early support for ULP interrupt handling, using assembler context saving routine from ESP-IDF.
+- Added `UlpWakeupSource` to ESP32-S2 and ESP32-S3, allowing these chips to be woken by ULP-generated interrupts.
+- Added `esp_lp_hal::ulp_wake_hp_core()` so ULP cores can trigger `UlpWakeupSource` on high-power cores
+- Added support for passing `OutputOpenDrain` GPIO variables to ULP/LP code
 
 ### Changed
 
