@@ -2360,7 +2360,6 @@ mod dma {
 
             Ok(())
         }
-        
 
         #[instability::unstable]
         pub async fn half_duplex_write_async(
