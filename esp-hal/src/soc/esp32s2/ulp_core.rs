@@ -91,7 +91,7 @@ impl<'d> UlpCore<'d> {
 
 fn ulp_set_wakeup_period(sleep_cycles: u32) {
     let mut cycles = sleep_cycles;
-    cycles = cycles.clamp(1, 0xFFFFFF) << 8;
+    cycles = cycles.clamp(0, 0xFFFFFF) << 8;
     LPWR::regs()
         .ulp_cp_timer_1()
         .write(|w| unsafe { w.ulp_cp_timer_slp_cycle().bits(cycles) });
