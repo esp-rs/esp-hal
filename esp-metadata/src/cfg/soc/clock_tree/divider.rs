@@ -79,23 +79,26 @@ impl ClockTreeNodeType for Divider {
     }
 
     fn input_clocks(&self) -> Vec<String> {
-        self.upstream_clock()
-            .iter()
-            .map(ToString::to_string)
-            .collect()
+        vec![self.source_clock().to_string()]
     }
 
     fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
-        let mut result = Ok(());
+        let mut result = None;
         self.output.visit_variables(|v| {
             if self.params.contains_key(v) {
                 return;
             }
-            if !ctx.has_clock(v) && result.is_ok() {
-                result = Err(anyhow::format_err!("{v} is not a valid clock signal name"));
+            if !ctx.has_clock(v) && matches!(result, None | Some(Ok(()))) {
+                result = Some(Err(anyhow::format_err!(
+                    "{v} is not a valid clock signal name"
+                )));
+            }
+
+            if result.is_none() {
+                result = Some(Ok(()));
             }
         });
-        result
+        result.unwrap_or_else(|| Err(anyhow::anyhow!("Divider node has no source clock")))
     }
 
     fn is_configurable(&self) -> bool {
@@ -171,7 +174,7 @@ impl ClockTreeNodeType for Divider {
 
     fn node_frequency_impl(&self, tree: &ProcessedClockData) -> TokenStream {
         let state = tree.properties(self).field_name();
-        let parent_clock = self.upstream_clock().unwrap();
+        let parent_clock = self.source_clock();
         let parent_frequency_fn = tree.node(parent_clock).frequency_function_name();
 
         let params = self.params.keys().map(|var| {
@@ -392,7 +395,7 @@ valid range ({min} ..= {max})."#
         _node: &dyn ClockTreeNodeType,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let request_fn_name = tree.node(self.upstream_clock().unwrap()).request_fn_name();
+        let request_fn_name = tree.node(self.source_clock()).request_fn_name();
         quote! {
             #request_fn_name(clocks);
         }
@@ -403,7 +406,7 @@ valid range ({min} ..= {max})."#
         _node: &dyn ClockTreeNodeType,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let release_fn_name = tree.node(self.upstream_clock().unwrap()).release_fn_name();
+        let release_fn_name = tree.node(self.source_clock()).release_fn_name();
         quote! {
             #release_fn_name(clocks);
         }
@@ -411,11 +414,7 @@ valid range ({min} ..= {max})."#
 }
 
 impl Divider {
-    pub fn upstream_clock(&self) -> Option<&str> {
-        self.find_clock_source()
-    }
-
-    pub(super) fn find_clock_source(&self) -> Option<&str> {
+    fn source_clock(&self) -> &str {
         let mut result = None;
         self.output.visit_variables(|var| {
             if !self.params.contains_key(var) {
@@ -425,7 +424,7 @@ impl Divider {
                 result = Some(var);
             }
         });
-        result
+        result.unwrap_or_else(|| panic!("Clock divider {} must have a source clock", self.name))
     }
 }
 
