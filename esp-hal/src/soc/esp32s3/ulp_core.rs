@@ -50,10 +50,42 @@ pub enum UlpCoreWakeupSource {
     HpCpu,
 }
 
+/// Configures `RTC_CNTL_ULP_CP_TIMER_1_REG` to set sleep cycles for ULP coprocessor timer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct UlpCoreSleepCycles {
+    cycles: u32,
+}
+impl UlpCoreSleepCycles {
+    /// Creates a new sleep cycle configuration.
+    /// ## Panics
+    ///
+    /// Panics if the cycles value is outside of the value range (0 ..= 0xFFFFFF).
+    pub const fn new(cycles: u32) -> Self {
+        ::core::assert!(
+            cycles <= 0xFFFFFF,
+            "`RTC_CNTL_ULP_CP_TIMER_SLP_CYCLE` sleep cycles must be between 0 and 0xFFFFFF (inclusive)."
+        );
+        Self { cycles }
+    }
+    fn cycles(self) -> u32 {
+        self.cycles
+    }
+    fn value(self) -> u32 {
+        self.cycles()
+    }
+}
+impl Default for UlpCoreSleepCycles {
+    fn default() -> Self {
+        // ESP32-S3 Technical Reference Manual. Register 2.2. RTC_CNTL_ULP_CP_TIMER_1_REG (0x0134)
+        // Field RTC_CNTL_ULP_CP_TIMER_SLP_CYCLE has a default value of 200 cycles.
+        Self { cycles: 200 }
+    }
+}
+
 /// Structure representing the ULP (Ultra-Low Power) core.
 pub struct UlpCore<'d> {
     _lp_core: crate::peripherals::ULP_RISCV_CORE<'d>,
-    _sleep_cycles: u32,
+    _sleep_cycles: UlpCoreSleepCycles,
 }
 
 impl<'d> UlpCore<'d> {
@@ -61,7 +93,7 @@ impl<'d> UlpCore<'d> {
     pub fn new(lp_core: crate::peripherals::ULP_RISCV_CORE<'d>) -> Self {
         let mut this = Self {
             _lp_core: lp_core,
-            _sleep_cycles: 200,
+            _sleep_cycles: Default::default(),
         };
         this.stop();
 
@@ -73,8 +105,10 @@ impl<'d> UlpCore<'d> {
         this
     }
 
-    /// Changes the timer rate used to wake-up the ULP core periodically
-    pub fn with_sleep_cycles(self, cycles: u32) -> Self {
+    /// Sets the number of ULP Timer cycles to wait after the ULP halts, before starting it again.
+    /// ULP Timer cycles are clocked at a rate of approximately 17.5MHz / 32768  = ~534 Hz.
+    /// The actual period between wake-ups is affected by the runtime duration of the ULP program.
+    pub fn with_sleep_cycles(self, cycles: UlpCoreSleepCycles) -> Self {
         let mut x = self;
         x._sleep_cycles = cycles;
         x
@@ -92,9 +126,8 @@ impl<'d> UlpCore<'d> {
     }
 }
 
-fn ulp_set_wakeup_period(sleep_cycles: u32) {
-    let mut cycles = sleep_cycles;
-    cycles = cycles.clamp(1, 0xFFFFFF) << 8;
+fn ulp_set_wakeup_period(sleep_cycles: UlpCoreSleepCycles) {
+    let cycles = sleep_cycles.value() << 8;
     LPWR::regs()
         .ulp_cp_timer_1()
         .write(|w| unsafe { w.ulp_cp_timer_slp_cycle().bits(cycles) });

@@ -111,13 +111,13 @@ global_asm!(
 
   /* Much of this assembly was sourced from the following ESP-IDF files...
   *  ...irq handler macros:
-  *    https://github.com/espressif/esp-idf/blob/master/components/ulp/ulp_riscv/ulp_core/ulp_riscv_vectors.S 
+  *    https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_vectors.S
   *
   *  ...critical section assembly
-  *    https://github.com/espressif/esp-idf/blob/master/components/ulp/ulp_riscv/ulp_core/include/ulp_riscv_utils.h
+  *    https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/include/ulp_riscv_utils.h
   *
   *  ...riscv halt code
-  *    https://github.com/espressif/esp-idf/blob/master/components/ulp/ulp_riscv/ulp_core/ulp_riscv_utils.c
+  *    https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_utils.c
   */
 
   /* Macro which first allocates space on the stack to save general
@@ -261,14 +261,7 @@ unsafe extern "C" fn lp_core_startup() -> ! {
         }
 
         main();
-
-        #[cfg(any(esp32s2, esp32s3))]
         ulp_riscv_halt();
-
-        #[cfg(esp32c6)]
-        loop {
-            core::arch::asm!("addi x0, x0, 0");
-        }
     }
 }
 
@@ -283,10 +276,17 @@ unsafe extern "C" fn ulp_riscv_rescue_from_monitor() {
 }
 
 /// Stops the ULP core, called from itself.
-#[cfg(any(esp32s2, esp32s3))]
 #[unsafe(link_section = ".init.rust")]
 fn ulp_riscv_halt() -> ! {
+    // ESP-S2 and ESP-S3 chips need to set the cocpu_shut_2_clk_dis delay field,
+    // and the cocpu_done flag, in order to halt.
+    #[cfg(any(esp32s2, esp32s3))]
     unsafe {
+        // Equivalent Rust code.
+        // unsafe { &*pac::RTC_CNTL::PTR }
+        //     .cocpu_ctrl()
+        //     .modify(|_, w| unsafe { w.cocpu_shut_2_clk_dis().bits(0x3f).cocpu_done().set_bit()
+        // });
         core::arch::asm!(
             "lui a5,0x8",
             "addi a5,a5,260",
@@ -314,9 +314,13 @@ fn ulp_riscv_halt() -> ! {
             // save it back!
             "sw a4,0(a5)",
         );
-        // NO-OP loop
-        loop {
-            core::arch::asm!("addi x0, x0, 0");
+    }
+
+    // All chips will enter a no-op loop, when halting.
+    loop {
+        unsafe {
+            // core::arch::asm!("addi x0, x0, 0");
+            core::arch::asm!("nop");
         }
     }
 }
