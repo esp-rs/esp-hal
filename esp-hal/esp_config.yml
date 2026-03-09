@@ -168,5 +168,15 @@ options:
     default:
       - value: 0
 
+  - name: use_rwdata_ld_hook
+    description: Include 'rwdata_hook.x'
+    default:
+      - value: false
+
+  - name: use_rwtext_ld_hook
+    description: Include 'rwtext_hook.x'
+    default:
+      - value: false
+
 checks:
   - "ESP_HAL_CONFIG_STACK_GUARD_OFFSET % 4 == 0"

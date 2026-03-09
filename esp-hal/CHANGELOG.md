@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Ecc::apply_config` and `esp_hal::ecc::Config` (#5073)
 - Added experimental low-level clock control functionality via `esp_hal::clock::ll` (#5092)
 - Work queue support for ECC operations (#5084)
+- A mechanism to hook into linker scripts (#5116)
 - Added `UlpWakeupSource` to ESP32-S2 and ESP32-S3, allowing these chips to be woken by ULP-generated interrupts. (#5132)
 
 ### Changed

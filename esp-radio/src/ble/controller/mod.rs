@@ -10,11 +10,11 @@ use bt_hci::{
     transport::{Transport, WithIndicator},
 };
 use docsplay::Display;
-use esp_hal::asynch::AtomicWaker;
 use esp_phy::PhyInitGuard;
 
 use crate::{
     RadioRefGuard,
+    asynch::AtomicWaker,
     ble::{Config, InvalidConfigError, have_hci_read_data, read_hci, read_next, send_hci},
 };
 
