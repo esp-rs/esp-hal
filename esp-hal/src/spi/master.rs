@@ -2361,6 +2361,9 @@ mod dma {
             Ok(())
         }
 
+        /// Half-duplex write using DMA.
+        ///
+        /// Returns [`DmaError::Overflow`] if the buffer exceeds the DMA Buffer
         #[instability::unstable]
         pub async fn half_duplex_write_async(
             &mut self,
