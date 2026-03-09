@@ -93,7 +93,7 @@ pub struct SystemClocks {
 }
 
 pub(crate) struct ProcessedClockData {
-    /// All instantiated clock tree node.
+    /// All instantiated clock tree nodes.
     clock_tree: Vec<ClockTreeNodeInstance>,
 
     /// Refcount/config type properties of the clock tree nodes.
@@ -110,11 +110,14 @@ pub(crate) struct ClockTreeNodeInstance {
     force_configurable: bool,
 
     /// Name of the instantiated clock tree node.
+    ///
+    /// Must be in CONSTANT_CASE, e.g. FUNCTION_CLOCK.
     name: String,
 
     /// Name of the template used to instantiate this clock tree node.
-    // TODO: this should be empty for system nodes
-    // TODO: we should have methods to modify names in implemntation code
+    ///
+    /// Must be in CONSTANT_CASE, e.g. UART0_FUNCTION_CLOCK.
+    // TODO: we should have methods to modify names in implementation code
     // (e.g. to make them able to first refer to a peripheral-local clock node, then fall back to a
     // system node) - fn resolve_clock_node(&self, tree: &ProcessedClockData, name: &str) -> &str
     template_name: String,
@@ -168,7 +171,7 @@ impl ClockTreeNodeInstance {
     fn config_type_name(&self) -> Ident {
         let item = self
             .template_name
-            .from_case(Case::Ada)
+            .from_case(Case::Constant)
             .to_case(Case::Pascal);
         quote::format_ident!("{}Config", item)
     }
@@ -178,7 +181,7 @@ impl ClockTreeNodeInstance {
     }
 
     fn name(&self) -> StateConverter<'_, String> {
-        self.name_str().from_case(Case::Ada)
+        self.name_str().from_case(Case::Constant)
     }
 
     fn name_str<'a>(&'a self) -> &'a String {
@@ -923,7 +926,7 @@ impl DeviceClocks {
             let node = &clock_tree[idx].borrow();
 
             // If item A configures item B, then item B is a dependent clock tree item. Sort the
-            // dependent clocks to be before their configurating nodes.
+            // dependent clocks to be before their configuring nodes.
             for clock in node.affected_nodes() {
                 let (aff_idx, _, affected) = clock_tree.get_full(clock).unwrap();
                 affected.borrow_mut().include_in_global_config = false;
