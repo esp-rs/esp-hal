@@ -55,7 +55,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 <!-- start chip support table -->
 | Driver                    | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C5 | ESP32-C6 | ESP32-H2 | ESP32-S2 | ESP32-S3 |
 | ------------------------- |:-----:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|
-| ADC                       | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| ADC                       | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | AES                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | ASSIST_DEBUG              |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |          | ⚒️      |
 | Analog Voltage Comparator |       |          |          | ❌       |          |          |          |          |
@@ -98,7 +98,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | SPI master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
 | SPI slave                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SYSTIMER                  |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| Temperature sensor        | ⚒️   | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| Temperature sensor        | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Timers                    | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Touch                     | ⚒️   |          |          | ❌       |          |          | ❌       | ❌       |
 | TWAI / CAN / CANFD        | ⚒️   |          | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
