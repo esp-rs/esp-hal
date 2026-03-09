@@ -13,6 +13,11 @@
   *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
   /* unconditionally add patched SPI-flash ROM functions (from esp-rom-sys) - the linker is still happy if there are none */
   *:esp_rom_spiflash.*(.literal .literal.* .text .text.*)
+
+  #IF ESP_HAL_CONFIG_USE_RWTEXT_LD_HOOK
+    INCLUDE "rwtext_hook.x"
+  #ENDIF
+
   . = ALIGN(4);
 } > RWTEXT
 
