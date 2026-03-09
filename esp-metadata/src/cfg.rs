@@ -25,6 +25,8 @@ pub(crate) use spi_slave::*;
 pub(crate) use timergroup::*;
 pub(crate) use uart::*;
 
+use crate::support_status::SupportStatusLevel;
+
 pub(crate) trait GenericProperty {
     fn cfgs(&self) -> Option<Vec<String>> {
         None
@@ -78,36 +80,6 @@ impl From<Option<u32>> for Value {
         match value {
             Some(v) => Value::Number(v),
             None => Value::Unset,
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone, Copy, PartialEq, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum SupportStatusLevel {
-    NotAvailable,
-    NotSupported,
-    #[default] // Just the common option to reduce visual noise of "declare only" drivers.
-    Partial,
-    Supported,
-}
-
-impl SupportStatusLevel {
-    pub fn icon(self) -> &'static str {
-        match self {
-            SupportStatusLevel::NotAvailable => "",
-            SupportStatusLevel::NotSupported => "❌",
-            SupportStatusLevel::Partial => "⚒️",
-            SupportStatusLevel::Supported => "✔️",
-        }
-    }
-
-    pub fn status(self) -> &'static str {
-        match self {
-            SupportStatusLevel::NotAvailable => "Not available",
-            SupportStatusLevel::NotSupported => "Not supported",
-            SupportStatusLevel::Partial => "Partial support",
-            SupportStatusLevel::Supported => "Supported",
         }
     }
 }

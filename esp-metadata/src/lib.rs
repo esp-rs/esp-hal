@@ -11,7 +11,12 @@ pub use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use strum::IntoEnumIterator;
 
-use crate::cfg::{PinLimitation, SupportItem, SupportStatusLevel, Value};
+mod support_status;
+
+use crate::{
+    cfg::{PinLimitation, SupportItem, Value},
+    support_status::SupportStatusLevel,
+};
 
 macro_rules! include_toml {
     (Config, $file:expr) => {{
@@ -1335,24 +1340,7 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
 
     writeln!(output)?;
 
-    // Print legend
-    for s in [
-        SupportStatusLevel::NotAvailable,
-        SupportStatusLevel::NotSupported,
-        SupportStatusLevel::Partial,
-        SupportStatusLevel::Supported,
-    ] {
-        writeln!(
-            output,
-            " * {}: {}",
-            if s.icon().is_empty() {
-                "Empty cell"
-            } else {
-                s.icon()
-            },
-            s.status()
-        )?;
-    }
+    SupportStatusLevel::write_legend(output)?;
 
     Ok(())
 }
