@@ -68,7 +68,7 @@ pub fn wake_hp_core() {
 /// Wake up the HP core
 #[cfg(esp32s2)]
 #[unsafe(link_section = ".init.rust")]
-pub fn ulp_wake_hp_core() {
+pub fn wake_hp_core() {
     // The line below may be used when this commit:
     // https://github.com/esp-rs/esp-pacs/commit/b71c83e1a66575f3921f9b9b7ab3b2eed77fbf7e
     // is released to crates.io.
@@ -85,7 +85,7 @@ pub fn ulp_wake_hp_core() {
 /// Wake up the HP core
 #[cfg(esp32s3)]
 #[unsafe(link_section = ".init.rust")]
-pub fn ulp_wake_hp_core() {
+pub fn wake_hp_core() {
     // The line below may be used when this commit:
     // https://github.com/esp-rs/esp-pacs/commit/b71c83e1a66575f3921f9b9b7ab3b2eed77fbf7e
     // is released to crates.io.
