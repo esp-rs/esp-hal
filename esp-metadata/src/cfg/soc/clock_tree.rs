@@ -286,6 +286,7 @@ impl ManagementProperties {
     }
 }
 
+/// Common interface for clock node types.
 pub(crate) trait ClockTreeNodeType: Any {
     /// Returns which clock nodes' configurations are affected when this node is configured.
     // TODO: pass instance to apply template naming scheme to returned clocks

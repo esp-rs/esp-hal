@@ -121,27 +121,46 @@ pub(crate) struct ClockTreeNodeInstance {
 }
 
 impl ClockTreeNodeInstance {
+    /// Returns which clock nodes' configurations are affected when this node is configured.
+    // TODO: pass instance to apply template naming scheme to returned clocks
+    // (e.g. FUNCTION_CLOCK -> UART0_FUNCTION_CLOCK)
+    fn affected_nodes(&self) -> Vec<&str> {
+        self.node.affected_nodes()
+    }
+
+    fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
+        self.node.validate_source_data(ctx)
+    }
+
+    fn is_configurable(&self) -> bool {
+        self.node.is_configurable() || self.force_configurable
+    }
+
     fn config_type(&self) -> Option<TokenStream> {
         if !self.is_first_instance || !self.is_configurable() {
             return None;
         }
-        Some(ClockTreeNodeType::config_type(self, self))
-    }
-
-    fn config_apply_impl_function(&self, tree: &ProcessedClockData) -> TokenStream {
-        ClockTreeNodeType::config_apply_impl_function(self, self, tree)
+        Some(self.node.config_type(self))
     }
 
     fn config_documentation(&self) -> Option<String> {
-        ClockTreeNodeType::config_documentation(self, self)
+        self.node.config_documentation(self)
     }
 
     fn config_docline(&self) -> Option<String> {
-        ClockTreeNodeType::config_docline(self, self)
+        self.node.config_docline(self)
     }
 
     fn node_frequency_impl(&self, tree: &ProcessedClockData) -> TokenStream {
-        ClockTreeNodeType::node_frequency_impl(self, self, tree)
+        self.node.node_frequency_impl(self, tree)
+    }
+
+    fn always_on(&self) -> bool {
+        self.node.always_on()
+    }
+
+    fn input_clocks(&self) -> Vec<String> {
+        self.node.input_clocks()
     }
 
     /// Returns the name of the clock configuration type. The corresponding field in the
@@ -154,12 +173,8 @@ impl ClockTreeNodeInstance {
         quote::format_ident!("{}Config", item)
     }
 
-    fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream {
-        ClockTreeNodeType::config_apply_function(self, self, tree)
-    }
-
     fn apply_configuration(&self, expr: &Expression, tree: &ProcessedClockData) -> TokenStream {
-        ClockTreeNodeType::apply_configuration(self, self, expr, tree)
+        self.node.apply_configuration(self, expr, tree)
     }
 
     fn name(&self) -> StateConverter<'_, String> {
@@ -230,15 +245,17 @@ impl ClockTreeNodeInstance {
         let enable_fn_impl_name = format_ident!("{}_impl", enable_fn_name);
         let always_on = properties.always_on();
 
-        let request_direct_dependencies = self.request_direct_dependencies(self, tree);
-        let release_direct_dependencies = self.release_direct_dependencies(self, tree);
+        let request_direct_dependencies = self.node.request_direct_dependencies(self, tree);
+        let release_direct_dependencies = self.node.release_direct_dependencies(self, tree);
 
         // Only configurables have an apply fn
-        let apply_fn = ty_name.as_ref().map(|_| self.config_apply_function(tree));
+        let apply_fn = ty_name
+            .as_ref()
+            .map(|_| self.node.config_apply_function(self, tree));
         let current_config_fn = self.config_current_function(tree);
         let apply_fn_impl = ty_name
             .as_ref()
-            .map(|_| self.config_apply_impl_function(tree))
+            .map(|_| self.node.config_apply_impl_function(self, tree))
             .unwrap_or_default();
         let frequency_function_impl = self.node_frequency_impl(tree);
         let frequency_function_name = self.frequency_function_name();
@@ -353,89 +370,6 @@ impl ClockTreeNodeInstance {
                 apply_fn_impl,
             ],
         }
-    }
-}
-
-impl ClockTreeNodeType for ClockTreeNodeInstance {
-    fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
-        self.node.validate_source_data(ctx)
-    }
-
-    fn is_configurable(&self) -> bool {
-        self.node.is_configurable() || self.force_configurable
-    }
-
-    fn config_apply_function(
-        &self,
-        instance: &ClockTreeNodeInstance,
-        tree: &ProcessedClockData,
-    ) -> TokenStream {
-        self.node.config_apply_function(instance, tree)
-    }
-
-    fn node_frequency_impl(
-        &self,
-        instance: &ClockTreeNodeInstance,
-        tree: &ProcessedClockData,
-    ) -> TokenStream {
-        self.node.node_frequency_impl(instance, tree)
-    }
-
-    fn config_type(&self, instance: &ClockTreeNodeInstance) -> TokenStream {
-        self.node.config_type(instance)
-    }
-
-    fn config_docline(&self, instance: &ClockTreeNodeInstance) -> Option<String> {
-        self.node.config_docline(instance)
-    }
-
-    fn request_direct_dependencies(
-        &self,
-        instance: &ClockTreeNodeInstance,
-        tree: &ProcessedClockData,
-    ) -> TokenStream {
-        self.node.request_direct_dependencies(instance, tree)
-    }
-
-    fn release_direct_dependencies(
-        &self,
-        instance: &ClockTreeNodeInstance,
-        tree: &ProcessedClockData,
-    ) -> TokenStream {
-        self.node.release_direct_dependencies(instance, tree)
-    }
-
-    fn affected_nodes<'s>(&'s self) -> Vec<&'s str> {
-        self.node.affected_nodes()
-    }
-
-    fn input_clocks(&self) -> Vec<String> {
-        self.node.input_clocks()
-    }
-
-    fn always_on(&self) -> bool {
-        self.node.always_on()
-    }
-
-    fn config_apply_impl_function(
-        &self,
-        instance: &ClockTreeNodeInstance,
-        tree: &ProcessedClockData,
-    ) -> TokenStream {
-        self.node.config_apply_impl_function(instance, tree)
-    }
-
-    fn config_documentation(&self, instance: &ClockTreeNodeInstance) -> Option<String> {
-        self.node.config_documentation(instance)
-    }
-
-    fn apply_configuration(
-        &self,
-        instance: &ClockTreeNodeInstance,
-        expr: &clock_tree::Expression,
-        tree: &ProcessedClockData,
-    ) -> TokenStream {
-        self.node.apply_configuration(instance, expr, tree)
     }
 }
 
