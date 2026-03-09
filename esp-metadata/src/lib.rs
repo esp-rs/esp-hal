@@ -1316,7 +1316,7 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
     writeln!(output)?;
 
     // Driver support status
-    let mut links = String::new();
+    let mut issues = Vec::new();
     for SupportItem {
         name,
         config_group,
@@ -1337,10 +1337,7 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
                 chip.pretty_name().len() - !status.status.icon().is_empty() as usize;
             if let Some(issue) = status.issue {
                 write!(output, " [{}][{issue}] |", status.status.icon())?;
-                writeln!(
-                    &mut links,
-                    "[{issue}]: https://github.com/esp-rs/esp-hal/issues/{issue}"
-                )?;
+                issues.push(issue);
             } else {
                 write!(output, " {:support_cell_width$} |", status.status.icon())?;
             }
@@ -1352,7 +1349,17 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
     SupportStatusLevel::write_legend(output)?;
 
     writeln!(output)?;
-    write!(output, "{links}")?;
+
+    // Print issue link definitions
+    issues.sort();
+    issues.dedup();
+
+    for issue in issues {
+        writeln!(
+            output,
+            "[{issue}]: https://github.com/esp-rs/esp-hal/issues/{issue}"
+        )?;
+    }
 
     Ok(())
 }
