@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, ops::Range, str::FromStr};
 
 use anyhow::{Context, Result};
 use convert_case::{Boundary, Case, Casing, StateConverter, pattern};
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 use serde::{Deserialize, Serialize};
@@ -835,6 +835,7 @@ impl DeviceClocks {
             .clock_tree
             .iter()
             .map(|node| {
+                let node_name = node.name();
                 let node = ClockTreeNodeInstance {
                     node: match node {
                         ClockTreeItem::Multiplexer(inner) => Box::new(inner.clone()),
@@ -849,14 +850,14 @@ impl DeviceClocks {
                     template_name: node.name().to_string(),
                 };
 
-                RefCell::new(node)
+                (node_name.to_string(), RefCell::new(node))
             })
-            .collect::<Vec<_>>();
+            .collect::<IndexMap<_, _>>();
 
         let validation_context = ValidationContext {
             tree: self.system_clocks.clock_tree.as_slice(),
         };
-        for node in clock_tree.iter() {
+        for node in clock_tree.values() {
             let node = node.borrow();
             node.validate_source_data(&validation_context)
                 .with_context(|| format!("Invalid clock tree item: {}", node.name_str()))?;
@@ -905,7 +906,7 @@ impl DeviceClocks {
                 node.validate_source_data(&validation_context)
                     .with_context(|| format!("Invalid clock tree item: {}", node.name))?;
 
-                clock_tree.push(RefCell::new(node));
+                clock_tree.insert(node.name.clone(), RefCell::new(node));
             }
         }
 
@@ -913,23 +914,21 @@ impl DeviceClocks {
         // access direct dependencies (downstream clocks). As it is simpler to define
         // dependents (inputs), we have to do a bit of maths.
         let dependency_graph =
-            DependencyGraph::build_from(clock_tree.iter_mut().map(|n| &*n.get_mut()));
+            DependencyGraph::build_from(clock_tree.values_mut().map(|n| &*n.get_mut()));
 
         // Apply legacy sorting to avoid reordering generated code.
         let mut sorted_clocks = IndexSet::new();
 
-        for (idx, node) in clock_tree.iter().enumerate() {
-            let node = node.borrow();
-            // If item A configures item B, then item B is a dependent clock tree item.
+        for idx in 0..clock_tree.len() {
+            let node = &clock_tree[idx].borrow();
+
+            // If item A configures item B, then item B is a dependent clock tree item. Sort the
+            // dependent clocks to be before their configurating nodes.
             for clock in node.affected_nodes() {
-                let idx = clock_tree
-                    .iter()
-                    .position(|n| n.borrow().name_str() == clock)
-                    .unwrap();
+                let (aff_idx, _, affected) = clock_tree.get_full(clock).unwrap();
+                affected.borrow_mut().include_in_global_config = false;
 
-                clock_tree[idx].borrow_mut().include_in_global_config = false;
-
-                sorted_clocks.insert(idx);
+                sorted_clocks.insert(aff_idx);
             }
 
             // Each tree item tells its own clock type, except for dependent items. If something has
@@ -967,7 +966,7 @@ impl DeviceClocks {
             // optionals that we can take from.
             let mut clock_tree = clock_tree
                 .into_iter()
-                .map(|n| Some(n.into_inner()))
+                .map(|(_, n)| Some(n.into_inner()))
                 .collect::<Vec<_>>();
             let mut sorted = Vec::with_capacity(clock_tree.len());
             for idx in sorted_clocks {
