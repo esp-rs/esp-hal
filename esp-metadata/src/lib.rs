@@ -1316,6 +1316,7 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
     writeln!(output)?;
 
     // Driver support status
+    let mut links = String::new();
     for SupportItem {
         name,
         config_group,
@@ -1332,15 +1333,26 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
             let status = config.device.peri_config.support_status(config_group);
             // VSCode displays emojis just a bit wider than 2 characters, making this
             // approximation a bit too wide but good enough.
-            let support_cell_width = chip.pretty_name().len() - !status.icon().is_empty() as usize;
-            write!(output, " {:support_cell_width$} |", status.icon())?;
+            let support_cell_width =
+                chip.pretty_name().len() - !status.status.icon().is_empty() as usize;
+            if let Some(issue) = status.issue {
+                write!(output, " [{}][{issue}] |", status.status.icon())?;
+                writeln!(
+                    &mut links,
+                    "[{issue}]: https://github.com/esp-rs/esp-hal/issues/{issue}"
+                )?;
+            } else {
+                write!(output, " {:support_cell_width$} |", status.status.icon())?;
+            }
         }
         writeln!(output)?;
     }
 
     writeln!(output)?;
-
     SupportStatusLevel::write_legend(output)?;
+
+    writeln!(output)?;
+    write!(output, "{links}")?;
 
     Ok(())
 }

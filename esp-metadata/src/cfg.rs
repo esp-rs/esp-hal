@@ -256,12 +256,12 @@ macro_rules! driver_configs {
             }
 
             /// Returns the support status of a peripheral by its name.
-            pub fn support_status(&self, driver: &str) -> SupportStatusLevel {
+            pub fn support_status(&self, driver: &str) -> SupportStatus {
                 let maybe_status = match driver {
-                    $(stringify!($driver) => self.$driver.as_ref().map(|p| p.support_status.status),)*
+                    $(stringify!($driver) => self.$driver.as_ref().map(|p| p.support_status),)*
                     _ => None,
                 };
-                maybe_status.unwrap_or(SupportStatusLevel::NotAvailable)
+                maybe_status.unwrap_or(SupportStatus { status: SupportStatusLevel::NotAvailable, issue: None })
             }
         }
     };

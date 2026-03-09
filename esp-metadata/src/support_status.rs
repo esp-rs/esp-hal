@@ -78,13 +78,19 @@ impl FromStr for SupportStatusLevel {
 pub(crate) struct SupportStatus {
     #[serde(default)]
     pub status: SupportStatusLevel,
+
+    #[serde(default)]
+    pub issue: Option<u32>,
 }
 
 impl FromStr for SupportStatus {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self { status: s.parse()? })
+        Ok(Self {
+            status: s.parse()?,
+            issue: None,
+        })
     }
 }
 
