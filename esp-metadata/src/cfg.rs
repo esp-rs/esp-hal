@@ -25,7 +25,7 @@ pub(crate) use spi_slave::*;
 pub(crate) use timergroup::*;
 pub(crate) use uart::*;
 
-use crate::support_status::SupportStatusLevel;
+use crate::support_status::{SupportStatus, SupportStatusLevel};
 
 pub(crate) trait GenericProperty {
     fn cfgs(&self) -> Option<Vec<String>> {
@@ -138,7 +138,9 @@ macro_rules! driver_configs {
         #[derive(Debug, Clone, serde::Deserialize)]
         pub(crate) struct $struct {
             #[serde(default)]
-            pub support_status: SupportStatusLevel,
+            #[serde(deserialize_with = "crate::support_status::string_or_struct")]
+            pub support_status: SupportStatus,
+
             // The list of peripherals for which this driver is implemented.
             // If empty, the driver supports a single instance only.
             #[serde(default)]
@@ -214,7 +216,7 @@ macro_rules! driver_configs {
             pub fn driver_names(&self) -> impl Iterator<Item = &str> {
                 [$(
                     self.$driver.as_ref().and_then(|d| {
-                        match d.support_status {
+                        match d.support_status.status {
                             SupportStatusLevel::NotAvailable | SupportStatusLevel::NotSupported => None,
                             _ => Some(stringify!($driver)),
                         }
@@ -256,7 +258,7 @@ macro_rules! driver_configs {
             /// Returns the support status of a peripheral by its name.
             pub fn support_status(&self, driver: &str) -> SupportStatusLevel {
                 let maybe_status = match driver {
-                    $(stringify!($driver) => self.$driver.as_ref().map(|p| p.support_status),)*
+                    $(stringify!($driver) => self.$driver.as_ref().map(|p| p.support_status.status),)*
                     _ => None,
                 };
                 maybe_status.unwrap_or(SupportStatusLevel::NotAvailable)
