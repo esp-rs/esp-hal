@@ -1325,14 +1325,10 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
             let config = Config::for_chip(&chip);
 
             let status = config.device.peri_config.support_status(config_group);
-            let status_icon = match status {
-                None => " ",
-                Some(status) => status.icon(),
-            };
             // VSCode displays emojis just a bit wider than 2 characters, making this
             // approximation a bit too wide but good enough.
-            let support_cell_width = chip.pretty_name().len() - status.is_some() as usize;
-            write!(output, " {status_icon:support_cell_width$} |")?;
+            let support_cell_width = chip.pretty_name().len() - !status.icon().is_empty() as usize;
+            write!(output, " {:support_cell_width$} |", status.icon())?;
         }
         writeln!(output)?;
     }
@@ -1340,13 +1336,22 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
     writeln!(output)?;
 
     // Print legend
-    writeln!(output, " * Empty cell: not available")?;
     for s in [
+        SupportStatusLevel::NotAvailable,
         SupportStatusLevel::NotSupported,
         SupportStatusLevel::Partial,
         SupportStatusLevel::Supported,
     ] {
-        writeln!(output, " * {}: {}", s.icon(), s.status())?;
+        writeln!(
+            output,
+            " * {}: {}",
+            if s.icon().is_empty() {
+                "Empty cell"
+            } else {
+                s.icon()
+            },
+            s.status()
+        )?;
     }
 
     Ok(())

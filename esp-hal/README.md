@@ -110,7 +110,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | USB Serial/JTAG           |       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |          | ⚒️      |
 | WIFI                      | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      |
 
- * Empty cell: not available
+ * Empty cell: Not available
  * ❌: Not supported
  * ⚒️: Partial support
  * ✔️: Supported

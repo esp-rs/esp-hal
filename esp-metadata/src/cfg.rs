@@ -85,6 +85,7 @@ impl From<Option<u32>> for Value {
 #[derive(Debug, Default, Clone, Copy, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum SupportStatusLevel {
+    NotAvailable,
     NotSupported,
     #[default] // Just the common option to reduce visual noise of "declare only" drivers.
     Partial,
@@ -94,6 +95,7 @@ pub(crate) enum SupportStatusLevel {
 impl SupportStatusLevel {
     pub fn icon(self) -> &'static str {
         match self {
+            SupportStatusLevel::NotAvailable => "",
             SupportStatusLevel::NotSupported => "❌",
             SupportStatusLevel::Partial => "⚒️",
             SupportStatusLevel::Supported => "✔️",
@@ -102,6 +104,7 @@ impl SupportStatusLevel {
 
     pub fn status(self) -> &'static str {
         match self {
+            SupportStatusLevel::NotAvailable => "Not available",
             SupportStatusLevel::NotSupported => "Not supported",
             SupportStatusLevel::Partial => "Partial support",
             SupportStatusLevel::Supported => "Supported",
@@ -240,7 +243,7 @@ macro_rules! driver_configs {
                 [$(
                     self.$driver.as_ref().and_then(|d| {
                         match d.support_status {
-                            SupportStatusLevel::NotSupported => None,
+                            SupportStatusLevel::NotAvailable | SupportStatusLevel::NotSupported => None,
                             _ => Some(stringify!($driver)),
                         }
                     }),
@@ -279,11 +282,12 @@ macro_rules! driver_configs {
             }
 
             /// Returns the support status of a peripheral by its name.
-            pub fn support_status(&self, driver: &str) -> Option<SupportStatusLevel> {
-                match driver {
+            pub fn support_status(&self, driver: &str) -> SupportStatusLevel {
+                let maybe_status = match driver {
                     $(stringify!($driver) => self.$driver.as_ref().map(|p| p.support_status),)*
-                    _ => None, // If the peripheral is not found, return None.
-                }
+                    _ => None,
+                };
+                maybe_status.unwrap_or(SupportStatusLevel::NotAvailable)
             }
         }
     };
