@@ -17,7 +17,7 @@ use core::{
 };
 
 use docsplay::Display;
-use esp_hal::{asynch::AtomicWaker, time::Duration};
+use esp_hal::time::Duration;
 use esp_sync::NonReentrantMutex;
 use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
@@ -25,6 +25,7 @@ use super::*;
 #[cfg(feature = "csi")]
 use crate::wifi::csi::CsiConfig;
 use crate::{
+    asynch::AtomicWaker,
     sys::include::*,
     wifi::{RxControlInfo, WifiError},
 };
