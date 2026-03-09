@@ -1776,9 +1776,9 @@ macro_rules! esp_wifi_result {
 
 pub(crate) mod embassy {
     use embassy_net_driver::{Capabilities, Driver, HardwareAddress, RxToken, TxToken};
-    use esp_hal::asynch::AtomicWaker;
 
     use super::*;
+    use crate::asynch::AtomicWaker;
 
     // We can get away with a single tx waker because the transmit queue is shared
     // between interfaces.
