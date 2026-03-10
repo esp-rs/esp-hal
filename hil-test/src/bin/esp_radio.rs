@@ -6,7 +6,8 @@
 // //% FEATURES(no_radio): rtos-radio-driver TODO: restore for P4
 //% FEATURES(no_ble): esp-radio/wifi esp-radio esp-radio/unstable
 //% FEATURES(no_wifi): esp-radio/ble esp-radio esp-radio/unstable trouble-host
-//% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble  esp-radio esp-radio/unstable trouble-host
+//% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble esp-radio/coex esp-radio/unstable
+//% FEATURES(has_wifi_ble): trouble-host
 
 // Even if the defaults change, keep this at a low-ish value for
 // the esp_rtos/moving_data_to_second_core test
