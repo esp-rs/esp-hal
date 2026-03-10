@@ -147,7 +147,7 @@ impl CpuInterrupt {
 }
 
 for_each_interrupt_priority!(
-    (all $( ($idx:literal, $n:literal, $ident:ident) ),*) => {
+    (all $( ($idx:literal, $n:literal, $ident:ident, $level:ident) ),*) => {
         /// Interrupt priority levels.
         ///
         /// A higher numeric value means higher priority. Interrupt requests at higher priority
@@ -175,7 +175,7 @@ for_each_interrupt_priority!(
         pub enum ElevatedRunLevel {
             $(
                 #[doc = concat!("Run level ", stringify!($n), ".")]
-                $ident = $n,
+                $level = $n,
             )*
         }
 
@@ -183,7 +183,7 @@ for_each_interrupt_priority!(
             /// Converts a [`Priority`] into an [`ElevatedRunLevel`].
             pub const fn from_priority(priority: Priority) -> Self {
                 match priority {
-                    $(Priority::$ident => Self::$ident,)*
+                    $(Priority::$ident => Self::$level,)*
                 }
             }
         }
@@ -198,7 +198,7 @@ impl Priority {
         const {
             let mut last = Self::min();
             for_each_interrupt_priority!(
-                ($_idx:literal, $_n:literal, $ident:ident) => {
+                ($_idx:literal, $_n:literal, $ident:ident, $_level:ident) => {
                     last = Self::$ident;
                 };
             );
@@ -214,7 +214,7 @@ impl Priority {
     pub(crate) fn try_from_u32(priority: u32) -> Result<Self, PriorityError> {
         let result;
         for_each_interrupt_priority!(
-            (all $( ($idx:literal, $n:literal, $ident:ident) ),*) => {
+            (all $( ($idx:literal, $n:literal, $ident:ident, $_level:ident) ),*) => {
                 result = match priority {
                     $($n => Ok(Priority::$ident),)*
                     _ => Err(PriorityError::InvalidInterruptPriority),
@@ -227,7 +227,6 @@ impl Priority {
 
 impl ElevatedRunLevel {
     /// Returns the highest run level
-    #[allow(unused_assignments)]
     #[instability::unstable]
     pub const fn max() -> ElevatedRunLevel {
         Self::from_priority(Priority::max())
@@ -519,7 +518,7 @@ pub(crate) mod rt {
 
         for_each_interrupt!(
             ([vector $n:tt] $int:literal) => {
-                for_each_interrupt_priority!(($n, $__:tt, $ident:ident) => { priorities[$int] = Some(Priority::$ident); };);
+                for_each_interrupt_priority!(($n, $__:tt, $ident:ident, $_level:ident) => { priorities[$int] = Some(Priority::$ident); };);
             };
         );
 
