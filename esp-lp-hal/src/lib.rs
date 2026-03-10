@@ -58,16 +58,11 @@ cfg_if::cfg_if! {
 pub(crate) static mut CPU_CLOCK: u32 = LP_FAST_CLK_HZ;
 
 /// Wake up the HP core
-#[cfg(esp32c6)]
 pub fn wake_hp_core() {
+	#[cfg(esp32c6)]
     unsafe { &*esp32c6_lp::PMU::PTR }
         .hp_lp_cpu_comm()
         .write(|w| w.lp_trigger_hp().set_bit());
-}
-
-/// Wake up the HP core
-#[unsafe(link_section = ".init.rust")]
-pub fn wake_hp_core() {
     #[cfg(esp32s2)]
     unsafe { &*esp32s2_ulp::RTC_CNTL::PTR }
         .state0()
