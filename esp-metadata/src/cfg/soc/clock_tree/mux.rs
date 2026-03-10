@@ -183,17 +183,7 @@ impl ClockTreeNodeType for Multiplexer {
         } else {
             quote! {}
         };
-        let variants = self.variants.iter().map(|v| {
-            let variant = v.config_enum_variant();
-            if v.default {
-                quote! {
-                    #[default]
-                    #variant
-                }
-            } else {
-                variant
-            }
-        });
+        let variants = self.variants.iter().map(|v| v.config_enum_variant());
 
         let docline =
             format!("The list of clock signals that the `{clock_name}` multiplexer can output.");
@@ -411,12 +401,12 @@ impl Multiplexer {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct MultiplexerVariant {
-    name: String,
+    pub name: String,
     pub outputs: String,
     #[serde(default, deserialize_with = "super::list_from_str")]
-    configures: Vec<ConfiguresExpression>,
+    pub configures: Vec<ConfiguresExpression>,
     #[serde(default)]
-    default: bool,
+    pub default: bool,
 }
 impl MultiplexerVariant {
     pub fn config_enum_variant_name(&self) -> Ident {
@@ -436,13 +426,22 @@ impl MultiplexerVariant {
         let docline = format!(" Selects `{}`.", self.outputs);
         let name = self.config_enum_variant_name();
 
+        let default = if self.default {
+            quote! {
+                #[default]
+            }
+        } else {
+            quote! {}
+        };
+
         quote! {
+            #default
             #[doc = #docline]
             #name,
         }
     }
 
-    fn validate_source_data(
+    pub fn validate_source_data(
         &self,
         instance: &ClockTreeNodeInstance,
         ctx: &ValidationContext<'_>,

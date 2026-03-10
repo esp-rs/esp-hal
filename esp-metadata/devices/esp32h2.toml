@@ -119,8 +119,8 @@ clocks = { system_clocks = { clock_tree = [
     # High-speed clock sources
     { name = "XTAL_CLK",     type = "source",  values = "32",     output = "VALUE * 1_000_000", always_on = true },
     { name = "PLL_F96M_CLK", type = "derived", from = "XTAL_CLK", output = "96_000_000" },
-    { name = "PLL_F64M_CLK", type = "divider",                    output = "PLL_F96M_CLK * 2 / 3" },
-    { name = "PLL_F48M_CLK", type = "divider",                    output = "PLL_F96M_CLK / 2" },
+    { name = "PLL_F64M_CLK", type = "generic",                    output = "PLL_F96M_CLK * 2 / 3" },
+    { name = "PLL_F48M_CLK", type = "generic",                    output = "PLL_F96M_CLK / 2" },
     { name = "RC_FAST_CLK",  type = "source",                     output = "8_000_000" },
     
     # Low-speed clocks
@@ -136,14 +136,14 @@ clocks = { system_clocks = { clock_tree = [
         { name = "RC_FAST", outputs = "RC_FAST_CLK"  },
     ] },
 
-    { name = "CPU_CLK", type = "divider", params = { divisor = "0..=255" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true }, # AHB_CLK * integer
-    { name = "AHB_CLK", type = "divider", params = { divisor = "0..=255" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true }, # Max 32M
-    { name = "APB_CLK", type = "divider", params = { divisor = "0..=255" }, output = "AHB_CLK / (divisor + 1)" },
+    { name = "CPU_CLK", type = "generic", params = { divisor = "0..=255" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true }, # AHB_CLK * integer
+    { name = "AHB_CLK", type = "generic", params = { divisor = "0..=255" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true }, # Max 32M
+    { name = "APB_CLK", type = "generic", params = { divisor = "0..=255" }, output = "AHB_CLK / (divisor + 1)" },
     # configurable, but automatic - there's no point in making APB_DECREASE_DIV part of the model as consumers will always see APB_CLK
-    # { name = "APB_DECREASE_DIV", type = "divider", output = "APB_DIV / (divisor + 1)" },
+    # { name = "APB_DECREASE_DIV", type = "generic", output = "APB_DIV / (divisor + 1)" },
 
     # LP clocks
-    { name = "XTAL_D2_CLK", type = "divider", output = "XTAL_CLK / 2" },
+    { name = "XTAL_D2_CLK", type = "generic", output = "XTAL_CLK / 2" },
     { name = "LP_FAST_CLK", type = "mux", variants = [
         { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
         { name = "PLL_LP_CLK",  outputs = "PLL_LP_CLK" },
