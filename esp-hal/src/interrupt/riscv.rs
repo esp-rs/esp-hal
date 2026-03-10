@@ -174,7 +174,7 @@ for_each_interrupt_priority!(
         #[repr(u8)]
         pub enum ElevatedRunLevel {
             $(
-                #[doc = concat!(" Run level ", stringify!($n), ".")]
+                #[doc = concat!("Run level ", stringify!($n), ".")]
                 $ident = $n,
             )*
         }
@@ -389,9 +389,8 @@ fn encode_jal_x0(target: usize, pc: usize) -> u32 {
 // Runlevel APIs
 
 /// Get the current run level (the level below which interrupts are masked).
-pub(crate) fn current_runlevel() -> RunLevel {
-    let priority = cpu_int::current_runlevel();
-    unwrap!(RunLevel::try_from_u32(priority as u32))
+pub(crate) fn current_raw_runlevel() -> u32 {
+    cpu_int::current_runlevel() as u32
 }
 
 /// Changes the current run level (the level below which interrupts are

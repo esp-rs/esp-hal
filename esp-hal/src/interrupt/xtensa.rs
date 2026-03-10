@@ -287,8 +287,8 @@ pub(crate) fn enable_cpu_interrupt_raw(cpu_interrupt: u32) {
 // Runlevel APIs
 
 /// Get the current run level (the level below which interrupts are masked).
-pub(crate) fn current_runlevel() -> RunLevel {
-    unwrap!(RunLevel::try_from_u32(xtensa_lx::interrupt::get_level()))
+pub(crate) fn current_raw_runlevel() -> u32 {
+    xtensa_lx::interrupt::get_level()
 }
 
 /// Changes the current run level (the level below which interrupts are

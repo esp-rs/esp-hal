@@ -419,7 +419,8 @@ impl RunLevel {
     /// ```
     #[inline]
     pub fn current() -> Self {
-        current_runlevel()
+        let raw = current_raw_runlevel();
+        unwrap!(Self::try_from_u32(raw))
     }
 
     /// Changes the current run level to the specified level and returns the previous level.
