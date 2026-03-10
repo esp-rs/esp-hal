@@ -840,12 +840,7 @@ impl DeviceClocks {
             .map(|node| {
                 let node_name = node.name();
                 let node = ClockTreeNodeInstance {
-                    node: match node {
-                        ClockTreeItem::Multiplexer(inner) => Box::new(inner.clone()),
-                        ClockTreeItem::Source(inner) => Box::new(inner.clone()),
-                        ClockTreeItem::Divider(inner) => Box::new(inner.clone()),
-                        ClockTreeItem::Derived(inner) => Box::new(inner.clone()),
-                    },
+                    node: node.boxed(),
                     include_in_global_config: true,
                     is_first_instance: true,
                     force_configurable: false,
@@ -878,12 +873,7 @@ impl DeviceClocks {
             let template_peripheral = peri.template_peripheral_name();
             for def in peri.clock_signals(&self.peripheral_clocks) {
                 let node = ClockTreeNodeInstance {
-                    node: match def {
-                        ClockTreeItem::Multiplexer(inner) => Box::new(inner.clone()),
-                        ClockTreeItem::Source(inner) => Box::new(inner.clone()),
-                        ClockTreeItem::Divider(inner) => Box::new(inner.clone()),
-                        ClockTreeItem::Derived(inner) => Box::new(inner.clone()),
-                    },
+                    node: def.boxed(),
                     include_in_global_config: false,
                     is_first_instance: matches!(
                         peri.clocks,

@@ -387,6 +387,15 @@ impl ClockTreeItem {
             ClockTreeItem::Derived(drv) => drv.source_options.name.as_str(),
         }
     }
+
+    pub(crate) fn boxed(&self) -> Box<dyn ClockTreeNodeType> {
+        match self {
+            ClockTreeItem::Multiplexer(mux) => Box::new(mux.clone()),
+            ClockTreeItem::Source(src) => Box::new(src.clone()),
+            ClockTreeItem::Divider(div) => Box::new(div.clone()),
+            ClockTreeItem::Derived(drv) => Box::new(drv.clone()),
+        }
+    }
 }
 
 // Based on https://serde.rs/string-or-struct.html
