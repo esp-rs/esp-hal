@@ -147,24 +147,59 @@ impl ClockTreeNodeType for Source {
         }
     }
 
-    fn config_docline(&self, instance: &ClockTreeNodeInstance) -> Option<String> {
-        if self.values.is_none() {
-            return None;
-        }
-
-        let clock_name = instance.name_str();
-        let docline = if self.list_of_fixed_frequencies().is_some() {
-            format!(" Selects the output frequency of `{clock_name}`.")
-        } else {
-            format!(" The target frequency of the `{clock_name}` clock source.")
-        };
-
-        Some(docline)
+    fn config_type(&self, instance: &ClockTreeNodeInstance) -> TokenStream {
+        self.impl_config_type(instance, None)
     }
 
-    fn config_type(&self, instance: &ClockTreeNodeInstance) -> TokenStream {
+    fn request_direct_dependencies(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> TokenStream {
+        // Normal sources don't have dependencies
+        quote! {}
+    }
+
+    fn release_direct_dependencies(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> TokenStream {
+        // Normal sources don't have dependencies
+        quote! {}
+    }
+}
+
+impl Source {
+    fn list_of_fixed_frequencies(&self) -> Option<Vec<u32>> {
+        self.values.as_ref().and_then(|d| d.as_enum_values())
+    }
+
+    fn impl_config_type(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        extra_docs: Option<&str>,
+    ) -> TokenStream {
         let clock_name = instance.name_str();
         let ty_name = instance.config_type_name();
+
+        let base_docline = if self.values.is_none() {
+            None
+        } else if self.list_of_fixed_frequencies().is_some() {
+            Some(format!("Selects the output frequency of `{clock_name}`."))
+        } else {
+            Some(format!(
+                "The target frequency of the `{clock_name}` clock source."
+            ))
+        };
+
+        let docline = match (base_docline, extra_docs) {
+            (None, None) => None,
+            (Some(base), None) => Some(base),
+            (None, Some(extra)) => Some(extra.to_string()),
+            (Some(base), Some(extra)) => Some(format!("{base} {extra}")),
+        }
+        .into_iter();
 
         if let Some(frequencies) = self.list_of_fixed_frequencies() {
             let mut eval_ctx = somni_expr::Context::new();
@@ -197,6 +232,7 @@ impl ClockTreeNodeType for Source {
                 .collect::<Vec<_>>();
 
             quote! {
+                #(#[doc = #docline])*
                 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
                 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
                 pub enum #ty_name {
@@ -242,6 +278,7 @@ impl ClockTreeNodeType for Source {
             });
 
             quote! {
+                #(#[doc = #docline])*
                 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
                 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
                 pub struct #ty_name(u32);
@@ -262,30 +299,6 @@ impl ClockTreeNodeType for Source {
                 }
             }
         }
-    }
-
-    fn request_direct_dependencies(
-        &self,
-        _instance: &ClockTreeNodeInstance,
-        _tree: &ProcessedClockData,
-    ) -> TokenStream {
-        // Normal sources don't have dependencies
-        quote! {}
-    }
-
-    fn release_direct_dependencies(
-        &self,
-        _instance: &ClockTreeNodeInstance,
-        _tree: &ProcessedClockData,
-    ) -> TokenStream {
-        // Normal sources don't have dependencies
-        quote! {}
-    }
-}
-
-impl Source {
-    fn list_of_fixed_frequencies(&self) -> Option<Vec<u32>> {
-        self.values.as_ref().and_then(|d| d.as_enum_values())
     }
 }
 
@@ -341,14 +354,10 @@ impl ClockTreeNodeType for DerivedClockSource {
         self.source_options.node_frequency_impl(instance, tree)
     }
 
-    fn config_docline(&self, instance: &ClockTreeNodeInstance) -> Option<String> {
-        self.source_options
-            .config_docline(instance)
-            .map(|doc| format!("{} Depends on `{}`.", doc, self.from))
-    }
-
     fn config_type(&self, instance: &ClockTreeNodeInstance) -> TokenStream {
-        self.source_options.config_type(instance)
+        let extra_docs = format!("Depends on `{}`.", self.from);
+        self.source_options
+            .impl_config_type(instance, Some(&extra_docs))
     }
 
     fn request_direct_dependencies(

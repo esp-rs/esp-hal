@@ -214,16 +214,6 @@ impl ClockTreeNodeType for Divider {
         cfg_expr_code
     }
 
-    fn config_docline(&self, instance: &ClockTreeNodeInstance) -> Option<String> {
-        let clock_name = instance.name_str();
-        let expr = &self.output.source();
-        Some(format!(
-            r#" Configures the `{clock_name}` clock divider.
-
- The output is calculated as `OUTPUT = {expr}`."#
-        ))
-    }
-
     fn config_type(&self, instance: &ClockTreeNodeInstance) -> TokenStream {
         let clock_name = instance.name_str();
         let ty_name = instance.config_type_name();
@@ -237,6 +227,14 @@ impl ClockTreeNodeType for Divider {
 
         let collapse_types =
             self.params.len() == 1 && self.params.values().all(|v| v.as_enum_values().is_some());
+
+        let expr = &self.output.source();
+        let docline = format!(
+            r#" Configures the `{clock_name}` clock divider.
+
+ The output is calculated as `OUTPUT = {expr}`."#
+        );
+        let mut doclines = docline.lines().map(|l| quote! { #[doc = #l] });
 
         // Create a new type for each enum parameter.
         // Define a field and accessor body for each parameter.
@@ -253,20 +251,23 @@ impl ClockTreeNodeType for Divider {
                     .map(|d| format!(" Selects `{param_name} = {d}`."));
                 let dividers = dividers.iter().map(number).collect::<Vec<_>>();
 
-                let enum_ty = if collapse_types {
-                    ty_name.clone()
+                let (enum_ty, doclines) = if collapse_types {
+                    (ty_name.clone(), Some(&mut doclines))
                 } else {
                     // TODO
                     let full_name = format!("{clock_name}_{}", param_name.to_uppercase());
 
-                    format_ident!(
+                    let ty_name = format_ident!(
                         "{}Config",
                         full_name.from_case(Case::Ada).to_case(Case::Pascal)
-                    )
+                    );
+                    (ty_name, None)
                 };
                 let unknown_value = format!("Invalid {clock_name} {param_name} value");
+                let doclines = doclines.into_iter().flatten();
 
                 enum_types.push(quote! {
+                    #(#doclines)*
                     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
                     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
                     pub enum #enum_ty {
@@ -332,6 +333,7 @@ valid range ({min} ..= {max})."#
         } else {
             // The divisor is a struct of one or more fields.
             quote! {
+                #(#doclines)*
                 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
                 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
                 pub struct #ty_name {

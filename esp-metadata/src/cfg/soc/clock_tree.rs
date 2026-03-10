@@ -347,7 +347,6 @@ pub(crate) trait ClockTreeNodeType: Any {
     }
 
     fn config_type(&self, instance: &ClockTreeNodeInstance) -> TokenStream;
-    fn config_docline(&self, instance: &ClockTreeNodeInstance) -> Option<String>;
 
     fn request_direct_dependencies(
         &self,
