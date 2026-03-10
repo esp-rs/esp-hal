@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- ESP32-S2, ESP32-S3: Added weakly-linked ULP interrupt handler, using assembly from ESP-IDF (#5134)
+- ESP32-S2, ESP32-S3: Added private ULP interrupt handler to prevent uncleared interrupts from hanging the core (#5134)
 
 ### Changed
 - Changed ULP entrypoint to allow `main()` to return, and halt, to the ULP Timer can be used (#5134)
@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix panic when handling buffers larger than 7 bytes in `LpI2c.write` and `LpI2c.read` (#4694)
-- ESP32-S2, ESP32-S3: Re-wrote `ulp_riscv_halt()` in RISC-V assembly, to squash a rare bug where halting would hang (#5134)
+- ESP32-S2, ESP32-S3: Re-wrote `ulp_riscv_halt()` to align with ESP_IDF, squashing a rare bug where halting the chip would hang (#5134)
 
 ### Removed
 
