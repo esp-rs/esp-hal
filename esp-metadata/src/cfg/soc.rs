@@ -150,10 +150,6 @@ impl ClockTreeNodeInstance {
         self.node.config_documentation(self)
     }
 
-    fn config_docline(&self) -> Option<String> {
-        self.node.config_docline(self)
-    }
-
     fn node_frequency_impl(&self, tree: &ProcessedClockData) -> TokenStream {
         self.node.node_frequency_impl(self, tree)
     }
@@ -408,13 +404,7 @@ impl SystemClocks {
         for clock_item in tree.clock_tree.iter() {
             // Generate code for all clock tree nodes
             if let Some(config_type) = clock_item.config_type() {
-                let doclines = clock_item.config_docline().unwrap();
-                let doclines = doclines.lines();
-
-                clock_tree_node_defs.push(quote! {
-                    #(#[doc = #doclines])*
-                    #config_type
-                });
+                clock_tree_node_defs.push(config_type);
             }
             let node_state = tree.properties(clock_item.name_str());
             if let Some(type_name) = node_state.type_name() {
