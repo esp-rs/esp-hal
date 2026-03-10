@@ -2,6 +2,7 @@ use super::{
     Ext0WakeupSource,
     Ext1WakeupSource,
     TimerWakeupSource,
+    UlpWakeupSource,
     WakeSource,
     WakeTriggers,
     WakeupLevel,
@@ -80,6 +81,27 @@ pub const DG_PERI_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
 pub const RTC_MEM_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
 /// RTC memory wait cycles.
 pub const RTC_MEM_WAIT_CYCLES: u16 = OTHER_BLOCKS_WAIT;
+
+impl WakeSource for UlpWakeupSource {
+    fn apply(
+        &self,
+        _rtc: &Rtc<'_>,
+        triggers: &mut WakeTriggers,
+        sleep_config: &mut RtcSleepConfig,
+    ) {
+        triggers.set_ulp_fsm(self.wake_on_interrupt);
+        triggers.set_ulp_riscv(self.wake_on_interrupt);
+        triggers.set_ulp_riscv_trap(self.wake_on_trap);
+
+        if self.clear_interrupts_on_sleep {
+            self.clear_interrupts();
+        }
+
+        // This one needs to be false to keep the ULP timer and ULP GPIO happy!
+        // Possibly relevant issue: https://github.com/espressif/esp-idf/issues/10595
+        sleep_config.set_rtc_peri_pd_en(false);
+    }
+}
 
 impl WakeSource for TimerWakeupSource {
     fn apply(

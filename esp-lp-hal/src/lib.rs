@@ -65,6 +65,19 @@ pub fn wake_hp_core() {
         .write(|w| w.lp_trigger_hp().set_bit());
 }
 
+/// Wake up the HP core
+#[unsafe(link_section = ".init.rust")]
+pub fn wake_hp_core() {
+    #[cfg(esp32s2)]
+    unsafe { &*esp32s2_ulp::RTC_CNTL::PTR }
+        .state0()
+        .write(|w| w.rtc_sw_cpu_int().set_bit());
+    #[cfg(esp32s3)]
+    unsafe { &*esp32s3_ulp::RTC_CNTL::PTR }
+        .rtc_state0()
+        .write(|w| w.rtc_sw_cpu_int().set_bit());
+}
+
 #[cfg(esp32c6)]
 global_asm!(
     r#"
