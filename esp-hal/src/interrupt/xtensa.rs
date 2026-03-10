@@ -180,6 +180,28 @@ pub enum Priority {
     // We should add these levels, and a mechanism to bind assembly-written handlers for them.
 }
 
+/// Interrupt run levels.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[repr(u8)]
+#[non_exhaustive]
+pub enum ElevatedRunLevel {
+    /// Run level 1.
+    Priority1 = 1,
+    /// Run level 2.
+    Priority2 = 2,
+    /// Run level 3.
+    Priority3 = 3,
+    /// Run level 4.
+    Priority4 = 4,
+    /// Run level 5.
+    Priority5 = 5,
+    /// Run level 6.
+    Priority6 = 6,
+    /// Run level 7.
+    Priority7 = 7,
+}
+
 impl Priority {
     /// Maximum interrupt priority
     #[instability::unstable]
@@ -191,19 +213,52 @@ impl Priority {
     pub const fn min() -> Priority {
         Priority::Priority1
     }
+}
+
+impl ElevatedRunLevel {
+    /// Maximum interrupt run level
+    #[instability::unstable]
+    pub const fn max() -> ElevatedRunLevel {
+        ElevatedRunLevel::Priority7
+    }
+
+    /// Minimum interrupt run level
+    pub const fn min() -> ElevatedRunLevel {
+        ElevatedRunLevel::Priority1
+    }
 
     pub(crate) fn try_from_u32(priority: u32) -> Result<Self, PriorityError> {
         match priority {
-            1 => Ok(Priority::Priority1),
-            2 => Ok(Priority::Priority2),
-            3 => Ok(Priority::Priority3),
+            1 => Ok(ElevatedRunLevel::Priority1),
+            2 => Ok(ElevatedRunLevel::Priority2),
+            3 => Ok(ElevatedRunLevel::Priority3),
+            4 => Ok(ElevatedRunLevel::Priority4),
+            5 => Ok(ElevatedRunLevel::Priority5),
+            6 => Ok(ElevatedRunLevel::Priority6),
+            7 => Ok(ElevatedRunLevel::Priority7),
+
             _ => Err(PriorityError::InvalidInterruptPriority),
+        }
+    }
+
+    /// Converts a [`Priority`] into an [`ElevatedRunLevel`].
+    pub const fn from_priority(priority: Priority) -> Self {
+        match priority {
+            Priority::Priority1 => ElevatedRunLevel::Priority1,
+            Priority::Priority2 => ElevatedRunLevel::Priority2,
+            Priority::Priority3 => ElevatedRunLevel::Priority3,
         }
     }
 }
 
+impl From<Priority> for ElevatedRunLevel {
+    fn from(priority: Priority) -> Self {
+        Self::from_priority(priority)
+    }
+}
+
 #[instability::unstable]
-impl TryFrom<u32> for Priority {
+impl TryFrom<u32> for ElevatedRunLevel {
     type Error = PriorityError;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
@@ -212,7 +267,7 @@ impl TryFrom<u32> for Priority {
 }
 
 #[instability::unstable]
-impl TryFrom<u8> for Priority {
+impl TryFrom<u8> for ElevatedRunLevel {
     type Error = PriorityError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
@@ -249,14 +304,26 @@ pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
     unsafe {
         match level {
             RunLevel::ThreadMode => core::arch::asm!("rsil {0}, 0", out(reg) token),
-            RunLevel::Interrupt(Priority::Priority1) => {
+            RunLevel::Interrupt(ElevatedRunLevel::Priority1) => {
                 core::arch::asm!("rsil {0}, 1", out(reg) token)
             }
-            RunLevel::Interrupt(Priority::Priority2) => {
+            RunLevel::Interrupt(ElevatedRunLevel::Priority2) => {
                 core::arch::asm!("rsil {0}, 2", out(reg) token)
             }
-            RunLevel::Interrupt(Priority::Priority3) => {
+            RunLevel::Interrupt(ElevatedRunLevel::Priority3) => {
                 core::arch::asm!("rsil {0}, 3", out(reg) token)
+            }
+            RunLevel::Interrupt(ElevatedRunLevel::Priority4) => {
+                core::arch::asm!("rsil {0}, 4", out(reg) token)
+            }
+            RunLevel::Interrupt(ElevatedRunLevel::Priority5) => {
+                core::arch::asm!("rsil {0}, 5", out(reg) token)
+            }
+            RunLevel::Interrupt(ElevatedRunLevel::Priority6) => {
+                core::arch::asm!("rsil {0}, 6", out(reg) token)
+            }
+            RunLevel::Interrupt(ElevatedRunLevel::Priority7) => {
+                core::arch::asm!("rsil {0}, 7", out(reg) token)
             }
         };
     }

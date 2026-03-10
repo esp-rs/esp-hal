@@ -167,6 +167,26 @@ for_each_interrupt_priority!(
                 [$(Priority::$ident,)*].into_iter()
             }
         }
+
+        /// Interrupt run levels.
+        #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[repr(u8)]
+        pub enum ElevatedRunLevel {
+            $(
+                #[doc = concat!(" Run level ", stringify!($n), ".")]
+                $ident = $n,
+            )*
+        }
+
+        impl ElevatedRunLevel {
+            /// Converts a [`Priority`] into an [`ElevatedRunLevel`].
+            pub const fn from_priority(priority: Priority) -> Self {
+                match priority {
+                    $(Priority::$ident => Self::$ident,)*
+                }
+            }
+        }
     };
 );
 
@@ -205,12 +225,36 @@ impl Priority {
     }
 }
 
+impl ElevatedRunLevel {
+    /// Returns the highest run level
+    #[allow(unused_assignments)]
+    #[instability::unstable]
+    pub const fn max() -> ElevatedRunLevel {
+        Self::from_priority(Priority::max())
+    }
+
+    /// Minimum elevated run level
+    pub const fn min() -> ElevatedRunLevel {
+        Self::from_priority(Priority::min())
+    }
+
+    pub(crate) fn try_from_u32(level: u32) -> Result<Self, PriorityError> {
+        Priority::try_from_u32(level).map(Self::from_priority)
+    }
+}
+
 #[instability::unstable]
-impl TryFrom<u32> for Priority {
+impl TryFrom<u32> for ElevatedRunLevel {
     type Error = PriorityError;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         Self::try_from_u32(value)
+    }
+}
+
+impl From<Priority> for ElevatedRunLevel {
+    fn from(priority: Priority) -> Self {
+        Self::from_priority(priority)
     }
 }
 
@@ -526,12 +570,13 @@ pub(crate) mod rt {
 
         cfg_if::cfg_if! {
             if #[cfg(interrupt_controller = "clic")] {
-                let prio = unwrap!(Priority::try_from_u32(cpu_int::current_runlevel() as u32));
+                let prio = cpu_int::current_runlevel();
                 let mcause = riscv::register::mcause::read();
             } else {
                 // Change the current runlevel so that interrupt handlers can access the correct runlevel.
                 let prio = unwrap!(INTERRUPT_TO_PRIORITY[cpu_intr as usize]);
-                let level = unsafe { change_current_runlevel(RunLevel::Interrupt(prio)) };
+                let level = unsafe { change_current_runlevel(RunLevel::Interrupt(ElevatedRunLevel::from(prio))) };
+                let prio = prio as u8;
             }
         }
 
@@ -549,7 +594,7 @@ pub(crate) mod rt {
         // Do not enable nesting on the highest priority level. Older interrupt controllers couldn't
         // properly mask the highest priority interrupt, and for CLIC we don't want to waste
         // the cycles it takes to enable nesting unnecessarily.
-        if prio != Priority::max() {
+        if prio != Priority::max() as u8 {
             unsafe {
                 riscv::interrupt::nested(handle_interrupts);
             }
