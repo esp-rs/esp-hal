@@ -53,7 +53,7 @@ impl CpuClock {
         xtal_clk: None,
         pll_clk: Some(PllClkConfig::_320),
         apll_clk: None,
-        cpu_pll_div: Some(CpuPllDivConfig::_4),
+        cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_4)),
         syscon_pre_div: None,
         cpu_clk: Some(CpuClkConfig::Pll),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
@@ -63,7 +63,7 @@ impl CpuClock {
         xtal_clk: None,
         pll_clk: Some(PllClkConfig::_320),
         apll_clk: None,
-        cpu_pll_div: Some(CpuPllDivConfig::_2),
+        cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_2)),
         syscon_pre_div: None,
         cpu_clk: Some(CpuClkConfig::Pll),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
@@ -73,7 +73,7 @@ impl CpuClock {
         xtal_clk: None,
         pll_clk: Some(PllClkConfig::_480),
         apll_clk: None,
-        cpu_pll_div: Some(CpuPllDivConfig::_2),
+        cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_2)),
         syscon_pre_div: None,
         cpu_clk: Some(CpuClkConfig::Pll),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
@@ -541,7 +541,9 @@ fn configure_cpu_clk_impl(
     let bbpll_config = clocks.pll_clk.map(|pll| pll.value()).unwrap_or_default();
     let is_240mhz = pll_selector == Some(CpuPllDivInConfig::Pll) && bbpll_config == 480_000_000;
     let clock_source_sel1_bit = match clocks.cpu_pll_div {
-        Some(CpuPllDivConfig::_2) => {
+        Some(CpuPllDivConfig {
+            divisor: CpuPllDivDivisor::_2,
+        }) => {
             if is_240mhz {
                 2
             } else {
