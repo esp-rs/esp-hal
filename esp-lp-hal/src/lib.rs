@@ -55,6 +55,17 @@ cfg_if::cfg_if! {
     }
 }
 
+cfg_if::cfg_if! {
+    if #[cfg(any(esp32s2,esp32s3))] {
+        // Constants are from: https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L16
+        const ULP_RISCV_TIMER_INT                         : u32 = 1 << 0;   /* Internal Timer Interrupt */
+        const ULP_RISCV_EBREAK_ECALL_ILLEGAL_INSN_INT     : u32 = 1 << 1;   /* EBREAK, ECALL or Illegal instruction */
+        const ULP_RISCV_BUS_ERROR_INT                     : u32 = 1 << 2;   /* Bus Error (Unaligned Memory Access) */
+        const ULP_RISCV_PERIPHERAL_INTERRUPT              : u32 = 1 << 31;  /* RTC Peripheral Interrupt */
+        const ULP_RISCV_INTERNAL_INTERRUPT                : u32 = ULP_RISCV_TIMER_INT | ULP_RISCV_EBREAK_ECALL_ILLEGAL_INSN_INT | ULP_RISCV_BUS_ERROR_INT;
+    }
+}
+
 pub(crate) static mut CPU_CLOCK: u32 = LP_FAST_CLK_HZ;
 
 /// Wake up the HP core
@@ -183,8 +194,7 @@ global_asm!(
   .section .text.vectors
   .global irq_vector
   .global reset_vector
-  .weak ulp_irq_handler
-  .type ulp_irq_handler, @function
+  .global _ulp_riscv_interrupt_handler
   
   /* The reset vector, jumps to startup code */
   reset_vector:
@@ -203,7 +213,7 @@ global_asm!(
      * We do not re-enable interrupts before calling the C handler as ULP RISC-V does not
      * support nested interrupts.
      */
-    jal ulp_irq_handler
+    jal _ulp_riscv_interrupt_handler 
 
     /* Restore the register context after returning from the C interrupt handler */
     restore_general_regs
@@ -212,36 +222,8 @@ global_asm!(
     /* Equivalent to retirq_insn() */
     .word 0x0400000B
  
-
   .balign 0x10
 	.section .init
-
-  /* Weakly-linked IRQ handler.
-  *  Simply clears the IRQ and returns.
-  */
-  ulp_irq_handler:
-     bltz    a0,1f
-     ret
-     1:
-     /* Store a base address in a0 (0xD000) */
-     lui     a0,0xd
-     /* Read interrupt flag from (a0-1808) = 0xC8F0 */
-     lw      a1,-1808(a0)
-     /* If zero, goto 2 */
-     beqz    a1,2f
-     /* Clear the interrupt in 0xC8F4 */
-     sw      a1,-1804(a0)
-     2:
-     /* Store a base address in a0 (0xA000) */
-     lui     a0,0xa
-     /* Read RTC_GPIO_STATUS_REG from (a0+1048) = 0xA418 */
-     lw      a1,1048(a0)
-     /* If no interrupt is raised (equal to 0), goto 3 */
-     beqz    a1,3f
-     /* Clear RTC_GPIO_STATUS_W1TC_REG by writing to (a0+1056) = 0xA420 */
-     sw      a1,1056(a0)
-     3:
-     ret 
 
   .balign 0x10
   __start:
@@ -256,6 +238,42 @@ global_asm!(
     j loop
   "#
 );
+
+#[cfg(any(esp32s2, esp32s3))]
+#[unsafe(no_mangle)]
+unsafe extern "C" fn _ulp_riscv_interrupt_handler(q1: u32) {
+    // This interrupt handler is placeholder - it simply checks the interrupt flags, and clears
+    // them. This function is based on the ESP-IDF implementation found here:
+    // https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L110
+
+    // ULP Internal Interrupts
+    if (q1 & ULP_RISCV_INTERNAL_INTERRUPT) > 0 {
+        // TODO
+    }
+
+    // External/Peripheral interrupts
+    if (q1 & ULP_RISCV_PERIPHERAL_INTERRUPT) > 0 {
+        // RTC Peripheral interrupts
+        let cocpu_int_st: u32 = unsafe { &*pac::SENS::PTR }.sar_cocpu_int_st().read().bits();
+
+        if cocpu_int_st > 0 {
+            // Clear the interrupt
+            unsafe { &*pac::SENS::PTR }
+                .sar_cocpu_int_clr()
+                .write(|w| unsafe { w.bits(cocpu_int_st) });
+        }
+
+        // RTC IO interrupts
+        let rtcio_int_st: u32 = unsafe { &*pac::RTC_IO::PTR }.status().read().bits();
+
+        if rtcio_int_st > 0 {
+            // Clear the interrupt
+            unsafe { &*pac::RTC_IO::PTR }
+                .status_w1tc()
+                .write(|w| unsafe { w.bits(rtcio_int_st) });
+        }
+    }
+}
 
 /// Entry point to the ULP program
 #[unsafe(export_name = "rust_main")]
@@ -294,49 +312,33 @@ unsafe extern "C" fn ulp_riscv_rescue_from_monitor() {
 /// Stops the ULP core, called from itself.
 #[unsafe(link_section = ".init.rust")]
 fn ulp_riscv_halt() -> ! {
-    // ESP-S2 and ESP-S3 chips need to set the cocpu_shut_2_clk_dis delay field,
-    // and the cocpu_done flag, in order to halt.
     #[cfg(any(esp32s2, esp32s3))]
-    unsafe {
-        // Equivalent Rust code.
-        // unsafe { &*pac::RTC_CNTL::PTR }
-        //     .cocpu_ctrl()
-        //     .modify(|_, w| unsafe { w.cocpu_shut_2_clk_dis().bits(0x3f).cocpu_done().set_bit()
-        // });
-        core::arch::asm!(
-            "lui a5,0x8",
-            "addi a5,a5,260",
-            // 0x8000 + 260 = 0x8104
-            "lw a4,0(a5)",
-            // a4 == *0x8104 == contents of RTC_CNTL::cocpu_ctrl register
-            "lui a3,0xffc04",
-            "addi a3,a3,-1",
-            // a3 = 0xFFC03FFF = bitmask
-            "and a4,a4,a3",
-            // a4 == a4 & a3 == bits [14-21] of a3
-            "lui a3,0xfc",
-            // a3 == 0xFC000
-            "or a4,a4,a3",
-            // a4 = a4 | a3, so we are setting bits [14-19] to 1, while keeping the existing values
-            // of btis [20,21].
-            "sw a4,0(a5)",
-            // store it back to cocpu_ctrl
-            "lw a4,0(a5)",
-            // re-load it back again?
-            // a3 = 0x2400000, i.e. bit 22 and 25 are set.
-            "lui a3,0x2400",
-            // do another or operation! so we are setting bit 22 and 25
-            "or a4,a4,a3",
-            // save it back!
-            "sw a4,0(a5)",
-        );
+    {
+        unsafe { &*pac::RTC_CNTL::PTR }
+            .cocpu_ctrl()
+            .modify(|r, w| unsafe {
+                // Read the existing register value
+                let mut cocpu_ctl = r.bits();
+                // Set the value of COCPU_SHUT_2_CLK_DIS to 0x3F,
+                // as per the ESP-IDF source: https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_utils.c#L29
+                cocpu_ctl &= 0xFFC03FFF;
+                cocpu_ctl |= 0x3F << 14;
+                // Write to the register.
+                w.bits(cocpu_ctl);
+                // Re-read the register
+                cocpu_ctl = r.bits();
+                // Set RTC_CNTL_COCPU_DONE and RTC_CNTL_COCPU_DONE
+                cocpu_ctl |= (1 << 22) | (1 << 25);
+                // Write to the register.
+                w.bits(cocpu_ctl);
+                w
+            });
     }
 
     // All chips will enter a no-op loop, when halting.
     loop {
         unsafe {
-            // core::arch::asm!("addi x0, x0, 0");
-            core::arch::asm!("nop");
+            core::arch::asm!("addi x0, x0, 0"); // no-op
         }
     }
 }
