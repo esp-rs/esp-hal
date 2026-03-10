@@ -384,7 +384,7 @@ pub struct UlpWakeupSource {
 #[cfg(any(esp32s2, esp32s3))]
 impl UlpWakeupSource {
     /// Create a new instance of `WakeFromUlpWakeupSource`
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             wake_on_interrupt: true,
             wake_on_trap: true,
@@ -393,72 +393,37 @@ impl UlpWakeupSource {
     }
 
     /// Enable wakeup triggered by software interrupt from ULP-FSM or ULP-RISCV
-    pub fn set_wake_on_interrupt(self, value: bool) -> Self {
-        Self {
-            wake_on_interrupt: value,
-            wake_on_trap: self.wake_on_trap,
-            clear_interrupts_on_sleep: self.clear_interrupts_on_sleep,
-        }
+    pub fn set_wake_on_interrupt(mut self, value: bool) -> Self {
+        self.wake_on_interrupt = value;
+        self
     }
 
     /// Enable wakeup triggered by ULP-RISCV Trap
-    pub fn set_wake_on_trap(self, value: bool) -> Self {
-        Self {
-            wake_on_interrupt: self.wake_on_interrupt,
-            wake_on_trap: value,
-            clear_interrupts_on_sleep: self.clear_interrupts_on_sleep,
-        }
+    pub fn set_wake_on_trap(mut self, value: bool) -> Self {
+        self.wake_on_trap = value;
+        self
     }
 
     /// Enable clearing of latched wake-up interrupts prior to entering sleep
-    pub fn set_clear_interrupts_on_sleep(self, value: bool) -> Self {
-        Self {
-            wake_on_interrupt: self.wake_on_interrupt,
-            wake_on_trap: self.wake_on_trap,
-            clear_interrupts_on_sleep: value,
-        }
+    pub fn set_clear_interrupts_on_sleep(mut self, value: bool) -> Self {
+        self.clear_interrupts_on_sleep = value;
+        self
     }
 
     /// Clears the wake-up interrupts
     pub fn clear_interrupts(&self) {
-        #[cfg(esp32s2)]
-        {
-            // Even though the ESP32-S2 doesn't separate the wake-sources between the ULP-FSM and
-            // ULP-RISCV software interrupts, it DOES actually have those interrupts as
-            // separate fields in it's RTC/LPWR registers, the same as the S3.
-            unsafe { &*crate::peripherals::LPWR::PTR }
-                .int_clr()
-                .write(|w| w.cocpu_trap().clear_bit_by_one());
-            unsafe { &*crate::peripherals::LPWR::PTR }
-                .int_clr()
-                .write(|w| w.cocpu().clear_bit_by_one());
-            unsafe { &*crate::peripherals::LPWR::PTR }
-                .int_clr()
-                .write(|w| w.ulp_cp().clear_bit_by_one());
-        }
-        #[cfg(esp32s3)]
-        {
-            unsafe { &*crate::peripherals::RTC_CNTL::PTR }
-                .int_clr()
-                .write(|w| w.cocpu_trap().clear_bit_by_one());
-            unsafe { &*crate::peripherals::RTC_CNTL::PTR }
-                .int_clr()
-                .write(|w| w.cocpu().clear_bit_by_one());
-            unsafe { &*crate::peripherals::RTC_CNTL::PTR }
-                .int_clr()
-                .write(|w| w.ulp_cp().clear_bit_by_one());
-        }
+        crate::peripherals::LPWR::regs().int_clr().write(|w| {
+            w.cocpu_trap().clear_bit_by_one();
+            w.cocpu().clear_bit_by_one();
+            w.ulp_cp().clear_bit_by_one()
+        });
     }
 }
 
 #[cfg(any(esp32s2, esp32s3))]
 impl Default for UlpWakeupSource {
     fn default() -> Self {
-        Self {
-            wake_on_interrupt: true,
-            wake_on_trap: true,
-            clear_interrupts_on_sleep: true,
-        }
+        Self::new()
     }
 }
 
