@@ -215,14 +215,22 @@ global_asm!(
      bltz    a0,1f
      ret
      1:
+     /* Store a base address in a0 (0xD000) */
      lui     a0,0xd
+     /* Read interrupt flag from (a0-1808) = 0xC8F0 */
      lw      a1,-1808(a0)
+     /* If zero, goto 2 */
      beqz    a1,2f
+     /* Clear the interrupt in 0xC8F4 */
      sw      a1,-1804(a0)
      2:
+     /* Store a base address in a0 (0xA000) */
      lui     a0,0xa
+     /* Read RTC_GPIO_STATUS_REG from (a0+1048) = 0xA418 */
      lw      a1,1048(a0)
+     /* If no interrupt is raised (equal to 0), goto 3 */
      beqz    a1,3f
+     /* Clear RTC_GPIO_STATUS_W1TC_REG by writing to (a0+1056) = 0xA420 */
      sw      a1,1056(a0)
      3:
      ret 
