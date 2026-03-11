@@ -85,7 +85,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | PARL_IO                   |       |          |          | ⚒️      | ⚒️      | ⚒️      |          |          |
 | PCNT                      | ⚒️   |          |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | PHY                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| PSRAM                     | ⚒️   |          |          | [❌🔗][5141] |          |          | ⚒️      | ⚒️      |
+| PSRAM                     | ⚒️   |          |          | [❌][5141] [^1] |          |          | ⚒️      | ⚒️      |
 | RGB display               | ⚒️   |          |          |          |          |          | ❌       | ⚒️      |
 | RMT                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | RNG                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
@@ -114,7 +114,8 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
  * ❌: Not supported
  * ⚒️: Partial support
  * ✔️: Supported
- * 🔗: Link to issue on GitHub
+
+[^1]: This cell is clickable and will open the peripheral's issue on GitHub
 
 [5141]: https://github.com/esp-rs/esp-hal/issues/5141
 <!-- end chip support table -->

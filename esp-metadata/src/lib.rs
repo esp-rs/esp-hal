@@ -1336,7 +1336,7 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
             let support_cell_width =
                 chip.pretty_name().len() - !status.status.icon().is_empty() as usize;
             if let Some(issue) = status.issue {
-                write!(output, " [{}🔗][{issue}] |", status.status.icon())?;
+                write!(output, " [{}][{issue}] [^1] |", status.status.icon())?;
                 issues.push(issue);
             } else {
                 write!(output, " {:support_cell_width$} |", status.status.icon())?;
@@ -1347,13 +1347,19 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
 
     writeln!(output)?;
     SupportStatusLevel::write_legend(output)?;
-    writeln!(output, " * 🔗: Link to issue on GitHub")?;
     writeln!(output)?;
 
     // Print issue link definitions
     issues.sort();
     issues.dedup();
 
+    if !issues.is_empty() {
+        writeln!(
+            output,
+            "[^1]: This cell is clickable and will open the peripheral's issue on GitHub"
+        )?;
+        writeln!(output)?;
+    }
     for issue in issues {
         writeln!(
             output,
