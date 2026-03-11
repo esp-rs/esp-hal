@@ -254,7 +254,7 @@ impl ClockTreeNodeInstance {
         let current_config_fn = self.config_current_function(tree);
         let apply_fn_impl = ty_name
             .as_ref()
-            .map(|_| self.node.config_apply_impl_function(self, tree))
+            .map(|_| self.config_apply_impl_function())
             .unwrap_or_default();
         let frequency_function_impl = self.node_frequency_impl(tree);
         let frequency_function_name = self.frequency_function_name();
@@ -368,6 +368,19 @@ impl ClockTreeNodeInstance {
                 },
                 apply_fn_impl,
             ],
+        }
+    }
+
+    /// Generates a stub implementation that the HAL needs to provide.
+    fn config_apply_impl_function(&self) -> TokenStream {
+        let ty_name = self.config_type_name();
+        let apply_fn_name = self.config_apply_function_name();
+        let hal_impl = format_ident!("{}_impl", apply_fn_name);
+
+        quote! {
+            fn #hal_impl(_clocks: &mut ClockTree, _old_config: Option<#ty_name>, _new_config: #ty_name) {
+                todo!()
+            }
         }
     }
 }

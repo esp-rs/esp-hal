@@ -87,22 +87,6 @@ impl ClockTreeNodeType for Multiplexer {
         self.impl_config_apply_function(instance, tree)
     }
 
-    fn config_apply_impl_function(
-        &self,
-        instance: &ClockTreeNodeInstance,
-        _tree: &ProcessedClockData,
-    ) -> TokenStream {
-        let ty_name = instance.config_type_name();
-        let apply_fn_name = instance.config_apply_function_name();
-        let hal_impl = format_ident!("{}_impl", apply_fn_name);
-
-        quote! {
-            fn #hal_impl(_clocks: &mut ClockTree, _old_selector: Option<#ty_name>, _new_selector: #ty_name) {
-                todo!()
-            }
-        }
-    }
-
     fn node_frequency_impl(
         &self,
         instance: &ClockTreeNodeInstance,
