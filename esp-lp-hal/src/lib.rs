@@ -55,9 +55,10 @@ cfg_if::cfg_if! {
     }
 }
 
+// ULP interrupt bitflags from:
+// https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L16
 cfg_if::cfg_if! {
     if #[cfg(any(esp32s2,esp32s3))] {
-        // Constants are from: https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L16
         const ULP_RISCV_TIMER_INT                         : u32 = 1 << 0;   /* Internal Timer Interrupt */
         const ULP_RISCV_EBREAK_ECALL_ILLEGAL_INSN_INT     : u32 = 1 << 1;   /* EBREAK, ECALL or Illegal instruction */
         const ULP_RISCV_BUS_ERROR_INT                     : u32 = 1 << 2;   /* Bus Error (Unaligned Memory Access) */
@@ -123,120 +124,32 @@ loop:
 );
 
 #[cfg(any(esp32s2, esp32s3))]
+// Include macros which define custom RISCV R-Type instructions, used for interrupt handling.
+global_asm!(include_str!("./ulp_riscv_interrupt_ops.S"));
+
+// Assembly containing the reset_vector and irq_vector instructions.
+#[cfg(any(esp32s2, esp32s3))]
+global_asm!(include_str!("./ulp_riscv_vectors.S"));
+
+#[cfg(any(esp32s2, esp32s3))]
 global_asm!(
     r#"
-  .equ SAVE_REGS, 17
-  .equ CONTEXT_SIZE, (SAVE_REGS * 4)
+    .balign 0x10
+    .section .init
+    __start:
+        /* setup the stack pointer */
+        la sp, __stack_top
 
-  /* Much of this assembly was sourced from the following ESP-IDF files...
-  *  ...irq handler macros:
-  *    https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_vectors.S
-  *
-  *  ...critical section assembly
-  *    https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/include/ulp_riscv_utils.h
-  *
-  *  ...riscv halt code
-  *    https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_utils.c
-  */
+        /* Custom instruction to un-mask the interrupts */
+        /* waitirq_insn zero */
+        maskirq_insn zero, zero
 
-  /* Macro which first allocates space on the stack to save general
-   * purpose registers, and then save them. GP register is excluded.
-   * The default size allocated on the stack is CONTEXT_SIZE, but it
-   * can be overridden.
-   *
-   * Note: We don't save the callee-saved s0-s11 registers to save space
-   */
-  .macro save_general_regs cxt_size=CONTEXT_SIZE
-      addi sp, sp, -\cxt_size
-      sw   ra, 0(sp)
-      sw   tp, 4(sp)
-      sw   t0, 8(sp)
-      sw   t1, 12(sp)
-      sw   t2, 16(sp)
-      sw   a0, 20(sp)
-      sw   a1, 24(sp)
-      sw   a2, 28(sp)
-      sw   a3, 32(sp)
-      sw   a4, 36(sp)
-      sw   a5, 40(sp)
-      sw   a6, 44(sp)
-      sw   a7, 48(sp)
-      sw   t3, 52(sp)
-      sw   t4, 56(sp)
-      sw   t5, 60(sp)
-      sw   t6, 64(sp)
-  .endm
+        call ulp_riscv_rescue_from_monitor
+        call rust_main
 
-  /* Restore the general purpose registers (excluding gp) from the context on
-   * the stack. The context is then deallocated. The default size is CONTEXT_SIZE
-   * but it can be overridden. */
-  .macro restore_general_regs cxt_size=CONTEXT_SIZE
-      lw   ra, 0(sp)
-      lw   tp, 4(sp)
-      lw   t0, 8(sp)
-      lw   t1, 12(sp)
-      lw   t2, 16(sp)
-      lw   a0, 20(sp)
-      lw   a1, 24(sp)
-      lw   a2, 28(sp)
-      lw   a3, 32(sp)
-      lw   a4, 36(sp)
-      lw   a5, 40(sp)
-      lw   a6, 44(sp)
-      lw   a7, 48(sp)
-      lw   t3, 52(sp)
-      lw   t4, 56(sp)
-      lw   t5, 60(sp)
-      lw   t6, 64(sp)
-      addi sp,sp, \cxt_size
-  .endm
-
-  .section .text.vectors
-  .global irq_vector
-  .global reset_vector
-  .global _ulp_riscv_interrupt_handler
-  
-  /* The reset vector, jumps to startup code */
-  reset_vector:
-    j __start
-
-  /* Interrupt handler */
-  .balign 0x10 
-  irq_vector:
-    /* Save the general gurpose register context before handling the interrupt */
-    save_general_regs
-    /* Fetch the interrupt status from the custom q1 register into a0 */
-    /* Equivalent to getq_insn(a0, q1) */
-    .word 0x0000C50B
-
-    /* Call the global C interrupt handler. The interrupt status is passed as the argument in a0.
-     * We do not re-enable interrupts before calling the C handler as ULP RISC-V does not
-     * support nested interrupts.
-     */
-    jal _ulp_riscv_interrupt_handler 
-
-    /* Restore the register context after returning from the C interrupt handler */
-    restore_general_regs
-
-    /* Exit interrupt handler by executing the custom retirq instruction which will restore pc and re-enable interrupts */
-    /* Equivalent to retirq_insn() */
-    .word 0x0400000B
- 
-  .balign 0x10
-	.section .init
-
-  .balign 0x10
-  __start:
-    /* setup the stack pointer */
-    la sp, __stack_top
-    /* Equivalent to ulp_enable_interrupts() */
-    .word 0x0600600b
-    call ulp_riscv_rescue_from_monitor
-    call rust_main
-
-  loop:
-    j loop
-  "#
+    loop:
+        j loop
+    "#
 );
 
 #[cfg(any(esp32s2, esp32s3))]
@@ -273,6 +186,48 @@ unsafe extern "C" fn _ulp_riscv_interrupt_handler(q1: u32) {
                 .write(|w| unsafe { w.bits(rtcio_int_st) });
         }
     }
+}
+
+/// Enter a critical section (disable interrupts)
+#[cfg(any(esp32s2, esp32s3))]
+pub fn ulp_disable_interrupts() {
+    // Enter a critical section by disabling all interrupts
+    // This inline assembly construct uses the t0 register and is equivalent to:
+    // > li t0, 0x80000007
+    // > maskirq_insn(zero, t0) // Mask all interrupt bits
+    //
+    // The mask 0x80000007 represents:
+    //   Bit 31 - RTC peripheral interrupt
+    //   Bit 2  - Bus error
+    //   Bit 1  - Ebreak / Ecall / Illegal Instruction
+    //   Bit 0  - Internal Timer
+    //
+    unsafe {
+        core::arch::asm!("li t0, 0x80000007", ".word 0x0602e00b");
+    }
+}
+
+/// Exit a critical section (re-enable interrupts)
+#[cfg(any(esp32s2, esp32s3))]
+pub fn ulp_enable_interrupts() {
+    // Exit a critical section by enabling all interrupts
+    // This inline assembly construct is equivalent to:
+    // > maskirq_insn(zero, zero)
+    unsafe {
+        core::arch::asm!(".word 0x0600600b");
+    }
+}
+
+/// Wait for any (even unmasked) interrupt
+#[cfg(any(esp32s2, esp32s3))]
+pub fn ulp_waitirq() -> u32 {
+    // Wait for pending interrupt, return pending interrupt mask
+    // waitirq a0
+    let result: u32;
+    unsafe {
+        core::arch::asm!(".word 0x0800400B", out("a0") result);
+    }
+    result
 }
 
 /// Entry point to the ULP program
