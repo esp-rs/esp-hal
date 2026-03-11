@@ -271,7 +271,7 @@ clocks = { system_clocks = { clock_tree = [
 ] } }
 
 [device.adc]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5174 }
 
 # TODO: define functionality for PSEUDO register
 [device.aes]
