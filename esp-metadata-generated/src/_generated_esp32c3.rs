@@ -514,12 +514,8 @@ macro_rules! for_each_sw_interrupt {
 #[macro_export]
 macro_rules! sw_interrupt_delay {
     () => {
-        unsafe {
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
-            ::core::arch::asm!("nop");
+        unsafe { ::core::arch::asm!("nop"); ::core::arch::asm!("nop");
+        ::core::arch::asm!("nop"); ::core::arch::asm!("nop"); ::core::arch::asm!("nop");
         }
     };
 }
@@ -765,2005 +761,1037 @@ macro_rules! for_each_sha_algorithm {
 #[macro_export]
 /// ESP-HAL must provide implementation for the following functions:
 /// ```rust, no_run
+///
 /// // XTAL_CLK
 ///
-/// fn configure_xtal_clk_impl(_clocks: &mut ClockTree, _config: XtalClkConfig) {
-///     todo!()
-/// }
+///fn configure_xtal_clk_impl (_clocks : & mut ClockTree , _config : XtalClkConfig) { todo ! () }
+///
 ///
 /// // PLL_CLK
 ///
-/// fn enable_pll_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_pll_clk_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_pll_clk_impl(_clocks: &mut ClockTree, _config: PllClkConfig) {
-///     todo!()
-/// }
+///fn configure_pll_clk_impl (_clocks : & mut ClockTree , _config : PllClkConfig) { todo ! () }
+///
 ///
 /// // RC_FAST_CLK
 ///
-/// fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_rc_fast_clk_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
+///
 ///
 /// // XTAL32K_CLK
 ///
-/// fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_xtal32k_clk_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
+///
 ///
 /// // RC_SLOW_CLK
 ///
-/// fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_rc_slow_clk_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
+///
 ///
 /// // RC_FAST_DIV_CLK
 ///
-/// fn enable_rc_fast_div_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_rc_fast_div_clk_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
+///
 ///
 /// // SYSTEM_PRE_DIV_IN
 ///
-/// fn enable_system_pre_div_in_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_system_pre_div_in_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_system_pre_div_in_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<SystemPreDivInConfig>,
-///     _new_selector: SystemPreDivInConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_system_pre_div_in_impl (_clocks : & mut ClockTree , _old_selector : Option < SystemPreDivInConfig > , _new_selector : SystemPreDivInConfig) { todo ! () }
+///
 ///
 /// // SYSTEM_PRE_DIV
 ///
-/// fn enable_system_pre_div_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_system_pre_div_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_system_pre_div_impl(_clocks: &mut ClockTree, _new_config: SystemPreDivConfig) {
-///     todo!()
-/// }
+///fn configure_system_pre_div_impl (_clocks : & mut ClockTree , _new_config : SystemPreDivConfig) { todo ! () }
+///
 ///
 /// // CPU_PLL_DIV_OUT
 ///
-/// fn enable_cpu_pll_div_out_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_cpu_pll_div_out_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_cpu_pll_div_out_impl(_clocks: &mut ClockTree, _config: CpuPllDivOutConfig) {
-///     todo!()
-/// }
+///fn configure_cpu_pll_div_out_impl (_clocks : & mut ClockTree , _config : CpuPllDivOutConfig) { todo ! () }
+///
 ///
 /// // APB_CLK
 ///
-/// fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_apb_clk_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_apb_clk_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<ApbClkConfig>,
-///     _new_selector: ApbClkConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_apb_clk_impl (_clocks : & mut ClockTree , _old_selector : Option < ApbClkConfig > , _new_selector : ApbClkConfig) { todo ! () }
+///
 ///
 /// // CRYPTO_CLK
 ///
-/// fn enable_crypto_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_crypto_clk_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_crypto_clk_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<CryptoClkConfig>,
-///     _new_selector: CryptoClkConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_crypto_clk_impl (_clocks : & mut ClockTree , _old_selector : Option < CryptoClkConfig > , _new_selector : CryptoClkConfig) { todo ! () }
+///
 ///
 /// // CPU_CLK
 ///
-/// fn configure_cpu_clk_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<CpuClkConfig>,
-///     _new_selector: CpuClkConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_cpu_clk_impl (_clocks : & mut ClockTree , _old_selector : Option < CpuClkConfig > , _new_selector : CpuClkConfig) { todo ! () }
+///
 ///
 /// // PLL_80M
 ///
-/// fn enable_pll_80m_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_pll_80m_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
+///
 ///
 /// // PLL_160M
 ///
-/// fn enable_pll_160m_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_pll_160m_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
+///
 ///
 /// // RC_FAST_CLK_DIV_N
 ///
-/// fn enable_rc_fast_clk_div_n_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_rc_fast_clk_div_n_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_rc_fast_clk_div_n_impl(_clocks: &mut ClockTree, _new_config: RcFastClkDivNConfig) {
-///     todo!()
-/// }
+///fn configure_rc_fast_clk_div_n_impl (_clocks : & mut ClockTree , _new_config : RcFastClkDivNConfig) { todo ! () }
+///
 ///
 /// // XTAL_DIV_CLK
 ///
-/// fn enable_xtal_div_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_xtal_div_clk_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
+///
 ///
 /// // RTC_SLOW_CLK
 ///
-/// fn enable_rtc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_rtc_slow_clk_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_rtc_slow_clk_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<RtcSlowClkConfig>,
-///     _new_selector: RtcSlowClkConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_rtc_slow_clk_impl (_clocks : & mut ClockTree , _old_selector : Option < RtcSlowClkConfig > , _new_selector : RtcSlowClkConfig) { todo ! () }
+///
 ///
 /// // RTC_FAST_CLK
 ///
-/// fn enable_rtc_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_rtc_fast_clk_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_rtc_fast_clk_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<RtcFastClkConfig>,
-///     _new_selector: RtcFastClkConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_rtc_fast_clk_impl (_clocks : & mut ClockTree , _old_selector : Option < RtcFastClkConfig > , _new_selector : RtcFastClkConfig) { todo ! () }
+///
 ///
 /// // LOW_POWER_CLK
 ///
-/// fn enable_low_power_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_low_power_clk_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_low_power_clk_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<LowPowerClkConfig>,
-///     _new_selector: LowPowerClkConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_low_power_clk_impl (_clocks : & mut ClockTree , _old_selector : Option < LowPowerClkConfig > , _new_selector : LowPowerClkConfig) { todo ! () }
+///
 ///
 /// // UART_MEM_CLK
 ///
-/// fn enable_uart_mem_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_uart_mem_clk_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
+///
 ///
 /// // RMT_SCLK
 ///
-/// fn enable_rmt_sclk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_rmt_sclk_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_rmt_sclk_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<RmtSclkConfig>,
-///     _new_selector: RmtSclkConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_rmt_sclk_impl (_clocks : & mut ClockTree , _old_selector : Option < RmtSclkConfig > , _new_selector : RmtSclkConfig) { todo ! () }
+///
 ///
 /// // TIMG0_FUNCTION_CLOCK
 ///
-/// fn enable_timg0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_timg0_function_clock_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_timg0_function_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0FunctionClockConfig>,
-///     _new_selector: Timg0FunctionClockConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_timg0_function_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Timg0FunctionClockConfig > , _new_selector : Timg0FunctionClockConfig) { todo ! () }
+///
 ///
 /// // TIMG0_CALIBRATION_CLOCK
 ///
-/// fn enable_timg0_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_timg0_calibration_clock_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_timg0_calibration_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0CalibrationClockConfig>,
-///     _new_selector: Timg0CalibrationClockConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_timg0_calibration_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Timg0CalibrationClockConfig > , _new_selector : Timg0CalibrationClockConfig) { todo ! () }
+///
 ///
 /// // TIMG0_WDT_CLOCK
 ///
-/// fn enable_timg0_wdt_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_timg0_wdt_clock_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_timg0_wdt_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0WdtClockConfig>,
-///     _new_selector: Timg0WdtClockConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_timg0_wdt_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Timg0WdtClockConfig > , _new_selector : Timg0WdtClockConfig) { todo ! () }
+///
 ///
 /// // TIMG1_FUNCTION_CLOCK
 ///
-/// fn enable_timg1_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_timg1_function_clock_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_timg1_function_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0FunctionClockConfig>,
-///     _new_selector: Timg0FunctionClockConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_timg1_function_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Timg0FunctionClockConfig > , _new_selector : Timg0FunctionClockConfig) { todo ! () }
+///
 ///
 /// // TIMG1_CALIBRATION_CLOCK
 ///
-/// fn enable_timg1_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_timg1_calibration_clock_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_timg1_calibration_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0CalibrationClockConfig>,
-///     _new_selector: Timg0CalibrationClockConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_timg1_calibration_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Timg0CalibrationClockConfig > , _new_selector : Timg0CalibrationClockConfig) { todo ! () }
+///
 ///
 /// // TIMG1_WDT_CLOCK
 ///
-/// fn enable_timg1_wdt_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_timg1_wdt_clock_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_timg1_wdt_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0WdtClockConfig>,
-///     _new_selector: Timg0WdtClockConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_timg1_wdt_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Timg0WdtClockConfig > , _new_selector : Timg0WdtClockConfig) { todo ! () }
+///
 ///
 /// // UART0_FUNCTION_CLOCK
 ///
-/// fn enable_uart0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_uart0_function_clock_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_uart0_function_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Uart0FunctionClockConfig>,
-///     _new_selector: Uart0FunctionClockConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_uart0_function_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Uart0FunctionClockConfig > , _new_selector : Uart0FunctionClockConfig) { todo ! () }
+///
 ///
 /// // UART0_MEM_CLOCK
 ///
-/// fn enable_uart0_mem_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_uart0_mem_clock_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_uart0_mem_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Uart0MemClockConfig>,
-///     _new_selector: Uart0MemClockConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_uart0_mem_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Uart0MemClockConfig > , _new_selector : Uart0MemClockConfig) { todo ! () }
+///
 ///
 /// // UART1_FUNCTION_CLOCK
 ///
-/// fn enable_uart1_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_uart1_function_clock_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_uart1_function_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Uart0FunctionClockConfig>,
-///     _new_selector: Uart0FunctionClockConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_uart1_function_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Uart0FunctionClockConfig > , _new_selector : Uart0FunctionClockConfig) { todo ! () }
+///
 ///
 /// // UART1_MEM_CLOCK
 ///
-/// fn enable_uart1_mem_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///fn enable_uart1_mem_clock_impl (_clocks : & mut ClockTree , _en : bool) { todo ! () }
 ///
-/// fn configure_uart1_mem_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Uart0MemClockConfig>,
-///     _new_selector: Uart0MemClockConfig,
-/// ) {
-///     todo!()
-/// }
+///fn configure_uart1_mem_clock_impl (_clocks : & mut ClockTree , _old_selector : Option < Uart0MemClockConfig > , _new_selector : Uart0MemClockConfig) { todo ! () }
+///
 /// ```
 macro_rules! define_clock_tree_types {
     () => {
-        /// Selects the output frequency of `XTAL_CLK`.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum XtalClkConfig {
-            /// 40 MHz
-            _40,
-        }
-        impl XtalClkConfig {
-            pub fn value(&self) -> u32 {
-                match self {
-                    XtalClkConfig::_40 => 40000000,
-                }
-            }
-        }
-        /// Selects the output frequency of `PLL_CLK`. Depends on `XTAL_CLK`.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum PllClkConfig {
-            /// 320 MHz
-            _320,
-            /// 480 MHz
-            _480,
-        }
-        impl PllClkConfig {
-            pub fn value(&self) -> u32 {
-                match self {
-                    PllClkConfig::_320 => 320000000,
-                    PllClkConfig::_480 => 480000000,
-                }
-            }
-        }
-        /// The list of clock signals that the `SYSTEM_PRE_DIV_IN` multiplexer can output.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum SystemPreDivInConfig {
-            /// Selects `XTAL_CLK`.
-            Xtal,
-            /// Selects `RC_FAST_CLK`.
-            RcFast,
-        }
-        /// Configures the `SYSTEM_PRE_DIV` clock divider.
-        ///
-        /// The output is calculated as `OUTPUT = SYSTEM_PRE_DIV_IN / (divisor + 1)`.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct SystemPreDivConfig {
-            divisor: u32,
-        }
-        impl SystemPreDivConfig {
-            /// Creates a new divider configuration.
-            /// ## Panics
-            ///
-            /// Panics if the divisor value is outside the
-            /// valid range (0 ..= 1023).
-            pub const fn new(divisor: u32) -> Self {
-                ::core::assert!(
-                    divisor <= 1023u32,
-                    "`SYSTEM_PRE_DIV` divisor value must be between 0 and 1023 (inclusive)."
-                );
-                Self { divisor }
-            }
-            fn divisor(self) -> u32 {
-                self.divisor
-            }
-            fn value(self) -> u32 {
-                self.divisor()
-            }
-        }
-        /// Selects the output frequency of `CPU_PLL_DIV_OUT`. Depends on `PLL_CLK`.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum CpuPllDivOutConfig {
-            /// 80 MHz
-            _80,
-            /// 160 MHz
-            _160,
-        }
-        impl CpuPllDivOutConfig {
-            pub fn value(&self) -> u32 {
-                match self {
-                    CpuPllDivOutConfig::_80 => 80000000,
-                    CpuPllDivOutConfig::_160 => 160000000,
-                }
-            }
-        }
-        /// The list of clock signals that the `APB_CLK` multiplexer can output.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum ApbClkConfig {
-            /// Selects `PLL_80M`.
-            Pll80m,
-            /// Selects `CPU_CLK`.
-            Cpu,
-        }
-        /// The list of clock signals that the `CRYPTO_CLK` multiplexer can output.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum CryptoClkConfig {
-            /// Selects `PLL_160M`.
-            Pll160m,
-            /// Selects `CPU_CLK`.
-            Cpu,
-        }
-        /// The list of clock signals that the `CPU_CLK` multiplexer can output.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum CpuClkConfig {
-            /// Selects `SYSTEM_PRE_DIV`.
-            Xtal,
-            /// Selects `SYSTEM_PRE_DIV`.
-            RcFast,
-            /// Selects `CPU_PLL_DIV_OUT`.
-            Pll,
-        }
-        /// Configures the `RC_FAST_CLK_DIV_N` clock divider.
-        ///
-        /// The output is calculated as `OUTPUT = RC_FAST_CLK / (divisor + 1)`.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct RcFastClkDivNConfig {
-            divisor: u32,
-        }
-        impl RcFastClkDivNConfig {
-            /// Creates a new divider configuration.
-            /// ## Panics
-            ///
-            /// Panics if the divisor value is outside the
-            /// valid range (0 ..= 3).
-            pub const fn new(divisor: u32) -> Self {
-                ::core::assert!(
-                    divisor <= 3u32,
-                    "`RC_FAST_CLK_DIV_N` divisor value must be between 0 and 3 (inclusive)."
-                );
-                Self { divisor }
-            }
-            fn divisor(self) -> u32 {
-                self.divisor
-            }
-            fn value(self) -> u32 {
-                self.divisor()
-            }
-        }
-        /// The list of clock signals that the `RTC_SLOW_CLK` multiplexer can output.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum RtcSlowClkConfig {
-            /// Selects `XTAL32K_CLK`.
-            Xtal32k,
-            /// Selects `RC_SLOW_CLK`.
-            RcSlow,
-            /// Selects `RC_FAST_DIV_CLK`.
-            RcFast,
-        }
-        /// The list of clock signals that the `RTC_FAST_CLK` multiplexer can output.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum RtcFastClkConfig {
-            /// Selects `XTAL_DIV_CLK`.
-            Xtal,
-            /// Selects `RC_FAST_CLK_DIV_N`.
-            Rc,
-        }
-        /// The list of clock signals that the `LOW_POWER_CLK` multiplexer can output.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum LowPowerClkConfig {
-            /// Selects `XTAL_CLK`.
-            Xtal,
-            /// Selects `RC_FAST_CLK`.
-            RcFast,
-            /// Selects `XTAL32K_CLK`.
-            Xtal32k,
-            /// Selects `RTC_SLOW_CLK`.
-            RtcSlow,
-        }
-        /// The list of clock signals that the `RMT_SCLK` multiplexer can output.
-        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum RmtSclkConfig {
-            #[default]
-            /// Selects `APB_CLK`.
-            ApbClk,
-            /// Selects `RC_FAST_CLK`.
-            RcFastClk,
-            /// Selects `XTAL_CLK`.
-            XtalClk,
-        }
-        /// The list of clock signals that the `TIMG0_FUNCTION_CLOCK` multiplexer can output.
-        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum Timg0FunctionClockConfig {
-            #[default]
-            /// Selects `XTAL_CLK`.
-            XtalClk,
-            /// Selects `APB_CLK`.
-            ApbClk,
-        }
-        /// The list of clock signals that the `TIMG0_CALIBRATION_CLOCK` multiplexer can output.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum Timg0CalibrationClockConfig {
-            /// Selects `RC_SLOW_CLK`.
-            RcSlowClk,
-            /// Selects `RC_FAST_DIV_CLK`.
-            RcFastDivClk,
-            /// Selects `XTAL32K_CLK`.
-            Xtal32kClk,
-        }
-        /// The list of clock signals that the `TIMG0_WDT_CLOCK` multiplexer can output.
-        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum Timg0WdtClockConfig {
-            #[default]
-            /// Selects `APB_CLK`.
-            ApbClk,
-            /// Selects `XTAL_CLK`.
-            XtalClk,
-        }
-        /// The list of clock signals that the `UART0_FUNCTION_CLOCK` multiplexer can output.
-        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum Uart0FunctionClockConfig {
-            /// Selects `APB_CLK`.
-            Apb,
-            /// Selects `RC_FAST_CLK`.
-            RcFast,
-            #[default]
-            /// Selects `XTAL_CLK`.
-            Xtal,
-        }
-        /// The list of clock signals that the `UART0_MEM_CLOCK` multiplexer can output.
-        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum Uart0MemClockConfig {
-            #[default]
-            /// Selects `UART_MEM_CLK`.
-            Mem,
-        }
-        /// Represents the device's clock tree.
-        pub struct ClockTree {
-            xtal_clk: Option<XtalClkConfig>,
-            pll_clk: Option<PllClkConfig>,
-            system_pre_div_in: Option<SystemPreDivInConfig>,
-            system_pre_div: Option<SystemPreDivConfig>,
-            cpu_pll_div_out: Option<CpuPllDivOutConfig>,
-            apb_clk: Option<ApbClkConfig>,
-            crypto_clk: Option<CryptoClkConfig>,
-            cpu_clk: Option<CpuClkConfig>,
-            rc_fast_clk_div_n: Option<RcFastClkDivNConfig>,
-            rtc_slow_clk: Option<RtcSlowClkConfig>,
-            rtc_fast_clk: Option<RtcFastClkConfig>,
-            low_power_clk: Option<LowPowerClkConfig>,
-            rmt_sclk: Option<RmtSclkConfig>,
-            timg0_function_clock: Option<Timg0FunctionClockConfig>,
-            timg0_calibration_clock: Option<Timg0CalibrationClockConfig>,
-            timg0_wdt_clock: Option<Timg0WdtClockConfig>,
-            timg1_function_clock: Option<Timg0FunctionClockConfig>,
-            timg1_calibration_clock: Option<Timg0CalibrationClockConfig>,
-            timg1_wdt_clock: Option<Timg0WdtClockConfig>,
-            uart0_function_clock: Option<Uart0FunctionClockConfig>,
-            uart0_mem_clock: Option<Uart0MemClockConfig>,
-            uart1_function_clock: Option<Uart0FunctionClockConfig>,
-            uart1_mem_clock: Option<Uart0MemClockConfig>,
-            rc_fast_clk_refcount: u32,
-            xtal32k_clk_refcount: u32,
-            rc_slow_clk_refcount: u32,
-            rc_fast_div_clk_refcount: u32,
-            apb_clk_refcount: u32,
-            crypto_clk_refcount: u32,
-            rtc_fast_clk_refcount: u32,
-            low_power_clk_refcount: u32,
-            uart_mem_clk_refcount: u32,
-            rmt_sclk_refcount: u32,
-            timg0_function_clock_refcount: u32,
-            timg0_calibration_clock_refcount: u32,
-            timg0_wdt_clock_refcount: u32,
-            timg1_function_clock_refcount: u32,
-            timg1_calibration_clock_refcount: u32,
-            timg1_wdt_clock_refcount: u32,
-            uart0_function_clock_refcount: u32,
-            uart0_mem_clock_refcount: u32,
-            uart1_function_clock_refcount: u32,
-            uart1_mem_clock_refcount: u32,
-        }
-        impl ClockTree {
-            /// Locks the clock tree for exclusive access.
-            pub fn with<R>(f: impl FnOnce(&mut ClockTree) -> R) -> R {
-                CLOCK_TREE.with(f)
-            }
-            /// Returns the current configuration of the XTAL_CLK clock tree node
-            pub fn xtal_clk(&self) -> Option<XtalClkConfig> {
-                self.xtal_clk
-            }
-            /// Returns the current configuration of the PLL_CLK clock tree node
-            pub fn pll_clk(&self) -> Option<PllClkConfig> {
-                self.pll_clk
-            }
-            /// Returns the current configuration of the SYSTEM_PRE_DIV_IN clock tree node
-            pub fn system_pre_div_in(&self) -> Option<SystemPreDivInConfig> {
-                self.system_pre_div_in
-            }
-            /// Returns the current configuration of the SYSTEM_PRE_DIV clock tree node
-            pub fn system_pre_div(&self) -> Option<SystemPreDivConfig> {
-                self.system_pre_div
-            }
-            /// Returns the current configuration of the CPU_PLL_DIV_OUT clock tree node
-            pub fn cpu_pll_div_out(&self) -> Option<CpuPllDivOutConfig> {
-                self.cpu_pll_div_out
-            }
-            /// Returns the current configuration of the APB_CLK clock tree node
-            pub fn apb_clk(&self) -> Option<ApbClkConfig> {
-                self.apb_clk
-            }
-            /// Returns the current configuration of the CRYPTO_CLK clock tree node
-            pub fn crypto_clk(&self) -> Option<CryptoClkConfig> {
-                self.crypto_clk
-            }
-            /// Returns the current configuration of the CPU_CLK clock tree node
-            pub fn cpu_clk(&self) -> Option<CpuClkConfig> {
-                self.cpu_clk
-            }
-            /// Returns the current configuration of the RC_FAST_CLK_DIV_N clock tree node
-            pub fn rc_fast_clk_div_n(&self) -> Option<RcFastClkDivNConfig> {
-                self.rc_fast_clk_div_n
-            }
-            /// Returns the current configuration of the RTC_SLOW_CLK clock tree node
-            pub fn rtc_slow_clk(&self) -> Option<RtcSlowClkConfig> {
-                self.rtc_slow_clk
-            }
-            /// Returns the current configuration of the RTC_FAST_CLK clock tree node
-            pub fn rtc_fast_clk(&self) -> Option<RtcFastClkConfig> {
-                self.rtc_fast_clk
-            }
-            /// Returns the current configuration of the LOW_POWER_CLK clock tree node
-            pub fn low_power_clk(&self) -> Option<LowPowerClkConfig> {
-                self.low_power_clk
-            }
-            /// Returns the current configuration of the RMT_SCLK clock tree node
-            pub fn rmt_sclk(&self) -> Option<RmtSclkConfig> {
-                self.rmt_sclk
-            }
-            /// Returns the current configuration of the TIMG0_FUNCTION_CLOCK clock tree node
-            pub fn timg0_function_clock(&self) -> Option<Timg0FunctionClockConfig> {
-                self.timg0_function_clock
-            }
-            /// Returns the current configuration of the TIMG0_CALIBRATION_CLOCK clock tree node
-            pub fn timg0_calibration_clock(&self) -> Option<Timg0CalibrationClockConfig> {
-                self.timg0_calibration_clock
-            }
-            /// Returns the current configuration of the TIMG0_WDT_CLOCK clock tree node
-            pub fn timg0_wdt_clock(&self) -> Option<Timg0WdtClockConfig> {
-                self.timg0_wdt_clock
-            }
-            /// Returns the current configuration of the TIMG1_FUNCTION_CLOCK clock tree node
-            pub fn timg1_function_clock(&self) -> Option<Timg0FunctionClockConfig> {
-                self.timg1_function_clock
-            }
-            /// Returns the current configuration of the TIMG1_CALIBRATION_CLOCK clock tree node
-            pub fn timg1_calibration_clock(&self) -> Option<Timg0CalibrationClockConfig> {
-                self.timg1_calibration_clock
-            }
-            /// Returns the current configuration of the TIMG1_WDT_CLOCK clock tree node
-            pub fn timg1_wdt_clock(&self) -> Option<Timg0WdtClockConfig> {
-                self.timg1_wdt_clock
-            }
-            /// Returns the current configuration of the UART0_FUNCTION_CLOCK clock tree node
-            pub fn uart0_function_clock(&self) -> Option<Uart0FunctionClockConfig> {
-                self.uart0_function_clock
-            }
-            /// Returns the current configuration of the UART0_MEM_CLOCK clock tree node
-            pub fn uart0_mem_clock(&self) -> Option<Uart0MemClockConfig> {
-                self.uart0_mem_clock
-            }
-            /// Returns the current configuration of the UART1_FUNCTION_CLOCK clock tree node
-            pub fn uart1_function_clock(&self) -> Option<Uart0FunctionClockConfig> {
-                self.uart1_function_clock
-            }
-            /// Returns the current configuration of the UART1_MEM_CLOCK clock tree node
-            pub fn uart1_mem_clock(&self) -> Option<Uart0MemClockConfig> {
-                self.uart1_mem_clock
-            }
-        }
-        static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
-            ::esp_sync::NonReentrantMutex::new(ClockTree {
-                xtal_clk: None,
-                pll_clk: None,
-                system_pre_div_in: None,
-                system_pre_div: None,
-                cpu_pll_div_out: None,
-                apb_clk: None,
-                crypto_clk: None,
-                cpu_clk: None,
-                rc_fast_clk_div_n: None,
-                rtc_slow_clk: None,
-                rtc_fast_clk: None,
-                low_power_clk: None,
-                rmt_sclk: None,
-                timg0_function_clock: None,
-                timg0_calibration_clock: None,
-                timg0_wdt_clock: None,
-                timg1_function_clock: None,
-                timg1_calibration_clock: None,
-                timg1_wdt_clock: None,
-                uart0_function_clock: None,
-                uart0_mem_clock: None,
-                uart1_function_clock: None,
-                uart1_mem_clock: None,
-                rc_fast_clk_refcount: 0,
-                xtal32k_clk_refcount: 0,
-                rc_slow_clk_refcount: 0,
-                rc_fast_div_clk_refcount: 0,
-                apb_clk_refcount: 0,
-                crypto_clk_refcount: 0,
-                rtc_fast_clk_refcount: 0,
-                low_power_clk_refcount: 0,
-                uart_mem_clk_refcount: 0,
-                rmt_sclk_refcount: 0,
-                timg0_function_clock_refcount: 0,
-                timg0_calibration_clock_refcount: 0,
-                timg0_wdt_clock_refcount: 0,
-                timg1_function_clock_refcount: 0,
-                timg1_calibration_clock_refcount: 0,
-                timg1_wdt_clock_refcount: 0,
-                uart0_function_clock_refcount: 0,
-                uart0_mem_clock_refcount: 0,
-                uart1_function_clock_refcount: 0,
-                uart1_mem_clock_refcount: 0,
-            });
-        pub fn configure_xtal_clk(clocks: &mut ClockTree, config: XtalClkConfig) {
-            clocks.xtal_clk = Some(config);
-            configure_xtal_clk_impl(clocks, config);
-        }
-        pub fn xtal_clk_config(clocks: &mut ClockTree) -> Option<XtalClkConfig> {
-            clocks.xtal_clk
-        }
-        fn request_xtal_clk(_clocks: &mut ClockTree) {}
-        fn release_xtal_clk(_clocks: &mut ClockTree) {}
-        pub fn xtal_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            unwrap!(clocks.xtal_clk).value()
-        }
-        pub fn configure_pll_clk(clocks: &mut ClockTree, config: PllClkConfig) {
-            clocks.pll_clk = Some(config);
-            configure_pll_clk_impl(clocks, config);
-        }
-        pub fn pll_clk_config(clocks: &mut ClockTree) -> Option<PllClkConfig> {
-            clocks.pll_clk
-        }
-        pub fn request_pll_clk(clocks: &mut ClockTree) {
-            trace!("Requesting PLL_CLK");
-            trace!("Enabling PLL_CLK");
-            request_xtal_clk(clocks);
-            enable_pll_clk_impl(clocks, true);
-        }
-        pub fn release_pll_clk(clocks: &mut ClockTree) {
-            trace!("Releasing PLL_CLK");
-            trace!("Disabling PLL_CLK");
-            enable_pll_clk_impl(clocks, false);
-            release_xtal_clk(clocks);
-        }
-        pub fn pll_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            unwrap!(clocks.pll_clk).value()
-        }
-        pub fn request_rc_fast_clk(clocks: &mut ClockTree) {
-            trace!("Requesting RC_FAST_CLK");
-            if increment_reference_count(&mut clocks.rc_fast_clk_refcount) {
-                trace!("Enabling RC_FAST_CLK");
-                enable_rc_fast_clk_impl(clocks, true);
-            }
-        }
-        pub fn release_rc_fast_clk(clocks: &mut ClockTree) {
-            trace!("Releasing RC_FAST_CLK");
-            if decrement_reference_count(&mut clocks.rc_fast_clk_refcount) {
-                trace!("Disabling RC_FAST_CLK");
-                enable_rc_fast_clk_impl(clocks, false);
-            }
-        }
-        pub fn rc_fast_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            17500000
-        }
-        pub fn request_xtal32k_clk(clocks: &mut ClockTree) {
-            trace!("Requesting XTAL32K_CLK");
-            if increment_reference_count(&mut clocks.xtal32k_clk_refcount) {
-                trace!("Enabling XTAL32K_CLK");
-                enable_xtal32k_clk_impl(clocks, true);
-            }
-        }
-        pub fn release_xtal32k_clk(clocks: &mut ClockTree) {
-            trace!("Releasing XTAL32K_CLK");
-            if decrement_reference_count(&mut clocks.xtal32k_clk_refcount) {
-                trace!("Disabling XTAL32K_CLK");
-                enable_xtal32k_clk_impl(clocks, false);
-            }
-        }
-        pub fn xtal32k_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            32768
-        }
-        pub fn request_rc_slow_clk(clocks: &mut ClockTree) {
-            trace!("Requesting RC_SLOW_CLK");
-            if increment_reference_count(&mut clocks.rc_slow_clk_refcount) {
-                trace!("Enabling RC_SLOW_CLK");
-                enable_rc_slow_clk_impl(clocks, true);
-            }
-        }
-        pub fn release_rc_slow_clk(clocks: &mut ClockTree) {
-            trace!("Releasing RC_SLOW_CLK");
-            if decrement_reference_count(&mut clocks.rc_slow_clk_refcount) {
-                trace!("Disabling RC_SLOW_CLK");
-                enable_rc_slow_clk_impl(clocks, false);
-            }
-        }
-        pub fn rc_slow_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            136000
-        }
-        pub fn request_rc_fast_div_clk(clocks: &mut ClockTree) {
-            trace!("Requesting RC_FAST_DIV_CLK");
-            if increment_reference_count(&mut clocks.rc_fast_div_clk_refcount) {
-                trace!("Enabling RC_FAST_DIV_CLK");
-                request_rc_fast_clk(clocks);
-                enable_rc_fast_div_clk_impl(clocks, true);
-            }
-        }
-        pub fn release_rc_fast_div_clk(clocks: &mut ClockTree) {
-            trace!("Releasing RC_FAST_DIV_CLK");
-            if decrement_reference_count(&mut clocks.rc_fast_div_clk_refcount) {
-                trace!("Disabling RC_FAST_DIV_CLK");
-                enable_rc_fast_div_clk_impl(clocks, false);
-                release_rc_fast_clk(clocks);
-            }
-        }
-        pub fn rc_fast_div_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            (rc_fast_clk_frequency(clocks) / 256)
-        }
-        pub fn configure_system_pre_div_in(
-            clocks: &mut ClockTree,
-            new_selector: SystemPreDivInConfig,
-        ) {
-            let old_selector = clocks.system_pre_div_in.replace(new_selector);
-            match new_selector {
-                SystemPreDivInConfig::Xtal => request_xtal_clk(clocks),
-                SystemPreDivInConfig::RcFast => request_rc_fast_clk(clocks),
-            }
-            configure_system_pre_div_in_impl(clocks, old_selector, new_selector);
-            if let Some(old_selector) = old_selector {
-                match old_selector {
-                    SystemPreDivInConfig::Xtal => release_xtal_clk(clocks),
-                    SystemPreDivInConfig::RcFast => release_rc_fast_clk(clocks),
-                }
-            }
-        }
-        pub fn system_pre_div_in_config(clocks: &mut ClockTree) -> Option<SystemPreDivInConfig> {
-            clocks.system_pre_div_in
-        }
-        pub fn request_system_pre_div_in(clocks: &mut ClockTree) {
-            trace!("Requesting SYSTEM_PRE_DIV_IN");
-            trace!("Enabling SYSTEM_PRE_DIV_IN");
-            match unwrap!(clocks.system_pre_div_in) {
-                SystemPreDivInConfig::Xtal => request_xtal_clk(clocks),
-                SystemPreDivInConfig::RcFast => request_rc_fast_clk(clocks),
-            }
-            enable_system_pre_div_in_impl(clocks, true);
-        }
-        pub fn release_system_pre_div_in(clocks: &mut ClockTree) {
-            trace!("Releasing SYSTEM_PRE_DIV_IN");
-            trace!("Disabling SYSTEM_PRE_DIV_IN");
-            enable_system_pre_div_in_impl(clocks, false);
-            match unwrap!(clocks.system_pre_div_in) {
-                SystemPreDivInConfig::Xtal => release_xtal_clk(clocks),
-                SystemPreDivInConfig::RcFast => release_rc_fast_clk(clocks),
-            }
-        }
-        pub fn system_pre_div_in_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.system_pre_div_in) {
-                SystemPreDivInConfig::Xtal => xtal_clk_frequency(clocks),
-                SystemPreDivInConfig::RcFast => rc_fast_clk_frequency(clocks),
-            }
-        }
-        pub fn configure_system_pre_div(clocks: &mut ClockTree, config: SystemPreDivConfig) {
-            clocks.system_pre_div = Some(config);
-            configure_system_pre_div_impl(clocks, config);
-        }
-        pub fn system_pre_div_config(clocks: &mut ClockTree) -> Option<SystemPreDivConfig> {
-            clocks.system_pre_div
-        }
-        pub fn request_system_pre_div(clocks: &mut ClockTree) {
-            trace!("Requesting SYSTEM_PRE_DIV");
-            trace!("Enabling SYSTEM_PRE_DIV");
-            request_system_pre_div_in(clocks);
-            enable_system_pre_div_impl(clocks, true);
-        }
-        pub fn release_system_pre_div(clocks: &mut ClockTree) {
-            trace!("Releasing SYSTEM_PRE_DIV");
-            trace!("Disabling SYSTEM_PRE_DIV");
-            enable_system_pre_div_impl(clocks, false);
-            release_system_pre_div_in(clocks);
-        }
-        pub fn system_pre_div_frequency(clocks: &mut ClockTree) -> u32 {
-            (system_pre_div_in_frequency(clocks) / (unwrap!(clocks.system_pre_div).divisor() + 1))
-        }
-        pub fn configure_cpu_pll_div_out(clocks: &mut ClockTree, config: CpuPllDivOutConfig) {
-            clocks.cpu_pll_div_out = Some(config);
-            configure_cpu_pll_div_out_impl(clocks, config);
-        }
-        pub fn cpu_pll_div_out_config(clocks: &mut ClockTree) -> Option<CpuPllDivOutConfig> {
-            clocks.cpu_pll_div_out
-        }
-        pub fn request_cpu_pll_div_out(clocks: &mut ClockTree) {
-            trace!("Requesting CPU_PLL_DIV_OUT");
-            trace!("Enabling CPU_PLL_DIV_OUT");
-            request_pll_clk(clocks);
-            enable_cpu_pll_div_out_impl(clocks, true);
-        }
-        pub fn release_cpu_pll_div_out(clocks: &mut ClockTree) {
-            trace!("Releasing CPU_PLL_DIV_OUT");
-            trace!("Disabling CPU_PLL_DIV_OUT");
-            enable_cpu_pll_div_out_impl(clocks, false);
-            release_pll_clk(clocks);
-        }
-        pub fn cpu_pll_div_out_frequency(clocks: &mut ClockTree) -> u32 {
-            unwrap!(clocks.cpu_pll_div_out).value()
-        }
-        pub fn configure_apb_clk(clocks: &mut ClockTree, new_selector: ApbClkConfig) {
-            let old_selector = clocks.apb_clk.replace(new_selector);
-            if clocks.apb_clk_refcount > 0 {
-                match new_selector {
-                    ApbClkConfig::Pll80m => request_pll_80m(clocks),
-                    ApbClkConfig::Cpu => request_cpu_clk(clocks),
-                }
-                configure_apb_clk_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        ApbClkConfig::Pll80m => release_pll_80m(clocks),
-                        ApbClkConfig::Cpu => release_cpu_clk(clocks),
-                    }
-                }
-            } else {
-                configure_apb_clk_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn apb_clk_config(clocks: &mut ClockTree) -> Option<ApbClkConfig> {
-            clocks.apb_clk
-        }
-        pub fn request_apb_clk(clocks: &mut ClockTree) {
-            trace!("Requesting APB_CLK");
-            if increment_reference_count(&mut clocks.apb_clk_refcount) {
-                trace!("Enabling APB_CLK");
-                match unwrap!(clocks.apb_clk) {
-                    ApbClkConfig::Pll80m => request_pll_80m(clocks),
-                    ApbClkConfig::Cpu => request_cpu_clk(clocks),
-                }
-                enable_apb_clk_impl(clocks, true);
-            }
-        }
-        pub fn release_apb_clk(clocks: &mut ClockTree) {
-            trace!("Releasing APB_CLK");
-            if decrement_reference_count(&mut clocks.apb_clk_refcount) {
-                trace!("Disabling APB_CLK");
-                enable_apb_clk_impl(clocks, false);
-                match unwrap!(clocks.apb_clk) {
-                    ApbClkConfig::Pll80m => release_pll_80m(clocks),
-                    ApbClkConfig::Cpu => release_cpu_clk(clocks),
-                }
-            }
-        }
-        pub fn apb_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.apb_clk) {
-                ApbClkConfig::Pll80m => pll_80m_frequency(clocks),
-                ApbClkConfig::Cpu => cpu_clk_frequency(clocks),
-            }
-        }
-        pub fn configure_crypto_clk(clocks: &mut ClockTree, new_selector: CryptoClkConfig) {
-            let old_selector = clocks.crypto_clk.replace(new_selector);
-            if clocks.crypto_clk_refcount > 0 {
-                match new_selector {
-                    CryptoClkConfig::Pll160m => request_pll_160m(clocks),
-                    CryptoClkConfig::Cpu => request_cpu_clk(clocks),
-                }
-                configure_crypto_clk_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        CryptoClkConfig::Pll160m => release_pll_160m(clocks),
-                        CryptoClkConfig::Cpu => release_cpu_clk(clocks),
-                    }
-                }
-            } else {
-                configure_crypto_clk_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn crypto_clk_config(clocks: &mut ClockTree) -> Option<CryptoClkConfig> {
-            clocks.crypto_clk
-        }
-        pub fn request_crypto_clk(clocks: &mut ClockTree) {
-            trace!("Requesting CRYPTO_CLK");
-            if increment_reference_count(&mut clocks.crypto_clk_refcount) {
-                trace!("Enabling CRYPTO_CLK");
-                match unwrap!(clocks.crypto_clk) {
-                    CryptoClkConfig::Pll160m => request_pll_160m(clocks),
-                    CryptoClkConfig::Cpu => request_cpu_clk(clocks),
-                }
-                enable_crypto_clk_impl(clocks, true);
-            }
-        }
-        pub fn release_crypto_clk(clocks: &mut ClockTree) {
-            trace!("Releasing CRYPTO_CLK");
-            if decrement_reference_count(&mut clocks.crypto_clk_refcount) {
-                trace!("Disabling CRYPTO_CLK");
-                enable_crypto_clk_impl(clocks, false);
-                match unwrap!(clocks.crypto_clk) {
-                    CryptoClkConfig::Pll160m => release_pll_160m(clocks),
-                    CryptoClkConfig::Cpu => release_cpu_clk(clocks),
-                }
-            }
-        }
-        pub fn crypto_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.crypto_clk) {
-                CryptoClkConfig::Pll160m => pll_160m_frequency(clocks),
-                CryptoClkConfig::Cpu => cpu_clk_frequency(clocks),
-            }
-        }
-        pub fn configure_cpu_clk(clocks: &mut ClockTree, new_selector: CpuClkConfig) {
-            let old_selector = clocks.cpu_clk.replace(new_selector);
-            match new_selector {
-                CpuClkConfig::Xtal => {
-                    configure_apb_clk(clocks, ApbClkConfig::Cpu);
-                    configure_crypto_clk(clocks, CryptoClkConfig::Cpu);
-                    configure_system_pre_div_in(clocks, SystemPreDivInConfig::Xtal);
-                }
-                CpuClkConfig::RcFast => {
-                    configure_apb_clk(clocks, ApbClkConfig::Cpu);
-                    configure_crypto_clk(clocks, CryptoClkConfig::Cpu);
-                    configure_system_pre_div_in(clocks, SystemPreDivInConfig::RcFast);
-                }
-                CpuClkConfig::Pll => {
-                    configure_apb_clk(clocks, ApbClkConfig::Pll80m);
-                    configure_crypto_clk(clocks, CryptoClkConfig::Pll160m);
-                }
-            }
-            match new_selector {
-                CpuClkConfig::Xtal => request_system_pre_div(clocks),
-                CpuClkConfig::RcFast => request_system_pre_div(clocks),
-                CpuClkConfig::Pll => request_cpu_pll_div_out(clocks),
-            }
-            configure_cpu_clk_impl(clocks, old_selector, new_selector);
-            if let Some(old_selector) = old_selector {
-                match old_selector {
-                    CpuClkConfig::Xtal => release_system_pre_div(clocks),
-                    CpuClkConfig::RcFast => release_system_pre_div(clocks),
-                    CpuClkConfig::Pll => release_cpu_pll_div_out(clocks),
-                }
-            }
-        }
-        pub fn cpu_clk_config(clocks: &mut ClockTree) -> Option<CpuClkConfig> {
-            clocks.cpu_clk
-        }
-        fn request_cpu_clk(_clocks: &mut ClockTree) {}
-        fn release_cpu_clk(_clocks: &mut ClockTree) {}
-        pub fn cpu_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.cpu_clk) {
-                CpuClkConfig::Xtal => system_pre_div_frequency(clocks),
-                CpuClkConfig::RcFast => system_pre_div_frequency(clocks),
-                CpuClkConfig::Pll => cpu_pll_div_out_frequency(clocks),
-            }
-        }
-        pub fn request_pll_80m(clocks: &mut ClockTree) {
-            trace!("Requesting PLL_80M");
-            trace!("Enabling PLL_80M");
-            request_cpu_clk(clocks);
-            enable_pll_80m_impl(clocks, true);
-        }
-        pub fn release_pll_80m(clocks: &mut ClockTree) {
-            trace!("Releasing PLL_80M");
-            trace!("Disabling PLL_80M");
-            enable_pll_80m_impl(clocks, false);
-            release_cpu_clk(clocks);
-        }
-        pub fn pll_80m_frequency(clocks: &mut ClockTree) -> u32 {
-            80000000
-        }
-        pub fn request_pll_160m(clocks: &mut ClockTree) {
-            trace!("Requesting PLL_160M");
-            trace!("Enabling PLL_160M");
-            request_cpu_clk(clocks);
-            enable_pll_160m_impl(clocks, true);
-        }
-        pub fn release_pll_160m(clocks: &mut ClockTree) {
-            trace!("Releasing PLL_160M");
-            trace!("Disabling PLL_160M");
-            enable_pll_160m_impl(clocks, false);
-            release_cpu_clk(clocks);
-        }
-        pub fn pll_160m_frequency(clocks: &mut ClockTree) -> u32 {
-            160000000
-        }
-        pub fn configure_rc_fast_clk_div_n(clocks: &mut ClockTree, config: RcFastClkDivNConfig) {
-            clocks.rc_fast_clk_div_n = Some(config);
-            configure_rc_fast_clk_div_n_impl(clocks, config);
-        }
-        pub fn rc_fast_clk_div_n_config(clocks: &mut ClockTree) -> Option<RcFastClkDivNConfig> {
-            clocks.rc_fast_clk_div_n
-        }
-        pub fn request_rc_fast_clk_div_n(clocks: &mut ClockTree) {
-            trace!("Requesting RC_FAST_CLK_DIV_N");
-            trace!("Enabling RC_FAST_CLK_DIV_N");
-            request_rc_fast_clk(clocks);
-            enable_rc_fast_clk_div_n_impl(clocks, true);
-        }
-        pub fn release_rc_fast_clk_div_n(clocks: &mut ClockTree) {
-            trace!("Releasing RC_FAST_CLK_DIV_N");
-            trace!("Disabling RC_FAST_CLK_DIV_N");
-            enable_rc_fast_clk_div_n_impl(clocks, false);
-            release_rc_fast_clk(clocks);
-        }
-        pub fn rc_fast_clk_div_n_frequency(clocks: &mut ClockTree) -> u32 {
-            (rc_fast_clk_frequency(clocks) / (unwrap!(clocks.rc_fast_clk_div_n).divisor() + 1))
-        }
-        pub fn request_xtal_div_clk(clocks: &mut ClockTree) {
-            trace!("Requesting XTAL_DIV_CLK");
-            trace!("Enabling XTAL_DIV_CLK");
-            request_xtal_clk(clocks);
-            enable_xtal_div_clk_impl(clocks, true);
-        }
-        pub fn release_xtal_div_clk(clocks: &mut ClockTree) {
-            trace!("Releasing XTAL_DIV_CLK");
-            trace!("Disabling XTAL_DIV_CLK");
-            enable_xtal_div_clk_impl(clocks, false);
-            release_xtal_clk(clocks);
-        }
-        pub fn xtal_div_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            (xtal_clk_frequency(clocks) / 2)
-        }
-        pub fn configure_rtc_slow_clk(clocks: &mut ClockTree, new_selector: RtcSlowClkConfig) {
-            let old_selector = clocks.rtc_slow_clk.replace(new_selector);
-            match new_selector {
-                RtcSlowClkConfig::Xtal32k => request_xtal32k_clk(clocks),
-                RtcSlowClkConfig::RcSlow => request_rc_slow_clk(clocks),
-                RtcSlowClkConfig::RcFast => request_rc_fast_div_clk(clocks),
-            }
-            configure_rtc_slow_clk_impl(clocks, old_selector, new_selector);
-            if let Some(old_selector) = old_selector {
-                match old_selector {
-                    RtcSlowClkConfig::Xtal32k => release_xtal32k_clk(clocks),
-                    RtcSlowClkConfig::RcSlow => release_rc_slow_clk(clocks),
-                    RtcSlowClkConfig::RcFast => release_rc_fast_div_clk(clocks),
-                }
-            }
-        }
-        pub fn rtc_slow_clk_config(clocks: &mut ClockTree) -> Option<RtcSlowClkConfig> {
-            clocks.rtc_slow_clk
-        }
-        pub fn request_rtc_slow_clk(clocks: &mut ClockTree) {
-            trace!("Requesting RTC_SLOW_CLK");
-            trace!("Enabling RTC_SLOW_CLK");
-            match unwrap!(clocks.rtc_slow_clk) {
-                RtcSlowClkConfig::Xtal32k => request_xtal32k_clk(clocks),
-                RtcSlowClkConfig::RcSlow => request_rc_slow_clk(clocks),
-                RtcSlowClkConfig::RcFast => request_rc_fast_div_clk(clocks),
-            }
-            enable_rtc_slow_clk_impl(clocks, true);
-        }
-        pub fn release_rtc_slow_clk(clocks: &mut ClockTree) {
-            trace!("Releasing RTC_SLOW_CLK");
-            trace!("Disabling RTC_SLOW_CLK");
-            enable_rtc_slow_clk_impl(clocks, false);
-            match unwrap!(clocks.rtc_slow_clk) {
-                RtcSlowClkConfig::Xtal32k => release_xtal32k_clk(clocks),
-                RtcSlowClkConfig::RcSlow => release_rc_slow_clk(clocks),
-                RtcSlowClkConfig::RcFast => release_rc_fast_div_clk(clocks),
-            }
-        }
-        pub fn rtc_slow_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.rtc_slow_clk) {
-                RtcSlowClkConfig::Xtal32k => xtal32k_clk_frequency(clocks),
-                RtcSlowClkConfig::RcSlow => rc_slow_clk_frequency(clocks),
-                RtcSlowClkConfig::RcFast => rc_fast_div_clk_frequency(clocks),
-            }
-        }
-        pub fn configure_rtc_fast_clk(clocks: &mut ClockTree, new_selector: RtcFastClkConfig) {
-            let old_selector = clocks.rtc_fast_clk.replace(new_selector);
-            if clocks.rtc_fast_clk_refcount > 0 {
-                match new_selector {
-                    RtcFastClkConfig::Xtal => request_xtal_div_clk(clocks),
-                    RtcFastClkConfig::Rc => request_rc_fast_clk_div_n(clocks),
-                }
-                configure_rtc_fast_clk_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        RtcFastClkConfig::Xtal => release_xtal_div_clk(clocks),
-                        RtcFastClkConfig::Rc => release_rc_fast_clk_div_n(clocks),
-                    }
-                }
-            } else {
-                configure_rtc_fast_clk_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn rtc_fast_clk_config(clocks: &mut ClockTree) -> Option<RtcFastClkConfig> {
-            clocks.rtc_fast_clk
-        }
-        pub fn request_rtc_fast_clk(clocks: &mut ClockTree) {
-            trace!("Requesting RTC_FAST_CLK");
-            if increment_reference_count(&mut clocks.rtc_fast_clk_refcount) {
-                trace!("Enabling RTC_FAST_CLK");
-                match unwrap!(clocks.rtc_fast_clk) {
-                    RtcFastClkConfig::Xtal => request_xtal_div_clk(clocks),
-                    RtcFastClkConfig::Rc => request_rc_fast_clk_div_n(clocks),
-                }
-                enable_rtc_fast_clk_impl(clocks, true);
-            }
-        }
-        pub fn release_rtc_fast_clk(clocks: &mut ClockTree) {
-            trace!("Releasing RTC_FAST_CLK");
-            if decrement_reference_count(&mut clocks.rtc_fast_clk_refcount) {
-                trace!("Disabling RTC_FAST_CLK");
-                enable_rtc_fast_clk_impl(clocks, false);
-                match unwrap!(clocks.rtc_fast_clk) {
-                    RtcFastClkConfig::Xtal => release_xtal_div_clk(clocks),
-                    RtcFastClkConfig::Rc => release_rc_fast_clk_div_n(clocks),
-                }
-            }
-        }
-        pub fn rtc_fast_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.rtc_fast_clk) {
-                RtcFastClkConfig::Xtal => xtal_div_clk_frequency(clocks),
-                RtcFastClkConfig::Rc => rc_fast_clk_div_n_frequency(clocks),
-            }
-        }
-        pub fn configure_low_power_clk(clocks: &mut ClockTree, new_selector: LowPowerClkConfig) {
-            let old_selector = clocks.low_power_clk.replace(new_selector);
-            if clocks.low_power_clk_refcount > 0 {
-                match new_selector {
-                    LowPowerClkConfig::Xtal => request_xtal_clk(clocks),
-                    LowPowerClkConfig::RcFast => request_rc_fast_clk(clocks),
-                    LowPowerClkConfig::Xtal32k => request_xtal32k_clk(clocks),
-                    LowPowerClkConfig::RtcSlow => request_rtc_slow_clk(clocks),
-                }
-                configure_low_power_clk_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        LowPowerClkConfig::Xtal => release_xtal_clk(clocks),
-                        LowPowerClkConfig::RcFast => release_rc_fast_clk(clocks),
-                        LowPowerClkConfig::Xtal32k => release_xtal32k_clk(clocks),
-                        LowPowerClkConfig::RtcSlow => release_rtc_slow_clk(clocks),
-                    }
-                }
-            } else {
-                configure_low_power_clk_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn low_power_clk_config(clocks: &mut ClockTree) -> Option<LowPowerClkConfig> {
-            clocks.low_power_clk
-        }
-        pub fn request_low_power_clk(clocks: &mut ClockTree) {
-            trace!("Requesting LOW_POWER_CLK");
-            if increment_reference_count(&mut clocks.low_power_clk_refcount) {
-                trace!("Enabling LOW_POWER_CLK");
-                match unwrap!(clocks.low_power_clk) {
-                    LowPowerClkConfig::Xtal => request_xtal_clk(clocks),
-                    LowPowerClkConfig::RcFast => request_rc_fast_clk(clocks),
-                    LowPowerClkConfig::Xtal32k => request_xtal32k_clk(clocks),
-                    LowPowerClkConfig::RtcSlow => request_rtc_slow_clk(clocks),
-                }
-                enable_low_power_clk_impl(clocks, true);
-            }
-        }
-        pub fn release_low_power_clk(clocks: &mut ClockTree) {
-            trace!("Releasing LOW_POWER_CLK");
-            if decrement_reference_count(&mut clocks.low_power_clk_refcount) {
-                trace!("Disabling LOW_POWER_CLK");
-                enable_low_power_clk_impl(clocks, false);
-                match unwrap!(clocks.low_power_clk) {
-                    LowPowerClkConfig::Xtal => release_xtal_clk(clocks),
-                    LowPowerClkConfig::RcFast => release_rc_fast_clk(clocks),
-                    LowPowerClkConfig::Xtal32k => release_xtal32k_clk(clocks),
-                    LowPowerClkConfig::RtcSlow => release_rtc_slow_clk(clocks),
-                }
-            }
-        }
-        pub fn low_power_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.low_power_clk) {
-                LowPowerClkConfig::Xtal => xtal_clk_frequency(clocks),
-                LowPowerClkConfig::RcFast => rc_fast_clk_frequency(clocks),
-                LowPowerClkConfig::Xtal32k => xtal32k_clk_frequency(clocks),
-                LowPowerClkConfig::RtcSlow => rtc_slow_clk_frequency(clocks),
-            }
-        }
-        pub fn request_uart_mem_clk(clocks: &mut ClockTree) {
-            trace!("Requesting UART_MEM_CLK");
-            if increment_reference_count(&mut clocks.uart_mem_clk_refcount) {
-                trace!("Enabling UART_MEM_CLK");
-                request_xtal_clk(clocks);
-                enable_uart_mem_clk_impl(clocks, true);
-            }
-        }
-        pub fn release_uart_mem_clk(clocks: &mut ClockTree) {
-            trace!("Releasing UART_MEM_CLK");
-            if decrement_reference_count(&mut clocks.uart_mem_clk_refcount) {
-                trace!("Disabling UART_MEM_CLK");
-                enable_uart_mem_clk_impl(clocks, false);
-                release_xtal_clk(clocks);
-            }
-        }
-        pub fn uart_mem_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            xtal_clk_frequency(clocks)
-        }
-        pub fn configure_rmt_sclk(clocks: &mut ClockTree, new_selector: RmtSclkConfig) {
-            let old_selector = clocks.rmt_sclk.replace(new_selector);
-            if clocks.rmt_sclk_refcount > 0 {
-                match new_selector {
-                    RmtSclkConfig::ApbClk => request_apb_clk(clocks),
-                    RmtSclkConfig::RcFastClk => request_rc_fast_clk(clocks),
-                    RmtSclkConfig::XtalClk => request_xtal_clk(clocks),
-                }
-                configure_rmt_sclk_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        RmtSclkConfig::ApbClk => release_apb_clk(clocks),
-                        RmtSclkConfig::RcFastClk => release_rc_fast_clk(clocks),
-                        RmtSclkConfig::XtalClk => release_xtal_clk(clocks),
-                    }
-                }
-            } else {
-                configure_rmt_sclk_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn rmt_sclk_config(clocks: &mut ClockTree) -> Option<RmtSclkConfig> {
-            clocks.rmt_sclk
-        }
-        pub fn request_rmt_sclk(clocks: &mut ClockTree) {
-            trace!("Requesting RMT_SCLK");
-            if increment_reference_count(&mut clocks.rmt_sclk_refcount) {
-                trace!("Enabling RMT_SCLK");
-                match unwrap!(clocks.rmt_sclk) {
-                    RmtSclkConfig::ApbClk => request_apb_clk(clocks),
-                    RmtSclkConfig::RcFastClk => request_rc_fast_clk(clocks),
-                    RmtSclkConfig::XtalClk => request_xtal_clk(clocks),
-                }
-                enable_rmt_sclk_impl(clocks, true);
-            }
-        }
-        pub fn release_rmt_sclk(clocks: &mut ClockTree) {
-            trace!("Releasing RMT_SCLK");
-            if decrement_reference_count(&mut clocks.rmt_sclk_refcount) {
-                trace!("Disabling RMT_SCLK");
-                enable_rmt_sclk_impl(clocks, false);
-                match unwrap!(clocks.rmt_sclk) {
-                    RmtSclkConfig::ApbClk => release_apb_clk(clocks),
-                    RmtSclkConfig::RcFastClk => release_rc_fast_clk(clocks),
-                    RmtSclkConfig::XtalClk => release_xtal_clk(clocks),
-                }
-            }
-        }
-        pub fn rmt_sclk_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.rmt_sclk) {
-                RmtSclkConfig::ApbClk => apb_clk_frequency(clocks),
-                RmtSclkConfig::RcFastClk => rc_fast_clk_frequency(clocks),
-                RmtSclkConfig::XtalClk => xtal_clk_frequency(clocks),
-            }
-        }
-        pub fn configure_timg0_function_clock(
-            clocks: &mut ClockTree,
-            new_selector: Timg0FunctionClockConfig,
-        ) {
-            let old_selector = clocks.timg0_function_clock.replace(new_selector);
-            if clocks.timg0_function_clock_refcount > 0 {
-                match new_selector {
-                    Timg0FunctionClockConfig::XtalClk => request_xtal_clk(clocks),
-                    Timg0FunctionClockConfig::ApbClk => request_apb_clk(clocks),
-                }
-                configure_timg0_function_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        Timg0FunctionClockConfig::XtalClk => release_xtal_clk(clocks),
-                        Timg0FunctionClockConfig::ApbClk => release_apb_clk(clocks),
-                    }
-                }
-            } else {
-                configure_timg0_function_clock_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn timg0_function_clock_config(
-            clocks: &mut ClockTree,
-        ) -> Option<Timg0FunctionClockConfig> {
-            clocks.timg0_function_clock
-        }
-        pub fn request_timg0_function_clock(clocks: &mut ClockTree) {
-            trace!("Requesting TIMG0_FUNCTION_CLOCK");
-            if increment_reference_count(&mut clocks.timg0_function_clock_refcount) {
-                trace!("Enabling TIMG0_FUNCTION_CLOCK");
-                match unwrap!(clocks.timg0_function_clock) {
-                    Timg0FunctionClockConfig::XtalClk => request_xtal_clk(clocks),
-                    Timg0FunctionClockConfig::ApbClk => request_apb_clk(clocks),
-                }
-                enable_timg0_function_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_timg0_function_clock(clocks: &mut ClockTree) {
-            trace!("Releasing TIMG0_FUNCTION_CLOCK");
-            if decrement_reference_count(&mut clocks.timg0_function_clock_refcount) {
-                trace!("Disabling TIMG0_FUNCTION_CLOCK");
-                enable_timg0_function_clock_impl(clocks, false);
-                match unwrap!(clocks.timg0_function_clock) {
-                    Timg0FunctionClockConfig::XtalClk => release_xtal_clk(clocks),
-                    Timg0FunctionClockConfig::ApbClk => release_apb_clk(clocks),
-                }
-            }
-        }
-        pub fn timg0_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.timg0_function_clock) {
-                Timg0FunctionClockConfig::XtalClk => xtal_clk_frequency(clocks),
-                Timg0FunctionClockConfig::ApbClk => apb_clk_frequency(clocks),
-            }
-        }
-        pub fn configure_timg0_calibration_clock(
-            clocks: &mut ClockTree,
-            new_selector: Timg0CalibrationClockConfig,
-        ) {
-            let old_selector = clocks.timg0_calibration_clock.replace(new_selector);
-            if clocks.timg0_calibration_clock_refcount > 0 {
-                match new_selector {
-                    Timg0CalibrationClockConfig::RcSlowClk => request_rc_slow_clk(clocks),
-                    Timg0CalibrationClockConfig::RcFastDivClk => request_rc_fast_div_clk(clocks),
-                    Timg0CalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
-                }
-                configure_timg0_calibration_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        Timg0CalibrationClockConfig::RcSlowClk => release_rc_slow_clk(clocks),
-                        Timg0CalibrationClockConfig::RcFastDivClk => {
-                            release_rc_fast_div_clk(clocks)
-                        }
-                        Timg0CalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
-                    }
-                }
-            } else {
-                configure_timg0_calibration_clock_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn timg0_calibration_clock_config(
-            clocks: &mut ClockTree,
-        ) -> Option<Timg0CalibrationClockConfig> {
-            clocks.timg0_calibration_clock
-        }
-        pub fn request_timg0_calibration_clock(clocks: &mut ClockTree) {
-            trace!("Requesting TIMG0_CALIBRATION_CLOCK");
-            if increment_reference_count(&mut clocks.timg0_calibration_clock_refcount) {
-                trace!("Enabling TIMG0_CALIBRATION_CLOCK");
-                match unwrap!(clocks.timg0_calibration_clock) {
-                    Timg0CalibrationClockConfig::RcSlowClk => request_rc_slow_clk(clocks),
-                    Timg0CalibrationClockConfig::RcFastDivClk => request_rc_fast_div_clk(clocks),
-                    Timg0CalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
-                }
-                enable_timg0_calibration_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_timg0_calibration_clock(clocks: &mut ClockTree) {
-            trace!("Releasing TIMG0_CALIBRATION_CLOCK");
-            if decrement_reference_count(&mut clocks.timg0_calibration_clock_refcount) {
-                trace!("Disabling TIMG0_CALIBRATION_CLOCK");
-                enable_timg0_calibration_clock_impl(clocks, false);
-                match unwrap!(clocks.timg0_calibration_clock) {
-                    Timg0CalibrationClockConfig::RcSlowClk => release_rc_slow_clk(clocks),
-                    Timg0CalibrationClockConfig::RcFastDivClk => release_rc_fast_div_clk(clocks),
-                    Timg0CalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
-                }
-            }
-        }
-        pub fn timg0_calibration_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.timg0_calibration_clock) {
-                Timg0CalibrationClockConfig::RcSlowClk => rc_slow_clk_frequency(clocks),
-                Timg0CalibrationClockConfig::RcFastDivClk => rc_fast_div_clk_frequency(clocks),
-                Timg0CalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(clocks),
-            }
-        }
-        pub fn configure_timg0_wdt_clock(
-            clocks: &mut ClockTree,
-            new_selector: Timg0WdtClockConfig,
-        ) {
-            let old_selector = clocks.timg0_wdt_clock.replace(new_selector);
-            if clocks.timg0_wdt_clock_refcount > 0 {
-                match new_selector {
-                    Timg0WdtClockConfig::ApbClk => request_apb_clk(clocks),
-                    Timg0WdtClockConfig::XtalClk => request_xtal_clk(clocks),
-                }
-                configure_timg0_wdt_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        Timg0WdtClockConfig::ApbClk => release_apb_clk(clocks),
-                        Timg0WdtClockConfig::XtalClk => release_xtal_clk(clocks),
-                    }
-                }
-            } else {
-                configure_timg0_wdt_clock_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn timg0_wdt_clock_config(clocks: &mut ClockTree) -> Option<Timg0WdtClockConfig> {
-            clocks.timg0_wdt_clock
-        }
-        pub fn request_timg0_wdt_clock(clocks: &mut ClockTree) {
-            trace!("Requesting TIMG0_WDT_CLOCK");
-            if increment_reference_count(&mut clocks.timg0_wdt_clock_refcount) {
-                trace!("Enabling TIMG0_WDT_CLOCK");
-                match unwrap!(clocks.timg0_wdt_clock) {
-                    Timg0WdtClockConfig::ApbClk => request_apb_clk(clocks),
-                    Timg0WdtClockConfig::XtalClk => request_xtal_clk(clocks),
-                }
-                enable_timg0_wdt_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_timg0_wdt_clock(clocks: &mut ClockTree) {
-            trace!("Releasing TIMG0_WDT_CLOCK");
-            if decrement_reference_count(&mut clocks.timg0_wdt_clock_refcount) {
-                trace!("Disabling TIMG0_WDT_CLOCK");
-                enable_timg0_wdt_clock_impl(clocks, false);
-                match unwrap!(clocks.timg0_wdt_clock) {
-                    Timg0WdtClockConfig::ApbClk => release_apb_clk(clocks),
-                    Timg0WdtClockConfig::XtalClk => release_xtal_clk(clocks),
-                }
-            }
-        }
-        pub fn timg0_wdt_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.timg0_wdt_clock) {
-                Timg0WdtClockConfig::ApbClk => apb_clk_frequency(clocks),
-                Timg0WdtClockConfig::XtalClk => xtal_clk_frequency(clocks),
-            }
-        }
-        pub fn configure_timg1_function_clock(
-            clocks: &mut ClockTree,
-            new_selector: Timg0FunctionClockConfig,
-        ) {
-            let old_selector = clocks.timg1_function_clock.replace(new_selector);
-            if clocks.timg1_function_clock_refcount > 0 {
-                match new_selector {
-                    Timg0FunctionClockConfig::XtalClk => request_xtal_clk(clocks),
-                    Timg0FunctionClockConfig::ApbClk => request_apb_clk(clocks),
-                }
-                configure_timg1_function_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        Timg0FunctionClockConfig::XtalClk => release_xtal_clk(clocks),
-                        Timg0FunctionClockConfig::ApbClk => release_apb_clk(clocks),
-                    }
-                }
-            } else {
-                configure_timg1_function_clock_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn timg1_function_clock_config(
-            clocks: &mut ClockTree,
-        ) -> Option<Timg0FunctionClockConfig> {
-            clocks.timg1_function_clock
-        }
-        pub fn request_timg1_function_clock(clocks: &mut ClockTree) {
-            trace!("Requesting TIMG1_FUNCTION_CLOCK");
-            if increment_reference_count(&mut clocks.timg1_function_clock_refcount) {
-                trace!("Enabling TIMG1_FUNCTION_CLOCK");
-                match unwrap!(clocks.timg1_function_clock) {
-                    Timg0FunctionClockConfig::XtalClk => request_xtal_clk(clocks),
-                    Timg0FunctionClockConfig::ApbClk => request_apb_clk(clocks),
-                }
-                enable_timg1_function_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_timg1_function_clock(clocks: &mut ClockTree) {
-            trace!("Releasing TIMG1_FUNCTION_CLOCK");
-            if decrement_reference_count(&mut clocks.timg1_function_clock_refcount) {
-                trace!("Disabling TIMG1_FUNCTION_CLOCK");
-                enable_timg1_function_clock_impl(clocks, false);
-                match unwrap!(clocks.timg1_function_clock) {
-                    Timg0FunctionClockConfig::XtalClk => release_xtal_clk(clocks),
-                    Timg0FunctionClockConfig::ApbClk => release_apb_clk(clocks),
-                }
-            }
-        }
-        pub fn timg1_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.timg1_function_clock) {
-                Timg0FunctionClockConfig::XtalClk => xtal_clk_frequency(clocks),
-                Timg0FunctionClockConfig::ApbClk => apb_clk_frequency(clocks),
-            }
-        }
-        pub fn configure_timg1_calibration_clock(
-            clocks: &mut ClockTree,
-            new_selector: Timg0CalibrationClockConfig,
-        ) {
-            let old_selector = clocks.timg1_calibration_clock.replace(new_selector);
-            if clocks.timg1_calibration_clock_refcount > 0 {
-                match new_selector {
-                    Timg0CalibrationClockConfig::RcSlowClk => request_rc_slow_clk(clocks),
-                    Timg0CalibrationClockConfig::RcFastDivClk => request_rc_fast_div_clk(clocks),
-                    Timg0CalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
-                }
-                configure_timg1_calibration_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        Timg0CalibrationClockConfig::RcSlowClk => release_rc_slow_clk(clocks),
-                        Timg0CalibrationClockConfig::RcFastDivClk => {
-                            release_rc_fast_div_clk(clocks)
-                        }
-                        Timg0CalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
-                    }
-                }
-            } else {
-                configure_timg1_calibration_clock_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn timg1_calibration_clock_config(
-            clocks: &mut ClockTree,
-        ) -> Option<Timg0CalibrationClockConfig> {
-            clocks.timg1_calibration_clock
-        }
-        pub fn request_timg1_calibration_clock(clocks: &mut ClockTree) {
-            trace!("Requesting TIMG1_CALIBRATION_CLOCK");
-            if increment_reference_count(&mut clocks.timg1_calibration_clock_refcount) {
-                trace!("Enabling TIMG1_CALIBRATION_CLOCK");
-                match unwrap!(clocks.timg1_calibration_clock) {
-                    Timg0CalibrationClockConfig::RcSlowClk => request_rc_slow_clk(clocks),
-                    Timg0CalibrationClockConfig::RcFastDivClk => request_rc_fast_div_clk(clocks),
-                    Timg0CalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
-                }
-                enable_timg1_calibration_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_timg1_calibration_clock(clocks: &mut ClockTree) {
-            trace!("Releasing TIMG1_CALIBRATION_CLOCK");
-            if decrement_reference_count(&mut clocks.timg1_calibration_clock_refcount) {
-                trace!("Disabling TIMG1_CALIBRATION_CLOCK");
-                enable_timg1_calibration_clock_impl(clocks, false);
-                match unwrap!(clocks.timg1_calibration_clock) {
-                    Timg0CalibrationClockConfig::RcSlowClk => release_rc_slow_clk(clocks),
-                    Timg0CalibrationClockConfig::RcFastDivClk => release_rc_fast_div_clk(clocks),
-                    Timg0CalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
-                }
-            }
-        }
-        pub fn timg1_calibration_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.timg1_calibration_clock) {
-                Timg0CalibrationClockConfig::RcSlowClk => rc_slow_clk_frequency(clocks),
-                Timg0CalibrationClockConfig::RcFastDivClk => rc_fast_div_clk_frequency(clocks),
-                Timg0CalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(clocks),
-            }
-        }
-        pub fn configure_timg1_wdt_clock(
-            clocks: &mut ClockTree,
-            new_selector: Timg0WdtClockConfig,
-        ) {
-            let old_selector = clocks.timg1_wdt_clock.replace(new_selector);
-            if clocks.timg1_wdt_clock_refcount > 0 {
-                match new_selector {
-                    Timg0WdtClockConfig::ApbClk => request_apb_clk(clocks),
-                    Timg0WdtClockConfig::XtalClk => request_xtal_clk(clocks),
-                }
-                configure_timg1_wdt_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        Timg0WdtClockConfig::ApbClk => release_apb_clk(clocks),
-                        Timg0WdtClockConfig::XtalClk => release_xtal_clk(clocks),
-                    }
-                }
-            } else {
-                configure_timg1_wdt_clock_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn timg1_wdt_clock_config(clocks: &mut ClockTree) -> Option<Timg0WdtClockConfig> {
-            clocks.timg1_wdt_clock
-        }
-        pub fn request_timg1_wdt_clock(clocks: &mut ClockTree) {
-            trace!("Requesting TIMG1_WDT_CLOCK");
-            if increment_reference_count(&mut clocks.timg1_wdt_clock_refcount) {
-                trace!("Enabling TIMG1_WDT_CLOCK");
-                match unwrap!(clocks.timg1_wdt_clock) {
-                    Timg0WdtClockConfig::ApbClk => request_apb_clk(clocks),
-                    Timg0WdtClockConfig::XtalClk => request_xtal_clk(clocks),
-                }
-                enable_timg1_wdt_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_timg1_wdt_clock(clocks: &mut ClockTree) {
-            trace!("Releasing TIMG1_WDT_CLOCK");
-            if decrement_reference_count(&mut clocks.timg1_wdt_clock_refcount) {
-                trace!("Disabling TIMG1_WDT_CLOCK");
-                enable_timg1_wdt_clock_impl(clocks, false);
-                match unwrap!(clocks.timg1_wdt_clock) {
-                    Timg0WdtClockConfig::ApbClk => release_apb_clk(clocks),
-                    Timg0WdtClockConfig::XtalClk => release_xtal_clk(clocks),
-                }
-            }
-        }
-        pub fn timg1_wdt_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.timg1_wdt_clock) {
-                Timg0WdtClockConfig::ApbClk => apb_clk_frequency(clocks),
-                Timg0WdtClockConfig::XtalClk => xtal_clk_frequency(clocks),
-            }
-        }
-        pub fn configure_uart0_function_clock(
-            clocks: &mut ClockTree,
-            new_selector: Uart0FunctionClockConfig,
-        ) {
-            let old_selector = clocks.uart0_function_clock.replace(new_selector);
-            if clocks.uart0_function_clock_refcount > 0 {
-                match new_selector {
-                    Uart0FunctionClockConfig::Apb => request_apb_clk(clocks),
-                    Uart0FunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
-                    Uart0FunctionClockConfig::Xtal => request_xtal_clk(clocks),
-                }
-                configure_uart0_function_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        Uart0FunctionClockConfig::Apb => release_apb_clk(clocks),
-                        Uart0FunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
-                        Uart0FunctionClockConfig::Xtal => release_xtal_clk(clocks),
-                    }
-                }
-            } else {
-                configure_uart0_function_clock_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn uart0_function_clock_config(
-            clocks: &mut ClockTree,
-        ) -> Option<Uart0FunctionClockConfig> {
-            clocks.uart0_function_clock
-        }
-        pub fn request_uart0_function_clock(clocks: &mut ClockTree) {
-            trace!("Requesting UART0_FUNCTION_CLOCK");
-            if increment_reference_count(&mut clocks.uart0_function_clock_refcount) {
-                trace!("Enabling UART0_FUNCTION_CLOCK");
-                match unwrap!(clocks.uart0_function_clock) {
-                    Uart0FunctionClockConfig::Apb => request_apb_clk(clocks),
-                    Uart0FunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
-                    Uart0FunctionClockConfig::Xtal => request_xtal_clk(clocks),
-                }
-                enable_uart0_function_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_uart0_function_clock(clocks: &mut ClockTree) {
-            trace!("Releasing UART0_FUNCTION_CLOCK");
-            if decrement_reference_count(&mut clocks.uart0_function_clock_refcount) {
-                trace!("Disabling UART0_FUNCTION_CLOCK");
-                enable_uart0_function_clock_impl(clocks, false);
-                match unwrap!(clocks.uart0_function_clock) {
-                    Uart0FunctionClockConfig::Apb => release_apb_clk(clocks),
-                    Uart0FunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
-                    Uart0FunctionClockConfig::Xtal => release_xtal_clk(clocks),
-                }
-            }
-        }
-        pub fn uart0_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.uart0_function_clock) {
-                Uart0FunctionClockConfig::Apb => apb_clk_frequency(clocks),
-                Uart0FunctionClockConfig::RcFast => rc_fast_clk_frequency(clocks),
-                Uart0FunctionClockConfig::Xtal => xtal_clk_frequency(clocks),
-            }
-        }
-        pub fn configure_uart0_mem_clock(
-            clocks: &mut ClockTree,
-            new_selector: Uart0MemClockConfig,
-        ) {
-            let old_selector = clocks.uart0_mem_clock.replace(new_selector);
-            if clocks.uart0_mem_clock_refcount > 0 {
-                request_uart_mem_clk(clocks);
-                configure_uart0_mem_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    release_uart_mem_clk(clocks);
-                }
-            } else {
-                configure_uart0_mem_clock_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn uart0_mem_clock_config(clocks: &mut ClockTree) -> Option<Uart0MemClockConfig> {
-            clocks.uart0_mem_clock
-        }
-        pub fn request_uart0_mem_clock(clocks: &mut ClockTree) {
-            trace!("Requesting UART0_MEM_CLOCK");
-            if increment_reference_count(&mut clocks.uart0_mem_clock_refcount) {
-                trace!("Enabling UART0_MEM_CLOCK");
-                request_uart_mem_clk(clocks);
-                enable_uart0_mem_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_uart0_mem_clock(clocks: &mut ClockTree) {
-            trace!("Releasing UART0_MEM_CLOCK");
-            if decrement_reference_count(&mut clocks.uart0_mem_clock_refcount) {
-                trace!("Disabling UART0_MEM_CLOCK");
-                enable_uart0_mem_clock_impl(clocks, false);
-                release_uart_mem_clk(clocks);
-            }
-        }
-        pub fn uart0_mem_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            uart_mem_clk_frequency(clocks)
-        }
-        pub fn configure_uart1_function_clock(
-            clocks: &mut ClockTree,
-            new_selector: Uart0FunctionClockConfig,
-        ) {
-            let old_selector = clocks.uart1_function_clock.replace(new_selector);
-            if clocks.uart1_function_clock_refcount > 0 {
-                match new_selector {
-                    Uart0FunctionClockConfig::Apb => request_apb_clk(clocks),
-                    Uart0FunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
-                    Uart0FunctionClockConfig::Xtal => request_xtal_clk(clocks),
-                }
-                configure_uart1_function_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        Uart0FunctionClockConfig::Apb => release_apb_clk(clocks),
-                        Uart0FunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
-                        Uart0FunctionClockConfig::Xtal => release_xtal_clk(clocks),
-                    }
-                }
-            } else {
-                configure_uart1_function_clock_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn uart1_function_clock_config(
-            clocks: &mut ClockTree,
-        ) -> Option<Uart0FunctionClockConfig> {
-            clocks.uart1_function_clock
-        }
-        pub fn request_uart1_function_clock(clocks: &mut ClockTree) {
-            trace!("Requesting UART1_FUNCTION_CLOCK");
-            if increment_reference_count(&mut clocks.uart1_function_clock_refcount) {
-                trace!("Enabling UART1_FUNCTION_CLOCK");
-                match unwrap!(clocks.uart1_function_clock) {
-                    Uart0FunctionClockConfig::Apb => request_apb_clk(clocks),
-                    Uart0FunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
-                    Uart0FunctionClockConfig::Xtal => request_xtal_clk(clocks),
-                }
-                enable_uart1_function_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_uart1_function_clock(clocks: &mut ClockTree) {
-            trace!("Releasing UART1_FUNCTION_CLOCK");
-            if decrement_reference_count(&mut clocks.uart1_function_clock_refcount) {
-                trace!("Disabling UART1_FUNCTION_CLOCK");
-                enable_uart1_function_clock_impl(clocks, false);
-                match unwrap!(clocks.uart1_function_clock) {
-                    Uart0FunctionClockConfig::Apb => release_apb_clk(clocks),
-                    Uart0FunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
-                    Uart0FunctionClockConfig::Xtal => release_xtal_clk(clocks),
-                }
-            }
-        }
-        pub fn uart1_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.uart1_function_clock) {
-                Uart0FunctionClockConfig::Apb => apb_clk_frequency(clocks),
-                Uart0FunctionClockConfig::RcFast => rc_fast_clk_frequency(clocks),
-                Uart0FunctionClockConfig::Xtal => xtal_clk_frequency(clocks),
-            }
-        }
-        pub fn configure_uart1_mem_clock(
-            clocks: &mut ClockTree,
-            new_selector: Uart0MemClockConfig,
-        ) {
-            let old_selector = clocks.uart1_mem_clock.replace(new_selector);
-            if clocks.uart1_mem_clock_refcount > 0 {
-                request_uart_mem_clk(clocks);
-                configure_uart1_mem_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    release_uart_mem_clk(clocks);
-                }
-            } else {
-                configure_uart1_mem_clock_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn uart1_mem_clock_config(clocks: &mut ClockTree) -> Option<Uart0MemClockConfig> {
-            clocks.uart1_mem_clock
-        }
-        pub fn request_uart1_mem_clock(clocks: &mut ClockTree) {
-            trace!("Requesting UART1_MEM_CLOCK");
-            if increment_reference_count(&mut clocks.uart1_mem_clock_refcount) {
-                trace!("Enabling UART1_MEM_CLOCK");
-                request_uart_mem_clk(clocks);
-                enable_uart1_mem_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_uart1_mem_clock(clocks: &mut ClockTree) {
-            trace!("Releasing UART1_MEM_CLOCK");
-            if decrement_reference_count(&mut clocks.uart1_mem_clock_refcount) {
-                trace!("Disabling UART1_MEM_CLOCK");
-                enable_uart1_mem_clock_impl(clocks, false);
-                release_uart_mem_clk(clocks);
-            }
-        }
-        pub fn uart1_mem_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            uart_mem_clk_frequency(clocks)
-        }
-        /// Clock tree configuration.
-        ///
-        /// The fields of this struct are optional, with the following caveats:
-        /// - If `XTAL_CLK` is not specified, the crystal frequency will be automatically detected
-        ///   if possible.
-        /// - The CPU and its upstream clock nodes will be set to a default configuration.
-        /// - Other unspecified clock sources will not be useable by peripherals.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        #[instability::unstable]
-        pub struct ClockConfig {
-            /// `XTAL_CLK` configuration.
-            pub xtal_clk: Option<XtalClkConfig>,
-            /// `PLL_CLK` configuration.
-            pub pll_clk: Option<PllClkConfig>,
-            /// `SYSTEM_PRE_DIV` configuration.
-            pub system_pre_div: Option<SystemPreDivConfig>,
-            /// `CPU_PLL_DIV_OUT` configuration.
-            pub cpu_pll_div_out: Option<CpuPllDivOutConfig>,
-            /// `CPU_CLK` configuration.
-            pub cpu_clk: Option<CpuClkConfig>,
-            /// `RC_FAST_CLK_DIV_N` configuration.
-            pub rc_fast_clk_div_n: Option<RcFastClkDivNConfig>,
-            /// `RTC_SLOW_CLK` configuration.
-            pub rtc_slow_clk: Option<RtcSlowClkConfig>,
-            /// `RTC_FAST_CLK` configuration.
-            pub rtc_fast_clk: Option<RtcFastClkConfig>,
-            /// `LOW_POWER_CLK` configuration.
-            pub low_power_clk: Option<LowPowerClkConfig>,
-        }
-        impl ClockConfig {
-            fn apply(&self) {
-                ClockTree::with(|clocks| {
-                    if let Some(config) = self.xtal_clk {
-                        configure_xtal_clk(clocks, config);
-                    }
-                    if let Some(config) = self.pll_clk {
-                        configure_pll_clk(clocks, config);
-                    }
-                    if let Some(config) = self.system_pre_div {
-                        configure_system_pre_div(clocks, config);
-                    }
-                    if let Some(config) = self.cpu_pll_div_out {
-                        configure_cpu_pll_div_out(clocks, config);
-                    }
-                    if let Some(config) = self.cpu_clk {
-                        configure_cpu_clk(clocks, config);
-                    }
-                    if let Some(config) = self.rc_fast_clk_div_n {
-                        configure_rc_fast_clk_div_n(clocks, config);
-                    }
-                    if let Some(config) = self.rtc_slow_clk {
-                        configure_rtc_slow_clk(clocks, config);
-                    }
-                    if let Some(config) = self.rtc_fast_clk {
-                        configure_rtc_fast_clk(clocks, config);
-                    }
-                    if let Some(config) = self.low_power_clk {
-                        configure_low_power_clk(clocks, config);
-                    }
-                });
-            }
-        }
-        fn increment_reference_count(refcount: &mut u32) -> bool {
-            let first = *refcount == 0;
-            *refcount = unwrap!(refcount.checked_add(1), "Reference count overflow");
-            first
-        }
-        fn decrement_reference_count(refcount: &mut u32) -> bool {
-            *refcount = refcount.saturating_sub(1);
-            let last = *refcount == 0;
-            last
-        }
+        #[doc = " Selects the output frequency of `XTAL_CLK`."] #[derive(Debug, Clone,
+        Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum XtalClkConfig { #[doc = " 40 MHz"] _40, } impl XtalClkConfig { pub fn
+        value(& self) -> u32 { match self { XtalClkConfig::_40 => 40000000, } } } #[doc =
+        " Selects the output frequency of `PLL_CLK`. Depends on `XTAL_CLK`."]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature = "defmt",
+        derive(defmt::Format))] pub enum PllClkConfig { #[doc = " 320 MHz"] _320, #[doc =
+        " 480 MHz"] _480, } impl PllClkConfig { pub fn value(& self) -> u32 { match self
+        { PllClkConfig::_320 => 320000000, PllClkConfig::_480 => 480000000, } } } #[doc =
+        " The list of clock signals that the `SYSTEM_PRE_DIV_IN` multiplexer can output."]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature = "defmt",
+        derive(defmt::Format))] pub enum SystemPreDivInConfig { #[doc =
+        " Selects `XTAL_CLK`."] Xtal, #[doc = " Selects `RC_FAST_CLK`."] RcFast, } #[doc
+        = " Configures the `SYSTEM_PRE_DIV` clock divider."] #[doc = ""] #[doc =
+        " The output is calculated as `OUTPUT = SYSTEM_PRE_DIV_IN / (divisor + 1)`."]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature = "defmt",
+        derive(defmt::Format))] pub struct SystemPreDivConfig { divisor : u32 } impl
+        SystemPreDivConfig { #[doc = r" Creates a new divider configuration."] #[doc =
+        "## Panics"] #[doc = ""] #[doc = "Panics if the divisor value is outside the"]
+        #[doc = "valid range (0 ..= 1023)."] pub const fn new(divisor : u32) -> Self {
+        ::core::assert!(divisor <= 1023u32,
+        "`SYSTEM_PRE_DIV` divisor value must be between 0 and 1023 (inclusive)."); Self {
+        divisor } } fn divisor(self) -> u32 { self.divisor } fn value(self) -> u32 { self
+        .divisor() } } #[doc =
+        " Selects the output frequency of `CPU_PLL_DIV_OUT`. Depends on `PLL_CLK`."]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature = "defmt",
+        derive(defmt::Format))] pub enum CpuPllDivOutConfig { #[doc = " 80 MHz"] _80,
+        #[doc = " 160 MHz"] _160, } impl CpuPllDivOutConfig { pub fn value(& self) -> u32
+        { match self { CpuPllDivOutConfig::_80 => 80000000, CpuPllDivOutConfig::_160 =>
+        160000000, } } } #[doc =
+        " The list of clock signals that the `APB_CLK` multiplexer can output."]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature = "defmt",
+        derive(defmt::Format))] pub enum ApbClkConfig { #[doc = " Selects `PLL_80M`."]
+        Pll80m, #[doc = " Selects `CPU_CLK`."] Cpu, } #[doc =
+        " The list of clock signals that the `CRYPTO_CLK` multiplexer can output."]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature = "defmt",
+        derive(defmt::Format))] pub enum CryptoClkConfig { #[doc =
+        " Selects `PLL_160M`."] Pll160m, #[doc = " Selects `CPU_CLK`."] Cpu, } #[doc =
+        " The list of clock signals that the `CPU_CLK` multiplexer can output."]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature = "defmt",
+        derive(defmt::Format))] pub enum CpuClkConfig { #[doc =
+        " Selects `SYSTEM_PRE_DIV`."] Xtal, #[doc = " Selects `SYSTEM_PRE_DIV`."] RcFast,
+        #[doc = " Selects `CPU_PLL_DIV_OUT`."] Pll, } #[doc =
+        " Configures the `RC_FAST_CLK_DIV_N` clock divider."] #[doc = ""] #[doc =
+        " The output is calculated as `OUTPUT = RC_FAST_CLK / (divisor + 1)`."]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature = "defmt",
+        derive(defmt::Format))] pub struct RcFastClkDivNConfig { divisor : u32 } impl
+        RcFastClkDivNConfig { #[doc = r" Creates a new divider configuration."] #[doc =
+        "## Panics"] #[doc = ""] #[doc = "Panics if the divisor value is outside the"]
+        #[doc = "valid range (0 ..= 3)."] pub const fn new(divisor : u32) -> Self {
+        ::core::assert!(divisor <= 3u32,
+        "`RC_FAST_CLK_DIV_N` divisor value must be between 0 and 3 (inclusive)."); Self {
+        divisor } } fn divisor(self) -> u32 { self.divisor } fn value(self) -> u32 { self
+        .divisor() } } #[doc =
+        " The list of clock signals that the `RTC_SLOW_CLK` multiplexer can output."]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature = "defmt",
+        derive(defmt::Format))] pub enum RtcSlowClkConfig { #[doc =
+        " Selects `XTAL32K_CLK`."] Xtal32k, #[doc = " Selects `RC_SLOW_CLK`."] RcSlow,
+        #[doc = " Selects `RC_FAST_DIV_CLK`."] RcFast, } #[doc =
+        " The list of clock signals that the `RTC_FAST_CLK` multiplexer can output."]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature = "defmt",
+        derive(defmt::Format))] pub enum RtcFastClkConfig { #[doc =
+        " Selects `XTAL_DIV_CLK`."] Xtal, #[doc = " Selects `RC_FAST_CLK_DIV_N`."] Rc, }
+        #[doc =
+        " The list of clock signals that the `LOW_POWER_CLK` multiplexer can output."]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature = "defmt",
+        derive(defmt::Format))] pub enum LowPowerClkConfig { #[doc =
+        " Selects `XTAL_CLK`."] Xtal, #[doc = " Selects `RC_FAST_CLK`."] RcFast, #[doc =
+        " Selects `XTAL32K_CLK`."] Xtal32k, #[doc = " Selects `RTC_SLOW_CLK`."] RtcSlow,
+        } #[doc =
+        " The list of clock signals that the `RMT_SCLK` multiplexer can output."]
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature =
+        "defmt", derive(defmt::Format))] pub enum RmtSclkConfig { #[default] #[doc =
+        " Selects `APB_CLK`."] ApbClk, #[doc = " Selects `RC_FAST_CLK`."] RcFastClk,
+        #[doc = " Selects `XTAL_CLK`."] XtalClk, } #[doc =
+        " The list of clock signals that the `TIMG0_FUNCTION_CLOCK` multiplexer can output."]
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature =
+        "defmt", derive(defmt::Format))] pub enum Timg0FunctionClockConfig { #[default]
+        #[doc = " Selects `XTAL_CLK`."] XtalClk, #[doc = " Selects `APB_CLK`."] ApbClk, }
+        #[doc =
+        " The list of clock signals that the `TIMG0_CALIBRATION_CLOCK` multiplexer can output."]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature = "defmt",
+        derive(defmt::Format))] pub enum Timg0CalibrationClockConfig { #[doc =
+        " Selects `RC_SLOW_CLK`."] RcSlowClk, #[doc = " Selects `RC_FAST_DIV_CLK`."]
+        RcFastDivClk, #[doc = " Selects `XTAL32K_CLK`."] Xtal32kClk, } #[doc =
+        " The list of clock signals that the `TIMG0_WDT_CLOCK` multiplexer can output."]
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature =
+        "defmt", derive(defmt::Format))] pub enum Timg0WdtClockConfig { #[default] #[doc
+        = " Selects `APB_CLK`."] ApbClk, #[doc = " Selects `XTAL_CLK`."] XtalClk, } #[doc
+        =
+        " The list of clock signals that the `UART0_FUNCTION_CLOCK` multiplexer can output."]
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature =
+        "defmt", derive(defmt::Format))] pub enum Uart0FunctionClockConfig { #[doc =
+        " Selects `APB_CLK`."] Apb, #[doc = " Selects `RC_FAST_CLK`."] RcFast, #[default]
+        #[doc = " Selects `XTAL_CLK`."] Xtal, } #[doc =
+        " The list of clock signals that the `UART0_MEM_CLOCK` multiplexer can output."]
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)] #[cfg_attr(feature =
+        "defmt", derive(defmt::Format))] pub enum Uart0MemClockConfig { #[default] #[doc
+        = " Selects `UART_MEM_CLK`."] Mem, } #[doc =
+        r" Represents the device's clock tree."] pub struct ClockTree { xtal_clk : Option
+        < XtalClkConfig >, pll_clk : Option < PllClkConfig >, system_pre_div_in : Option
+        < SystemPreDivInConfig >, system_pre_div : Option < SystemPreDivConfig >,
+        cpu_pll_div_out : Option < CpuPllDivOutConfig >, apb_clk : Option < ApbClkConfig
+        >, crypto_clk : Option < CryptoClkConfig >, cpu_clk : Option < CpuClkConfig >,
+        rc_fast_clk_div_n : Option < RcFastClkDivNConfig >, rtc_slow_clk : Option <
+        RtcSlowClkConfig >, rtc_fast_clk : Option < RtcFastClkConfig >, low_power_clk :
+        Option < LowPowerClkConfig >, rmt_sclk : Option < RmtSclkConfig >,
+        timg0_function_clock : Option < Timg0FunctionClockConfig >,
+        timg0_calibration_clock : Option < Timg0CalibrationClockConfig >, timg0_wdt_clock
+        : Option < Timg0WdtClockConfig >, timg1_function_clock : Option <
+        Timg0FunctionClockConfig >, timg1_calibration_clock : Option <
+        Timg0CalibrationClockConfig >, timg1_wdt_clock : Option < Timg0WdtClockConfig >,
+        uart0_function_clock : Option < Uart0FunctionClockConfig >, uart0_mem_clock :
+        Option < Uart0MemClockConfig >, uart1_function_clock : Option <
+        Uart0FunctionClockConfig >, uart1_mem_clock : Option < Uart0MemClockConfig >,
+        rc_fast_clk_refcount : u32, xtal32k_clk_refcount : u32, rc_slow_clk_refcount :
+        u32, rc_fast_div_clk_refcount : u32, apb_clk_refcount : u32, crypto_clk_refcount
+        : u32, rtc_fast_clk_refcount : u32, low_power_clk_refcount : u32,
+        uart_mem_clk_refcount : u32, rmt_sclk_refcount : u32,
+        timg0_function_clock_refcount : u32, timg0_calibration_clock_refcount : u32,
+        timg0_wdt_clock_refcount : u32, timg1_function_clock_refcount : u32,
+        timg1_calibration_clock_refcount : u32, timg1_wdt_clock_refcount : u32,
+        uart0_function_clock_refcount : u32, uart0_mem_clock_refcount : u32,
+        uart1_function_clock_refcount : u32, uart1_mem_clock_refcount : u32, } impl
+        ClockTree { #[doc = r" Locks the clock tree for exclusive access."] pub fn with <
+        R > (f : impl FnOnce(& mut ClockTree) -> R) -> R { CLOCK_TREE.with(f) } #[doc =
+        "Returns the current configuration of the XTAL_CLK clock tree node"] pub fn
+        xtal_clk(& self) -> Option < XtalClkConfig > { self.xtal_clk } #[doc =
+        "Returns the current configuration of the PLL_CLK clock tree node"] pub fn
+        pll_clk(& self) -> Option < PllClkConfig > { self.pll_clk } #[doc =
+        "Returns the current configuration of the SYSTEM_PRE_DIV_IN clock tree node"] pub
+        fn system_pre_div_in(& self) -> Option < SystemPreDivInConfig > { self
+        .system_pre_div_in } #[doc =
+        "Returns the current configuration of the SYSTEM_PRE_DIV clock tree node"] pub fn
+        system_pre_div(& self) -> Option < SystemPreDivConfig > { self.system_pre_div }
+        #[doc =
+        "Returns the current configuration of the CPU_PLL_DIV_OUT clock tree node"] pub
+        fn cpu_pll_div_out(& self) -> Option < CpuPllDivOutConfig > { self
+        .cpu_pll_div_out } #[doc =
+        "Returns the current configuration of the APB_CLK clock tree node"] pub fn
+        apb_clk(& self) -> Option < ApbClkConfig > { self.apb_clk } #[doc =
+        "Returns the current configuration of the CRYPTO_CLK clock tree node"] pub fn
+        crypto_clk(& self) -> Option < CryptoClkConfig > { self.crypto_clk } #[doc =
+        "Returns the current configuration of the CPU_CLK clock tree node"] pub fn
+        cpu_clk(& self) -> Option < CpuClkConfig > { self.cpu_clk } #[doc =
+        "Returns the current configuration of the RC_FAST_CLK_DIV_N clock tree node"] pub
+        fn rc_fast_clk_div_n(& self) -> Option < RcFastClkDivNConfig > { self
+        .rc_fast_clk_div_n } #[doc =
+        "Returns the current configuration of the RTC_SLOW_CLK clock tree node"] pub fn
+        rtc_slow_clk(& self) -> Option < RtcSlowClkConfig > { self.rtc_slow_clk } #[doc =
+        "Returns the current configuration of the RTC_FAST_CLK clock tree node"] pub fn
+        rtc_fast_clk(& self) -> Option < RtcFastClkConfig > { self.rtc_fast_clk } #[doc =
+        "Returns the current configuration of the LOW_POWER_CLK clock tree node"] pub fn
+        low_power_clk(& self) -> Option < LowPowerClkConfig > { self.low_power_clk }
+        #[doc = "Returns the current configuration of the RMT_SCLK clock tree node"] pub
+        fn rmt_sclk(& self) -> Option < RmtSclkConfig > { self.rmt_sclk } #[doc =
+        "Returns the current configuration of the TIMG0_FUNCTION_CLOCK clock tree node"]
+        pub fn timg0_function_clock(& self) -> Option < Timg0FunctionClockConfig > { self
+        .timg0_function_clock } #[doc =
+        "Returns the current configuration of the TIMG0_CALIBRATION_CLOCK clock tree node"]
+        pub fn timg0_calibration_clock(& self) -> Option < Timg0CalibrationClockConfig >
+        { self.timg0_calibration_clock } #[doc =
+        "Returns the current configuration of the TIMG0_WDT_CLOCK clock tree node"] pub
+        fn timg0_wdt_clock(& self) -> Option < Timg0WdtClockConfig > { self
+        .timg0_wdt_clock } #[doc =
+        "Returns the current configuration of the TIMG1_FUNCTION_CLOCK clock tree node"]
+        pub fn timg1_function_clock(& self) -> Option < Timg0FunctionClockConfig > { self
+        .timg1_function_clock } #[doc =
+        "Returns the current configuration of the TIMG1_CALIBRATION_CLOCK clock tree node"]
+        pub fn timg1_calibration_clock(& self) -> Option < Timg0CalibrationClockConfig >
+        { self.timg1_calibration_clock } #[doc =
+        "Returns the current configuration of the TIMG1_WDT_CLOCK clock tree node"] pub
+        fn timg1_wdt_clock(& self) -> Option < Timg0WdtClockConfig > { self
+        .timg1_wdt_clock } #[doc =
+        "Returns the current configuration of the UART0_FUNCTION_CLOCK clock tree node"]
+        pub fn uart0_function_clock(& self) -> Option < Uart0FunctionClockConfig > { self
+        .uart0_function_clock } #[doc =
+        "Returns the current configuration of the UART0_MEM_CLOCK clock tree node"] pub
+        fn uart0_mem_clock(& self) -> Option < Uart0MemClockConfig > { self
+        .uart0_mem_clock } #[doc =
+        "Returns the current configuration of the UART1_FUNCTION_CLOCK clock tree node"]
+        pub fn uart1_function_clock(& self) -> Option < Uart0FunctionClockConfig > { self
+        .uart1_function_clock } #[doc =
+        "Returns the current configuration of the UART1_MEM_CLOCK clock tree node"] pub
+        fn uart1_mem_clock(& self) -> Option < Uart0MemClockConfig > { self
+        .uart1_mem_clock } } static CLOCK_TREE : ::esp_sync::NonReentrantMutex <
+        ClockTree > = ::esp_sync::NonReentrantMutex::new(ClockTree { xtal_clk : None,
+        pll_clk : None, system_pre_div_in : None, system_pre_div : None, cpu_pll_div_out
+        : None, apb_clk : None, crypto_clk : None, cpu_clk : None, rc_fast_clk_div_n :
+        None, rtc_slow_clk : None, rtc_fast_clk : None, low_power_clk : None, rmt_sclk :
+        None, timg0_function_clock : None, timg0_calibration_clock : None,
+        timg0_wdt_clock : None, timg1_function_clock : None, timg1_calibration_clock :
+        None, timg1_wdt_clock : None, uart0_function_clock : None, uart0_mem_clock :
+        None, uart1_function_clock : None, uart1_mem_clock : None, rc_fast_clk_refcount :
+        0, xtal32k_clk_refcount : 0, rc_slow_clk_refcount : 0, rc_fast_div_clk_refcount :
+        0, apb_clk_refcount : 0, crypto_clk_refcount : 0, rtc_fast_clk_refcount : 0,
+        low_power_clk_refcount : 0, uart_mem_clk_refcount : 0, rmt_sclk_refcount : 0,
+        timg0_function_clock_refcount : 0, timg0_calibration_clock_refcount : 0,
+        timg0_wdt_clock_refcount : 0, timg1_function_clock_refcount : 0,
+        timg1_calibration_clock_refcount : 0, timg1_wdt_clock_refcount : 0,
+        uart0_function_clock_refcount : 0, uart0_mem_clock_refcount : 0,
+        uart1_function_clock_refcount : 0, uart1_mem_clock_refcount : 0, }); pub fn
+        configure_xtal_clk(clocks : & mut ClockTree, config : XtalClkConfig) { clocks
+        .xtal_clk = Some(config); configure_xtal_clk_impl(clocks, config); } pub fn
+        xtal_clk_config(clocks : & mut ClockTree) -> Option < XtalClkConfig > { clocks
+        .xtal_clk } fn request_xtal_clk(_clocks : & mut ClockTree) {} fn
+        release_xtal_clk(_clocks : & mut ClockTree) {} pub fn xtal_clk_frequency(clocks :
+        & mut ClockTree) -> u32 { unwrap!(clocks.xtal_clk) .value() } pub fn
+        configure_pll_clk(clocks : & mut ClockTree, config : PllClkConfig) { clocks
+        .pll_clk = Some(config); configure_pll_clk_impl(clocks, config); } pub fn
+        pll_clk_config(clocks : & mut ClockTree) -> Option < PllClkConfig > { clocks
+        .pll_clk } pub fn request_pll_clk(clocks : & mut ClockTree) {
+        trace!("Requesting PLL_CLK"); trace!("Enabling PLL_CLK");
+        request_xtal_clk(clocks); enable_pll_clk_impl(clocks, true); } pub fn
+        release_pll_clk(clocks : & mut ClockTree) { trace!("Releasing PLL_CLK");
+        trace!("Disabling PLL_CLK"); enable_pll_clk_impl(clocks, false);
+        release_xtal_clk(clocks); } pub fn pll_clk_frequency(clocks : & mut ClockTree) ->
+        u32 { unwrap!(clocks.pll_clk) .value() } pub fn request_rc_fast_clk(clocks : &
+        mut ClockTree) { trace!("Requesting RC_FAST_CLK"); if increment_reference_count(&
+        mut clocks.rc_fast_clk_refcount) { trace!("Enabling RC_FAST_CLK");
+        enable_rc_fast_clk_impl(clocks, true); } } pub fn release_rc_fast_clk(clocks : &
+        mut ClockTree) { trace!("Releasing RC_FAST_CLK"); if decrement_reference_count(&
+        mut clocks.rc_fast_clk_refcount) { trace!("Disabling RC_FAST_CLK");
+        enable_rc_fast_clk_impl(clocks, false); } } pub fn rc_fast_clk_frequency(clocks :
+        & mut ClockTree) -> u32 { 17500000 } pub fn request_xtal32k_clk(clocks : & mut
+        ClockTree) { trace!("Requesting XTAL32K_CLK"); if increment_reference_count(& mut
+        clocks.xtal32k_clk_refcount) { trace!("Enabling XTAL32K_CLK");
+        enable_xtal32k_clk_impl(clocks, true); } } pub fn release_xtal32k_clk(clocks : &
+        mut ClockTree) { trace!("Releasing XTAL32K_CLK"); if decrement_reference_count(&
+        mut clocks.xtal32k_clk_refcount) { trace!("Disabling XTAL32K_CLK");
+        enable_xtal32k_clk_impl(clocks, false); } } pub fn xtal32k_clk_frequency(clocks :
+        & mut ClockTree) -> u32 { 32768 } pub fn request_rc_slow_clk(clocks : & mut
+        ClockTree) { trace!("Requesting RC_SLOW_CLK"); if increment_reference_count(& mut
+        clocks.rc_slow_clk_refcount) { trace!("Enabling RC_SLOW_CLK");
+        enable_rc_slow_clk_impl(clocks, true); } } pub fn release_rc_slow_clk(clocks : &
+        mut ClockTree) { trace!("Releasing RC_SLOW_CLK"); if decrement_reference_count(&
+        mut clocks.rc_slow_clk_refcount) { trace!("Disabling RC_SLOW_CLK");
+        enable_rc_slow_clk_impl(clocks, false); } } pub fn rc_slow_clk_frequency(clocks :
+        & mut ClockTree) -> u32 { 136000 } pub fn request_rc_fast_div_clk(clocks : & mut
+        ClockTree) { trace!("Requesting RC_FAST_DIV_CLK"); if increment_reference_count(&
+        mut clocks.rc_fast_div_clk_refcount) { trace!("Enabling RC_FAST_DIV_CLK");
+        request_rc_fast_clk(clocks); enable_rc_fast_div_clk_impl(clocks, true); } } pub
+        fn release_rc_fast_div_clk(clocks : & mut ClockTree) {
+        trace!("Releasing RC_FAST_DIV_CLK"); if decrement_reference_count(& mut clocks
+        .rc_fast_div_clk_refcount) { trace!("Disabling RC_FAST_DIV_CLK");
+        enable_rc_fast_div_clk_impl(clocks, false); release_rc_fast_clk(clocks); } } pub
+        fn rc_fast_div_clk_frequency(clocks : & mut ClockTree) -> u32 {
+        (rc_fast_clk_frequency(clocks) / 256) } pub fn configure_system_pre_div_in(clocks
+        : & mut ClockTree, new_selector : SystemPreDivInConfig) { let old_selector =
+        clocks.system_pre_div_in.replace(new_selector); match new_selector {
+        SystemPreDivInConfig::Xtal => request_xtal_clk(clocks),
+        SystemPreDivInConfig::RcFast => request_rc_fast_clk(clocks), }
+        configure_system_pre_div_in_impl(clocks, old_selector, new_selector); if let
+        Some(old_selector) = old_selector { match old_selector {
+        SystemPreDivInConfig::Xtal => release_xtal_clk(clocks),
+        SystemPreDivInConfig::RcFast => release_rc_fast_clk(clocks), } } } pub fn
+        system_pre_div_in_config(clocks : & mut ClockTree) -> Option <
+        SystemPreDivInConfig > { clocks.system_pre_div_in } pub fn
+        request_system_pre_div_in(clocks : & mut ClockTree) {
+        trace!("Requesting SYSTEM_PRE_DIV_IN"); trace!("Enabling SYSTEM_PRE_DIV_IN");
+        match unwrap!(clocks.system_pre_div_in) { SystemPreDivInConfig::Xtal =>
+        request_xtal_clk(clocks), SystemPreDivInConfig::RcFast =>
+        request_rc_fast_clk(clocks), } enable_system_pre_div_in_impl(clocks, true); } pub
+        fn release_system_pre_div_in(clocks : & mut ClockTree) {
+        trace!("Releasing SYSTEM_PRE_DIV_IN"); trace!("Disabling SYSTEM_PRE_DIV_IN");
+        enable_system_pre_div_in_impl(clocks, false); match unwrap!(clocks
+        .system_pre_div_in) { SystemPreDivInConfig::Xtal => release_xtal_clk(clocks),
+        SystemPreDivInConfig::RcFast => release_rc_fast_clk(clocks), } } pub fn
+        system_pre_div_in_frequency(clocks : & mut ClockTree) -> u32 { match
+        unwrap!(clocks.system_pre_div_in) { SystemPreDivInConfig::Xtal =>
+        xtal_clk_frequency(clocks), SystemPreDivInConfig::RcFast =>
+        rc_fast_clk_frequency(clocks), } } pub fn configure_system_pre_div(clocks : & mut
+        ClockTree, config : SystemPreDivConfig) { clocks.system_pre_div = Some(config);
+        configure_system_pre_div_impl(clocks, config); } pub fn
+        system_pre_div_config(clocks : & mut ClockTree) -> Option < SystemPreDivConfig >
+        { clocks.system_pre_div } pub fn request_system_pre_div(clocks : & mut ClockTree)
+        { trace!("Requesting SYSTEM_PRE_DIV"); trace!("Enabling SYSTEM_PRE_DIV");
+        request_system_pre_div_in(clocks); enable_system_pre_div_impl(clocks, true); }
+        pub fn release_system_pre_div(clocks : & mut ClockTree) {
+        trace!("Releasing SYSTEM_PRE_DIV"); trace!("Disabling SYSTEM_PRE_DIV");
+        enable_system_pre_div_impl(clocks, false); release_system_pre_div_in(clocks); }
+        pub fn system_pre_div_frequency(clocks : & mut ClockTree) -> u32 {
+        (system_pre_div_in_frequency(clocks) / (unwrap!(clocks.system_pre_div) .divisor()
+        + 1)) } pub fn configure_cpu_pll_div_out(clocks : & mut ClockTree, config :
+        CpuPllDivOutConfig) { clocks.cpu_pll_div_out = Some(config);
+        configure_cpu_pll_div_out_impl(clocks, config); } pub fn
+        cpu_pll_div_out_config(clocks : & mut ClockTree) -> Option < CpuPllDivOutConfig >
+        { clocks.cpu_pll_div_out } pub fn request_cpu_pll_div_out(clocks : & mut
+        ClockTree) { trace!("Requesting CPU_PLL_DIV_OUT");
+        trace!("Enabling CPU_PLL_DIV_OUT"); request_pll_clk(clocks);
+        enable_cpu_pll_div_out_impl(clocks, true); } pub fn
+        release_cpu_pll_div_out(clocks : & mut ClockTree) {
+        trace!("Releasing CPU_PLL_DIV_OUT"); trace!("Disabling CPU_PLL_DIV_OUT");
+        enable_cpu_pll_div_out_impl(clocks, false); release_pll_clk(clocks); } pub fn
+        cpu_pll_div_out_frequency(clocks : & mut ClockTree) -> u32 { unwrap!(clocks
+        .cpu_pll_div_out) .value() } pub fn configure_apb_clk(clocks : & mut ClockTree,
+        new_selector : ApbClkConfig) { let old_selector = clocks.apb_clk
+        .replace(new_selector); if clocks.apb_clk_refcount > 0 { match new_selector {
+        ApbClkConfig::Pll80m => request_pll_80m(clocks), ApbClkConfig::Cpu =>
+        request_cpu_clk(clocks), } configure_apb_clk_impl(clocks, old_selector,
+        new_selector); if let Some(old_selector) = old_selector { match old_selector {
+        ApbClkConfig::Pll80m => release_pll_80m(clocks), ApbClkConfig::Cpu =>
+        release_cpu_clk(clocks), } } } else { configure_apb_clk_impl(clocks,
+        old_selector, new_selector); } } pub fn apb_clk_config(clocks : & mut ClockTree)
+        -> Option < ApbClkConfig > { clocks.apb_clk } pub fn request_apb_clk(clocks : &
+        mut ClockTree) { trace!("Requesting APB_CLK"); if increment_reference_count(& mut
+        clocks.apb_clk_refcount) { trace!("Enabling APB_CLK"); match unwrap!(clocks
+        .apb_clk) { ApbClkConfig::Pll80m => request_pll_80m(clocks), ApbClkConfig::Cpu =>
+        request_cpu_clk(clocks), } enable_apb_clk_impl(clocks, true); } } pub fn
+        release_apb_clk(clocks : & mut ClockTree) { trace!("Releasing APB_CLK"); if
+        decrement_reference_count(& mut clocks.apb_clk_refcount) {
+        trace!("Disabling APB_CLK"); enable_apb_clk_impl(clocks, false); match
+        unwrap!(clocks.apb_clk) { ApbClkConfig::Pll80m => release_pll_80m(clocks),
+        ApbClkConfig::Cpu => release_cpu_clk(clocks), } } } pub fn
+        apb_clk_frequency(clocks : & mut ClockTree) -> u32 { match unwrap!(clocks
+        .apb_clk) { ApbClkConfig::Pll80m => pll_80m_frequency(clocks), ApbClkConfig::Cpu
+        => cpu_clk_frequency(clocks), } } pub fn configure_crypto_clk(clocks : & mut
+        ClockTree, new_selector : CryptoClkConfig) { let old_selector = clocks.crypto_clk
+        .replace(new_selector); if clocks.crypto_clk_refcount > 0 { match new_selector {
+        CryptoClkConfig::Pll160m => request_pll_160m(clocks), CryptoClkConfig::Cpu =>
+        request_cpu_clk(clocks), } configure_crypto_clk_impl(clocks, old_selector,
+        new_selector); if let Some(old_selector) = old_selector { match old_selector {
+        CryptoClkConfig::Pll160m => release_pll_160m(clocks), CryptoClkConfig::Cpu =>
+        release_cpu_clk(clocks), } } } else { configure_crypto_clk_impl(clocks,
+        old_selector, new_selector); } } pub fn crypto_clk_config(clocks : & mut
+        ClockTree) -> Option < CryptoClkConfig > { clocks.crypto_clk } pub fn
+        request_crypto_clk(clocks : & mut ClockTree) { trace!("Requesting CRYPTO_CLK");
+        if increment_reference_count(& mut clocks.crypto_clk_refcount) {
+        trace!("Enabling CRYPTO_CLK"); match unwrap!(clocks.crypto_clk) {
+        CryptoClkConfig::Pll160m => request_pll_160m(clocks), CryptoClkConfig::Cpu =>
+        request_cpu_clk(clocks), } enable_crypto_clk_impl(clocks, true); } } pub fn
+        release_crypto_clk(clocks : & mut ClockTree) { trace!("Releasing CRYPTO_CLK"); if
+        decrement_reference_count(& mut clocks.crypto_clk_refcount) {
+        trace!("Disabling CRYPTO_CLK"); enable_crypto_clk_impl(clocks, false); match
+        unwrap!(clocks.crypto_clk) { CryptoClkConfig::Pll160m =>
+        release_pll_160m(clocks), CryptoClkConfig::Cpu => release_cpu_clk(clocks), } } }
+        pub fn crypto_clk_frequency(clocks : & mut ClockTree) -> u32 { match
+        unwrap!(clocks.crypto_clk) { CryptoClkConfig::Pll160m =>
+        pll_160m_frequency(clocks), CryptoClkConfig::Cpu => cpu_clk_frequency(clocks), }
+        } pub fn configure_cpu_clk(clocks : & mut ClockTree, new_selector : CpuClkConfig)
+        { let old_selector = clocks.cpu_clk.replace(new_selector); match new_selector {
+        CpuClkConfig::Xtal => { configure_apb_clk(clocks, ApbClkConfig::Cpu);
+        configure_crypto_clk(clocks, CryptoClkConfig::Cpu);
+        configure_system_pre_div_in(clocks, SystemPreDivInConfig::Xtal); },
+        CpuClkConfig::RcFast => { configure_apb_clk(clocks, ApbClkConfig::Cpu);
+        configure_crypto_clk(clocks, CryptoClkConfig::Cpu);
+        configure_system_pre_div_in(clocks, SystemPreDivInConfig::RcFast); },
+        CpuClkConfig::Pll => { configure_apb_clk(clocks, ApbClkConfig::Pll80m);
+        configure_crypto_clk(clocks, CryptoClkConfig::Pll160m); }, } match new_selector {
+        CpuClkConfig::Xtal => request_system_pre_div(clocks), CpuClkConfig::RcFast =>
+        request_system_pre_div(clocks), CpuClkConfig::Pll =>
+        request_cpu_pll_div_out(clocks), } configure_cpu_clk_impl(clocks, old_selector,
+        new_selector); if let Some(old_selector) = old_selector { match old_selector {
+        CpuClkConfig::Xtal => release_system_pre_div(clocks), CpuClkConfig::RcFast =>
+        release_system_pre_div(clocks), CpuClkConfig::Pll =>
+        release_cpu_pll_div_out(clocks), } } } pub fn cpu_clk_config(clocks : & mut
+        ClockTree) -> Option < CpuClkConfig > { clocks.cpu_clk } fn
+        request_cpu_clk(_clocks : & mut ClockTree) {} fn release_cpu_clk(_clocks : & mut
+        ClockTree) {} pub fn cpu_clk_frequency(clocks : & mut ClockTree) -> u32 { match
+        unwrap!(clocks.cpu_clk) { CpuClkConfig::Xtal => system_pre_div_frequency(clocks),
+        CpuClkConfig::RcFast => system_pre_div_frequency(clocks), CpuClkConfig::Pll =>
+        cpu_pll_div_out_frequency(clocks), } } pub fn request_pll_80m(clocks : & mut
+        ClockTree) { trace!("Requesting PLL_80M"); trace!("Enabling PLL_80M");
+        request_cpu_clk(clocks); enable_pll_80m_impl(clocks, true); } pub fn
+        release_pll_80m(clocks : & mut ClockTree) { trace!("Releasing PLL_80M");
+        trace!("Disabling PLL_80M"); enable_pll_80m_impl(clocks, false);
+        release_cpu_clk(clocks); } pub fn pll_80m_frequency(clocks : & mut ClockTree) ->
+        u32 { 80000000 } pub fn request_pll_160m(clocks : & mut ClockTree) {
+        trace!("Requesting PLL_160M"); trace!("Enabling PLL_160M");
+        request_cpu_clk(clocks); enable_pll_160m_impl(clocks, true); } pub fn
+        release_pll_160m(clocks : & mut ClockTree) { trace!("Releasing PLL_160M");
+        trace!("Disabling PLL_160M"); enable_pll_160m_impl(clocks, false);
+        release_cpu_clk(clocks); } pub fn pll_160m_frequency(clocks : & mut ClockTree) ->
+        u32 { 160000000 } pub fn configure_rc_fast_clk_div_n(clocks : & mut ClockTree,
+        config : RcFastClkDivNConfig) { clocks.rc_fast_clk_div_n = Some(config);
+        configure_rc_fast_clk_div_n_impl(clocks, config); } pub fn
+        rc_fast_clk_div_n_config(clocks : & mut ClockTree) -> Option <
+        RcFastClkDivNConfig > { clocks.rc_fast_clk_div_n } pub fn
+        request_rc_fast_clk_div_n(clocks : & mut ClockTree) {
+        trace!("Requesting RC_FAST_CLK_DIV_N"); trace!("Enabling RC_FAST_CLK_DIV_N");
+        request_rc_fast_clk(clocks); enable_rc_fast_clk_div_n_impl(clocks, true); } pub
+        fn release_rc_fast_clk_div_n(clocks : & mut ClockTree) {
+        trace!("Releasing RC_FAST_CLK_DIV_N"); trace!("Disabling RC_FAST_CLK_DIV_N");
+        enable_rc_fast_clk_div_n_impl(clocks, false); release_rc_fast_clk(clocks); } pub
+        fn rc_fast_clk_div_n_frequency(clocks : & mut ClockTree) -> u32 {
+        (rc_fast_clk_frequency(clocks) / (unwrap!(clocks.rc_fast_clk_div_n) .divisor() +
+        1)) } pub fn request_xtal_div_clk(clocks : & mut ClockTree) {
+        trace!("Requesting XTAL_DIV_CLK"); trace!("Enabling XTAL_DIV_CLK");
+        request_xtal_clk(clocks); enable_xtal_div_clk_impl(clocks, true); } pub fn
+        release_xtal_div_clk(clocks : & mut ClockTree) {
+        trace!("Releasing XTAL_DIV_CLK"); trace!("Disabling XTAL_DIV_CLK");
+        enable_xtal_div_clk_impl(clocks, false); release_xtal_clk(clocks); } pub fn
+        xtal_div_clk_frequency(clocks : & mut ClockTree) -> u32 {
+        (xtal_clk_frequency(clocks) / 2) } pub fn configure_rtc_slow_clk(clocks : & mut
+        ClockTree, new_selector : RtcSlowClkConfig) { let old_selector = clocks
+        .rtc_slow_clk.replace(new_selector); match new_selector {
+        RtcSlowClkConfig::Xtal32k => request_xtal32k_clk(clocks),
+        RtcSlowClkConfig::RcSlow => request_rc_slow_clk(clocks), RtcSlowClkConfig::RcFast
+        => request_rc_fast_div_clk(clocks), } configure_rtc_slow_clk_impl(clocks,
+        old_selector, new_selector); if let Some(old_selector) = old_selector { match
+        old_selector { RtcSlowClkConfig::Xtal32k => release_xtal32k_clk(clocks),
+        RtcSlowClkConfig::RcSlow => release_rc_slow_clk(clocks), RtcSlowClkConfig::RcFast
+        => release_rc_fast_div_clk(clocks), } } } pub fn rtc_slow_clk_config(clocks : &
+        mut ClockTree) -> Option < RtcSlowClkConfig > { clocks.rtc_slow_clk } pub fn
+        request_rtc_slow_clk(clocks : & mut ClockTree) {
+        trace!("Requesting RTC_SLOW_CLK"); trace!("Enabling RTC_SLOW_CLK"); match
+        unwrap!(clocks.rtc_slow_clk) { RtcSlowClkConfig::Xtal32k =>
+        request_xtal32k_clk(clocks), RtcSlowClkConfig::RcSlow =>
+        request_rc_slow_clk(clocks), RtcSlowClkConfig::RcFast =>
+        request_rc_fast_div_clk(clocks), } enable_rtc_slow_clk_impl(clocks, true); } pub
+        fn release_rtc_slow_clk(clocks : & mut ClockTree) {
+        trace!("Releasing RTC_SLOW_CLK"); trace!("Disabling RTC_SLOW_CLK");
+        enable_rtc_slow_clk_impl(clocks, false); match unwrap!(clocks.rtc_slow_clk) {
+        RtcSlowClkConfig::Xtal32k => release_xtal32k_clk(clocks),
+        RtcSlowClkConfig::RcSlow => release_rc_slow_clk(clocks), RtcSlowClkConfig::RcFast
+        => release_rc_fast_div_clk(clocks), } } pub fn rtc_slow_clk_frequency(clocks : &
+        mut ClockTree) -> u32 { match unwrap!(clocks.rtc_slow_clk) {
+        RtcSlowClkConfig::Xtal32k => xtal32k_clk_frequency(clocks),
+        RtcSlowClkConfig::RcSlow => rc_slow_clk_frequency(clocks),
+        RtcSlowClkConfig::RcFast => rc_fast_div_clk_frequency(clocks), } } pub fn
+        configure_rtc_fast_clk(clocks : & mut ClockTree, new_selector : RtcFastClkConfig)
+        { let old_selector = clocks.rtc_fast_clk.replace(new_selector); if clocks
+        .rtc_fast_clk_refcount > 0 { match new_selector { RtcFastClkConfig::Xtal =>
+        request_xtal_div_clk(clocks), RtcFastClkConfig::Rc =>
+        request_rc_fast_clk_div_n(clocks), } configure_rtc_fast_clk_impl(clocks,
+        old_selector, new_selector); if let Some(old_selector) = old_selector { match
+        old_selector { RtcFastClkConfig::Xtal => release_xtal_div_clk(clocks),
+        RtcFastClkConfig::Rc => release_rc_fast_clk_div_n(clocks), } } } else {
+        configure_rtc_fast_clk_impl(clocks, old_selector, new_selector); } } pub fn
+        rtc_fast_clk_config(clocks : & mut ClockTree) -> Option < RtcFastClkConfig > {
+        clocks.rtc_fast_clk } pub fn request_rtc_fast_clk(clocks : & mut ClockTree) {
+        trace!("Requesting RTC_FAST_CLK"); if increment_reference_count(& mut clocks
+        .rtc_fast_clk_refcount) { trace!("Enabling RTC_FAST_CLK"); match unwrap!(clocks
+        .rtc_fast_clk) { RtcFastClkConfig::Xtal => request_xtal_div_clk(clocks),
+        RtcFastClkConfig::Rc => request_rc_fast_clk_div_n(clocks), }
+        enable_rtc_fast_clk_impl(clocks, true); } } pub fn release_rtc_fast_clk(clocks :
+        & mut ClockTree) { trace!("Releasing RTC_FAST_CLK"); if
+        decrement_reference_count(& mut clocks.rtc_fast_clk_refcount) {
+        trace!("Disabling RTC_FAST_CLK"); enable_rtc_fast_clk_impl(clocks, false); match
+        unwrap!(clocks.rtc_fast_clk) { RtcFastClkConfig::Xtal =>
+        release_xtal_div_clk(clocks), RtcFastClkConfig::Rc =>
+        release_rc_fast_clk_div_n(clocks), } } } pub fn rtc_fast_clk_frequency(clocks : &
+        mut ClockTree) -> u32 { match unwrap!(clocks.rtc_fast_clk) {
+        RtcFastClkConfig::Xtal => xtal_div_clk_frequency(clocks), RtcFastClkConfig::Rc =>
+        rc_fast_clk_div_n_frequency(clocks), } } pub fn configure_low_power_clk(clocks :
+        & mut ClockTree, new_selector : LowPowerClkConfig) { let old_selector = clocks
+        .low_power_clk.replace(new_selector); if clocks.low_power_clk_refcount > 0 {
+        match new_selector { LowPowerClkConfig::Xtal => request_xtal_clk(clocks),
+        LowPowerClkConfig::RcFast => request_rc_fast_clk(clocks),
+        LowPowerClkConfig::Xtal32k => request_xtal32k_clk(clocks),
+        LowPowerClkConfig::RtcSlow => request_rtc_slow_clk(clocks), }
+        configure_low_power_clk_impl(clocks, old_selector, new_selector); if let
+        Some(old_selector) = old_selector { match old_selector { LowPowerClkConfig::Xtal
+        => release_xtal_clk(clocks), LowPowerClkConfig::RcFast =>
+        release_rc_fast_clk(clocks), LowPowerClkConfig::Xtal32k =>
+        release_xtal32k_clk(clocks), LowPowerClkConfig::RtcSlow =>
+        release_rtc_slow_clk(clocks), } } } else { configure_low_power_clk_impl(clocks,
+        old_selector, new_selector); } } pub fn low_power_clk_config(clocks : & mut
+        ClockTree) -> Option < LowPowerClkConfig > { clocks.low_power_clk } pub fn
+        request_low_power_clk(clocks : & mut ClockTree) {
+        trace!("Requesting LOW_POWER_CLK"); if increment_reference_count(& mut clocks
+        .low_power_clk_refcount) { trace!("Enabling LOW_POWER_CLK"); match unwrap!(clocks
+        .low_power_clk) { LowPowerClkConfig::Xtal => request_xtal_clk(clocks),
+        LowPowerClkConfig::RcFast => request_rc_fast_clk(clocks),
+        LowPowerClkConfig::Xtal32k => request_xtal32k_clk(clocks),
+        LowPowerClkConfig::RtcSlow => request_rtc_slow_clk(clocks), }
+        enable_low_power_clk_impl(clocks, true); } } pub fn release_low_power_clk(clocks
+        : & mut ClockTree) { trace!("Releasing LOW_POWER_CLK"); if
+        decrement_reference_count(& mut clocks.low_power_clk_refcount) {
+        trace!("Disabling LOW_POWER_CLK"); enable_low_power_clk_impl(clocks, false);
+        match unwrap!(clocks.low_power_clk) { LowPowerClkConfig::Xtal =>
+        release_xtal_clk(clocks), LowPowerClkConfig::RcFast =>
+        release_rc_fast_clk(clocks), LowPowerClkConfig::Xtal32k =>
+        release_xtal32k_clk(clocks), LowPowerClkConfig::RtcSlow =>
+        release_rtc_slow_clk(clocks), } } } pub fn low_power_clk_frequency(clocks : & mut
+        ClockTree) -> u32 { match unwrap!(clocks.low_power_clk) { LowPowerClkConfig::Xtal
+        => xtal_clk_frequency(clocks), LowPowerClkConfig::RcFast =>
+        rc_fast_clk_frequency(clocks), LowPowerClkConfig::Xtal32k =>
+        xtal32k_clk_frequency(clocks), LowPowerClkConfig::RtcSlow =>
+        rtc_slow_clk_frequency(clocks), } } pub fn request_uart_mem_clk(clocks : & mut
+        ClockTree) { trace!("Requesting UART_MEM_CLK"); if increment_reference_count(&
+        mut clocks.uart_mem_clk_refcount) { trace!("Enabling UART_MEM_CLK");
+        request_xtal_clk(clocks); enable_uart_mem_clk_impl(clocks, true); } } pub fn
+        release_uart_mem_clk(clocks : & mut ClockTree) {
+        trace!("Releasing UART_MEM_CLK"); if decrement_reference_count(& mut clocks
+        .uart_mem_clk_refcount) { trace!("Disabling UART_MEM_CLK");
+        enable_uart_mem_clk_impl(clocks, false); release_xtal_clk(clocks); } } pub fn
+        uart_mem_clk_frequency(clocks : & mut ClockTree) -> u32 {
+        xtal_clk_frequency(clocks) } pub fn configure_rmt_sclk(clocks : & mut ClockTree,
+        new_selector : RmtSclkConfig) { let old_selector = clocks.rmt_sclk
+        .replace(new_selector); if clocks.rmt_sclk_refcount > 0 { match new_selector {
+        RmtSclkConfig::ApbClk => request_apb_clk(clocks), RmtSclkConfig::RcFastClk =>
+        request_rc_fast_clk(clocks), RmtSclkConfig::XtalClk => request_xtal_clk(clocks),
+        } configure_rmt_sclk_impl(clocks, old_selector, new_selector); if let
+        Some(old_selector) = old_selector { match old_selector { RmtSclkConfig::ApbClk =>
+        release_apb_clk(clocks), RmtSclkConfig::RcFastClk => release_rc_fast_clk(clocks),
+        RmtSclkConfig::XtalClk => release_xtal_clk(clocks), } } } else {
+        configure_rmt_sclk_impl(clocks, old_selector, new_selector); } } pub fn
+        rmt_sclk_config(clocks : & mut ClockTree) -> Option < RmtSclkConfig > { clocks
+        .rmt_sclk } pub fn request_rmt_sclk(clocks : & mut ClockTree) {
+        trace!("Requesting RMT_SCLK"); if increment_reference_count(& mut clocks
+        .rmt_sclk_refcount) { trace!("Enabling RMT_SCLK"); match unwrap!(clocks.rmt_sclk)
+        { RmtSclkConfig::ApbClk => request_apb_clk(clocks), RmtSclkConfig::RcFastClk =>
+        request_rc_fast_clk(clocks), RmtSclkConfig::XtalClk => request_xtal_clk(clocks),
+        } enable_rmt_sclk_impl(clocks, true); } } pub fn release_rmt_sclk(clocks : & mut
+        ClockTree) { trace!("Releasing RMT_SCLK"); if decrement_reference_count(& mut
+        clocks.rmt_sclk_refcount) { trace!("Disabling RMT_SCLK");
+        enable_rmt_sclk_impl(clocks, false); match unwrap!(clocks.rmt_sclk) {
+        RmtSclkConfig::ApbClk => release_apb_clk(clocks), RmtSclkConfig::RcFastClk =>
+        release_rc_fast_clk(clocks), RmtSclkConfig::XtalClk => release_xtal_clk(clocks),
+        } } } pub fn rmt_sclk_frequency(clocks : & mut ClockTree) -> u32 { match
+        unwrap!(clocks.rmt_sclk) { RmtSclkConfig::ApbClk => apb_clk_frequency(clocks),
+        RmtSclkConfig::RcFastClk => rc_fast_clk_frequency(clocks), RmtSclkConfig::XtalClk
+        => xtal_clk_frequency(clocks), } } pub fn configure_timg0_function_clock(clocks :
+        & mut ClockTree, new_selector : Timg0FunctionClockConfig) { let old_selector =
+        clocks.timg0_function_clock.replace(new_selector); if clocks
+        .timg0_function_clock_refcount > 0 { match new_selector {
+        Timg0FunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+        Timg0FunctionClockConfig::ApbClk => request_apb_clk(clocks), }
+        configure_timg0_function_clock_impl(clocks, old_selector, new_selector); if let
+        Some(old_selector) = old_selector { match old_selector {
+        Timg0FunctionClockConfig::XtalClk => release_xtal_clk(clocks),
+        Timg0FunctionClockConfig::ApbClk => release_apb_clk(clocks), } } } else {
+        configure_timg0_function_clock_impl(clocks, old_selector, new_selector); } } pub
+        fn timg0_function_clock_config(clocks : & mut ClockTree) -> Option <
+        Timg0FunctionClockConfig > { clocks.timg0_function_clock } pub fn
+        request_timg0_function_clock(clocks : & mut ClockTree) {
+        trace!("Requesting TIMG0_FUNCTION_CLOCK"); if increment_reference_count(& mut
+        clocks.timg0_function_clock_refcount) { trace!("Enabling TIMG0_FUNCTION_CLOCK");
+        match unwrap!(clocks.timg0_function_clock) { Timg0FunctionClockConfig::XtalClk =>
+        request_xtal_clk(clocks), Timg0FunctionClockConfig::ApbClk =>
+        request_apb_clk(clocks), } enable_timg0_function_clock_impl(clocks, true); } }
+        pub fn release_timg0_function_clock(clocks : & mut ClockTree) {
+        trace!("Releasing TIMG0_FUNCTION_CLOCK"); if decrement_reference_count(& mut
+        clocks.timg0_function_clock_refcount) { trace!("Disabling TIMG0_FUNCTION_CLOCK");
+        enable_timg0_function_clock_impl(clocks, false); match unwrap!(clocks
+        .timg0_function_clock) { Timg0FunctionClockConfig::XtalClk =>
+        release_xtal_clk(clocks), Timg0FunctionClockConfig::ApbClk =>
+        release_apb_clk(clocks), } } } pub fn timg0_function_clock_frequency(clocks : &
+        mut ClockTree) -> u32 { match unwrap!(clocks.timg0_function_clock) {
+        Timg0FunctionClockConfig::XtalClk => xtal_clk_frequency(clocks),
+        Timg0FunctionClockConfig::ApbClk => apb_clk_frequency(clocks), } } pub fn
+        configure_timg0_calibration_clock(clocks : & mut ClockTree, new_selector :
+        Timg0CalibrationClockConfig) { let old_selector = clocks.timg0_calibration_clock
+        .replace(new_selector); if clocks.timg0_calibration_clock_refcount > 0 { match
+        new_selector { Timg0CalibrationClockConfig::RcSlowClk =>
+        request_rc_slow_clk(clocks), Timg0CalibrationClockConfig::RcFastDivClk =>
+        request_rc_fast_div_clk(clocks), Timg0CalibrationClockConfig::Xtal32kClk =>
+        request_xtal32k_clk(clocks), } configure_timg0_calibration_clock_impl(clocks,
+        old_selector, new_selector); if let Some(old_selector) = old_selector { match
+        old_selector { Timg0CalibrationClockConfig::RcSlowClk =>
+        release_rc_slow_clk(clocks), Timg0CalibrationClockConfig::RcFastDivClk =>
+        release_rc_fast_div_clk(clocks), Timg0CalibrationClockConfig::Xtal32kClk =>
+        release_xtal32k_clk(clocks), } } } else {
+        configure_timg0_calibration_clock_impl(clocks, old_selector, new_selector); } }
+        pub fn timg0_calibration_clock_config(clocks : & mut ClockTree) -> Option <
+        Timg0CalibrationClockConfig > { clocks.timg0_calibration_clock } pub fn
+        request_timg0_calibration_clock(clocks : & mut ClockTree) {
+        trace!("Requesting TIMG0_CALIBRATION_CLOCK"); if increment_reference_count(& mut
+        clocks.timg0_calibration_clock_refcount) {
+        trace!("Enabling TIMG0_CALIBRATION_CLOCK"); match unwrap!(clocks
+        .timg0_calibration_clock) { Timg0CalibrationClockConfig::RcSlowClk =>
+        request_rc_slow_clk(clocks), Timg0CalibrationClockConfig::RcFastDivClk =>
+        request_rc_fast_div_clk(clocks), Timg0CalibrationClockConfig::Xtal32kClk =>
+        request_xtal32k_clk(clocks), } enable_timg0_calibration_clock_impl(clocks, true);
+        } } pub fn release_timg0_calibration_clock(clocks : & mut ClockTree) {
+        trace!("Releasing TIMG0_CALIBRATION_CLOCK"); if decrement_reference_count(& mut
+        clocks.timg0_calibration_clock_refcount) {
+        trace!("Disabling TIMG0_CALIBRATION_CLOCK");
+        enable_timg0_calibration_clock_impl(clocks, false); match unwrap!(clocks
+        .timg0_calibration_clock) { Timg0CalibrationClockConfig::RcSlowClk =>
+        release_rc_slow_clk(clocks), Timg0CalibrationClockConfig::RcFastDivClk =>
+        release_rc_fast_div_clk(clocks), Timg0CalibrationClockConfig::Xtal32kClk =>
+        release_xtal32k_clk(clocks), } } } pub fn
+        timg0_calibration_clock_frequency(clocks : & mut ClockTree) -> u32 { match
+        unwrap!(clocks.timg0_calibration_clock) { Timg0CalibrationClockConfig::RcSlowClk
+        => rc_slow_clk_frequency(clocks), Timg0CalibrationClockConfig::RcFastDivClk =>
+        rc_fast_div_clk_frequency(clocks), Timg0CalibrationClockConfig::Xtal32kClk =>
+        xtal32k_clk_frequency(clocks), } } pub fn configure_timg0_wdt_clock(clocks : &
+        mut ClockTree, new_selector : Timg0WdtClockConfig) { let old_selector = clocks
+        .timg0_wdt_clock.replace(new_selector); if clocks.timg0_wdt_clock_refcount > 0 {
+        match new_selector { Timg0WdtClockConfig::ApbClk => request_apb_clk(clocks),
+        Timg0WdtClockConfig::XtalClk => request_xtal_clk(clocks), }
+        configure_timg0_wdt_clock_impl(clocks, old_selector, new_selector); if let
+        Some(old_selector) = old_selector { match old_selector {
+        Timg0WdtClockConfig::ApbClk => release_apb_clk(clocks),
+        Timg0WdtClockConfig::XtalClk => release_xtal_clk(clocks), } } } else {
+        configure_timg0_wdt_clock_impl(clocks, old_selector, new_selector); } } pub fn
+        timg0_wdt_clock_config(clocks : & mut ClockTree) -> Option < Timg0WdtClockConfig
+        > { clocks.timg0_wdt_clock } pub fn request_timg0_wdt_clock(clocks : & mut
+        ClockTree) { trace!("Requesting TIMG0_WDT_CLOCK"); if increment_reference_count(&
+        mut clocks.timg0_wdt_clock_refcount) { trace!("Enabling TIMG0_WDT_CLOCK"); match
+        unwrap!(clocks.timg0_wdt_clock) { Timg0WdtClockConfig::ApbClk =>
+        request_apb_clk(clocks), Timg0WdtClockConfig::XtalClk =>
+        request_xtal_clk(clocks), } enable_timg0_wdt_clock_impl(clocks, true); } } pub fn
+        release_timg0_wdt_clock(clocks : & mut ClockTree) {
+        trace!("Releasing TIMG0_WDT_CLOCK"); if decrement_reference_count(& mut clocks
+        .timg0_wdt_clock_refcount) { trace!("Disabling TIMG0_WDT_CLOCK");
+        enable_timg0_wdt_clock_impl(clocks, false); match unwrap!(clocks.timg0_wdt_clock)
+        { Timg0WdtClockConfig::ApbClk => release_apb_clk(clocks),
+        Timg0WdtClockConfig::XtalClk => release_xtal_clk(clocks), } } } pub fn
+        timg0_wdt_clock_frequency(clocks : & mut ClockTree) -> u32 { match unwrap!(clocks
+        .timg0_wdt_clock) { Timg0WdtClockConfig::ApbClk => apb_clk_frequency(clocks),
+        Timg0WdtClockConfig::XtalClk => xtal_clk_frequency(clocks), } } pub fn
+        configure_timg1_function_clock(clocks : & mut ClockTree, new_selector :
+        Timg0FunctionClockConfig) { let old_selector = clocks.timg1_function_clock
+        .replace(new_selector); if clocks.timg1_function_clock_refcount > 0 { match
+        new_selector { Timg0FunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+        Timg0FunctionClockConfig::ApbClk => request_apb_clk(clocks), }
+        configure_timg1_function_clock_impl(clocks, old_selector, new_selector); if let
+        Some(old_selector) = old_selector { match old_selector {
+        Timg0FunctionClockConfig::XtalClk => release_xtal_clk(clocks),
+        Timg0FunctionClockConfig::ApbClk => release_apb_clk(clocks), } } } else {
+        configure_timg1_function_clock_impl(clocks, old_selector, new_selector); } } pub
+        fn timg1_function_clock_config(clocks : & mut ClockTree) -> Option <
+        Timg0FunctionClockConfig > { clocks.timg1_function_clock } pub fn
+        request_timg1_function_clock(clocks : & mut ClockTree) {
+        trace!("Requesting TIMG1_FUNCTION_CLOCK"); if increment_reference_count(& mut
+        clocks.timg1_function_clock_refcount) { trace!("Enabling TIMG1_FUNCTION_CLOCK");
+        match unwrap!(clocks.timg1_function_clock) { Timg0FunctionClockConfig::XtalClk =>
+        request_xtal_clk(clocks), Timg0FunctionClockConfig::ApbClk =>
+        request_apb_clk(clocks), } enable_timg1_function_clock_impl(clocks, true); } }
+        pub fn release_timg1_function_clock(clocks : & mut ClockTree) {
+        trace!("Releasing TIMG1_FUNCTION_CLOCK"); if decrement_reference_count(& mut
+        clocks.timg1_function_clock_refcount) { trace!("Disabling TIMG1_FUNCTION_CLOCK");
+        enable_timg1_function_clock_impl(clocks, false); match unwrap!(clocks
+        .timg1_function_clock) { Timg0FunctionClockConfig::XtalClk =>
+        release_xtal_clk(clocks), Timg0FunctionClockConfig::ApbClk =>
+        release_apb_clk(clocks), } } } pub fn timg1_function_clock_frequency(clocks : &
+        mut ClockTree) -> u32 { match unwrap!(clocks.timg1_function_clock) {
+        Timg0FunctionClockConfig::XtalClk => xtal_clk_frequency(clocks),
+        Timg0FunctionClockConfig::ApbClk => apb_clk_frequency(clocks), } } pub fn
+        configure_timg1_calibration_clock(clocks : & mut ClockTree, new_selector :
+        Timg0CalibrationClockConfig) { let old_selector = clocks.timg1_calibration_clock
+        .replace(new_selector); if clocks.timg1_calibration_clock_refcount > 0 { match
+        new_selector { Timg0CalibrationClockConfig::RcSlowClk =>
+        request_rc_slow_clk(clocks), Timg0CalibrationClockConfig::RcFastDivClk =>
+        request_rc_fast_div_clk(clocks), Timg0CalibrationClockConfig::Xtal32kClk =>
+        request_xtal32k_clk(clocks), } configure_timg1_calibration_clock_impl(clocks,
+        old_selector, new_selector); if let Some(old_selector) = old_selector { match
+        old_selector { Timg0CalibrationClockConfig::RcSlowClk =>
+        release_rc_slow_clk(clocks), Timg0CalibrationClockConfig::RcFastDivClk =>
+        release_rc_fast_div_clk(clocks), Timg0CalibrationClockConfig::Xtal32kClk =>
+        release_xtal32k_clk(clocks), } } } else {
+        configure_timg1_calibration_clock_impl(clocks, old_selector, new_selector); } }
+        pub fn timg1_calibration_clock_config(clocks : & mut ClockTree) -> Option <
+        Timg0CalibrationClockConfig > { clocks.timg1_calibration_clock } pub fn
+        request_timg1_calibration_clock(clocks : & mut ClockTree) {
+        trace!("Requesting TIMG1_CALIBRATION_CLOCK"); if increment_reference_count(& mut
+        clocks.timg1_calibration_clock_refcount) {
+        trace!("Enabling TIMG1_CALIBRATION_CLOCK"); match unwrap!(clocks
+        .timg1_calibration_clock) { Timg0CalibrationClockConfig::RcSlowClk =>
+        request_rc_slow_clk(clocks), Timg0CalibrationClockConfig::RcFastDivClk =>
+        request_rc_fast_div_clk(clocks), Timg0CalibrationClockConfig::Xtal32kClk =>
+        request_xtal32k_clk(clocks), } enable_timg1_calibration_clock_impl(clocks, true);
+        } } pub fn release_timg1_calibration_clock(clocks : & mut ClockTree) {
+        trace!("Releasing TIMG1_CALIBRATION_CLOCK"); if decrement_reference_count(& mut
+        clocks.timg1_calibration_clock_refcount) {
+        trace!("Disabling TIMG1_CALIBRATION_CLOCK");
+        enable_timg1_calibration_clock_impl(clocks, false); match unwrap!(clocks
+        .timg1_calibration_clock) { Timg0CalibrationClockConfig::RcSlowClk =>
+        release_rc_slow_clk(clocks), Timg0CalibrationClockConfig::RcFastDivClk =>
+        release_rc_fast_div_clk(clocks), Timg0CalibrationClockConfig::Xtal32kClk =>
+        release_xtal32k_clk(clocks), } } } pub fn
+        timg1_calibration_clock_frequency(clocks : & mut ClockTree) -> u32 { match
+        unwrap!(clocks.timg1_calibration_clock) { Timg0CalibrationClockConfig::RcSlowClk
+        => rc_slow_clk_frequency(clocks), Timg0CalibrationClockConfig::RcFastDivClk =>
+        rc_fast_div_clk_frequency(clocks), Timg0CalibrationClockConfig::Xtal32kClk =>
+        xtal32k_clk_frequency(clocks), } } pub fn configure_timg1_wdt_clock(clocks : &
+        mut ClockTree, new_selector : Timg0WdtClockConfig) { let old_selector = clocks
+        .timg1_wdt_clock.replace(new_selector); if clocks.timg1_wdt_clock_refcount > 0 {
+        match new_selector { Timg0WdtClockConfig::ApbClk => request_apb_clk(clocks),
+        Timg0WdtClockConfig::XtalClk => request_xtal_clk(clocks), }
+        configure_timg1_wdt_clock_impl(clocks, old_selector, new_selector); if let
+        Some(old_selector) = old_selector { match old_selector {
+        Timg0WdtClockConfig::ApbClk => release_apb_clk(clocks),
+        Timg0WdtClockConfig::XtalClk => release_xtal_clk(clocks), } } } else {
+        configure_timg1_wdt_clock_impl(clocks, old_selector, new_selector); } } pub fn
+        timg1_wdt_clock_config(clocks : & mut ClockTree) -> Option < Timg0WdtClockConfig
+        > { clocks.timg1_wdt_clock } pub fn request_timg1_wdt_clock(clocks : & mut
+        ClockTree) { trace!("Requesting TIMG1_WDT_CLOCK"); if increment_reference_count(&
+        mut clocks.timg1_wdt_clock_refcount) { trace!("Enabling TIMG1_WDT_CLOCK"); match
+        unwrap!(clocks.timg1_wdt_clock) { Timg0WdtClockConfig::ApbClk =>
+        request_apb_clk(clocks), Timg0WdtClockConfig::XtalClk =>
+        request_xtal_clk(clocks), } enable_timg1_wdt_clock_impl(clocks, true); } } pub fn
+        release_timg1_wdt_clock(clocks : & mut ClockTree) {
+        trace!("Releasing TIMG1_WDT_CLOCK"); if decrement_reference_count(& mut clocks
+        .timg1_wdt_clock_refcount) { trace!("Disabling TIMG1_WDT_CLOCK");
+        enable_timg1_wdt_clock_impl(clocks, false); match unwrap!(clocks.timg1_wdt_clock)
+        { Timg0WdtClockConfig::ApbClk => release_apb_clk(clocks),
+        Timg0WdtClockConfig::XtalClk => release_xtal_clk(clocks), } } } pub fn
+        timg1_wdt_clock_frequency(clocks : & mut ClockTree) -> u32 { match unwrap!(clocks
+        .timg1_wdt_clock) { Timg0WdtClockConfig::ApbClk => apb_clk_frequency(clocks),
+        Timg0WdtClockConfig::XtalClk => xtal_clk_frequency(clocks), } } pub fn
+        configure_uart0_function_clock(clocks : & mut ClockTree, new_selector :
+        Uart0FunctionClockConfig) { let old_selector = clocks.uart0_function_clock
+        .replace(new_selector); if clocks.uart0_function_clock_refcount > 0 { match
+        new_selector { Uart0FunctionClockConfig::Apb => request_apb_clk(clocks),
+        Uart0FunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
+        Uart0FunctionClockConfig::Xtal => request_xtal_clk(clocks), }
+        configure_uart0_function_clock_impl(clocks, old_selector, new_selector); if let
+        Some(old_selector) = old_selector { match old_selector {
+        Uart0FunctionClockConfig::Apb => release_apb_clk(clocks),
+        Uart0FunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
+        Uart0FunctionClockConfig::Xtal => release_xtal_clk(clocks), } } } else {
+        configure_uart0_function_clock_impl(clocks, old_selector, new_selector); } } pub
+        fn uart0_function_clock_config(clocks : & mut ClockTree) -> Option <
+        Uart0FunctionClockConfig > { clocks.uart0_function_clock } pub fn
+        request_uart0_function_clock(clocks : & mut ClockTree) {
+        trace!("Requesting UART0_FUNCTION_CLOCK"); if increment_reference_count(& mut
+        clocks.uart0_function_clock_refcount) { trace!("Enabling UART0_FUNCTION_CLOCK");
+        match unwrap!(clocks.uart0_function_clock) { Uart0FunctionClockConfig::Apb =>
+        request_apb_clk(clocks), Uart0FunctionClockConfig::RcFast =>
+        request_rc_fast_clk(clocks), Uart0FunctionClockConfig::Xtal =>
+        request_xtal_clk(clocks), } enable_uart0_function_clock_impl(clocks, true); } }
+        pub fn release_uart0_function_clock(clocks : & mut ClockTree) {
+        trace!("Releasing UART0_FUNCTION_CLOCK"); if decrement_reference_count(& mut
+        clocks.uart0_function_clock_refcount) { trace!("Disabling UART0_FUNCTION_CLOCK");
+        enable_uart0_function_clock_impl(clocks, false); match unwrap!(clocks
+        .uart0_function_clock) { Uart0FunctionClockConfig::Apb =>
+        release_apb_clk(clocks), Uart0FunctionClockConfig::RcFast =>
+        release_rc_fast_clk(clocks), Uart0FunctionClockConfig::Xtal =>
+        release_xtal_clk(clocks), } } } pub fn uart0_function_clock_frequency(clocks : &
+        mut ClockTree) -> u32 { match unwrap!(clocks.uart0_function_clock) {
+        Uart0FunctionClockConfig::Apb => apb_clk_frequency(clocks),
+        Uart0FunctionClockConfig::RcFast => rc_fast_clk_frequency(clocks),
+        Uart0FunctionClockConfig::Xtal => xtal_clk_frequency(clocks), } } pub fn
+        configure_uart0_mem_clock(clocks : & mut ClockTree, new_selector :
+        Uart0MemClockConfig) { let old_selector = clocks.uart0_mem_clock
+        .replace(new_selector); if clocks.uart0_mem_clock_refcount > 0 {
+        request_uart_mem_clk(clocks); configure_uart0_mem_clock_impl(clocks,
+        old_selector, new_selector); if let Some(old_selector) = old_selector {
+        release_uart_mem_clk(clocks); } } else { configure_uart0_mem_clock_impl(clocks,
+        old_selector, new_selector); } } pub fn uart0_mem_clock_config(clocks : & mut
+        ClockTree) -> Option < Uart0MemClockConfig > { clocks.uart0_mem_clock } pub fn
+        request_uart0_mem_clock(clocks : & mut ClockTree) {
+        trace!("Requesting UART0_MEM_CLOCK"); if increment_reference_count(& mut clocks
+        .uart0_mem_clock_refcount) { trace!("Enabling UART0_MEM_CLOCK");
+        request_uart_mem_clk(clocks); enable_uart0_mem_clock_impl(clocks, true); } } pub
+        fn release_uart0_mem_clock(clocks : & mut ClockTree) {
+        trace!("Releasing UART0_MEM_CLOCK"); if decrement_reference_count(& mut clocks
+        .uart0_mem_clock_refcount) { trace!("Disabling UART0_MEM_CLOCK");
+        enable_uart0_mem_clock_impl(clocks, false); release_uart_mem_clk(clocks); } } pub
+        fn uart0_mem_clock_frequency(clocks : & mut ClockTree) -> u32 {
+        uart_mem_clk_frequency(clocks) } pub fn configure_uart1_function_clock(clocks : &
+        mut ClockTree, new_selector : Uart0FunctionClockConfig) { let old_selector =
+        clocks.uart1_function_clock.replace(new_selector); if clocks
+        .uart1_function_clock_refcount > 0 { match new_selector {
+        Uart0FunctionClockConfig::Apb => request_apb_clk(clocks),
+        Uart0FunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
+        Uart0FunctionClockConfig::Xtal => request_xtal_clk(clocks), }
+        configure_uart1_function_clock_impl(clocks, old_selector, new_selector); if let
+        Some(old_selector) = old_selector { match old_selector {
+        Uart0FunctionClockConfig::Apb => release_apb_clk(clocks),
+        Uart0FunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
+        Uart0FunctionClockConfig::Xtal => release_xtal_clk(clocks), } } } else {
+        configure_uart1_function_clock_impl(clocks, old_selector, new_selector); } } pub
+        fn uart1_function_clock_config(clocks : & mut ClockTree) -> Option <
+        Uart0FunctionClockConfig > { clocks.uart1_function_clock } pub fn
+        request_uart1_function_clock(clocks : & mut ClockTree) {
+        trace!("Requesting UART1_FUNCTION_CLOCK"); if increment_reference_count(& mut
+        clocks.uart1_function_clock_refcount) { trace!("Enabling UART1_FUNCTION_CLOCK");
+        match unwrap!(clocks.uart1_function_clock) { Uart0FunctionClockConfig::Apb =>
+        request_apb_clk(clocks), Uart0FunctionClockConfig::RcFast =>
+        request_rc_fast_clk(clocks), Uart0FunctionClockConfig::Xtal =>
+        request_xtal_clk(clocks), } enable_uart1_function_clock_impl(clocks, true); } }
+        pub fn release_uart1_function_clock(clocks : & mut ClockTree) {
+        trace!("Releasing UART1_FUNCTION_CLOCK"); if decrement_reference_count(& mut
+        clocks.uart1_function_clock_refcount) { trace!("Disabling UART1_FUNCTION_CLOCK");
+        enable_uart1_function_clock_impl(clocks, false); match unwrap!(clocks
+        .uart1_function_clock) { Uart0FunctionClockConfig::Apb =>
+        release_apb_clk(clocks), Uart0FunctionClockConfig::RcFast =>
+        release_rc_fast_clk(clocks), Uart0FunctionClockConfig::Xtal =>
+        release_xtal_clk(clocks), } } } pub fn uart1_function_clock_frequency(clocks : &
+        mut ClockTree) -> u32 { match unwrap!(clocks.uart1_function_clock) {
+        Uart0FunctionClockConfig::Apb => apb_clk_frequency(clocks),
+        Uart0FunctionClockConfig::RcFast => rc_fast_clk_frequency(clocks),
+        Uart0FunctionClockConfig::Xtal => xtal_clk_frequency(clocks), } } pub fn
+        configure_uart1_mem_clock(clocks : & mut ClockTree, new_selector :
+        Uart0MemClockConfig) { let old_selector = clocks.uart1_mem_clock
+        .replace(new_selector); if clocks.uart1_mem_clock_refcount > 0 {
+        request_uart_mem_clk(clocks); configure_uart1_mem_clock_impl(clocks,
+        old_selector, new_selector); if let Some(old_selector) = old_selector {
+        release_uart_mem_clk(clocks); } } else { configure_uart1_mem_clock_impl(clocks,
+        old_selector, new_selector); } } pub fn uart1_mem_clock_config(clocks : & mut
+        ClockTree) -> Option < Uart0MemClockConfig > { clocks.uart1_mem_clock } pub fn
+        request_uart1_mem_clock(clocks : & mut ClockTree) {
+        trace!("Requesting UART1_MEM_CLOCK"); if increment_reference_count(& mut clocks
+        .uart1_mem_clock_refcount) { trace!("Enabling UART1_MEM_CLOCK");
+        request_uart_mem_clk(clocks); enable_uart1_mem_clock_impl(clocks, true); } } pub
+        fn release_uart1_mem_clock(clocks : & mut ClockTree) {
+        trace!("Releasing UART1_MEM_CLOCK"); if decrement_reference_count(& mut clocks
+        .uart1_mem_clock_refcount) { trace!("Disabling UART1_MEM_CLOCK");
+        enable_uart1_mem_clock_impl(clocks, false); release_uart_mem_clk(clocks); } } pub
+        fn uart1_mem_clock_frequency(clocks : & mut ClockTree) -> u32 {
+        uart_mem_clk_frequency(clocks) } #[doc = r" Clock tree configuration."] #[doc =
+        r""] #[doc =
+        r" The fields of this struct are optional, with the following caveats:"] #[doc =
+        r" - If `XTAL_CLK` is not specified, the crystal frequency will be automatically detected"]
+        #[doc = r"   if possible."] #[doc =
+        r" - The CPU and its upstream clock nodes will be set to a default configuration."]
+        #[doc =
+        r" - Other unspecified clock sources will not be useable by peripherals."]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)] #[cfg_attr(feature = "defmt",
+        derive(defmt::Format))] #[instability::unstable] pub struct ClockConfig { #[doc =
+        " `XTAL_CLK` configuration."] pub xtal_clk : Option < XtalClkConfig >, #[doc =
+        " `PLL_CLK` configuration."] pub pll_clk : Option < PllClkConfig >, #[doc =
+        " `SYSTEM_PRE_DIV` configuration."] pub system_pre_div : Option <
+        SystemPreDivConfig >, #[doc = " `CPU_PLL_DIV_OUT` configuration."] pub
+        cpu_pll_div_out : Option < CpuPllDivOutConfig >, #[doc =
+        " `CPU_CLK` configuration."] pub cpu_clk : Option < CpuClkConfig >, #[doc =
+        " `RC_FAST_CLK_DIV_N` configuration."] pub rc_fast_clk_div_n : Option <
+        RcFastClkDivNConfig >, #[doc = " `RTC_SLOW_CLK` configuration."] pub rtc_slow_clk
+        : Option < RtcSlowClkConfig >, #[doc = " `RTC_FAST_CLK` configuration."] pub
+        rtc_fast_clk : Option < RtcFastClkConfig >, #[doc =
+        " `LOW_POWER_CLK` configuration."] pub low_power_clk : Option < LowPowerClkConfig
+        >, } impl ClockConfig { fn apply(& self) { ClockTree::with(| clocks | { if let
+        Some(config) = self.xtal_clk { configure_xtal_clk(clocks, config); } if let
+        Some(config) = self.pll_clk { configure_pll_clk(clocks, config); } if let
+        Some(config) = self.system_pre_div { configure_system_pre_div(clocks, config); }
+        if let Some(config) = self.cpu_pll_div_out { configure_cpu_pll_div_out(clocks,
+        config); } if let Some(config) = self.cpu_clk { configure_cpu_clk(clocks,
+        config); } if let Some(config) = self.rc_fast_clk_div_n {
+        configure_rc_fast_clk_div_n(clocks, config); } if let Some(config) = self
+        .rtc_slow_clk { configure_rtc_slow_clk(clocks, config); } if let Some(config) =
+        self.rtc_fast_clk { configure_rtc_fast_clk(clocks, config); } if let Some(config)
+        = self.low_power_clk { configure_low_power_clk(clocks, config); } }); } } fn
+        increment_reference_count(refcount : & mut u32) -> bool { let first = * refcount
+        == 0; * refcount = unwrap!(refcount.checked_add(1), "Reference count overflow");
+        first } fn decrement_reference_count(refcount : & mut u32) -> bool { * refcount =
+        refcount.saturating_sub(1); let last = * refcount == 0; last }
     };
 }
 /// Implement the `Peripheral` enum and enable/disable/reset functions.
@@ -2773,318 +1801,109 @@ macro_rules! define_clock_tree_types {
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! implement_peripheral_clocks {
     () => {
-        #[doc(hidden)]
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        #[repr(u8)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum Peripheral {
-            /// AES peripheral clock signal
-            Aes,
-            /// APB_SAR_ADC peripheral clock signal
-            ApbSarAdc,
-            /// DMA peripheral clock signal
-            Dma,
-            /// DS peripheral clock signal
-            Ds,
-            /// HMAC peripheral clock signal
-            Hmac,
-            /// I2C_EXT0 peripheral clock signal
-            I2cExt0,
-            /// I2S0 peripheral clock signal
-            I2s0,
-            /// LEDC peripheral clock signal
-            Ledc,
-            /// RMT peripheral clock signal
-            Rmt,
-            /// RSA peripheral clock signal
-            Rsa,
-            /// SHA peripheral clock signal
-            Sha,
-            /// SPI2 peripheral clock signal
-            Spi2,
-            /// SYSTIMER peripheral clock signal
-            Systimer,
-            /// TIMG0 peripheral clock signal
-            Timg0,
-            /// TIMG1 peripheral clock signal
-            Timg1,
-            /// TSENS peripheral clock signal
-            Tsens,
-            /// TWAI0 peripheral clock signal
-            Twai0,
-            /// UART0 peripheral clock signal
-            Uart0,
-            /// UART1 peripheral clock signal
-            Uart1,
-            /// UART_MEM peripheral clock signal
-            UartMem,
-            /// UHCI0 peripheral clock signal
-            Uhci0,
-            /// USB_DEVICE peripheral clock signal
-            UsbDevice,
-        }
-        impl Peripheral {
-            const KEEP_ENABLED: &[Peripheral] = &[
-                Self::Systimer,
-                Self::Timg0,
-                Self::Uart0,
-                Self::UartMem,
-                Self::UsbDevice,
-            ];
-            const COUNT: usize = Self::ALL.len();
-            const ALL: &[Self] = &[
-                Self::Aes,
-                Self::ApbSarAdc,
-                Self::Dma,
-                Self::Ds,
-                Self::Hmac,
-                Self::I2cExt0,
-                Self::I2s0,
-                Self::Ledc,
-                Self::Rmt,
-                Self::Rsa,
-                Self::Sha,
-                Self::Spi2,
-                Self::Systimer,
-                Self::Timg0,
-                Self::Timg1,
-                Self::Tsens,
-                Self::Twai0,
-                Self::Uart0,
-                Self::Uart1,
-                Self::UartMem,
-                Self::Uhci0,
-                Self::UsbDevice,
-            ];
-        }
-        unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
-            match peripheral {
-                Peripheral::Aes => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en1()
-                        .modify(|_, w| w.crypto_aes_clk_en().bit(enable));
-                }
-                Peripheral::ApbSarAdc => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en0()
-                        .modify(|_, w| w.apb_saradc_clk_en().bit(enable));
-                }
-                Peripheral::Dma => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en1()
-                        .modify(|_, w| w.dma_clk_en().bit(enable));
-                }
-                Peripheral::Ds => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en1()
-                        .modify(|_, w| w.crypto_ds_clk_en().bit(enable));
-                }
-                Peripheral::Hmac => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en1()
-                        .modify(|_, w| w.crypto_hmac_clk_en().bit(enable));
-                }
-                Peripheral::I2cExt0 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en0()
-                        .modify(|_, w| w.i2c_ext0_clk_en().bit(enable));
-                }
-                Peripheral::I2s0 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en0()
-                        .modify(|_, w| w.i2s0_clk_en().bit(enable));
-                }
-                Peripheral::Ledc => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en0()
-                        .modify(|_, w| w.ledc_clk_en().bit(enable));
-                }
-                Peripheral::Rmt => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en0()
-                        .modify(|_, w| w.rmt_clk_en().bit(enable));
-                }
-                Peripheral::Rsa => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en1()
-                        .modify(|_, w| w.crypto_rsa_clk_en().bit(enable));
-                }
-                Peripheral::Sha => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en1()
-                        .modify(|_, w| w.crypto_sha_clk_en().bit(enable));
-                }
-                Peripheral::Spi2 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en0()
-                        .modify(|_, w| w.spi2_clk_en().bit(enable));
-                }
-                Peripheral::Systimer => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en0()
-                        .modify(|_, w| w.systimer_clk_en().bit(enable));
-                }
-                Peripheral::Timg0 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en0()
-                        .modify(|_, w| w.timergroup_clk_en().bit(enable));
-                }
-                Peripheral::Timg1 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en0()
-                        .modify(|_, w| w.timergroup1_clk_en().bit(enable));
-                }
-                Peripheral::Tsens => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en1()
-                        .modify(|_, w| w.tsens_clk_en().bit(enable));
-                }
-                Peripheral::Twai0 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en0()
-                        .modify(|_, w| w.twai_clk_en().bit(enable));
-                }
-                Peripheral::Uart0 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en0()
-                        .modify(|_, w| w.uart_clk_en().bit(enable));
-                }
-                Peripheral::Uart1 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en0()
-                        .modify(|_, w| w.uart1_clk_en().bit(enable));
-                }
-                Peripheral::UartMem => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en0()
-                        .modify(|_, w| w.uart_mem_clk_en().bit(enable));
-                }
-                Peripheral::Uhci0 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en0()
-                        .modify(|_, w| w.uhci0_clk_en().bit(enable));
-                }
-                Peripheral::UsbDevice => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_clk_en0()
-                        .modify(|_, w| w.usb_device_clk_en().bit(enable));
-                }
-            }
-        }
-        unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
-            match peripheral {
-                Peripheral::Aes => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en1()
-                        .modify(|_, w| w.crypto_aes_rst().bit(reset));
-                }
-                Peripheral::ApbSarAdc => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en0()
-                        .modify(|_, w| w.apb_saradc_rst().bit(reset));
-                }
-                Peripheral::Dma => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en1()
-                        .modify(|_, w| w.dma_rst().bit(reset));
-                }
-                Peripheral::Ds => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en1()
-                        .modify(|_, w| w.crypto_ds_rst().bit(reset));
-                }
-                Peripheral::Hmac => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en1()
-                        .modify(|_, w| w.crypto_hmac_rst().bit(reset));
-                }
-                Peripheral::I2cExt0 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en0()
-                        .modify(|_, w| w.i2c_ext0_rst().bit(reset));
-                }
-                Peripheral::I2s0 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en0()
-                        .modify(|_, w| w.i2s0_rst().bit(reset));
-                }
-                Peripheral::Ledc => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en0()
-                        .modify(|_, w| w.ledc_rst().bit(reset));
-                }
-                Peripheral::Rmt => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en0()
-                        .modify(|_, w| w.rmt_rst().bit(reset));
-                }
-                Peripheral::Rsa => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en1()
-                        .modify(|_, w| w.crypto_rsa_rst().bit(reset));
-                }
-                Peripheral::Sha => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en1()
-                        .modify(|_, w| w.crypto_sha_rst().bit(reset));
-                }
-                Peripheral::Spi2 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en0()
-                        .modify(|_, w| w.spi2_rst().bit(reset));
-                }
-                Peripheral::Systimer => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en0()
-                        .modify(|_, w| w.systimer_rst().bit(reset));
-                }
-                Peripheral::Timg0 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en0()
-                        .modify(|_, w| w.timergroup_rst().bit(reset));
-                }
-                Peripheral::Timg1 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en0()
-                        .modify(|_, w| w.timergroup1_rst().bit(reset));
-                }
-                Peripheral::Tsens => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en1()
-                        .modify(|_, w| w.tsens_rst().bit(reset));
-                }
-                Peripheral::Twai0 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en0()
-                        .modify(|_, w| w.twai_rst().bit(reset));
-                }
-                Peripheral::Uart0 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en0()
-                        .modify(|_, w| w.uart_rst().bit(reset));
-                }
-                Peripheral::Uart1 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en0()
-                        .modify(|_, w| w.uart1_rst().bit(reset));
-                }
-                Peripheral::UartMem => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en0()
-                        .modify(|_, w| w.uart_mem_rst().bit(reset));
-                }
-                Peripheral::Uhci0 => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en0()
-                        .modify(|_, w| w.uhci0_rst().bit(reset));
-                }
-                Peripheral::UsbDevice => {
-                    crate::peripherals::SYSTEM::regs()
-                        .perip_rst_en0()
-                        .modify(|_, w| w.usb_device_rst().bit(reset));
-                }
-            }
-        }
+        #[doc(hidden)] #[derive(Debug, Clone, Copy, PartialEq, Eq)] #[repr(u8)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))] pub enum Peripheral { #[doc
+        = "AES peripheral clock signal"] Aes, #[doc =
+        "APB_SAR_ADC peripheral clock signal"] ApbSarAdc, #[doc =
+        "DMA peripheral clock signal"] Dma, #[doc = "DS peripheral clock signal"] Ds,
+        #[doc = "HMAC peripheral clock signal"] Hmac, #[doc =
+        "I2C_EXT0 peripheral clock signal"] I2cExt0, #[doc =
+        "I2S0 peripheral clock signal"] I2s0, #[doc = "LEDC peripheral clock signal"]
+        Ledc, #[doc = "RMT peripheral clock signal"] Rmt, #[doc =
+        "RSA peripheral clock signal"] Rsa, #[doc = "SHA peripheral clock signal"] Sha,
+        #[doc = "SPI2 peripheral clock signal"] Spi2, #[doc =
+        "SYSTIMER peripheral clock signal"] Systimer, #[doc =
+        "TIMG0 peripheral clock signal"] Timg0, #[doc = "TIMG1 peripheral clock signal"]
+        Timg1, #[doc = "TSENS peripheral clock signal"] Tsens, #[doc =
+        "TWAI0 peripheral clock signal"] Twai0, #[doc = "UART0 peripheral clock signal"]
+        Uart0, #[doc = "UART1 peripheral clock signal"] Uart1, #[doc =
+        "UART_MEM peripheral clock signal"] UartMem, #[doc =
+        "UHCI0 peripheral clock signal"] Uhci0, #[doc =
+        "USB_DEVICE peripheral clock signal"] UsbDevice, } impl Peripheral { const
+        KEEP_ENABLED : & [Peripheral] = & [Self::Systimer, Self::Timg0, Self::Uart0,
+        Self::UartMem, Self::UsbDevice,]; const COUNT : usize = Self::ALL.len(); const
+        ALL : & [Self] = & [Self::Aes, Self::ApbSarAdc, Self::Dma, Self::Ds, Self::Hmac,
+        Self::I2cExt0, Self::I2s0, Self::Ledc, Self::Rmt, Self::Rsa, Self::Sha,
+        Self::Spi2, Self::Systimer, Self::Timg0, Self::Timg1, Self::Tsens, Self::Twai0,
+        Self::Uart0, Self::Uart1, Self::UartMem, Self::Uhci0, Self::UsbDevice,]; } unsafe
+        fn enable_internal_racey(peripheral : Peripheral, enable : bool) { match
+        peripheral { Peripheral::Aes => { crate ::peripherals::SYSTEM::regs()
+        .perip_clk_en1().modify(| _, w | w.crypto_aes_clk_en().bit(enable)); }
+        Peripheral::ApbSarAdc => { crate ::peripherals::SYSTEM::regs().perip_clk_en0()
+        .modify(| _, w | w.apb_saradc_clk_en().bit(enable)); } Peripheral::Dma => { crate
+        ::peripherals::SYSTEM::regs().perip_clk_en1().modify(| _, w | w.dma_clk_en()
+        .bit(enable)); } Peripheral::Ds => { crate ::peripherals::SYSTEM::regs()
+        .perip_clk_en1().modify(| _, w | w.crypto_ds_clk_en().bit(enable)); }
+        Peripheral::Hmac => { crate ::peripherals::SYSTEM::regs().perip_clk_en1()
+        .modify(| _, w | w.crypto_hmac_clk_en().bit(enable)); } Peripheral::I2cExt0 => {
+        crate ::peripherals::SYSTEM::regs().perip_clk_en0().modify(| _, w | w
+        .i2c_ext0_clk_en().bit(enable)); } Peripheral::I2s0 => { crate
+        ::peripherals::SYSTEM::regs().perip_clk_en0().modify(| _, w | w.i2s0_clk_en()
+        .bit(enable)); } Peripheral::Ledc => { crate ::peripherals::SYSTEM::regs()
+        .perip_clk_en0().modify(| _, w | w.ledc_clk_en().bit(enable)); } Peripheral::Rmt
+        => { crate ::peripherals::SYSTEM::regs().perip_clk_en0().modify(| _, w | w
+        .rmt_clk_en().bit(enable)); } Peripheral::Rsa => { crate
+        ::peripherals::SYSTEM::regs().perip_clk_en1().modify(| _, w | w
+        .crypto_rsa_clk_en().bit(enable)); } Peripheral::Sha => { crate
+        ::peripherals::SYSTEM::regs().perip_clk_en1().modify(| _, w | w
+        .crypto_sha_clk_en().bit(enable)); } Peripheral::Spi2 => { crate
+        ::peripherals::SYSTEM::regs().perip_clk_en0().modify(| _, w | w.spi2_clk_en()
+        .bit(enable)); } Peripheral::Systimer => { crate ::peripherals::SYSTEM::regs()
+        .perip_clk_en0().modify(| _, w | w.systimer_clk_en().bit(enable)); }
+        Peripheral::Timg0 => { crate ::peripherals::SYSTEM::regs().perip_clk_en0()
+        .modify(| _, w | w.timergroup_clk_en().bit(enable)); } Peripheral::Timg1 => {
+        crate ::peripherals::SYSTEM::regs().perip_clk_en0().modify(| _, w | w
+        .timergroup1_clk_en().bit(enable)); } Peripheral::Tsens => { crate
+        ::peripherals::SYSTEM::regs().perip_clk_en1().modify(| _, w | w.tsens_clk_en()
+        .bit(enable)); } Peripheral::Twai0 => { crate ::peripherals::SYSTEM::regs()
+        .perip_clk_en0().modify(| _, w | w.twai_clk_en().bit(enable)); }
+        Peripheral::Uart0 => { crate ::peripherals::SYSTEM::regs().perip_clk_en0()
+        .modify(| _, w | w.uart_clk_en().bit(enable)); } Peripheral::Uart1 => { crate
+        ::peripherals::SYSTEM::regs().perip_clk_en0().modify(| _, w | w.uart1_clk_en()
+        .bit(enable)); } Peripheral::UartMem => { crate ::peripherals::SYSTEM::regs()
+        .perip_clk_en0().modify(| _, w | w.uart_mem_clk_en().bit(enable)); }
+        Peripheral::Uhci0 => { crate ::peripherals::SYSTEM::regs().perip_clk_en0()
+        .modify(| _, w | w.uhci0_clk_en().bit(enable)); } Peripheral::UsbDevice => {
+        crate ::peripherals::SYSTEM::regs().perip_clk_en0().modify(| _, w | w
+        .usb_device_clk_en().bit(enable)); } } } unsafe fn
+        assert_peri_reset_racey(peripheral : Peripheral, reset : bool) { match peripheral
+        { Peripheral::Aes => { crate ::peripherals::SYSTEM::regs().perip_rst_en1()
+        .modify(| _, w | w.crypto_aes_rst().bit(reset)); } Peripheral::ApbSarAdc => {
+        crate ::peripherals::SYSTEM::regs().perip_rst_en0().modify(| _, w | w
+        .apb_saradc_rst().bit(reset)); } Peripheral::Dma => { crate
+        ::peripherals::SYSTEM::regs().perip_rst_en1().modify(| _, w | w.dma_rst()
+        .bit(reset)); } Peripheral::Ds => { crate ::peripherals::SYSTEM::regs()
+        .perip_rst_en1().modify(| _, w | w.crypto_ds_rst().bit(reset)); }
+        Peripheral::Hmac => { crate ::peripherals::SYSTEM::regs().perip_rst_en1()
+        .modify(| _, w | w.crypto_hmac_rst().bit(reset)); } Peripheral::I2cExt0 => {
+        crate ::peripherals::SYSTEM::regs().perip_rst_en0().modify(| _, w | w
+        .i2c_ext0_rst().bit(reset)); } Peripheral::I2s0 => { crate
+        ::peripherals::SYSTEM::regs().perip_rst_en0().modify(| _, w | w.i2s0_rst()
+        .bit(reset)); } Peripheral::Ledc => { crate ::peripherals::SYSTEM::regs()
+        .perip_rst_en0().modify(| _, w | w.ledc_rst().bit(reset)); } Peripheral::Rmt => {
+        crate ::peripherals::SYSTEM::regs().perip_rst_en0().modify(| _, w | w.rmt_rst()
+        .bit(reset)); } Peripheral::Rsa => { crate ::peripherals::SYSTEM::regs()
+        .perip_rst_en1().modify(| _, w | w.crypto_rsa_rst().bit(reset)); }
+        Peripheral::Sha => { crate ::peripherals::SYSTEM::regs().perip_rst_en1().modify(|
+        _, w | w.crypto_sha_rst().bit(reset)); } Peripheral::Spi2 => { crate
+        ::peripherals::SYSTEM::regs().perip_rst_en0().modify(| _, w | w.spi2_rst()
+        .bit(reset)); } Peripheral::Systimer => { crate ::peripherals::SYSTEM::regs()
+        .perip_rst_en0().modify(| _, w | w.systimer_rst().bit(reset)); }
+        Peripheral::Timg0 => { crate ::peripherals::SYSTEM::regs().perip_rst_en0()
+        .modify(| _, w | w.timergroup_rst().bit(reset)); } Peripheral::Timg1 => { crate
+        ::peripherals::SYSTEM::regs().perip_rst_en0().modify(| _, w | w.timergroup1_rst()
+        .bit(reset)); } Peripheral::Tsens => { crate ::peripherals::SYSTEM::regs()
+        .perip_rst_en1().modify(| _, w | w.tsens_rst().bit(reset)); } Peripheral::Twai0
+        => { crate ::peripherals::SYSTEM::regs().perip_rst_en0().modify(| _, w | w
+        .twai_rst().bit(reset)); } Peripheral::Uart0 => { crate
+        ::peripherals::SYSTEM::regs().perip_rst_en0().modify(| _, w | w.uart_rst()
+        .bit(reset)); } Peripheral::Uart1 => { crate ::peripherals::SYSTEM::regs()
+        .perip_rst_en0().modify(| _, w | w.uart1_rst().bit(reset)); } Peripheral::UartMem
+        => { crate ::peripherals::SYSTEM::regs().perip_rst_en0().modify(| _, w | w
+        .uart_mem_rst().bit(reset)); } Peripheral::Uhci0 => { crate
+        ::peripherals::SYSTEM::regs().perip_rst_en0().modify(| _, w | w.uhci0_rst()
+        .bit(reset)); } Peripheral::UsbDevice => { crate ::peripherals::SYSTEM::regs()
+        .perip_rst_en0().modify(| _, w | w.usb_device_rst().bit(reset)); } } }
     };
 }
 /// Macro to get the address range of the given memory region.
@@ -3092,8 +1911,7 @@ macro_rules! implement_peripheral_clocks {
 /// This macro provides two syntax options for each memory region:
 ///
 /// - `memory_range!("region_name")` returns the address range as a range expression (`start..end`).
-/// - `memory_range!(size as str, "region_name")` returns the size of the region as a string
-///   literal.
+/// - `memory_range!(size as str, "region_name")` returns the size of the region as a string literal.
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! memory_range {
@@ -3143,8 +1961,7 @@ macro_rules! for_each_i2c_master {
 ///
 /// This macro has one option for its "Individual matcher" case:
 ///
-/// Syntax: `($id:literal, $instance:ident, $sys:ident, $rx:ident, $tx:ident, $cts:ident,
-/// $rts:ident)`
+/// Syntax: `($id:literal, $instance:ident, $sys:ident, $rx:ident, $tx:ident, $cts:ident, $rts:ident)`
 ///
 /// Macro fragments:
 ///
@@ -3172,8 +1989,7 @@ macro_rules! for_each_uart {
 ///
 /// This macro has one option for its "Individual matcher" case:
 ///
-/// Syntax: `($instance:ident, $sys:ident, $sclk:ident [$($cs:ident),*] [$($sio:ident),*]
-/// $($is_qspi:literal)?)`
+/// Syntax: `($instance:ident, $sys:ident, $sclk:ident [$($cs:ident),*] [$($sio:ident),*] $($is_qspi:literal)?)`
 ///
 /// Macro fragments:
 ///
@@ -3183,8 +1999,7 @@ macro_rules! for_each_uart {
 /// - `$is_qspi`: a `true` literal present if the SPI instance supports QSPI.
 ///
 /// Example data:
-/// - `(SPI2, Spi2, FSPICLK [FSPICS0, FSPICS1, FSPICS2, FSPICS3, FSPICS4, FSPICS5] [FSPID, FSPIQ,
-///   FSPIWP, FSPIHD, FSPIIO4, FSPIIO5, FSPIIO6, FSPIIO7], true)`
+/// - `(SPI2, Spi2, FSPICLK [FSPICS0, FSPICS1, FSPICS2, FSPICS3, FSPICS4, FSPICS5] [FSPID, FSPIQ, FSPIWP, FSPIHD, FSPIIO4, FSPIIO5, FSPIIO6, FSPIIO7], true)`
 /// - `(SPI3, Spi3, SPI3_CLK [SPI3_CS0, SPI3_CS1, SPI3_CS2] [SPI3_D, SPI3_Q])`
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
@@ -3706,25 +2521,19 @@ macro_rules! for_each_peripheral {
 ///
 /// This macro has one option for its "Individual matcher" case:
 ///
-/// Syntax: `($n:literal, $gpio:ident ($($digital_input_function:ident =>
-/// $digital_input_signal:ident)*) ($($digital_output_function:ident =>
-/// $digital_output_signal:ident)*) ($([$pin_attribute:ident])*))`
+/// Syntax: `($n:literal, $gpio:ident ($($digital_input_function:ident => $digital_input_signal:ident)*) ($($digital_output_function:ident => $digital_output_signal:ident)*) ($([$pin_attribute:ident])*))`
 ///
 /// Macro fragments:
 ///
 /// - `$n`: the number of the GPIO. For `GPIO0`, `$n` is 0.
 /// - `$gpio`: the name of the GPIO.
-/// - `$digital_input_function`: the number of the digital function, as an identifier (i.e. for
-///   function 0 this is `_0`).
+/// - `$digital_input_function`: the number of the digital function, as an identifier (i.e. for function 0 this is `_0`).
 /// - `$digital_input_function`: the name of the digital function, as an identifier.
-/// - `$digital_output_function`: the number of the digital function, as an identifier (i.e. for
-///   function 0 this is `_0`).
+/// - `$digital_output_function`: the number of the digital function, as an identifier (i.e. for function 0 this is `_0`).
 /// - `$digital_output_function`: the name of the digital function, as an identifier.
-/// - `$pin_attribute`: `Input` and/or `Output`, marks the possible directions of the GPIO.
-///   Bracketed so that they can also be matched as optional fragments. Order is always Input first.
+/// - `$pin_attribute`: `Input` and/or `Output`, marks the possible directions of the GPIO. Bracketed so that they can also be matched as optional fragments. Order is always Input first.
 ///
-/// Example data: `(0, GPIO0 (_5 => EMAC_TX_CLK) (_1 => CLK_OUT1 _5 => EMAC_TX_CLK) ([Input]
-/// [Output]))`
+/// Example data: `(0, GPIO0 (_5 => EMAC_TX_CLK) (_1 => CLK_OUT1 _5 => EMAC_TX_CLK) ([Input] [Output]))`
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_gpio {
@@ -3778,16 +2587,12 @@ macro_rules! for_each_gpio {
 /// This macro has two options for its "Individual matcher" case:
 ///
 /// - `all`: `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
-/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` -
-///   expanded signal case, where you need the number(s) of a signal, or the general group to which
-///   the signal belongs. For example, in case of `ADC2_CH3` the expanded form looks like
-///   `(ADC2_CH3, ADCn_CHm, 2, 3)`.
+/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. For example, in case of `ADC2_CH3` the expanded form looks like `(ADC2_CH3, ADCn_CHm, 2, 3)`.
 ///
 /// Macro fragments:
 ///
 /// - `$signal`: the name of the signal.
-/// - `$group`: the name of the signal, with numbers replaced by placeholders. For `ADC2_CH3` this
-///   is `ADCn_CHm`.
+/// - `$group`: the name of the signal, with numbers replaced by placeholders. For `ADC2_CH3` this is `ADCn_CHm`.
 /// - `$number`: the numbers extracted from `$signal`.
 /// - `$gpio`: the name of the GPIO.
 ///
@@ -3832,16 +2637,12 @@ macro_rules! for_each_analog_function {
 /// This macro has two options for its "Individual matcher" case:
 ///
 /// - `all`: `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
-/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` -
-///   expanded signal case, where you need the number(s) of a signal, or the general group to which
-///   the signal belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like
-///   `(SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1)`.
+/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like `(SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1)`.
 ///
 /// Macro fragments:
 ///
 /// - `$signal`: the name of the signal.
-/// - `$group`: the name of the signal, with numbers replaced by placeholders. For `ADC2_CH3` this
-///   is `ADCn_CHm`.
+/// - `$group`: the name of the signal, with numbers replaced by placeholders. For `ADC2_CH3` this is `ADCn_CHm`.
 /// - `$number`: the numbers extracted from `$signal`.
 /// - `$gpio`: the name of the GPIO.
 ///
@@ -3882,143 +2683,36 @@ macro_rules! for_each_lp_function {
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! define_io_mux_signals {
     () => {
-        #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-        #[derive(Debug, PartialEq, Copy, Clone)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        #[doc(hidden)]
-        pub enum InputSignal {
-            SPIQ             = 0,
-            SPID             = 1,
-            SPIHD            = 2,
-            SPIWP            = 3,
-            U0RXD            = 6,
-            U0CTS            = 7,
-            U0DSR            = 8,
-            U1RXD            = 9,
-            U1CTS            = 10,
-            U1DSR            = 11,
-            I2S_MCLK         = 12,
-            I2SO_BCK         = 13,
-            I2SO_WS          = 14,
-            I2SI_SD          = 15,
-            I2SI_BCK         = 16,
-            I2SI_WS          = 17,
-            GPIO_BT_PRIORITY = 18,
-            GPIO_BT_ACTIVE   = 19,
-            CPU_GPIO_0       = 28,
-            CPU_GPIO_1       = 29,
-            CPU_GPIO_2       = 30,
-            CPU_GPIO_3       = 31,
-            CPU_GPIO_4       = 32,
-            CPU_GPIO_5       = 33,
-            CPU_GPIO_6       = 34,
-            CPU_GPIO_7       = 35,
-            EXT_ADC_START    = 45,
-            RMT_SIG_0        = 51,
-            RMT_SIG_1        = 52,
-            I2CEXT0_SCL      = 53,
-            I2CEXT0_SDA      = 54,
-            FSPICLK          = 63,
-            FSPIQ            = 64,
-            FSPID            = 65,
-            FSPIHD           = 66,
-            FSPIWP           = 67,
-            FSPICS0          = 68,
-            TWAI_RX          = 74,
-            SIG_FUNC_97      = 97,
-            SIG_FUNC_98      = 98,
-            SIG_FUNC_99      = 99,
-            SIG_FUNC_100     = 100,
-            MTCK,
-            MTMS,
-            MTDI,
-        }
-        #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-        #[derive(Debug, PartialEq, Copy, Clone)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        #[doc(hidden)]
-        pub enum OutputSignal {
-            SPIQ             = 0,
-            SPID             = 1,
-            SPIHD            = 2,
-            SPIWP            = 3,
-            SPICLK           = 4,
-            SPICS0           = 5,
-            U0TXD            = 6,
-            U0RTS            = 7,
-            U0DTR            = 8,
-            U1TXD            = 9,
-            U1RTS            = 10,
-            U1DTR            = 11,
-            I2S_MCLK         = 12,
-            I2SO_BCK         = 13,
-            I2SO_WS          = 14,
-            I2SO_SD          = 15,
-            I2SI_BCK         = 16,
-            I2SI_WS          = 17,
-            GPIO_WLAN_PRIO   = 18,
-            GPIO_WLAN_ACTIVE = 19,
-            CPU_GPIO_0       = 28,
-            CPU_GPIO_1       = 29,
-            CPU_GPIO_2       = 30,
-            CPU_GPIO_3       = 31,
-            CPU_GPIO_4       = 32,
-            CPU_GPIO_5       = 33,
-            CPU_GPIO_6       = 34,
-            CPU_GPIO_7       = 35,
-            USB_JTAG_TCK     = 36,
-            USB_JTAG_TMS     = 37,
-            USB_JTAG_TDI     = 38,
-            USB_JTAG_TDO     = 39,
-            LEDC_LS_SIG0     = 45,
-            LEDC_LS_SIG1     = 46,
-            LEDC_LS_SIG2     = 47,
-            LEDC_LS_SIG3     = 48,
-            LEDC_LS_SIG4     = 49,
-            LEDC_LS_SIG5     = 50,
-            RMT_SIG_0        = 51,
-            RMT_SIG_1        = 52,
-            I2CEXT0_SCL      = 53,
-            I2CEXT0_SDA      = 54,
-            GPIO_SD0         = 55,
-            GPIO_SD1         = 56,
-            GPIO_SD2         = 57,
-            GPIO_SD3         = 58,
-            I2SO_SD1         = 59,
-            FSPICLK          = 63,
-            FSPIQ            = 64,
-            FSPID            = 65,
-            FSPIHD           = 66,
-            FSPIWP           = 67,
-            FSPICS0          = 68,
-            FSPICS1          = 69,
-            FSPICS3          = 70,
-            FSPICS2          = 71,
-            FSPICS4          = 72,
-            FSPICS5          = 73,
-            TWAI_TX          = 74,
-            TWAI_BUS_OFF_ON  = 75,
-            TWAI_CLKOUT      = 76,
-            ANT_SEL0         = 89,
-            ANT_SEL1         = 90,
-            ANT_SEL2         = 91,
-            ANT_SEL3         = 92,
-            ANT_SEL4         = 93,
-            ANT_SEL5         = 94,
-            ANT_SEL6         = 95,
-            ANT_SEL7         = 96,
-            SIG_FUNC_97      = 97,
-            SIG_FUNC_98      = 98,
-            SIG_FUNC_99      = 99,
-            SIG_FUNC_100     = 100,
-            CLK_OUT1         = 123,
-            CLK_OUT2         = 124,
-            CLK_OUT3         = 125,
-            SPICS1           = 126,
-            USB_JTAG_TRST    = 127,
-            GPIO             = 128,
-            MTDO,
-        }
+        #[allow(non_camel_case_types, clippy::upper_case_acronyms)] #[derive(Debug,
+        PartialEq, Copy, Clone)] #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)] pub enum InputSignal { SPIQ = 0, SPID = 1, SPIHD = 2, SPIWP = 3,
+        U0RXD = 6, U0CTS = 7, U0DSR = 8, U1RXD = 9, U1CTS = 10, U1DSR = 11, I2S_MCLK =
+        12, I2SO_BCK = 13, I2SO_WS = 14, I2SI_SD = 15, I2SI_BCK = 16, I2SI_WS = 17,
+        GPIO_BT_PRIORITY = 18, GPIO_BT_ACTIVE = 19, CPU_GPIO_0 = 28, CPU_GPIO_1 = 29,
+        CPU_GPIO_2 = 30, CPU_GPIO_3 = 31, CPU_GPIO_4 = 32, CPU_GPIO_5 = 33, CPU_GPIO_6 =
+        34, CPU_GPIO_7 = 35, EXT_ADC_START = 45, RMT_SIG_0 = 51, RMT_SIG_1 = 52,
+        I2CEXT0_SCL = 53, I2CEXT0_SDA = 54, FSPICLK = 63, FSPIQ = 64, FSPID = 65, FSPIHD
+        = 66, FSPIWP = 67, FSPICS0 = 68, TWAI_RX = 74, SIG_FUNC_97 = 97, SIG_FUNC_98 =
+        98, SIG_FUNC_99 = 99, SIG_FUNC_100 = 100, MTCK, MTMS, MTDI, }
+        #[allow(non_camel_case_types, clippy::upper_case_acronyms)] #[derive(Debug,
+        PartialEq, Copy, Clone)] #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)] pub enum OutputSignal { SPIQ = 0, SPID = 1, SPIHD = 2, SPIWP = 3,
+        SPICLK = 4, SPICS0 = 5, U0TXD = 6, U0RTS = 7, U0DTR = 8, U1TXD = 9, U1RTS = 10,
+        U1DTR = 11, I2S_MCLK = 12, I2SO_BCK = 13, I2SO_WS = 14, I2SO_SD = 15, I2SI_BCK =
+        16, I2SI_WS = 17, GPIO_WLAN_PRIO = 18, GPIO_WLAN_ACTIVE = 19, CPU_GPIO_0 = 28,
+        CPU_GPIO_1 = 29, CPU_GPIO_2 = 30, CPU_GPIO_3 = 31, CPU_GPIO_4 = 32, CPU_GPIO_5 =
+        33, CPU_GPIO_6 = 34, CPU_GPIO_7 = 35, USB_JTAG_TCK = 36, USB_JTAG_TMS = 37,
+        USB_JTAG_TDI = 38, USB_JTAG_TDO = 39, LEDC_LS_SIG0 = 45, LEDC_LS_SIG1 = 46,
+        LEDC_LS_SIG2 = 47, LEDC_LS_SIG3 = 48, LEDC_LS_SIG4 = 49, LEDC_LS_SIG5 = 50,
+        RMT_SIG_0 = 51, RMT_SIG_1 = 52, I2CEXT0_SCL = 53, I2CEXT0_SDA = 54, GPIO_SD0 =
+        55, GPIO_SD1 = 56, GPIO_SD2 = 57, GPIO_SD3 = 58, I2SO_SD1 = 59, FSPICLK = 63,
+        FSPIQ = 64, FSPID = 65, FSPIHD = 66, FSPIWP = 67, FSPICS0 = 68, FSPICS1 = 69,
+        FSPICS3 = 70, FSPICS2 = 71, FSPICS4 = 72, FSPICS5 = 73, TWAI_TX = 74,
+        TWAI_BUS_OFF_ON = 75, TWAI_CLKOUT = 76, ANT_SEL0 = 89, ANT_SEL1 = 90, ANT_SEL2 =
+        91, ANT_SEL3 = 92, ANT_SEL4 = 93, ANT_SEL5 = 94, ANT_SEL6 = 95, ANT_SEL7 = 96,
+        SIG_FUNC_97 = 97, SIG_FUNC_98 = 98, SIG_FUNC_99 = 99, SIG_FUNC_100 = 100,
+        CLK_OUT1 = 123, CLK_OUT2 = 124, CLK_OUT3 = 125, SPICS1 = 126, USB_JTAG_TRST =
+        127, GPIO = 128, MTDO, }
     };
 }
 /// Defines and implements the `io_mux_reg` function.
@@ -4038,8 +2732,7 @@ macro_rules! define_io_mux_signals {
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! define_io_mux_reg {
     () => {
-        pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO {
-            crate::peripherals::IO_MUX::regs().gpio(gpio_num as usize)
-        }
+        pub (crate) fn io_mux_reg(gpio_num : u8) -> & 'static crate ::pac::io_mux::GPIO {
+        crate ::peripherals::IO_MUX::regs().gpio(gpio_num as usize) }
     };
 }

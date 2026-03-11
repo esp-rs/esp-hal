@@ -6,8 +6,7 @@
 //! This crate provides properties that are specific to various Espressif microcontrollers,
 //! and provides macros to work with peripherals, pins, and various other parts of the chips.
 //!
-//! This crate can be used both in firmware, as well as in build scripts, but the usage is
-//! different.
+//! This crate can be used both in firmware, as well as in build scripts, but the usage is different.
 //!
 //! ## Usage in build scripts
 //!
@@ -70,9 +69,9 @@
 //! }
 //! ```
 //!
-//! Different macros can have multiple different syntax options for their individual matchers,
-//! usually to provide more detailed information, while preserving simpler syntax for more basic use
-//! cases. Consult each macro's documentation for available options.
+//! Different macros can have multiple different syntax options for their individual matchers, usually
+//! to provide more detailed information, while preserving simpler syntax for more basic use cases.
+//! Consult each macro's documentation for available options.
 //!
 //! ### Repeated matcher
 //!

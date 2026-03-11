@@ -539,7 +539,7 @@ has_tx_fifo_watermark = true # why not s2
 bus_timeout_is_exponential = true
 
 [device.i2c_slave]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5156 }
 
 [device.rsa]
 support_status = "partial"
@@ -607,7 +607,7 @@ support_status = "partial"
 combined_uart_selector_field = true
 
 [device.bit_scrambler]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5170 }
 
 [device.assist_debug]
 support_status = "partial"
@@ -615,22 +615,22 @@ has_sp_monitor = true
 has_region_monitor = true
 
 [device.avc]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5168 }
 
 [device.twai]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5163 }
 
 [device.key_manager]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5171 }
 
 [device.touch]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5164 }
 
 [device.ds]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5159 }
 
 [device.lp_uart]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5155 }
 ram_size = 32
 
 [device.lp_i2c_master]
@@ -668,25 +668,25 @@ version = 2
 # TODO: model chip select signal (active low)
 
 [device.ledc]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5161 }
 
 [device.mcpwm]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5154 }
 
 [device.sleep]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5165 }
 
 [device.etm]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5167 }
 
 [device.hmac]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5166 }
 
 # [device.ecdsa]
 # support_status = "not_supported"
 
 [device.i2s]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5172 }
 
 [device.io_mux]
 
@@ -694,13 +694,13 @@ support_status = "not_supported"
 support_status = { status = "not_supported", issue = 5141 }
 
 [device.sd_slave]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5169 }
 
 [device.ulp_riscv]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5160 }
 
 [device.lp_timer]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5162 }
 
 [device.temp_sensor]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5153 }
