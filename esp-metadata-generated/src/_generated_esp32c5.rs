@@ -587,17 +587,18 @@ macro_rules! for_each_classified_interrupt {
 macro_rules! for_each_interrupt_priority {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_interrupt_priority { $(($pattern) => $code;)*
-        ($other : tt) => {} } _for_each_inner_interrupt_priority!((0, 1, Priority1));
-        _for_each_inner_interrupt_priority!((1, 2, Priority2));
-        _for_each_inner_interrupt_priority!((2, 3, Priority3));
-        _for_each_inner_interrupt_priority!((3, 4, Priority4));
-        _for_each_inner_interrupt_priority!((4, 5, Priority5));
-        _for_each_inner_interrupt_priority!((5, 6, Priority6));
-        _for_each_inner_interrupt_priority!((6, 7, Priority7));
-        _for_each_inner_interrupt_priority!((7, 8, Priority8));
-        _for_each_inner_interrupt_priority!((all(0, 1, Priority1), (1, 2, Priority2), (2,
-        3, Priority3), (3, 4, Priority4), (4, 5, Priority5), (5, 6, Priority6), (6, 7,
-        Priority7), (7, 8, Priority8)));
+        ($other : tt) => {} } _for_each_inner_interrupt_priority!((0, 1, Priority1,
+        Level1)); _for_each_inner_interrupt_priority!((1, 2, Priority2, Level2));
+        _for_each_inner_interrupt_priority!((2, 3, Priority3, Level3));
+        _for_each_inner_interrupt_priority!((3, 4, Priority4, Level4));
+        _for_each_inner_interrupt_priority!((4, 5, Priority5, Level5));
+        _for_each_inner_interrupt_priority!((5, 6, Priority6, Level6));
+        _for_each_inner_interrupt_priority!((6, 7, Priority7, Level7));
+        _for_each_inner_interrupt_priority!((7, 8, Priority8, Level8));
+        _for_each_inner_interrupt_priority!((all(0, 1, Priority1, Level1), (1, 2,
+        Priority2, Level2), (2, 3, Priority3, Level3), (3, 4, Priority4, Level4), (4, 5,
+        Priority5, Level5), (5, 6, Priority6, Level6), (6, 7, Priority7, Level7), (7, 8,
+        Priority8, Level8)));
     };
 }
 #[macro_export]

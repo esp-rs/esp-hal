@@ -60,6 +60,8 @@ async fn waiting_blocking_task() {
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
+    use esp_hal::gpio::{DriveMode, Flex, OutputConfig, Pull};
+
     use super::*;
 
     #[init]
@@ -70,6 +72,17 @@ mod tests {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
         let (sda, scl) = hil_test::i2c_pins!(peripherals);
+
+        // Test that the pin can be explicitly configured using Flex:
+        let mut scl = Flex::new(scl);
+        scl.apply_output_config(
+            &OutputConfig::default()
+                .with_drive_mode(DriveMode::OpenDrain)
+                .with_pull(Pull::Up),
+        );
+        scl.set_input_enable(true);
+        scl.set_output_enable(true);
+        scl.set_high();
 
         // Create a new peripheral object with the described wiring and standard
         // I2C clock speed:

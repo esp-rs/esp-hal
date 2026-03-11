@@ -691,7 +691,7 @@ support_status = "not_supported"
 [device.io_mux]
 
 [device.psram]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5141 }
 
 [device.sd_slave]
 support_status = "not_supported"

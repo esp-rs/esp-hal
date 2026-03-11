@@ -1,0 +1,32 @@
+name: Assignee inactivity reminder
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # every day at 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (log only, do not post comments)"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  reminder:
+    name: Check assigned issues
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/github-script@v8
+        env:
+          DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run }}
+        with:
+          script: |
+            const { run } = require('./.github/scripts/assignee-reminder.js');
+            const dryRun = process.env.DRY_RUN !== 'false';
+            await run({ github, context, core, dryRun });

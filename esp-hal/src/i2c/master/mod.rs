@@ -1146,15 +1146,44 @@ where
     #[procmacros::doc_replace]
     /// Connect a pin to the I2C SDA signal.
     ///
+    /// If this function is called with a pin singleton (e.g. `GPIO2`), the pin will be configured
+    /// to use the internal pull-up resistor. If this is undesired, call this function with a fully
+    /// configured [`Flex`][crate::gpio::Flex] pin driver. Note that if you use `Flex`, the I2C
+    /// driver will not change the pin's configuration in any way.
+    ///
     /// This will replace previous pin assignments for this signal.
     ///
-    /// ## Example
+    /// ## Examples
+    ///
+    /// Basic usage
     ///
     /// ```rust, no_run
     /// # {before_snippet}
     /// use esp_hal::i2c::master::{Config, I2c};
     ///
     /// let i2c = I2c::new(peripherals.I2C0, Config::default())?.with_sda(peripherals.GPIO2);
+    /// # {after_snippet}
+    /// ```
+    ///
+    /// Using `Flex` to configure the pin
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::{
+    ///     gpio::{DriveMode, Flex, OutputConfig},
+    ///     i2c::master::{Config, I2c},
+    /// };
+    ///
+    /// let mut sda = Flex::new(peripherals.GPIO2);
+    ///
+    /// // The default pullup setting is `Pull::None`.
+    /// sda.apply_output_config(&OutputConfig::default().with_drive_mode(DriveMode::OpenDrain));
+    /// sda.set_input_enable(true);
+    /// sda.set_output_enable(true);
+    /// // Initial pin state to avoid the pin to go low during peripheral configuration.
+    /// sda.set_high();
+    ///
+    /// let i2c = I2c::new(peripherals.I2C0, Config::default())?.with_sda(sda);
     /// # {after_snippet}
     /// ```
     pub fn with_sda(mut self, sda: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
@@ -1169,15 +1198,44 @@ where
     #[procmacros::doc_replace]
     /// Connect a pin to the I2C SCL signal.
     ///
+    /// If this function is called with a pin singleton (e.g. `GPIO2`), the pin will be configured
+    /// to use the internal pull-up resistor. If this is undesired, call this function with a fully
+    /// configured [`Flex`][crate::gpio::Flex] pin driver. Note that if you use `Flex`, the I2C
+    /// driver will not change the pin's configuration in any way.
+    ///
     /// This will replace previous pin assignments for this signal.
     ///
-    /// ## Example
+    /// ## Examples
+    ///
+    /// Basic usage
     ///
     /// ```rust, no_run
     /// # {before_snippet}
     /// use esp_hal::i2c::master::{Config, I2c};
     ///
     /// let i2c = I2c::new(peripherals.I2C0, Config::default())?.with_scl(peripherals.GPIO2);
+    /// # {after_snippet}
+    /// ```
+    ///
+    /// Using `Flex` to configure the pin
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::{
+    ///     gpio::{DriveMode, Flex, OutputConfig},
+    ///     i2c::master::{Config, I2c},
+    /// };
+    ///
+    /// let mut scl = Flex::new(peripherals.GPIO2);
+    ///
+    /// // The default pullup setting is `Pull::None`.
+    /// scl.apply_output_config(&OutputConfig::default().with_drive_mode(DriveMode::OpenDrain));
+    /// scl.set_input_enable(true);
+    /// scl.set_output_enable(true);
+    /// // Initial pin state to avoid the pin to go low during peripheral configuration.
+    /// scl.set_high();
+    ///
+    /// let i2c = I2c::new(peripherals.I2C0, Config::default())?.with_scl(scl);
     /// # {after_snippet}
     /// ```
     pub fn with_scl(mut self, scl: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {

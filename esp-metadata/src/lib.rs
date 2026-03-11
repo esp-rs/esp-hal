@@ -11,7 +11,12 @@ pub use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use strum::IntoEnumIterator;
 
-use crate::cfg::{PinLimitation, SupportItem, SupportStatusLevel, Value};
+mod support_status;
+
+use crate::{
+    cfg::{PinLimitation, SupportItem, Value},
+    support_status::SupportStatusLevel,
+};
 
 macro_rules! include_toml {
     (Config, $file:expr) => {{
@@ -1311,6 +1316,7 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
     writeln!(output)?;
 
     // Driver support status
+    let mut issues = Vec::new();
     for SupportItem {
         name,
         config_group,
@@ -1327,30 +1333,37 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
             let status = config.device.peri_config.support_status(config_group);
             // VSCode displays emojis just a bit wider than 2 characters, making this
             // approximation a bit too wide but good enough.
-            let support_cell_width = chip.pretty_name().len() - !status.icon().is_empty() as usize;
-            write!(output, " {:support_cell_width$} |", status.icon())?;
+            let support_cell_width =
+                chip.pretty_name().len() - !status.status.icon().is_empty() as usize;
+            if let Some(issue) = status.issue {
+                write!(output, " [{}][{issue}] [^1] |", status.status.icon())?;
+                issues.push(issue);
+            } else {
+                write!(output, " {:support_cell_width$} |", status.status.icon())?;
+            }
         }
         writeln!(output)?;
     }
 
     writeln!(output)?;
+    SupportStatusLevel::write_legend(output)?;
+    writeln!(output)?;
 
-    // Print legend
-    for s in [
-        SupportStatusLevel::NotAvailable,
-        SupportStatusLevel::NotSupported,
-        SupportStatusLevel::Partial,
-        SupportStatusLevel::Supported,
-    ] {
+    // Print issue link definitions
+    issues.sort();
+    issues.dedup();
+
+    if !issues.is_empty() {
         writeln!(
             output,
-            " * {}: {}",
-            if s.icon().is_empty() {
-                "Empty cell"
-            } else {
-                s.icon()
-            },
-            s.status()
+            "[^1]: This cell is clickable and will open the peripheral's issue on GitHub"
+        )?;
+        writeln!(output)?;
+    }
+    for issue in issues {
+        writeln!(
+            output,
+            "[{issue}]: https://github.com/esp-rs/esp-hal/issues/{issue}"
         )?;
     }
 
