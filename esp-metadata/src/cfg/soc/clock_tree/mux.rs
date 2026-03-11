@@ -108,7 +108,40 @@ impl ClockTreeNodeType for Multiplexer {
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        self.node_frequency_impl2(instance, tree)
+        let ty_name = instance.config_type_name();
+        let state = tree.properties(instance.name_str()).field_name();
+        let variants = self
+            .variants
+            .iter()
+            .map(|variant| {
+                let name = variant.config_enum_variant_name();
+
+                quote! { #ty_name::#name }
+            })
+            .collect::<Vec<_>>();
+
+        let variant_frequencies = self
+            .variants
+            .iter()
+            .map(|variant| {
+                let frequency_fn = tree.node(&variant.outputs).frequency_function_name();
+
+                quote! { #frequency_fn(clocks) }
+            })
+            .collect::<Vec<_>>();
+
+        if variant_frequencies.len() > 1 {
+            quote! {
+                match unwrap!(clocks.#state) {
+                    #(#variants => #variant_frequencies,)*
+                }
+            }
+        } else {
+            let variant_frequency = variant_frequencies.first().unwrap();
+            quote! {
+                #variant_frequency
+            }
+        }
     }
 
     fn config_type(&self, instance: &ClockTreeNodeInstance) -> TokenStream {
@@ -259,48 +292,6 @@ impl Multiplexer {
                 #configures
 
                 #apply_impl
-            }
-        }
-    }
-
-    // Allows reusing the same code for peripheral_source nodes
-    pub fn node_frequency_impl2(
-        &self,
-        instance: &ClockTreeNodeInstance,
-        tree: &ProcessedClockData,
-    ) -> TokenStream {
-        let ty_name = instance.config_type_name();
-        let state = tree.properties(instance.name_str()).field_name();
-        let variants = self
-            .variants
-            .iter()
-            .map(|variant| {
-                let name = variant.config_enum_variant_name();
-
-                quote! { #ty_name::#name }
-            })
-            .collect::<Vec<_>>();
-
-        let variant_frequencies = self
-            .variants
-            .iter()
-            .map(|variant| {
-                let frequency_fn = tree.node(&variant.outputs).frequency_function_name();
-
-                quote! { #frequency_fn(clocks) }
-            })
-            .collect::<Vec<_>>();
-
-        if variant_frequencies.len() > 1 {
-            quote! {
-                match unwrap!(clocks.#state) {
-                    #(#variants => #variant_frequencies,)*
-                }
-            }
-        } else {
-            let variant_frequency = variant_frequencies.first().unwrap();
-            quote! {
-                #variant_frequency
             }
         }
     }
