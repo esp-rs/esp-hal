@@ -78,7 +78,6 @@ cfg_if::cfg_if! {
     }
 }
 
-
 pub(crate) static mut CPU_CLOCK: u32 = LP_FAST_CLK_HZ;
 
 /// Wake up the HP core
@@ -135,32 +134,30 @@ loop:
 "#
 );
 
-#[cfg(any(esp32s2,esp32s3))]
+#[cfg(any(esp32s2, esp32s3))]
 // Include the following macros which define custom RISCV R-Type instructions...
-// 
+//
 // # getq_insn rd, qs
 // Copies the value of Qx into a general purpose register rd
-// 
+//
 // # setq_insn qd, rs
 // Copies the value of general purpose register rs to Qx
-// 
+//
 // # retirq_insn
 // Copies the value of Q0 to CPU PC, and renables interrupts
-// 
+//
 // # maskirq_insn rd, rs
-// Copies the value of the register IRQ Mask to the register rd, and copies the value of register rs to to IRQ mask.
-// 
+// Copies the value of the register IRQ Mask to the register rd, and copies the value of register rs
+// to to IRQ mask.
+//
 // # waitirq_insn rd
-// Pause execution until any interrupt (masked or unmasked) becomes pending. Stores the pending IRQ bitmask into register rd.
-global_asm!(
-    include_str!("./ulp_riscv_interrupt_ops.S")
-);
+// Pause execution until any interrupt (masked or unmasked) becomes pending. Stores the pending IRQ
+// bitmask into register rd.
+global_asm!(include_str!("./ulp_riscv_interrupt_ops.S"));
 
 // Assembly containing the reset_vector and irq_vector instructions.
 #[cfg(any(esp32s2, esp32s3))]
-global_asm!(
-    include_str!("./ulp_riscv_vectors.S")
-);
+global_asm!(include_str!("./ulp_riscv_vectors.S"));
 
 #[cfg(any(esp32s2, esp32s3))]
 global_asm!(
@@ -182,7 +179,6 @@ global_asm!(
         j loop
     "#
 );
-
 
 #[cfg(esp32s2)]
 global_asm!(
@@ -275,6 +271,48 @@ unsafe extern "C" fn _ulp_riscv_interrupt_handler(q1: u32) {
                 .write(|w| unsafe { w.bits(rtcio_int_st) });
         }
     }
+}
+
+/// Enter a critical section (disable interrupts)
+#[cfg(any(esp32s2, esp32s3))]
+pub fn ulp_disable_interrupts() {
+    // Enter a critical section by disabling all interrupts
+    // This inline assembly construct uses the t0 register and is equivalent to:
+    // > li t0, 0x80000007
+    // > maskirq_insn(zero, t0) // Mask all interrupt bits
+    //
+    // The mask 0x80000007 represents:
+    //   Bit 31 - RTC peripheral interrupt
+    //   Bit 2  - Bus error
+    //   Bit 1  - Ebreak / Ecall / Illegal Instruction
+    //   Bit 0  - Internal Timer
+    //
+    unsafe {
+        core::arch::asm!("li t0, 0x80000007", ".word 0x0602e00b");
+    }
+}
+
+/// Exit a critical section (re-enable interrupts)
+#[cfg(any(esp32s2, esp32s3))]
+pub fn ulp_enable_interrupts() {
+    // Exit a critical section by enabling all interrupts
+    // This inline assembly construct is equivalent to:
+    // > maskirq_insn(zero, zero)
+    unsafe {
+        core::arch::asm!(".word 0x0600600b");
+    }
+}
+
+/// Wait for any (even unmasked) interrupt
+#[cfg(any(esp32s2, esp32s3))]
+pub fn ulp_waitirq() -> u32 {
+    // Wait for pending interrupt, return pending interrupt mask
+    // waitirq a0
+    let result: u32;
+    unsafe {
+        core::arch::asm!(".word 0x0800400B", out("a0") result);
+    }
+    result
 }
 
 /// Entry point to the ULP program
