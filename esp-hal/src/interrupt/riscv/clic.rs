@@ -1,5 +1,5 @@
 use super::{InterruptKind, Priority, RunLevel};
-use crate::soc::pac::CLIC;
+use crate::{interrupt::ElevatedRunLevel, soc::pac::CLIC};
 
 #[cfg(feature = "rt")]
 pub(super) fn init() {
@@ -38,7 +38,9 @@ pub(super) fn set_kind_raw(cpu_interrupt: u32, kind: InterruptKind) {
 pub(super) fn set_priority_raw(cpu_interrupt: u32, priority: Priority) {
     // Lower 16 interrupts are reserved for CLINT, which is currently not implemented.
     let clic = unsafe { CLIC::steal() };
-    let prio_bits = prio_to_bits(RunLevel::Interrupt(priority));
+    let prio_bits = prio_to_bits(RunLevel::Interrupt(ElevatedRunLevel::from_priority(
+        priority,
+    )));
     // The `ctl` field would only write the 3 programmable bits, but we have the correct final
     // value anyway so let's write it directly.
     clic.int_ctl(cpu_interrupt as usize)
