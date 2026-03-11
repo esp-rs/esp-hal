@@ -181,7 +181,7 @@ impl Parse for Replacements {
                             let branches = conditions
                                 .into_iter()
                                 .map(Some)
-                                .zip(lit_strs.into_iter())
+                                .zip(lit_strs)
                                 .collect::<Vec<_>>();
                             add_inline_replacement(&arg.placeholder, branches);
                         }
