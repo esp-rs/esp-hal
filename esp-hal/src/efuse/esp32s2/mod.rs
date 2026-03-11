@@ -1,5 +1,6 @@
 use crate::peripherals::EFUSE;
 
+#[cfg_attr(not(feature = "unstable"), allow(dead_code))]
 mod fields;
 #[instability::unstable]
 pub use fields::*;
