@@ -231,8 +231,8 @@ pub fn ulp_waitirq() -> u32 {
 }
 
 /// Entry point to the ULP program
+#[unsafe(link_section = ".init.rust")]
 #[unsafe(export_name = "rust_main")]
-#[unsafe(link_section = ".init")]
 unsafe extern "C" fn lp_core_startup() -> ! {
     unsafe {
         unsafe extern "Rust" {
@@ -255,8 +255,8 @@ unsafe extern "C" fn lp_core_startup() -> ! {
 }
 
 #[cfg(any(esp32s2, esp32s3))]
+#[unsafe(link_section = ".init.rust")]
 #[unsafe(no_mangle)]
-#[unsafe(link_section = ".init")]
 unsafe extern "C" fn ulp_riscv_rescue_from_monitor() {
     // Rescue RISC-V core from monitor state.
     unsafe { &*pac::RTC_CNTL::PTR }
@@ -271,21 +271,13 @@ fn ulp_riscv_halt() -> ! {
     {
         unsafe { &*pac::RTC_CNTL::PTR }
             .cocpu_ctrl()
-            .modify(|r, w| unsafe {
-                // Read the existing register value
-                let mut cocpu_ctl = r.bits();
-                // Set the value of COCPU_SHUT_2_CLK_DIS to 0x3F,
-                // as per the ESP-IDF source: https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_utils.c#L29
-                cocpu_ctl &= 0xFFC03FFF;
-                cocpu_ctl |= 0x3F << 14;
-                // Write to the register.
-                w.bits(cocpu_ctl);
-                // Re-read the register
-                cocpu_ctl = r.bits();
-                // Set RTC_CNTL_COCPU_DONE and RTC_CNTL_COCPU_DONE
-                cocpu_ctl |= (1 << 22) | (1 << 25);
-                // Write to the register.
-                w.bits(cocpu_ctl);
+            .write(|w| unsafe {
+                w.cocpu_shut_2_clk_dis()
+                    .bits(0x3F)
+                    .cocpu_done()
+                    .set_bit()
+                    .cocpu_shut_reset_en()
+                    .set_bit();
                 w
             });
     }
