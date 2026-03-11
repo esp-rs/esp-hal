@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # LCD - RGB/Digital Parallel Interface Mode
 //!
 //! ## Overview
@@ -14,7 +15,7 @@
 //! display.
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::gpio::Level;
 //! # use esp_hal::lcd_cam::{
 //! #     LcdCam,
@@ -91,8 +92,7 @@
 //!
 //! let transfer = dpi.send(false, dma_buf).map_err(|e| e.0)?;
 //! transfer.wait();
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
 
 use core::{
@@ -102,23 +102,22 @@ use core::{
 };
 
 use crate::{
-    clock::Clocks,
-    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, Tx, TxChannelFor},
-    gpio::{interconnect::PeripheralOutput, Level, OutputSignal},
+    Blocking,
+    DriverMode,
+    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, TxChannelFor},
+    gpio::{Level, OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
-        calculate_clkm,
-        lcd::{ClockMode, DelayMode, Lcd, Phase, Polarity},
         BitOrder,
         ByteOrder,
         ClockError,
+        calculate_clkm,
+        lcd::{ClockMode, DelayMode, Lcd, Phase, Polarity},
     },
     pac,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
+    soc::clocks::ClockTree,
     system::{self, GenericPeripheralGuard},
     time::Rate,
-    Blocking,
-    DriverMode,
 };
 
 /// Errors that can occur when configuring the DPI peripheral.
@@ -131,8 +130,8 @@ pub enum ConfigError {
 
 /// Represents the RGB LCD interface.
 pub struct Dpi<'d, Dm: DriverMode> {
-    lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    tx_channel: ChannelTx<'d, Blocking, PeripheralTxChannel<LCD_CAM>>,
+    lcd_cam: LCD_CAM<'d>,
+    tx_channel: ChannelTx<Blocking, PeripheralTxChannel<LCD_CAM<'d>>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
     _mode: PhantomData<Dm>,
 }
@@ -142,15 +141,12 @@ where
     Dm: DriverMode,
 {
     /// Create a new instance of the RGB/DPI driver.
-    pub fn new<CH>(
+    pub fn new(
         lcd: Lcd<'d, Dm>,
-        channel: impl Peripheral<P = CH> + 'd,
+        channel: impl TxChannelFor<LCD_CAM<'d>>,
         config: Config,
-    ) -> Result<Self, ConfigError>
-    where
-        CH: TxChannelFor<LCD_CAM>,
-    {
-        let tx_channel = ChannelTx::new(channel.map(|ch| ch.degrade()));
+    ) -> Result<Self, ConfigError> {
+        let tx_channel = ChannelTx::new(channel.degrade());
 
         let mut this = Self {
             lcd_cam: lcd.lcd_cam,
@@ -175,18 +171,19 @@ where
     /// [`ConfigError::Clock`] variant will be returned if the frequency passed
     /// in `Config` is too low.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        let clocks = Clocks::get();
         // Due to https://www.espressif.com/sites/default/files/documentation/esp32-s3_errata_en.pdf
         // the LCD_PCLK divider must be at least 2. To make up for this the user
         // provided frequency is doubled to match.
-        let (i, divider) = calculate_clkm(
-            (config.frequency.as_hz() * 2) as _,
-            &[
-                clocks.xtal_clock.as_hz() as _,
-                clocks.cpu_clock.as_hz() as _,
-                clocks.crypto_pwm_clock.as_hz() as _,
-            ],
-        )
+        let (i, divider) = ClockTree::with(|clocks| {
+            calculate_clkm(
+                (config.frequency.as_hz() * 2) as _,
+                &[
+                    crate::soc::clocks::xtal_clk_frequency(clocks) as usize,
+                    crate::soc::clocks::pll_d2_frequency(clocks) as usize,
+                    crate::soc::clocks::crypto_pwm_clk_frequency(clocks) as usize,
+                ],
+            )
+        })
         .map_err(ConfigError::Clock)?;
 
         self.regs().lcd_clock().write(|w| unsafe {
@@ -317,10 +314,11 @@ where
     ///
     /// Sets the specified pin to push-pull output and connects it to the VSYNC
     /// signal.
-    pub fn with_vsync<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_V_SYNC.connect_to(pin);
+    pub fn with_vsync(self, pin: impl PeripheralOutput<'d>) -> Self {
+        let pin = pin.into();
+        pin.apply_output_config(&OutputConfig::default());
+        pin.set_output_enable(true);
+        OutputSignal::LCD_V_SYNC.connect_to(&pin);
 
         self
     }
@@ -329,10 +327,11 @@ where
     ///
     /// Sets the specified pin to push-pull output and connects it to the HSYNC
     /// signal.
-    pub fn with_hsync<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_H_SYNC.connect_to(pin);
+    pub fn with_hsync(self, pin: impl PeripheralOutput<'d>) -> Self {
+        let pin = pin.into();
+        pin.apply_output_config(&OutputConfig::default());
+        pin.set_output_enable(true);
+        OutputSignal::LCD_H_SYNC.connect_to(&pin);
 
         self
     }
@@ -341,10 +340,11 @@ where
     ///
     /// Sets the specified pin to push-pull output and connects it to the DE
     /// signal.
-    pub fn with_de<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_H_ENABLE.connect_to(pin);
+    pub fn with_de(self, pin: impl PeripheralOutput<'d>) -> Self {
+        let pin = pin.into();
+        pin.apply_output_config(&OutputConfig::default());
+        pin.set_output_enable(true);
+        OutputSignal::LCD_H_ENABLE.connect_to(&pin);
 
         self
     }
@@ -353,10 +353,21 @@ where
     ///
     /// Sets the specified pin to push-pull output and connects it to the PCLK
     /// signal.
-    pub fn with_pclk<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_PCLK.connect_to(pin);
+    pub fn with_pclk(self, pin: impl PeripheralOutput<'d>) -> Self {
+        let pin = pin.into();
+        pin.apply_output_config(&OutputConfig::default());
+        pin.set_output_enable(true);
+        OutputSignal::LCD_PCLK.connect_to(&pin);
+
+        self
+    }
+
+    fn with_data_pin(self, signal: OutputSignal, pin: impl PeripheralOutput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.apply_output_config(&OutputConfig::default());
+        pin.set_output_enable(true);
+        signal.connect_to(&pin);
 
         self
     }
@@ -365,198 +376,134 @@ where
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_0
     /// signal.
-    pub fn with_data0<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_DATA_0.connect_to(pin);
-
-        self
+    pub fn with_data0(self, pin: impl PeripheralOutput<'d>) -> Self {
+        self.with_data_pin(OutputSignal::LCD_DATA_0, pin)
     }
 
     /// Assign the DATA_1 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_1
     /// signal.
-    pub fn with_data1<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_DATA_1.connect_to(pin);
-
-        self
+    pub fn with_data1(self, pin: impl PeripheralOutput<'d>) -> Self {
+        self.with_data_pin(OutputSignal::LCD_DATA_1, pin)
     }
 
     /// Assign the DATA_2 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_2
     /// signal.
-    pub fn with_data2<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_DATA_2.connect_to(pin);
-
-        self
+    pub fn with_data2(self, pin: impl PeripheralOutput<'d>) -> Self {
+        self.with_data_pin(OutputSignal::LCD_DATA_2, pin)
     }
 
     /// Assign the DATA_3 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_3
     /// signal.
-    pub fn with_data3<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_DATA_3.connect_to(pin);
-
-        self
+    pub fn with_data3(self, pin: impl PeripheralOutput<'d>) -> Self {
+        self.with_data_pin(OutputSignal::LCD_DATA_3, pin)
     }
 
     /// Assign the DATA_4 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_4
     /// signal.
-    pub fn with_data4<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_DATA_4.connect_to(pin);
-
-        self
+    pub fn with_data4(self, pin: impl PeripheralOutput<'d>) -> Self {
+        self.with_data_pin(OutputSignal::LCD_DATA_4, pin)
     }
 
     /// Assign the DATA_5 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_5
     /// signal.
-    pub fn with_data5<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_DATA_5.connect_to(pin);
-
-        self
+    pub fn with_data5(self, pin: impl PeripheralOutput<'d>) -> Self {
+        self.with_data_pin(OutputSignal::LCD_DATA_5, pin)
     }
 
     /// Assign the DATA_6 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_6
     /// signal.
-    pub fn with_data6<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_DATA_6.connect_to(pin);
-
-        self
+    pub fn with_data6(self, pin: impl PeripheralOutput<'d>) -> Self {
+        self.with_data_pin(OutputSignal::LCD_DATA_6, pin)
     }
 
     /// Assign the DATA_7 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_7
     /// signal.
-    pub fn with_data7<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_DATA_7.connect_to(pin);
-
-        self
+    pub fn with_data7(self, pin: impl PeripheralOutput<'d>) -> Self {
+        self.with_data_pin(OutputSignal::LCD_DATA_7, pin)
     }
 
     /// Assign the DATA_8 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_8
     /// signal.
-    pub fn with_data8<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_DATA_8.connect_to(pin);
-
-        self
+    pub fn with_data8(self, pin: impl PeripheralOutput<'d>) -> Self {
+        self.with_data_pin(OutputSignal::LCD_DATA_8, pin)
     }
 
     /// Assign the DATA_9 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_9
     /// signal.
-    pub fn with_data9<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_DATA_9.connect_to(pin);
-
-        self
+    pub fn with_data9(self, pin: impl PeripheralOutput<'d>) -> Self {
+        self.with_data_pin(OutputSignal::LCD_DATA_9, pin)
     }
 
     /// Assign the DATA_10 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_10 signal.
-    pub fn with_data10<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_DATA_10.connect_to(pin);
-
-        self
+    pub fn with_data10(self, pin: impl PeripheralOutput<'d>) -> Self {
+        self.with_data_pin(OutputSignal::LCD_DATA_10, pin)
     }
 
     /// Assign the DATA_11 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_11 signal.
-    pub fn with_data11<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_DATA_11.connect_to(pin);
-
-        self
+    pub fn with_data11(self, pin: impl PeripheralOutput<'d>) -> Self {
+        self.with_data_pin(OutputSignal::LCD_DATA_11, pin)
     }
 
     /// Assign the DATA_12 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_12 signal.
-    pub fn with_data12<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_DATA_12.connect_to(pin);
-
-        self
+    pub fn with_data12(self, pin: impl PeripheralOutput<'d>) -> Self {
+        self.with_data_pin(OutputSignal::LCD_DATA_12, pin)
     }
 
     /// Assign the DATA_13 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_13 signal.
-    pub fn with_data13<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_DATA_13.connect_to(pin);
-
-        self
+    pub fn with_data13(self, pin: impl PeripheralOutput<'d>) -> Self {
+        self.with_data_pin(OutputSignal::LCD_DATA_13, pin)
     }
 
     /// Assign the DATA_14 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_14 signal.
-    pub fn with_data14<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_DATA_14.connect_to(pin);
-
-        self
+    pub fn with_data14(self, pin: impl PeripheralOutput<'d>) -> Self {
+        self.with_data_pin(OutputSignal::LCD_DATA_14, pin)
     }
 
     /// Assign the DATA_15 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_15 signal.
-    pub fn with_data15<S: PeripheralOutput>(self, pin: impl Peripheral<P = S> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
-        pin.set_to_push_pull_output();
-        OutputSignal::LCD_DATA_15.connect_to(pin);
-
-        self
+    pub fn with_data15(self, pin: impl PeripheralOutput<'d>) -> Self {
+        self.with_data_pin(OutputSignal::LCD_DATA_15, pin)
     }
 
     /// Sending out the [DmaTxBuffer] to the RGB/DPI interface.
     ///
-    /// - `next_frame_en`: Automatically send the next frame data when the
-    ///   current frame is sent out.
+    /// - `next_frame_en`: Automatically send the next frame data when the current frame is sent
+    ///   out.
     pub fn send<TX: DmaTxBuffer>(
         mut self,
         next_frame_en: bool,
@@ -612,7 +559,7 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
     }
 
     /// Stops this transfer on the spot and returns the peripheral and buffer.
-    pub fn stop(mut self) -> (Dpi<'d, Dm>, BUF) {
+    pub fn stop(mut self) -> (Dpi<'d, Dm>, BUF::Final) {
         self.stop_peripherals();
         let (dpi, view) = self.release();
         (dpi, BUF::from_view(view))
@@ -622,7 +569,7 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
     ///
     /// Note: If you specified `next_frame_en` as true in [Dpi::send], you're
     /// just waiting for a DMA error when you call this.
-    pub fn wait(mut self) -> (Result<(), DmaError>, Dpi<'d, Dm>, BUF) {
+    pub fn wait(mut self) -> (Result<(), DmaError>, Dpi<'d, Dm>, BUF::Final) {
         while !self.is_done() {
             core::hint::spin_loop();
         }
@@ -770,8 +717,7 @@ pub struct Format {
 
     /// Configures the byte order for data transmission.
     ///
-    /// - In 8-bit mode, [ByteOrder::Inverted] means every two bytes are
-    ///   swapped.
+    /// - In 8-bit mode, [ByteOrder::Inverted] means every two bytes are swapped.
     /// - In 16-bit mode, this controls the byte order (endianness).
     pub byte_order: ByteOrder,
 

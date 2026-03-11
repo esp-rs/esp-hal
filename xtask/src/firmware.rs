@@ -4,15 +4,15 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::ValueEnum;
 use esp_metadata::Chip;
+use serde::Deserialize;
 use strum::IntoEnumIterator as _;
 
 use crate::windows_safe_path;
 
 /// A single, configured example (or test).
-
 #[derive(Debug, Clone)]
 pub struct Metadata {
     example_path: PathBuf,
@@ -22,6 +22,7 @@ pub struct Metadata {
     tag: Option<String>,
     description: Option<String>,
     env_vars: HashMap<String, String>,
+    cargo_config: Vec<String>,
 }
 
 impl Metadata {
@@ -72,6 +73,11 @@ impl Metadata {
         &self.env_vars
     }
 
+    /// A list of all cargo `--config` values to use.
+    pub fn cargo_config(&self) -> &[String] {
+        &self.cargo_config
+    }
+
     /// If the specified chip is in the list of chips, then it is supported.
     pub fn supports_chip(&self, chip: Chip) -> bool {
         self.chip == chip
@@ -87,19 +93,27 @@ impl Metadata {
         self.description.clone()
     }
 
-    pub fn matches(&self, filter: &Option<String>) -> bool {
-        let Some(filter) = filter.as_deref() else {
+    /// Check if the example matches the given filter.
+    pub fn matches(&self, filter: Option<&str>) -> bool {
+        let Some(filter) = filter else {
             return false;
         };
 
         filter == self.binary_name() || filter == self.output_file_name()
     }
+
+    /// Check if the example matches the given name (case insensitive).
+    pub fn matches_name(&self, name: &str) -> bool {
+        name.to_lowercase() == self.binary_name() || name.to_lowercase() == self.output_file_name()
+    }
 }
 
+/// A single configuration of an example, as parsed from metadata lines.
 #[derive(Debug, Default, Clone)]
 pub struct Configuration {
     chips: Vec<Chip>,
     name: String,
+    cargo_config: Vec<String>,
     features: Vec<String>,
     esp_config: HashMap<String, String>,
     tag: Option<String>,
@@ -173,21 +187,17 @@ fn parse_meta_line(line: &str) -> anyhow::Result<MetaLine> {
 pub fn load(path: &Path) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
 
-    for entry in fs::read_dir(path)? {
-        let path = windows_safe_path(&entry?.path());
+    for entry in fs::read_dir(path).context("Failed to read {path}")? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        log::debug!("Loading example from path: {}", path.display());
+        let path = windows_safe_path(&entry.path());
         let text = fs::read_to_string(&path)
             .with_context(|| format!("Could not read {}", path.display()))?;
 
-        let mut description = None;
-
-        // collect `//!` as description
-        for line in text.lines().filter(|line| line.starts_with("//!")) {
-            let line = line.trim_start_matches("//!");
-            let mut descr: String = description.unwrap_or_default();
-            descr.push_str(line);
-            descr.push('\n');
-            description = Some(descr);
-        }
+        let description = parse_description(&text);
 
         // When the list of configuration names is missing, the metadata is applied to
         // all configurations. Each configuration encountered will create a
@@ -226,6 +236,11 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                         .map(|s| Chip::from_str(s, false).unwrap())
                         .collect::<Vec<_>>();
                     relevant_metadata.apply(|meta| meta.chips = chips.clone());
+                }
+                // A list of cargo `--config` configurations.
+                "CARGO-CONFIG" => {
+                    relevant_metadata
+                        .apply(|meta| meta.cargo_config.push(meta_line.value.to_string()));
                 }
                 // Cargo features to enable for the current configuration.
                 "FEATURES" => {
@@ -278,6 +293,8 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             // Other values are merged
             meta.features.extend_from_slice(&all_configuration.features);
             meta.esp_config.extend(all_configuration.esp_config.clone());
+            meta.cargo_config
+                .extend(all_configuration.cargo_config.clone());
         }
 
         // If no configurations are specified, fall back to the unnamed one. Otherwise
@@ -304,6 +321,7 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                     features: configuration.features.clone(),
                     tag: configuration.tag.clone(),
                     env_vars: configuration.esp_config.clone(),
+                    cargo_config: configuration.cargo_config.clone(),
                 })
             }
         }
@@ -313,4 +331,69 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
     examples.sort_by_key(|e| e.feature_set().join(","));
 
     Ok(examples)
+}
+
+#[derive(Debug, Deserialize)]
+struct CargoToml {
+    features: HashMap<String, Vec<String>>,
+}
+
+/// Load all examples by finding all packages in the given path, and parsing their metadata.
+pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
+    let mut examples = Vec::new();
+
+    let mut packages = crate::find_packages(examples_path)?;
+    packages.sort();
+
+    for package_path in packages {
+        log::debug!("Loading package from path: {}", package_path.display());
+        let cargo_toml_path = package_path.join("Cargo.toml");
+        let main_rs_path = package_path.join("src").join("main.rs");
+
+        if !cargo_toml_path.exists() || !main_rs_path.exists() {
+            continue;
+        }
+
+        let text = fs::read_to_string(&main_rs_path)?;
+        let description = parse_description(&text);
+
+        let toml = fs::read_to_string(&cargo_toml_path)?;
+        let toml: CargoToml = toml_edit::de::from_str(&toml)?;
+
+        let chips = toml
+            .features
+            .keys()
+            .filter_map(|chip| Chip::from_str(&chip, true).ok());
+
+        for chip in chips {
+            examples.push(Metadata {
+                example_path: package_path.clone(),
+                chip,
+                configuration_name: String::new(),
+                features: vec![],
+                tag: None,
+                description: description.clone(),
+                env_vars: HashMap::new(),
+                cargo_config: Vec::new(),
+            });
+        }
+    }
+
+    Ok(examples)
+}
+
+fn parse_description(text: &str) -> Option<String> {
+    let mut description = None;
+
+    for line in text.lines().filter(|line| line.starts_with("//!")) {
+        let line = line.trim_start_matches("//!");
+        let mut descr: String = description.unwrap_or_default();
+        descr.push_str(line);
+        descr.push('\n');
+        description = Some(descr);
+    }
+
+    log::debug!("Parsed description: {:?}", description);
+
+    description
 }

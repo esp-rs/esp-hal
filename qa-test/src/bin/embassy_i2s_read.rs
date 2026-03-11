@@ -6,7 +6,7 @@
 //! You can also inspect the MCLK, BCLK and WS with a logic analyzer.
 //!
 //! The following wiring is assumed:
-//! - MCLK =>  GPIO0 (not supported on ESP32)
+//! - MCLK =>  GPIO0
 //! - BCLK =>  GPIO2
 //! - WS   =>  GPIO4
 //! - DIN  =>  GPIO5
@@ -20,19 +20,22 @@ use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
     dma_buffers,
-    i2s::master::{DataFormat, I2s, Standard},
+    i2s::master::{Channels, Config, DataFormat, I2s},
+    interrupt::software::SoftwareInterruptControl,
     time::Rate,
     timer::timg::TimerGroup,
 };
 use esp_println::println;
 
-#[esp_hal_embassy::main]
+esp_bootloader_esp_idf::esp_app_desc!();
+
+#[esp_rtos::main]
 async fn main(_spawner: Spawner) {
     println!("Init!");
     let peripherals = esp_hal::init(esp_hal::Config::default());
-
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_hal_embassy::init(timg0.timer0);
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
@@ -42,28 +45,26 @@ async fn main(_spawner: Spawner) {
         }
     }
 
-    let (rx_buffer, rx_descriptors, _, tx_descriptors) = dma_buffers!(4092 * 4, 0);
+    let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(4092 * 4, 0);
 
     let i2s = I2s::new(
         peripherals.I2S0,
-        Standard::Philips,
-        DataFormat::Data16Channel16,
-        Rate::from_hz(44100),
         dma_channel,
-        rx_descriptors,
-        tx_descriptors,
+        Config::new_tdm_philips()
+            .with_sample_rate(Rate::from_hz(44100))
+            .with_data_format(DataFormat::Data16Channel16)
+            .with_channels(Channels::STEREO),
     )
+    .unwrap()
+    .with_mclk(peripherals.GPIO0)
     .into_async();
-
-    #[cfg(not(feature = "esp32"))]
-    let i2s = i2s.with_mclk(peripherals.GPIO0);
 
     let i2s_rx = i2s
         .i2s_rx
         .with_bclk(peripherals.GPIO2)
         .with_ws(peripherals.GPIO4)
         .with_din(peripherals.GPIO5)
-        .build();
+        .build(rx_descriptors);
 
     let buffer = rx_buffer;
     println!("Start");

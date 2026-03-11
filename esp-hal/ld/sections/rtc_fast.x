@@ -6,7 +6,7 @@ SECTIONS {
    *(.rtc_fast.literal .rtc_fast.text .rtc_fast.literal.* .rtc_fast.text.*)
    . = ALIGN(4);
   } > RTC_FAST_RWTEXT AT > RODATA
-  
+
   .rtc_fast.data :
   {
     . = ALIGN(4);
@@ -15,6 +15,9 @@ SECTIONS {
     _rtc_fast_data_end = ABSOLUTE(.);
     . = ALIGN(4);
   } > RTC_FAST_RWDATA AT > RODATA
+
+  /* LMA of .data */
+  _rtc_fast_sidata = LOADADDR(.rtc_fast.data);
 
  .rtc_fast.bss (NOLOAD) :
   {

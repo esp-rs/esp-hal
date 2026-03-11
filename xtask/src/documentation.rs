@@ -1,18 +1,18 @@
 use std::{
     collections::HashSet,
-    fs,
+    fs::{self, create_dir_all},
+    io::Write,
     path::{Path, PathBuf},
 };
 
-use anyhow::{ensure, Context as _, Result};
+use anyhow::{Context as _, Result, ensure};
 use clap::ValueEnum;
 use esp_metadata::Config;
-use kuchikiki::traits::*;
 use minijinja::Value;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::{cargo::CargoArgsBuilder, Chip, Package};
+use crate::{Chip, Package, cargo::CargoArgsBuilder, windows_safe_path};
 
 // ----------------------------------------------------------------------------
 // Build Documentation
@@ -22,12 +22,14 @@ struct Manifest {
     versions: HashSet<semver::Version>,
 }
 
+/// Build the documentation for the specified packages and chips.
 pub fn build_documentation(
     workspace: &Path,
     packages: &mut [Package],
     chips: &mut [Chip],
     base_url: Option<String>,
 ) -> Result<()> {
+    log::info!("Building documentation for packages: {packages:?} on chips: {chips:?}");
     let output_path = workspace.join("docs");
 
     fs::create_dir_all(&output_path)
@@ -57,7 +59,7 @@ pub fn build_documentation(
                 _ => vec![Chip::Esp32c6],
             }
         } else {
-            log::warn!("Package '{package}' does not have chip features, ignoring argument");
+            log::debug!("Package '{package}' does not have chip features, ignoring argument");
             vec![]
         };
 
@@ -77,10 +79,13 @@ pub fn build_documentation(
         // Write out the package manifest JSON file:
         fs::write(
             output_path.join(package.to_string()).join("manifest.json"),
-            serde_json::to_string(&manifest)?,
-        )?;
+            serde_json::to_string(&manifest)
+                .with_context(|| format!("Failed to parse {manifest:?}"))?,
+        )
+        .with_context(|| format!("Failed to write out {}", output_path.display()))?;
 
         // Patch the generated documentation to include a select box for the version:
+        #[cfg(feature = "deploy-docs")]
         patch_documentation_index_for_package(workspace, package, &version, &base_url)?;
     }
 
@@ -96,7 +101,7 @@ fn build_documentation_for_package(
 
     // Ensure that the package/chip combination provided are valid:
     if let Some(chip) = chip {
-        if let Err(err) = crate::validate_package_chip(package, &chip) {
+        if let Err(err) = package.validate_package_chip(&chip) {
             log::warn!("{err}");
             return Ok(());
         }
@@ -139,6 +144,34 @@ fn build_documentation_for_package(
         )
     })?;
 
+    // create "/latest" redirect - assuming that the current version is the latest
+    let latest_path = if package.chip_features_matter() {
+        output_path
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("latest")
+    } else {
+        output_path.parent().unwrap().join("latest")
+    };
+    log::info!("Creating latest version redirect at {:?}", latest_path);
+    create_dir_all(latest_path.clone())
+        .with_context(|| format!("Failed to create dir in {}", latest_path.display()))?;
+    std::fs::File::create(latest_path.clone().join("index.html"))?
+        .write_all(
+            format!(
+                "<meta http-equiv=\"refresh\" content=\"0; url=../{}/\" />",
+                if package.chip_features_matter() {
+                    version.to_string()
+                } else {
+                    format!("{}/{}", version, package.to_string().replace('-', "_"))
+                }
+            )
+            .as_bytes(),
+        )
+        .with_context(|| format!("Failed to create or write to {}", latest_path.display()))?;
+
     Ok(())
 }
 
@@ -146,6 +179,31 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     let package_name = package.to_string();
     let package_path = crate::windows_safe_path(&workspace.join(&package_name));
 
+    // Process Cargo.toml for documentation
+    let pre_process_res = pre_process_cargo_toml(chip, &package_path);
+
+    if pre_process_res.is_ok() {
+        let cargo_doc_res = cargo_doc_without_pre_processing(workspace, package, chip);
+
+        // Restore the original Cargo.toml
+        restore_cargo_toml(package_path)?;
+        cargo_doc_res
+    } else {
+        // Restore the original Cargo.toml
+        restore_cargo_toml(package_path)?;
+        Err(pre_process_res.err().unwrap())
+    }
+}
+
+fn cargo_doc_without_pre_processing(
+    workspace: &Path,
+    package: Package,
+    chip: Option<Chip>,
+) -> Result<PathBuf> {
+    let package_name = package.to_string();
+    let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+
+    // build documentation using the pre-processed Cargo.toml
     if let Some(chip) = chip {
         log::info!("Building '{package_name}' documentation targeting '{chip}'");
     } else {
@@ -159,18 +217,25 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
         "nightly"
     };
 
+    log::debug!("Using toolchain '{toolchain}'");
+
     // Determine the appropriate build target for the given package and chip,
     // if we're able to:
     let target = if let Some(ref chip) = chip {
-        Some(crate::target_triple(package, chip)?)
+        Some(package.target_triple(chip)?)
     } else {
         None
     };
 
     let mut features = vec![];
-    if let Some(chip) = chip {
+    let doc_features = if let Some(chip) = &chip {
         features.push(chip.to_string());
-        features.extend(apply_feature_rules(&package, Config::for_chip(&chip)));
+        package.doc_feature_rules(Config::for_chip(chip))
+    } else {
+        package.doc_feature_rules(&Config::empty())
+    };
+    if let Some(doc_features) = doc_features {
+        features.extend(doc_features);
     }
 
     // Build up an array of command-line arguments to pass to `cargo`:
@@ -182,13 +247,13 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
         .arg("--lib")
         .arg("--no-deps");
 
-    if let Some(target) = target {
+    if let Some(ref target) = target {
         builder = builder.target(target);
     }
 
     // Special case: `esp-metadata` requires `std`, and we get some really confusing
     // errors if we try to pass `-Zbuild-std=core`:
-    if package != Package::EspMetadata {
+    if package.needs_build_std() {
         builder = builder.arg("-Zbuild-std=alloc,core");
     }
 
@@ -211,7 +276,7 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
         workspace.join(package.to_string()).join("target")
     };
 
-    if let Some(target) = target {
+    if let Some(ref target) = target {
         docs_path = docs_path.join(target);
     }
     docs_path = docs_path.join("doc");
@@ -219,54 +284,120 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     Ok(crate::windows_safe_path(&docs_path))
 }
 
-fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
-    let chip_name = &config.name();
+/// Pre-process the Cargo.toml file
+///
+/// This will keep the orignal as "Cargo.toml_original"
+///
+/// This will check for `#DOC_IF <condition>` lines - evaluating the condition to false will turn
+/// any documenting comments into non-documenting comments until a `#DOC_ENDIF` line is encountered.
+///
+/// The only currently supported function for expressions is `has(<SYMBOL>)`
+/// e.g. `has("psram")`
+fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &PathBuf) -> Result<(), anyhow::Error> {
+    let cargo_toml = std::fs::read_to_string(windows_safe_path(&package_path.join("Cargo.toml")))
+        .with_context(|| {
+        format!(
+            "Failed to read {}",
+            package_path.join("Cargo.toml").display()
+        )
+    })?;
 
-    let mut features = vec![];
-    match package {
-        Package::EspBacktrace => features.push("defmt".to_owned()),
-        Package::EspConfig => features.push("build".to_owned()),
-        Package::EspHal => {
-            features.push("unstable".to_owned());
-            features.push("ci".to_owned());
-            match chip_name.as_str() {
-                "esp32" => features.push("psram".to_owned()),
-                "esp32s2" => features.push("psram".to_owned()),
-                "esp32s3" => features.push("psram".to_owned()),
-                _ => {}
-            };
+    std::fs::rename(
+        windows_safe_path(&package_path.join("Cargo.toml")),
+        windows_safe_path(&package_path.join("Cargo.toml_original")),
+    )
+    .with_context(|| {
+        format!(
+            "Failed to rename {}",
+            package_path.join("Cargo.toml").display()
+        )
+    })?;
+
+    let cargo_toml = cargo_toml.lines();
+
+    let chip_cfg = if let Some(chip) = &chip {
+        Some(Config::for_chip(chip))
+    } else {
+        None
+    };
+    let mut processed_cargo_toml = Vec::new();
+    let mut engine = somni_expr::Context::new();
+    engine.add_function("has", move |cond: &str| -> bool {
+        if let Some(chip_cfg) = chip_cfg {
+            chip_cfg.all().iter().any(|symbol| cond == symbol)
+        } else {
+            false
         }
-        Package::EspWifi => {
-            features.push("esp-hal/unstable".to_owned());
-            if config.contains("wifi") {
-                features.push("wifi".to_owned());
-                features.push("esp-now".to_owned());
-                features.push("sniffer".to_owned());
-                features.push("smoltcp/proto-ipv4".to_owned());
-                features.push("smoltcp/proto-ipv6".to_owned());
-            }
-            if config.contains("ble") {
-                features.push("ble".to_owned());
-            }
-            if config.contains("wifi") && config.contains("ble") {
-                features.push("coex".to_owned());
+    });
+
+    let mut hide = false;
+    for line in cargo_toml {
+        let mut line = line.to_string();
+
+        if line.starts_with("#DOC_ENDIF") {
+            hide = false;
+            continue;
+        }
+
+        if line.starts_with("#DOC_IF ") {
+            let expr = line.strip_prefix("#DOC_IF ").unwrap();
+            hide = !(engine
+                .evaluate::<bool>(expr)
+                .map_err(|err| anyhow::anyhow!(format!("{:?}", err)))
+                .with_context(|| format!("Error evaluating expression in Cargo.toml: {}", expr))?);
+            continue;
+        }
+
+        if hide {
+            if line.starts_with("#!") {
+                line = format!("#{}", line.strip_prefix("#!").unwrap_or_default());
+            } else if line.starts_with("##") {
+                line = format!("#{}", line.strip_prefix("##").unwrap_or_default());
             }
         }
-        Package::EspHalEmbassy => {
-            features.push("esp-hal/unstable".to_owned());
-        }
-        _ => {}
+
+        processed_cargo_toml.push(line);
     }
 
-    features
+    std::fs::write(
+        windows_safe_path(&package_path.join("Cargo.toml")),
+        processed_cargo_toml.join("\n"),
+    )
+    .with_context(|| {
+        format!(
+            "Failed to write pre-processed {}",
+            package_path.join("Cargo.toml").display()
+        )
+    })?;
+
+    Ok(())
 }
 
+/// Restore the original Cargo.toml file
+fn restore_cargo_toml(package_path: PathBuf) -> Result<(), anyhow::Error> {
+    if std::fs::exists(windows_safe_path(&package_path.join("Cargo.toml_original")))? {
+        if std::fs::exists(windows_safe_path(&package_path.join("Cargo.toml")))? {
+            std::fs::remove_file(windows_safe_path(&package_path.join("Cargo.toml")))?;
+        }
+
+        std::fs::rename(
+            windows_safe_path(&package_path.join("Cargo.toml_original")),
+            windows_safe_path(&package_path.join("Cargo.toml")),
+        )?;
+    }
+
+    Ok(())
+}
+
+#[cfg(feature = "deploy-docs")]
 fn patch_documentation_index_for_package(
     workspace: &Path,
     package: &Package,
     version: &semver::Version,
     base_url: &Option<String>,
 ) -> Result<()> {
+    use kuchikiki::traits::*;
+
     let package_name = package.to_string().replace('-', "_");
     let package_path = workspace.join("docs").join(package.to_string());
     let version_path = package_path.join(version.to_string());
@@ -274,7 +405,9 @@ fn patch_documentation_index_for_package(
     let mut index_paths = Vec::new();
 
     if package.chip_features_matter() {
-        for chip_path in fs::read_dir(version_path)? {
+        for chip_path in fs::read_dir(&version_path)
+            .with_context(|| format!("Failed to read {}", version_path.display()))?
+        {
             let chip_path = chip_path?.path();
             if chip_path.is_dir() {
                 let path = chip_path.join(&package_name).join("index.html");
@@ -287,7 +420,8 @@ fn patch_documentation_index_for_package(
     }
 
     for (version, index_path) in index_paths {
-        let html = fs::read_to_string(&index_path)?;
+        let html = fs::read_to_string(&index_path)
+            .with_context(|| format!("Failed to read {}", index_path.display()))?;
         let document = kuchikiki::parse_html().one(html);
 
         let elem = document
@@ -305,7 +439,8 @@ fn patch_documentation_index_for_package(
         let node = elem.as_node();
         node.append(kuchikiki::parse_html().one(html));
 
-        fs::write(&index_path, document.to_string())?;
+        fs::write(&index_path, document.to_string())
+            .with_context(|| format!("Failed to write to {}", index_path.display()))?;
     }
 
     Ok(())
@@ -314,6 +449,7 @@ fn patch_documentation_index_for_package(
 // ----------------------------------------------------------------------------
 // Build Documentation Index
 
+/// Build the documentation index for all packages.
 pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> Result<()> {
     let docs_path = workspace.join("docs");
     let resources_path = workspace.join("resources");
@@ -321,6 +457,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
     packages.sort();
 
     for package in packages {
+        log::debug!("Building documentation index for package '{package}'");
         // Not all packages have documentation built:
         if !package.is_published() {
             continue;
@@ -329,7 +466,9 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
         // If the chip features are not relevant, then there is no need to generate an
         // index for the given package's documentation:
         if !package.chip_features_matter() {
-            log::warn!("Package '{package}' does not have device-specific documentation, no need to generate an index");
+            log::warn!(
+                "Package '{package}' does not have device-specific documentation, no need to generate an index"
+            );
             continue;
         }
 
@@ -337,8 +476,17 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
         let mut device_doc_paths = Vec::new();
 
         // Each path we iterate over should be the directory for a given version of
-        // the package's documentation:
-        for version_path in fs::read_dir(package_docs_path)? {
+        // the package's documentation: (except latest)
+        if !package_docs_path.exists() {
+            log::warn!(
+                "Package documentation path does not exist: '{}', skipping",
+                package_docs_path.display()
+            );
+            continue;
+        }
+        for version_path in fs::read_dir(&package_docs_path)
+            .with_context(|| format!("Failed to read {}", &package_docs_path.display()))?
+        {
             let version_path = version_path?.path();
             if version_path.is_file() {
                 log::debug!(
@@ -348,7 +496,13 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
                 continue;
             }
 
-            for path in fs::read_dir(&version_path)? {
+            if version_path.file_name().unwrap() == "latest" {
+                continue;
+            }
+
+            for path in fs::read_dir(&version_path)
+                .with_context(|| format!("Failed to read {}", version_path.display()))?
+            {
                 let path = path?.path();
                 if path.is_dir() {
                     device_doc_paths.push(path);
@@ -360,14 +514,12 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
                 .map(|path| {
                     let chip = path
                         .components()
-                        .last()
+                        .next_back()
                         .unwrap()
                         .as_os_str()
                         .to_string_lossy();
 
-                    let chip = Chip::from_str(&chip, true).unwrap();
-
-                    chip
+                    Chip::from_str(&chip, true).unwrap()
                 })
                 .collect::<Vec<_>>();
 
@@ -382,7 +534,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
                 minijinja::context! { metadata => meta },
             )?;
             let path = version_path.join("index.html");
-            fs::write(&path, html).context(format!("Failed to write index.html"))?;
+            fs::write(&path, html).context("Failed to write index.html")?;
             log::info!("Created {}", path.display());
         }
     }
@@ -394,7 +546,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
     )
     .context("Failed to copy esp-rs.svg")?;
 
-    let meta = generate_documentation_meta_for_index(&workspace)?;
+    let meta = generate_documentation_meta_for_index(workspace)?;
 
     // Render the template to HTML and write it out to the desired path:
     let html = render_template(
@@ -403,7 +555,17 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
         minijinja::context! { metadata => meta },
     )?;
     let path = docs_path.join("index.html");
-    fs::write(&path, html).context(format!("Failed to write index.html"))?;
+    fs::write(&path, html).context("Failed to write index.html")?;
+    log::info!("Created {}", path.display());
+
+    // Render the 404 template:
+    let html = render_template(
+        &resources_path,
+        "404.html.jinja",
+        minijinja::context! { metadata => meta },
+    )?;
+    let path = docs_path.join("404.html");
+    fs::write(&path, html).context("Failed to write 404.html")?;
     log::info!("Created {}", path.display());
 
     Ok(())
@@ -420,7 +582,7 @@ fn generate_documentation_meta_for_package(
 
     for chip in chips {
         // Ensure that the package/chip combination provided are valid:
-        crate::validate_package_chip(&package, chip)?;
+        package.validate_package_chip(chip)?;
 
         // Build the context object required for rendering this particular build's
         // information on the documentation index:
@@ -432,6 +594,8 @@ fn generate_documentation_meta_for_package(
             package => package.to_string().replace('-', "_"),
         });
     }
+
+    log::debug!("Generated metadata for package '{package}': {metadata:#?}");
 
     Ok(metadata)
 }
@@ -461,6 +625,8 @@ fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Value>>
         });
     }
 
+    log::debug!("Generated metadata for documentation index: {metadata:#?}");
+
     Ok(metadata)
 }
 
@@ -477,7 +643,11 @@ fn fetch_manifest(base_url: &Option<String>, package: &Package) -> Result<Manife
 
     #[cfg(feature = "deploy-docs")]
     let manifest = match reqwest::blocking::get(manifest_url) {
-        Ok(resp) => resp.json::<Manifest>()?,
+        Ok(resp) if resp.status().is_success() => resp.json::<Manifest>()?,
+        Ok(resp) => {
+            log::warn!("Unable to fetch package manifest: {}", resp.status());
+            Manifest::default()
+        }
         Err(err) => {
             log::warn!("Unable to fetch package manifest: {err}");
             Manifest::default()
@@ -497,7 +667,7 @@ where
     let source = fs::read_to_string(resources.join(template))
         .context(format!("Failed to read {template}"))?;
 
-    let mut env = minijinja::Environment::new();
+    let mut env = minijinja::Environment::empty();
     env.add_template(template, &source)?;
 
     let tmpl = env.get_template(template)?;

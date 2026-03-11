@@ -2,18 +2,63 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 
 ### Added
 
+- `doc_replace` can now replace `__placeholders__` in-line (#5119)
+
 ### Changed
+
+- The `handler` macro no longer generates code to check the Priority (#4996)
 
 ### Fixed
 
+- Fixed the logic for determining which sections should be loaded in `load_lp_code!` macro (#4612)
+
+
 ### Removed
+
+
+## [v0.21.0] - 2025-10-30
+
+## [v0.20.0] - 2025-10-13
+
+### Added
+
+- Added support for lifetimes and generics to `BuilderLite` derive macro (#3963)
+- Added `ram(reclaimed)` as an alias for `link_section = ".dram2_uninit"` (#4245)
+
+### Changed
+
+- All `ram` proc macro options except `reclaimed` are considered `unstable` (#4309)
+
+### Fixed
+
+- Replaced `embassy_main` with `rtos_main` (intended to be called as `esp_rtos::main`) (#4172)
+
+## [v0.19.0] - 2025-07-16
+
+### Added
+
+- Added simplified conditional documentation using the `#[enable_doc_switch]` macro (#3630)
+- `error!` and `warning!` (moved from `esp-build`) (#3645)
+- Added `doc_replace` macro (#3744)
+
+### Changed
+
+- MSRV is now 1.88.0 (#3742)
+- The `handler` macro no longer accepts priority as a string (#3643)
+
+## [v0.18.0] - 2025-06-03
+
+### Changed
+
+- Using the `#[handler]` macro with a priority of `None` will fail at compile time (#3304)
+- Bump Rust edition to 2024, bump MSRV to 1.86. (#3391, #3560)
 
 ## [0.17.0] - 2025-02-24
 
@@ -22,12 +67,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `#[builder_lite(into)]` attribute that generates the setter with `impl Into<T>` parameter (#3011)
 - Added `#[builder_lite(skip_setter)]` and `#[builder_lite(skip_getter)]` attribute to skip generating setters or getters (#3011)
 - Added `#[builder_lite(skip)]` to ignore a field completely (#3011)
-
-### Changed
-
-### Fixed
-
-### Removed
 
 ## 0.16.0 - 2025-01-15
 
@@ -78,6 +117,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.1.0 - 2022-08-25
 
-- Initial release
+### Added
+
+- Initial release (#2518)
 
 [0.17.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-hal-procmacros-v0.17.0
+[v0.18.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.17.0...esp-hal-procmacros-v0.18.0
+[v0.19.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.18.0...esp-hal-procmacros-v0.19.0
+[v0.20.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.19.0...esp-hal-procmacros-v0.20.0
+[v0.21.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.20.0...esp-hal-procmacros-v0.21.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.21.0...HEAD

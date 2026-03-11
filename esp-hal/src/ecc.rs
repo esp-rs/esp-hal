@@ -9,110 +9,514 @@
 //! ECC Accelerator can complete various calculation based on different
 //! elliptic curves, thus accelerating ECC algorithm and ECC-derived
 //! algorithms (such as ECDSA).
-//!
-//! ## Configuration
-//! ECC Accelerator supports:
-//! - Two different elliptic curves, namely P-192 and P-256 defined in FIPS
-//!   186-3.
-//! - Seven working modes.
-//! - Interrupt upon completion of calculation.
-//!
-//! Inputs of the ECC hardware accelerator must be provided in big-endian
-//! representation. The driver handles the inner representation of the blocks.
-//!
-//! ## Examples
-//! Visit the [ECC] test for an example of using the ECC Accelerator.
-//!
-//! [ECC]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/ecc.rs
 
-use core::marker::PhantomData;
+use core::{marker::PhantomData, ptr::NonNull};
+
+use procmacros::BuilderLite;
 
 use crate::{
-    interrupt::InterruptHandler,
-    pac,
-    peripheral::{Peripheral, PeripheralRef},
-    peripherals::{Interrupt, ECC},
-    reg_access::{AlignmentHelper, SocDependentEndianess},
-    system::{self, GenericPeripheralGuard},
     Blocking,
     DriverMode,
+    interrupt::InterruptHandler,
+    pac::{self, ecc::mult_conf::KEY_LENGTH},
+    peripherals::{ECC, Interrupt},
+    private::Sealed,
+    system::{self, GenericPeripheralGuard},
+    work_queue::{Handle, Poll, Status, VTable, WorkQueue, WorkQueueDriver, WorkQueueFrontend},
 };
 
-/// The ECC Accelerator driver instance
+/// This macro defines 4 other macros:
+/// - `doc_summary` that takes the first line of the documentation and returns it as a string
+/// - `result_type` that generates the return types for each operation
+/// - `operation` that generates the operation function
+/// - `backend_operation` that generates the backend operation function
+///
+/// These generated macros can then be fed to `for_each_ecc_working_mode!` to generate operations
+/// the device supports.
+macro_rules! define_operations {
+    ($($op:tt {
+        // The first line is used for summary, and it is prepended with `# ` on the driver method.
+        docs: [$first_line:literal $(, $lines:literal)*],
+        // The driver method name
+        function: $function:ident,
+        // Whether the operation is modular, i.e. whether it needs a modulus argument.
+        $(modular_arithmetic_method: $is_modular:literal,)?
+        // Whether the operation does point verification first.
+        $(verifies_point: $verifies_point:literal,)?
+        // Input parameters. This determines the name and order of the function arguments,
+        // as well as which memory block they will be written to. Depending on the value of
+        // cfg(ecc_separate_jacobian_point_memory), qx, qy and qz may be mapped to px, py and k.
+        inputs: [$($input:ident),*],
+        // What data does the output contain?
+        // - Scalar (and which memory block contains the scalar)
+        // - AffinePoint
+        // - JacobianPoint
+        returns: [
+            $(
+                // What data is computed may be device specific.
+                $(#[$returns_meta:meta])*
+                $returns:ident $({ const $c:ident: $t:tt = $v:expr })?
+            ),*
+        ]
+    }),*) => {
+        macro_rules! doc_summary {
+            $(
+                ($op) => { $first_line };
+            )*
+        }
+        macro_rules! result_type {
+            $(
+                ($op) => {
+                    #[doc = concat!("A marker type representing ", doc_summary!($op))]
+                    #[non_exhaustive]
+                    pub struct $op;
+
+                    impl crate::private::Sealed for $op {}
+
+                    impl EccOperation for $op {
+                        const WORK_MODE: WorkMode = WorkMode::$op;
+                        const VERIFIES_POINT: bool = $crate::if_set!($($verifies_point)?, false);
+                    }
+
+                    paste::paste! {
+                        $(
+                            $(#[$returns_meta])*
+                            impl [<OperationReturns $returns>] for $op {
+                                $(
+                                    const $c: $t = $v;
+                                )?
+                            }
+                        )*
+
+                        $(
+                            const _: bool = $verifies_point; // I just need this ignored.
+                            impl OperationVerifiesPoint for $op {}
+                        )?
+                    }
+                };
+            )*
+        }
+        macro_rules! driver_method {
+            $(
+                ($op) => {
+                    #[doc = concat!("# ", $first_line)]
+                    $(#[doc = $lines])*
+                    #[doc = r"
+
+## Errors
+
+This function will return an error if the bitlength of the parameters is different
+from the bitlength of the prime fields of the curve."]
+                    #[inline]
+                    pub fn $function<'op>(
+                        &'op mut self,
+                        curve: EllipticCurve,
+                        $(#[cfg($is_modular)] modulus: EccModBase,)?
+                        $($input: &[u8],)*
+                    ) -> Result<EccResultHandle<'op, $op>, KeyLengthMismatch> {
+                        curve.size_check([$($input),*])?;
+
+                        paste::paste! {
+                            $(
+                                self.info().write_mem(self.info().[<$input _mem>](), $input);
+                            )*
+                        };
+
+                        #[cfg(ecc_has_modular_arithmetic)]
+                        let mod_base = $crate::if_set! {
+                            $(
+                                {
+                                    $crate::ignore!($is_modular);
+                                    modulus
+                                }
+                            )?,
+                            // else
+                            EccModBase::OrderOfCurve
+                        };
+
+                        Ok(self.run_operation::<$op>(
+                            curve,
+                            #[cfg(ecc_has_modular_arithmetic)] mod_base,
+                        ))
+                    }
+                };
+            )*
+        }
+
+        macro_rules! backend_operation {
+            $(
+                ($op) => {
+                    #[doc = concat!("Configures a new ", $first_line, " operation with the given inputs, to be executed on [`EccBackend`].")]
+                    ///
+                    /// Outputs need to be assigned separately before executing the operation.
+                    pub fn $function<'op>(
+                        self,
+                        $(#[cfg($is_modular)] modulus: EccModBase,)?
+                        $($input: &'op [u8],)*
+                    ) -> Result<EccBackendOperation<'op, $op>, KeyLengthMismatch> {
+                        self.size_check([&$($input,)*])?;
+
+                        #[cfg(ecc_has_modular_arithmetic)]
+                        let mod_base = $crate::if_set! {
+                            $(
+                                {
+                                    $crate::ignore!($is_modular);
+                                    modulus
+                                }
+                            )?,
+                            // else
+                            EccModBase::OrderOfCurve
+                        };
+
+                        let work_item = EccWorkItem {
+                            curve: self,
+                            operation: WorkMode::$op,
+                            cancelled: false,
+                            #[cfg(ecc_has_modular_arithmetic)]
+                            mod_base,
+                            inputs: {
+                                let mut inputs = MemoryPointers::default();
+                                $(
+                                    paste::paste! {
+                                        inputs.[<set_ $input>](NonNull::from($input));
+                                    };
+                                )*
+                                inputs
+                            },
+                            point_verification_result: false,
+                            outputs: MemoryPointers::default(),
+                        };
+
+                        Ok(EccBackendOperation::new(work_item))
+                    }
+                };
+            )*
+        }
+    }
+}
+
+define_operations! {
+    AffinePointMultiplication {
+        docs: [
+            "Base Point Multiplication",
+            "",
+            "This operation performs `(Qx, Qy) = k * (Px, Py)`."
+        ],
+        function: affine_point_multiplication,
+        inputs: [k, px, py],
+        returns: [AffinePoint]
+    },
+
+    AffinePointVerification {
+        docs: [
+            "Base Point Verification",
+            "",
+            "This operation verifies whether Point (Px, Py) is on the selected elliptic curve."
+        ],
+        function: affine_point_verification,
+        verifies_point: true,
+        inputs: [px, py],
+        returns: []
+    },
+
+    AffinePointVerificationAndMultiplication {
+        docs: [
+            "Base Point Verification and Multiplication",
+            "",
+            "This operation verifies whether Point (Px, Py) is on the selected elliptic curve and performs `(Qx, Qy) = k * (Px, Py)`."
+        ],
+        function: affine_point_verification_multiplication,
+        verifies_point: true,
+        inputs: [k, px, py],
+        returns: [
+            AffinePoint,
+            #[cfg(ecc_separate_jacobian_point_memory)]
+            JacobianPoint
+        ]
+    },
+
+    AffinePointAddition {
+        docs: [
+            "Point Addition",
+            "",
+            "This operation performs `(Rx, Ry) = (Jx, Jy, Jz) = (Px, Py, 1) + (Qx, Qy, Qz)`."
+        ],
+        function: affine_point_addition,
+        inputs: [px, py, qx, qy, qz],
+        returns: [
+            AffinePoint,
+            #[cfg(ecc_separate_jacobian_point_memory)]
+            JacobianPoint
+        ]
+    },
+
+    JacobianPointMultiplication {
+        docs: [
+            "Jacobian Point Multiplication",
+            "",
+            "This operation performs `(Qx, Qy, Qz) = k * (Px, Py, 1)`."
+        ],
+        function: jacobian_point_multiplication,
+        inputs: [k, px, py],
+        returns: [
+            JacobianPoint
+        ]
+    },
+
+    JacobianPointVerification {
+        docs: [
+            "Jacobian Point Verification",
+            "",
+            "This operation verifies whether Point (Qx, Qy, Qz) is on the selected elliptic curve."
+        ],
+        function: jacobian_point_verification,
+        verifies_point: true,
+        inputs: [qx, qy, qz],
+        returns: [
+            JacobianPoint
+        ]
+    },
+
+    AffinePointVerificationAndJacobianPointMultiplication {
+        docs: [
+            "Base Point Verification + Jacobian Point Multiplication",
+            "",
+            "This operation first verifies whether Point (Px, Py) is on the selected elliptic curve. If yes, it performs `(Qx, Qy, Qz) = k * (Px, Py, 1)`."
+        ],
+        function: affine_point_verification_jacobian_multiplication,
+        verifies_point: true,
+        inputs: [k, px, py],
+        returns: [
+            JacobianPoint
+        ]
+    },
+
+    FiniteFieldDivision {
+        docs: [
+            "Finite Field Division",
+            "",
+            "This operation performs `R = Py * k^{−1} mod p`."
+        ],
+        function: finite_field_division,
+        inputs: [k, py],
+        returns: [
+            Scalar { const LOCATION: ScalarResultLocation = ScalarResultLocation::Py }
+        ]
+    },
+
+    ModularAddition {
+        docs: [
+            "Modular Addition",
+            "",
+            "This operation performs `R = Px + Py mod p`."
+        ],
+        function: modular_addition,
+        modular_arithmetic_method: true,
+        inputs: [px, py],
+        returns: [
+            Scalar { const LOCATION: ScalarResultLocation = ScalarResultLocation::Px }
+        ]
+    },
+
+    ModularSubtraction {
+        docs: [
+            "Modular Subtraction",
+            "",
+            "This operation performs `R = Px - Py mod p`."
+        ],
+        function: modular_subtraction,
+        modular_arithmetic_method: true,
+        inputs: [px, py],
+        returns: [
+            Scalar { const LOCATION: ScalarResultLocation = ScalarResultLocation::Px }
+        ]
+    },
+
+    ModularMultiplication {
+        docs: [
+            "Modular Multiplication",
+            "",
+            "This operation performs `R = Px * Py mod p`."
+        ],
+        function: modular_multiplication,
+        modular_arithmetic_method: true,
+        inputs: [px, py],
+        returns: [
+            Scalar { const LOCATION: ScalarResultLocation = ScalarResultLocation::Py }
+        ]
+    },
+
+    ModularDivision {
+        docs: [
+            "Modular Division",
+            "",
+            "This operation performs `R = Px * Py^{−1} mod p`."
+        ],
+        function: modular_division,
+        modular_arithmetic_method: true,
+        inputs: [px, py],
+        returns: [
+            Scalar { const LOCATION: ScalarResultLocation = ScalarResultLocation::Py }
+        ]
+    }
+}
+
+const MEM_BLOCK_SIZE: usize = property!("ecc.mem_block_size");
+
+/// The ECC Accelerator driver.
+///
+/// Note that as opposed to commonly used standards, this driver operates on
+/// **little-endian** data.
 pub struct Ecc<'d, Dm: DriverMode> {
-    ecc: PeripheralRef<'d, ECC>,
-    alignment_helper: AlignmentHelper<SocDependentEndianess>,
+    _ecc: ECC<'d>,
     phantom: PhantomData<Dm>,
+    _memory_guard: EccMemoryPowerGuard,
     _guard: GenericPeripheralGuard<{ system::Peripheral::Ecc as u8 }>,
 }
 
-/// ECC interface error
-#[derive(Debug)]
-pub enum Error {
-    /// It means the purpose of the selected block does not match the
-    /// configured key purpose and the calculation will not proceed.
-    SizeMismatchCurve,
-    /// It means that the point is not on the curve.
-    PointNotOnSelectedCurve,
+struct EccMemoryPowerGuard;
+
+impl EccMemoryPowerGuard {
+    fn new() -> Self {
+        #[cfg(soc_has_pcr)]
+        crate::peripherals::PCR::regs()
+            .ecc_pd_ctrl()
+            .modify(|_, w| {
+                w.ecc_mem_force_pd().clear_bit();
+                w.ecc_mem_force_pu().set_bit();
+                w.ecc_mem_pd().clear_bit()
+            });
+        Self
+    }
 }
 
-/// Represents supported elliptic curves for cryptographic operations.
-pub enum EllipticCurve {
-    /// The P-192 elliptic curve, a 192-bit curve.
-    P192 = 0,
-    /// The P-256 elliptic curve. a 256-bit curve.
-    P256 = 1,
+impl Drop for EccMemoryPowerGuard {
+    fn drop(&mut self) {
+        #[cfg(soc_has_pcr)]
+        crate::peripherals::PCR::regs()
+            .ecc_pd_ctrl()
+            .modify(|_, w| {
+                w.ecc_mem_force_pd().clear_bit();
+                w.ecc_mem_force_pu().clear_bit();
+                w.ecc_mem_pd().set_bit()
+            });
+    }
 }
 
-#[derive(Clone)]
-/// Represents the operational modes for elliptic curve or modular arithmetic
-/// computations.
-pub enum WorkMode {
-    /// Point multiplication mode.
-    PointMultiMode          = 0,
-    #[cfg(esp32c2)]
-    /// Division mode.
-    DivisionMode            = 1,
-    /// Point verification mode.
-    PointVerif              = 2,
-    /// Point verification and multiplication mode.
-    PointVerifMulti         = 3,
-    /// Jacobian point multiplication mode.
-    JacobianPointMulti      = 4,
-    #[cfg(esp32h2)]
-    /// Point addition mode.
-    PointAdd                = 5,
-    /// Jacobian point verification mode.
-    JacobianPointVerif      = 6,
-    /// Point verification and multiplication in Jacobian coordinates.
-    PointVerifJacobianMulti = 7,
-    #[cfg(esp32h2)]
-    /// Modular addition mode.
-    ModAdd                  = 8,
-    #[cfg(esp32h2)]
-    /// Modular subtraction mode.
-    ModSub                  = 9,
-    #[cfg(esp32h2)]
-    /// Modular multiplication mode.
-    ModMulti                = 10,
-    #[cfg(esp32h2)]
-    /// Modular division mode.
-    ModDiv                  = 11,
+/// ECC peripheral configuration.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Config {
+    /// Force enable register clock.
+    force_enable_reg_clock: bool,
+
+    /// Force enable memory clock.
+    #[cfg(ecc_has_memory_clock_gate)]
+    force_enable_mem_clock: bool,
+
+    /// Enable constant time operation and minimized power consumption variation for
+    /// point-multiplication operations.
+    #[cfg_attr(
+        esp32h2,
+        doc = r"
+
+Only available on chip revision 1.2 and above."
+    )]
+    #[cfg(ecc_supports_enhanced_security)]
+    enhanced_security: bool,
+}
+
+/// The length of the arguments do not match the length required by the curve.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KeyLengthMismatch;
+
+/// ECC operation error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OperationError {
+    /// The length of the arguments do not match the length required by the curve.
+    ParameterLengthMismatch,
+
+    /// Point verification failed.
+    PointNotOnCurve,
+}
+
+/// Modulus base.
+#[cfg(ecc_has_modular_arithmetic)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EccModBase {
+    /// The order of the curve.
+    OrderOfCurve = 0,
+
+    /// Prime modulus.
+    PrimeModulus = 1,
+}
+
+impl From<KeyLengthMismatch> for OperationError {
+    fn from(_: KeyLengthMismatch) -> Self {
+        OperationError::ParameterLengthMismatch
+    }
+}
+
+for_each_ecc_curve! {
+    (all $(( $id:literal, $name:ident, $bits:literal )),*) => {
+        /// Represents supported elliptic curves for cryptographic operations.
+        ///
+        /// The methods that represent operations require the `EccBackend` to be started before use.
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum EllipticCurve {
+            $(
+                #[doc = concat!("The ", stringify!($name), " elliptic curve, a ", $bits, "-bit curve.")]
+                $name,
+            )*
+        }
+        impl EllipticCurve {
+            /// Returns the size of the elliptic curve in bytes.
+            pub const fn size(self) -> usize {
+                match self {
+                    $(
+                        EllipticCurve::$name => $bits / 8,
+                    )*
+                }
+            }
+        }
+    };
+}
+
+for_each_ecc_working_mode! {
+    (all $(($wm_id:literal, $op:tt)),*) => {
+        impl EllipticCurve {
+            fn size_check<const N: usize>(&self, params: [&[u8]; N]) -> Result<(), KeyLengthMismatch> {
+                let bytes = self.size();
+
+                if params.iter().any(|p| p.len() != bytes) {
+                    return Err(KeyLengthMismatch);
+                }
+
+                Ok(())
+            }
+
+            $(
+                // Macro defined by `define_operations`
+                backend_operation!($op);
+            )*
+        }
+    };
 }
 
 impl<'d> Ecc<'d, Blocking> {
     /// Create a new instance in [Blocking] mode.
-    pub fn new(ecc: impl Peripheral<P = ECC> + 'd) -> Self {
-        crate::into_ref!(ecc);
-
-        let guard = GenericPeripheralGuard::new();
-
-        Self {
-            ecc,
-            alignment_helper: AlignmentHelper::default(),
+    pub fn new(ecc: ECC<'d>, config: Config) -> Self {
+        let this = Self {
+            _ecc: ecc,
             phantom: PhantomData,
-            _guard: guard,
-        }
+            _memory_guard: EccMemoryPowerGuard::new(),
+            _guard: GenericPeripheralGuard::new(),
+        };
+
+        this.info().apply_config(&config);
+
+        this
     }
 }
 
@@ -125,898 +529,790 @@ impl crate::interrupt::InterruptConfigurable for Ecc<'_, Blocking> {
     }
 }
 
-impl<Dm: DriverMode> Ecc<'_, Dm> {
-    fn regs(&self) -> &pac::ecc::RegisterBlock {
-        self.ecc.register_block()
+struct Info {
+    regs: &'static pac::ecc::RegisterBlock,
+}
+
+impl Info {
+    fn reset(&self) {
+        self.regs.mult_conf().reset()
     }
 
-    /// Resets the ECC peripheral.
-    pub fn reset(&mut self) {
-        self.regs().mult_conf().reset()
-    }
+    fn apply_config(&self, config: &Config) {
+        self.regs.mult_conf().modify(|_, w| {
+            w.clk_en().bit(config.force_enable_reg_clock);
 
-    /// # Base point multiplication
-    ///
-    /// Base Point Multiplication can be represented as:
-    /// (Q_x, Q_y) = k * (P_x, P_y)
-    ///
-    /// Output is stored in `x` and `y`.
-    ///
-    /// # Error
-    ///
-    /// This function will return an error if any bitlength value is different
-    /// from the bitlength of the prime fields of the curve.
-    pub fn affine_point_multiplication(
-        &mut self,
-        curve: &EllipticCurve,
-        k: &[u8],
-        x: &mut [u8],
-        y: &mut [u8],
-    ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || x.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                false
+            #[cfg(ecc_has_memory_clock_gate)]
+            w.mem_clock_gate_force_on()
+                .bit(config.force_enable_mem_clock);
+
+            #[cfg(ecc_supports_enhanced_security)]
+            if !cfg!(esp32h2) || crate::soc::chip_revision_above(102) {
+                w.security_mode().bit(config.enhanced_security);
             }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || x.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                true
-            }
-        };
-        let mode = WorkMode::PointMultiMode;
 
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().k_mem(0).as_ptr(), tmp.as_ref(), 8);
-        self.reverse_words(x, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            8,
-        );
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            8,
-        );
-
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode()
-                .bits(mode as u8)
-                .key_length()
-                .bit(curve)
-                .start()
-                .set_bit()
+            w
         });
-
-        // wait for interrupt
-        while self.is_busy() {}
-
-        self.alignment_helper
-            .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 8);
-        self.reverse_words(tmp.as_ref(), x);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 8);
-        self.reverse_words(tmp.as_ref(), y);
-
-        Ok(())
     }
 
-    /// # Finite Field Division
-    ///
-    /// Finite Field Division can be represented as:
-    /// Result = P_y * k^{−1} mod p
-    ///
-    /// Output is stored in `y`.
-    ///
-    /// # Error
-    ///
-    /// This function will return an error if any bitlength value is different
-    /// from the bitlength of the prime fields of the curve.
-    #[cfg(esp32c2)]
-    pub fn finite_field_division(
-        &mut self,
-        curve: &EllipticCurve,
-        k: &[u8],
-        y: &mut [u8],
-    ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                false
-            }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                true
-            }
-        };
-        let mode = WorkMode::DivisionMode;
-
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().k_mem(0).as_ptr(), tmp.as_ref(), 8);
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            8,
-        );
-
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode()
-                .bits(mode as u8)
-                .key_length()
-                .bit(curve)
-                .start()
-                .set_bit()
-        });
-
-        // wait for interrupt
-        while self.is_busy() {}
-
-        self.alignment_helper
-            .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 8);
-        self.reverse_words(tmp.as_ref(), y);
-
-        Ok(())
+    fn check_point_verification_result(&self) -> Result<(), OperationError> {
+        if self
+            .regs
+            .mult_conf()
+            .read()
+            .verification_result()
+            .bit_is_set()
+        {
+            Ok(())
+        } else {
+            Err(OperationError::PointNotOnCurve)
+        }
     }
 
-    /// # Base Point Verification
-    ///
-    /// Base Point Verification can be used to verify if a point (Px, Py) is
-    /// on a selected elliptic curve.
-    ///
-    /// # Error
-    ///
-    /// This function will return an error if any bitlength value is different
-    /// from the bitlength of the prime fields of the curve.
-    ///
-    /// This function will return an error if the point is not on the selected
-    /// elliptic curve.
-    pub fn affine_point_verification(
-        &mut self,
-        curve: &EllipticCurve,
-        x: &[u8],
-        y: &[u8],
-    ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if x.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                false
-            }
-            EllipticCurve::P256 => {
-                if x.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                true
-            }
-        };
-        let mode = WorkMode::PointVerif;
+    #[inline]
+    fn write_mem(&self, mut word_ptr: *mut u32, data: &[u8]) {
+        // Note that at least the C2 requires writing this memory in words.
 
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(x, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            8,
-        );
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            8,
-        );
+        debug_assert!(data.len() <= MEM_BLOCK_SIZE);
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode()
-                .bits(mode as u8)
-                .key_length()
-                .bit(curve)
-                .start()
-                .set_bit()
-        });
+        #[cfg(ecc_zero_extend_writes)]
+        let end = word_ptr.wrapping_byte_add(MEM_BLOCK_SIZE);
 
-        // wait for interrupt
-        while self.is_busy() {}
+        let (chunks, remainder) = data.as_chunks::<4>();
+        debug_assert!(remainder.is_empty());
 
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
+        for word_bytes in chunks {
+            unsafe { word_ptr.write_volatile(u32::from_le_bytes(*word_bytes)) };
+            word_ptr = word_ptr.wrapping_add(1);
         }
 
-        Ok(())
-    }
-
-    /// # Base Point Verification + Base Point Multiplication
-    ///
-    /// In this working mode, ECC first verifies if Point (P_x, P_y) is on the
-    /// selected elliptic curve or not. If yes, then perform the multiplication:
-    /// (Q_x, Q_y) = k * (P_x, P_y)
-    ///
-    /// Output is stored in `x` and `y`.
-    ///
-    /// # Error
-    ///
-    /// This function will return an error if any bitlength value is different
-    /// from the bitlength of the prime fields of the curve.
-    ///
-    /// This function will return an error if the point is not on the selected
-    /// elliptic curve.
-    #[cfg(not(esp32h2))]
-    pub fn affine_point_verification_multiplication(
-        &mut self,
-        curve: &EllipticCurve,
-        k: &[u8],
-        x: &mut [u8],
-        y: &mut [u8],
-    ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || x.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                false
-            }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || x.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                true
-            }
-        };
-        let mode = WorkMode::PointVerifMulti;
-
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().k_mem(0).as_ptr(), tmp.as_ref(), 8);
-        self.reverse_words(x, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            8,
-        );
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            8,
-        );
-
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode()
-                .bits(mode as u8)
-                .key_length()
-                .bit(curve)
-                .start()
-                .set_bit()
-        });
-
-        // wait for interrupt
-        while self.is_busy() {}
-
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
+        #[cfg(ecc_zero_extend_writes)]
+        while word_ptr < end {
+            unsafe { word_ptr.write_volatile(0) };
+            word_ptr = word_ptr.wrapping_add(1);
         }
-
-        self.alignment_helper
-            .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 8);
-        self.reverse_words(tmp.as_ref(), x);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 8);
-        self.reverse_words(tmp.as_ref(), y);
-
-        Ok(())
     }
 
-    /// # Base Point Verification + Base Point Multiplication
-    ///
-    /// In this working mode, ECC first verifies if Point (P_x, P_y) is on the
-    /// selected elliptic curve or not. If yes, then perform the multiplication:
-    /// (Q_x, Q_y) = (J_x, J_y, J_z) = k * (P_x, P_y)
-    ///
-    /// The affine point representation output is stored in `px` and `py`.
-    /// The Jacobian point representation output is stored in `qx`, `qy`, and
-    /// `qz`.
-    ///
-    /// # Error
-    ///
-    /// This function will return an error if any bitlength value is different
-    /// from the bitlength of the prime fields of the curve.
-    ///
-    /// This function will return an error if the point is not on the selected
-    /// elliptic curve.
-    #[allow(clippy::too_many_arguments)]
-    #[cfg(esp32h2)]
-    pub fn affine_point_verification_multiplication(
-        &mut self,
-        curve: &EllipticCurve,
-        k: &[u8],
-        px: &mut [u8],
-        py: &mut [u8],
-        qx: &mut [u8],
-        qy: &mut [u8],
-        qz: &mut [u8],
-    ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || px.len() != 24 || py.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                false
-            }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || px.len() != 32 || py.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                true
-            }
-        };
-        let mode = WorkMode::PointVerifMulti;
-
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().k_mem(0).as_ptr(), tmp.as_ref(), 8);
-        self.reverse_words(px, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            8,
-        );
-        self.reverse_words(py, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            8,
-        );
-
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode()
-                .bits(mode as u8)
-                .key_length()
-                .bit(curve)
-                .start()
-                .set_bit()
-        });
-
-        // wait for interrupt
-        while self.is_busy() {}
-
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
+    #[inline]
+    fn read_mem(&self, mut word_ptr: *const u32, out: &mut [u8]) {
+        for word_bytes in out.chunks_exact_mut(4) {
+            let word = unsafe { word_ptr.read_volatile() };
+            word_ptr = word_ptr.wrapping_add(1);
+            word_bytes.copy_from_slice(&word.to_le_bytes());
         }
-
-        self.alignment_helper
-            .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 8);
-        self.reverse_words(tmp.as_ref(), px);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 8);
-        self.reverse_words(tmp.as_ref(), py);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qx_mem(0).as_ptr(), &mut tmp, 8);
-        self.reverse_words(tmp.as_ref(), qx);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qy_mem(0).as_ptr(), &mut tmp, 8);
-        self.reverse_words(tmp.as_ref(), qy);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qz_mem(0).as_ptr(), &mut tmp, 8);
-        self.reverse_words(tmp.as_ref(), qz);
-
-        Ok(())
     }
 
-    /// # Jacobian Point Multiplication
-    ///
-    /// Jacobian Point Multiplication can be represented as:
-    /// (Q_x, Q_y, Q_z) = k * (P_x, P_y, 1)
-    ///
-    /// Output is stored in `x`, `y`, and `k`.
-    ///
-    /// # Error
-    ///
-    /// This function will return an error if any bitlength value is different
-    /// from the bitlength of the prime fields of the curve.
-    pub fn jacobian_point_multiplication(
-        &mut self,
-        curve: &EllipticCurve,
-        k: &mut [u8],
-        x: &mut [u8],
-        y: &mut [u8],
-    ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || x.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                false
-            }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || x.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                true
-            }
-        };
-        let mode = WorkMode::JacobianPointMulti;
+    fn k_mem(&self) -> *mut u32 {
+        self.regs.k_mem(0).as_ptr()
+    }
 
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().k_mem(0).as_ptr(), tmp.as_ref(), 8);
-        self.reverse_words(x, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            8,
-        );
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            8,
-        );
+    fn px_mem(&self) -> *mut u32 {
+        self.regs.px_mem(0).as_ptr()
+    }
 
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode()
-                .bits(mode as u8)
-                .key_length()
-                .bit(curve)
-                .start()
-                .set_bit()
-        });
+    fn py_mem(&self) -> *mut u32 {
+        self.regs.py_mem(0).as_ptr()
+    }
 
-        while self.is_busy() {}
-
+    fn qx_mem(&self) -> *mut u32 {
         cfg_if::cfg_if! {
-            if #[cfg(not(esp32h2))] {
-            self.alignment_helper
-                .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 8);
-            self.reverse_words(tmp.as_ref(), x);
-            self.alignment_helper
-                .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 8);
-            self.reverse_words(tmp.as_ref(), y);
-            self.alignment_helper
-                .volatile_read_regset(self.regs().k_mem(0).as_ptr(), &mut tmp, 8);
-            self.reverse_words(tmp.as_ref(), k);
+            if #[cfg(ecc_separate_jacobian_point_memory)] {
+                self.regs.qx_mem(0).as_ptr()
             } else {
-            self.alignment_helper
-                .volatile_read_regset(self.regs().qx_mem(0).as_ptr(), &mut tmp, 8);
-            self.reverse_words(tmp.as_ref(), x);
-            self.alignment_helper
-                .volatile_read_regset(self.regs().qy_mem(0).as_ptr(), &mut tmp, 8);
-            self.reverse_words(tmp.as_ref(), y);
-            self.alignment_helper
-                .volatile_read_regset(self.regs().qz_mem(0).as_ptr(), &mut tmp, 8);
-            self.reverse_words(tmp.as_ref(), k);
+                self.regs.px_mem(0).as_ptr()
             }
         }
-
-        Ok(())
     }
 
-    /// # Jacobian Point Verification
-    ///
-    /// Jacobian Point Verification can be used to verify if a point (Q_x, Q_y,
-    /// Q_z) is on a selected elliptic curve.
-    ///
-    /// # Error
-    ///
-    /// This function will return an error if any bitlength value is different
-    /// from the bitlength of the prime fields of the curve.
-    ///
-    /// This function will return an error if the point is not on the selected
-    /// elliptic curve.
-    pub fn jacobian_point_verification(
-        &mut self,
-        curve: &EllipticCurve,
-        x: &[u8],
-        y: &[u8],
-        z: &[u8],
-    ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if x.len() != 24 || y.len() != 24 || z.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                false
-            }
-            EllipticCurve::P256 => {
-                if x.len() != 32 || y.len() != 32 || z.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                true
-            }
-        };
-        let mode = WorkMode::JacobianPointVerif;
-
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(x, &mut tmp);
-
+    fn qy_mem(&self) -> *mut u32 {
         cfg_if::cfg_if! {
-            if #[cfg(not(esp32h2))] {
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().px_mem(0).as_ptr(), tmp.as_ref(), 8);
-                self.reverse_words(y, &mut tmp);
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().py_mem(0).as_ptr(), tmp.as_ref(), 8);
-                self.reverse_words(z, &mut tmp);
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().k_mem(0).as_ptr(), tmp.as_ref(), 8);
+            if #[cfg(ecc_separate_jacobian_point_memory)] {
+                self.regs.qy_mem(0).as_ptr()
             } else {
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().qx_mem(0).as_ptr(), tmp.as_ref(), 8);
-                self.reverse_words(y, &mut tmp);
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().qy_mem(0).as_ptr(), tmp.as_ref(), 8);
-                self.reverse_words(z, &mut tmp);
-                self.alignment_helper
-                    .volatile_write_regset(self.regs().qz_mem(0).as_ptr(), tmp.as_ref(), 8);
+                self.regs.py_mem(0).as_ptr()
             }
         }
-
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode()
-                .bits(mode as u8)
-                .key_length()
-                .bit(curve)
-                .start()
-                .set_bit()
-        });
-
-        // wait for interrupt
-        while self.is_busy() {}
-
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
-        }
-
-        Ok(())
     }
 
-    /// # Base Point Verification + Jacobian Point Multiplication
-    ///
-    /// In this working mode, ECC first verifies if Point (Px, Py) is on the
-    /// selected elliptic curve or not. If yes, then perform the multiplication:
-    /// (Q_x, Q_y, Q_z) = k * (P_x, P_y, 1)
-    ///
-    /// Output is stored in `x`, `y`, and `k`.
-    ///
-    /// # Error
-    ///
-    /// This function will return an error if any bitlength value is different
-    /// from the bitlength of the prime fields of the curve.
-    ///
-    /// This function will return an error if the point is not on the selected
-    /// elliptic curve.
-    pub fn affine_point_verification_jacobian_multiplication(
-        &mut self,
-        curve: &EllipticCurve,
-        k: &mut [u8],
-        x: &mut [u8],
-        y: &mut [u8],
-    ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if k.len() != 24 || x.len() != 24 || y.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                false
-            }
-            EllipticCurve::P256 => {
-                if k.len() != 32 || x.len() != 32 || y.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                true
-            }
-        };
-        let mode = WorkMode::PointVerifJacobianMulti;
-
-        let mut tmp = [0_u8; 32];
-        self.reverse_words(k, &mut tmp);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().k_mem(0).as_ptr(), tmp.as_ref(), 8);
-        self.reverse_words(x, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().px_mem(0).as_ptr(),
-            tmp.as_ref(),
-            8,
-        );
-        self.reverse_words(y, &mut tmp);
-        self.alignment_helper.volatile_write_regset(
-            self.regs().py_mem(0).as_ptr(),
-            tmp.as_ref(),
-            8,
-        );
-
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode()
-                .bits(mode as u8)
-                .key_length()
-                .bit(curve)
-                .start()
-                .set_bit()
-        });
-
-        // wait for interrupt
-        while self.is_busy() {}
-
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
-        }
-
-        if !self.regs().mult_conf().read().verification_result().bit() {
-            self.regs().mult_conf().reset();
-            return Err(Error::PointNotOnSelectedCurve);
-        }
-
+    fn qz_mem(&self) -> *mut u32 {
         cfg_if::cfg_if! {
-            if #[cfg(not(esp32h2))] {
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 8);
-                self.reverse_words(tmp.as_ref(), x);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 8);
-                self.reverse_words(tmp.as_ref(), y);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().k_mem(0).as_ptr(), &mut tmp, 8);
-                self.reverse_words(tmp.as_ref(), k);
+            if #[cfg(ecc_separate_jacobian_point_memory)] {
+                self.regs.qz_mem(0).as_ptr()
             } else {
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().qx_mem(0).as_ptr(), &mut tmp, 8);
-                self.reverse_words(tmp.as_ref(), x);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().qy_mem(0).as_ptr(), &mut tmp, 8);
-                self.reverse_words(tmp.as_ref(), y);
-                self.alignment_helper
-                    .volatile_read_regset(self.regs().qz_mem(0).as_ptr(), &mut tmp, 8);
-                self.reverse_words(tmp.as_ref(), k);
+                self.regs.k_mem(0).as_ptr()
             }
         }
-
-        Ok(())
     }
 
-    /// # Point Addition
-    ///
-    /// In this working mode, ECC first verifies if Point (Px, Py) is on the
-    /// selected elliptic curve or not. If yes, then perform the addition:
-    /// (R_x, R_y) = (J_x, J_y, J_z) = (P_x, P_y, 1) + (Q_x, Q_y, Q_z)
-    ///
-    /// This functions requires data in Little Endian.
-    /// The affine point representation output is stored in `px` and `py`.
-    /// The Jacobian point representation output is stored in `qx`, `qy`, and
-    /// `qz`.
-    ///
-    /// # Error
-    ///
-    /// This function will return an error if any bitlength value is different
-    /// from the bitlength of the prime fields of the curve.
-    ///
-    /// This function will return an error if the point is not on the selected
-    /// elliptic curve.
-    #[cfg(esp32h2)]
-    pub fn affine_point_addition(
-        &mut self,
-        curve: &EllipticCurve,
-        px: &mut [u8],
-        py: &mut [u8],
-        qx: &mut [u8],
-        qy: &mut [u8],
-        qz: &mut [u8],
-    ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if px.len() != 24
-                    || py.len() != 24
-                    || qx.len() != 24
-                    || qy.len() != 24
-                    || qz.len() != 24
-                {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                false
-            }
-            EllipticCurve::P256 => {
-                if px.len() != 32
-                    || py.len() != 32
-                    || qx.len() != 32
-                    || qy.len() != 32
-                    || qz.len() != 32
-                {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                true
-            }
-        };
-        let mode = WorkMode::PointAdd;
-
-        let mut tmp = [0_u8; 32];
-
-        tmp[0..px.len()].copy_from_slice(px);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().px_mem(0).as_ptr(), &tmp, 8);
-        tmp[0..py.len()].copy_from_slice(py);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().py_mem(0).as_ptr(), &tmp, 8);
-        tmp[0..qx.len()].copy_from_slice(qx);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().qx_mem(0).as_ptr(), &tmp, 8);
-        tmp[0..qy.len()].copy_from_slice(qy);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().qy_mem(0).as_ptr(), &tmp, 8);
-        tmp[0..qz.len()].copy_from_slice(qz);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().qz_mem(0).as_ptr(), &tmp, 8);
-
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode()
-                .bits(mode as u8)
-                .key_length()
-                .bit(curve)
-                .start()
-                .set_bit()
-        });
-
-        // wait for interrupt
-        while self.is_busy() {}
-
-        self.alignment_helper
-            .volatile_read_regset(self.regs().px_mem(0).as_ptr(), &mut tmp, 8);
-        let mut tmp_len = px.len();
-        px[..].copy_from_slice(&tmp[..tmp_len]);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().py_mem(0).as_ptr(), &mut tmp, 8);
-        tmp_len = py.len();
-        py[..].copy_from_slice(&tmp[..tmp_len]);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qx_mem(0).as_ptr(), &mut tmp, 8);
-        tmp_len = qx.len();
-        qx[..].copy_from_slice(&tmp[..tmp_len]);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qy_mem(0).as_ptr(), &mut tmp, 8);
-        tmp_len = qy.len();
-        qy[..].copy_from_slice(&tmp[..tmp_len]);
-        self.alignment_helper
-            .volatile_read_regset(self.regs().qz_mem(0).as_ptr(), &mut tmp, 8);
-        tmp_len = qz.len();
-        qz[..].copy_from_slice(&tmp[..tmp_len]);
-
-        Ok(())
+    fn read_point_result(&self, x: &mut [u8], y: &mut [u8]) {
+        self.read_mem(self.px_mem(), x);
+        self.read_mem(self.py_mem(), y);
     }
 
-    /// # Mod Operations (+-*/)
-    ///
-    /// In this working mode, ECC first verifies if Point (A, B) is on the
-    /// selected elliptic curve or not. If yes, then perform single mod
-    /// operation: R = A (+-*/) B mod N
-    ///
-    /// This functions requires data in Little Endian.
-    /// Output is stored in `a` (+-) and in `b` (*/).
-    ///
-    /// # Error
-    ///
-    /// This function will return an error if any bitlength value is different
-    /// from the bitlength of the prime fields of the curve.
-    ///
-    /// This function will return an error if the point is not on the selected
-    /// elliptic curve.
-    #[cfg(esp32h2)]
-    pub fn mod_operations(
-        &mut self,
-        curve: &EllipticCurve,
-        a: &mut [u8],
-        b: &mut [u8],
-        work_mode: WorkMode,
-    ) -> Result<(), Error> {
-        let curve = match curve {
-            EllipticCurve::P192 => {
-                if a.len() != 24 || b.len() != 24 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                false
-            }
-            EllipticCurve::P256 => {
-                if a.len() != 32 || b.len() != 32 {
-                    return Err(Error::SizeMismatchCurve);
-                }
-                true
-            }
-        };
-
-        let mut tmp = [0_u8; 32];
-        tmp[0..a.len()].copy_from_slice(a);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().px_mem(0).as_ptr(), &tmp, 8);
-        tmp[0..b.len()].copy_from_slice(b);
-        self.alignment_helper
-            .volatile_write_regset(self.regs().py_mem(0).as_ptr(), &tmp, 8);
-
-        self.regs().mult_conf().write(|w| unsafe {
-            w.work_mode()
-                .bits(work_mode.clone() as u8)
-                .key_length()
-                .bit(curve)
-                .start()
-                .set_bit()
-        });
-
-        // wait for interrupt
-        while self.is_busy() {}
-
-        match work_mode {
-            WorkMode::ModAdd | WorkMode::ModSub => {
-                self.alignment_helper.volatile_read_regset(
-                    self.regs().px_mem(0).as_ptr(),
-                    &mut tmp,
-                    8,
-                );
-                let tmp_len = a.len();
-                a[..].copy_from_slice(&tmp[..tmp_len]);
-            }
-            WorkMode::ModMulti | WorkMode::ModDiv => {
-                self.alignment_helper.volatile_read_regset(
-                    self.regs().py_mem(0).as_ptr(),
-                    &mut tmp,
-                    8,
-                );
-                let tmp_len = b.len();
-                b[..].copy_from_slice(&tmp[..tmp_len]);
-            }
-            _ => unreachable!(),
-        }
-
-        Ok(())
-    }
-
-    /// Register an interrupt handler for the ECC peripheral.
-    ///
-    /// Note that this will replace any previously registered interrupt
-    /// handlers.
-    #[instability::unstable]
-    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::system::Cpu::other() {
-            crate::interrupt::disable(core, Interrupt::ECC);
-        }
-        unsafe { crate::interrupt::bind_interrupt(Interrupt::ECC, handler.handler()) };
-        unwrap!(crate::interrupt::enable(Interrupt::ECC, handler.priority()));
+    fn read_jacobian_result(&self, qx: &mut [u8], qy: &mut [u8], qz: &mut [u8]) {
+        self.read_mem(self.qx_mem(), qx);
+        self.read_mem(self.qy_mem(), qy);
+        self.read_mem(self.qz_mem(), qz);
     }
 
     fn is_busy(&self) -> bool {
-        self.regs().mult_conf().read().start().bit_is_set()
+        self.regs.mult_conf().read().start().bit_is_set()
     }
 
-    fn reverse_words(&self, src: &[u8], dst: &mut [u8]) {
-        let n = core::cmp::min(src.len(), dst.len());
-        let nsrc = if src.len() > n {
-            src.split_at(n).0
-        } else {
-            src
+    fn start_operation(
+        &self,
+        mode: WorkMode,
+        curve: EllipticCurve,
+        #[cfg(ecc_has_modular_arithmetic)] mod_base: EccModBase,
+    ) {
+        let curve_variant;
+        for_each_ecc_curve! {
+            (all $(($_id:tt, $name:ident, $_bits:tt)),*) => {
+                curve_variant = match curve {
+                    $(EllipticCurve::$name => KEY_LENGTH::$name,)*
+                }
+            };
         };
-        let ndst = if dst.len() > n {
-            dst.split_at_mut(n).0
-        } else {
-            dst
-        };
-        for (a, b) in nsrc.chunks_exact(4).zip(ndst.rchunks_exact_mut(4)) {
-            b.copy_from_slice(&u32::from_be_bytes(a.try_into().unwrap()).to_ne_bytes());
+        self.regs.mult_conf().modify(|_, w| unsafe {
+            w.work_mode().bits(mode as u8);
+            w.key_length().variant(curve_variant);
+
+            #[cfg(ecc_has_modular_arithmetic)]
+            w.mod_base().bit(mod_base as u8 == 1);
+
+            w.start().set_bit()
+        });
+    }
+}
+
+// Broken into separate macro invocations per item, to make the "Expand macro" LSP output more
+// readable
+
+for_each_ecc_working_mode! {
+    (all $(( $id:literal, $mode:tt )),*) => {
+        #[derive(Clone, Copy)]
+        #[doc(hidden)]
+        /// Represents the operational modes for elliptic curve or modular arithmetic
+        /// computations.
+        pub enum WorkMode {
+            $(
+                $mode = $id,
+            )*
         }
+    };
+}
+
+// Result type for each operation
+for_each_ecc_working_mode! {
+    (all $(( $id:literal, $mode:tt )),*) => {
+        $(
+            result_type!($mode);
+        )*
+    };
+}
+
+// The main driver implementation
+for_each_ecc_working_mode! {
+    (all $(( $id:literal, $mode:tt )),*) => {
+        impl<'d, Dm: DriverMode> Ecc<'d, Dm> {
+            fn info(&self) -> Info {
+                Info { regs: ECC::regs() }
+            }
+
+            fn run_operation<'op, O: EccOperation>(
+                &'op mut self,
+                curve: EllipticCurve,
+                #[cfg(ecc_has_modular_arithmetic)] mod_base: EccModBase,
+            ) -> EccResultHandle<'op, O> {
+                self.info().start_operation(
+                    O::WORK_MODE,
+                    curve,
+                    #[cfg(ecc_has_modular_arithmetic)] mod_base,
+                );
+
+                // wait for interrupt
+                while self.info().is_busy() {}
+
+                EccResultHandle::new(curve, self)
+            }
+
+            /// Applies the given configuration to the ECC peripheral.
+            pub fn apply_config(&mut self, config: &Config) {
+                self.info().apply_config(config);
+            }
+
+            /// Resets the ECC peripheral.
+            pub fn reset(&mut self) {
+                self.info().reset()
+            }
+
+            /// Register an interrupt handler for the ECC peripheral.
+            ///
+            /// Note that this will replace any previously registered interrupt
+            /// handlers.
+            #[instability::unstable]
+            pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+                for core in crate::system::Cpu::other() {
+                    crate::interrupt::disable(core, Interrupt::ECC);
+                }
+                crate::interrupt::bind_handler(Interrupt::ECC, handler);
+            }
+
+            $(
+                driver_method!($mode);
+            )*
+        }
+    };
+}
+
+/// Marks an ECC operation.
+pub trait EccOperation: Sealed {
+    /// Whether the operation verifies that the input point is on the curve.
+    const VERIFIES_POINT: bool;
+
+    /// Work mode
+    #[doc(hidden)]
+    const WORK_MODE: WorkMode;
+}
+
+/// Scalar result location.
+#[doc(hidden)]
+pub enum ScalarResultLocation {
+    /// The scalar value is stored in the `Px` memory location.
+    Px,
+    /// The scalar value is stored in the `Py` memory location.
+    Py,
+    /// The scalar value is stored in the `k` memory location.
+    K,
+}
+
+/// Marks operations that return a scalar value.
+pub trait OperationReturnsScalar: EccOperation {
+    /// Where the scalar value is stored.
+    #[doc(hidden)]
+    const LOCATION: ScalarResultLocation;
+}
+
+/// Marks operations that return a point in affine format.
+pub trait OperationReturnsAffinePoint: EccOperation {}
+
+/// Marks operations that return a point in Jacobian format.
+pub trait OperationReturnsJacobianPoint: EccOperation {}
+
+/// Marks operations that verify that the input point is on the curve.
+pub trait OperationVerifiesPoint: EccOperation {}
+
+/// The result of an ECC operation.
+///
+/// This struct can be used to read the result of an ECC operation. The methods which can be used
+/// depend on the operation. An operation can compute multiple values, such as an affine point and
+/// a Jacobian point at the same time.
+#[must_use]
+pub struct EccResultHandle<'op, O>
+where
+    O: EccOperation,
+{
+    curve: EllipticCurve,
+    info: Info,
+    _marker: PhantomData<(&'op mut (), O)>,
+}
+
+impl<'op, O> EccResultHandle<'op, O>
+where
+    O: EccOperation,
+{
+    fn new<'d, Dm: DriverMode>(curve: EllipticCurve, driver: &'op mut Ecc<'d, Dm>) -> Self {
+        Self {
+            curve,
+            info: driver.info(),
+            _marker: PhantomData,
+        }
+    }
+
+    fn run_checks<const N: usize>(&self, params: [&[u8]; N]) -> Result<(), OperationError> {
+        self.curve.size_check(params)?;
+        if O::VERIFIES_POINT {
+            self.info.check_point_verification_result()?;
+        }
+        Ok(())
+    }
+
+    /// Returns whether the operation was successful.
+    ///
+    /// For operations that only perform point verification, this method returns whether the point
+    /// is on the curve. For operations that do not perform point verification, this method always
+    /// returns true.
+    pub fn success(&self) -> bool {
+        if O::VERIFIES_POINT {
+            self.info.check_point_verification_result().is_ok()
+        } else {
+            true
+        }
+    }
+
+    /// Retrieve the scalar result of the operation.
+    ///
+    /// ## Errors
+    ///
+    /// Returns an error if point verification failed, or if `out` is not the correct size.
+    pub fn read_scalar_result(&self, out: &mut [u8]) -> Result<(), OperationError>
+    where
+        O: OperationReturnsScalar,
+    {
+        self.run_checks([out])?;
+
+        match O::LOCATION {
+            ScalarResultLocation::Px => self.info.read_mem(self.info.px_mem(), out),
+            ScalarResultLocation::Py => self.info.read_mem(self.info.py_mem(), out),
+            ScalarResultLocation::K => self.info.read_mem(self.info.k_mem(), out),
+        }
+
+        Ok(())
+    }
+
+    /// Retrieve the affine point result of the operation.
+    ///
+    /// ## Errors
+    ///
+    /// Returns an error if point verification failed, or if `x` or `y` are not the correct size.
+    pub fn read_affine_point_result(&self, x: &mut [u8], y: &mut [u8]) -> Result<(), OperationError>
+    where
+        O: OperationReturnsAffinePoint,
+    {
+        self.run_checks([x, y])?;
+        self.info.read_point_result(x, y);
+        Ok(())
+    }
+
+    /// Retrieve the Jacobian point result of the operation.
+    ///
+    /// ## Errors
+    ///
+    /// Returns an error if point verification failed, or if `x`, `y`, or `z` are not the correct
+    /// size.
+    pub fn read_jacobian_point_result(
+        &self,
+        x: &mut [u8],
+        y: &mut [u8],
+        z: &mut [u8],
+    ) -> Result<(), OperationError>
+    where
+        O: OperationReturnsJacobianPoint,
+    {
+        self.run_checks([x, y, z])?;
+        self.info.read_jacobian_result(x, y, z);
+        Ok(())
+    }
+}
+
+struct EccWorkItem {
+    curve: EllipticCurve,
+    operation: WorkMode,
+    cancelled: bool,
+    #[cfg(ecc_has_modular_arithmetic)]
+    mod_base: EccModBase,
+    inputs: MemoryPointers,
+    point_verification_result: bool,
+    outputs: MemoryPointers,
+}
+
+#[derive(Default)]
+struct MemoryPointers {
+    // All of these pointers point to slices with curve-appropriate lengths.
+    k: Option<NonNull<u8>>,
+    px: Option<NonNull<u8>>,
+    py: Option<NonNull<u8>>,
+    #[cfg(ecc_separate_jacobian_point_memory)]
+    qx: Option<NonNull<u8>>,
+    #[cfg(ecc_separate_jacobian_point_memory)]
+    qy: Option<NonNull<u8>>,
+    #[cfg(ecc_separate_jacobian_point_memory)]
+    qz: Option<NonNull<u8>>,
+}
+
+impl MemoryPointers {
+    fn set_scalar(&mut self, location: ScalarResultLocation, ptr: NonNull<[u8]>) {
+        match location {
+            ScalarResultLocation::Px => self.set_px(ptr),
+            ScalarResultLocation::Py => self.set_py(ptr),
+            ScalarResultLocation::K => self.set_k(ptr),
+        }
+    }
+
+    fn set_k(&mut self, ptr: NonNull<[u8]>) {
+        self.k = Some(ptr.cast());
+    }
+
+    fn set_px(&mut self, ptr: NonNull<[u8]>) {
+        self.px = Some(ptr.cast());
+    }
+
+    fn set_py(&mut self, ptr: NonNull<[u8]>) {
+        self.py = Some(ptr.cast());
+    }
+
+    fn set_qx(&mut self, ptr: NonNull<[u8]>) {
+        cfg_if::cfg_if! {
+            if #[cfg(ecc_separate_jacobian_point_memory)] {
+                self.qx = Some(ptr.cast());
+            } else {
+                self.px = Some(ptr.cast());
+            }
+        }
+    }
+
+    fn set_qy(&mut self, ptr: NonNull<[u8]>) {
+        cfg_if::cfg_if! {
+            if #[cfg(ecc_separate_jacobian_point_memory)] {
+                self.qy = Some(ptr.cast());
+            } else {
+                self.py = Some(ptr.cast());
+            }
+        }
+    }
+
+    fn set_qz(&mut self, ptr: NonNull<[u8]>) {
+        cfg_if::cfg_if! {
+            if #[cfg(ecc_separate_jacobian_point_memory)] {
+                self.qz = Some(ptr.cast());
+            } else {
+                self.k = Some(ptr.cast());
+            }
+        }
+    }
+}
+
+// Safety: MemoryPointers is safe to share between threads, in the context of a WorkQueue. The
+// WorkQueue ensures that only a single location can access the data. All the internals, except
+// for the pointers, are Sync. The pointers are safe to share because they point at data that the
+// ECC driver ensures can be accessed safely and soundly.
+unsafe impl Sync for MemoryPointers {}
+// Safety: we will not hold on to the pointers when the work item leaves the queue.
+unsafe impl Send for MemoryPointers {}
+
+static ECC_WORK_QUEUE: WorkQueue<EccWorkItem> = WorkQueue::new();
+
+const ECC_VTABLE: VTable<EccWorkItem> = VTable {
+    post: |driver, item| {
+        let driver = unsafe { EccBackend::from_raw(driver) };
+
+        // Ensure driver is initialized
+        if let DriverState::Uninitialized(ecc) = &driver.driver {
+            let mut ecc = Ecc::new(unsafe { ecc.clone_unchecked() }, driver.config);
+            ecc.set_interrupt_handler(ecc_work_queue_handler);
+            driver.driver = DriverState::Initialized(ecc);
+        };
+
+        Some(driver.process(item))
+    },
+    poll: |driver, item| {
+        let driver = unsafe { EccBackend::from_raw(driver) };
+        driver.poll(item)
+    },
+    cancel: |driver, item| {
+        let driver = unsafe { EccBackend::from_raw(driver) };
+        driver.cancel(item);
+    },
+    stop: |driver| {
+        let driver = unsafe { EccBackend::from_raw(driver) };
+        driver.deinitialize()
+    },
+};
+
+enum DriverState<'d> {
+    Uninitialized(ECC<'d>),
+    Initialized(Ecc<'d, Blocking>),
+}
+
+/// ECC processing backend.
+///
+/// This struct enables shared access to the device's ECC hardware using a work queue.
+pub struct EccBackend<'d> {
+    driver: DriverState<'d>,
+    config: Config,
+}
+
+impl<'d> EccBackend<'d> {
+    /// Creates a new ECC backend.
+    ///
+    /// The backend needs to be [`start`][Self::start]ed before it can execute ECC operations.
+    pub fn new(ecc: ECC<'d>, config: Config) -> Self {
+        Self {
+            driver: DriverState::Uninitialized(ecc),
+            config,
+        }
+    }
+
+    /// Registers the ECC driver to process ECC operations.
+    ///
+    /// The driver stops operating when the returned object is dropped.
+    pub fn start(&mut self) -> EccWorkQueueDriver<'_, 'd> {
+        EccWorkQueueDriver {
+            inner: WorkQueueDriver::new(self, ECC_VTABLE, &ECC_WORK_QUEUE),
+        }
+    }
+
+    // WorkQueue callbacks. They may run in any context.
+
+    unsafe fn from_raw<'any>(ptr: NonNull<()>) -> &'any mut Self {
+        unsafe { ptr.cast::<EccBackend<'_>>().as_mut() }
+    }
+
+    fn process(&mut self, item: &mut EccWorkItem) -> Poll {
+        let DriverState::Initialized(driver) = &mut self.driver else {
+            unreachable!()
+        };
+
+        let bytes = item.curve.size();
+
+        macro_rules! set_input {
+            ($input:ident, $input_mem:ident) => {
+                if let Some($input) = item.inputs.$input {
+                    driver.info().write_mem(driver.info().$input_mem(), unsafe {
+                        core::slice::from_raw_parts($input.as_ptr(), bytes)
+                    });
+                }
+            };
+        }
+
+        set_input!(k, k_mem);
+        set_input!(px, px_mem);
+        set_input!(py, py_mem);
+
+        #[cfg(ecc_separate_jacobian_point_memory)]
+        {
+            set_input!(qx, qx_mem);
+            set_input!(qy, qy_mem);
+            set_input!(qz, qz_mem);
+        }
+
+        driver.info().start_operation(
+            item.operation,
+            item.curve,
+            #[cfg(ecc_has_modular_arithmetic)]
+            item.mod_base,
+        );
+        Poll::Pending(false)
+    }
+
+    fn poll(&mut self, item: &mut EccWorkItem) -> Poll {
+        let DriverState::Initialized(driver) = &mut self.driver else {
+            unreachable!()
+        };
+
+        if driver.info().is_busy() {
+            return Poll::Pending(false);
+        }
+        if item.cancelled {
+            return Poll::Ready(Status::Cancelled);
+        }
+
+        let bytes = item.curve.size();
+
+        macro_rules! read_output {
+            ($output:ident, $output_mem:ident) => {
+                if let Some($output) = item.outputs.$output {
+                    driver.info().read_mem(driver.info().$output_mem(), unsafe {
+                        core::slice::from_raw_parts_mut($output.as_ptr(), bytes)
+                    });
+                }
+            };
+        }
+
+        read_output!(k, k_mem);
+        read_output!(px, px_mem);
+        read_output!(py, py_mem);
+
+        #[cfg(ecc_separate_jacobian_point_memory)]
+        {
+            read_output!(qx, qx_mem);
+            read_output!(qy, qy_mem);
+            read_output!(qz, qz_mem);
+        }
+
+        item.point_verification_result = driver.info().check_point_verification_result().is_ok();
+
+        Poll::Ready(Status::Completed)
+    }
+
+    fn cancel(&mut self, item: &mut EccWorkItem) {
+        let DriverState::Initialized(driver) = &mut self.driver else {
+            unreachable!()
+        };
+        driver.reset();
+        item.cancelled = true;
+    }
+
+    fn deinitialize(&mut self) {
+        if let DriverState::Initialized(ref ecc) = self.driver {
+            self.driver = DriverState::Uninitialized(unsafe { ecc._ecc.clone_unchecked() });
+        }
+    }
+}
+
+/// An active work queue driver.
+///
+/// This object must be kept around, otherwise ECC operations will never complete.
+pub struct EccWorkQueueDriver<'t, 'd> {
+    inner: WorkQueueDriver<'t, EccBackend<'d>, EccWorkItem>,
+}
+
+impl<'t, 'd> EccWorkQueueDriver<'t, 'd> {
+    /// Finishes processing the current work queue item, then stops the driver.
+    pub fn stop(self) -> impl Future<Output = ()> {
+        self.inner.stop()
+    }
+}
+
+#[crate::ram]
+#[crate::handler]
+fn ecc_work_queue_handler() {
+    if !ECC_WORK_QUEUE.process() {
+        // The queue may indicate that it needs to be polled again. In this case, we do not clear
+        // the interrupt bit, which causes the interrupt to be re-handled.
+        cfg_if::cfg_if! {
+            if #[cfg(esp32c5)] {
+                let reg = ECC::regs().int_clr();
+            } else {
+                let reg = ECC::regs().mult_int_clr();
+            }
+        }
+        reg.write(|w| w.calc_done().clear_bit_by_one());
+    }
+}
+
+/// An ECC operation that can be enqueued on the work queue.
+pub struct EccBackendOperation<'op, O: EccOperation> {
+    frontend: WorkQueueFrontend<EccWorkItem>,
+    _marker: PhantomData<(&'op mut (), O)>,
+}
+
+impl<'op, O: EccOperation> EccBackendOperation<'op, O> {
+    fn new(work_item: EccWorkItem) -> Self {
+        Self {
+            frontend: WorkQueueFrontend::new(work_item),
+            _marker: PhantomData,
+        }
+    }
+
+    /// Designate a buffer for the scalar result of the operation.
+    ///
+    /// Once the operation is processed, the result can be retrieved from the designated buffer.
+    ///
+    /// ## Errors
+    ///
+    /// Returns an error if `out` is not the correct size.
+    pub fn with_scalar_result(mut self, out: &'op mut [u8]) -> Result<Self, KeyLengthMismatch>
+    where
+        O: OperationReturnsScalar,
+    {
+        self.frontend.data().curve.size_check([out])?;
+
+        self.frontend
+            .data_mut()
+            .outputs
+            .set_scalar(O::LOCATION, NonNull::from(out));
+
+        Ok(self)
+    }
+
+    /// Designate buffers for the affine point result of the operation.
+    ///
+    /// Once the operation is processed, the result can be retrieved from the designated buffers.
+    ///
+    /// ## Errors
+    ///
+    /// Returns an error if `x` or `y` are not the correct size.
+    pub fn with_affine_point_result(
+        mut self,
+        px: &'op mut [u8],
+        py: &'op mut [u8],
+    ) -> Result<Self, KeyLengthMismatch>
+    where
+        O: OperationReturnsAffinePoint,
+    {
+        self.frontend.data().curve.size_check([px, py])?;
+
+        self.frontend.data_mut().outputs.set_px(NonNull::from(px));
+        self.frontend.data_mut().outputs.set_py(NonNull::from(py));
+
+        Ok(self)
+    }
+
+    /// Designate buffers for the Jacobian point result of the operation.
+    ///
+    /// Once the operation is processed, the result can be retrieved from the designated buffers.
+    ///
+    /// ## Errors
+    ///
+    /// Returns an error if `x`, `y`, or `z` are not the correct size.
+    pub fn with_jacobian_point_result(
+        mut self,
+        qx: &'op mut [u8],
+        qy: &'op mut [u8],
+        qz: &'op mut [u8],
+    ) -> Result<Self, KeyLengthMismatch>
+    where
+        O: OperationReturnsJacobianPoint,
+    {
+        self.frontend.data().curve.size_check([qx, qy, qz])?;
+
+        self.frontend.data_mut().outputs.set_qx(NonNull::from(qx));
+        self.frontend.data_mut().outputs.set_qy(NonNull::from(qy));
+        self.frontend.data_mut().outputs.set_qz(NonNull::from(qz));
+
+        Ok(self)
+    }
+
+    /// Returns `true` if the input point is on the curve.
+    ///
+    /// The operation must be processed before this method returns a meaningful value.
+    pub fn point_on_curve(&self) -> bool
+    where
+        O: OperationVerifiesPoint,
+    {
+        self.frontend.data().point_verification_result
+    }
+
+    /// Starts processing the operation.
+    ///
+    /// The returned [`EccHandle`] must be polled to completion before the operation is considered
+    /// complete.
+    pub fn process(&mut self) -> EccHandle<'_> {
+        EccHandle(self.frontend.post(&ECC_WORK_QUEUE))
+    }
+}
+
+/// A handle for an in-progress operation.
+#[must_use]
+pub struct EccHandle<'t>(Handle<'t, EccWorkItem>);
+
+impl EccHandle<'_> {
+    /// Polls the status of the work item.
+    ///
+    /// This function returns `true` if the item has been processed.
+    #[inline]
+    pub fn poll(&mut self) -> bool {
+        self.0.poll()
+    }
+
+    /// Polls the work item to completion, by busy-looping.
+    ///
+    /// This function returns immediately if `poll` returns `true`.
+    #[inline]
+    pub fn wait_blocking(self) -> Status {
+        self.0.wait_blocking()
+    }
+
+    /// Waits until the work item is completed.
+    #[inline]
+    pub fn wait(&mut self) -> impl Future<Output = Status> {
+        self.0.wait()
+    }
+
+    /// Cancels the work item and asynchronously waits until it is removed from the work queue.
+    #[inline]
+    pub fn cancel(&mut self) -> impl Future<Output = ()> {
+        self.0.cancel()
     }
 }

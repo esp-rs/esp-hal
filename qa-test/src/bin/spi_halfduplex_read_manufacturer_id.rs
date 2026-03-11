@@ -9,7 +9,7 @@
 //! - CS          =>  GPIO5
 //!
 //! The following wiring is assumed for ESP32:
-//! - SCLK        =>  GPIO0
+//! - SCLK        =>  GPIO12
 //! - MISO/IO0    =>  GPIO2
 //! - MOSI/IO1    =>  GPIO4
 //! - IO2         =>  GPIO5
@@ -33,13 +33,14 @@ use esp_hal::{
     delay::Delay,
     main,
     spi::{
-        master::{Address, Command, Config, Spi},
-        DataMode,
         Mode,
+        master::{Address, Command, Config, DataMode, Spi},
     },
     time::Rate,
 };
 use esp_println::println;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
@@ -48,7 +49,7 @@ fn main() -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
-            let sclk = peripherals.GPIO0;
+            let sclk = peripherals.GPIO12;
             let miso = peripherals.GPIO2;
             let mosi = peripherals.GPIO4;
             let sio2 = peripherals.GPIO5;

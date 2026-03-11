@@ -1,0 +1,22 @@
+[package]
+name = "xtensa-lx-rt-proc-macros"
+version = "0.5.0"
+edition = "2024"
+rust-version = "1.86.0"
+description = "Attributes re-exported in `xtensa-lx-rt`"
+documentation = "https://docs.espressif.com/projects/rust/xtensa-lx-rt-proc-macros/latest/"
+repository = "https://github.com/esp-rs/esp-hal"
+license = "MIT OR Apache-2.0"
+keywords = ["esp32", "xtensa-lx-rt", "runtime", "startup"]
+categories = ["embedded", "no-std"]
+
+[package.metadata.espressif]
+requires_target = ["xtensa-esp32-none-elf", "xtensa-esp32s2-none-elf", "xtensa-esp32s3-none-elf"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0.95"
+quote = "1.0"
+syn = { version = "2.0", default-features = false, features = ["full", "parsing", "printing", "proc-macro", "clone-impls"] }

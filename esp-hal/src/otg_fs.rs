@@ -31,7 +31,7 @@
 //! Visit the [USB Serial] example for an example of using the USB OTG
 //! peripheral.
 //!
-//! [USB Serial]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/usb_serial.rs
+//! [USB Serial]: https://github.com/esp-rs/esp-hal/blob/main/examples/peripheral/usb_serial/src/main.rs
 //!
 //! ## Implementation State
 //! - Low-speed (LS) is not supported.
@@ -41,7 +41,6 @@ use esp_synopsys_usb_otg::UsbPeripheral;
 
 use crate::{
     gpio::InputSignal,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals,
     system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
 };
@@ -54,23 +53,32 @@ pub trait UsbDp: crate::private::Sealed {}
 /// Trait representing the USB D- (data minus) pin.
 pub trait UsbDm: crate::private::Sealed {}
 
+for_each_analog_function! {
+    (USB_DM, $gpio:ident) => {
+        impl UsbDm for crate::peripherals::$gpio<'_> {}
+    };
+    (USB_DP, $gpio:ident) => {
+        impl UsbDp for crate::peripherals::$gpio<'_> {}
+    };
+}
+
 /// USB peripheral.
 pub struct Usb<'d> {
-    _usb0: PeripheralRef<'d, peripherals::USB0>,
+    _usb0: peripherals::USB0<'d>,
     _guard: GenericPeripheralGuard<{ PeripheralEnable::Usb as u8 }>,
 }
 
 impl<'d> Usb<'d> {
     /// Creates a new `Usb` instance.
     pub fn new(
-        usb0: impl Peripheral<P = peripherals::USB0> + 'd,
-        _usb_dp: impl Peripheral<P = impl UsbDp> + 'd,
-        _usb_dm: impl Peripheral<P = impl UsbDm> + 'd,
+        usb0: peripherals::USB0<'d>,
+        _usb_dp: impl UsbDp + 'd,
+        _usb_dm: impl UsbDm + 'd,
     ) -> Self {
         let guard = GenericPeripheralGuard::new();
 
         Self {
-            _usb0: usb0.into_ref(),
+            _usb0: usb0,
             _guard: guard,
         }
     }
@@ -92,10 +100,10 @@ impl<'d> Usb<'d> {
 
         use crate::gpio::Level;
 
-        InputSignal::USB_OTG_IDDIG.connect_to(Level::High); // connected connector is mini-B side
-        InputSignal::USB_SRP_BVALID.connect_to(Level::High); // HIGH to force USB device mode
-        InputSignal::USB_OTG_VBUSVALID.connect_to(Level::High); // receiving a valid Vbus from device
-        InputSignal::USB_OTG_AVALID.connect_to(Level::Low);
+        InputSignal::USB_OTG_IDDIG.connect_to(&Level::High); // connected connector is mini-B side
+        InputSignal::USB_SRP_BVALID.connect_to(&Level::High); // HIGH to force USB device mode
+        InputSignal::USB_OTG_VBUSVALID.connect_to(&Level::High); // receiving a valid Vbus from device
+        InputSignal::USB_OTG_AVALID.connect_to(&Level::Low);
     }
 
     fn _disable() {
@@ -132,8 +140,6 @@ pub mod asynch {
     };
     pub use embassy_usb_synopsys_otg::Config;
     use embassy_usb_synopsys_otg::{
-        on_interrupt,
-        otg_v1::Otg,
         Bus as OtgBus,
         ControlPipe,
         Driver as OtgDriver,
@@ -143,6 +149,8 @@ pub mod asynch {
         Out,
         PhyType,
         State,
+        on_interrupt,
+        otg_v1::Otg,
     };
     use procmacros::handler;
 
@@ -169,8 +177,7 @@ pub mod asynch {
         ///
         /// # Arguments
         ///
-        /// * `ep_out_buffer` - An internal buffer used to temporarily store
-        ///   received packets.
+        /// * `ep_out_buffer` - An internal buffer used to temporarily store received packets.
         ///
         /// Must be large enough to fit all OUT endpoint max packet sizes.
         /// Endpoint allocation will fail if it is too small.
@@ -206,21 +213,23 @@ pub mod asynch {
         fn alloc_endpoint_in(
             &mut self,
             ep_type: EndpointType,
+            ep_addr: Option<EndpointAddress>,
             max_packet_size: u16,
             interval_ms: u8,
         ) -> Result<Self::EndpointIn, EndpointAllocError> {
             self.inner
-                .alloc_endpoint_in(ep_type, max_packet_size, interval_ms)
+                .alloc_endpoint_in(ep_type, ep_addr, max_packet_size, interval_ms)
         }
 
         fn alloc_endpoint_out(
             &mut self,
             ep_type: EndpointType,
+            ep_addr: Option<EndpointAddress>,
             max_packet_size: u16,
             interval_ms: u8,
         ) -> Result<Self::EndpointOut, EndpointAllocError> {
             self.inner
-                .alloc_endpoint_out(ep_type, max_packet_size, interval_ms)
+                .alloc_endpoint_out(ep_type, ep_addr, max_packet_size, interval_ms)
         }
 
         fn start(self, control_max_packet_size: u16) -> (Self::Bus, Self::ControlPipe) {
@@ -270,16 +279,7 @@ pub mod asynch {
             // Enable PHY clock
             r.pcgcctl().write(|w| w.0 = 0);
 
-            unsafe {
-                crate::interrupt::bind_interrupt(
-                    crate::peripherals::Interrupt::USB,
-                    interrupt_handler.handler(),
-                );
-            }
-            unwrap!(crate::interrupt::enable(
-                crate::peripherals::Interrupt::USB,
-                interrupt_handler.priority(),
-            ));
+            crate::interrupt::bind_handler(crate::peripherals::Interrupt::USB, interrupt_handler);
         }
 
         fn disable(&mut self) {

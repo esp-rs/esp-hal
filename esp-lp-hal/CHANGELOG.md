@@ -5,16 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 
 ### Added
+- Add `wake_hp_core` for ESP32-S2 and ESP32-S3 (#5133)
 
 ### Changed
 
-- Bump MSRV to 1.84 (#2951)
-- Fix gpio `input_state` and `output_state` for the ESP32-S3 and ESP32-S2 (#3191)
 
 ### Fixed
+
+- Fix panic when handling buffers larger than 7 bytes in `LpI2c.write` and `LpI2c.read` (#4694)
+
+### Removed
+
+
+## [v0.3.0] - 2025-10-13
+
+### Fixed
+
+- Fixed size of LP_UART's RAM block (#3812)
+
+## [v0.2.0] - 2025-06-03
+
+### Changed
+
+- Fix gpio `input_state` and `output_state` for the ESP32-S3 and ESP32-S2 (#3191)
+- Bump Rust edition to 2024, bump MSRV to 1.86. (#2951, #3391, #3560)
 
 ### Removed
 
@@ -26,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add the `esp32c6-lp-hal` package (#714)
 - Add GPIO (output) and delay functionality to `esp32c6-lp-hal` (#715)
-- Add GPIO input support and implement additional `embedded-hal` output traits for the C6's LP core [#720]
+- Add GPIO input support and implement additional `embedded-hal` output traits for the C6's LP core (#720)
 - Add the `ulp-riscv-hal` package (#840)
 - Add LP_UART basic driver (#1113)
 - Added basic `LP-I2C` driver for C6 (#1185)
@@ -42,3 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed to `esp-ulp-riscv-hal` (#916)
 - Remove 2nd level generics from GPIO pin (#1526)
 - GPIO Input/Output types have been converted to unit structs (#1754)
+
+[v0.2.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-lp-hal-v0.2.0
+[v0.3.0]: https://github.com/esp-rs/esp-hal/compare/esp-lp-hal-v0.2.0...esp-lp-hal-v0.3.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-lp-hal-v0.3.0...HEAD

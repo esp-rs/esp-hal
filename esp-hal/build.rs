@@ -1,218 +1,143 @@
+use std::error::Error;
+#[cfg(feature = "rt")]
 use std::{
     collections::HashMap,
     env,
-    error::Error,
     fs::{self, File},
     io::{BufRead, Write},
     path::{Path, PathBuf},
-    str::FromStr,
 };
 
-use esp_build::assert_unique_used_features;
-use esp_config::{generate_config, Validator, Value};
-use esp_metadata::{Chip, Config};
+use esp_config::{Value, generate_config_from_yaml_definition};
+use esp_metadata_generated::assert_unique_features;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    // if using '"rust-analyzer.cargo.buildScripts.useRustcWrapper": true' we can detect this
+    let suppress_panics = std::env::var("RUSTC_WRAPPER")
+        .unwrap_or_default()
+        .contains("rust-analyzer");
+
     println!("cargo:rustc-check-cfg=cfg(is_debug_build)");
-    if let Ok(level) = std::env::var("OPT_LEVEL") {
-        if level == "0" || level == "1" {
-            println!("cargo:rustc-cfg=is_debug_build");
-        }
+    if let Ok(level) = std::env::var("OPT_LEVEL")
+        && (level == "0" || level == "1")
+    {
+        println!("cargo:rustc-cfg=is_debug_build");
     }
 
-    // NOTE: update when adding new device support!
+    // If some library required unstable make sure unstable is actually enabled.
+    if !suppress_panics && cfg!(feature = "requires-unstable") && !cfg!(feature = "unstable") {
+        panic!(
+            "\n\nThe `unstable` feature is required by a dependent crate but is not enabled.\n\n"
+        );
+    }
+
+    // Log and defmt are mutually exclusive features. The main technical reason is
+    // that allowing both would make the exact panicking behaviour a fragile
+    // implementation detail.
+    assert_unique_features!("log-04", "defmt");
+
     // Ensure that exactly one chip has been specified:
-    assert_unique_used_features!(
-        "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32s2", "esp32s3"
-    );
+    let chip = esp_metadata_generated::Chip::from_cargo_feature()?;
 
-    // NOTE: update when adding new device support!
-    // Determine the name of the configured device:
-    let device_name = if cfg!(feature = "esp32") {
-        "esp32"
-    } else if cfg!(feature = "esp32c2") {
-        "esp32c2"
-    } else if cfg!(feature = "esp32c3") {
-        "esp32c3"
-    } else if cfg!(feature = "esp32c6") {
-        "esp32c6"
-    } else if cfg!(feature = "esp32h2") {
-        "esp32h2"
-    } else if cfg!(feature = "esp32s2") {
-        "esp32s2"
-    } else if cfg!(feature = "esp32s3") {
-        "esp32s3"
-    } else {
-        unreachable!() // We've confirmed exactly one known device was selected
-    };
+    if !suppress_panics && chip.target() != std::env::var("TARGET").unwrap_or_default().as_str() {
+        panic!("
+        Seems you are building for an unsupported or wrong target (e.g. the host environment).
+        Maybe you are missing the `target` in `.cargo/config.toml` or you have configs overriding it?
 
-    // Load the configuration file for the configured device:
-    let chip = Chip::from_str(device_name)?;
-    let config = Config::for_chip(&chip);
+        See https://doc.rust-lang.org/cargo/reference/config.html#hierarchical-structure
+        ");
+    }
 
     // Define all necessary configuration symbols for the configured device:
-    config.define_symbols();
-
-    // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
-    // files:
-    let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
-    println!("cargo:rustc-link-search={}", out.display());
+    chip.define_cfgs();
 
     // emit config
-    let cfg = generate_config("esp_hal", &[
-        (
-            "place-spi-driver-in-ram",
-            "Places the SPI driver in RAM for better performance",
-            Value::Bool(false),
-            None
-        ),
-        (
-            "place-switch-tables-in-ram",
-            "Places switch-tables, some lookup tables and constants related to interrupt handling into RAM - resulting in better performance but slightly more RAM consumption.",
-            Value::Bool(true),
-            None
-        ),
-        (
-            "place-anon-in-ram",
-            "Places anonymous symbols into RAM - resulting in better performance at the cost of significant more RAM consumption. Best to be combined with `place-switch-tables-in-ram`.",
-            Value::Bool(false),
-            None
-        ),
-        // Ideally, we should be able to set any clock frequency for any chip. However, currently
-        // only the 32 and C2 implements any sort of configurability, and the rest have a fixed
-        // clock frequeny.
-        // TODO: only show this configuration for chips that have multiple valid options.
-        (
-            "xtal-frequency",
-            "The frequency of the crystal oscillator, in MHz. Set to `auto` to automatically detect the frequency. `auto` may not be able to identify the clock frequency in some cases. Also, configuring a specific frequency may increase performance slightly.",
-            Value::String(match device_name {
-                "esp32" | "esp32c2" => String::from("auto"),
-                // The rest has only one option
-                "esp32c3" | "esp32c6" | "esp32s2" | "esp32s3" => String::from("40"),
-                "esp32h2" => String::from("32"),
-                _ => unreachable!(),
-            }),
-            Some(Validator::Enumeration(match device_name {
-                "esp32" | "esp32c2" => vec![String::from("auto"), String::from("26"), String::from("40")],
-                // The rest has only one option
-                "esp32c3" | "esp32c6" | "esp32s2" | "esp32s3" => vec![String::from("40")],
-                "esp32h2" => vec![String::from("32")],
-                _ => unreachable!(),
-            })),
-        ),
-        // ideally we should only offer this for ESP32 but the config system doesn't
-        // support per target configs, yet
-        (
-            "spi-address-workaround",
-            "(ESP32 only) Enables a workaround for the issue where SPI in half-duplex mode incorrectly transmits the address on a single line if the data buffer is empty.",
-            Value::Bool(true),
-            None
-        ),
-        // ideally we should only offer this for ESP32-C6/ESP32-H2 but the config system doesn't support per target configs, yet
-        (
-            "flip-link",
-            "(ESP32-C6/ESP32-H2 only): Move the stack to start of RAM to get zero-cost stack overflow protection.",
-            Value::Bool(false),
-            None
-        ),
-        // ideally we should only offer this for ESP32, ESP32-S2 and `octal` only for ESP32-S3 but the config system doesn't support per target configs, yet
-        (
-            "psram-mode",
-            "(ESP32, ESP32-S2 and ESP32-S3 only, `octal` is only supported for ESP32-S3) SPIRAM chip mode",
-            Value::String(String::from("quad")),
-            Some(Validator::Enumeration(
-                vec![String::from("quad"), String::from("octal")]
-            )),
-        ),
-        // Rust's stack smashing protection configuration
-        (
-            "stack-guard-offset",
-            "The stack guard variable will be placed this many bytes from the stack's end.",
-            Value::Integer(4096),
-            None
-        ),
-        (
-            "stack-guard-value",
-            "The value to be written to the stack guard variable.",
-            Value::Integer(0xDEED_BAAD),
-            None
-        )
-    ], true);
+    println!("cargo:rerun-if-changed=./esp_config.yml");
+    let cfg_yaml = std::fs::read_to_string("./esp_config.yml")
+        .expect("Failed to read esp_config.yml for esp-hal");
+    let cfg = generate_config_from_yaml_definition(&cfg_yaml, true, true, Some(chip)).unwrap();
 
     // RISC-V and Xtensa devices each require some special handling and processing
     // of linker scripts:
 
-    #[allow(unused_mut)]
-    let mut config_symbols = config.all().collect::<Vec<_>>();
+    let mut config_symbols: Vec<String> =
+        chip.all_symbols().iter().map(|c| c.to_string()).collect();
 
     for (key, value) in &cfg {
-        if let Value::Bool(true) = value {
-            config_symbols.push(key);
+        match value {
+            Value::Bool(true) => {
+                config_symbols.push(key.clone());
+            }
+            Value::String(v) => {
+                config_symbols.push(format!("{key}_{v}"));
+            }
+            _ => {}
         }
     }
 
-    if cfg!(feature = "esp32") || cfg!(feature = "esp32s2") || cfg!(feature = "esp32s3") {
-        // Xtensa devices:
+    // Only emit linker directives if the `rt` feature is enabled
+    #[cfg(feature = "rt")]
+    {
+        // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
+        // files:
+        let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
-        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-        File::create(out.join("memory_extras.x"))?.write_all(&generate_memory_extras())?;
+        println!("cargo:rustc-link-search={}", out.display());
 
-        let (irtc, drtc) = if cfg!(feature = "esp32s3") {
-            ("rtc_fast_seg", "rtc_fast_seg")
-        } else {
-            ("rtc_fast_iram_seg", "rtc_fast_dram_seg")
-        };
+        if chip.is_xtensa() {
+            #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+            File::create(out.join("memory_extras.x"))?.write_all(&generate_memory_extras())?;
 
-        let alias = format!(
-            r#"
+            let (irtc, drtc) = if cfg!(feature = "esp32s3") {
+                ("rtc_fast_seg", "rtc_fast_seg")
+            } else {
+                ("rtc_fast_iram_seg", "rtc_fast_dram_seg")
+            };
+
+            let alias = format!(
+                r#"
             REGION_ALIAS("ROTEXT", irom_seg);
             REGION_ALIAS("RWTEXT", iram_seg);
             REGION_ALIAS("RODATA", drom_seg);
             REGION_ALIAS("RWDATA", dram_seg);
-            REGION_ALIAS("RTC_FAST_RWTEXT", {});
-            REGION_ALIAS("RTC_FAST_RWDATA", {});
-        "#,
-            irtc, drtc
-        );
+            REGION_ALIAS("RTC_FAST_RWTEXT", {irtc});
+            REGION_ALIAS("RTC_FAST_RWDATA", {drtc});
+        "#
+            );
 
-        fs::write(out.join("alias.x"), alias)?;
-        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x"))?;
-    } else {
-        // RISC-V devices:
+            fs::write(out.join("alias.x"), alias)?;
+            fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x"))?;
+        } else {
+            // RISC-V devices:
 
-        preprocess_file(
-            &config_symbols,
-            &cfg,
-            "ld/riscv/asserts.x",
-            out.join("asserts.x"),
-        )?;
-        preprocess_file(
-            &config_symbols,
-            &cfg,
-            "ld/riscv/debug.x",
-            out.join("debug.x"),
-        )?;
-        preprocess_file(
-            &config_symbols,
-            &cfg,
-            "ld/riscv/hal-defaults.x",
-            out.join("hal-defaults.x"),
-        )?;
+            preprocess_file(
+                &config_symbols,
+                &cfg,
+                "ld/riscv/asserts.x",
+                out.join("asserts.x"),
+            )?;
+            preprocess_file(
+                &config_symbols,
+                &cfg,
+                "ld/riscv/hal-defaults.x",
+                out.join("hal-defaults.x"),
+            )?;
+        }
+
+        // With the architecture-specific linker scripts taken care of, we can copy all
+        // remaining linker scripts which are common to all devices:
+        copy_dir_all(&config_symbols, &cfg, "ld/sections", &out)?;
+        copy_dir_all(&config_symbols, &cfg, format!("ld/{}", chip.name()), &out)?;
     }
-
-    // With the architecture-specific linker scripts taken care of, we can copy all
-    // remaining linker scripts which are common to all devices:
-    copy_dir_all(&config_symbols, &cfg, "ld/sections", &out)?;
-    copy_dir_all(&config_symbols, &cfg, format!("ld/{device_name}"), &out)?;
 
     Ok(())
 }
 
 // ----------------------------------------------------------------------------
 // Helper Functions
-
+#[cfg(feature = "rt")]
 fn copy_dir_all(
-    config_symbols: &[&str],
+    config_symbols: &[String],
     cfg: &HashMap<String, Value>,
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
@@ -241,8 +166,9 @@ fn copy_dir_all(
 }
 
 /// A naive pre-processor for linker scripts
+#[cfg(feature = "rt")]
 fn preprocess_file(
-    config: &[&str],
+    config: &[String],
     cfg: &HashMap<String, Value>,
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
@@ -261,7 +187,7 @@ fn preprocess_file(
 
         if let Some(condition) = trimmed.strip_prefix("#IF ") {
             let should_take = take.iter().all(|v| *v);
-            let should_take = should_take && config.contains(&condition);
+            let should_take = should_take && config.iter().any(|c| c == condition);
             take.push(should_take);
             continue;
         } else if trimmed == "#ELSE" {
@@ -283,6 +209,7 @@ fn preprocess_file(
     Ok(())
 }
 
+#[cfg(feature = "rt")]
 fn substitute_config(cfg: &HashMap<String, Value>, line: &str) -> String {
     let mut result = String::new();
     let mut chars = line.chars().peekable();
@@ -320,9 +247,9 @@ fn substitute_config(cfg: &HashMap<String, Value>, line: &str) -> String {
     result
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(all(feature = "esp32", feature = "rt"))]
 fn generate_memory_extras() -> Vec<u8> {
-    let reserve_dram = if cfg!(feature = "bluetooth") {
+    let reserve_dram = if cfg!(feature = "__bluetooth") {
         "0x10000"
     } else {
         "0x0"
@@ -338,7 +265,7 @@ fn generate_memory_extras() -> Vec<u8> {
     .to_vec()
 }
 
-#[cfg(feature = "esp32s2")]
+#[cfg(all(feature = "esp32s2", feature = "rt"))]
 fn generate_memory_extras() -> Vec<u8> {
     let reserved_cache = if cfg!(feature = "psram") {
         "0x4000"

@@ -8,23 +8,45 @@ Automation using [cargo-xtask](https://github.com/matklad/cargo-xtask).
 Usage: xtask <COMMAND>
 
 Commands:
-  build-documentation    Build documentation for the specified chip
-  build-examples         Build all examples for the specified chip
-  build-package          Build the specified package with the given options
-  build-tests            Build all applicable tests or the specified test for a specified chip
-  bump-version           Bump the version of the specified package(s)
-  fmt-packages           Format all packages in the workspace with rustfmt
-  generate-efuse-fields  Generate the eFuse fields source file from a CSV
-  lint-packages          Lint all packages in the workspace with clippy
-  run-example            Run the given example for the specified chip
-  run-doc-test           Run doctests for specified chip and package
-  run-tests              Run all applicable tests or the specified test for a specified chip
-  run-elfs               Run all ELFs in a folder
-  help                   Print this message or the help of the given subcommand(s)
+  build                      Build-related subcommands
+  run                        Run-related subcommands
+  release                    Release-related subcommands
+  ci                         Perform (parts of) the checks done in CI
+  fmt-packages               Format all packages in the workspace with rustfmt
+  clean                      Run cargo clean
+  lint-packages              Lint all packages in the workspace with clippy
+  semver-check               Semver Checks
+  check-changelog            Check the changelog for packages
+  update-chip-support-table  Re-generate the chip support table in the esp-hal README
+  host-tests                 Run host tests for all the packages where they are present
+  check-global-symbols       Check global symbols in the compiled `.rlib`
+  help                       Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help  Print help
 ```
+
+You can get help for subcommands, too!
+
+```text
+cargo xtask build examples --help
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running `[...]/target/debug/xtask build examples --help`
+
+Build all examples for the specified chip
+
+Usage: xtask build examples [OPTIONS] <EXAMPLE>
+
+[...]
+```
+
+## Releasing crates
+
+To start the release process, run `cargo xrelease plan` to prepare all crates, or `cargo xrelease plan <a space-separated list of crates>` to release a specific crate and its dependencies.
+
+For example, to release `esp-println`, run `cargo xrelease plan esp-println`.
+
+The release is a multi-step process. Each step in the process will tell you what to do next.
 
 ## Test/example metadata use
 
@@ -97,6 +119,19 @@ One environment variable is specified in a single line. The name and value are s
 This key is additive. The unnamed list is added to named lists, and multiple lists with the
 same name are merged.
 
+### `//% CARGO-CONFIG`
+
+The value of this key will be passed as a `--config` argument to `cargo`. Any amount
+of configuration can be specified this way.
+
+```
+//% CARGO-CONFIG: target.'cfg(target_arch = "riscv32")'.rustflags = [ "-Z", "stack-protector=all" ]
+//% CARGO-CONFIG: target.'cfg(target_arch = "xtensa")'.rustflags = [ "-Z", "stack-protector=all" ]
+```
+
+This key is additive. The unnamed list is added to named lists, and multiple lists with the
+same name are merged.
+
 ### Working with multiple metadata configurations
 
 Processing a file will create one configuration, or however many names (that is, the list of
@@ -115,12 +150,94 @@ option, while the other will select `multiple-integrated`.
 //% ENV(multiple_integrated): ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE = multiple-integrated
 ```
 
-You can specifiy a test or example by file, or by configuration. If the
-parameters match multiple files, they will be built or executed in sucession.
+You can specify a test or example by file, or by configuration. If the
+parameters match multiple files, they will be built or executed in succession.
 
-For example, running `cargo xtask run-tests esp32 embassy_test` will run both
+For example, running `cargo xtask run tests esp32 embassy_test` will run both
 `embassy_test_single_integrated` and `embassy_test_multiple_integrated`, but you can also
-run `cargo xtask run-tests esp32 embassy_test_multiple_integrated` to select only one.
+run `cargo xtask run tests esp32 embassy_test_multiple_integrated` to select only one.
 
-In this example, running the `cargo xtask build-tests esp32 embassy_test` command creates an
+In this example, running the `cargo xtask build tests esp32 embassy_test` command creates an
 `embassy_test_single_integrated` and an `embassy_test_multiple_integrated` binary.
+
+## MCP server
+
+The xtask includes an [MCP](https://modelcontextprotocol.io/) server that exposes xtask commands as tools for AI agents. It runs over stdio and is built with the `mcp` cargo feature.
+
+### Claude Code
+
+Create `.mcp.json` in the repository root (it is gitignored):
+
+```json
+{
+  "mcpServers": {
+    "esp-hal-xtask": {
+      "command": "cargo",
+      "args": ["xmcp"]
+    }
+  }
+}
+```
+
+### VS Code (GitHub Copilot / Copilot Chat)
+
+Add to `.vscode/mcp.json` (create if it doesn't exist):
+
+```json
+{
+  "servers": {
+    "esp-hal-xtask": {
+      "command": "cargo",
+      "args": ["xmcp"]
+    }
+  }
+}
+```
+
+### Zed
+
+Add to Zed's settings (`settings.json`):
+
+```json
+{
+  "context_servers": {
+    "esp-hal-xtask": {
+      "command": {
+        "path": "cargo",
+        "args": ["xmcp"]
+      }
+    }
+  }
+}
+```
+
+### Gemini Code Assist (CLI)
+
+Run with `--mcp-server` flag:
+
+```bash
+gemini --mcp-server="cargo xmcp"
+```
+
+Or add to `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "esp-hal-xtask": {
+      "command": "cargo",
+      "args": ["xmcp"]
+    }
+  }
+}
+```
+
+### Other MCP clients
+
+The server is a standard stdio MCP server. Launch it with:
+
+```bash
+cargo xmcp
+```
+
+Point any MCP-compatible client at this command.

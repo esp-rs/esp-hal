@@ -2,7 +2,7 @@
 
 #![allow(unused)] // TODO: Remove me when `embedded_hal::i2c::I2c` is implemented
 
-use crate::pac::{lp_i2c0::COMD, LP_I2C0};
+use crate::pac::{LP_I2C0, lp_i2c0::COMD};
 
 const LP_I2C_TRANS_COMPLETE_INT_ST_S: u32 = 7;
 const LP_I2C_END_DETECT_INT_ST_S: u32 = 3;
@@ -12,12 +12,14 @@ const I2C_LL_INTR_MASK: u32 = (1 << LP_I2C_TRANS_COMPLETE_INT_ST_S)
     | (1 << LP_I2C_END_DETECT_INT_ST_S)
     | (1 << LP_I2C_NACK_INT_ST_S);
 
-const LP_I2C_FIFO_LEN: u32 = 16;
+const LP_I2C_FIFO_LEN: u32 = property!("lp_i2c_master.fifo_size");
 
 #[doc(hidden)]
 pub unsafe fn conjure() -> LpI2c {
-    LpI2c {
-        i2c: LP_I2C0::steal(),
+    unsafe {
+        LpI2c {
+            i2c: LP_I2C0::steal(),
+        }
     }
 }
 
@@ -187,8 +189,8 @@ pub struct LpI2c {
 }
 
 impl LpI2c {
-    /// Writes bytes to slave with address `addr`
-    pub fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Error> {
+    /// Writes bytes to slave with given `address`
+    pub fn write(&mut self, address: u8, bytes: &[u8]) -> Result<(), Error> {
         let mut cmd_iterator = CommandRegister::COMD0;
 
         // If SCL is busy, reset the Master FSM
@@ -206,7 +208,7 @@ impl LpI2c {
         self.add_cmd_lp(&mut cmd_iterator, Command::Start)?;
 
         // Load device address and R/W bit into FIFO
-        self.write_fifo((addr << 1) | OperationType::Write as u8);
+        self.write_fifo((address << 1) | OperationType::Write as u8);
 
         self.add_cmd_lp(
             &mut cmd_iterator,
@@ -217,7 +219,7 @@ impl LpI2c {
             },
         )?;
 
-        self.enable_interrupts(I2C_LL_INTR_MASK);
+        self.enable_listen(I2C_LL_INTR_MASK);
 
         let mut data_idx = 0;
         let mut remaining_bytes = bytes.len() as u32;
@@ -225,11 +227,7 @@ impl LpI2c {
         let mut fifo_available = LP_I2C_FIFO_LEN - 1;
 
         while remaining_bytes > 0 {
-            let fifo_size = if remaining_bytes < fifo_available {
-                remaining_bytes
-            } else {
-                fifo_available
-            };
+            let fifo_size = remaining_bytes.min(fifo_available);
             remaining_bytes -= fifo_size;
 
             // Write data to the FIFO
@@ -256,6 +254,7 @@ impl LpI2c {
 
             // Add the Stop/End command
             self.add_cmd_lp(&mut cmd_iterator, cmd)?;
+            cmd_iterator = CommandRegister::COMD0;
 
             // Start the I2C transaction
             self.lp_i2c_update();
@@ -273,8 +272,8 @@ impl LpI2c {
         Ok(())
     }
 
-    /// Reads enough bytes from slave with `addr` to fill `buffer`
-    pub fn read(&mut self, addr: u8, buffer: &mut [u8]) -> Result<(), Error> {
+    /// Reads enough bytes from slave with given `address` to fill `buffer`
+    pub fn read(&mut self, address: u8, buffer: &mut [u8]) -> Result<(), Error> {
         // Check size constraints
         if buffer.len() > 254 {
             return Err(Error::ExceedingFifo);
@@ -285,7 +284,7 @@ impl LpI2c {
         self.add_cmd_lp(&mut cmd_iterator, Command::Start)?;
 
         // Load device address
-        self.write_fifo((addr << 1) | OperationType::Read as u8);
+        self.write_fifo((address << 1) | OperationType::Read as u8);
 
         self.add_cmd_lp(
             &mut cmd_iterator,
@@ -296,18 +295,14 @@ impl LpI2c {
             },
         )?;
 
-        self.enable_interrupts(
+        self.enable_listen(
             (1 << LP_I2C_TRANS_COMPLETE_INT_ST_S) | (1 << LP_I2C_END_DETECT_INT_ST_S),
         );
 
         let mut remaining_bytes = buffer.len();
 
         while remaining_bytes > 0 {
-            let fifo_size = if remaining_bytes < LP_I2C_FIFO_LEN as usize {
-                remaining_bytes
-            } else {
-                LP_I2C_FIFO_LEN as usize
-            };
+            let fifo_size = remaining_bytes.min(LP_I2C_FIFO_LEN as usize);
             remaining_bytes -= fifo_size;
 
             if fifo_size == 1 {
@@ -353,6 +348,7 @@ impl LpI2c {
                 )?;
                 // Send END command signaling more data to come
                 self.add_cmd_lp(&mut cmd_iterator, Command::End)?;
+                cmd_iterator = CommandRegister::COMD0;
             }
 
             self.lp_i2c_update();
@@ -372,14 +368,19 @@ impl LpI2c {
         Ok(())
     }
 
-    /// Writes bytes to slave with address `addr` and then reads enough bytes
+    /// Writes bytes to slave with given `address` and then reads enough bytes
     /// to fill `buffer` *in a single transaction*
-    pub fn write_read(&mut self, addr: u8, bytes: &[u8], buffer: &mut [u8]) -> Result<(), Error> {
+    pub fn write_read(
+        &mut self,
+        address: u8,
+        bytes: &[u8],
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
         // It would be possible to combine the write and read in one transaction, but
         // filling the tx fifo with the current code is somewhat slow even in release
         // mode which can cause issues.
-        self.write(addr, bytes)?;
-        self.read(addr, buffer)?;
+        self.write(address, bytes)?;
+        self.read(address, buffer)?;
 
         Ok(())
     }
@@ -435,7 +436,7 @@ impl LpI2c {
         Ok(())
     }
 
-    fn enable_interrupts(&self, mask: u32) {
+    fn enable_listen(&self, mask: u32) {
         self.i2c.int_ena().write(|w| unsafe { w.bits(mask) });
     }
 

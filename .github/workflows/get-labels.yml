@@ -1,0 +1,57 @@
+name: Get Labels
+
+on:
+  workflow_call:
+    outputs:
+      labels:
+        description: "Space-separated list of all labels"
+        value: ${{ jobs.get-labels.outputs.labels }}
+      packages:
+        description: "Space-separated list of packages with breaking changes"
+        value: ${{ jobs.get-labels.outputs.packages }}
+
+jobs:
+  get-labels:
+    runs-on: ubuntu-latest
+    outputs:
+      labels: ${{ steps.list.outputs.labels }}
+      packages: ${{ steps.list.outputs.packages }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: List labels
+        id: list
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            LABELS=$(printf "%b" "${{ join(github.event.pull_request.labels.*.name, '\n') }}")
+          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            COMMIT_MSG=$(git log -1 --pretty=%B)
+            PR_NUMBER=$(echo "$COMMIT_MSG" | grep -o "#[0-9]*" | grep -o "[0-9]*" || true)
+            if [ -n "$PR_NUMBER" ]; then
+              LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' 2>/dev/null || true)
+            fi
+          fi
+
+          PACKAGES=""
+          if [ -n "$LABELS" ]; then
+            # -o: only output matches, not rows
+            # -P: Perl-compatible regular expressions
+            # `(?<=)`: look-behind: match only if this is present, but do not make this part of the match
+            PACKAGES=$(echo "$LABELS" \
+              | grep -oP '(?<=^breaking-change-)[a-z0-9-]+$' || true \
+              | tr '\n' ',' \
+              | sed 's/,$//')
+            fi
+
+          # Convert labels to space-separated for the 'labels' output
+          LABELS_SPACE=$(echo "$LABELS" | tr '\n' ' ' | xargs)
+          # Convert comma-separated PACKAGES to space-separated
+          PACKAGES_SPACE=$(echo "$PACKAGES" | tr ',' ' ')
+
+          echo "labels=$LABELS_SPACE" >> "$GITHUB_OUTPUT"
+          echo "packages=$PACKAGES_SPACE" >> "$GITHUB_OUTPUT"
+
+          echo "Detected labels: $LABELS_SPACE"
+          echo "Detected packages: $PACKAGES_SPACE"

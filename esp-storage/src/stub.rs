@@ -7,8 +7,10 @@ const ERROR_CODE: i32 = 1;
 const ERASE_BYTE: u8 = 0xff;
 const WORD_SIZE: u32 = 4;
 const SECTOR_SIZE: u32 = 4 << 10;
-const NUM_SECTORS: u32 = 4;
-const FLASH_SIZE: u32 = SECTOR_SIZE * NUM_SECTORS;
+const BLOCK_SIZE: u32 = 4 << 14;
+const NUM_BLOCKS: u32 = 4;
+const FLASH_SIZE: u32 = BLOCK_SIZE * NUM_BLOCKS;
+const NUM_SECTORS: u32 = FLASH_SIZE / SECTOR_SIZE;
 
 static mut FLASH_LOCK: bool = true;
 static mut FLASH_DATA: [u8; FLASH_SIZE as usize] = [0u8; FLASH_SIZE as usize];
@@ -24,6 +26,7 @@ fn check<const ALIGN: u32, const SIZE: u32, const MAX_LEN: u32>(
     offset: u32,
     length: u32,
     data: *const u32,
+    is_write: bool,
 ) -> bool {
     if offset % ALIGN > 0 {
         print_error!("Not aligned offset: {offset}");
@@ -45,12 +48,12 @@ fn check<const ALIGN: u32, const SIZE: u32, const MAX_LEN: u32>(
         print_error!("Length out of range: {length} > {MAX_LEN}");
         return false;
     }
-    let addr = unsafe { (data as *const u8).offset_from(ptr::null()) } as u32;
+    let addr = data as u32;
     if addr % ALIGN > 0 {
         print_error!("Not aligned data: {addr:#0x}");
         return false;
     }
-    if unsafe { FLASH_LOCK } {
+    if is_write && unsafe { FLASH_LOCK } {
         print_error!("Flash locked");
         return false;
     }
@@ -58,7 +61,7 @@ fn check<const ALIGN: u32, const SIZE: u32, const MAX_LEN: u32>(
 }
 
 pub(crate) fn spiflash_read(src_addr: u32, data: *mut u32, len: u32) -> i32 {
-    if check::<WORD_SIZE, FLASH_SIZE, SECTOR_SIZE>(src_addr, len, data) {
+    if check::<WORD_SIZE, FLASH_SIZE, SECTOR_SIZE>(src_addr, len, data, false) {
         maybe_with_critical_section(|| {
             let src = unsafe { slice::from_raw_parts_mut(data as *mut u8, len as _) };
             unsafe { src.copy_from_slice(&FLASH_DATA[src_addr as usize..][..len as usize]) };
@@ -77,7 +80,7 @@ pub(crate) fn spiflash_unlock() -> i32 {
 }
 
 pub(crate) fn spiflash_erase_sector(sector_number: u32) -> i32 {
-    if check::<1, NUM_SECTORS, 1>(sector_number, 1, ptr::null()) {
+    if check::<1, NUM_SECTORS, 1>(sector_number, 1, ptr::null(), true) {
         maybe_with_critical_section(|| {
             let dst_addr = sector_number * SECTOR_SIZE;
             let len = SECTOR_SIZE;
@@ -89,8 +92,21 @@ pub(crate) fn spiflash_erase_sector(sector_number: u32) -> i32 {
     }
 }
 
+pub(crate) fn spiflash_erase_block(block_number: u32) -> i32 {
+    if check::<1, NUM_BLOCKS, 1>(block_number, 1, ptr::null(), true) {
+        maybe_with_critical_section(|| {
+            let dst_addr = block_number * BLOCK_SIZE;
+            let len = BLOCK_SIZE;
+            unsafe { FLASH_DATA[dst_addr as usize..][..len as usize].fill(ERASE_BYTE) };
+        });
+        SUCCESS_CODE
+    } else {
+        ERROR_CODE
+    }
+}
+
 pub(crate) fn spiflash_write(dest_addr: u32, data: *const u32, len: u32) -> i32 {
-    if check::<WORD_SIZE, FLASH_SIZE, SECTOR_SIZE>(dest_addr, len, data) {
+    if check::<WORD_SIZE, FLASH_SIZE, SECTOR_SIZE>(dest_addr, len, data, true) {
         maybe_with_critical_section(|| {
             let dst = unsafe { slice::from_raw_parts(data as *const u8, len as _) };
             for (d, s) in unsafe { &mut FLASH_DATA[dest_addr as usize..][..len as usize] }

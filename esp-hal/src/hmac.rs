@@ -9,11 +9,9 @@
 //! Main features:
 //!
 //! - Standard HMAC-SHA-256 algorithm.
-//! - Hash result only accessible by configurable hardware peripheral (in
-//!   downstream mode).
+//! - Hash result only accessible by configurable hardware peripheral (in downstream mode).
 //! - Compatible to challenge-response authentication algorithm.
-//! - Generates required keys for the Digital Signature (DS) peripheral (in
-//!   downstream mode).
+//! - Generates required keys for the Digital Signature (DS) peripheral (in downstream mode).
 //! - Re-enables soft-disabled JTAG (in downstream mode).
 //!
 //! ## Configuration
@@ -32,13 +30,12 @@
 //! ## Examples
 //! Visit the [HMAC] example to learn how to use the HMAC accelerator
 //!
-//! [HMAC]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/hmac.rs
+//! [HMAC]: https://github.com/esp-rs/esp-hal/blob/main/examples/peripheral/hmac/src/main.rs
 
 use core::convert::Infallible;
 
 use crate::{
     pac,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::HMAC,
     reg_access::{AlignmentHelper, SocDependentEndianess},
     system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
@@ -48,7 +45,7 @@ use crate::{
 /// It allows users to compute HMACs for cryptographic purposes, ensuring data
 /// integrity and authenticity.
 pub struct Hmac<'d> {
-    hmac: PeripheralRef<'d, HMAC>,
+    hmac: HMAC<'d>,
     alignment_helper: AlignmentHelper<SocDependentEndianess>,
     byte_written: usize,
     next_command: NextCommand,
@@ -107,9 +104,7 @@ enum NextCommand {
 
 impl<'d> Hmac<'d> {
     /// Creates a new instance of the HMAC peripheral.
-    pub fn new(hmac: impl Peripheral<P = HMAC> + 'd) -> Self {
-        crate::into_ref!(hmac);
-
+    pub fn new(hmac: HMAC<'d>) -> Self {
         let guard = GenericPeripheralGuard::new();
 
         Self {
@@ -184,7 +179,7 @@ impl<'d> Hmac<'d> {
         nb::block!(self.write_data(&[0x80])).unwrap();
         nb::block!(self.flush_data()).unwrap();
         self.next_command();
-        debug_assert!(self.byte_written % 4 == 0);
+        debug_assert!(self.byte_written.is_multiple_of(4));
 
         self.padding(msg_len);
 
@@ -203,7 +198,7 @@ impl<'d> Hmac<'d> {
             #[cfg(not(esp32s2))]
             self.regs().rd_result_mem(0).as_ptr(),
             output,
-            core::cmp::min(output.len(), 32) / self.alignment_helper.align_size(),
+            core::cmp::min(output.len(), 32),
         );
 
         self.regs()
@@ -236,16 +231,14 @@ impl<'d> Hmac<'d> {
     }
 
     fn write_data<'a>(&mut self, incoming: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
-        let mod_length = self.byte_written % 64;
-
         let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
             #[cfg(esp32s2)]
             self.regs().wr_message_(0).as_ptr(),
             #[cfg(not(esp32s2))]
             self.regs().wr_message_mem(0).as_ptr(),
             incoming,
-            64 / self.alignment_helper.align_size(),
-            mod_length / self.alignment_helper.align_size(),
+            64,
+            self.byte_written % 64,
         );
 
         self.byte_written = self
@@ -277,11 +270,11 @@ impl<'d> Hmac<'d> {
             self.regs().wr_message_(0).as_ptr(),
             #[cfg(not(esp32s2))]
             self.regs().wr_message_mem(0).as_ptr(),
-            (self.byte_written % 64) / self.alignment_helper.align_size(),
+            self.byte_written % 64,
         );
 
         self.byte_written = self.byte_written.wrapping_add(flushed);
-        if flushed > 0 && self.byte_written % 64 == 0 {
+        if flushed > 0 && self.byte_written.is_multiple_of(64) {
             self.regs()
                 .set_message_one()
                 .write(|w| w.set_text_one().set_bit());
@@ -304,14 +297,14 @@ impl<'d> Hmac<'d> {
                 #[cfg(not(esp32s2))]
                 self.regs().wr_message_mem(0).as_ptr(),
                 0_u8,
-                pad_len / self.alignment_helper.align_size(),
-                mod_cursor / self.alignment_helper.align_size(),
+                pad_len,
+                mod_cursor,
             );
             self.regs()
                 .set_message_one()
                 .write(|w| w.set_text_one().set_bit());
             self.byte_written = self.byte_written.wrapping_add(pad_len);
-            debug_assert!(self.byte_written % 64 == 0);
+            debug_assert!(self.byte_written.is_multiple_of(64));
             while self.is_busy() {}
             self.next_command = NextCommand::MessagePad;
             self.next_command();
@@ -326,8 +319,8 @@ impl<'d> Hmac<'d> {
             #[cfg(not(esp32s2))]
             self.regs().wr_message_mem(0).as_ptr(),
             0_u8,
-            pad_len / self.alignment_helper.align_size(),
-            mod_cursor / self.alignment_helper.align_size(),
+            pad_len,
+            mod_cursor,
         );
 
         self.byte_written = self.byte_written.wrapping_add(pad_len);
@@ -343,8 +336,8 @@ impl<'d> Hmac<'d> {
             #[cfg(not(esp32s2))]
             self.regs().wr_message_mem(0).as_ptr(),
             &len_mem,
-            64 / self.alignment_helper.align_size(),
-            (64 - core::mem::size_of::<u64>()) / self.alignment_helper.align_size(),
+            64,
+            64 - core::mem::size_of::<u64>(),
         );
         self.regs()
             .set_message_one()

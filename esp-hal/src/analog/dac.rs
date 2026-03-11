@@ -1,3 +1,9 @@
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "dac1_pin" => {
+        cfg(esp32) => "GPIO25",
+        cfg(esp32s2) => "GPIO17"
+    }
+))]
 //! # Digital to Analog Converter (DAC)
 //!
 //! ## Overview
@@ -16,13 +22,11 @@
 //! ## Examples
 //! ### Write a value to a DAC channel
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::analog::dac::Dac;
 //! # use esp_hal::delay::Delay;
 //! # use embedded_hal::delay::DelayNs;
-#![cfg_attr(esp32, doc = "let dac1_pin = peripherals.GPIO25;")]
-#![cfg_attr(esp32s2, doc = "let dac1_pin = peripherals.GPIO17;")]
-//! let mut dac1 = Dac::new(peripherals.DAC1, dac1_pin);
+//! let mut dac1 = Dac::new(peripherals.DAC1, peripherals.__dac1_pin__);
 //!
 //! let mut delay = Delay::new();
 //!
@@ -38,42 +42,38 @@
 //! # }
 //! ```
 
-use crate::{
-    gpio::{self, AnalogPin},
-    peripheral::{Peripheral, PeripheralRef},
-};
+use crate::gpio::AnalogPin;
 
 // Only specific pins can be used with each DAC peripheral, and of course
 // these pins are different depending on which chip you are using; for this
 // reason, we will type alias the pins for ease of use later in this module:
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
-        type Dac1Gpio = gpio::GpioPin<25>;
-        type Dac2Gpio = gpio::GpioPin<26>;
+        type Dac1Gpio<'d> = crate::peripherals::GPIO25<'d>;
+        type Dac2Gpio<'d> = crate::peripherals::GPIO26<'d>;
     } else if #[cfg(esp32s2)] {
-        type Dac1Gpio = gpio::GpioPin<17>;
-        type Dac2Gpio = gpio::GpioPin<18>;
+        type Dac1Gpio<'d> = crate::peripherals::GPIO17<'d>;
+        type Dac2Gpio<'d> = crate::peripherals::GPIO18<'d>;
     }
 }
 
 /// Digital-to-Analog Converter (DAC) Channel
 pub struct Dac<'d, T>
 where
-    T: Instance,
-    T::Pin: AnalogPin,
+    T: Instance + 'd,
+    T::Pin: AnalogPin + 'd,
 {
-    _inner: PeripheralRef<'d, T>,
+    _inner: T,
+    _lifetime: core::marker::PhantomData<&'d mut ()>,
 }
 
 impl<'d, T> Dac<'d, T>
 where
-    T: Instance,
-    T::Pin: AnalogPin,
+    T: Instance + 'd,
+    T::Pin: AnalogPin + 'd,
 {
     /// Construct a new instance of [`Dac`].
-    pub fn new(dac: impl Peripheral<P = T> + 'd, pin: T::Pin) -> Self {
-        crate::into_ref!(dac);
-
+    pub fn new(dac: T, pin: T::Pin) -> Self {
         // TODO: Revert on drop.
         pin.set_analog(crate::private::Internal);
 
@@ -84,7 +84,10 @@ where
 
         T::enable_xpd();
 
-        Self { _inner: dac }
+        Self {
+            _inner: dac,
+            _lifetime: core::marker::PhantomData,
+        }
     }
 
     /// Writes the given value.
@@ -122,14 +125,16 @@ pub trait Instance: crate::private::Sealed {
     }
 }
 
-impl Instance for crate::peripherals::DAC1 {
+#[cfg(dac_dac1)]
+impl<'d> Instance for crate::peripherals::DAC1<'d> {
     const INDEX: usize = 0;
 
-    type Pin = Dac1Gpio;
+    type Pin = Dac1Gpio<'d>;
 }
 
-impl Instance for crate::peripherals::DAC2 {
+#[cfg(dac_dac2)]
+impl<'d> Instance for crate::peripherals::DAC2<'d> {
     const INDEX: usize = 1;
 
-    type Pin = Dac2Gpio;
+    type Pin = Dac2Gpio<'d>;
 }

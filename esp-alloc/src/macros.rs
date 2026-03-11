@@ -7,8 +7,8 @@
 /// ```rust, no_run
 /// // Use 64kB in the same region stack uses (dram_seg), for the heap.
 /// heap_allocator!(size: 64000);
-/// // Use 64kB in dram2_seg for the heap, which is otherwise unused.
-/// heap_allocator!(#[link_section = ".dram2_uninit"] size: 64000);
+/// // Use 64kB for the heap in the memory region reclaimed from the bootloader, which is otherwise unused.
+/// heap_allocator!(#[ram(reclaimed)] size: 64000);
 /// ```
 #[macro_export]
 macro_rules! heap_allocator {
@@ -28,14 +28,21 @@ macro_rules! heap_allocator {
 
 /// Initialize a global heap allocator backed by PSRAM
 ///
-/// You need a SoC which supports PSRAM
-/// and activate the feature to enable it. You need to pass the PSRAM peripheral
-/// and the psram module path.
+/// You need a SoC which supports PSRAM and activate the feature to enable
+/// it. You need to pass the PSRAM peripheral and the psram module path.
 ///
 /// # Usage
+///
 /// ```rust, no_run
 /// esp_alloc::psram_allocator!(peripherals.PSRAM, hal::psram);
 /// ```
+///
+/// # ⚠️ Limitations
+///
+/// On ESP32, ESP32-S2 and ESP32-S3 the atomic instructions do not work
+/// correctly when the memory they access is located in PSRAM. This means that
+/// the allocator must not be used to allocate `Atomic*` types - either directly
+/// or indirectly. Be very careful when using PSRAM in your global allocator.
 #[macro_export]
 macro_rules! psram_allocator {
     ($peripheral:expr, $psram_module:path) => {{

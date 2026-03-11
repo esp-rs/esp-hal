@@ -1,8 +1,11 @@
-/// Low-level API
-///
-/// This gives you access to the underlying low level functionality.
-/// These operate on raw pointers and all functions here are unsafe.
-/// No pre-conditions are checked by any of these functions.
+//! # Low-level API
+//!
+//! ⚠️ This is a low-level API and should be used with caution. ⚠️
+//!
+//! This gives you access to the underlying low level functionality.
+//! These operate on raw pointers and all functions here are unsafe.
+//! No pre-conditions are checked by any of these functions.
+
 use crate::chip_specific;
 
 /// Low-level SPI NOR Flash read
@@ -29,13 +32,25 @@ pub unsafe fn spiflash_unlock() -> Result<(), i32> {
     }
 }
 
-/// Low-level SPI NOR Flash erase
+/// Low-level SPI NOR Flash sector erase
 ///
 /// # Safety
 ///
 /// The `sector_number` * sector_size should not exceeds the size of flash.
 pub unsafe fn spiflash_erase_sector(sector_number: u32) -> Result<(), i32> {
     match chip_specific::spiflash_erase_sector(sector_number) {
+        0 => Ok(()),
+        value => Err(value),
+    }
+}
+
+/// Low-level SPI NOR Flash block erase
+///
+/// # Safety
+///
+/// The `block_number` * block_size should not exceeds the size of flash.
+pub unsafe fn spiflash_erase_block(block_number: u32) -> Result<(), i32> {
+    match chip_specific::spiflash_erase_block(block_number) {
         0 => Ok(()),
         value => Err(value),
     }

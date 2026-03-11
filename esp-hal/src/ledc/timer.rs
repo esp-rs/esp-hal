@@ -24,6 +24,8 @@ const LEDC_TIMER_DIV_NUM_MAX: u64 = 0x3FFFF;
 pub enum Error {
     /// Invalid Divisor
     Divisor,
+    /// Frequency unset
+    FrequencyUnset,
 }
 
 #[cfg(esp32)]
@@ -223,6 +225,7 @@ pub struct Timer<'a, S: TimerSpeed> {
     duty: Option<config::Duty>,
     frequency: u32,
     configured: bool,
+    #[cfg(soc_has_clock_node_ref_tick)]
     use_ref_tick: bool,
     clock_source: Option<S::ClockSourceType>,
 }
@@ -241,14 +244,15 @@ where
         self.duty = Some(config.duty);
         self.clock_source = Some(config.clock_source);
 
-        // TODO: we should return some error here if `unwrap()` fails
-        let src_freq: u32 = self.freq().unwrap().as_hz();
+        let src_freq: u32 = self.freq().ok_or(Error::FrequencyUnset)?.as_hz();
         let precision = 1 << config.duty as u32;
         let frequency: u32 = config.frequency.as_hz();
         self.frequency = frequency;
 
+        #[cfg_attr(not(soc_has_clock_node_ref_tick), expect(unused_mut))]
         let mut divisor = ((src_freq as u64) << 8) / frequency as u64 / precision as u64;
 
+        #[cfg(soc_has_clock_node_ref_tick)]
         if divisor > LEDC_TIMER_DIV_NUM_MAX {
             // APB_CLK results in divisor which too high. Try using REF_TICK as clock
             // source.
@@ -298,6 +302,7 @@ impl<'a, S: TimerSpeed> Timer<'a, S> {
             duty: None,
             frequency: 0u32,
             configured: false,
+            #[cfg(soc_has_clock_node_ref_tick)]
             use_ref_tick: false,
             clock_source: None,
         }
@@ -338,13 +343,13 @@ impl TimerHW<LowSpeed> for Timer<'_, LowSpeed> {
     /// Configure the HW for the timer
     fn configure_hw(&self, divisor: u32) {
         let duty = unwrap!(self.duty) as u8;
-        let use_ref_tick = self.use_ref_tick;
 
         self.ledc
             .timer(self.number as usize)
             .conf()
             .modify(|_, w| unsafe {
-                w.tick_sel().bit(use_ref_tick);
+                #[cfg(soc_has_clock_node_ref_tick)]
+                w.tick_sel().bit(self.use_ref_tick);
                 w.rst().clear_bit();
                 w.pause().clear_bit();
                 w.clk_div().bits(divisor);

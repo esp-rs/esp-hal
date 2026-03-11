@@ -1,43 +1,37 @@
 [package]
 name          = "xtensa-lx-rt"
-version       = "0.18.0"
-edition       = "2021"
-rust-version  = "1.84.0"
+version       = "0.21.0"
+edition       = "2024"
+rust-version  = "1.88.0"
 description   = "Minimal startup/runtime for Xtensa LX CPUs"
-documentation = "https://docs.espressif.com/projects/rust/"
+documentation = "https://docs.espressif.com/projects/rust/xtensa-lx-rt/latest/"
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 keywords      = ["lx", "peripheral", "register", "xtensa"]
 categories    = ["embedded", "hardware-support", "no-std"]
+links         = "xtensa-lx-rt"
 
-[package.metadata.docs.rs]
-features = ["esp32"]
+[package.metadata.espressif]
+requires_target = ["xtensa-esp32-none-elf", "xtensa-esp32s2-none-elf", "xtensa-esp32s3-none-elf"]
+
+[lib]
+bench = false
+test  = false
 
 [dependencies]
-document-features = "0.2.10"
-macros            = { version = "0.2.2", package = "xtensa-lx-rt-proc-macros", path = "./procmacros" }
-r0                = "1.0.0"
-xtensa-lx         = { version = "0.10.0", path = "../xtensa-lx" }
+document-features = "0.2"
+defmt             = {version = "1.0.1", optional = true}
+macros            = { version = "0.5.0", package = "xtensa-lx-rt-proc-macros", path = "../xtensa-lx-rt-proc-macros" }
+xtensa-lx         = { version = "0.13.0", path = "../xtensa-lx" }
 
 [build-dependencies]
-anyhow          = "1.0.95"
-enum-as-inner   = "0.6.1"
-minijinja       = "2.6.0"
-serde           = { version = "1.0.217", features = ["derive"] }
-strum           = { version = "0.26.3", features = ["derive"] }
-toml            = "0.8.19"
 
 [features]
 ## Save and restore float registers for exceptions
 float-save-restore = []
 
-#! ### Chip Support Feature Flags
-## Target the ESP32
-esp32   = []
-## Target the ESP32-S2
-esp32s2 = []
-## Target the ESP32-S3
-esp32s3 = []
+## Implement `defmt::Format`
+defmt = ["dep:defmt"]
 
 [lints.rust]
 unexpected_cfgs = "allow"

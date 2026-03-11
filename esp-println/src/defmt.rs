@@ -2,9 +2,11 @@
 // Implementation taken from defmt-rtt, with a custom framing prefix
 
 #[cfg(feature = "critical-section")]
-use critical_section::RestoreState;
+use esp_sync::RestoreState;
 
 use super::{LockToken, PrinterImpl};
+#[cfg(feature = "critical-section")]
+use crate::LOCK;
 
 /// Global logger lock.
 #[cfg(feature = "critical-section")]
@@ -20,7 +22,7 @@ unsafe impl defmt::Logger for Logger {
         #[cfg(feature = "critical-section")]
         unsafe {
             // safety: Must be paired with corresponding call to release(), see below
-            let restore = critical_section::acquire();
+            let restore = LOCK.acquire();
 
             // safety: accessing the `static mut` is OK because we have acquired a critical
             // section.
@@ -48,28 +50,30 @@ unsafe impl defmt::Logger for Logger {
     }
 
     unsafe fn release() {
-        // safety: accessing the `static mut` is OK because we have acquired a critical
-        // section.
-        ENCODER.end_frame(do_write);
-
-        Self::flush();
-
-        #[cfg(feature = "critical-section")]
-        {
-            // We don't need to write a custom end-of-frame sequence because:
-            //  - using `defmt`, the rzcobs encoding already includes a terminating zero
-            //  - using `defmt-raw`, we don't add any additional framing data
-
+        unsafe {
             // safety: accessing the `static mut` is OK because we have acquired a critical
             // section.
-            TAKEN = false;
+            ENCODER.end_frame(do_write);
 
-            // safety: accessing the `static mut` is OK because we have acquired a critical
-            // section.
-            let restore = CS_RESTORE;
+            Self::flush();
 
-            // safety: Must be paired with corresponding call to acquire(), see above
-            critical_section::release(restore);
+            #[cfg(feature = "critical-section")]
+            {
+                // We don't need to write a custom end-of-frame sequence because:
+                //  - using `defmt`, the rzcobs encoding already includes a terminating zero
+                //  - using `defmt-raw`, we don't add any additional framing data
+
+                // safety: accessing the `static mut` is OK because we have acquired a critical
+                // section.
+                TAKEN = false;
+
+                // safety: accessing the `static mut` is OK because we have acquired a critical
+                // section.
+                let restore = CS_RESTORE;
+
+                // safety: Must be paired with corresponding call to acquire(), see above
+                LOCK.release(restore);
+            }
         }
     }
 
@@ -83,9 +87,11 @@ unsafe impl defmt::Logger for Logger {
     }
 
     unsafe fn write(bytes: &[u8]) {
-        // safety: accessing the `static mut` is OK because we have acquired a critical
-        // section.
-        ENCODER.write(bytes, do_write);
+        unsafe {
+            // safety: accessing the `static mut` is OK because we have acquired a critical
+            // section.
+            ENCODER.write(bytes, do_write);
+        }
     }
 }
 
@@ -97,3 +103,11 @@ fn do_write(bytes: &[u8]) {
     };
     PrinterImpl::write_bytes_in_cs(bytes, token)
 }
+
+#[cfg(feature = "timestamp")]
+defmt::timestamp!("{=u64:ms}", {
+    unsafe extern "Rust" {
+        fn _esp_println_timestamp() -> u64;
+    }
+    unsafe { _esp_println_timestamp() }
+});

@@ -1,3 +1,10 @@
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "analog_pin" => {
+        cfg(esp32) => "GPIO32",
+        cfg(any(esp32s2, esp32s3)) => "GPIO3",
+        cfg(not(any(esp32, esp32s2, esp32s3)))  => "GPIO2"
+    }
+))]
 //! # Analog to Digital Converter (ADC)
 //!
 //! ## Overview
@@ -21,23 +28,14 @@
 //! ### Read an analog signal from a pin
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::analog::adc::AdcConfig;
 //! # use esp_hal::peripherals::ADC1;
 //! # use esp_hal::analog::adc::Attenuation;
 //! # use esp_hal::analog::adc::Adc;
 //! # use esp_hal::delay::Delay;
-#![cfg_attr(esp32, doc = "let analog_pin = peripherals.GPIO32;")]
-#![cfg_attr(any(esp32s2, esp32s3), doc = "let analog_pin = peripherals.GPIO3;")]
-#![cfg_attr(
-    not(any(esp32, esp32s2, esp32s3)),
-    doc = "let analog_pin = peripherals.GPIO2;"
-)]
 //! let mut adc1_config = AdcConfig::new();
-//! let mut pin = adc1_config.enable_pin(
-//!     analog_pin,
-//!     Attenuation::_11dB,
-//! );
+//! let mut pin = adc1_config.enable_pin(peripherals.__analog_pin__, Attenuation::_11dB);
 //! let mut adc1 = Adc::new(peripherals.ADC1, adc1_config);
 //!
 //! let mut delay = Delay::new();
@@ -49,7 +47,7 @@
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! ## Implementation State
 //!
 //!  - [ADC calibration is not implemented for all targets].
@@ -57,32 +55,33 @@
 //! [ADC calibration is not implemented for all targets]: https://github.com/esp-rs/esp-hal/issues/326
 use core::marker::PhantomData;
 
-pub use self::implementation::*;
 use crate::gpio::AnalogPin;
 
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(riscv, path = "riscv.rs")]
 #[cfg_attr(any(esp32s2, esp32s3), path = "xtensa.rs")]
+#[cfg(feature = "unstable")]
 mod implementation;
 
-/// The attenuation of the ADC pin.
+#[cfg(feature = "unstable")]
+pub use self::implementation::*;
+
+/// The approximate attenuation of the ADC pin.
 ///
 /// The effective measurement range for a given attenuation is dependent on the
 /// device being targeted. Please refer to "ADC Characteristics" section of your
 /// device's datasheet for more information.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
+#[allow(clippy::enum_variant_names, reason = "unit of measurement")]
 pub enum Attenuation {
-    /// 0dB attenuation
+    /// About 0dB attenuation.
     _0dB   = 0b00,
-    /// 2.5dB attenuation
-    #[cfg(not(esp32c2))]
+    /// About 2.5dB attenuation.
     _2p5dB = 0b01,
-    /// 6dB attenuation
-    #[cfg(not(esp32c2))]
+    /// About 6dB attenuation.
     _6dB   = 0b10,
-    /// 11dB attenuation
+    /// About 11dB attenuation.
     _11dB  = 0b11,
 }
 
@@ -102,19 +101,20 @@ pub struct AdcPin<PIN, ADCI, CS = ()> {
     /// The underlying GPIO pin
     pub pin: PIN,
     /// Calibration scheme used for the configured ADC pin
-    #[cfg_attr(esp32, allow(unused))]
     pub cal_scheme: CS,
     _phantom: PhantomData<ADCI>,
 }
 
 /// Configuration for the ADC.
+#[cfg(feature = "unstable")]
 pub struct AdcConfig<ADCI> {
-    #[cfg_attr(not(esp32), allow(unused))]
+    #[cfg(esp32)]
     resolution: Resolution,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     _phantom: PhantomData<ADCI>,
 }
 
+#[cfg(feature = "unstable")]
 impl<ADCI> AdcConfig<ADCI> {
     /// Create a new configuration struct with its default values
     pub fn new() -> Self {
@@ -128,7 +128,7 @@ impl<ADCI> AdcConfig<ADCI> {
     {
         // TODO revert this on drop
         pin.set_analog(crate::private::Internal);
-        self.attenuations[PIN::CHANNEL as usize] = Some(attenuation);
+        self.attenuations[pin.adc_channel() as usize] = Some(attenuation);
 
         AdcPin {
             pin,
@@ -140,6 +140,7 @@ impl<ADCI> AdcConfig<ADCI> {
     /// Enable the specified pin with the given attenuation and calibration
     /// scheme
     #[cfg(not(esp32))]
+    #[cfg(feature = "unstable")]
     pub fn enable_pin_with_cal<PIN, CS>(
         &mut self,
         pin: PIN,
@@ -152,7 +153,7 @@ impl<ADCI> AdcConfig<ADCI> {
     {
         // TODO revert this on drop
         pin.set_analog(crate::private::Internal);
-        self.attenuations[PIN::CHANNEL as usize] = Some(attenuation);
+        self.attenuations[pin.adc_channel() as usize] = Some(attenuation);
 
         AdcPin {
             pin,
@@ -162,9 +163,11 @@ impl<ADCI> AdcConfig<ADCI> {
     }
 }
 
+#[cfg(feature = "unstable")]
 impl<ADCI> Default for AdcConfig<ADCI> {
     fn default() -> Self {
         Self {
+            #[cfg(esp32)]
             resolution: Resolution::default(),
             attenuations: [None; NUM_ATTENS],
             _phantom: PhantomData,
@@ -174,6 +177,7 @@ impl<ADCI> Default for AdcConfig<ADCI> {
 
 #[cfg(not(esp32))]
 #[doc(hidden)]
+#[cfg(feature = "unstable")]
 pub trait CalibrationAccess: RegisterAccess {
     const ADC_CAL_CNT_MAX: u16;
     const ADC_CAL_CHANNEL: u16;
@@ -188,7 +192,7 @@ pub trait CalibrationAccess: RegisterAccess {
 /// A helper trait to get the ADC channel of a compatible GPIO pin.
 pub trait AdcChannel {
     /// Channel number used by the ADC
-    const CHANNEL: u8;
+    fn adc_channel(&self) -> u8;
 }
 
 /// A trait abstracting over calibration methods.
@@ -218,7 +222,7 @@ impl<ADCI> AdcCalScheme<ADCI> for () {
 }
 
 /// A helper trait to get access to ADC calibration efuses.
-#[cfg(not(any(esp32, esp32s2, esp32h2)))]
+#[cfg(not(any(esp32, esp32s2)))]
 trait AdcCalEfuse {
     /// Get ADC calibration init code
     ///
@@ -236,16 +240,12 @@ trait AdcCalEfuse {
     fn cal_code(atten: Attenuation) -> Option<u16>;
 }
 
-macro_rules! impl_adc_interface {
-    ($adc:ident [
-        $( (GpioPin<$pin:literal>, $channel:expr) ,)+
-    ]) => {
-        $(
-            impl $crate::analog::adc::AdcChannel for crate::gpio::GpioPin<$pin> {
-                const CHANNEL: u8 = $channel;
+for_each_analog_function! {
+    (($ch_name:ident, ADCn_CHm, $adc:literal, $ch:literal), $gpio:ident) => {
+        impl $crate::analog::adc::AdcChannel for $crate::peripherals::$gpio<'_> {
+            fn adc_channel(&self) -> u8 {
+                $ch
             }
-        )+
-    }
+        }
+    };
 }
-
-pub(crate) use impl_adc_interface;

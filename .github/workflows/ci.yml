@@ -4,7 +4,7 @@
 # updates which must be made to the CI workflow in order to reflect this; the
 # changes are:
 #
-# 1.) In the 'esp-hal' job, add the name of the chip to the `matrix.soc` array.
+# 1.) In the 'esp-hal' job, add the appropriate build command.
 # 1a.) If the device has a low-power core (which is supported in
 #      `esp-lp-hal`), then update the `if` condition to build prerequisites.
 # 2.) In the 'msrv' job, add checks as needed for the new chip.
@@ -18,13 +18,15 @@ on:
     branches-ignore:
       - "gh-readonly-queue/**"
       - "main"
+      - "backport-**"
+      - "release-branch-**"
   merge_group:
   workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  MSRV: "1.84.0"
+  MSRV: "1.88.0"
   DEFMT_LOG: trace
 
 # Cancel any currently running workflows from the same PR, branch, or
@@ -36,12 +38,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
 
 jobs:
+  get-labels:
+    uses: ./.github/workflows/get-labels.yml
+
   # --------------------------------------------------------------------------
   # Build Packages
-
   esp-hal:
-    name: esp-hal (${{ matrix.device.soc }})
-    runs-on: ubuntu-latest
+    needs: get-labels
+    runs-on: macos-m1-self-hosted
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
       CI: 1
@@ -50,56 +54,91 @@ jobs:
       STATIC_IP: 1.1.1.1
       GATEWAY_IP: 1.1.1.1
       HOST_IP: 1.1.1.1
+      SKIP_CI: ${{ contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
 
     strategy:
       fail-fast: false
       matrix:
-        device: [
-            # RISC-V devices:
-            { soc: "esp32c2", toolchain: "stable" },
-            { soc: "esp32c3", toolchain: "stable" },
-            { soc: "esp32c6", toolchain: "stable" },
-            { soc: "esp32h2", toolchain: "stable" },
-            # Xtensa devices:
-            { soc: "esp32", toolchain: "esp" },
-            { soc: "esp32s2", toolchain: "esp" },
-            { soc: "esp32s3", toolchain: "esp" },
-          ]
+        # load-blance runners a bit
+        group:
+          - xtensa
+          - riscv
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Skip CI
+        if: env.SKIP_CI == 'true'
+        run: |
+          echo "skipping"
+
+      - uses: actions/checkout@v6
+        if: env.SKIP_CI != 'true'
 
       # Install the Rust toolchain for Xtensa devices:
-      - uses: esp-rs/xtensa-toolchain@v1.5
+      - uses: esp-rs/xtensa-toolchain@v1.6
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
         with:
-          ldproxy: false
-          version: 1.85.0.0
+          version: 1.93.0.0
 
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
+        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
           components: rust-src
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: "ci-${{ matrix.device.soc }}"
-          cache-all-crates: true
+      - name: Setup cargo-batch
+        if: env.SKIP_CI != 'true'
+        run: |
+          if ! command -v cargo-batch &> /dev/null; then
+              cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
+          fi
 
-      - name: Build and Check
+      - name: Build and Check Xtensa
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
         shell: bash
-        run: cargo +${{ matrix.device.toolchain }} xtask ci ${{ matrix.device.soc }}
+        run: |
+          # lints and docs are checked separately
+          cargo xcheck ci esp32 --toolchain esp --no-lint --no-docs
+          cargo xcheck ci esp32s2 --toolchain esp --no-lint --no-docs
+          cargo xcheck ci esp32s3 --toolchain esp --no-lint --no-docs
+
+      - name: Build and Check RISC-V
+        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
+        shell: bash
+        run: |
+          # lints and docs are checked separately
+          cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32c5 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
+
+  detect-extras-runner:
+    needs: get-labels
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
+    uses: ./.github/workflows/check-runner.yml
+    with:
+      primary-runner: macos-m1-self-hosted
+      fallback-runner: ubuntu-latest
 
   extras:
-    runs-on: macos-m1-self-hosted
+    needs: [get-labels, detect-extras-runner]
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
+    runs-on: ${{ needs.detect-extras-runner.outputs.selected-runner }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2
 
+      # Install dependencies for building the extra crates on ubuntu
+      - name: Install dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get -y install musl-tools libudev-dev pkg-config
       # Build the extra crates
       - name: Build the bench-server
         run: cd extras/bench-server && cargo build
@@ -108,90 +147,250 @@ jobs:
       - name: Build ieee802154-sniffer
         run: cd extras/ieee802154-sniffer && cargo build
 
+  docs:
+    needs: get-labels
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        group:
+          - xtensa
+          - riscv
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # Install the Rust toolchain for Xtensa devices:
+      - uses: esp-rs/xtensa-toolchain@v1.6
+        with:
+          version: 1.88.0.0
+
+      # Install the Rust stable toolchain for RISC-V devices:
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: stable
+          components: rust-src
+      # Install the Rust nightly toolchain for RISC-V devices:
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: nightly
+          components: rust-src
+
+      - name: Build Xtensa docs
+        if: matrix.group == 'xtensa'
+        shell: bash
+        run: cargo xtask build documentation --chips esp32,esp32s2,esp32s3
+
+      - name: Build RISC-V docs
+        if: matrix.group == 'riscv'
+        shell: bash
+        run: cargo xtask build documentation --chips esp32c2,esp32c3,esp32c5,esp32c6,esp32h2
+
   # --------------------------------------------------------------------------
   # MSRV
 
   msrv:
-    runs-on: macos-m1-self-hosted
+    needs: get-labels
+    runs-on: ubuntu-latest
+    env:
+      SKIP_CI: ${{ contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        group:
+          - xtensa
+          - riscv
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: esp-rs/xtensa-toolchain@v1.5
+      - name: Skip CI
+        if: env.SKIP_CI == 'true'
+        run: |
+          echo "skipping"
+
+      - uses: actions/checkout@v6
+        if: env.SKIP_CI != 'true'
+
+      - uses: esp-rs/xtensa-toolchain@v1.6
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
         with:
-          ldproxy: false
           version: ${{ env.MSRV }}
+
+      - name: esp toolchain checks
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
+        run: rustc +esp --version --verbose
+
       - uses: dtolnay/rust-toolchain@v1
+        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,x86_64-unknown-linux-gnu
           toolchain: ${{ env.MSRV }}
-          components: rust-src
-      - uses: Swatinem/rust-cache@v2
+          components: rust-src,clippy
 
-      # Verify the MSRV for all RISC-V chips.
-      - name: msrv RISCV (esp-hal)
+      - name: Stable toolchain checks
+        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
+        run: rustc +${{ env.MSRV }} --version --verbose
+
+      # Verify the MSRV for all chips by running a lint session
+      - name: msrv RISC-V (esp-hal)
+        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         run: |
-          cargo xtask build-package --features=esp32c2,ci --target=riscv32imc-unknown-none-elf   esp-hal
-          cargo xtask build-package --features=esp32c3,ci --target=riscv32imc-unknown-none-elf   esp-hal
-          cargo xtask build-package --features=esp32c6,ci --target=riscv32imac-unknown-none-elf  esp-hal
-          cargo xtask build-package --features=esp32h2,ci --target=riscv32imac-unknown-none-elf  esp-hal
+          cargo xtask lint-packages --chips esp32c2,esp32c3,esp32c5,esp32c6,esp32h2 --toolchain ${{ env.MSRV }}
 
-      - name: msrv RISCV (esp-wifi)
-        run: |
-          cargo xtask build-package --features=esp32c2,wifi,ble,esp-hal/unstable --target=riscv32imc-unknown-none-elf   esp-wifi
-          cargo xtask build-package --features=esp32c3,wifi,ble,esp-hal/unstable --target=riscv32imc-unknown-none-elf   esp-wifi
-          cargo xtask build-package --features=esp32c6,wifi,ble,esp-hal/unstable --target=riscv32imac-unknown-none-elf  esp-wifi
-          cargo xtask build-package --features=esp32h2,ble,esp-hal/unstable --target=riscv32imac-unknown-none-elf  esp-wifi
-
-        # Verify the MSRV for all Xtensa chips:
       - name: msrv Xtensa (esp-hal)
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
         run: |
-          cargo xtask build-package --toolchain=esp --features=esp32,ci   --target=xtensa-esp32-none-elf   esp-hal
-          cargo xtask build-package --toolchain=esp --features=esp32s2,ci --target=xtensa-esp32s2-none-elf esp-hal
-          cargo xtask build-package --toolchain=esp --features=esp32s3,ci --target=xtensa-esp32s3-none-elf esp-hal
-
-      - name: msrv Xtensa (esp-wifi)
-        run: |
-          cargo xtask build-package --toolchain=esp --features=esp32,wifi,ble,esp-hal/unstable   --target=xtensa-esp32-none-elf   esp-wifi
-          cargo xtask build-package --toolchain=esp --features=esp32s2,wifi,esp-hal/unstable     --target=xtensa-esp32s2-none-elf esp-wifi
-          cargo xtask build-package --toolchain=esp --features=esp32s3,wifi,ble,esp-hal/unstable --target=xtensa-esp32s3-none-elf esp-wifi
-
-      - name: msrv (esp-lp-hal)
-        run: |
-          cargo xtask build-package --features=esp32c6 --target=riscv32imac-unknown-none-elf esp-lp-hal
-          cargo xtask build-package --features=esp32s2 --target=riscv32imc-unknown-none-elf  esp-lp-hal
-          cargo xtask build-package --features=esp32s3 --target=riscv32imc-unknown-none-elf  esp-lp-hal
-
-  # --------------------------------------------------------------------------
-  # Format
-
-  rustfmt:
-    runs-on: macos-m1-self-hosted
-
-    steps:
-      - uses: actions/checkout@v4
-      # Some of the configuration items in 'rustfmt.toml' require the 'nightly'
-      # release channel:
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: nightly
-          components: rustfmt
-      - uses: Swatinem/rust-cache@v2
-
-      # Check the formatting of all packages:
-      - run: cargo xtask fmt-packages --check
+          cargo xtask lint-packages --chips esp32,esp32s2,esp32s3 --toolchain esp
 
   # --------------------------------------------------------------------------
   # host tests
 
-  host-tests:
-    runs-on: macos-m1-self-hosted
+  detect-host-tests-runner:
+    needs: get-labels
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
+    uses: ./.github/workflows/check-runner.yml
+    with:
+      primary-runner: macos-m1-self-hosted
+      fallback-runner: ubuntu-latest
 
+  host-tests:
+    needs: detect-host-tests-runner
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
+    runs-on: ${{ needs.detect-host-tests-runner.outputs.selected-runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+      # Some of the configuration items in 'rustfmt.toml' require the 'nightly'
+      # release channel, MIRI is only available in nightly
       - uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
+          toolchain: nightly
+          components: rustfmt,miri
+
+      # Run xtask tests
+      - name: Run xtask tests
+        run: cd xtask && cargo test --features release
 
       # Check the formatting of all packages:
-      - run: cd esp-config && cargo test --features build
+      - run: cargo xtask fmt-packages --check
+
+      # Check metadata generation for all packages:
+      - run: cargo xtask update-metadata --check
+
+      # Run host tests for all applicable packages:
+      - run: cargo xtask host-tests
+
+      # Check for unused dependencies
+      - name: Machete
+        uses: bnjbvr/cargo-machete@main
+        with:
+          args: >
+            esp-alloc
+            esp-backtrace
+            esp-bootloader-esp-idf
+            esp-config
+            esp-hal
+            esp-hal-procmacros
+            esp-lp-hal
+            esp-metadata
+            esp-phy
+            esp-println
+            esp-radio
+            esp-radio-rtos-driver
+            esp-riscv-rt
+            esp-rom-sys
+            esp-rtos
+            esp-storage
+            esp-sync
+            examples
+            extras
+            xtask
+
+  # --------------------------------------------------------------------------
+  # Check links in .rs, .md, and .toml files
+
+  link-check:
+    needs: get-labels
+    if: ${{ github.event_name != 'pull_request' ||
+      !contains(needs.get-labels.outputs.labels, 'skip-ci-non-code-change') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          args: >
+            --verbose
+            --no-progress
+            --format detailed
+            --timeout 7
+            --max-concurrency 6
+            --retry-wait-time 3
+            --max-retries 6
+            --accept "200,301,302"
+            --exclude-path ".*/target/.*|.*/static\.files/.*|.*/docs/.*"
+            --remap "https://github.com/${{ github.repository }}/(?:blob|tree)/[^/]+/(.+) file://$GITHUB_WORKSPACE/\$1"
+            './**/*.rs'
+            './**/*.md'
+            './**/*.toml'
+
+  # Dummy HIL test-build check for PRs
+  #
+  # This job only exists so that the required "build-tests-full (...)" checks
+  # are green on normal PR CI. It does NOT actually build tests.
+  #
+  # The real test builds run in hil.yml on merge_group (and when dispatched
+  # via `/hil full`) using a job with the same id + matrix, so the merge
+  # queue reuses these check names.
+  #
+  # For a reference, check out this GH discussion: https://github.com/orgs/community/discussions/102764
+  build-tests-full:
+    if: github.event_name != 'merge_group'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - soc: esp32c2
+            rust-target: riscv32imc-unknown-none-elf
+            runner: esp32c2-jtag
+            host: aarch64
+          - soc: esp32c3
+            rust-target: riscv32imc-unknown-none-elf
+            runner: esp32c3-usb
+            host: armv7
+          - soc: esp32c5
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32c5-usb
+            host: aarch64
+          - soc: esp32c6
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32c6-usb
+            host: armv7
+          - soc: esp32h2
+            rust-target: riscv32imac-unknown-none-elf
+            runner: esp32h2-usb
+            host: armv7
+          - soc: esp32
+            rust-target: xtensa-esp32-none-elf
+            runner: esp32-jtag
+            host: aarch64
+          - soc: esp32s2
+            rust-target: xtensa-esp32s2-none-elf
+            runner: esp32s2-jtag
+            host: armv7
+          - soc: esp32s3
+            rust-target: xtensa-esp32s3-none-elf
+            runner: esp32s3-usb
+            host: armv7
+
+    steps:
+      - name: Dummy placeholder for HIL test builds
+        run: |
+          echo "NOOP: Dummy build-tests-full for ${{ matrix.target.soc }}."
+          echo "Real HIL test builds run only in hil.yml (merge_group or /hil full)."

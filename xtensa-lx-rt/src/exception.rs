@@ -34,6 +34,7 @@ pub use context::Context;
 /// vectors).
 #[allow(unused)]
 #[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(C)]
 pub enum ExceptionCause {
     /// Illegal Instruction

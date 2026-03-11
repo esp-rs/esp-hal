@@ -89,19 +89,21 @@ where
     fn adc_val(&self, val: u16) -> u16 {
         let val = self.line.adc_val(val);
 
-        let err = if val == 0 {
+        // Calculate polynomial error using Horner's method to prevent overflow.
+        // Horner's evaluates: err = coeff[0] + val*(coeff[1] + val*(coeff[2] + ...))
+        // This avoids computing val^n which causes overflow when multiplied by coefficients.
+        let err = if val == 0 || self.coeff.is_empty() {
             0
         } else {
-            // err = coeff[0] + coeff[1] * val + coeff[2] * val^2 + ... + coeff[n] * val^n
-            let mut var = 1i64;
-            let mut err = (var * self.coeff[0] / COEFF_MUL) as i32;
+            let val_i64 = val as i64;
+            let mut poly = 0i64;
 
-            for coeff in &self.coeff[1..] {
-                var *= val as i64;
-                err += (var * *coeff / COEFF_MUL) as i32;
+            // Iterate coefficients in reverse order for Horner's method
+            for &coeff in self.coeff.iter().rev() {
+                poly = poly * val_i64 + coeff;
             }
 
-            err
+            (poly / COEFF_MUL) as i32
         };
 
         (val as i32 - err) as u16
@@ -124,21 +126,21 @@ macro_rules! coeff_tables {
     };
 }
 
-#[cfg(any(esp32c3, esp32c6, esp32s3))]
+#[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
 mod impls {
     use super::*;
 
-    impl AdcHasCurveCal for crate::peripherals::ADC1 {
+    impl AdcHasCurveCal for crate::peripherals::ADC1<'_> {
         const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS1;
     }
 
     #[cfg(esp32c3)]
-    impl AdcHasCurveCal for crate::peripherals::ADC2 {
+    impl AdcHasCurveCal for crate::peripherals::ADC2<'_> {
         const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS1;
     }
 
     #[cfg(esp32s3)]
-    impl AdcHasCurveCal for crate::peripherals::ADC2 {
+    impl AdcHasCurveCal for crate::peripherals::ADC2<'_> {
         const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS2;
     }
 
@@ -192,6 +194,31 @@ mod impls {
                 -0.3801417550380255,
                 -0.0006020352420772,
                 0.0000012442478488,
+            ],
+        ];
+
+        /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/465b159cd8771ffab6be70c7675ecf6705b62649/components/esp_adc/esp32h2/curve_fitting_coefficients.c>
+        #[cfg(esp32h2)]
+        CURVES_COEFFS1 [
+            _0dB => [
+                -0.5081991760658888,
+                0.0000007858995319,
+                0,
+            ],
+            _2p5dB => [
+                -0.8359230818901277,
+                0.0000009025419089,
+                0,
+            ],
+            _6dB => [
+                -1.165668771581976,
+                0.0000008294679249,
+                0,
+            ],
+            _11dB => [
+                -0.3637329628677273,
+                -0.0000196072597389,
+                0.0000007871689227,
             ],
         ];
 

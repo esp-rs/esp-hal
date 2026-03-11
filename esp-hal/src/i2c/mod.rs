@@ -8,9 +8,16 @@
 //! For more information, see
 #![doc = crate::trm_markdown_link!("i2c")]
 
+#[cfg(i2c_master_driver_supported)]
 pub mod master;
 
-#[cfg(lp_i2c0)]
+#[cfg(soc_has_lp_i2c0)]
 crate::unstable_module! {
     pub mod lp_i2c;
+}
+
+#[cfg(esp32s3)] // Only support ESP32-S3 for now.
+#[cfg(soc_has_rtc_i2c)]
+crate::unstable_module! {
+    pub mod rtc;
 }

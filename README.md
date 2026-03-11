@@ -13,16 +13,16 @@
   </a>
 </p>
 
-Bare-metal (`no_std`) hardware abstraction layer for Espressif devices. Currently supports, to varying degrees, the following devices:
+Bare-metal (`no_std`) hardware abstraction layer for Espressif devices. Currently supports the following devices:
 
 - ESP32 Series: _ESP32_
 - ESP32-C Series: _ESP32-C2, ESP32-C3, ESP32-C6_
 - ESP32-H Series: _ESP32-H2_
 - ESP32-S Series: _ESP32-S2, ESP32-S3_
 
-Additionally provides limited support for programming the low-power RISC-V cores found on the _ESP32-C6_, _ESP32-S2_, and _ESP32-S3_ via the [esp-lp-hal] package.
+Additionally provides support for programming the low-power RISC-V cores found on the _ESP32-C6_, _ESP32-S2_, and _ESP32-S3_ via the [esp-lp-hal] package.
 
-For additional information regarding any of the crates in this repository, please refer to the relevant crate's `README.md` file. If you have any questions, comments, or concerns, please [open an issue], [start a new discussion], or join us on [Matrix].
+For additional information regarding any of the crates in this repository, please refer to the relevant crate's `README.md` file. If you have any questions, comments, or concerns, please [open an issue], or join us on [Matrix].
 
 If you are currently using (or considering using) `esp-hal` in a production environment and have any feedback or require support, please feel free to contact us at <rust.support@espressif.com>.
 
@@ -33,7 +33,6 @@ If you are currently using (or considering using) `esp-hal` in a production envi
 [esp-lp-hal]: https://github.com/esp-rs/esp-hal/tree/main/esp-lp-hal
 [esp-idf-svc]: https://github.com/esp-rs/esp-idf-svc
 [open an issue]: https://github.com/esp-rs/esp-hal/issues/new
-[start a new discussion]: https://github.com/esp-rs/esp-hal/discussions/new
 [matrix]: https://matrix.to/#/#esp-rs:matrix.org
 
 ## Getting Started
@@ -42,19 +41,37 @@ For information relating to the development of Rust applications on ESP devices,
 
 For information about the HAL and how to use it in your own projects, please refer to the [documentation].
 
-When browsing the examples, we recommend viewing the tag for the `esp-hal` release you are using to ensure compatibility, e.g. [esp-hal-v1.0.0-beta.0], as the `main` branch is used for development and APIs may have changed in the meantime.
+When browsing the examples, we recommend viewing the tag for the `esp-hal` release you are using to ensure compatibility, e.g. [esp-hal-v1.0.0], as the `main` branch is used for development and APIs may have changed in the meantime.
 
-[The Rust on ESP Book]: https://esp-rs.github.io/book/
+[The Rust on ESP Book]: https://docs.espressif.com/projects/rust/book/
 [documentation]: https://docs.espressif.com/projects/rust/
-[esp-hal-v1.0.0-beta.0]: https://github.com/esp-rs/esp-hal/tree/esp-hal-v1.0.0-beta.0/examples
+[esp-hal-v1.0.0]: https://github.com/esp-rs/esp-hal/tree/esp-hal-v1.0.0/examples
 
 ## Resources
 
 - [The Rust Programming Language](https://doc.rust-lang.org/book/)
 - [The Embedded Rust Book](https://docs.rust-embedded.org/book/index.html)
 - [The Embedonomicon](https://docs.rust-embedded.org/embedonomicon/)
-- [The Rust on ESP Book](https://esp-rs.github.io/book/)
-- [Embedded Rust (no_std) on Espressif](https://esp-rs.github.io/no_std-training/)
+- [The Rust on ESP Book](https://docs.espressif.com/projects/rust/esp-hal/latest/)
+- [Embedded Rust (no_std) on Espressif](https://docs.espressif.com/projects/rust/no_std-training/)
+
+## Support policy
+
+All active development will occur on `main`.
+
+We will only backport fixes to the _latest_ minor release in a major version. For example, this means we will apply patches (bug fixes) to `1.1.x` until `1.2.0` is released, at which point all patches are only backported to the `1.2.x` series of releases.
+
+If you are a user of `unstable` APIs, we will never push breaking changes in a patch release. However, `unstable` changes _will_ make their way into minor releases. This means that as an `unstable` user updating from `1.1.x` to `1.2.x` _may_ introduce breaking changes. If you depend on `unstable`, we recommend defining your esp-hal dependency as follows:
+
+```toml
+esp-hal = { version = "~1.1" }
+```
+
+Using the [`~` operator](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#tilde-requirements) will prevent cargo auto updating to minor versions, allowing you to use `cargo update` without the possibility of breaking your project.
+
+## AI Contribution Policy
+
+We follow the same policy as the official Rust Embedded working group, please review [the policy](https://github.com/rust-embedded/wg/blob/HEAD/CODE_OF_CONDUCT.md#ai-tool-use-policy) before contributing with AI tools.
 
 ## Contributing
 

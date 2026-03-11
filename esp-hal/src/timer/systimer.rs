@@ -17,18 +17,57 @@
 //! [`PeriodicTimer`](super::PeriodicTimer). Using the System timer directly is
 //! only possible through the low level [`Timer`](crate::timer::Timer) trait.
 
-use core::fmt::Debug;
+use core::{fmt::Debug, marker::PhantomData, num::NonZeroU32};
+
+use esp_sync::RawMutex;
 
 use super::{Error, Timer as _};
 use crate::{
     asynch::AtomicWaker,
     interrupt::{self, InterruptHandler},
-    peripheral::Peripheral,
     peripherals::{Interrupt, SYSTIMER},
-    sync::{lock, RawMutex},
     system::{Cpu, Peripheral as PeripheralEnable, PeripheralClockControl},
     time::{Duration, Instant},
 };
+
+// System Timer is only clocked by XTAL divided by 2 or 2.5 (or RC_FAST_CLK which is not supported
+// yet). Some XTAL options (most, in fact) divided by this value may not be an integer multiple of
+// 1_000_000. Because the timer API works with microseconds, we need to correct for this. To avoid
+// u64 division as much as possible, we use the two highest bits of the divisor to determine the
+// division method.
+// - If these flags are 0b00, we divide by the divisor.
+// - If these flags are 0b01, we multiply by a constant before dividing by the divisor to improve
+//   accuracy.
+// - If these flags are 0b10, we shift the timestamp by the lower bits.
+//
+// Apart from the S2, the System Timer clock divider outputs a 16MHz timer clock when using
+// the "default" XTAL configuration, so this method will commonly use the shifting based
+// division.
+//
+// On a 26MHz C2, the divider outputs 10.4MHz. On a 32MHz C3, the divider outputs 12.8MHz.
+//
+// Time is unreliable before `init_timestamp_scaler` is called.
+//
+// Because a single crate version can have "rt" enabled, `ESP_HAL_SYSTIMER_CORRECTION` needs
+// to be shared between versions. This aspect of this driver must be therefore kept stable.
+#[unsafe(no_mangle)]
+#[cfg(feature = "rt")]
+static mut ESP_HAL_SYSTIMER_CORRECTION: NonZeroU32 = NonZeroU32::new(SHIFT_TIMESTAMP_FLAG).unwrap(); // Shift-by-0 = no-op
+
+#[cfg(not(feature = "rt"))]
+unsafe extern "Rust" {
+    static mut ESP_HAL_SYSTIMER_CORRECTION: NonZeroU32;
+}
+
+const SHIFT_TIMESTAMP_FLAG: u32 = 0x8000_0000;
+const SHIFT_MASK: u32 = 0x0000_FFFF;
+// If the tick rate is not an integer number of microseconds: Since the divider is 2.5,
+// and we assume XTAL is an integer number of MHz, we can multiply by 5, then divide by
+// 5 to improve accuracy. On H2 the divider is 2, so we can multiply by 2, then divide by
+// 2.
+const UNEVEN_DIVIDER_FLAG: u32 = 0x4000_0000;
+const UNEVEN_MULTIPLIER: u32 = if cfg!(esp32h2) { 2 } else { 5 };
+const UNEVEN_DIVIDER_MASK: u32 = 0x0000_FFFF;
 
 /// The configuration of a unit.
 #[derive(Copy, Clone)]
@@ -44,18 +83,18 @@ pub enum UnitConfig {
 }
 
 /// System Timer driver.
-pub struct SystemTimer {
+pub struct SystemTimer<'d> {
     /// Alarm 0.
-    pub alarm0: Alarm,
+    pub alarm0: Alarm<'d>,
 
     /// Alarm 1.
-    pub alarm1: Alarm,
+    pub alarm1: Alarm<'d>,
 
     /// Alarm 2.
-    pub alarm2: Alarm,
+    pub alarm2: Alarm<'d>,
 }
 
-impl SystemTimer {
+impl<'d> SystemTimer<'d> {
     cfg_if::cfg_if! {
         if #[cfg(esp32s2)] {
             /// Bitmask to be applied to the raw register value.
@@ -70,47 +109,133 @@ impl SystemTimer {
         }
     }
 
+    /// One-time initialization for the timestamp conversion/scaling.
+    #[cfg(feature = "rt")]
+    pub(crate) fn init_timestamp_scaler() {
+        // Maximum tick rate is 80MHz (S2), which fits in a u32, so let's narrow the type.
+        let systimer_rate = Self::ticks_per_second();
+
+        // Select the optimal way to divide timestamps.
+        let packed_rate_and_method = if systimer_rate.is_multiple_of(1_000_000) {
+            let ticks_per_us = systimer_rate as u32 / 1_000_000;
+            if ticks_per_us.is_power_of_two() {
+                // Turn the division into a shift
+                SHIFT_TIMESTAMP_FLAG | (ticks_per_us.ilog2() & SHIFT_MASK)
+            } else {
+                // We need to divide by an integer :(
+                ticks_per_us
+            }
+        } else {
+            // The rate is not a multiple of 1 MHz, we need to scale it up to prevent precision
+            // loss.
+            let multiplied_ticks_per_us = (systimer_rate * UNEVEN_MULTIPLIER as u64) / 1_000_000;
+            UNEVEN_DIVIDER_FLAG | (multiplied_ticks_per_us as u32)
+        };
+
+        // Safety: we only ever write ESP_HAL_SYSTIMER_CORRECTION in `init_timestamp_scaler`, which
+        // is called once and only once during startup, from `time_init`.
+        unsafe {
+            let correction_ptr = &raw mut ESP_HAL_SYSTIMER_CORRECTION;
+            *correction_ptr = unwrap!(NonZeroU32::new(packed_rate_and_method));
+        }
+    }
+
+    #[inline]
+    pub(crate) fn ticks_to_us(ticks: u64) -> u64 {
+        // Safety: we only ever write ESP_HAL_SYSTIMER_CORRECTION in `init_timestamp_scaler`, which
+        // is called once and only once during startup.
+        let correction = unsafe { ESP_HAL_SYSTIMER_CORRECTION };
+
+        let correction = correction.get();
+        match correction & (SHIFT_TIMESTAMP_FLAG | UNEVEN_DIVIDER_FLAG) {
+            v if v == SHIFT_TIMESTAMP_FLAG => ticks >> (correction & SHIFT_MASK),
+            v if v == UNEVEN_DIVIDER_FLAG => {
+                // Not only that, but we need to multiply the timestamp first otherwise
+                // we'd count slower than the timer.
+                let multiplied = if UNEVEN_MULTIPLIER.is_power_of_two() {
+                    ticks << UNEVEN_MULTIPLIER.ilog2()
+                } else {
+                    ticks * UNEVEN_MULTIPLIER as u64
+                };
+
+                let divider = correction & UNEVEN_DIVIDER_MASK;
+                multiplied / divider as u64
+            }
+            _ => ticks / correction as u64,
+        }
+    }
+
+    #[inline]
+    fn us_to_ticks(us: u64) -> u64 {
+        // Safety: we only ever write ESP_HAL_SYSTIMER_CORRECTION in `init_timestamp_scaler`, which
+        // is called once and only once during startup.
+        let correction = unsafe { ESP_HAL_SYSTIMER_CORRECTION };
+
+        let correction = correction.get();
+        match correction & (SHIFT_TIMESTAMP_FLAG | UNEVEN_DIVIDER_FLAG) {
+            v if v == SHIFT_TIMESTAMP_FLAG => us << (correction & SHIFT_MASK),
+            v if v == UNEVEN_DIVIDER_FLAG => {
+                let multiplier = correction & UNEVEN_DIVIDER_MASK;
+                let multiplied = us * multiplier as u64;
+
+                // Not only that, but we need to divide the timestamp first otherwise
+                // we'd return a slightly too-big value.
+                if UNEVEN_MULTIPLIER.is_power_of_two() {
+                    multiplied >> UNEVEN_MULTIPLIER.ilog2()
+                } else {
+                    multiplied / UNEVEN_MULTIPLIER as u64
+                }
+            }
+            _ => us * correction as u64,
+        }
+    }
+
     /// Returns the tick frequency of the underlying timer unit.
     #[inline]
     pub fn ticks_per_second() -> u64 {
+        // FIXME: this requires a critical section. We can probably do better, if we can formulate
+        // invariants well.
         cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
-                const MULTIPLIER: u32 = 2;
-                const DIVIDER: u32 = 1;
-            } else if #[cfg(esp32h2)] {
-                // The counters and comparators are driven using `XTAL_CLK`.
-                // The average clock frequency is fXTAL_CLK/2, which is 16 MHz.
-                // The timer counting is incremented by 1/16 μs on each `CNT_CLK` cycle.
-                const MULTIPLIER: u32 = 1;
-                const DIVIDER: u32 = 2;
+            if #[cfg(esp32c5)] {
+                // Assuming SYSTIMER runs from XTAL, the hardware always runs at 16 MHz.
+                16_000_000
             } else {
-                // The counters and comparators are driven using `XTAL_CLK`.
-                // The average clock frequency is fXTAL_CLK/2.5, which is 16 MHz.
-                // The timer counting is incremented by 1/16 μs on each `CNT_CLK` cycle.
-                const MULTIPLIER: u32 = 4;
-                const DIVIDER: u32 = 10;
+                crate::soc::clocks::ClockTree::with(|clocks| {
+                    cfg_if::cfg_if! {
+                        if #[cfg(esp32s2)] {
+                            crate::soc::clocks::apb_clk_frequency(clocks) as u64
+                        } else if #[cfg(esp32h2)] {
+                            // The counters and comparators are driven using `XTAL_CLK`.
+                            // The average clock frequency is fXTAL_CLK/2, (16 MHz for XTAL = 32 MHz)
+                            (crate::soc::clocks::xtal_clk_frequency(clocks) / 2) as u64
+                        } else {
+                            // The counters and comparators are driven using `XTAL_CLK`.
+                            // The average clock frequency is fXTAL_CLK/2.5 (16 MHz for XTAL = 40 MHz)
+                            (crate::soc::clocks::xtal_clk_frequency(clocks) * 10 / 25) as u64
+                        }
+                    }
+                })
             }
         }
-        let xtal_freq_mhz = crate::clock::Clocks::xtal_freq().as_hz();
-        ((xtal_freq_mhz * MULTIPLIER) / DIVIDER) as u64
     }
 
     /// Create a new instance.
-    pub fn new(_systimer: SYSTIMER) -> Self {
+    pub fn new(_systimer: SYSTIMER<'d>) -> Self {
         // Don't reset Systimer as it will break `time::Instant::now`, only enable it
         PeripheralClockControl::enable(PeripheralEnable::Systimer);
 
-        #[cfg(soc_etm)]
+        #[cfg(etm_driver_supported)]
         etm::enable_etm();
 
         Self {
-            alarm0: Alarm::new(0),
-            alarm1: Alarm::new(1),
-            alarm2: Alarm::new(2),
+            alarm0: Alarm::new(Comparator::Comparator0),
+            alarm1: Alarm::new(Comparator::Comparator1),
+            alarm2: Alarm::new(Comparator::Comparator2),
         }
     }
 
     /// Get the current count of the given unit in the System Timer.
+    #[inline]
     pub fn unit_value(unit: Unit) -> u64 {
         // This should be safe to access from multiple contexts
         // worst case scenario the second accessor ends up reading
@@ -126,8 +251,7 @@ impl SystemTimer {
     ///
     /// # Safety
     ///
-    /// - Disabling a `Unit` whilst [`Alarm`]s are using it will affect the
-    ///   [`Alarm`]s operation.
+    /// - Disabling a `Unit` whilst [`Alarm`]s are using it will affect the [`Alarm`]s operation.
     /// - Disabling Unit0 will affect [`Instant::now`].
     pub unsafe fn configure_unit(unit: Unit, config: UnitConfig) {
         unit.configure(config)
@@ -141,8 +265,7 @@ impl SystemTimer {
     ///
     /// # Safety
     ///
-    /// - Modifying a unit's count whilst [`Alarm`]s are using it may cause
-    ///   unexpected behaviour
+    /// - Modifying a unit's count whilst [`Alarm`]s are using it may cause unexpected behaviour
     /// - Any modification of the unit0 count will affect [`Instant::now`]
     pub unsafe fn set_unit_value(unit: Unit, value: u64) {
         unit.set_count(value)
@@ -171,7 +294,7 @@ impl Unit {
 
     #[cfg(not(esp32s2))]
     fn configure(&self, config: UnitConfig) {
-        lock(&CONF_LOCK, || {
+        CONF_LOCK.lock(|| {
             SYSTIMER::regs().conf().modify(|_, w| match config {
                 UnitConfig::Disabled => match self.channel() {
                     0 => w.timer_unit0_work_en().clear_bit(),
@@ -235,6 +358,7 @@ impl Unit {
         }
     }
 
+    #[inline]
     fn read_count(&self) -> u64 {
         // This can be a shared reference as long as this type isn't Sync.
 
@@ -263,32 +387,68 @@ impl Unit {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+enum Comparator {
+    Comparator0,
+    Comparator1,
+    Comparator2,
+}
+
 /// An alarm unit
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Alarm {
-    comp: u8,
+pub struct Alarm<'d> {
+    comp: Comparator,
     unit: Unit,
+    _lifetime: PhantomData<&'d mut ()>,
 }
 
-impl Alarm {
-    const fn new(comp: u8) -> Self {
+impl Alarm<'_> {
+    const fn new(comp: Comparator) -> Self {
         Alarm {
             comp,
             unit: Unit::Unit0,
+            _lifetime: PhantomData,
         }
+    }
+
+    /// Unsafely clone this peripheral reference.
+    ///
+    /// # Safety
+    ///
+    /// You must ensure that you're only using one instance of this type at a
+    /// time.
+    pub unsafe fn clone_unchecked(&self) -> Self {
+        Self {
+            comp: self.comp,
+            unit: self.unit,
+            _lifetime: PhantomData,
+        }
+    }
+
+    /// Creates a new peripheral reference with a shorter lifetime.
+    ///
+    /// Use this method if you would like to keep working with the peripheral
+    /// after you dropped the driver that consumes this.
+    ///
+    /// See [Peripheral singleton] section for more information.
+    ///
+    /// [Peripheral singleton]: crate#peripheral-singletons
+    pub fn reborrow(&mut self) -> Alarm<'_> {
+        unsafe { self.clone_unchecked() }
     }
 
     /// Returns the comparator's number.
     #[inline]
     fn channel(&self) -> u8 {
-        self.comp
+        self.comp as u8
     }
 
     /// Enables/disables the comparator. If enabled, this means
     /// it will generate interrupt based on its configuration.
     fn set_enable(&self, enable: bool) {
-        lock(&CONF_LOCK, || {
+        CONF_LOCK.lock(|| {
             #[cfg(not(esp32s2))]
             SYSTIMER::regs().conf().modify(|_, w| match self.channel() {
                 0 => w.target0_work_en().bit(enable),
@@ -401,9 +561,7 @@ impl Alarm {
         }
 
         #[cfg(not(esp32s2))]
-        unsafe {
-            interrupt::bind_interrupt(interrupt, handler.handler());
-        }
+        interrupt::bind_handler(interrupt, handler);
 
         #[cfg(esp32s2)]
         {
@@ -413,30 +571,33 @@ impl Alarm {
             // checks if an interrupt is active before calling the associated
             // handler functions.
 
-            static mut HANDLERS: [Option<extern "C" fn()>; 3] = [None, None, None];
+            static mut HANDLERS: [Option<crate::interrupt::IsrCallback>; 3] = [None, None, None];
 
             #[crate::ram]
-            unsafe extern "C" fn _handle_interrupt<const CH: u8>() {
+            extern "C" fn _handle_interrupt<const CH: u8>() {
                 if SYSTIMER::regs().int_raw().read().target(CH).bit_is_set() {
                     let handler = unsafe { HANDLERS[CH as usize] };
                     if let Some(handler) = handler {
-                        handler();
+                        (handler.callback())();
                     }
                 }
             }
 
+            let priority = handler.priority();
             unsafe {
                 HANDLERS[self.channel() as usize] = Some(handler.handler());
-                let handler = match self.channel() {
-                    0 => _handle_interrupt::<0>,
-                    1 => _handle_interrupt::<1>,
-                    2 => _handle_interrupt::<2>,
-                    _ => unreachable!(),
-                };
-                interrupt::bind_interrupt(interrupt, handler);
             }
+            let handler = match self.channel() {
+                0 => _handle_interrupt::<0>,
+                1 => _handle_interrupt::<1>,
+                2 => _handle_interrupt::<2>,
+                _ => unreachable!(),
+            };
+            interrupt::bind_handler(
+                interrupt,
+                crate::interrupt::InterruptHandler::new(handler, priority),
+            );
         }
-        unwrap!(interrupt::enable(interrupt, handler.priority()));
     }
 }
 
@@ -451,7 +612,7 @@ enum ComparatorMode {
     Target,
 }
 
-impl super::Timer for Alarm {
+impl super::Timer for Alarm<'_> {
     fn start(&self) {
         self.set_enable(true);
     }
@@ -483,7 +644,7 @@ impl super::Timer for Alarm {
 
         let ticks = self.unit.read_count();
 
-        let us = ticks / (SystemTimer::ticks_per_second() / 1_000_000);
+        let us = SystemTimer::ticks_to_us(ticks);
 
         Instant::from_ticks(us)
     }
@@ -492,7 +653,7 @@ impl super::Timer for Alarm {
         let mode = self.mode();
 
         let us = value.as_micros();
-        let ticks = us * (SystemTimer::ticks_per_second() / 1_000_000);
+        let ticks = SystemTimer::us_to_ticks(us);
 
         if matches!(mode, ComparatorMode::Period) {
             // Period mode
@@ -541,7 +702,7 @@ impl super::Timer for Alarm {
     }
 
     fn enable_interrupt(&self, state: bool) {
-        lock(&INT_ENA_LOCK, || {
+        INT_ENA_LOCK.lock(|| {
             SYSTIMER::regs()
                 .int_ena()
                 .modify(|_, w| w.target(self.channel()).bit(state));
@@ -589,25 +750,15 @@ impl super::Timer for Alarm {
     }
 }
 
-impl Peripheral for Alarm {
-    type P = Self;
-
-    #[inline]
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Alarm {
-            comp: self.comp,
-            unit: self.unit,
-        }
-    }
-}
-
-impl crate::private::Sealed for Alarm {}
+impl crate::private::Sealed for Alarm<'_> {}
 
 static CONF_LOCK: RawMutex = RawMutex::new();
 static INT_ENA_LOCK: RawMutex = RawMutex::new();
 
 // Async functionality of the system timer.
 mod asynch {
+    use core::marker::PhantomData;
+
     use procmacros::handler;
 
     use super::*;
@@ -616,39 +767,41 @@ mod asynch {
     const NUM_ALARMS: usize = 3;
     static WAKERS: [AtomicWaker; NUM_ALARMS] = [const { AtomicWaker::new() }; NUM_ALARMS];
 
-    pub(super) fn waker(alarm: &Alarm) -> &AtomicWaker {
+    pub(super) fn waker(alarm: &Alarm<'_>) -> &'static AtomicWaker {
         &WAKERS[alarm.channel() as usize]
     }
 
     #[inline]
-    fn handle_alarm(alarm: u8) {
+    fn handle_alarm(comp: Comparator) {
         Alarm {
-            comp: alarm,
+            comp,
             unit: Unit::Unit0,
+            _lifetime: PhantomData,
         }
         .enable_interrupt(false);
 
-        WAKERS[alarm as usize].wake();
+        WAKERS[comp as usize].wake();
     }
 
     #[handler]
     pub(crate) fn target0_handler() {
-        handle_alarm(0);
+        handle_alarm(Comparator::Comparator0);
     }
 
     #[handler]
     pub(crate) fn target1_handler() {
-        handle_alarm(1);
+        handle_alarm(Comparator::Comparator1);
     }
 
     #[handler]
     pub(crate) fn target2_handler() {
-        handle_alarm(2);
+        handle_alarm(Comparator::Comparator2);
     }
 }
 
-#[cfg(soc_etm)]
+#[cfg(etm_driver_supported)]
 pub mod etm {
+    #![cfg_attr(docsrs, procmacros::doc_replace)]
     //! # Event Task Matrix Function
     //!
     //! ## Overview
@@ -657,12 +810,11 @@ pub mod etm {
     //! allows the system timer’s ETM events to trigger any peripherals’ ETM
     //! tasks.
     //!
-    //!    The system timer can generate the following ETM events:
-    //!    - SYSTIMER_EVT_CNT_CMPx: Indicates the alarm pulses generated by
-    //!      COMPx
+    //! The system timer can generate the following ETM events:
+    //! - SYSTIMER_EVT_CNT_CMPx: Indicates the alarm pulses generated by COMPx
     //! ## Example
     //! ```rust, no_run
-    #![doc = crate::before_snippet!()]
+    //! # {before_snippet}
     //! # use esp_hal::timer::systimer::{etm::Event, SystemTimer};
     //! # use esp_hal::timer::PeriodicTimer;
     //! # use esp_hal::etm::Etm;
@@ -672,14 +824,14 @@ pub mod etm {
     //! #     Pull,
     //! # };
     //! let syst = SystemTimer::new(peripherals.SYSTIMER);
-    //! let etm = Etm::new(peripherals.SOC_ETM);
+    //! let etm = Etm::new(peripherals.ETM);
     //! let gpio_ext = Channels::new(peripherals.GPIO_SD);
     //! let alarm0 = syst.alarm0;
     //! let mut led = peripherals.GPIO1;
     //!
     //! let timer_event = Event::new(&alarm0);
     //! let led_task = gpio_ext.channel0_task.toggle(
-    //!     &mut led,
+    //!     led,
     //!     OutputConfig {
     //!         open_drain: false,
     //!         pull: Pull::None,
@@ -687,14 +839,12 @@ pub mod etm {
     //!     },
     //! );
     //!
-    //! let _configured_etm_channel = etm.channel0.setup(&timer_event,
-    //! &led_task);
+    //! let _configured_etm_channel = etm.channel0.setup(&timer_event, &led_task);
     //!
     //! let timer = PeriodicTimer::new(alarm0);
     //! // configure the timer as usual
     //! // when it fires it will toggle the GPIO
-    //! # Ok(())
-    //! # }
+    //! # {after_snippet}
     //! ```
 
     use super::*;
@@ -706,7 +856,7 @@ pub mod etm {
 
     impl Event {
         /// Creates an ETM event from the given [Alarm]
-        pub fn new(alarm: &Alarm) -> Self {
+        pub fn new(alarm: &Alarm<'_>) -> Self {
             Self {
                 id: 50 + alarm.channel(),
             }

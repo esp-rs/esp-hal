@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Pulse Counter (PCNT)
 //!
 //! ## Overview
@@ -16,7 +17,7 @@
 //! ### Decoding a quadrature encoder
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::gpio::{Input, InputConfig, Pull};
 //! # use esp_hal::interrupt::Priority;
 //! # use esp_hal::pcnt::{channel, unit, Pcnt};
@@ -24,8 +25,8 @@
 //! # use critical_section::Mutex;
 //! # use portable_atomic::AtomicI32;
 //!
-//! static UNIT0: Mutex<RefCell<Option<unit::Unit<'static, 1>>>> =
-//! Mutex::new(RefCell::new(None)); static VALUE: AtomicI32 = AtomicI32::new(0);
+//! static UNIT0: Mutex<RefCell<Option<unit::Unit<'static, 1>>>> = Mutex::new(RefCell::new(None));
+//! static VALUE: AtomicI32 = AtomicI32::new(0);
 //!
 //! // Initialize Pulse Counter (PCNT) unit with limits and filter settings
 //! let mut pcnt = Pcnt::new(peripherals.PCNT);
@@ -41,20 +42,18 @@
 //! let config = InputConfig::default().with_pull(Pull::Up);
 //! let pin_a = Input::new(peripherals.GPIO4, config);
 //! let pin_b = Input::new(peripherals.GPIO5, config);
-//! let (input_a, _) = pin_a.split();
-//! let (input_b, _) = pin_b.split();
+//! let input_a = pin_a.peripheral_input();
+//! let input_b = pin_b.peripheral_input();
 //! ch0.set_ctrl_signal(input_a.clone());
 //! ch0.set_edge_signal(input_b.clone());
 //! ch0.set_ctrl_mode(channel::CtrlMode::Reverse, channel::CtrlMode::Keep);
-//! ch0.set_input_mode(channel::EdgeMode::Increment,
-//! channel::EdgeMode::Decrement);
+//! ch0.set_input_mode(channel::EdgeMode::Increment, channel::EdgeMode::Decrement);
 //!
 //! let ch1 = &u0.channel1;
 //! ch1.set_ctrl_signal(input_b);
 //! ch1.set_edge_signal(input_a);
 //! ch1.set_ctrl_mode(channel::CtrlMode::Reverse, channel::CtrlMode::Keep);
-//! ch1.set_input_mode(channel::EdgeMode::Decrement,
-//! channel::EdgeMode::Increment);
+//! ch1.set_input_mode(channel::EdgeMode::Decrement, channel::EdgeMode::Increment);
 //!
 //! // Enable interrupts and resume pulse counter unit
 //! u0.listen();
@@ -72,7 +71,7 @@
 //!     }
 //! }
 //!
-//! #[handler(priority = Priority::Priority2)]
+//! #[esp_hal::handler]
 //! fn interrupt_handler() {
 //!     critical_section::with(|cs| {
 //!         let mut u0 = UNIT0.borrow_ref_mut(cs);
@@ -91,14 +90,13 @@
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! [channel]: channel/index.html
 //! [unit]: unit/index.html
 
 use self::unit::Unit;
 use crate::{
     interrupt::{self, InterruptHandler},
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::{Interrupt, PCNT},
     system::GenericPeripheralGuard,
 };
@@ -108,7 +106,7 @@ pub mod unit;
 
 /// Pulse Counter (PCNT) peripheral driver.
 pub struct Pcnt<'d> {
-    _instance: PeripheralRef<'d, PCNT>,
+    _instance: PCNT<'d>,
 
     /// Unit 0
     pub unit0: Unit<'d, 0>,
@@ -136,11 +134,11 @@ pub struct Pcnt<'d> {
 
 impl<'d> Pcnt<'d> {
     /// Return a new PCNT
-    pub fn new(_instance: impl Peripheral<P = PCNT> + 'd) -> Self {
-        crate::into_ref!(_instance);
-
+    pub fn new(_instance: PCNT<'d>) -> Self {
         let guard = GenericPeripheralGuard::new();
         let pcnt = PCNT::regs();
+
+        let unit_count = pcnt.unit_iter().count() as u8;
 
         // disable filter, all events, and channel settings
         for unit in pcnt.unit_iter() {
@@ -152,11 +150,6 @@ impl<'d> Pcnt<'d> {
 
         // Remove reset bit from units.
         pcnt.ctrl().modify(|_, w| {
-            #[cfg(not(esp32))]
-            let unit_count = 4;
-            #[cfg(esp32)]
-            let unit_count = 8;
-
             for i in 0..unit_count {
                 w.cnt_rst_u(i).clear_bit();
             }
@@ -191,8 +184,7 @@ impl<'d> Pcnt<'d> {
         for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::PCNT);
         }
-        unsafe { interrupt::bind_interrupt(Interrupt::PCNT, handler.handler()) };
-        unwrap!(interrupt::enable(Interrupt::PCNT, handler.priority()));
+        interrupt::bind_handler(Interrupt::PCNT, handler);
     }
 }
 

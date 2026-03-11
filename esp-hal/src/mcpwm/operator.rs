@@ -13,10 +13,9 @@ use core::marker::PhantomData;
 
 use super::PeripheralGuard;
 use crate::{
-    gpio::interconnect::{OutputConnection, PeripheralOutput},
-    mcpwm::{timer::Timer, PwmPeripheral},
+    gpio::interconnect::{OutputSignal, PeripheralOutput},
+    mcpwm::{PwmClockGuard, PwmPeripheral, timer::Timer},
     pac,
-    peripheral::{Peripheral, PeripheralRef},
 };
 
 /// Input/Output Stream descriptor for each channel
@@ -162,22 +161,20 @@ impl DeadTimeCfg {
 /// A MCPWM operator
 ///
 /// The PWM Operator submodule has the following functions:
-/// * Generates a PWM signal pair, based on timing references obtained from the
-///   corresponding PWM timer.
-/// * Each signal out of the PWM signal pair includes a specific pattern of dead
-///   time. (Not yet implemented)
-/// * Superimposes a carrier on the PWM signal, if configured to do so. (Not yet
+/// * Generates a PWM signal pair, based on timing references obtained from the corresponding PWM
+///   timer.
+/// * Each signal out of the PWM signal pair includes a specific pattern of dead time. (Not yet
 ///   implemented)
+/// * Superimposes a carrier on the PWM signal, if configured to do so. (Not yet implemented)
 /// * Handles response under fault conditions. (Not yet implemented)
 pub struct Operator<'d, const OP: u8, PWM> {
     phantom: PhantomData<&'d PWM>,
     _guard: PeripheralGuard,
+    _pwm_clock_guard: PwmClockGuard,
 }
 
 impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
-    pub(super) fn new() -> Self {
-        let guard = PeripheralGuard::new(PWM::peripheral());
-
+    pub(super) fn new(guard: PeripheralGuard) -> Self {
         // Side note:
         // It would have been nice to deselect any timer reference on peripheral
         // initialization.
@@ -187,6 +184,7 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
         Operator {
             phantom: PhantomData,
             _guard: guard,
+            _pwm_clock_guard: PwmClockGuard::new::<PWM>(),
         }
     }
 
@@ -212,7 +210,7 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
     /// Use the A output with the given pin and configuration
     pub fn with_pin_a(
         self,
-        pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin: impl PeripheralOutput<'d>,
         config: PwmPinConfig<true>,
     ) -> PwmPin<'d, PWM, OP, true> {
         PwmPin::new(pin, config)
@@ -221,7 +219,7 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
     /// Use the B output with the given pin and configuration
     pub fn with_pin_b(
         self,
-        pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin: impl PeripheralOutput<'d>,
         config: PwmPinConfig<false>,
     ) -> PwmPin<'d, PWM, OP, false> {
         PwmPin::new(pin, config)
@@ -230,9 +228,9 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
     /// Use both the A and the B output with the given pins and configurations
     pub fn with_pins(
         self,
-        pin_a: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin_a: impl PeripheralOutput<'d>,
         config_a: PwmPinConfig<true>,
-        pin_b: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin_b: impl PeripheralOutput<'d>,
         config_b: PwmPinConfig<false>,
     ) -> (PwmPin<'d, PWM, OP, true>, PwmPin<'d, PWM, OP, false>) {
         (PwmPin::new(pin_a, config_a), PwmPin::new(pin_b, config_b))
@@ -244,9 +242,9 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
     /// configured deadtime
     pub fn with_linked_pins(
         self,
-        pin_a: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin_a: impl PeripheralOutput<'d>,
         config_a: PwmPinConfig<true>,
-        pin_b: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin_b: impl PeripheralOutput<'d>,
         config_b: PwmPinConfig<false>,
         config_dt: DeadTimeCfg,
     ) -> LinkedPins<'d, PWM, OP> {
@@ -287,17 +285,14 @@ impl<const IS_A: bool> PwmPinConfig<IS_A> {
 
 /// A pin driven by an MCPWM operator
 pub struct PwmPin<'d, PWM, const OP: u8, const IS_A: bool> {
-    pin: PeripheralRef<'d, OutputConnection>,
+    pin: OutputSignal<'d>,
     phantom: PhantomData<PWM>,
     _guard: PeripheralGuard,
 }
 
 impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP, IS_A> {
-    fn new(
-        pin: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        config: PwmPinConfig<IS_A>,
-    ) -> Self {
-        crate::into_mapped_ref!(pin);
+    fn new(pin: impl PeripheralOutput<'d>, config: PwmPinConfig<IS_A>) -> Self {
+        let pin = pin.into();
 
         let guard = PeripheralGuard::new(PWM::peripheral());
 
@@ -309,8 +304,8 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         pin.set_actions(config.actions);
         pin.set_update_method(config.update_method);
 
-        PWM::output_signal::<OP, IS_A>().connect_to(&mut pin.pin);
-        pin.pin.enable_output(true);
+        PWM::output_signal::<OP, IS_A>().connect_to(&pin.pin);
+        pin.pin.set_output_enable(true);
 
         pin
     }
@@ -324,7 +319,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
 
         // SAFETY:
         // `bits` is a valid bit pattern
-        ch.gen((!IS_A) as usize).write(|w| unsafe { w.bits(bits) });
+        ch.gen_((!IS_A) as usize).write(|w| unsafe { w.bits(bits) });
     }
 
     /// Set how a new timestamp syncs with the timer
@@ -445,6 +440,12 @@ impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetD
     }
 }
 
+#[procmacros::doc_replace(
+    "mcpwm_clk" => {
+        cfg(not(esp32h2)) => "40",
+        cfg(esp32h2) => "32"
+    }
+)]
 /// Two pins driven by the same timer and operator
 ///
 /// Useful for complementary or mirrored signals with or without
@@ -453,23 +454,19 @@ impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetD
 /// # H-Bridge example
 ///
 /// ```rust, no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// # use esp_hal::mcpwm::{McPwm, PeripheralClockConfig};
 /// # use esp_hal::mcpwm::operator::{DeadTimeCfg, PwmPinConfig, PWMStream};
 /// // active high complementary using PWMA input
 /// let bridge_active = DeadTimeCfg::new_ahc();
+///
 /// // use PWMB as input for both outputs
-/// let bridge_off = DeadTimeCfg::new_bypass().set_output_swap(PWMStream::PWMA,
-/// true);
-#[cfg_attr(
-    esp32h2,
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(40))?;"
-)]
-#[cfg_attr(
-    not(esp32h2),
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(32))?;"
-)]
-/// let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
+/// let bridge_off = DeadTimeCfg::new_bypass().set_output_swap(PWMStream::PWMA, true);
+///
+/// let mut mcpwm = McPwm::new(
+///     peripherals.MCPWM0,
+///     PeripheralClockConfig::with_frequency(Rate::from_mhz(__mcpwm_clk__))?,
+/// );
 ///
 /// let mut pins = mcpwm.operator0.with_linked_pins(
 ///     peripherals.GPIO0,
@@ -487,8 +484,7 @@ impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetD
 /// pins.set_deadtime_cfg(bridge_active);
 /// // pin_a: _______-------_____________-------______
 /// // pin_b: ------_________-----------_________-----
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
 pub struct LinkedPins<'d, PWM, const OP: u8> {
     pin_a: PwmPin<'d, PWM, OP, true>,
@@ -497,9 +493,9 @@ pub struct LinkedPins<'d, PWM, const OP: u8> {
 
 impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
     fn new(
-        pin_a: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin_a: impl PeripheralOutput<'d>,
         config_a: PwmPinConfig<true>,
-        pin_b: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin_b: impl PeripheralOutput<'d>,
         config_b: PwmPinConfig<false>,
         config_dt: DeadTimeCfg,
     ) -> Self {
