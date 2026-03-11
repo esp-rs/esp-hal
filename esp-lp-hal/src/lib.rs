@@ -55,18 +55,6 @@ cfg_if::cfg_if! {
     }
 }
 
-// ULP interrupt bitflags from:
-// https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L16
-cfg_if::cfg_if! {
-    if #[cfg(any(esp32s2,esp32s3))] {
-        const ULP_RISCV_TIMER_INT                         : u32 = 1 << 0;   /* Internal Timer Interrupt */
-        const ULP_RISCV_EBREAK_ECALL_ILLEGAL_INSN_INT     : u32 = 1 << 1;   /* EBREAK, ECALL or Illegal instruction */
-        const ULP_RISCV_BUS_ERROR_INT                     : u32 = 1 << 2;   /* Bus Error (Unaligned Memory Access) */
-        const ULP_RISCV_PERIPHERAL_INTERRUPT              : u32 = 1 << 31;  /* RTC Peripheral Interrupt */
-        const ULP_RISCV_INTERNAL_INTERRUPT                : u32 = ULP_RISCV_TIMER_INT | ULP_RISCV_EBREAK_ECALL_ILLEGAL_INSN_INT | ULP_RISCV_BUS_ERROR_INT;
-    }
-}
-
 pub(crate) static mut CPU_CLOCK: u32 = LP_FAST_CLK_HZ;
 
 /// Wake up the HP core
@@ -124,25 +112,27 @@ loop:
 );
 
 #[cfg(any(esp32s2, esp32s3))]
-// Include macros which define custom RISCV R-Type instructions, used for interrupt handling.
-global_asm!(include_str!("./ulp_riscv_interrupt_ops.S"));
-
-// Assembly containing the reset_vector and irq_vector instructions.
-#[cfg(any(esp32s2, esp32s3))]
-global_asm!(include_str!("./ulp_riscv_vectors.S"));
-
-#[cfg(any(esp32s2, esp32s3))]
 global_asm!(
     r#"
+    .section .text.vectors
+    .global irq_vector
+    .global reset_vector
+
+    /* The reset vector, jumps to startup code */
+    reset_vector:
+        /* no more than 16 bytes here ! */
+        j __start
+
+    /* Interrupt handler (stub impl) */
+    .balign 0x10
+    irq_vector:
+        ret
+
     .balign 0x10
     .section .init
     __start:
         /* setup the stack pointer */
         la sp, __stack_top
-
-        /* Custom instruction to un-mask the interrupts */
-        /* waitirq_insn zero */
-        maskirq_insn zero, zero
 
         call ulp_riscv_rescue_from_monitor
         call rust_main
@@ -151,84 +141,6 @@ global_asm!(
         j loop
     "#
 );
-
-#[cfg(any(esp32s2, esp32s3))]
-#[unsafe(no_mangle)]
-unsafe extern "C" fn _ulp_riscv_interrupt_handler(q1: u32) {
-    // This interrupt handler is placeholder - it simply checks the interrupt flags, and clears
-    // them. This function is based on the ESP-IDF implementation found here:
-    // https://github.com/espressif/esp-idf/blob/12f36a021f511cd4de41d3fffff146c5336ac1e7/components/ulp/ulp_riscv/ulp_core/ulp_riscv_interrupt.c#L110
-
-    // ULP Internal Interrupts
-    if (q1 & ULP_RISCV_INTERNAL_INTERRUPT) > 0 {
-        // TODO
-    }
-
-    // External/Peripheral interrupts
-    if (q1 & ULP_RISCV_PERIPHERAL_INTERRUPT) > 0 {
-        // RTC Peripheral interrupts
-        let cocpu_int_st: u32 = unsafe { &*pac::SENS::PTR }.sar_cocpu_int_st().read().bits();
-
-        if cocpu_int_st > 0 {
-            // Clear the interrupt
-            unsafe { &*pac::SENS::PTR }
-                .sar_cocpu_int_clr()
-                .write(|w| unsafe { w.bits(cocpu_int_st) });
-        }
-
-        // RTC IO interrupts
-        let rtcio_int_st: u32 = unsafe { &*pac::RTC_IO::PTR }.status().read().bits();
-
-        if rtcio_int_st > 0 {
-            // Clear the interrupt
-            unsafe { &*pac::RTC_IO::PTR }
-                .status_w1tc()
-                .write(|w| unsafe { w.bits(rtcio_int_st) });
-        }
-    }
-}
-
-/// Enter a critical section (disable interrupts)
-#[cfg(any(esp32s2, esp32s3))]
-pub fn ulp_disable_interrupts() {
-    // Enter a critical section by disabling all interrupts
-    // This inline assembly construct uses the t0 register and is equivalent to:
-    // > li t0, 0x80000007
-    // > maskirq_insn(zero, t0) // Mask all interrupt bits
-    //
-    // The mask 0x80000007 represents:
-    //   Bit 31 - RTC peripheral interrupt
-    //   Bit 2  - Bus error
-    //   Bit 1  - Ebreak / Ecall / Illegal Instruction
-    //   Bit 0  - Internal Timer
-    //
-    unsafe {
-        core::arch::asm!("li t0, 0x80000007", ".word 0x0602e00b");
-    }
-}
-
-/// Exit a critical section (re-enable interrupts)
-#[cfg(any(esp32s2, esp32s3))]
-pub fn ulp_enable_interrupts() {
-    // Exit a critical section by enabling all interrupts
-    // This inline assembly construct is equivalent to:
-    // > maskirq_insn(zero, zero)
-    unsafe {
-        core::arch::asm!(".word 0x0600600b");
-    }
-}
-
-/// Wait for any (even unmasked) interrupt
-#[cfg(any(esp32s2, esp32s3))]
-pub fn ulp_waitirq() -> u32 {
-    // Wait for pending interrupt, return pending interrupt mask
-    // waitirq a0
-    let result: u32;
-    unsafe {
-        core::arch::asm!(".word 0x0800400B", out("a0") result);
-    }
-    result
-}
 
 /// Entry point to the ULP program
 #[unsafe(export_name = "rust_main")]
