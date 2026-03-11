@@ -114,37 +114,35 @@ loop:
 #[cfg(any(esp32s2, esp32s3))]
 global_asm!(
     r#"
-    .section .text.vectors
-    .global irq_vector
-    .global reset_vector
+	.section .text.vectors
+	.global irq_vector
+	.global reset_vector
 
-    /* The reset vector, jumps to startup code */
-    reset_vector:
-        /* no more than 16 bytes here ! */
-        j __start
+/* The reset vector, jumps to startup code */
+reset_vector:
+	j __start
 
-    /* Interrupt handler (stub impl) */
-    .balign 0x10
-    irq_vector:
-        ret
+/* Interrupt handler */
+.balign 16
+irq_vector:
+	ret
 
-    .balign 0x10
-    .section .init
-    __start:
-        /* setup the stack pointer */
-        la sp, __stack_top
+	.section .text
 
-        call ulp_riscv_rescue_from_monitor
-        call rust_main
+__start:
+    /* setup the stack pointer */
+	la sp, __stack_top
 
-    loop:
-        j loop
-    "#
+	call ulp_riscv_rescue_from_monitor
+	call rust_main
+loop:
+	j loop
+"#
 );
 
 /// Entry point to the ULP program
+#[unsafe(link_section = ".init.rust")]
 #[unsafe(export_name = "rust_main")]
-#[unsafe(link_section = ".init")]
 unsafe extern "C" fn lp_core_startup() -> ! {
     unsafe {
         unsafe extern "Rust" {
@@ -167,8 +165,8 @@ unsafe extern "C" fn lp_core_startup() -> ! {
 }
 
 #[cfg(any(esp32s2, esp32s3))]
+#[unsafe(link_section = ".init.rust")]
 #[unsafe(no_mangle)]
-#[unsafe(link_section = ".init")]
 unsafe extern "C" fn ulp_riscv_rescue_from_monitor() {
     // Rescue RISC-V core from monitor state.
     unsafe { &*pac::RTC_CNTL::PTR }
