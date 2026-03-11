@@ -156,6 +156,8 @@ mod coex_utils;
 mod fmt;
 pub(crate) mod reg_access;
 
+use core::marker::PhantomData;
+
 use esp_hal as hal;
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
@@ -187,6 +189,7 @@ pub(crate) mod sys {
     pub use esp_wifi_sys_esp32s3::*;
 }
 
+use crate::refcount::Refcount;
 #[cfg(feature = "wifi")]
 use crate::wifi::WifiError;
 
@@ -212,9 +215,11 @@ macro_rules! unstable_module {
     };
 }
 
+mod asynch;
 mod compat;
 mod interrupt_dispatch;
 mod radio_clocks;
+mod refcount;
 mod time;
 
 #[cfg(feature = "wifi")]
@@ -236,8 +241,6 @@ pub(crate) mod common_adapter;
 
 #[cfg(all(feature = "ble", bt_controller = "npl"))]
 pub(crate) static ESP_RADIO_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
-
-static RADIO_REFCOUNT: esp_sync::NonReentrantMutex<u32> = esp_sync::NonReentrantMutex::new(0);
 
 // this is just to verify that we use the correct defaults in `build.rs`
 #[allow(clippy::assertions_on_constants)] // TODO: try assert_eq once it's usable in const context
@@ -337,36 +340,31 @@ pub(crate) fn deinit() {
 /// Management of the global reference count
 /// and conditional hardware initialization/deinitialization.
 #[derive(Debug)]
-pub(crate) struct RadioRefGuard;
+pub(crate) struct RadioRefGuard {
+    _private: PhantomData<()>,
+}
+
+static RADIO_REFCOUNT: Refcount = Refcount::new();
 
 impl RadioRefGuard {
     /// Increments the refcount. If the old count was 0, it performs hardware init.
     /// If hardware init fails, it rolls back the refcount only once.
     fn new() -> Self {
-        RADIO_REFCOUNT.with(|rc| {
-            debug!("Creating RadioRefGuard");
+        debug!("Creating RadioRefGuard");
 
-            if *rc == 0 {
-                init();
-            }
-
-            *rc += 1;
-            RadioRefGuard
-        })
+        RADIO_REFCOUNT.increment(init);
+        RadioRefGuard {
+            _private: PhantomData,
+        }
     }
 }
 
 impl Drop for RadioRefGuard {
     /// Decrements the refcount. If the count drops to 0, it performs hardware de-init.
     fn drop(&mut self) {
-        RADIO_REFCOUNT.with(|rc| {
-            debug!("Dropping RadioRefGuard");
+        debug!("Dropping RadioRefGuard");
 
-            *rc -= 1;
-            if *rc == 0 {
-                deinit();
-            }
-        })
+        RADIO_REFCOUNT.decrement(deinit);
     }
 }
 

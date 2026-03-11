@@ -540,26 +540,27 @@ macro_rules! for_each_classified_interrupt {
 macro_rules! for_each_interrupt_priority {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_interrupt_priority { $(($pattern) => $code;)*
-        ($other : tt) => {} } _for_each_inner_interrupt_priority!((0, 1, Priority1));
-        _for_each_inner_interrupt_priority!((1, 2, Priority2));
-        _for_each_inner_interrupt_priority!((2, 3, Priority3));
-        _for_each_inner_interrupt_priority!((3, 4, Priority4));
-        _for_each_inner_interrupt_priority!((4, 5, Priority5));
-        _for_each_inner_interrupt_priority!((5, 6, Priority6));
-        _for_each_inner_interrupt_priority!((6, 7, Priority7));
-        _for_each_inner_interrupt_priority!((7, 8, Priority8));
-        _for_each_inner_interrupt_priority!((8, 9, Priority9));
-        _for_each_inner_interrupt_priority!((9, 10, Priority10));
-        _for_each_inner_interrupt_priority!((10, 11, Priority11));
-        _for_each_inner_interrupt_priority!((11, 12, Priority12));
-        _for_each_inner_interrupt_priority!((12, 13, Priority13));
-        _for_each_inner_interrupt_priority!((13, 14, Priority14));
-        _for_each_inner_interrupt_priority!((14, 15, Priority15));
-        _for_each_inner_interrupt_priority!((all(0, 1, Priority1), (1, 2, Priority2), (2,
-        3, Priority3), (3, 4, Priority4), (4, 5, Priority5), (5, 6, Priority6), (6, 7,
-        Priority7), (7, 8, Priority8), (8, 9, Priority9), (9, 10, Priority10), (10, 11,
-        Priority11), (11, 12, Priority12), (12, 13, Priority13), (13, 14, Priority14),
-        (14, 15, Priority15)));
+        ($other : tt) => {} } _for_each_inner_interrupt_priority!((0, 1, Priority1,
+        Level1)); _for_each_inner_interrupt_priority!((1, 2, Priority2, Level2));
+        _for_each_inner_interrupt_priority!((2, 3, Priority3, Level3));
+        _for_each_inner_interrupt_priority!((3, 4, Priority4, Level4));
+        _for_each_inner_interrupt_priority!((4, 5, Priority5, Level5));
+        _for_each_inner_interrupt_priority!((5, 6, Priority6, Level6));
+        _for_each_inner_interrupt_priority!((6, 7, Priority7, Level7));
+        _for_each_inner_interrupt_priority!((7, 8, Priority8, Level8));
+        _for_each_inner_interrupt_priority!((8, 9, Priority9, Level9));
+        _for_each_inner_interrupt_priority!((9, 10, Priority10, Level10));
+        _for_each_inner_interrupt_priority!((10, 11, Priority11, Level11));
+        _for_each_inner_interrupt_priority!((11, 12, Priority12, Level12));
+        _for_each_inner_interrupt_priority!((12, 13, Priority13, Level13));
+        _for_each_inner_interrupt_priority!((13, 14, Priority14, Level14));
+        _for_each_inner_interrupt_priority!((14, 15, Priority15, Level15));
+        _for_each_inner_interrupt_priority!((all(0, 1, Priority1, Level1), (1, 2,
+        Priority2, Level2), (2, 3, Priority3, Level3), (3, 4, Priority4, Level4), (4, 5,
+        Priority5, Level5), (5, 6, Priority6, Level6), (6, 7, Priority7, Level7), (7, 8,
+        Priority8, Level8), (8, 9, Priority9, Level9), (9, 10, Priority10, Level10), (10,
+        11, Priority11, Level11), (11, 12, Priority12, Level12), (12, 13, Priority13,
+        Level13), (13, 14, Priority14, Level14), (14, 15, Priority15, Level15)));
     };
 }
 #[macro_export]

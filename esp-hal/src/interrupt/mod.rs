@@ -400,7 +400,7 @@ pub enum RunLevel {
     ThreadMode,
 
     /// An elevated level, usually an interrupt handler's.
-    Interrupt(Priority),
+    Interrupt(ElevatedRunLevel),
 }
 
 impl RunLevel {
@@ -419,7 +419,8 @@ impl RunLevel {
     /// ```
     #[inline]
     pub fn current() -> Self {
-        current_runlevel()
+        let raw = current_raw_runlevel();
+        unwrap!(Self::try_from_u32(raw))
     }
 
     /// Changes the current run level to the specified level and returns the previous level.
@@ -464,14 +465,21 @@ impl RunLevel {
         if priority == 0 {
             Ok(RunLevel::ThreadMode)
         } else {
-            Priority::try_from_u32(priority).map(RunLevel::Interrupt)
+            ElevatedRunLevel::try_from_u32(priority).map(RunLevel::Interrupt)
         }
+    }
+}
+
+impl PartialEq<ElevatedRunLevel> for RunLevel {
+    fn eq(&self, other: &ElevatedRunLevel) -> bool {
+        *self == RunLevel::Interrupt(*other)
     }
 }
 
 impl PartialEq<Priority> for RunLevel {
     fn eq(&self, other: &Priority) -> bool {
-        *self == RunLevel::Interrupt(*other)
+        let runlevel = ElevatedRunLevel::from(*other);
+        *self == RunLevel::Interrupt(runlevel)
     }
 }
 

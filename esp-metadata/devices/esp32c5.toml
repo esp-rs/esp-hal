@@ -270,6 +270,9 @@ clocks = { system_clocks = { clock_tree = [
     { name = "UsbDevice", keep_enabled = true },
 ] } }
 
+[device.adc]
+support_status = "not_supported"
+
 # TODO: define functionality for PSEUDO register
 [device.aes]
 support_status = "partial"
@@ -697,4 +700,7 @@ support_status = "not_supported"
 support_status = "not_supported"
 
 [device.lp_timer]
+support_status = "not_supported"
+
+[device.temp_sensor]
 support_status = "not_supported"
