@@ -1,16 +1,18 @@
 # esp-metadata
 
 [![Crates.io](https://img.shields.io/crates/v/esp-metadata?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-metadata)
-[![docs.rs](https://img.shields.io/docsrs/esp-metadata?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp-metadata)
-![MSRV](https://img.shields.io/badge/MSRV-1.84-blue?labelColor=1C2C2E&style=flat-square)
+[![docs.rs](https://img.shields.io/docsrs/esp-metadata?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.espressif.com/projects/rust/esp-metadata/latest/)
+![MSRV](https://img.shields.io/badge/MSRV-1.86.0-blue?labelColor=1C2C2E&style=flat-square)
 ![Crates.io](https://img.shields.io/crates/l/esp-metadata?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
 Metadata for Espressif devices, intended for use in [build scripts].
 
+Firmware crates are meant to depend on `esp-metadata-generated`, not on this crate directly. To update `esp-metadata-generated`, make your changes in `esp-metadata`, then run `cargo xtask update-metadata`.
+
 [build scripts]: https://doc.rust-lang.org/cargo/reference/build-scripts.html
 
-## [Documentation](https://docs.rs/crate/esp-metadata)
+## [Documentation](https://docs.espressif.com/projects/rust/esp-metadata/latest/)
 
 ## Minimum Supported Rust Version (MSRV)
 

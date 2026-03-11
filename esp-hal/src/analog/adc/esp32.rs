@@ -1,34 +1,62 @@
-use core::marker::PhantomData;
+use core::{
+    marker::PhantomData,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use super::{AdcConfig, Attenuation};
 use crate::{
-    peripheral::PeripheralRef,
     peripherals::{ADC1, ADC2, RTC_IO, SENS},
+    private::{self},
 };
 
 pub(super) const NUM_ATTENS: usize = 10;
 
+// ADC2 cannot be used with `radio` functionality on `esp32`, this global helps us to track it's
+// state to prevent unexpected behaviour
+static ADC2_IN_USE: AtomicBool = AtomicBool::new(false);
+
+/// ADC Error
+#[derive(Debug)]
+pub enum Error {
+    /// `ADC2` is used together with `radio`.
+    Adc2InUse,
+}
+
+#[doc(hidden)]
+/// Tries to "claim" `ADC2` peripheral and set its status
+pub fn try_claim_adc2(_: private::Internal) -> Result<(), Error> {
+    if ADC2_IN_USE.fetch_or(true, Ordering::Relaxed) {
+        Err(Error::Adc2InUse)
+    } else {
+        Ok(())
+    }
+}
+
+#[doc(hidden)]
+/// Resets `ADC2` usage status to `Unused`
+pub fn release_adc2(_: private::Internal) {
+    ADC2_IN_USE.store(false, Ordering::Relaxed);
+}
+
 /// The sampling/readout resolution of the ADC.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
+#[allow(clippy::enum_variant_names, reason = "unit of measurement")]
 pub enum Resolution {
     /// 9-bit resolution
-    Resolution9Bit  = 0b00,
+    _9Bit,
     /// 10-bit resolution
-    Resolution10Bit = 0b01,
+    _10Bit,
     /// 11-bit resolution
-    Resolution11Bit = 0b10,
+    _11Bit,
     /// 12-bit resolution
     #[default]
-    Resolution12Bit = 0b11,
+    _12Bit,
 }
 
 #[doc(hidden)]
 pub trait RegisterAccess {
-    fn set_bit_width(resolution: u8);
-
-    fn set_sample_bit(resolution: u8);
+    fn set_resolution(resolution: u8);
 
     fn set_attenuation(channel: usize, attenuation: u8);
 
@@ -47,16 +75,15 @@ pub trait RegisterAccess {
     fn read_done_sar() -> bool;
 
     fn read_data_sar() -> u16;
+
+    fn instance_number() -> u8;
 }
 
-impl RegisterAccess for ADC1 {
-    fn set_bit_width(resolution: u8) {
+impl RegisterAccess for ADC1<'_> {
+    fn set_resolution(resolution: u8) {
         SENS::regs()
             .sar_start_force()
             .modify(|_, w| unsafe { w.sar1_bit_width().bits(resolution) });
-    }
-
-    fn set_sample_bit(resolution: u8) {
         SENS::regs()
             .sar_read_ctrl()
             .modify(|_, w| unsafe { w.sar1_sample_bit().bits(resolution) });
@@ -122,16 +149,17 @@ impl RegisterAccess for ADC1 {
             .meas1_data_sar()
             .bits()
     }
+
+    fn instance_number() -> u8 {
+        1
+    }
 }
 
-impl RegisterAccess for ADC2 {
-    fn set_bit_width(resolution: u8) {
+impl RegisterAccess for ADC2<'_> {
+    fn set_resolution(resolution: u8) {
         SENS::regs()
             .sar_start_force()
             .modify(|_, w| unsafe { w.sar2_bit_width().bits(resolution) });
-    }
-
-    fn set_sample_bit(resolution: u8) {
         SENS::regs()
             .sar_read_ctrl2()
             .modify(|_, w| unsafe { w.sar2_sample_bit().bits(resolution) });
@@ -197,33 +225,42 @@ impl RegisterAccess for ADC2 {
             .meas2_data_sar()
             .bits()
     }
+
+    fn instance_number() -> u8 {
+        2
+    }
 }
 
 /// Analog-to-Digital Converter peripheral driver.
 pub struct Adc<'d, ADC, Dm: crate::DriverMode> {
-    _adc: PeripheralRef<'d, ADC>,
+    _adc: ADC,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
-    _phantom: PhantomData<Dm>,
+    _phantom: PhantomData<(Dm, &'d mut ())>,
 }
 
 impl<'d, ADCI> Adc<'d, ADCI, crate::Blocking>
 where
-    ADCI: RegisterAccess,
+    ADCI: RegisterAccess + 'd,
 {
     /// Configure a given ADC instance using the provided configuration, and
     /// initialize the ADC for use
-    pub fn new(
-        adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
-        config: AdcConfig<ADCI>,
-    ) -> Self {
+    ///
+    /// # Panics
+    ///
+    /// `ADC2` cannot be used simultaneously with `radio` functionalities, otherwise this function
+    /// will panic.
+    pub fn new(adc_instance: ADCI, config: AdcConfig<ADCI>) -> Self {
+        if ADCI::instance_number() == 2 && try_claim_adc2(private::Internal).is_err() {
+            panic!(
+                "ADC2 is already in use by Radio. On ESP32, ADC2 cannot be used simultaneously with Wi-Fi or Bluetooth."
+            );
+        }
+
         let sensors = SENS::regs();
 
         // Set reading and sampling resolution
-        let resolution: u8 = config.resolution as u8;
-
-        ADCI::set_bit_width(resolution);
-        ADCI::set_sample_bit(resolution);
+        ADCI::set_resolution(config.resolution as u8);
 
         // Set attenuation for pins
         let attenuations = config.attenuations;
@@ -238,37 +275,26 @@ where
         ADCI::clear_dig_force();
         ADCI::set_start_force();
         ADCI::set_en_pad_force();
-        sensors
-            .sar_touch_ctrl1()
-            .modify(|_, w| w.xpd_hall_force().set_bit());
-        sensors
-            .sar_touch_ctrl1()
-            .modify(|_, w| w.hall_phase_force().set_bit());
+        sensors.sar_touch_ctrl1().modify(|_, w| {
+            w.xpd_hall_force().set_bit();
+            w.hall_phase_force().set_bit()
+        });
 
-        // Set power to SW power on
-        sensors
-            .sar_meas_wait2()
-            .modify(|_, w| unsafe { w.force_xpd_sar().bits(0b11) });
-
-        // disable AMP
-        sensors
-            .sar_meas_wait2()
-            .modify(|_, w| unsafe { w.force_xpd_amp().bits(0b10) });
-        sensors
-            .sar_meas_ctrl()
-            .modify(|_, w| unsafe { w.amp_rst_fb_fsm().bits(0) });
-        sensors
-            .sar_meas_ctrl()
-            .modify(|_, w| unsafe { w.amp_short_ref_fsm().bits(0) });
-        sensors
-            .sar_meas_ctrl()
-            .modify(|_, w| unsafe { w.amp_short_ref_gnd_fsm().bits(0) });
-        sensors
-            .sar_meas_wait1()
-            .modify(|_, w| unsafe { w.sar_amp_wait1().bits(1) });
-        sensors
-            .sar_meas_wait1()
-            .modify(|_, w| unsafe { w.sar_amp_wait2().bits(1) });
+        sensors.sar_meas_wait2().modify(|_, w| unsafe {
+            // Set power to SW power on
+            w.force_xpd_sar().bits(0b11);
+            // disable AMP
+            w.force_xpd_amp().bits(0b10)
+        });
+        sensors.sar_meas_ctrl().modify(|_, w| unsafe {
+            w.amp_rst_fb_fsm().bits(0);
+            w.amp_short_ref_fsm().bits(0);
+            w.amp_short_ref_gnd_fsm().bits(0)
+        });
+        sensors.sar_meas_wait1().modify(|_, w| unsafe {
+            w.sar_amp_wait1().bits(1);
+            w.sar_amp_wait2().bits(1)
+        });
         sensors
             .sar_meas_wait2()
             .modify(|_, w| unsafe { w.sar_amp_wait3().bits(1) });
@@ -276,11 +302,14 @@ where
         // Do *not* invert the output
         // NOTE: This seems backwards, but was verified experimentally.
         sensors
+            .sar_read_ctrl()
+            .modify(|_, w| w.sar1_data_inv().set_bit());
+        sensors
             .sar_read_ctrl2()
             .modify(|_, w| w.sar2_data_inv().set_bit());
 
         Adc {
-            _adc: adc_instance.into_ref(),
+            _adc: adc_instance,
             attenuations: config.attenuations,
             active_channel: None,
             _phantom: PhantomData,
@@ -292,26 +321,29 @@ where
     /// This method takes an [AdcPin](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
-    pub fn read_oneshot<PIN>(&mut self, _pin: &mut super::AdcPin<PIN, ADCI>) -> nb::Result<u16, ()>
+    pub fn read_oneshot<PIN>(&mut self, pin: &mut super::AdcPin<PIN, ADCI>) -> nb::Result<u16, ()>
     where
         PIN: super::AdcChannel,
     {
-        if self.attenuations[PIN::CHANNEL as usize].is_none() {
-            panic!("Channel {} is not configured reading!", PIN::CHANNEL);
+        if self.attenuations[pin.pin.adc_channel() as usize].is_none() {
+            panic!(
+                "Channel {} is not configured reading!",
+                pin.pin.adc_channel()
+            );
         }
 
         if let Some(active_channel) = self.active_channel {
             // There is conversion in progress:
             // - if it's for a different channel try again later
             // - if it's for the given channel, go ahead and check progress
-            if active_channel != PIN::CHANNEL {
+            if active_channel != pin.pin.adc_channel() {
                 return Err(nb::Error::WouldBlock);
             }
         } else {
             // If no conversions are in progress, start a new one for given channel
-            self.active_channel = Some(PIN::CHANNEL);
+            self.active_channel = Some(pin.pin.adc_channel());
 
-            ADCI::set_en_pad(PIN::CHANNEL);
+            ADCI::set_en_pad(pin.pin.adc_channel());
 
             ADCI::clear_start_sar();
             ADCI::set_start_sar();
@@ -349,32 +381,8 @@ impl<ADC1> Adc<'_, ADC1, crate::Blocking> {
     }
 }
 
-mod adc_implementation {
-    crate::analog::adc::impl_adc_interface! {
-        ADC1 [
-            (GpioPin<36>, 0), // Alt. name: SENSOR_VP
-            (GpioPin<37>, 1), // Alt. name: SENSOR_CAPP
-            (GpioPin<38>, 2), // Alt. name: SENSOR_CAPN
-            (GpioPin<39>, 3), // Alt. name: SENSOR_VN
-            (GpioPin<33>, 4), // Alt. name: 32K_XP
-            (GpioPin<32>, 5), // Alt. name: 32K_XN
-            (GpioPin<34>, 6), // Alt. name: VDET_1
-            (GpioPin<35>, 7), // Alt. name: VDET_2
-        ]
-    }
-
-    crate::analog::adc::impl_adc_interface! {
-        ADC2 [
-            (GpioPin<4>,  0),
-            (GpioPin<0>,  1),
-            (GpioPin<2>,  2),
-            (GpioPin<15>, 3), // Alt. name: MTDO
-            (GpioPin<13>, 4), // Alt. name: MTCK
-            (GpioPin<12>, 5), // Alt. name: MTDI
-            (GpioPin<14>, 6), // Alt. name: MTMS
-            (GpioPin<27>, 7),
-            (GpioPin<25>, 8),
-            (GpioPin<26>, 9),
-        ]
+impl Drop for ADC2<'_> {
+    fn drop(&mut self) {
+        release_adc2(private::Internal);
     }
 }

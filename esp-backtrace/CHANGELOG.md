@@ -5,15 +5,60 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 
 ### Added
 
+- Initial ESP32-C5 support (#4859, #4866)
+- Made `Backtrace` and `BacktraceFrame` implement `Clone` (#5089)
+
 ### Changed
+
 
 ### Fixed
 
+
 ### Removed
+
+
+## [v0.18.1] - 2025-10-30
+
+## [v0.18.0] - 2025-10-13
+
+### Changed
+
+- `exception-handler` now panics. (#3838)
+- Only halt cores in panics when `halt-cores` feature is enabled. (#4010)
+- It is no longer possible to select multiple halt method features (`halt-cores`, `custom-halt`, `semihosting`) (#4012)
+- RISC-V: If stack-frames are not enabled the panic-handler will now emit a stack dump (#4189)
+
+### Removed
+
+- the `exception-handler` feature got removed (#3887)
+
+## [v0.17.0] - 2025-07-16
+
+### Removed
+
+- Removed support for ESP32-P4 (#3754)
+
+## [v0.16.0] - 2025-06-03
+
+### Added
+
+- The length of the stack trace can now be configured using `ESP_BACKTRACE_CONFIG_BACKTRACE_FRAMES` (#3271)
+- `Backtrace` and `BacktraceFrame` types. (#3280)
+
+### Changed
+
+- The `arch::backtrace` function now returns a `Backtrace` struct (#3280)
+- Bump Rust edition to 2024, bump MSRV to 1.86. (#3391, #3560)
+- Update `defmt` to 1.0 (#3416)
+
+### Fixed
+
+- Stack traces no longer stop at recursive functions (#3270)
+- ESP32/S2/S3: Fixed an issue where the backtrace wasn't correctly captured in some cases (#3272)
 
 ## [0.15.1] - 2025-02-24
 
@@ -35,15 +80,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.14.1 - 2024-09-06
 
-### Added
-
 ### Changed
 
 - Print a more helpful message in case of a `Cp0Disabled` exception (#2061)
-
-### Fixed
-
-### Removed
 
 ## 0.14.0 - 2024-08-29
 
@@ -56,8 +95,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improve panic message printing (#1823)
 
 ## 0.13.0 - 2024-07-16
-
-No changes - published to avoid conflicts with `esp-println`
 
 ## 0.12.2 - 2024-07-15
 
@@ -73,3 +110,8 @@ No changes - published to avoid conflicts with `esp-println`
 - Only prints float registers on targets which have them. (#1690)
 
 [0.15.1]: https://github.com/esp-rs/esp-hal/releases/tag/esp-backtrace-v0.15.1
+[v0.16.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.15.1...esp-backtrace-v0.16.0
+[v0.17.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.16.0...esp-backtrace-v0.17.0
+[v0.18.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.17.0...esp-backtrace-v0.18.0
+[v0.18.1]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.18.0...esp-backtrace-v0.18.1
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.18.1...HEAD

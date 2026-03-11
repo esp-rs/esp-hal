@@ -1,20 +1,11 @@
 use core::ops::Not;
 
 use crate::{
-    clock::Clock,
-    efuse::Efuse,
+    clock::RtcClock,
     gpio::RtcFunction,
     rtc_cntl::{
-        rtc::{
-            rtc_clk_cpu_freq_set_xtal,
-            HpAnalog,
-            HpSysCntlReg,
-            HpSysPower,
-            LpAnalog,
-            LpSysPower,
-            RtcCalSel,
-            SavedClockConfig,
-        },
+        Rtc,
+        rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower, SavedClockConfig},
         sleep::{
             Ext1WakeupSource,
             TimerWakeupSource,
@@ -23,9 +14,8 @@ use crate::{
             WakeTriggers,
             WakeupLevel,
         },
-        Rtc,
-        RtcClock,
     },
+    soc::clocks::{ClockTree, Timg0CalibrationClockConfig},
 };
 
 impl WakeSource for TimerWakeupSource {
@@ -38,11 +28,8 @@ impl WakeSource for TimerWakeupSource {
         triggers.set_timer(true);
 
         let lp_timer = unsafe { &*esp32c6::LP_TIMER::ptr() };
-        let clock_freq = RtcClock::slow_freq();
-        // TODO: maybe add sleep time adjustment like idf
         // TODO: maybe add check to prevent overflow?
-        let clock_hz = clock_freq.frequency().as_hz() as u64;
-        let ticks = self.duration.as_micros() as u64 * clock_hz / 1_000_000u64;
+        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros() as u64);
         // "alarm" time in slow rtc ticks
         let now = rtc.time_since_boot_raw();
         let time_in_ticks = now + ticks;
@@ -72,7 +59,7 @@ impl Ext1WakeupSource<'_, '_> {
     }
 
     fn wake_io_reset() {
-        use crate::gpio::{GpioPin, RtcPin};
+        use crate::gpio::RtcPin;
 
         fn uninit_pin(pin: impl RtcPin, wakeup_pins: u8) {
             if wakeup_pins & (1 << pin.number()) != 0 {
@@ -82,14 +69,14 @@ impl Ext1WakeupSource<'_, '_> {
         }
 
         let wakeup_pins = Ext1WakeupSource::wakeup_pins();
-        uninit_pin(unsafe { GpioPin::<0>::steal() }, wakeup_pins);
-        uninit_pin(unsafe { GpioPin::<1>::steal() }, wakeup_pins);
-        uninit_pin(unsafe { GpioPin::<2>::steal() }, wakeup_pins);
-        uninit_pin(unsafe { GpioPin::<3>::steal() }, wakeup_pins);
-        uninit_pin(unsafe { GpioPin::<4>::steal() }, wakeup_pins);
-        uninit_pin(unsafe { GpioPin::<5>::steal() }, wakeup_pins);
-        uninit_pin(unsafe { GpioPin::<6>::steal() }, wakeup_pins);
-        uninit_pin(unsafe { GpioPin::<7>::steal() }, wakeup_pins);
+        uninit_pin(unsafe { crate::peripherals::GPIO0::steal() }, wakeup_pins);
+        uninit_pin(unsafe { crate::peripherals::GPIO1::steal() }, wakeup_pins);
+        uninit_pin(unsafe { crate::peripherals::GPIO2::steal() }, wakeup_pins);
+        uninit_pin(unsafe { crate::peripherals::GPIO3::steal() }, wakeup_pins);
+        uninit_pin(unsafe { crate::peripherals::GPIO4::steal() }, wakeup_pins);
+        uninit_pin(unsafe { crate::peripherals::GPIO5::steal() }, wakeup_pins);
+        uninit_pin(unsafe { crate::peripherals::GPIO6::steal() }, wakeup_pins);
+        uninit_pin(unsafe { crate::peripherals::GPIO7::steal() }, wakeup_pins);
     }
 }
 
@@ -623,22 +610,8 @@ const CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ: u32 = 160;
 impl SleepTimeConfig {
     const RTC_CLK_CAL_FRACT: u32 = 19;
 
-    fn rtc_clk_cal_fast(mut slowclk_cycles: u32) -> u32 {
-        let xtal_freq = 40; // esp-idf has a very complicated way of determining this
-
-        // The Fosc CLK of calibration circuit is divided by 32 for ECO1.
-        // So we need to divide the calibrate cycles of the FOSC for ECO1 and above
-        // chips by 32 to avoid excessive calibration time.
-        if Efuse::chip_revision() >= 1 {
-            slowclk_cycles /= 32;
-        }
-
-        let xtal_cycles =
-            RtcClock::calibrate_internal(RtcCalSel::RtcCalRcFast, slowclk_cycles) as u64;
-
-        let divider: u64 = xtal_freq as u64 * slowclk_cycles as u64;
-        let period_64: u64 = ((xtal_cycles << Self::RTC_CLK_CAL_FRACT) + divider / 2 - 1) / divider;
-        (period_64 & (u32::MAX as u64)) as u32
+    fn rtc_clk_cal_fast(slowclk_cycles: u32) -> u32 {
+        RtcClock::calibrate(Timg0CalibrationClockConfig::RcFastDivClk, slowclk_cycles)
     }
 
     fn new(_deep: bool) -> Self {
@@ -646,7 +619,7 @@ impl SleepTimeConfig {
 
         // Calibrate rtc slow clock
         // TODO: do an actual calibration instead of a read
-        let slowclk_period = unsafe { lp_aon().store1().read().lp_aon_store1().bits() };
+        let slowclk_period = unsafe { lp_aon().store1().read().data().bits() };
 
         // Calibrate rtc fast clock, only PMU supported chips sleep process is needed.
         const FAST_CLK_SRC_CAL_CYCLES: u32 = 2048;
@@ -730,7 +703,7 @@ impl SleepTimeConfig {
         #[rustfmt::skip] // ASCII art
         //  When the SOC wakeup (lp timer or GPIO wakeup) and Modem wakeup (Beacon wakeup) complete,
         // the soc wakeup will be delayed until the RF is turned on in Modem state.
-        // 
+        //
         //              modem wakeup                      TBTT, RF on by HW
         //                   |                                    |
         //                  \|/                                  \|/
@@ -744,10 +717,10 @@ impl SleepTimeConfig {
         //                   |                                                                  |
         //                   |<--      PMU guard time, also the maximum time for the SOC     -->|
         //                   |                           wake-up delay                          |
-        // 
-        const CONFIG_ESP_WIFI_ENHANCED_LIGHT_SLEEP: bool = true;
+        //
+        const CONFIG_ESP_RADIO_ENHANCED_LIGHT_SLEEP: bool = true;
 
-        let (rf_on_protect_time_us, sync_time_us) = if CONFIG_ESP_WIFI_ENHANCED_LIGHT_SLEEP {
+        let (rf_on_protect_time_us, sync_time_us) = if CONFIG_ESP_RADIO_ENHANCED_LIGHT_SLEEP {
             (
                 MachineConstants::HP_REGDMA_RF_ON_WORK_TIME_US,
                 MachineConstants::HP_CLOCK_DOMAIN_SYNC_TIME_US,
@@ -783,11 +756,11 @@ impl Default for RtcSleepConfig {
 }
 
 unsafe fn pmu<'a>() -> &'a esp32c6::pmu::RegisterBlock {
-    &*esp32c6::PMU::ptr()
+    unsafe { &*esp32c6::PMU::ptr() }
 }
 
 unsafe fn lp_aon<'a>() -> &'a esp32c6::lp_aon::RegisterBlock {
-    &*esp32c6::LP_AON::ptr()
+    unsafe { &*esp32c6::LP_AON::ptr() }
 }
 
 bitfield::bitfield! {
@@ -958,8 +931,14 @@ impl RtcSleepConfig {
             wakeup_mask & reject_mask
         };
 
-        let cpu_freq_config = SavedClockConfig::save();
-        rtc_clk_cpu_freq_set_xtal();
+        let cpu_freq_config = ClockTree::with(|clocks| {
+            let cpu_freq_config = SavedClockConfig::save(clocks);
+            crate::soc::clocks::configure_soc_root_clk(
+                clocks,
+                crate::soc::clocks::SocRootClkConfig::Xtal,
+            );
+            cpu_freq_config
+        });
 
         // pmu_sleep_config_default + pmu_sleep_init.
 
@@ -1025,10 +1004,9 @@ impl RtcSleepConfig {
             // misc_modules_sleep_prepare
 
             // TODO: IDF-7370
-            #[cfg(not(pmu))]
+            #[cfg(not(soc_has_pmu))]
             if !(self.deep && wakeup_triggers.touch) {
-                let saradc = &*esp32c6::APB_SARADC::ptr();
-                saradc
+                APB_SARADC::regs()
                     .ctrl()
                     .modify(|_, w| w.saradc2_pwdet_drv().bit(false));
             }
@@ -1049,7 +1027,9 @@ impl RtcSleepConfig {
 
         // esp-idf returns if the sleep was rejected, we don't return anything
 
-        cpu_freq_config.restore();
+        ClockTree::with(|clocks| {
+            cpu_freq_config.restore(clocks);
+        });
     }
 
     /// Cleans up after sleep

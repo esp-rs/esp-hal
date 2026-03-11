@@ -1,154 +1,298 @@
 [package]
 name          = "esp-hal"
-version       = "1.0.0-beta.0"
-edition       = "2021"
-rust-version  = "1.84.0"
+version       = "1.0.0"
+edition       = "2024"
+rust-version  = "1.88.0"
 description   = "Bare-metal HAL for Espressif devices"
 documentation = "https://docs.espressif.com/projects/rust/esp-hal/latest/"
 keywords      = ["embedded", "embedded-hal", "esp32", "espressif", "hal"]
 categories    = ["embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
-links         = "esp-hal"
+exclude = [ "api-baseline", "MIGRATING-*", "CHANGELOG.md" ]
+
+[package.metadata.espressif]
+semver-checked = true
+doc-config = { features = ["unstable", "rt"], append = [
+    { if = 'chip_has("psram")', features = ["psram"] },
+    { if = 'chip_has("usb_otg_driver_supported")', features = ["__usb_otg"] },
+    { if = 'chip_has("bt_driver_supported")', features = ["__bluetooth"] },
+] }
+check-configs = [
+    { features = [] },
+    { features = ["rt"] },
+    { features = ["unstable", "rt"] },
+    { features = ["unstable", "rt", "psram"], if = 'chip_has("psram")' },
+    { features = ["unstable", "rt", "__usb_otg"], if = 'chip_has("usb_otg_driver_supported")' },
+    { features = ["unstable", "rt", "__bluetooth"], if = 'chip_has("bt_driver_supported")' },
+]
+# Prefer fewer, but more complex clippy rules. A clippy run should cover as much code as possible.
+clippy-configs = [
+    { features = ["unstable", "rt"], append = [
+        { if = 'chip_has("psram")', features = ["psram"] },
+        { if = 'chip_has("usb_otg_driver_supported")', features = ["__usb_otg"] },
+        { if = 'chip_has("bt_driver_supported")', features = ["__bluetooth"] },
+    ] },
+]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
-features       = ["esp32c6"]
+features       = ["esp32c6", "unstable"]
 rustdoc-args   = ["--cfg", "docsrs"]
 
+[lib]
+bench = false
+test  = false
+
 [dependencies]
-bitflags                 = "2.8.0"
-bytemuck                 = "1.21.0"
-bitfield                 = "0.18.1"
-cfg-if                   = "1.0.0"
-critical-section         = "1.2.0"
-defmt                    = { version = "0.3.10", optional = true }
-delegate                 = "0.13.2"
-digest                   = { version = "0.10.7", default-features = false, optional = true }
-document-features        = "0.2.11"
-embassy-embedded-hal     = { version = "0.3.0", optional = true }
-embassy-futures          = "0.1.1"
-embassy-sync             = "0.6.2"
-embassy-usb-driver       = { version = "0.1.0", optional = true }
-embassy-usb-synopsys-otg = { version = "0.2.0", optional = true }
-embedded-can             = { version = "0.4.1", optional = true }
+bitflags                 = "2.9"
+bytemuck                 = "1.24"
+cfg-if                   = "1"
+critical-section         = { version = "1", features = ["restore-state-u32"], optional = true }
 embedded-hal             = "1.0.0"
 embedded-hal-async       = "1.0.0"
-embedded-io              = { version = "0.6.1", optional = true }
-embedded-io-async        = { version = "0.6.1", optional = true }
-enumset                  = "1.1.5"
-esp-build                = { version = "0.2.0", path = "../esp-build" }
-esp-config               = { version = "0.3.0", path = "../esp-config" }
-esp-synopsys-usb-otg     = { version = "0.4.2", optional = true, features = ["fs", "esp32sx"] }
-fugit                    = "0.3.7"
-instability              = "0.3.7"
-log                      = { version = "0.4.26", optional = true }
-nb                       = "1.1.0"
+enumset                  = "1.1"
 paste                    = "1.0.15"
-portable-atomic          = { version = "1.11.0", default-features = false }
-procmacros               = { version = "0.17.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+portable-atomic          = { version = "1.11", default-features = false }
+
+esp-rom-sys              = { version = "0.1.3", path = "../esp-rom-sys" }
+
+# Unstable dependencies that are not (strictly) part of the public API
+bitfield                 = "0.19"
+delegate                 = "0.13"
+document-features        = "0.2"
+embassy-futures          = "0.1"
+embassy-sync             = "0.7"
+fugit                    = "0.3.7"
+instability              = "0.3.9"
 strum                    = { version = "0.27.1", default-features = false, features = ["derive"] }
-void                     = { version = "1.0.2", default-features = false }
-usb-device               = { version = "0.3.2", optional = true }
-rand_core06              = { package = "rand_core", version = "0.6.4", optional = true }
-rand_core09              = { package = "rand_core", version = "0.9.0", optional = true }
-ufmt-write               = "0.1.0"
+
+esp-config               = { version = "0.6.1", path = "../esp-config" }
+esp-metadata-generated   = { version = "0.3.0", path = "../esp-metadata-generated" }
+esp-sync                 = { version = "0.1.1", path = "../esp-sync" }
+procmacros               = { version = "0.21.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+
+# Dependencies that are optional because they are used by unstable drivers.
+# They are needed when using the `unstable` feature.
+digest                   = { version = "0.10.7", default-features = false, features = ["core-api"], optional = true }
+embassy-usb-driver       = { version = "0.2", optional = true }
+embassy-usb-synopsys-otg = { version = "0.3", optional = true }
+embedded-can             = { version = "0.4.1", optional = true }
+esp-synopsys-usb-otg     = { version = "0.4.2", optional = true }
+nb                       = { version = "1.1", optional = true }
+
+# Logging interfaces, they are mutually exclusive so they need to be behind separate features.
+defmt                    = { version = "1.0.1", optional = true }
+log-04                   = { package = "log", version = "0.4", optional = true }
+
+# ESP32-only fallback SHA algorithms
+sha1                     = { version = "0.10", default-features = false, optional = true }
+sha2                     = { version = "0.10", default-features = false, optional = true }
+
+# Optional dependencies that enable ecosystem support.
+# We could support individually enabling them, but there is no big downside to just
+# enabling them all via the `unstable` feature.
+embassy-embedded-hal     = { version = "0.5", optional = true }
+embedded-io-06           = { package = "embedded-io", version = "0.6", optional = true }
+embedded-io-async-06     = { package = "embedded-io-async", version = "0.6", optional = true }
+embedded-io-07           = { package = "embedded-io", version = "0.7", optional = true }
+embedded-io-async-07     = { package = "embedded-io-async", version = "0.7", optional = true }
+rand_core-06             = { package = "rand_core", version = "0.6", optional = true }
+rand_core-09             = { package = "rand_core", version = "0.9", optional = true }
+ufmt-write               = { version = "0.1", optional = true }
 
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { version = "0.36.0", features = ["critical-section", "rt"], optional = true }
-esp32c2 = { version = "0.25.0", features = ["critical-section", "rt"], optional = true }
-esp32c3 = { version = "0.28.0", features = ["critical-section", "rt"], optional = true }
-esp32c6 = { version = "0.19.0", features = ["critical-section", "rt"], optional = true }
-esp32h2 = { version = "0.15.0", features = ["critical-section", "rt"], optional = true }
-esp32s2 = { version = "0.27.0", features = ["critical-section", "rt"], optional = true }
-esp32s3 = { version = "0.31.0", features = ["critical-section", "rt"], optional = true }
+esp32   = { version = "0.39", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b6e370c" }
+esp32c2 = { version = "0.28", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b6e370c" }
+esp32c3 = { version = "0.31", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b6e370c" }
+esp32c5 = { version = "0.1",  features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b6e370c" }
+esp32c6 = { version = "0.22", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b6e370c" }
+esp32h2 = { version = "0.18", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b6e370c" }
+esp32s2 = { version = "0.30", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b6e370c" }
+esp32s3 = { version = "0.34", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "b6e370c" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
-riscv            = { version = "0.12.1" }
-esp-riscv-rt     = { version = "0.10.0", path = "../esp-riscv-rt" }
-critical-section = { version = "1.2.0", features = ["restore-state-u8"] }
+riscv            = { version = "0.15.0" }
+esp-riscv-rt     = { version = "0.13.0", path = "../esp-riscv-rt", optional = true }
 
 [target.'cfg(target_arch = "xtensa")'.dependencies]
-xtensa-lx        = { version = "0.10.0", path = "../xtensa-lx" }
-xtensa-lx-rt     = { version = "0.18.0", path = "../xtensa-lx-rt" }
-critical-section = { version = "1.2.0", features = ["restore-state-u32"] }
+xtensa-lx        = { version = "0.13.0", path = "../xtensa-lx" }
+xtensa-lx-rt     = { version = "0.21.0", path = "../xtensa-lx-rt", optional = true }
 
 [build-dependencies]
-basic-toml   = "0.1.9"
-cfg-if       = "1.0.0"
-esp-build    = { version = "0.2.0", path = "../esp-build" }
-esp-metadata = { version = "0.6.0", path = "../esp-metadata" }
-esp-config   = { version = "0.3.0", path = "../esp-config", features = ["build"] }
-serde        = { version = "1.0.218", features = ["derive"] }
+esp-metadata-generated = { version = "0.3.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-config   = { version = "0.6.1", path = "../esp-config", features = ["build"] }
 
 [dev-dependencies]
-jiff = { version = "0.2.2", default-features = false, features = ["static"] }
+crypto-bigint = { version = "0.5.5", default-features = false }
+jiff = { version = "0.2", default-features = false, features = ["static"] }
 
 [features]
-default = []
+default = ["rt", "exception-handler", "float-save-restore"]
 
-bluetooth = []
-
-usb-otg = ["dep:embassy-usb-driver", "dep:embassy-usb-synopsys-otg", "dep:esp-synopsys-usb-otg", "dep:usb-device"]
-
-__esp_hal_embassy = []
-
-## Enable debug features in the HAL (used for development).
-debug = [
-    "esp32?/impl-register-debug",
-    "esp32c2?/impl-register-debug",
-    "esp32c3?/impl-register-debug",
-    "esp32c6?/impl-register-debug",
-    "esp32h2?/impl-register-debug",
-    "esp32s2?/impl-register-debug",
-    "esp32s3?/impl-register-debug",
+# These features are considered private and unstable. They are not covered by
+# semver guarantees and may change or be removed without notice.
+__bluetooth = []
+__usb_otg = [
+    "dep:embassy-usb-driver",
+    "dep:embassy-usb-synopsys-otg",
+    "dep:esp-synopsys-usb-otg",
+    "esp-synopsys-usb-otg/esp32sx",
+    "esp-synopsys-usb-otg/fs",
 ]
-## Enable logging output using the `log` crate.
-log = ["dep:log"]
 
-# Chip Support Feature Flags
-# Target the ESP32.
-esp32   = ["dep:esp32", "procmacros/rtc-slow", "xtensa-lx-rt/esp32"]
-# Target the ESP32-C2.
-esp32c2 = ["dep:esp32c2", "portable-atomic/unsafe-assume-single-core"]
-# Target the ESP32-C3.
-esp32c3 = ["dep:esp32c3", "esp-riscv-rt/rtc-ram", "portable-atomic/unsafe-assume-single-core"]
-# Target the ESP32-C6.
-esp32c6 = ["dep:esp32c6", "esp-riscv-rt/rtc-ram", "procmacros/has-lp-core"]
-# Target the ESP32-H2.
-esp32h2 = ["dep:esp32h2", "esp-riscv-rt/rtc-ram"]
-# Target the ESP32-S2.
-esp32s2 = ["dep:esp32s2", "portable-atomic/critical-section", "procmacros/has-ulp-core", "procmacros/rtc-slow", "usb-otg", "xtensa-lx-rt/esp32s2"]
-# Target the ESP32-S3.
-esp32s3 = ["dep:esp32s3", "procmacros/has-ulp-core", "procmacros/rtc-slow", "usb-otg", "xtensa-lx-rt/esp32s3"]
+#! ### Runtime support
+#! These features are meant to be enabled by firmware projects. If you are writing a library that
+#! depends on `esp-hal`, you should *not* enable these features under any circumstance.
 
-#! ### Trait Implementation Feature Flags
-## Implement `defmt::Format` on certain types.
+## Enable code necessary to run the firmware.
+rt = [
+    "dep:xtensa-lx-rt",
+    "dep:esp-riscv-rt",
+    "esp32?/rt",
+    "esp32c2?/rt",
+    "esp32c3?/rt",
+    "esp32c6?/rt",
+    "esp32h2?/rt",
+    "esp32s2?/rt",
+    "esp32s3?/rt",
+    "critical-section",
+]
+
+## Enable a simple exception handler turning exceptions into panics.
+exception-handler = []
+
+## Save and restore the floating point co-processor context.
+##
+## This feature enables the floating-point coprocessor in interrupt contexts, and adds code to save and restore the relevant registers.
+##
+## <section class="warning">
+## If you intend to do floating-point calculations in multiple contexts, or in interrupt/exception handlers, you will need to enable this feature.
+## </section>
+##
+## Note that this feature is only effective on ESP32 and ESP32-S3. Other chips don't have a hardware floating-point coprocessor.
+##
+## ⚠️ This feature is considered unstable.
+float-save-restore = ["xtensa-lx-rt/float-save-restore"]
+
+#! ### Chip selection
+#! One of the following features must be enabled to select the target chip:
+
+##
+esp32   = [
+    "dep:esp32",
+    "procmacros/rtc-slow",
+    "esp-rom-sys/esp32",
+    "esp-sync/esp32",
+    "esp-metadata-generated/esp32",
+    "dep:sha1",
+    "dep:sha2"
+]
+##
+esp32c2 = [
+    "dep:esp32c2",
+    "esp-riscv-rt/no-mie-mip",
+    "portable-atomic/unsafe-assume-single-core",
+    "esp-rom-sys/esp32c2",
+    "esp-sync/esp32c2",
+    "esp-metadata-generated/esp32c2",
+]
+##
+esp32c3 = [
+    "dep:esp32c3",
+    "esp-riscv-rt/no-mie-mip",
+    "esp-riscv-rt/rtc-ram",
+    "portable-atomic/unsafe-assume-single-core",
+    "esp-rom-sys/esp32c3",
+    "esp-sync/esp32c3",
+    "esp-metadata-generated/esp32c3",
+]
+##
+esp32c5 = [
+    "dep:esp32c5",
+    "esp-riscv-rt/rtc-ram",
+    "esp-riscv-rt/clic-48",
+    "procmacros/has-lp-core",
+    "esp-rom-sys/esp32c5",
+    "esp-sync/esp32c5",
+    "esp-metadata-generated/esp32c5",
+]
+##
+esp32c6 = [
+    "dep:esp32c6",
+    "esp-riscv-rt/rtc-ram",
+    "procmacros/has-lp-core",
+    "esp-rom-sys/esp32c6",
+    "esp-sync/esp32c6",
+    "esp-metadata-generated/esp32c6",
+]
+##
+esp32h2 = [
+    "dep:esp32h2",
+    "esp-riscv-rt/rtc-ram",
+    "esp-rom-sys/esp32h2",
+    "esp-sync/esp32h2",
+    "esp-metadata-generated/esp32h2",
+]
+##
+esp32s2 = [
+    "dep:esp32s2",
+    "portable-atomic/unsafe-assume-single-core",
+    "procmacros/has-ulp-core",
+    "procmacros/rtc-slow",
+    "__usb_otg",
+    "esp-rom-sys/esp32s2",
+    "esp-sync/esp32s2",
+    "esp-metadata-generated/esp32s2",
+]
+##
+esp32s3 = [
+    "dep:esp32s3",
+    "procmacros/has-ulp-core",
+    "procmacros/rtc-slow",
+    "__usb_otg",
+    "esp-rom-sys/esp32s3",
+    "esp-sync/esp32s3",
+    "esp-metadata-generated/esp32s3",
+]
+
+#! ### Logging Feature Flags
+## Enable logging output using version 0.4 of the `log` crate.
+log-04 = ["dep:log-04"]
+
+## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
 defmt = [
     "dep:defmt",
     "embassy-futures/defmt",
     "embassy-sync/defmt",
-    "embedded-hal/defmt-03",
-    "embedded-io/defmt-03",
-    "embedded-io-async/defmt-03",
+    "embedded-io-06?/defmt-03",
+    "embedded-io-async-06?/defmt-03",
+    "embedded-io-07?/defmt",
+    "embedded-io-async-07?/defmt",
+    "enumset/defmt",
     "esp32?/defmt",
     "esp32c2?/defmt",
     "esp32c3?/defmt",
+    "esp32c5?/defmt",
     "esp32c6?/defmt",
     "esp32h2?/defmt",
     "esp32s2?/defmt",
     "esp32s3?/defmt",
     "fugit/defmt",
+    "esp-riscv-rt?/defmt",
+    "xtensa-lx-rt?/defmt",
+    "esp-sync/defmt"
 ]
 
+#DOC_IF has("psram")
 #! ### PSRAM Feature Flags
+
 ## Use externally connected PSRAM (`quad` by default, can be configured to `octal` via ESP_HAL_CONFIG_PSRAM_MODE)
 psram = []
 
-# This feature is intended for testing; you probably don't want to enable it:
-ci = ["defmt", "bluetooth"]
+#DOC_ENDIF
 
 #! ### Unstable APIs
 #! Unstable APIs are drivers and features that are not yet ready for general use.
@@ -156,14 +300,26 @@ ci = ["defmt", "bluetooth"]
 #! Unstable APIs are not covered by semver guarantees.
 
 ## Enables APIs that are not stable and thus come with no stability guarantees.
+## Never enable this feature in a library crate using esp-hal.
 unstable = [
+    "dep:digest",
     "dep:embassy-embedded-hal",
     "dep:embedded-can",
-    "dep:embedded-io",
-    "dep:embedded-io-async",
-    "dep:rand_core06",
-    "dep:rand_core09",
+    "dep:embedded-io-06",
+    "dep:embedded-io-async-06",
+    "dep:embedded-io-07",
+    "dep:embedded-io-async-07",
+    "dep:rand_core-06",
+    "dep:rand_core-09",
+    "dep:nb",
+    "dep:ufmt-write",
 ]
+
+## Libraries that depend on `esp-hal` should enable this feature to indicate their use of unstable APIs.
+## However, they must **not** enable the `unstable` feature themselves.
+##
+## For development you can enable the `unstable` and the chip feature by adding esp-hal as a dev-dependency.
+requires-unstable = []
 
 [lints.clippy]
 mixed_attributes_style = "allow"

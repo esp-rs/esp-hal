@@ -1,3 +1,7 @@
+#![cfg_attr(
+    all(docsrs, not(not_really_docsrs)),
+    doc = "<div style='padding:30px;background:#810;color:#fff;text-align:center;'><p>You might want to <a href='https://docs.espressif.com/projects/rust/'>browse the <code>esp-lp-hal</code> documentation on the esp-rs website</a> instead.</p><p>The documentation here on <a href='https://docs.rs'>docs.rs</a> is built for a single chip only (ESP32-C6, in particular), while on the esp-rs website you can select your exact chip from the list of supported devices. Available peripherals and their APIs change depending on the chip.</p></div>\n\n<br/>\n\n"
+)]
 //! Bare-metal (`no_std`) HAL for the low power and ultra-low power cores found
 //! in some Espressif devices. Where applicable, drivers implement the
 //! [embedded-hal] traits.
@@ -8,26 +12,30 @@
 //! for that device.
 //!
 //! ## Feature Flags
-#![doc = document_features::document_features!()]
+#![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(asm_sub_register)]
 #![deny(missing_docs)]
 #![no_std]
 
+#[allow(unused_imports, reason = "Only used for some MCUs currently")]
+#[macro_use]
+extern crate esp_metadata_generated;
+
 use core::arch::global_asm;
 
 pub mod delay;
 pub mod gpio;
-#[cfg(esp32c6)]
+#[cfg(lp_i2c_master_driver_supported)]
 pub mod i2c;
-#[cfg(esp32c6)]
+#[cfg(lp_uart_driver_supported)]
 pub mod uart;
 
-#[cfg(feature = "esp32c6")]
+#[cfg(esp32c6)]
 pub use esp32c6_lp as pac;
-#[cfg(feature = "esp32s2")]
+#[cfg(esp32s2)]
 pub use esp32s2_ulp as pac;
-#[cfg(feature = "esp32s3")]
+#[cfg(esp32s3)]
 pub use esp32s3_ulp as pac;
 
 /// The prelude
@@ -36,13 +44,13 @@ pub mod prelude {
 }
 
 cfg_if::cfg_if! {
-    if #[cfg(feature = "esp32c6")] {
+    if #[cfg(esp32c6)] {
         // LP_FAST_CLK is not very accurate, for now use a rough estimate
         const LP_FAST_CLK_HZ: u32 = 16_000_000;
         const XTAL_D2_CLK_HZ: u32 = 20_000_000;
-    } else if #[cfg(feature = "esp32s2")] {
+    } else if #[cfg(esp32s2)] {
         const LP_FAST_CLK_HZ: u32 = 8_000_000;
-    } else if #[cfg(feature = "esp32s3")] {
+    } else if #[cfg(esp32s3)] {
         const LP_FAST_CLK_HZ: u32 = 17_500_000;
     }
 }
@@ -50,14 +58,22 @@ cfg_if::cfg_if! {
 pub(crate) static mut CPU_CLOCK: u32 = LP_FAST_CLK_HZ;
 
 /// Wake up the HP core
-#[cfg(feature = "esp32c6")]
 pub fn wake_hp_core() {
+    #[cfg(esp32c6)]
     unsafe { &*esp32c6_lp::PMU::PTR }
         .hp_lp_cpu_comm()
         .write(|w| w.lp_trigger_hp().set_bit());
+    #[cfg(esp32s2)]
+    unsafe { &*esp32s2_ulp::RTC_CNTL::PTR }
+        .state0()
+        .write(|w| w.rtc_sw_cpu_int().set_bit());
+    #[cfg(esp32s3)]
+    unsafe { &*esp32s3_ulp::RTC_CNTL::PTR }
+        .rtc_state0()
+        .write(|w| w.rtc_sw_cpu_int().set_bit());
 }
 
-#[cfg(feature = "esp32c6")]
+#[cfg(esp32c6)]
 global_asm!(
     r#"
     .section    .init.vector, "ax"
@@ -95,7 +111,7 @@ loop:
 "#
 );
 
-#[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
+#[cfg(any(esp32s2, esp32s3))]
 global_asm!(
     r#"
 	.section .text.vectors
@@ -125,29 +141,31 @@ loop:
 "#
 );
 
-#[link_section = ".init.rust"]
-#[export_name = "rust_main"]
+#[unsafe(link_section = ".init.rust")]
+#[unsafe(export_name = "rust_main")]
 unsafe extern "C" fn lp_core_startup() -> ! {
-    extern "Rust" {
-        fn main() -> !;
-    }
+    unsafe {
+        unsafe extern "Rust" {
+            fn main() -> !;
+        }
 
-    #[cfg(feature = "esp32c6")]
-    if (*pac::LP_CLKRST::PTR)
-        .lp_clk_conf()
-        .read()
-        .fast_clk_sel()
-        .bit_is_set()
-    {
-        CPU_CLOCK = XTAL_D2_CLK_HZ;
-    }
+        #[cfg(esp32c6)]
+        if (*pac::LP_CLKRST::PTR)
+            .lp_clk_conf()
+            .read()
+            .fast_clk_sel()
+            .bit_is_set()
+        {
+            CPU_CLOCK = XTAL_D2_CLK_HZ;
+        }
 
-    main();
+        main();
+    }
 }
 
-#[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
-#[link_section = ".init.rust"]
-#[no_mangle]
+#[cfg(any(esp32s2, esp32s3))]
+#[unsafe(link_section = ".init.rust")]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn ulp_riscv_rescue_from_monitor() {
     // Rescue RISC-V core from monitor state.
     unsafe { &*pac::RTC_CNTL::PTR }
@@ -155,9 +173,9 @@ unsafe extern "C" fn ulp_riscv_rescue_from_monitor() {
         .modify(|_, w| w.cocpu_done().clear_bit().cocpu_shut_reset_en().clear_bit());
 }
 
-#[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
-#[link_section = ".init.rust"]
-#[no_mangle]
+#[cfg(any(esp32s2, esp32s3))]
+#[unsafe(link_section = ".init.rust")]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn ulp_riscv_halt() {
     unsafe { &*pac::RTC_CNTL::PTR }
         .cocpu_ctrl()

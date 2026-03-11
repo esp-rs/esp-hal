@@ -7,7 +7,7 @@
 //!
 //! ## Examples
 //!
-//! ```rust
+//! ```rust,no_run
 //! esp_lp_hal::delay::Delay.delay_millis(500);
 //! ```
 
@@ -54,13 +54,13 @@ impl Delay {
     }
 }
 
-#[cfg(feature = "esp32c6")]
+#[cfg(esp32c6)]
 #[inline(always)]
 fn cycles() -> u64 {
     riscv::register::mcycle::read64()
 }
 
-#[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
+#[cfg(any(esp32s2, esp32s3))]
 #[inline(always)]
 fn cycles() -> u64 {
     let mut cycles: u32;

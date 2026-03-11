@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! Control the ULP core
 //!
 //! ## Overview
@@ -15,24 +16,19 @@
 //! ## Examples
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! const CODE: &[u8] = &[
-//!     0x17, 0x05, 0x00, 0x00, 0x13, 0x05, 0x05, 0x01, 0x81, 0x45, 0x85, 0x05,
-//!     0x0c, 0xc1, 0xf5, 0xbf, 0x00, 0x00, 0x00, 0x00,
+//!     0x17, 0x05, 0x00, 0x00, 0x13, 0x05, 0x05, 0x01, 0x81, 0x45, 0x85, 0x05, 0x0c, 0xc1, 0xf5,
+//!     0xbf, 0x00, 0x00, 0x00, 0x00,
 //! ];
 //!
-//! let mut ulp_core =
-//!     esp_hal::ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
+//! let mut ulp_core = esp_hal::ulp_core::UlpCore::new(peripherals.ULP_RISCV_CORE);
 //! ulp_core.stop();
 //!
 //! // copy code to RTC ram
 //! let lp_ram = 0x5000_0000 as *mut u8;
 //! unsafe {
-//!     core::ptr::copy_nonoverlapping(
-//!         CODE as *const _ as *const u8,
-//!         lp_ram,
-//!         CODE.len(),
-//!     );
+//!     core::ptr::copy_nonoverlapping(CODE as *const _ as *const u8, lp_ram, CODE.len());
 //! }
 //!
 //! // start ULP core
@@ -45,10 +41,7 @@
 //! # }
 //! ```
 
-use crate::{
-    peripheral::{Peripheral, PeripheralRef},
-    peripherals::LPWR,
-};
+use crate::peripherals::LPWR;
 
 /// Enum representing the possible wakeup sources for the ULP core.
 #[derive(Debug, Clone, Copy)]
@@ -59,14 +52,12 @@ pub enum UlpCoreWakeupSource {
 
 /// Structure representing the ULP (Ultra-Low Power) core.
 pub struct UlpCore<'d> {
-    _lp_core: PeripheralRef<'d, crate::peripherals::ULP_RISCV_CORE>,
+    _lp_core: crate::peripherals::ULP_RISCV_CORE<'d>,
 }
 
 impl<'d> UlpCore<'d> {
     /// Creates a new instance of the `UlpCore` struct.
-    pub fn new(lp_core: impl Peripheral<P = crate::peripherals::ULP_RISCV_CORE> + 'd) -> Self {
-        crate::into_ref!(lp_core);
-
+    pub fn new(lp_core: crate::peripherals::ULP_RISCV_CORE<'d>) -> Self {
         let mut this = Self { _lp_core: lp_core };
         this.stop();
 

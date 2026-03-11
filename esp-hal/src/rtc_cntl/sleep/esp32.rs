@@ -2,7 +2,7 @@ use super::{Ext0WakeupSource, Ext1WakeupSource, TimerWakeupSource, WakeSource, W
 use crate::{
     gpio::{RtcFunction, RtcPin},
     peripherals::{BB, DPORT, I2S0, LPWR, NRX, RTC_IO},
-    rtc_cntl::{sleep::WakeupLevel, Clock, Rtc, RtcClock},
+    rtc_cntl::{Rtc, sleep::WakeupLevel},
 };
 
 // Approximate mapping of voltages to RTC_CNTL_DBIAS_WAK, RTC_CNTL_DBIAS_SLP,
@@ -76,11 +76,8 @@ impl WakeSource for TimerWakeupSource {
         _sleep_config: &mut RtcSleepConfig,
     ) {
         triggers.set_timer(true);
-        let clock_freq = RtcClock::slow_freq();
-        // TODO: maybe add sleep time adjustlemnt like idf
         // TODO: maybe add check to prevent overflow?
-        let clock_hz = clock_freq.frequency().as_hz() as u64;
-        let ticks = self.duration.as_micros() as u64 * clock_hz / 1_000_000u64;
+        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros() as u64);
         // "alarm" time in slow rtc ticks
         let now = rtc.time_since_boot_raw();
         let time_in_ticks = now + ticks;
@@ -99,7 +96,7 @@ impl WakeSource for TimerWakeupSource {
     }
 }
 
-impl<P: RtcPin> WakeSource for Ext0WakeupSource<'_, P> {
+impl<P: RtcPin> WakeSource for Ext0WakeupSource<P> {
     fn apply(
         &self,
         _rtc: &Rtc<'_>,
@@ -128,7 +125,7 @@ impl<P: RtcPin> WakeSource for Ext0WakeupSource<'_, P> {
     }
 }
 
-impl<P: RtcPin> Drop for Ext0WakeupSource<'_, P> {
+impl<P: RtcPin> Drop for Ext0WakeupSource<P> {
     fn drop(&mut self) {
         // should we have saved the pin configuration first?
         // set pin back to IO_MUX (input_enable and func have no effect when pin is sent

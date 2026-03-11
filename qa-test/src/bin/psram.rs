@@ -6,7 +6,7 @@
 //! the device comes with octal-SPIRAM
 
 //% CHIPS: esp32 esp32s2 esp32s3
-//% FEATURES: esp-hal/psram esp-alloc/internal-heap-stats esp-hal/log
+//% FEATURES: esp-hal/psram esp-alloc/internal-heap-stats
 
 #![no_std]
 #![no_main]
@@ -19,6 +19,8 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{main, psram};
 use esp_println::println;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 fn init_psram_heap(start: *mut u8, size: usize) {
     unsafe {
@@ -39,6 +41,11 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let (start, size) = psram::psram_raw_parts(&peripherals.PSRAM);
+
+    if size == 0 {
+        panic!("No PSRAM detected");
+    }
+
     init_psram_heap(start, size);
 
     println!("Going to access PSRAM");

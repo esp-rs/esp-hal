@@ -8,99 +8,42 @@ cfg_if::cfg_if! {
     }
 }
 
-#[cfg(not(esp32h2))]
+use core::{
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+// We only have to count on devices that have multiple ADCs sharing the same interrupt
+#[cfg(all(adc_adc1, adc_adc2))]
+use portable_atomic::{AtomicU32, Ordering};
+use procmacros::handler;
+
 pub use self::calibration::*;
 use super::{AdcCalSource, AdcConfig, Attenuation};
-#[cfg(any(esp32c6, esp32h2))]
-use crate::clock::clocks_ll::regi2c_write_mask;
-#[cfg(any(esp32c2, esp32c3, esp32c6))]
-use crate::efuse::Efuse;
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
+use crate::efuse::AdcCalibUnit;
 use crate::{
-    analog::adc::asynch::AdcFuture,
-    interrupt::{InterruptConfigurable, InterruptHandler},
-    peripheral::PeripheralRef,
-    peripherals::{Interrupt, APB_SARADC},
-    system::{GenericPeripheralGuard, Peripheral},
     Async,
     Blocking,
+    asynch::AtomicWaker,
+    interrupt::{InterruptConfigurable, InterruptHandler},
+    peripherals::{APB_SARADC, Interrupt},
+    soc::regi2c,
+    system::{GenericPeripheralGuard, Peripheral},
 };
 
 mod calibration;
-
-// polyfill for c2 and c3
-#[cfg(any(esp32c2, esp32c3))]
-#[inline(always)]
-fn regi2c_write_mask(block: u8, host_id: u8, reg_add: u8, msb: u8, lsb: u8, data: u8) {
-    unsafe {
-        crate::rom::rom_i2c_writeReg_Mask(
-            block as _,
-            host_id as _,
-            reg_add as _,
-            msb as _,
-            lsb as _,
-            data as _,
-        );
-    }
-}
 
 // Constants taken from:
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32c2/include/soc/regi2c_saradc.h
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32c3/include/soc/regi2c_saradc.h
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32c6/include/soc/regi2c_saradc.h
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32h2/include/soc/regi2c_saradc.h
-// https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32h4/include/soc/regi2c_saradc.h
 cfg_if::cfg_if! {
-    if #[cfg(adc1)] {
-        const I2C_SAR_ADC: u8 = 0x69;
-        const I2C_SAR_ADC_HOSTID: u8 = 0;
-
+    if #[cfg(adc_adc1)] {
         const ADC_VAL_MASK: u16 = 0xfff;
         const ADC_CAL_CNT_MAX: u16 = 32;
         const ADC_CAL_CHANNEL: u16 = 15;
-
-        const ADC_SAR1_ENCAL_GND_ADDR: u8 = 0x7;
-        const ADC_SAR1_ENCAL_GND_ADDR_MSB: u8 = 5;
-        const ADC_SAR1_ENCAL_GND_ADDR_LSB: u8 = 5;
-
-        const ADC_SAR1_INITIAL_CODE_HIGH_ADDR: u8 = 0x1;
-        const ADC_SAR1_INITIAL_CODE_HIGH_ADDR_MSB: u8 = 0x3;
-        const ADC_SAR1_INITIAL_CODE_HIGH_ADDR_LSB: u8 = 0x0;
-
-        const ADC_SAR1_INITIAL_CODE_LOW_ADDR: u8 = 0x0;
-        const ADC_SAR1_INITIAL_CODE_LOW_ADDR_MSB: u8 = 0x7;
-        const ADC_SAR1_INITIAL_CODE_LOW_ADDR_LSB: u8 = 0x0;
-
-        const ADC_SAR1_DREF_ADDR: u8 = 0x2;
-        const ADC_SAR1_DREF_ADDR_MSB: u8 = 0x6;
-        const ADC_SAR1_DREF_ADDR_LSB: u8 = 0x4;
-
-        const ADC_SARADC1_ENCAL_REF_ADDR: u8 = 0x7;
-        const ADC_SARADC1_ENCAL_REF_ADDR_MSB: u8 = 4;
-        const ADC_SARADC1_ENCAL_REF_ADDR_LSB: u8 = 4;
-    }
-}
-
-cfg_if::cfg_if! {
-    if #[cfg(adc2)] {
-        const ADC_SAR2_ENCAL_GND_ADDR: u8 = 0x7;
-        const ADC_SAR2_ENCAL_GND_ADDR_MSB: u8 = 7;
-        const ADC_SAR2_ENCAL_GND_ADDR_LSB: u8 = 7;
-
-        const ADC_SAR2_INITIAL_CODE_HIGH_ADDR: u8 = 0x4;
-        const ADC_SAR2_INITIAL_CODE_HIGH_ADDR_MSB: u8 = 0x3;
-        const ADC_SAR2_INITIAL_CODE_HIGH_ADDR_LSB: u8 = 0x0;
-
-        const ADC_SAR2_INITIAL_CODE_LOW_ADDR: u8 = 0x3;
-        const ADC_SAR2_INITIAL_CODE_LOW_ADDR_MSB: u8 = 0x7;
-        const ADC_SAR2_INITIAL_CODE_LOW_ADDR_LSB: u8 = 0x0;
-
-        const ADC_SAR2_DREF_ADDR: u8 = 0x5;
-        const ADC_SAR2_DREF_ADDR_MSB: u8 = 0x6;
-        const ADC_SAR2_DREF_ADDR_LSB: u8 = 0x4;
-
-        const ADC_SARADC2_ENCAL_REF_ADDR: u8 = 0x7;
-        const ADC_SARADC2_ENCAL_REF_ADDR_MSB: u8 = 6;
-        const ADC_SARADC2_ENCAL_REF_ADDR_LSB: u8 = 6;
     }
 }
 
@@ -112,16 +55,6 @@ cfg_if::cfg_if! {
     } else {
         pub(super) const NUM_ATTENS: usize = 5;
     }
-}
-
-/// The sampling/readout resolution of the ADC.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
-pub enum Resolution {
-    /// 12-bit resolution
-    #[default]
-    Resolution12Bit,
 }
 
 impl<ADCI> AdcConfig<ADCI>
@@ -145,6 +78,7 @@ where
         // Connect calibration source
         ADCI::connect_cal(source, true);
 
+        ADCI::calibration_init();
         for _ in 0..ADC_CAL_CNT_MAX {
             ADCI::set_init_code(0);
 
@@ -189,12 +123,15 @@ pub trait RegisterAccess {
     /// Reset flags
     fn reset();
 
+    /// Set up ADC hardware for calibration
+    fn calibration_init();
+
     /// Set calibration parameter to ADC hardware
     fn set_init_code(data: u16);
 }
 
-#[cfg(adc1)]
-impl RegisterAccess for crate::peripherals::ADC1 {
+#[cfg(adc_adc1)]
+impl RegisterAccess for crate::peripherals::ADC1<'_> {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
         APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
             w.saradc1_onetime_sample().set_bit();
@@ -234,71 +171,51 @@ impl RegisterAccess for crate::peripherals::ADC1 {
             .modify(|_, w| w.onetime_start().clear_bit());
     }
 
+    // Currently #[cfg] covers all supported RISC-V devices,
+    // but, for example, esp32p4 uses the value 4 instead of 1,
+    // so it is not standard across all RISC-V devices.
+    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
+    fn calibration_init() {
+        // e.g.
+        // https://github.com/espressif/esp-idf/blob/800f141f94c0f880c162de476512e183df671307/components/hal/esp32c3/include/hal/adc_ll.h#L702
+        regi2c::ADC_SAR1_DREF.write_field(1);
+    }
+
     fn set_init_code(data: u16) {
         let [msb, lsb] = data.to_be_bytes();
 
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            ADC_SAR1_INITIAL_CODE_HIGH_ADDR,
-            ADC_SAR1_INITIAL_CODE_HIGH_ADDR_MSB,
-            ADC_SAR1_INITIAL_CODE_HIGH_ADDR_LSB,
-            msb as _,
-        );
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            ADC_SAR1_INITIAL_CODE_LOW_ADDR,
-            ADC_SAR1_INITIAL_CODE_LOW_ADDR_MSB,
-            ADC_SAR1_INITIAL_CODE_LOW_ADDR_LSB,
-            lsb as _,
-        );
+        regi2c::ADC_SAR1_INITIAL_CODE_HIGH.write_field(msb);
+        regi2c::ADC_SAR1_INITIAL_CODE_LOW.write_field(lsb);
     }
 }
 
-#[cfg(adc1)]
-impl super::CalibrationAccess for crate::peripherals::ADC1 {
+#[cfg(adc_adc1)]
+impl super::CalibrationAccess for crate::peripherals::ADC1<'_> {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
-        let value = enable as _;
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            ADC_SAR1_DREF_ADDR,
-            ADC_SAR1_DREF_ADDR_MSB,
-            ADC_SAR1_DREF_ADDR_LSB,
-            value,
-        );
+        regi2c::ADC_SAR1_DREF.write_field(enable as _);
     }
 
     fn connect_cal(source: AdcCalSource, enable: bool) {
-        let value = enable as _;
         match source {
-            AdcCalSource::Gnd => regi2c_write_mask(
-                I2C_SAR_ADC,
-                I2C_SAR_ADC_HOSTID,
-                ADC_SAR1_ENCAL_GND_ADDR,
-                ADC_SAR1_ENCAL_GND_ADDR_MSB,
-                ADC_SAR1_ENCAL_GND_ADDR_LSB,
-                value,
-            ),
-            AdcCalSource::Ref => regi2c_write_mask(
-                I2C_SAR_ADC,
-                I2C_SAR_ADC_HOSTID,
-                ADC_SARADC1_ENCAL_REF_ADDR,
-                ADC_SARADC1_ENCAL_REF_ADDR_MSB,
-                ADC_SARADC1_ENCAL_REF_ADDR_LSB,
-                value,
-            ),
+            AdcCalSource::Gnd => regi2c::ADC_SAR1_ENCAL_GND.write_field(enable as _),
+            #[cfg(not(esp32h2))]
+            AdcCalSource::Ref => regi2c::ADC_SAR1_ENCAL_REF.write_field(enable as _),
+            // For the ESP32-H2 ground and internal reference voltage are mutually exclusive and
+            // you can toggle between them.
+            //
+            // See: <https://github.com/espressif/esp-idf/blob/5c51472e82a58098dda8d40a1c4f250c374fc900/components/hal/esp32h2/include/hal/adc_ll.h#L645>
+            #[cfg(esp32h2)]
+            AdcCalSource::Ref => regi2c::ADC_SAR1_ENCAL_GND.write_field(!enable as _),
         }
     }
 }
 
-#[cfg(adc2)]
-impl RegisterAccess for crate::peripherals::ADC2 {
+#[cfg(adc_adc2)]
+impl RegisterAccess for crate::peripherals::ADC2<'_> {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
         APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
             w.saradc2_onetime_sample().set_bit();
@@ -336,76 +253,44 @@ impl RegisterAccess for crate::peripherals::ADC2 {
             .modify(|_, w| w.onetime_start().clear_bit());
     }
 
+    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
+    fn calibration_init() {
+        regi2c::ADC_SAR2_DREF.write_field(1);
+    }
+
     fn set_init_code(data: u16) {
         let [msb, lsb] = data.to_be_bytes();
 
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            ADC_SAR2_INITIAL_CODE_HIGH_ADDR,
-            ADC_SAR2_INITIAL_CODE_HIGH_ADDR_MSB,
-            ADC_SAR2_INITIAL_CODE_HIGH_ADDR_LSB,
-            msb as _,
-        );
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            ADC_SAR2_INITIAL_CODE_LOW_ADDR,
-            ADC_SAR2_INITIAL_CODE_LOW_ADDR_MSB,
-            ADC_SAR2_INITIAL_CODE_LOW_ADDR_LSB,
-            lsb as _,
-        );
+        regi2c::ADC_SAR2_INITIAL_CODE_HIGH.write_field(msb as _);
+        regi2c::ADC_SAR2_INITIAL_CODE_LOW.write_field(lsb as _);
     }
 }
 
-#[cfg(adc2)]
-impl super::CalibrationAccess for crate::peripherals::ADC2 {
+#[cfg(adc_adc2)]
+impl super::CalibrationAccess for crate::peripherals::ADC2<'_> {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
-        let value = enable as _;
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            ADC_SAR2_DREF_ADDR,
-            ADC_SAR2_DREF_ADDR_MSB,
-            ADC_SAR2_DREF_ADDR_LSB,
-            value,
-        );
+        regi2c::ADC_SAR2_DREF.write_field(enable as _);
     }
 
     fn connect_cal(source: AdcCalSource, enable: bool) {
-        let value = enable as _;
         match source {
-            AdcCalSource::Gnd => regi2c_write_mask(
-                I2C_SAR_ADC,
-                I2C_SAR_ADC_HOSTID,
-                ADC_SAR2_ENCAL_GND_ADDR,
-                ADC_SAR2_ENCAL_GND_ADDR_MSB,
-                ADC_SAR2_ENCAL_GND_ADDR_LSB,
-                value,
-            ),
-            AdcCalSource::Ref => regi2c_write_mask(
-                I2C_SAR_ADC,
-                I2C_SAR_ADC_HOSTID,
-                ADC_SARADC2_ENCAL_REF_ADDR,
-                ADC_SARADC2_ENCAL_REF_ADDR_MSB,
-                ADC_SARADC2_ENCAL_REF_ADDR_LSB,
-                value,
-            ),
+            AdcCalSource::Gnd => regi2c::ADC_SAR2_ENCAL_GND.write_field(enable as _),
+            AdcCalSource::Ref => regi2c::ADC_SAR2_ENCAL_REF.write_field(enable as _),
         }
     }
 }
 
 /// Analog-to-Digital Converter peripheral driver.
 pub struct Adc<'d, ADCI, Dm: crate::DriverMode> {
-    _adc: PeripheralRef<'d, ADCI>,
+    _adc: ADCI,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
     _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
-    _phantom: PhantomData<Dm>,
+    _phantom: PhantomData<(Dm, &'d mut ())>,
 }
 
 impl<'d, ADCI> Adc<'d, ADCI, Blocking>
@@ -414,10 +299,7 @@ where
 {
     /// Configure a given ADC instance using the provided configuration, and
     /// initialize the ADC for use
-    pub fn new(
-        adc_instance: impl crate::peripheral::Peripheral<P = ADCI> + 'd,
-        config: AdcConfig<ADCI>,
-    ) -> Self {
+    pub fn new(adc_instance: ADCI, config: AdcConfig<ADCI>) -> Self {
         let guard = GenericPeripheralGuard::new();
 
         APB_SARADC::regs().ctrl().modify(|_, w| unsafe {
@@ -428,7 +310,7 @@ where
         });
 
         Adc {
-            _adc: adc_instance.into_ref(),
+            _adc: adc_instance,
             attenuations: config.attenuations,
             active_channel: None,
             _guard: guard,
@@ -438,8 +320,8 @@ where
 
     /// Reconfigures the ADC driver to operate in asynchronous mode.
     pub fn into_async(mut self) -> Adc<'d, ADCI, Async> {
-        asynch::acquire_async_adc();
-        self.set_interrupt_handler(asynch::adc_interrupt_handler);
+        acquire_async_adc();
+        self.set_interrupt_handler(adc_interrupt_handler);
 
         // Reset interrupt flags and disable oneshot reading to normalize state before
         // entering async mode, otherwise there can be '0' readings, happening initially
@@ -468,22 +350,26 @@ where
         PIN: super::AdcChannel,
         CS: super::AdcCalScheme<ADCI>,
     {
-        if self.attenuations[PIN::CHANNEL as usize].is_none() {
-            panic!("Channel {} is not configured reading!", PIN::CHANNEL);
+        if self.attenuations[pin.pin.adc_channel() as usize].is_none() {
+            panic!(
+                "Channel {} is not configured reading!",
+                pin.pin.adc_channel()
+            );
         }
 
         if let Some(active_channel) = self.active_channel {
             // There is conversion in progress:
             // - if it's for a different channel try again later
             // - if it's for the given channel, go ahead and check progress
-            if active_channel != PIN::CHANNEL {
+            if active_channel != pin.pin.adc_channel() {
                 return Err(nb::Error::WouldBlock);
             }
         } else {
             // If no conversions are in progress, start a new one for given channel
-            self.active_channel = Some(PIN::CHANNEL);
+            self.active_channel = Some(pin.pin.adc_channel());
 
             // Set ADC unit calibration according used scheme for pin
+            ADCI::calibration_init();
             ADCI::set_init_code(pin.cal_scheme.adc_cal());
 
             let channel = self.active_channel.unwrap();
@@ -537,101 +423,37 @@ impl<ADCI> InterruptConfigurable for Adc<'_, ADCI, Blocking> {
         for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, InterruptSource);
         }
-        unsafe { crate::interrupt::bind_interrupt(InterruptSource, handler.handler()) };
-        unwrap!(crate::interrupt::enable(
-            InterruptSource,
-            handler.priority()
-        ));
+        crate::interrupt::bind_handler(InterruptSource, handler);
     }
 }
 
-#[cfg(all(adc1, not(esp32h2)))]
-impl super::AdcCalEfuse for crate::peripherals::ADC1 {
+#[cfg(adc_adc1)]
+impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_init_code(1, atten)
+        crate::efuse::rtc_calib_init_code(AdcCalibUnit::ADC1, atten)
     }
 
     fn cal_mv(atten: Attenuation) -> u16 {
-        Efuse::rtc_calib_cal_mv(1, atten)
+        crate::efuse::rtc_calib_cal_mv(AdcCalibUnit::ADC1, atten)
     }
 
     fn cal_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_cal_code(1, atten)
+        crate::efuse::rtc_calib_cal_code(AdcCalibUnit::ADC1, atten)
     }
 }
 
-#[cfg(adc2)]
-impl super::AdcCalEfuse for crate::peripherals::ADC2 {
+#[cfg(adc_adc2)]
+impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_init_code(2, atten)
+        crate::efuse::rtc_calib_init_code(AdcCalibUnit::ADC2, atten)
     }
 
     fn cal_mv(atten: Attenuation) -> u16 {
-        Efuse::rtc_calib_cal_mv(2, atten)
+        crate::efuse::rtc_calib_cal_mv(AdcCalibUnit::ADC2, atten)
     }
 
     fn cal_code(atten: Attenuation) -> Option<u16> {
-        Efuse::rtc_calib_cal_code(2, atten)
-    }
-}
-
-#[cfg(esp32c2)]
-mod adc_implementation {
-    crate::analog::adc::impl_adc_interface! {
-        ADC1 [
-            (GpioPin<0>, 0),
-            (GpioPin<1>, 1),
-            (GpioPin<2>, 2),
-            (GpioPin<3>, 3),
-            (GpioPin<4>, 4),
-        ]
-    }
-}
-
-#[cfg(esp32c3)]
-mod adc_implementation {
-    crate::analog::adc::impl_adc_interface! {
-        ADC1 [
-            (GpioPin<0>, 0),
-            (GpioPin<1>, 1),
-            (GpioPin<2>, 2),
-            (GpioPin<3>, 3),
-            (GpioPin<4>, 4),
-        ]
-    }
-
-    crate::analog::adc::impl_adc_interface! {
-        ADC2 [
-            (GpioPin<5>, 0),
-        ]
-    }
-}
-
-#[cfg(esp32c6)]
-mod adc_implementation {
-    crate::analog::adc::impl_adc_interface! {
-        ADC1 [
-            (GpioPin<0>, 0),
-            (GpioPin<1>, 1),
-            (GpioPin<2>, 2),
-            (GpioPin<3>, 3),
-            (GpioPin<4>, 4),
-            (GpioPin<5>, 5),
-            (GpioPin<6>, 6),
-        ]
-    }
-}
-
-#[cfg(esp32h2)]
-mod adc_implementation {
-    crate::analog::adc::impl_adc_interface! {
-        ADC1 [
-            (GpioPin<1>, 0),
-            (GpioPin<2>, 1),
-            (GpioPin<3>, 2),
-            (GpioPin<4>, 3),
-            (GpioPin<5>, 4),
-        ]
+        crate::efuse::rtc_calib_cal_code(AdcCalibUnit::ADC2, atten)
     }
 }
 
@@ -641,7 +463,7 @@ where
 {
     /// Create a new instance in [crate::Blocking] mode.
     pub fn into_blocking(self) -> Adc<'d, ADCI, Blocking> {
-        if asynch::release_async_adc() {
+        if release_async_adc() {
             // Disable ADC interrupt on all cores if the last async ADC instance is disabled
             for cpu in crate::system::Cpu::all() {
                 crate::interrupt::disable(cpu, InterruptSource);
@@ -663,16 +485,17 @@ where
     /// underlies the pin.
     pub async fn read_oneshot<PIN, CS>(&mut self, pin: &mut super::AdcPin<PIN, ADCI, CS>) -> u16
     where
-        ADCI: asynch::AsyncAccess,
+        ADCI: Instance,
         PIN: super::AdcChannel,
         CS: super::AdcCalScheme<ADCI>,
     {
-        let channel = PIN::CHANNEL;
+        let channel = pin.pin.adc_channel();
         if self.attenuations[channel as usize].is_none() {
             panic!("Channel {} is not configured reading!", channel);
         }
 
         // Set ADC unit calibration according used scheme for pin
+        ADCI::calibration_init();
         ADCI::set_init_code(pin.cal_scheme.adc_cal());
 
         let attenuation = self.attenuations[channel as usize].unwrap() as u8;
@@ -701,160 +524,144 @@ where
     }
 }
 
-/// Async functionality
-pub(crate) mod asynch {
-    use core::{
-        marker::PhantomData,
-        pin::Pin,
-        task::{Context, Poll},
-    };
+#[cfg(all(adc_adc1, adc_adc2))]
+static ASYNC_ADC_COUNT: AtomicU32 = AtomicU32::new(0);
 
-    // We only have to count on devices that have multiple ADCs sharing the same interrupt
-    #[cfg(all(adc1, adc2))]
-    use portable_atomic::{AtomicU32, Ordering};
-    use procmacros::handler;
+pub(super) fn acquire_async_adc() {
+    #[cfg(all(adc_adc1, adc_adc2))]
+    ASYNC_ADC_COUNT.fetch_add(1, Ordering::Relaxed);
+}
 
-    use crate::{asynch::AtomicWaker, peripherals::APB_SARADC, Async};
-
-    #[cfg(all(adc1, adc2))]
-    static ASYNC_ADC_COUNT: AtomicU32 = AtomicU32::new(0);
-
-    pub(super) fn acquire_async_adc() {
-        #[cfg(all(adc1, adc2))]
-        ASYNC_ADC_COUNT.fetch_add(1, Ordering::Relaxed);
-    }
-
-    pub(super) fn release_async_adc() -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(all(adc1, adc2))] {
-                ASYNC_ADC_COUNT.fetch_sub(1, Ordering::Relaxed) == 1
-            } else {
-                true
-            }
+pub(super) fn release_async_adc() -> bool {
+    cfg_if::cfg_if! {
+        if #[cfg(all(adc_adc1, adc_adc2))] {
+            ASYNC_ADC_COUNT.fetch_sub(1, Ordering::Relaxed) == 1
+        } else {
+            true
         }
     }
+}
 
-    #[handler]
-    pub(crate) fn adc_interrupt_handler() {
-        let saradc = APB_SARADC::regs();
-        let interrupt_status = saradc.int_st().read();
+#[handler]
+pub(crate) fn adc_interrupt_handler() {
+    let saradc = APB_SARADC::regs();
+    let interrupt_status = saradc.int_st().read();
 
-        #[cfg(adc1)]
-        if interrupt_status.adc1_done().bit_is_set() {
-            handle_async(crate::peripherals::ADC1)
-        }
-
-        #[cfg(adc2)]
-        if interrupt_status.adc2_done().bit_is_set() {
-            handle_async(crate::peripherals::ADC2)
-        }
+    #[cfg(adc_adc1)]
+    if interrupt_status.adc1_done().bit_is_set() {
+        unsafe { handle_async(crate::peripherals::ADC1::steal()) }
     }
 
-    fn handle_async<ADCI: AsyncAccess>(_instance: ADCI) {
-        ADCI::waker().wake();
-        ADCI::disable_interrupt();
+    #[cfg(adc_adc2)]
+    if interrupt_status.adc2_done().bit_is_set() {
+        unsafe { handle_async(crate::peripherals::ADC2::steal()) }
+    }
+}
+
+fn handle_async<ADCI: Instance>(_instance: ADCI) {
+    ADCI::waker().wake();
+    ADCI::unlisten();
+}
+
+/// Enable asynchronous access.
+pub trait Instance: crate::private::Sealed {
+    /// Enable the ADC interrupt
+    fn listen();
+
+    /// Disable the ADC interrupt
+    fn unlisten();
+
+    /// Clear the ADC interrupt
+    fn clear_interrupt();
+
+    /// Obtain the waker for the ADC interrupt
+    fn waker() -> &'static AtomicWaker;
+}
+
+#[cfg(adc_adc1)]
+impl Instance for crate::peripherals::ADC1<'_> {
+    fn listen() {
+        APB_SARADC::regs()
+            .int_ena()
+            .modify(|_, w| w.adc1_done().set_bit());
     }
 
-    #[doc(hidden)]
-    pub trait AsyncAccess {
-        /// Enable the ADC interrupt
-        fn enable_interrupt();
-
-        /// Disable the ADC interrupt
-        fn disable_interrupt();
-
-        /// Clear the ADC interrupt
-        fn clear_interrupt();
-
-        /// Obtain the waker for the ADC interrupt
-        fn waker() -> &'static AtomicWaker;
+    fn unlisten() {
+        APB_SARADC::regs()
+            .int_ena()
+            .modify(|_, w| w.adc1_done().clear_bit());
     }
 
-    #[cfg(adc1)]
-    impl AsyncAccess for crate::peripherals::ADC1 {
-        fn enable_interrupt() {
-            APB_SARADC::regs()
-                .int_ena()
-                .modify(|_, w| w.adc1_done().set_bit());
-        }
-
-        fn disable_interrupt() {
-            APB_SARADC::regs()
-                .int_ena()
-                .modify(|_, w| w.adc1_done().clear_bit());
-        }
-
-        fn clear_interrupt() {
-            APB_SARADC::regs()
-                .int_clr()
-                .write(|w| w.adc1_done().clear_bit_by_one());
-        }
-
-        fn waker() -> &'static AtomicWaker {
-            static WAKER: AtomicWaker = AtomicWaker::new();
-
-            &WAKER
-        }
+    fn clear_interrupt() {
+        APB_SARADC::regs()
+            .int_clr()
+            .write(|w| w.adc1_done().clear_bit_by_one());
     }
 
-    #[cfg(adc2)]
-    impl AsyncAccess for crate::peripherals::ADC2 {
-        fn enable_interrupt() {
-            APB_SARADC::regs()
-                .int_ena()
-                .modify(|_, w| w.adc2_done().set_bit());
-        }
+    fn waker() -> &'static AtomicWaker {
+        static WAKER: AtomicWaker = AtomicWaker::new();
 
-        fn disable_interrupt() {
-            APB_SARADC::regs()
-                .int_ena()
-                .modify(|_, w| w.adc2_done().clear_bit());
-        }
+        &WAKER
+    }
+}
 
-        fn clear_interrupt() {
-            APB_SARADC::regs()
-                .int_clr()
-                .write(|w| w.adc2_done().clear_bit_by_one());
-        }
-
-        fn waker() -> &'static AtomicWaker {
-            static WAKER: AtomicWaker = AtomicWaker::new();
-
-            &WAKER
-        }
+#[cfg(adc_adc2)]
+impl Instance for crate::peripherals::ADC2<'_> {
+    fn listen() {
+        APB_SARADC::regs()
+            .int_ena()
+            .modify(|_, w| w.adc2_done().set_bit());
     }
 
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub(crate) struct AdcFuture<ADCI: AsyncAccess> {
-        phantom: PhantomData<ADCI>,
+    fn unlisten() {
+        APB_SARADC::regs()
+            .int_ena()
+            .modify(|_, w| w.adc2_done().clear_bit());
     }
 
-    impl<ADCI: AsyncAccess> AdcFuture<ADCI> {
-        pub fn new(_self: &super::Adc<'_, ADCI, Async>) -> Self {
-            Self {
-                phantom: PhantomData,
-            }
-        }
+    fn clear_interrupt() {
+        APB_SARADC::regs()
+            .int_clr()
+            .write(|w| w.adc2_done().clear_bit_by_one());
     }
 
-    impl<ADCI: AsyncAccess + super::RegisterAccess> core::future::Future for AdcFuture<ADCI> {
-        type Output = ();
+    fn waker() -> &'static AtomicWaker {
+        static WAKER: AtomicWaker = AtomicWaker::new();
 
-        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            if ADCI::is_done() {
-                ADCI::clear_interrupt();
-                Poll::Ready(())
-            } else {
-                ADCI::waker().register(cx.waker());
-                ADCI::enable_interrupt();
-                Poll::Pending
-            }
+        &WAKER
+    }
+}
+
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+pub(crate) struct AdcFuture<ADCI: Instance> {
+    phantom: PhantomData<ADCI>,
+}
+
+impl<ADCI: Instance> AdcFuture<ADCI> {
+    pub fn new(_self: &super::Adc<'_, ADCI, Async>) -> Self {
+        Self {
+            phantom: PhantomData,
         }
     }
+}
 
-    impl<ADCI: AsyncAccess> Drop for AdcFuture<ADCI> {
-        fn drop(&mut self) {
-            ADCI::disable_interrupt();
+impl<ADCI: Instance + super::RegisterAccess> core::future::Future for AdcFuture<ADCI> {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if ADCI::is_done() {
+            ADCI::clear_interrupt();
+            Poll::Ready(())
+        } else {
+            ADCI::waker().register(cx.waker());
+            ADCI::listen();
+            Poll::Pending
         }
+    }
+}
+
+impl<ADCI: Instance> Drop for AdcFuture<ADCI> {
+    fn drop(&mut self) {
+        ADCI::unlisten();
     }
 }

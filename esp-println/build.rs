@@ -1,39 +1,34 @@
 use std::{env, path::Path};
 
-use esp_build::assert_unique_used_features;
+use esp_metadata_generated::assert_unique_used_features;
+use log_04::LevelFilter;
 
-fn main() {
-    // Ensure that only a single chip is specified
-    assert_unique_used_features!(
-        "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32p4", "esp32s2", "esp32s3"
-    );
-
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Ensure that only a single communication method is specified
-    assert_unique_used_features!("jtag-serial", "uart", "auto");
+    assert_unique_used_features!("jtag-serial", "uart", "auto", "no-op");
 
+    let chip = esp_metadata_generated::Chip::from_cargo_feature()?;
     // Ensure that, if the `jtag-serial` communication method feature is enabled,
     // a compatible chip feature is also enabled.
-    if cfg!(feature = "jtag-serial")
-        && !(cfg!(feature = "esp32c3")
-            || cfg!(feature = "esp32c6")
-            || cfg!(feature = "esp32h2")
-            || cfg!(feature = "esp32p4")
-            || cfg!(feature = "esp32s3"))
-    {
+    let has_jtag_serial = chip.contains("soc_has_usb_device");
+
+    if cfg!(feature = "jtag-serial") && !has_jtag_serial {
         panic!(
-            "The `jtag-serial` feature is only supported by the ESP32-C3, ESP32-C6, ESP32-H2, ESP32-P4, and ESP32-S3"
+            "The `jtag-serial` feature is only supported by the ESP32-C3, ESP32-C5, ESP32-C6, ESP32-H2, ESP32-P4, and ESP32-S3"
         );
     }
 
-    // Ensure that, if the `colors` is used with `log`.`
-    if cfg!(feature = "colors") && !cfg!(feature = "log") {
+    // Ensure that, if the `colors` is used with `log-04`.
+    if cfg!(feature = "colors") && !cfg!(feature = "log-04") {
         println!(
-            "cargo:warning=The `colors` feature is only effective when using the `log` feature"
+            "cargo:warning=The `colors` feature is only effective when using the `log-04` feature"
         );
     }
 
     if std::env::var("ESP_LOGLEVEL").is_ok() || std::env::var("ESP_LOGFILTER").is_ok() {
-        panic!("`ESP_LOGLEVEL` and `ESP_LOGFILTER` is not supported anymore. Please use `ESP_LOG` instead.");
+        panic!(
+            "`ESP_LOGLEVEL` and `ESP_LOGFILTER` is not supported anymore. Please use `ESP_LOG` instead."
+        );
     }
 
     generate_filter_snippet();
@@ -43,6 +38,8 @@ fn main() {
 
     println!("cargo:rerun-if-env-changed=ESP_LOG");
     println!("cargo:rustc-check-cfg=cfg(host_is_windows)");
+
+    Ok(())
 }
 
 fn generate_filter_snippet() {
@@ -61,54 +58,62 @@ fn generate_filter_snippet() {
                 .iter()
                 .map(|v| v.level)
                 .max()
-                .unwrap_or(log::LevelFilter::Off);
+                .unwrap_or(LevelFilter::Off);
             let max = match max {
-                log::LevelFilter::Off => "Off",
-                log::LevelFilter::Error => "Error",
-                log::LevelFilter::Warn => "Warn",
-                log::LevelFilter::Info => "Info",
-                log::LevelFilter::Debug => "Debug",
-                log::LevelFilter::Trace => "Trace",
+                LevelFilter::Off => "Off",
+                LevelFilter::Error => "Error",
+                LevelFilter::Warn => "Warn",
+                LevelFilter::Info => "Info",
+                LevelFilter::Debug => "Debug",
+                LevelFilter::Trace => "Trace",
             };
 
             let mut snippet = String::new();
 
             snippet.push_str(&format!(
-                "pub(crate) const FILTER_MAX: log::LevelFilter = log::LevelFilter::{};",
-                max
+                "pub(crate) const FILTER_MAX: log_04::LevelFilter = log_04::LevelFilter::{max};"
             ));
 
-            snippet
-                .push_str("pub(crate) fn is_enabled(level: log::Level, _target: &str) -> bool {");
+            snippet.push_str(
+                "pub(crate) fn is_enabled(level: log_04::Level, _target: &str) -> bool {",
+            );
 
+            let mut global_level = None;
             for directive in res.directives {
                 let level = match directive.level {
-                    log::LevelFilter::Off => "Off",
-                    log::LevelFilter::Error => "Error",
-                    log::LevelFilter::Warn => "Warn",
-                    log::LevelFilter::Info => "Info",
-                    log::LevelFilter::Debug => "Debug",
-                    log::LevelFilter::Trace => "Trace",
+                    LevelFilter::Off => "Off",
+                    LevelFilter::Error => "Error",
+                    LevelFilter::Warn => "Warn",
+                    LevelFilter::Info => "Info",
+                    LevelFilter::Debug => "Debug",
+                    LevelFilter::Trace => "Trace",
                 };
 
                 if let Some(name) = directive.name {
+                    // If a prefix matches, don't continue to the next directive
                     snippet.push_str(&format!(
-                "if _target.starts_with(\"{}\") && level <= log::LevelFilter::{} {{ return true; }}",
-                &name, level
-            ));
-                } else {
-                    snippet.push_str(&format!(
-                        "if level <= log::LevelFilter::{} {{ return true; }}",
-                        level
+                        "if _target.starts_with(\"{}\") {{ return level <= log_04::LevelFilter::{}; }}",
+                        &name, level
                     ));
+                } else {
+                    if global_level.is_some() {
+                        panic!("Multiple global log levels specified in `ESP_LOG`");
+                    }
+                    global_level = Some(level);
                 }
             }
-            snippet.push_str(" false");
+
+            // Place the fallback rule at the end
+            if let Some(level) = global_level {
+                snippet.push_str(&format!("level <= log_04::LevelFilter::{level}"));
+            } else {
+                snippet.push_str(" false");
+            }
             snippet.push('}');
             snippet
         }
     } else {
-        "pub(crate) const FILTER_MAX: log::LevelFilter = log::LevelFilter::Off; pub(crate) fn is_enabled(_level: log::Level, _target: &str) -> bool { true }".to_string()
+        "pub(crate) const FILTER_MAX: log_04::LevelFilter = log_04::LevelFilter::Off; pub(crate) fn is_enabled(_level: log_04::Level, _target: &str) -> bool { true }".to_string()
     };
 
     std::fs::write(&dest_path, &snippet).unwrap();
@@ -133,7 +138,7 @@ impl ParseResult {
 #[derive(Debug)]
 struct Directive {
     pub(crate) name: Option<String>,
-    pub(crate) level: log::LevelFilter,
+    pub(crate) level: LevelFilter,
 }
 
 /// Parse a logging specification string (e.g:
@@ -158,10 +163,10 @@ fn parse_spec(spec: &str) -> ParseResult {
                         // treat that as a global fallback
                         match part0.parse() {
                             Ok(num) => (num, None),
-                            Err(_) => (log::LevelFilter::max(), Some(part0)),
+                            Err(_) => (LevelFilter::max(), Some(part0)),
                         }
                     }
-                    (Some(part0), Some(""), None) => (log::LevelFilter::max(), Some(part0)),
+                    (Some(part0), Some(""), None) => (LevelFilter::max(), Some(part0)),
                     (Some(part0), Some(part1), None) => {
                         if let Ok(num) = part1.parse() {
                             (num, Some(part0))
@@ -182,6 +187,14 @@ fn parse_spec(spec: &str) -> ParseResult {
             });
         }
     }
+
+    // Sort by length so that the most specific prefixes come first
+    result
+        .directives
+        .sort_by(|a, b| match (a.name.as_ref(), b.name.as_ref()) {
+            (Some(a), Some(b)) => b.len().cmp(&a.len()),
+            _ => std::cmp::Ordering::Equal,
+        });
 
     result
 }

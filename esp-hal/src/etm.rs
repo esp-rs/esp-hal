@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Event Task Matrix (ETM)
 //!
 //! ## Overview
@@ -19,24 +20,24 @@
 //! channel will trigger the corresponding task automatically.
 //!
 //! For more information, please refer to the
-#![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/peripherals/etm.html)")]
+#![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", chip!(), "/api-reference/peripherals/etm.html)")]
 //! ## Examples
 //!
 //! ### Control LED by the button via ETM
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::gpio::etm::{Channels, InputConfig, OutputConfig};
 //! # use esp_hal::etm::Etm;
 //! # use esp_hal::gpio::Pull;
 //! # use esp_hal::gpio::Level;
 //!
-//! let mut led = peripherals.GPIO1;
+//! let led = peripherals.GPIO1;
 //! let button = peripherals.GPIO9;
 //!
 //! // setup ETM
 //! let gpio_ext = Channels::new(peripherals.GPIO_SD);
 //! let led_task = gpio_ext.channel0_task.toggle(
-//!     &mut led,
+//!     led,
 //!     OutputConfig {
 //!         open_drain: false,
 //!         pull: Pull::None,
@@ -44,10 +45,10 @@
 //!     },
 //! );
 //! let button_event = gpio_ext
-//! .channel0_event
-//! .falling_edge(button, InputConfig { pull: Pull::Down });
+//!     .channel0_event
+//!     .falling_edge(button, InputConfig { pull: Pull::Down });
 //!
-//! let etm = Etm::new(peripherals.SOC_ETM);
+//! let etm = Etm::new(peripherals.ETM);
 //! let channel0 = etm.channel0;
 //!
 //! // make sure the configured channel doesn't get dropped - dropping it will
@@ -58,10 +59,10 @@
 //! loop {}
 //! # }
 //! ```
-//! 
+//!
 //! ### Control LED by the systimer via ETM
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::gpio::etm::{Channels, InputConfig, OutputConfig};
 //! # use esp_hal::etm::Etm;
 //! # use esp_hal::gpio::Pull;
@@ -72,15 +73,15 @@
 //!
 //! let syst = SystemTimer::new(peripherals.SYSTIMER);
 //! let mut alarm0 = syst.alarm0;
-//! let mut timer = PeriodicTimer::new(&mut alarm0);
+//! let mut timer = PeriodicTimer::new(alarm0.reborrow());
 //! timer.start(Duration::from_secs(1));
 //!
-//! let mut led = peripherals.GPIO1;
+//! let led = peripherals.GPIO1;
 //!
 //! // setup ETM
 //! let gpio_ext = Channels::new(peripherals.GPIO_SD);
 //! let led_task = gpio_ext.channel0_task.toggle(
-//!     &mut led,
+//!     led,
 //!     OutputConfig {
 //!         open_drain: false,
 //!         pull: Pull::None,
@@ -88,9 +89,9 @@
 //!     },
 //! );
 //!
-//! let timer_event = Event::new(&mut alarm0);
+//! let timer_event = Event::new(&alarm0);
 //!
-//! let etm = Etm::new(peripherals.SOC_ETM);
+//! let etm = Etm::new(peripherals.ETM);
 //! let channel0 = etm.channel0;
 //!
 //! // make sure the configured channel doesn't get dropped - dropping it will
@@ -102,11 +103,7 @@
 //! # }
 //! ```
 
-use crate::{
-    peripheral::{Peripheral, PeripheralRef},
-    peripherals::SOC_ETM,
-    system::GenericPeripheralGuard,
-};
+use crate::{peripherals::ETM, system::GenericPeripheralGuard};
 
 /// Unconfigured EtmChannel.
 #[non_exhaustive]
@@ -121,7 +118,7 @@ impl<const C: u8> EtmChannel<C> {
         E: EtmEvent,
         T: EtmTask,
     {
-        let etm = SOC_ETM::regs();
+        let etm = ETM::regs();
         let guard = GenericPeripheralGuard::new();
 
         etm.ch(C as usize)
@@ -145,11 +142,13 @@ impl<const C: u8> EtmChannel<C> {
 }
 
 fn disable_channel(channel: u8) {
-    let etm = SOC_ETM::regs();
     if channel < 32 {
-        etm.ch_ena_ad0_clr().write(|w| w.ch_clr(channel).set_bit());
+        ETM::regs()
+            .ch_ena_ad0_clr()
+            .write(|w| w.ch_clr(channel).set_bit());
     } else {
-        etm.ch_ena_ad1_clr()
+        ETM::regs()
+            .ch_ena_ad1_clr()
             .write(|w| w.ch_clr(channel - 32).set_bit());
     }
 }
@@ -186,7 +185,7 @@ macro_rules! create_etm {
             ///
             /// Provides access to all the [EtmChannel]
             pub struct Etm<'d> {
-                _peripheral: PeripheralRef<'d, crate::peripherals::SOC_ETM>,
+                _peripheral: crate::peripherals::ETM<'d>,
                 $(
                     /// An individual ETM channel, identified by its index number.
                     pub [< channel $num >]: EtmChannel<$num>,
@@ -195,9 +194,7 @@ macro_rules! create_etm {
 
             impl<'d> Etm<'d> {
                 /// Creates a new `Etm` instance.
-                pub fn new(peripheral: impl Peripheral<P = crate::peripherals::SOC_ETM> + 'd) -> Self {
-                    crate::into_ref!(peripheral);
-
+                pub fn new(peripheral: crate::peripherals::ETM<'d>) -> Self {
                     Self {
                         _peripheral: peripheral,
                         $([< channel $num >]: EtmChannel { },)+

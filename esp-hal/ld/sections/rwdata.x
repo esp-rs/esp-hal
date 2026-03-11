@@ -13,6 +13,10 @@
     *(.rodata..Lanon .rodata..Lanon.*)
   #ENDIF
 
+  #IF ESP_HAL_CONFIG_USE_RWDATA_LD_HOOK
+    INCLUDE "rwdata_hook.x"
+  #ENDIF
+
   *(.sdata .sdata.* .sdata2 .sdata2.*);
   *(.data .data.*);
   *(.data1)
@@ -22,6 +26,13 @@
 
 /* LMA of .data */
 _sidata = LOADADDR(.data);
+
+.data.wifi :
+{
+  . = ALIGN(4);
+  *( .dram1 .dram1.*)
+  . = ALIGN(4);
+} > RWDATA
 
 .bss (NOLOAD) : ALIGN(4)
 {
@@ -48,12 +59,6 @@ _sidata = LOADADDR(.data);
 {
   . = ALIGN(4);
   *(.noinit .noinit.*)
-  . = ALIGN(4);
-} > RWDATA
-
-.data.wifi :
-{
-  . = ALIGN(4);
-  *( .dram1 .dram1.*)
+  *(.uninit .uninit.*)
   . = ALIGN(4);
 } > RWDATA

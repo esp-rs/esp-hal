@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # CPU Clock Control
 //!
 //! ## Overview
@@ -24,7 +25,7 @@
 #![cfg_attr(esp32h2, doc = "* 96MHz")]
 #![cfg_attr(esp32c2, doc = "* 120MHz")]
 #![cfg_attr(not(any(esp32c2, esp32h2)), doc = "* 160MHz")]
-#![cfg_attr(xtensa, doc = "* 240MHz")]
+#![cfg_attr(any(esp32c5, xtensa), doc = "* 240MHz")]
 //! ### Frozen Clock Frequencies
 //!
 //! Once the clock configuration is applied, the clock frequencies become
@@ -34,94 +35,64 @@
 //!
 //! ### Initialize With Different Clock Frequencies
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! use esp_hal::clock::CpuClock;
 //!
 //! // Initialize with the highest possible frequency for this chip
 //! let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
 //! let peripherals = esp_hal::init(config);
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
+#![cfg_attr(not(feature = "rt"), expect(unused))]
 
-#[cfg(any(esp32, esp32c2))]
-use crate::rtc_cntl::RtcClock;
+#[cfg(soc_has_clock_node_lp_slow_clk)]
+use clocks::LpSlowClkConfig;
+#[cfg(all(not(esp32s2), soc_has_clock_node_rtc_slow_clk))]
+use clocks::RtcSlowClkConfig;
+#[cfg(soc_has_clock_node_timg0_function_clock)]
+use clocks::Timg0FunctionClockConfig;
+use esp_rom_sys::rom::ets_delay_us;
+
+/// Low-level clock control
+///
+/// <section class="warning">
+/// This module provides experimental low-level clock control functionality. These functions
+/// can render your device temporarily unusable. Use with caution.
+/// </section>
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+pub mod ll {
+    #[cfg(feature = "unstable")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+    pub use crate::soc::clocks::*;
+}
+
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+pub use crate::soc::clocks::ClockConfig;
+#[cfg(not(feature = "unstable"))]
+pub(crate) use crate::soc::clocks::ClockConfig;
+pub use crate::soc::clocks::CpuClock;
 use crate::{
-    peripheral::{Peripheral, PeripheralRef},
+    ESP_HAL_LOCK,
+    peripherals::TIMG0,
+    soc::clocks::{self, ClockTree},
     time::Rate,
 };
 
-#[cfg_attr(esp32, path = "clocks_ll/esp32.rs")]
-#[cfg_attr(esp32c2, path = "clocks_ll/esp32c2.rs")]
-#[cfg_attr(esp32c3, path = "clocks_ll/esp32c3.rs")]
-#[cfg_attr(esp32c6, path = "clocks_ll/esp32c6.rs")]
-#[cfg_attr(esp32h2, path = "clocks_ll/esp32h2.rs")]
-#[cfg_attr(esp32s2, path = "clocks_ll/esp32s2.rs")]
-#[cfg_attr(esp32s3, path = "clocks_ll/esp32s3.rs")]
-pub(crate) mod clocks_ll;
-
-/// Clock properties
-#[doc(hidden)]
-pub trait Clock {
-    /// Frequency of the clock in [Rate].
-    fn frequency(&self) -> Rate;
-
-    /// Frequency of the clock in Megahertz
-    fn mhz(&self) -> u32 {
-        self.frequency().as_mhz()
-    }
-
-    /// Frequency of the clock in Hertz
-    fn hz(&self) -> u32 {
-        self.frequency().as_hz()
-    }
-}
-
-/// CPU clock speed
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(
-    clippy::enum_variant_names,
-    reason = "MHz suffix indicates physical unit."
-)]
-#[non_exhaustive]
-pub enum CpuClock {
-    /// 80MHz CPU clock
-    #[cfg(not(esp32h2))]
-    _80MHz  = 80,
-
-    /// 96MHz CPU clock
-    #[cfg(esp32h2)]
-    _96MHz  = 96,
-
-    /// 120MHz CPU clock
-    #[cfg(esp32c2)]
-    _120MHz = 120,
-
-    /// 160MHz CPU clock
-    #[cfg(not(any(esp32c2, esp32h2)))]
-    _160MHz = 160,
-
-    /// 240MHz CPU clock
-    #[cfg(xtensa)]
-    _240MHz = 240,
-}
-
-impl Default for CpuClock {
-    fn default() -> Self {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32h2)] {
-                Self::_96MHz
-            } else {
-                // FIXME: I don't think this is correct in general?
-                Self::_80MHz
-            }
-        }
-    }
-}
-
 impl CpuClock {
+    #[procmacros::doc_replace]
     /// Use the highest possible frequency for a particular chip.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::clock::CpuClock;
+    /// let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    /// let peripherals = esp_hal::init(config);
+    /// # {after_snippet}
+    /// ```
     pub const fn max() -> Self {
         cfg_if::cfg_if! {
             if #[cfg(esp32c2)] {
@@ -137,119 +108,74 @@ impl CpuClock {
     }
 }
 
-impl Clock for CpuClock {
-    fn frequency(&self) -> Rate {
-        Rate::from_mhz(*self as u32)
-    }
-}
-
-/// XTAL clock speed
+/// RTC Clocks.
 #[instability::unstable]
-#[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
-pub enum XtalClock {
-    /// 26MHz XTAL clock
-    #[cfg(any(esp32, esp32c2))]
-    _26M,
-    /// 32MHz XTAL clock
-    #[cfg(any(esp32c3, esp32h2, esp32s3))]
-    _32M,
-    /// 40MHz XTAL clock
-    #[cfg(not(esp32h2))]
-    _40M,
-    /// Other XTAL clock
-    Other(u32),
-}
+pub struct RtcClock;
 
-impl Clock for XtalClock {
-    fn frequency(&self) -> Rate {
-        match self {
-            #[cfg(any(esp32, esp32c2))]
-            XtalClock::_26M => Rate::from_mhz(26),
-            #[cfg(any(esp32c3, esp32h2, esp32s3))]
-            XtalClock::_32M => Rate::from_mhz(32),
-            #[cfg(not(esp32h2))]
-            XtalClock::_40M => Rate::from_mhz(40),
-            XtalClock::Other(mhz) => Rate::from_mhz(*mhz),
-        }
+cfg_if::cfg_if! {
+    if #[cfg(soc_has_clock_node_timg_calibration_clock)] {
+        use crate::soc::clocks::TimgCalibrationClockConfig;
+    } else if #[cfg(soc_has_clock_node_timg0_calibration_clock)] {
+        use crate::soc::clocks::Timg0CalibrationClockConfig as TimgCalibrationClockConfig;
     }
 }
 
-#[allow(clippy::enum_variant_names, unused)]
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) enum PllClock {
-    #[cfg(esp32h2)]
-    Pll8MHz,
-    #[cfg(any(esp32c6, esp32h2))]
-    Pll48MHz,
-    #[cfg(esp32h2)]
-    Pll64MHz,
-    #[cfg(esp32c6)]
-    Pll80MHz,
-    #[cfg(esp32h2)]
-    Pll96MHz,
-    #[cfg(esp32c6)]
-    Pll120MHz,
-    #[cfg(esp32c6)]
-    Pll160MHz,
-    #[cfg(esp32c6)]
-    Pll240MHz,
-    #[cfg(not(any(esp32c2, esp32c6, esp32h2)))]
-    Pll320MHz,
-    #[cfg(not(esp32h2))]
-    Pll480MHz,
-}
+/// RTC Watchdog Timer driver.
+impl RtcClock {
+    const CAL_FRACT: u32 = 19;
 
-impl Clock for PllClock {
-    fn frequency(&self) -> Rate {
-        match self {
-            #[cfg(esp32h2)]
-            Self::Pll8MHz => Rate::from_mhz(8),
-            #[cfg(any(esp32c6, esp32h2))]
-            Self::Pll48MHz => Rate::from_mhz(48),
-            #[cfg(esp32h2)]
-            Self::Pll64MHz => Rate::from_mhz(64),
-            #[cfg(esp32c6)]
-            Self::Pll80MHz => Rate::from_mhz(80),
-            #[cfg(esp32h2)]
-            Self::Pll96MHz => Rate::from_mhz(96),
-            #[cfg(esp32c6)]
-            Self::Pll120MHz => Rate::from_mhz(120),
-            #[cfg(esp32c6)]
-            Self::Pll160MHz => Rate::from_mhz(160),
-            #[cfg(esp32c6)]
-            Self::Pll240MHz => Rate::from_mhz(240),
-            #[cfg(not(any(esp32c2, esp32c6, esp32h2)))]
-            Self::Pll320MHz => Rate::from_mhz(320),
-            #[cfg(not(esp32h2))]
-            Self::Pll480MHz => Rate::from_mhz(480),
+    /// Get the RTC_SLOW_CLK source.
+    #[cfg_attr(all(not(feature = "unstable"), esp32c5), expect(dead_code))]
+    pub fn slow_freq() -> Rate {
+        cfg_if::cfg_if! {
+            if #[cfg(soc_has_clock_node_rtc_slow_clk)] {
+                let getter = clocks::rtc_slow_clk_frequency;
+            } else {
+                let getter = clocks::lp_slow_clk_frequency;
+            }
         }
+        Rate::from_hz(ClockTree::with(getter))
     }
-}
 
-#[allow(unused)]
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum ApbClock {
-    #[cfg(esp32h2)]
-    ApbFreq32MHz,
-    #[cfg(not(esp32h2))]
-    ApbFreq40MHz,
-    #[cfg(not(esp32h2))]
-    ApbFreq80MHz,
-    ApbFreqOther(u32),
-}
+    /// Measure the frequency of one of the TIMG0 calibration clocks,
+    /// using XTAL_CLK as the reference clock.
+    ///
+    /// This function will time out and return 0 if the time for the given
+    /// number of cycles to be counted exceeds the expected time twice. This
+    /// may happen if 32k XTAL is being calibrated, but the oscillator has
+    /// not started up (due to incorrect loading capacitance, board design
+    /// issue, or lack of 32 XTAL on board).
+    pub(crate) fn calibrate(cal_clk: TimgCalibrationClockConfig, slowclk_cycles: u32) -> u32 {
+        ClockTree::with(|clocks| {
+            let xtal_freq = Rate::from_hz(clocks::xtal_clk_frequency(clocks));
 
-impl Clock for ApbClock {
-    fn frequency(&self) -> Rate {
-        match self {
-            #[cfg(esp32h2)]
-            ApbClock::ApbFreq32MHz => Rate::from_mhz(32),
-            #[cfg(not(esp32h2))]
-            ApbClock::ApbFreq40MHz => Rate::from_mhz(40),
-            #[cfg(not(esp32h2))]
-            ApbClock::ApbFreq80MHz => Rate::from_mhz(80),
-            ApbClock::ApbFreqOther(mhz) => Rate::from_mhz(*mhz),
-        }
+            let (xtal_cycles, _) = Clocks::measure_rtc_clock(
+                clocks,
+                cal_clk,
+                #[cfg(soc_has_clock_node_timg0_function_clock)]
+                Timg0FunctionClockConfig::XtalClk,
+                slowclk_cycles,
+            );
+
+            if xtal_cycles == 0 {
+                warn!("{:?} calibration failed", cal_clk);
+            } else {
+                debug!("Counted {} XTAL cycles", xtal_cycles);
+
+                debug!(
+                    "{:?} frequency: {}",
+                    cal_clk,
+                    (xtal_freq / xtal_cycles) * slowclk_cycles
+                );
+            }
+
+            let divider = xtal_freq.as_mhz() as u64 * slowclk_cycles as u64;
+
+            let period_64 =
+                (((xtal_cycles as u64) << RtcClock::CAL_FRACT) + divider / 2u64 - 1u64) / divider;
+
+            (period_64 & u32::MAX as u64) as u32
+        })
     }
 }
 
@@ -258,48 +184,33 @@ impl Clock for ApbClock {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 #[doc(hidden)]
+#[instability::unstable]
 pub struct Clocks {
     /// CPU clock frequency
+    #[cfg(soc_has_clock_node_cpu_clk)]
     pub cpu_clock: Rate,
 
     /// APB clock frequency
+    #[cfg(soc_has_clock_node_apb_clk)]
     pub apb_clock: Rate,
 
     /// XTAL clock frequency
+    #[cfg(soc_has_clock_node_xtal_clk)]
     pub xtal_clock: Rate,
-
-    /// I2C clock frequency
-    #[cfg(esp32)]
-    pub i2c_clock: Rate,
-
-    /// PWM clock frequency
-    #[cfg(esp32)]
-    pub pwm_clock: Rate,
-
-    /// Crypto PWM  clock frequency
-    #[cfg(esp32s3)]
-    pub crypto_pwm_clock: Rate,
-
-    /// Crypto clock frequency
-    #[cfg(any(esp32c6, esp32h2))]
-    pub crypto_clock: Rate,
-
-    /// PLL 48M clock frequency (fixed)
-    #[cfg(esp32h2)]
-    pub pll_48m_clock: Rate,
-
-    /// PLL 96M clock frequency (fixed)
-    #[cfg(esp32h2)]
-    pub pll_96m_clock: Rate,
 }
 
 static mut ACTIVE_CLOCKS: Option<Clocks> = None;
 
 impl Clocks {
-    pub(crate) fn init(cpu_clock_speed: CpuClock) {
-        critical_section::with(|_| {
-            unsafe { ACTIVE_CLOCKS = Some(Self::configure(cpu_clock_speed)) };
-        })
+    pub(crate) fn init(cpu_clock_config: ClockConfig) {
+        ESP_HAL_LOCK.lock(|| {
+            crate::rtc_cntl::rtc::init();
+
+            let config = Self::configure(cpu_clock_config);
+            unsafe { ACTIVE_CLOCKS = Some(config) };
+        });
+
+        Clocks::calibrate_rtc_slow_clock();
     }
 
     fn try_get<'a>() -> Option<&'a Clocks> {
@@ -314,357 +225,312 @@ impl Clocks {
     pub fn get<'a>() -> &'a Clocks {
         unwrap!(Self::try_get())
     }
+}
 
-    /// Returns the xtal frequency.
-    ///
-    /// This function will run the frequency estimation if called before
-    /// [`crate::init()`].
-    #[cfg(systimer)]
-    #[inline]
-    pub(crate) fn xtal_freq() -> Rate {
-        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
-            if let Some(clocks) = Self::try_get() {
-                return clocks.xtal_clock;
+impl Clocks {
+    /// Configure the CPU clock speed.
+    pub(crate) fn configure(clock_config: ClockConfig) -> Self {
+        use crate::soc::clocks::ClockTree;
+
+        clock_config.configure();
+
+        ClockTree::with(|clocks| {
+            // FIXME: MCPWM clock configuration needs to know about the active clock source
+            // frequency. In the future, we should turn the MCPWM config structs into
+            // plain old data structures and remove this pre-configuration, otherwise we will not be
+            // able to select a different clock source.
+            #[cfg(soc_has_clock_node_mcpwm0_function_clock)]
+            clocks::configure_mcpwm0_function_clock(clocks, Default::default());
+            #[cfg(soc_has_clock_node_mcpwm1_function_clock)]
+            clocks::configure_mcpwm1_function_clock(clocks, Default::default());
+
+            // Until we have every clock consumer modelled, we should manually keep clocks alive
+            #[cfg(soc_has_clock_node_rc_fast_clk)]
+            clocks::request_rc_fast_clk(clocks);
+            #[cfg(soc_has_clock_node_rc_slow_clk)]
+            clocks::request_rc_slow_clk(clocks);
+            #[cfg(soc_has_clock_node_pll_clk)]
+            clocks::request_pll_clk(clocks);
+            #[cfg(soc_has_clock_node_pll_f96m_clk)]
+            clocks::request_pll_f96m_clk(clocks);
+            #[cfg(soc_has_clock_node_pll_f240m)]
+            clocks::request_pll_f240m(clocks);
+            #[cfg(soc_has_clock_node_rc_fast_div_clk)]
+            clocks::request_rc_fast_div_clk(clocks);
+
+            // TODO: this struct can be removed once everything uses the new internal clock tree
+            // code
+            Self {
+                #[cfg(soc_has_clock_node_cpu_clk)]
+                cpu_clock: Rate::from_hz(clocks::cpu_clk_frequency(clocks)),
+                #[cfg(soc_has_clock_node_apb_clk)]
+                apb_clock: Rate::from_hz(clocks::apb_clk_frequency(clocks)),
+                #[cfg(soc_has_clock_node_xtal_clk)]
+                xtal_clock: Rate::from_hz(clocks::xtal_clk_frequency(clocks)),
+            }
+        })
+    }
+
+    /// Uses a TIMG0 feature to count clock cycles of a high-frequency clock, for a period of time
+    /// that is measured by a low-frequency clock. This function can be used to calibrate two
+    /// clocks to each other, e.g. to determine a rough value of the XTAL clock, or to determine
+    /// the current frequency of a low-precision RC oscillator.
+    pub(crate) fn measure_rtc_clock(
+        clocks: &mut ClockTree,
+        rtc_clock: TimgCalibrationClockConfig,
+        // TODO: verify function clock is used, C6 TRM suggests fixed XTAL_CLK
+        #[cfg(soc_has_clock_node_timg0_function_clock)] function_clock: Timg0FunctionClockConfig,
+        slow_cycles: u32,
+    ) -> (u32, Rate) {
+        #[cfg(timergroup_rc_fast_calibration_divider)]
+        let calibration_divider = if rtc_clock == TimgCalibrationClockConfig::RcFastDivClk
+            && crate::soc::chip_revision_above(property!(
+                "timergroup.rc_fast_calibration_divider_min_rev"
+            )) {
+            property!("timergroup.rc_fast_calibration_divider")
+        } else {
+            1
+        };
+        #[cfg(not(timergroup_rc_fast_calibration_divider))]
+        let calibration_divider = 1;
+
+        // On some revisions calibration uses a divided RC_FAST tick.
+        let calibration_cycles = (slow_cycles / calibration_divider).max(1);
+
+        // By default the TIMG0 bus clock is running. Do not create a peripheral guard as dropping
+        // it would reset the timer, and it would enable its WDT.
+
+        // Make sure the process doesn't time out due to some spooky configuration.
+        #[cfg(not(esp32))]
+        TIMG0::regs().rtccalicfg2().reset();
+
+        TIMG0::regs()
+            .rtccalicfg()
+            .modify(|_, w| w.rtc_cali_start().clear_bit());
+
+        // Make sure we measure the crystal.
+        cfg_if::cfg_if! {
+            if #[cfg(soc_has_clock_node_timg0_function_clock)] {
+                let current_function_clock = clocks::timg0_function_clock_config(clocks);
+                clocks::configure_timg0_function_clock(clocks, function_clock);
+                clocks::request_timg0_function_clock(clocks);
+            }
+        }
+        cfg_if::cfg_if! {
+            if #[cfg(soc_has_clock_node_timg_calibration_clock)] {
+                let current_calib_clock = clocks::timg_calibration_clock_config(clocks);
+                clocks::configure_timg_calibration_clock(clocks, rtc_clock);
+                clocks::request_timg_calibration_clock(clocks);
+
+                let calibration_clock_frequency = clocks::timg_calibration_clock_frequency(clocks);
+            } else {
+                let current_calib_clock = clocks::timg0_calibration_clock_config(clocks);
+                clocks::configure_timg0_calibration_clock(clocks, rtc_clock);
+                clocks::request_timg0_calibration_clock(clocks);
+
+                let calibration_clock_frequency = clocks::timg0_calibration_clock_frequency(clocks);
             }
         }
 
-        Self::measure_xtal_frequency().frequency()
-    }
-}
+        let effective_calibration_clock_frequency =
+            calibration_clock_frequency / calibration_divider;
 
-#[cfg(esp32)]
-impl Clocks {
-    fn measure_xtal_frequency() -> XtalClock {
-        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
-            if RtcClock::estimate_xtal_frequency() > 33 {
-                XtalClock::_40M
-            } else {
-                XtalClock::_26M
+        // Set up timeout based on the calibration clock frequency. This is counted in XTAL_CLK
+        // cycles.
+        #[cfg(not(esp32))]
+        {
+            let function_clk_freq = clocks::timg0_function_clock_frequency(clocks) as u64;
+            let expected_function_clock_cycles = (function_clk_freq * slow_cycles as u64
+                / effective_calibration_clock_frequency as u64)
+                as u32;
+
+            TIMG0::regs().rtccalicfg2().modify(|_, w| unsafe {
+                let writer = w.rtc_cali_timeout_thres();
+                let mask = (1 << writer.width()) - 1;
+                writer.bits((expected_function_clock_cycles * 2).min(mask));
+                w
+            });
+        }
+
+        TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
+            w.rtc_cali_max().bits(calibration_cycles as u16);
+            w.rtc_cali_start_cycling().clear_bit();
+            w.rtc_cali_start().set_bit()
+        });
+
+        // Delay, otherwise the CPU may read back the previous state of the completion flag and skip
+        // waiting.
+        let us_time_estimate = slow_cycles * 1_000_000 / effective_calibration_clock_frequency;
+        ets_delay_us(us_time_estimate);
+
+        #[cfg(esp32)]
+        let mut timeout_us = us_time_estimate;
+
+        // Wait for the calibration to finish
+        let cali_value = loop {
+            if TIMG0::regs()
+                .rtccalicfg()
+                .read()
+                .rtc_cali_rdy()
+                .bit_is_set()
+            {
+                break TIMG0::regs().rtccalicfg1().read().rtc_cali_value().bits();
             }
-        } else {
-            const {
-                match esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY").as_bytes() {
-                    b"auto" => XtalClock::Other(0), // Can't be `unreachable!` due to const eval.
-                    b"26" => XtalClock::_26M,
-                    b"40" => XtalClock::_40M,
-                    other => XtalClock::Other(esp_config::esp_config_int_parse!(u32, other)),
+
+            #[cfg(not(esp32))]
+            if TIMG0::regs()
+                .rtccalicfg2()
+                .read()
+                .rtc_cali_timeout()
+                .bit_is_set()
+            {
+                // Timed out waiting for calibration
+                break 0;
+            }
+
+            #[cfg(esp32)]
+            if timeout_us > 0 {
+                timeout_us -= 1;
+                ets_delay_us(1);
+            } else {
+                // Timed out waiting for calibration
+                break 0;
+            }
+        };
+
+        TIMG0::regs()
+            .rtccalicfg()
+            .modify(|_, w| w.rtc_cali_start().clear_bit());
+
+        // TODO: this would be nicer if we had clock node objects instead of free-standing functions
+        cfg_if::cfg_if! {
+            if #[cfg(soc_has_clock_node_timg_calibration_clock)] {
+                if let Some(calib_clock) = current_calib_clock
+                    && calib_clock != rtc_clock
+                {
+                    clocks::configure_timg_calibration_clock(clocks, calib_clock);
                 }
-            }
-        }
-    }
-
-    /// Configure the CPU clock speed.
-    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = Self::measure_xtal_frequency();
-
-        if cpu_clock_speed != CpuClock::default() {
-            let pll_freq = match cpu_clock_speed {
-                CpuClock::_80MHz => PllClock::Pll320MHz,
-                CpuClock::_160MHz => PllClock::Pll320MHz,
-                CpuClock::_240MHz => PllClock::Pll480MHz,
-            };
-
-            clocks_ll::esp32_rtc_update_to_xtal(xtal_freq, 1);
-            clocks_ll::esp32_rtc_bbpll_enable();
-            clocks_ll::esp32_rtc_bbpll_configure(xtal_freq, pll_freq);
-            clocks_ll::set_cpu_freq(cpu_clock_speed);
-        }
-
-        Self {
-            cpu_clock: cpu_clock_speed.frequency(),
-            apb_clock: Rate::from_mhz(80),
-            xtal_clock: Rate::from_mhz(xtal_freq.mhz()),
-            i2c_clock: Rate::from_mhz(80),
-            // The docs are unclear here. pwm_clock seems to be tied to clocks.apb_clock
-            // while simultaneously being fixed at 160 MHz.
-            // Testing showed 160 MHz to be correct for current clock configurations.
-            pwm_clock: Rate::from_mhz(160),
-        }
-    }
-}
-
-#[cfg(esp32c2)]
-impl Clocks {
-    fn measure_xtal_frequency() -> XtalClock {
-        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
-            if RtcClock::estimate_xtal_frequency() > 33 {
-                XtalClock::_40M
+                clocks::release_timg_calibration_clock(clocks);
             } else {
-                XtalClock::_26M
-            }
-        } else {
-            const {
-                match esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY").as_bytes() {
-                    b"auto" => XtalClock::Other(0), // Can't be `unreachable!` due to const eval.
-                    b"26" => XtalClock::_26M,
-                    b"40" => XtalClock::_40M,
-                    other => XtalClock::Other(esp_config::esp_config_int_parse!(u32, other)),
+                if let Some(calib_clock) = current_calib_clock
+                    && calib_clock != rtc_clock
+                {
+                    clocks::configure_timg0_calibration_clock(clocks, calib_clock);
                 }
+                clocks::release_timg0_calibration_clock(clocks);
             }
         }
+
+        #[cfg(soc_has_clock_node_timg0_function_clock)]
+        {
+            if let Some(func_clock) = current_function_clock
+                && func_clock != function_clock
+            {
+                clocks::configure_timg0_function_clock(clocks, func_clock);
+            }
+            clocks::release_timg0_function_clock(clocks);
+        }
+
+        (cali_value, Rate::from_hz(calibration_clock_frequency))
     }
 
-    /// Configure the CPU clock speed.
-    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = Self::measure_xtal_frequency();
-
-        let apb_freq;
-        if cpu_clock_speed != CpuClock::default() {
-            let pll_freq = PllClock::Pll480MHz;
-
-            if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
-                apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
-                clocks_ll::esp32c2_rtc_update_to_xtal(xtal_freq, 1);
-                clocks_ll::esp32c2_rtc_apb_freq_update(apb_freq);
+    pub(crate) fn calibrate_rtc_slow_clock() {
+        // Unfortunate device specific mapping.
+        // TODO: fix it by generating cfgs for each mux input?
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s2)] {
+                // Can directly measure output of the RTC_SLOW mux
+                let slow_clk = TimgCalibrationClockConfig::RtcClk;
+            } else if #[cfg(soc_has_clock_node_rtc_slow_clk)] {
+                let slow_clk = match unwrap!(ClockTree::with(clocks::rtc_slow_clk_config)) {
+                    RtcSlowClkConfig::RcFast => TimgCalibrationClockConfig::RcFastDivClk,
+                    RtcSlowClkConfig::RcSlow => TimgCalibrationClockConfig::RcSlowClk,
+                    #[cfg(not(esp32c2))]
+                    RtcSlowClkConfig::Xtal32k => TimgCalibrationClockConfig::Xtal32kClk,
+                    #[cfg(esp32c2)]
+                    RtcSlowClkConfig::OscSlow => TimgCalibrationClockConfig::Osc32kClk,
+                };
             } else {
-                apb_freq = ApbClock::ApbFreq40MHz;
-                clocks_ll::esp32c2_rtc_bbpll_enable();
-                clocks_ll::esp32c2_rtc_bbpll_configure(xtal_freq, pll_freq);
-                clocks_ll::esp32c2_rtc_freq_to_pll_mhz(cpu_clock_speed);
-                clocks_ll::esp32c2_rtc_apb_freq_update(apb_freq);
+                let slow_clk = match unwrap!(ClockTree::with(clocks::lp_slow_clk_config)) {
+                    LpSlowClkConfig::OscSlow => TimgCalibrationClockConfig::Xtal32kClk, //?
+                    LpSlowClkConfig::Xtal32k => TimgCalibrationClockConfig::Xtal32kClk,
+                    LpSlowClkConfig::RcSlow => TimgCalibrationClockConfig::RcSlowClk,
+                };
             }
-        } else {
-            apb_freq = ApbClock::ApbFreq40MHz;
         }
 
-        Self {
-            cpu_clock: cpu_clock_speed.frequency(),
-            apb_clock: apb_freq.frequency(),
-            xtal_clock: xtal_freq.frequency(),
-        }
-    }
-}
+        let cal_val = RtcClock::calibrate(slow_clk, 1024);
 
-#[cfg(esp32c3)]
-impl Clocks {
-    fn measure_xtal_frequency() -> XtalClock {
-        XtalClock::_40M
-    }
-
-    /// Configure the CPU clock speed.
-    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = Self::measure_xtal_frequency();
-
-        let apb_freq;
-        if cpu_clock_speed != CpuClock::default() {
-            if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
-                apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
-                clocks_ll::esp32c3_rtc_update_to_xtal(xtal_freq, 1);
-                clocks_ll::esp32c3_rtc_apb_freq_update(apb_freq);
+        cfg_if::cfg_if! {
+            if #[cfg(soc_has_lp_aon)] {
+                use crate::peripherals::LP_AON;
             } else {
-                let pll_freq = PllClock::Pll480MHz;
-                apb_freq = ApbClock::ApbFreq80MHz;
-                clocks_ll::esp32c3_rtc_bbpll_enable();
-                clocks_ll::esp32c3_rtc_bbpll_configure(xtal_freq, pll_freq);
-                clocks_ll::esp32c3_rtc_freq_to_pll_mhz(cpu_clock_speed);
-                clocks_ll::esp32c3_rtc_apb_freq_update(apb_freq);
+                use crate::peripherals::LPWR as LP_AON;
             }
+        }
+
+        LP_AON::regs()
+            .store1()
+            .write(|w| unsafe { w.bits(cal_val) });
+    }
+}
+
+/// The CPU clock frequency.
+pub fn cpu_clock() -> Rate {
+    Clocks::get().cpu_clock
+}
+
+/// The XTAL clock frequency.
+pub fn xtal_clock() -> Rate {
+    Clocks::get().xtal_clock
+}
+
+/// Read the calibrated RTC slow clock period from the STORE1 register.
+///
+/// The period is in unit of microseconds, represented as a fixed-point number
+/// with `RtcClock::CAL_FRACT` fractional bits.
+///
+/// Written by [`Clocks::calibrate_rtc_slow_clock`] during clock
+/// initialization.
+fn rtc_slow_cal_period() -> u64 {
+    cfg_if::cfg_if! {
+        if #[cfg(soc_has_lp_aon)] {
+            use crate::peripherals::LP_AON;
         } else {
-            apb_freq = ApbClock::ApbFreq80MHz;
-        }
-
-        Self {
-            cpu_clock: cpu_clock_speed.frequency(),
-            apb_clock: apb_freq.frequency(),
-            xtal_clock: xtal_freq.frequency(),
+            use crate::peripherals::LPWR as LP_AON;
         }
     }
+
+    LP_AON::regs().store1().read().bits() as u64
 }
 
-#[cfg(esp32c6)]
-impl Clocks {
-    fn measure_xtal_frequency() -> XtalClock {
-        XtalClock::_40M
-    }
+/// Convert RTC slow clock ticks to microseconds using the calibrated period.
+#[cfg(lp_timer_driver_supported)]
+pub(crate) fn rtc_ticks_to_us(ticks: u64) -> u64 {
+    let period = rtc_slow_cal_period();
 
-    /// Configure the CPU clock speed.
-    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = Self::measure_xtal_frequency();
+    // The LP timer is a 48-bit counter running from RTC_SLOW_CLK.
+    // `period` is a fixed point number with 19 fractional bits, it may be a 24-bit value if
+    // RTC_SLOW_CLK is as low as 32768 Hz. Just multiplying the two may cause an overflow on 64
+    // bits. We use a calculation that prevents overflow unconditionally because the counter reaches
+    // 2^19 pretty quickly. We could use a larger mask (up to 40 bits), but that would make the
+    // calculation slower and more complex for perhaps too little benefit.
 
-        let apb_freq;
-        if cpu_clock_speed != CpuClock::default() {
-            if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
-                apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
-                clocks_ll::esp32c6_rtc_update_to_xtal(xtal_freq, 1);
-                clocks_ll::esp32c6_rtc_apb_freq_update(apb_freq);
-            } else {
-                let pll_freq = PllClock::Pll480MHz;
-                apb_freq = ApbClock::ApbFreq80MHz;
-                clocks_ll::esp32c6_rtc_bbpll_enable();
-                clocks_ll::esp32c6_rtc_bbpll_configure(xtal_freq, pll_freq);
-                clocks_ll::esp32c6_rtc_freq_to_pll_mhz(cpu_clock_speed);
-                clocks_ll::esp32c6_rtc_apb_freq_update(apb_freq);
-            }
-        } else {
-            apb_freq = ApbClock::ApbFreq80MHz;
-        }
+    const MASK: u64 = (1 << RtcClock::CAL_FRACT) - 1;
+    let upper = (ticks & !MASK) >> RtcClock::CAL_FRACT;
+    let lower = ticks & MASK;
 
-        Self {
-            cpu_clock: cpu_clock_speed.frequency(),
-            apb_clock: apb_freq.frequency(),
-            xtal_clock: xtal_freq.frequency(),
-            crypto_clock: Rate::from_mhz(160),
-        }
-    }
+    upper * period + ((lower * period) >> RtcClock::CAL_FRACT)
 }
 
-#[cfg(esp32h2)]
-impl Clocks {
-    fn measure_xtal_frequency() -> XtalClock {
-        XtalClock::_32M
-    }
+/// Convert microseconds to RTC slow clock ticks using the calibrated period.
+pub(crate) fn us_to_rtc_ticks(time_in_us: u64) -> u64 {
+    let period = rtc_slow_cal_period();
 
-    /// Configure the CPU clock speed.
-    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = Self::measure_xtal_frequency();
-
-        let apb_freq;
-        if cpu_clock_speed != CpuClock::default() {
-            if cpu_clock_speed.mhz() <= xtal_freq.mhz() {
-                apb_freq = ApbClock::ApbFreqOther(cpu_clock_speed.mhz());
-                clocks_ll::esp32h2_rtc_update_to_xtal(xtal_freq, 1);
-                clocks_ll::esp32h2_rtc_apb_freq_update(apb_freq);
-            } else {
-                let pll_freq = PllClock::Pll96MHz;
-                apb_freq = ApbClock::ApbFreq32MHz;
-                clocks_ll::esp32h2_rtc_bbpll_enable();
-                clocks_ll::esp32h2_rtc_bbpll_configure(xtal_freq, pll_freq);
-                clocks_ll::esp32h2_rtc_freq_to_pll_mhz(cpu_clock_speed);
-                clocks_ll::esp32h2_rtc_apb_freq_update(apb_freq);
-            }
-        } else {
-            apb_freq = ApbClock::ApbFreq32MHz;
-        }
-
-        Self {
-            cpu_clock: cpu_clock_speed.frequency(),
-            apb_clock: apb_freq.frequency(),
-            xtal_clock: xtal_freq.frequency(),
-            pll_48m_clock: Rate::from_mhz(48),
-            crypto_clock: Rate::from_mhz(96),
-            pll_96m_clock: Rate::from_mhz(96),
-        }
-    }
-}
-
-#[cfg(esp32s2)]
-impl Clocks {
-    fn measure_xtal_frequency() -> XtalClock {
-        XtalClock::_40M
-    }
-
-    /// Configure the CPU clock speed.
-    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = Self::measure_xtal_frequency();
-
-        if cpu_clock_speed != CpuClock::default() {
-            clocks_ll::set_cpu_clock(cpu_clock_speed);
-        }
-
-        Self {
-            cpu_clock: cpu_clock_speed.frequency(),
-            apb_clock: Rate::from_mhz(80),
-            xtal_clock: xtal_freq.frequency(),
-        }
-    }
-}
-
-#[cfg(esp32s3)]
-impl Clocks {
-    fn measure_xtal_frequency() -> XtalClock {
-        XtalClock::_40M
-    }
-
-    /// Configure the CPU clock speed.
-    pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
-        let xtal_freq = Self::measure_xtal_frequency();
-
-        if cpu_clock_speed != CpuClock::default() {
-            clocks_ll::set_cpu_clock(cpu_clock_speed);
-        }
-
-        Self {
-            cpu_clock: cpu_clock_speed.frequency(),
-            apb_clock: Rate::from_mhz(80),
-            xtal_clock: xtal_freq.frequency(),
-            crypto_pwm_clock: Rate::from_mhz(160),
-        }
-    }
-}
-
-/// Control the radio peripheral clocks
-#[cfg(any(bt, ieee802154, wifi))]
-#[instability::unstable]
-pub struct RadioClockController<'d> {
-    _rcc: PeripheralRef<'d, crate::peripherals::RADIO_CLK>,
-}
-
-#[cfg(any(bt, ieee802154, wifi))]
-impl<'d> RadioClockController<'d> {
-    /// Create a new instance of the radio clock controller
-    #[instability::unstable]
-    pub fn new(rcc: impl Peripheral<P = crate::peripherals::RADIO_CLK> + 'd) -> Self {
-        crate::into_ref!(rcc);
-        Self { _rcc: rcc }
-    }
-
-    /// Enable the PHY clocks
-    #[instability::unstable]
-    #[cfg(phy)]
-    #[inline]
-    pub fn enable_phy(&mut self, enable: bool) {
-        clocks_ll::enable_phy(enable);
-    }
-
-    /// Enable the Bluetooth clocks
-    #[instability::unstable]
-    #[cfg(bt)]
-    #[inline]
-    pub fn enable_bt(&mut self, enable: bool) {
-        clocks_ll::enable_bt(enable);
-    }
-
-    /// Enable the WiFi clocks
-    #[instability::unstable]
-    #[cfg(wifi)]
-    #[inline]
-    pub fn enable_wifi(&mut self, enable: bool) {
-        clocks_ll::enable_wifi(enable);
-    }
-
-    /// Enable the IEEE 802.15.4 peripheral clocks
-    #[instability::unstable]
-    #[cfg(ieee802154)]
-    #[inline]
-    pub fn enable_ieee802154(&mut self, enable: bool) {
-        clocks_ll::enable_ieee802154(enable);
-    }
-
-    /// Reset the MAC
-    #[instability::unstable]
-    #[inline]
-    pub fn reset_mac(&mut self) {
-        clocks_ll::reset_mac();
-    }
-
-    /// Do any common initial initialization needed
-    #[instability::unstable]
-    #[inline]
-    pub fn init_clocks(&mut self) {
-        clocks_ll::init_clocks();
-    }
-
-    /// Initialize BLE RTC clocks
-    #[instability::unstable]
-    #[inline]
-    pub fn ble_rtc_clk_init(&mut self) {
-        clocks_ll::ble_rtc_clk_init();
-    }
-
-    /// Reset the Resolvable Private Address (RPA).
-    #[instability::unstable]
-    #[inline]
-    pub fn reset_rpa(&mut self) {
-        clocks_ll::reset_rpa();
+    if time_in_us > (u64::MAX >> RtcClock::CAL_FRACT) {
+        ((time_in_us / period) << RtcClock::CAL_FRACT)
+            + ((time_in_us % period) << RtcClock::CAL_FRACT) / period
+    } else {
+        (time_in_us << RtcClock::CAL_FRACT) / period
     }
 }

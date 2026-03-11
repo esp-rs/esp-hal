@@ -1,16 +1,3 @@
-/* before memory.x to allow override */
-ENTRY(ESP32Reset)
-
-/* after memory.x to allow override */
-PROVIDE(__pre_init = DefaultPreInit);
-PROVIDE(__zero_bss = default_mem_hook);
-PROVIDE(__init_data = default_mem_hook);
-PROVIDE(__post_init = default_post_init);
-
-PROVIDE(__level_1_interrupt = handle_interrupts);
-PROVIDE(__level_2_interrupt = handle_interrupts);
-PROVIDE(__level_3_interrupt = handle_interrupts);
-
 INCLUDE exception.x
 
 SECTIONS {
@@ -29,7 +16,7 @@ SECTIONS {
 
     /* Create an empty gap as big as .text section */
 
-    . = . + SIZEOF(.rodata_desc);
+    . = . + SIZEOF(.flash.appdesc);
     . = . + SIZEOF(.rodata);
     . = . + SIZEOF(.rodata.wifi);
 
@@ -54,7 +41,6 @@ INSERT BEFORE .data;
 
 /* Shared sections - ordering matters */
 SECTIONS {
-  INCLUDE "rodata_desc.x"
   INCLUDE "rwtext.x"
   INCLUDE "rwdata.x"
 }
@@ -64,8 +50,6 @@ INCLUDE "rtc_fast.x"
 INCLUDE "rtc_slow.x"
 INCLUDE "stack.x"
 INCLUDE "dram2.x"
+INCLUDE "metadata.x"
+INCLUDE "eh_frame.x"
 /* End of Shared sections */
-
-EXTERN(DefaultHandler);
-
-INCLUDE "device.x"

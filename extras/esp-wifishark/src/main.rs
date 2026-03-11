@@ -35,7 +35,7 @@ fn main() {
 
     let wifi_capture_interface = Interface {
         value: "wifi".into(),
-        display: "esp-wifi Ethernet capture".into(),
+        display: "esp-radio Ethernet capture".into(),
         dlt: Dlt {
             data_link_type: DataLink::USER0,
             name: "USER0".into(),
@@ -45,7 +45,7 @@ fn main() {
 
     let bt_capture_interface = Interface {
         value: "bt".into(),
-        display: "esp-wifi HCI capture".into(),
+        display: "esp-radio HCI capture".into(),
         dlt: Dlt {
             data_link_type: DataLink::USER1,
             name: "USER1".into(),
@@ -56,8 +56,8 @@ fn main() {
     match args.extcap.run().unwrap() {
         ExtcapStep::Interfaces(interfaces_step) => {
             let metadata = Metadata {
-                help_url: "http://github.com/esp-rs/esp-wifi".into(),
-                display_description: "esp-wifi".into(),
+                help_url: "https://github.com/esp-rs/esp-hal/tree/main/esp-radio".into(),
+                display_description: "esp-radio".into(),
                 ..r_extcap::cargo_metadata!()
             };
 

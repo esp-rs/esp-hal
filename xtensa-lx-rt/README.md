@@ -1,8 +1,8 @@
 # `xtensa-lx-rt`
 
 [![Crates.io](https://img.shields.io/crates/v/xtensa-lx-rt?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/xtensa-lx-rt)
-[![docs.rs](https://img.shields.io/docsrs/xtensa-lx-rt?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/xtensa-lx-rt)
-![MSRV](https://img.shields.io/badge/MSRV-1.84-blue?labelColor=1C2C2E&style=flat-square)
+[![docs.rs](https://img.shields.io/docsrs/xtensa-lx-rt?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.espressif.com/projects/rust/xtensa-lx-rt/latest/)
+![MSRV](https://img.shields.io/badge/MSRV-1.88.0-blue?labelColor=1C2C2E&style=flat-square)
 ![Crates.io](https://img.shields.io/crates/l/xtensa-lx-rt?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
@@ -16,7 +16,7 @@ Minimal runtime/startup for Xtensa LX processors. This crate currently supports 
 
 ## I get linker errors when I build for debug
 
-Xtensa only provides a small code space for exceptions to fit inside, when building an unoptimized build the code size of a exception handler may exceed that size, causing a linker error. To fix this, you should always optimize this crate, even in debug builds. Adding the following to your projects `Cargo.toml` should do the trick.
+Xtensa only provides a small code space for exceptions to fit inside, when building an unoptimized build the code size of an exception handler may exceed that size, causing a linker error. To fix this, you should always optimize this crate, even in debug builds. Adding the following to your projects `Cargo.toml` should do the trick.
 
 ```toml
 [profile.dev.package.xtensa-lx-rt]

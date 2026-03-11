@@ -1,18 +1,18 @@
 # esp-riscv-rt
 
 [![Crates.io](https://img.shields.io/crates/v/esp-riscv-rt?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-riscv-rt)
-[![docs.rs](https://img.shields.io/docsrs/esp-riscv-rt?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp-riscv-rt)
-![MSRV](https://img.shields.io/badge/MSRV-1.84-blue?labelColor=1C2C2E&style=flat-square)
+[![docs.rs](https://img.shields.io/docsrs/esp-riscv-rt?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.espressif.com/projects/rust/esp-riscv-rt/latest/)
+![MSRV](https://img.shields.io/badge/MSRV-1.86.0-blue?labelColor=1C2C2E&style=flat-square)
 ![Crates.io](https://img.shields.io/crates/l/esp-riscv-rt?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
 Minimal runtime / startup for RISC-V devices from Espressif.
 
-Much of the code in this package originated in the [rust-embedded/riscv] repository.
+This is using [rust-embedded/riscv] under the hood as much as possible and uses custom code where needed.
 
 [rust-embedded/riscv]: https://github.com/rust-embedded/riscv
 
-## [Documentation](https://docs.rs/crate/esp-riscv-rt)
+## [Documentation](https://docs.espressif.com/projects/rust/esp-riscv-rt/latest/)
 
 ## Minimum Supported Rust Version (MSRV)
 

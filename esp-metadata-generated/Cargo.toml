@@ -1,0 +1,30 @@
+[package]
+name          = "esp-metadata-generated"
+version       = "0.3.0"
+edition       = "2024"
+rust-version  = "1.86.0"
+description   = "Generated metadata for Espressif devices"
+documentation = "https://docs.espressif.com/projects/rust/esp-metadata-generated/latest/"
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
+
+[package.metadata.espressif]
+check-configs = [
+    { features = [] },
+    { features = ["build-script"] },
+]
+clippy-configs = [] # don't waste time on this
+
+[dependencies]
+
+[features]
+build-script = []
+_device-selected = []
+esp32   = ["_device-selected"]
+esp32c2 = ["_device-selected"]
+esp32c3 = ["_device-selected"]
+esp32c5 = ["_device-selected"]
+esp32c6 = ["_device-selected"]
+esp32h2 = ["_device-selected"]
+esp32s2 = ["_device-selected"]
+esp32s3 = ["_device-selected"]

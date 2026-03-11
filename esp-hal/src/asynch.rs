@@ -2,8 +2,7 @@
 use core::task::Waker;
 
 use embassy_sync::waitqueue::GenericAtomicWaker;
-
-use crate::sync::RawMutex;
+use esp_sync::RawMutex;
 
 /// Utility struct to register and wake a waker.
 pub struct AtomicWaker {
@@ -19,12 +18,15 @@ impl AtomicWaker {
         }
     }
 
-    delegate::delegate! {
-        to self.waker {
-            /// Register a waker. Overwrites the previous waker, if any.
-            pub fn register(&self, w: &Waker);
-            /// Wake the registered waker, if any.
-            pub fn wake(&self);
-        }
+    /// Register a waker. Overwrites the previous waker, if any.
+    #[inline]
+    pub fn register(&self, w: &Waker) {
+        self.waker.register(w);
+    }
+
+    /// Wake the registered waker, if any.
+    #[crate::ram]
+    pub fn wake(&self) {
+        self.waker.wake();
     }
 }

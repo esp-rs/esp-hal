@@ -14,6 +14,8 @@ use esp_hal::{
 };
 use esp_println::println;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();

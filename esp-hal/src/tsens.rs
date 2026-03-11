@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Temperature Sensor (tsens)
 //!
 //! ## Overview
@@ -22,30 +23,27 @@
 //! second, and print it
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::tsens::{TemperatureSensor, Config};
 //! # use esp_hal::delay::Delay;
 //!
-//! let temperature_sensor = TemperatureSensor::new(
-//!         peripherals.TSENS,
-//!         Config::default())?;
+//! let temperature_sensor = TemperatureSensor::new(peripherals.TSENS, Config::default())?;
 //! let delay = Delay::new();
 //! delay.delay_micros(200);
 //! loop {
-//!   let temp = temperature_sensor.get_temperature();
-//!   println!("Temperature: {:.2}°C", temp.to_celcius());
-//!   delay.delay_millis(1_000);
+//!     let temp = temperature_sensor.get_temperature();
+//!     println!("Temperature: {:.2}°C", temp.to_celcius());
+//!     delay.delay_millis(1_000);
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! ## Implementation State
 //!
 //! - Temperature calibration range is not supported
 //! - Interrupts are not supported
 
 use crate::{
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::{APB_SARADC, TSENS},
     system::GenericPeripheralGuard,
 };
@@ -120,7 +118,7 @@ impl Temperature {
 /// Temperature sensor driver
 #[derive(Debug)]
 pub struct TemperatureSensor<'d> {
-    _peripheral: PeripheralRef<'d, TSENS>,
+    _peripheral: TSENS<'d>,
     _tsens_guard: GenericPeripheralGuard<{ crate::system::Peripheral::Tsens as u8 }>,
     _abp_saradc_guard: GenericPeripheralGuard<{ crate::system::Peripheral::ApbSarAdc as u8 }>,
 }
@@ -128,11 +126,7 @@ pub struct TemperatureSensor<'d> {
 impl<'d> TemperatureSensor<'d> {
     /// Create a new temperature sensor instance with configuration
     /// The sensor will be automatically powered up
-    pub fn new(
-        peripheral: impl Peripheral<P = TSENS> + 'd,
-        config: Config,
-    ) -> Result<Self, ConfigError> {
-        crate::into_ref!(peripheral);
+    pub fn new(peripheral: TSENS<'d>, config: Config) -> Result<Self, ConfigError> {
         // NOTE: We need enable ApbSarAdc before enabling Tsens
         let apb_saradc_guard = GenericPeripheralGuard::new();
         let tsens_guard = GenericPeripheralGuard::new();

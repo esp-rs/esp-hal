@@ -1,52 +1,71 @@
+use enumset::EnumSet;
 use portable_atomic::{AtomicBool, Ordering};
 
-use crate::{asynch::AtomicWaker, dma::*, peripheral::Peripheral, peripherals::Interrupt};
+use crate::{
+    asynch::AtomicWaker,
+    dma::{
+        BurstConfig,
+        DmaChannel,
+        DmaPeripheral,
+        DmaRxChannel,
+        DmaRxInterrupt,
+        DmaTxChannel,
+        DmaTxInterrupt,
+        InterruptAccess,
+        PdmaChannel,
+        RegisterAccess,
+        RxRegisterAccess,
+        TxRegisterAccess,
+    },
+    interrupt::InterruptHandler,
+    peripherals::Interrupt,
+    system::Peripheral,
+};
 
 pub(super) type SpiRegisterBlock = crate::pac::spi2::RegisterBlock;
 
 /// The RX half of an arbitrary SPI DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct AnySpiDmaRxChannel(pub(crate) AnySpiDmaChannel);
+pub struct AnySpiDmaRxChannel<'d>(pub(crate) AnySpiDmaChannel<'d>);
 
-impl AnySpiDmaRxChannel {
+impl AnySpiDmaRxChannel<'_> {
     fn regs(&self) -> &SpiRegisterBlock {
         self.0.register_block()
     }
 }
 
-impl crate::private::Sealed for AnySpiDmaRxChannel {}
-impl DmaRxChannel for AnySpiDmaRxChannel {}
-impl Peripheral for AnySpiDmaRxChannel {
-    type P = Self;
-
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Self(self.0.clone_unchecked())
-    }
-}
+impl crate::private::Sealed for AnySpiDmaRxChannel<'_> {}
+impl DmaRxChannel for AnySpiDmaRxChannel<'_> {}
 
 /// The TX half of an arbitrary SPI DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct AnySpiDmaTxChannel(pub(crate) AnySpiDmaChannel);
+pub struct AnySpiDmaTxChannel<'d>(pub(crate) AnySpiDmaChannel<'d>);
 
-impl AnySpiDmaTxChannel {
+impl AnySpiDmaTxChannel<'_> {
     fn regs(&self) -> &SpiRegisterBlock {
         self.0.register_block()
     }
 }
 
-impl crate::private::Sealed for AnySpiDmaTxChannel {}
-impl DmaTxChannel for AnySpiDmaTxChannel {}
-impl Peripheral for AnySpiDmaTxChannel {
-    type P = Self;
+impl crate::private::Sealed for AnySpiDmaTxChannel<'_> {}
+impl DmaTxChannel for AnySpiDmaTxChannel<'_> {}
 
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Self(self.0.clone_unchecked())
+impl RegisterAccess for AnySpiDmaTxChannel<'_> {
+    fn peripheral_clock(&self) -> Option<Peripheral> {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                Some(Peripheral::SpiDma)
+            } else {
+                match self.0 {
+                    AnySpiDmaChannel(any::Inner::Spi2(_)) => Some(Peripheral::Spi2Dma),
+                    AnySpiDmaChannel(any::Inner::Spi3(_)) => Some(Peripheral::Spi3Dma),
+                }
+            }
+        }
     }
-}
 
-impl RegisterAccess for AnySpiDmaTxChannel {
     fn reset(&self) {
         self.regs().dma_conf().modify(|_, w| w.out_rst().set_bit());
         self.regs()
@@ -105,7 +124,7 @@ impl RegisterAccess for AnySpiDmaTxChannel {
     }
 
     #[cfg(psram_dma)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+    fn set_ext_mem_block_size(&self, size: crate::dma::DmaExtMemBKSize) {
         self.regs()
             .dma_conf()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
@@ -113,11 +132,11 @@ impl RegisterAccess for AnySpiDmaTxChannel {
 
     #[cfg(psram_dma)]
     fn can_access_psram(&self) -> bool {
-        matches!(self.0, AnySpiDmaChannel(AnySpiDmaChannelInner::Spi2(_)))
+        matches!(self.0, AnySpiDmaChannel(any::Inner::Spi2(_)))
     }
 }
 
-impl TxRegisterAccess for AnySpiDmaTxChannel {
+impl TxRegisterAccess for AnySpiDmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
@@ -150,7 +169,7 @@ impl TxRegisterAccess for AnySpiDmaTxChannel {
     }
 }
 
-impl InterruptAccess<DmaTxInterrupt> for AnySpiDmaTxChannel {
+impl InterruptAccess<DmaTxInterrupt> for AnySpiDmaTxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaTxInterrupt>, enable: bool) {
         self.regs().dma_int_ena().modify(|_, w| {
             for interrupt in interrupts {
@@ -232,7 +251,20 @@ impl InterruptAccess<DmaTxInterrupt> for AnySpiDmaTxChannel {
     }
 }
 
-impl RegisterAccess for AnySpiDmaRxChannel {
+impl RegisterAccess for AnySpiDmaRxChannel<'_> {
+    fn peripheral_clock(&self) -> Option<Peripheral> {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                Some(Peripheral::SpiDma)
+            } else {
+                match self.0 {
+                    AnySpiDmaChannel(any::Inner::Spi2(_)) => Some(Peripheral::Spi2Dma),
+                    AnySpiDmaChannel(any::Inner::Spi3(_)) => Some(Peripheral::Spi3Dma),
+                }
+            }
+        }
+    }
+
     fn reset(&self) {
         self.regs().dma_conf().modify(|_, w| w.in_rst().set_bit());
         self.regs().dma_conf().modify(|_, w| w.in_rst().clear_bit());
@@ -285,7 +317,7 @@ impl RegisterAccess for AnySpiDmaRxChannel {
     }
 
     #[cfg(psram_dma)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+    fn set_ext_mem_block_size(&self, size: crate::dma::DmaExtMemBKSize) {
         self.regs()
             .dma_conf()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
@@ -293,11 +325,11 @@ impl RegisterAccess for AnySpiDmaRxChannel {
 
     #[cfg(psram_dma)]
     fn can_access_psram(&self) -> bool {
-        matches!(self.0, AnySpiDmaChannel(AnySpiDmaChannelInner::Spi2(_)))
+        matches!(self.0, AnySpiDmaChannel(any::Inner::Spi2(_)))
     }
 }
 
-impl RxRegisterAccess for AnySpiDmaRxChannel {
+impl RxRegisterAccess for AnySpiDmaRxChannel<'_> {
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
         Some(self.0.peripheral_interrupt())
     }
@@ -307,7 +339,7 @@ impl RxRegisterAccess for AnySpiDmaRxChannel {
     }
 }
 
-impl InterruptAccess<DmaRxInterrupt> for AnySpiDmaRxChannel {
+impl InterruptAccess<DmaRxInterrupt> for AnySpiDmaRxChannel<'_> {
     fn enable_listen(&self, interrupts: EnumSet<DmaRxInterrupt>, enable: bool) {
         self.regs().dma_int_ena().modify(|_, w| {
             for interrupt in interrupts {
@@ -399,15 +431,15 @@ impl InterruptAccess<DmaRxInterrupt> for AnySpiDmaRxChannel {
 
 crate::any_peripheral! {
     /// An SPI-compatible type-erased DMA channel.
-    pub peripheral AnySpiDmaChannel {
-        Spi2(Spi2DmaChannel),
-        Spi3(Spi3DmaChannel),
+    pub peripheral AnySpiDmaChannel<'d> {
+        Spi2(crate::peripherals::DMA_SPI2<'d>),
+        Spi3(crate::peripherals::DMA_SPI3<'d>),
     }
 }
 
-impl DmaChannel for AnySpiDmaChannel {
-    type Rx = AnySpiDmaRxChannel;
-    type Tx = AnySpiDmaTxChannel;
+impl<'d> DmaChannel for AnySpiDmaChannel<'d> {
+    type Rx = AnySpiDmaRxChannel<'d>;
+    type Tx = AnySpiDmaTxChannel<'d>;
 
     unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
         (
@@ -417,13 +449,13 @@ impl DmaChannel for AnySpiDmaChannel {
     }
 }
 
-impl PdmaChannel for AnySpiDmaChannel {
+impl PdmaChannel for AnySpiDmaChannel<'_> {
     type RegisterBlock = SpiRegisterBlock;
 
     delegate::delegate! {
         to match &self.0 {
-            AnySpiDmaChannelInner::Spi2(channel) => channel,
-            AnySpiDmaChannelInner::Spi3(channel) => channel,
+            any::Inner::Spi2(channel) => channel,
+            any::Inner::Spi3(channel) => channel,
         } {
             fn register_block(&self) -> &SpiRegisterBlock;
             fn tx_waker(&self) -> &'static AtomicWaker;

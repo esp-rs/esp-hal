@@ -13,6 +13,7 @@ MEMORY
                   [0x50000000, 0x50002000, "RTC_IRAM"],
                   [0x50000000, 0x50002000, "RTC_DRAM"],
                   [0x600FE000, 0x60100000, "MEM_INTERNAL2"]]
+    */
 
     ICACHE : ORIGIN = 0x4037C000,  LENGTH = 0x4000
     /* Instruction RAM */

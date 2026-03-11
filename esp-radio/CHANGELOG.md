@@ -1,0 +1,431 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- It's now possible to obtain the access point info of the currently connected AP, by using `WifiController::ap_info(&self)` (#4405)
+- `ble::mac` to get the MAC address of the device (#4485)
+- `last_calibration_result` to get the result of the last calibration (#4479)
+- `BleInitError` for BLE init failures and `Internal`, `WrongClockConfig`, `SchedulerNotInitialized` and `Adc2IsUsed` variants to `WifiError (#4482)
+- `wifi::csi::WifiCsiInfo` wraps `wifi::wifi_csi_info_t` (#4643)
+- `WifiController::set_channel()`, `WifiController::channel()` `WifiController::set_bandwidth()`, `WifiController::bandwidth()` methods and `Bandwidth` enum (#4705)
+- Exposed types necessary to configure the ble `Config` structure. (#4764)
+- New configuration options `ESP_RADIO_CONFIG_EVENT_CHANNEL_CAPACITY` and `ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS` to configure the internal event channel. (#4898)
+- A new `subscribe()` method on `WifiController` to get an `EventSubscriber` for receiving Wi-Fi events. (#4898)
+- New event-related types: `event::EventInfo`, `event::WifiEvent`, `wifi::DisconnectReason`, `wifi::ConnectedStationInfo`, `wifi::DisconnectedStationInfo`, `wifi::AccessPointStationConnectedInfo`, `wifi::AccessPointStationDisconnectedInfo`, `wifi::AccessPointStationEventInfo`. (#4898)
+- `enable_wifi_events` and `disable_wifi_events` functions to control which Wi-Fi events are processed. (#4898)
+- Added `WifiController::set_max_tx_power`, allowing the configuration of the maximum Wi-Fi transmitting power. (#4906)
+- Basic WiFi support for ESP32-C5 (#5003)
+- `set_band_mode` to support 5G-band (#5023)
+- BLE Support for ESP32-C5 (#5065)
+- IEEE 802.15.4 Support for ESP32-C5 (#5070)
+
+### Changed
+
+- `phy_calibration_data` and `set_phy_calibration_data` are now marked as `unstable`. (#4463)
+- The `InitializationError::General` is replaced by `InitializationError::Internal` (#4467)
+- The `WifiError::InternalError` is removed and `InternalWifiError` was folded into `WifiError`, some variants renamed for clarity (#4467)
+- Refactor: extract submodules from `esp_radio::wifi` module (#4460)
+- `BleConnector::new` returns `BleInitError` instead of `InvalidConfigError` (#4482)
+- `esp_radio::init()` is not public anymore (#4482)
+- `esp_radio::wifi::new` and `BleConnector::new` no longer take a `Controller` (#4482)
+- The `Client` and `Sta` are replaced with `Station`, `Ap` with `AccessPoint` and `ApSta` with `AccessPointStation` (#4546)
+- `WifiEvent` uses full names for events instead of acronyms (#4554)
+- `WifiController::set_mode` is now unstable (#4570)
+- `ScanTypeConfig` now uses `esp_hal::time::Duration` instead of `core::time::Duration` (#4609)
+- The `CsiConfig` struct has been moved to the `wifi::csi` module (#4588)
+- The `ScanTypeConfig`, and `ScanConfig` types have been moved to `wifi::scan` (#4588)
+- `esp-alloc` dependency no longer enables default features (#4721)
+- `sys-logs` feature has been renamed to `print-logs-from-driver` and has been marked unstable (#4810)
+- Unstable features now require the `unstable` feature flag to be enabled (#4810)
+- `RxControlInfo` is unstable, `RxControlInfo::from_raw()` is no longer public (#4811)
+- `event`, `sniffer`, and `csi` modules are marked unstable (#4811)
+- `WifiDevice` has been renamed to `Interface` and `WifiDeviceMode` to `InterfaceType` (#4881)
+- `wifi::Config` has been changed to `wifi::ControllerConfig` and `wifi::ModeConfig` into `wifi::Config` (#4891)
+- `connect_async` now returns `Ok(ConnectedStationInfo)` on success, providing detailed information about the connection. (#4898)
+- `disconnect_async` now returns `Ok(DisconnectedStationInfo)`. (#4898)
+- `WifiError::Disconnected` is now a tuple-like enum variant `WifiError::Disconnected(DisconnectedStationInfo)` containing details about the disconnection. (#4898)
+- `WifiController::scan_with_config_async` has been changed to `WifiController::scan_async` (#4946)
+- Various structs now use the `Ssid` type to represent SSIDs instead of `String` (#4953)
+- Update to `bt-hci` version 0.8 and `trouble-host` version 0.6 (#4962)
+- `WifiController::is_connected()` now returns a simple `bool` instead of `Result<bool, WifiError>` and is marked as unstable (#4971)
+- `ScanMethod` has been moved to `wifi::sta` (#5033)
+- `set_protocols` / `set_bandwidths` changed to support 5G-band (#5023)
+- `CountryInfo` is now unstable (#4981)
+- MAC addresses now should be obtained from `esp_hal::efuse::interface_mac_address(InterfaceMacAddress::...)`. (#5002)
+- `WifiError::Unknown(i32)` has been renamed to `WifiError::Internal(i32)` (#5018)
+- The default BLE task priority is no longer higher than the maximum priority supported by the OS (#5074)
+
+### Fixed
+
+- Avoid panicking in WiFi scan if an access point with using an unmapped auth-method is found (#4458)
+- Fixed a linker error (about missing symbols) when the `wifi` feature is selected but the code doesn't use it (#4513)
+- ESP32-C2: Disable BLE controller before deinitializing the stack (#4606)
+- Fix a crash after shutting down WiFi (#4761)
+- Fix a crash when trying to handle an unknown WiFi event (#4942)
+- Align IEEE 802.15.4 driver with ESP-IDF 5.5.2 C driver: overhauled ISR event handling, added timer0-based ACK timeout, per-state stop dispatch, TX deferral with pending TX mechanism, CCA support, ACK frame return, and fixed TX power default (20 dBm) (#5006)
+- `WifiController::set_config` now stops the Wi-Fi controller on error to avoid leaving the controller in an inconsistent state. (#5100)
+
+### Removed
+
+- The `serde` feature has been removed (#4435)
+- `Controller` struct and `InitializationError::InterruptsDisabled` enum variant have been removed (#4482)
+- `wifi::wifi_csi_info_t` is no longer exposed to the public API (#4643)
+- the free standing `xxx_state()` functions have been removed together with their return types `WifiApState`/`WifiStaState` (#4571)
+- `wifi::Country` has been replaced by `wifi::CountryInfo` (#4788)
+- `InitializationError` is no longer `pub` for `wifi` (#4809)
+- `wifi::Capability` and `WifiController::capabilities()` no longer available (#4816)
+- `FreeApListOnDrop` is no longer available (#4816)
+- `wifi::ModeConfig::None` is no longer available (#4834)
+- Support for non-async `start`,`stop`,`scan`,`connect` and `disconnect` in `WifiController` has been removed (#4870)
+- Support for the feature `smoltcp` has been removed (#4870)
+- The `event::EventExt` trait and its associated handler functions (`update_handler`, `take_handler`, `replace_handler`) have been removed. Use `WifiController::subscribe()` instead. (#4898)
+- `WifiController` methods `wait_for_event`, `wait_for_events`, and `wait_for_all_events` have been removed. They are replaced by `wait_for_disconnect_async`, `wait_for_access_point_connected_event_async`, or by using an `EventSubscriber`. (#4898)
+- `wifi::WifiMode` and `WifiController::set_mode` have been removed (#4991)
+- `WifiController` methods `start_async` and `stop_async` have been removed. `set_config` will now make sure that the controller is started / re-started as needed. Dropping the controller will stop it first. (#4984)
+- `power_save` has been dropped from `ControllerConfig` (#4981)
+- MAC address getters: `access_point_mac()`, `station_mac()` and `ble::mac()`. (#5002)
+- `WifiController::is_started()` has been removed (#5039)
+- `WifiError::{Interface, Nvs, InvalidMac, WakeFailed, WouldBlock, PostFail, UnknownWifiMode, NotInitialized, NotStopped, Mode, State, ControlBlock, Timeout, InvalidInitState, StopState, NotAssociated, TxDisallowed, Internal(i32), WrongClockConfig, SchedulerNotInitialized, AdcIsUsed, NotStarted}` have been removed (#5018, #5039)
+
+## [v0.17.0] - 2025-10-30
+
+### Fixed
+
+- Avoid 802.15.4 rx stopping when BLE is used at the same time (#4348)
+- Fixed undefined behaviour in `WifiController::scan_with_config` (#4408)
+
+## [v0.16.0] - 2025-10-13
+
+### Added
+
+- `AccessPointInfo::country` to access the Country Code from the Wi-Fi scan results (#3837)
+- `unstable` feature to opt into `ble`, `esp-now`, `csi`, `sniffer`, `esp-ieee802154` and `smoltcp` APIs (#3865)
+- Added unstable `wifi-eap` feature (#3924)
+- Optional `max` field in `ScanConfig` to allow limiting the number of returned results (#3963)
+- `set_phy_calibration_data` and `phy_calibration_data` (#4001)
+- common traits for `Protocol`, `Country`, (#4017)
+- `BuilderLite` pattern to `AccessPointConfig`, `ClientConfig`, and `EapClientConfig` (#4017, #4115)
+- lifetime to `Sniffer` (#4017)
+- `dtim_period` parameter for `PowerSaveMode` (#4040)
+- `WifiConfig`, `CountryInfo` and `OperatingClass` (#4121)
+- Configuration options for `BleController` (#4223, #4254, #4259)
+- BLE controller: Added support for `embedded-io 0.7` (#4280)
+
+### Changed
+
+- `esp_wifi::init` no longer needs an `RNG` driver. (#3829)
+- The `builtin-scheduler` feature has been removed. Your project will have to specify a task scheduler. (#3855)
+- `esp-wifi` has been renamed to `esp-radio`. (#3858)
+- Removed `EspWifi` prefix from structs in the package codebase. (#3869)
+- Rename `esp-wifi` to `esp-radio`. (#3858)
+- `esp-ieee802154` package has been folded into `esp-radio`, it's now alloc. (#3861, #3890)
+- `ble`, `esp-now`, `csi`, `sniffer`, `esp-ieee802154` and `smoltcp` features and APIs marked as unstable (#3865)
+- Update bt-hci version to add additional HCI commands (#3920)
+- `AuthMethod`, `Protocol`, `AccessPointInfo`, `AccessPointConfiguration`, `ClientConfiguration`, `Capability`, `Configuration`, `WifiEvent`, `InternalWifiError`, `ScanTypeConfig`, `WifiState`, and `WifiMode` have been marked as `#[non_exhaustive]` (#3981, #4017)
+- The `Configuration`, `ClientConfiguration`, `AccessPointConfiguration`, and `EapClientConfiguration` enums have been renamed to `ModeConfig`, `ClientConfig`, `AccessPointConfig`, and `EapClientConfig` (#3994, #4278)
+- Error types implement `core::error::Error` (#3994, #4278)
+- Use `esp-phy` internally for PHY initialization (#3892)
+- `ap_state()` and `sta_state()` marked as stable (#4017)
+- `wifi_state()` marked as unstable (#4017)
+- `ap_mac` and `sta_mac` returns `[u8; 6]` instead of taking an `[u8; 6]` argument (#4017)
+- `RxControlInfo` hidden behind `esp-now` feature (#4017)
+- `set_configuration()` to `set_config() (#4017)
+- `WifiState` split into `WifiStaState` and `WifiApState` (#4046)
+- `Mixed` has been renamed to `ApSta` in `Config` and `Capability` (#4040)
+- The memory allocation functions expected by `esp_radio` have been renamed and extended (#3890, #4043)
+- Updated radio related drivers to ESP-IDF 5.5.1 (#4113)
+- Event handlers are now passed the event by reference (#4113)
+- Some build-time configuration options have been replaced by runtime options in `WifiConfig` (#4121)
+- Update to bt-hci version with flash usage improvements (#4146, #4165)
+- `scan_mode`, `(ap_)beacon_timeout`, `listen_interval` and `failure_retry_cnt` config options have been replaced by runtime options in `AccessPointConfig`, `ClientConfig` and `EapClientConfig` (#4224)
+- The `ieee802154_rx_queue_size` config option has been replaced by a runtime option in `esp_radio::ieee802154::Config` (#4224)
+- The default value of `wifi_max_burst_size` has been changed to 3 (#4231)
+- Set `ble_ll_sync_cnt` to 0 on C6, C2 and H2 as in esp-idf Kconfig default (#4241)
+- `esp_radio::wifi::WifiController::scan_with_config_sync` has been renamed to `scan_with_config` (#4294)
+- `wifi::AuthMethod` has been renamed to `wifi::AuthenticationMethod` (#4778)
+- `wifi::Bandwidth` is now `#[non_exhaustive]` (#4816)
+
+### Fixed
+
+- Fixed a BLE panic caused by unimplemented functions (#3762)
+- Fixed the BLE stack crashing in certain cases (#3854)
+- `ADC2` now cannot be used simultaneously with `radio` on ESP32 (#3876)
+- Fixed names of some Wi-Fi events: ApStaConnected, ApStaDisconnected, ApProbeReqReceived (#4065)
+- BLE on ESP32-C2 with 26MHz xtal (#4062)
+
+### Removed
+
+- `scan_with_config_sync_max`, `scan_with_config_sync_max`, `scan_n`, and `scan_n_async` functions (#3963)
+- `EnumSetType` from `Protocol`, `Country` enums (#4017)
+- `AtomicWifiState` and `WifiDeviceMode` are not available anymore (#4029)
+- `wifi_state()` and `WifiState` are not available anymore (#4046)
+- `config` module (#4040)
+- Remove `as_client_conf_ref`, `as_ap_conf_ref`, `as_ap_conf_mut`, `as_client_conf_mut` and `as_mixed_conf_mut` from `Config` (#4060)
+
+## [v0.15.0] - 2025-07-16
+
+### Changed
+
+- MSRV is now 1.88.0 (#3742)
+- Removed `esp_wifi::deinit_unchecked` and `esp_wifi::EspWifiController::deinit` - you can just drop `EspWifiController` instead (#3553)
+- `defmt` and `log-04` can no longer be selected at the same time (#3675)
+- `esp_wifi::init` no longer requires the `RADIO_CLK` peripheral (#3687)
+
+## [v0.14.1] - 2025-06-05
+
+### Added
+
+- It's now possible to obtain the RSSI of the currently connected AP, by using `WifiController::rssi(&self)` (#3593)
+
+### Fixed
+
+- Fix a compilation error for ESP32 + coex + ble + defmt (#3596)
+
+## [v0.14.0] - 2025-06-03
+
+### Added
+
+- It's possible to use partial RF calibration, it's possible to use the None-calibration-schema after deep-sleep (#3383)
+
+### Changed
+
+- The scheduler now runs at interrupt priority 1 on Xtensa chips, too. (#3164)
+- `esp-now` and `sniffer` are available via `Interfaces` (#3283)
+- Remove the `heapless` dependency (including from the public API) (#3317)
+- Bump Rust edition to 2024, bump MSRV to 1.86. (#3391, #3560)
+- Update `defmt` to 1.0 (#3416)
+- The `log` feature has been replaced by `log-04`. (#3425)
+- Removed `esp_wifi::deinit_unchecked` and `esp_wifi::EspWifiController::deinit` - you can just drop `EspWifiController` instead (#3553)
+
+### Fixed
+
+- Update bt-hci version to fix serialization/deserialization of byte slices (#3340)
+- Allow `Configuration::None`, set country early, changed default power-save-mode to None (#3364)
+- Enterprise WPA fixed for ESP32-S2 (#3406)
+- COEX on ESP32 is now working (#3403)
+- Correctly de-init wifi if the WifiController is dropped (#3550)
+
+## [0.13.0] - 2025-02-24
+
+### Added
+
+- Added support for using an external scheduler (#3115)
+
+### Changed
+
+- `esp_wifi::init` now takes an `impl Peripheral` for RNG source (#2992)
+- `set_power_saving` is now also available when the `coex` feature is activated (#3081)
+- Network interfaces and the controller are now more separated (#3027)
+
+### Fixed
+
+- Fixed a problem using BLE on ESP32-C6 when connected via Serial-JTAG (#2981)
+- Fix a possible dead-lock when the rx-queue is overrun (#3015)
+
+## 0.12.0 - 2025-01-15
+
+### Changed
+
+- Bump smoltcp to 0.12.0 (#2849)
+- `csi_enabled` option converted to feature (#2945)
+- Bump MSRV to 1.84 (#2951)
+
+### Fixed
+
+- Fixed triggering a debug-assertion during scan (#2612)
+- Fix WPA2-ENTERPRISE functionality (#2896)
+- Make sure to de-allocate memory used by timers on removal (#2936)
+
+## 0.11.0 - 2024-11-20
+
+### Added
+
+- Added `serde` support through the `serde` feature (#2346)
+- Added `PowerSaveMode` and `set_power_saving` methods on `EspNowManager` & `WifiController` (#2446)
+- Added CSI support (#2422)
+- Enable setting event handlers for wifi events (#2453)
+
+### Changed
+
+- `esp_wifi::init` no longer requires `EspWifiInitFor`, and now returns `EspWifiController`, see the migration guide for more details (#2301)
+- No need to add `rom_functions.x` manually anymore (#2374)
+- esp-now: Data is now private in `ReceivedData` - use `data()` (#2396)
+- Changed the async APIs to have a `_async` postfix to avoid name collisions (#2446)
+- `phy_enable_usb` is enabled by default (#2446)
+- Removed `get_` prefixes from functions (#2528)
+- Opting out of `esp-alloc` now requires implementing `esp_wifi_deallocate_internal_ram` (#3320)
+- Config: Crate prefixes and configuration keys are now separated by `_CONFIG_` (#2848)
+
+### Fixed
+
+- Fixed a possible crash when parsing results from a radius server (#2380)
+- Fixed `async fn WifiController::disconnect` hanging forever when awaited if not connected when called (#2392)
+- Fixed building esp-wifi without either `ble` or `wifi` enabled (#3336)
+
+### Removed
+
+- Feature `have-strchr` is removed (#2462)
+- Features `async`, `embassy-net` have been removed (#2446)
+- Features `phy-enable-usb` & `dump-packets` have been turned into configuration options `phy_enable_usb` & `dump_packets` (#2446)
+- Features `ps-min-modem` & `ps-max-modem` have been removed in favour of a runtime config (#2446)
+- The blocking networking stack is removed (#2488)
+
+## 0.10.1 - 2024-10-10
+
+### Changed
+
+- Bumped esp-wifi-sys to `v0.6.0` (#2328)
+
+## 0.10.0 - 2024-10-10 - YANKED
+
+### Added
+
+- Added `have-strchr` feature to disable including `strchr` (#2096)
+- Adding a way to deinitialize the WiFi stack (#2187)
+
+### Changed
+
+- esp-wifi now allocates memory from the global allocator provided by `esp-alloc` (#2099)
+- Renamed the `wifi-logs` feature to `sys-logs` for consistency (#2183)
+- Updated drivers to v5.3.1 (#2239)
+- Rename `initialize` to `init` (#2295)
+- `esp-wifi` no longer enables features on `esp-hal-embassy` (like `esp-hal-embassy/esp32c6`) (#2306)
+
+### Fixed
+
+- Feature `sys-logs` doesn't break the build anymore (#2117)
+- Fixed a panic when overflow-checks are enabled (#2164)
+- Create mutexes in heap memory, fixes running out of mutexes when connecting and disconnecting to a WPA2-ENTERPRISE ap multiple times (#2202)
+
+### Removed
+
+- Removed the `clocks` parameter from `esp_wifi::initialize` (#1999)
+- `cfg_toml` configuration system has been removed in favour of [esp-config](https://docs.rs/esp-config) (#2156)
+- Removed the `embedded-svc` traits and feature (#2235)
+- Removed the `log` feature from default features (#2253)
+- Removed the `enumset` feature (#2297)
+- Removed `esp_wifi::current_millis` (#2304)
+
+## 0.9.1 - 2024-09-03
+
+### Fixed
+
+- Builds on stable, again (#2067)
+
+## 0.9.0 - 2024-09-03
+
+### Added
+
+- Added support for WPA2-ENTERPRISE (#2004)
+
+## 0.8.0 - 2024-08-29
+
+### Added
+
+- Implement `embedded_io::{ReadReady, WriteReady}` traits for `WifiStack` (#1882)
+- Implement `queue_msg_waiting` on the os_adapter (#1925)
+- Added API for promiscuous mode (#1935)
+- Implement `bt_hci::transport::Transport` traits for BLE (#1933)
+
+### Changed
+
+- Changed `init` to accept timers of multiple types (#1957)
+
+### Fixed
+
+- Increased NPL event queue size to prevent overflow (#1891)
+
+## 0.7.1 - 2024-07-17
+
+### Changed
+
+- Check no password is set when using `AuthMethod::None` (#1806)
+
+### Fixed
+
+- Downgrade `embedded-svc` to 0.27.1 (#1820)
+
+## 0.7.0 - 2024-07-15
+
+### Added
+
+- Add support for `Protocol::P802D11BGNAX` (#1742)
+
+### Fixed
+
+- Fixed `set_mode` functionality (#1742)
+
+### Changed
+
+- `esp_wifi::initialize` no longer requires running maximum CPU clock, instead check it runs above 80MHz. (#1688)
+- Rename `set_mode` to `set_protocol`, also available in esp-now API (#1742)
+- `esp_wifi::initialize` now takes a `PeriodicTimer<ErasedTimer>` (#1753)
+
+## 0.6.0 - 2024-06-04
+
+### Removed
+
+- Removed embedded-hal v0.2 dependency (#1582)
+
+## 0.5.1 - 2024-04-22
+
+### Fixed
+
+- Patch release to fix docs.rs build (#1582)
+
+## 0.5.0 - 2024-04-19
+
+### Fixed
+
+- Fix compile error when using smoltcp `DNS_MAX_RESULT_COUNT` values other than 1 (#1654)
+
+## 0.4.0 - 2024-03-12
+
+### Changed
+
+- Users don't need embedded-svc to control wifi anymore. The wifi trait is optionally implemented now. (#429)
+- Better network performance by forced yielding of the task when buffers are full / empty. (#430)
+- Depend on esp-hal 0.16.1, update other dependencies (#1582)
+
+## 0.3.0 - 2024-01-29
+
+### Added
+
+- Include coex in list of enabled features for docs.rs (#405)
+
+### Fixed
+
+- Small correction to coex warning message (#404)
+- Use a random local port when initializing the wifi stack. (#414)
+
+### Changed
+
+- Update driver blobs (#410)
+- Update dependencies to fit `embedded-hal` `1.0` (#1582)
+
+## 0.2.0 - 2024-01-05
+
+### Added
+
+- Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, supporting BLE on WiFi on ESP32, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, ESP32-H2 (#1582)
+
+## 0.1.0 - 2023-11-27
+
+### Added
+
+- Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, supporting BLE on WiFi on ESP32, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6 (#1582)
+
+[0.13.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-wifi-v0.13.0
+[v0.14.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.13.0...esp-wifi-v0.14.0
+[v0.14.1]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.14.0...esp-wifi-v0.14.1
+[v0.15.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.14.1...esp-wifi-v0.15.0
+[v0.16.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.15.0...esp-radio-v0.16.0
+[v0.17.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.16.0...esp-radio-v0.17.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.17.0...HEAD
