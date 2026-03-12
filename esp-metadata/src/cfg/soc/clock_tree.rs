@@ -39,7 +39,7 @@
 
 use std::{any::Any, collections::HashMap, str::FromStr};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use indexmap::IndexMap;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
@@ -154,16 +154,28 @@ where
 }
 
 pub struct ValidationContext<'c> {
-    pub tree: &'c [ClockTreeItem],
+    pub tree: &'c [&'c ClockTreeNodeInstance],
 }
 
-impl ValidationContext<'_> {
+impl<'c> ValidationContext<'c> {
     pub fn has_clock(&self, clk: &str) -> bool {
         self.clock(clk).is_some()
     }
 
-    fn clock(&self, clk: &str) -> Option<&ClockTreeItem> {
-        self.tree.iter().find(|item| item.name() == clk)
+    fn clock(&self, clk: &str) -> Option<&ClockTreeNodeInstance> {
+        self.tree
+            .iter()
+            .cloned()
+            .find(|item| item.name_str() == clk)
+    }
+
+    pub(crate) fn run_validation(&self) -> Result<()> {
+        for node in self.tree {
+            node.validate_source_data(self)
+                .with_context(|| format!("Invalid clock tree item: {}", node.name_str()))?;
+        }
+
+        Ok(())
     }
 }
 
@@ -434,8 +446,8 @@ impl ConfiguresExpression {
             anyhow::bail!("Clock source {} not found", self.target);
         };
 
-        let clock_name = clock.name();
-        match clock {
+        let clock_name = clock.name_str();
+        match &clock.prototype {
             ClockTreeItem::Multiplexer(multiplexer) => {
                 if let Some(name) = self.value.as_name() {
                     if !multiplexer.variant_names().any(|v| v == name) {

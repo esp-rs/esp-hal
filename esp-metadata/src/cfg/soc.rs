@@ -105,6 +105,8 @@ pub(crate) struct ProcessedClockData {
 
 pub(crate) struct ClockTreeNodeInstance {
     node: Box<dyn ClockTreeNodeType>,
+    prototype: ClockTreeItem,
+
     include_in_global_config: bool,
     is_first_instance: bool,
     force_configurable: bool,
@@ -844,6 +846,7 @@ impl DeviceClocks {
                 let node_name = node.name();
                 let node = ClockTreeNodeInstance {
                     node: node.boxed(),
+                    prototype: node.clone(),
                     include_in_global_config: true,
                     is_first_instance: true,
                     force_configurable: false,
@@ -854,15 +857,6 @@ impl DeviceClocks {
                 (node_name.to_string(), RefCell::new(node))
             })
             .collect::<IndexMap<_, _>>();
-
-        let validation_context = ValidationContext {
-            tree: self.system_clocks.clock_tree.as_slice(),
-        };
-        for node in clock_tree.values() {
-            let node = node.borrow();
-            node.validate_source_data(&validation_context)
-                .with_context(|| format!("Invalid clock tree item: {}", node.name_str()))?;
-        }
 
         // Merge peripheral clock sources into the clock tree
         let mut peri_clocks = self.peripheral_clocks.peripheral_clocks.clone();
@@ -875,6 +869,7 @@ impl DeviceClocks {
             for def in peri.clock_signals(&self.peripheral_clocks) {
                 let node = ClockTreeNodeInstance {
                     node: def.boxed(),
+                    prototype: def.clone(),
                     include_in_global_config: false,
                     is_first_instance: matches!(
                         peri.clocks,
@@ -897,12 +892,22 @@ impl DeviceClocks {
                     ),
                 };
 
-                node.validate_source_data(&validation_context)
-                    .with_context(|| format!("Invalid clock tree item: {}", node.name))?;
-
                 clock_tree.insert(node.name.clone(), RefCell::new(node));
             }
         }
+
+        ValidationContext {
+            tree: clock_tree
+                .values()
+                .map(|item| unsafe {
+                    // Safety: we're not mutating the item, so immutable borrow should be ok without
+                    // the guard wrapper.
+                    item.try_borrow_unguarded().unwrap()
+                })
+                .collect::<Vec<_>>()
+                .as_slice(),
+        }
+        .run_validation()?;
 
         // Apply legacy sorting to avoid reordering generated code.
         let mut sorted_clocks = IndexSet::new();
