@@ -1,4 +1,4 @@
-#[embedded_test::tests(default_timeout = 2)]
+#[embedded_test::tests]
 mod tests {
     use hil_test as _;
 
