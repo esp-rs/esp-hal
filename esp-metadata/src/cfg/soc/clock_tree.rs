@@ -530,14 +530,10 @@ impl ValuesExpression {
     }
 
     fn as_range(&self) -> Option<(u32, u32)> {
-        if self.0.len() != 1 {
-            None
+        if let [ValueFragment::Range(min, max)] = self.0.as_slice() {
+            Some((*min, *max))
         } else {
-            let ValueFragment::Range(min, max) = self.0[0] else {
-                return None;
-            };
-
-            Some((min, max))
+            None
         }
     }
 }
@@ -575,10 +571,20 @@ impl FromStr for ValueFragment {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         fn parse_number(s: &str) -> Result<u32, String> {
-            s.replace('_', "")
-                .trim()
-                .parse()
-                .map_err(|e| format!("Invalid number: {}", e))
+            let s = s.replace('_', "");
+            let s = s.trim();
+
+            let result = if s.starts_with("0x") {
+                u32::from_str_radix(&s[2..], 16)
+            } else if s.starts_with("0o") {
+                u32::from_str_radix(&s[2..], 8)
+            } else if s.starts_with("0b") {
+                u32::from_str_radix(&s[2..], 2)
+            } else {
+                s.parse()
+            };
+
+            result.map_err(|e| format!("Failed to parse {s}: {e}"))
         }
 
         if let Some((start, end_incl)) = s.split_once("..=") {
