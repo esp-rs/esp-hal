@@ -42,6 +42,7 @@ use crate::{
         ClockTreeNodeInstance,
         clock_tree::{
             ClockTreeNodeType,
+            ConfiguresExpression,
             Expression,
             RejectExpression,
             ValidationContext,
@@ -159,6 +160,20 @@ impl ClockTreeNodeType for Divider {
                 #hal_impl(clocks, old_config, config);
             }
         }
+    }
+
+    fn validate_configures_expr(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        _expr: &ConfiguresExpression,
+    ) -> Result<()> {
+        anyhow::ensure!(
+            self.is_configurable(),
+            "Divider `{}` is not configurable",
+            instance.name_str()
+        );
+
+        Ok(())
     }
 
     fn apply_configuration(

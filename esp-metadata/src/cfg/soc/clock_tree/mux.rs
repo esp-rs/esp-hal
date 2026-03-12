@@ -71,6 +71,24 @@ impl ClockTreeNodeType for Multiplexer {
         self.upstream_clocks().count() > 1
     }
 
+    fn validate_configures_expr(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        expr: &ConfiguresExpression,
+    ) -> Result<()> {
+        let clock_name = instance.name_str();
+
+        if let Some(name) = expr.value.as_name() {
+            if !self.variant_names().any(|v| v == name) {
+                anyhow::bail!("Multiplexer `{clock_name}` does not have variant `{name}`");
+            }
+        } else {
+            anyhow::bail!("Multiplexer config expression for `{clock_name}` must be a name");
+        }
+
+        Ok(())
+    }
+
     fn apply_configuration(
         &self,
         instance: &ClockTreeNodeInstance,
@@ -206,7 +224,7 @@ impl Multiplexer {
         self.variants.iter().map(|v| v.outputs.as_str())
     }
 
-    pub fn variant_names(&self) -> impl Iterator<Item = &str> {
+    fn variant_names(&self) -> impl Iterator<Item = &str> {
         self.variants.iter().map(|v| v.name.as_str())
     }
 
@@ -425,8 +443,12 @@ impl MultiplexerVariant {
         );
 
         for (index, config) in self.configures.iter().enumerate() {
-            config
-                .validate_source_data(instance, ctx)
+            let Some(clock) = ctx.clock(instance, &config.target) else {
+                anyhow::bail!("Clock source {} not found", config.target);
+            };
+
+            clock
+                .validate_configures_expr(config)
                 .with_context(|| format!("Incorrect `configures` expression at index {index}"))?;
         }
 

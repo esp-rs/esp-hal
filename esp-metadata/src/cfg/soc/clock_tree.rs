@@ -345,6 +345,14 @@ pub(crate) trait ClockTreeNodeType: Any {
         Some(format!(" `{}` configuration.", instance.name_str()))
     }
 
+    fn validate_configures_expr(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _expr: &ConfiguresExpression,
+    ) -> Result<()> {
+        anyhow::bail!("Configures expressions are not supported")
+    }
+
     fn apply_configuration(
         &self,
         instance: &ClockTreeNodeInstance,
@@ -445,42 +453,6 @@ where
 pub struct ConfiguresExpression {
     target: String,
     value: Expression,
-}
-
-impl ConfiguresExpression {
-    fn validate_source_data(
-        &self,
-        instance: &ClockTreeNodeInstance,
-        ctx: &ValidationContext<'_>,
-    ) -> Result<()> {
-        let Some(clock) = ctx.clock(instance, &self.target) else {
-            anyhow::bail!("Clock source {} not found", self.target);
-        };
-
-        let clock_name = clock.name_str();
-        match &clock.prototype {
-            ClockTreeItem::Multiplexer(multiplexer) => {
-                if let Some(name) = self.value.as_name() {
-                    if !multiplexer.variant_names().any(|v| v == name) {
-                        anyhow::bail!("Multiplexer `{clock_name}` does not have variant `{name}`");
-                    }
-                } else {
-                    anyhow::bail!(
-                        "Multiplexer config expression for `{clock_name}` must be a name"
-                    );
-                }
-            }
-            ClockTreeItem::Divider(divider) => {
-                anyhow::ensure!(
-                    divider.is_configurable(),
-                    "Divider `{clock_name}` is not configurable",
-                )
-            }
-            _ => anyhow::bail!("Cannot configure source clock {}", self.target),
-        }
-
-        Ok(())
-    }
 }
 
 impl<'de> Deserialize<'de> for ConfiguresExpression {

@@ -13,6 +13,7 @@ use crate::{
             ClockNodeFunctions,
             ClockTreeItem,
             ClockTreeNodeType,
+            ConfiguresExpression,
             DependencyGraph,
             Expression,
             Function,
@@ -105,7 +106,6 @@ pub(crate) struct ProcessedClockData {
 
 pub(crate) struct ClockTreeNodeInstance {
     node: Box<dyn ClockTreeNodeType>,
-    prototype: ClockTreeItem,
 
     include_in_global_config: bool,
     is_first_instance: bool,
@@ -402,6 +402,10 @@ impl ClockTreeNodeInstance {
         } else {
             tree.node(clock)
         }
+    }
+
+    fn validate_configures_expr(&self, expr: &ConfiguresExpression) -> Result<()> {
+        self.node.validate_configures_expr(self, expr)
     }
 }
 
@@ -869,7 +873,6 @@ impl DeviceClocks {
                 let node_name = node.name();
                 let node = ClockTreeNodeInstance {
                     node: node.boxed(),
-                    prototype: node.clone(),
                     include_in_global_config: true,
                     is_first_instance: true,
                     force_configurable: false,
@@ -893,7 +896,6 @@ impl DeviceClocks {
             for def in peri.clock_signals(&self.peripheral_clocks) {
                 let node = ClockTreeNodeInstance {
                     node: def.boxed(),
-                    prototype: def.clone(),
                     include_in_global_config: false,
                     is_first_instance: matches!(
                         peri.clocks,
