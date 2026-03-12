@@ -141,9 +141,9 @@ pub mod sleep;
 pub(crate) mod rtc;
 
 cfg_if::cfg_if! {
-    if #[cfg(any(esp32c6, esp32c61, esp32h2, esp32c5))] {
+    if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
         use crate::peripherals::LP_WDT;
-        #[cfg(not(esp32c5))]
+        #[cfg(not(any(esp32c5, esp32c61)))]
         use crate::peripherals::LP_TIMER;
         use crate::peripherals::LP_AON;
     } else {
@@ -691,7 +691,7 @@ pub fn wakeup_cause() -> SleepSource {
     cfg_if::cfg_if! {
         if #[cfg(esp32)] {
             let wakeup_cause_bits = LPWR::regs().wakeup_state().read().wakeup_cause().bits() as u32;
-        } else if #[cfg(any(esp32c5, esp32c6, esp32h2))] {
+        } else if #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))] {
             let wakeup_cause_bits = crate::peripherals::PMU::regs()
                 .slp_wakeup_status0()
                 .read()
