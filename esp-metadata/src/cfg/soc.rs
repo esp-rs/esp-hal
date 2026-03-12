@@ -864,8 +864,6 @@ impl DeviceClocks {
                 .with_context(|| format!("Invalid clock tree item: {}", node.name_str()))?;
         }
 
-        let mut management_properties = HashMap::new();
-
         // Merge peripheral clock sources into the clock tree
         let mut peri_clocks = self.peripheral_clocks.peripheral_clocks.clone();
         peri_clocks.sort_by(|a, b| a.name.cmp(&b.name));
@@ -906,12 +904,6 @@ impl DeviceClocks {
             }
         }
 
-        // To compute refcount requirement and correct initialization order, we need to be able to
-        // access direct dependencies (downstream clocks). As it is simpler to define
-        // dependents (inputs), we have to do a bit of maths.
-        let dependency_graph =
-            DependencyGraph::build_from(clock_tree.values_mut().map(|n| &*n.get_mut()));
-
         // Apply legacy sorting to avoid reordering generated code.
         let mut sorted_clocks = IndexSet::new();
 
@@ -930,7 +922,31 @@ impl DeviceClocks {
             // Each tree item tells its own clock type, except for dependent items. If something has
             // already been classified, we can only change it from its kind to dependent.
             sorted_clocks.insert(idx);
+        }
 
+        // Now sort the nodes according to the order we've established.
+        let clock_tree = {
+            // ClockTreeNodeInstance is not Clone, so let's turn the vector into a vector of
+            // optionals that we can take from.
+            let mut clock_tree = clock_tree
+                .into_iter()
+                .map(|(_, n)| Some(n.into_inner()))
+                .collect::<Vec<_>>();
+            let mut sorted = Vec::with_capacity(clock_tree.len());
+            for idx in sorted_clocks {
+                sorted.push(clock_tree[idx].take().unwrap());
+            }
+            sorted
+        };
+
+        // To compute refcount requirement and correct initialization order, we need to be able to
+        // access direct dependencies (downstream clocks). As it is simpler to define
+        // dependents (inputs), we have to do a bit of maths.
+        let dependency_graph = DependencyGraph::build_from(clock_tree.iter());
+
+        let mut management_properties = HashMap::new();
+
+        for node in clock_tree.iter() {
             // If there's a single dependent clock, we can piggyback on its refcount.
             // Note that this is only valid if the clock node is not expected to be manually
             // managed. In the current model, manually managed clocks have 0 consumers.
@@ -955,21 +971,6 @@ impl DeviceClocks {
                 },
             );
         }
-
-        // Now sort the nodes according to the order we've established.
-        let clock_tree = {
-            // ClockTreeNodeInstance is not Clone, so let's turn the vector into a vector of
-            // optionals that we can take from.
-            let mut clock_tree = clock_tree
-                .into_iter()
-                .map(|(_, n)| Some(n.into_inner()))
-                .collect::<Vec<_>>();
-            let mut sorted = Vec::with_capacity(clock_tree.len());
-            for idx in sorted_clocks {
-                sorted.push(clock_tree[idx].take().unwrap());
-            }
-            sorted
-        };
 
         Ok(ProcessedClockData {
             clock_tree,
