@@ -145,6 +145,7 @@ impl RtcClock {
     /// may happen if 32k XTAL is being calibrated, but the oscillator has
     /// not started up (due to incorrect loading capacitance, board design
     /// issue, or lack of 32 XTAL on board).
+    #[cfg(not(esp32c61))]
     pub(crate) fn calibrate(cal_clk: TimgCalibrationClockConfig, slowclk_cycles: u32) -> u32 {
         ClockTree::with(|clocks| {
             let xtal_freq = Rate::from_hz(clocks::xtal_clk_frequency(clocks));
@@ -275,6 +276,7 @@ impl Clocks {
     /// that is measured by a low-frequency clock. This function can be used to calibrate two
     /// clocks to each other, e.g. to determine a rough value of the XTAL clock, or to determine
     /// the current frequency of a low-precision RC oscillator.
+    #[cfg(not(esp32c61))]
     pub(crate) fn measure_rtc_clock(
         clocks: &mut ClockTree,
         rtc_clock: TimgCalibrationClockConfig,
@@ -434,6 +436,12 @@ impl Clocks {
         (cali_value, Rate::from_hz(calibration_clock_frequency))
     }
 
+    #[cfg(esp32c61)]
+    pub(crate) fn calibrate_rtc_slow_clock() {
+        // TODO: implement
+    }
+
+    #[cfg(not(esp32c61))]
     pub(crate) fn calibrate_rtc_slow_clock() {
         // Unfortunate device specific mapping.
         // TODO: fix it by generating cfgs for each mux input?
@@ -450,7 +458,7 @@ impl Clocks {
                     #[cfg(esp32c2)]
                     RtcSlowClkConfig::OscSlow => TimgCalibrationClockConfig::Osc32kClk,
                 };
-            } else {
+            } else if #[cfg(soc_has_clock_node_lp_slow_clk)]{
                 let slow_clk = match unwrap!(ClockTree::with(clocks::lp_slow_clk_config)) {
                     LpSlowClkConfig::OscSlow => TimgCalibrationClockConfig::Xtal32kClk, //?
                     LpSlowClkConfig::Xtal32k => TimgCalibrationClockConfig::Xtal32kClk,
