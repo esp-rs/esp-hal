@@ -14,6 +14,7 @@ use crate::cfg::{
 };
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Multiplexer {
     /// The unique name of the clock tree item.
     pub name: String,
@@ -22,8 +23,6 @@ pub struct Multiplexer {
     always_on: bool,
 
     // reject: Option<RejectExpression>,
-    #[serde(default)]
-    pub default: Option<String>,
     pub variants: Vec<MultiplexerVariant>,
 }
 
@@ -37,18 +36,22 @@ impl ClockTreeNodeType for Multiplexer {
     }
 
     fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
-        let mut default_exists = false;
+        let mut default = None;
         for variant in &self.variants {
-            default_exists |= Some(variant.name.as_str()) == self.default.as_deref();
+            if variant.default {
+                if default.is_some() {
+                    anyhow::bail!("Multiplexer {} has multiple default options", self.name);
+                }
+                default = Some(variant.name.as_str());
+            }
             variant.validate_source_data(ctx).with_context(|| {
-                format!("Multiplexer option {} has incorrect data", variant.name)
+                format!(
+                    "Multiplexer option {}/{} has incorrect data",
+                    self.name, variant.name
+                )
             })?;
         }
-        anyhow::ensure!(
-            self.default.is_none() || default_exists,
-            "Multiplexer default option {} not found",
-            self.default.as_ref().unwrap()
-        );
+
         Ok(())
     }
 
@@ -148,9 +151,14 @@ impl ClockTreeNodeType for Multiplexer {
         let clock_name = instance.name_str();
         let ty_name = instance.config_type_name();
 
+        let derive_default = if self.variants.iter().any(|v| v.default) {
+            quote! { Default, }
+        } else {
+            quote! {}
+        };
         let variants = self.variants.iter().map(|v| {
             let variant = v.config_enum_variant();
-            if Some(v.name.as_str()) == self.default.as_deref() {
+            if v.default {
                 quote! {
                     #[default]
                     #variant
@@ -160,13 +168,11 @@ impl ClockTreeNodeType for Multiplexer {
             }
         });
 
-        let default = self.default.as_ref().map(|_| quote! { Default, });
-
         let docline =
             format!("The list of clock signals that the `{clock_name}` multiplexer can output.");
         quote! {
             #[doc = #docline]
-            #[derive(Debug, #default Clone, Copy, PartialEq, Eq, Hash)]
+            #[derive(Debug, #derive_default Clone, Copy, PartialEq, Eq, Hash)]
             #[cfg_attr(feature = "defmt", derive(defmt::Format))]
             pub enum #ty_name {
                 #(#variants)*
@@ -370,6 +376,8 @@ pub struct MultiplexerVariant {
     pub outputs: String,
     #[serde(default, deserialize_with = "super::list_from_str")]
     configures: Vec<ConfiguresExpression>,
+    #[serde(default)]
+    default: bool,
 }
 impl MultiplexerVariant {
     pub fn config_enum_variant_name(&self) -> Ident {

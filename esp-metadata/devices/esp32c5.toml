@@ -217,21 +217,21 @@ clocks = { system_clocks = { clock_tree = [
     { name = "rst_field", value = "{{peripheral}}_rst_en" },
 ], peripheral_clocks = [
     { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [ # UART_SCLK
-            { name = "XTAL",     outputs = "XTAL_CLK" },
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [ # UART_SCLK
+            { name = "XTAL",     outputs = "XTAL_CLK", default = true },
             { name = "PLL_F80M", outputs = "PLL_F80M" },
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
         ] },
     ] },
     { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true, clocks = "Uart0" },
     { name = "Timg0", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup0_conf", peripheral = "tg0", peri_clk_template = "{{control}}::regs().timergroup0_timer_clk_conf().modify(|_, w| w.tg0_timer_clk_en().bit(enable));" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL_CLK", variants = [
-            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK", default = true },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
             { name = "PLL_F80M",    outputs = "PLL_F80M" },
         ] },
-        { name = "WDT_CLOCK", type = "mux", default = "XTAL_CLK", variants = [
-            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+        { name = "WDT_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK", default = true },
             { name = "PLL_F80M",    outputs = "PLL_F80M" },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
         ] },
@@ -240,24 +240,24 @@ clocks = { system_clocks = { clock_tree = [
     { name = "I2cExt0", template_params = { peripheral = "i2c0" } },
     { name = "Pcnt" },
     { name = "Rmt", clocks = [
-        { name = "SCLK", type = "mux", default = "PLL_F80M", variants = [
+        { name = "SCLK", type = "mux", variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
-            { name = "PLL_F80M",    outputs = "PLL_F80M" },
+            { name = "PLL_F80M",    outputs = "PLL_F80M", default = true },
         ] },
     ] },
     { name = "Systimer", keep_enabled = true }, # can be clocked from XTAL_CLK or RC_FAST_CLK, the latter has no divider?
     { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" }, clocks = [
-        { name = "RX_CLOCK", type = "mux", default = "PLL_F240M", variants = [
+        { name = "RX_CLOCK", type = "mux", variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
-            { name = "PLL_F240M",   outputs = "PLL_F240M" },
+            { name = "PLL_F240M",   outputs = "PLL_F240M", default = true },
             # TODO: external clock
         ] },
-        { name = "TX_CLOCK", type = "mux", default = "PLL_F240M", variants = [
+        { name = "TX_CLOCK", type = "mux", variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
-            { name = "PLL_F240M",   outputs = "PLL_F240M" },
+            { name = "PLL_F240M",   outputs = "PLL_F240M", default = true },
         ] },
     ] },
     { name = "Dma", template_params = { peripheral = "gdma" } },
