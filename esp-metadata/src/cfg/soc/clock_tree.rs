@@ -313,13 +313,6 @@ pub(crate) trait ClockTreeNodeType: Any {
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream;
-    fn config_apply_impl_function(
-        &self,
-        _instance: &ClockTreeNodeInstance,
-        _tree: &ProcessedClockData,
-    ) -> TokenStream {
-        quote! {}
-    }
 
     fn node_frequency_impl(
         &self,
