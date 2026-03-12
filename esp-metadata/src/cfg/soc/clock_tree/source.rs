@@ -78,7 +78,11 @@ impl ClockTreeNodeType for Source {
         self.always_on
     }
 
-    fn validate_source_data(&self, _ctx: &ValidationContext<'_>) -> Result<()> {
+    fn validate_source_data(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _ctx: &ValidationContext<'_>,
+    ) -> Result<()> {
         Ok(())
     }
 
@@ -296,18 +300,27 @@ pub struct DerivedClockSource {
 }
 
 impl ClockTreeNodeType for DerivedClockSource {
-    fn input_clocks(&self) -> Vec<String> {
+    fn input_clocks(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> Vec<String> {
+        // Note: Group-local derived clock are not supported.
         vec![self.from.clone()]
     }
 
-    fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
+    fn validate_source_data(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        ctx: &ValidationContext<'_>,
+    ) -> Result<()> {
         anyhow::ensure!(
-            ctx.has_clock(&self.from),
+            ctx.has_clock(instance, &self.from),
             "Clock `{}` is not defined",
             self.from
         );
 
-        self.source_options.validate_source_data(ctx)
+        self.source_options.validate_source_data(instance, ctx)
     }
 
     fn is_configurable(&self) -> bool {
@@ -338,10 +351,10 @@ impl ClockTreeNodeType for DerivedClockSource {
 
     fn request_direct_dependencies(
         &self,
-        _instance: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let request_fn_name = tree.node(&self.from).request_fn_name();
+        let request_fn_name = instance.resolve_node(tree, &self.from).request_fn_name();
         quote! {
             #request_fn_name(clocks);
         }
@@ -349,10 +362,10 @@ impl ClockTreeNodeType for DerivedClockSource {
 
     fn release_direct_dependencies(
         &self,
-        _instance: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let release_fn_name = tree.node(&self.from).release_fn_name();
+        let release_fn_name = instance.resolve_node(tree, &self.from).release_fn_name();
         quote! {
             #release_fn_name(clocks);
         }

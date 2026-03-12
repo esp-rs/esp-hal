@@ -158,15 +158,16 @@ pub struct ValidationContext<'c> {
 }
 
 impl<'c> ValidationContext<'c> {
-    pub fn has_clock(&self, clk: &str) -> bool {
-        self.clock(clk).is_some()
+    pub fn has_clock(&self, instance: &ClockTreeNodeInstance, clk: &str) -> bool {
+        self.clock(instance, clk).is_some()
     }
 
-    fn clock(&self, clk: &str) -> Option<&ClockTreeNodeInstance> {
+    fn clock(&self, instance: &ClockTreeNodeInstance, clk: &str) -> Option<&ClockTreeNodeInstance> {
+        let local_clk = format!("{}_{}", instance.group, clk);
         self.tree
             .iter()
             .cloned()
-            .find(|item| item.name_str() == clk)
+            .find(|item| [&local_clk, clk].contains(&item.name_str().as_str()))
     }
 
     pub(crate) fn run_validation(&self) -> Result<()> {
@@ -187,33 +188,35 @@ pub(crate) struct DependencyGraph {
 }
 
 impl DependencyGraph {
-    pub(super) fn build_from<'a>(
-        clock_tree: impl Iterator<Item = &'a ClockTreeNodeInstance>,
-    ) -> Self {
+    pub fn empty() -> Self {
+        Self {
+            graph: IndexMap::new(),
+            reverse_graph: IndexMap::new(),
+        }
+    }
+
+    pub(super) fn build_from(clock_tree: &ProcessedClockData) -> Self {
         let mut dependency_graph = IndexMap::new();
         let mut reverse_dependency_graph = IndexMap::new();
 
-        for node in clock_tree {
+        for node in clock_tree.clock_tree.iter() {
+            dependency_graph.insert(node.name.clone(), Vec::new());
+            reverse_dependency_graph.insert(node.name.clone(), Vec::new());
+        }
+
+        for node in clock_tree.clock_tree.iter() {
             let node_name = node.name_str();
-            dependency_graph
-                .entry(node_name.clone())
-                .or_insert_with(Vec::new);
-            reverse_dependency_graph
-                .entry(node_name.clone())
-                .or_insert_with(Vec::new);
 
-            for input in node.input_clocks() {
-                let graph_node = dependency_graph
-                    .entry(input.clone())
-                    .or_insert_with(Vec::new);
-
+            for input in node.input_clocks(clock_tree) {
+                let graph_node = &mut dependency_graph[&input];
                 if !graph_node.contains(node_name) {
                     graph_node.push(node_name.clone());
                 }
-                reverse_dependency_graph
-                    .entry(node_name.clone())
-                    .or_insert_with(Vec::new)
-                    .push(input);
+
+                let reverse_node = &mut reverse_dependency_graph[node_name];
+                if !reverse_node.contains(&input) {
+                    reverse_node.push(input);
+                }
             }
         }
 
@@ -307,18 +310,22 @@ pub(crate) trait ClockTreeNodeType: Any {
         vec![]
     }
 
-    // TODO: pass instance to apply template naming scheme to returned clocks
-    // (e.g. FUNCTION_CLOCK -> UART0_FUNCTION_CLOCK)
-    fn input_clocks(&self) -> Vec<String> {
+    fn input_clocks(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> Vec<String> {
         vec![]
     }
 
     fn always_on(&self) -> bool {
         false
     }
-    // TODO: pass instance to apply template naming scheme to returned clocks
-    // (e.g. FUNCTION_CLOCK -> UART0_FUNCTION_CLOCK)
-    fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()>;
+    fn validate_source_data(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        ctx: &ValidationContext<'_>,
+    ) -> Result<()>;
     fn is_configurable(&self) -> bool;
     fn config_apply_function(
         &self,
@@ -441,8 +448,12 @@ pub struct ConfiguresExpression {
 }
 
 impl ConfiguresExpression {
-    fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
-        let Some(clock) = ctx.clock(&self.target) else {
+    fn validate_source_data(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        ctx: &ValidationContext<'_>,
+    ) -> Result<()> {
+        let Some(clock) = ctx.clock(instance, &self.target) else {
             anyhow::bail!("Clock source {} not found", self.target);
         };
 

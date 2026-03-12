@@ -75,18 +75,31 @@ pub struct Divider {
 }
 
 impl ClockTreeNodeType for Divider {
-    fn input_clocks(&self) -> Vec<String> {
-        vec![self.source_clock().to_string()]
+    fn input_clocks(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> Vec<String> {
+        vec![
+            instance
+                .resolve_node(tree, self.source_clock())
+                .name_str()
+                .to_string(),
+        ]
     }
 
-    fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
+    fn validate_source_data(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        ctx: &ValidationContext<'_>,
+    ) -> Result<()> {
         let mut result = None;
         let mut seen = HashSet::new();
         self.output.visit_variables(|v| {
             if self.params.contains_key(v) {
                 return;
             }
-            if !ctx.has_clock(v) && matches!(result, None | Some(Ok(()))) {
+            if !ctx.has_clock(instance, v) && matches!(result, None | Some(Ok(()))) {
                 result = Some(Err(anyhow::format_err!(
                     "{v} is not a valid clock signal name"
                 )));
@@ -179,8 +192,10 @@ impl ClockTreeNodeType for Divider {
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let state = tree.properties(instance.name_str()).field_name();
-        let parent_clock = self.source_clock(); // TODO get from node
-        let parent_frequency_fn = tree.node(parent_clock).frequency_function_name();
+        let parent_clock = self.source_clock(); // TODO get from node?
+        let parent_frequency_fn = instance
+            .resolve_node(tree, parent_clock)
+            .frequency_function_name();
 
         let params = self.params.keys().map(|var| {
             let param_fn = format_ident!("{}", var);
@@ -399,10 +414,12 @@ valid range ({min} ..= {max})."#
 
     fn request_direct_dependencies(
         &self,
-        _instance: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let request_fn_name = tree.node(self.source_clock()).request_fn_name();
+        let request_fn_name = instance
+            .resolve_node(tree, self.source_clock())
+            .request_fn_name();
         quote! {
             #request_fn_name(clocks);
         }
@@ -410,10 +427,12 @@ valid range ({min} ..= {max})."#
 
     fn release_direct_dependencies(
         &self,
-        _instance: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let release_fn_name = tree.node(self.source_clock()).release_fn_name();
+        let release_fn_name = instance
+            .resolve_node(tree, self.source_clock())
+            .release_fn_name();
         quote! {
             #release_fn_name(clocks);
         }
