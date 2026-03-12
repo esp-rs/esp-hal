@@ -40,12 +40,15 @@ impl ClockTreeNodeType for Multiplexer {
         for variant in &self.variants {
             if variant.default {
                 if default.is_some() {
-                    anyhow::bail!("Multiplexer has multiple default options");
+                    anyhow::bail!("Multiplexer {} has multiple default options", self.name);
                 }
                 default = Some(variant.name.as_str());
             }
             variant.validate_source_data(ctx).with_context(|| {
-                format!("Multiplexer option {} has incorrect data", variant.name)
+                format!(
+                    "Multiplexer option {}/{} has incorrect data",
+                    self.name, variant.name
+                )
             })?;
         }
 
