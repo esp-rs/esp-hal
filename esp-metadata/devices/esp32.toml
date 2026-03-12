@@ -178,7 +178,7 @@ clocks = { system_clocks = { clock_tree = [
         { name = "XTAL",    outputs = "XTAL_CLK" },
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
     ] },
-    { name = "SYSCON_PRE_DIV", type = "divider", params = { divisor = "0 .. 1024" }, output = "SYSCON_PRE_DIV_IN / (divisor + 1)" },
+    { name = "SYSCON_PRE_DIV", type = "divider", params = { divisor = "0 .. 0x400" }, output = "SYSCON_PRE_DIV_IN / (divisor + 1)" },
 
     # The meta-switch
     { name = "CPU_CLK", type = "mux", always_on = true, variants = [
