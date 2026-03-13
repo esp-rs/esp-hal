@@ -102,15 +102,26 @@ impl ClockTreeNodeType for Multiplexer {
         &self,
         instance: &ClockTreeNodeInstance,
         expr: &ConfiguresExpression,
-        tree: &ProcessedClockData,
+        _tree: &ProcessedClockData,
     ) -> TokenStream {
-        expr.to_enum_selector(instance, tree, |v| {
-            self.variants
-                .iter()
-                .find(|variant| variant.name == v)
-                .unwrap()
-                .config_enum_variant_name()
-        })
+        let ast::RightHandExpression::Variable { variable } = &expr.effect().value else {
+            unreachable!()
+        };
+
+        let config_function = instance.config_apply_function_name();
+        let enum_name = instance.config_type_name();
+
+        let configured_name = expr.name(*variable);
+        let variant = self
+            .variants
+            .iter()
+            .find(|variant| variant.name == configured_name)
+            .unwrap()
+            .config_enum_variant_name();
+
+        quote! {
+            #config_function(clocks, #enum_name::#variant);
+        }
     }
 
     fn config_apply_function(

@@ -47,6 +47,7 @@ use crate::{
             RejectExpression,
             ValidationContext,
             ValuesExpression,
+            expr_compiler::ExprCompiler,
         },
         soc::ProcessedClockData,
     },
@@ -182,7 +183,44 @@ impl ClockTreeNodeType for Divider {
         expr: &ConfiguresExpression,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        expr.to_numeric_setter(instance, tree)
+        let effect = expr.effect();
+
+        let config_function = instance.config_apply_function_name();
+        let state = instance.config_type_name();
+
+        let mut variables = HashMap::new();
+        for clock in tree.clock_tree.iter() {
+            let clock_name = clock.name_str().as_str();
+            let frequency_fn = clock.frequency_function_name();
+            variables.insert(clock_name, quote! { #frequency_fn(clocks) });
+        }
+
+        let cfg_expr_code = ExprCompiler::new(&variables).compile_right_hand_expression(
+            &expr.source,
+            &effect.value,
+            tree,
+        );
+
+        if let Some(property) = effect.property.as_ref() {
+            let node_name = instance.name_str();
+            let read_config_function = instance.current_config_function_name();
+            let property = format_ident!("{}", property);
+            quote! {
+                let mut config_value = unwrap!(
+                    #read_config_function(clocks),
+                    concat!("Attempted to change ", stringify!(#property), " on ", #node_name, " which has not yet been configured."),
+                );
+
+                config_value.#property = #cfg_expr_code;
+
+                #config_function(clocks, config_value);
+            }
+        } else {
+            quote! {
+                let config_value = #state::new(#cfg_expr_code);
+                #config_function(clocks, config_value);
+            }
+        }
     }
 
     fn node_frequency_impl(
