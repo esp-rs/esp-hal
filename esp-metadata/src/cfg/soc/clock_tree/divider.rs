@@ -93,13 +93,13 @@ impl ClockTreeNodeType for Divider {
             }
 
             if seen.insert(v) {
-                result = Some(if result.is_none() {
-                    Ok(())
-                } else {
-                    Err(anyhow::anyhow!(
+                if result.is_none() {
+                    result = Some(Ok(()));
+                } else if matches!(result, Some(Ok(()))) {
+                    result = Some(Err(anyhow::anyhow!(
                         "Divider nodes cannot have more than one source clock"
-                    ))
-                });
+                    )));
+                }
             }
         });
         result.unwrap_or_else(|| Err(anyhow::anyhow!("Divider node has no source clock")))

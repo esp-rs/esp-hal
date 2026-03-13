@@ -3423,6 +3423,15 @@ macro_rules! define_clock_tree_types {
                     if let Some(config) = self.soc_root_clk {
                         configure_soc_root_clk(clocks, config);
                     }
+                    if let Some(config) = self.ledc_sclk {
+                        configure_ledc_sclk(clocks, config);
+                    }
+                    if let Some(config) = self.lp_fast_clk {
+                        configure_lp_fast_clk(clocks, config);
+                    }
+                    if let Some(config) = self.lp_slow_clk {
+                        configure_lp_slow_clk(clocks, config);
+                    }
                     if let Some(config) = self.cpu_hs_div {
                         configure_cpu_hs_div(clocks, config);
                     }
@@ -3435,23 +3444,14 @@ macro_rules! define_clock_tree_types {
                     if let Some(config) = self.ahb_ls_div {
                         configure_ahb_ls_div(clocks, config);
                     }
-                    if let Some(config) = self.apb_clk {
-                        configure_apb_clk(clocks, config);
-                    }
                     if let Some(config) = self.mspi_fast_hs_clk {
                         configure_mspi_fast_hs_clk(clocks, config);
                     }
                     if let Some(config) = self.mspi_fast_ls_clk {
                         configure_mspi_fast_ls_clk(clocks, config);
                     }
-                    if let Some(config) = self.ledc_sclk {
-                        configure_ledc_sclk(clocks, config);
-                    }
-                    if let Some(config) = self.lp_fast_clk {
-                        configure_lp_fast_clk(clocks, config);
-                    }
-                    if let Some(config) = self.lp_slow_clk {
-                        configure_lp_slow_clk(clocks, config);
+                    if let Some(config) = self.apb_clk {
+                        configure_apb_clk(clocks, config);
                     }
                 });
             }
