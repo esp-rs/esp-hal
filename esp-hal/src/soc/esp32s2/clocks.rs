@@ -747,7 +747,23 @@ fn configure_uart0_function_clock_impl(
 ) {
     UART0::regs().conf0().modify(|_, w| {
         w.tick_ref_always_on()
-            .bit(new_config == Uart0FunctionClockConfig::Apb)
+            .bit(new_config.sclk == Uart0FunctionClockSclk::Apb)
+    });
+}
+// UART2_BAUD_RATE_GENERATOR
+
+fn enable_uart0_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_uart0_baud_rate_generator_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<Uart0BaudRateGeneratorConfig>,
+    new_config: Uart0BaudRateGeneratorConfig,
+) {
+    UART0::regs().clkdiv().write(|w| unsafe {
+        w.clkdiv().bits(new_config.integral as _);
+        w.frag().bits(new_config.fractional as _)
     });
 }
 
@@ -778,6 +794,23 @@ fn configure_uart1_function_clock_impl(
 ) {
     UART1::regs().conf0().modify(|_, w| {
         w.tick_ref_always_on()
-            .bit(new_config == Uart0FunctionClockConfig::Apb)
+            .bit(new_config.sclk == Uart0FunctionClockSclk::Apb)
+    });
+}
+
+// UART1_BAUD_RATE_GENERATOR
+
+fn enable_uart1_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_uart1_baud_rate_generator_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<Uart0BaudRateGeneratorConfig>,
+    new_config: Uart0BaudRateGeneratorConfig,
+) {
+    UART1::regs().clkdiv().write(|w| unsafe {
+        w.clkdiv().bits(new_config.integral as _);
+        w.frag().bits(new_config.fractional as _)
     });
 }

@@ -16,7 +16,7 @@
 // TODO: This is a temporary place for this, should probably be moved into clocks_ll.
 
 use crate::{
-    peripherals::{I2C_ANA_MST, LP_CLKRST, MODEM_LPCON, PCR, PMU},
+    peripherals::{I2C_ANA_MST, LP_CLKRST, MODEM_LPCON, PCR, PMU, UART0, UART1},
     soc::regi2c,
 };
 
@@ -681,6 +681,23 @@ fn configure_uart0_function_clock_impl(
     configure_uart_function_clock(0, new_config);
 }
 
+// UART0_BAUD_RATE_GENERATOR
+
+fn enable_uart0_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do
+}
+
+fn configure_uart0_baud_rate_generator_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<Uart0BaudRateGeneratorConfig>,
+    new_config: Uart0BaudRateGeneratorConfig,
+) {
+    UART0::regs().clkdiv().write(|w| unsafe {
+        w.clkdiv().bits(new_config.integral as _);
+        w.frag().bits(new_config.fractional as _)
+    });
+}
+
 // UART1_FUNCTION_CLOCK
 
 fn enable_uart1_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
@@ -695,6 +712,23 @@ fn configure_uart1_function_clock_impl(
     configure_uart_function_clock(1, new_config);
 }
 
+// UART1_BAUD_RATE_GENERATOR
+
+fn enable_uart1_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do
+}
+
+fn configure_uart1_baud_rate_generator_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<Uart0BaudRateGeneratorConfig>,
+    new_config: Uart0BaudRateGeneratorConfig,
+) {
+    UART1::regs().clkdiv().write(|w| unsafe {
+        w.clkdiv().bits(new_config.integral as _);
+        w.frag().bits(new_config.fractional as _)
+    });
+}
+
 fn enable_uart_function_clock(uart: usize, en: bool) {
     PCR::regs()
         .uart(uart)
@@ -704,10 +738,14 @@ fn enable_uart_function_clock(uart: usize, en: bool) {
 
 fn configure_uart_function_clock(uart: usize, new_config: Uart0FunctionClockConfig) {
     PCR::regs().uart(uart).clk_conf().modify(|_, w| unsafe {
-        w.sclk_sel().bits(match new_config {
-            Uart0FunctionClockConfig::Xtal => 0,
-            Uart0FunctionClockConfig::RcFast => 1,
-            Uart0FunctionClockConfig::PllF80m => 2,
-        })
+        w.sclk_sel().bits(match new_config.sclk {
+            Uart0FunctionClockSclk::Xtal => 0,
+            Uart0FunctionClockSclk::RcFast => 1,
+            Uart0FunctionClockSclk::PllF80m => 2,
+        });
+        w.sclk_div_a().bits(0);
+        w.sclk_div_b().bits(0);
+        w.sclk_div_num().bits(new_config.div_num as _);
+        w
     });
 }

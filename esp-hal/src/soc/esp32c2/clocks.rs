@@ -692,11 +692,28 @@ fn configure_uart0_function_clock_impl(
     new_config: Uart0FunctionClockConfig,
 ) {
     UART0::regs().clk_conf().modify(|_, w| unsafe {
-        w.sclk_sel().bits(match new_config {
-            Uart0FunctionClockConfig::PllF40m => 1,
-            Uart0FunctionClockConfig::RcFast => 2,
-            Uart0FunctionClockConfig::Xtal => 3,
+        w.sclk_sel().bits(match new_config.sclk {
+            Uart0FunctionClockSclk::PllF40m => 1,
+            Uart0FunctionClockSclk::RcFast => 2,
+            Uart0FunctionClockSclk::Xtal => 3,
         })
+    });
+}
+
+// UART0_BAUD_RATE_GENERATOR
+
+fn enable_uart0_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do
+}
+
+fn configure_uart0_baud_rate_generator_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<Uart0BaudRateGeneratorConfig>,
+    new_config: Uart0BaudRateGeneratorConfig,
+) {
+    UART0::regs().clkdiv().write(|w| unsafe {
+        w.clkdiv().bits(new_config.integral as _);
+        w.frag().bits(new_config.fractional as _)
     });
 }
 
@@ -726,10 +743,27 @@ fn configure_uart1_function_clock_impl(
     new_config: Uart0FunctionClockConfig,
 ) {
     UART1::regs().clk_conf().modify(|_, w| unsafe {
-        w.sclk_sel().bits(match new_config {
-            Uart0FunctionClockConfig::PllF40m => 1,
-            Uart0FunctionClockConfig::RcFast => 2,
-            Uart0FunctionClockConfig::Xtal => 3,
+        w.sclk_sel().bits(match new_config.sclk {
+            Uart0FunctionClockSclk::PllF40m => 1,
+            Uart0FunctionClockSclk::RcFast => 2,
+            Uart0FunctionClockSclk::Xtal => 3,
         })
+    });
+}
+
+// UART1_BAUD_RATE_GENERATOR
+
+fn enable_uart1_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do
+}
+
+fn configure_uart1_baud_rate_generator_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<Uart0BaudRateGeneratorConfig>,
+    new_config: Uart0BaudRateGeneratorConfig,
+) {
+    UART1::regs().clkdiv().write(|w| unsafe {
+        w.clkdiv().bits(new_config.integral as _);
+        w.frag().bits(new_config.fractional as _)
     });
 }

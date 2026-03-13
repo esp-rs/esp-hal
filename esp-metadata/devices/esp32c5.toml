@@ -217,11 +217,12 @@ clocks = { system_clocks = { clock_tree = [
     { name = "rst_field", value = "{{peripheral}}_rst_en" },
 ], peripheral_clocks = [
     { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", variants = [ # UART_SCLK
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
             { name = "XTAL",     outputs = "XTAL_CLK", default = true },
             { name = "PLL_F80M", outputs = "PLL_F80M" },
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
-        ] },
+        ], div_num = "0 .. 0x100" } },
+        { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x1000" } },
     ] },
     { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true, clocks = "Uart0" },
     { name = "Timg0", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup0_conf", peripheral = "tg0", peri_clk_template = "{{control}}::regs().timergroup0_timer_clk_conf().modify(|_, w| w.tg0_timer_clk_en().bit(enable));" }, keep_enabled = true, clocks = [

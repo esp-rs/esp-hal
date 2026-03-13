@@ -293,11 +293,12 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Uart1", clocks = "Uart0" },
     { name = "I2s0" },
     { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk", params = { sclk = [
             { name = "APB",      outputs = "APB_CLK", default = true },
             { name = "REF_TICK", outputs = "REF_TICK" }
-        ] },
+        ] } },
         { name = "MEM_CLOCK", type = "generic", output = "UART_MEM_CLK" },
+        { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x100000" } },
     ] },
     #{ name = "Spi01" },
 
