@@ -59,7 +59,7 @@ jobs:
         # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
         with:
-          version: 1.93.0.0
+          version: 1.94.0.1
 
       # Check all chips at once only for esp-hal
       - name: Run check-global-symbols

@@ -24,6 +24,7 @@
 
 #![no_std]
 #![no_main]
+#![feature(c_variadic)]
 
 #[path = "misc_non_drivers/clock_monitor.rs"]
 mod clock_monitor;
@@ -54,3 +55,6 @@ mod efuse;
 
 #[path = "misc_non_drivers/interrupt_nesting.rs"]
 mod interrupt_nesting;
+
+#[path = "misc_non_drivers/vaargs.rs"]
+mod vaargs;
