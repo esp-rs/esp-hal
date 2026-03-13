@@ -509,8 +509,11 @@ impl ConfiguresExpression {
             variables.insert(clock_name, quote! { #frequency_fn(clocks) });
         }
 
-        let cfg_expr_code = ExprCompiler::new(&variables)
-            .compile_right_hand_expression(&self.source, &effect.value);
+        let cfg_expr_code = ExprCompiler::new(&variables).compile_right_hand_expression(
+            &self.source,
+            &effect.value,
+            tree,
+        );
 
         if let Some(property) = effect.property.as_ref() {
             let read_config_function = affected_node.current_config_function_name();
@@ -713,6 +716,7 @@ impl RejectExpression {
         &self,
         config_fields: &[(&'a str, Ident)],
         mut variables: HashMap<&'a str, TokenStream>,
+        tree: &ProcessedClockData,
     ) -> TokenStream {
         let mut patterns = vec![];
 
@@ -722,7 +726,7 @@ impl RejectExpression {
             variables.insert(var, quote! { #config_field.value() });
         }
 
-        let reject_expr = self.0.to_rust(variables);
+        let reject_expr = self.0.to_rust(variables, tree);
 
         let assert_reject = quote! {
             assert!(!(#reject_expr));
@@ -779,8 +783,12 @@ impl Expression {
         visit_variables(self.expr(), &mut |token| f(self.lookup(token)))
     }
 
-    fn to_rust(&self, variables: HashMap<&str, TokenStream>) -> TokenStream {
-        ExprCompiler::new(&variables).compile_expression(self)
+    fn to_rust(
+        &self,
+        variables: HashMap<&str, TokenStream>,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        ExprCompiler::new(&variables).compile_expression(self, tree)
     }
 }
 
