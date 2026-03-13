@@ -516,10 +516,14 @@ impl ConfiguresExpression {
         );
 
         if let Some(property) = effect.property.as_ref() {
+            let node_name = affected_node.name_str();
             let read_config_function = affected_node.current_config_function_name();
             let property = format_ident!("{}", property);
             quote! {
-                let mut config_value = unwrap!(#read_config_function(clocks));
+                let mut config_value = unwrap!(
+                    #read_config_function(clocks),
+                    concat!("Attempted to change ", stringify!(#property), " on ", #node_name, " which has not yet been configured."),
+                );
 
                 config_value.#property = #cfg_expr_code;
 
