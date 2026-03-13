@@ -709,22 +709,33 @@ impl FromStr for ValueFragment {
     }
 }
 
+// Asserts that will be run before configuring a node.
+//
+// Referring to a node by name resolves to its output frequency. `property(NODE)` resolves to the
+// node's property value.
 #[derive(Debug, Clone, Deserialize)]
 pub struct RejectExpression(Expression);
 impl RejectExpression {
     fn to_rust<'a>(
-        &self,
-        config_fields: &[(&'a str, Ident)],
+        &'a self,
         mut variables: HashMap<&'a str, TokenStream>,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let mut patterns = vec![];
 
-        for (var, config_field) in config_fields {
-            patterns.push(quote! { let Some(#config_field) = clocks.#config_field });
-            // FIXME: don't assume a clock node can be represented as a fixed value
-            variables.insert(var, quote! { #config_field.value() });
-        }
+        self.0.visit_variables(|var| {
+            if !variables.contains_key(var) {
+                // Referring to a node by name resolves to its output frequency.
+                let properties = tree.properties(var);
+                let node = tree.node(var);
+                let freq_fn = node.frequency_function_name();
+                variables.insert(var, quote! { #freq_fn(clocks) });
+
+                // Only run the assert if the referenced nodes have been configured
+                let node_field = properties.field_name();
+                patterns.push(quote! { clocks.#node_field.is_some() });
+            }
+        });
 
         let reject_expr = self.0.to_rust(variables, tree);
 

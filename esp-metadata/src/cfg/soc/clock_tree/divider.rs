@@ -139,19 +139,12 @@ impl ClockTreeNodeType for Divider {
         let reject_exprs = self.reject.as_ref().map(|reject| {
             let mut variables = HashMap::new();
 
-            let mut config_fields = vec![];
-
             for var in self.params.keys() {
                 let param_fn = format_ident!("{}", var);
                 variables.insert(var.as_str(), quote! { config.#param_fn() });
             }
-            reject.0.visit_variables(|var| {
-                if !self.params.contains_key(var) {
-                    config_fields.push((var, tree.properties(var).field_name()));
-                }
-            });
 
-            reject.to_rust(&config_fields, variables, tree)
+            reject.to_rust(variables, tree)
         });
         quote! {
             pub fn #apply_fn_name(clocks: &mut ClockTree, config: #ty_name) {

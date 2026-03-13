@@ -102,16 +102,9 @@ impl ClockTreeNodeType for Source {
         let reject_exprs = self.reject.as_ref().map(|reject| {
             let mut variables = HashMap::new();
 
-            let mut config_fields = vec![];
-
             variables.insert("VALUE", quote! { config.value() });
-            reject.0.visit_variables(|var| {
-                if var != "VALUE" {
-                    config_fields.push((var, tree.properties(var).field_name()));
-                }
-            });
 
-            reject.to_rust(&config_fields, variables, tree)
+            reject.to_rust(variables, tree)
         });
         quote! {
             pub fn #apply_fn_name(clocks: &mut ClockTree, config: #ty_name) {
