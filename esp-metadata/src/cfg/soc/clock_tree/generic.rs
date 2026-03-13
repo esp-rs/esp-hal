@@ -445,7 +445,6 @@ impl ClockTreeNodeType for Generic {
             ClockSource::Mux(inputs) => {
                 let ty_name = self.param_type_name(instance, source_param_name);
                 let source_param_name = format_ident!("{source_param_name}");
-                let state = tree.properties(instance.name_str()).field_name();
 
                 let (variants, variant_frequencies) = inputs
                     .iter()
@@ -459,7 +458,7 @@ impl ClockTreeNodeType for Generic {
                     .unzip::<_, _, Vec<_>, Vec<_>>();
 
                 quote! {
-                    match unwrap!(clocks.#state).#source_param_name {
+                    match config.#source_param_name {
                         #(#variants => #variant_frequencies,)*
                     }
                 }
@@ -468,11 +467,10 @@ impl ClockTreeNodeType for Generic {
         variables.insert(source_param_name, source_frequency_tokens);
 
         // Numeric parameters
-        let state = tree.properties(instance.name_str()).field_name();
         variables.extend(self.params.iter().flat_map(|(var, p)| {
             if let NodeParameter::Value(_) = p {
                 let param_fn = format_ident!("{var}");
-                Some((var.as_str(), quote! { unwrap!(clocks.#state).#param_fn() }))
+                Some((var.as_str(), quote! { config.#param_fn() }))
             } else {
                 None
             }

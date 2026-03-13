@@ -214,6 +214,11 @@ impl ClockTreeNodeInstance {
         format_ident!("{}_frequency", name)
     }
 
+    fn config_frequency_function_name(&self) -> Ident {
+        let name = self.name().to_case(Case::Snake);
+        format_ident!("{}_config_frequency", name)
+    }
+
     fn config_apply_function_name(&self) -> Ident {
         let name = self.name().to_case(Case::Snake);
         format_ident!("configure_{}", name)
@@ -268,6 +273,7 @@ impl ClockTreeNodeInstance {
             .unwrap_or_default();
         let frequency_function_impl = self.node_frequency_impl(tree);
         let frequency_function_name = self.frequency_function_name();
+        let config_frequency_function_name = self.config_frequency_function_name();
 
         let enable_trace = format!("Enabling {}", self.name_str());
         let disable_trace = format!("Disabling {}", self.name_str());
@@ -359,9 +365,26 @@ impl ClockTreeNodeInstance {
 
             frequency: Function {
                 _name: frequency_function_name.to_string(),
-                implementation: quote! {
-                    pub fn #frequency_function_name(clocks: &mut ClockTree) -> u32 {
-                        #frequency_function_impl
+                implementation: if self.is_configurable() {
+                    let node_field = properties.field_name();
+                    quote! {
+                        #[allow(unused_variables)]
+                        pub fn #config_frequency_function_name(clocks: &mut ClockTree, config: #ty_name) -> u32 {
+                            #frequency_function_impl
+                        }
+                        pub fn #frequency_function_name(clocks: &mut ClockTree) -> u32 {
+                            if let Some(config) = clocks.#node_field {
+                                #config_frequency_function_name(clocks, config)
+                            } else {
+                                0
+                            }
+                        }
+                    }
+                } else {
+                    quote! {
+                        pub fn #frequency_function_name(clocks: &mut ClockTree) -> u32 {
+                            #frequency_function_impl
+                        }
                     }
                 },
             },

@@ -138,7 +138,6 @@ impl ClockTreeNodeType for Multiplexer {
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let ty_name = instance.config_type_name();
-        let state = tree.properties(instance.name_str()).field_name();
         let variants = self
             .variants
             .iter()
@@ -163,7 +162,7 @@ impl ClockTreeNodeType for Multiplexer {
 
         if variant_frequencies.len() > 1 {
             quote! {
-                match unwrap!(clocks.#state) {
+                match config {
                     #(#variants => #variant_frequencies,)*
                 }
             }
