@@ -179,26 +179,10 @@ impl ClockTreeNodeType for Divider {
     fn apply_configuration(
         &self,
         instance: &ClockTreeNodeInstance,
-        expr: &Expression,
+        expr: &ConfiguresExpression,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let config_function = instance.config_apply_function_name();
-        let state = instance.config_type_name();
-
-        let cfg_expr_code = expr.to_rust({
-            let mut variables = HashMap::new();
-            for clock in tree.clock_tree.iter() {
-                let clock_name = clock.name_str().as_str();
-                let frequency_fn = clock.frequency_function_name();
-                variables.insert(clock_name, quote! { #frequency_fn(clocks) });
-            }
-            variables
-        });
-
-        quote! {
-            let config_value = #state::new(#cfg_expr_code);
-            #config_function(clocks, config_value);
-        }
+        expr.to_numeric_setter(instance, tree)
     }
 
     fn node_frequency_impl(

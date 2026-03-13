@@ -24,7 +24,7 @@ impl<'ctx> ExprCompiler<'ctx> {
         self.compile_right_hand_expression(source, expression)
     }
 
-    fn compile_right_hand_expression(
+    pub fn compile_right_hand_expression(
         &self,
         source: &str,
         expression: &ast::RightHandExpression<DefaultTypeSet>,

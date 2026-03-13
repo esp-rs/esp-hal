@@ -356,7 +356,7 @@ pub(crate) trait ClockTreeNodeType: Any {
     fn apply_configuration(
         &self,
         instance: &ClockTreeNodeInstance,
-        _expr: &Expression,
+        _expr: &ConfiguresExpression,
         _tree: &ProcessedClockData,
     ) -> TokenStream {
         if instance.is_configurable() {
@@ -451,8 +451,71 @@ where
 /// - Divider = value
 #[derive(Debug, Clone)]
 pub struct ConfiguresExpression {
-    target: String,
+    effect: ConfiguresEffect,
     value: Expression,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConfiguresEffect {
+    node: String,
+    value: ast::RightHandExpression<DefaultTypeSet>,
+}
+
+impl ConfiguresExpression {
+    pub(crate) fn effect(&self) -> &ConfiguresEffect {
+        &self.effect
+    }
+
+    pub(crate) fn name(&self, token: Token) -> &str {
+        self.value.lookup(token)
+    }
+
+    pub(crate) fn to_enum_selector(
+        &self,
+        affected_node: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+        variants: impl Fn(&str) -> Ident,
+    ) -> TokenStream {
+        let ast::RightHandExpression::Variable { variable } = &self.effect().value else {
+            unreachable!()
+        };
+
+        let config_function = affected_node.config_apply_function_name();
+        let enum_name = affected_node.config_type_name();
+
+        let configured_name = self.value.lookup(*variable);
+        let variant = variants(configured_name);
+
+        quote! {
+            #config_function(clocks, #enum_name::#variant);
+        }
+    }
+
+    pub(crate) fn to_numeric_setter(
+        &self,
+        affected_node: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        let effect = self.effect();
+
+        let config_function = affected_node.config_apply_function_name();
+        let state = affected_node.config_type_name();
+
+        let mut variables = HashMap::new();
+        for clock in tree.clock_tree.iter() {
+            let clock_name = clock.name_str().as_str();
+            let frequency_fn = clock.frequency_function_name();
+            variables.insert(clock_name, quote! { #frequency_fn(clocks) });
+        }
+
+        let cfg_expr_code = ExprCompiler::new(&variables)
+            .compile_right_hand_expression(&self.value.source, &effect.value);
+
+        quote! {
+            let config_value = #state::new(#cfg_expr_code);
+            #config_function(clocks, config_value);
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for ConfiguresExpression {
@@ -469,15 +532,30 @@ impl FromStr for ConfiguresExpression {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (target, value_str) = s.split_once('=').ok_or_else(|| {
-            format!("The config expression must be in the format 'target = value'")
-        })?;
-        let value = somni_parser::parser::parse_expression(value_str)
+        let value = somni_parser::parser::parse_expression(s)
             .map_err(|e| format!("Failed to parse expression: {}", e))?;
+
+        let effect = match &value {
+            ast::Expression::Assignment {
+                left_expr,
+                operator: _,
+                right_expr,
+            } => ConfiguresEffect {
+                // NODE = VALUE
+                node: if let ast::LeftHandExpression::Name { variable } = left_expr {
+                    variable.source(s).to_string()
+                } else {
+                    return Err(format!("Invalid config expression: {}", s));
+                },
+                value: right_expr.clone(),
+            },
+            _ => return Err(format!("Invalid config expression: {}", s)),
+        };
+
         Ok(ConfiguresExpression {
-            target: target.trim().to_string(),
+            effect,
             value: Expression {
-                source: value_str.to_string(),
+                source: s.to_string(),
                 expr: value,
             },
         })
@@ -664,14 +742,6 @@ impl Expression {
         }
 
         visit_variables(self.expr(), &mut |token| f(self.lookup(token)))
-    }
-
-    fn as_name(&self) -> Option<&str> {
-        if let ast::RightHandExpression::Variable { variable } = self.expr() {
-            Some(self.lookup(*variable))
-        } else {
-            None
-        }
     }
 
     fn to_rust(&self, variables: HashMap<&str, TokenStream>) -> TokenStream {
