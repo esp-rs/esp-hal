@@ -124,6 +124,7 @@ impl RtcClock {
 
     /// Get the nominal value of the RTC_SLOW_CLK source.
     #[instability::unstable]
+    #[cfg(all(soc_has_clock_node_lp_slow_clk, soc_has_clock_node_rtc_slow_clk))]
     pub fn slow_freq() -> Rate {
         cfg_if::cfg_if! {
             if #[cfg(soc_has_clock_node_rtc_slow_clk)] {
