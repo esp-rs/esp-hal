@@ -151,7 +151,7 @@ impl ClockTreeNodeType for Divider {
                 }
             });
 
-            reject.to_rust(&config_fields, variables)
+            reject.to_rust(&config_fields, variables, tree)
         });
         quote! {
             pub fn #apply_fn_name(clocks: &mut ClockTree, config: #ty_name) {
@@ -208,14 +208,12 @@ impl ClockTreeNodeType for Divider {
             (var, quote! { unwrap!(clocks.#state).#param_fn() })
         });
 
-        let cfg_expr_code = self.output.to_rust({
-            let mut variables = HashMap::new();
-            variables.insert(parent_clock, quote! { #parent_frequency_fn(clocks) });
-            for (var, param_value_accessor) in params {
-                variables.insert(var.as_str(), param_value_accessor);
-            }
-            variables
-        });
+        let mut variables = HashMap::new();
+        variables.insert(parent_clock, quote! { #parent_frequency_fn(clocks) });
+        for (var, param_value_accessor) in params {
+            variables.insert(var.as_str(), param_value_accessor);
+        }
+        let cfg_expr_code = self.output.to_rust(variables, tree);
 
         cfg_expr_code
     }
@@ -472,7 +470,11 @@ impl DividerOutputExpression {
         &self.0.source
     }
 
-    fn to_rust(&self, variables: HashMap<&str, TokenStream>) -> TokenStream {
-        self.0.to_rust(variables)
+    fn to_rust(
+        &self,
+        variables: HashMap<&str, TokenStream>,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        self.0.to_rust(variables, tree)
     }
 }
