@@ -219,14 +219,13 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Spi2" },
     { name = "Uart1", clocks = "Uart0" },
     { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", variants = [ # UART_SCLK
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
             { name = "APB",      outputs = "APB_CLK" },
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
             { name = "XTAL",     outputs = "XTAL_CLK", default = true },
-        ] },
-        { name = "MEM_CLOCK", type = "mux", variants = [
-            { name = "MEM", outputs = "UART_MEM_CLK", default = true },
-        ] },
+        ], div_num = "0 .. 0x100" } },
+        { name = "MEM_CLOCK", type = "generic", output = "UART_MEM_CLK" },
+        { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x1000" } },
     ] },
     #{ name = "Spi01" },
     
@@ -506,6 +505,7 @@ instances = [
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
 ]
 ram_size = 128
+has_sclk_divider = true
 
 [device.uhci]
 support_status = "partial"

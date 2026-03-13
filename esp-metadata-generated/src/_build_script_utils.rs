@@ -380,10 +380,13 @@ impl Chip {
                     "soc_has_clock_node_timg1_calibration_clock",
                     "soc_has_clock_node_uart0_function_clock",
                     "soc_has_clock_node_uart0_mem_clock",
+                    "soc_has_clock_node_uart0_baud_rate_generator",
                     "soc_has_clock_node_uart1_function_clock",
                     "soc_has_clock_node_uart1_mem_clock",
+                    "soc_has_clock_node_uart1_baud_rate_generator",
                     "soc_has_clock_node_uart2_function_clock",
                     "soc_has_clock_node_uart2_mem_clock",
+                    "soc_has_clock_node_uart2_baud_rate_generator",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "spi_master_supports_dma",
@@ -583,10 +586,13 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_calibration_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart0_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart0_mem_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart0_baud_rate_generator",
                     "cargo:rustc-cfg=soc_has_clock_node_uart1_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart1_mem_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart1_baud_rate_generator",
                     "cargo:rustc-cfg=soc_has_clock_node_uart2_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart2_mem_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart2_baud_rate_generator",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=spi_master_supports_dma",
@@ -904,8 +910,10 @@ impl Chip {
                     "soc_has_clock_node_timg0_wdt_clock",
                     "soc_has_clock_node_uart0_function_clock",
                     "soc_has_clock_node_uart0_mem_clock",
+                    "soc_has_clock_node_uart0_baud_rate_generator",
                     "soc_has_clock_node_uart1_function_clock",
                     "soc_has_clock_node_uart1_mem_clock",
+                    "soc_has_clock_node_uart1_baud_rate_generator",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "spi_master_supports_dma",
@@ -915,6 +923,7 @@ impl Chip {
                     "timergroup_timg_has_divcnt_rst",
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
+                    "uart_has_sclk_divider",
                     "wifi_mac_version=\"1\"",
                 ],
                 cfgs: &[
@@ -1063,8 +1072,10 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_timg0_wdt_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart0_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart0_mem_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart0_baud_rate_generator",
                     "cargo:rustc-cfg=soc_has_clock_node_uart1_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart1_mem_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart1_baud_rate_generator",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=spi_master_supports_dma",
@@ -1074,6 +1085,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
+                    "cargo:rustc-cfg=uart_has_sclk_divider",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
                 ],
                 memory_layout: &MemoryLayout {
@@ -1375,8 +1387,10 @@ impl Chip {
                     "soc_has_clock_node_timg1_wdt_clock",
                     "soc_has_clock_node_uart0_function_clock",
                     "soc_has_clock_node_uart0_mem_clock",
+                    "soc_has_clock_node_uart0_baud_rate_generator",
                     "soc_has_clock_node_uart1_function_clock",
                     "soc_has_clock_node_uart1_mem_clock",
+                    "soc_has_clock_node_uart1_baud_rate_generator",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "spi_master_supports_dma",
@@ -1386,6 +1400,7 @@ impl Chip {
                     "timergroup_timg_has_divcnt_rst",
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
+                    "uart_has_sclk_divider",
                     "wifi_mac_version=\"1\"",
                 ],
                 cfgs: &[
@@ -1581,8 +1596,10 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_wdt_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart0_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart0_mem_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart0_baud_rate_generator",
                     "cargo:rustc-cfg=soc_has_clock_node_uart1_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart1_mem_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart1_baud_rate_generator",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=spi_master_supports_dma",
@@ -1592,6 +1609,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
+                    "cargo:rustc-cfg=uart_has_sclk_divider",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
                 ],
                 memory_layout: &MemoryLayout {
@@ -1927,7 +1945,9 @@ impl Chip {
                     "soc_has_clock_node_timg1_function_clock",
                     "soc_has_clock_node_timg1_wdt_clock",
                     "soc_has_clock_node_uart0_function_clock",
+                    "soc_has_clock_node_uart0_baud_rate_generator",
                     "soc_has_clock_node_uart1_function_clock",
+                    "soc_has_clock_node_uart1_baud_rate_generator",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "spi_master_supports_dma",
@@ -2165,7 +2185,9 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_wdt_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart0_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart0_baud_rate_generator",
                     "cargo:rustc-cfg=soc_has_clock_node_uart1_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart1_baud_rate_generator",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=spi_master_supports_dma",
@@ -2548,7 +2570,9 @@ impl Chip {
                     "soc_has_clock_node_timg1_calibration_clock",
                     "soc_has_clock_node_timg1_wdt_clock",
                     "soc_has_clock_node_uart0_function_clock",
+                    "soc_has_clock_node_uart0_baud_rate_generator",
                     "soc_has_clock_node_uart1_function_clock",
+                    "soc_has_clock_node_uart1_baud_rate_generator",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "spi_master_supports_dma",
@@ -2825,7 +2849,9 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_calibration_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_wdt_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart0_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart0_baud_rate_generator",
                     "cargo:rustc-cfg=soc_has_clock_node_uart1_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart1_baud_rate_generator",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=spi_master_supports_dma",
@@ -3379,7 +3405,9 @@ impl Chip {
                     "soc_has_clock_node_timg1_calibration_clock",
                     "soc_has_clock_node_timg1_wdt_clock",
                     "soc_has_clock_node_uart0_function_clock",
+                    "soc_has_clock_node_uart0_baud_rate_generator",
                     "soc_has_clock_node_uart1_function_clock",
+                    "soc_has_clock_node_uart1_baud_rate_generator",
                     "has_dram_region",
                     "has_dram2_uninit_region",
                     "spi_master_supports_dma",
@@ -3620,7 +3648,9 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_calibration_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_wdt_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart0_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart0_baud_rate_generator",
                     "cargo:rustc-cfg=soc_has_clock_node_uart1_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart1_baud_rate_generator",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
                     "cargo:rustc-cfg=spi_master_supports_dma",
@@ -3939,8 +3969,10 @@ impl Chip {
                     "soc_has_clock_node_timg1_function_clock",
                     "soc_has_clock_node_timg1_calibration_clock",
                     "soc_has_clock_node_uart0_function_clock",
+                    "soc_has_clock_node_uart0_baud_rate_generator",
                     "soc_has_clock_node_uart0_mem_clock",
                     "soc_has_clock_node_uart1_function_clock",
+                    "soc_has_clock_node_uart1_baud_rate_generator",
                     "soc_has_clock_node_uart1_mem_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
@@ -4153,8 +4185,10 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_calibration_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart0_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart0_baud_rate_generator",
                     "cargo:rustc-cfg=soc_has_clock_node_uart0_mem_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart1_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart1_baud_rate_generator",
                     "cargo:rustc-cfg=soc_has_clock_node_uart1_mem_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
@@ -4597,10 +4631,13 @@ impl Chip {
                     "soc_has_clock_node_timg1_function_clock",
                     "soc_has_clock_node_timg1_calibration_clock",
                     "soc_has_clock_node_uart0_function_clock",
+                    "soc_has_clock_node_uart0_baud_rate_generator",
                     "soc_has_clock_node_uart0_mem_clock",
                     "soc_has_clock_node_uart1_function_clock",
+                    "soc_has_clock_node_uart1_baud_rate_generator",
                     "soc_has_clock_node_uart1_mem_clock",
                     "soc_has_clock_node_uart2_function_clock",
+                    "soc_has_clock_node_uart2_baud_rate_generator",
                     "soc_has_clock_node_uart2_mem_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
@@ -4612,6 +4649,7 @@ impl Chip {
                     "timergroup_timg_has_timer1",
                     "timergroup_rc_fast_calibration_is_set",
                     "uart_ram_size=\"128\"",
+                    "uart_has_sclk_divider",
                     "wifi_mac_version=\"1\"",
                 ],
                 cfgs: &[
@@ -4850,10 +4888,13 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_function_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_timg1_calibration_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart0_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart0_baud_rate_generator",
                     "cargo:rustc-cfg=soc_has_clock_node_uart0_mem_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart1_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart1_baud_rate_generator",
                     "cargo:rustc-cfg=soc_has_clock_node_uart1_mem_clock",
                     "cargo:rustc-cfg=soc_has_clock_node_uart2_function_clock",
+                    "cargo:rustc-cfg=soc_has_clock_node_uart2_baud_rate_generator",
                     "cargo:rustc-cfg=soc_has_clock_node_uart2_mem_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
@@ -4865,6 +4906,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg_has_timer1",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
+                    "cargo:rustc-cfg=uart_has_sclk_divider",
                     "cargo:rustc-cfg=wifi_mac_version=\"1\"",
                 ],
                 memory_layout: &MemoryLayout {
@@ -5294,10 +5336,13 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_timg1_calibration_clock)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_uart0_function_clock)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_uart0_mem_clock)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_uart0_baud_rate_generator)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_uart1_function_clock)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_uart1_mem_clock)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_uart1_baud_rate_generator)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_uart2_function_clock)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_uart2_mem_clock)");
+    println!("cargo:rustc-check-cfg=cfg(soc_has_clock_node_uart2_baud_rate_generator)");
     println!("cargo:rustc-check-cfg=cfg(has_dram_region)");
     println!("cargo:rustc-check-cfg=cfg(has_dram2_uninit_region)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_supports_dma)");
@@ -5363,6 +5408,7 @@ pub fn emit_check_cfg_directives() {
     println!("cargo:rustc-check-cfg=cfg(spi_master_has_app_interrupts)");
     println!("cargo:rustc-check-cfg=cfg(spi_master_has_dma_segmented_transfer)");
     println!("cargo:rustc-check-cfg=cfg(timergroup_timg_has_divcnt_rst)");
+    println!("cargo:rustc-check-cfg=cfg(uart_has_sclk_divider)");
     println!("cargo:rustc-check-cfg=cfg(esp32c3)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_ds)");
     println!("cargo:rustc-check-cfg=cfg(soc_has_fe)");

@@ -1014,7 +1014,10 @@ impl DeviceClocks {
             // managed. In the current model, manually managed clocks have 0 consumers.
             let has_one_direct_dependent = tree.dependency_graph.users(node.name_str()).len() == 1;
 
-            let refcounted = !(node.always_on() || has_one_direct_dependent);
+            // Peripheral nodes are always refcounted, because we can't assume which node is
+            // referred to by the drivers.
+            let is_peripheral_node = !node.group.is_empty();
+            let refcounted = is_peripheral_node || !(node.always_on() || has_one_direct_dependent);
 
             let properties = ManagementProperties {
                 name: format_ident!("{}", node.name().to_case(Case::Snake)),
