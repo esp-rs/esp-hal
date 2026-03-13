@@ -18,10 +18,7 @@ impl<'ctx> ExprCompiler<'ctx> {
 
     pub fn compile_expression(&self, expression: &Expression) -> TokenStream {
         let source = expression.source.as_str();
-        let ast::Expression::Expression { expression } = &expression.expr else {
-            panic!("Invalid expression");
-        };
-        self.compile_right_hand_expression(source, expression)
+        self.compile_right_hand_expression(source, &expression.expr)
     }
 
     pub fn compile_right_hand_expression(

@@ -165,13 +165,20 @@ impl ClockTreeNodeType for Divider {
     fn validate_configures_expr(
         &self,
         instance: &ClockTreeNodeInstance,
-        _expr: &ConfiguresExpression,
+        expr: &ConfiguresExpression,
     ) -> Result<()> {
         anyhow::ensure!(
             self.is_configurable(),
             "Divider `{}` is not configurable",
             instance.name_str()
         );
+        if let Some(property) = expr.effect().property.as_ref() {
+            anyhow::ensure!(
+                self.params.contains_key(property),
+                "Divider does not have property `{}`",
+                property
+            );
+        }
 
         Ok(())
     }
