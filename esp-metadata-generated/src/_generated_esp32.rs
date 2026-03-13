@@ -1432,7 +1432,7 @@ macro_rules! define_clock_tree_types {
             unwrap!(clocks.xtal_clk).value()
         }
         pub fn configure_pll_clk(clocks: &mut ClockTree, config: PllClkConfig) {
-            if let Some(cpu_pll_div) = clocks.cpu_pll_div {
+            if clocks.cpu_pll_div.is_some() {
                 assert!(
                     !((config.value() == 480000000)
                         && (unwrap!(clocks.cpu_pll_div).divisor() == 4))
@@ -1563,8 +1563,8 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn configure_cpu_pll_div(clocks: &mut ClockTree, config: CpuPllDivConfig) {
-            if let Some(pll_clk) = clocks.pll_clk {
-                assert!(!((pll_clk.value() == 480000000) && (config.divisor() == 4)));
+            if clocks.pll_clk.is_some() {
+                assert!(!((pll_clk_frequency(clocks) == 480000000) && (config.divisor() == 4)));
             }
             let old_config = clocks.cpu_pll_div.replace(config);
             configure_cpu_pll_div_impl(clocks, old_config, config);
