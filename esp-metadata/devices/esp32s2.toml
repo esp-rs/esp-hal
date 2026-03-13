@@ -117,14 +117,14 @@ clocks = { system_clocks = { clock_tree = [
         { name = "PLL",  outputs = "PLL_CLK" },
         { name = "APLL", outputs = "APLL_CLK" },
     ] },
-    { name = "CPU_PLL_DIV", type = "divider", params = { divisor = "2, 3, 4, 6" }, output = "CPU_PLL_DIV_IN / divisor" }, # TODO reject = "PLL_CLK == 320_000_000 && divisor % 3 == 0"
+    { name = "CPU_PLL_DIV", type = "generic", params = { divisor = "2, 3, 4, 6" }, output = "CPU_PLL_DIV_IN / divisor" }, # TODO reject = "PLL_CLK == 320_000_000 && divisor % 3 == 0"
 
     # Represents SEL0 = 0, 2
     { name = "SYSTEM_PRE_DIV_IN", type = "mux", variants = [
         { name = "XTAL",    outputs = "XTAL_CLK" },
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
     ] },
-    { name = "SYSTEM_PRE_DIV", type = "divider", params = { divisor = "0 .. 1024" }, output = "SYSTEM_PRE_DIV_IN / (divisor + 1)" },
+    { name = "SYSTEM_PRE_DIV", type = "generic", params = { divisor = "0 .. 1024" }, output = "SYSTEM_PRE_DIV_IN / (divisor + 1)" },
 
     # The meta-switch
     { name = "CPU_CLK", type = "mux", always_on = true, variants = [
@@ -136,7 +136,7 @@ clocks = { system_clocks = { clock_tree = [
     ] },
 
     # APB options
-    { name = "APB_CLK_CPU_DIV2", type = "divider", output = "CPU_CLK / 2" },
+    { name = "APB_CLK_CPU_DIV2", type = "generic", output = "CPU_CLK / 2" },
     { name = "APB_CLK_80M",      type = "derived", from = "CPU_CLK", output = "80_000_000" },
     { name = "APB_CLK", type = "mux", variants = [
         { name = "PLL",     outputs = "APB_CLK_80M" },
@@ -146,8 +146,8 @@ clocks = { system_clocks = { clock_tree = [
     ] },
 
     # REF_TICK, configuring CPU clock needs to ensure this is 1MHz
-    { name = "REF_TICK_XTAL", type = "divider", params = { divisor = "0 .. 256" }, output = "XTAL_CLK / (divisor + 1)" },
-    { name = "REF_TICK_CK8M", type = "divider", params = { divisor = "0 .. 256" }, output = "RC_FAST_CLK / (divisor + 1)" },
+    { name = "REF_TICK_XTAL", type = "generic", params = { divisor = "0 .. 256" }, output = "XTAL_CLK / (divisor + 1)" },
+    { name = "REF_TICK_CK8M", type = "generic", params = { divisor = "0 .. 256" }, output = "RC_FAST_CLK / (divisor + 1)" },
     { name = "REF_TICK", type = "mux", variants = [
         { name = "PLL",     outputs = "REF_TICK_XTAL" },
         { name = "APLL",    outputs = "REF_TICK_XTAL" },
@@ -158,8 +158,8 @@ clocks = { system_clocks = { clock_tree = [
     # Low-speed clocks
     { name = "XTAL32K_CLK",     type = "source",  output = "32768" },
     { name = "RC_SLOW_CLK",     type = "source",  output = "90_000" },
-    { name = "RC_FAST_DIV_CLK", type = "divider", output = "RC_FAST_CLK / 256" },
-    { name = "XTAL_DIV_CLK",    type = "divider", output = "XTAL_CLK / 4" }, # source: esp-idf SOC_RTC_FAST_CLK_SRC_XTAL_D4
+    { name = "RC_FAST_DIV_CLK", type = "generic", output = "RC_FAST_CLK / 256" },
+    { name = "XTAL_DIV_CLK",    type = "generic", output = "XTAL_CLK / 4" }, # source: esp-idf SOC_RTC_FAST_CLK_SRC_XTAL_D4
 
     { name = "RTC_SLOW_CLK", type = "mux", variants = [
         { name = "XTAL32K",    outputs = "XTAL32K_CLK" },
@@ -241,9 +241,7 @@ clocks = { system_clocks = { clock_tree = [
             { name = "APB",      outputs = "APB_CLK", default = true },
             { name = "REF_TICK", outputs = "REF_TICK" }
         ] },
-        { name = "MEM_CLOCK", type = "mux", variants = [
-            { name = "MEM", outputs = "UART_MEM_CLK", default = true },
-        ] },
+        { name = "MEM_CLOCK", type = "generic", output = "UART_MEM_CLK" },
     ] },
     #{ name = "Spi01" },
     #{ name = "Timers" },

@@ -152,15 +152,15 @@ clocks = { system_clocks = { clock_tree = [
     # { name = "EXT32K_CLK",   type = "source", output = "32768" }, # currently unimplemented
 
     # PLL divider taps
-    { name = "PLL_F12M",  type = "divider", output = "PLL_CLK / 40" },
-    { name = "PLL_F20M",  type = "divider", output = "PLL_CLK / 24" },
-    { name = "PLL_F40M",  type = "divider", output = "PLL_CLK / 12" },
-    { name = "PLL_F48M",  type = "divider", output = "PLL_CLK / 10" },
-    { name = "PLL_F60M",  type = "divider", output = "PLL_CLK / 8"  },
-    { name = "PLL_F80M",  type = "divider", output = "PLL_CLK / 6"  },
-    { name = "PLL_F120M", type = "divider", output = "PLL_CLK / 4"  },
-    { name = "PLL_F160M", type = "divider", output = "PLL_CLK / 3"  },
-    { name = "PLL_F240M", type = "divider", output = "PLL_CLK / 2"  },
+    { name = "PLL_F12M",  type = "generic", output = "PLL_CLK / 40" },
+    { name = "PLL_F20M",  type = "generic", output = "PLL_CLK / 24" },
+    { name = "PLL_F40M",  type = "generic", output = "PLL_CLK / 12" },
+    { name = "PLL_F48M",  type = "generic", output = "PLL_CLK / 10" },
+    { name = "PLL_F60M",  type = "generic", output = "PLL_CLK / 8"  },
+    { name = "PLL_F80M",  type = "generic", output = "PLL_CLK / 6"  },
+    { name = "PLL_F120M", type = "generic", output = "PLL_CLK / 4"  },
+    { name = "PLL_F160M", type = "generic", output = "PLL_CLK / 3"  },
+    { name = "PLL_F240M", type = "generic", output = "PLL_CLK / 2"  },
 
     # HP SOC clock root (PCR_SOC_CLK_SEL: XTAL, RC_FAST, PLL_F160M, PLL_F240M)
     { name = "HP_ROOT_CLK", type = "mux", variants = [
@@ -170,16 +170,16 @@ clocks = { system_clocks = { clock_tree = [
         { name = "PLL_F240M", outputs = "PLL_F240M" },
     ] },
     # CPU_CLK divider: divider = (CPU_DIV_NUM + 1), n*F_AHB
-    { name = "CPU_CLK", type = "divider", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true },
+    { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true },
 
     # AHB_CLK divider: divider = (AHB_DIV_NUM + 1), <= 48MHz
-    { name = "AHB_CLK", type = "divider", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true },
+    { name = "AHB_CLK", type = "generic", params = { divisor = "0..256" }, output = "HP_ROOT_CLK / (divisor + 1)", always_on = true },
 
     # APB_CLK divider: divider = (APB_DIV_NUM + 1)
-    { name = "APB_CLK", type = "divider", params = { divisor = "0..256" }, output = "AHB_CLK / (divisor + 1)", always_on = true },
+    { name = "APB_CLK", type = "generic", params = { divisor = "0..256" }, output = "AHB_CLK / (divisor + 1)", always_on = true },
 
     # LP clocks (RTC domain)
-    { name = "XTAL_D2_CLK", type = "divider", output = "XTAL_CLK / 2" },
+    { name = "XTAL_D2_CLK", type = "generic", output = "XTAL_CLK / 2" },
     { name = "LP_FAST_CLK", type = "mux", variants = [
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
         { name = "XTAL_D2", outputs = "XTAL_D2_CLK" },
