@@ -172,6 +172,11 @@ impl ClockTreeNodeType for Divider {
                 "Divider does not have property `{}`",
                 property
             );
+        } else {
+            anyhow::ensure!(
+                self.params.len() == 1,
+                "Divider has multiple properties but no property was specified"
+            )
         }
 
         Ok(())
@@ -200,9 +205,33 @@ impl ClockTreeNodeType for Divider {
             &effect.value,
             tree,
         );
+        let node_name = instance.name_str();
+
+        let (param_name, param_type) = if let Some(property) = effect.property.as_ref() {
+            (property, &self.params[property])
+        } else {
+            self.params.get_index(0).unwrap()
+        };
+
+        let collapse_types =
+            self.params.len() == 1 && self.params.values().all(|v| v.as_enum_values().is_some());
+
+        let cfg_expr_code = if !collapse_types && param_type.as_enum_values().is_some() {
+            let full_name = format!("{node_name}_{}", param_name.to_uppercase());
+
+            let ty_name = format_ident!(
+                "{}Config",
+                full_name.from_case(Case::Ada).to_case(Case::Pascal)
+            );
+
+            quote! {
+                #ty_name::new(#cfg_expr_code)
+            }
+        } else {
+            cfg_expr_code
+        };
 
         if let Some(property) = effect.property.as_ref() {
-            let node_name = instance.name_str();
             let read_config_function = instance.current_config_function_name();
             let property = format_ident!("{}", property);
             quote! {
