@@ -45,8 +45,8 @@ impl<'ctx> ExprCompiler<'ctx> {
             ast::RightHandExpression::BinaryOperator { name, operands } => {
                 self.compile_binary_operator(source, name, operands, tree)
             }
-            ast::RightHandExpression::FunctionCall { .. } => {
-                panic!("Function calls are not supported")
+            ast::RightHandExpression::FunctionCall { name, arguments } => {
+                self.compile_function_call(source, name, arguments, tree)
             }
         }
     }
@@ -106,5 +106,24 @@ impl<'ctx> ExprCompiler<'ctx> {
             ast::LiteralValue::String(s) => quote! { #s },
             ast::LiteralValue::Boolean(b) => quote! { #b },
         }
+    }
+
+    fn compile_function_call(
+        &self,
+        source: &str,
+        name: &Token,
+        arguments: &[ast::RightHandExpression<DefaultTypeSet>],
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        // property(NODE)
+        let [ast::RightHandExpression::Variable { variable }] = arguments else {
+            panic!("Function calls must be of the form property(NODE)")
+        };
+
+        // TODO: pass instance to resolve node
+        let node_props = tree.properties(variable.source(source));
+        let node_field = quote::format_ident!("{}", node_props.field_name());
+        let name = quote::format_ident!("{}", name.source(source));
+        quote! { unwrap!(clocks.#node_field).#name() }
     }
 }

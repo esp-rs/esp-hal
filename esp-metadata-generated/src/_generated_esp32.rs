@@ -1433,7 +1433,10 @@ macro_rules! define_clock_tree_types {
         }
         pub fn configure_pll_clk(clocks: &mut ClockTree, config: PllClkConfig) {
             if let Some(cpu_pll_div) = clocks.cpu_pll_div {
-                assert!(!((config.value() == 480000000) && (cpu_pll_div.value() == 4)));
+                assert!(
+                    !((config.value() == 480000000)
+                        && (unwrap!(clocks.cpu_pll_div).divisor() == 4))
+                );
             }
             let old_config = clocks.pll_clk.replace(config);
             configure_pll_clk_impl(clocks, old_config, config);
