@@ -48,6 +48,7 @@ use serde::{
     Deserializer,
     de::{self, SeqAccess, Visitor},
 };
+use somni_expr::error::MarkInSource;
 use somni_parser::{ast, lexer::Token, parser::DefaultTypeSet};
 
 use crate::cfg::{
@@ -749,15 +750,17 @@ impl<'de> Deserialize<'de> for Expression {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        if let ast::Expression::Expression { expression } =
-            somni_parser::parser::parse_expression::<DefaultTypeSet>(&s).unwrap()
-        {
-            Ok(Expression {
+        match somni_parser::parser::parse_expression::<DefaultTypeSet>(&s) {
+            Ok(ast::Expression::Expression { expression }) => Ok(Expression {
                 source: s,
                 expr: expression,
-            })
-        } else {
-            Err(serde::de::Error::custom("Assignments are not supported"))
+            }),
+
+            Ok(_) => Err(de::Error::custom("Assignments are not supported")),
+            Err(err) => Err(de::Error::custom(format!(
+                "Invalid expression: {}",
+                MarkInSource(&s, err.location, "Expression error", &err.error)
+            ))),
         }
     }
 }
