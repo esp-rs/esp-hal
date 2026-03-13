@@ -669,10 +669,8 @@ fn configure_timg1_wdt_clock_impl(
 
 fn enable_uart0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
     // Disabling this prevents the device from booting
-    // PCR::regs()
-    //    .uart(0)
-    //    .clk_conf()
-    //    .modify(|_, w| w.sclk_en().bit(en));
+    // TODO: https://github.com/esp-rs/esp-hal/issues/4952
+    // enable_uart_function_clock(0, en);
 }
 
 fn configure_uart0_function_clock_impl(
@@ -680,22 +678,13 @@ fn configure_uart0_function_clock_impl(
     _old_config: Option<Uart0FunctionClockConfig>,
     new_config: Uart0FunctionClockConfig,
 ) {
-    PCR::regs().uart(0).clk_conf().modify(|_, w| unsafe {
-        w.sclk_sel().bits(match new_config {
-            Uart0FunctionClockConfig::Xtal => 0,
-            Uart0FunctionClockConfig::RcFast => 1,
-            Uart0FunctionClockConfig::PllF80m => 2,
-        })
-    });
+    configure_uart_function_clock(0, new_config);
 }
 
 // UART1_FUNCTION_CLOCK
 
 fn enable_uart1_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
-    PCR::regs()
-        .uart(1)
-        .clk_conf()
-        .modify(|_, w| w.sclk_en().bit(en));
+    enable_uart_function_clock(1, en);
 }
 
 fn configure_uart1_function_clock_impl(
@@ -703,7 +692,18 @@ fn configure_uart1_function_clock_impl(
     _old_config: Option<Uart0FunctionClockConfig>,
     new_config: Uart0FunctionClockConfig,
 ) {
-    PCR::regs().uart(1).clk_conf().modify(|_, w| unsafe {
+    configure_uart_function_clock(1, new_config);
+}
+
+fn enable_uart_function_clock(uart: usize, en: bool) {
+    PCR::regs()
+        .uart(uart)
+        .clk_conf()
+        .modify(|_, w| w.sclk_en().bit(en));
+}
+
+fn configure_uart_function_clock(uart: usize, new_config: Uart0FunctionClockConfig) {
+    PCR::regs().uart(uart).clk_conf().modify(|_, w| unsafe {
         w.sclk_sel().bits(match new_config {
             Uart0FunctionClockConfig::Xtal => 0,
             Uart0FunctionClockConfig::RcFast => 1,
