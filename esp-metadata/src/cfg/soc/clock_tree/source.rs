@@ -203,7 +203,12 @@ impl Source {
                 .map(|freq| {
                     eval_ctx.add_variable("VALUE", *freq as u64);
                     eval_ctx
-                        .evaluate_parsed::<u64>(&self.output.0.source, &self.output.0.expr)
+                        .evaluate_parsed::<u64>(
+                            &self.output.0.source,
+                            &somni_parser::ast::Expression::Expression {
+                                expression: self.output.0.expr.clone(),
+                            },
+                        )
                         .unwrap()
                 })
                 .collect::<Vec<_>>();

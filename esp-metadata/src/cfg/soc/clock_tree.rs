@@ -452,7 +452,7 @@ where
 #[derive(Debug, Clone)]
 pub struct ConfiguresExpression {
     effect: ConfiguresEffect,
-    value: Expression,
+    source: String,
 }
 
 #[derive(Debug, Clone)]
@@ -468,7 +468,7 @@ impl ConfiguresExpression {
     }
 
     pub(crate) fn name(&self, token: Token) -> &str {
-        self.value.lookup(token)
+        token.source(&self.source)
     }
 
     pub(crate) fn to_enum_selector(
@@ -484,7 +484,7 @@ impl ConfiguresExpression {
         let config_function = affected_node.config_apply_function_name();
         let enum_name = affected_node.config_type_name();
 
-        let configured_name = self.value.lookup(*variable);
+        let configured_name = self.name(*variable);
         let variant = variants(configured_name);
 
         quote! {
@@ -510,11 +510,23 @@ impl ConfiguresExpression {
         }
 
         let cfg_expr_code = ExprCompiler::new(&variables)
-            .compile_right_hand_expression(&self.value.source, &effect.value);
+            .compile_right_hand_expression(&self.source, &effect.value);
 
-        quote! {
-            let config_value = #state::new(#cfg_expr_code);
-            #config_function(clocks, config_value);
+        if let Some(property) = effect.property.as_ref() {
+            let read_config_function = affected_node.current_config_function_name();
+            let property = format_ident!("{}", property);
+            quote! {
+                let mut config_value = unwrap!(#read_config_function(clocks));
+
+                config_value.#property = #cfg_expr_code;
+
+                #config_function(clocks, config_value);
+            }
+        } else {
+            quote! {
+                let config_value = #state::new(#cfg_expr_code);
+                #config_function(clocks, config_value);
+            }
         }
     }
 }
@@ -558,18 +570,23 @@ impl FromStr for ConfiguresExpression {
                 if arguments.len() != 3 {
                     return Err(format!("Invalid config expression: {}", s));
                 }
+                let ast::RightHandExpression::Variable { variable } = &arguments[0] else {
+                    return Err(format!(
+                        "Node name in configure expression must be an identifier: {s}"
+                    ));
+                };
+                let node = variable.source(s).to_string();
+
+                let ast::RightHandExpression::Variable { variable } = &arguments[1] else {
+                    return Err(format!(
+                        "Property name in configure expression must be an identifier: {s}"
+                    ));
+                };
+                let property = Some(variable.source(s).to_string());
+
                 ConfiguresEffect {
-                    node: if let ast::RightHandExpression::Variable { variable } = &arguments[0] {
-                        variable.source(s).to_string()
-                    } else {
-                        return Err(format!("Invalid config expression: {}", s));
-                    },
-                    property: if let ast::RightHandExpression::Variable { variable } = &arguments[1]
-                    {
-                        Some(variable.source(s).to_string())
-                    } else {
-                        return Err(format!("Invalid config expression: {}", s));
-                    },
+                    node,
+                    property,
                     value: arguments[2].clone(),
                 }
             }
@@ -578,10 +595,7 @@ impl FromStr for ConfiguresExpression {
 
         Ok(ConfiguresExpression {
             effect,
-            value: Expression {
-                source: s.to_string(),
-                expr: value,
-            },
+            source: s.to_string(),
         })
     }
 }
@@ -729,7 +743,7 @@ impl RejectExpression {
 #[derive(Debug, Clone)]
 pub(crate) struct Expression {
     source: String,
-    expr: ast::Expression<DefaultTypeSet>,
+    expr: ast::RightHandExpression<DefaultTypeSet>,
 }
 
 impl Expression {
@@ -738,10 +752,7 @@ impl Expression {
     }
 
     fn expr(&self) -> &ast::RightHandExpression<DefaultTypeSet> {
-        match &self.expr {
-            ast::Expression::Assignment { .. } => unimplemented!("Assignments are not supported"),
-            ast::Expression::Expression { expression } => expression,
-        }
+        &self.expr
     }
 
     fn visit_variables<'s>(&'s self, mut f: impl FnMut(&'s str)) {
@@ -779,7 +790,15 @@ impl<'de> Deserialize<'de> for Expression {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        let expr = somni_parser::parser::parse_expression::<DefaultTypeSet>(&s).unwrap();
-        Ok(Expression { source: s, expr })
+        if let ast::Expression::Expression { expression } =
+            somni_parser::parser::parse_expression::<DefaultTypeSet>(&s).unwrap()
+        {
+            Ok(Expression {
+                source: s,
+                expr: expression,
+            })
+        } else {
+            Err(serde::de::Error::custom("Assignments are not supported"))
+        }
     }
 }
