@@ -1096,12 +1096,9 @@ macro_rules! define_clock_tree_types {
             /// Selects `APLL_CLK`.
             Apll,
         }
-        /// Configures the `CPU_PLL_DIV` clock divider.
-        ///
-        /// The output is calculated as `OUTPUT = CPU_PLL_DIV_IN / divisor`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum CpuPllDivConfig {
+        pub enum CpuPllDivDivisor {
             /// Selects `divisor = 2`.
             _2 = 2,
             /// Selects `divisor = 3`.
@@ -1111,29 +1108,33 @@ macro_rules! define_clock_tree_types {
             /// Selects `divisor = 6`.
             _6 = 6,
         }
-        impl CpuPllDivConfig {
-            /// Creates a new divider configuration.
+        impl CpuPllDivDivisor {
+            /// Creates a new parameter value from a raw number.
             pub const fn new(raw: u32) -> Self {
                 match raw {
-                    2 => CpuPllDivConfig::_2,
-                    3 => CpuPllDivConfig::_3,
-                    4 => CpuPllDivConfig::_4,
-                    6 => CpuPllDivConfig::_6,
+                    2 => Self::_2,
+                    3 => Self::_3,
+                    4 => Self::_4,
+                    6 => Self::_6,
                     _ => ::core::panic!("Invalid CPU_PLL_DIV divisor value"),
                 }
             }
         }
+        /// Configures the `CPU_PLL_DIV` clock node.
+        ///
+        /// The output is calculated as `OUTPUT = CPU_PLL_DIV_IN / divisor`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub struct CpuPllDivConfig {
+            divisor: CpuPllDivDivisor,
+        }
         impl CpuPllDivConfig {
-            fn divisor(self) -> u32 {
-                match self {
-                    CpuPllDivConfig::_2 => 2,
-                    CpuPllDivConfig::_3 => 3,
-                    CpuPllDivConfig::_4 => 4,
-                    CpuPllDivConfig::_6 => 6,
-                }
+            /// Creates a new configuration for the CPU_PLL_DIV clock node.
+            pub const fn new(divisor: CpuPllDivDivisor) -> Self {
+                Self { divisor }
             }
-            fn value(self) -> u32 {
-                self.divisor()
+            fn divisor(self) -> u32 {
+                self.divisor as u32
             }
         }
         /// The list of clock signals that the `SYSTEM_PRE_DIV_IN` multiplexer can output.
@@ -1145,7 +1146,7 @@ macro_rules! define_clock_tree_types {
             /// Selects `RC_FAST_CLK`.
             RcFast,
         }
-        /// Configures the `SYSTEM_PRE_DIV` clock divider.
+        /// Configures the `SYSTEM_PRE_DIV` clock node.
         ///
         /// The output is calculated as `OUTPUT = SYSTEM_PRE_DIV_IN / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1154,23 +1155,21 @@ macro_rules! define_clock_tree_types {
             divisor: u32,
         }
         impl SystemPreDivConfig {
-            /// Creates a new divider configuration.
+            /// Creates a new configuration for the SYSTEM_PRE_DIV clock node.
+            ///
             /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 1023).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
-                    divisor <= 1023u32,
-                    "`SYSTEM_PRE_DIV` divisor value must be between 0 and 1023 (inclusive)."
+                    divisor <= 1023,
+                    "`SYSTEM_PRE_DIV` divisor must be between 0 and 1023 (inclusive)."
                 );
                 Self { divisor }
             }
             fn divisor(self) -> u32 {
-                self.divisor
-            }
-            fn value(self) -> u32 {
-                self.divisor()
+                self.divisor as u32
             }
         }
         /// The list of clock signals that the `APB_CLK` multiplexer can output.
@@ -1199,7 +1198,7 @@ macro_rules! define_clock_tree_types {
             /// Selects `REF_TICK_CK8M`.
             RcFast,
         }
-        /// Configures the `REF_TICK_XTAL` clock divider.
+        /// Configures the `REF_TICK_XTAL` clock node.
         ///
         /// The output is calculated as `OUTPUT = XTAL_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1208,26 +1207,24 @@ macro_rules! define_clock_tree_types {
             divisor: u32,
         }
         impl RefTickXtalConfig {
-            /// Creates a new divider configuration.
+            /// Creates a new configuration for the REF_TICK_XTAL clock node.
+            ///
             /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
-                    divisor <= 255u32,
-                    "`REF_TICK_XTAL` divisor value must be between 0 and 255 (inclusive)."
+                    divisor <= 255,
+                    "`REF_TICK_XTAL` divisor must be between 0 and 255 (inclusive)."
                 );
                 Self { divisor }
             }
             fn divisor(self) -> u32 {
-                self.divisor
-            }
-            fn value(self) -> u32 {
-                self.divisor()
+                self.divisor as u32
             }
         }
-        /// Configures the `REF_TICK_CK8M` clock divider.
+        /// Configures the `REF_TICK_CK8M` clock node.
         ///
         /// The output is calculated as `OUTPUT = RC_FAST_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1236,23 +1233,21 @@ macro_rules! define_clock_tree_types {
             divisor: u32,
         }
         impl RefTickCk8mConfig {
-            /// Creates a new divider configuration.
+            /// Creates a new configuration for the REF_TICK_CK8M clock node.
+            ///
             /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 255).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
-                    divisor <= 255u32,
-                    "`REF_TICK_CK8M` divisor value must be between 0 and 255 (inclusive)."
+                    divisor <= 255,
+                    "`REF_TICK_CK8M` divisor must be between 0 and 255 (inclusive)."
                 );
                 Self { divisor }
             }
             fn divisor(self) -> u32 {
-                self.divisor
-            }
-            fn value(self) -> u32 {
-                self.divisor()
+                self.divisor as u32
             }
         }
         /// The list of clock signals that the `CPU_CLK` multiplexer can output.

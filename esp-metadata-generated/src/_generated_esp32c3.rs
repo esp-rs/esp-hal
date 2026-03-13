@@ -1169,7 +1169,7 @@ macro_rules! define_clock_tree_types {
             /// Selects `RC_FAST_CLK`.
             RcFast,
         }
-        /// Configures the `SYSTEM_PRE_DIV` clock divider.
+        /// Configures the `SYSTEM_PRE_DIV` clock node.
         ///
         /// The output is calculated as `OUTPUT = SYSTEM_PRE_DIV_IN / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1178,23 +1178,21 @@ macro_rules! define_clock_tree_types {
             divisor: u32,
         }
         impl SystemPreDivConfig {
-            /// Creates a new divider configuration.
+            /// Creates a new configuration for the SYSTEM_PRE_DIV clock node.
+            ///
             /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 1023).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
-                    divisor <= 1023u32,
-                    "`SYSTEM_PRE_DIV` divisor value must be between 0 and 1023 (inclusive)."
+                    divisor <= 1023,
+                    "`SYSTEM_PRE_DIV` divisor must be between 0 and 1023 (inclusive)."
                 );
                 Self { divisor }
             }
             fn divisor(self) -> u32 {
-                self.divisor
-            }
-            fn value(self) -> u32 {
-                self.divisor()
+                self.divisor as u32
             }
         }
         /// Selects the output frequency of `CPU_PLL_DIV_OUT`. Depends on `PLL_CLK`.
@@ -1243,7 +1241,7 @@ macro_rules! define_clock_tree_types {
             /// Selects `CPU_PLL_DIV_OUT`.
             Pll,
         }
-        /// Configures the `RC_FAST_CLK_DIV_N` clock divider.
+        /// Configures the `RC_FAST_CLK_DIV_N` clock node.
         ///
         /// The output is calculated as `OUTPUT = RC_FAST_CLK / (divisor + 1)`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1252,23 +1250,21 @@ macro_rules! define_clock_tree_types {
             divisor: u32,
         }
         impl RcFastClkDivNConfig {
-            /// Creates a new divider configuration.
+            /// Creates a new configuration for the RC_FAST_CLK_DIV_N clock node.
+            ///
             /// ## Panics
             ///
             /// Panics if the divisor value is outside the
             /// valid range (0 ..= 3).
             pub const fn new(divisor: u32) -> Self {
                 ::core::assert!(
-                    divisor <= 3u32,
-                    "`RC_FAST_CLK_DIV_N` divisor value must be between 0 and 3 (inclusive)."
+                    divisor <= 3,
+                    "`RC_FAST_CLK_DIV_N` divisor must be between 0 and 3 (inclusive)."
                 );
                 Self { divisor }
             }
             fn divisor(self) -> u32 {
-                self.divisor
-            }
-            fn value(self) -> u32 {
-                self.divisor()
+                self.divisor as u32
             }
         }
         /// The list of clock signals that the `RTC_SLOW_CLK` multiplexer can output.

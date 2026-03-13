@@ -48,7 +48,7 @@ impl CpuClock {
     const PRESET_80: ClockConfig = ClockConfig {
         xtal_clk: None,
         system_pre_div: None,
-        cpu_pll_div: Some(CpuPllDivConfig::_6),
+        cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_6)),
         cpu_clk: Some(CpuClkConfig::Pll),
         rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
@@ -58,7 +58,7 @@ impl CpuClock {
     const PRESET_120: ClockConfig = ClockConfig {
         xtal_clk: None,
         system_pre_div: None,
-        cpu_pll_div: Some(CpuPllDivConfig::_4),
+        cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_4)),
         cpu_clk: Some(CpuClkConfig::Pll),
         rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
@@ -434,10 +434,11 @@ fn configure_cpu_clk_impl(
     // Based on TRM Table 6.2-2
     if new_config == CpuClkConfig::Pll {
         SYSTEM::regs().cpu_per_conf().modify(|_, w| unsafe {
-            w.cpuperiod_sel().bits(match unwrap!(clocks.cpu_pll_div) {
-                CpuPllDivConfig::_4 => 1,
-                CpuPllDivConfig::_6 => 0,
-            })
+            w.cpuperiod_sel()
+                .bits(match unwrap!(clocks.cpu_pll_div).divisor {
+                    CpuPllDivDivisor::_4 => 1,
+                    CpuPllDivDivisor::_6 => 0,
+                })
         });
     }
 
