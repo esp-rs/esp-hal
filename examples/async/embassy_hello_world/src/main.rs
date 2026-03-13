@@ -13,6 +13,7 @@ use esp_hal::{interrupt::software::SoftwareInterruptControl, timer::timg::TimerG
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
+/// Periodically prints a heartbeat line.
 #[embassy_executor::task]
 async fn run() {
     loop {

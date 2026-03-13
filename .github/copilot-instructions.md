@@ -26,6 +26,7 @@ All automation goes through `cargo xtask`. Use `--packages` and `--chips` to sco
 | Host-side unit tests | `cargo xtask host-tests` | Fast, runs on host |
 | Validate metadata | `cargo xtask update-metadata --check` | Fast |
 | Validate changelog | `cargo xtask check-changelog` | Fast |
+| Verify proc-macro doc coverage in end-user binary | `cargo xtask check-documentation-coverage` | Runs rustdoc private-item coverage check on macro-expanded example code |
 | Build an example | `cargo xtask run example [name] --chip <chip>` | |
 | Build docs | `cargo xtask build documentation --chips <list>` | Slow — scope to affected chips |
 | HIL tests (needs hardware) | `cargo xtask run tests <chip> [--test name]` | Requires connected device |
@@ -107,6 +108,7 @@ Prefer these over `#[cfg(feature = "esp32c3")]` where possible.
 4. `cargo xtask check-changelog` — add changelog entry if API changed
 5. Build affected examples/tests for relevant chips
 6. `cargo xtask host-tests` — if host-side code changed
+7. If touching proc macros that affect end-user binaries, run `cargo xtask check-documentation-coverage`
 
 ## Key references
 

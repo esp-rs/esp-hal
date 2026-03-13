@@ -166,6 +166,7 @@ You can find the complete list of available symbols in `esp-metadata-generated/s
 ## API Surface
 
 - API documentation must be provided for every new driver and API.
+- End-user binaries should not expose undocumented proc-macro expansion artifacts in rustdoc output; generated items must either be documented or explicitly hidden with `#[doc(hidden)]`.
 - Private details should not leak into the public API, and should be made private where technically possible.
   - Implementation details that _need_ to be public should be marked with `#[doc(hidden)]` and a comment as to why it needs to be public.
     - For the time being, this includes any `Instance` traits, and `State` or `Info` structs as well.
