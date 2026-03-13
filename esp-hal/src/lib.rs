@@ -275,6 +275,7 @@ use core::marker::PhantomData;
 
 pub use esp_metadata_generated::chip;
 use esp_rom_sys as _;
+#[cfg_attr(esp32c61, expect(unused))]
 pub(crate) use unstable_driver;
 pub(crate) use unstable_module;
 
@@ -552,6 +553,7 @@ pub(crate) mod private {
     }
 
     pub(crate) struct OnDrop<F: FnOnce()>(ManuallyDrop<F>);
+    #[cfg_attr(esp32c61, expect(unused))] // TODO: remove when more peripherals are supported
     impl<F: FnOnce()> OnDrop<F> {
         pub fn new(cb: F) -> Self {
             Self(ManuallyDrop::new(cb))

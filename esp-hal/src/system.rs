@@ -59,10 +59,12 @@ pub(crate) fn disable_peripherals() {
 
 #[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg(not(esp32c61))]
 pub(crate) struct PeripheralGuard {
     peripheral: Peripheral,
 }
 
+#[cfg(not(esp32c61))]
 impl PeripheralGuard {
     pub(crate) fn new_with(p: Peripheral, init: fn()) -> Self {
         if PeripheralClockControl::enable(p) {
@@ -78,6 +80,7 @@ impl PeripheralGuard {
     }
 }
 
+#[cfg(not(esp32c61))]
 impl Clone for PeripheralGuard {
     fn clone(&self) -> Self {
         Self::new(self.peripheral)
@@ -88,6 +91,7 @@ impl Clone for PeripheralGuard {
     }
 }
 
+#[cfg(not(esp32c61))]
 impl Drop for PeripheralGuard {
     fn drop(&mut self) {
         PeripheralClockControl::disable(self.peripheral);
@@ -96,8 +100,10 @@ impl Drop for PeripheralGuard {
 
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg(not(esp32c61))]
 pub(crate) struct GenericPeripheralGuard<const P: u8> {}
 
+#[cfg(not(esp32c61))]
 impl<const P: u8> GenericPeripheralGuard<P> {
     pub(crate) fn new_with(init: fn()) -> Self {
         let peripheral = const { Peripheral::try_from(P).unwrap() };
@@ -118,6 +124,7 @@ impl<const P: u8> GenericPeripheralGuard<P> {
     }
 }
 
+#[cfg(not(esp32c61))]
 impl<const P: u8> Clone for GenericPeripheralGuard<P> {
     fn clone(&self) -> Self {
         Self::new()
@@ -128,6 +135,7 @@ impl<const P: u8> Clone for GenericPeripheralGuard<P> {
     }
 }
 
+#[cfg(not(esp32c61))]
 impl<const P: u8> Drop for GenericPeripheralGuard<P> {
     fn drop(&mut self) {
         let peripheral = const { Peripheral::try_from(P).unwrap() };
@@ -167,6 +175,7 @@ impl PeripheralClockControl {
     /// Returns `true` if it actually disabled the peripheral.
     ///
     /// Before disabling a peripheral it will also get reset
+    #[cfg(not(esp32c61))]
     pub(crate) fn disable(peripheral: Peripheral) -> bool {
         PERIPHERAL_REF_COUNT.with(|ref_counts| {
             Self::enable_forced_with_counts(peripheral, false, false, ref_counts)

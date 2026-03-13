@@ -15,5 +15,4 @@ pub(crate) mod regi2c;
 
 pub(crate) use esp32c61 as pac;
 
-
 pub(crate) fn pre_init() {}
