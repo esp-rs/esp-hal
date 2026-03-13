@@ -15,7 +15,6 @@ use crate::{
             ClockTreeNodeType,
             ConfiguresExpression,
             DependencyGraph,
-            Expression,
             Function,
             ManagementProperties,
             ValidationContext,
@@ -179,7 +178,11 @@ impl ClockTreeNodeInstance {
         quote::format_ident!("{}Config", item)
     }
 
-    fn apply_configuration(&self, expr: &Expression, tree: &ProcessedClockData) -> TokenStream {
+    fn apply_configuration(
+        &self,
+        expr: &ConfiguresExpression,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
         self.node.apply_configuration(self, expr, tree)
     }
 

@@ -48,6 +48,7 @@ use serde::{
     Deserializer,
     de::{self, SeqAccess, Visitor},
 };
+use somni_expr::error::MarkInSource;
 use somni_parser::{ast, lexer::Token, parser::DefaultTypeSet};
 
 use crate::cfg::{
@@ -356,7 +357,7 @@ pub(crate) trait ClockTreeNodeType: Any {
     fn apply_configuration(
         &self,
         instance: &ClockTreeNodeInstance,
-        _expr: &Expression,
+        _expr: &ConfiguresExpression,
         _tree: &ProcessedClockData,
     ) -> TokenStream {
         if instance.is_configurable() {
@@ -451,8 +452,25 @@ where
 /// - Divider = value
 #[derive(Debug, Clone)]
 pub struct ConfiguresExpression {
-    target: String,
-    value: Expression,
+    effect: ConfiguresEffect,
+    source: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConfiguresEffect {
+    node: String,
+    property: Option<String>,
+    value: ast::RightHandExpression<DefaultTypeSet>,
+}
+
+impl ConfiguresExpression {
+    pub(crate) fn effect(&self) -> &ConfiguresEffect {
+        &self.effect
+    }
+
+    pub(crate) fn name(&self, token: Token) -> &str {
+        token.source(&self.source)
+    }
 }
 
 impl<'de> Deserialize<'de> for ConfiguresExpression {
@@ -469,17 +487,57 @@ impl FromStr for ConfiguresExpression {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (target, value_str) = s.split_once('=').ok_or_else(|| {
-            format!("The config expression must be in the format 'target = value'")
-        })?;
-        let value = somni_parser::parser::parse_expression(value_str)
+        let value = somni_parser::parser::parse_expression(s)
             .map_err(|e| format!("Failed to parse expression: {}", e))?;
-        Ok(ConfiguresExpression {
-            target: target.trim().to_string(),
-            value: Expression {
-                source: value_str.to_string(),
-                expr: value,
+
+        let effect = match &value {
+            ast::Expression::Assignment {
+                left_expr,
+                operator: _,
+                right_expr,
+            } => ConfiguresEffect {
+                // NODE = VALUE
+                node: if let ast::LeftHandExpression::Name { variable } = left_expr {
+                    variable.source(s).to_string()
+                } else {
+                    return Err(format!("Invalid config expression: {}", s));
+                },
+                property: None,
+                value: right_expr.clone(),
             },
+            ast::Expression::Expression {
+                expression: ast::RightHandExpression::FunctionCall { name, arguments },
+            } if name.source(s) == "configure" => {
+                // configure(NODE, property, VALUE)
+                if arguments.len() != 3 {
+                    return Err(format!("Invalid config expression: {}", s));
+                }
+                let ast::RightHandExpression::Variable { variable } = &arguments[0] else {
+                    return Err(format!(
+                        "Node name in configure expression must be an identifier: {s}"
+                    ));
+                };
+                let node = variable.source(s).to_string();
+
+                let ast::RightHandExpression::Variable { variable } = &arguments[1] else {
+                    return Err(format!(
+                        "Property name in configure expression must be an identifier: {s}"
+                    ));
+                };
+                let property = Some(variable.source(s).to_string());
+
+                ConfiguresEffect {
+                    node,
+                    property,
+                    value: arguments[2].clone(),
+                }
+            }
+            _ => return Err(format!("Invalid config expression: {}", s)),
+        };
+
+        Ok(ConfiguresExpression {
+            effect,
+            source: s.to_string(),
         })
     }
 }
@@ -590,23 +648,35 @@ impl FromStr for ValueFragment {
     }
 }
 
+// Asserts that will be run before configuring a node.
+//
+// Referring to a node by name resolves to its output frequency. `property(NODE)` resolves to the
+// node's property value.
 #[derive(Debug, Clone, Deserialize)]
 pub struct RejectExpression(Expression);
 impl RejectExpression {
     fn to_rust<'a>(
-        &self,
-        config_fields: &[(&'a str, Ident)],
+        &'a self,
         mut variables: HashMap<&'a str, TokenStream>,
+        tree: &ProcessedClockData,
     ) -> TokenStream {
         let mut patterns = vec![];
 
-        for (var, config_field) in config_fields {
-            patterns.push(quote! { let Some(#config_field) = clocks.#config_field });
-            // FIXME: don't assume a clock node can be represented as a fixed value
-            variables.insert(var, quote! { #config_field.value() });
-        }
+        self.0.visit_variables(|var| {
+            if !variables.contains_key(var) {
+                // Referring to a node by name resolves to its output frequency.
+                let properties = tree.properties(var);
+                let node = tree.node(var);
+                let freq_fn = node.frequency_function_name();
+                variables.insert(var, quote! { #freq_fn(clocks) });
 
-        let reject_expr = self.0.to_rust(variables);
+                // Only run the assert if the referenced nodes have been configured
+                let node_field = properties.field_name();
+                patterns.push(quote! { clocks.#node_field.is_some() });
+            }
+        });
+
+        let reject_expr = self.0.to_rust(variables, tree);
 
         let assert_reject = quote! {
             assert!(!(#reject_expr));
@@ -627,7 +697,7 @@ impl RejectExpression {
 #[derive(Debug, Clone)]
 pub(crate) struct Expression {
     source: String,
-    expr: ast::Expression<DefaultTypeSet>,
+    expr: ast::RightHandExpression<DefaultTypeSet>,
 }
 
 impl Expression {
@@ -636,10 +706,7 @@ impl Expression {
     }
 
     fn expr(&self) -> &ast::RightHandExpression<DefaultTypeSet> {
-        match &self.expr {
-            ast::Expression::Assignment { .. } => unimplemented!("Assignments are not supported"),
-            ast::Expression::Expression { expression } => expression,
-        }
+        &self.expr
     }
 
     fn visit_variables<'s>(&'s self, mut f: impl FnMut(&'s str)) {
@@ -657,8 +724,10 @@ impl Expression {
                     visit_variables(&operands[0], f);
                     visit_variables(&operands[1], f);
                 }
-                ast::RightHandExpression::FunctionCall { .. } => {
-                    panic!("Function calls are not supported")
+                ast::RightHandExpression::FunctionCall { name: _, arguments } => {
+                    // This will ensure the user knows the node is referenced in the expression. A
+                    // bit of a convention over specification, though.
+                    visit_variables(&arguments[0], f);
                 }
             }
         }
@@ -666,16 +735,12 @@ impl Expression {
         visit_variables(self.expr(), &mut |token| f(self.lookup(token)))
     }
 
-    fn as_name(&self) -> Option<&str> {
-        if let ast::RightHandExpression::Variable { variable } = self.expr() {
-            Some(self.lookup(*variable))
-        } else {
-            None
-        }
-    }
-
-    fn to_rust(&self, variables: HashMap<&str, TokenStream>) -> TokenStream {
-        ExprCompiler::new(&variables).compile_expression(self)
+    fn to_rust(
+        &self,
+        variables: HashMap<&str, TokenStream>,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        ExprCompiler::new(&variables).compile_expression(self, tree)
     }
 }
 
@@ -685,7 +750,17 @@ impl<'de> Deserialize<'de> for Expression {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        let expr = somni_parser::parser::parse_expression::<DefaultTypeSet>(&s).unwrap();
-        Ok(Expression { source: s, expr })
+        match somni_parser::parser::parse_expression::<DefaultTypeSet>(&s) {
+            Ok(ast::Expression::Expression { expression }) => Ok(Expression {
+                source: s,
+                expr: expression,
+            }),
+
+            Ok(_) => Err(de::Error::custom("Assignments are not supported")),
+            Err(err) => Err(de::Error::custom(format!(
+                "Invalid expression: {}",
+                MarkInSource(&s, err.location, "Expression error", &err.error)
+            ))),
+        }
     }
 }
