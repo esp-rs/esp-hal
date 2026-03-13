@@ -774,8 +774,10 @@ impl Expression {
                     visit_variables(&operands[0], f);
                     visit_variables(&operands[1], f);
                 }
-                ast::RightHandExpression::FunctionCall { .. } => {
-                    panic!("Function calls are not supported")
+                ast::RightHandExpression::FunctionCall { name: _, arguments } => {
+                    // This will ensure the user knows the node is referenced in the expression. A
+                    // bit of a convention over specification, though.
+                    visit_variables(&arguments[0], f);
                 }
             }
         }
