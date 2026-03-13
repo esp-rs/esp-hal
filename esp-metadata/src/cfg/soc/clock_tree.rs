@@ -458,6 +458,7 @@ pub struct ConfiguresExpression {
 #[derive(Debug, Clone)]
 pub struct ConfiguresEffect {
     node: String,
+    property: Option<String>,
     value: ast::RightHandExpression<DefaultTypeSet>,
 }
 
@@ -547,8 +548,31 @@ impl FromStr for ConfiguresExpression {
                 } else {
                     return Err(format!("Invalid config expression: {}", s));
                 },
+                property: None,
                 value: right_expr.clone(),
             },
+            ast::Expression::Expression {
+                expression: ast::RightHandExpression::FunctionCall { name, arguments },
+            } if name.source(s) == "configure" => {
+                // configure(NODE, property, VALUE)
+                if arguments.len() != 3 {
+                    return Err(format!("Invalid config expression: {}", s));
+                }
+                ConfiguresEffect {
+                    node: if let ast::RightHandExpression::Variable { variable } = &arguments[0] {
+                        variable.source(s).to_string()
+                    } else {
+                        return Err(format!("Invalid config expression: {}", s));
+                    },
+                    property: if let ast::RightHandExpression::Variable { variable } = &arguments[1]
+                    {
+                        Some(variable.source(s).to_string())
+                    } else {
+                        return Err(format!("Invalid config expression: {}", s));
+                    },
+                    value: arguments[2].clone(),
+                }
+            }
             _ => return Err(format!("Invalid config expression: {}", s)),
         };
 

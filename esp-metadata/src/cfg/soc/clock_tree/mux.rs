@@ -76,6 +76,11 @@ impl ClockTreeNodeType for Multiplexer {
         instance: &ClockTreeNodeInstance,
         expr: &ConfiguresExpression,
     ) -> Result<()> {
+        anyhow::ensure!(
+            expr.effect().property.is_none(),
+            "Multiplexer config expression for `{}` must not have a property",
+            instance.name_str()
+        );
         let ast::RightHandExpression::Variable { variable } = &expr.effect().value else {
             anyhow::bail!(
                 "Multiplexer config expression for `{}` must be a name",
