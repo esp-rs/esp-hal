@@ -1194,13 +1194,17 @@ macro_rules! define_clock_tree_types {
             /// Selects `REF_TICK`.
             RefTick,
         }
-        /// The list of clock signals that the `UART0_MEM_CLOCK` multiplexer can output.
-        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        /// Configures the `UART0_MEM_CLOCK` clock node.
+        ///
+        /// The output is calculated as `OUTPUT = UART_MEM_CLK`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum Uart0MemClockConfig {
-            #[default]
-            /// Selects `UART_MEM_CLK`.
-            Mem,
+        pub struct Uart0MemClockConfig {}
+        impl Uart0MemClockConfig {
+            /// Creates a new configuration for the MEM_CLOCK clock node.
+            pub const fn new() -> Self {
+                Self {}
+            }
         }
         /// Represents the device's clock tree.
         pub struct ClockTree {
@@ -2386,20 +2390,9 @@ macro_rules! define_clock_tree_types {
                 Uart0FunctionClockConfig::RefTick => ref_tick_frequency(clocks),
             }
         }
-        pub fn configure_uart0_mem_clock(
-            clocks: &mut ClockTree,
-            new_selector: Uart0MemClockConfig,
-        ) {
-            let old_selector = clocks.uart0_mem_clock.replace(new_selector);
-            if clocks.uart0_mem_clock_refcount > 0 {
-                request_uart_mem_clk(clocks);
-                configure_uart0_mem_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    release_uart_mem_clk(clocks);
-                }
-            } else {
-                configure_uart0_mem_clock_impl(clocks, old_selector, new_selector);
-            }
+        pub fn configure_uart0_mem_clock(clocks: &mut ClockTree, config: Uart0MemClockConfig) {
+            let old_config = clocks.uart0_mem_clock.replace(config);
+            configure_uart0_mem_clock_impl(clocks, old_config, config);
         }
         pub fn uart0_mem_clock_config(clocks: &mut ClockTree) -> Option<Uart0MemClockConfig> {
             clocks.uart0_mem_clock
@@ -2477,20 +2470,9 @@ macro_rules! define_clock_tree_types {
                 Uart0FunctionClockConfig::RefTick => ref_tick_frequency(clocks),
             }
         }
-        pub fn configure_uart1_mem_clock(
-            clocks: &mut ClockTree,
-            new_selector: Uart0MemClockConfig,
-        ) {
-            let old_selector = clocks.uart1_mem_clock.replace(new_selector);
-            if clocks.uart1_mem_clock_refcount > 0 {
-                request_uart_mem_clk(clocks);
-                configure_uart1_mem_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    release_uart_mem_clk(clocks);
-                }
-            } else {
-                configure_uart1_mem_clock_impl(clocks, old_selector, new_selector);
-            }
+        pub fn configure_uart1_mem_clock(clocks: &mut ClockTree, config: Uart0MemClockConfig) {
+            let old_config = clocks.uart1_mem_clock.replace(config);
+            configure_uart1_mem_clock_impl(clocks, old_config, config);
         }
         pub fn uart1_mem_clock_config(clocks: &mut ClockTree) -> Option<Uart0MemClockConfig> {
             clocks.uart1_mem_clock
@@ -2568,20 +2550,9 @@ macro_rules! define_clock_tree_types {
                 Uart0FunctionClockConfig::RefTick => ref_tick_frequency(clocks),
             }
         }
-        pub fn configure_uart2_mem_clock(
-            clocks: &mut ClockTree,
-            new_selector: Uart0MemClockConfig,
-        ) {
-            let old_selector = clocks.uart2_mem_clock.replace(new_selector);
-            if clocks.uart2_mem_clock_refcount > 0 {
-                request_uart_mem_clk(clocks);
-                configure_uart2_mem_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    release_uart_mem_clk(clocks);
-                }
-            } else {
-                configure_uart2_mem_clock_impl(clocks, old_selector, new_selector);
-            }
+        pub fn configure_uart2_mem_clock(clocks: &mut ClockTree, config: Uart0MemClockConfig) {
+            let old_config = clocks.uart2_mem_clock.replace(config);
+            configure_uart2_mem_clock_impl(clocks, old_config, config);
         }
         pub fn uart2_mem_clock_config(clocks: &mut ClockTree) -> Option<Uart0MemClockConfig> {
             clocks.uart2_mem_clock
