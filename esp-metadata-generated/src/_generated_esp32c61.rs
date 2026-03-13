@@ -76,6 +76,12 @@ macro_rules! property {
     ("soc.rc_fast_clk_default", str) => {
         stringify!(17500000)
     };
+    ("timergroup.timg_has_timer1") => {
+        false
+    };
+    ("timergroup.timg_has_divcnt_rst") => {
+        true
+    };
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]

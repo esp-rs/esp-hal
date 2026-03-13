@@ -232,7 +232,6 @@ esp32c6 = [
 ##
 esp32c61 = [
     "dep:esp32c61",
-    "esp-riscv-rt/rtc-ram",
     "esp-riscv-rt/clic-48",
     "procmacros/has-lp-core",
     "esp-rom-sys/esp32c61",

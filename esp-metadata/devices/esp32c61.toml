@@ -77,6 +77,7 @@ peripherals = [
 ]
 
 symbols = [
+    "swd",
     # ROM capabilities (TODO: verify against esp-idf when implementing)
     "rom_crc_le",
     "rom_crc_be",
@@ -123,5 +124,10 @@ status_registers = 3
 software_interrupt_count = 4
 software_interrupt_delay = 24 # CPU speed dependent
 controller = { Riscv = { flavour = "clic", interrupts = 32, priority_levels = 8 } }
+
+[device.timergroup]
+support_status = "partial"
+instances = [{ name = "timg0" }, { name = "timg1" }]
+timg_has_divcnt_rst = true
 
 [device.systimer]

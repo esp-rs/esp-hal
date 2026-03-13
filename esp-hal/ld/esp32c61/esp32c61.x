@@ -27,7 +27,6 @@ INSERT BEFORE .text;
 /* Shared sections #2 - ordering matters */
 INCLUDE "rodata.x"
 INCLUDE "text.x"
-INCLUDE "rtc_fast.x"
 INCLUDE "stack.x"
 INCLUDE "dram2.x"
 INCLUDE "metadata.x"
