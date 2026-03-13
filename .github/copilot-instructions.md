@@ -13,6 +13,7 @@ Bare-metal `no_std` Rust HAL for Espressif SoCs. MSRV: **1.88.0** (source: `MSRV
 | esp32c3 | RISC-V | `riscv32imc-unknown-none-elf` | `--toolchain stable` |
 | esp32c5 | RISC-V | `riscv32imac-unknown-none-elf` | `--toolchain stable` |
 | esp32c6 | RISC-V | `riscv32imac-unknown-none-elf` | `--toolchain stable` |
+| esp32c61 | RISC-V | `riscv32imac-unknown-none-elf` | `--toolchain stable` |
 | esp32h2 | RISC-V | `riscv32imac-unknown-none-elf` | `--toolchain stable` |
 
 ## Commands
