@@ -180,7 +180,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
     quote!(
         #[allow(non_snake_case)]
         #[unsafe(export_name = "main")]
-        pub fn __risc_v_rt__main() -> ! {
+        pub fn __risc_v_rt__main() {
             #[unsafe(export_name = #magic_symbol_name)]
             static ULP_MAGIC: [u32; 0] = [0u32; 0];
 
@@ -531,7 +531,7 @@ mod tests {
             quote::quote! {
                 #[allow(non_snake_case)]
                 #[unsafe(export_name = "main")]
-                pub fn __risc_v_rt__main () -> ! {
+                pub fn __risc_v_rt__main () {
                     #[unsafe(export_name = "__ULP_MAGIC_")]
                     static ULP_MAGIC: [u32;0] = [0u32;0];
                     unsafe {
@@ -564,7 +564,7 @@ mod tests {
             quote::quote! {
                 #[allow(non_snake_case)]
                 #[unsafe(export_name = "main")]
-                pub fn __risc_v_rt__main () -> ! {
+                pub fn __risc_v_rt__main () {
                     # [unsafe (export_name = "__ULP_MAGIC_Output<1>$LpI2c$LpUart$")]
                     static ULP_MAGIC: [u32;0] = [0u32;0];
                     unsafe { ULP_MAGIC.as_ptr().read_volatile();
