@@ -13,6 +13,7 @@ use crate::{
             ClockNodeFunctions,
             ClockTreeItem,
             ClockTreeNodeType,
+            ConfiguresExpression,
             DependencyGraph,
             Expression,
             Function,
@@ -105,6 +106,7 @@ pub(crate) struct ProcessedClockData {
 
 pub(crate) struct ClockTreeNodeInstance {
     node: Box<dyn ClockTreeNodeType>,
+
     include_in_global_config: bool,
     is_first_instance: bool,
     force_configurable: bool,
@@ -113,6 +115,11 @@ pub(crate) struct ClockTreeNodeInstance {
     ///
     /// Must be in CONSTANT_CASE, e.g. FUNCTION_CLOCK.
     name: String,
+
+    /// Name of the group (e.g. peripheral) this tree node belongs to.
+    ///
+    /// Must be in CONSTANT_CASE, e.g. UART0.
+    group: String,
 
     /// Name of the template used to instantiate this clock tree node.
     ///
@@ -132,7 +139,7 @@ impl ClockTreeNodeInstance {
     }
 
     fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
-        self.node.validate_source_data(ctx)
+        self.node.validate_source_data(self, ctx)
     }
 
     fn is_configurable(&self) -> bool {
@@ -158,8 +165,8 @@ impl ClockTreeNodeInstance {
         self.node.always_on()
     }
 
-    fn input_clocks(&self) -> Vec<String> {
-        self.node.input_clocks()
+    fn input_clocks(&self, tree: &ProcessedClockData) -> Vec<String> {
+        self.node.input_clocks(self, tree)
     }
 
     /// Returns the name of the clock configuration type. The corresponding field in the
@@ -254,7 +261,7 @@ impl ClockTreeNodeInstance {
         let current_config_fn = self.config_current_function(tree);
         let apply_fn_impl = ty_name
             .as_ref()
-            .map(|_| self.node.config_apply_impl_function(self, tree))
+            .map(|_| self.config_apply_impl_function())
             .unwrap_or_default();
         let frequency_function_impl = self.node_frequency_impl(tree);
         let frequency_function_name = self.frequency_function_name();
@@ -370,6 +377,36 @@ impl ClockTreeNodeInstance {
             ],
         }
     }
+
+    /// Generates a stub implementation that the HAL needs to provide.
+    fn config_apply_impl_function(&self) -> TokenStream {
+        let ty_name = self.config_type_name();
+        let apply_fn_name = self.config_apply_function_name();
+        let hal_impl = format_ident!("{}_impl", apply_fn_name);
+
+        quote! {
+            fn #hal_impl(_clocks: &mut ClockTree, _old_config: Option<#ty_name>, _new_config: #ty_name) {
+                todo!()
+            }
+        }
+    }
+
+    fn resolve_node<'tree>(
+        &self,
+        tree: &'tree ProcessedClockData,
+        clock: &str,
+    ) -> &'tree ClockTreeNodeInstance {
+        let local_node = format!("{}_{}", self.group, clock);
+        if let Some(node) = tree.try_get_node(&local_node) {
+            node
+        } else {
+            tree.node(clock)
+        }
+    }
+
+    fn validate_configures_expr(&self, expr: &ConfiguresExpression) -> Result<()> {
+        self.node.validate_configures_expr(self, expr)
+    }
 }
 
 impl ProcessedClockData {
@@ -377,10 +414,15 @@ impl ProcessedClockData {
     ///
     /// As the clock tree is stored as a vector, this method performs a linear search.
     fn node(&self, name: &str) -> &ClockTreeNodeInstance {
-        self.clock_tree
-            .iter()
-            .find(|item| item.name_str() == name)
+        self.try_get_node(name)
             .unwrap_or_else(|| panic!("Clock node {name} not found"))
+    }
+
+    /// Returns a node by its name (e.g. `XTAL_CLK`), or None if not found.
+    ///
+    /// As the clock tree is stored as a vector, this method performs a linear search.
+    fn try_get_node(&self, name: &str) -> Option<&ClockTreeNodeInstance> {
+        self.clock_tree.iter().find(|item| item.name_str() == name)
     }
 
     fn properties(&self, node_name: &str) -> &ManagementProperties {
@@ -835,23 +877,13 @@ impl DeviceClocks {
                     is_first_instance: true,
                     force_configurable: false,
                     name: node.name().to_string(),
+                    group: String::new(),
                     template_name: node.name().to_string(),
                 };
 
                 (node_name.to_string(), RefCell::new(node))
             })
             .collect::<IndexMap<_, _>>();
-
-        let validation_context = ValidationContext {
-            tree: self.system_clocks.clock_tree.as_slice(),
-        };
-        for node in clock_tree.values() {
-            let node = node.borrow();
-            node.validate_source_data(&validation_context)
-                .with_context(|| format!("Invalid clock tree item: {}", node.name_str()))?;
-        }
-
-        let mut management_properties = HashMap::new();
 
         // Merge peripheral clock sources into the clock tree
         let mut peri_clocks = self.peripheral_clocks.peripheral_clocks.clone();
@@ -877,6 +909,9 @@ impl DeviceClocks {
                         peri.name.from_case(Case::Ada).to_case(Case::Constant),
                         def.name()
                     ),
+                    group: template_peripheral
+                        .from_case(Case::Ada)
+                        .to_case(Case::Constant),
                     template_name: format!(
                         "{}_{}",
                         template_peripheral
@@ -886,18 +921,22 @@ impl DeviceClocks {
                     ),
                 };
 
-                node.validate_source_data(&validation_context)
-                    .with_context(|| format!("Invalid clock tree item: {}", node.name))?;
-
                 clock_tree.insert(node.name.clone(), RefCell::new(node));
             }
         }
 
-        // To compute refcount requirement and correct initialization order, we need to be able to
-        // access direct dependencies (downstream clocks). As it is simpler to define
-        // dependents (inputs), we have to do a bit of maths.
-        let dependency_graph =
-            DependencyGraph::build_from(clock_tree.values_mut().map(|n| &*n.get_mut()));
+        ValidationContext {
+            tree: clock_tree
+                .values()
+                .map(|item| unsafe {
+                    // Safety: we're not mutating the item, so immutable borrow should be ok without
+                    // the guard wrapper.
+                    item.try_borrow_unguarded().unwrap()
+                })
+                .collect::<Vec<_>>()
+                .as_slice(),
+        }
+        .run_validation()?;
 
         // Apply legacy sorting to avoid reordering generated code.
         let mut sorted_clocks = IndexSet::new();
@@ -917,30 +956,6 @@ impl DeviceClocks {
             // Each tree item tells its own clock type, except for dependent items. If something has
             // already been classified, we can only change it from its kind to dependent.
             sorted_clocks.insert(idx);
-
-            // If there's a single dependent clock, we can piggyback on its refcount.
-            // Note that this is only valid if the clock node is not expected to be manually
-            // managed. In the current model, manually managed clocks have 0 consumers.
-            let has_one_direct_dependent = dependency_graph.users(node.name_str()).len() == 1;
-
-            let refcounted = !(node.always_on() || has_one_direct_dependent);
-
-            management_properties.insert(
-                node.name_str().clone(),
-                ManagementProperties {
-                    name: format_ident!("{}", node.name().to_case(Case::Snake)),
-                    refcounted,
-                    // Always-on clock sources don't need enable functions.
-                    has_enable: !(node.always_on()
-                        && dependency_graph.inputs(node.name_str()).is_empty()),
-                    state_ty: if node.is_configurable() {
-                        Some(node.config_type_name())
-                    } else {
-                        None
-                    },
-                    always_on: node.always_on(),
-                },
-            );
         }
 
         // Now sort the nodes according to the order we've established.
@@ -958,11 +973,44 @@ impl DeviceClocks {
             sorted
         };
 
-        Ok(ProcessedClockData {
+        let mut tree = ProcessedClockData {
             clock_tree,
-            management_properties,
-            dependency_graph,
-        })
+            management_properties: HashMap::new(),
+            dependency_graph: DependencyGraph::empty(),
+        };
+
+        // To compute refcount requirement and correct initialization order, we need to be able to
+        // access direct dependencies (downstream clocks). As it is simpler to define
+        // dependents (inputs), we have to do a bit of maths.
+        tree.dependency_graph = DependencyGraph::build_from(&tree);
+
+        for node in tree.clock_tree.iter() {
+            // If there's a single dependent clock, we can piggyback on its refcount.
+            // Note that this is only valid if the clock node is not expected to be manually
+            // managed. In the current model, manually managed clocks have 0 consumers.
+            let has_one_direct_dependent = tree.dependency_graph.users(node.name_str()).len() == 1;
+
+            let refcounted = !(node.always_on() || has_one_direct_dependent);
+
+            tree.management_properties.insert(
+                node.name_str().clone(),
+                ManagementProperties {
+                    name: format_ident!("{}", node.name().to_case(Case::Snake)),
+                    refcounted,
+                    // Always-on clock sources don't need enable functions.
+                    has_enable: !(node.always_on()
+                        && tree.dependency_graph.inputs(node.name_str()).is_empty()),
+                    state_ty: if node.is_configurable() {
+                        Some(node.config_type_name())
+                    } else {
+                        None
+                    },
+                    always_on: node.always_on(),
+                },
+            );
+        }
+
+        Ok(tree)
     }
 }
 
