@@ -48,7 +48,7 @@ impl CpuClock {
     const PRESET_80: ClockConfig = ClockConfig {
         xtal_clk: None,
         system_pre_div: None,
-        cpu_pll_div: Some(CpuPllDivConfig::_6),
+        cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_6)),
         cpu_clk: Some(CpuClkConfig::Pll),
         rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
@@ -58,7 +58,7 @@ impl CpuClock {
     const PRESET_120: ClockConfig = ClockConfig {
         xtal_clk: None,
         system_pre_div: None,
-        cpu_pll_div: Some(CpuPllDivConfig::_4),
+        cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_4)),
         cpu_clk: Some(CpuClkConfig::Pll),
         rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
@@ -434,10 +434,11 @@ fn configure_cpu_clk_impl(
     // Based on TRM Table 6.2-2
     if new_config == CpuClkConfig::Pll {
         SYSTEM::regs().cpu_per_conf().modify(|_, w| unsafe {
-            w.cpuperiod_sel().bits(match unwrap!(clocks.cpu_pll_div) {
-                CpuPllDivConfig::_4 => 1,
-                CpuPllDivConfig::_6 => 0,
-            })
+            w.cpuperiod_sel()
+                .bits(match unwrap!(clocks.cpu_pll_div).divisor {
+                    CpuPllDivDivisor::_4 => 1,
+                    CpuPllDivDivisor::_6 => 0,
+                })
         });
     }
 
@@ -691,11 +692,28 @@ fn configure_uart0_function_clock_impl(
     new_config: Uart0FunctionClockConfig,
 ) {
     UART0::regs().clk_conf().modify(|_, w| unsafe {
-        w.sclk_sel().bits(match new_config {
-            Uart0FunctionClockConfig::PllF40m => 1,
-            Uart0FunctionClockConfig::RcFast => 2,
-            Uart0FunctionClockConfig::Xtal => 3,
+        w.sclk_sel().bits(match new_config.sclk {
+            Uart0FunctionClockSclk::PllF40m => 1,
+            Uart0FunctionClockSclk::RcFast => 2,
+            Uart0FunctionClockSclk::Xtal => 3,
         })
+    });
+}
+
+// UART0_BAUD_RATE_GENERATOR
+
+fn enable_uart0_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do
+}
+
+fn configure_uart0_baud_rate_generator_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<Uart0BaudRateGeneratorConfig>,
+    new_config: Uart0BaudRateGeneratorConfig,
+) {
+    UART0::regs().clkdiv().write(|w| unsafe {
+        w.clkdiv().bits(new_config.integral as _);
+        w.frag().bits(new_config.fractional as _)
     });
 }
 
@@ -725,10 +743,27 @@ fn configure_uart1_function_clock_impl(
     new_config: Uart0FunctionClockConfig,
 ) {
     UART1::regs().clk_conf().modify(|_, w| unsafe {
-        w.sclk_sel().bits(match new_config {
-            Uart0FunctionClockConfig::PllF40m => 1,
-            Uart0FunctionClockConfig::RcFast => 2,
-            Uart0FunctionClockConfig::Xtal => 3,
+        w.sclk_sel().bits(match new_config.sclk {
+            Uart0FunctionClockSclk::PllF40m => 1,
+            Uart0FunctionClockSclk::RcFast => 2,
+            Uart0FunctionClockSclk::Xtal => 3,
         })
+    });
+}
+
+// UART1_BAUD_RATE_GENERATOR
+
+fn enable_uart1_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do
+}
+
+fn configure_uart1_baud_rate_generator_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<Uart0BaudRateGeneratorConfig>,
+    new_config: Uart0BaudRateGeneratorConfig,
+) {
+    UART1::regs().clkdiv().write(|w| unsafe {
+        w.clkdiv().bits(new_config.integral as _);
+        w.frag().bits(new_config.fractional as _)
     });
 }

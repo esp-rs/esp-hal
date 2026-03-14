@@ -17,7 +17,7 @@
 // TODO: This is a temporary place for this, should probably be moved into clocks_ll.
 
 use crate::{
-    peripherals::{I2C_ANA_MST, LP_CLKRST, MODEM_LPCON, PCR, PMU, TIMG0, TIMG1},
+    peripherals::{I2C_ANA_MST, LP_CLKRST, MODEM_LPCON, PCR, PMU, TIMG0, TIMG1, UART0, UART1},
     soc::regi2c,
 };
 
@@ -44,14 +44,14 @@ impl CpuClock {
     const PRESET_80: ClockConfig = ClockConfig {
         xtal_clk: None,
         soc_root_clk: Some(SocRootClkConfig::Pll),
-        cpu_hs_div: Some(CpuHsDivConfig::_1),
+        cpu_hs_div: Some(CpuHsDivConfig::new(CpuHsDivDivisor::_1)),
         cpu_ls_div: None, // Unused when root clock is PLL
-        ahb_hs_div: Some(AhbHsDivConfig::_3),
+        ahb_hs_div: Some(AhbHsDivConfig::new(AhbHsDivDivisor::_3)),
         ahb_ls_div: None, // Unused when root clock is PLL
         // Configures 80MHz MSPI clock
-        mspi_fast_hs_clk: Some(MspiFastHsClkConfig::_5),
+        mspi_fast_hs_clk: Some(MspiFastHsClkConfig::new(MspiFastHsClkDivisor::_5)),
         mspi_fast_ls_clk: None, // Unused when root clock is PLL
-        apb_clk: Some(ApbClkConfig::new(0)),
+        apb_clk: Some(ApbClkConfig::new(ApbClkDivisor::_0)),
         ledc_sclk: Some(LedcSclkConfig::PllF80m),
         lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
@@ -59,14 +59,14 @@ impl CpuClock {
     const PRESET_160: ClockConfig = ClockConfig {
         xtal_clk: None,
         soc_root_clk: Some(SocRootClkConfig::Pll),
-        cpu_hs_div: Some(CpuHsDivConfig::_0),
+        cpu_hs_div: Some(CpuHsDivConfig::new(CpuHsDivDivisor::_0)),
         cpu_ls_div: None, // Unused when root clock is PLL
-        ahb_hs_div: Some(AhbHsDivConfig::_3),
+        ahb_hs_div: Some(AhbHsDivConfig::new(AhbHsDivDivisor::_3)),
         ahb_ls_div: None, // Unused when root clock is PLL
         // Configures 80MHz MSPI clock
-        mspi_fast_hs_clk: Some(MspiFastHsClkConfig::_5),
+        mspi_fast_hs_clk: Some(MspiFastHsClkConfig::new(MspiFastHsClkDivisor::_5)),
         mspi_fast_ls_clk: None, // Unused when root clock is PLL
-        apb_clk: Some(ApbClkConfig::new(0)),
+        apb_clk: Some(ApbClkConfig::new(ApbClkDivisor::_0)),
         ledc_sclk: Some(LedcSclkConfig::PllF80m),
         lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
@@ -106,7 +106,9 @@ impl ClockConfig {
         // before calibration. Therefore, before switching SOC_ROOT_CLK to HS, we need to set
         // MSPI source clock HS divider to make it run at 80MHz after the switch.
         // PLL = 480MHz, so divider is 6.
-        ClockTree::with(|clocks| configure_mspi_fast_hs_clk(clocks, MspiFastHsClkConfig::_5));
+        ClockTree::with(|clocks| {
+            configure_mspi_fast_hs_clk(clocks, MspiFastHsClkConfig::new(MspiFastHsClkDivisor::_5))
+        });
 
         self.apply();
     }
@@ -784,6 +786,23 @@ fn configure_uart0_function_clock_impl(
     configure_uart_function_clock(0, new_config);
 }
 
+// UART0_BAUD_RATE_GENERATOR
+
+fn enable_uart0_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do
+}
+
+fn configure_uart0_baud_rate_generator_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<Uart0BaudRateGeneratorConfig>,
+    new_config: Uart0BaudRateGeneratorConfig,
+) {
+    UART0::regs().clkdiv().write(|w| unsafe {
+        w.clkdiv().bits(new_config.integral as _);
+        w.frag().bits(new_config.fractional as _)
+    });
+}
+
 // UART1_FUNCTION_CLOCK
 
 fn enable_uart1_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
@@ -798,6 +817,23 @@ fn configure_uart1_function_clock_impl(
     configure_uart_function_clock(1, new_config);
 }
 
+// UART1_BAUD_RATE_GENERATOR
+
+fn enable_uart1_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do
+}
+
+fn configure_uart1_baud_rate_generator_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<Uart0BaudRateGeneratorConfig>,
+    new_config: Uart0BaudRateGeneratorConfig,
+) {
+    UART1::regs().clkdiv().write(|w| unsafe {
+        w.clkdiv().bits(new_config.integral as _);
+        w.frag().bits(new_config.fractional as _)
+    });
+}
+
 fn enable_uart_function_clock(uart: usize, en: bool) {
     PCR::regs()
         .uart(uart)
@@ -807,10 +843,14 @@ fn enable_uart_function_clock(uart: usize, en: bool) {
 
 fn configure_uart_function_clock(uart: usize, new_config: Uart0FunctionClockConfig) {
     PCR::regs().uart(uart).clk_conf().modify(|_, w| unsafe {
-        w.sclk_sel().bits(match new_config {
-            Uart0FunctionClockConfig::PllF80m => 1,
-            Uart0FunctionClockConfig::RcFast => 2,
-            Uart0FunctionClockConfig::Xtal => 3,
-        })
+        w.sclk_sel().bits(match new_config.sclk {
+            Uart0FunctionClockSclk::PllF80m => 1,
+            Uart0FunctionClockSclk::RcFast => 2,
+            Uart0FunctionClockSclk::Xtal => 3,
+        });
+        w.sclk_div_a().bits(0);
+        w.sclk_div_b().bits(0);
+        w.sclk_div_num().bits(new_config.div_num as _);
+        w
     });
 }

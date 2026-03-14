@@ -103,14 +103,14 @@ clocks = { system_clocks = { clock_tree = [
     # Low-speed clocks
     { name = "XTAL32K_CLK",     type = "source",  output = "32768" },
     { name = "RC_SLOW_CLK",     type = "source",  output = "136_000" },
-    { name = "RC_FAST_DIV_CLK", type = "divider", output = "RC_FAST_CLK / 256" },
+    { name = "RC_FAST_DIV_CLK", type = "generic", output = "RC_FAST_CLK / 256" },
 
     # CPU clock source dividers
     { name = "SYSTEM_PRE_DIV_IN", type = "mux", variants = [
         { name = "XTAL",    outputs = "XTAL_CLK" },
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
     ] },
-    { name = "SYSTEM_PRE_DIV",  type = "divider", params = { divisor = "0 .. 1024" }, output = "SYSTEM_PRE_DIV_IN / (divisor + 1)" },
+    { name = "SYSTEM_PRE_DIV",  type = "generic", params = { divisor = "0 .. 1024" }, output = "SYSTEM_PRE_DIV_IN / (divisor + 1)" },
     # PLL CLK divider, modeled as a generic derived source because valid divider values depend on the PLL frequency
     { name = "CPU_PLL_DIV_OUT", type = "derived", from = "PLL_CLK", values = "80, 160", output = "VALUE * 1_000_000" },
 
@@ -136,8 +136,8 @@ clocks = { system_clocks = { clock_tree = [
     ] },
 
     # Low-power clocks
-    { name = "RC_FAST_CLK_DIV_N", type = "divider", params = { divisor = "0 ..= 3" }, output = "RC_FAST_CLK / (divisor + 1)" },
-    { name = "XTAL_DIV_CLK",      type = "divider", output = "XTAL_CLK / 2" },
+    { name = "RC_FAST_CLK_DIV_N", type = "generic", params = { divisor = "0 ..= 3" }, output = "RC_FAST_CLK / (divisor + 1)" },
+    { name = "XTAL_DIV_CLK",      type = "generic", output = "XTAL_CLK / 2" },
     { name = "RTC_SLOW_CLK", type = "mux", variants = [
         { name = "XTAL32K", outputs = "XTAL32K_CLK" },
         { name = "RC_SLOW", outputs = "RC_SLOW_CLK" },
@@ -219,14 +219,13 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Spi2" },
     { name = "Uart1", clocks = "Uart0" },
     { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", variants = [ # UART_SCLK
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
             { name = "APB",      outputs = "APB_CLK" },
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
             { name = "XTAL",     outputs = "XTAL_CLK", default = true },
-        ] },
-        { name = "MEM_CLOCK", type = "mux", variants = [
-            { name = "MEM", outputs = "UART_MEM_CLK", default = true },
-        ] },
+        ], div_num = "0 .. 0x100" } },
+        { name = "MEM_CLOCK", type = "generic", output = "UART_MEM_CLK" },
+        { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x1000" } },
     ] },
     #{ name = "Spi01" },
     
@@ -506,6 +505,7 @@ instances = [
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
 ]
 ram_size = 128
+has_sclk_divider = true
 
 [device.uhci]
 support_status = "partial"

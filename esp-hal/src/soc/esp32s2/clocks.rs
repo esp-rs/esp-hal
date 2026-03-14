@@ -51,7 +51,7 @@ impl CpuClock {
         xtal_clk: None,
         pll_clk: Some(PllClkConfig::_480),
         apll_clk: None,
-        cpu_pll_div: Some(CpuPllDivConfig::_6),
+        cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_6)),
         system_pre_div: None,
         cpu_clk: Some(CpuClkConfig::Pll),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
@@ -61,7 +61,7 @@ impl CpuClock {
         xtal_clk: None,
         pll_clk: Some(PllClkConfig::_480),
         apll_clk: None,
-        cpu_pll_div: Some(CpuPllDivConfig::_3),
+        cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_3)),
         system_pre_div: None,
         cpu_clk: Some(CpuClkConfig::Pll),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
@@ -71,7 +71,7 @@ impl CpuClock {
         xtal_clk: None,
         pll_clk: Some(PllClkConfig::_480),
         apll_clk: None,
-        cpu_pll_div: Some(CpuPllDivConfig::_2),
+        cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_2)),
         system_pre_div: None,
         cpu_clk: Some(CpuClkConfig::Pll),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
@@ -401,13 +401,13 @@ fn configure_cpu_clk_impl(
     };
     let clock_source_sel1_bit = clocks.pll_clk == Some(PllClkConfig::_480);
     let clock_source_sel2_bit = match (clocks.pll_clk, clocks.cpu_pll_div) {
-        (Some(PllClkConfig::_480), Some(CpuPllDivConfig::_6)) => 0,
-        (Some(PllClkConfig::_480), Some(CpuPllDivConfig::_3)) => 1,
-        (Some(PllClkConfig::_480), Some(CpuPllDivConfig::_2)) => 2,
+        (Some(PllClkConfig::_480), Some(div)) if div.divisor() == 6 => 0,
+        (Some(PllClkConfig::_480), Some(div)) if div.divisor() == 3 => 1,
+        (Some(PllClkConfig::_480), Some(div)) if div.divisor() == 2 => 2,
 
         // 320 MHz or APLL
-        (_, Some(CpuPllDivConfig::_4)) => 0,
-        (_, Some(CpuPllDivConfig::_2)) => 1,
+        (_, Some(div)) if div.divisor() == 4 => 0,
+        (_, Some(div)) if div.divisor() == 2 => 1,
 
         // don't care
         _ => 0,
@@ -456,7 +456,12 @@ fn uses_80mhz_flash() -> bool {
 fn is_max_cpu_speed(clocks: &mut ClockTree) -> bool {
     clocks.cpu_clk == Some(CpuClkConfig::Pll)
         && (clocks.pll_clk, clocks.cpu_pll_div)
-            == (Some(PllClkConfig::_480), Some(CpuPllDivConfig::_2))
+            == (
+                Some(PllClkConfig::_480),
+                Some(CpuPllDivConfig {
+                    divisor: CpuPllDivDivisor::_2,
+                }),
+            )
 }
 
 const RTC_CNTL_DBIAS_1V10: u8 = 4;
@@ -742,7 +747,23 @@ fn configure_uart0_function_clock_impl(
 ) {
     UART0::regs().conf0().modify(|_, w| {
         w.tick_ref_always_on()
-            .bit(new_config == Uart0FunctionClockConfig::Apb)
+            .bit(new_config.sclk == Uart0FunctionClockSclk::Apb)
+    });
+}
+// UART2_BAUD_RATE_GENERATOR
+
+fn enable_uart0_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_uart0_baud_rate_generator_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<Uart0BaudRateGeneratorConfig>,
+    new_config: Uart0BaudRateGeneratorConfig,
+) {
+    UART0::regs().clkdiv().write(|w| unsafe {
+        w.clkdiv().bits(new_config.integral as _);
+        w.frag().bits(new_config.fractional as _)
     });
 }
 
@@ -773,6 +794,23 @@ fn configure_uart1_function_clock_impl(
 ) {
     UART1::regs().conf0().modify(|_, w| {
         w.tick_ref_always_on()
-            .bit(new_config == Uart0FunctionClockConfig::Apb)
+            .bit(new_config.sclk == Uart0FunctionClockSclk::Apb)
+    });
+}
+
+// UART1_BAUD_RATE_GENERATOR
+
+fn enable_uart1_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_uart1_baud_rate_generator_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<Uart0BaudRateGeneratorConfig>,
+    new_config: Uart0BaudRateGeneratorConfig,
+) {
+    UART1::regs().clkdiv().write(|w| unsafe {
+        w.clkdiv().bits(new_config.integral as _);
+        w.frag().bits(new_config.fractional as _)
     });
 }

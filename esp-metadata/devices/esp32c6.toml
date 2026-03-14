@@ -152,28 +152,28 @@ clocks = { system_clocks = { clock_tree = [
         { name = "RC_FAST", outputs = "RC_FAST_CLK", configures = ["HP_ROOT_CLK = 1", "CPU_CLK = LS", "AHB_CLK = LS", "MSPI_FAST_CLK = LS"] },
         { name = "PLL",     outputs = "PLL_CLK",     configures = ["HP_ROOT_CLK = 3", "CPU_CLK = HS", "AHB_CLK = HS", "MSPI_FAST_CLK = HS"] },
     ] },
-    { name = "HP_ROOT_CLK", type = "divider", params = { divisor = "1, 3" }, output = "SOC_ROOT_CLK / divisor" }, # AUTO_DIV, only divides when using PLL_CLK
+    { name = "HP_ROOT_CLK", type = "generic", params = { divisor = "1, 3" }, output = "SOC_ROOT_CLK / divisor" }, # AUTO_DIV, only divides when using PLL_CLK
 
     # TODO: model by-4 divider for 120MHz CPU clock
-    { name = "CPU_HS_DIV", type = "divider", params = { divisor = "0, 1, 3" }, output = "HP_ROOT_CLK / (divisor + 1)" },
-    { name = "CPU_LS_DIV", type = "divider", params = { divisor = "0, 1, 3, 7, 15, 31" }, output = "HP_ROOT_CLK / (divisor + 1)" },
+    { name = "CPU_HS_DIV", type = "generic", params = { divisor = "0, 1, 3" }, output = "HP_ROOT_CLK / (divisor + 1)" },
+    { name = "CPU_LS_DIV", type = "generic", params = { divisor = "0, 1, 3, 7, 15, 31" }, output = "HP_ROOT_CLK / (divisor + 1)" },
     { name = "CPU_CLK",    type = "mux", always_on = true, variants = [
         { name = "HS", outputs = "CPU_HS_DIV" },
         { name = "LS", outputs = "CPU_LS_DIV" },
     ] },
 
-    { name = "AHB_HS_DIV", type = "divider", params = { divisor = "3, 7, 15" }, output = "HP_ROOT_CLK / (divisor + 1)" },
-    { name = "AHB_LS_DIV", type = "divider", params = { divisor = "0, 1, 3, 7, 15, 31" }, output = "HP_ROOT_CLK / (divisor + 1)" },
+    { name = "AHB_HS_DIV", type = "generic", params = { divisor = "3, 7, 15" }, output = "HP_ROOT_CLK / (divisor + 1)" },
+    { name = "AHB_LS_DIV", type = "generic", params = { divisor = "0, 1, 3, 7, 15, 31" }, output = "HP_ROOT_CLK / (divisor + 1)" },
     { name = "AHB_CLK",    type = "mux", always_on = true, variants = [
         { name = "HS", outputs = "AHB_HS_DIV" },
         { name = "LS", outputs = "AHB_LS_DIV" },
     ] },
-    { name = "APB_CLK", type = "divider", params = { divisor = "0, 1, 3" }, output = "AHB_CLK / (divisor + 1)" },
+    { name = "APB_CLK", type = "generic", params = { divisor = "0, 1, 3" }, output = "AHB_CLK / (divisor + 1)" },
     # configurable, but automatic - there's no point in making APB_DECREASE_DIV part of the model as consumers will always see APB_CLK
-    # { name = "APB_DECREASE_DIV", type = "divider", output = "APB_DIV / (divisor + 1)" },
+    # { name = "APB_DECREASE_DIV", type = "generic", output = "APB_DIV / (divisor + 1)" },
 
-    { name = "MSPI_FAST_HS_CLK", type = "divider", params = { divisor = "3, 4, 5" }, output = "HP_ROOT_CLK / (divisor + 1)" },
-    { name = "MSPI_FAST_LS_CLK", type = "divider", params = { divisor = "0, 1, 2" }, output = "HP_ROOT_CLK / (divisor + 1)" },
+    { name = "MSPI_FAST_HS_CLK", type = "generic", params = { divisor = "3, 4, 5" }, output = "HP_ROOT_CLK / (divisor + 1)" },
+    { name = "MSPI_FAST_LS_CLK", type = "generic", params = { divisor = "0, 1, 2" }, output = "HP_ROOT_CLK / (divisor + 1)" },
     { name = "MSPI_FAST_CLK",    type = "mux", variants = [
         { name = "HS", outputs = "MSPI_FAST_HS_CLK" },
         { name = "LS", outputs = "MSPI_FAST_LS_CLK" },
@@ -190,7 +190,7 @@ clocks = { system_clocks = { clock_tree = [
     ] },
 
     # LP clocks
-    { name = "XTAL_D2_CLK", type = "divider", output = "XTAL_CLK / 2" },
+    { name = "XTAL_D2_CLK", type = "generic", output = "XTAL_CLK / 2" },
     { name = "LP_FAST_CLK", type = "mux", variants = [
         { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
         { name = "XTAL_D2_CLK", outputs = "XTAL_D2_CLK" },
@@ -216,11 +216,12 @@ clocks = { system_clocks = { clock_tree = [
 ], peripheral_clocks = [
     # This list is based on TRM (v1.1) - 8.4.1 PCR Registers
     { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", variants = [ # UART_SCLK
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
             { name = "PLL_F80M", outputs = "PLL_F80M" },
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
             { name = "XTAL",     outputs = "XTAL_CLK", default = true },
-        ] },
+        ], div_num = "0 .. 0x100" } },
+        { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x1000" } },
     ] },
     { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, clocks = "Uart0" },
     { name = "I2cExt0", template_params = { peripheral = "i2c0" } },

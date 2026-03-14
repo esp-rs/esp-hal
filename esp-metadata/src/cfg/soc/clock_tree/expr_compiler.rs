@@ -5,7 +5,10 @@ use quote::quote;
 use somni_expr::DefaultTypeSet;
 use somni_parser::{ast, lexer::Token};
 
-use crate::{cfg::clock_tree::Expression, number};
+use crate::{
+    cfg::{ProcessedClockData, clock_tree::Expression},
+    number,
+};
 
 pub struct ExprCompiler<'ctx> {
     variables: &'ctx HashMap<&'ctx str, TokenStream>,
@@ -16,18 +19,20 @@ impl<'ctx> ExprCompiler<'ctx> {
         Self { variables }
     }
 
-    pub fn compile_expression(&self, expression: &Expression) -> TokenStream {
+    pub fn compile_expression(
+        &self,
+        expression: &Expression,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
         let source = expression.source.as_str();
-        let ast::Expression::Expression { expression } = &expression.expr else {
-            panic!("Invalid expression");
-        };
-        self.compile_right_hand_expression(source, expression)
+        self.compile_right_hand_expression(source, &expression.expr, tree)
     }
 
-    fn compile_right_hand_expression(
+    pub fn compile_right_hand_expression(
         &self,
         source: &str,
         expression: &ast::RightHandExpression<DefaultTypeSet>,
+        tree: &ProcessedClockData,
     ) -> TokenStream {
         match expression {
             ast::RightHandExpression::Variable { variable } => {
@@ -35,13 +40,13 @@ impl<'ctx> ExprCompiler<'ctx> {
             }
             ast::RightHandExpression::Literal { value } => self.compile_literal(value),
             ast::RightHandExpression::UnaryOperator { name, operand } => {
-                self.compile_unary_operator(source, name, operand)
+                self.compile_unary_operator(source, name, operand, tree)
             }
             ast::RightHandExpression::BinaryOperator { name, operands } => {
-                self.compile_binary_operator(source, name, operands)
+                self.compile_binary_operator(source, name, operands, tree)
             }
-            ast::RightHandExpression::FunctionCall { .. } => {
-                panic!("Function calls are not supported")
+            ast::RightHandExpression::FunctionCall { name, arguments } => {
+                self.compile_function_call(source, name, arguments, tree)
             }
         }
     }
@@ -59,6 +64,7 @@ impl<'ctx> ExprCompiler<'ctx> {
         source: &str,
         name: &Token,
         operand: &ast::RightHandExpression<DefaultTypeSet>,
+        tree: &ProcessedClockData,
     ) -> TokenStream {
         let operator = match name.source(source) {
             "!" => quote! { ! },
@@ -66,7 +72,7 @@ impl<'ctx> ExprCompiler<'ctx> {
             other => todo!("Unsupported unary operator: {other}"),
         };
 
-        let operand = self.compile_right_hand_expression(source, operand);
+        let operand = self.compile_right_hand_expression(source, operand, tree);
         quote! { #operator (#operand) }
     }
 
@@ -75,6 +81,7 @@ impl<'ctx> ExprCompiler<'ctx> {
         source: &str,
         name: &Token,
         operands: &[ast::RightHandExpression<DefaultTypeSet>; 2],
+        tree: &ProcessedClockData,
     ) -> TokenStream {
         let operator = match name.source(source) {
             "+" => quote! { + },
@@ -87,8 +94,8 @@ impl<'ctx> ExprCompiler<'ctx> {
             other => todo!("Unsupported binary operator: {other}"),
         };
 
-        let lhs = self.compile_right_hand_expression(source, &operands[0]);
-        let rhs = self.compile_right_hand_expression(source, &operands[1]);
+        let lhs = self.compile_right_hand_expression(source, &operands[0], tree);
+        let rhs = self.compile_right_hand_expression(source, &operands[1], tree);
         quote! { (#lhs #operator #rhs) }
     }
 
@@ -99,5 +106,24 @@ impl<'ctx> ExprCompiler<'ctx> {
             ast::LiteralValue::String(s) => quote! { #s },
             ast::LiteralValue::Boolean(b) => quote! { #b },
         }
+    }
+
+    fn compile_function_call(
+        &self,
+        source: &str,
+        name: &Token,
+        arguments: &[ast::RightHandExpression<DefaultTypeSet>],
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        // property(NODE)
+        let [ast::RightHandExpression::Variable { variable }] = arguments else {
+            panic!("Function calls must be of the form property(NODE)")
+        };
+
+        // TODO: pass instance to resolve node
+        let node_props = tree.properties(variable.source(source));
+        let node_field = quote::format_ident!("{}", node_props.field_name());
+        let name = quote::format_ident!("{}", name.source(source));
+        quote! { unwrap!(clocks.#node_field).#name() }
     }
 }
