@@ -124,8 +124,8 @@ cfg_if::cfg_if! {
 impl RtcClock {
     const CAL_FRACT: u32 = 19;
 
-    /// Get the RTC_SLOW_CLK source.
-    #[cfg_attr(all(not(feature = "unstable"), esp32c5), expect(dead_code))]
+    /// Get the nominal value of the RTC_SLOW_CLK source.
+    #[instability::unstable]
     pub fn slow_freq() -> Rate {
         cfg_if::cfg_if! {
             if #[cfg(soc_has_clock_node_rtc_slow_clk)] {

@@ -37,6 +37,7 @@ use serde::Deserialize;
 
 use crate::{
     cfg::{
+        ClockTreeNodeInstance,
         clock_tree::{
             ClockTreeNodeType,
             Expression,
@@ -53,7 +54,7 @@ use crate::{
 #[derive(Debug, Clone, Deserialize)]
 pub struct Source {
     /// The unique name of the clock tree item.
-    name: String,
+    pub name: String,
 
     #[serde(default)]
     always_on: bool,
@@ -73,15 +74,15 @@ pub struct Source {
 }
 
 impl ClockTreeNodeType for Source {
-    fn name_str<'a>(&'a self) -> &'a String {
-        &self.name
-    }
-
     fn always_on(&self) -> bool {
         self.always_on
     }
 
-    fn validate_source_data(&self, _ctx: &ValidationContext<'_>) -> Result<()> {
+    fn validate_source_data(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _ctx: &ValidationContext<'_>,
+    ) -> Result<()> {
         Ok(())
     }
 
@@ -89,77 +90,98 @@ impl ClockTreeNodeType for Source {
         self.values.is_some() || !self.output.is_constant()
     }
 
-    fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream {
-        let ty_name = self.config_type_name();
-        let state = tree.properties(self).field_name();
-        let apply_fn_name = self.config_apply_function_name();
+    fn config_apply_function(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        let ty_name = instance.config_type_name();
+        let state = tree.properties(instance.name_str()).field_name();
+        let apply_fn_name = instance.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
         let reject_exprs = self.reject.as_ref().map(|reject| {
             let mut variables = HashMap::new();
 
-            let mut config_fields = vec![];
-
             variables.insert("VALUE", quote! { config.value() });
-            reject.0.visit_variables(|var| {
-                if var != "VALUE" {
-                    config_fields.push((var, tree.properties(tree.node(var)).field_name()));
-                }
-            });
 
-            reject.to_rust(&config_fields, variables)
+            reject.to_rust(variables, instance, tree)
         });
         quote! {
             pub fn #apply_fn_name(clocks: &mut ClockTree, config: #ty_name) {
                 #reject_exprs
-                clocks.#state = Some(config);
-                #hal_impl(clocks, config);
+                let old_config = clocks.#state.replace(config);
+                #hal_impl(clocks, old_config, config);
             }
         }
     }
 
-    fn config_apply_impl_function(&self, _tree: &ProcessedClockData) -> TokenStream {
-        let ty_name = self.config_type_name();
-        let apply_fn_name = self.config_apply_function_name();
-        let hal_impl = format_ident!("{}_impl", apply_fn_name);
-        quote! {
-            fn #hal_impl(_clocks: &mut ClockTree, _config: #ty_name) {
-                todo!()
-            }
-        }
-    }
-
-    fn node_frequency_impl(&self, tree: &ProcessedClockData) -> TokenStream {
-        let state_field = tree.properties(self).field_name();
+    fn node_frequency_impl(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        let state_field = tree.properties(instance.name_str()).field_name();
 
         if self.values.is_some() {
             quote! { unwrap!(clocks.#state_field).value() }
         } else {
-            self.output.0.to_rust(HashMap::new())
+            self.output.0.to_rust(HashMap::new(), instance, tree)
         }
     }
 
-    fn config_docline(&self) -> Option<String> {
-        if self.values.is_none() {
-            return None;
-        }
+    fn config_type(&self, instance: &ClockTreeNodeInstance) -> TokenStream {
+        self.impl_config_type(instance, None)
+    }
 
-        let clock_name = self.name.as_str();
-        let docline = if self.list_of_fixed_frequencies().is_some() {
-            format!(" Selects the output frequency of `{clock_name}`.")
+    fn request_direct_dependencies(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> TokenStream {
+        // Normal sources don't have dependencies
+        quote! {}
+    }
+
+    fn release_direct_dependencies(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> TokenStream {
+        // Normal sources don't have dependencies
+        quote! {}
+    }
+}
+
+impl Source {
+    fn list_of_fixed_frequencies(&self) -> Option<Vec<u32>> {
+        self.values.as_ref().and_then(|d| d.as_enum_values())
+    }
+
+    fn impl_config_type(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        extra_docs: Option<&str>,
+    ) -> TokenStream {
+        let clock_name = instance.name_str();
+        let ty_name = instance.config_type_name();
+
+        let base_docline = if self.values.is_none() {
+            None
+        } else if self.list_of_fixed_frequencies().is_some() {
+            Some(format!("Selects the output frequency of `{clock_name}`."))
         } else {
-            format!(" The target frequency of the `{clock_name}` clock source.")
+            Some(format!(
+                "The target frequency of the `{clock_name}` clock source."
+            ))
         };
 
-        Some(docline)
-    }
-
-    fn config_type(&self) -> Option<TokenStream> {
-        if self.values.is_none() {
-            return None;
+        let docline = match (base_docline, extra_docs) {
+            (None, None) => None,
+            (Some(base), None) => Some(base),
+            (None, Some(extra)) => Some(extra.to_string()),
+            (Some(base), Some(extra)) => Some(format!("{base} {extra}")),
         }
-
-        let clock_name = &self.name;
-        let ty_name = self.config_type_name()?;
+        .into_iter();
 
         if let Some(frequencies) = self.list_of_fixed_frequencies() {
             let mut eval_ctx = somni_expr::Context::new();
@@ -174,7 +196,12 @@ impl ClockTreeNodeType for Source {
                 .map(|freq| {
                     eval_ctx.add_variable("VALUE", *freq as u64);
                     eval_ctx
-                        .evaluate_parsed::<u64>(&self.output.0.source, &self.output.0.expr)
+                        .evaluate_parsed::<u64>(
+                            &self.output.0.source,
+                            &somni_parser::ast::Expression::Expression {
+                                expression: self.output.0.expr.clone(),
+                            },
+                        )
                         .unwrap()
                 })
                 .collect::<Vec<_>>();
@@ -191,7 +218,8 @@ impl ClockTreeNodeType for Source {
                 .map(|freq| number(freq))
                 .collect::<Vec<_>>();
 
-            Some(quote! {
+            quote! {
+                #(#[doc = #docline])*
                 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
                 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
                 pub enum #ty_name {
@@ -208,7 +236,7 @@ impl ClockTreeNodeType for Source {
                        }
                     }
                 }
-            })
+            }
         } else {
             let mut extra_docs = vec![];
             let validate = self.values.as_ref().map(|d| {
@@ -236,7 +264,8 @@ impl ClockTreeNodeType for Source {
                 }
             });
 
-            Some(quote! {
+            quote! {
+                #(#[doc = #docline])*
                 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
                 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
                 pub struct #ty_name(u32);
@@ -255,94 +284,75 @@ impl ClockTreeNodeType for Source {
                         self.0
                     }
                 }
-            })
+            }
         }
-    }
-
-    fn request_direct_dependencies(
-        &self,
-        _node: &dyn ClockTreeNodeType,
-        _tree: &ProcessedClockData,
-    ) -> TokenStream {
-        // Normal sources don't have dependencies
-        quote! {}
-    }
-
-    fn release_direct_dependencies(
-        &self,
-        _node: &dyn ClockTreeNodeType,
-        _tree: &ProcessedClockData,
-    ) -> TokenStream {
-        // Normal sources don't have dependencies
-        quote! {}
-    }
-}
-
-impl Source {
-    fn list_of_fixed_frequencies(&self) -> Option<Vec<u32>> {
-        self.values.as_ref().and_then(|d| d.as_enum_values())
     }
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct DerivedClockSource {
     #[serde(flatten)]
-    source_options: Source,
+    pub source_options: Source,
 
     from: String,
 }
 
 impl ClockTreeNodeType for DerivedClockSource {
-    fn name_str<'a>(&'a self) -> &'a String {
-        self.source_options.name_str()
-    }
-
-    fn input_clocks(&self) -> Vec<String> {
+    fn input_clocks(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> Vec<String> {
+        // Note: Group-local derived clock are not supported.
         vec![self.from.clone()]
     }
 
-    fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
+    fn validate_source_data(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        ctx: &ValidationContext<'_>,
+    ) -> Result<()> {
         anyhow::ensure!(
-            ctx.has_clock(&self.from),
+            ctx.has_clock(instance, &self.from),
             "Clock `{}` is not defined",
             self.from
         );
 
-        self.source_options.validate_source_data(ctx)
+        self.source_options.validate_source_data(instance, ctx)
     }
 
     fn is_configurable(&self) -> bool {
         self.source_options.is_configurable()
     }
 
-    fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream {
-        self.source_options.config_apply_function(tree)
+    fn config_apply_function(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        self.source_options.config_apply_function(instance, tree)
     }
 
-    fn config_apply_impl_function(&self, tree: &ProcessedClockData) -> TokenStream {
-        self.source_options.config_apply_impl_function(tree)
+    fn node_frequency_impl(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        self.source_options.node_frequency_impl(instance, tree)
     }
 
-    fn node_frequency_impl(&self, tree: &ProcessedClockData) -> TokenStream {
-        self.source_options.node_frequency_impl(tree)
-    }
-
-    fn config_docline(&self) -> Option<String> {
+    fn config_type(&self, instance: &ClockTreeNodeInstance) -> TokenStream {
+        let extra_docs = format!("Depends on `{}`.", self.from);
         self.source_options
-            .config_docline()
-            .map(|doc| format!("{} Depends on `{}`.", doc, self.from))
-    }
-
-    fn config_type(&self) -> Option<TokenStream> {
-        self.source_options.config_type()
+            .impl_config_type(instance, Some(&extra_docs))
     }
 
     fn request_direct_dependencies(
         &self,
-        _node: &dyn ClockTreeNodeType,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let request_fn_name = tree.node(&self.from).request_fn_name();
+        let request_fn_name = instance.resolve_node(tree, &self.from).request_fn_name();
         quote! {
             #request_fn_name(clocks);
         }
@@ -350,10 +360,10 @@ impl ClockTreeNodeType for DerivedClockSource {
 
     fn release_direct_dependencies(
         &self,
-        _node: &dyn ClockTreeNodeType,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let release_fn_name = tree.node(&self.from).release_fn_name();
+        let release_fn_name = instance.resolve_node(tree, &self.from).release_fn_name();
         quote! {
             #release_fn_name(clocks);
         }

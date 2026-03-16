@@ -7,7 +7,7 @@ use core::sync::atomic::{Ordering, compiler_fence};
 use esp_sync::raw::SingleCoreInterruptLock;
 use esp_sync::{GenericRawMutex, RestoreState, raw::RawLock};
 
-use crate::interrupt::{Priority, RunLevel};
+use crate::interrupt::{ElevatedRunLevel, Priority, RunLevel};
 
 /// A lock that disables interrupts below a certain priority.
 pub struct PriorityLock(pub RunLevel);
@@ -68,7 +68,9 @@ impl RawPriorityLimitedMutex {
     /// Create a new lock that is accessible at or below the given `priority`.
     pub const fn new(priority: Priority) -> Self {
         Self {
-            inner: GenericRawMutex::new(PriorityLock(RunLevel::Interrupt(priority))),
+            inner: GenericRawMutex::new(PriorityLock(RunLevel::Interrupt(
+                ElevatedRunLevel::from_priority(priority),
+            ))),
         }
     }
 

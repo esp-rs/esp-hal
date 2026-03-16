@@ -55,57 +55,57 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 <!-- start chip support table -->
 | Driver                    | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C5 | ESP32-C6 | ESP32-H2 | ESP32-S2 | ESP32-S3 |
 | ------------------------- |:-----:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|
-| ADC                       | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| ADC                       | ⚒️   | ⚒️      | ⚒️      | [❌][5174] [^1] | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | AES                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | ASSIST_DEBUG              |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |          | ⚒️      |
-| Analog Voltage Comparator |       |          |          | ❌       |          |          |          |          |
-| Bit Scrambler             |       |          |          | ❌       |          |          |          |          |
+| Analog Voltage Comparator |       |          |          | [❌][5168] [^1] |          |          |          |          |
+| Bit Scrambler             |       |          |          | [❌][5170] [^1] |          |          |          |          |
 | Bluetooth                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |          | ⚒️      |
 | Camera interface          | ❌    |          |          |          |          |          | ❌       | ⚒️      |
 | DAC                       | ⚒️   |          |          |          |          |          | ⚒️      |          |
 | Dedicated GPIO            |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | DMA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| DS                        |       |          | ❌       | ❌       | ❌       | ❌       | ❌       | ❌       |
+| DS                        |       |          | ❌       | [❌][5159] [^1] | ❌       | ❌       | ❌       | ❌       |
 | ECC                       |       | ⚒️      |          | ⚒️      | ⚒️      | ⚒️      |          |          |
 | Ethernet                  | ❌    |          |          |          |          |          |          |          |
-| ETM                       |       |          |          | ❌       | ⚒️      | ⚒️      |          |          |
+| ETM                       |       |          |          | [❌][5167] [^1] | ⚒️      | ⚒️      |          |          |
 | GPIO                      | ✔️   | ✔️      | ✔️      | ⚒️      | ✔️      | ✔️      | ✔️      | ✔️      |
-| HMAC                      |       |          | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| HMAC                      |       |          | ⚒️      | [❌][5166] [^1] | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | I2C master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
-| I2C slave                 | ❌    |          | ❌       | ❌       | ❌       | ❌       | ❌       | ❌       |
-| I2S                       | ⚒️   |          | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| I2C slave                 | ❌    |          | ❌       | [❌][5156] [^1] | ❌       | ❌       | ❌       | ❌       |
+| I2S                       | ⚒️   |          | ⚒️      | [❌][5172] [^1] | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | IEEE 802.15.4             |       |          |          | ⚒️      | ⚒️      | ⚒️      |          |          |
 | Interrupts                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | IOMUX                     | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| Key Manager               |       |          |          | ❌       |          |          |          |          |
-| LEDC                      | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| Key Manager               |       |          |          | [❌][5171] [^1] |          |          |          |          |
+| LEDC                      | ⚒️   | ⚒️      | ⚒️      | [❌][5161] [^1] | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | LP I2C master             |       |          |          | ⚒️      | ⚒️      |          |          |          |
-| LP UART                   |       |          |          | ❌       | ⚒️      |          |          |          |
-| MCPWM                     | ⚒️   |          |          | ❌       | ⚒️      | ⚒️      |          | ⚒️      |
+| LP UART                   |       |          |          | [❌][5155] [^1] | ⚒️      |          |          |          |
+| MCPWM                     | ⚒️   |          |          | [❌][5154] [^1] | ⚒️      | ⚒️      |          | ⚒️      |
 | PARL_IO                   |       |          |          | ⚒️      | ⚒️      | ⚒️      |          |          |
 | PCNT                      | ⚒️   |          |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | PHY                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| PSRAM                     | ⚒️   |          |          | ❌       |          |          | ⚒️      | ⚒️      |
+| PSRAM                     | ⚒️   |          |          | [❌][5141] [^1] |          |          | ⚒️      | ⚒️      |
 | RGB display               | ⚒️   |          |          |          |          |          | ❌       | ⚒️      |
 | RMT                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | RNG                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | RSA                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| RTC Timekeeping           | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| RTC Timekeeping           | ⚒️   | ⚒️      | ⚒️      | [❌][5162] [^1] | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SDIO host                 | ⚒️   |          |          |          |          |          |          | ⚒️      |
-| SDIO slave                | ⚒️   |          |          | ❌       | ⚒️      |          |          |          |
+| SDIO slave                | ⚒️   |          |          | [❌][5169] [^1] | ⚒️      |          |          |          |
 | SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| Light/deep sleep          | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| Light/deep sleep          | ⚒️   | ⚒️      | ⚒️      | [❌][5165] [^1] | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SPI master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
 | SPI slave                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | SYSTIMER                  |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| Temperature sensor        | ⚒️   | ⚒️      | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| Temperature sensor        | ⚒️   | ⚒️      | ⚒️      | [❌][5153] [^1] | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Timers                    | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| Touch                     | ⚒️   |          |          | ❌       |          |          | ❌       | ❌       |
-| TWAI / CAN / CANFD        | ⚒️   |          | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| Touch                     | ⚒️   |          |          | [❌][5164] [^1] |          |          | ❌       | ❌       |
+| TWAI / CAN / CANFD        | ⚒️   |          | ⚒️      | [❌][5163] [^1] | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | UART                      | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
 | UHCI                      | ❌    |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ❌       | ⚒️      |
 | ULP (FSM)                 | ⚒️   |          |          |          |          |          | ⚒️      | ⚒️      |
-| ULP (RISC-V)              |       |          |          | ❌       | ⚒️      |          | ⚒️      | ⚒️      |
+| ULP (RISC-V)              |       |          |          | [❌][5160] [^1] | ⚒️      |          | ⚒️      | ⚒️      |
 | USB OTG FS                |       |          |          |          |          |          | ⚒️      | ⚒️      |
 | USB Serial/JTAG           |       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      |          | ⚒️      |
 | WIFI                      | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      |          | ⚒️      | ⚒️      |
@@ -114,6 +114,29 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
  * ❌: Not supported
  * ⚒️: Partial support
  * ✔️: Supported
+
+[^1]: This cell is clickable and will open the peripheral's issue on GitHub
+
+[5141]: https://github.com/esp-rs/esp-hal/issues/5141
+[5153]: https://github.com/esp-rs/esp-hal/issues/5153
+[5154]: https://github.com/esp-rs/esp-hal/issues/5154
+[5155]: https://github.com/esp-rs/esp-hal/issues/5155
+[5156]: https://github.com/esp-rs/esp-hal/issues/5156
+[5159]: https://github.com/esp-rs/esp-hal/issues/5159
+[5160]: https://github.com/esp-rs/esp-hal/issues/5160
+[5161]: https://github.com/esp-rs/esp-hal/issues/5161
+[5162]: https://github.com/esp-rs/esp-hal/issues/5162
+[5163]: https://github.com/esp-rs/esp-hal/issues/5163
+[5164]: https://github.com/esp-rs/esp-hal/issues/5164
+[5165]: https://github.com/esp-rs/esp-hal/issues/5165
+[5166]: https://github.com/esp-rs/esp-hal/issues/5166
+[5167]: https://github.com/esp-rs/esp-hal/issues/5167
+[5168]: https://github.com/esp-rs/esp-hal/issues/5168
+[5169]: https://github.com/esp-rs/esp-hal/issues/5169
+[5170]: https://github.com/esp-rs/esp-hal/issues/5170
+[5171]: https://github.com/esp-rs/esp-hal/issues/5171
+[5172]: https://github.com/esp-rs/esp-hal/issues/5172
+[5174]: https://github.com/esp-rs/esp-hal/issues/5174
 <!-- end chip support table -->
 
 ## `unstable` feature

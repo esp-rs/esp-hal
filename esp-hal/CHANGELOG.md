@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `AdcPin` now implements `Debug` and `defmt::Format`. (#5194)
 - RMT: All public types now derive `Debug` and `defmt::Format`. (#4302)
 - RMT: `Channel::apply_config` has been added. (#4302)
 - Added blocking `send_break`, `wait_for_break` and `wait_for_break_with_timeout` for sending and detecting software breaks with the UART driver (#4284)
@@ -37,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C5: Add AES support (#4983)
 - C5: Add USB Serial/JTAG support (#5008)
 - C5: Add PARL_IO support (#5042)
-- `esp_hal::interrupt::RunLevel` (#4996, #5108)
+- `esp_hal::interrupt::{RunLevel, ElevatedRunLevel}` (#4996, #5108, #5146)
 - MAC addresses for radio interfaces getter: `esp_hal::efuse::interface_mac_address(InterfaceMacAddress::)`. (#5002)
 - `ShaXContext` objects now implement `digest::core_api::BlockSizeUser` (and thus they can be used with the `hmac` crate) (#5050)
 - C5: Add ASSIST_DEBUG support (#5058)
@@ -45,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added experimental low-level clock control functionality via `esp_hal::clock::ll` (#5092)
 - Work queue support for ECC operations (#5084)
 - A mechanism to hook into linker scripts (#5116)
+- ESP32-S2, ESP32-S3: Add `UlpWakeupSource` so these chips can be woken up by ULP-generated interrupts. (#5132)
 
 ### Changed
 

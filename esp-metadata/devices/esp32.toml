@@ -116,7 +116,7 @@ memory_map = { ranges = [
 # `clocks` in a peripheral clock definition can either be a different `peripheral_clocks` entry (string), or a new definition (array) that uses the same syntax as `system_clocks` above.
 clocks = { system_clocks = { clock_tree = [
     { name = "XTAL_CLK",      type = "source",                     values = "26, 40",                     output = "VALUE * 1_000_000", always_on = true }, # 2-40MHz, always on? sw ability to measure using an internal RC clock
-    { name = "PLL_CLK",       type = "derived", from = "XTAL_CLK", values = "320, 480",                   output = "VALUE * 1_000_000", reject = "VALUE == 480_000_000 && CPU_PLL_DIV == 4" },
+    { name = "PLL_CLK",       type = "derived", from = "XTAL_CLK", values = "320, 480",                   output = "VALUE * 1_000_000", reject = "VALUE == 480_000_000 && divisor(CPU_PLL_DIV) == 4" },
     { name = "APLL_CLK",      type = "derived", from = "PLL_CLK",  values = "16_000_000 ..= 128_000_000", output = "VALUE" },
     { name = "RC_FAST_CLK",   type = "source",  output = "8_000_000" }, # this is supposed to be adjustable using RTC_CNTL_CK8M_DIV_SEL
     { name = "PLL_F160M_CLK", type = "derived", from = "PLL_CLK", output = "160_000_000" },
@@ -178,7 +178,7 @@ clocks = { system_clocks = { clock_tree = [
         { name = "XTAL",    outputs = "XTAL_CLK" },
         { name = "RC_FAST", outputs = "RC_FAST_CLK" },
     ] },
-    { name = "SYSCON_PRE_DIV", type = "divider", params = { divisor = "0 .. 1024" }, output = "SYSCON_PRE_DIV_IN / (divisor + 1)" },
+    { name = "SYSCON_PRE_DIV", type = "divider", params = { divisor = "0 .. 0x400" }, output = "SYSCON_PRE_DIV_IN / (divisor + 1)" },
 
     # The meta-switch
     { name = "CPU_CLK", type = "mux", always_on = true, variants = [
@@ -235,9 +235,9 @@ clocks = { system_clocks = { clock_tree = [
 
     # System-wide peripheral clocks
     # LEDC_SCLK: The TRM is slightly confusing, there is a single mux in the peripheral selecting between APB and RTC_FAST.
-    { name = "UART_MEM_CLK", type = "mux", default = "XTAL", variants = [
+    { name = "UART_MEM_CLK", type = "mux", variants = [
         # The actual source clock is unknown, but it also doesn't matter.
-        { name = "XTAL", outputs = "XTAL_CLK" },
+        { name = "XTAL", outputs = "XTAL_CLK", default = true },
     ] },
 ] }, peripheral_clocks = { templates = [
     # templates
@@ -269,16 +269,16 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Twai0", template_params = { peripheral = "twai" } },
     { name = "I2cExt1" },
     { name = "Mcpwm0", template_params = { peripheral = "pwm0" }, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", default = "PLL_F160M", variants = [
-            { name = "PLL_F160M", outputs = "PLL_F160M_CLK" }
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "PLL_F160M", outputs = "PLL_F160M_CLK", default = true }
         ] }
     ] },
     { name = "Spi3" },
     { name = "Timg1", template_params = { peripheral = "timergroup1" }, clocks = "Timg0" }, # same clock options, but different instance
     #{ name = "Efuse" },
     { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true, clocks = [
-        { name = "CALIBRATION_CLOCK", type = "mux", default = "RC_SLOW_CLK", variants = [
-            { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
+        { name = "CALIBRATION_CLOCK", type = "mux", variants = [
+            { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK", default = true },
             { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
             { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
         ] },
@@ -293,12 +293,12 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Uart1", clocks = "Uart0" },
     { name = "I2s0" },
     { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", default = "APB", variants = [
-            { name = "APB",      outputs = "APB_CLK" },
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "APB",      outputs = "APB_CLK", default = true },
             { name = "REF_TICK", outputs = "REF_TICK" }
         ] },
-        { name = "MEM_CLOCK", type = "mux", default = "MEM", variants = [
-            { name = "MEM", outputs = "UART_MEM_CLK" },
+        { name = "MEM_CLOCK", type = "mux", variants = [
+            { name = "MEM", outputs = "UART_MEM_CLK", default = true },
         ] },
     ] },
     #{ name = "Spi01" },

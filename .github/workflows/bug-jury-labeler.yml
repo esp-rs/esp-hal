@@ -1,0 +1,39 @@
+name: Bug Jury labeler
+
+on:
+  schedule:
+    - cron: "0 2 * * 1" # Every Monday at 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (log only, do not label)"
+        required: false
+        type: boolean
+        default: true
+      batch_size:
+        description: "Number of issues to label"
+        required: false
+        type: number
+        default: 10
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  label:
+    name: Label unassigned issues for Bug Jury
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/github-script@v8
+        env:
+          DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run }}
+          BATCH_SIZE: ${{ inputs.batch_size || '10' }}
+        with:
+          script: |
+            const { run } = require('./.github/scripts/bug-jury-labeler.js');
+            const dryRun = process.env.DRY_RUN !== 'false';
+            const batchSize = parseInt(process.env.BATCH_SIZE, 10) || 10;
+            await run({ github, context, core, batchSize, dryRun });

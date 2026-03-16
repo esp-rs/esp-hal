@@ -683,7 +683,11 @@ macro_rules! for_each_sha_algorithm {
 /// ```rust, no_run
 /// // XTAL_CLK
 ///
-/// fn configure_xtal_clk_impl(_clocks: &mut ClockTree, _config: XtalClkConfig) {
+/// fn configure_xtal_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<XtalClkConfig>,
+///     _new_config: XtalClkConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -693,7 +697,11 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
-/// fn configure_pll_clk_impl(_clocks: &mut ClockTree, _config: PllClkConfig) {
+/// fn configure_pll_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<PllClkConfig>,
+///     _new_config: PllClkConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -703,7 +711,11 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
-/// fn configure_apll_clk_impl(_clocks: &mut ClockTree, _config: ApllClkConfig) {
+/// fn configure_apll_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<ApllClkConfig>,
+///     _new_config: ApllClkConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -721,8 +733,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_cpu_pll_div_in_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<CpuPllDivInConfig>,
-///     _new_selector: CpuPllDivInConfig,
+///     _old_config: Option<CpuPllDivInConfig>,
+///     _new_config: CpuPllDivInConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -733,7 +745,11 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
-/// fn configure_cpu_pll_div_impl(_clocks: &mut ClockTree, _new_config: CpuPllDivConfig) {
+/// fn configure_cpu_pll_div_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<CpuPllDivConfig>,
+///     _new_config: CpuPllDivConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -745,8 +761,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_system_pre_div_in_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<SystemPreDivInConfig>,
-///     _new_selector: SystemPreDivInConfig,
+///     _old_config: Option<SystemPreDivInConfig>,
+///     _new_config: SystemPreDivInConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -757,7 +773,11 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
-/// fn configure_system_pre_div_impl(_clocks: &mut ClockTree, _new_config: SystemPreDivConfig) {
+/// fn configure_system_pre_div_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<SystemPreDivConfig>,
+///     _new_config: SystemPreDivConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -769,8 +789,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_apb_clk_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<ApbClkConfig>,
-///     _new_selector: ApbClkConfig,
+///     _old_config: Option<ApbClkConfig>,
+///     _new_config: ApbClkConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -783,8 +803,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_ref_tick_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<RefTickConfig>,
-///     _new_selector: RefTickConfig,
+///     _old_config: Option<RefTickConfig>,
+///     _new_config: RefTickConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -795,7 +815,11 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
-/// fn configure_ref_tick_xtal_impl(_clocks: &mut ClockTree, _new_config: RefTickXtalConfig) {
+/// fn configure_ref_tick_xtal_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<RefTickXtalConfig>,
+///     _new_config: RefTickXtalConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -805,7 +829,11 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
-/// fn configure_ref_tick_ck8m_impl(_clocks: &mut ClockTree, _new_config: RefTickCk8mConfig) {
+/// fn configure_ref_tick_ck8m_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<RefTickCk8mConfig>,
+///     _new_config: RefTickCk8mConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -813,8 +841,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_cpu_clk_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<CpuClkConfig>,
-///     _new_selector: CpuClkConfig,
+///     _old_config: Option<CpuClkConfig>,
+///     _new_config: CpuClkConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -863,8 +891,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_rtc_slow_clk_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<RtcSlowClkConfig>,
-///     _new_selector: RtcSlowClkConfig,
+///     _old_config: Option<RtcSlowClkConfig>,
+///     _new_config: RtcSlowClkConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -877,8 +905,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_rtc_fast_clk_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<RtcFastClkConfig>,
-///     _new_selector: RtcFastClkConfig,
+///     _old_config: Option<RtcFastClkConfig>,
+///     _new_config: RtcFastClkConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -897,8 +925,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_timg0_function_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0FunctionClockConfig>,
-///     _new_selector: Timg0FunctionClockConfig,
+///     _old_config: Option<Timg0FunctionClockConfig>,
+///     _new_config: Timg0FunctionClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -911,8 +939,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_timg0_calibration_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0CalibrationClockConfig>,
-///     _new_selector: Timg0CalibrationClockConfig,
+///     _old_config: Option<Timg0CalibrationClockConfig>,
+///     _new_config: Timg0CalibrationClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -925,8 +953,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_timg1_function_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0FunctionClockConfig>,
-///     _new_selector: Timg0FunctionClockConfig,
+///     _old_config: Option<Timg0FunctionClockConfig>,
+///     _new_config: Timg0FunctionClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -939,8 +967,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_timg1_calibration_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0CalibrationClockConfig>,
-///     _new_selector: Timg0CalibrationClockConfig,
+///     _old_config: Option<Timg0CalibrationClockConfig>,
+///     _new_config: Timg0CalibrationClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -953,8 +981,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_uart0_function_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Uart0FunctionClockConfig>,
-///     _new_selector: Uart0FunctionClockConfig,
+///     _old_config: Option<Uart0FunctionClockConfig>,
+///     _new_config: Uart0FunctionClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -967,8 +995,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_uart0_mem_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Uart0MemClockConfig>,
-///     _new_selector: Uart0MemClockConfig,
+///     _old_config: Option<Uart0MemClockConfig>,
+///     _new_config: Uart0MemClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -981,8 +1009,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_uart1_function_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Uart0FunctionClockConfig>,
-///     _new_selector: Uart0FunctionClockConfig,
+///     _old_config: Option<Uart0FunctionClockConfig>,
+///     _new_config: Uart0FunctionClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -995,8 +1023,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_uart1_mem_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Uart0MemClockConfig>,
-///     _new_selector: Uart0MemClockConfig,
+///     _old_config: Option<Uart0MemClockConfig>,
+///     _new_config: Uart0MemClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -1104,9 +1132,6 @@ macro_rules! define_clock_tree_types {
                     CpuPllDivConfig::_6 => 6,
                 }
             }
-            fn value(self) -> u32 {
-                self.divisor()
-            }
         }
         /// The list of clock signals that the `SYSTEM_PRE_DIV_IN` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1140,9 +1165,6 @@ macro_rules! define_clock_tree_types {
             }
             fn divisor(self) -> u32 {
                 self.divisor
-            }
-            fn value(self) -> u32 {
-                self.divisor()
             }
         }
         /// The list of clock signals that the `APB_CLK` multiplexer can output.
@@ -1195,9 +1217,6 @@ macro_rules! define_clock_tree_types {
             fn divisor(self) -> u32 {
                 self.divisor
             }
-            fn value(self) -> u32 {
-                self.divisor()
-            }
         }
         /// Configures the `REF_TICK_CK8M` clock divider.
         ///
@@ -1222,9 +1241,6 @@ macro_rules! define_clock_tree_types {
             }
             fn divisor(self) -> u32 {
                 self.divisor
-            }
-            fn value(self) -> u32 {
-                self.divisor()
             }
         }
         /// The list of clock signals that the `CPU_CLK` multiplexer can output.
@@ -1479,8 +1495,8 @@ macro_rules! define_clock_tree_types {
                 uart1_mem_clock_refcount: 0,
             });
         pub fn configure_xtal_clk(clocks: &mut ClockTree, config: XtalClkConfig) {
-            clocks.xtal_clk = Some(config);
-            configure_xtal_clk_impl(clocks, config);
+            let old_config = clocks.xtal_clk.replace(config);
+            configure_xtal_clk_impl(clocks, old_config, config);
         }
         pub fn xtal_clk_config(clocks: &mut ClockTree) -> Option<XtalClkConfig> {
             clocks.xtal_clk
@@ -1491,8 +1507,8 @@ macro_rules! define_clock_tree_types {
             unwrap!(clocks.xtal_clk).value()
         }
         pub fn configure_pll_clk(clocks: &mut ClockTree, config: PllClkConfig) {
-            clocks.pll_clk = Some(config);
-            configure_pll_clk_impl(clocks, config);
+            let old_config = clocks.pll_clk.replace(config);
+            configure_pll_clk_impl(clocks, old_config, config);
         }
         pub fn pll_clk_config(clocks: &mut ClockTree) -> Option<PllClkConfig> {
             clocks.pll_clk
@@ -1517,8 +1533,8 @@ macro_rules! define_clock_tree_types {
             unwrap!(clocks.pll_clk).value()
         }
         pub fn configure_apll_clk(clocks: &mut ClockTree, config: ApllClkConfig) {
-            clocks.apll_clk = Some(config);
-            configure_apll_clk_impl(clocks, config);
+            let old_config = clocks.apll_clk.replace(config);
+            configure_apll_clk_impl(clocks, old_config, config);
         }
         pub fn apll_clk_config(clocks: &mut ClockTree) -> Option<ApllClkConfig> {
             clocks.apll_clk
@@ -1597,8 +1613,8 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn configure_cpu_pll_div(clocks: &mut ClockTree, config: CpuPllDivConfig) {
-            clocks.cpu_pll_div = Some(config);
-            configure_cpu_pll_div_impl(clocks, config);
+            let old_config = clocks.cpu_pll_div.replace(config);
+            configure_cpu_pll_div_impl(clocks, old_config, config);
         }
         pub fn cpu_pll_div_config(clocks: &mut ClockTree) -> Option<CpuPllDivConfig> {
             clocks.cpu_pll_div
@@ -1663,8 +1679,8 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn configure_system_pre_div(clocks: &mut ClockTree, config: SystemPreDivConfig) {
-            clocks.system_pre_div = Some(config);
-            configure_system_pre_div_impl(clocks, config);
+            let old_config = clocks.system_pre_div.replace(config);
+            configure_system_pre_div_impl(clocks, old_config, config);
         }
         pub fn system_pre_div_config(clocks: &mut ClockTree) -> Option<SystemPreDivConfig> {
             clocks.system_pre_div
@@ -1803,8 +1819,8 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn configure_ref_tick_xtal(clocks: &mut ClockTree, config: RefTickXtalConfig) {
-            clocks.ref_tick_xtal = Some(config);
-            configure_ref_tick_xtal_impl(clocks, config);
+            let old_config = clocks.ref_tick_xtal.replace(config);
+            configure_ref_tick_xtal_impl(clocks, old_config, config);
         }
         pub fn ref_tick_xtal_config(clocks: &mut ClockTree) -> Option<RefTickXtalConfig> {
             clocks.ref_tick_xtal
@@ -1825,8 +1841,8 @@ macro_rules! define_clock_tree_types {
             (xtal_clk_frequency(clocks) / (unwrap!(clocks.ref_tick_xtal).divisor() + 1))
         }
         pub fn configure_ref_tick_ck8m(clocks: &mut ClockTree, config: RefTickCk8mConfig) {
-            clocks.ref_tick_ck8m = Some(config);
-            configure_ref_tick_ck8m_impl(clocks, config);
+            let old_config = clocks.ref_tick_ck8m.replace(config);
+            configure_ref_tick_ck8m_impl(clocks, old_config, config);
         }
         pub fn ref_tick_ck8m_config(clocks: &mut ClockTree) -> Option<RefTickCk8mConfig> {
             clocks.ref_tick_ck8m

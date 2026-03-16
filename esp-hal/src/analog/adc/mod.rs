@@ -105,6 +105,27 @@ pub struct AdcPin<PIN, ADCI, CS = ()> {
     _phantom: PhantomData<ADCI>,
 }
 
+impl<PIN: core::fmt::Debug, ADCI, CS: core::fmt::Debug> core::fmt::Debug for AdcPin<PIN, ADCI, CS> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("AdcPin")
+            .field("pin", &self.pin)
+            .field("cal_scheme", &self.cal_scheme)
+            .finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl<PIN: defmt::Format, ADCI, CS: defmt::Format> defmt::Format for AdcPin<PIN, ADCI, CS> {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        defmt::write!(
+            fmt,
+            "AdcPin {{ pin: {}, cal_scheme: {} }}",
+            self.pin,
+            self.cal_scheme
+        );
+    }
+}
+
 /// Configuration for the ADC.
 #[cfg(feature = "unstable")]
 pub struct AdcConfig<ADCI> {

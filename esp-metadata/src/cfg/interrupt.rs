@@ -213,11 +213,12 @@ impl GenericProperty for InterruptControllerProperties {
         let all_priorities = (0..properties.priority_levels)
             .map(|p| {
                 let variant = format_ident!("Priority{}", p + 1);
+                let level_variant = format_ident!("Level{}", p + 1);
                 let numeric = number(p + 1);
                 let p = number(p);
 
                 quote! {
-                    #p, #numeric, #variant
+                    #p, #numeric, #variant, #level_variant
                 }
             })
             .collect::<Vec<_>>();

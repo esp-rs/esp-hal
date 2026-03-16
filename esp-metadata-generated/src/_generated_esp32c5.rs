@@ -587,17 +587,18 @@ macro_rules! for_each_classified_interrupt {
 macro_rules! for_each_interrupt_priority {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_interrupt_priority { $(($pattern) => $code;)*
-        ($other : tt) => {} } _for_each_inner_interrupt_priority!((0, 1, Priority1));
-        _for_each_inner_interrupt_priority!((1, 2, Priority2));
-        _for_each_inner_interrupt_priority!((2, 3, Priority3));
-        _for_each_inner_interrupt_priority!((3, 4, Priority4));
-        _for_each_inner_interrupt_priority!((4, 5, Priority5));
-        _for_each_inner_interrupt_priority!((5, 6, Priority6));
-        _for_each_inner_interrupt_priority!((6, 7, Priority7));
-        _for_each_inner_interrupt_priority!((7, 8, Priority8));
-        _for_each_inner_interrupt_priority!((all(0, 1, Priority1), (1, 2, Priority2), (2,
-        3, Priority3), (3, 4, Priority4), (4, 5, Priority5), (5, 6, Priority6), (6, 7,
-        Priority7), (7, 8, Priority8)));
+        ($other : tt) => {} } _for_each_inner_interrupt_priority!((0, 1, Priority1,
+        Level1)); _for_each_inner_interrupt_priority!((1, 2, Priority2, Level2));
+        _for_each_inner_interrupt_priority!((2, 3, Priority3, Level3));
+        _for_each_inner_interrupt_priority!((3, 4, Priority4, Level4));
+        _for_each_inner_interrupt_priority!((4, 5, Priority5, Level5));
+        _for_each_inner_interrupt_priority!((5, 6, Priority6, Level6));
+        _for_each_inner_interrupt_priority!((6, 7, Priority7, Level7));
+        _for_each_inner_interrupt_priority!((7, 8, Priority8, Level8));
+        _for_each_inner_interrupt_priority!((all(0, 1, Priority1, Level1), (1, 2,
+        Priority2, Level2), (2, 3, Priority3, Level3), (3, 4, Priority4, Level4), (4, 5,
+        Priority5, Level5), (5, 6, Priority6, Level6), (6, 7, Priority7, Level7), (7, 8,
+        Priority8, Level8)));
     };
 }
 #[macro_export]
@@ -889,7 +890,11 @@ macro_rules! for_each_sha_algorithm {
 /// ```rust, no_run
 /// // XTAL_CLK
 ///
-/// fn configure_xtal_clk_impl(_clocks: &mut ClockTree, _config: XtalClkConfig) {
+/// fn configure_xtal_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<XtalClkConfig>,
+///     _new_config: XtalClkConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -985,8 +990,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_hp_root_clk_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<HpRootClkConfig>,
-///     _new_selector: HpRootClkConfig,
+///     _old_config: Option<HpRootClkConfig>,
+///     _new_config: HpRootClkConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -997,7 +1002,11 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
-/// fn configure_cpu_clk_impl(_clocks: &mut ClockTree, _new_config: CpuClkConfig) {
+/// fn configure_cpu_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<CpuClkConfig>,
+///     _new_config: CpuClkConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -1007,7 +1016,11 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
-/// fn configure_ahb_clk_impl(_clocks: &mut ClockTree, _new_config: AhbClkConfig) {
+/// fn configure_ahb_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<AhbClkConfig>,
+///     _new_config: AhbClkConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -1017,7 +1030,11 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
-/// fn configure_apb_clk_impl(_clocks: &mut ClockTree, _new_config: ApbClkConfig) {
+/// fn configure_apb_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<ApbClkConfig>,
+///     _new_config: ApbClkConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -1035,8 +1052,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_lp_fast_clk_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<LpFastClkConfig>,
-///     _new_selector: LpFastClkConfig,
+///     _old_config: Option<LpFastClkConfig>,
+///     _new_config: LpFastClkConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -1049,8 +1066,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_lp_slow_clk_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<LpSlowClkConfig>,
-///     _new_selector: LpSlowClkConfig,
+///     _old_config: Option<LpSlowClkConfig>,
+///     _new_config: LpSlowClkConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -1063,8 +1080,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_crypto_clk_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<CryptoClkConfig>,
-///     _new_selector: CryptoClkConfig,
+///     _old_config: Option<CryptoClkConfig>,
+///     _new_config: CryptoClkConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -1077,8 +1094,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_timg_calibration_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<TimgCalibrationClockConfig>,
-///     _new_selector: TimgCalibrationClockConfig,
+///     _old_config: Option<TimgCalibrationClockConfig>,
+///     _new_config: TimgCalibrationClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -1091,8 +1108,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_parlio_rx_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<ParlioRxClockConfig>,
-///     _new_selector: ParlioRxClockConfig,
+///     _old_config: Option<ParlioRxClockConfig>,
+///     _new_config: ParlioRxClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -1105,8 +1122,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_parlio_tx_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<ParlioTxClockConfig>,
-///     _new_selector: ParlioTxClockConfig,
+///     _old_config: Option<ParlioTxClockConfig>,
+///     _new_config: ParlioTxClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -1119,8 +1136,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_rmt_sclk_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<RmtSclkConfig>,
-///     _new_selector: RmtSclkConfig,
+///     _old_config: Option<RmtSclkConfig>,
+///     _new_config: RmtSclkConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -1133,8 +1150,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_timg0_function_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0FunctionClockConfig>,
-///     _new_selector: Timg0FunctionClockConfig,
+///     _old_config: Option<Timg0FunctionClockConfig>,
+///     _new_config: Timg0FunctionClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -1147,8 +1164,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_timg0_wdt_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0WdtClockConfig>,
-///     _new_selector: Timg0WdtClockConfig,
+///     _old_config: Option<Timg0WdtClockConfig>,
+///     _new_config: Timg0WdtClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -1161,8 +1178,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_timg1_function_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0FunctionClockConfig>,
-///     _new_selector: Timg0FunctionClockConfig,
+///     _old_config: Option<Timg0FunctionClockConfig>,
+///     _new_config: Timg0FunctionClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -1175,8 +1192,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_timg1_wdt_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0WdtClockConfig>,
-///     _new_selector: Timg0WdtClockConfig,
+///     _old_config: Option<Timg0WdtClockConfig>,
+///     _new_config: Timg0WdtClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -1189,8 +1206,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_uart0_function_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Uart0FunctionClockConfig>,
-///     _new_selector: Uart0FunctionClockConfig,
+///     _old_config: Option<Uart0FunctionClockConfig>,
+///     _new_config: Uart0FunctionClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -1203,8 +1220,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_uart1_function_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Uart0FunctionClockConfig>,
-///     _new_selector: Uart0FunctionClockConfig,
+///     _old_config: Option<Uart0FunctionClockConfig>,
+///     _new_config: Uart0FunctionClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -1265,9 +1282,6 @@ macro_rules! define_clock_tree_types {
             fn divisor(self) -> u32 {
                 self.divisor
             }
-            fn value(self) -> u32 {
-                self.divisor()
-            }
         }
         /// Configures the `AHB_CLK` clock divider.
         ///
@@ -1293,9 +1307,6 @@ macro_rules! define_clock_tree_types {
             fn divisor(self) -> u32 {
                 self.divisor
             }
-            fn value(self) -> u32 {
-                self.divisor()
-            }
         }
         /// Configures the `APB_CLK` clock divider.
         ///
@@ -1320,9 +1331,6 @@ macro_rules! define_clock_tree_types {
             }
             fn divisor(self) -> u32 {
                 self.divisor
-            }
-            fn value(self) -> u32 {
-                self.divisor()
             }
         }
         /// The list of clock signals that the `LP_FAST_CLK` multiplexer can output.
@@ -1622,8 +1630,8 @@ macro_rules! define_clock_tree_types {
                 uart1_function_clock_refcount: 0,
             });
         pub fn configure_xtal_clk(clocks: &mut ClockTree, config: XtalClkConfig) {
-            clocks.xtal_clk = Some(config);
-            configure_xtal_clk_impl(clocks, config);
+            let old_config = clocks.xtal_clk.replace(config);
+            configure_xtal_clk_impl(clocks, old_config, config);
         }
         pub fn xtal_clk_config(clocks: &mut ClockTree) -> Option<XtalClkConfig> {
             clocks.xtal_clk
@@ -1947,8 +1955,8 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn configure_cpu_clk(clocks: &mut ClockTree, config: CpuClkConfig) {
-            clocks.cpu_clk = Some(config);
-            configure_cpu_clk_impl(clocks, config);
+            let old_config = clocks.cpu_clk.replace(config);
+            configure_cpu_clk_impl(clocks, old_config, config);
         }
         pub fn cpu_clk_config(clocks: &mut ClockTree) -> Option<CpuClkConfig> {
             clocks.cpu_clk
@@ -1973,8 +1981,8 @@ macro_rules! define_clock_tree_types {
             (hp_root_clk_frequency(clocks) / (unwrap!(clocks.cpu_clk).divisor() + 1))
         }
         pub fn configure_ahb_clk(clocks: &mut ClockTree, config: AhbClkConfig) {
-            clocks.ahb_clk = Some(config);
-            configure_ahb_clk_impl(clocks, config);
+            let old_config = clocks.ahb_clk.replace(config);
+            configure_ahb_clk_impl(clocks, old_config, config);
         }
         pub fn ahb_clk_config(clocks: &mut ClockTree) -> Option<AhbClkConfig> {
             clocks.ahb_clk
@@ -1995,8 +2003,8 @@ macro_rules! define_clock_tree_types {
             (hp_root_clk_frequency(clocks) / (unwrap!(clocks.ahb_clk).divisor() + 1))
         }
         pub fn configure_apb_clk(clocks: &mut ClockTree, config: ApbClkConfig) {
-            clocks.apb_clk = Some(config);
-            configure_apb_clk_impl(clocks, config);
+            let old_config = clocks.apb_clk.replace(config);
+            configure_apb_clk_impl(clocks, old_config, config);
         }
         pub fn apb_clk_config(clocks: &mut ClockTree) -> Option<ApbClkConfig> {
             clocks.apb_clk

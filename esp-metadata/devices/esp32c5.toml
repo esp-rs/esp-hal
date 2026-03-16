@@ -217,21 +217,21 @@ clocks = { system_clocks = { clock_tree = [
     { name = "rst_field", value = "{{peripheral}}_rst_en" },
 ], peripheral_clocks = [
     { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [ # UART_SCLK
-            { name = "XTAL",     outputs = "XTAL_CLK" },
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [ # UART_SCLK
+            { name = "XTAL",     outputs = "XTAL_CLK", default = true },
             { name = "PLL_F80M", outputs = "PLL_F80M" },
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
         ] },
     ] },
     { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true, clocks = "Uart0" },
     { name = "Timg0", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup0_conf", peripheral = "tg0", peri_clk_template = "{{control}}::regs().timergroup0_timer_clk_conf().modify(|_, w| w.tg0_timer_clk_en().bit(enable));" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL_CLK", variants = [
-            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK", default = true },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
             { name = "PLL_F80M",    outputs = "PLL_F80M" },
         ] },
-        { name = "WDT_CLOCK", type = "mux", default = "XTAL_CLK", variants = [
-            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+        { name = "WDT_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK", default = true },
             { name = "PLL_F80M",    outputs = "PLL_F80M" },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
         ] },
@@ -240,24 +240,24 @@ clocks = { system_clocks = { clock_tree = [
     { name = "I2cExt0", template_params = { peripheral = "i2c0" } },
     { name = "Pcnt" },
     { name = "Rmt", clocks = [
-        { name = "SCLK", type = "mux", default = "PLL_F80M", variants = [
+        { name = "SCLK", type = "mux", variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
-            { name = "PLL_F80M",    outputs = "PLL_F80M" },
+            { name = "PLL_F80M",    outputs = "PLL_F80M", default = true },
         ] },
     ] },
     { name = "Systimer", keep_enabled = true }, # can be clocked from XTAL_CLK or RC_FAST_CLK, the latter has no divider?
     { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" }, clocks = [
-        { name = "RX_CLOCK", type = "mux", default = "PLL_F240M", variants = [
+        { name = "RX_CLOCK", type = "mux", variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
-            { name = "PLL_F240M",   outputs = "PLL_F240M" },
+            { name = "PLL_F240M",   outputs = "PLL_F240M", default = true },
             # TODO: external clock
         ] },
-        { name = "TX_CLOCK", type = "mux", default = "PLL_F240M", variants = [
+        { name = "TX_CLOCK", type = "mux", variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
-            { name = "PLL_F240M",   outputs = "PLL_F240M" },
+            { name = "PLL_F240M",   outputs = "PLL_F240M", default = true },
         ] },
     ] },
     { name = "Dma", template_params = { peripheral = "gdma" } },
@@ -271,7 +271,7 @@ clocks = { system_clocks = { clock_tree = [
 ] } }
 
 [device.adc]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5174 }
 
 # TODO: define functionality for PSEUDO register
 [device.aes]
@@ -539,7 +539,7 @@ has_tx_fifo_watermark = true # why not s2
 bus_timeout_is_exponential = true
 
 [device.i2c_slave]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5156 }
 
 [device.rsa]
 support_status = "partial"
@@ -607,7 +607,7 @@ support_status = "partial"
 combined_uart_selector_field = true
 
 [device.bit_scrambler]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5170 }
 
 [device.assist_debug]
 support_status = "partial"
@@ -615,22 +615,22 @@ has_sp_monitor = true
 has_region_monitor = true
 
 [device.avc]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5168 }
 
 [device.twai]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5163 }
 
 [device.key_manager]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5171 }
 
 [device.touch]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5164 }
 
 [device.ds]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5159 }
 
 [device.lp_uart]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5155 }
 ram_size = 32
 
 [device.lp_i2c_master]
@@ -668,39 +668,39 @@ version = 2
 # TODO: model chip select signal (active low)
 
 [device.ledc]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5161 }
 
 [device.mcpwm]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5154 }
 
 [device.sleep]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5165 }
 
 [device.etm]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5167 }
 
 [device.hmac]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5166 }
 
 # [device.ecdsa]
 # support_status = "not_supported"
 
 [device.i2s]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5172 }
 
 [device.io_mux]
 
 [device.psram]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5141 }
 
 [device.sd_slave]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5169 }
 
 [device.ulp_riscv]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5160 }
 
 [device.lp_timer]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5162 }
 
 [device.temp_sensor]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 5153 }

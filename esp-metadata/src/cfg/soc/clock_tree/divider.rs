@@ -28,7 +28,7 @@
 //! - request/release functions that update the reference counts and the bitmap
 //! - A cached output frequency value.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::Result;
 use convert_case::{Case, Casing};
@@ -39,12 +39,15 @@ use serde::Deserialize;
 
 use crate::{
     cfg::{
+        ClockTreeNodeInstance,
         clock_tree::{
             ClockTreeNodeType,
+            ConfiguresExpression,
             Expression,
             RejectExpression,
             ValidationContext,
             ValuesExpression,
+            expr_compiler::ExprCompiler,
         },
         soc::ProcessedClockData,
     },
@@ -74,28 +77,44 @@ pub struct Divider {
 }
 
 impl ClockTreeNodeType for Divider {
-    fn name_str<'a>(&'a self) -> &'a String {
-        &self.name
+    fn input_clocks(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> Vec<String> {
+        vec![
+            instance
+                .resolve_node(tree, self.source_clock())
+                .name_str()
+                .to_string(),
+        ]
     }
 
-    fn input_clocks(&self) -> Vec<String> {
-        vec![self.source_clock().to_string()]
-    }
-
-    fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
+    fn validate_source_data(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        ctx: &ValidationContext<'_>,
+    ) -> Result<()> {
         let mut result = None;
+        let mut seen = HashSet::new();
         self.output.visit_variables(|v| {
             if self.params.contains_key(v) {
                 return;
             }
-            if !ctx.has_clock(v) && matches!(result, None | Some(Ok(()))) {
+            if !ctx.has_clock(instance, v) && matches!(result, None | Some(Ok(()))) {
                 result = Some(Err(anyhow::format_err!(
                     "{v} is not a valid clock signal name"
                 )));
             }
 
-            if result.is_none() {
-                result = Some(Ok(()));
+            if seen.insert(v) {
+                if result.is_none() {
+                    result = Some(Ok(()));
+                } else if matches!(result, Some(Ok(()))) {
+                    result = Some(Err(anyhow::anyhow!(
+                        "Divider nodes cannot have more than one source clock"
+                    )));
+                }
             }
         });
         result.unwrap_or_else(|| Err(anyhow::anyhow!("Divider node has no source clock")))
@@ -109,104 +128,160 @@ impl ClockTreeNodeType for Divider {
         contains_divisor
     }
 
-    fn config_apply_function(&self, tree: &ProcessedClockData) -> TokenStream {
-        let ty_name = self.config_type_name();
-        let state = tree.properties(self).field_name();
-        let apply_fn_name = self.config_apply_function_name();
+    fn config_apply_function(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        let ty_name = instance.config_type_name();
+        let state = tree.properties(instance.name_str()).field_name();
+        let apply_fn_name = instance.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
         let reject_exprs = self.reject.as_ref().map(|reject| {
             let mut variables = HashMap::new();
-
-            let mut config_fields = vec![];
 
             for var in self.params.keys() {
                 let param_fn = format_ident!("{}", var);
                 variables.insert(var.as_str(), quote! { config.#param_fn() });
             }
-            reject.0.visit_variables(|var| {
-                if !self.params.contains_key(var) {
-                    config_fields.push((var, tree.properties(tree.node(var)).field_name()));
-                }
-            });
 
-            reject.to_rust(&config_fields, variables)
+            reject.to_rust(variables, instance, tree)
         });
         quote! {
             pub fn #apply_fn_name(clocks: &mut ClockTree, config: #ty_name) {
                 #reject_exprs
-                clocks.#state = Some(config);
-                #hal_impl(clocks, config);
+                let old_config = clocks.#state.replace(config);
+                #hal_impl(clocks, old_config, config);
             }
         }
     }
 
-    fn config_apply_impl_function(&self, _tree: &ProcessedClockData) -> TokenStream {
-        let ty_name = self.config_type_name();
-        let apply_fn_name = self.config_apply_function_name();
-        let hal_impl = format_ident!("{}_impl", apply_fn_name);
-        quote! {
-            fn #hal_impl(_clocks: &mut ClockTree, _new_config: #ty_name) {
-                todo!()
+    fn validate_configures_expr(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        expr: &ConfiguresExpression,
+    ) -> Result<()> {
+        anyhow::ensure!(
+            self.is_configurable(),
+            "Divider `{}` is not configurable",
+            instance.name_str()
+        );
+        if let Some(property) = expr.effect().property.as_ref() {
+            anyhow::ensure!(
+                self.params.contains_key(property),
+                "Divider does not have property `{}`",
+                property
+            );
+        } else {
+            anyhow::ensure!(
+                self.params.len() == 1,
+                "Divider has multiple properties but no property was specified"
+            )
+        }
+
+        Ok(())
+    }
+
+    fn apply_configuration(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        expr: &ConfiguresExpression,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        let effect = expr.effect();
+
+        let config_function = instance.config_apply_function_name();
+        let state = instance.config_type_name();
+
+        let mut variables = HashMap::new();
+        for clock in tree.clock_tree.iter() {
+            let clock_name = clock.name_str().as_str();
+            let frequency_fn = clock.frequency_function_name();
+            variables.insert(clock_name, quote! { #frequency_fn(clocks) });
+        }
+
+        let cfg_expr_code = ExprCompiler::new(&variables).compile_right_hand_expression(
+            &expr.source,
+            &effect.value,
+            instance,
+            tree,
+        );
+        let node_name = instance.name_str();
+
+        let (param_name, param_type) = if let Some(property) = effect.property.as_ref() {
+            (property, &self.params[property])
+        } else {
+            self.params.get_index(0).unwrap()
+        };
+
+        let collapse_types =
+            self.params.len() == 1 && self.params.values().all(|v| v.as_enum_values().is_some());
+
+        let cfg_expr_code = if !collapse_types && param_type.as_enum_values().is_some() {
+            let full_name = format!("{node_name}_{}", param_name.to_uppercase());
+
+            let ty_name = format_ident!(
+                "{}Config",
+                full_name.from_case(Case::Ada).to_case(Case::Pascal)
+            );
+
+            quote! {
+                #ty_name::new(#cfg_expr_code)
+            }
+        } else {
+            cfg_expr_code
+        };
+
+        if let Some(property) = effect.property.as_ref() {
+            let read_config_function = instance.current_config_function_name();
+            let property = format_ident!("{}", property);
+            quote! {
+                let mut config_value = unwrap!(
+                    #read_config_function(clocks),
+                    concat!("Attempted to change ", stringify!(#property), " on ", #node_name, " which has not yet been configured."),
+                );
+
+                config_value.#property = #cfg_expr_code;
+
+                #config_function(clocks, config_value);
+            }
+        } else {
+            quote! {
+                let config_value = #state::new(#cfg_expr_code);
+                #config_function(clocks, config_value);
             }
         }
     }
 
-    fn apply_configuration(&self, expr: &Expression, tree: &ProcessedClockData) -> TokenStream {
-        let config_function = self.config_apply_function_name();
-
-        let state = self.config_type_name().unwrap();
-
-        let cfg_expr_code = expr.to_rust({
-            let mut variables = HashMap::new();
-            for clock in tree.clock_tree.iter() {
-                let clock_name = clock.name_str().as_str();
-                let frequency_fn = clock.frequency_function_name();
-                variables.insert(clock_name, quote! { #frequency_fn(clocks) });
-            }
-            variables
-        });
-
-        quote! {
-            let config_value = #state::new(#cfg_expr_code);
-            #config_function(clocks, config_value);
-        }
-    }
-
-    fn node_frequency_impl(&self, tree: &ProcessedClockData) -> TokenStream {
-        let state = tree.properties(self).field_name();
-        let parent_clock = self.source_clock();
-        let parent_frequency_fn = tree.node(parent_clock).frequency_function_name();
+    fn node_frequency_impl(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        let state = tree.properties(instance.name_str()).field_name();
+        let parent_clock = self.source_clock(); // TODO get from node?
+        let parent_frequency_fn = instance
+            .resolve_node(tree, parent_clock)
+            .frequency_function_name();
 
         let params = self.params.keys().map(|var| {
             let param_fn = format_ident!("{}", var);
             (var, quote! { unwrap!(clocks.#state).#param_fn() })
         });
 
-        let cfg_expr_code = self.output.to_rust({
-            let mut variables = HashMap::new();
-            variables.insert(parent_clock, quote! { #parent_frequency_fn(clocks) });
-            for (var, param_value_accessor) in params {
-                variables.insert(var.as_str(), param_value_accessor);
-            }
-            variables
-        });
+        let mut variables = HashMap::new();
+        variables.insert(parent_clock, quote! { #parent_frequency_fn(clocks) });
+        for (var, param_value_accessor) in params {
+            variables.insert(var.as_str(), param_value_accessor);
+        }
+        let cfg_expr_code = self.output.to_rust(variables, instance, tree);
 
         cfg_expr_code
     }
 
-    fn config_docline(&self) -> Option<String> {
-        let clock_name = self.name.as_str();
-        let expr = &self.output.source();
-        Some(format!(
-            r#" Configures the `{clock_name}` clock divider.
-
- The output is calculated as `OUTPUT = {expr}`."#
-        ))
-    }
-
-    fn config_type(&self) -> Option<TokenStream> {
-        let clock_name = &self.name;
-        let ty_name = self.config_type_name()?;
+    fn config_type(&self, instance: &ClockTreeNodeInstance) -> TokenStream {
+        let clock_name = instance.name_str();
+        let ty_name = instance.config_type_name();
 
         let mut enum_types = vec![];
         let mut field_names = vec![];
@@ -217,6 +292,14 @@ impl ClockTreeNodeType for Divider {
 
         let collapse_types =
             self.params.len() == 1 && self.params.values().all(|v| v.as_enum_values().is_some());
+
+        let expr = &self.output.source();
+        let docline = format!(
+            r#" Configures the `{clock_name}` clock divider.
+
+ The output is calculated as `OUTPUT = {expr}`."#
+        );
+        let mut doclines = docline.lines().map(|l| quote! { #[doc = #l] });
 
         // Create a new type for each enum parameter.
         // Define a field and accessor body for each parameter.
@@ -233,20 +316,23 @@ impl ClockTreeNodeType for Divider {
                     .map(|d| format!(" Selects `{param_name} = {d}`."));
                 let dividers = dividers.iter().map(number).collect::<Vec<_>>();
 
-                let enum_ty = if collapse_types {
-                    ty_name.clone()
+                let (enum_ty, doclines) = if collapse_types {
+                    (ty_name.clone(), Some(&mut doclines))
                 } else {
                     // TODO
                     let full_name = format!("{clock_name}_{}", param_name.to_uppercase());
 
-                    format_ident!(
+                    let ty_name = format_ident!(
                         "{}Config",
                         full_name.from_case(Case::Ada).to_case(Case::Pascal)
-                    )
+                    );
+                    (ty_name, None)
                 };
                 let unknown_value = format!("Invalid {clock_name} {param_name} value");
+                let doclines = doclines.into_iter().flatten();
 
                 enum_types.push(quote! {
+                    #(#doclines)*
                     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
                     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
                     pub enum #enum_ty {
@@ -312,6 +398,7 @@ valid range ({min} ..= {max})."#
         } else {
             // The divisor is a struct of one or more fields.
             quote! {
+                #(#doclines)*
                 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
                 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
                 pub struct #ty_name {
@@ -366,16 +453,7 @@ valid range ({min} ..= {max})."#
             })
             .collect::<Vec<_>>();
 
-        let single_accessor = if self.params.len() == 1 {
-            let param_name = field_names.first().cloned().unwrap();
-            quote! { fn value(self) -> u32 {
-                self.#param_name()
-            } }
-        } else {
-            quote! {}
-        };
-
-        Some(quote! {
+        quote! {
             #(#enum_types)*
 
             #node_type_decl
@@ -384,18 +462,18 @@ valid range ({min} ..= {max})."#
                 #node_ctor
 
                 #(#param_accessors)*
-
-                #single_accessor
             }
-        })
+        }
     }
 
     fn request_direct_dependencies(
         &self,
-        _node: &dyn ClockTreeNodeType,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let request_fn_name = tree.node(self.source_clock()).request_fn_name();
+        let request_fn_name = instance
+            .resolve_node(tree, self.source_clock())
+            .request_fn_name();
         quote! {
             #request_fn_name(clocks);
         }
@@ -403,10 +481,12 @@ valid range ({min} ..= {max})."#
 
     fn release_direct_dependencies(
         &self,
-        _node: &dyn ClockTreeNodeType,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let release_fn_name = tree.node(self.source_clock()).release_fn_name();
+        let release_fn_name = instance
+            .resolve_node(tree, self.source_clock())
+            .release_fn_name();
         quote! {
             #release_fn_name(clocks);
         }
@@ -415,16 +495,16 @@ valid range ({min} ..= {max})."#
 
 impl Divider {
     fn source_clock(&self) -> &str {
+        // We've validated that there is exactly one clock source.
         let mut result = None;
         self.output.visit_variables(|var| {
             if !self.params.contains_key(var) {
-                if let Some(seen) = result {
-                    panic!("A divider cannot combine two clock sources ({seen}, {var})");
-                }
                 result = Some(var);
             }
         });
-        result.unwrap_or_else(|| panic!("Clock divider {} must have a source clock", self.name))
+        result.expect(
+            "Clock divider has no source clock. This should have been prevented in validation.",
+        )
     }
 }
 
@@ -440,7 +520,12 @@ impl DividerOutputExpression {
         &self.0.source
     }
 
-    fn to_rust(&self, variables: HashMap<&str, TokenStream>) -> TokenStream {
-        self.0.to_rust(variables)
+    fn to_rust(
+        &self,
+        variables: HashMap<&str, TokenStream>,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        self.0.to_rust(variables, instance, tree)
     }
 }
