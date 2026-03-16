@@ -89,10 +89,9 @@ cpu_has_csr_pc = true # TODO: VERIFY
 cpu_has_prv_mode = true # TODO
 rc_fast_clk_default = 17_500_000
 
-# TODO: fill from ESP-IDF / TRM when implementing clocks
 memory_map = { ranges = [
     { name = "dram", start = 0x4080_0000, end = 0x4085_0000 },
-    { name = "dram2_uninit", start = 0, end = 0x4084_EA70 },
+    { name = "dram2_uninit", start = 0x4083_C570, end = 0x4084_EA70 },
 ] }
 
 clocks = { system_clocks = { clock_tree = [
