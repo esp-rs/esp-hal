@@ -73,10 +73,11 @@
 
 mod ll;
 
-#[cfg(all(feature = "unstable", rng_trng_supported))]
+#[cfg(rng_trng_supported)]
 mod trng;
 
-#[cfg(all(feature = "unstable", rng_trng_supported))]
+#[cfg(rng_trng_supported)]
+#[instability::unstable]
 pub use trng::*;
 
 /// (Pseudo-)Random Number Generator.

@@ -152,11 +152,8 @@ pub(crate) mod reg_access;
 use core::marker::PhantomData;
 
 use esp_hal as hal;
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+#[instability::unstable]
 pub use esp_phy::CalibrationResult;
-#[cfg(not(feature = "unstable"))]
-use esp_phy::CalibrationResult;
 use esp_radio_rtos_driver as preempt;
 #[cfg(all(esp32, feature = "unstable"))]
 use hal::analog::adc::{release_adc2, try_claim_adc2};
