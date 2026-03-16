@@ -138,15 +138,14 @@ pub enum TrngError {
 /// can create [`Trng`] instances at any time, as long as the [`TrngSource`] is alive.
 #[cfg_attr(docsrs, procmacros::doc_replace(
     "analog_pin" => {
-        cfg(esp32) => "let analog_pin = peripherals.GPIO32;",
-        cfg(not(esp32)) => "let analog_pin = peripherals.GPIO3;"
+        cfg(esp32) => "GPIO32",
+        _ => "GPIO3"
     }
 ))]
 /// ## Example
 ///
 /// ```rust, no_run
 /// # {before_snippet}
-/// # use esp_hal::Blocking;
 /// # use esp_hal::peripherals::ADC1;
 /// # use esp_hal::analog::adc::{AdcConfig, Attenuation, Adc};
 /// #
@@ -157,7 +156,7 @@ pub enum TrngError {
 /// // ADC is not available from now
 /// let trng_source = TrngSource::new(peripherals.RNG, peripherals.ADC1.reborrow());
 ///
-/// let trng = Trng::try_new().unwrap(); // Unwrap is safe as we have enabled TrngSource.
+/// let trng = Trng::try_new()?;
 ///
 /// // Generate true random numbers
 /// trng.read(&mut buf);
@@ -169,19 +168,17 @@ pub enum TrngError {
 /// // Drop the true random number source. ADC is available now.
 /// core::mem::drop(trng_source);
 ///
-/// # {analog_pin}
-///
 /// let mut adc1_config = AdcConfig::new();
-/// let mut adc1_pin = adc1_config.enable_pin(analog_pin, Attenuation::_11dB);
-/// let mut adc1 = Adc::<ADC1, Blocking>::new(peripherals.ADC1, adc1_config);
-/// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin))?;
+/// let mut adc1_pin = adc1_config.enable_pin(peripherals.__analog_pin__, Attenuation::_11dB);
+/// let mut adc1 = Adc::new(peripherals.ADC1, adc1_config);
+/// let pin_value = adc1.read_oneshot(&mut adc1_pin)?;
 ///
 /// // Now we can only generate pseudo-random numbers...
 /// rng.read(&mut buf);
 /// let pseudo_random_number = rng.random();
 ///
 /// // ... but the ADC is available for use.
-/// let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin))?;
+/// let pin_value: u16 = adc1.read_oneshot(&mut adc1_pin)?;
 /// # {after_snippet}
 /// ```
 #[derive(Default, Debug)]

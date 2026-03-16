@@ -16,23 +16,13 @@
 //! The hardware RNG produces true random numbers
 //! under any of the following conditions:
 //!
-//! <div class="warning">
-//!
 //! - RF subsystem is enabled (i.e. Wi-Fi or Bluetooth are enabled).
 //! - An ADC is used to generate entropy.
-//! </div>
 //!
 //! When any of these conditions are true, samples of physical noise are
 //! continuously mixed into the internal hardware RNG state to provide entropy.
 //! If none of the above conditions are true, the output of the RNG should be
-//! considered pseudo-random only [`Rng`].
-//!
-//! <div class="warning">
-//!
-//! Note that, when the Wi-Fi module is enabled, the value read from the high-speed ADC can be
-//! saturated in some extreme cases, which lowers the entropy. Thus, it is advisable to also enable
-//! the SAR ADC as the noise source for the random number generator for such cases.
-//! </div>
+//! considered pseudo-random only. See [`Rng`].
 //!
 //! For more information, please refer to the
 //! # {documentation}
