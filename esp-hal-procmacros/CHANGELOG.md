@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The `handler` macro no longer generates code to check the Priority (#4996)
+- ESP32-S2, ESP32-S3: LP core `entry!` macro now accepts `OutputOpenDrain` GPIO type (#5131)
 
 ### Fixed
 
