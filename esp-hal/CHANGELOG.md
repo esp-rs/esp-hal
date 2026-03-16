@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `AdcPin` now implements `Debug` and `defmt::Format`. (#XXXX)
 - RMT: All public types now derive `Debug` and `defmt::Format`. (#4302)
 - RMT: `Channel::apply_config` has been added. (#4302)
 - Added blocking `send_break`, `wait_for_break` and `wait_for_break_with_timeout` for sending and detecting software breaks with the UART driver (#4284)
