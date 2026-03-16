@@ -6,7 +6,7 @@ use somni_expr::DefaultTypeSet;
 use somni_parser::{ast, lexer::Token};
 
 use crate::{
-    cfg::{ProcessedClockData, clock_tree::Expression},
+    cfg::{ClockTreeNodeInstance, ProcessedClockData, clock_tree::Expression},
     number,
 };
 
@@ -22,16 +22,18 @@ impl<'ctx> ExprCompiler<'ctx> {
     pub fn compile_expression(
         &self,
         expression: &Expression,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let source = expression.source.as_str();
-        self.compile_right_hand_expression(source, &expression.expr, tree)
+        self.compile_right_hand_expression(source, &expression.expr, instance, tree)
     }
 
     pub fn compile_right_hand_expression(
         &self,
         source: &str,
         expression: &ast::RightHandExpression<DefaultTypeSet>,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         match expression {
@@ -40,13 +42,13 @@ impl<'ctx> ExprCompiler<'ctx> {
             }
             ast::RightHandExpression::Literal { value } => self.compile_literal(value),
             ast::RightHandExpression::UnaryOperator { name, operand } => {
-                self.compile_unary_operator(source, name, operand, tree)
+                self.compile_unary_operator(source, name, operand, instance, tree)
             }
             ast::RightHandExpression::BinaryOperator { name, operands } => {
-                self.compile_binary_operator(source, name, operands, tree)
+                self.compile_binary_operator(source, name, operands, instance, tree)
             }
             ast::RightHandExpression::FunctionCall { name, arguments } => {
-                self.compile_function_call(source, name, arguments, tree)
+                self.compile_function_call(source, name, arguments, instance, tree)
             }
         }
     }
@@ -64,6 +66,7 @@ impl<'ctx> ExprCompiler<'ctx> {
         source: &str,
         name: &Token,
         operand: &ast::RightHandExpression<DefaultTypeSet>,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let operator = match name.source(source) {
@@ -72,7 +75,7 @@ impl<'ctx> ExprCompiler<'ctx> {
             other => todo!("Unsupported unary operator: {other}"),
         };
 
-        let operand = self.compile_right_hand_expression(source, operand, tree);
+        let operand = self.compile_right_hand_expression(source, operand, instance, tree);
         quote! { #operator (#operand) }
     }
 
@@ -81,6 +84,7 @@ impl<'ctx> ExprCompiler<'ctx> {
         source: &str,
         name: &Token,
         operands: &[ast::RightHandExpression<DefaultTypeSet>; 2],
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let operator = match name.source(source) {
@@ -94,8 +98,8 @@ impl<'ctx> ExprCompiler<'ctx> {
             other => todo!("Unsupported binary operator: {other}"),
         };
 
-        let lhs = self.compile_right_hand_expression(source, &operands[0], tree);
-        let rhs = self.compile_right_hand_expression(source, &operands[1], tree);
+        let lhs = self.compile_right_hand_expression(source, &operands[0], instance, tree);
+        let rhs = self.compile_right_hand_expression(source, &operands[1], instance, tree);
         quote! { (#lhs #operator #rhs) }
     }
 
@@ -113,6 +117,7 @@ impl<'ctx> ExprCompiler<'ctx> {
         source: &str,
         name: &Token,
         arguments: &[ast::RightHandExpression<DefaultTypeSet>],
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         // property(NODE)
@@ -120,8 +125,8 @@ impl<'ctx> ExprCompiler<'ctx> {
             panic!("Function calls must be of the form property(NODE)")
         };
 
-        // TODO: pass instance to resolve node
-        let node_props = tree.properties(variable.source(source));
+        let referred_node = instance.resolve_node(tree, variable.source(source));
+        let node_props = tree.properties(referred_node.name_str());
         let node_field = quote::format_ident!("{}", node_props.field_name());
         let name = quote::format_ident!("{}", name.source(source));
         quote! { unwrap!(clocks.#node_field).#name() }

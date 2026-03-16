@@ -658,6 +658,7 @@ impl RejectExpression {
     fn to_rust<'a>(
         &'a self,
         mut variables: HashMap<&'a str, TokenStream>,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let mut patterns = vec![];
@@ -665,8 +666,8 @@ impl RejectExpression {
         self.0.visit_variables(|var| {
             if !variables.contains_key(var) {
                 // Referring to a node by name resolves to its output frequency.
-                let properties = tree.properties(var);
-                let node = tree.node(var);
+                let node = instance.resolve_node(tree, var);
+                let properties = tree.properties(node.name_str());
                 let freq_fn = node.frequency_function_name();
                 variables.insert(var, quote! { #freq_fn(clocks) });
 
@@ -676,7 +677,7 @@ impl RejectExpression {
             }
         });
 
-        let reject_expr = self.0.to_rust(variables, tree);
+        let reject_expr = self.0.to_rust(variables, instance, tree);
 
         let assert_reject = quote! {
             assert!(!(#reject_expr));
@@ -738,9 +739,10 @@ impl Expression {
     fn to_rust(
         &self,
         variables: HashMap<&str, TokenStream>,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        ExprCompiler::new(&variables).compile_expression(self, tree)
+        ExprCompiler::new(&variables).compile_expression(self, instance, tree)
     }
 }
 

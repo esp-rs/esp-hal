@@ -104,7 +104,7 @@ impl ClockTreeNodeType for Source {
 
             variables.insert("VALUE", quote! { config.value() });
 
-            reject.to_rust(variables, tree)
+            reject.to_rust(variables, instance, tree)
         });
         quote! {
             pub fn #apply_fn_name(clocks: &mut ClockTree, config: #ty_name) {
@@ -125,7 +125,7 @@ impl ClockTreeNodeType for Source {
         if self.values.is_some() {
             quote! { unwrap!(clocks.#state_field).value() }
         } else {
-            self.output.0.to_rust(HashMap::new(), tree)
+            self.output.0.to_rust(HashMap::new(), instance, tree)
         }
     }
 
