@@ -145,7 +145,7 @@ impl ClockTreeNodeType for Divider {
                 variables.insert(var.as_str(), quote! { config.#param_fn() });
             }
 
-            reject.to_rust(variables, tree)
+            reject.to_rust(variables, instance, tree)
         });
         quote! {
             pub fn #apply_fn_name(clocks: &mut ClockTree, config: #ty_name) {
@@ -203,6 +203,7 @@ impl ClockTreeNodeType for Divider {
         let cfg_expr_code = ExprCompiler::new(&variables).compile_right_hand_expression(
             &expr.source,
             &effect.value,
+            instance,
             tree,
         );
         let node_name = instance.name_str();
@@ -273,7 +274,7 @@ impl ClockTreeNodeType for Divider {
         for (var, param_value_accessor) in params {
             variables.insert(var.as_str(), param_value_accessor);
         }
-        let cfg_expr_code = self.output.to_rust(variables, tree);
+        let cfg_expr_code = self.output.to_rust(variables, instance, tree);
 
         cfg_expr_code
     }
@@ -522,8 +523,9 @@ impl DividerOutputExpression {
     fn to_rust(
         &self,
         variables: HashMap<&str, TokenStream>,
+        instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        self.0.to_rust(variables, tree)
+        self.0.to_rust(variables, instance, tree)
     }
 }

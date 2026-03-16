@@ -912,9 +912,7 @@ impl DeviceClocks {
                         peri.name.from_case(Case::Ada).to_case(Case::Constant),
                         def.name()
                     ),
-                    group: template_peripheral
-                        .from_case(Case::Ada)
-                        .to_case(Case::Constant),
+                    group: peri.name.from_case(Case::Ada).to_case(Case::Constant),
                     template_name: format!(
                         "{}_{}",
                         template_peripheral
