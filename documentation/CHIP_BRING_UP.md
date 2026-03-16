@@ -230,7 +230,7 @@ Avoid enabling advanced peripherals (e.g., `i2c`, `spi`, LP peripherals) at this
 ## HAL
 ### clocks_ll
 
-You don't need to **implement** clocks at this phase, however fake-defining them and at least using some blinding placeholders is required. Refer to the previous [C5 support PR ](https://github.com/esp-rs/esp-hal/pull/4859/changes#diff-75a5e847ec368b58a227b16ea788a0007a569040ed5793bf8cdda6f37676f0f5) as guidance.
+You don't need to **implement** clocks at this phase, however fake-defining them and at least using some blinding placeholders is required. Refer to the previous [C5 support PR](https://github.com/esp-rs/esp-hal/pull/4859/changes#diff-75a5e847ec368b58a227b16ea788a0007a569040ed5793bf8cdda6f37676f0f5) as guidance.
 
 ### esp-hal/src/efuse
 
@@ -298,3 +298,6 @@ Implementing further peripheral support boils down to a relatively simple loop o
 
 - **A huge number of errors**
   Sometimes this process does indeed cause dozens or even hundreds of errors, but it is worth checking again to see if most of them can be corrected with a couple of `cfg`-gates.
+
+- **Code has been successfully flashed, but the chip keeps rebooting**
+  Make sure you have disabled `WDT`s or are not using `RTC RAM` on a chip that **does not** support this feature — this applies both not enabling the “esp-riscv-rt/rtc-ram” feature for the given chip and to the absence of `RTC-RAM`-related sections in the linker script.
