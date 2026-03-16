@@ -150,7 +150,6 @@ impl RtcClock {
     /// may happen if 32k XTAL is being calibrated, but the oscillator has
     /// not started up (due to incorrect loading capacitance, board design
     /// issue, or lack of 32 XTAL on board).
-
     #[cfg(any(
         soc_has_clock_node_timg_calibration_clock,
         soc_has_clock_node_timg0_calibration_clock

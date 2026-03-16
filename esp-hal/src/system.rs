@@ -59,7 +59,6 @@ pub(crate) fn disable_peripherals() {
 
 #[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-
 pub(crate) struct PeripheralGuard {
     peripheral: Peripheral,
 }
@@ -97,7 +96,6 @@ impl Drop for PeripheralGuard {
 
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-
 pub(crate) struct GenericPeripheralGuard<const P: u8> {}
 
 impl<const P: u8> GenericPeripheralGuard<P> {
@@ -169,7 +167,6 @@ impl PeripheralClockControl {
     /// Returns `true` if it actually disabled the peripheral.
     ///
     /// Before disabling a peripheral it will also get reset
-
     pub(crate) fn disable(peripheral: Peripheral) -> bool {
         PERIPHERAL_REF_COUNT.with(|ref_counts| {
             Self::enable_forced_with_counts(peripheral, false, false, ref_counts)
