@@ -1,4 +1,4 @@
-//! Clock tree definitions and implementations for ESP32-C5.
+//! Clock tree definitions and implementations for ESP32-C61.
 //!
 //! Remarks:
 //! - Enabling a clock node assumes it has first been configured. Some fixed clock nodes don't need

@@ -34,7 +34,7 @@ pub fn block_version() -> (u8, u8) {
 
 /// Get version of RTC calibration block
 ///
-/// see <https://github.com/espressif/esp-idf/blob/caf1a18/components/efuse/esp32c5/esp_efuse_rtc_calib.c#L20>
+/// see <https://github.com/espressif/esp-idf/blob/caf1a18/components/efuse/esp32c61/esp_efuse_rtc_calib.c#L20>
 #[instability::unstable]
 pub fn rtc_calib_version() -> u8 {
     let (_major, minor) = block_version();

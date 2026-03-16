@@ -2,12 +2,10 @@ MEMORY
 {
      /* MEMORY_MAP = [
         [0x42000000, 0x46000000, "DROM"],
-        [0x40800000, 0x4084ea70, "DRAM"],
+        [0x40800000, 0x40850000, "DRAM"],
         [0x40800000, 0x4084ea70, "BYTE_ACCESSIBLE"],
-        [0x42000000, 0x46000000, "IROM"],
-        [0x40800000, 0x4084ea70, "IRAM"],
-        [0x50000000, 0x50004000, "RTC_IRAM"],
-        [0x50000000, 0x50004000, "RTC_DRAM"],
+        [0x42000000, 0x44000000, "IROM"],
+        [0x40800000, 0x40850000, "IRAM"],
     ] */
 
     /* 320K of on-chip SRAM, portion reserved for cache */

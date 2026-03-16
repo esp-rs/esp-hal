@@ -51,7 +51,10 @@ use clocks::LpSlowClkConfig;
 use clocks::RtcSlowClkConfig;
 #[cfg(soc_has_clock_node_timg0_function_clock)]
 use clocks::Timg0FunctionClockConfig;
-#[cfg(soc_has_clock_node_timg_calibration_clock)]
+#[cfg(any(
+    soc_has_clock_node_timg_calibration_clock,
+    soc_has_clock_node_timg0_calibration_clock
+))]
 use esp_rom_sys::rom::ets_delay_us;
 
 /// Low-level clock control
@@ -75,7 +78,10 @@ pub use crate::soc::clocks::ClockConfig;
 pub(crate) use crate::soc::clocks::ClockConfig;
 pub use crate::soc::clocks::CpuClock;
 use crate::{ESP_HAL_LOCK, soc::clocks, time::Rate};
-#[cfg(soc_has_clock_node_timg_calibration_clock)]
+#[cfg(any(
+    soc_has_clock_node_timg_calibration_clock,
+    soc_has_clock_node_timg0_calibration_clock
+))]
 use crate::{peripherals::TIMG0, soc::clocks::ClockTree};
 
 impl CpuClock {
@@ -124,7 +130,7 @@ impl RtcClock {
 
     /// Get the nominal value of the RTC_SLOW_CLK source.
     #[instability::unstable]
-    #[cfg(all(soc_has_clock_node_lp_slow_clk, soc_has_clock_node_rtc_slow_clk))]
+    #[cfg(any(soc_has_clock_node_lp_slow_clk, soc_has_clock_node_rtc_slow_clk))]
     pub fn slow_freq() -> Rate {
         cfg_if::cfg_if! {
             if #[cfg(soc_has_clock_node_rtc_slow_clk)] {
@@ -145,7 +151,10 @@ impl RtcClock {
     /// not started up (due to incorrect loading capacitance, board design
     /// issue, or lack of 32 XTAL on board).
 
-    #[cfg(soc_has_clock_node_timg_calibration_clock)]
+    #[cfg(any(
+        soc_has_clock_node_timg_calibration_clock,
+        soc_has_clock_node_timg0_calibration_clock
+    ))]
     pub(crate) fn calibrate(cal_clk: TimgCalibrationClockConfig, slowclk_cycles: u32) -> u32 {
         ClockTree::with(|clocks| {
             let xtal_freq = Rate::from_hz(clocks::xtal_clk_frequency(clocks));
@@ -276,7 +285,10 @@ impl Clocks {
     /// that is measured by a low-frequency clock. This function can be used to calibrate two
     /// clocks to each other, e.g. to determine a rough value of the XTAL clock, or to determine
     /// the current frequency of a low-precision RC oscillator.
-    #[cfg(soc_has_clock_node_timg_calibration_clock)]
+    #[cfg(any(
+        soc_has_clock_node_timg_calibration_clock,
+        soc_has_clock_node_timg0_calibration_clock
+    ))]
     pub(crate) fn measure_rtc_clock(
         clocks: &mut ClockTree,
         rtc_clock: TimgCalibrationClockConfig,
@@ -436,12 +448,18 @@ impl Clocks {
         (cali_value, Rate::from_hz(calibration_clock_frequency))
     }
 
-    #[cfg(not(soc_has_clock_node_timg_calibration_clock))]
+    #[cfg(not(any(
+        soc_has_clock_node_timg_calibration_clock,
+        soc_has_clock_node_timg0_calibration_clock
+    )))]
     pub(crate) fn calibrate_rtc_slow_clock() {
         // Do nothing until TIMG_CALIBRATION_CLOCK is added to device metadata.
     }
 
-    #[cfg(soc_has_clock_node_timg_calibration_clock)]
+    #[cfg(any(
+        soc_has_clock_node_timg_calibration_clock,
+        soc_has_clock_node_timg0_calibration_clock
+    ))]
     pub(crate) fn calibrate_rtc_slow_clock() {
         // Unfortunate device specific mapping.
         // TODO: fix it by generating cfgs for each mux input?
