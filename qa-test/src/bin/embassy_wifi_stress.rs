@@ -39,7 +39,7 @@ async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let mut peripherals = initialize_esp_hal(EspConfig::default().with_cpu_clock(CpuClock::max()));
 
-    esp_alloc::heap_allocator!(size: 32 * 1024);
+    // only have one memory region to make it easier to spot leaks
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
 
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
@@ -69,22 +69,21 @@ async fn main(_spawner: Spawner) {
                 ScanConfig::default()
                     .with_ssid(SSID)
                     .with_scan_type(ScanTypeConfig::Active {
-                        min: esp_hal::time::Duration::from_millis(5),
-                        max: esp_hal::time::Duration::from_millis(20),
+                        min: esp_hal::time::Duration::from_millis(50),
+                        max: esp_hal::time::Duration::from_millis(200),
                     });
             println!("Scanning for WiFi networks");
             let aps = controller
                 .scan_async(&scan_config)
                 .with_timeout(Duration::from_secs(5))
-                .await
-                .unwrap();
+                .await;
             if aps.is_err() {
                 println!("Failed to scan wifi networks, timeout hit!");
                 Timer::after(Duration::from_secs(2)).await;
                 continue;
             }
 
-            let mut aps = aps.unwrap();
+            let mut aps = aps.unwrap().unwrap();
             println!("Found {} access points", aps.len());
             if aps.is_empty() {
                 println!("No access points found.");
