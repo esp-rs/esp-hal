@@ -961,9 +961,6 @@ macro_rules! define_clock_tree_types {
                     CpuPllDivConfig::_4 => 4,
                 }
             }
-            fn value(self) -> u32 {
-                self.divisor()
-            }
         }
         /// The list of clock signals that the `SYSCON_PRE_DIV_IN` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -997,9 +994,6 @@ macro_rules! define_clock_tree_types {
             }
             fn divisor(self) -> u32 {
                 self.divisor
-            }
-            fn value(self) -> u32 {
-                self.divisor()
             }
         }
         /// The list of clock signals that the `APB_CLK` multiplexer can output.
@@ -1050,9 +1044,6 @@ macro_rules! define_clock_tree_types {
             fn divisor(self) -> u32 {
                 self.divisor
             }
-            fn value(self) -> u32 {
-                self.divisor()
-            }
         }
         /// Configures the `REF_TICK_FOSC` clock divider.
         ///
@@ -1077,9 +1068,6 @@ macro_rules! define_clock_tree_types {
             }
             fn divisor(self) -> u32 {
                 self.divisor
-            }
-            fn value(self) -> u32 {
-                self.divisor()
             }
         }
         /// Configures the `REF_TICK_APLL` clock divider.
@@ -1106,9 +1094,6 @@ macro_rules! define_clock_tree_types {
             fn divisor(self) -> u32 {
                 self.divisor
             }
-            fn value(self) -> u32 {
-                self.divisor()
-            }
         }
         /// Configures the `REF_TICK_PLL` clock divider.
         ///
@@ -1133,9 +1118,6 @@ macro_rules! define_clock_tree_types {
             }
             fn divisor(self) -> u32 {
                 self.divisor
-            }
-            fn value(self) -> u32 {
-                self.divisor()
             }
         }
         /// The list of clock signals that the `CPU_CLK` multiplexer can output.
@@ -1432,8 +1414,11 @@ macro_rules! define_clock_tree_types {
             unwrap!(clocks.xtal_clk).value()
         }
         pub fn configure_pll_clk(clocks: &mut ClockTree, config: PllClkConfig) {
-            if let Some(cpu_pll_div) = clocks.cpu_pll_div {
-                assert!(!((config.value() == 480000000) && (cpu_pll_div.value() == 4)));
+            if clocks.cpu_pll_div.is_some() {
+                assert!(
+                    !((config.value() == 480000000)
+                        && (unwrap!(clocks.cpu_pll_div).divisor() == 4))
+                );
             }
             let old_config = clocks.pll_clk.replace(config);
             configure_pll_clk_impl(clocks, old_config, config);
@@ -1560,8 +1545,8 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn configure_cpu_pll_div(clocks: &mut ClockTree, config: CpuPllDivConfig) {
-            if let Some(pll_clk) = clocks.pll_clk {
-                assert!(!((pll_clk.value() == 480000000) && (config.divisor() == 4)));
+            if clocks.pll_clk.is_some() {
+                assert!(!((pll_clk_frequency(clocks) == 480000000) && (config.divisor() == 4)));
             }
             let old_config = clocks.cpu_pll_div.replace(config);
             configure_cpu_pll_div_impl(clocks, old_config, config);
