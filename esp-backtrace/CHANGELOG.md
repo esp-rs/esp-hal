@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial ESP32-C5 support (#4859, #4866)
 - Made `Backtrace` and `BacktraceFrame` implement `Clone` (#5089)
+- Initial ESP32-C61 support (#5187)
 
 ### Changed
 
