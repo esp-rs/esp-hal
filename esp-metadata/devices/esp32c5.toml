@@ -136,7 +136,7 @@ rc_fast_clk_default = 17_500_000
 
 memory_map = { ranges = [
     { name = "dram", start = 0x4080_0000, end = 0x4086_0000 },
-    { name = "dram2_uninit", start = 0, end = 0x4085_E5A0 }, # todo
+    { name = "dram2_uninit", start = 0x4084_C7A0, end = 0x4085_E5A0 },
 ] }
 
 clocks = { system_clocks = { clock_tree = [
