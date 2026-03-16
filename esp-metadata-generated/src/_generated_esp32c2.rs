@@ -884,9 +884,6 @@ macro_rules! define_clock_tree_types {
             fn divisor(self) -> u32 {
                 self.divisor
             }
-            fn value(self) -> u32 {
-                self.divisor()
-            }
         }
         /// Configures the `CPU_PLL_DIV` clock divider.
         ///
@@ -915,9 +912,6 @@ macro_rules! define_clock_tree_types {
                     CpuPllDivConfig::_4 => 4,
                     CpuPllDivConfig::_6 => 6,
                 }
-            }
-            fn value(self) -> u32 {
-                self.divisor()
             }
         }
         /// The list of clock signals that the `APB_CLK` multiplexer can output.
@@ -981,9 +975,6 @@ macro_rules! define_clock_tree_types {
             }
             fn divisor(self) -> u32 {
                 self.divisor
-            }
-            fn value(self) -> u32 {
-                self.divisor()
             }
         }
         /// The list of clock signals that the `RTC_SLOW_CLK` multiplexer can output.

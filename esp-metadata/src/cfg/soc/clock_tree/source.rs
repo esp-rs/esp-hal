@@ -102,16 +102,9 @@ impl ClockTreeNodeType for Source {
         let reject_exprs = self.reject.as_ref().map(|reject| {
             let mut variables = HashMap::new();
 
-            let mut config_fields = vec![];
-
             variables.insert("VALUE", quote! { config.value() });
-            reject.0.visit_variables(|var| {
-                if var != "VALUE" {
-                    config_fields.push((var, tree.properties(var).field_name()));
-                }
-            });
 
-            reject.to_rust(&config_fields, variables)
+            reject.to_rust(variables, instance, tree)
         });
         quote! {
             pub fn #apply_fn_name(clocks: &mut ClockTree, config: #ty_name) {
@@ -132,7 +125,7 @@ impl ClockTreeNodeType for Source {
         if self.values.is_some() {
             quote! { unwrap!(clocks.#state_field).value() }
         } else {
-            self.output.0.to_rust(HashMap::new())
+            self.output.0.to_rust(HashMap::new(), instance, tree)
         }
     }
 
@@ -203,7 +196,12 @@ impl Source {
                 .map(|freq| {
                     eval_ctx.add_variable("VALUE", *freq as u64);
                     eval_ctx
-                        .evaluate_parsed::<u64>(&self.output.0.source, &self.output.0.expr)
+                        .evaluate_parsed::<u64>(
+                            &self.output.0.source,
+                            &somni_parser::ast::Expression::Expression {
+                                expression: self.output.0.expr.clone(),
+                            },
+                        )
                         .unwrap()
                 })
                 .collect::<Vec<_>>();

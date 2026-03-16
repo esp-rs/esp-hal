@@ -15,7 +15,6 @@ use crate::{
             ClockTreeNodeType,
             ConfiguresExpression,
             DependencyGraph,
-            Expression,
             Function,
             ManagementProperties,
             ValidationContext,
@@ -179,7 +178,11 @@ impl ClockTreeNodeInstance {
         quote::format_ident!("{}Config", item)
     }
 
-    fn apply_configuration(&self, expr: &Expression, tree: &ProcessedClockData) -> TokenStream {
+    fn apply_configuration(
+        &self,
+        expr: &ConfiguresExpression,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
         self.node.apply_configuration(self, expr, tree)
     }
 
@@ -909,9 +912,7 @@ impl DeviceClocks {
                         peri.name.from_case(Case::Ada).to_case(Case::Constant),
                         def.name()
                     ),
-                    group: template_peripheral
-                        .from_case(Case::Ada)
-                        .to_case(Case::Constant),
+                    group: peri.name.from_case(Case::Ada).to_case(Case::Constant),
                     template_name: format!(
                         "{}_{}",
                         template_peripheral
