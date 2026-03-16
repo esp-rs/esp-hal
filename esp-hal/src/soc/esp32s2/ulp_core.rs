@@ -73,9 +73,6 @@ impl UlpCoreTimerCycles {
     fn cycles(self) -> u32 {
         self.cycles
     }
-    fn value(self) -> u32 {
-        self.cycles()
-    }
 }
 impl Default for UlpCoreTimerCycles {
     fn default() -> Self {
@@ -179,7 +176,7 @@ fn ulp_config_wakeup_source(wakeup_src: UlpCoreWakeupSource) {
         }
         UlpCoreWakeupSource::Timer(sleep_cycles) => {
             // configure timer duration
-            let cycles = sleep_cycles.value() << 8;
+            let cycles = sleep_cycles.cycles() << 8;
             LPWR::regs()
                 .ulp_cp_timer_1()
                 .write(|w| unsafe { w.ulp_cp_timer_slp_cycle().bits(cycles) });
