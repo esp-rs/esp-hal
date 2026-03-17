@@ -11,7 +11,6 @@ pub(crate) mod os_adapter_chip_specific;
 use core::ptr::NonNull;
 
 use allocator_api2::boxed::Box;
-use esp_phy::PhyController;
 use esp_sync::RawMutex;
 
 use super::event::WifiEvent;
@@ -20,7 +19,6 @@ use crate::{
         common::{str_from_c, thread_sem_get},
         malloc::{InternalMemory, calloc_internal},
     },
-    hal::peripherals::WIFI,
     sys::c_types::*,
     time::{blob_ticks_to_micros, millis_to_blob_ticks},
 };
@@ -792,7 +790,7 @@ pub unsafe extern "C" fn wifi_apb80m_release() {
 /// *************************************************************************
 pub unsafe extern "C" fn phy_disable() {
     trace!("phy_disable");
-    unsafe { WIFI::steal() }.decrease_phy_ref_count();
+    core::mem::drop(esp_phy::enable_phy());
 }
 
 /// **************************************************************************
@@ -811,7 +809,7 @@ pub unsafe extern "C" fn phy_disable() {
 pub unsafe extern "C" fn phy_enable() {
     // quite some code needed here
     trace!("phy_enable");
-    core::mem::forget(unsafe { WIFI::steal() }.enable_phy());
+    core::mem::forget(esp_phy::enable_phy());
 }
 
 /// **************************************************************************

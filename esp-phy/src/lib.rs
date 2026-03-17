@@ -1,10 +1,11 @@
 //! PHY initialization handling for chips with a radio.
 //!
+//! This should be considered an implementation detail of `esp-radio` and similar 3rd party crates.
+//!
 //! # Usage
 //! ## Enabling and Disabling the PHY
-//! The [PhyController] trait is implemented for all modem peripherals (`WIFI`, `BT` and
-//! `IEEE802154`), that are present for a particular chip. See its documentation for further usage
-//! instructions.
+//! Use [enable_phy] to enable the PHY. Drop the returned [PhyInitGuard] to disable the PHY.
+//! Enabling / disabling the PHY is ref-counted so these actions need to be balanced.
 //!
 //! ## Backing Up and Restoring PHY Calibration Data
 //! If the PHY has already been calibrated, you can use [backup_phy_calibration_data] to persist
@@ -20,15 +21,13 @@
 
 // MUST be the first module
 mod fmt;
+pub(crate) mod reg_access;
 
 use core::{cell::Cell, marker::PhantomData};
 
+use esp_hal::system::Cpu;
 #[cfg(esp32)]
 use esp_hal::time::{Duration, Instant};
-use esp_hal::{
-    rtc_cntl::{SocResetReason, reset_reason},
-    system::Cpu,
-};
 use esp_sync::{NonReentrantMutex, RawMutex};
 
 /// Tracks the number of references to the PHY clock.
@@ -113,10 +112,6 @@ pub(crate) mod sys {
 mod common_adapter;
 mod phy_clocks;
 mod phy_init_data;
-
-pub(crate) mod private {
-    pub trait Sealed {}
-}
 
 /// Length of the PHY calibration data.
 pub const PHY_CALIBRATION_DATA_LENGTH: usize =
@@ -230,9 +225,7 @@ impl PhyState {
             // If the SOC just woke up from deep sleep and
             // `phy_skip_calibration_after_deep_sleep` is enabled, no calibration will be
             // performed.
-            if cfg!(phy_skip_calibration_after_deep_sleep)
-                && reset_reason(Cpu::current()) == Some(SocResetReason::CoreDeepSleep)
-            {
+            if cfg!(phy_skip_calibration_after_deep_sleep) && is_reset_from_deepsleep() {
                 sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_NONE
             } else if cfg!(phy_full_calibration) {
                 sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_FULL
@@ -346,6 +339,20 @@ impl PhyState {
     }
 }
 
+fn is_reset_from_deepsleep() -> bool {
+    // feature gated to avoid forgetting to double check the correct value for future chips
+    #[cfg(any(esp32, esp32c2, esp32c3, esp32c5, esp32c6, esp32h2, esp32s2, esp32s3))]
+    const CORE_DEEP_SLEEP: u32 = 5;
+
+    unsafe extern "C" {
+        fn rtc_get_reset_reason(cpu_num: u32) -> u32;
+    }
+
+    let reason = unsafe { rtc_get_reset_reason(Cpu::current() as u32) };
+
+    reason == CORE_DEEP_SLEEP
+}
+
 /// Global PHY initialization state
 static PHY_STATE: NonReentrantMutex<PhyState> = NonReentrantMutex::new(PhyState::new());
 
@@ -375,83 +382,39 @@ impl Drop for PhyInitGuard<'_> {
     }
 }
 
-/// Common functionality for controlling PHY initialization.
-pub trait PhyController<'d>: private::Sealed {
-    /// Enable the PHY.
-    ///
-    /// If no other [PhyInitGuard] is currently alive, this will also initialize the PHY, which
-    /// will involve a full RF calibration, unless you loaded previously backed up calibration
-    /// data with [set_phy_calibration_data].
-    fn enable_phy(&self) -> PhyInitGuard<'d> {
-        // In esp-idf, this is done after calculating the MAC time delta, but it shouldn't make
-        // much of a difference.
-        let _phy_clock_guard = self.enable_phy_clock();
+/// Enable the PHY.
+///
+/// If no other [PhyInitGuard] is currently alive, this will also initialize the PHY, which
+/// will involve a full RF calibration, unless you loaded previously backed up calibration
+/// data with [set_phy_calibration_data].
+pub fn enable_phy<'d>() -> PhyInitGuard<'d> {
+    // In esp-idf, this is done after calculating the MAC time delta, but it shouldn't make
+    // much of a difference.
+    let _phy_clock_guard = enable_phy_clock();
 
-        PHY_STATE.with(|phy_state| phy_state.increase_ref_count());
+    PHY_STATE.with(|phy_state| phy_state.increase_ref_count());
 
-        PhyInitGuard { _phy_clock_guard }
-    }
+    PhyInitGuard { _phy_clock_guard }
+}
 
-    /// Enable the PHY clock and acquire a [PhyClockGuard].
-    ///
-    /// The PHY clock will only be disabled, once all [PhyClockGuard]'s of all
-    /// modems were dropped.
-    fn enable_phy_clock(&self) -> PhyClockGuard<'d> {
-        increase_phy_clock_ref_count_internal();
-        PhyClockGuard {
-            _phantom: PhantomData,
-        }
-    }
-
-    /// Decreases the PHY clock reference count for this modem ignoring
-    /// currently alive [PhyClockGuard]s.
-    ///
-    /// # Panics
-    /// This function panics if the PHY clock is inactive. If the ref count is
-    /// lower than the number of alive [PhyClockGuard]s, dropping a guard can
-    /// now panic.
-    fn decrease_phy_clock_ref_count(&self) {
-        decrease_phy_clock_ref_count_internal();
-    }
-
-    /// Decreases the PHY init reference count for this modem ignoring
-    /// currently alive [PhyInitGuard]s.
-    ///
-    /// This will also decrease the PHY clock ref count.
-    /// # Panics
-    /// This function panics if the PHY is inactive. If the ref count is
-    /// lower than the number of alive [PhyInitGuard]s, dropping a guard can
-    /// now panic.
-    fn decrease_phy_ref_count(&self) {
-        PHY_STATE.with(|phy_state| phy_state.decrease_ref_count());
-        self.decrease_phy_clock_ref_count();
+/// Enable the PHY clock and acquire a [PhyClockGuard].
+///
+/// The PHY clock will only be disabled, once all [PhyClockGuard]'s of all
+/// modems were dropped.
+pub fn enable_phy_clock<'d>() -> PhyClockGuard<'d> {
+    increase_phy_clock_ref_count_internal();
+    PhyClockGuard {
+        _phantom: PhantomData,
     }
 }
-macro_rules! impl_phy_controller {
-    ($feature_gate:ident, $peripheral:tt) => {
-        #[cfg($feature_gate)]
-        impl private::Sealed for esp_hal::peripherals::$peripheral<'_> {}
 
-        #[cfg($feature_gate)]
-        impl<'d> PhyController<'d> for esp_hal::peripherals::$peripheral<'d> {}
-    };
-}
-impl_phy_controller!(soc_has_wifi, WIFI);
-impl_phy_controller!(soc_has_bt, BT);
-impl_phy_controller!(soc_has_ieee802154, IEEE802154);
-
+/// Set the MAC time update callback.
+///
+/// See [MacTimeUpdateCb] for details.
 #[cfg(esp32)]
-/// Trait providing MAC time functionality for the Wi-Fi peripheral.
-pub trait MacTimeExt {
-    /// Set the MAC time update callback.
-    ///
-    /// See [MacTimeUpdateCb] for details.
-    fn set_mac_time_update_cb(&self, mac_time_update_cb: MacTimeUpdateCb) {
-        PHY_STATE.with(|phy_state| phy_state.mac_time_update_cb = Some(mac_time_update_cb));
-    }
+pub fn set_mac_time_update_cb(&self, mac_time_update_cb: MacTimeUpdateCb) {
+    PHY_STATE.with(|phy_state| phy_state.mac_time_update_cb = Some(mac_time_update_cb));
 }
-#[cfg(esp32)]
-impl MacTimeExt for esp_hal::peripherals::WIFI<'_> {}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]

@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use core::ptr::{NonNull, addr_of, addr_of_mut};
 
-use esp_phy::{PhyController, PhyInitGuard};
+use esp_phy::PhyInitGuard;
 use esp_sync::RawMutex;
 use portable_atomic::{AtomicBool, Ordering};
 
@@ -350,7 +350,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         #[cfg(feature = "coex")]
         crate::sys::include::coex_enable();
 
-        phy_init_guard = esp_hal::peripherals::BT::steal().enable_phy();
+        phy_init_guard = esp_phy::enable_phy();
 
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {

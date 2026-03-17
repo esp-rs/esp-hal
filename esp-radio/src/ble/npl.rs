@@ -5,7 +5,7 @@ use core::{
 };
 
 use esp_hal::time::Instant;
-use esp_phy::{PhyController, PhyInitGuard};
+use esp_phy::PhyInitGuard;
 
 use super::*;
 use crate::{
@@ -1136,7 +1136,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             os_msys_init();
         }
 
-        phy_init_guard = esp_hal::peripherals::BT::steal().enable_phy();
+        phy_init_guard = esp_phy::enable_phy();
 
         // init bb
         bt_bb_v2_init_cmplx(1);

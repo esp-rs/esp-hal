@@ -1,5 +1,5 @@
 pub(crate) fn enable_phy(en: bool) {
-    esp_hal::peripherals::MODEM_SYSCON::regs()
+    regs!(MODEM_SYSCON)
         .clk_conf_power_st()
         .modify(|_, w| unsafe {
             w.clk_modem_apb_st_map().bits(6);
@@ -10,7 +10,7 @@ pub(crate) fn enable_phy(en: bool) {
             w.clk_zb_st_map().bits(4)
         });
 
-    esp_hal::peripherals::MODEM_LPCON::regs()
+    regs!(MODEM_LPCON)
         .clk_conf_power_st()
         .modify(|_, w| unsafe {
             w.clk_lp_apb_st_map().bits(6);
@@ -19,11 +19,11 @@ pub(crate) fn enable_phy(en: bool) {
             w.clk_wifipwr_st_map().bits(6)
         });
 
-    esp_hal::peripherals::MODEM_LPCON::regs()
+    regs!(MODEM_LPCON)
         .clk_conf()
         .modify(|_, w| w.clk_coex_en().bit(en));
 
-    esp_hal::peripherals::MODEM_SYSCON::regs()
+    regs!(MODEM_SYSCON)
         .clk_conf1()
         .modify(|_, w| {
             w.clk_wifi_apb_en().bit(en);
@@ -34,11 +34,11 @@ pub(crate) fn enable_phy(en: bool) {
             w.clk_wifimac_en().bit(en)
         });
 
-    esp_hal::peripherals::MODEM_SYSCON::regs()
+    regs!(MODEM_SYSCON)
         .clk_conf1()
         .modify(|r, w| unsafe { w.bits(r.bits() | 0x1fb) });
 
-    esp_hal::peripherals::MODEM_SYSCON::regs()
+    regs!(MODEM_SYSCON)
         .clk_conf1()
         .modify(|_, w| {
             w.clk_fe_apb_en().bit(en);
