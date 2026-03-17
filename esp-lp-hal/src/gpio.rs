@@ -33,44 +33,92 @@ cfg_if::cfg_if! {
     }
 }
 
-/// GPIO input driver
-pub struct Input<const PIN: u8>;
+/// Digital input or output level.
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+pub enum Level {
+    /// Low
+    Low,
+    /// High
+    High,
+}
 
-impl<const PIN: u8> Input<PIN> {
-    /// Read the input state/level of the pin.
-    pub fn input_state(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32c6)] {
-                (unsafe { &*LpIo::PTR }.in_().read().bits() >> PIN) & 0x1 != 0
-            } else if #[cfg(esp32s2)] {
-                (unsafe { &*LpIo::PTR }.in_().read().gpio_in_next().bits() >> PIN) & 0x1 != 0
-            } else if #[cfg(esp32s3)] {
-                (unsafe { &*LpIo::PTR }.in_().read().next().bits() >> PIN) & 0x1 != 0
-            }
+impl core::ops::Not for Level {
+    type Output = Self;
+
+    fn not(self) -> Self {
+        match self {
+            Self::Low => Self::High,
+            Self::High => Self::Low,
         }
     }
 }
 
-/// GPIO output driver
-pub struct Output<const PIN: u8>;
+impl Level {
+    /// Create a [`Level`] from [`bool`].
+    ///
+    /// Like `<Level as From<bool>>::from(val)`, but `const`.
+    pub(crate) const fn const_from(val: bool) -> Self {
+        match val {
+            true => Self::High,
+            false => Self::Low,
+        }
+    }
 
-impl<const PIN: u8> Output<PIN> {
-    /// Read the output state/level of the pin.
-    pub fn output_state(&self) -> bool {
+    /// Convert a [`Level`] to [`bool`].
+    ///
+    /// Like `<bool as From<Level>>::from(self)`, but `const`.
+    pub(crate) const fn const_into(self) -> bool {
+        match self {
+            Level::Low => false,
+            Level::High => true,
+        }
+    }
+}
+
+impl From<bool> for Level {
+    fn from(val: bool) -> Self {
+        Self::const_from(val)
+    }
+}
+
+impl From<Level> for bool {
+    fn from(level: Level) -> bool {
+        level.const_into()
+    }
+}
+
+/// Flexible pin driver.
+/// Provides a common implementation for input and output pins.
+pub struct Flex<const PIN: u8> {}
+
+#[allow(clippy::new_without_default)]
+impl<const PIN: u8> Flex<PIN> {
+    /// Create flexible pin driver for a [Pin].
+    /// No mode change happens.
+    pub const fn new() -> Self {
+        Self {}
+    }
+
+    // Input functions
+
+    /// Get the current pin input level.
+    pub fn level(&self) -> Level {
         cfg_if::cfg_if! {
             if #[cfg(esp32c6)] {
-                (unsafe { &*LpIo::PTR }.out().read().bits() >> PIN) & 0x1 != 0
+                ((unsafe { &*LpIo::PTR }.in_().read().bits() >> PIN) & 0x1 != 0).into()
             } else if #[cfg(esp32s2)] {
-                (unsafe { &*LpIo::PTR }.out().read().gpio_out_data().bits() >> PIN) & 0x1 != 0
+                ((unsafe { &*LpIo::PTR }.in_().read().gpio_in_next().bits() >> PIN) & 0x1 != 0).into()
             } else if #[cfg(esp32s3)] {
-                (unsafe { &*LpIo::PTR }.out().read().data().bits() >> PIN) & 0x1 != 0
+                ((unsafe { &*LpIo::PTR }.in_().read().next().bits() >> PIN) & 0x1 != 0).into()
             }
         }
     }
 
-    /// Set the output state/level of the pin.
-    pub fn set_output(&mut self, on: bool) {
-        if on {
+    // Output functions
+
+    /// Set the output level.
+    pub fn set_level(&mut self, level: Level) {
+        if level == Level::High {
             unsafe { &*LpIo::PTR }
                 .out_w1ts()
                 .write(|w| unsafe { w.out_data_w1ts().bits(1 << PIN) });
@@ -80,6 +128,102 @@ impl<const PIN: u8> Output<PIN> {
                 .write(|w| unsafe { w.out_data_w1tc().bits(1 << PIN) });
         }
     }
+
+    /// What level output is set to
+    pub fn output_level(&self) -> Level {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32c6)] {
+                ((unsafe { &*LpIo::PTR }.out().read().bits() >> PIN) & 0x1 != 0).into()
+            } else if #[cfg(esp32s2)] {
+                ((unsafe { &*LpIo::PTR }.out().read().gpio_out_data().bits() >> PIN) & 0x1 != 0).into()
+            } else if #[cfg(esp32s3)] {
+                ((unsafe { &*LpIo::PTR }.out().read().data().bits() >> PIN) & 0x1 != 0).into()
+            }
+        }
+    }
+
+    /// Toggle pin output
+    pub fn toggle(&mut self) {
+        let level = self.output_level();
+        self.set_level(!level);
+    }
+}
+
+/// Digital input.
+pub struct Input<const PIN: u8> {
+    pin: Flex<PIN>,
+}
+
+#[allow(clippy::new_without_default)]
+impl<const PIN: u8> Input<PIN> {
+    /// Creates a new GPIO input.
+    pub const fn new() -> Self {
+        let pin = Flex::<PIN>::new();
+        Self { pin }
+    }
+
+    /// Get the current pin input level.
+    pub fn level(&self) -> Level {
+        self.pin.level()
+    }
+}
+
+/// Digital output.
+pub struct Output<const PIN: u8> {
+    pin: Flex<PIN>,
+}
+
+#[allow(clippy::new_without_default)]
+impl<const PIN: u8> Output<PIN> {
+    /// Creates a new GPIO output.
+    pub const fn new() -> Self {
+        let pin = Flex::<PIN>::new();
+        Self { pin }
+    }
+
+    /// Set the output level.
+    pub fn set_level(&mut self, level: Level) {
+        self.pin.set_level(level);
+    }
+    /// Returns which level the pin is set to.
+    pub fn output_level(&self) -> Level {
+        self.pin.output_level()
+    }
+    /// Toggles the pin output.
+    pub fn toggle(&mut self) {
+        self.pin.toggle()
+    }
+}
+
+/// Digital output, open drain mode
+/// Can be read as an input pin.
+pub struct OutputOpenDrain<const PIN: u8> {
+    pin: Flex<PIN>,
+}
+
+#[allow(clippy::new_without_default)]
+impl<const PIN: u8> OutputOpenDrain<PIN> {
+    /// Creates a new GPIO output.
+    pub const fn new() -> Self {
+        let pin = Flex::<PIN>::new();
+        Self { pin }
+    }
+    /// Get the current pin input level.
+    pub fn level(&self) -> Level {
+        self.pin.level()
+    }
+    /// Set the output level.
+    pub fn set_level(&mut self, level: Level) {
+        self.pin.set_level(level);
+    }
+    /// Returns which level the pin is set to.
+    pub fn output_level(&self) -> Level {
+        self.pin.output_level()
+    }
+    /// Toggles the pin output.
+    pub fn toggle(&mut self) {
+        self.pin.toggle()
+    }
 }
 
 // Used by the `entry` procmacro:
@@ -88,7 +232,17 @@ pub unsafe fn conjure_output<const PIN: u8>() -> Option<Output<PIN>> {
     if PIN > MAX_GPIO_PIN {
         None
     } else {
-        Some(Output)
+        Some(Output::<PIN>::new())
+    }
+}
+
+// Used by the `entry` procmacro:
+#[doc(hidden)]
+pub unsafe fn conjure_output_open_drain<const PIN: u8>() -> Option<OutputOpenDrain<PIN>> {
+    if PIN > MAX_GPIO_PIN {
+        None
+    } else {
+        Some(OutputOpenDrain::<PIN>::new())
     }
 }
 
@@ -98,7 +252,7 @@ pub unsafe fn conjure_input<const PIN: u8>() -> Option<Input<PIN>> {
     if PIN > MAX_GPIO_PIN {
         None
     } else {
-        Some(Input)
+        Some(Input::<PIN>::new())
     }
 }
 
@@ -113,25 +267,30 @@ impl<const PIN: u8> embedded_hal::digital::ErrorType for Output<PIN> {
 }
 
 #[cfg(feature = "embedded-hal")]
+impl<const PIN: u8> embedded_hal::digital::ErrorType for OutputOpenDrain<PIN> {
+    type Error = core::convert::Infallible;
+}
+
+#[cfg(feature = "embedded-hal")]
 impl<const PIN: u8> embedded_hal::digital::InputPin for Input<PIN> {
     fn is_high(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.input_state())
+        Ok(self.level() == Level::High)
     }
 
     fn is_low(&mut self) -> Result<bool, Self::Error> {
-        Ok(!self.is_high()?)
+        Ok(self.level() == Level::Low)
     }
 }
 
 #[cfg(feature = "embedded-hal")]
 impl<const PIN: u8> embedded_hal::digital::OutputPin for Output<PIN> {
     fn set_low(&mut self) -> Result<(), Self::Error> {
-        self.set_output(false);
+        self.set_level(Level::Low);
         Ok(())
     }
 
     fn set_high(&mut self) -> Result<(), Self::Error> {
-        self.set_output(true);
+        self.set_level(Level::High);
         Ok(())
     }
 }
@@ -139,10 +298,46 @@ impl<const PIN: u8> embedded_hal::digital::OutputPin for Output<PIN> {
 #[cfg(feature = "embedded-hal")]
 impl<const PIN: u8> embedded_hal::digital::StatefulOutputPin for Output<PIN> {
     fn is_set_high(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.output_state())
+        Ok(self.output_level() == Level::High)
     }
 
     fn is_set_low(&mut self) -> Result<bool, Self::Error> {
-        Ok(!self.is_set_high()?)
+        Ok(self.output_level() == Level::Low)
+    }
+}
+
+// OutputOpenDrain
+#[cfg(feature = "embedded-hal")]
+impl<const PIN: u8> embedded_hal::digital::InputPin for OutputOpenDrain<PIN> {
+    fn is_high(&mut self) -> Result<bool, Self::Error> {
+        Ok(self.level() == Level::High)
+    }
+
+    fn is_low(&mut self) -> Result<bool, Self::Error> {
+        Ok(self.level() == Level::Low)
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+impl<const PIN: u8> embedded_hal::digital::OutputPin for OutputOpenDrain<PIN> {
+    fn set_low(&mut self) -> Result<(), Self::Error> {
+        self.set_level(Level::Low);
+        Ok(())
+    }
+
+    fn set_high(&mut self) -> Result<(), Self::Error> {
+        self.set_level(Level::High);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "embedded-hal")]
+impl<const PIN: u8> embedded_hal::digital::StatefulOutputPin for OutputOpenDrain<PIN> {
+    fn is_set_high(&mut self) -> Result<bool, Self::Error> {
+        Ok(self.output_level() == Level::High)
+    }
+
+    fn is_set_low(&mut self) -> Result<bool, Self::Error> {
+        Ok(self.output_level() == Level::Low)
     }
 }
