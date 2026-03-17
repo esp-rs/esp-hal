@@ -27,7 +27,7 @@ env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MSRV: "1.88.0"
-  DEFMT_LOG: trace
+  DEFMT_LOG: info
 
 # Cancel any currently running workflows from the same PR, branch, or
 # tag when a new workflow is triggered.
@@ -338,6 +338,45 @@ jobs:
             './**/*.rs'
             './**/*.md'
             './**/*.toml'
+
+  radio-hil-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imac-unknown-none-elf
+          toolchain: stable
+          components: rust-src
+
+      - name: Build radio HIL tests
+        run: |
+          cd hil-test-radio
+          cargo build --bin esp_radio \
+            --features="unstable esp-alloc embassy esp-radio/wifi esp-radio/ble esp-radio esp-radio/unstable trouble-host esp-radio/defmt defmt esp-radio/csi esp32c6" \
+            --target riscv32imac-unknown-none-elf
+
+      - name: Upload radio HIL test artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: radio-hil-tests
+          path: hil-test-radio/target/riscv32imac-unknown-none-elf/debug/esp_radio
+          if-no-files-found: error
+          overwrite: true
+
+  radio-hil-run:
+    runs-on: [self-hosted, esp32c6-radio]
+    needs: radio-hil-build
+    steps:
+      - name: Download radio HIL test artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: radio-hil-tests
+          path: .
+
+      - name: Run HIL tests
+        run: |
+          DEFMT_LOG=info /home/pi/radio-hil-util/target/release/esp-radio-hil-runner --binary ./esp_radio
 
   # Dummy HIL test-build check for PRs
   #

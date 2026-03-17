@@ -485,6 +485,7 @@ fn revert_scrap_path_deps() -> Result<()> {
     let pkgs = [
         crate::Package::Examples.to_string(),
         crate::Package::HilTest.to_string(),
+        crate::Package::HilTestRadio.to_string(),
         crate::Package::QaTest.to_string(),
     ];
 
@@ -527,6 +528,7 @@ fn scrap_path_deps() -> Result<()> {
     let pkgs = [
         crate::Package::Examples.to_string(),
         crate::Package::HilTest.to_string(),
+        crate::Package::HilTestRadio.to_string(),
         crate::Package::QaTest.to_string(),
     ];
 
