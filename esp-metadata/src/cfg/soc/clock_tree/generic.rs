@@ -217,6 +217,8 @@ impl ClockTreeNodeType for Generic {
         let ty_name = instance.config_type_name();
         let apply_fn_name = instance.config_apply_function_name();
         let hal_impl = format_ident!("{apply_fn_name}_impl");
+        let receiver = instance.properties.receiver();
+        let hal_impl = quote! { #(#receiver.)* #hal_impl };
 
         // TODO: support reject exprs - implement `value(node, property)` in expressions
 
@@ -301,7 +303,7 @@ impl ClockTreeNodeType for Generic {
 
         let config_field = instance.properties.config_accessor();
         quote! {
-            pub fn #apply_fn_name(clocks: &mut ClockTree, config: #ty_name) {
+            pub fn #apply_fn_name(#(#receiver,)* clocks: &mut ClockTree, config: #ty_name) {
                 #reject_exprs
                 let old_config = #config_field.replace(config);
 
@@ -367,6 +369,8 @@ impl ClockTreeNodeType for Generic {
             self.params.get_index(0).unwrap()
         };
 
+        let receiver = instance.properties.receiver();
+
         let cfg_value =
             match v {
                 NodeParameter::Value(values) => {
@@ -417,18 +421,18 @@ impl ClockTreeNodeType for Generic {
             let property = format_ident!("{}", property);
             quote! {
                 let mut config_value = unwrap!(
-                    #read_config_function(clocks),
+                    #(#receiver.)*#read_config_function(clocks),
                     concat!("Attempted to change ", stringify!(#property), " on ", #node_name, " which has not yet been configured."),
                 );
 
                 config_value.#property = #cfg_value;
 
-                #config_function(clocks, config_value);
+                #(#receiver.)* #config_function(clocks, config_value);
             }
         } else {
             quote! {
                 let config_value = #state::new(#cfg_value);
-                #config_function(clocks, config_value);
+                #(#receiver.)* #config_function(clocks, config_value);
             }
         }
     }
@@ -445,13 +449,15 @@ impl ClockTreeNodeType for Generic {
         let source_frequency_tokens = match self.upstream_clocks() {
             ClockSource::Fixed(input) => {
                 let source_node = instance.resolve_node(tree, &input);
+                let source_receiver = source_node.properties.receiver();
                 let freq_fn = source_node.frequency_function_name();
-                quote! { #freq_fn(clocks) }
+                quote! { #(#source_receiver.)* #freq_fn(clocks) }
             }
             ClockSource::Mux(input) if input.len() == 1 => {
                 let source_node = instance.resolve_node(tree, &input[0].outputs);
+                let source_receiver = source_node.properties.receiver();
                 let freq_fn = source_node.frequency_function_name();
-                quote! { #freq_fn(clocks) }
+                quote! { #(#source_receiver.)* #freq_fn(clocks) }
             }
             ClockSource::Mux(inputs) => {
                 let ty_name = self.param_type_name(instance, source_param_name);
@@ -463,8 +469,12 @@ impl ClockTreeNodeType for Generic {
                         let name = variant.config_enum_variant_name();
                         let source_node = instance.resolve_node(tree, &variant.outputs);
                         let frequency_fn = source_node.frequency_function_name();
+                        let source_receiver = source_node.properties.receiver();
 
-                        (quote! { #ty_name::#name }, quote! { #frequency_fn(clocks) })
+                        (
+                            quote! { #ty_name::#name },
+                            quote! { #(#source_receiver.)* #frequency_fn(clocks) },
+                        )
                     })
                     .unzip::<_, _, Vec<_>, Vec<_>>();
 
@@ -690,9 +700,11 @@ impl Generic {
                 let ty_name = self.param_type_name(instance, param);
                 let request_upstream_branches = mux_inputs.iter().map(|variant| {
                     let match_arm = variant.config_enum_variant_name();
-                    let function = op(instance.resolve_node(tree, &variant.outputs));
+                    let upstream_node = instance.resolve_node(tree, &variant.outputs);
+                    let upstream_receiver = upstream_node.properties.receiver();
+                    let function = op(upstream_node);
                     quote! {
-                        #ty_name::#match_arm => #function(clocks)
+                        #ty_name::#match_arm => #(#upstream_receiver.)*#function(clocks)
                     }
                 });
 
@@ -706,9 +718,11 @@ impl Generic {
         };
 
         // Single option, generate a function call
-        let function = op(instance.resolve_node(tree, single_source));
+        let upstream_node = instance.resolve_node(tree, single_source);
+        let function = op(upstream_node);
+        let upstream_receiver = upstream_node.properties.receiver();
         quote! {
-            #function(clocks);
+            #(#upstream_receiver.)*#function(clocks);
         }
     }
 

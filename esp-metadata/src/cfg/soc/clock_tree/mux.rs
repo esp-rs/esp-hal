@@ -156,11 +156,11 @@ impl ClockTreeNodeType for Multiplexer {
             .variants
             .iter()
             .map(|variant| {
-                let frequency_fn = instance
-                    .resolve_node(tree, &variant.outputs)
-                    .frequency_function_name();
+                let upstream_node = instance.resolve_node(tree, &variant.outputs);
+                let frequency_fn = upstream_node.frequency_function_name();
+                let receiver = upstream_node.properties.receiver();
 
-                quote! { #frequency_fn(clocks) }
+                quote! { #(#receiver.)* #frequency_fn(clocks) }
             })
             .collect::<Vec<_>>();
 
@@ -248,6 +248,9 @@ impl Multiplexer {
         let apply_fn_name = instance.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
         let config_field = instance.properties.config_accessor();
+        let receiver = instance.properties.receiver();
+
+        let hal_impl = quote! { #(#receiver.)*#hal_impl };
 
         let request_upstream = self.impl_request_upstream(instance, tree, quote! { new_selector });
         let release_upstream = self.impl_release_upstream(instance, tree, quote! { old_selector });
@@ -312,7 +315,7 @@ impl Multiplexer {
         };
 
         quote! {
-            pub fn #apply_fn_name(clocks: &mut ClockTree, new_selector: #ty_name) {
+            pub fn #apply_fn_name(#(#receiver,)* clocks: &mut ClockTree, new_selector: #ty_name) {
                 let old_selector = #config_field.replace(new_selector);
 
                 #configures
@@ -332,11 +335,12 @@ impl Multiplexer {
             let ty_name = instance.config_type_name();
             let request_upstream_branches = self.variants.iter().map(|variant| {
                 let match_arm = variant.config_enum_variant_name();
-                let function = instance
-                    .resolve_node(tree, &variant.outputs)
-                    .request_fn_name();
+
+                let upstream_node = instance.resolve_node(tree, &variant.outputs);
+                let receiver = upstream_node.properties.receiver();
+                let func = upstream_node.request_fn_name();
                 quote! {
-                    #ty_name::#match_arm => #function(clocks)
+                    #ty_name::#match_arm => #(#receiver.)*#func(clocks)
                 }
             });
 
@@ -350,9 +354,10 @@ impl Multiplexer {
                 .variants
                 .first()
                 .map(|variant| {
-                    instance
-                        .resolve_node(tree, &variant.outputs)
-                        .request_fn_name()
+                    let upstream_node = instance.resolve_node(tree, &variant.outputs);
+                    let receiver = upstream_node.properties.receiver();
+                    let func = upstream_node.request_fn_name();
+                    quote! { #(#receiver.)*#func }
                 })
                 .into_iter();
 
@@ -372,11 +377,11 @@ impl Multiplexer {
             let ty_name = instance.config_type_name();
             let release_upstream_branches = self.variants.iter().map(|variant| {
                 let match_arm = variant.config_enum_variant_name();
-                let function = instance
-                    .resolve_node(tree, &variant.outputs)
-                    .release_fn_name();
+                let upstream_node = instance.resolve_node(tree, &variant.outputs);
+                let receiver = upstream_node.properties.receiver();
+                let func = upstream_node.release_fn_name();
                 quote! {
-                    #ty_name::#match_arm => #function(clocks)
+                    #ty_name::#match_arm => #(#receiver.)*#func(clocks)
                 }
             });
             quote! {
@@ -389,9 +394,10 @@ impl Multiplexer {
                 .variants
                 .first()
                 .map(|variant| {
-                    instance
-                        .resolve_node(tree, &variant.outputs)
-                        .release_fn_name()
+                    let upstream_node = instance.resolve_node(tree, &variant.outputs);
+                    let receiver = upstream_node.properties.receiver();
+                    let func = upstream_node.release_fn_name();
+                    quote! { #(#receiver.)*#func }
                 })
                 .into_iter();
 

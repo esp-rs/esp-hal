@@ -73,6 +73,8 @@ pub(crate) struct Function {
 }
 
 pub(crate) struct ClockNodeFunctions {
+    pub impl_type: Option<Ident>,
+
     pub request: Function,
     pub release: Function,
     pub apply_config: Function,
@@ -222,6 +224,7 @@ pub(crate) struct ManagementProperties {
     /// This clock node is considered always running.
     pub always_on: bool,
 
+    pub receiver: Option<TokenStream>,
     pub accessor: Option<TokenStream>,
 }
 
@@ -255,6 +258,11 @@ impl ManagementProperties {
 
     pub fn always_on(&self) -> bool {
         self.always_on
+    }
+
+    /// For peripheral clocks, returns a receiver expression (`self`).
+    pub fn receiver(&self) -> &[TokenStream] {
+        self.receiver.as_slice()
     }
 
     /// Returns an expression that accesses the node's current configuration field in the ClockTree

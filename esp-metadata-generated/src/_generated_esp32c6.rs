@@ -1115,217 +1115,172 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
-/// // MCPWM0_FUNCTION_CLOCK
+/// impl McpwmInstance {
+///     // MCPWM_FUNCTION_CLOCK
 ///
-/// fn enable_mcpwm0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_function_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<McpwmFunctionClockConfig>,
+///         _new_config: McpwmFunctionClockConfig,
+///     ) {
+///         todo!()
+///     }
 /// }
+/// impl ParlIoInstance {
+///     // PARL_IO_RX_CLOCK
 ///
-/// fn configure_mcpwm0_function_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_config: Option<McpwmFunctionClockConfig>,
-///     _new_config: McpwmFunctionClockConfig,
-/// ) {
-///     todo!()
+///     fn enable_rx_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_rx_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<ParlIoRxClockConfig>,
+///         _new_config: ParlIoRxClockConfig,
+///     ) {
+///         todo!()
+///     }
+///
+///     // PARL_IO_TX_CLOCK
+///
+///     fn enable_tx_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_tx_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<ParlIoTxClockConfig>,
+///         _new_config: ParlIoTxClockConfig,
+///     ) {
+///         todo!()
+///     }
 /// }
+/// impl RmtInstance {
+///     // RMT_SCLK
 ///
-/// // PARL_IO_RX_CLOCK
+///     fn enable_sclk_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
 ///
-/// fn enable_parl_io_rx_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
+///     fn configure_sclk_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<RmtSclkConfig>,
+///         _new_config: RmtSclkConfig,
+///     ) {
+///         todo!()
+///     }
 /// }
+/// impl TimgInstance {
+///     // TIMG_FUNCTION_CLOCK
 ///
-/// fn configure_parl_io_rx_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_config: Option<ParlIoRxClockConfig>,
-///     _new_config: ParlIoRxClockConfig,
-/// ) {
-///     todo!()
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_function_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<TimgFunctionClockConfig>,
+///         _new_config: TimgFunctionClockConfig,
+///     ) {
+///         todo!()
+///     }
+///
+///     // TIMG_CALIBRATION_CLOCK
+///
+///     fn enable_calibration_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_calibration_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<TimgCalibrationClockConfig>,
+///         _new_config: TimgCalibrationClockConfig,
+///     ) {
+///         todo!()
+///     }
+///
+///     // TIMG_WDT_CLOCK
+///
+///     fn enable_wdt_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_wdt_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<TimgWdtClockConfig>,
+///         _new_config: TimgWdtClockConfig,
+///     ) {
+///         todo!()
+///     }
 /// }
+/// impl UartInstance {
+///     // UART_FUNCTION_CLOCK
 ///
-/// // PARL_IO_TX_CLOCK
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
 ///
-/// fn enable_parl_io_tx_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
+///     fn configure_function_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<UartFunctionClockConfig>,
+///         _new_config: UartFunctionClockConfig,
+///     ) {
+///         todo!()
+///     }
 ///
-/// fn configure_parl_io_tx_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_config: Option<ParlIoTxClockConfig>,
-///     _new_config: ParlIoTxClockConfig,
-/// ) {
-///     todo!()
-/// }
+///     // UART_BAUD_RATE_GENERATOR
 ///
-/// // RMT_SCLK
+///     fn enable_baud_rate_generator_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
 ///
-/// fn enable_rmt_sclk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
-/// fn configure_rmt_sclk_impl(
-///     _clocks: &mut ClockTree,
-///     _old_config: Option<RmtSclkConfig>,
-///     _new_config: RmtSclkConfig,
-/// ) {
-///     todo!()
-/// }
-///
-/// // TIMG0_FUNCTION_CLOCK
-///
-/// fn enable_timg0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
-/// fn configure_timg0_function_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_config: Option<TimgFunctionClockConfig>,
-///     _new_config: TimgFunctionClockConfig,
-/// ) {
-///     todo!()
-/// }
-///
-/// // TIMG0_CALIBRATION_CLOCK
-///
-/// fn enable_timg0_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
-/// fn configure_timg0_calibration_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_config: Option<TimgCalibrationClockConfig>,
-///     _new_config: TimgCalibrationClockConfig,
-/// ) {
-///     todo!()
-/// }
-///
-/// // TIMG0_WDT_CLOCK
-///
-/// fn enable_timg0_wdt_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
-/// fn configure_timg0_wdt_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_config: Option<TimgWdtClockConfig>,
-///     _new_config: TimgWdtClockConfig,
-/// ) {
-///     todo!()
-/// }
-///
-/// // TIMG1_FUNCTION_CLOCK
-///
-/// fn enable_timg1_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
-/// fn configure_timg1_function_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_config: Option<TimgFunctionClockConfig>,
-///     _new_config: TimgFunctionClockConfig,
-/// ) {
-///     todo!()
-/// }
-///
-/// // TIMG1_CALIBRATION_CLOCK
-///
-/// fn enable_timg1_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
-/// fn configure_timg1_calibration_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_config: Option<TimgCalibrationClockConfig>,
-///     _new_config: TimgCalibrationClockConfig,
-/// ) {
-///     todo!()
-/// }
-///
-/// // TIMG1_WDT_CLOCK
-///
-/// fn enable_timg1_wdt_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
-/// fn configure_timg1_wdt_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_config: Option<TimgWdtClockConfig>,
-///     _new_config: TimgWdtClockConfig,
-/// ) {
-///     todo!()
-/// }
-///
-/// // UART0_FUNCTION_CLOCK
-///
-/// fn enable_uart0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
-/// fn configure_uart0_function_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_config: Option<UartFunctionClockConfig>,
-///     _new_config: UartFunctionClockConfig,
-/// ) {
-///     todo!()
-/// }
-///
-/// // UART0_BAUD_RATE_GENERATOR
-///
-/// fn enable_uart0_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
-/// fn configure_uart0_baud_rate_generator_impl(
-///     _clocks: &mut ClockTree,
-///     _old_config: Option<UartBaudRateGeneratorConfig>,
-///     _new_config: UartBaudRateGeneratorConfig,
-/// ) {
-///     todo!()
-/// }
-///
-/// // UART1_FUNCTION_CLOCK
-///
-/// fn enable_uart1_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
-/// fn configure_uart1_function_clock_impl(
-///     _clocks: &mut ClockTree,
-///     _old_config: Option<UartFunctionClockConfig>,
-///     _new_config: UartFunctionClockConfig,
-/// ) {
-///     todo!()
-/// }
-///
-/// // UART1_BAUD_RATE_GENERATOR
-///
-/// fn enable_uart1_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
-/// fn configure_uart1_baud_rate_generator_impl(
-///     _clocks: &mut ClockTree,
-///     _old_config: Option<UartBaudRateGeneratorConfig>,
-///     _new_config: UartBaudRateGeneratorConfig,
-/// ) {
-///     todo!()
+///     fn configure_baud_rate_generator_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<UartBaudRateGeneratorConfig>,
+///         _new_config: UartBaudRateGeneratorConfig,
+///     ) {
+///         todo!()
+///     }
 /// }
 /// ```
 macro_rules! define_clock_tree_types {
     () => {
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum McpwmInstance {
             Mcpwm0 = 0,
         }
-        pub enum Parl_IoInstance {
-            Parl_Io = 0,
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum ParlIoInstance {
+            ParlIo = 0,
         }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum RmtInstance {
             Rmt = 0,
         }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum TimgInstance {
             Timg0 = 0,
             Timg1 = 1,
         }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum UartInstance {
             Uart0 = 0,
             Uart1 = 1,
@@ -2021,11 +1976,11 @@ macro_rules! define_clock_tree_types {
             }
             /// Returns the current configuration of the PARL_IO_RX_CLOCK clock tree node
             pub fn parl_io_rx_clock(&self) -> Option<ParlIoRxClockConfig> {
-                self.parl_io_rx_clock[Parl_IoInstance::Parl_Io as usize]
+                self.parl_io_rx_clock[ParlIoInstance::ParlIo as usize]
             }
             /// Returns the current configuration of the PARL_IO_TX_CLOCK clock tree node
             pub fn parl_io_tx_clock(&self) -> Option<ParlIoTxClockConfig> {
-                self.parl_io_tx_clock[Parl_IoInstance::Parl_Io as usize]
+                self.parl_io_tx_clock[ParlIoInstance::ParlIo as usize]
             }
             /// Returns the current configuration of the RMT_SCLK clock tree node
             pub fn rmt_sclk(&self) -> Option<RmtSclkConfig> {
@@ -2957,973 +2912,673 @@ macro_rules! define_clock_tree_types {
                 0
             }
         }
-        pub fn configure_mcpwm0_function_clock(
-            clocks: &mut ClockTree,
-            new_selector: McpwmFunctionClockConfig,
-        ) {
-            let old_selector =
-                clocks.mcpwm_function_clock[McpwmInstance::Mcpwm0 as usize].replace(new_selector);
-            if clocks.mcpwm_function_clock_refcount[McpwmInstance::Mcpwm0 as usize] > 0 {
-                match new_selector {
-                    McpwmFunctionClockConfig::PllF160m => request_pll_f160m(clocks),
-                    McpwmFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                    McpwmFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+        impl McpwmInstance {
+            pub fn configure_function_clock(
+                self,
+                clocks: &mut ClockTree,
+                new_selector: McpwmFunctionClockConfig,
+            ) {
+                let old_selector = clocks.mcpwm_function_clock[McpwmInstance::Mcpwm0 as usize]
+                    .replace(new_selector);
+                if clocks.mcpwm_function_clock_refcount[McpwmInstance::Mcpwm0 as usize] > 0 {
+                    match new_selector {
+                        McpwmFunctionClockConfig::PllF160m => request_pll_f160m(clocks),
+                        McpwmFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                        McpwmFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+                    }
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
+                    if let Some(old_selector) = old_selector {
+                        match old_selector {
+                            McpwmFunctionClockConfig::PllF160m => release_pll_f160m(clocks),
+                            McpwmFunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                            McpwmFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
+                        }
+                    }
+                } else {
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
                 }
-                configure_mcpwm0_function_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
+            }
+            pub fn function_clock_config(
+                self,
+                clocks: &mut ClockTree,
+            ) -> Option<McpwmFunctionClockConfig> {
+                clocks.mcpwm_function_clock[McpwmInstance::Mcpwm0 as usize]
+            }
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting MCPWM0_FUNCTION_CLOCK");
+                if increment_reference_count(
+                    &mut clocks.mcpwm_function_clock_refcount[McpwmInstance::Mcpwm0 as usize],
+                ) {
+                    trace!("Enabling MCPWM0_FUNCTION_CLOCK");
+                    match unwrap!(clocks.mcpwm_function_clock[McpwmInstance::Mcpwm0 as usize]) {
+                        McpwmFunctionClockConfig::PllF160m => request_pll_f160m(clocks),
+                        McpwmFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                        McpwmFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+                    }
+                    self.enable_function_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing MCPWM0_FUNCTION_CLOCK");
+                if decrement_reference_count(
+                    &mut clocks.mcpwm_function_clock_refcount[McpwmInstance::Mcpwm0 as usize],
+                ) {
+                    trace!("Disabling MCPWM0_FUNCTION_CLOCK");
+                    self.enable_function_clock_impl(clocks, false);
+                    match unwrap!(clocks.mcpwm_function_clock[McpwmInstance::Mcpwm0 as usize]) {
                         McpwmFunctionClockConfig::PllF160m => release_pll_f160m(clocks),
                         McpwmFunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
                         McpwmFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
                     }
                 }
-            } else {
-                configure_mcpwm0_function_clock_impl(clocks, old_selector, new_selector);
+            }
+            #[allow(unused_variables)]
+            pub fn function_clock_config_frequency(
+                self,
+                clocks: &mut ClockTree,
+                config: McpwmFunctionClockConfig,
+            ) -> u32 {
+                match config {
+                    McpwmFunctionClockConfig::PllF160m => pll_f160m_frequency(clocks),
+                    McpwmFunctionClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
+                    McpwmFunctionClockConfig::XtalClk => xtal_clk_frequency(clocks),
+                }
+            }
+            pub fn function_clock_frequency(self, clocks: &mut ClockTree) -> u32 {
+                if let Some(config) = clocks.mcpwm_function_clock[McpwmInstance::Mcpwm0 as usize] {
+                    self.function_clock_config_frequency(clocks, config)
+                } else {
+                    0
+                }
             }
         }
-        pub fn mcpwm0_function_clock_config(
-            clocks: &mut ClockTree,
-        ) -> Option<McpwmFunctionClockConfig> {
-            clocks.mcpwm_function_clock[McpwmInstance::Mcpwm0 as usize]
-        }
-        pub fn request_mcpwm0_function_clock(clocks: &mut ClockTree) {
-            trace!("Requesting MCPWM0_FUNCTION_CLOCK");
-            if increment_reference_count(
-                &mut clocks.mcpwm_function_clock_refcount[McpwmInstance::Mcpwm0 as usize],
+        impl ParlIoInstance {
+            pub fn configure_rx_clock(
+                self,
+                clocks: &mut ClockTree,
+                new_selector: ParlIoRxClockConfig,
             ) {
-                trace!("Enabling MCPWM0_FUNCTION_CLOCK");
-                match unwrap!(clocks.mcpwm_function_clock[McpwmInstance::Mcpwm0 as usize]) {
-                    McpwmFunctionClockConfig::PllF160m => request_pll_f160m(clocks),
-                    McpwmFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                    McpwmFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
-                }
-                enable_mcpwm0_function_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_mcpwm0_function_clock(clocks: &mut ClockTree) {
-            trace!("Releasing MCPWM0_FUNCTION_CLOCK");
-            if decrement_reference_count(
-                &mut clocks.mcpwm_function_clock_refcount[McpwmInstance::Mcpwm0 as usize],
-            ) {
-                trace!("Disabling MCPWM0_FUNCTION_CLOCK");
-                enable_mcpwm0_function_clock_impl(clocks, false);
-                match unwrap!(clocks.mcpwm_function_clock[McpwmInstance::Mcpwm0 as usize]) {
-                    McpwmFunctionClockConfig::PllF160m => release_pll_f160m(clocks),
-                    McpwmFunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                    McpwmFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
+                let old_selector =
+                    clocks.parl_io_rx_clock[ParlIoInstance::ParlIo as usize].replace(new_selector);
+                if clocks.parl_io_rx_clock_refcount[ParlIoInstance::ParlIo as usize] > 0 {
+                    match new_selector {
+                        ParlIoRxClockConfig::XtalClk => request_xtal_clk(clocks),
+                        ParlIoRxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                        ParlIoRxClockConfig::PllF240m => request_pll_f240m(clocks),
+                    }
+                    self.configure_rx_clock_impl(clocks, old_selector, new_selector);
+                    if let Some(old_selector) = old_selector {
+                        match old_selector {
+                            ParlIoRxClockConfig::XtalClk => release_xtal_clk(clocks),
+                            ParlIoRxClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                            ParlIoRxClockConfig::PllF240m => release_pll_f240m(clocks),
+                        }
+                    }
+                } else {
+                    self.configure_rx_clock_impl(clocks, old_selector, new_selector);
                 }
             }
-        }
-        #[allow(unused_variables)]
-        pub fn mcpwm0_function_clock_config_frequency(
-            clocks: &mut ClockTree,
-            config: McpwmFunctionClockConfig,
-        ) -> u32 {
-            match config {
-                McpwmFunctionClockConfig::PllF160m => pll_f160m_frequency(clocks),
-                McpwmFunctionClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
-                McpwmFunctionClockConfig::XtalClk => xtal_clk_frequency(clocks),
+            pub fn rx_clock_config(self, clocks: &mut ClockTree) -> Option<ParlIoRxClockConfig> {
+                clocks.parl_io_rx_clock[ParlIoInstance::ParlIo as usize]
             }
-        }
-        pub fn mcpwm0_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.mcpwm_function_clock[McpwmInstance::Mcpwm0 as usize] {
-                mcpwm0_function_clock_config_frequency(clocks, config)
-            } else {
-                0
-            }
-        }
-        pub fn configure_parl_io_rx_clock(
-            clocks: &mut ClockTree,
-            new_selector: ParlIoRxClockConfig,
-        ) {
-            let old_selector =
-                clocks.parl_io_rx_clock[Parl_IoInstance::Parl_Io as usize].replace(new_selector);
-            if clocks.parl_io_rx_clock_refcount[Parl_IoInstance::Parl_Io as usize] > 0 {
-                match new_selector {
-                    ParlIoRxClockConfig::XtalClk => request_xtal_clk(clocks),
-                    ParlIoRxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                    ParlIoRxClockConfig::PllF240m => request_pll_f240m(clocks),
+            pub fn request_rx_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting PARL_IO_RX_CLOCK");
+                if increment_reference_count(
+                    &mut clocks.parl_io_rx_clock_refcount[ParlIoInstance::ParlIo as usize],
+                ) {
+                    trace!("Enabling PARL_IO_RX_CLOCK");
+                    match unwrap!(clocks.parl_io_rx_clock[ParlIoInstance::ParlIo as usize]) {
+                        ParlIoRxClockConfig::XtalClk => request_xtal_clk(clocks),
+                        ParlIoRxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                        ParlIoRxClockConfig::PllF240m => request_pll_f240m(clocks),
+                    }
+                    self.enable_rx_clock_impl(clocks, true);
                 }
-                configure_parl_io_rx_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
+            }
+            pub fn release_rx_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing PARL_IO_RX_CLOCK");
+                if decrement_reference_count(
+                    &mut clocks.parl_io_rx_clock_refcount[ParlIoInstance::ParlIo as usize],
+                ) {
+                    trace!("Disabling PARL_IO_RX_CLOCK");
+                    self.enable_rx_clock_impl(clocks, false);
+                    match unwrap!(clocks.parl_io_rx_clock[ParlIoInstance::ParlIo as usize]) {
                         ParlIoRxClockConfig::XtalClk => release_xtal_clk(clocks),
                         ParlIoRxClockConfig::RcFastClk => release_rc_fast_clk(clocks),
                         ParlIoRxClockConfig::PllF240m => release_pll_f240m(clocks),
                     }
                 }
-            } else {
-                configure_parl_io_rx_clock_impl(clocks, old_selector, new_selector);
             }
-        }
-        pub fn parl_io_rx_clock_config(clocks: &mut ClockTree) -> Option<ParlIoRxClockConfig> {
-            clocks.parl_io_rx_clock[Parl_IoInstance::Parl_Io as usize]
-        }
-        pub fn request_parl_io_rx_clock(clocks: &mut ClockTree) {
-            trace!("Requesting PARL_IO_RX_CLOCK");
-            if increment_reference_count(
-                &mut clocks.parl_io_rx_clock_refcount[Parl_IoInstance::Parl_Io as usize],
+            #[allow(unused_variables)]
+            pub fn rx_clock_config_frequency(
+                self,
+                clocks: &mut ClockTree,
+                config: ParlIoRxClockConfig,
+            ) -> u32 {
+                match config {
+                    ParlIoRxClockConfig::XtalClk => xtal_clk_frequency(clocks),
+                    ParlIoRxClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
+                    ParlIoRxClockConfig::PllF240m => pll_f240m_frequency(clocks),
+                }
+            }
+            pub fn rx_clock_frequency(self, clocks: &mut ClockTree) -> u32 {
+                if let Some(config) = clocks.parl_io_rx_clock[ParlIoInstance::ParlIo as usize] {
+                    self.rx_clock_config_frequency(clocks, config)
+                } else {
+                    0
+                }
+            }
+            pub fn configure_tx_clock(
+                self,
+                clocks: &mut ClockTree,
+                new_selector: ParlIoTxClockConfig,
             ) {
-                trace!("Enabling PARL_IO_RX_CLOCK");
-                match unwrap!(clocks.parl_io_rx_clock[Parl_IoInstance::Parl_Io as usize]) {
-                    ParlIoRxClockConfig::XtalClk => request_xtal_clk(clocks),
-                    ParlIoRxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                    ParlIoRxClockConfig::PllF240m => request_pll_f240m(clocks),
-                }
-                enable_parl_io_rx_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_parl_io_rx_clock(clocks: &mut ClockTree) {
-            trace!("Releasing PARL_IO_RX_CLOCK");
-            if decrement_reference_count(
-                &mut clocks.parl_io_rx_clock_refcount[Parl_IoInstance::Parl_Io as usize],
-            ) {
-                trace!("Disabling PARL_IO_RX_CLOCK");
-                enable_parl_io_rx_clock_impl(clocks, false);
-                match unwrap!(clocks.parl_io_rx_clock[Parl_IoInstance::Parl_Io as usize]) {
-                    ParlIoRxClockConfig::XtalClk => release_xtal_clk(clocks),
-                    ParlIoRxClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                    ParlIoRxClockConfig::PllF240m => release_pll_f240m(clocks),
+                let old_selector =
+                    clocks.parl_io_tx_clock[ParlIoInstance::ParlIo as usize].replace(new_selector);
+                if clocks.parl_io_tx_clock_refcount[ParlIoInstance::ParlIo as usize] > 0 {
+                    match new_selector {
+                        ParlIoTxClockConfig::XtalClk => request_xtal_clk(clocks),
+                        ParlIoTxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                        ParlIoTxClockConfig::PllF240m => request_pll_f240m(clocks),
+                    }
+                    self.configure_tx_clock_impl(clocks, old_selector, new_selector);
+                    if let Some(old_selector) = old_selector {
+                        match old_selector {
+                            ParlIoTxClockConfig::XtalClk => release_xtal_clk(clocks),
+                            ParlIoTxClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                            ParlIoTxClockConfig::PllF240m => release_pll_f240m(clocks),
+                        }
+                    }
+                } else {
+                    self.configure_tx_clock_impl(clocks, old_selector, new_selector);
                 }
             }
-        }
-        #[allow(unused_variables)]
-        pub fn parl_io_rx_clock_config_frequency(
-            clocks: &mut ClockTree,
-            config: ParlIoRxClockConfig,
-        ) -> u32 {
-            match config {
-                ParlIoRxClockConfig::XtalClk => xtal_clk_frequency(clocks),
-                ParlIoRxClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
-                ParlIoRxClockConfig::PllF240m => pll_f240m_frequency(clocks),
+            pub fn tx_clock_config(self, clocks: &mut ClockTree) -> Option<ParlIoTxClockConfig> {
+                clocks.parl_io_tx_clock[ParlIoInstance::ParlIo as usize]
             }
-        }
-        pub fn parl_io_rx_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.parl_io_rx_clock[Parl_IoInstance::Parl_Io as usize] {
-                parl_io_rx_clock_config_frequency(clocks, config)
-            } else {
-                0
-            }
-        }
-        pub fn configure_parl_io_tx_clock(
-            clocks: &mut ClockTree,
-            new_selector: ParlIoTxClockConfig,
-        ) {
-            let old_selector =
-                clocks.parl_io_tx_clock[Parl_IoInstance::Parl_Io as usize].replace(new_selector);
-            if clocks.parl_io_tx_clock_refcount[Parl_IoInstance::Parl_Io as usize] > 0 {
-                match new_selector {
-                    ParlIoTxClockConfig::XtalClk => request_xtal_clk(clocks),
-                    ParlIoTxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                    ParlIoTxClockConfig::PllF240m => request_pll_f240m(clocks),
+            pub fn request_tx_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting PARL_IO_TX_CLOCK");
+                if increment_reference_count(
+                    &mut clocks.parl_io_tx_clock_refcount[ParlIoInstance::ParlIo as usize],
+                ) {
+                    trace!("Enabling PARL_IO_TX_CLOCK");
+                    match unwrap!(clocks.parl_io_tx_clock[ParlIoInstance::ParlIo as usize]) {
+                        ParlIoTxClockConfig::XtalClk => request_xtal_clk(clocks),
+                        ParlIoTxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                        ParlIoTxClockConfig::PllF240m => request_pll_f240m(clocks),
+                    }
+                    self.enable_tx_clock_impl(clocks, true);
                 }
-                configure_parl_io_tx_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
+            }
+            pub fn release_tx_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing PARL_IO_TX_CLOCK");
+                if decrement_reference_count(
+                    &mut clocks.parl_io_tx_clock_refcount[ParlIoInstance::ParlIo as usize],
+                ) {
+                    trace!("Disabling PARL_IO_TX_CLOCK");
+                    self.enable_tx_clock_impl(clocks, false);
+                    match unwrap!(clocks.parl_io_tx_clock[ParlIoInstance::ParlIo as usize]) {
                         ParlIoTxClockConfig::XtalClk => release_xtal_clk(clocks),
                         ParlIoTxClockConfig::RcFastClk => release_rc_fast_clk(clocks),
                         ParlIoTxClockConfig::PllF240m => release_pll_f240m(clocks),
                     }
                 }
-            } else {
-                configure_parl_io_tx_clock_impl(clocks, old_selector, new_selector);
             }
-        }
-        pub fn parl_io_tx_clock_config(clocks: &mut ClockTree) -> Option<ParlIoTxClockConfig> {
-            clocks.parl_io_tx_clock[Parl_IoInstance::Parl_Io as usize]
-        }
-        pub fn request_parl_io_tx_clock(clocks: &mut ClockTree) {
-            trace!("Requesting PARL_IO_TX_CLOCK");
-            if increment_reference_count(
-                &mut clocks.parl_io_tx_clock_refcount[Parl_IoInstance::Parl_Io as usize],
-            ) {
-                trace!("Enabling PARL_IO_TX_CLOCK");
-                match unwrap!(clocks.parl_io_tx_clock[Parl_IoInstance::Parl_Io as usize]) {
-                    ParlIoTxClockConfig::XtalClk => request_xtal_clk(clocks),
-                    ParlIoTxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                    ParlIoTxClockConfig::PllF240m => request_pll_f240m(clocks),
+            #[allow(unused_variables)]
+            pub fn tx_clock_config_frequency(
+                self,
+                clocks: &mut ClockTree,
+                config: ParlIoTxClockConfig,
+            ) -> u32 {
+                match config {
+                    ParlIoTxClockConfig::XtalClk => xtal_clk_frequency(clocks),
+                    ParlIoTxClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
+                    ParlIoTxClockConfig::PllF240m => pll_f240m_frequency(clocks),
                 }
-                enable_parl_io_tx_clock_impl(clocks, true);
             }
-        }
-        pub fn release_parl_io_tx_clock(clocks: &mut ClockTree) {
-            trace!("Releasing PARL_IO_TX_CLOCK");
-            if decrement_reference_count(
-                &mut clocks.parl_io_tx_clock_refcount[Parl_IoInstance::Parl_Io as usize],
-            ) {
-                trace!("Disabling PARL_IO_TX_CLOCK");
-                enable_parl_io_tx_clock_impl(clocks, false);
-                match unwrap!(clocks.parl_io_tx_clock[Parl_IoInstance::Parl_Io as usize]) {
-                    ParlIoTxClockConfig::XtalClk => release_xtal_clk(clocks),
-                    ParlIoTxClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                    ParlIoTxClockConfig::PllF240m => release_pll_f240m(clocks),
+            pub fn tx_clock_frequency(self, clocks: &mut ClockTree) -> u32 {
+                if let Some(config) = clocks.parl_io_tx_clock[ParlIoInstance::ParlIo as usize] {
+                    self.tx_clock_config_frequency(clocks, config)
+                } else {
+                    0
                 }
             }
         }
-        #[allow(unused_variables)]
-        pub fn parl_io_tx_clock_config_frequency(
-            clocks: &mut ClockTree,
-            config: ParlIoTxClockConfig,
-        ) -> u32 {
-            match config {
-                ParlIoTxClockConfig::XtalClk => xtal_clk_frequency(clocks),
-                ParlIoTxClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
-                ParlIoTxClockConfig::PllF240m => pll_f240m_frequency(clocks),
-            }
-        }
-        pub fn parl_io_tx_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.parl_io_tx_clock[Parl_IoInstance::Parl_Io as usize] {
-                parl_io_tx_clock_config_frequency(clocks, config)
-            } else {
-                0
-            }
-        }
-        pub fn configure_rmt_sclk(clocks: &mut ClockTree, new_selector: RmtSclkConfig) {
-            let old_selector = clocks.rmt_sclk[RmtInstance::Rmt as usize].replace(new_selector);
-            if clocks.rmt_sclk_refcount[RmtInstance::Rmt as usize] > 0 {
-                match new_selector {
-                    RmtSclkConfig::PllF80m => request_pll_f80m(clocks),
-                    RmtSclkConfig::RcFastClk => request_rc_fast_clk(clocks),
-                    RmtSclkConfig::XtalClk => request_xtal_clk(clocks),
+        impl RmtInstance {
+            pub fn configure_sclk(self, clocks: &mut ClockTree, new_selector: RmtSclkConfig) {
+                let old_selector = clocks.rmt_sclk[RmtInstance::Rmt as usize].replace(new_selector);
+                if clocks.rmt_sclk_refcount[RmtInstance::Rmt as usize] > 0 {
+                    match new_selector {
+                        RmtSclkConfig::PllF80m => request_pll_f80m(clocks),
+                        RmtSclkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                        RmtSclkConfig::XtalClk => request_xtal_clk(clocks),
+                    }
+                    self.configure_sclk_impl(clocks, old_selector, new_selector);
+                    if let Some(old_selector) = old_selector {
+                        match old_selector {
+                            RmtSclkConfig::PllF80m => release_pll_f80m(clocks),
+                            RmtSclkConfig::RcFastClk => release_rc_fast_clk(clocks),
+                            RmtSclkConfig::XtalClk => release_xtal_clk(clocks),
+                        }
+                    }
+                } else {
+                    self.configure_sclk_impl(clocks, old_selector, new_selector);
                 }
-                configure_rmt_sclk_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
+            }
+            pub fn sclk_config(self, clocks: &mut ClockTree) -> Option<RmtSclkConfig> {
+                clocks.rmt_sclk[RmtInstance::Rmt as usize]
+            }
+            pub fn request_sclk(self, clocks: &mut ClockTree) {
+                trace!("Requesting RMT_SCLK");
+                if increment_reference_count(
+                    &mut clocks.rmt_sclk_refcount[RmtInstance::Rmt as usize],
+                ) {
+                    trace!("Enabling RMT_SCLK");
+                    match unwrap!(clocks.rmt_sclk[RmtInstance::Rmt as usize]) {
+                        RmtSclkConfig::PllF80m => request_pll_f80m(clocks),
+                        RmtSclkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                        RmtSclkConfig::XtalClk => request_xtal_clk(clocks),
+                    }
+                    self.enable_sclk_impl(clocks, true);
+                }
+            }
+            pub fn release_sclk(self, clocks: &mut ClockTree) {
+                trace!("Releasing RMT_SCLK");
+                if decrement_reference_count(
+                    &mut clocks.rmt_sclk_refcount[RmtInstance::Rmt as usize],
+                ) {
+                    trace!("Disabling RMT_SCLK");
+                    self.enable_sclk_impl(clocks, false);
+                    match unwrap!(clocks.rmt_sclk[RmtInstance::Rmt as usize]) {
                         RmtSclkConfig::PllF80m => release_pll_f80m(clocks),
                         RmtSclkConfig::RcFastClk => release_rc_fast_clk(clocks),
                         RmtSclkConfig::XtalClk => release_xtal_clk(clocks),
                     }
                 }
-            } else {
-                configure_rmt_sclk_impl(clocks, old_selector, new_selector);
             }
-        }
-        pub fn rmt_sclk_config(clocks: &mut ClockTree) -> Option<RmtSclkConfig> {
-            clocks.rmt_sclk[RmtInstance::Rmt as usize]
-        }
-        pub fn request_rmt_sclk(clocks: &mut ClockTree) {
-            trace!("Requesting RMT_SCLK");
-            if increment_reference_count(&mut clocks.rmt_sclk_refcount[RmtInstance::Rmt as usize]) {
-                trace!("Enabling RMT_SCLK");
-                match unwrap!(clocks.rmt_sclk[RmtInstance::Rmt as usize]) {
-                    RmtSclkConfig::PllF80m => request_pll_f80m(clocks),
-                    RmtSclkConfig::RcFastClk => request_rc_fast_clk(clocks),
-                    RmtSclkConfig::XtalClk => request_xtal_clk(clocks),
+            #[allow(unused_variables)]
+            pub fn sclk_config_frequency(
+                self,
+                clocks: &mut ClockTree,
+                config: RmtSclkConfig,
+            ) -> u32 {
+                match config {
+                    RmtSclkConfig::PllF80m => pll_f80m_frequency(clocks),
+                    RmtSclkConfig::RcFastClk => rc_fast_clk_frequency(clocks),
+                    RmtSclkConfig::XtalClk => xtal_clk_frequency(clocks),
                 }
-                enable_rmt_sclk_impl(clocks, true);
             }
-        }
-        pub fn release_rmt_sclk(clocks: &mut ClockTree) {
-            trace!("Releasing RMT_SCLK");
-            if decrement_reference_count(&mut clocks.rmt_sclk_refcount[RmtInstance::Rmt as usize]) {
-                trace!("Disabling RMT_SCLK");
-                enable_rmt_sclk_impl(clocks, false);
-                match unwrap!(clocks.rmt_sclk[RmtInstance::Rmt as usize]) {
-                    RmtSclkConfig::PllF80m => release_pll_f80m(clocks),
-                    RmtSclkConfig::RcFastClk => release_rc_fast_clk(clocks),
-                    RmtSclkConfig::XtalClk => release_xtal_clk(clocks),
+            pub fn sclk_frequency(self, clocks: &mut ClockTree) -> u32 {
+                if let Some(config) = clocks.rmt_sclk[RmtInstance::Rmt as usize] {
+                    self.sclk_config_frequency(clocks, config)
+                } else {
+                    0
                 }
             }
         }
-        #[allow(unused_variables)]
-        pub fn rmt_sclk_config_frequency(clocks: &mut ClockTree, config: RmtSclkConfig) -> u32 {
-            match config {
-                RmtSclkConfig::PllF80m => pll_f80m_frequency(clocks),
-                RmtSclkConfig::RcFastClk => rc_fast_clk_frequency(clocks),
-                RmtSclkConfig::XtalClk => xtal_clk_frequency(clocks),
-            }
-        }
-        pub fn rmt_sclk_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.rmt_sclk[RmtInstance::Rmt as usize] {
-                rmt_sclk_config_frequency(clocks, config)
-            } else {
-                0
-            }
-        }
-        pub fn configure_timg0_function_clock(
-            clocks: &mut ClockTree,
-            new_selector: TimgFunctionClockConfig,
-        ) {
-            let old_selector =
-                clocks.timg_function_clock[TimgInstance::Timg0 as usize].replace(new_selector);
-            if clocks.timg_function_clock_refcount[TimgInstance::Timg0 as usize] > 0 {
-                match new_selector {
-                    TimgFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
-                    TimgFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                    TimgFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
+        impl TimgInstance {
+            pub fn configure_function_clock(
+                self,
+                clocks: &mut ClockTree,
+                new_selector: TimgFunctionClockConfig,
+            ) {
+                let old_selector =
+                    clocks.timg_function_clock[TimgInstance::Timg0 as usize].replace(new_selector);
+                if clocks.timg_function_clock_refcount[TimgInstance::Timg0 as usize] > 0 {
+                    match new_selector {
+                        TimgFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+                        TimgFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                        TimgFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
+                    }
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
+                    if let Some(old_selector) = old_selector {
+                        match old_selector {
+                            TimgFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
+                            TimgFunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                            TimgFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
+                        }
+                    }
+                } else {
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
                 }
-                configure_timg0_function_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
+            }
+            pub fn function_clock_config(
+                self,
+                clocks: &mut ClockTree,
+            ) -> Option<TimgFunctionClockConfig> {
+                clocks.timg_function_clock[TimgInstance::Timg0 as usize]
+            }
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting TIMG0_FUNCTION_CLOCK");
+                if increment_reference_count(
+                    &mut clocks.timg_function_clock_refcount[TimgInstance::Timg0 as usize],
+                ) {
+                    trace!("Enabling TIMG0_FUNCTION_CLOCK");
+                    match unwrap!(clocks.timg_function_clock[TimgInstance::Timg0 as usize]) {
+                        TimgFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+                        TimgFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                        TimgFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
+                    }
+                    self.enable_function_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing TIMG0_FUNCTION_CLOCK");
+                if decrement_reference_count(
+                    &mut clocks.timg_function_clock_refcount[TimgInstance::Timg0 as usize],
+                ) {
+                    trace!("Disabling TIMG0_FUNCTION_CLOCK");
+                    self.enable_function_clock_impl(clocks, false);
+                    match unwrap!(clocks.timg_function_clock[TimgInstance::Timg0 as usize]) {
                         TimgFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
                         TimgFunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
                         TimgFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
                     }
                 }
-            } else {
-                configure_timg0_function_clock_impl(clocks, old_selector, new_selector);
             }
-        }
-        pub fn timg0_function_clock_config(
-            clocks: &mut ClockTree,
-        ) -> Option<TimgFunctionClockConfig> {
-            clocks.timg_function_clock[TimgInstance::Timg0 as usize]
-        }
-        pub fn request_timg0_function_clock(clocks: &mut ClockTree) {
-            trace!("Requesting TIMG0_FUNCTION_CLOCK");
-            if increment_reference_count(
-                &mut clocks.timg_function_clock_refcount[TimgInstance::Timg0 as usize],
+            #[allow(unused_variables)]
+            pub fn function_clock_config_frequency(
+                self,
+                clocks: &mut ClockTree,
+                config: TimgFunctionClockConfig,
+            ) -> u32 {
+                match config {
+                    TimgFunctionClockConfig::XtalClk => xtal_clk_frequency(clocks),
+                    TimgFunctionClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
+                    TimgFunctionClockConfig::PllF80m => pll_f80m_frequency(clocks),
+                }
+            }
+            pub fn function_clock_frequency(self, clocks: &mut ClockTree) -> u32 {
+                if let Some(config) = clocks.timg_function_clock[TimgInstance::Timg0 as usize] {
+                    self.function_clock_config_frequency(clocks, config)
+                } else {
+                    0
+                }
+            }
+            pub fn configure_calibration_clock(
+                self,
+                clocks: &mut ClockTree,
+                new_selector: TimgCalibrationClockConfig,
             ) {
-                trace!("Enabling TIMG0_FUNCTION_CLOCK");
-                match unwrap!(clocks.timg_function_clock[TimgInstance::Timg0 as usize]) {
-                    TimgFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
-                    TimgFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                    TimgFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
-                }
-                enable_timg0_function_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_timg0_function_clock(clocks: &mut ClockTree) {
-            trace!("Releasing TIMG0_FUNCTION_CLOCK");
-            if decrement_reference_count(
-                &mut clocks.timg_function_clock_refcount[TimgInstance::Timg0 as usize],
-            ) {
-                trace!("Disabling TIMG0_FUNCTION_CLOCK");
-                enable_timg0_function_clock_impl(clocks, false);
-                match unwrap!(clocks.timg_function_clock[TimgInstance::Timg0 as usize]) {
-                    TimgFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
-                    TimgFunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                    TimgFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
+                let old_selector = clocks.timg_calibration_clock[TimgInstance::Timg0 as usize]
+                    .replace(new_selector);
+                if clocks.timg_calibration_clock_refcount[TimgInstance::Timg0 as usize] > 0 {
+                    match new_selector {
+                        TimgCalibrationClockConfig::RcSlowClk => request_lp_slow_clk(clocks),
+                        TimgCalibrationClockConfig::RcFastDivClk => request_rc_fast_clk(clocks),
+                        TimgCalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
+                    }
+                    self.configure_calibration_clock_impl(clocks, old_selector, new_selector);
+                    if let Some(old_selector) = old_selector {
+                        match old_selector {
+                            TimgCalibrationClockConfig::RcSlowClk => release_lp_slow_clk(clocks),
+                            TimgCalibrationClockConfig::RcFastDivClk => release_rc_fast_clk(clocks),
+                            TimgCalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
+                        }
+                    }
+                } else {
+                    self.configure_calibration_clock_impl(clocks, old_selector, new_selector);
                 }
             }
-        }
-        #[allow(unused_variables)]
-        pub fn timg0_function_clock_config_frequency(
-            clocks: &mut ClockTree,
-            config: TimgFunctionClockConfig,
-        ) -> u32 {
-            match config {
-                TimgFunctionClockConfig::XtalClk => xtal_clk_frequency(clocks),
-                TimgFunctionClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
-                TimgFunctionClockConfig::PllF80m => pll_f80m_frequency(clocks),
+            pub fn calibration_clock_config(
+                self,
+                clocks: &mut ClockTree,
+            ) -> Option<TimgCalibrationClockConfig> {
+                clocks.timg_calibration_clock[TimgInstance::Timg0 as usize]
             }
-        }
-        pub fn timg0_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.timg_function_clock[TimgInstance::Timg0 as usize] {
-                timg0_function_clock_config_frequency(clocks, config)
-            } else {
-                0
-            }
-        }
-        pub fn configure_timg0_calibration_clock(
-            clocks: &mut ClockTree,
-            new_selector: TimgCalibrationClockConfig,
-        ) {
-            let old_selector =
-                clocks.timg_calibration_clock[TimgInstance::Timg0 as usize].replace(new_selector);
-            if clocks.timg_calibration_clock_refcount[TimgInstance::Timg0 as usize] > 0 {
-                match new_selector {
-                    TimgCalibrationClockConfig::RcSlowClk => request_lp_slow_clk(clocks),
-                    TimgCalibrationClockConfig::RcFastDivClk => request_rc_fast_clk(clocks),
-                    TimgCalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
+            pub fn request_calibration_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting TIMG0_CALIBRATION_CLOCK");
+                if increment_reference_count(
+                    &mut clocks.timg_calibration_clock_refcount[TimgInstance::Timg0 as usize],
+                ) {
+                    trace!("Enabling TIMG0_CALIBRATION_CLOCK");
+                    match unwrap!(clocks.timg_calibration_clock[TimgInstance::Timg0 as usize]) {
+                        TimgCalibrationClockConfig::RcSlowClk => request_lp_slow_clk(clocks),
+                        TimgCalibrationClockConfig::RcFastDivClk => request_rc_fast_clk(clocks),
+                        TimgCalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
+                    }
+                    self.enable_calibration_clock_impl(clocks, true);
                 }
-                configure_timg0_calibration_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
+            }
+            pub fn release_calibration_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing TIMG0_CALIBRATION_CLOCK");
+                if decrement_reference_count(
+                    &mut clocks.timg_calibration_clock_refcount[TimgInstance::Timg0 as usize],
+                ) {
+                    trace!("Disabling TIMG0_CALIBRATION_CLOCK");
+                    self.enable_calibration_clock_impl(clocks, false);
+                    match unwrap!(clocks.timg_calibration_clock[TimgInstance::Timg0 as usize]) {
                         TimgCalibrationClockConfig::RcSlowClk => release_lp_slow_clk(clocks),
                         TimgCalibrationClockConfig::RcFastDivClk => release_rc_fast_clk(clocks),
                         TimgCalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
                     }
                 }
-            } else {
-                configure_timg0_calibration_clock_impl(clocks, old_selector, new_selector);
             }
-        }
-        pub fn timg0_calibration_clock_config(
-            clocks: &mut ClockTree,
-        ) -> Option<TimgCalibrationClockConfig> {
-            clocks.timg_calibration_clock[TimgInstance::Timg0 as usize]
-        }
-        pub fn request_timg0_calibration_clock(clocks: &mut ClockTree) {
-            trace!("Requesting TIMG0_CALIBRATION_CLOCK");
-            if increment_reference_count(
-                &mut clocks.timg_calibration_clock_refcount[TimgInstance::Timg0 as usize],
+            #[allow(unused_variables)]
+            pub fn calibration_clock_config_frequency(
+                self,
+                clocks: &mut ClockTree,
+                config: TimgCalibrationClockConfig,
+            ) -> u32 {
+                match config {
+                    TimgCalibrationClockConfig::RcSlowClk => lp_slow_clk_frequency(clocks),
+                    TimgCalibrationClockConfig::RcFastDivClk => rc_fast_clk_frequency(clocks),
+                    TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(clocks),
+                }
+            }
+            pub fn calibration_clock_frequency(self, clocks: &mut ClockTree) -> u32 {
+                if let Some(config) = clocks.timg_calibration_clock[TimgInstance::Timg0 as usize] {
+                    self.calibration_clock_config_frequency(clocks, config)
+                } else {
+                    0
+                }
+            }
+            pub fn configure_wdt_clock(
+                self,
+                clocks: &mut ClockTree,
+                new_selector: TimgWdtClockConfig,
             ) {
-                trace!("Enabling TIMG0_CALIBRATION_CLOCK");
-                match unwrap!(clocks.timg_calibration_clock[TimgInstance::Timg0 as usize]) {
-                    TimgCalibrationClockConfig::RcSlowClk => request_lp_slow_clk(clocks),
-                    TimgCalibrationClockConfig::RcFastDivClk => request_rc_fast_clk(clocks),
-                    TimgCalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
-                }
-                enable_timg0_calibration_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_timg0_calibration_clock(clocks: &mut ClockTree) {
-            trace!("Releasing TIMG0_CALIBRATION_CLOCK");
-            if decrement_reference_count(
-                &mut clocks.timg_calibration_clock_refcount[TimgInstance::Timg0 as usize],
-            ) {
-                trace!("Disabling TIMG0_CALIBRATION_CLOCK");
-                enable_timg0_calibration_clock_impl(clocks, false);
-                match unwrap!(clocks.timg_calibration_clock[TimgInstance::Timg0 as usize]) {
-                    TimgCalibrationClockConfig::RcSlowClk => release_lp_slow_clk(clocks),
-                    TimgCalibrationClockConfig::RcFastDivClk => release_rc_fast_clk(clocks),
-                    TimgCalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
+                let old_selector =
+                    clocks.timg_wdt_clock[TimgInstance::Timg0 as usize].replace(new_selector);
+                if clocks.timg_wdt_clock_refcount[TimgInstance::Timg0 as usize] > 0 {
+                    match new_selector {
+                        TimgWdtClockConfig::XtalClk => request_xtal_clk(clocks),
+                        TimgWdtClockConfig::PllF80m => request_pll_f80m(clocks),
+                        TimgWdtClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    }
+                    self.configure_wdt_clock_impl(clocks, old_selector, new_selector);
+                    if let Some(old_selector) = old_selector {
+                        match old_selector {
+                            TimgWdtClockConfig::XtalClk => release_xtal_clk(clocks),
+                            TimgWdtClockConfig::PllF80m => release_pll_f80m(clocks),
+                            TimgWdtClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        }
+                    }
+                } else {
+                    self.configure_wdt_clock_impl(clocks, old_selector, new_selector);
                 }
             }
-        }
-        #[allow(unused_variables)]
-        pub fn timg0_calibration_clock_config_frequency(
-            clocks: &mut ClockTree,
-            config: TimgCalibrationClockConfig,
-        ) -> u32 {
-            match config {
-                TimgCalibrationClockConfig::RcSlowClk => lp_slow_clk_frequency(clocks),
-                TimgCalibrationClockConfig::RcFastDivClk => rc_fast_clk_frequency(clocks),
-                TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(clocks),
+            pub fn wdt_clock_config(self, clocks: &mut ClockTree) -> Option<TimgWdtClockConfig> {
+                clocks.timg_wdt_clock[TimgInstance::Timg0 as usize]
             }
-        }
-        pub fn timg0_calibration_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.timg_calibration_clock[TimgInstance::Timg0 as usize] {
-                timg0_calibration_clock_config_frequency(clocks, config)
-            } else {
-                0
-            }
-        }
-        pub fn configure_timg0_wdt_clock(clocks: &mut ClockTree, new_selector: TimgWdtClockConfig) {
-            let old_selector =
-                clocks.timg_wdt_clock[TimgInstance::Timg0 as usize].replace(new_selector);
-            if clocks.timg_wdt_clock_refcount[TimgInstance::Timg0 as usize] > 0 {
-                match new_selector {
-                    TimgWdtClockConfig::XtalClk => request_xtal_clk(clocks),
-                    TimgWdtClockConfig::PllF80m => request_pll_f80m(clocks),
-                    TimgWdtClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+            pub fn request_wdt_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting TIMG0_WDT_CLOCK");
+                if increment_reference_count(
+                    &mut clocks.timg_wdt_clock_refcount[TimgInstance::Timg0 as usize],
+                ) {
+                    trace!("Enabling TIMG0_WDT_CLOCK");
+                    match unwrap!(clocks.timg_wdt_clock[TimgInstance::Timg0 as usize]) {
+                        TimgWdtClockConfig::XtalClk => request_xtal_clk(clocks),
+                        TimgWdtClockConfig::PllF80m => request_pll_f80m(clocks),
+                        TimgWdtClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                    }
+                    self.enable_wdt_clock_impl(clocks, true);
                 }
-                configure_timg0_wdt_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
+            }
+            pub fn release_wdt_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing TIMG0_WDT_CLOCK");
+                if decrement_reference_count(
+                    &mut clocks.timg_wdt_clock_refcount[TimgInstance::Timg0 as usize],
+                ) {
+                    trace!("Disabling TIMG0_WDT_CLOCK");
+                    self.enable_wdt_clock_impl(clocks, false);
+                    match unwrap!(clocks.timg_wdt_clock[TimgInstance::Timg0 as usize]) {
                         TimgWdtClockConfig::XtalClk => release_xtal_clk(clocks),
                         TimgWdtClockConfig::PllF80m => release_pll_f80m(clocks),
                         TimgWdtClockConfig::RcFastClk => release_rc_fast_clk(clocks),
                     }
                 }
-            } else {
-                configure_timg0_wdt_clock_impl(clocks, old_selector, new_selector);
+            }
+            #[allow(unused_variables)]
+            pub fn wdt_clock_config_frequency(
+                self,
+                clocks: &mut ClockTree,
+                config: TimgWdtClockConfig,
+            ) -> u32 {
+                match config {
+                    TimgWdtClockConfig::XtalClk => xtal_clk_frequency(clocks),
+                    TimgWdtClockConfig::PllF80m => pll_f80m_frequency(clocks),
+                    TimgWdtClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
+                }
+            }
+            pub fn wdt_clock_frequency(self, clocks: &mut ClockTree) -> u32 {
+                if let Some(config) = clocks.timg_wdt_clock[TimgInstance::Timg0 as usize] {
+                    self.wdt_clock_config_frequency(clocks, config)
+                } else {
+                    0
+                }
             }
         }
-        pub fn timg0_wdt_clock_config(clocks: &mut ClockTree) -> Option<TimgWdtClockConfig> {
-            clocks.timg_wdt_clock[TimgInstance::Timg0 as usize]
-        }
-        pub fn request_timg0_wdt_clock(clocks: &mut ClockTree) {
-            trace!("Requesting TIMG0_WDT_CLOCK");
-            if increment_reference_count(
-                &mut clocks.timg_wdt_clock_refcount[TimgInstance::Timg0 as usize],
+        impl UartInstance {
+            pub fn configure_function_clock(
+                self,
+                clocks: &mut ClockTree,
+                config: UartFunctionClockConfig,
             ) {
-                trace!("Enabling TIMG0_WDT_CLOCK");
-                match unwrap!(clocks.timg_wdt_clock[TimgInstance::Timg0 as usize]) {
-                    TimgWdtClockConfig::XtalClk => request_xtal_clk(clocks),
-                    TimgWdtClockConfig::PllF80m => request_pll_f80m(clocks),
-                    TimgWdtClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                }
-                enable_timg0_wdt_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_timg0_wdt_clock(clocks: &mut ClockTree) {
-            trace!("Releasing TIMG0_WDT_CLOCK");
-            if decrement_reference_count(
-                &mut clocks.timg_wdt_clock_refcount[TimgInstance::Timg0 as usize],
-            ) {
-                trace!("Disabling TIMG0_WDT_CLOCK");
-                enable_timg0_wdt_clock_impl(clocks, false);
-                match unwrap!(clocks.timg_wdt_clock[TimgInstance::Timg0 as usize]) {
-                    TimgWdtClockConfig::XtalClk => release_xtal_clk(clocks),
-                    TimgWdtClockConfig::PllF80m => release_pll_f80m(clocks),
-                    TimgWdtClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                }
-            }
-        }
-        #[allow(unused_variables)]
-        pub fn timg0_wdt_clock_config_frequency(
-            clocks: &mut ClockTree,
-            config: TimgWdtClockConfig,
-        ) -> u32 {
-            match config {
-                TimgWdtClockConfig::XtalClk => xtal_clk_frequency(clocks),
-                TimgWdtClockConfig::PllF80m => pll_f80m_frequency(clocks),
-                TimgWdtClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
-            }
-        }
-        pub fn timg0_wdt_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.timg_wdt_clock[TimgInstance::Timg0 as usize] {
-                timg0_wdt_clock_config_frequency(clocks, config)
-            } else {
-                0
-            }
-        }
-        pub fn configure_timg1_function_clock(
-            clocks: &mut ClockTree,
-            new_selector: TimgFunctionClockConfig,
-        ) {
-            let old_selector =
-                clocks.timg_function_clock[TimgInstance::Timg1 as usize].replace(new_selector);
-            if clocks.timg_function_clock_refcount[TimgInstance::Timg1 as usize] > 0 {
-                match new_selector {
-                    TimgFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
-                    TimgFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                    TimgFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
-                }
-                configure_timg1_function_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        TimgFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
-                        TimgFunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                        TimgFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
+                let old_config =
+                    clocks.uart_function_clock[UartInstance::Uart0 as usize].replace(config);
+                if clocks.uart_function_clock_refcount[UartInstance::Uart0 as usize] > 0 {
+                    match config.sclk {
+                        UartFunctionClockSclk::PllF80m => request_pll_f80m(clocks),
+                        UartFunctionClockSclk::RcFast => request_rc_fast_clk(clocks),
+                        UartFunctionClockSclk::Xtal => request_xtal_clk(clocks),
                     }
-                }
-            } else {
-                configure_timg1_function_clock_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn timg1_function_clock_config(
-            clocks: &mut ClockTree,
-        ) -> Option<TimgFunctionClockConfig> {
-            clocks.timg_function_clock[TimgInstance::Timg1 as usize]
-        }
-        pub fn request_timg1_function_clock(clocks: &mut ClockTree) {
-            trace!("Requesting TIMG1_FUNCTION_CLOCK");
-            if increment_reference_count(
-                &mut clocks.timg_function_clock_refcount[TimgInstance::Timg1 as usize],
-            ) {
-                trace!("Enabling TIMG1_FUNCTION_CLOCK");
-                match unwrap!(clocks.timg_function_clock[TimgInstance::Timg1 as usize]) {
-                    TimgFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
-                    TimgFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                    TimgFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
-                }
-                enable_timg1_function_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_timg1_function_clock(clocks: &mut ClockTree) {
-            trace!("Releasing TIMG1_FUNCTION_CLOCK");
-            if decrement_reference_count(
-                &mut clocks.timg_function_clock_refcount[TimgInstance::Timg1 as usize],
-            ) {
-                trace!("Disabling TIMG1_FUNCTION_CLOCK");
-                enable_timg1_function_clock_impl(clocks, false);
-                match unwrap!(clocks.timg_function_clock[TimgInstance::Timg1 as usize]) {
-                    TimgFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
-                    TimgFunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                    TimgFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
-                }
-            }
-        }
-        #[allow(unused_variables)]
-        pub fn timg1_function_clock_config_frequency(
-            clocks: &mut ClockTree,
-            config: TimgFunctionClockConfig,
-        ) -> u32 {
-            match config {
-                TimgFunctionClockConfig::XtalClk => xtal_clk_frequency(clocks),
-                TimgFunctionClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
-                TimgFunctionClockConfig::PllF80m => pll_f80m_frequency(clocks),
-            }
-        }
-        pub fn timg1_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.timg_function_clock[TimgInstance::Timg1 as usize] {
-                timg1_function_clock_config_frequency(clocks, config)
-            } else {
-                0
-            }
-        }
-        pub fn configure_timg1_calibration_clock(
-            clocks: &mut ClockTree,
-            new_selector: TimgCalibrationClockConfig,
-        ) {
-            let old_selector =
-                clocks.timg_calibration_clock[TimgInstance::Timg1 as usize].replace(new_selector);
-            if clocks.timg_calibration_clock_refcount[TimgInstance::Timg1 as usize] > 0 {
-                match new_selector {
-                    TimgCalibrationClockConfig::RcSlowClk => request_lp_slow_clk(clocks),
-                    TimgCalibrationClockConfig::RcFastDivClk => request_rc_fast_clk(clocks),
-                    TimgCalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
-                }
-                configure_timg1_calibration_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        TimgCalibrationClockConfig::RcSlowClk => release_lp_slow_clk(clocks),
-                        TimgCalibrationClockConfig::RcFastDivClk => release_rc_fast_clk(clocks),
-                        TimgCalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
+                    self.configure_function_clock_impl(clocks, old_config, config);
+                    if let Some(old_config) = old_config {
+                        match old_config.sclk {
+                            UartFunctionClockSclk::PllF80m => release_pll_f80m(clocks),
+                            UartFunctionClockSclk::RcFast => release_rc_fast_clk(clocks),
+                            UartFunctionClockSclk::Xtal => release_xtal_clk(clocks),
+                        }
                     }
-                }
-            } else {
-                configure_timg1_calibration_clock_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn timg1_calibration_clock_config(
-            clocks: &mut ClockTree,
-        ) -> Option<TimgCalibrationClockConfig> {
-            clocks.timg_calibration_clock[TimgInstance::Timg1 as usize]
-        }
-        pub fn request_timg1_calibration_clock(clocks: &mut ClockTree) {
-            trace!("Requesting TIMG1_CALIBRATION_CLOCK");
-            if increment_reference_count(
-                &mut clocks.timg_calibration_clock_refcount[TimgInstance::Timg1 as usize],
-            ) {
-                trace!("Enabling TIMG1_CALIBRATION_CLOCK");
-                match unwrap!(clocks.timg_calibration_clock[TimgInstance::Timg1 as usize]) {
-                    TimgCalibrationClockConfig::RcSlowClk => request_lp_slow_clk(clocks),
-                    TimgCalibrationClockConfig::RcFastDivClk => request_rc_fast_clk(clocks),
-                    TimgCalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
-                }
-                enable_timg1_calibration_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_timg1_calibration_clock(clocks: &mut ClockTree) {
-            trace!("Releasing TIMG1_CALIBRATION_CLOCK");
-            if decrement_reference_count(
-                &mut clocks.timg_calibration_clock_refcount[TimgInstance::Timg1 as usize],
-            ) {
-                trace!("Disabling TIMG1_CALIBRATION_CLOCK");
-                enable_timg1_calibration_clock_impl(clocks, false);
-                match unwrap!(clocks.timg_calibration_clock[TimgInstance::Timg1 as usize]) {
-                    TimgCalibrationClockConfig::RcSlowClk => release_lp_slow_clk(clocks),
-                    TimgCalibrationClockConfig::RcFastDivClk => release_rc_fast_clk(clocks),
-                    TimgCalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
+                } else {
+                    self.configure_function_clock_impl(clocks, old_config, config);
                 }
             }
-        }
-        #[allow(unused_variables)]
-        pub fn timg1_calibration_clock_config_frequency(
-            clocks: &mut ClockTree,
-            config: TimgCalibrationClockConfig,
-        ) -> u32 {
-            match config {
-                TimgCalibrationClockConfig::RcSlowClk => lp_slow_clk_frequency(clocks),
-                TimgCalibrationClockConfig::RcFastDivClk => rc_fast_clk_frequency(clocks),
-                TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(clocks),
+            pub fn function_clock_config(
+                self,
+                clocks: &mut ClockTree,
+            ) -> Option<UartFunctionClockConfig> {
+                clocks.uart_function_clock[UartInstance::Uart0 as usize]
             }
-        }
-        pub fn timg1_calibration_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.timg_calibration_clock[TimgInstance::Timg1 as usize] {
-                timg1_calibration_clock_config_frequency(clocks, config)
-            } else {
-                0
-            }
-        }
-        pub fn configure_timg1_wdt_clock(clocks: &mut ClockTree, new_selector: TimgWdtClockConfig) {
-            let old_selector =
-                clocks.timg_wdt_clock[TimgInstance::Timg1 as usize].replace(new_selector);
-            if clocks.timg_wdt_clock_refcount[TimgInstance::Timg1 as usize] > 0 {
-                match new_selector {
-                    TimgWdtClockConfig::XtalClk => request_xtal_clk(clocks),
-                    TimgWdtClockConfig::PllF80m => request_pll_f80m(clocks),
-                    TimgWdtClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                }
-                configure_timg1_wdt_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        TimgWdtClockConfig::XtalClk => release_xtal_clk(clocks),
-                        TimgWdtClockConfig::PllF80m => release_pll_f80m(clocks),
-                        TimgWdtClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting UART0_FUNCTION_CLOCK");
+                if increment_reference_count(
+                    &mut clocks.uart_function_clock_refcount[UartInstance::Uart0 as usize],
+                ) {
+                    trace!("Enabling UART0_FUNCTION_CLOCK");
+                    match unwrap!(clocks.uart_function_clock[UartInstance::Uart0 as usize]).sclk {
+                        UartFunctionClockSclk::PllF80m => request_pll_f80m(clocks),
+                        UartFunctionClockSclk::RcFast => request_rc_fast_clk(clocks),
+                        UartFunctionClockSclk::Xtal => request_xtal_clk(clocks),
                     }
-                }
-            } else {
-                configure_timg1_wdt_clock_impl(clocks, old_selector, new_selector);
-            }
-        }
-        pub fn timg1_wdt_clock_config(clocks: &mut ClockTree) -> Option<TimgWdtClockConfig> {
-            clocks.timg_wdt_clock[TimgInstance::Timg1 as usize]
-        }
-        pub fn request_timg1_wdt_clock(clocks: &mut ClockTree) {
-            trace!("Requesting TIMG1_WDT_CLOCK");
-            if increment_reference_count(
-                &mut clocks.timg_wdt_clock_refcount[TimgInstance::Timg1 as usize],
-            ) {
-                trace!("Enabling TIMG1_WDT_CLOCK");
-                match unwrap!(clocks.timg_wdt_clock[TimgInstance::Timg1 as usize]) {
-                    TimgWdtClockConfig::XtalClk => request_xtal_clk(clocks),
-                    TimgWdtClockConfig::PllF80m => request_pll_f80m(clocks),
-                    TimgWdtClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                }
-                enable_timg1_wdt_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_timg1_wdt_clock(clocks: &mut ClockTree) {
-            trace!("Releasing TIMG1_WDT_CLOCK");
-            if decrement_reference_count(
-                &mut clocks.timg_wdt_clock_refcount[TimgInstance::Timg1 as usize],
-            ) {
-                trace!("Disabling TIMG1_WDT_CLOCK");
-                enable_timg1_wdt_clock_impl(clocks, false);
-                match unwrap!(clocks.timg_wdt_clock[TimgInstance::Timg1 as usize]) {
-                    TimgWdtClockConfig::XtalClk => release_xtal_clk(clocks),
-                    TimgWdtClockConfig::PllF80m => release_pll_f80m(clocks),
-                    TimgWdtClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    self.enable_function_clock_impl(clocks, true);
                 }
             }
-        }
-        #[allow(unused_variables)]
-        pub fn timg1_wdt_clock_config_frequency(
-            clocks: &mut ClockTree,
-            config: TimgWdtClockConfig,
-        ) -> u32 {
-            match config {
-                TimgWdtClockConfig::XtalClk => xtal_clk_frequency(clocks),
-                TimgWdtClockConfig::PllF80m => pll_f80m_frequency(clocks),
-                TimgWdtClockConfig::RcFastClk => rc_fast_clk_frequency(clocks),
-            }
-        }
-        pub fn timg1_wdt_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.timg_wdt_clock[TimgInstance::Timg1 as usize] {
-                timg1_wdt_clock_config_frequency(clocks, config)
-            } else {
-                0
-            }
-        }
-        pub fn configure_uart0_function_clock(
-            clocks: &mut ClockTree,
-            config: UartFunctionClockConfig,
-        ) {
-            let old_config =
-                clocks.uart_function_clock[UartInstance::Uart0 as usize].replace(config);
-            if clocks.uart_function_clock_refcount[UartInstance::Uart0 as usize] > 0 {
-                match config.sclk {
-                    UartFunctionClockSclk::PllF80m => request_pll_f80m(clocks),
-                    UartFunctionClockSclk::RcFast => request_rc_fast_clk(clocks),
-                    UartFunctionClockSclk::Xtal => request_xtal_clk(clocks),
-                }
-                configure_uart0_function_clock_impl(clocks, old_config, config);
-                if let Some(old_config) = old_config {
-                    match old_config.sclk {
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing UART0_FUNCTION_CLOCK");
+                if decrement_reference_count(
+                    &mut clocks.uart_function_clock_refcount[UartInstance::Uart0 as usize],
+                ) {
+                    trace!("Disabling UART0_FUNCTION_CLOCK");
+                    self.enable_function_clock_impl(clocks, false);
+                    match unwrap!(clocks.uart_function_clock[UartInstance::Uart0 as usize]).sclk {
                         UartFunctionClockSclk::PllF80m => release_pll_f80m(clocks),
                         UartFunctionClockSclk::RcFast => release_rc_fast_clk(clocks),
                         UartFunctionClockSclk::Xtal => release_xtal_clk(clocks),
                     }
                 }
-            } else {
-                configure_uart0_function_clock_impl(clocks, old_config, config);
             }
-        }
-        pub fn uart0_function_clock_config(
-            clocks: &mut ClockTree,
-        ) -> Option<UartFunctionClockConfig> {
-            clocks.uart_function_clock[UartInstance::Uart0 as usize]
-        }
-        pub fn request_uart0_function_clock(clocks: &mut ClockTree) {
-            trace!("Requesting UART0_FUNCTION_CLOCK");
-            if increment_reference_count(
-                &mut clocks.uart_function_clock_refcount[UartInstance::Uart0 as usize],
-            ) {
-                trace!("Enabling UART0_FUNCTION_CLOCK");
-                match unwrap!(clocks.uart_function_clock[UartInstance::Uart0 as usize]).sclk {
-                    UartFunctionClockSclk::PllF80m => request_pll_f80m(clocks),
-                    UartFunctionClockSclk::RcFast => request_rc_fast_clk(clocks),
-                    UartFunctionClockSclk::Xtal => request_xtal_clk(clocks),
-                }
-                enable_uart0_function_clock_impl(clocks, true);
+            #[allow(unused_variables)]
+            pub fn function_clock_config_frequency(
+                self,
+                clocks: &mut ClockTree,
+                config: UartFunctionClockConfig,
+            ) -> u32 {
+                (match config.sclk {
+                    UartFunctionClockSclk::PllF80m => pll_f80m_frequency(clocks),
+                    UartFunctionClockSclk::RcFast => rc_fast_clk_frequency(clocks),
+                    UartFunctionClockSclk::Xtal => xtal_clk_frequency(clocks),
+                } / (config.div_num() + 1))
             }
-        }
-        pub fn release_uart0_function_clock(clocks: &mut ClockTree) {
-            trace!("Releasing UART0_FUNCTION_CLOCK");
-            if decrement_reference_count(
-                &mut clocks.uart_function_clock_refcount[UartInstance::Uart0 as usize],
-            ) {
-                trace!("Disabling UART0_FUNCTION_CLOCK");
-                enable_uart0_function_clock_impl(clocks, false);
-                match unwrap!(clocks.uart_function_clock[UartInstance::Uart0 as usize]).sclk {
-                    UartFunctionClockSclk::PllF80m => release_pll_f80m(clocks),
-                    UartFunctionClockSclk::RcFast => release_rc_fast_clk(clocks),
-                    UartFunctionClockSclk::Xtal => release_xtal_clk(clocks),
+            pub fn function_clock_frequency(self, clocks: &mut ClockTree) -> u32 {
+                if let Some(config) = clocks.uart_function_clock[UartInstance::Uart0 as usize] {
+                    self.function_clock_config_frequency(clocks, config)
+                } else {
+                    0
                 }
             }
-        }
-        #[allow(unused_variables)]
-        pub fn uart0_function_clock_config_frequency(
-            clocks: &mut ClockTree,
-            config: UartFunctionClockConfig,
-        ) -> u32 {
-            (match config.sclk {
-                UartFunctionClockSclk::PllF80m => pll_f80m_frequency(clocks),
-                UartFunctionClockSclk::RcFast => rc_fast_clk_frequency(clocks),
-                UartFunctionClockSclk::Xtal => xtal_clk_frequency(clocks),
-            } / (config.div_num() + 1))
-        }
-        pub fn uart0_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.uart_function_clock[UartInstance::Uart0 as usize] {
-                uart0_function_clock_config_frequency(clocks, config)
-            } else {
-                0
-            }
-        }
-        pub fn configure_uart0_baud_rate_generator(
-            clocks: &mut ClockTree,
-            config: UartBaudRateGeneratorConfig,
-        ) {
-            let old_config =
-                clocks.uart_baud_rate_generator[UartInstance::Uart0 as usize].replace(config);
-            configure_uart0_baud_rate_generator_impl(clocks, old_config, config);
-        }
-        pub fn uart0_baud_rate_generator_config(
-            clocks: &mut ClockTree,
-        ) -> Option<UartBaudRateGeneratorConfig> {
-            clocks.uart_baud_rate_generator[UartInstance::Uart0 as usize]
-        }
-        pub fn request_uart0_baud_rate_generator(clocks: &mut ClockTree) {
-            trace!("Requesting UART0_BAUD_RATE_GENERATOR");
-            if increment_reference_count(
-                &mut clocks.uart_baud_rate_generator_refcount[UartInstance::Uart0 as usize],
+            pub fn configure_baud_rate_generator(
+                self,
+                clocks: &mut ClockTree,
+                config: UartBaudRateGeneratorConfig,
             ) {
-                trace!("Enabling UART0_BAUD_RATE_GENERATOR");
-                request_uart0_function_clock(clocks);
-                enable_uart0_baud_rate_generator_impl(clocks, true);
+                let old_config =
+                    clocks.uart_baud_rate_generator[UartInstance::Uart0 as usize].replace(config);
+                self.configure_baud_rate_generator_impl(clocks, old_config, config);
             }
-        }
-        pub fn release_uart0_baud_rate_generator(clocks: &mut ClockTree) {
-            trace!("Releasing UART0_BAUD_RATE_GENERATOR");
-            if decrement_reference_count(
-                &mut clocks.uart_baud_rate_generator_refcount[UartInstance::Uart0 as usize],
-            ) {
-                trace!("Disabling UART0_BAUD_RATE_GENERATOR");
-                enable_uart0_baud_rate_generator_impl(clocks, false);
-                release_uart0_function_clock(clocks);
+            pub fn baud_rate_generator_config(
+                self,
+                clocks: &mut ClockTree,
+            ) -> Option<UartBaudRateGeneratorConfig> {
+                clocks.uart_baud_rate_generator[UartInstance::Uart0 as usize]
             }
-        }
-        #[allow(unused_variables)]
-        pub fn uart0_baud_rate_generator_config_frequency(
-            clocks: &mut ClockTree,
-            config: UartBaudRateGeneratorConfig,
-        ) -> u32 {
-            ((uart0_function_clock_frequency(clocks) * 16)
-                / ((config.integral() * 16) + config.fractional()))
-        }
-        pub fn uart0_baud_rate_generator_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.uart_baud_rate_generator[UartInstance::Uart0 as usize] {
-                uart0_baud_rate_generator_config_frequency(clocks, config)
-            } else {
-                0
-            }
-        }
-        pub fn configure_uart1_function_clock(
-            clocks: &mut ClockTree,
-            config: UartFunctionClockConfig,
-        ) {
-            let old_config =
-                clocks.uart_function_clock[UartInstance::Uart1 as usize].replace(config);
-            if clocks.uart_function_clock_refcount[UartInstance::Uart1 as usize] > 0 {
-                match config.sclk {
-                    UartFunctionClockSclk::PllF80m => request_pll_f80m(clocks),
-                    UartFunctionClockSclk::RcFast => request_rc_fast_clk(clocks),
-                    UartFunctionClockSclk::Xtal => request_xtal_clk(clocks),
-                }
-                configure_uart1_function_clock_impl(clocks, old_config, config);
-                if let Some(old_config) = old_config {
-                    match old_config.sclk {
-                        UartFunctionClockSclk::PllF80m => release_pll_f80m(clocks),
-                        UartFunctionClockSclk::RcFast => release_rc_fast_clk(clocks),
-                        UartFunctionClockSclk::Xtal => release_xtal_clk(clocks),
-                    }
-                }
-            } else {
-                configure_uart1_function_clock_impl(clocks, old_config, config);
-            }
-        }
-        pub fn uart1_function_clock_config(
-            clocks: &mut ClockTree,
-        ) -> Option<UartFunctionClockConfig> {
-            clocks.uart_function_clock[UartInstance::Uart1 as usize]
-        }
-        pub fn request_uart1_function_clock(clocks: &mut ClockTree) {
-            trace!("Requesting UART1_FUNCTION_CLOCK");
-            if increment_reference_count(
-                &mut clocks.uart_function_clock_refcount[UartInstance::Uart1 as usize],
-            ) {
-                trace!("Enabling UART1_FUNCTION_CLOCK");
-                match unwrap!(clocks.uart_function_clock[UartInstance::Uart1 as usize]).sclk {
-                    UartFunctionClockSclk::PllF80m => request_pll_f80m(clocks),
-                    UartFunctionClockSclk::RcFast => request_rc_fast_clk(clocks),
-                    UartFunctionClockSclk::Xtal => request_xtal_clk(clocks),
-                }
-                enable_uart1_function_clock_impl(clocks, true);
-            }
-        }
-        pub fn release_uart1_function_clock(clocks: &mut ClockTree) {
-            trace!("Releasing UART1_FUNCTION_CLOCK");
-            if decrement_reference_count(
-                &mut clocks.uart_function_clock_refcount[UartInstance::Uart1 as usize],
-            ) {
-                trace!("Disabling UART1_FUNCTION_CLOCK");
-                enable_uart1_function_clock_impl(clocks, false);
-                match unwrap!(clocks.uart_function_clock[UartInstance::Uart1 as usize]).sclk {
-                    UartFunctionClockSclk::PllF80m => release_pll_f80m(clocks),
-                    UartFunctionClockSclk::RcFast => release_rc_fast_clk(clocks),
-                    UartFunctionClockSclk::Xtal => release_xtal_clk(clocks),
+            pub fn request_baud_rate_generator(self, clocks: &mut ClockTree) {
+                trace!("Requesting UART0_BAUD_RATE_GENERATOR");
+                if increment_reference_count(
+                    &mut clocks.uart_baud_rate_generator_refcount[UartInstance::Uart0 as usize],
+                ) {
+                    trace!("Enabling UART0_BAUD_RATE_GENERATOR");
+                    self.request_function_clock(clocks);
+                    self.enable_baud_rate_generator_impl(clocks, true);
                 }
             }
-        }
-        #[allow(unused_variables)]
-        pub fn uart1_function_clock_config_frequency(
-            clocks: &mut ClockTree,
-            config: UartFunctionClockConfig,
-        ) -> u32 {
-            (match config.sclk {
-                UartFunctionClockSclk::PllF80m => pll_f80m_frequency(clocks),
-                UartFunctionClockSclk::RcFast => rc_fast_clk_frequency(clocks),
-                UartFunctionClockSclk::Xtal => xtal_clk_frequency(clocks),
-            } / (config.div_num() + 1))
-        }
-        pub fn uart1_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.uart_function_clock[UartInstance::Uart1 as usize] {
-                uart1_function_clock_config_frequency(clocks, config)
-            } else {
-                0
+            pub fn release_baud_rate_generator(self, clocks: &mut ClockTree) {
+                trace!("Releasing UART0_BAUD_RATE_GENERATOR");
+                if decrement_reference_count(
+                    &mut clocks.uart_baud_rate_generator_refcount[UartInstance::Uart0 as usize],
+                ) {
+                    trace!("Disabling UART0_BAUD_RATE_GENERATOR");
+                    self.enable_baud_rate_generator_impl(clocks, false);
+                    self.release_function_clock(clocks);
+                }
             }
-        }
-        pub fn configure_uart1_baud_rate_generator(
-            clocks: &mut ClockTree,
-            config: UartBaudRateGeneratorConfig,
-        ) {
-            let old_config =
-                clocks.uart_baud_rate_generator[UartInstance::Uart1 as usize].replace(config);
-            configure_uart1_baud_rate_generator_impl(clocks, old_config, config);
-        }
-        pub fn uart1_baud_rate_generator_config(
-            clocks: &mut ClockTree,
-        ) -> Option<UartBaudRateGeneratorConfig> {
-            clocks.uart_baud_rate_generator[UartInstance::Uart1 as usize]
-        }
-        pub fn request_uart1_baud_rate_generator(clocks: &mut ClockTree) {
-            trace!("Requesting UART1_BAUD_RATE_GENERATOR");
-            if increment_reference_count(
-                &mut clocks.uart_baud_rate_generator_refcount[UartInstance::Uart1 as usize],
-            ) {
-                trace!("Enabling UART1_BAUD_RATE_GENERATOR");
-                request_uart1_function_clock(clocks);
-                enable_uart1_baud_rate_generator_impl(clocks, true);
+            #[allow(unused_variables)]
+            pub fn baud_rate_generator_config_frequency(
+                self,
+                clocks: &mut ClockTree,
+                config: UartBaudRateGeneratorConfig,
+            ) -> u32 {
+                ((self.function_clock_frequency(clocks) * 16)
+                    / ((config.integral() * 16) + config.fractional()))
             }
-        }
-        pub fn release_uart1_baud_rate_generator(clocks: &mut ClockTree) {
-            trace!("Releasing UART1_BAUD_RATE_GENERATOR");
-            if decrement_reference_count(
-                &mut clocks.uart_baud_rate_generator_refcount[UartInstance::Uart1 as usize],
-            ) {
-                trace!("Disabling UART1_BAUD_RATE_GENERATOR");
-                enable_uart1_baud_rate_generator_impl(clocks, false);
-                release_uart1_function_clock(clocks);
-            }
-        }
-        #[allow(unused_variables)]
-        pub fn uart1_baud_rate_generator_config_frequency(
-            clocks: &mut ClockTree,
-            config: UartBaudRateGeneratorConfig,
-        ) -> u32 {
-            ((uart1_function_clock_frequency(clocks) * 16)
-                / ((config.integral() * 16) + config.fractional()))
-        }
-        pub fn uart1_baud_rate_generator_frequency(clocks: &mut ClockTree) -> u32 {
-            if let Some(config) = clocks.uart_baud_rate_generator[UartInstance::Uart1 as usize] {
-                uart1_baud_rate_generator_config_frequency(clocks, config)
-            } else {
-                0
+            pub fn baud_rate_generator_frequency(self, clocks: &mut ClockTree) -> u32 {
+                if let Some(config) = clocks.uart_baud_rate_generator[UartInstance::Uart0 as usize]
+                {
+                    self.baud_rate_generator_config_frequency(clocks, config)
+                } else {
+                    0
+                }
             }
         }
         /// Clock tree configuration.

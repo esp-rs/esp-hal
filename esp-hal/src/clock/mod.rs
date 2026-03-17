@@ -242,9 +242,9 @@ impl Clocks {
             // plain old data structures and remove this pre-configuration, otherwise we will not be
             // able to select a different clock source.
             #[cfg(soc_has_clock_node_mcpwm0_function_clock)]
-            clocks::configure_mcpwm0_function_clock(clocks, Default::default());
+            clocks::McpwmInstance::Mcpwm0.configure_function_clock(clocks, Default::default());
             #[cfg(soc_has_clock_node_mcpwm1_function_clock)]
-            clocks::configure_mcpwm1_function_clock(clocks, Default::default());
+            clocks::McpwmInstance::Mcpwm1.configure_function_clock(clocks, Default::default());
 
             // Until we have every clock consumer modelled, we should manually keep clocks alive
             #[cfg(soc_has_clock_node_rc_fast_clk)]
@@ -319,9 +319,9 @@ impl Clocks {
         // Make sure we measure the crystal.
         cfg_if::cfg_if! {
             if #[cfg(soc_has_clock_node_timg0_function_clock)] {
-                let current_function_clock = clocks::timg0_function_clock_config(clocks);
-                clocks::configure_timg0_function_clock(clocks, function_clock);
-                clocks::request_timg0_function_clock(clocks);
+                let current_function_clock = clocks::TimgInstance::Timg0.function_clock_config(clocks);
+                clocks::TimgInstance::Timg0.configure_function_clock(clocks, function_clock);
+                clocks::TimgInstance::Timg0.request_function_clock(clocks);
             }
         }
         cfg_if::cfg_if! {
@@ -332,11 +332,11 @@ impl Clocks {
 
                 let calibration_clock_frequency = clocks::timg_calibration_clock_frequency(clocks);
             } else {
-                let current_calib_clock = clocks::timg0_calibration_clock_config(clocks);
-                clocks::configure_timg0_calibration_clock(clocks, rtc_clock);
-                clocks::request_timg0_calibration_clock(clocks);
+                let current_calib_clock = clocks::TimgInstance::Timg0.calibration_clock_config(clocks);
+                clocks::TimgInstance::Timg0.configure_calibration_clock(clocks, rtc_clock);
+                clocks::TimgInstance::Timg0.request_calibration_clock(clocks);
 
-                let calibration_clock_frequency = clocks::timg0_calibration_clock_frequency(clocks);
+                let calibration_clock_frequency = clocks::TimgInstance::Timg0.calibration_clock_frequency(clocks);
             }
         }
 
@@ -347,7 +347,8 @@ impl Clocks {
         // cycles.
         #[cfg(not(esp32))]
         {
-            let function_clk_freq = clocks::timg0_function_clock_frequency(clocks) as u64;
+            let function_clk_freq =
+                clocks::TimgInstance::Timg0.function_clock_frequency(clocks) as u64;
             let expected_function_clock_cycles = (function_clk_freq * slow_cycles as u64
                 / effective_calibration_clock_frequency as u64)
                 as u32;
@@ -423,9 +424,9 @@ impl Clocks {
                 if let Some(calib_clock) = current_calib_clock
                     && calib_clock != rtc_clock
                 {
-                    clocks::configure_timg0_calibration_clock(clocks, calib_clock);
+                    clocks::TimgInstance::Timg0.configure_calibration_clock(clocks, calib_clock);
                 }
-                clocks::release_timg0_calibration_clock(clocks);
+                clocks::TimgInstance::Timg0.release_calibration_clock(clocks);
             }
         }
 
@@ -434,9 +435,9 @@ impl Clocks {
             if let Some(func_clock) = current_function_clock
                 && func_clock != function_clock
             {
-                clocks::configure_timg0_function_clock(clocks, func_clock);
+                clocks::TimgInstance::Timg0.configure_function_clock(clocks, func_clock);
             }
-            clocks::release_timg0_function_clock(clocks);
+            clocks::TimgInstance::Timg0.release_function_clock(clocks);
         }
 
         (cali_value, Rate::from_hz(calibration_clock_frequency))

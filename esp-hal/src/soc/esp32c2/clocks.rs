@@ -608,164 +608,134 @@ fn enable_uart_mem_clk_impl(_clocks: &mut ClockTree, en: bool) {
         .modify(|_, w| w.uart_mem_clk_en().bit(en));
 }
 
-// TIMG0_FUNCTION_CLOCK
+impl TimgInstance {
+    // TIMG_FUNCTION_CLOCK
 
-fn enable_timg0_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
-    // TODO: should we model T0_DIVIDER, too?
-    TIMG0::regs()
-        .regclk()
-        .modify(|_, w| w.timer_clk_is_active().bit(en));
-}
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        // TODO: should we model T0_DIVIDER, too?
+        TIMG0::regs()
+            .regclk()
+            .modify(|_, w| w.timer_clk_is_active().bit(en));
+    }
 
-fn configure_timg0_function_clock_impl(
-    _clocks: &mut ClockTree,
-    _old_config: Option<TimgFunctionClockConfig>,
-    new_config: TimgFunctionClockConfig,
-) {
-    TIMG0::regs().t(0).config().modify(|_, w| {
-        w.use_xtal()
-            .bit(new_config == TimgFunctionClockConfig::XtalClk)
-    });
-}
-
-// TIMG0_CALIBRATION_CLOCK
-
-fn enable_timg0_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do, calibration clocks can only be selected. They are gated by the CALI_START bit,
-    // which is managed by the calibration process.
-}
-
-fn configure_timg0_calibration_clock_impl(
-    _clocks: &mut ClockTree,
-    _old_config: Option<TimgCalibrationClockConfig>,
-    new_config: TimgCalibrationClockConfig,
-) {
-    TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
-        w.rtc_cali_clk_sel().bits(match new_config {
-            TimgCalibrationClockConfig::RcSlowClk => 0,
-            TimgCalibrationClockConfig::RcFastDivClk => 1,
-            TimgCalibrationClockConfig::Osc32kClk => 2,
-        })
-    });
-}
-
-// TIMG0_WDT_CLOCK
-
-fn enable_timg0_wdt_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-    // No separate clock control enable bit.
-}
-
-fn configure_timg0_wdt_clock_impl(
-    _clocks: &mut ClockTree,
-    _old_config: Option<TimgWdtClockConfig>,
-    new_config: TimgWdtClockConfig,
-) {
-    TIMG0::regs().wdtconfig0().modify(|_, w| {
-        w.wdt_use_xtal()
-            .bit(new_config == TimgWdtClockConfig::XtalClk)
-    });
-}
-
-// UART0_MEM_CLOCK
-
-fn enable_uart0_mem_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do.
-}
-
-fn configure_uart0_mem_clock_impl(
-    _clocks: &mut ClockTree,
-    _old_config: Option<UartMemClockConfig>,
-    _new_config: UartMemClockConfig,
-) {
-    // Nothing to do.
-}
-
-// UART0_FUNCTION_CLOCK
-
-fn enable_uart0_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
-    UART0::regs().clk_conf().modify(|_, w| w.sclk_en().bit(en));
-}
-
-fn configure_uart0_function_clock_impl(
-    _clocks: &mut ClockTree,
-    _old_config: Option<UartFunctionClockConfig>,
-    new_config: UartFunctionClockConfig,
-) {
-    UART0::regs().clk_conf().modify(|_, w| unsafe {
-        w.sclk_sel().bits(match new_config.sclk {
-            UartFunctionClockSclk::PllF40m => 1,
-            UartFunctionClockSclk::RcFast => 2,
-            UartFunctionClockSclk::Xtal => 3,
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<TimgFunctionClockConfig>,
+        new_config: TimgFunctionClockConfig,
+    ) {
+        TIMG0::regs().t(0).config().modify(|_, w| {
+            w.use_xtal()
+                .bit(new_config == TimgFunctionClockConfig::XtalClk)
         });
-        w.sclk_div_num().bits(new_config.div_num as _)
-    });
-}
+    }
 
-// UART0_BAUD_RATE_GENERATOR
+    // TIMG_CALIBRATION_CLOCK
 
-fn enable_uart0_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do
-}
+    fn enable_calibration_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do, calibration clocks can only be selected. They are gated by the CALI_START
+        // bit, which is managed by the calibration process.
+    }
 
-fn configure_uart0_baud_rate_generator_impl(
-    _clocks: &mut ClockTree,
-    _old_config: Option<UartBaudRateGeneratorConfig>,
-    new_config: UartBaudRateGeneratorConfig,
-) {
-    UART0::regs().clkdiv().write(|w| unsafe {
-        w.clkdiv().bits(new_config.integral as _);
-        w.frag().bits(new_config.fractional as _)
-    });
-}
-
-// UART1_MEM_CLOCK
-
-fn enable_uart1_mem_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do.
-}
-
-fn configure_uart1_mem_clock_impl(
-    _clocks: &mut ClockTree,
-    _old_config: Option<UartMemClockConfig>,
-    _new_config: UartMemClockConfig,
-) {
-    // Nothing to do.
-}
-
-// UART1_FUNCTION_CLOCK
-
-fn enable_uart1_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
-    UART1::regs().clk_conf().modify(|_, w| w.sclk_en().bit(en));
-}
-
-fn configure_uart1_function_clock_impl(
-    _clocks: &mut ClockTree,
-    _old_config: Option<UartFunctionClockConfig>,
-    new_config: UartFunctionClockConfig,
-) {
-    UART1::regs().clk_conf().modify(|_, w| unsafe {
-        w.sclk_sel().bits(match new_config.sclk {
-            UartFunctionClockSclk::PllF40m => 1,
-            UartFunctionClockSclk::RcFast => 2,
-            UartFunctionClockSclk::Xtal => 3,
+    fn configure_calibration_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<TimgCalibrationClockConfig>,
+        new_config: TimgCalibrationClockConfig,
+    ) {
+        TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
+            w.rtc_cali_clk_sel().bits(match new_config {
+                TimgCalibrationClockConfig::RcSlowClk => 0,
+                TimgCalibrationClockConfig::RcFastDivClk => 1,
+                TimgCalibrationClockConfig::Osc32kClk => 2,
+            })
         });
-        w.sclk_div_num().bits(new_config.div_num as _)
-    });
+    }
+
+    // TIMG_WDT_CLOCK
+
+    fn enable_wdt_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // No separate clock control enable bit.
+    }
+
+    fn configure_wdt_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<TimgWdtClockConfig>,
+        new_config: TimgWdtClockConfig,
+    ) {
+        TIMG0::regs().wdtconfig0().modify(|_, w| {
+            w.wdt_use_xtal()
+                .bit(new_config == TimgWdtClockConfig::XtalClk)
+        });
+    }
 }
 
-// UART1_BAUD_RATE_GENERATOR
+impl UartInstance {
+    // UART_FUNCTION_CLOCK
 
-fn enable_uart1_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do
-}
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        let regs = match self {
+            UartInstance::Uart0 => UART0::regs(),
+            UartInstance::Uart1 => UART1::regs(),
+        };
+        regs.clk_conf().modify(|_, w| w.sclk_en().bit(en));
+    }
 
-fn configure_uart1_baud_rate_generator_impl(
-    _clocks: &mut ClockTree,
-    _old_config: Option<UartBaudRateGeneratorConfig>,
-    new_config: UartBaudRateGeneratorConfig,
-) {
-    UART1::regs().clkdiv().write(|w| unsafe {
-        w.clkdiv().bits(new_config.integral as _);
-        w.frag().bits(new_config.fractional as _)
-    });
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<UartFunctionClockConfig>,
+        new_config: UartFunctionClockConfig,
+    ) {
+        let regs = match self {
+            UartInstance::Uart0 => UART0::regs(),
+            UartInstance::Uart1 => UART1::regs(),
+        };
+        regs.clk_conf().modify(|_, w| unsafe {
+            w.sclk_sel().bits(match new_config.sclk {
+                UartFunctionClockSclk::PllF40m => 1,
+                UartFunctionClockSclk::RcFast => 2,
+                UartFunctionClockSclk::Xtal => 3,
+            });
+            w.sclk_div_num().bits(new_config.div_num as _)
+        });
+    }
+
+    // UART_MEM_CLOCK
+
+    fn enable_mem_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do.
+    }
+
+    fn configure_mem_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<UartMemClockConfig>,
+        _new_config: UartMemClockConfig,
+    ) {
+        // Nothing to do.
+    }
+
+    // UART_BAUD_RATE_GENERATOR
+
+    fn enable_baud_rate_generator_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do.
+    }
+
+    fn configure_baud_rate_generator_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<UartBaudRateGeneratorConfig>,
+        new_config: UartBaudRateGeneratorConfig,
+    ) {
+        let regs = match self {
+            UartInstance::Uart0 => UART0::regs(),
+            UartInstance::Uart1 => UART1::regs(),
+        };
+        regs.clkdiv().write(|w| unsafe {
+            w.clkdiv().bits(new_config.integral as _);
+            w.frag().bits(new_config.fractional as _)
+        });
+    }
 }
