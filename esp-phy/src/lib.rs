@@ -419,7 +419,7 @@ pub fn enable_phy_clock<'d>() -> PhyClockGuard<'d> {
 ///
 /// See [MacTimeUpdateCb] for details.
 #[cfg(esp32)]
-pub fn set_mac_time_update_cb(&self, mac_time_update_cb: MacTimeUpdateCb) {
+pub fn set_mac_time_update_cb(mac_time_update_cb: MacTimeUpdateCb) {
     PHY_STATE.with(|phy_state| phy_state.mac_time_update_cb = Some(mac_time_update_cb));
 }
 
