@@ -147,9 +147,9 @@ clocks = { system_clocks = { clock_tree = [
     ] },
 
     # System-wide peripheral clocks
-    { name = "UART_MEM_CLK", type = "mux", default = "XTAL", variants = [
+    { name = "UART_MEM_CLK", type = "mux", variants = [
         # The actual source clock is unknown, but it also doesn't matter.
-        { name = "XTAL", outputs = "XTAL_CLK" },
+        { name = "XTAL", outputs = "XTAL_CLK", default = true },
     ] },
 ] }, peripheral_clocks = { templates = [
     # templates
@@ -174,8 +174,8 @@ clocks = { system_clocks = { clock_tree = [
     { name = "ApbSarAdc", template_params = { peripheral = "apb_saradc" } },
     { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
     { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL_CLK", variants = [
-            { name = "XTAL_CLK", outputs = "XTAL_CLK" },
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK", outputs = "XTAL_CLK", default = true },
             { name = "PLL_40M",  outputs = "PLL_40M" },
         ] },
         { name = "CALIBRATION_CLOCK", type = "mux", variants = [
@@ -183,8 +183,8 @@ clocks = { system_clocks = { clock_tree = [
             { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
             { name = "OSC32K_CLK",     outputs = "OSC_SLOW_CLK" },
         ] },
-        { name = "WDT_CLOCK", type = "mux", default = "PLL_40M", variants = [
-            { name = "PLL_40M",  outputs = "PLL_40M" },
+        { name = "WDT_CLOCK", type = "mux", variants = [
+            { name = "PLL_40M",  outputs = "PLL_40M", default = true },
             { name = "XTAL_CLK", outputs = "XTAL_CLK" },
         ] },
     ] },
@@ -193,13 +193,13 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Spi2" },
     { name = "Uart1", clocks = "Uart0" },
     { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", default = "XTAL", variants = [ # UART_SCLK
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [ # UART_SCLK
             { name = "PLL_F40M", outputs = "PLL_40M" },
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
-            { name = "XTAL",     outputs = "XTAL_CLK" },
+            { name = "XTAL",     outputs = "XTAL_CLK", default = true },
         ] },
-        { name = "MEM_CLOCK", type = "mux", default = "MEM", variants = [
-            { name = "MEM", outputs = "UART_MEM_CLK" },
+        { name = "MEM_CLOCK", type = "mux", variants = [
+            { name = "MEM", outputs = "UART_MEM_CLK", default = true },
         ] },
     ] },
     #{ name = "Spi01" },

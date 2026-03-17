@@ -39,7 +39,7 @@
 
 use std::{any::Any, collections::HashMap, str::FromStr};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use indexmap::IndexMap;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
@@ -48,6 +48,7 @@ use serde::{
     Deserializer,
     de::{self, SeqAccess, Visitor},
 };
+use somni_expr::error::MarkInSource;
 use somni_parser::{ast, lexer::Token, parser::DefaultTypeSet};
 
 use crate::cfg::{
@@ -154,16 +155,29 @@ where
 }
 
 pub struct ValidationContext<'c> {
-    pub tree: &'c [ClockTreeItem],
+    pub tree: &'c [&'c ClockTreeNodeInstance],
 }
 
-impl ValidationContext<'_> {
-    pub fn has_clock(&self, clk: &str) -> bool {
-        self.clock(clk).is_some()
+impl<'c> ValidationContext<'c> {
+    pub fn has_clock(&self, instance: &ClockTreeNodeInstance, clk: &str) -> bool {
+        self.clock(instance, clk).is_some()
     }
 
-    fn clock(&self, clk: &str) -> Option<&ClockTreeItem> {
-        self.tree.iter().find(|item| item.name() == clk)
+    fn clock(&self, instance: &ClockTreeNodeInstance, clk: &str) -> Option<&ClockTreeNodeInstance> {
+        let local_clk = format!("{}_{}", instance.group, clk);
+        self.tree
+            .iter()
+            .cloned()
+            .find(|item| [&local_clk, clk].contains(&item.name_str().as_str()))
+    }
+
+    pub(crate) fn run_validation(&self) -> Result<()> {
+        for node in self.tree {
+            node.validate_source_data(self)
+                .with_context(|| format!("Invalid clock tree item: {}", node.name_str()))?;
+        }
+
+        Ok(())
     }
 }
 
@@ -175,33 +189,35 @@ pub(crate) struct DependencyGraph {
 }
 
 impl DependencyGraph {
-    pub(super) fn build_from<'a>(
-        clock_tree: impl Iterator<Item = &'a ClockTreeNodeInstance>,
-    ) -> Self {
+    pub fn empty() -> Self {
+        Self {
+            graph: IndexMap::new(),
+            reverse_graph: IndexMap::new(),
+        }
+    }
+
+    pub(super) fn build_from(clock_tree: &ProcessedClockData) -> Self {
         let mut dependency_graph = IndexMap::new();
         let mut reverse_dependency_graph = IndexMap::new();
 
-        for node in clock_tree {
+        for node in clock_tree.clock_tree.iter() {
+            dependency_graph.insert(node.name.clone(), Vec::new());
+            reverse_dependency_graph.insert(node.name.clone(), Vec::new());
+        }
+
+        for node in clock_tree.clock_tree.iter() {
             let node_name = node.name_str();
-            dependency_graph
-                .entry(node_name.clone())
-                .or_insert_with(Vec::new);
-            reverse_dependency_graph
-                .entry(node_name.clone())
-                .or_insert_with(Vec::new);
 
-            for input in node.input_clocks() {
-                let graph_node = dependency_graph
-                    .entry(input.clone())
-                    .or_insert_with(Vec::new);
-
+            for input in node.input_clocks(clock_tree) {
+                let graph_node = &mut dependency_graph[&input];
                 if !graph_node.contains(node_name) {
                     graph_node.push(node_name.clone());
                 }
-                reverse_dependency_graph
-                    .entry(node_name.clone())
-                    .or_insert_with(Vec::new)
-                    .push(input);
+
+                let reverse_node = &mut reverse_dependency_graph[node_name];
+                if !reverse_node.contains(&input) {
+                    reverse_node.push(input);
+                }
             }
         }
 
@@ -295,31 +311,28 @@ pub(crate) trait ClockTreeNodeType: Any {
         vec![]
     }
 
-    // TODO: pass instance to apply template naming scheme to returned clocks
-    // (e.g. FUNCTION_CLOCK -> UART0_FUNCTION_CLOCK)
-    fn input_clocks(&self) -> Vec<String> {
+    fn input_clocks(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> Vec<String> {
         vec![]
     }
 
     fn always_on(&self) -> bool {
         false
     }
-    // TODO: pass instance to apply template naming scheme to returned clocks
-    // (e.g. FUNCTION_CLOCK -> UART0_FUNCTION_CLOCK)
-    fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()>;
+    fn validate_source_data(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        ctx: &ValidationContext<'_>,
+    ) -> Result<()>;
     fn is_configurable(&self) -> bool;
     fn config_apply_function(
         &self,
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream;
-    fn config_apply_impl_function(
-        &self,
-        _instance: &ClockTreeNodeInstance,
-        _tree: &ProcessedClockData,
-    ) -> TokenStream {
-        quote! {}
-    }
 
     fn node_frequency_impl(
         &self,
@@ -333,10 +346,18 @@ pub(crate) trait ClockTreeNodeType: Any {
         Some(format!(" `{}` configuration.", instance.name_str()))
     }
 
+    fn validate_configures_expr(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _expr: &ConfiguresExpression,
+    ) -> Result<()> {
+        anyhow::bail!("Configures expressions are not supported")
+    }
+
     fn apply_configuration(
         &self,
         instance: &ClockTreeNodeInstance,
-        _expr: &Expression,
+        _expr: &ConfiguresExpression,
         _tree: &ProcessedClockData,
     ) -> TokenStream {
         if instance.is_configurable() {
@@ -431,39 +452,24 @@ where
 /// - Divider = value
 #[derive(Debug, Clone)]
 pub struct ConfiguresExpression {
-    target: String,
-    value: Expression,
+    effect: ConfiguresEffect,
+    source: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConfiguresEffect {
+    node: String,
+    property: Option<String>,
+    value: ast::RightHandExpression<DefaultTypeSet>,
 }
 
 impl ConfiguresExpression {
-    fn validate_source_data(&self, ctx: &ValidationContext<'_>) -> Result<()> {
-        let Some(clock) = ctx.clock(&self.target) else {
-            anyhow::bail!("Clock source {} not found", self.target);
-        };
+    pub(crate) fn effect(&self) -> &ConfiguresEffect {
+        &self.effect
+    }
 
-        let clock_name = clock.name();
-        match clock {
-            ClockTreeItem::Multiplexer(multiplexer) => {
-                if let Some(name) = self.value.as_name() {
-                    if !multiplexer.variant_names().any(|v| v == name) {
-                        anyhow::bail!("Multiplexer `{clock_name}` does not have variant `{name}`");
-                    }
-                } else {
-                    anyhow::bail!(
-                        "Multiplexer config expression for `{clock_name}` must be a name"
-                    );
-                }
-            }
-            ClockTreeItem::Divider(divider) => {
-                anyhow::ensure!(
-                    divider.is_configurable(),
-                    "Divider `{clock_name}` is not configurable",
-                )
-            }
-            _ => anyhow::bail!("Cannot configure source clock {}", self.target),
-        }
-
-        Ok(())
+    pub(crate) fn name(&self, token: Token) -> &str {
+        token.source(&self.source)
     }
 }
 
@@ -481,17 +487,57 @@ impl FromStr for ConfiguresExpression {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (target, value_str) = s.split_once('=').ok_or_else(|| {
-            format!("The config expression must be in the format 'target = value'")
-        })?;
-        let value = somni_parser::parser::parse_expression(value_str)
+        let value = somni_parser::parser::parse_expression(s)
             .map_err(|e| format!("Failed to parse expression: {}", e))?;
-        Ok(ConfiguresExpression {
-            target: target.trim().to_string(),
-            value: Expression {
-                source: value_str.to_string(),
-                expr: value,
+
+        let effect = match &value {
+            ast::Expression::Assignment {
+                left_expr,
+                operator: _,
+                right_expr,
+            } => ConfiguresEffect {
+                // NODE = VALUE
+                node: if let ast::LeftHandExpression::Name { variable } = left_expr {
+                    variable.source(s).to_string()
+                } else {
+                    return Err(format!("Invalid config expression: {}", s));
+                },
+                property: None,
+                value: right_expr.clone(),
             },
+            ast::Expression::Expression {
+                expression: ast::RightHandExpression::FunctionCall { name, arguments },
+            } if name.source(s) == "configure" => {
+                // configure(NODE, property, VALUE)
+                if arguments.len() != 3 {
+                    return Err(format!("Invalid config expression: {}", s));
+                }
+                let ast::RightHandExpression::Variable { variable } = &arguments[0] else {
+                    return Err(format!(
+                        "Node name in configure expression must be an identifier: {s}"
+                    ));
+                };
+                let node = variable.source(s).to_string();
+
+                let ast::RightHandExpression::Variable { variable } = &arguments[1] else {
+                    return Err(format!(
+                        "Property name in configure expression must be an identifier: {s}"
+                    ));
+                };
+                let property = Some(variable.source(s).to_string());
+
+                ConfiguresEffect {
+                    node,
+                    property,
+                    value: arguments[2].clone(),
+                }
+            }
+            _ => return Err(format!("Invalid config expression: {}", s)),
+        };
+
+        Ok(ConfiguresExpression {
+            effect,
+            source: s.to_string(),
         })
     }
 }
@@ -530,14 +576,10 @@ impl ValuesExpression {
     }
 
     fn as_range(&self) -> Option<(u32, u32)> {
-        if self.0.len() != 1 {
-            None
+        if let [ValueFragment::Range(min, max)] = self.0.as_slice() {
+            Some((*min, *max))
         } else {
-            let ValueFragment::Range(min, max) = self.0[0] else {
-                return None;
-            };
-
-            Some((min, max))
+            None
         }
     }
 }
@@ -575,10 +617,20 @@ impl FromStr for ValueFragment {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         fn parse_number(s: &str) -> Result<u32, String> {
-            s.replace('_', "")
-                .trim()
-                .parse()
-                .map_err(|e| format!("Invalid number: {}", e))
+            let s = s.replace('_', "");
+            let s = s.trim();
+
+            let result = if s.starts_with("0x") {
+                u32::from_str_radix(&s[2..], 16)
+            } else if s.starts_with("0o") {
+                u32::from_str_radix(&s[2..], 8)
+            } else if s.starts_with("0b") {
+                u32::from_str_radix(&s[2..], 2)
+            } else {
+                s.parse()
+            };
+
+            result.map_err(|e| format!("Failed to parse {s}: {e}"))
         }
 
         if let Some((start, end_incl)) = s.split_once("..=") {
@@ -596,23 +648,36 @@ impl FromStr for ValueFragment {
     }
 }
 
+// Asserts that will be run before configuring a node.
+//
+// Referring to a node by name resolves to its output frequency. `property(NODE)` resolves to the
+// node's property value.
 #[derive(Debug, Clone, Deserialize)]
 pub struct RejectExpression(Expression);
 impl RejectExpression {
     fn to_rust<'a>(
-        &self,
-        config_fields: &[(&'a str, Ident)],
+        &'a self,
         mut variables: HashMap<&'a str, TokenStream>,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
     ) -> TokenStream {
         let mut patterns = vec![];
 
-        for (var, config_field) in config_fields {
-            patterns.push(quote! { let Some(#config_field) = clocks.#config_field });
-            // FIXME: don't assume a clock node can be represented as a fixed value
-            variables.insert(var, quote! { #config_field.value() });
-        }
+        self.0.visit_variables(|var| {
+            if !variables.contains_key(var) {
+                // Referring to a node by name resolves to its output frequency.
+                let node = instance.resolve_node(tree, var);
+                let properties = tree.properties(node.name_str());
+                let freq_fn = node.frequency_function_name();
+                variables.insert(var, quote! { #freq_fn(clocks) });
 
-        let reject_expr = self.0.to_rust(variables);
+                // Only run the assert if the referenced nodes have been configured
+                let node_field = properties.field_name();
+                patterns.push(quote! { clocks.#node_field.is_some() });
+            }
+        });
+
+        let reject_expr = self.0.to_rust(variables, instance, tree);
 
         let assert_reject = quote! {
             assert!(!(#reject_expr));
@@ -633,7 +698,7 @@ impl RejectExpression {
 #[derive(Debug, Clone)]
 pub(crate) struct Expression {
     source: String,
-    expr: ast::Expression<DefaultTypeSet>,
+    expr: ast::RightHandExpression<DefaultTypeSet>,
 }
 
 impl Expression {
@@ -642,10 +707,7 @@ impl Expression {
     }
 
     fn expr(&self) -> &ast::RightHandExpression<DefaultTypeSet> {
-        match &self.expr {
-            ast::Expression::Assignment { .. } => unimplemented!("Assignments are not supported"),
-            ast::Expression::Expression { expression } => expression,
-        }
+        &self.expr
     }
 
     fn visit_variables<'s>(&'s self, mut f: impl FnMut(&'s str)) {
@@ -663,8 +725,10 @@ impl Expression {
                     visit_variables(&operands[0], f);
                     visit_variables(&operands[1], f);
                 }
-                ast::RightHandExpression::FunctionCall { .. } => {
-                    panic!("Function calls are not supported")
+                ast::RightHandExpression::FunctionCall { name: _, arguments } => {
+                    // This will ensure the user knows the node is referenced in the expression. A
+                    // bit of a convention over specification, though.
+                    visit_variables(&arguments[0], f);
                 }
             }
         }
@@ -672,16 +736,13 @@ impl Expression {
         visit_variables(self.expr(), &mut |token| f(self.lookup(token)))
     }
 
-    fn as_name(&self) -> Option<&str> {
-        if let ast::RightHandExpression::Variable { variable } = self.expr() {
-            Some(self.lookup(*variable))
-        } else {
-            None
-        }
-    }
-
-    fn to_rust(&self, variables: HashMap<&str, TokenStream>) -> TokenStream {
-        ExprCompiler::new(&variables).compile_expression(self)
+    fn to_rust(
+        &self,
+        variables: HashMap<&str, TokenStream>,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> TokenStream {
+        ExprCompiler::new(&variables).compile_expression(self, instance, tree)
     }
 }
 
@@ -691,7 +752,17 @@ impl<'de> Deserialize<'de> for Expression {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        let expr = somni_parser::parser::parse_expression::<DefaultTypeSet>(&s).unwrap();
-        Ok(Expression { source: s, expr })
+        match somni_parser::parser::parse_expression::<DefaultTypeSet>(&s) {
+            Ok(ast::Expression::Expression { expression }) => Ok(Expression {
+                source: s,
+                expr: expression,
+            }),
+
+            Ok(_) => Err(de::Error::custom("Assignments are not supported")),
+            Err(err) => Err(de::Error::custom(format!(
+                "Invalid expression: {}",
+                MarkInSource(&s, err.location, "Expression error", &err.error)
+            ))),
+        }
     }
 }

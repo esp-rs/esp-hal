@@ -683,7 +683,11 @@ macro_rules! for_each_sha_algorithm {
 /// ```rust, no_run
 /// // XTAL_CLK
 ///
-/// fn configure_xtal_clk_impl(_clocks: &mut ClockTree, _config: XtalClkConfig) {
+/// fn configure_xtal_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<XtalClkConfig>,
+///     _new_config: XtalClkConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -693,7 +697,11 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
-/// fn configure_pll_clk_impl(_clocks: &mut ClockTree, _config: PllClkConfig) {
+/// fn configure_pll_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<PllClkConfig>,
+///     _new_config: PllClkConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -703,7 +711,11 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
-/// fn configure_apll_clk_impl(_clocks: &mut ClockTree, _config: ApllClkConfig) {
+/// fn configure_apll_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<ApllClkConfig>,
+///     _new_config: ApllClkConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -721,8 +733,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_cpu_pll_div_in_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<CpuPllDivInConfig>,
-///     _new_selector: CpuPllDivInConfig,
+///     _old_config: Option<CpuPllDivInConfig>,
+///     _new_config: CpuPllDivInConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -733,7 +745,11 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
-/// fn configure_cpu_pll_div_impl(_clocks: &mut ClockTree, _new_config: CpuPllDivConfig) {
+/// fn configure_cpu_pll_div_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<CpuPllDivConfig>,
+///     _new_config: CpuPllDivConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -745,8 +761,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_system_pre_div_in_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<SystemPreDivInConfig>,
-///     _new_selector: SystemPreDivInConfig,
+///     _old_config: Option<SystemPreDivInConfig>,
+///     _new_config: SystemPreDivInConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -757,7 +773,11 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
-/// fn configure_system_pre_div_impl(_clocks: &mut ClockTree, _new_config: SystemPreDivConfig) {
+/// fn configure_system_pre_div_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<SystemPreDivConfig>,
+///     _new_config: SystemPreDivConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -769,8 +789,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_apb_clk_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<ApbClkConfig>,
-///     _new_selector: ApbClkConfig,
+///     _old_config: Option<ApbClkConfig>,
+///     _new_config: ApbClkConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -783,8 +803,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_ref_tick_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<RefTickConfig>,
-///     _new_selector: RefTickConfig,
+///     _old_config: Option<RefTickConfig>,
+///     _new_config: RefTickConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -795,7 +815,11 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
-/// fn configure_ref_tick_xtal_impl(_clocks: &mut ClockTree, _new_config: RefTickXtalConfig) {
+/// fn configure_ref_tick_xtal_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<RefTickXtalConfig>,
+///     _new_config: RefTickXtalConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -805,7 +829,11 @@ macro_rules! for_each_sha_algorithm {
 ///     todo!()
 /// }
 ///
-/// fn configure_ref_tick_ck8m_impl(_clocks: &mut ClockTree, _new_config: RefTickCk8mConfig) {
+/// fn configure_ref_tick_ck8m_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<RefTickCk8mConfig>,
+///     _new_config: RefTickCk8mConfig,
+/// ) {
 ///     todo!()
 /// }
 ///
@@ -813,8 +841,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_cpu_clk_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<CpuClkConfig>,
-///     _new_selector: CpuClkConfig,
+///     _old_config: Option<CpuClkConfig>,
+///     _new_config: CpuClkConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -863,8 +891,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_rtc_slow_clk_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<RtcSlowClkConfig>,
-///     _new_selector: RtcSlowClkConfig,
+///     _old_config: Option<RtcSlowClkConfig>,
+///     _new_config: RtcSlowClkConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -877,8 +905,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_rtc_fast_clk_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<RtcFastClkConfig>,
-///     _new_selector: RtcFastClkConfig,
+///     _old_config: Option<RtcFastClkConfig>,
+///     _new_config: RtcFastClkConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -897,8 +925,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_timg0_function_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0FunctionClockConfig>,
-///     _new_selector: Timg0FunctionClockConfig,
+///     _old_config: Option<Timg0FunctionClockConfig>,
+///     _new_config: Timg0FunctionClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -911,8 +939,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_timg0_calibration_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0CalibrationClockConfig>,
-///     _new_selector: Timg0CalibrationClockConfig,
+///     _old_config: Option<Timg0CalibrationClockConfig>,
+///     _new_config: Timg0CalibrationClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -925,8 +953,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_timg1_function_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0FunctionClockConfig>,
-///     _new_selector: Timg0FunctionClockConfig,
+///     _old_config: Option<Timg0FunctionClockConfig>,
+///     _new_config: Timg0FunctionClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -939,8 +967,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_timg1_calibration_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Timg0CalibrationClockConfig>,
-///     _new_selector: Timg0CalibrationClockConfig,
+///     _old_config: Option<Timg0CalibrationClockConfig>,
+///     _new_config: Timg0CalibrationClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -953,8 +981,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_uart0_function_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Uart0FunctionClockConfig>,
-///     _new_selector: Uart0FunctionClockConfig,
+///     _old_config: Option<Uart0FunctionClockConfig>,
+///     _new_config: Uart0FunctionClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -967,8 +995,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_uart0_mem_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Uart0MemClockConfig>,
-///     _new_selector: Uart0MemClockConfig,
+///     _old_config: Option<Uart0MemClockConfig>,
+///     _new_config: Uart0MemClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -981,8 +1009,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_uart1_function_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Uart0FunctionClockConfig>,
-///     _new_selector: Uart0FunctionClockConfig,
+///     _old_config: Option<Uart0FunctionClockConfig>,
+///     _new_config: Uart0FunctionClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -995,8 +1023,8 @@ macro_rules! for_each_sha_algorithm {
 ///
 /// fn configure_uart1_mem_clock_impl(
 ///     _clocks: &mut ClockTree,
-///     _old_selector: Option<Uart0MemClockConfig>,
-///     _new_selector: Uart0MemClockConfig,
+///     _old_config: Option<Uart0MemClockConfig>,
+///     _new_config: Uart0MemClockConfig,
 /// ) {
 ///     todo!()
 /// }
@@ -1104,9 +1132,6 @@ macro_rules! define_clock_tree_types {
                     CpuPllDivConfig::_6 => 6,
                 }
             }
-            fn value(self) -> u32 {
-                self.divisor()
-            }
         }
         /// The list of clock signals that the `SYSTEM_PRE_DIV_IN` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1140,9 +1165,6 @@ macro_rules! define_clock_tree_types {
             }
             fn divisor(self) -> u32 {
                 self.divisor
-            }
-            fn value(self) -> u32 {
-                self.divisor()
             }
         }
         /// The list of clock signals that the `APB_CLK` multiplexer can output.
@@ -1195,9 +1217,6 @@ macro_rules! define_clock_tree_types {
             fn divisor(self) -> u32 {
                 self.divisor
             }
-            fn value(self) -> u32 {
-                self.divisor()
-            }
         }
         /// Configures the `REF_TICK_CK8M` clock divider.
         ///
@@ -1222,9 +1241,6 @@ macro_rules! define_clock_tree_types {
             }
             fn divisor(self) -> u32 {
                 self.divisor
-            }
-            fn value(self) -> u32 {
-                self.divisor()
             }
         }
         /// The list of clock signals that the `CPU_CLK` multiplexer can output.
@@ -1479,20 +1495,28 @@ macro_rules! define_clock_tree_types {
                 uart1_mem_clock_refcount: 0,
             });
         pub fn configure_xtal_clk(clocks: &mut ClockTree, config: XtalClkConfig) {
-            clocks.xtal_clk = Some(config);
-            configure_xtal_clk_impl(clocks, config);
+            let old_config = clocks.xtal_clk.replace(config);
+            configure_xtal_clk_impl(clocks, old_config, config);
         }
         pub fn xtal_clk_config(clocks: &mut ClockTree) -> Option<XtalClkConfig> {
             clocks.xtal_clk
         }
         fn request_xtal_clk(_clocks: &mut ClockTree) {}
         fn release_xtal_clk(_clocks: &mut ClockTree) {}
+        #[allow(unused_variables)]
+        pub fn xtal_clk_config_frequency(clocks: &mut ClockTree, config: XtalClkConfig) -> u32 {
+            config.value()
+        }
         pub fn xtal_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            unwrap!(clocks.xtal_clk).value()
+            if let Some(config) = clocks.xtal_clk {
+                xtal_clk_config_frequency(clocks, config)
+            } else {
+                0
+            }
         }
         pub fn configure_pll_clk(clocks: &mut ClockTree, config: PllClkConfig) {
-            clocks.pll_clk = Some(config);
-            configure_pll_clk_impl(clocks, config);
+            let old_config = clocks.pll_clk.replace(config);
+            configure_pll_clk_impl(clocks, old_config, config);
         }
         pub fn pll_clk_config(clocks: &mut ClockTree) -> Option<PllClkConfig> {
             clocks.pll_clk
@@ -1513,12 +1537,20 @@ macro_rules! define_clock_tree_types {
                 release_xtal_clk(clocks);
             }
         }
+        #[allow(unused_variables)]
+        pub fn pll_clk_config_frequency(clocks: &mut ClockTree, config: PllClkConfig) -> u32 {
+            config.value()
+        }
         pub fn pll_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            unwrap!(clocks.pll_clk).value()
+            if let Some(config) = clocks.pll_clk {
+                pll_clk_config_frequency(clocks, config)
+            } else {
+                0
+            }
         }
         pub fn configure_apll_clk(clocks: &mut ClockTree, config: ApllClkConfig) {
-            clocks.apll_clk = Some(config);
-            configure_apll_clk_impl(clocks, config);
+            let old_config = clocks.apll_clk.replace(config);
+            configure_apll_clk_impl(clocks, old_config, config);
         }
         pub fn apll_clk_config(clocks: &mut ClockTree) -> Option<ApllClkConfig> {
             clocks.apll_clk
@@ -1535,8 +1567,16 @@ macro_rules! define_clock_tree_types {
             enable_apll_clk_impl(clocks, false);
             release_pll_clk(clocks);
         }
+        #[allow(unused_variables)]
+        pub fn apll_clk_config_frequency(clocks: &mut ClockTree, config: ApllClkConfig) -> u32 {
+            config.value()
+        }
         pub fn apll_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            unwrap!(clocks.apll_clk).value()
+            if let Some(config) = clocks.apll_clk {
+                apll_clk_config_frequency(clocks, config)
+            } else {
+                0
+            }
         }
         pub fn request_rc_fast_clk(clocks: &mut ClockTree) {
             trace!("Requesting RC_FAST_CLK");
@@ -1590,15 +1630,26 @@ macro_rules! define_clock_tree_types {
                 CpuPllDivInConfig::Apll => release_apll_clk(clocks),
             }
         }
-        pub fn cpu_pll_div_in_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.cpu_pll_div_in) {
+        #[allow(unused_variables)]
+        pub fn cpu_pll_div_in_config_frequency(
+            clocks: &mut ClockTree,
+            config: CpuPllDivInConfig,
+        ) -> u32 {
+            match config {
                 CpuPllDivInConfig::Pll => pll_clk_frequency(clocks),
                 CpuPllDivInConfig::Apll => apll_clk_frequency(clocks),
             }
         }
+        pub fn cpu_pll_div_in_frequency(clocks: &mut ClockTree) -> u32 {
+            if let Some(config) = clocks.cpu_pll_div_in {
+                cpu_pll_div_in_config_frequency(clocks, config)
+            } else {
+                0
+            }
+        }
         pub fn configure_cpu_pll_div(clocks: &mut ClockTree, config: CpuPllDivConfig) {
-            clocks.cpu_pll_div = Some(config);
-            configure_cpu_pll_div_impl(clocks, config);
+            let old_config = clocks.cpu_pll_div.replace(config);
+            configure_cpu_pll_div_impl(clocks, old_config, config);
         }
         pub fn cpu_pll_div_config(clocks: &mut ClockTree) -> Option<CpuPllDivConfig> {
             clocks.cpu_pll_div
@@ -1615,8 +1666,19 @@ macro_rules! define_clock_tree_types {
             enable_cpu_pll_div_impl(clocks, false);
             release_cpu_pll_div_in(clocks);
         }
+        #[allow(unused_variables)]
+        pub fn cpu_pll_div_config_frequency(
+            clocks: &mut ClockTree,
+            config: CpuPllDivConfig,
+        ) -> u32 {
+            (cpu_pll_div_in_frequency(clocks) / config.divisor())
+        }
         pub fn cpu_pll_div_frequency(clocks: &mut ClockTree) -> u32 {
-            (cpu_pll_div_in_frequency(clocks) / unwrap!(clocks.cpu_pll_div).divisor())
+            if let Some(config) = clocks.cpu_pll_div {
+                cpu_pll_div_config_frequency(clocks, config)
+            } else {
+                0
+            }
         }
         pub fn configure_system_pre_div_in(
             clocks: &mut ClockTree,
@@ -1656,15 +1718,26 @@ macro_rules! define_clock_tree_types {
                 SystemPreDivInConfig::RcFast => release_rc_fast_clk(clocks),
             }
         }
-        pub fn system_pre_div_in_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.system_pre_div_in) {
+        #[allow(unused_variables)]
+        pub fn system_pre_div_in_config_frequency(
+            clocks: &mut ClockTree,
+            config: SystemPreDivInConfig,
+        ) -> u32 {
+            match config {
                 SystemPreDivInConfig::Xtal => xtal_clk_frequency(clocks),
                 SystemPreDivInConfig::RcFast => rc_fast_clk_frequency(clocks),
             }
         }
+        pub fn system_pre_div_in_frequency(clocks: &mut ClockTree) -> u32 {
+            if let Some(config) = clocks.system_pre_div_in {
+                system_pre_div_in_config_frequency(clocks, config)
+            } else {
+                0
+            }
+        }
         pub fn configure_system_pre_div(clocks: &mut ClockTree, config: SystemPreDivConfig) {
-            clocks.system_pre_div = Some(config);
-            configure_system_pre_div_impl(clocks, config);
+            let old_config = clocks.system_pre_div.replace(config);
+            configure_system_pre_div_impl(clocks, old_config, config);
         }
         pub fn system_pre_div_config(clocks: &mut ClockTree) -> Option<SystemPreDivConfig> {
             clocks.system_pre_div
@@ -1681,8 +1754,19 @@ macro_rules! define_clock_tree_types {
             enable_system_pre_div_impl(clocks, false);
             release_system_pre_div_in(clocks);
         }
+        #[allow(unused_variables)]
+        pub fn system_pre_div_config_frequency(
+            clocks: &mut ClockTree,
+            config: SystemPreDivConfig,
+        ) -> u32 {
+            (system_pre_div_in_frequency(clocks) / (config.divisor() + 1))
+        }
         pub fn system_pre_div_frequency(clocks: &mut ClockTree) -> u32 {
-            (system_pre_div_in_frequency(clocks) / (unwrap!(clocks.system_pre_div).divisor() + 1))
+            if let Some(config) = clocks.system_pre_div {
+                system_pre_div_config_frequency(clocks, config)
+            } else {
+                0
+            }
         }
         pub fn configure_apb_clk(clocks: &mut ClockTree, new_selector: ApbClkConfig) {
             let old_selector = clocks.apb_clk.replace(new_selector);
@@ -1735,12 +1819,20 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
-        pub fn apb_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.apb_clk) {
+        #[allow(unused_variables)]
+        pub fn apb_clk_config_frequency(clocks: &mut ClockTree, config: ApbClkConfig) -> u32 {
+            match config {
                 ApbClkConfig::Pll => apb_clk_80m_frequency(clocks),
                 ApbClkConfig::Apll => apb_clk_cpu_div2_frequency(clocks),
                 ApbClkConfig::Xtal => cpu_clk_frequency(clocks),
                 ApbClkConfig::RcFast => cpu_clk_frequency(clocks),
+            }
+        }
+        pub fn apb_clk_frequency(clocks: &mut ClockTree) -> u32 {
+            if let Some(config) = clocks.apb_clk {
+                apb_clk_config_frequency(clocks, config)
+            } else {
+                0
             }
         }
         pub fn configure_ref_tick(clocks: &mut ClockTree, new_selector: RefTickConfig) {
@@ -1794,17 +1886,25 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
-        pub fn ref_tick_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.ref_tick) {
+        #[allow(unused_variables)]
+        pub fn ref_tick_config_frequency(clocks: &mut ClockTree, config: RefTickConfig) -> u32 {
+            match config {
                 RefTickConfig::Pll => ref_tick_xtal_frequency(clocks),
                 RefTickConfig::Apll => ref_tick_xtal_frequency(clocks),
                 RefTickConfig::Xtal => ref_tick_xtal_frequency(clocks),
                 RefTickConfig::RcFast => ref_tick_ck8m_frequency(clocks),
             }
         }
+        pub fn ref_tick_frequency(clocks: &mut ClockTree) -> u32 {
+            if let Some(config) = clocks.ref_tick {
+                ref_tick_config_frequency(clocks, config)
+            } else {
+                0
+            }
+        }
         pub fn configure_ref_tick_xtal(clocks: &mut ClockTree, config: RefTickXtalConfig) {
-            clocks.ref_tick_xtal = Some(config);
-            configure_ref_tick_xtal_impl(clocks, config);
+            let old_config = clocks.ref_tick_xtal.replace(config);
+            configure_ref_tick_xtal_impl(clocks, old_config, config);
         }
         pub fn ref_tick_xtal_config(clocks: &mut ClockTree) -> Option<RefTickXtalConfig> {
             clocks.ref_tick_xtal
@@ -1821,12 +1921,23 @@ macro_rules! define_clock_tree_types {
             enable_ref_tick_xtal_impl(clocks, false);
             release_xtal_clk(clocks);
         }
+        #[allow(unused_variables)]
+        pub fn ref_tick_xtal_config_frequency(
+            clocks: &mut ClockTree,
+            config: RefTickXtalConfig,
+        ) -> u32 {
+            (xtal_clk_frequency(clocks) / (config.divisor() + 1))
+        }
         pub fn ref_tick_xtal_frequency(clocks: &mut ClockTree) -> u32 {
-            (xtal_clk_frequency(clocks) / (unwrap!(clocks.ref_tick_xtal).divisor() + 1))
+            if let Some(config) = clocks.ref_tick_xtal {
+                ref_tick_xtal_config_frequency(clocks, config)
+            } else {
+                0
+            }
         }
         pub fn configure_ref_tick_ck8m(clocks: &mut ClockTree, config: RefTickCk8mConfig) {
-            clocks.ref_tick_ck8m = Some(config);
-            configure_ref_tick_ck8m_impl(clocks, config);
+            let old_config = clocks.ref_tick_ck8m.replace(config);
+            configure_ref_tick_ck8m_impl(clocks, old_config, config);
         }
         pub fn ref_tick_ck8m_config(clocks: &mut ClockTree) -> Option<RefTickCk8mConfig> {
             clocks.ref_tick_ck8m
@@ -1843,8 +1954,19 @@ macro_rules! define_clock_tree_types {
             enable_ref_tick_ck8m_impl(clocks, false);
             release_rc_fast_clk(clocks);
         }
+        #[allow(unused_variables)]
+        pub fn ref_tick_ck8m_config_frequency(
+            clocks: &mut ClockTree,
+            config: RefTickCk8mConfig,
+        ) -> u32 {
+            (rc_fast_clk_frequency(clocks) / (config.divisor() + 1))
+        }
         pub fn ref_tick_ck8m_frequency(clocks: &mut ClockTree) -> u32 {
-            (rc_fast_clk_frequency(clocks) / (unwrap!(clocks.ref_tick_ck8m).divisor() + 1))
+            if let Some(config) = clocks.ref_tick_ck8m {
+                ref_tick_ck8m_config_frequency(clocks, config)
+            } else {
+                0
+            }
         }
         pub fn configure_cpu_clk(clocks: &mut ClockTree, new_selector: CpuClkConfig) {
             let old_selector = clocks.cpu_clk.replace(new_selector);
@@ -1903,12 +2025,20 @@ macro_rules! define_clock_tree_types {
         }
         fn request_cpu_clk(_clocks: &mut ClockTree) {}
         fn release_cpu_clk(_clocks: &mut ClockTree) {}
-        pub fn cpu_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.cpu_clk) {
+        #[allow(unused_variables)]
+        pub fn cpu_clk_config_frequency(clocks: &mut ClockTree, config: CpuClkConfig) -> u32 {
+            match config {
                 CpuClkConfig::Xtal => system_pre_div_frequency(clocks),
                 CpuClkConfig::RcFast => system_pre_div_frequency(clocks),
                 CpuClkConfig::Apll => cpu_pll_div_frequency(clocks),
                 CpuClkConfig::Pll => cpu_pll_div_frequency(clocks),
+            }
+        }
+        pub fn cpu_clk_frequency(clocks: &mut ClockTree) -> u32 {
+            if let Some(config) = clocks.cpu_clk {
+                cpu_clk_config_frequency(clocks, config)
+            } else {
+                0
             }
         }
         pub fn request_apb_clk_cpu_div2(clocks: &mut ClockTree) {
@@ -2052,11 +2182,22 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
-        pub fn rtc_slow_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.rtc_slow_clk) {
+        #[allow(unused_variables)]
+        pub fn rtc_slow_clk_config_frequency(
+            clocks: &mut ClockTree,
+            config: RtcSlowClkConfig,
+        ) -> u32 {
+            match config {
                 RtcSlowClkConfig::Xtal32k => xtal32k_clk_frequency(clocks),
                 RtcSlowClkConfig::RcSlow => rc_slow_clk_frequency(clocks),
                 RtcSlowClkConfig::RcFast => rc_fast_div_clk_frequency(clocks),
+            }
+        }
+        pub fn rtc_slow_clk_frequency(clocks: &mut ClockTree) -> u32 {
+            if let Some(config) = clocks.rtc_slow_clk {
+                rtc_slow_clk_config_frequency(clocks, config)
+            } else {
+                0
             }
         }
         pub fn configure_rtc_fast_clk(clocks: &mut ClockTree, new_selector: RtcFastClkConfig) {
@@ -2102,10 +2243,21 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
-        pub fn rtc_fast_clk_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.rtc_fast_clk) {
+        #[allow(unused_variables)]
+        pub fn rtc_fast_clk_config_frequency(
+            clocks: &mut ClockTree,
+            config: RtcFastClkConfig,
+        ) -> u32 {
+            match config {
                 RtcFastClkConfig::Xtal => xtal_div_clk_frequency(clocks),
                 RtcFastClkConfig::Rc => rc_fast_clk_frequency(clocks),
+            }
+        }
+        pub fn rtc_fast_clk_frequency(clocks: &mut ClockTree) -> u32 {
+            if let Some(config) = clocks.rtc_fast_clk {
+                rtc_fast_clk_config_frequency(clocks, config)
+            } else {
+                0
             }
         }
         pub fn request_uart_mem_clk(clocks: &mut ClockTree) {
@@ -2175,10 +2327,21 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
-        pub fn timg0_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.timg0_function_clock) {
+        #[allow(unused_variables)]
+        pub fn timg0_function_clock_config_frequency(
+            clocks: &mut ClockTree,
+            config: Timg0FunctionClockConfig,
+        ) -> u32 {
+            match config {
                 Timg0FunctionClockConfig::XtalClk => xtal_clk_frequency(clocks),
                 Timg0FunctionClockConfig::ApbClk => apb_clk_frequency(clocks),
+            }
+        }
+        pub fn timg0_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
+            if let Some(config) = clocks.timg0_function_clock {
+                timg0_function_clock_config_frequency(clocks, config)
+            } else {
+                0
             }
         }
         pub fn configure_timg0_calibration_clock(
@@ -2235,11 +2398,22 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
-        pub fn timg0_calibration_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.timg0_calibration_clock) {
+        #[allow(unused_variables)]
+        pub fn timg0_calibration_clock_config_frequency(
+            clocks: &mut ClockTree,
+            config: Timg0CalibrationClockConfig,
+        ) -> u32 {
+            match config {
                 Timg0CalibrationClockConfig::RtcClk => rtc_slow_clk_frequency(clocks),
                 Timg0CalibrationClockConfig::RcFastDivClk => rc_fast_div_clk_frequency(clocks),
                 Timg0CalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(clocks),
+            }
+        }
+        pub fn timg0_calibration_clock_frequency(clocks: &mut ClockTree) -> u32 {
+            if let Some(config) = clocks.timg0_calibration_clock {
+                timg0_calibration_clock_config_frequency(clocks, config)
+            } else {
+                0
             }
         }
         pub fn configure_timg1_function_clock(
@@ -2290,10 +2464,21 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
-        pub fn timg1_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.timg1_function_clock) {
+        #[allow(unused_variables)]
+        pub fn timg1_function_clock_config_frequency(
+            clocks: &mut ClockTree,
+            config: Timg0FunctionClockConfig,
+        ) -> u32 {
+            match config {
                 Timg0FunctionClockConfig::XtalClk => xtal_clk_frequency(clocks),
                 Timg0FunctionClockConfig::ApbClk => apb_clk_frequency(clocks),
+            }
+        }
+        pub fn timg1_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
+            if let Some(config) = clocks.timg1_function_clock {
+                timg1_function_clock_config_frequency(clocks, config)
+            } else {
+                0
             }
         }
         pub fn configure_timg1_calibration_clock(
@@ -2350,11 +2535,22 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
-        pub fn timg1_calibration_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.timg1_calibration_clock) {
+        #[allow(unused_variables)]
+        pub fn timg1_calibration_clock_config_frequency(
+            clocks: &mut ClockTree,
+            config: Timg0CalibrationClockConfig,
+        ) -> u32 {
+            match config {
                 Timg0CalibrationClockConfig::RtcClk => rtc_slow_clk_frequency(clocks),
                 Timg0CalibrationClockConfig::RcFastDivClk => rc_fast_div_clk_frequency(clocks),
                 Timg0CalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(clocks),
+            }
+        }
+        pub fn timg1_calibration_clock_frequency(clocks: &mut ClockTree) -> u32 {
+            if let Some(config) = clocks.timg1_calibration_clock {
+                timg1_calibration_clock_config_frequency(clocks, config)
+            } else {
+                0
             }
         }
         pub fn configure_uart0_function_clock(
@@ -2405,10 +2601,21 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
-        pub fn uart0_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.uart0_function_clock) {
+        #[allow(unused_variables)]
+        pub fn uart0_function_clock_config_frequency(
+            clocks: &mut ClockTree,
+            config: Uart0FunctionClockConfig,
+        ) -> u32 {
+            match config {
                 Uart0FunctionClockConfig::Apb => apb_clk_frequency(clocks),
                 Uart0FunctionClockConfig::RefTick => ref_tick_frequency(clocks),
+            }
+        }
+        pub fn uart0_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
+            if let Some(config) = clocks.uart0_function_clock {
+                uart0_function_clock_config_frequency(clocks, config)
+            } else {
+                0
             }
         }
         pub fn configure_uart0_mem_clock(
@@ -2445,8 +2652,19 @@ macro_rules! define_clock_tree_types {
                 release_uart_mem_clk(clocks);
             }
         }
-        pub fn uart0_mem_clock_frequency(clocks: &mut ClockTree) -> u32 {
+        #[allow(unused_variables)]
+        pub fn uart0_mem_clock_config_frequency(
+            clocks: &mut ClockTree,
+            config: Uart0MemClockConfig,
+        ) -> u32 {
             uart_mem_clk_frequency(clocks)
+        }
+        pub fn uart0_mem_clock_frequency(clocks: &mut ClockTree) -> u32 {
+            if let Some(config) = clocks.uart0_mem_clock {
+                uart0_mem_clock_config_frequency(clocks, config)
+            } else {
+                0
+            }
         }
         pub fn configure_uart1_function_clock(
             clocks: &mut ClockTree,
@@ -2496,10 +2714,21 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
-        pub fn uart1_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
-            match unwrap!(clocks.uart1_function_clock) {
+        #[allow(unused_variables)]
+        pub fn uart1_function_clock_config_frequency(
+            clocks: &mut ClockTree,
+            config: Uart0FunctionClockConfig,
+        ) -> u32 {
+            match config {
                 Uart0FunctionClockConfig::Apb => apb_clk_frequency(clocks),
                 Uart0FunctionClockConfig::RefTick => ref_tick_frequency(clocks),
+            }
+        }
+        pub fn uart1_function_clock_frequency(clocks: &mut ClockTree) -> u32 {
+            if let Some(config) = clocks.uart1_function_clock {
+                uart1_function_clock_config_frequency(clocks, config)
+            } else {
+                0
             }
         }
         pub fn configure_uart1_mem_clock(
@@ -2536,8 +2765,19 @@ macro_rules! define_clock_tree_types {
                 release_uart_mem_clk(clocks);
             }
         }
-        pub fn uart1_mem_clock_frequency(clocks: &mut ClockTree) -> u32 {
+        #[allow(unused_variables)]
+        pub fn uart1_mem_clock_config_frequency(
+            clocks: &mut ClockTree,
+            config: Uart0MemClockConfig,
+        ) -> u32 {
             uart_mem_clk_frequency(clocks)
+        }
+        pub fn uart1_mem_clock_frequency(clocks: &mut ClockTree) -> u32 {
+            if let Some(config) = clocks.uart1_mem_clock {
+                uart1_mem_clock_config_frequency(clocks, config)
+            } else {
+                0
+            }
         }
         /// Clock tree configuration.
         ///
