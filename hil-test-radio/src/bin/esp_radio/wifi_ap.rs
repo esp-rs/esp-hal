@@ -97,7 +97,7 @@ mod tests {
                 }
                 _ => (),
             }
-            Timer::after(Duration::from_millis(5000)).await
+            Timer::after(Duration::from_millis(2000)).await
         }
     }
 
