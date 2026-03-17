@@ -221,6 +221,8 @@ pub(crate) struct ManagementProperties {
 
     /// This clock node is considered always running.
     pub always_on: bool,
+
+    pub accessor: Option<TokenStream>,
 }
 
 impl ManagementProperties {
@@ -262,7 +264,8 @@ impl ManagementProperties {
     pub fn config_accessor_from(&self, field: &str) -> TokenStream {
         let node_field = &self.name;
         let field = format_ident!("{}", field);
-        quote! { #field.#node_field }
+        let accessor = self.accessor.as_ref().into_iter();
+        quote! { #field.#node_field #([#accessor])* }
     }
 }
 

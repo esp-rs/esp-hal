@@ -136,6 +136,11 @@ pub(crate) struct ProcessedClockData {
     /// All instantiated clock tree nodes.
     clock_tree: IndexMap<String, ClockTreeNodeInstance>,
 
+    /// Clock template groups and the instances of those groups.
+    ///
+    /// For each group, we generate an enum that lists the instances.
+    group_instances: IndexMap<String, IndexSet<String>>,
+
     /// System clock graph.
     dependency_graph: DependencyGraph,
 }
@@ -487,6 +492,7 @@ impl SystemClocks {
         let mut clock_tree_node_defs = vec![];
         let mut clock_tree_node_impls = vec![];
         let mut clock_tree_node_state_getter_doclines = vec![];
+        let mut clock_tree_state_funcs = vec![];
         let mut clock_tree_state_fields = vec![];
         let mut clock_tree_state_accessors = vec![];
         let mut clock_tree_state_field_types = vec![];
@@ -496,6 +502,23 @@ impl SystemClocks {
         let mut provided_function_doclines = vec![];
 
         let mut first_instances = HashSet::new();
+        let mut instance_enums = Vec::new();
+
+        for (group_template, instances) in tree.group_instances.iter() {
+            let enum_name = format_ident!(
+                "{}Instance",
+                group_template.from_case(Case::Constant).to_case(Case::Ada)
+            );
+            let variants = instances
+                .iter()
+                .map(|v| format_ident!("{}", v.from_case(Case::Constant).to_case(Case::Ada)));
+            let idxs = (0..).map(crate::number);
+            instance_enums.push(quote! {
+                pub enum #enum_name {
+                    #(#variants = #idxs,)*
+                }
+            });
+        }
 
         for clock_item in tree.clock_tree.values() {
             // Generate code for all clock tree nodes
@@ -508,6 +531,13 @@ impl SystemClocks {
                 clock_tree_node_defs.push(clock_item.config_type());
             }
             if let Some(type_name) = clock_item.properties.type_name() {
+                clock_tree_state_funcs.push(format_ident!(
+                    "{}",
+                    clock_item
+                        .name
+                        .from_case(Case::Constant)
+                        .to_case(Case::Snake)
+                ));
                 clock_tree_state_fields.push(clock_item.properties.field_name());
                 clock_tree_state_accessors.push(clock_item.properties.config_accessor_from("self"));
                 clock_tree_state_field_types.push(type_name);
@@ -585,6 +615,7 @@ impl SystemClocks {
             /// ```
             macro_rules! define_clock_tree_types {
                 () => {
+                    #(#instance_enums)*
                     #(#clock_tree_node_defs)*
 
                     /// Represents the device's clock tree.
@@ -600,7 +631,7 @@ impl SystemClocks {
 
                         #(
                             #[doc = #clock_tree_node_state_getter_doclines]
-                            pub fn #clock_tree_state_fields(&self) -> #clock_tree_state_field_types {
+                            pub fn #clock_tree_state_funcs(&self) -> #clock_tree_state_field_types {
                                 #clock_tree_state_accessors
                             }
                         )*
@@ -909,6 +940,7 @@ impl DeviceClocks {
                         refcounted: false,
                         has_enable: false,
                         always_on: false,
+                        accessor: None, // System clocks are never collected in an array
                     },
                 };
 
@@ -937,6 +969,12 @@ impl DeviceClocks {
                 .iter()
             {
                 let name = format!("{peri_name}_{}", def.name());
+                let instance_ty = format_ident!(
+                    "{}Instance",
+                    group_name.from_case(Case::Constant).to_case(Case::Ada)
+                );
+                let instance_variant =
+                    format_ident!("{}", peri_name.from_case(Case::Constant).to_case(Case::Ada));
                 let node = ClockTreeNodeInstance {
                     node: def.boxed(),
                     include_in_global_config: false,
@@ -949,12 +987,15 @@ impl DeviceClocks {
                     properties: ManagementProperties {
                         name: format_ident!(
                             "{}",
-                            name.from_case(Case::Constant).to_case(Case::Snake)
+                            format!("{group_name}_{}", def.name())
+                                .from_case(Case::Constant)
+                                .to_case(Case::Snake)
                         ),
                         state_ty: None,
                         refcounted: false,
                         has_enable: false,
                         always_on: false,
+                        accessor: Some(quote! { #instance_ty::#instance_variant as usize }),
                     },
                 };
 
@@ -1013,6 +1054,7 @@ impl DeviceClocks {
 
         let mut tree = ProcessedClockData {
             clock_tree,
+            group_instances: IndexMap::new(),
             dependency_graph: DependencyGraph::empty(),
         };
 
@@ -1044,6 +1086,13 @@ impl DeviceClocks {
                 None
             };
             node.properties.always_on = node.always_on();
+
+            if !node.group_template.is_empty() {
+                tree.group_instances
+                    .entry(node.group_template.clone())
+                    .or_default()
+                    .insert(node.group_instance.clone());
+            }
         }
 
         Ok(tree)
