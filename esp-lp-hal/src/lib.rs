@@ -182,13 +182,9 @@ fn ulp_riscv_halt() -> ! {
         unsafe { &*pac::RTC_CNTL::PTR }
             .cocpu_ctrl()
             .modify(|_, w| unsafe {
-                w.cocpu_shut_2_clk_dis()
-                    .bits(0x3F)
-                    .cocpu_done()
-                    .set_bit()
-                    .cocpu_shut_reset_en()
-                    .set_bit();
-                w
+                w.cocpu_shut_2_clk_dis().bits(0x3F);
+                w.cocpu_done().set_bit();
+                w.cocpu_shut_reset_en().set_bit()
             });
     }
 
