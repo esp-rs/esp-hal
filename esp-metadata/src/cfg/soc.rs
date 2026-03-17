@@ -268,11 +268,11 @@ impl ClockTreeNodeInstance {
     fn config_current_function(&self, tree: &ProcessedClockData) -> TokenStream {
         if self.is_configurable() {
             let ty_name = self.config_type_name();
-            let state = tree.properties(self.name_str()).field_name();
+            let config_field = tree.properties(self.name_str()).config_accessor();
             let fn_name = self.current_config_function_name();
             quote! {
                 pub fn #fn_name(clocks: &mut ClockTree) -> Option<#ty_name> {
-                    clocks.#state
+                    #config_field
                 }
             }
         } else {
@@ -402,14 +402,14 @@ impl ClockTreeNodeInstance {
             frequency: Function {
                 _name: frequency_function_name.to_string(),
                 implementation: if self.is_configurable() {
-                    let node_field = properties.field_name();
+                    let config_field = properties.config_accessor();
                     quote! {
                         #[allow(unused_variables)]
                         pub fn #config_frequency_function_name(clocks: &mut ClockTree, config: #ty_name) -> u32 {
                             #frequency_function_impl
                         }
                         pub fn #frequency_function_name(clocks: &mut ClockTree) -> u32 {
-                            if let Some(config) = clocks.#node_field {
+                            if let Some(config) = #config_field {
                                 #config_frequency_function_name(clocks, config)
                             } else {
                                 0
@@ -500,6 +500,7 @@ impl SystemClocks {
         let mut clock_tree_node_impls = vec![];
         let mut clock_tree_node_state_getter_doclines = vec![];
         let mut clock_tree_state_fields = vec![];
+        let mut clock_tree_state_accessors = vec![];
         let mut clock_tree_state_field_types = vec![];
         let mut clock_tree_refcount_fields = vec![];
         let mut configurables = vec![];
@@ -521,6 +522,7 @@ impl SystemClocks {
             let node_state = tree.properties(clock_item.name_str());
             if let Some(type_name) = node_state.type_name() {
                 clock_tree_state_fields.push(node_state.field_name());
+                clock_tree_state_accessors.push(node_state.config_accessor_from("self"));
                 clock_tree_state_field_types.push(type_name);
                 clock_tree_node_state_getter_doclines.push(format!(
                     "Returns the current configuration of the {} clock tree node",
@@ -612,7 +614,7 @@ impl SystemClocks {
                         #(
                             #[doc = #clock_tree_node_state_getter_doclines]
                             pub fn #clock_tree_state_fields(&self) -> Option<#clock_tree_state_field_types> {
-                                self.#clock_tree_state_fields
+                                #clock_tree_state_accessors
                             }
                         )*
                     }

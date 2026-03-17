@@ -248,6 +248,18 @@ impl ManagementProperties {
     pub fn always_on(&self) -> bool {
         self.always_on
     }
+
+    /// Returns an expression that accesses the node's current configuration field in the ClockTree
+    /// struct.
+    pub fn config_accessor(&self) -> TokenStream {
+        self.config_accessor_from("clocks")
+    }
+
+    pub fn config_accessor_from(&self, field: &str) -> TokenStream {
+        let node_field = &self.name;
+        let field = format_ident!("{}", field);
+        quote! { #field.#node_field }
+    }
 }
 
 /// Common interface for clock node types.
@@ -622,8 +634,8 @@ impl RejectExpression {
                 variables.insert(var, quote! { #freq_fn(clocks) });
 
                 // Only run the assert if the referenced nodes have been configured
-                let node_field = properties.field_name();
-                patterns.push(quote! { clocks.#node_field.is_some() });
+                let config_field = properties.config_accessor();
+                patterns.push(quote! { #config_field.is_some() });
             }
         });
 

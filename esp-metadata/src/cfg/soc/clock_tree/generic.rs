@@ -301,11 +301,11 @@ impl ClockTreeNodeType for Generic {
             reject.to_rust(variables, instance, tree)
         });
 
-        let state = instance_properties.field_name();
+        let config_field = instance_properties.config_accessor();
         quote! {
             pub fn #apply_fn_name(clocks: &mut ClockTree, config: #ty_name) {
                 #reject_exprs
-                let old_config = clocks.#state.replace(config);
+                let old_config = #config_field.replace(config);
 
                 #func_body
             }
@@ -616,8 +616,8 @@ impl ClockTreeNodeType for Generic {
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let state_field = tree.properties(instance.name_str()).field_name();
-        self.impl_request_upstream(instance, tree, quote! { unwrap!(clocks.#state_field) })
+        let config_field = tree.properties(instance.name_str()).config_accessor();
+        self.impl_request_upstream(instance, tree, quote! { unwrap!(#config_field) })
     }
 
     fn release_direct_dependencies(
@@ -625,8 +625,8 @@ impl ClockTreeNodeType for Generic {
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let state_field = tree.properties(instance.name_str()).field_name();
-        self.impl_release_upstream(instance, tree, quote! { unwrap!(clocks.#state_field) })
+        let config_field = tree.properties(instance.name_str()).config_accessor();
+        self.impl_release_upstream(instance, tree, quote! { unwrap!(#config_field) })
     }
 }
 
