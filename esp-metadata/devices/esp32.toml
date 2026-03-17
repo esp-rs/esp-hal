@@ -12,6 +12,33 @@ target = "xtensa-esp32-none-elf"
 cores  = 2
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf"
 
+symbols = [
+    # Additional peripherals defined by us (the developers):
+    "phy",
+    "psram",
+    "touch",
+
+    # ROM capabilities
+    "rom_crc_le",
+    "rom_crc_be",
+    "rom_md5_bsd",
+
+    # Wakeup SOC based on ESP-IDF:
+    "pm_support_ext0_wakeup",
+    "pm_support_ext1_wakeup",
+    "pm_support_touch_sensor_wakeup",
+    "ulp_supported",
+]
+
+[device.soc]
+multi_core_enabled = true
+rc_fast_clk_default = 8_500_000
+
+memory_map = { ranges = [
+    { name = "dram", start = 0x3FFA_E000, end = 0x4000_0000 },
+    { name = "dram2_uninit", start = 0x3FFE_7E30, end = 0x4000_0000 },
+] }
+
 peripherals = [
     { name = "AES" },
     { name = "APB_CTRL" },
@@ -78,35 +105,6 @@ peripherals = [
     { name = "SW_INTERRUPT", virtual = true },
     { name = "TOUCH", virtual = true },
 ]
-
-symbols = [
-    # Additional peripherals defined by us (the developers):
-    "phy",
-    "psram",
-    "touch",
-
-    # ROM capabilities
-    "rom_crc_le",
-    "rom_crc_be",
-    "rom_md5_bsd",
-
-    # Wakeup SOC based on ESP-IDF:
-    "pm_support_ext0_wakeup",
-    "pm_support_ext1_wakeup",
-    "pm_support_touch_sensor_wakeup",
-    "ulp_supported",
-]
-
-[device.soc]
-multi_core_enabled = true
-rc_fast_clk_default = 8_500_000
-
-memory_map = { ranges = [
-    { name = "dram", start = 0x3FFA_E000, end = 0x4000_0000 },
-    { name = "dram2_uninit", start = 0x3FFE_7E30, end = 0x4000_0000 },
-] }
-
-
 
 # PeripheralClockControl templates and peripheral clock signals.
 #

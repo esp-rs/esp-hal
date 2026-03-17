@@ -12,6 +12,32 @@ target = "riscv32imc-unknown-none-elf"
 cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf"
 
+symbols = [
+    # Additional peripherals defined by us (the developers):
+    "phy",
+    "swd",
+
+    # ROM capabilities
+    "rom_crc_le",
+    "rom_crc_be",
+    "rom_md5_mbedtls",
+
+    # Wakeup SOC based on ESP-IDF:
+    "pm_support_wifi_wakeup",
+    "pm_support_bt_wakeup",
+    "uart_support_wakeup_int",
+    "gpio_support_deepsleep_wakeup",
+]
+
+[device.soc]
+cpu_has_csr_pc = true
+rc_fast_clk_default = 17_500_000
+
+memory_map = { ranges = [
+    { name = "dram", start = 0x3FCA_0000, end = 0x3FCE_0000 },
+    { name = "dram2_uninit", start = 0x3FCC_E800, end = 0x3FCD_EB70 },
+] }
+
 peripherals = [
     { name = "APB_CTRL" },
     { name = "APB_SARADC" },
@@ -51,33 +77,6 @@ peripherals = [
     { name = "SW_INTERRUPT", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true },
 ]
-
-symbols = [
-    # Additional peripherals defined by us (the developers):
-    "phy",
-    "swd",
-
-    # ROM capabilities
-    "rom_crc_le",
-    "rom_crc_be",
-    "rom_md5_mbedtls",
-
-    # Wakeup SOC based on ESP-IDF:
-    "pm_support_wifi_wakeup",
-    "pm_support_bt_wakeup",
-    "uart_support_wakeup_int",
-    "gpio_support_deepsleep_wakeup",
-]
-
-[device.soc]
-cpu_has_csr_pc = true
-rc_fast_clk_default = 17_500_000
-
-memory_map = { ranges = [
-    { name = "dram", start = 0x3FCA_0000, end = 0x3FCE_0000 },
-    { name = "dram2_uninit", start = 0x3FCC_E800, end = 0x3FCD_EB70 },
-] }
-
 
 clocks = { system_clocks = { clock_tree = [
     # High-speed clock sources

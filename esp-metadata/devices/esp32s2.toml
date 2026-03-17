@@ -12,6 +12,35 @@ target = "xtensa-esp32s2-none-elf"
 cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf"
 
+symbols = [
+    # Additional peripherals defined by us (the developers):
+    "phy",
+    "psram",
+    "psram_dma",
+    "ulp_riscv_core",
+
+    # ROM capabilities
+    "rom_crc_le",
+    "rom_md5_bsd",
+
+    # Wakeup SOC based on ESP-IDF:
+    "pm_support_ext0_wakeup",
+    "pm_support_ext1_wakeup",
+    "pm_support_touch_sensor_wakeup",
+    "pm_support_wifi_wakeup",
+    "uart_support_wakeup_int",
+    "ulp_supported",
+    "riscv_coproc_supported",
+]
+
+[device.soc]
+rc_fast_clk_default = 8_500_000
+
+memory_map = { ranges = [
+    { name = "dram", start = 0x3FFB_0000, end = 0x4000_0000 },
+    { name = "dram2_uninit", start = 0x3FFD_E000, end = 0x4000_0000 },
+] }
+
 peripherals = [
     { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 4 },
     { name = "APB_SARADC" },
@@ -76,35 +105,6 @@ peripherals = [
     { name = "SW_INTERRUPT", virtual = true },
     { name = "ULP_RISCV_CORE", virtual = true },
 ]
-
-symbols = [
-    # Additional peripherals defined by us (the developers):
-    "phy",
-    "psram",
-    "psram_dma",
-    "ulp_riscv_core",
-
-    # ROM capabilities
-    "rom_crc_le",
-    "rom_md5_bsd",
-
-    # Wakeup SOC based on ESP-IDF:
-    "pm_support_ext0_wakeup",
-    "pm_support_ext1_wakeup",
-    "pm_support_touch_sensor_wakeup",
-    "pm_support_wifi_wakeup",
-    "uart_support_wakeup_int",
-    "ulp_supported",
-    "riscv_coproc_supported",
-]
-
-[device.soc]
-rc_fast_clk_default = 8_500_000
-
-memory_map = { ranges = [
-    { name = "dram", start = 0x3FFB_0000, end = 0x4000_0000 },
-    { name = "dram2_uninit", start = 0x3FFD_E000, end = 0x4000_0000 },
-] }
 
 clocks = { system_clocks = { clock_tree = [
     { name = "XTAL_CLK",    type = "source",                     values = "40",                         output = "VALUE * 1_000_000", always_on = true },

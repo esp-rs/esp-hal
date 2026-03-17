@@ -8,6 +8,7 @@ use quote::{format_ident, quote};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    PeripheralDef,
     cfg::{
         clock_tree::{
             ClockNodeFunctions,
@@ -26,6 +27,35 @@ use crate::{
 
 pub mod clock_tree;
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct SocConfig {
+    #[serde(default)]
+    pub peripherals: Vec<PeripheralDef>,
+    #[serde(default)]
+    pub clocks: DeviceClocks,
+    pub memory_map: MemoryMap,
+}
+
+impl super::GenericProperty for SocConfig {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        let mut cfgs = vec![];
+
+        cfgs.extend(self.clocks.cfgs());
+        cfgs.extend(self.memory_map.cfgs());
+
+        Some(cfgs)
+    }
+
+    fn macros(&self) -> Option<TokenStream> {
+        let mut tokens = quote! {};
+
+        tokens.extend(self.clocks.macros());
+        tokens.extend(self.memory_map.macros());
+
+        Some(tokens)
+    }
+}
+
 /// Memory region.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct MemoryRange {
@@ -40,8 +70,8 @@ pub struct MemoryMap {
     pub ranges: Vec<MemoryRange>,
 }
 
-impl super::GenericProperty for MemoryMap {
-    fn macros(&self) -> Option<TokenStream> {
+impl MemoryMap {
+    fn macros(&self) -> TokenStream {
         let region_branches = self.ranges.iter().map(|region| {
             let name = region.name.to_uppercase();
             let start = number_hex(region.range.start as usize);
@@ -61,7 +91,7 @@ impl super::GenericProperty for MemoryMap {
             }
         });
 
-        Some(quote! {
+        quote! {
             /// Macro to get the address range of the given memory region.
             ///
             /// This macro provides two syntax options for each memory region:
@@ -73,16 +103,14 @@ impl super::GenericProperty for MemoryMap {
             macro_rules! memory_range {
                 #(#region_branches)*
             }
-        })
+        }
     }
 
-    fn cfgs(&self) -> Option<Vec<String>> {
-        Some(
-            self.ranges
-                .iter()
-                .map(|region| format!("has_{}_region", region.name.to_lowercase()))
-                .collect(),
-        )
+    fn cfgs(&self) -> Vec<String> {
+        self.ranges
+            .iter()
+            .map(|region| format!("has_{}_region", region.name.to_lowercase()))
+            .collect()
     }
 }
 
@@ -862,7 +890,7 @@ impl PeripheralClocks {
             }
         }
 
-        match proc_macro2::TokenStream::from_str(&template) {
+        match TokenStream::from_str(&template) {
             Ok(tokens) => Ok(tokens),
             Err(err) => anyhow::bail!("Failed to inflate {template_name}: {err}"),
         }
@@ -1038,23 +1066,19 @@ impl DeviceClocks {
 
         Ok(tree)
     }
-}
 
-impl super::GenericProperty for DeviceClocks {
-    fn cfgs(&self) -> Option<Vec<String>> {
+    fn cfgs(&self) -> Vec<String> {
         let processed_clocks = self.process().unwrap();
 
-        let cfgs = processed_clocks
+        processed_clocks
             .clock_tree
             .iter()
             .map(|node| node.name().to_case(Case::Snake))
             .map(|name| format!("soc_has_clock_node_{name}"))
-            .collect::<Vec<_>>();
-
-        Some(cfgs)
+            .collect::<Vec<_>>()
     }
 
-    fn macros(&self) -> Option<TokenStream> {
+    fn macros(&self) -> TokenStream {
         let processed_clocks = self.process().unwrap();
 
         let system_clocks = match self.system_clocks.generate_macro(&processed_clocks) {
@@ -1072,9 +1096,9 @@ impl super::GenericProperty for DeviceClocks {
             ),
         };
 
-        Some(quote! {
+        quote! {
             #system_clocks
             #peripheral_clocks
-        })
+        }
     }
 }

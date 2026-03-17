@@ -12,6 +12,28 @@ target = "riscv32imac-unknown-none-elf"
 cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c5_technical_reference_manual_en.pdf"
 
+symbols = [
+    # Additional peripherals defined by us (the developers):
+    # "lp_core",
+
+    # ROM capabilities
+    "rom_crc_le",
+    "rom_crc_be",
+    "rom_md5_bsd",
+]
+
+[device.soc]
+cpu_has_branch_predictor = true
+cpu_has_csr_pc = false
+cpu_csr_prv_mode = 0x810
+rc_fast_clk_default = 17_500_000
+
+memory_map = { ranges = [
+    { name = "dram", start = 0x4080_0000, end = 0x4086_0000 },
+    # start address from correct bootloader commit: https://github.com/espressif/esp-idf/blob/d66ebb8/components/bootloader/subproject/main/ld/esp32c5/bootloader.ld#L32
+    { name = "dram2_uninit", start = 0x4084_E5A0, end = 0x4085_E5A0 },
+] }
+
 peripherals = [
     { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 6 },
     { name = "ASSIST_DEBUG" },
@@ -118,30 +140,6 @@ peripherals = [
     { name = "MEM2MEM7", virtual = true, dma_peripheral = 14 },
     { name = "MEM2MEM8", virtual = true, dma_peripheral = 15 },
 ]
-
-
-symbols = [
-    # Additional peripherals defined by us (the developers):
-    # "lp_core",
-
-    # ROM capabilities
-    "rom_crc_le",
-    "rom_crc_be",
-    "rom_md5_bsd",
-]
-
-[device.soc]
-cpu_has_branch_predictor = true
-cpu_has_csr_pc = false
-cpu_csr_prv_mode = 0x810
-rc_fast_clk_default = 17_500_000
-
-memory_map = { ranges = [
-    { name = "dram", start = 0x4080_0000, end = 0x4086_0000 },
-    # start address from correct bootloader commit: https://github.com/espressif/esp-idf/blob/d66ebb8/components/bootloader/subproject/main/ld/esp32c5/bootloader.ld#L32
-    { name = "dram2_uninit", start = 0x4084_E5A0, end = 0x4085_E5A0 },
-] }
-
 clocks = { system_clocks = { clock_tree = [
     # High-speed clock sources
     { name = "XTAL_CLK",    type = "source",  values = "40, 48", output = "VALUE * 1_000_000", always_on = true }, # TODO: not user-configurable

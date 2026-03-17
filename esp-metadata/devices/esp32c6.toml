@@ -12,6 +12,36 @@ target = "riscv32imac-unknown-none-elf"
 cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf"
 
+symbols = [
+    # Additional peripherals defined by us (the developers):
+    "phy",
+    "lp_core",
+    "swd",
+
+    # ROM capabilities
+    "rom_crc_le",
+    "rom_crc_be",
+    "rom_md5_bsd",
+
+    # Wakeup SOC based on ESP-IDF:
+    "pm_support_wifi_wakeup",
+    "pm_support_beacon_wakeup",
+    "pm_support_bt_wakeup",
+    "gpio_support_deepsleep_wakeup",
+    "uart_support_wakeup_int",
+    "pm_support_ext1_wakeup",
+]
+
+[device.soc]
+cpu_has_csr_pc = true
+cpu_csr_prv_mode = 0xC10
+rc_fast_clk_default = 17_500_000
+
+memory_map = { ranges = [
+    { name = "dram", start = 0x4080_0000, end = 0x4088_0000 },
+    { name = "dram2_uninit", start = 0x4086_E610, end = 0x4087_E610 },
+] }
+
 peripherals = [
     { name = "AES", interrupts = { peri = "AES" }, dma_peripheral = 6 },
     { name = "APB_SARADC", dma_peripheral = 8 },
@@ -105,36 +135,6 @@ peripherals = [
     { name = "MEM2MEM7", virtual = true, dma_peripheral = 14 },
     { name = "MEM2MEM8", virtual = true, dma_peripheral = 15 },
 ]
-
-symbols = [
-    # Additional peripherals defined by us (the developers):
-    "phy",
-    "lp_core",
-    "swd",
-
-    # ROM capabilities
-    "rom_crc_le",
-    "rom_crc_be",
-    "rom_md5_bsd",
-
-    # Wakeup SOC based on ESP-IDF:
-    "pm_support_wifi_wakeup",
-    "pm_support_beacon_wakeup",
-    "pm_support_bt_wakeup",
-    "gpio_support_deepsleep_wakeup",
-    "uart_support_wakeup_int",
-    "pm_support_ext1_wakeup",
-]
-
-[device.soc]
-cpu_has_csr_pc = true
-cpu_csr_prv_mode = 0xC10
-rc_fast_clk_default = 17_500_000
-
-memory_map = { ranges = [
-    { name = "dram", start = 0x4080_0000, end = 0x4088_0000 },
-    { name = "dram2_uninit", start = 0x4086_E610, end = 0x4087_E610 },
-] }
 
 clocks = { system_clocks = { clock_tree = [
     # High-speed clock sources

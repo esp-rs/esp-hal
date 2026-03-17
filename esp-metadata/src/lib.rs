@@ -316,7 +316,6 @@ struct Device {
     cores: usize,
     trm: String,
 
-    peripherals: Vec<PeripheralDef>,
     symbols: Vec<String>,
 
     // Peripheral driver configuration:
@@ -366,7 +365,6 @@ impl Config {
                 target: String::new(),
                 cores: 1,
                 trm: String::new(),
-                peripherals: Vec::new(),
                 symbols: Vec::new(),
                 peri_config: PeriConfig::default(),
             },
@@ -378,8 +376,7 @@ impl Config {
         for instance in self.device.peri_config.driver_instances() {
             let (driver, peri) = instance.split_once('.').unwrap();
             ensure!(
-                self.device
-                    .peripherals
+                self.peripherals()
                     .iter()
                     .any(|p| p.name.eq_ignore_ascii_case(peri)),
                 "Driver {driver} marks an implementation for '{peri}' but this peripheral is not defined for '{}'",
@@ -411,7 +408,14 @@ impl Config {
 
     /// The peripherals of the device.
     pub fn peripherals(&self) -> &[PeripheralDef] {
-        &self.device.peripherals
+        &self
+            .device
+            .peri_config
+            .soc
+            .as_ref()
+            .expect("[device.soc] must be defined")
+            .config
+            .peripherals
     }
 
     /// User-defined symbols for the device.
@@ -430,7 +434,7 @@ impl Config {
                     Cores::Multi => String::from("multi_core"),
                 },
             ];
-            all.extend(self.device.peripherals.iter().map(|p| p.symbol_name()));
+            all.extend(self.peripherals().iter().map(|p| p.symbol_name()));
             all.extend_from_slice(&self.device.symbols);
             all.extend(
                 self.device
@@ -631,7 +635,7 @@ impl Config {
 
         let mut stable_peris = vec![];
 
-        for p in self.device.peripherals.iter() {
+        for p in self.peripherals().iter() {
             if p.stable && !stable_peris.contains(&p.name.as_str()) {
                 stable_peris.push(p.name.as_str());
             }
@@ -690,7 +694,7 @@ This pin may be available with certain limitations. Check your hardware to make 
             }
         }
 
-        for peri in self.device.peripherals.iter() {
+        for peri in self.peripherals().iter() {
             let hal = format_ident!("{}", peri.name);
             let pac = if peri.is_virtual {
                 format_ident!("virtual")
@@ -852,7 +856,7 @@ pub fn generate_build_script_utils() -> TokenStream {
         let target = config.device.target.as_str();
         let cfgs = config.list_of_cfgs();
         let soc_config = config.device.peri_config.soc.as_ref().unwrap();
-        let memory_regions = soc_config.memory_map.ranges.iter().map(|r| {
+        let memory_regions = soc_config.config.memory_map.ranges.iter().map(|r| {
             let name = r.name.as_str();
             let start = number_hex(r.range.start);
             let end = number_hex(r.range.end);
