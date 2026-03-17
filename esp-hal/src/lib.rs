@@ -101,46 +101,52 @@ let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 //! cargo install esp-generate
 //! esp-generate --chip=esp32c6 your-project
 //! ```
-//!
-//! ## Blinky
-//!
-//! Some minimal code to blink an LED looks like this:
-//!
-//! ```rust, no_run
-//! #![no_std]
-//! #![no_main]
-//!
-//! use esp_hal::{
-//!     clock::CpuClock,
-//!     gpio::{Io, Level, Output, OutputConfig},
-//!     main,
-//!     time::{Duration, Instant},
-//! };
-//!
-//! // You need a panic handler. Usually, you would use esp_backtrace, panic-probe, or
-//! // something similar, but you can also bring your own like this:
-//! #[panic_handler]
-//! fn panic(_: &core::panic::PanicInfo) -> ! {
-//!     esp_hal::system::software_reset()
-//! }
-//!
-//! #[main]
-//! fn main() -> ! {
-//!     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
-//!     let peripherals = esp_hal::init(config);
-//!
-//!     // Set GPIO0 as an output, and set its state high initially.
-//!     let mut led = Output::new(peripherals.GPIO0, Level::High, OutputConfig::default());
-//!
-//!     loop {
-//!         led.toggle();
-//!         // Wait for half a second
-//!         let delay_start = Instant::now();
-//!         while delay_start.elapsed() < Duration::from_millis(500) {}
-//!     }
-//! }
-//! ```
-//!
+#![cfg_attr(
+    // Feature-gated so that this doesn't prevent gradual device bringup. Any
+    // stable driver would serve the purpose here, so this block will be part
+    // of the released documentation.
+    gpio_driver_supported,
+    doc = r#"
+## Blinky
+
+Some minimal code to blink an LED looks like this:
+
+```rust, no_run
+#![no_std]
+#![no_main]
+
+use esp_hal::{
+    clock::CpuClock,
+    gpio::{Io, Level, Output, OutputConfig},
+    main,
+    time::{Duration, Instant},
+};
+
+// You need a panic handler. Usually, you would use esp_backtrace, panic-probe, or
+// something similar, but you can also bring your own like this:
+#[panic_handler]
+fn panic(_: &core::panic::PanicInfo) -> ! {
+    esp_hal::system::software_reset()
+}
+
+#[main]
+fn main() -> ! {
+    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let peripherals = esp_hal::init(config);
+
+    // Set GPIO0 as an output, and set its state high initially.
+    let mut led = Output::new(peripherals.GPIO0, Level::High, OutputConfig::default());
+
+    loop {
+        led.toggle();
+        // Wait for half a second
+        let delay_start = Instant::now();
+        while delay_start.elapsed() < Duration::from_millis(500) {}
+    }
+}
+```
+"#
+)]
 //! ## Additional configuration
 //!
 //! We've exposed some configuration options that don't fit into cargo
@@ -275,6 +281,7 @@ use core::marker::PhantomData;
 
 pub use esp_metadata_generated::chip;
 use esp_rom_sys as _;
+#[cfg_attr(esp32c61, allow(unused))]
 pub(crate) use unstable_driver;
 pub(crate) use unstable_module;
 
@@ -311,7 +318,7 @@ pub mod peripherals;
 mod reg_access;
 #[cfg(any(spi_master_driver_supported, spi_slave_driver_supported))]
 pub mod spi;
-#[cfg_attr(esp32c5, allow(dead_code))]
+#[cfg_attr(any(esp32c5, esp32c61), allow(dead_code))]
 pub mod system;
 pub mod time;
 #[cfg(uart_driver_supported)]
@@ -455,19 +462,24 @@ pub trait DriverMode: crate::private::Sealed {}
 ///
 /// [`Async`] drivers can be converted to a [`Blocking`] driver using the
 /// `into_blocking` method, for example:
-///
-/// ```rust, no_run
-/// # {before_snippet}
-/// # use esp_hal::uart::{Config, Uart};
-/// let uart = Uart::new(peripherals.UART0, Config::default())?
-///     .with_rx(peripherals.GPIO1)
-///     .with_tx(peripherals.GPIO2)
-///     .into_async();
-///
-/// let blocking_uart = uart.into_blocking();
-///
-/// # {after_snippet}
-/// ```
+#[cfg_attr(
+    // Feature-gated so that this doesn't prevent gradual device bringup. Any
+    // stable driver would serve the purpose here, so this block will be part
+    // of the released documentation.
+    all(uart_driver_supported, gpio_driver_supported),
+    doc = r#"
+```rust, no_run
+# {before_snippet}
+# use esp_hal::uart::{Config, Uart};
+let uart = Uart::new(peripherals.UART0, Config::default())?
+    .with_rx(peripherals.GPIO1)
+    .with_tx(peripherals.GPIO2)
+    .into_async();
+let blocking_uart = uart.into_blocking();
+# {after_snippet}
+```
+"#
+)]
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct Blocking;
@@ -478,18 +490,24 @@ pub struct Blocking;
 /// Drivers are constructed in blocking mode by default. To set up an async
 /// driver, a [`Blocking`] driver must be converted to an `Async` driver using
 /// the `into_async` method, for example:
+#[cfg_attr(
+    // Feature-gated so that this doesn't prevent gradual device bringup. Any
+    // stable driver would serve the purpose here, so this block will be part
+    // of the released documentation.
+    all(uart_driver_supported, gpio_driver_supported),
+    doc = r#"
+```rust, no_run
+# {before_snippet}
+# use esp_hal::uart::{Config, Uart};
+let uart = Uart::new(peripherals.UART0, Config::default())?
+    .with_rx(peripherals.GPIO1)
+    .with_tx(peripherals.GPIO2)
+    .into_async();
 ///
-/// ```rust, no_run
-/// # {before_snippet}
-/// # use esp_hal::uart::{Config, Uart};
-/// let uart = Uart::new(peripherals.UART0, Config::default())?
-///     .with_rx(peripherals.GPIO1)
-///     .with_tx(peripherals.GPIO2)
-///     .into_async();
-///
-/// # {after_snippet}
-/// ```
-///
+# {after_snippet}
+```
+"#
+)]
 /// Drivers can be converted back to blocking mode using the `into_blocking`
 /// method, see [`Blocking`] documentation for more details.
 ///
@@ -552,6 +570,7 @@ pub(crate) mod private {
     }
 
     pub(crate) struct OnDrop<F: FnOnce()>(ManuallyDrop<F>);
+    #[cfg_attr(esp32c61, expect(unused))] // TODO: remove when more peripherals are supported
     impl<F: FnOnce()> OnDrop<F> {
         pub fn new(cb: F) -> Self {
             Self(ManuallyDrop::new(cb))

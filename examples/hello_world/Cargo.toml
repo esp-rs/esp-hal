@@ -39,6 +39,11 @@ esp32c6 = [
     "esp-bootloader-esp-idf/esp32c6",
     "esp-hal/esp32c6",
 ]
+esp32c61 = [
+    "esp-backtrace/esp32c61",
+    "esp-bootloader-esp-idf/esp32c61",
+    "esp-hal/esp32c61",
+]
 esp32h2 = [
     "esp-backtrace/esp32h2",
     "esp-bootloader-esp-idf/esp32h2",

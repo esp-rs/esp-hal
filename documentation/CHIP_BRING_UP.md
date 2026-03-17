@@ -19,6 +19,12 @@ In particular, this page specifies:
 - the current MMU page size assumptions (and any resulting flash size configuration requirements)
 - where flasher stubs are sourced from
 
+To build a bootloader for your chip, simply open any example folder in `esp-idf`, configure the target chip and run the appropriate command:
+```
+idf.py set-target <CHIP>
+idf.py bootloader
+``` 
+
 Also, you will need to implement and define a couple of chip-specific functions in `espflash/src/targets/<chip>.rs`. It is sufficient to use the implementation of already supported chips as a reference.
 
 ### probe-rs Support (optional)
@@ -81,7 +87,7 @@ This means:
 - `ORIGIN = 0x40800000`
 - `LENGTH = 0x4084E5A0 - 0x40800000 = 0x4E5A0`
 
-To verify correctness, search for the `bootloader_iram_loader_seg_start == assertion`. It should match ORIGIN + LENGTH.
+To verify correctness, search for the `bootloader_iram_loader_seg_start ==` assertion. It should match ORIGIN + LENGTH.
 
 Next, update the `dram2_seg` length formula. You need the value of `SOC_ROM_STACK_START` from ESP-IDF. For C5, this value is `0x4085e5a0`. The final definition becomes:
 ```
@@ -171,6 +177,8 @@ symbols = [
   
 memory_map = { ranges = [
 { name = "dram", start = <FILL_FROM_MEMORY.X>, end = <FILL_FROM_MEMORY.X> },
+# start should be `iram_loader_seg_start` counted from https://github.com/espressif/esp-idf/blob/d66ebb8/components/bootloader/subproject/main/ld/esp32c5/bootloader.ld#L32 or ORIGIN + LENGTH of RAM from memory.x. 
+# End is `SOC_ROM_STACK_START` from `IDF` or lookup for `PRO CPU stack` address range in bootloader.ld.in for the given chip
 { name = "dram2_uninit", start = 0, end = 1 }, # TODO
 ] }
 
@@ -224,7 +232,7 @@ Avoid enabling advanced peripherals (e.g., `i2c`, `spi`, LP peripherals) at this
 ## HAL
 ### clocks_ll
 
-You don't need to **implement** clocks at this phase, however fake-defining them and at least using some blinding placeholders is required. Refer to the previous [C5 support PR ](https://github.com/esp-rs/esp-hal/pull/4859/changes#diff-75a5e847ec368b58a227b16ea788a0007a569040ed5793bf8cdda6f37676f0f5) as guidance.
+You don't need to **implement** clocks at this phase, however fake-defining them and at least using some blinding placeholders is required. Refer to the previous [C5 support PR](https://github.com/esp-rs/esp-hal/pull/4859/changes#diff-75a5e847ec368b58a227b16ea788a0007a569040ed5793bf8cdda6f37676f0f5) as guidance.
 
 ### esp-hal/src/efuse
 
@@ -292,3 +300,6 @@ Implementing further peripheral support boils down to a relatively simple loop o
 
 - **A huge number of errors**
   Sometimes this process does indeed cause dozens or even hundreds of errors, but it is worth checking again to see if most of them can be corrected with a couple of `cfg`-gates.
+
+- **Code has been successfully flashed, but the chip keeps rebooting**
+  Make sure you have disabled `WDT`s or are not using `RTC RAM` on a chip that **does not** support this feature — this applies both not enabling the “esp-riscv-rt/rtc-ram” feature for the given chip and to the absence of `RTC-RAM`-related sections in the linker script.

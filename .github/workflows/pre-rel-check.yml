@@ -58,6 +58,7 @@ jobs:
           cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs --no-check-crates
           cargo xcheck ci esp32c5 --toolchain stable --no-lint --no-docs --no-check-crates
           cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs --no-check-crates
+          cargo xcheck ci esp32c61 --toolchain stable --no-lint --no-docs --no-check-crates
           cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs --no-check-crates
 
       - name: try-build-tests
@@ -70,4 +71,5 @@ jobs:
           cargo xtask build tests esp32c3
           cargo xtask build tests esp32c5
           cargo xtask build tests esp32c6
+          cargo xtask build tests esp32c61
           cargo xtask build tests esp32h2
