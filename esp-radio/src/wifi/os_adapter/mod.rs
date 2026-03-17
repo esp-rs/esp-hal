@@ -790,7 +790,7 @@ pub unsafe extern "C" fn wifi_apb80m_release() {
 /// *************************************************************************
 pub unsafe extern "C" fn phy_disable() {
     trace!("phy_disable");
-    core::mem::drop(esp_phy::enable_phy());
+    esp_phy::disable_phy();
 }
 
 /// **************************************************************************

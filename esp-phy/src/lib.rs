@@ -397,6 +397,13 @@ pub fn enable_phy<'d>() -> PhyInitGuard<'d> {
     PhyInitGuard { _phy_clock_guard }
 }
 
+/// Manually disable the PHY.
+///
+/// This is only useful if you [core::mem::forget] the [PhyInitGuard].
+pub fn disable_phy() {
+    PHY_STATE.with(|phy_state| phy_state.decrease_ref_count());
+}
+
 /// Enable the PHY clock and acquire a [PhyClockGuard].
 ///
 /// The PHY clock will only be disabled, once all [PhyClockGuard]'s of all
