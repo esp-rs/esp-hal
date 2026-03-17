@@ -47,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Work queue support for ECC operations (#5084)
 - A mechanism to hook into linker scripts (#5116)
 - ESP32-S2, ESP32-S3: Add `UlpWakeupSource` so these chips can be woken up by ULP-generated interrupts. (#5132)
-- ESP32-S2, ESP32-S3: Add support for configuring the ULP Timer with `UlpCore.with_sleep_cycles(cycles : UlpCoreSleepCycles)` (#5134)
+- ESP32-S2, ESP32-S3: `UlpCore.run()` now accepts `UlpCoreWakeupSource::Timer(UlpCoreSleepCycles)` as an argument, allowing ULP applications to be woken up by the ULP Timer. (#5134)
 
 ### Changed
 

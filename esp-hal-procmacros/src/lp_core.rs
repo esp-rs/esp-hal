@@ -139,16 +139,6 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
                             let mut #param_name = unsafe { the_hal::gpio::conjure_output().unwrap() };
                         ));
                     }
-                    "OutputOpenDrain" => {
-                        let pin = extract_pin(&t.ty);
-                        if used_pins.contains(&pin) {
-                            return Error::new(arg.span(), "duplicate pin").to_compile_error();
-                        }
-                        used_pins.push(pin);
-                        create_peripheral.push(quote!(
-                            let mut #param_name = unsafe { the_hal::gpio::conjure_output_open_drain().unwrap() };
-                        ));
-                    }
                     "Input" => {
                         let pin = extract_pin(&t.ty);
                         if used_pins.contains(&pin) {

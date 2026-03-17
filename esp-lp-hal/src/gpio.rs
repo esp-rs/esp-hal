@@ -53,8 +53,6 @@ impl<const PIN: u8> Input<PIN> {
 
 /// GPIO output driver
 pub struct Output<const PIN: u8>;
-/// GPIO output driver open drain
-pub struct OutputOpenDrain<const PIN: u8>;
 
 impl<const PIN: u8> Output<PIN> {
     /// Read the output state/level of the pin.
@@ -84,47 +82,6 @@ impl<const PIN: u8> Output<PIN> {
     }
 }
 
-impl<const PIN: u8> OutputOpenDrain<PIN> {
-    /// Read the output state/level of the pin.
-    pub fn output_state(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "esp32c6")] {
-                (unsafe { &*LpIo::PTR }.out().read().bits() >> PIN) & 0x1 != 0
-            } else if #[cfg(feature = "esp32s2")] {
-                (unsafe { &*LpIo::PTR }.out().read().gpio_out_data().bits() >> PIN) & 0x1 != 0
-            } else if #[cfg(feature = "esp32s3")] {
-                (unsafe { &*LpIo::PTR }.out().read().data().bits() >> PIN) & 0x1 != 0
-            }
-        }
-    }
-
-    /// Set the output state/level of the pin.
-    pub fn set_output(&mut self, on: bool) {
-        if on {
-            unsafe { &*LpIo::PTR }
-                .out_w1ts()
-                .write(|w| unsafe { w.out_data_w1ts().bits(1 << PIN) });
-        } else {
-            unsafe { &*LpIo::PTR }
-                .out_w1tc()
-                .write(|w| unsafe { w.out_data_w1tc().bits(1 << PIN) });
-        }
-    }
-
-    /// Read the input state/level of the pin.
-    pub fn input_state(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "esp32c6")] {
-                (unsafe { &*LpIo::PTR }.in_().read().bits() >> PIN) & 0x1 != 0
-            } else if #[cfg(feature = "esp32s2")] {
-                (unsafe { &*LpIo::PTR }.in_().read().gpio_in_next().bits() >> PIN) & 0x1 != 0
-            } else if #[cfg(feature = "esp32s3")] {
-                (unsafe { &*LpIo::PTR }.in_().read().next().bits() >> PIN) & 0x1 != 0
-            }
-        }
-    }
-}
-
 // Used by the `entry` procmacro:
 #[doc(hidden)]
 pub unsafe fn conjure_output<const PIN: u8>() -> Option<Output<PIN>> {
@@ -132,16 +89,6 @@ pub unsafe fn conjure_output<const PIN: u8>() -> Option<Output<PIN>> {
         None
     } else {
         Some(Output)
-    }
-}
-
-// Used by the `entry` procmacro:
-#[doc(hidden)]
-pub unsafe fn conjure_output_open_drain<const PIN: u8>() -> Option<OutputOpenDrain<PIN>> {
-    if PIN > MAX_GPIO_PIN {
-        None
-    } else {
-        Some(OutputOpenDrain)
     }
 }
 
@@ -162,11 +109,6 @@ impl<const PIN: u8> embedded_hal::digital::ErrorType for Input<PIN> {
 
 #[cfg(feature = "embedded-hal")]
 impl<const PIN: u8> embedded_hal::digital::ErrorType for Output<PIN> {
-    type Error = core::convert::Infallible;
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<const PIN: u8> embedded_hal::digital::ErrorType for OutputOpenDrain<PIN> {
     type Error = core::convert::Infallible;
 }
 
@@ -196,42 +138,6 @@ impl<const PIN: u8> embedded_hal::digital::OutputPin for Output<PIN> {
 
 #[cfg(feature = "embedded-hal")]
 impl<const PIN: u8> embedded_hal::digital::StatefulOutputPin for Output<PIN> {
-    fn is_set_high(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.output_state())
-    }
-
-    fn is_set_low(&mut self) -> Result<bool, Self::Error> {
-        Ok(!self.is_set_high()?)
-    }
-}
-
-// OutputOpenDrain
-#[cfg(feature = "embedded-hal")]
-impl<const PIN: u8> embedded_hal::digital::InputPin for OutputOpenDrain<PIN> {
-    fn is_high(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.input_state())
-    }
-
-    fn is_low(&mut self) -> Result<bool, Self::Error> {
-        Ok(!self.is_high()?)
-    }
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<const PIN: u8> embedded_hal::digital::OutputPin for OutputOpenDrain<PIN> {
-    fn set_low(&mut self) -> Result<(), Self::Error> {
-        self.set_output(false);
-        Ok(())
-    }
-
-    fn set_high(&mut self) -> Result<(), Self::Error> {
-        self.set_output(true);
-        Ok(())
-    }
-}
-
-#[cfg(feature = "embedded-hal")]
-impl<const PIN: u8> embedded_hal::digital::StatefulOutputPin for OutputOpenDrain<PIN> {
     fn is_set_high(&mut self) -> Result<bool, Self::Error> {
         Ok(self.output_state())
     }
