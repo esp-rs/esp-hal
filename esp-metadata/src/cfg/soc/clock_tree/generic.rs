@@ -372,7 +372,7 @@ impl ClockTreeNodeType for Generic {
             match v {
                 NodeParameter::Value(values) => {
                     let mut variables = HashMap::new();
-                    for clock in tree.clock_tree.iter() {
+                    for clock in tree.clock_tree.values() {
                         let clock_name = clock.name_str().as_str();
                         let frequency_fn = clock.frequency_function_name();
                         variables.insert(clock_name, quote! { #frequency_fn(clocks) });

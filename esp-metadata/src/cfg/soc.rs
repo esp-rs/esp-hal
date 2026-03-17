@@ -134,7 +134,7 @@ struct ClockGroup {
 
 pub(crate) struct ProcessedClockData {
     /// All instantiated clock tree nodes.
-    clock_tree: Vec<ClockTreeNodeInstance>,
+    clock_tree: IndexMap<String, ClockTreeNodeInstance>,
 
     /// System clock graph.
     dependency_graph: DependencyGraph,
@@ -482,7 +482,7 @@ impl ProcessedClockData {
     ///
     /// As the clock tree is stored as a vector, this method performs a linear search.
     fn try_get_node(&self, name: &str) -> Option<&ClockTreeNodeInstance> {
-        self.clock_tree.iter().find(|item| item.name_str() == name)
+        self.clock_tree.get(name)
     }
 }
 
@@ -501,7 +501,7 @@ impl SystemClocks {
 
         let mut first_instances = HashSet::new();
 
-        for clock_item in tree.clock_tree.iter() {
+        for clock_item in tree.clock_tree.values() {
             // Generate code for all clock tree nodes
             let is_first_instance = first_instances.insert(format!(
                 "{}_{}",
@@ -1007,9 +1007,10 @@ impl DeviceClocks {
                 .into_iter()
                 .map(|(_, n)| Some(n.into_inner()))
                 .collect::<Vec<_>>();
-            let mut sorted = Vec::with_capacity(clock_tree.len());
+            let mut sorted = IndexMap::with_capacity(clock_tree.len());
             for idx in sorted_clocks {
-                sorted.push(clock_tree[idx].take().unwrap());
+                let node = clock_tree[idx].take().unwrap();
+                sorted.insert(node.name.clone(), node);
             }
             sorted
         };
@@ -1024,7 +1025,7 @@ impl DeviceClocks {
         // dependents (inputs), we have to do a bit of maths.
         tree.dependency_graph = DependencyGraph::build_from(&tree);
 
-        for node in tree.clock_tree.iter_mut() {
+        for node in tree.clock_tree.values_mut() {
             // If there's a single dependent clock, we can piggyback on its refcount.
             // Note that this is only valid if the clock node is not expected to be manually
             // managed. In the current model, manually managed clocks have 0 consumers.
@@ -1059,7 +1060,7 @@ impl DeviceClocks {
         // per instance
         processed_clocks
             .clock_tree
-            .iter()
+            .values()
             .map(|node| node.name().to_case(Case::Snake))
             .map(|name| format!("soc_has_clock_node_{name}"))
             .collect::<Vec<_>>()

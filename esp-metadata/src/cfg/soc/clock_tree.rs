@@ -146,12 +146,12 @@ impl DependencyGraph {
         let mut dependency_graph = IndexMap::new();
         let mut reverse_dependency_graph = IndexMap::new();
 
-        for node in clock_tree.clock_tree.iter() {
+        for node in clock_tree.clock_tree.values() {
             dependency_graph.insert(node.name.clone(), Vec::new());
             reverse_dependency_graph.insert(node.name.clone(), Vec::new());
         }
 
-        for node in clock_tree.clock_tree.iter() {
+        for node in clock_tree.clock_tree.values() {
             let node_name = node.name_str();
 
             for input in node.input_clocks(clock_tree) {
