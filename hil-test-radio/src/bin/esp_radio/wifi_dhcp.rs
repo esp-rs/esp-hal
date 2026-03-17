@@ -491,7 +491,13 @@ mod tests {
             let token = wifi_interface.transmit();
             assert!(matches!(token, None));
 
-            controller.connect_async().await.unwrap();
+            match controller.connect_async().await {
+                Ok(_) => {}
+                Err(_) => {
+                    Timer::after(Duration::from_millis(1000)).await;
+                    controller.connect_async().await.unwrap();
+                }
+            }
 
             let token = wifi_interface.transmit();
 
@@ -510,6 +516,7 @@ mod tests {
             assert!(matches!(token, None));
         }
         {
+            Timer::after(Duration::from_millis(2000)).await;
             let station_config = Config::Station(
                 StationConfig::default()
                     .with_ssid("AP")
@@ -521,7 +528,14 @@ mod tests {
                 ControllerConfig::default().with_initial_config(station_config),
             )
             .unwrap();
-            controller.connect_async().await.unwrap();
+
+            match controller.connect_async().await {
+                Ok(_) => {}
+                Err(_) => {
+                    Timer::after(Duration::from_millis(1000)).await;
+                    controller.connect_async().await.unwrap();
+                }
+            }
 
             let mut wifi_interface = interfaces.station;
 

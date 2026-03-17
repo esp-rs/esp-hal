@@ -221,7 +221,6 @@ mod tests {
             socket.abort();
 
             Timer::after(Duration::from_millis(3000)).await;
-            break;
         }
     }
 }
