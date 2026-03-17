@@ -24,6 +24,7 @@ use crate::{
         ManagementProperties,
         ValidationContext,
     },
+    number,
     number_hex,
 };
 
@@ -493,10 +494,13 @@ impl SystemClocks {
         let mut clock_tree_node_impls = vec![];
         let mut clock_tree_node_state_getter_doclines = vec![];
         let mut clock_tree_state_funcs = vec![];
-        let mut clock_tree_state_fields = vec![];
+        let mut clock_tree_state_func_return_types = vec![];
+        let mut clock_tree_state_field_names = vec![];
         let mut clock_tree_state_accessors = vec![];
         let mut clock_tree_state_field_types = vec![];
-        let mut clock_tree_refcount_fields = vec![];
+        let mut clock_tree_state_field_initializers = vec![];
+        let mut clock_tree_refcount_field_decls = vec![];
+        let mut clock_tree_refcount_field_inits = vec![];
         let mut configurables = vec![];
         let mut system_config_steps = HashMap::new();
         let mut provided_function_doclines = vec![];
@@ -512,7 +516,7 @@ impl SystemClocks {
             let variants = instances
                 .iter()
                 .map(|v| format_ident!("{}", v.from_case(Case::Constant).to_case(Case::Ada)));
-            let idxs = (0..).map(crate::number);
+            let idxs = (0..).map(number);
             instance_enums.push(quote! {
                 pub enum #enum_name {
                     #(#variants = #idxs,)*
@@ -527,9 +531,44 @@ impl SystemClocks {
                 clock_item.group_template,
                 clock_item.node.name()
             ));
-            if is_first_instance && clock_item.is_configurable() {
-                clock_tree_node_defs.push(clock_item.config_type());
+            if is_first_instance {
+                if clock_item.is_configurable() {
+                    clock_tree_node_defs.push(clock_item.config_type());
+                }
+
+                let instance_count =
+                    if let Some(instances) = tree.group_instances.get(&clock_item.group_template) {
+                        Some(number(instances.len()))
+                    } else {
+                        None
+                    };
+
+                if let Some(refcount_field) = clock_item.properties.refcount_field() {
+                    if let Some(instance_count) = instance_count.as_ref() {
+                        clock_tree_refcount_field_decls
+                            .push(quote! { #refcount_field: [u32; #instance_count] });
+                        clock_tree_refcount_field_inits
+                            .push(quote! { #refcount_field: [0; #instance_count] });
+                    } else {
+                        clock_tree_refcount_field_decls.push(quote! { #refcount_field: u32 });
+                        clock_tree_refcount_field_inits.push(quote! { #refcount_field: 0 });
+                    }
+                }
+
+                if let Some(type_name) = clock_item.properties.type_name() {
+                    clock_tree_state_field_names.push(clock_item.properties.field_name());
+
+                    if let Some(instance_count) = instance_count.as_ref() {
+                        clock_tree_state_field_types.push(quote! { [#type_name; #instance_count] });
+                        clock_tree_state_field_initializers
+                            .push(quote! { [None; #instance_count] });
+                    } else {
+                        clock_tree_state_field_types.push(type_name);
+                        clock_tree_state_field_initializers.push(quote! {None});
+                    }
+                }
             }
+
             if let Some(type_name) = clock_item.properties.type_name() {
                 clock_tree_state_funcs.push(format_ident!(
                     "{}",
@@ -538,16 +577,13 @@ impl SystemClocks {
                         .from_case(Case::Constant)
                         .to_case(Case::Snake)
                 ));
-                clock_tree_state_fields.push(clock_item.properties.field_name());
+                clock_tree_state_func_return_types.push(type_name.clone());
                 clock_tree_state_accessors.push(clock_item.properties.config_accessor_from("self"));
-                clock_tree_state_field_types.push(type_name);
+
                 clock_tree_node_state_getter_doclines.push(format!(
                     "Returns the current configuration of the {} clock tree node",
                     clock_item.name_str(),
                 ));
-            }
-            if let Some(refcount_field) = clock_item.properties.refcount_field() {
-                clock_tree_refcount_fields.push(refcount_field);
             }
 
             let node_funcs = clock_item.node_functions(tree);
@@ -620,8 +656,8 @@ impl SystemClocks {
 
                     /// Represents the device's clock tree.
                     pub struct ClockTree {
-                        #(#clock_tree_state_fields: #clock_tree_state_field_types,)*
-                        #(#clock_tree_refcount_fields: u32,)*
+                        #(#clock_tree_state_field_names: #clock_tree_state_field_types,)*
+                        #(#clock_tree_refcount_field_decls,)*
                     }
                     impl ClockTree {
                         /// Locks the clock tree for exclusive access.
@@ -631,7 +667,7 @@ impl SystemClocks {
 
                         #(
                             #[doc = #clock_tree_node_state_getter_doclines]
-                            pub fn #clock_tree_state_funcs(&self) -> #clock_tree_state_field_types {
+                            pub fn #clock_tree_state_funcs(&self) -> #clock_tree_state_func_return_types {
                                 #clock_tree_state_accessors
                             }
                         )*
@@ -639,8 +675,8 @@ impl SystemClocks {
 
                     static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
                         ::esp_sync::NonReentrantMutex::new(ClockTree {
-                            #(#clock_tree_state_fields: None,)*
-                            #(#clock_tree_refcount_fields: 0,)*
+                            #(#clock_tree_state_field_names: #clock_tree_state_field_initializers,)*
+                            #(#clock_tree_refcount_field_inits,)*
                         });
 
                     #(#clock_tree_node_impls)*

@@ -244,7 +244,9 @@ impl ManagementProperties {
     }
 
     pub fn refcount_accessor(&self) -> Option<TokenStream> {
-        self.refcount_field().map(|field| quote! { clocks.#field })
+        let accessor = self.accessor.as_ref().into_iter();
+        self.refcount_field()
+            .map(|field| quote! { clocks.#field #([#accessor])* })
     }
 
     pub fn has_enable(&self) -> bool {
