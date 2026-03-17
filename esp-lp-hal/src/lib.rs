@@ -135,18 +135,18 @@ __start:
 
 	call ulp_riscv_rescue_from_monitor
 	call rust_main
-	call ulp_riscv_halt
 loop:
 	j loop
 "#
 );
 
+/// Entry point to the ULP program
 #[unsafe(link_section = ".init.rust")]
 #[unsafe(export_name = "rust_main")]
 unsafe extern "C" fn lp_core_startup() -> ! {
     unsafe {
         unsafe extern "Rust" {
-            fn main() -> !;
+            fn main();
         }
 
         #[cfg(esp32c6)]
@@ -160,6 +160,7 @@ unsafe extern "C" fn lp_core_startup() -> ! {
         }
 
         main();
+        ulp_riscv_halt();
     }
 }
 
@@ -173,15 +174,24 @@ unsafe extern "C" fn ulp_riscv_rescue_from_monitor() {
         .modify(|_, w| w.cocpu_done().clear_bit().cocpu_shut_reset_en().clear_bit());
 }
 
-#[cfg(any(esp32s2, esp32s3))]
+/// Stops the ULP core, called from itself.
 #[unsafe(link_section = ".init.rust")]
-#[unsafe(no_mangle)]
-unsafe extern "C" fn ulp_riscv_halt() {
-    unsafe { &*pac::RTC_CNTL::PTR }
-        .cocpu_ctrl()
-        .modify(|_, w| unsafe { w.cocpu_shut_2_clk_dis().bits(0x3f).cocpu_done().set_bit() });
+fn ulp_riscv_halt() -> ! {
+    #[cfg(any(esp32s2, esp32s3))]
+    {
+        unsafe { &*pac::RTC_CNTL::PTR }
+            .cocpu_ctrl()
+            .modify(|_, w| unsafe {
+                w.cocpu_shut_2_clk_dis().bits(0x3F);
+                w.cocpu_done().set_bit();
+                w.cocpu_shut_reset_en().set_bit()
+            });
+    }
 
+    // All chips will enter a no-op loop, when halting.
     loop {
-        riscv::asm::wfi();
+        unsafe {
+            core::arch::asm!("addi x0, x0, 0"); // no-op
+        }
     }
 }
