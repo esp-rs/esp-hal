@@ -300,6 +300,10 @@ pub struct PeripheralDef {
     /// as stable.
     #[serde(default)]
     stable: bool,
+
+    /// Instantiates a clock group for the peripheral.
+    #[serde(default)]
+    clock_group: Option<String>,
 }
 
 impl PeripheralDef {

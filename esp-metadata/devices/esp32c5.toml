@@ -89,14 +89,14 @@ peripherals = [
     # { name = "MODEM_PWR0" },
     # { name = "MODEM_PWR1" },
     # { name = "OTP_DEBUG" },
-    { name = "PARL_IO", interrupts = { tx = "PARL_IO_TX", rx = "PARL_IO_RX" }, dma_peripheral = 9 },
+    { name = "PARL_IO", interrupts = { tx = "PARL_IO_TX", rx = "PARL_IO_RX" }, dma_peripheral = 9, clock_group = "PARL_IO" },
     { name = "PAU" },
     { name = "PCNT" },
     { name = "PCR" },
     { name = "PMU" },
     # { name = "PSRAM_MEM_MONITOR" },
     { name = "PVT_MONITOR", pac = "PVT" },
-    { name = "RMT" },
+    { name = "RMT", clock_group = "RMT" },
     { name = "RNG" },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "SHA", interrupts = { peri = "SHA" }, dma_peripheral = 7 },
@@ -108,13 +108,13 @@ peripherals = [
     { name = "SYSTEM", pac = "PCR" },
     { name = "SYSTIMER" },
     { name = "TEE" },
-    { name = "TIMG0" },
-    { name = "TIMG1" },
+    { name = "TIMG0", clock_group = "TIMG" },
+    { name = "TIMG1", clock_group = "TIMG" },
     # { name = "TRACE0", pac = "TRACE" },
     # { name = "TWAI0" }, # TODO: too different from what we know
     # { name = "TWAI1" }, # TODO: too different from what we know
-    { name = "UART0", interrupts = { peri = "UART0" }, stable = true },
-    { name = "UART1", interrupts = { peri = "UART1" }, stable = true },
+    { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
+    { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "UHCI0", dma_peripheral = 2 },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
 
@@ -206,18 +206,8 @@ clocks = { system_clocks = { clock_tree = [
         { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_CLK" },
         { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
     ] },
-] }, peripheral_clocks = { templates = [
-    # templates
-    { name = "default_clk_en_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
-    { name = "clk_en_template", value = "{{default_clk_en_template}}" },
-    { name = "rst_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{rst_field}}().bit(reset));" },
-    # substitutions
-    { name = "control", value = "crate::peripherals::SYSTEM" },
-    { name = "conf_register", value = "{{peripheral}}_conf" },
-    { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
-    { name = "rst_field", value = "{{peripheral}}_rst_en" },
-], peripheral_clocks = [
-    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true, clocks = [
+], template_groups = [
+    { group = "UART", clocks = [
         { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
             { name = "XTAL",     outputs = "XTAL_CLK", default = true },
             { name = "PLL_F80M", outputs = "PLL_F80M" },
@@ -225,8 +215,7 @@ clocks = { system_clocks = { clock_tree = [
         ], div_num = "0 .. 0x100" } },
         { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x1000" } },
     ] },
-    { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true, clocks = "Uart0" },
-    { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true, clocks = [
+    { group = "TIMG", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK", default = true },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
@@ -238,19 +227,14 @@ clocks = { system_clocks = { clock_tree = [
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
         ] },
     ] },
-    { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, clocks = "Timg0" },
-    { name = "I2cExt0", template_params = { peripheral = "i2c0" } },
-    { name = "Pcnt" },
-    { name = "Rmt", clocks = [
+    { group = "RMT", clocks = [
         { name = "SCLK", type = "mux", variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
             { name = "PLL_F80M",    outputs = "PLL_F80M", default = true },
         ] },
     ] },
-    { name = "Systimer", keep_enabled = true }, # can be clocked from XTAL_CLK or RC_FAST_CLK, the latter has no divider?
-    { name = "ApbSarAdc", template_params = { peripheral = "saradc", clk_en_field = "saradc_reg_clk_en", rst_field = "saradc_reg_rst_en" }, keep_enabled = true },
-    { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" }, clocks = [
+    { group = "PARL_IO", clocks = [
         { name = "RX_CLOCK", type = "mux", variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
@@ -263,6 +247,27 @@ clocks = { system_clocks = { clock_tree = [
             { name = "PLL_F240M",   outputs = "PLL_F240M", default = true },
         ] },
     ] },
+] }, peripheral_clocks = { templates = [
+    # templates
+    { name = "default_clk_en_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
+    { name = "clk_en_template", value = "{{default_clk_en_template}}" },
+    { name = "rst_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{rst_field}}().bit(reset));" },
+    # substitutions
+    { name = "control", value = "crate::peripherals::SYSTEM" },
+    { name = "conf_register", value = "{{peripheral}}_conf" },
+    { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
+    { name = "rst_field", value = "{{peripheral}}_rst_en" },
+], peripheral_clocks = [
+    { name = "Uart0", template_params = { conf_register = "uart(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true},
+    { name = "Uart1", template_params = { conf_register = "uart(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
+    { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
+    { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
+    { name = "I2cExt0", template_params = { peripheral = "i2c0" } },
+    { name = "Pcnt" },
+    { name = "Rmt" },
+    { name = "Systimer", keep_enabled = true }, # can be clocked from XTAL_CLK or RC_FAST_CLK, the latter has no divider?
+    { name = "ApbSarAdc", template_params = { peripheral = "saradc", clk_en_field = "saradc_reg_clk_en", rst_field = "saradc_reg_rst_en" }, keep_enabled = true },
+    { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" } },
     { name = "Dma", template_params = { peripheral = "gdma" } },
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
     { name = "Spi2" },

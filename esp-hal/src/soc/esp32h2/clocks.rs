@@ -374,14 +374,14 @@ fn enable_mcpwm0_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
 
 fn configure_mcpwm0_function_clock_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<Mcpwm0FunctionClockConfig>,
-    new_config: Mcpwm0FunctionClockConfig,
+    _old_config: Option<McpwmFunctionClockConfig>,
+    new_config: McpwmFunctionClockConfig,
 ) {
     PCR::regs().pwm_clk_conf().modify(|_, w| unsafe {
         w.pwm_clkm_sel().bits(match new_config {
-            Mcpwm0FunctionClockConfig::XtalClk => 0,
-            Mcpwm0FunctionClockConfig::RcFastClk => 1,
-            Mcpwm0FunctionClockConfig::PllF96m => 2,
+            McpwmFunctionClockConfig::XtalClk => 0,
+            McpwmFunctionClockConfig::RcFastClk => 1,
+            McpwmFunctionClockConfig::PllF96m => 2,
         })
     });
 }
@@ -397,8 +397,8 @@ fn enable_timg0_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
 
 fn configure_timg0_function_clock_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<Timg0FunctionClockConfig>,
-    new_config: Timg0FunctionClockConfig,
+    _old_config: Option<TimgFunctionClockConfig>,
+    new_config: TimgFunctionClockConfig,
 ) {
     // TODO: add variants to PAC
     PCR::regs()
@@ -406,9 +406,9 @@ fn configure_timg0_function_clock_impl(
         .timer_clk_conf()
         .modify(|_, w| unsafe {
             w.timer_clk_sel().bits(match new_config {
-                Timg0FunctionClockConfig::XtalClk => 0,
-                Timg0FunctionClockConfig::RcFastClk => 1,
-                Timg0FunctionClockConfig::PllF48m => 2,
+                TimgFunctionClockConfig::XtalClk => 0,
+                TimgFunctionClockConfig::RcFastClk => 1,
+                TimgFunctionClockConfig::PllF48m => 2,
             })
         });
 }
@@ -422,14 +422,14 @@ fn enable_timg0_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
 
 fn configure_timg0_calibration_clock_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<Timg0CalibrationClockConfig>,
-    new_config: Timg0CalibrationClockConfig,
+    _old_config: Option<TimgCalibrationClockConfig>,
+    new_config: TimgCalibrationClockConfig,
 ) {
     TIMG0::regs().rtccalicfg().modify(|_, w| unsafe {
         w.rtc_cali_clk_sel().bits(match new_config {
-            Timg0CalibrationClockConfig::RcSlowClk => 0,
-            Timg0CalibrationClockConfig::RcFastDivClk => 1,
-            Timg0CalibrationClockConfig::Xtal32kClk => 2,
+            TimgCalibrationClockConfig::RcSlowClk => 0,
+            TimgCalibrationClockConfig::RcFastDivClk => 1,
+            TimgCalibrationClockConfig::Xtal32kClk => 2,
         })
     });
 }
@@ -445,61 +445,61 @@ fn enable_timg0_wdt_clock_impl(_clocks: &mut ClockTree, en: bool) {
 
 fn configure_timg0_wdt_clock_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<Timg0WdtClockConfig>,
-    new_config: Timg0WdtClockConfig,
+    _old_config: Option<TimgWdtClockConfig>,
+    new_config: TimgWdtClockConfig,
 ) {
     PCR::regs()
         .timergroup(0)
         .wdt_clk_conf()
         .modify(|_, w| unsafe {
             w.wdt_clk_sel().bits(match new_config {
-                Timg0WdtClockConfig::XtalClk => 0,
-                Timg0WdtClockConfig::RcFastClk => 1,
-                Timg0WdtClockConfig::PllF48m => 2,
+                TimgWdtClockConfig::XtalClk => 0,
+                TimgWdtClockConfig::RcFastClk => 1,
+                TimgWdtClockConfig::PllF48m => 2,
             })
         });
 }
 
-// PARLIO_RX_CLOCK
+// PARL_IO_RX_CLOCK
 
-fn enable_parlio_rx_clock_impl(_clocks: &mut ClockTree, en: bool) {
+fn enable_parl_io_rx_clock_impl(_clocks: &mut ClockTree, en: bool) {
     PCR::regs()
         .parl_clk_rx_conf()
         .modify(|_, w| w.parl_clk_rx_en().bit(en));
 }
 
-fn configure_parlio_rx_clock_impl(
+fn configure_parl_io_rx_clock_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<ParlioRxClockConfig>,
-    new_config: ParlioRxClockConfig,
+    _old_config: Option<ParlIoRxClockConfig>,
+    new_config: ParlIoRxClockConfig,
 ) {
     PCR::regs().parl_clk_rx_conf().modify(|_, w| unsafe {
         w.parl_clk_rx_sel().bits(match new_config {
-            ParlioRxClockConfig::XtalClk => 0,
-            ParlioRxClockConfig::RcFastClk => 2,
-            ParlioRxClockConfig::PllF96m => 1,
+            ParlIoRxClockConfig::XtalClk => 0,
+            ParlIoRxClockConfig::RcFastClk => 2,
+            ParlIoRxClockConfig::PllF96m => 1,
         })
     });
 }
 
-// PARLIO_TX_CLOCK
+// PARL_IO_TX_CLOCK
 
-fn enable_parlio_tx_clock_impl(_clocks: &mut ClockTree, en: bool) {
+fn enable_parl_io_tx_clock_impl(_clocks: &mut ClockTree, en: bool) {
     PCR::regs()
         .parl_clk_tx_conf()
         .modify(|_, w| w.parl_clk_tx_en().bit(en));
 }
 
-fn configure_parlio_tx_clock_impl(
+fn configure_parl_io_tx_clock_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<ParlioTxClockConfig>,
-    new_config: ParlioTxClockConfig,
+    _old_config: Option<ParlIoTxClockConfig>,
+    new_config: ParlIoTxClockConfig,
 ) {
     PCR::regs().parl_clk_tx_conf().modify(|_, w| unsafe {
         w.parl_clk_tx_sel().bits(match new_config {
-            ParlioTxClockConfig::XtalClk => 0,
-            ParlioTxClockConfig::RcFastClk => 2,
-            ParlioTxClockConfig::PllF96m => 1,
+            ParlIoTxClockConfig::XtalClk => 0,
+            ParlIoTxClockConfig::RcFastClk => 2,
+            ParlIoTxClockConfig::PllF96m => 1,
         })
     });
 }
@@ -536,8 +536,8 @@ fn enable_timg1_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
 
 fn configure_timg1_function_clock_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<Timg0FunctionClockConfig>,
-    new_config: Timg0FunctionClockConfig,
+    _old_config: Option<TimgFunctionClockConfig>,
+    new_config: TimgFunctionClockConfig,
 ) {
     // TODO: add variants to PAC
     PCR::regs()
@@ -545,9 +545,9 @@ fn configure_timg1_function_clock_impl(
         .timer_clk_conf()
         .modify(|_, w| unsafe {
             w.timer_clk_sel().bits(match new_config {
-                Timg0FunctionClockConfig::XtalClk => 0,
-                Timg0FunctionClockConfig::RcFastClk => 1,
-                Timg0FunctionClockConfig::PllF48m => 2,
+                TimgFunctionClockConfig::XtalClk => 0,
+                TimgFunctionClockConfig::RcFastClk => 1,
+                TimgFunctionClockConfig::PllF48m => 2,
             })
         });
 }
@@ -561,14 +561,14 @@ fn enable_timg1_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
 
 fn configure_timg1_calibration_clock_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<Timg0CalibrationClockConfig>,
-    new_config: Timg0CalibrationClockConfig,
+    _old_config: Option<TimgCalibrationClockConfig>,
+    new_config: TimgCalibrationClockConfig,
 ) {
     TIMG1::regs().rtccalicfg().modify(|_, w| unsafe {
         w.rtc_cali_clk_sel().bits(match new_config {
-            Timg0CalibrationClockConfig::RcSlowClk => 0,
-            Timg0CalibrationClockConfig::RcFastDivClk => 1,
-            Timg0CalibrationClockConfig::Xtal32kClk => 2,
+            TimgCalibrationClockConfig::RcSlowClk => 0,
+            TimgCalibrationClockConfig::RcFastDivClk => 1,
+            TimgCalibrationClockConfig::Xtal32kClk => 2,
         })
     });
 }
@@ -584,17 +584,17 @@ fn enable_timg1_wdt_clock_impl(_clocks: &mut ClockTree, en: bool) {
 
 fn configure_timg1_wdt_clock_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<Timg0WdtClockConfig>,
-    new_config: Timg0WdtClockConfig,
+    _old_config: Option<TimgWdtClockConfig>,
+    new_config: TimgWdtClockConfig,
 ) {
     PCR::regs()
         .timergroup(1)
         .wdt_clk_conf()
         .modify(|_, w| unsafe {
             w.wdt_clk_sel().bits(match new_config {
-                Timg0WdtClockConfig::XtalClk => 0,
-                Timg0WdtClockConfig::RcFastClk => 1,
-                Timg0WdtClockConfig::PllF48m => 2,
+                TimgWdtClockConfig::XtalClk => 0,
+                TimgWdtClockConfig::RcFastClk => 1,
+                TimgWdtClockConfig::PllF48m => 2,
             })
         });
 }
@@ -609,8 +609,8 @@ fn enable_uart0_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
 
 fn configure_uart0_function_clock_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<Uart0FunctionClockConfig>,
-    new_config: Uart0FunctionClockConfig,
+    _old_config: Option<UartFunctionClockConfig>,
+    new_config: UartFunctionClockConfig,
 ) {
     configure_uart_function_clock(0, new_config);
 }
@@ -623,8 +623,8 @@ fn enable_uart0_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
 
 fn configure_uart0_baud_rate_generator_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<Uart0BaudRateGeneratorConfig>,
-    new_config: Uart0BaudRateGeneratorConfig,
+    _old_config: Option<UartBaudRateGeneratorConfig>,
+    new_config: UartBaudRateGeneratorConfig,
 ) {
     UART0::regs().clkdiv().write(|w| unsafe {
         w.clkdiv().bits(new_config.integral as _);
@@ -640,8 +640,8 @@ fn enable_uart1_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
 
 fn configure_uart1_function_clock_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<Uart0FunctionClockConfig>,
-    new_config: Uart0FunctionClockConfig,
+    _old_config: Option<UartFunctionClockConfig>,
+    new_config: UartFunctionClockConfig,
 ) {
     configure_uart_function_clock(1, new_config);
 }
@@ -654,8 +654,8 @@ fn enable_uart1_baud_rate_generator_impl(_clocks: &mut ClockTree, _en: bool) {
 
 fn configure_uart1_baud_rate_generator_impl(
     _clocks: &mut ClockTree,
-    _old_config: Option<Uart0BaudRateGeneratorConfig>,
-    new_config: Uart0BaudRateGeneratorConfig,
+    _old_config: Option<UartBaudRateGeneratorConfig>,
+    new_config: UartBaudRateGeneratorConfig,
 ) {
     UART1::regs().clkdiv().write(|w| unsafe {
         w.clkdiv().bits(new_config.integral as _);
@@ -670,12 +670,12 @@ fn enable_uart_function_clock(uart: usize, en: bool) {
         .modify(|_, w| w.sclk_en().bit(en));
 }
 
-fn configure_uart_function_clock(uart: usize, new_config: Uart0FunctionClockConfig) {
+fn configure_uart_function_clock(uart: usize, new_config: UartFunctionClockConfig) {
     PCR::regs().uart(uart).clk_conf().modify(|_, w| unsafe {
         w.sclk_sel().bits(match new_config.sclk {
-            Uart0FunctionClockSclk::PllF48m => 1,
-            Uart0FunctionClockSclk::RcFast => 2,
-            Uart0FunctionClockSclk::Xtal => 3,
+            UartFunctionClockSclk::PllF48m => 1,
+            UartFunctionClockSclk::RcFast => 2,
+            UartFunctionClockSclk::Xtal => 3,
         });
         w.sclk_div_a().bits(0);
         w.sclk_div_b().bits(0);

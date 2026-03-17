@@ -72,9 +72,9 @@ use super::Error;
 #[cfg(timergroup_timg1)]
 use crate::peripherals::TIMG1;
 #[cfg(soc_has_clock_node_timg0_function_clock)]
-use crate::soc::clocks::Timg0FunctionClockConfig;
+use crate::soc::clocks::TimgFunctionClockConfig;
 #[cfg(soc_has_clock_node_timg0_wdt_clock)]
-use crate::soc::clocks::Timg0WdtClockConfig;
+use crate::soc::clocks::TimgWdtClockConfig;
 use crate::{
     asynch::AtomicWaker,
     interrupt::{self, InterruptConfigurable, InterruptHandler},
@@ -124,11 +124,11 @@ pub trait TimerGroupInstance {
     fn id() -> u8;
     fn register_block() -> *const RegisterBlock;
     #[cfg(soc_has_clock_node_timg0_function_clock)]
-    fn configure_src_clk(src: Timg0FunctionClockConfig);
+    fn configure_src_clk(src: TimgFunctionClockConfig);
     fn enable_peripheral();
     fn reset_peripheral();
     #[cfg(soc_has_clock_node_timg0_wdt_clock)]
-    fn configure_wdt_src_clk(src: Timg0WdtClockConfig);
+    fn configure_wdt_src_clk(src: TimgWdtClockConfig);
     #[cfg(soc_has_clock_node_timg0_wdt_clock)]
     fn gate_wdt_src_clk(enable: bool);
     fn wdt_src_frequency() -> Rate;
@@ -147,7 +147,7 @@ impl TimerGroupInstance for TIMG0<'_> {
     }
 
     #[cfg(soc_has_clock_node_timg0_function_clock)]
-    fn configure_src_clk(src: Timg0FunctionClockConfig) {
+    fn configure_src_clk(src: TimgFunctionClockConfig) {
         crate::soc::clocks::ClockTree::with(|clocks| {
             crate::soc::clocks::configure_timg0_function_clock(clocks, src);
             crate::soc::clocks::request_timg0_function_clock(clocks);
@@ -164,7 +164,7 @@ impl TimerGroupInstance for TIMG0<'_> {
     }
 
     #[cfg(soc_has_clock_node_timg0_wdt_clock)]
-    fn configure_wdt_src_clk(src: Timg0WdtClockConfig) {
+    fn configure_wdt_src_clk(src: TimgWdtClockConfig) {
         crate::soc::clocks::ClockTree::with(|clocks| {
             crate::soc::clocks::configure_timg0_wdt_clock(clocks, src)
         });
@@ -210,7 +210,7 @@ impl TimerGroupInstance for crate::peripherals::TIMG1<'_> {
     }
 
     #[cfg(soc_has_clock_node_timg0_function_clock)]
-    fn configure_src_clk(src: Timg0FunctionClockConfig) {
+    fn configure_src_clk(src: TimgFunctionClockConfig) {
         crate::soc::clocks::ClockTree::with(|clocks| {
             crate::soc::clocks::configure_timg1_function_clock(clocks, src);
             crate::soc::clocks::request_timg1_function_clock(clocks);
@@ -226,7 +226,7 @@ impl TimerGroupInstance for crate::peripherals::TIMG1<'_> {
     }
 
     #[cfg(soc_has_clock_node_timg0_wdt_clock)]
-    fn configure_wdt_src_clk(src: Timg0WdtClockConfig) {
+    fn configure_wdt_src_clk(src: TimgWdtClockConfig) {
         crate::soc::clocks::ClockTree::with(|clocks| {
             crate::soc::clocks::configure_timg1_wdt_clock(clocks, src)
         });
@@ -270,7 +270,7 @@ where
         T::enable_peripheral();
 
         #[cfg(soc_has_clock_node_timg0_function_clock)]
-        T::configure_src_clk(Timg0FunctionClockConfig::default());
+        T::configure_src_clk(TimgFunctionClockConfig::default());
 
         Self {
             _timer_group: PhantomData,
@@ -669,7 +669,7 @@ where
 
         this.set_write_protection(false);
         #[cfg(soc_has_clock_node_timg0_wdt_clock)]
-        TG::configure_wdt_src_clk(Timg0WdtClockConfig::default());
+        TG::configure_wdt_src_clk(TimgWdtClockConfig::default());
         this.set_write_protection(true);
 
         this

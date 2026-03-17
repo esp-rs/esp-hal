@@ -60,8 +60,8 @@ peripherals = [
     { name = "I2S1", interrupts = { peri = "I2S1" }, dma_peripheral = 1 },
     { name = "IO_MUX" },
     { name = "LEDC" },
-    { name = "MCPWM0" },
-    { name = "MCPWM1" },
+    { name = "MCPWM0", clock_group = "MCPWM" },
+    { name = "MCPWM1", clock_group = "MCPWM" },
     { name = "NRX" },
     { name = "PCNT" },
     { name = "RMT" },
@@ -79,12 +79,12 @@ peripherals = [
     { name = "SPI1" },
     { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA" }, dma_peripheral = 2, stable = true },
     { name = "SPI3", interrupts = { peri = "SPI3", dma = "SPI3_DMA" }, dma_peripheral = 3, stable = true },
-    { name = "TIMG0" },
-    { name = "TIMG1" },
+    { name = "TIMG0", clock_group = "TIMG" },
+    { name = "TIMG1", clock_group = "TIMG" },
     { name = "TWAI0" },
-    { name = "UART0", interrupts = { peri = "UART0" }, stable = true },
-    { name = "UART1", interrupts = { peri = "UART1" }, stable = true },
-    { name = "UART2", interrupts = { peri = "UART2" }, stable = true },
+    { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
+    { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
+    { name = "UART2", interrupts = { peri = "UART2" }, stable = true, clock_group = "UART" },
     { name = "UHCI0", dma_peripheral = 4 },
     { name = "UHCI1", dma_peripheral = 5 },
     { name = "WIFI", interrupts = { mac = "WIFI_MAC" }, stable = true },
@@ -237,6 +237,27 @@ clocks = { system_clocks = { clock_tree = [
         # The actual source clock is unknown, but it also doesn't matter.
         { name = "XTAL", outputs = "XTAL_CLK", default = true },
     ] },
+], template_groups = [
+    { group = "MCPWM", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "PLL_F160M", outputs = "PLL_F160M_CLK", default = true }
+        ] }
+    ] },
+    { group = "TIMG", clocks = [
+        { name = "CALIBRATION_CLOCK", type = "mux", variants = [
+            { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK", default = true },
+            { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
+            { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
+        ] },
+    ] },
+    { group = "UART", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk", params = { sclk = [
+            { name = "APB",      outputs = "APB_CLK", default = true },
+            { name = "REF_TICK", outputs = "REF_TICK" }
+        ] } },
+        { name = "MEM_CLOCK", type = "generic", output = "UART_MEM_CLK" },
+        { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x100000" } },
+    ] },
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
@@ -260,27 +281,17 @@ clocks = { system_clocks = { clock_tree = [
     #{ name = "SdioSlave", template_params = { reg_group = "wifi_clk" } },
 
     { name = "UartMem", keep_enabled = true }, # TODO: keep_enabled can be removed once esp-println needs explicit initialization
-    { name = "Uart2", clocks = "Uart0" },
+    { name = "Uart2" },
     { name = "SpiDma" },
     { name = "I2s1" },
-    { name = "Mcpwm1", template_params = { peripheral = "pwm1" }, clocks = "Mcpwm0" },
+    { name = "Mcpwm1", template_params = { peripheral = "pwm1" } },
     { name = "Twai0", template_params = { peripheral = "twai" } },
     { name = "I2cExt1" },
-    { name = "Mcpwm0", template_params = { peripheral = "pwm0" }, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", variants = [
-            { name = "PLL_F160M", outputs = "PLL_F160M_CLK", default = true }
-        ] }
-    ] },
+    { name = "Mcpwm0", template_params = { peripheral = "pwm0" } },
     { name = "Spi3" },
-    { name = "Timg1", template_params = { peripheral = "timergroup1" }, clocks = "Timg0" }, # same clock options, but different instance
+    { name = "Timg1", template_params = { peripheral = "timergroup1" } },
     #{ name = "Efuse" },
-    { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true, clocks = [
-        { name = "CALIBRATION_CLOCK", type = "mux", variants = [
-            { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK", default = true },
-            { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
-            { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
-        ] },
-    ] },
+    { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true },
     { name = "Uhci1" },
     { name = "Ledc" },
     { name = "Pcnt" },
@@ -288,16 +299,9 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Uhci0" },
     { name = "I2cExt0" },
     { name = "Spi2" },
-    { name = "Uart1", clocks = "Uart0" },
+    { name = "Uart1" },
     { name = "I2s0" },
-    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk", params = { sclk = [
-            { name = "APB",      outputs = "APB_CLK", default = true },
-            { name = "REF_TICK", outputs = "REF_TICK" }
-        ] } },
-        { name = "MEM_CLOCK", type = "generic", output = "UART_MEM_CLK" },
-        { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x100000" } },
-    ] },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
     #{ name = "Spi01" },
 
     # Radio clocks not modeled here.

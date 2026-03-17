@@ -7,6 +7,7 @@ use std::{
 use anyhow::{Context, Result, anyhow};
 use cargo::CargoAction;
 use esp_metadata::{Chip, Config, TokenStream};
+use log::info;
 use parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
 use pretty_yaml::{config::FormatOptions, format_text};
 use serde::{Deserialize, Serialize};
@@ -992,6 +993,7 @@ fn generate_metadata(
     let out_path = workspace.join("esp-metadata-generated").join("src");
 
     for chip in Chip::iter() {
+        info!("Generating metadata for {}", chip.pretty_name());
         let config = esp_metadata::Config::for_chip(&chip);
         call_for_file(
             &out_path.join(format!("_generated_{chip}.rs")),

@@ -100,60 +100,6 @@ impl ClockNodeFunctions {
     }
 }
 
-/// Represents the clock input options for a peripheral.
-#[derive(Debug, Clone, Deserialize)]
-pub enum PeripheralClockTreeEntry {
-    /// Defines clock tree items relevant for the current peripheral.
-    Definition(Vec<ClockTreeItem>),
-
-    /// References a clock tree defined in another peripheral. This peripheral will inherit the
-    /// clock tree from the referenced peripheral.
-    Reference(String),
-}
-
-impl Default for PeripheralClockTreeEntry {
-    fn default() -> Self {
-        PeripheralClockTreeEntry::Definition(Vec::new())
-    }
-}
-
-// Based on https://serde.rs/string-or-struct.html
-pub(super) fn ref_or_def<'de, D>(deserializer: D) -> Result<PeripheralClockTreeEntry, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct PeripheralClockTreeEntryVisitor;
-
-    impl<'de> Visitor<'de> for PeripheralClockTreeEntryVisitor {
-        type Value = PeripheralClockTreeEntry;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("string or list")
-        }
-
-        fn visit_str<E>(self, value: &str) -> Result<PeripheralClockTreeEntry, E>
-        where
-            E: de::Error,
-        {
-            Ok(PeripheralClockTreeEntry::Reference(value.to_string()))
-        }
-
-        fn visit_seq<S>(self, list: S) -> Result<PeripheralClockTreeEntry, S::Error>
-        where
-            S: SeqAccess<'de>,
-        {
-            // `SeqAccessDeserializer` is a wrapper that turns a `SeqAccess`
-            // into a `Deserializer`, allowing it to be used as the input to T's
-            // `Deserialize` implementation. T then deserializes itself using
-            // the entries from the map visitor.
-            Deserialize::deserialize(de::value::SeqAccessDeserializer::new(list))
-                .map(PeripheralClockTreeEntry::Definition)
-        }
-    }
-
-    deserializer.deserialize_any(PeripheralClockTreeEntryVisitor)
-}
-
 pub struct ValidationContext<'c> {
     pub tree: &'c [&'c ClockTreeNodeInstance],
 }

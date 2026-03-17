@@ -15,7 +15,7 @@ use crate::{
             WakeupLevel,
         },
     },
-    soc::clocks::{ClockTree, Timg0CalibrationClockConfig},
+    soc::clocks::{ClockTree, TimgCalibrationClockConfig},
 };
 
 impl WakeSource for TimerWakeupSource {
@@ -611,7 +611,7 @@ impl SleepTimeConfig {
     const RTC_CLK_CAL_FRACT: u32 = 19;
 
     fn rtc_clk_cal_fast(slowclk_cycles: u32) -> u32 {
-        RtcClock::calibrate(Timg0CalibrationClockConfig::RcFastDivClk, slowclk_cycles)
+        RtcClock::calibrate(TimgCalibrationClockConfig::RcFastDivClk, slowclk_cycles)
     }
 
     fn new(_deep: bool) -> Self {

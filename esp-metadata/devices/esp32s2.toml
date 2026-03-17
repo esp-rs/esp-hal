@@ -78,11 +78,11 @@ peripherals = [
     { name = "SYSCON" },
     { name = "SYSTEM" },
     { name = "SYSTIMER" },
-    { name = "TIMG0" },
-    { name = "TIMG1" },
+    { name = "TIMG0", clock_group = "TIMG" },
+    { name = "TIMG1", clock_group = "TIMG" },
     { name = "TWAI0" },
-    { name = "UART0", interrupts = { peri = "UART0" }, stable = true },
-    { name = "UART1", interrupts = { peri = "UART1" }, stable = true },
+    { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
+    { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "UHCI0", dma_peripheral = 3 },
     { name = "USB0" },
     { name = "USB_WRAP" },
@@ -176,6 +176,26 @@ clocks = { system_clocks = { clock_tree = [
         # The actual source clock is unknown, but it also doesn't matter.
         { name = "XTAL", outputs = "XTAL_CLK", default = true },
     ] },
+], template_groups = [
+    { group = "TIMG", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL_CLK", outputs = "XTAL_CLK", default = true },
+            { name = "APB_CLK",  outputs = "APB_CLK" },
+        ] },
+        { name = "CALIBRATION_CLOCK", type = "mux", variants = [
+            { name = "RTC_CLK",         outputs = "RTC_SLOW_CLK", default = true },
+            { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
+            { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
+        ] },
+    ] },
+    { group = "UART", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk", params = { sclk = [
+            { name = "APB",      outputs = "APB_CLK", default = true },
+            { name = "REF_TICK", outputs = "REF_TICK" }
+        ] } },
+        { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x100000" } },
+        { name = "MEM_CLOCK", type = "generic", output = "UART_MEM_CLK" },
+    ] },
 ] }, peripheral_clocks = { templates = [
     # templates
     { name = "clk_en_template", value = "{{control}}::regs().{{clk_en_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
@@ -213,19 +233,9 @@ clocks = { system_clocks = { clock_tree = [
     { name = "I2cExt1" },
     { name = "Mcpwm0", template_params = { peripheral = "pwm0" } },
     { name = "Spi3" },
-    { name = "Timg1", template_params = { peripheral = "timergroup1" }, clocks = "Timg0" },
+    { name = "Timg1", template_params = { peripheral = "timergroup1" } },
     #{ name = "Efuse" },
-    { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "mux", variants = [
-            { name = "XTAL_CLK", outputs = "XTAL_CLK", default = true },
-            { name = "APB_CLK",  outputs = "APB_CLK" },
-        ] },
-        { name = "CALIBRATION_CLOCK", type = "mux", variants = [
-            { name = "RTC_CLK",         outputs = "RTC_SLOW_CLK", default = true },
-            { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
-            { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
-        ] },
-    ] },
+    { name = "Timg0", template_params = { peripheral = "timergroup" }, keep_enabled = true },
     { name = "Uhci1" },
     { name = "Ledc" },
     { name = "Pcnt" },
@@ -233,17 +243,10 @@ clocks = { system_clocks = { clock_tree = [
     { name = "Uhci0" },
     { name = "I2cExt0" },
     { name = "Spi2" },
-    { name = "Uart1", clocks = "Uart0" },
+    { name = "Uart1" },
     { name = "I2s0" },
     { name = "Wdg" },
-    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true, clocks = [
-        { name = "FUNCTION_CLOCK", type = "generic", output = "sclk", params = { sclk = [
-            { name = "APB",      outputs = "APB_CLK", default = true },
-            { name = "REF_TICK", outputs = "REF_TICK" }
-        ] } },
-        { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x100000" } },
-        { name = "MEM_CLOCK", type = "generic", output = "UART_MEM_CLK" },
-    ] },
+    { name = "Uart0", template_params = { peripheral = "uart" }, keep_enabled = true },
     #{ name = "Spi01" },
     #{ name = "Timers" },
     

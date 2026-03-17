@@ -50,11 +50,7 @@ use clocks::LpSlowClkConfig;
 #[cfg(all(not(esp32s2), soc_has_clock_node_rtc_slow_clk))]
 use clocks::RtcSlowClkConfig;
 #[cfg(soc_has_clock_node_timg0_function_clock)]
-use clocks::Timg0FunctionClockConfig;
-#[cfg(any(
-    soc_has_clock_node_timg_calibration_clock,
-    soc_has_clock_node_timg0_calibration_clock
-))]
+use clocks::TimgFunctionClockConfig;
 use esp_rom_sys::rom::ets_delay_us;
 
 /// Low-level clock control
@@ -116,13 +112,11 @@ impl CpuClock {
 #[instability::unstable]
 pub struct RtcClock;
 
-cfg_if::cfg_if! {
-    if #[cfg(soc_has_clock_node_timg_calibration_clock)] {
-        use crate::soc::clocks::TimgCalibrationClockConfig;
-    } else if #[cfg(soc_has_clock_node_timg0_calibration_clock)] {
-        use crate::soc::clocks::Timg0CalibrationClockConfig as TimgCalibrationClockConfig;
-    }
-}
+#[cfg(any(
+    soc_has_clock_node_timg_calibration_clock,
+    soc_has_clock_node_timg0_calibration_clock
+))]
+use crate::soc::clocks::TimgCalibrationClockConfig;
 
 /// RTC Watchdog Timer driver.
 impl RtcClock {
@@ -162,7 +156,7 @@ impl RtcClock {
                 clocks,
                 cal_clk,
                 #[cfg(soc_has_clock_node_timg0_function_clock)]
-                Timg0FunctionClockConfig::XtalClk,
+                TimgFunctionClockConfig::XtalClk,
                 slowclk_cycles,
             );
 
@@ -292,7 +286,7 @@ impl Clocks {
         clocks: &mut ClockTree,
         rtc_clock: TimgCalibrationClockConfig,
         // TODO: verify function clock is used, C6 TRM suggests fixed XTAL_CLK
-        #[cfg(soc_has_clock_node_timg0_function_clock)] function_clock: Timg0FunctionClockConfig,
+        #[cfg(soc_has_clock_node_timg0_function_clock)] function_clock: TimgFunctionClockConfig,
         slow_cycles: u32,
     ) -> (u32, Rate) {
         #[cfg(timergroup_rc_fast_calibration_divider)]
