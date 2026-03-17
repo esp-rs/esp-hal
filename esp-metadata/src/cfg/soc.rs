@@ -602,7 +602,7 @@ impl SystemClocks {
 
                     /// Represents the device's clock tree.
                     pub struct ClockTree {
-                        #(#clock_tree_state_fields: Option<#clock_tree_state_field_types>,)*
+                        #(#clock_tree_state_fields: #clock_tree_state_field_types,)*
                         #(#clock_tree_refcount_fields: u32,)*
                     }
                     impl ClockTree {
@@ -613,7 +613,7 @@ impl SystemClocks {
 
                         #(
                             #[doc = #clock_tree_node_state_getter_doclines]
-                            pub fn #clock_tree_state_fields(&self) -> Option<#clock_tree_state_field_types> {
+                            pub fn #clock_tree_state_fields(&self) -> #clock_tree_state_field_types {
                                 #clock_tree_state_accessors
                             }
                         )*
@@ -1030,7 +1030,8 @@ impl DeviceClocks {
                 has_enable: !(node.always_on()
                     && tree.dependency_graph.inputs(node.name_str()).is_empty()),
                 state_ty: if node.is_configurable() {
-                    Some(node.config_type_name())
+                    let type_name = node.config_type_name();
+                    Some(quote! { Option<#type_name> })
                 } else {
                     None
                 },

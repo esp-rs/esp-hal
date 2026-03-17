@@ -215,7 +215,7 @@ fn topological_sort(dep_graph: &IndexMap<String, Vec<String>>) -> impl Iterator<
 #[derive(Debug)]
 pub(crate) struct ManagementProperties {
     pub name: Ident,
-    pub state_ty: Option<Ident>,
+    pub state_ty: Option<TokenStream>,
     pub refcounted: bool,
     pub has_enable: bool,
 
@@ -229,7 +229,7 @@ impl ManagementProperties {
         self.name.clone()
     }
 
-    pub fn type_name(&self) -> Option<Ident> {
+    pub fn type_name(&self) -> Option<TokenStream> {
         self.state_ty.clone()
     }
 
