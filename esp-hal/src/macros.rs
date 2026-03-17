@@ -176,33 +176,40 @@ macro_rules! any_peripheral {
 
             #[procmacros::doc_replace]
             /// Attempts to downcast the pin into the underlying peripheral instance.
-            ///
-            /// ## Example
-            ///
-            /// ```rust,no_run
-            /// # {before_snippet}
-            /// #
-            /// # use esp_hal::{
-            /// #     uart::AnyUart as AnyPeripheral,
-            /// #     peripherals::{UART0 as PERI0, UART1 as PERI1},
-            /// # };
-            /// #
-            /// # let peri0 = peripherals.UART0;
-            /// # let peri1 = peripherals.UART1;
-            /// // let peri0 = peripherals.PERI0;
-            /// // let peri1 = peripherals.PERI1;
-            /// let any_peri0 = AnyPeripheral::from(peri0);
-            /// let any_peri1 = AnyPeripheral::from(peri1);
-            ///
-            /// let uart0 = any_peri0
-            ///     .downcast::<PERI0>()
-            ///     .expect("This downcast succeeds because AnyPeripheral was created from Peri0");
-            /// let uart0 = any_peri1
-            ///     .downcast::<PERI0>()
-            ///     .expect_err("This AnyPeripheral was created from Peri1, it cannot be downcast to Peri0");
-            /// #
-            /// # {after_snippet}
-            /// ```
+            #[cfg_attr(
+                // Feature-gated so that this doesn't prevent gradual device bringup. Any
+                // stable driver would serve the purpose here, so this block will be part
+                // of the released documentation.
+                uart_driver_supported,
+                doc = r#"
+## Example
+
+```rust,no_run
+# {before_snippet}
+#
+# use esp_hal::{
+#     uart::AnyUart as AnyPeripheral,
+#     peripherals::{UART0 as PERI0, UART1 as PERI1},
+# };
+#
+# let peri0 = peripherals.UART0;
+# let peri1 = peripherals.UART1;
+// let peri0 = peripherals.PERI0;
+// let peri1 = peripherals.PERI1;
+let any_peri0 = AnyPeripheral::from(peri0);
+let any_peri1 = AnyPeripheral::from(peri1);
+
+let uart0 = any_peri0
+    .downcast::<PERI0>()
+    .expect("This downcast succeeds because AnyPeripheral was created from Peri0");
+let uart0 = any_peri1
+    .downcast::<PERI0>()
+    .expect_err("This AnyPeripheral was created from Peri1, it cannot be downcast to Peri0");
+#
+# {after_snippet}
+```
+"#
+            )]
             #[inline]
             pub fn downcast<P>(self) -> Result<P, Self>
             where
@@ -317,52 +324,59 @@ macro_rules! metadata {
 
 #[procmacros::doc_replace]
 /// Extract fields from [`Peripherals`][crate::peripherals::Peripherals] into named groups.
-///
-/// ## Example
-///
-/// ```rust,no_run
-/// # {before_snippet}
-/// #
-/// use esp_hal::assign_resources;
-///
-/// assign_resources! {
-///     Resources<'d> {
-///         display: DisplayResources<'d> {
-///             spi:  SPI2,
-///             sda:  GPIO5,
-///             sclk: GPIO4,
-///             cs:   GPIO3,
-///             dc:   GPIO2,
-///         },
-///         axl: AccelerometerResources<'d> {
-///             i2c: I2C0,
-///             sda: GPIO0,
-///             scl: GPIO1,
-///         },
-///     }
-/// }
-///
-/// # struct Display<'d>(core::marker::PhantomData<&'d ()>);
-/// fn init_display<'d>(r: DisplayResources<'d>) -> Display<'d> {
-///     // use `r.spi`, `r.sda`, `r.sclk`, `r.cs`, `r.dc`
-///     todo!()
-/// }
-///
-/// # struct Accelerometer<'d>(core::marker::PhantomData<&'d ()>);
-/// fn init_accelerometer<'d>(r: AccelerometerResources<'d>) -> Accelerometer<'d> {
-///     // use `r.i2c`, `r.sda`, `r.scl`
-///     todo!()
-/// }
-///
-/// // let peripherals = esp_hal::init(...);
-/// let resources = split_resources!(peripherals);
-///
-/// let display = init_display(resources.display);
-/// let axl = init_accelerometer(resources.axl);
-///
-/// // Other fields (`peripherals.UART0`, ...) of the `peripherals` struct can still be accessed.
-/// # {after_snippet}
-/// ```
+#[cfg_attr(
+    // Feature-gated so that this doesn't prevent gradual device bringup. Any
+    // stable driver would serve the purpose here, so this block will be part
+    // of the released documentation.
+    all(soc_has_spi2, soc_has_i2c0, gpio_driver_supported),
+    doc = r#"
+## Example
+
+```rust,no_run
+# {before_snippet}
+#
+use esp_hal::assign_resources;
+
+assign_resources! {
+    Resources<'d> {
+        display: DisplayResources<'d> {
+            spi:  SPI2,
+            sda:  GPIO5,
+            sclk: GPIO4,
+            cs:   GPIO3,
+            dc:   GPIO2,
+        },
+        axl: AccelerometerResources<'d> {
+            i2c: I2C0,
+            sda: GPIO0,
+            scl: GPIO1,
+        },
+    }
+}
+
+# struct Display<'d>(core::marker::PhantomData<&'d ()>);
+fn init_display<'d>(r: DisplayResources<'d>) -> Display<'d> {
+    // use `r.spi`, `r.sda`, `r.sclk`, `r.cs`, `r.dc`
+    todo!()
+}
+
+# struct Accelerometer<'d>(core::marker::PhantomData<&'d ()>);
+fn init_accelerometer<'d>(r: AccelerometerResources<'d>) -> Accelerometer<'d> {
+    // use `r.i2c`, `r.sda`, `r.scl`
+    todo!()
+}
+
+// let peripherals = esp_hal::init(...);
+let resources = split_resources!(peripherals);
+
+let display = init_display(resources.display);
+let axl = init_accelerometer(resources.axl);
+
+// Other fields (`peripherals.UART0`, ...) of the `peripherals` struct can still be accessed.
+# {after_snippet}
+```
+"#
+)]
 // Based on https://crates.io/crates/assign-resources
 #[macro_export]
 #[cfg(feature = "unstable")]

@@ -1,0 +1,133 @@
+# ESP32-C61 Device Metadata
+#
+# Empty [`device.driver`] tables imply `partial` support status.
+#
+# If you modify a driver support status, run `cargo xtask update-metadata` to
+# update the table in the esp-hal README.
+
+[device]
+name   = "esp32c61"
+arch   = "riscv"
+target = "riscv32imac-unknown-none-elf"
+cores  = 1
+trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c61_technical_reference_manual_en.pdf"
+
+peripherals = [
+    { name = "ASSIST_DEBUG"},
+    { name = "CLINT" },
+    # { name = "CPU_APM" }, # TODO: verify we need it
+    { name = "DMA" },
+    { name = "ECC" },
+    { name = "ECDSA" },
+    { name = "EFUSE" },
+    { name = "ETM", pac = "SOC_ETM" },
+    # { name = "GPIO" },
+    # { name = "GPIO_SD", pac = "GPIO_EXT" },
+    # { name = "HINF" }, # TODO: add PAC manually later
+    { name = "HP_APM" },
+    { name = "HP_SYS" },
+    { name = "I2C_ANA_MST" },
+    { name = "I2C0", interrupts = { peri = "I2C_EXT0" } },
+    { name = "I2S0", interrupts = { peri = "I2S0" } },
+    # { name = "IEEE802154" }, # TODO: add PAC manually later
+    { name = "INTERRUPT_CORE0" },
+    { name = "INTPRI" },
+    { name = "IO_MUX" },
+    # { name = "LEDC" }, # TODO: define later
+    { name = "LP_ANA" },
+    { name = "LP_AON" },
+    { name = "LP_APM" },
+    { name = "LPWR", pac = "LP_CLKRST" },
+    # { name = "LP_GPIO" }, # TODO: add PAC manually later
+    # { name = "LP_I2C0" },
+    { name = "LP_IO_MUX" },
+    { name = "LP_PERI", pac = "LPPERI" },
+    { name = "LP_TEE" },
+    { name = "LP_TIMER" },
+    { name = "LP_WDT" },
+    { name = "MEM_MONITOR" },
+    { name = "MODEM_LPCON" },
+    { name = "MODEM_SYSCON" },
+    # { name = "OTP_DEBUG" },
+    { name = "PAU" },
+    { name = "PCR" },
+    { name = "PMU" },
+    { name = "SHA", interrupts = { peri = "SHA" } },
+    { name = "SLC" },
+    # { name = "SLCHOST" }, TODO: add PAC manually later
+    # { name = "SPI0" },
+    # { name = "SPI1" },
+    # { name = "SPI2", interrupts = { peri = "SPI2" } },
+    { name = "SYSTEM", pac = "PCR" },
+    { name = "SYSTIMER" },
+    { name = "TEE" },
+    { name = "TIMG0" },
+    { name = "TIMG1" },
+    # { name = "TRACE0", pac = "TRACE" },
+    { name = "UART0", interrupts = { peri = "UART0" } },
+    { name = "UART1", interrupts = { peri = "UART1" } },
+    { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
+
+    { name = "BT", virtual = true },
+    { name = "FLASH", virtual = true },
+    # { name = "GPIO_DEDICATED", virtual = true },
+    { name = "LP_CORE", virtual = true },
+    { name = "SW_INTERRUPT", virtual = true },
+    { name = "WIFI", virtual = true },
+]
+
+symbols = [
+    "swd",
+    # ROM capabilities (TODO: verify against esp-idf when implementing)
+    "rom_crc_le",
+    "rom_crc_be",
+    "rom_md5_bsd",
+]
+
+[device.soc]
+cpu_has_csr_pc = true # TODO: VERIFY
+cpu_has_prv_mode = true # TODO
+rc_fast_clk_default = 17_500_000
+
+memory_map = { ranges = [
+    { name = "dram", start = 0x4080_0000, end = 0x4085_0000 },
+    # start address from correct bootloader commit: https://github.com/espressif/esp-idf/blob/d66ebb8/components/bootloader/subproject/main/ld/esp32c61/bootloader.ld#L32
+    { name = "dram2_uninit", start = 0x4083_EA70, end = 0x4084_EA70 },
+] }
+
+clocks = { system_clocks = { clock_tree = [
+    { name = "XTAL_CLK", type = "source", output = "40_000_000", always_on = true },
+    { name = "CPU_CLK", type = "source", output = "1", always_on = true },
+    { name = "APB_CLK", type = "source", output = "1", always_on = true },
+    # { name = "RC_FAST_CLK", type = "source", output = "20_000_000" },
+    # { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", output = "x" },
+
+] }, peripheral_clocks = { templates = [
+    { name = "default_clk_en_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{clk_en_field}}().bit(enable));" },
+    { name = "clk_en_template", value = "{{default_clk_en_template}}" },
+    { name = "rst_template", value = "{{control}}::regs().{{conf_register}}().modify(|_, w| w.{{rst_field}}().bit(reset));" },
+    { name = "control", value = "crate::peripherals::SYSTEM" },
+    { name = "conf_register", value = "{{peripheral}}_conf" },
+    { name = "clk_en_field", value = "{{peripheral}}_clk_en" },
+    { name = "rst_field", value = "{{peripheral}}_rst_en" },
+], peripheral_clocks = [
+    { name = "Timg0", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup0_conf", peripheral = "tg0", peri_clk_template = "{{control}}::regs().timergroup0_timer_clk_conf().modify(|_, w| w.tg0_timer_clk_en().bit(enable));" }, keep_enabled = true, clocks = [] },
+    { name = "Timg1", template_params = { clk_en_template = "{{default_clk_en_template}} {{peri_clk_template}}", conf_register = "timergroup1_conf", peripheral = "tg1", peri_clk_template = "{{control}}::regs().timergroup1_timer_clk_conf().modify(|_, w| w.tg1_timer_clk_en().bit(enable));" }, clocks = "Timg0" },
+
+    { name = "Systimer", template_params = { peripheral = "systimer" }, keep_enabled = true, clocks = [] },
+] } }
+
+
+[device.interrupts]
+support_status = "partial"
+status_registers = 3
+software_interrupt_count = 4
+software_interrupt_delay = 24 # CPU speed dependent
+controller = { Riscv = { flavour = "clic", interrupts = 32, priority_levels = 8 } }
+
+[device.timergroup]
+support_status = "partial"
+instances = [{ name = "timg0" }, { name = "timg1" }]
+timg_has_divcnt_rst = true
+
+[device.systimer]
