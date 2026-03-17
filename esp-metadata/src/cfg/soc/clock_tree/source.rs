@@ -100,7 +100,7 @@ impl ClockTreeNodeType for Source {
         tree: &ProcessedClockData,
     ) -> TokenStream {
         let ty_name = instance.config_type_name();
-        let config_field = tree.properties(instance.name_str()).config_accessor();
+        let config_field = instance.properties.config_accessor();
         let apply_fn_name = instance.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
         let reject_exprs = self.reject.as_ref().map(|reject| {

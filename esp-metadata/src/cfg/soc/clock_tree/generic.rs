@@ -215,7 +215,6 @@ impl ClockTreeNodeType for Generic {
         let num_inputs = self.upstream_clocks().len();
 
         let ty_name = instance.config_type_name();
-        let instance_properties = tree.properties(instance.name_str());
         let apply_fn_name = instance.config_apply_function_name();
         let hal_impl = format_ident!("{apply_fn_name}_impl");
 
@@ -264,7 +263,7 @@ impl ClockTreeNodeType for Generic {
                 quote! {}
             };
 
-            let refcount_field = instance_properties.refcount_field_name();
+            let refcount_field = instance.properties.refcount_field_name();
             if refcount_field.is_some() {
                 quote! {
                     #configures
@@ -301,7 +300,7 @@ impl ClockTreeNodeType for Generic {
             reject.to_rust(variables, instance, tree)
         });
 
-        let config_field = instance_properties.config_accessor();
+        let config_field = instance.properties.config_accessor();
         quote! {
             pub fn #apply_fn_name(clocks: &mut ClockTree, config: #ty_name) {
                 #reject_exprs
@@ -616,7 +615,7 @@ impl ClockTreeNodeType for Generic {
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let config_field = tree.properties(instance.name_str()).config_accessor();
+        let config_field = instance.properties.config_accessor();
         self.impl_request_upstream(instance, tree, quote! { unwrap!(#config_field) })
     }
 
@@ -625,7 +624,7 @@ impl ClockTreeNodeType for Generic {
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let config_field = tree.properties(instance.name_str()).config_accessor();
+        let config_field = instance.properties.config_accessor();
         self.impl_release_upstream(instance, tree, quote! { unwrap!(#config_field) })
     }
 }
