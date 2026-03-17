@@ -3141,7 +3141,7 @@ impl Chip {
                         (
                             "dram2_uninit",
                             MemoryRegion {
-                                address_range: 0x4083BD70..0x4084CA70,
+                                address_range: 0x4083EA70..0x4084EA70,
                             },
                         ),
                     ],

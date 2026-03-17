@@ -87,7 +87,7 @@ This means:
 - `ORIGIN = 0x40800000`
 - `LENGTH = 0x4084E5A0 - 0x40800000 = 0x4E5A0`
 
-To verify correctness, search for the `bootloader_iram_loader_seg_start == assertion`. It should match ORIGIN + LENGTH.
+To verify correctness, search for the `bootloader_iram_loader_seg_start ==` assertion. It should match ORIGIN + LENGTH.
 
 Next, update the `dram2_seg` length formula. You need the value of `SOC_ROM_STACK_START` from ESP-IDF. For C5, this value is `0x4085e5a0`. The final definition becomes:
 ```
@@ -177,6 +177,8 @@ symbols = [
   
 memory_map = { ranges = [
 { name = "dram", start = <FILL_FROM_MEMORY.X>, end = <FILL_FROM_MEMORY.X> },
+# start should be `iram_loader_seg_start` counted from https://github.com/espressif/esp-idf/blob/d66ebb8/components/bootloader/subproject/main/ld/esp32c5/bootloader.ld#L32 or ORIGIN + LENGTH of RAM from memory.x. 
+# End is `SOC_ROM_STACK_START` from `IDF` or lookup for `PRO CPU stack` address range in bootloader.ld.in for the given chip
 { name = "dram2_uninit", start = 0, end = 1 }, # TODO
 ] }
 
