@@ -100,7 +100,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | SYSTIMER                  |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Temperature sensor        | ⚒️   | ⚒️      | ⚒️      | [❌][5153] [^1] | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Timers                    | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| Touch                     | ⚒️   |          |          | [❌][5164] [^1] |          |          | ❌       | ❌       |
+| Touch                     | ⚒️   |          |          | [❌][5164] [^1] |          |          | [❌][1905] [^1] | [❌][1905] [^1] |
 | TWAI / CAN / CANFD        | ⚒️   |          | ⚒️      | [❌][5163] [^1] | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | UART                      | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
 | UHCI                      | ❌    |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ❌       | ⚒️      |
@@ -117,6 +117,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 
 [^1]: This cell is clickable and will open the peripheral's issue on GitHub
 
+[1905]: https://github.com/esp-rs/esp-hal/issues/1905
 [5141]: https://github.com/esp-rs/esp-hal/issues/5141
 [5153]: https://github.com/esp-rs/esp-hal/issues/5153
 [5154]: https://github.com/esp-rs/esp-hal/issues/5154
