@@ -91,6 +91,7 @@ impl From<Level> for bool {
 /// Provides a common implementation for input and output pins.
 pub struct Flex<const PIN: u8> {}
 
+#[allow(clippy::new_without_default)]
 impl<const PIN: u8> Flex<PIN> {
     /// Create flexible pin driver for a [Pin].
     /// No mode change happens.
@@ -153,6 +154,7 @@ pub struct Input<const PIN: u8> {
     pin: Flex<PIN>,
 }
 
+#[allow(clippy::new_without_default)]
 impl<const PIN: u8> Input<PIN> {
     /// Creates a new GPIO input.
     pub const fn new() -> Self {
@@ -171,6 +173,7 @@ pub struct Output<const PIN: u8> {
     pin: Flex<PIN>,
 }
 
+#[allow(clippy::new_without_default)]
 impl<const PIN: u8> Output<PIN> {
     /// Creates a new GPIO output.
     pub const fn new() -> Self {
@@ -198,6 +201,7 @@ pub struct OutputOpenDrain<const PIN: u8> {
     pin: Flex<PIN>,
 }
 
+#[allow(clippy::new_without_default)]
 impl<const PIN: u8> OutputOpenDrain<PIN> {
     /// Creates a new GPIO output.
     pub const fn new() -> Self {
