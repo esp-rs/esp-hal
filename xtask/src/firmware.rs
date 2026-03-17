@@ -187,6 +187,8 @@ fn parse_meta_line(line: &str) -> anyhow::Result<MetaLine> {
 pub fn load(path: &Path) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
 
+    println!("Loading examples from {}", path.display());
+
     for entry in fs::read_dir(path).context("Failed to read {path}")? {
         let entry = entry?;
         if !entry.file_type()?.is_file() {
