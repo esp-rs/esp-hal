@@ -182,33 +182,33 @@ macro_rules! any_peripheral {
                 // of the released documentation.
                 uart_driver_supported,
                 doc = r#"
-            ## Example
+## Example
 
-            ```rust,no_run
-            # {before_snippet}
-            #
-            # use esp_hal::{
-            #     uart::AnyUart as AnyPeripheral,
-            #     peripherals::{UART0 as PERI0, UART1 as PERI1},
-            # };
-            #
-            # let peri0 = peripherals.UART0;
-            # let peri1 = peripherals.UART1;
-            // let peri0 = peripherals.PERI0;
-            // let peri1 = peripherals.PERI1;
-            let any_peri0 = AnyPeripheral::from(peri0);
-            let any_peri1 = AnyPeripheral::from(peri1);
+```rust,no_run
+# {before_snippet}
+#
+# use esp_hal::{
+#     uart::AnyUart as AnyPeripheral,
+#     peripherals::{UART0 as PERI0, UART1 as PERI1},
+# };
+#
+# let peri0 = peripherals.UART0;
+# let peri1 = peripherals.UART1;
+// let peri0 = peripherals.PERI0;
+// let peri1 = peripherals.PERI1;
+let any_peri0 = AnyPeripheral::from(peri0);
+let any_peri1 = AnyPeripheral::from(peri1);
 
-            let uart0 = any_peri0
-                .downcast::<PERI0>()
-                .expect("This downcast succeeds because AnyPeripheral was created from Peri0");
-            let uart0 = any_peri1
-                .downcast::<PERI0>()
-                .expect_err("This AnyPeripheral was created from Peri1, it cannot be downcast to Peri0");
-            #
-            # {after_snippet}
-            ```
-            "#
+let uart0 = any_peri0
+    .downcast::<PERI0>()
+    .expect("This downcast succeeds because AnyPeripheral was created from Peri0");
+let uart0 = any_peri1
+    .downcast::<PERI0>()
+    .expect_err("This AnyPeripheral was created from Peri1, it cannot be downcast to Peri0");
+#
+# {after_snippet}
+```
+"#
             )]
             #[inline]
             pub fn downcast<P>(self) -> Result<P, Self>
