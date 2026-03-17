@@ -100,16 +100,6 @@ impl<const PIN: u8> Flex<PIN> {
 
     // Input functions
 
-    /// Get whether the pin input level is high.
-    pub fn is_high(&self) -> bool {
-        self.level() == Level::High
-    }
-
-    /// Get whether the pin input level is low.
-    pub fn is_low(&self) -> bool {
-        self.level() == Level::Low
-    }
-
     /// Get the current pin input level.
     pub fn level(&self) -> Level {
         cfg_if::cfg_if! {
@@ -125,16 +115,6 @@ impl<const PIN: u8> Flex<PIN> {
 
     // Output functions
 
-    /// Set the output as high.
-    pub fn set_high(&mut self) {
-        self.set_level(Level::High)
-    }
-
-    /// Set the output as low.
-    pub fn set_low(&mut self) {
-        self.set_level(Level::Low)
-    }
-
     /// Set the output level.
     pub fn set_level(&mut self, level: Level) {
         if level == Level::High {
@@ -146,16 +126,6 @@ impl<const PIN: u8> Flex<PIN> {
                 .out_w1tc()
                 .write(|w| unsafe { w.out_data_w1tc().bits(1 << PIN) });
         }
-    }
-
-    /// Is the output pin set as high?
-    pub fn is_set_high(&self) -> bool {
-        self.output_level() == Level::High
-    }
-
-    /// Is the output pin set as low?
-    pub fn is_set_low(&self) -> bool {
-        self.output_level() == Level::Low
     }
 
     /// What level output is set to
@@ -190,16 +160,6 @@ impl<const PIN: u8> Input<PIN> {
         Self { pin }
     }
 
-    /// Get whether the pin input level is high.
-    pub fn is_high(&self) -> bool {
-        self.level() == Level::High
-    }
-
-    /// Get whether the pin input level is low.
-    pub fn is_low(&self) -> bool {
-        self.level() == Level::Low
-    }
-
     /// Get the current pin input level.
     pub fn level(&self) -> Level {
         self.pin.level()
@@ -218,25 +178,9 @@ impl<const PIN: u8> Output<PIN> {
         Self { pin }
     }
 
-    /// Set the output as high.
-    pub fn set_high(&mut self) {
-        self.set_level(Level::High)
-    }
-    /// Set the output as low.
-    pub fn set_low(&mut self) {
-        self.set_level(Level::Low)
-    }
     /// Set the output level.
     pub fn set_level(&mut self, level: Level) {
         self.pin.set_level(level);
-    }
-    /// Returns whether the pin is set to a high level.
-    pub fn is_set_high(&self) -> bool {
-        self.output_level() == Level::High
-    }
-    /// Returns whether the pin is set to a low level.
-    pub fn is_set_low(&self) -> bool {
-        self.output_level() == Level::Low
     }
     /// Returns which level the pin is set to.
     pub fn output_level(&self) -> Level {
@@ -260,41 +204,13 @@ impl<const PIN: u8> OutputOpenDrain<PIN> {
         let pin = Flex::<PIN>::new();
         Self { pin }
     }
-
-    /// Get whether the pin input level is high.
-    pub fn is_high(&self) -> bool {
-        self.level() == Level::High
-    }
-
-    /// Get whether the pin input level is low.
-    pub fn is_low(&self) -> bool {
-        self.level() == Level::Low
-    }
-
     /// Get the current pin input level.
     pub fn level(&self) -> Level {
         self.pin.level()
     }
-
-    /// Set the output as high.
-    pub fn set_high(&mut self) {
-        self.set_level(Level::High)
-    }
-    /// Set the output as low.
-    pub fn set_low(&mut self) {
-        self.set_level(Level::Low)
-    }
     /// Set the output level.
     pub fn set_level(&mut self, level: Level) {
         self.pin.set_level(level);
-    }
-    /// Returns whether the pin is set to a high level.
-    pub fn is_set_high(&self) -> bool {
-        self.output_level() == Level::High
-    }
-    /// Returns whether the pin is set to a low level.
-    pub fn is_set_low(&self) -> bool {
-        self.output_level() == Level::Low
     }
     /// Returns which level the pin is set to.
     pub fn output_level(&self) -> Level {
