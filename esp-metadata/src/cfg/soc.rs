@@ -288,7 +288,6 @@ impl ClockTreeNodeInstance {
 
         let request_fn_name = self.request_fn_name();
         let release_fn_name = self.release_fn_name();
-        let refcount_name = self.properties.refcount_field_name();
         let enable_fn_name = self.enable_fn_name();
         let enable_fn_impl_name = format_ident!("{}_impl", enable_fn_name);
         let always_on = self.properties.always_on();
@@ -315,6 +314,7 @@ impl ClockTreeNodeInstance {
         let request_trace = format!("Requesting {}", self.name_str());
         let release_trace = format!("Releasing {}", self.name_str());
 
+        let refcount_accessor = self.properties.refcount_accessor();
         ClockNodeFunctions {
             request: Function {
                 _name: request_fn_name.to_string(),
@@ -322,11 +322,11 @@ impl ClockTreeNodeInstance {
                     quote! {
                         fn #request_fn_name(_clocks: &mut ClockTree) { }
                     }
-                } else if refcount_name.is_some() {
+                } else if let Some(refcount_accessor) = &refcount_accessor {
                     quote! {
                         pub fn #request_fn_name(clocks: &mut ClockTree) {
                             trace!(#request_trace);
-                            if increment_reference_count(&mut clocks.#refcount_name) {
+                            if increment_reference_count(&mut #refcount_accessor) {
                                 trace!(#enable_trace);
                                 #request_direct_dependencies
                                 #enable_fn_impl_name(clocks, true);
@@ -357,11 +357,11 @@ impl ClockTreeNodeInstance {
                     quote! {
                         fn #release_fn_name(_clocks: &mut ClockTree) { }
                     }
-                } else if refcount_name.is_some() {
+                } else if let Some(refcount_accessor) = &refcount_accessor {
                     quote! {
                         pub fn #release_fn_name(clocks: &mut ClockTree) {
                             trace!(#release_trace);
-                            if decrement_reference_count(&mut clocks.#refcount_name) {
+                            if decrement_reference_count(&mut #refcount_accessor) {
                                 trace!(#disable_trace);
                                 #enable_fn_impl_name(clocks, false);
                                 #release_direct_dependencies
@@ -424,7 +424,7 @@ impl ClockTreeNodeInstance {
             },
 
             hal_functions: vec![
-                if !always_on && (refcount_name.is_some() || self.properties.has_enable()) {
+                if !always_on && (refcount_accessor.is_some() || self.properties.has_enable()) {
                     quote! {
                         fn #enable_fn_impl_name(_clocks: &mut ClockTree, _en: bool) {
                             todo!()
@@ -520,7 +520,7 @@ impl SystemClocks {
                     clock_item.name_str(),
                 ));
             }
-            if let Some(refcount_field) = clock_item.properties.refcount_field_name() {
+            if let Some(refcount_field) = clock_item.properties.refcount_field() {
                 clock_tree_refcount_fields.push(refcount_field);
             }
 

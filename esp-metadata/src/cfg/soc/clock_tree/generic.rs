@@ -263,11 +263,10 @@ impl ClockTreeNodeType for Generic {
                 quote! {}
             };
 
-            let refcount_field = instance.properties.refcount_field_name();
-            if refcount_field.is_some() {
+            if let Some(refcount_accessor) = instance.properties.refcount_accessor() {
                 quote! {
                     #configures
-                    if clocks.#refcount_field > 0 {
+                    if #refcount_accessor > 0 {
                         #request_upstream
                         #hal_impl(clocks, old_config, config);
                         if let Some(old_config) = old_config {

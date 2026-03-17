@@ -233,12 +233,16 @@ impl ManagementProperties {
         self.state_ty.clone()
     }
 
-    pub fn refcount_field_name(&self) -> Option<Ident> {
+    pub fn refcount_field(&self) -> Option<Ident> {
         if self.refcounted {
             Some(format_ident!("{}_refcount", self.name))
         } else {
             None
         }
+    }
+
+    pub fn refcount_accessor(&self) -> Option<TokenStream> {
+        self.refcount_field().map(|field| quote! { clocks.#field })
     }
 
     pub fn has_enable(&self) -> bool {

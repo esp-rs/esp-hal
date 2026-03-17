@@ -248,7 +248,6 @@ impl Multiplexer {
         let apply_fn_name = instance.config_apply_function_name();
         let hal_impl = format_ident!("{}_impl", apply_fn_name);
         let config_field = instance.properties.config_accessor();
-        let refcount_field = instance.properties.refcount_field_name();
 
         let request_upstream = self.impl_request_upstream(instance, tree, quote! { new_selector });
         let release_upstream = self.impl_release_upstream(instance, tree, quote! { old_selector });
@@ -300,9 +299,9 @@ impl Multiplexer {
                 #release_upstream
             }
         };
-        let apply_impl = if refcount_field.is_some() {
+        let apply_impl = if let Some(refcount_accessor) = instance.properties.refcount_accessor() {
             quote! {
-                if clocks.#refcount_field > 0 {
+                if #refcount_accessor > 0 {
                     #apply_and_switch_input
                 } else {
                     #hal_impl(clocks, old_selector, new_selector);
