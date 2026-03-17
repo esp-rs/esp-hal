@@ -103,6 +103,10 @@ pub struct Generic {
 }
 
 impl ClockTreeNodeType for Generic {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
     fn input_clocks(
         &self,
         instance: &ClockTreeNodeInstance,
@@ -738,10 +742,13 @@ impl Generic {
         }
 
         // Enum parameter
-        let enum_name_prefix = instance
-            .template_name
-            .from_case(Case::Constant)
-            .to_case(Case::Pascal);
+        let enum_name_prefix = if instance.group_template.is_empty() {
+            self.name.clone()
+        } else {
+            format!("{}_{}", instance.group_template, self.name)
+        }
+        .from_case(Case::Constant)
+        .to_case(Case::Pascal);
         let enum_param_name = param_name.from_case(Case::Snake).to_case(Case::Pascal);
         format_ident!("{enum_name_prefix}{enum_param_name}")
     }

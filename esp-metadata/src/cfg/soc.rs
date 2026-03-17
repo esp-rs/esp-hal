@@ -147,26 +147,22 @@ pub(crate) struct ClockTreeNodeInstance {
     node: Box<dyn ClockTreeNodeType>,
 
     include_in_global_config: bool,
-    is_first_instance: bool,
     force_configurable: bool,
 
     /// Name of the instantiated clock tree node.
     ///
-    /// Must be in CONSTANT_CASE, e.g. FUNCTION_CLOCK.
+    /// Must be in CONSTANT_CASE, e.g. UART0_FUNCTION_CLOCK.
     name: String,
 
     /// Name of the group (e.g. peripheral) this tree node belongs to.
     ///
     /// Must be in CONSTANT_CASE, e.g. UART0.
-    group: String,
+    group_instance: String,
 
-    /// Name of the template used to instantiate this clock tree node.
+    /// Name of the template group used to instantiate this clock tree node.
     ///
-    /// Must be in CONSTANT_CASE, e.g. UART0_FUNCTION_CLOCK.
-    // TODO: we should have methods to modify names in implementation code
-    // (e.g. to make them able to first refer to a peripheral-local clock node, then fall back to a
-    // system node) - fn resolve_clock_node(&self, tree: &ProcessedClockData, name: &str) -> &str
-    template_name: String,
+    /// Must be in CONSTANT_CASE, e.g. UART.
+    group_template: String,
 }
 
 impl ClockTreeNodeInstance {
@@ -185,11 +181,8 @@ impl ClockTreeNodeInstance {
         self.node.is_configurable() || self.force_configurable
     }
 
-    fn config_type(&self) -> Option<TokenStream> {
-        if !self.is_first_instance || !self.is_configurable() {
-            return None;
-        }
-        Some(self.node.config_type(self))
+    fn config_type(&self) -> TokenStream {
+        self.node.config_type(self)
     }
 
     fn config_documentation(&self) -> Option<String> {
@@ -211,11 +204,14 @@ impl ClockTreeNodeInstance {
     /// Returns the name of the clock configuration type. The corresponding field in the
     /// `ClockConfig` struct will have this type.
     fn config_type_name(&self) -> Ident {
-        let item = self
-            .template_name
-            .from_case(Case::Constant)
-            .to_case(Case::Pascal);
-        quote::format_ident!("{}Config", item)
+        let type_name = if self.group_template.is_empty() {
+            self.node.name().to_string()
+        } else {
+            format!("{}_{}", self.group_template, self.node.name())
+        }
+        .from_case(Case::Constant)
+        .to_case(Case::Pascal);
+        quote::format_ident!("{type_name}Config")
     }
 
     fn apply_configuration(
@@ -462,7 +458,7 @@ impl ClockTreeNodeInstance {
         tree: &'tree ProcessedClockData,
         clock: &str,
     ) -> &'tree ClockTreeNodeInstance {
-        let local_node = format!("{}_{}", self.group, clock);
+        let local_node = format!("{}_{}", self.group_instance, clock);
         if let Some(node) = tree.try_get_node(&local_node) {
             node
         } else {
@@ -509,10 +505,18 @@ impl SystemClocks {
         let mut configurables = vec![];
         let mut system_config_steps = HashMap::new();
         let mut provided_function_doclines = vec![];
+
+        let mut first_instances = HashSet::new();
+
         for clock_item in tree.clock_tree.iter() {
             // Generate code for all clock tree nodes
-            if let Some(config_type) = clock_item.config_type() {
-                clock_tree_node_defs.push(config_type);
+            let is_first_instance = first_instances.insert(format!(
+                "{}_{}",
+                clock_item.group_template,
+                clock_item.node.name()
+            ));
+            if is_first_instance && clock_item.is_configurable() {
+                clock_tree_node_defs.push(clock_item.config_type());
             }
             let node_state = tree.properties(clock_item.name_str());
             if let Some(type_name) = node_state.type_name() {
@@ -902,22 +906,15 @@ impl DeviceClocks {
                 let node = ClockTreeNodeInstance {
                     node: node.boxed(),
                     include_in_global_config: true,
-                    is_first_instance: true,
                     force_configurable: false,
                     name: node.name().to_string(),
-                    group: String::new(),
-                    template_name: node.name().to_string(),
+                    group_instance: String::new(),
+                    group_template: String::new(),
                 };
 
                 (node_name.to_string(), RefCell::new(node))
             })
             .collect::<IndexMap<_, _>>();
-
-        // Merge peripheral clock sources into the clock tree
-        let mut peri_clocks = self.peripheral_clocks.peripheral_clocks.clone();
-        peri_clocks.sort_by(|a, b| a.name.cmp(&b.name));
-
-        let mut first_instances = HashSet::new();
 
         for peri in config.peripherals.iter() {
             let Some(group_name) = peri.clock_group.as_ref() else {
@@ -926,7 +923,7 @@ impl DeviceClocks {
             };
 
             // Instantiate template group
-            let is_first_instance = first_instances.insert(group_name.clone());
+            let peri_name = peri.name.from_case(Case::Ada).to_case(Case::Constant);
 
             // A peripheral can have any number of clock sources. We'll turn them into clock tree
             // nodes here.
@@ -939,17 +936,15 @@ impl DeviceClocks {
                 .clocks
                 .iter()
             {
-                let peri_name = peri.name.from_case(Case::Ada).to_case(Case::Constant);
                 let node = ClockTreeNodeInstance {
                     node: def.boxed(),
                     include_in_global_config: false,
-                    is_first_instance,
                     // FIXME peripherals force configurability because we don't have a way to
                     // cfg them out. Decide if we can do better.
                     force_configurable: true,
                     name: format!("{peri_name}_{}", def.name()),
-                    group: peri_name.clone(),
-                    template_name: format!("{group_name}_{}", def.name()),
+                    group_instance: peri_name.clone(),
+                    group_template: group_name.clone(),
                 };
 
                 clock_tree.insert(node.name.clone(), RefCell::new(node));
@@ -1023,7 +1018,7 @@ impl DeviceClocks {
 
             // Peripheral nodes are always refcounted, because we can't assume which node is
             // referred to by the drivers.
-            let is_peripheral_node = !node.group.is_empty();
+            let is_peripheral_node = !node.group_instance.is_empty();
             let refcounted = is_peripheral_node || !(node.always_on() || has_one_direct_dependent);
 
             let properties = ManagementProperties {

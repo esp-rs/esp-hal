@@ -110,7 +110,7 @@ impl<'c> ValidationContext<'c> {
     }
 
     fn clock(&self, instance: &ClockTreeNodeInstance, clk: &str) -> Option<&ClockTreeNodeInstance> {
-        let local_clk = format!("{}_{}", instance.group, clk);
+        let local_clk = format!("{}_{}", instance.group_instance, clk);
         self.tree
             .iter()
             .cloned()
@@ -252,6 +252,8 @@ impl ManagementProperties {
 
 /// Common interface for clock node types.
 pub(crate) trait ClockTreeNodeType: Any {
+    fn name(&self) -> &str;
+
     /// Returns which clock nodes' configurations are affected when this node is configured.
     // TODO: pass instance to apply template naming scheme to returned clocks
     // (e.g. FUNCTION_CLOCK -> UART0_FUNCTION_CLOCK)
