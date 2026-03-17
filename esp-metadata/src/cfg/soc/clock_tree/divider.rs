@@ -258,7 +258,6 @@ impl ClockTreeNodeType for Divider {
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let state = tree.properties(instance.name_str()).field_name();
         let parent_clock = self.source_clock(); // TODO get from node?
         let parent_frequency_fn = instance
             .resolve_node(tree, parent_clock)
@@ -266,7 +265,7 @@ impl ClockTreeNodeType for Divider {
 
         let params = self.params.keys().map(|var| {
             let param_fn = format_ident!("{}", var);
-            (var, quote! { unwrap!(clocks.#state).#param_fn() })
+            (var, quote! { config.#param_fn() })
         });
 
         let mut variables = HashMap::new();

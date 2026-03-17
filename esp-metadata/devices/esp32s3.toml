@@ -836,7 +836,7 @@ ram_size = 128
 support_status = "partial"
 
 [device.touch]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 1905 }
 
 [device.ds]
 support_status = "not_supported"

@@ -3006,6 +3006,7 @@ pub struct Info {
     pub release_uart_clks: fn(&mut ClockTree),
     pub configure_sclk: fn(&mut ClockTree, ClockSource),
     pub sclk_frequency: fn(&mut ClockTree) -> u32,
+    pub sclk_config_frequency: fn(&mut ClockTree, ClockSource) -> u32,
 }
 
 /// Peripheral state for a UART instance.
@@ -3337,9 +3338,10 @@ impl Info {
 
     fn change_baud(&self, config: &Config) -> Result<(), ConfigError> {
         ClockTree::with(|clocks| {
-            (self.configure_sclk)(clocks, config.clock_source);
-            let clk = (self.sclk_frequency)(clocks);
+            let clk = (self.sclk_config_frequency)(clocks, config.clock_source);
 
+            // TODO: this block should only prepare the new clock config, and it should
+            // be applied only after validating the resulting baud rate.
             cfg_if::cfg_if! {
                 if #[cfg(any(esp32, esp32s2))] {
                     self.regs().conf0().modify(|_, w| {
@@ -3374,7 +3376,7 @@ impl Info {
                     conf.modify(|_, w| unsafe {
                         w.sclk_div_a().bits(0);
                         w.sclk_div_b().bits(0);
-                        w.sclk_div_num().bits(clk_div as u8 - 1)
+                        w.sclk_div_num().bits(clk_div as u8 - 1) // TODO: remember the -1
                     });
 
                     let divider = (clk << 4) / (config.baudrate * clk_div);
@@ -3384,6 +3386,7 @@ impl Info {
             let divider_integer = divider >> 4;
             let divider_frag = (divider & 0xf) as u8;
 
+            (self.configure_sclk)(clocks, config.clock_source);
             self.regs().clkdiv().write(|w| unsafe {
                 w.clkdiv().bits(divider_integer as _);
                 w.frag().bits(divider_frag)
@@ -3788,6 +3791,7 @@ for_each_uart! {
                     release_uart_clks,
                     configure_sclk: paste::paste!(clocks:: [< configure_ $inst:lower _function_clock >]),
                     sclk_frequency: paste::paste!(clocks:: [< $inst:lower _function_clock_frequency >]),
+                    sclk_config_frequency: paste::paste!(clocks:: [< $inst:lower _function_clock_config_frequency >]),
                 };
                 (&PERIPHERAL, &STATE)
             }

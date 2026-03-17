@@ -120,10 +120,8 @@ impl ClockTreeNodeType for Source {
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
-        let state_field = tree.properties(instance.name_str()).field_name();
-
         if self.values.is_some() {
-            quote! { unwrap!(clocks.#state_field).value() }
+            quote! { config.value() }
         } else {
             self.output.0.to_rust(HashMap::new(), instance, tree)
         }
