@@ -3145,10 +3145,10 @@ macro_rules! memory_range {
         "393216"
     };
     ("DRAM2_UNINIT") => {
-        0x4085A5A0..0x4085E5A0
+        0x4084BBA0..0x4085C5A0
     };
     (size as str, "DRAM2_UNINIT") => {
-        "16384"
+        "68096"
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the I2C master driver.

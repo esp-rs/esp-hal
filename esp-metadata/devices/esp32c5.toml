@@ -136,8 +136,8 @@ rc_fast_clk_default = 17_500_000
 
 memory_map = { ranges = [
     { name = "dram", start = 0x4080_0000, end = 0x4086_0000 },
-    # start address from correct bootloader commit: https://github.com/espressif/esp-idf/blob/d66ebb8/components/bootloader/subproject/main/ld/esp32c5/bootloader.ld#L30
-    { name = "dram2_uninit", start = 0x4085_A5A0, end = 0x4085_E5A0 },
+    # start address from correct bootloader commit: https://github.com/espressif/esp-idf/blob/d66ebb8/components/bootloader/subproject/main/ld/esp32c5/bootloader.ld#L33
+    { name = "dram2_uninit", start = 0x4084_BBA0, end = 0x4085_C5A0 },
 ] }
 
 clocks = { system_clocks = { clock_tree = [
