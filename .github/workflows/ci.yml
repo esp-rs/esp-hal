@@ -61,7 +61,7 @@ jobs:
       matrix:
         # load-blance runners a bit
         group:
-          - xtensa
+          - xtensa-riscvimc
           - riscv
 
     steps:
@@ -75,13 +75,13 @@ jobs:
 
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
-        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa-riscvimc'
         with:
           version: 1.93.0.0
 
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
-        if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
+        if: env.SKIP_CI != 'true'
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
@@ -94,22 +94,22 @@ jobs:
               cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
           fi
 
-      - name: Build and Check Xtensa
-        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa'
+      - name: Build and Check Xtensa and Risc-V (esp32c2/c3)
+        if: env.SKIP_CI != 'true' && matrix.group == 'xtensa-riscvimc'
         shell: bash
         run: |
           # lints and docs are checked separately
           cargo xcheck ci esp32 --toolchain esp --no-lint --no-docs
           cargo xcheck ci esp32s2 --toolchain esp --no-lint --no-docs
           cargo xcheck ci esp32s3 --toolchain esp --no-lint --no-docs
+          cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
 
       - name: Build and Check RISC-V
         if: env.SKIP_CI != 'true' && matrix.group == 'riscv'
         shell: bash
         run: |
           # lints and docs are checked separately
-          cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32c5 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs
           cargo xcheck ci esp32c61 --toolchain stable --no-lint --no-docs
